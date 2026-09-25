@@ -1,5 +1,8 @@
+import type { UserHub } from "./hub/user-hub";
+
 export interface Env {
   DB: D1Database;
+  USER_HUB: DurableObjectNamespace<UserHub>;
   LOGIN_IP_LIMITER: RateLimit;
   LOGIN_EMAIL_LIMITER: RateLimit;
   REGISTER_IP_LIMITER: RateLimit;

@@ -5,6 +5,7 @@ import type { Env } from "./env";
 import { ApiError, errorBody, Errors } from "./http/errors";
 import { logMeta } from "./log";
 import { authRoutes } from "./routes/auth";
+import { webSocketRoute } from "./routes/ws";
 
 export interface AppDeps {
   /** Tests inject fakes; production uses the Workers rate limiting bindings. */
@@ -40,6 +41,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   );
 
   app.route("/v1/auth", authRoutes);
+  app.get("/v1/ws", webSocketRoute);
 
   app.notFound((c) => {
     const e = Errors.notFound();

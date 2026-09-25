@@ -6,10 +6,13 @@
   // otherwise `npm test` fails with "This Worker requires compatibility date ...".
   "compatibility_date": "2026-08-15",
   "observability": { "enabled": true },
+  // Inherited by every environment. SQLite-backed class (required for new Durable Objects).
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserHub"] }],
 
   // ---- Top level = local development only (`npm run dev`, `npm test`). Never deployed. ----
   "workers_dev": false,
   "dev": { "ip": "127.0.0.1", "port": 8787 },
+  "durable_objects": { "bindings": [{ "name": "USER_HUB", "class_name": "UserHub" }] },
   "d1_databases": [
     {
       "binding": "DB",
@@ -37,6 +40,7 @@
     "staging": {
       "workers_dev": false,
       "routes": [{ "pattern": "relay-staging.shellx.pro", "custom_domain": true }],
+      "durable_objects": { "bindings": [{ "name": "USER_HUB", "class_name": "UserHub" }] },
       // database_id is added by the runbook (relay/README.md) after `wrangler d1 create shellx-staging`.
       "d1_databases": [{ "binding": "DB", "database_name": "shellx-staging", "migrations_dir": "migrations" }],
       "ratelimits": [
@@ -56,6 +60,7 @@
     "production": {
       "workers_dev": false,
       "routes": [{ "pattern": "relay.shellx.pro", "custom_domain": true }],
+      "durable_objects": { "bindings": [{ "name": "USER_HUB", "class_name": "UserHub" }] },
       // database_id is added by the runbook (relay/README.md) after `wrangler d1 create shellx-production`.
       "d1_databases": [{ "binding": "DB", "database_name": "shellx-production", "migrations_dir": "migrations" }],
       "ratelimits": [
