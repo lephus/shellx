@@ -2,7 +2,7 @@ import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
-import { choosePasswordSource, confirmationMatches, needsConfirmation } from "../scripts/reset-cli";
+import { choosePasswordSource, confirmationMatches, needsConfirmation, wranglerFailureMessage } from "../scripts/reset-cli";
 import { createLinePrompter } from "../scripts/line-prompter";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
@@ -201,5 +201,38 @@ describe("createLinePrompter", () => {
   it("close() is a no-op for line prompter", () => {
     const prompter = createLinePrompter("answer\n", () => {});
     expect(() => prompter.close()).not.toThrow();
+  });
+});
+
+describe("wranglerFailureMessage", () => {
+  // Shaped like the error execFileSync throws: its message is "Command failed: <argv>", and the argv
+  // carries the reset SQL (e-mail address + argon2 hash).
+  const sql = "UPDATE users SET password_hash = '$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA' WHERE email = 'user@example.com';";
+  const execError = (extra: Record<string, unknown>) =>
+    Object.assign(new Error(`Command failed: node wrangler.js d1 execute DB --local --json --command ${sql}`), {
+      stdout: "",
+      stderr: "",
+      ...extra,
+    });
+
+  it("reports only the exit status, never the argv/SQL", () => {
+    const message = wranglerFailureMessage(execError({ status: 1, signal: null }));
+    expect(message).toBe("wrangler d1 execute failed (exit 1)");
+    expect(message).not.toContain("user@example.com");
+    expect(message).not.toContain("argon2id");
+  });
+
+  it("reports a terminating signal", () => {
+    expect(wranglerFailureMessage(execError({ status: null, signal: "SIGTERM" }))).toBe("wrangler d1 execute failed (SIGTERM)");
+  });
+
+  it("reports a spawn error code", () => {
+    expect(wranglerFailureMessage(execError({ code: "ENOENT" }))).toBe("wrangler d1 execute failed (ENOENT)");
+  });
+
+  it("falls back to a generic line for anything else", () => {
+    expect(wranglerFailureMessage(execError({}))).toBe("wrangler d1 execute failed");
+    expect(wranglerFailureMessage("boom user@example.com")).toBe("wrangler d1 execute failed");
+    expect(wranglerFailureMessage(null)).toBe("wrangler d1 execute failed");
   });
 });

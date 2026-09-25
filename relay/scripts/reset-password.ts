@@ -17,7 +17,7 @@ import { isValidEmail, normalizeEmail } from "../src/auth/email";
 import { isAcceptablePassword } from "../src/auth/password-policy";
 import { base64UrlEncode } from "../src/auth/tokens";
 import { accountExistsFromWranglerJson, buildResetSql } from "./reset-sql";
-import { choosePasswordSource, confirmationMatches, needsConfirmation } from "./reset-cli";
+import { choosePasswordSource, confirmationMatches, needsConfirmation, wranglerFailureMessage } from "./reset-cli";
 import { createPrompter } from "./prompter";
 
 const { values } = parseArgs({
@@ -92,10 +92,16 @@ try {
   // Execute via wrangler d1
   const wrangler = join(dirname(require.resolve("wrangler/package.json")), "bin", "wrangler.js");
   const where = target === "local" ? ["--local"] : ["--env", target, "--remote"];
-  const output = execFileSync(process.execPath, [wrangler, "d1", "execute", "DB", ...where, "--json", "--command", sql], {
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", "inherit"],
-  });
+  let output: string;
+  try {
+    output = execFileSync(process.execPath, [wrangler, "d1", "execute", "DB", ...where, "--json", "--command", sql], {
+      encoding: "utf8",
+      stdio: ["inherit", "pipe", "inherit"],
+    });
+  } catch (err) {
+    // The error's message embeds the argv (SQL with e-mail + hash): report the exit status only.
+    throw new Error(wranglerFailureMessage(err));
+  }
 
   // Use pure function to check if account exists
   if (!accountExistsFromWranglerJson(output)) {
