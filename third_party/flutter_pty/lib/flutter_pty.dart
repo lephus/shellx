@@ -42,8 +42,8 @@ final _ptyKill = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
 final _ptyJobError = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
     int Function(Pointer<PtyHandle>)>('pty_job_error');
 
-final _ptyDebugFail = _dylib.lookupFunction<Void Function(Int),
-    void Function(int)>('pty_debug_fail');
+final _ptyDebugFail = _dylib
+    .lookupFunction<Void Function(Int), void Function(int)>('pty_debug_fail');
 
 final _init = () {
   return _bindings.Dart_InitializeApiDL(NativeApi.initializeApiDLData);
@@ -275,7 +275,10 @@ class Pty {
   /// ignored); without a job (see [jobError]) it terminates the process only.
   /// It returns false without signalling once the process has exited, on
   /// both platforms: POSIX, its pid may have been reused; Windows, what the
-  /// process left behind is not killed, as on POSIX.
+  /// process left behind in a console of its own is not killed, as on
+  /// POSIX (what was still attached to its pseudo console ended with it:
+  /// the pseudo console is closed when the process exits, which terminates
+  /// the console's remaining clients).
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
     if (_exited || _released) return false;
     if (Platform.isWindows) {

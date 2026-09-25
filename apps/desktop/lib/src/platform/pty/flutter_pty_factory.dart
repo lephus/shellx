@@ -231,8 +231,11 @@ final class FlutterPtyFactory implements PtyFactory {
 /// a killer, the plugin's job-object kill (Windows). Once the shell has
 /// exited it is a no-op on both (overview §5.6 Pty contract): the pid may
 /// already belong to another process, and what the shell left behind is
-/// not killed (on Windows only what is still attached to the closed pseudo
-/// console ends with it). Kill failures never throw: they go to
+/// not killed. (On Windows, what was still attached to the shell's pseudo
+/// console has ended anyway: the plugin closes the pseudo console when the
+/// shell exits, and ClosePseudoConsole terminates the console's remaining
+/// clients; what runs in a console of its own keeps running.) Kill failures
+/// never throw: they go to
 /// [onError] as `kill of pid <pid> failed: <reason>` — never output,
 /// arguments or environment — and to [onProblem] as the pid alone (what the
 /// user is shown). Each tree kill (a Future that never fails) is

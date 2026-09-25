@@ -719,8 +719,11 @@ FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle)
     {
         if (!handle->killed)
         {
-            // The process exited on its own: what it left behind keeps
-            // running, as on POSIX, instead of KILL_ON_JOB_CLOSE ending it.
+            // The process exited on its own: closing the job must not end
+            // what it left behind (KILL_ON_JOB_CLOSE), as on POSIX. What was
+            // still attached to its pseudo console has ended already
+            // (ClosePseudoConsole terminates the console's remaining
+            // clients); what runs in a console of its own keeps running.
             // After pty_kill the flag stays, so closing the job also ends
             // anything that slipped past TerminateJobObject.
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
