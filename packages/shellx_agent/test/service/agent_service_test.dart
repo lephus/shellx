@@ -562,6 +562,17 @@ void main() {
     });
   });
 
+  // Final review M5.
+  test('the pairing URI carries a copy of the agent key, not the identity’s '
+      'own bytes', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final uri = rig.service.startPairing();
+      expect(uri.agentPublicKey, agentKey.publicKey);
+      expect(uri.agentPublicKey, isNot(same(agentKey.publicKey)));
+    });
+  });
+
   test('a pairing channel accepts nothing but pair.confirm', () {
     fakeAsync((async) {
       final rig = AgentRig(async);

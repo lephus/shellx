@@ -159,12 +159,14 @@ final class AgentService {
     await _relay.stop();
   }
 
-  /// Creates a single-use pairing code and the QR URI that carries it.
+  /// Creates a single-use pairing code and the QR URI that carries it. The
+  /// URI holds a copy of the public key: changing it cannot change the
+  /// identity the handshakes use.
   PairingUri startPairing() {
     final offer = _pairing.create();
     return PairingUri(
       agentDeviceId: _deviceId,
-      agentPublicKey: _identity.publicKey,
+      agentPublicKey: Uint8List.fromList(_identity.publicKey),
       secret: offer.secret,
     );
   }
