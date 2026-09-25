@@ -30,7 +30,17 @@ pairingRoutes.post("/", requireAuth, async (c) => {
   return c.body(null, 201);
 });
 
-/** DELETE /v1/pairings/:agent_id/:mobile_id — either party; idempotent; notifies the hub. */
+/**
+ * DELETE /v1/pairings/:agent_id/:mobile_id — either party; idempotent; notifies the hub.
+ *
+ * Notify-before-delete: the relay may only ever *remove* trust, so a failure must never lose a
+ * pairing_removed event. We first check the row exists (scoped to the caller's account, defence
+ * in depth), then call the hub — which durably queues the event for the agent before doing
+ * anything live (see UserHub.notifyPairingRemoved) — and only delete the D1 row once that
+ * succeeds. If the hub call throws, the row is left in place so a retry finds it again and can
+ * still deliver the event; the worst case is a duplicate delivery, which clients handle
+ * idempotently, never a lost one.
+ */
 pairingRoutes.delete("/:agent_id/:mobile_id", requireAuth, async (c) => {
   const auth = c.get("auth");
   const agentId = parseUuid(c.req.param("agent_id"));
@@ -38,9 +48,23 @@ pairingRoutes.delete("/:agent_id/:mobile_id", requireAuth, async (c) => {
   if (agentId === null || mobileId === null || (auth.deviceId !== agentId && auth.deviceId !== mobileId)) {
     throw Errors.forbidden();
   }
-  const result = await c.env.DB.prepare("DELETE FROM pairings WHERE agent_id = ? AND mobile_id = ?")
-    .bind(agentId, mobileId)
-    .run();
-  if (result.meta.changes > 0) await hubFor(c.env, auth.userId).notifyPairingRemoved(agentId, mobileId);
+  const db = c.env.DB;
+  const existing = await db
+    .prepare(
+      `SELECT 1 FROM pairings
+        WHERE agent_id = ? AND mobile_id = ? AND agent_id IN (SELECT id FROM devices WHERE user_id = ?)`,
+    )
+    .bind(agentId, mobileId, auth.userId)
+    .first();
+  if (existing !== null) {
+    await hubFor(c.env, auth.userId).notifyPairingRemoved(agentId, mobileId);
+    await db
+      .prepare(
+        `DELETE FROM pairings
+          WHERE agent_id = ? AND mobile_id = ? AND agent_id IN (SELECT id FROM devices WHERE user_id = ?)`,
+      )
+      .bind(agentId, mobileId, auth.userId)
+      .run();
+  }
   return c.body(null, 204);
 });

@@ -50,9 +50,12 @@ export class UserHub extends DurableObject<Env> {
     super(ctx, env);
     // Heartbeat is answered by the runtime without waking the object (spec §6.1).
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
-    // Durable (SQLite-backed) queue of EVENT frames for an agent that was offline when they happened.
+    // Durable (SQLite-backed), deduplicated queue of pairing_removed events pending delivery to an
+    // agent: at most one row per (agent, mobile) pair, so repeated pair/unpair cycles while the
+    // agent is offline collapse into a single replay. The frame is encoded at delivery time, not
+    // stored, so a protocol change cannot leave stale encoded bytes behind.
     ctx.storage.sql.exec(
-      "CREATE TABLE IF NOT EXISTS pending_events (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, frame BLOB NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS pending_pairing_removed (agent_id TEXT NOT NULL, mobile_id TEXT NOT NULL, UNIQUE (agent_id, mobile_id))",
     );
   }
 
@@ -105,16 +108,20 @@ export class UserHub extends DurableObject<Env> {
 
   /**
    * Sends EVENT pairing_removed to both devices if connected (clients handle it idempotently).
-   * If the agent is offline the event is queued durably and delivered on its next connection,
-   * because the agent is the source of truth for trust (spec §5.4–5.5).
+   * The event is *always* durably queued for the agent too — even when it looks live — because a
+   * live socket can be silently dead (e.g. a peer that vanished without a close frame), and the
+   * relay may only ever remove trust: a lost pairing_removed is unsafe, a duplicate is not (spec
+   * §5.4–5.5, constraint 8). The queue is delivered again on every one of the agent's future
+   * connects, right after the PRESENCE snapshot, and cleared as delivered.
    */
   notifyPairingRemoved(agentId: string, mobileId: string): void {
     const frame = pairingRemovedEvent(agentId, mobileId);
-    const agentSockets = this.socketsOf(agentId);
-    if (agentSockets.length === 0) {
-      this.ctx.storage.sql.exec("INSERT INTO pending_events (device_id, frame) VALUES (?, ?)", agentId, frame.buffer);
-    }
-    for (const ws of agentSockets) safeSend(ws, frame);
+    this.ctx.storage.sql.exec(
+      "INSERT OR IGNORE INTO pending_pairing_removed (agent_id, mobile_id) VALUES (?, ?)",
+      agentId,
+      mobileId,
+    );
+    for (const ws of this.socketsOf(agentId)) safeSend(ws, frame);
     if (mobileId !== agentId) for (const ws of this.socketsOf(mobileId)) safeSend(ws, frame);
   }
 
@@ -167,11 +174,14 @@ export class UserHub extends DurableObject<Env> {
 
   private deliverPending(ws: WebSocket, deviceId: string): void {
     const rows = this.ctx.storage.sql
-      .exec<{ frame: ArrayBuffer }>("SELECT frame FROM pending_events WHERE device_id = ? ORDER BY id", deviceId)
+      .exec<{ mobile_id: string }>(
+        "SELECT mobile_id FROM pending_pairing_removed WHERE agent_id = ? ORDER BY rowid",
+        deviceId,
+      )
       .toArray();
     if (rows.length === 0) return;
-    for (const row of rows) ws.send(new Uint8Array(row.frame));
-    this.ctx.storage.sql.exec("DELETE FROM pending_events WHERE device_id = ?", deviceId);
+    for (const row of rows) ws.send(pairingRemovedEvent(deviceId, row.mobile_id));
+    this.ctx.storage.sql.exec("DELETE FROM pending_pairing_removed WHERE agent_id = ?", deviceId);
   }
 
   private takeToken(deviceId: string): boolean {

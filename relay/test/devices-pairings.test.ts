@@ -158,8 +158,86 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const forbidden = await call(app, "DELETE", path, { token: bystander.token });
     expect(forbidden.status).toBe(403);
     expect(await errorCode(forbidden)).toBe("forbidden");
+    const stillPaired = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+      .bind(account.agent.deviceId, mobile.deviceId).first();
+    expect(stillPaired).not.toBeNull(); // the bystander's 403 must not touch the row
     expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
     expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
+  });
+
+  it("replays the event to an agent that was online when it fired, on its next connect", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await pair(app, account.agent.token, mobile.deviceId);
+    const a = await connect(app, account.agent.token);
+
+    const res = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, {
+      token: mobile.token,
+    });
+    expect(res.status).toBe(204);
+    expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    a.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // A silently-dead live socket must not lose the event: it was queued too, and is replayed here.
+    const again = await connect(app, account.agent.token);
+    expect(hex(await again.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    await again.expectSilence();
+  });
+
+  it("dedupes repeated pair/unpair cycles while the agent is offline into one queued event", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
+    await pair(app, account.agent.token, mobile.deviceId);
+    await call(app, "DELETE", path, { token: mobile.token });
+    await pair(app, account.agent.token, mobile.deviceId);
+    await call(app, "DELETE", path, { token: mobile.token });
+    await pair(app, account.agent.token, mobile.deviceId);
+    await call(app, "DELETE", path, { token: mobile.token });
+
+    const a = await connect(app, account.agent.token);
+    expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    await a.expectSilence(); // exactly one queued row survived three cycles, not three
+  });
+
+  it("keeps the pairing row when the hub RPC fails, so a retry can still deliver the event", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await pair(app, account.agent.token, mobile.deviceId);
+    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
+
+    let calls = 0;
+    const failingOnce = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        online: async () => [],
+        disconnect: async () => {},
+        notifyPairingRemoved: async () => {
+          calls++;
+          if (calls === 1) throw new Error("boom");
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const failed = await call(app, "DELETE", path, { token: mobile.token, bindings: { USER_HUB: failingOnce } });
+    expect(failed.status).toBe(500);
+    expect(await errorCode(failed)).toBe("internal_error");
+    const stillThere = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+      .bind(account.agent.deviceId, mobile.deviceId).first();
+    expect(stillThere).not.toBeNull(); // the failed hub call must not have deleted the row
+
+    const retried = await call(app, "DELETE", path, { token: mobile.token });
+    expect(retried.status).toBe(204);
+    const gone = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+      .bind(account.agent.deviceId, mobile.deviceId).first();
+    expect(gone).toBeNull();
+
+    const a = await connect(app, account.agent.token);
+    expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
   });
 });
 
