@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
@@ -45,4 +46,30 @@ void main() {
     final real = PairingCodeManager();
     expect(real.create().secret, isNot(real.create().secret));
   });
+
+  test(
+    'returned secrets are copied; mutations do not corrupt the live code',
+    () {
+      final offer = manager.create();
+      final originalSecretBytes = Uint8List.fromList(offer.secret);
+
+      // Mutate the returned secret.
+      offer.secret[0] = 255;
+      offer.secret[1] = 254;
+
+      // The active secret should still have the original bytes.
+      final active = manager.activeSecret!;
+      expect(active, originalSecretBytes);
+      expect(active[0], isNot(255));
+      expect(active[1], isNot(254));
+
+      // Mutate the active secret returned.
+      active[2] = 200;
+
+      // The next call to activeSecret should return a fresh copy.
+      final nextActive = manager.activeSecret!;
+      expect(nextActive[2], isNot(200));
+      expect(nextActive, originalSecretBytes);
+    },
+  );
 }

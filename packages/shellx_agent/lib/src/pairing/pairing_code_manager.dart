@@ -19,7 +19,8 @@ final class PairingCodeManager {
 
   final DateTime Function() _now;
   final Random _random;
-  PairingOffer? _offer;
+  Uint8List? _secret;
+  DateTime? _expiresAt;
 
   /// Creates a new code, replacing any previous one.
   PairingOffer create({Duration ttl = const Duration(minutes: 5)}) {
@@ -27,19 +28,33 @@ final class PairingCodeManager {
     for (var i = 0; i < secret.length; i++) {
       secret[i] = _random.nextInt(256);
     }
-    return _offer = PairingOffer(secret: secret, expiresAt: _now().add(ttl));
+    final expiresAt = _now().add(ttl);
+    // Store a copy internally to prevent caller mutations from corrupting the live code.
+    _secret = Uint8List.fromList(secret);
+    _expiresAt = expiresAt;
+    // Return a PairingOffer with a copy of the secret.
+    return PairingOffer(
+      secret: Uint8List.fromList(secret),
+      expiresAt: expiresAt,
+    );
   }
 
   /// The current code, or null when there is none or it has expired.
   Uint8List? get activeSecret {
-    final offer = _offer;
-    if (offer == null) return null;
-    if (!_now().isBefore(offer.expiresAt)) {
-      _offer = null;
+    final secret = _secret;
+    final expiresAt = _expiresAt;
+    if (secret == null || expiresAt == null) return null;
+    if (!_now().isBefore(expiresAt)) {
+      _secret = null;
+      _expiresAt = null;
       return null;
     }
-    return offer.secret;
+    // Return a fresh copy each time to prevent caller mutations.
+    return Uint8List.fromList(secret);
   }
 
-  void invalidate() => _offer = null;
+  void invalidate() {
+    _secret = null;
+    _expiresAt = null;
+  }
 }

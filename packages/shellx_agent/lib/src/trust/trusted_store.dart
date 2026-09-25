@@ -6,12 +6,12 @@ import 'package:shellx_core/shellx_core.dart';
 
 /// A phone this agent trusts (spec §5.3 step 5).
 final class TrustedDevice {
-  const TrustedDevice({
+  TrustedDevice({
     required this.mobileId,
-    required this.publicKey,
+    required Uint8List publicKey,
     required this.name,
     required this.pairedAt,
-  });
+  }) : publicKey = Uint8List.fromList(publicKey);
 
   final String mobileId;
   final Uint8List publicKey;
@@ -25,20 +25,29 @@ final class TrustedDevice {
     'paired_at': pairedAt.millisecondsSinceEpoch,
   };
 
-  static TrustedDevice fromJson(Map<String, Object?> json) => TrustedDevice(
-    mobileId: json['mobile_id'] as String,
-    publicKey: fromBase64UrlNoPad(json['public_key'] as String),
-    name: json['name'] as String,
-    pairedAt: DateTime.fromMillisecondsSinceEpoch(
-      json['paired_at'] as int,
-      isUtc: true,
-    ),
-  );
+  static TrustedDevice fromJson(Map<String, Object?> json) {
+    final publicKey = fromBase64UrlNoPad(json['public_key'] as String);
+    if (publicKey.length != 32) {
+      throw FormatException('Public key must be exactly 32 bytes');
+    }
+    return TrustedDevice(
+      mobileId: json['mobile_id'] as String,
+      publicKey: publicKey,
+      name: json['name'] as String,
+      pairedAt: DateTime.fromMillisecondsSinceEpoch(
+        json['paired_at'] as int,
+        isUtc: true,
+      ),
+    );
+  }
 }
 
 /// Local trust list — the only source of truth for trust (spec §5.4).
 /// Stored as a JSON array under [storageKey]. Unreadable data counts as
 /// "no trusted devices" (fail closed).
+///
+/// **Important:** Create one shared instance per underlying [KeyValueStore]
+/// instance. The mutation lock is per [TrustedStore] instance.
 final class TrustedStore {
   TrustedStore(KeyValueStore store) : _store = store;
 
@@ -78,10 +87,17 @@ final class TrustedStore {
     if (raw == null || raw.isEmpty) return [];
     try {
       final decoded = jsonDecode(raw) as List<Object?>;
-      return [
-        for (final entry in decoded)
-          TrustedDevice.fromJson((entry as Map).cast<String, Object?>()),
-      ];
+      final devices = <TrustedDevice>[];
+      for (final entry in decoded) {
+        try {
+          devices.add(
+            TrustedDevice.fromJson((entry as Map).cast<String, Object?>()),
+          );
+        } catch (_) {
+          // Skip corrupt entries (e.g., wrong key length).
+        }
+      }
+      return devices;
     } catch (_) {
       return [];
     }

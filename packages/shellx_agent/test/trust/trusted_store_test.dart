@@ -77,4 +77,59 @@ void main() {
     expect(await store.list(), hasLength(3));
     expect(changes, 3);
   });
+
+  test('TrustedDevice rejects public keys that are not 32 bytes', () {
+    expect(
+      () => TrustedDevice.fromJson({
+        'mobile_id': 'm1',
+        'public_key': base64UrlNoPad(Uint8List(16)), // Wrong length
+        'name': 'Phone',
+        'paired_at': 0,
+      }),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test(
+    'TrustedStore skips entries with invalid key lengths but keeps valid ones',
+    () async {
+      final kv = InMemoryKeyValueStore();
+      // Manually write storage with one valid and one invalid entry.
+      await kv.write(
+        TrustedStore.storageKey,
+        jsonEncode([
+          {
+            'mobile_id': 'm1',
+            'public_key': base64UrlNoPad(
+              Uint8List.fromList(List.filled(32, 7)),
+            ),
+            'name': 'Valid',
+            'paired_at': DateTime.utc(2026, 9, 25, 10).millisecondsSinceEpoch,
+          },
+          {
+            'mobile_id': 'm2',
+            'public_key': base64UrlNoPad(Uint8List(16)), // Wrong length
+            'name': 'Invalid',
+            'paired_at': DateTime.utc(2026, 9, 25, 10).millisecondsSinceEpoch,
+          },
+        ]),
+      );
+      final store = TrustedStore(kv);
+      final devices = await store.list();
+      expect(devices, hasLength(1));
+      expect(devices.first.mobileId, 'm1');
+    },
+  );
+
+  test('TrustedDevice copies the public key on construction', () {
+    final original = Uint8List.fromList(List.filled(32, 42));
+    final device = TrustedDevice(
+      mobileId: 'm1',
+      publicKey: original,
+      name: 'Phone',
+      pairedAt: DateTime.utc(2026, 9, 25, 10),
+    );
+    original[0] = 99; // Mutate the original.
+    expect(device.publicKey[0], 42); // Device's copy should be unchanged.
+  });
 }
