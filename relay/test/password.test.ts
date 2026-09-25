@@ -1,6 +1,6 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { describe, expect, it } from "vitest";
-import { createArgon2 } from "../src/auth/argon2";
+import { ARGON2_SALT_BYTES, buildArgon2, createArgon2, type Argon2Exports } from "../src/auth/argon2";
 import { hashPassword, verifyPassword } from "../src/auth/password";
 
 // Known answers computed independently with Node's crypto.argon2Sync and @noble/hashes argon2id.
@@ -62,5 +62,88 @@ describe("argon2id (static WASM in workerd)", () => {
     console.log(JSON.stringify({ event: "argon2_timing", median_ms: median, samples_ms: samples }));
     expect(median).toBeGreaterThan(0);
     expect(median).toBeLessThan(500);
+  });
+});
+
+/**
+ * A fake `Argon2Exports` backed by a plain ArrayBuffer "heap" and a bump allocator,
+ * so tests can force `malloc` to fail on a chosen call (simulating real WASM
+ * allocation failure) without needing to exhaust the real WASM instance's memory.
+ */
+function makeFakeExports(opts: { failMallocOnCall: number }): {
+  ex: Argon2Exports;
+  freed: number[];
+  heap: () => Uint8Array;
+} {
+  const buffer = new ArrayBuffer(1 << 16);
+  const freed: number[] = [];
+  let nextPtr = 8; // keep 0 reserved for "null"/allocation failure
+  let mallocCalls = 0;
+
+  const ex: Argon2Exports = {
+    memory: { buffer } as unknown as WebAssembly.Memory,
+    _initialize() {},
+    malloc(size) {
+      mallocCalls++;
+      if (mallocCalls === opts.failMallocOnCall) return 0;
+      const ptr = nextPtr;
+      nextPtr += Math.max(size, 1);
+      return ptr;
+    },
+    free(ptr) {
+      freed.push(ptr);
+    },
+    argon2_hash() {
+      throw new Error("argon2_hash must not run once an earlier allocation has failed");
+    },
+    argon2_verify() {
+      throw new Error("argon2_verify must not run once an earlier allocation has failed");
+    },
+    argon2_encodedlen() {
+      return 128;
+    },
+  };
+
+  return { ex, freed, heap: () => new Uint8Array(buffer) };
+}
+
+describe("argon2 buffer cleanup on allocation failure", () => {
+  it("wipes and frees the password buffer when a later allocation fails during hash()", () => {
+    // 1st malloc call copies in the password (succeeds); 2nd copies in the salt (fails).
+    const { ex, freed, heap } = makeFakeExports({ failMallocOnCall: 2 });
+    const argon2 = buildArgon2(ex);
+    const password = "correct horse battery";
+    const passwordBytes = new TextEncoder().encode(password.normalize("NFC"));
+
+    expect(() => argon2.hash(password, new Uint8Array(ARGON2_SALT_BYTES))).toThrow("argon2: out of memory");
+
+    // The password pointer (the first, and only successful, allocation) must have
+    // been freed, and its bytes zeroed before that free — not leaked in the heap.
+    expect(freed).toEqual([8]);
+    expect(heap().subarray(8, 8 + passwordBytes.length)).toEqual(new Uint8Array(passwordBytes.length));
+  });
+
+  it("wipes and frees the password buffer when a later allocation fails during verify()", () => {
+    // 1st malloc call copies in the password (succeeds); 2nd copies in the encoded PHC (fails).
+    const { ex, freed, heap } = makeFakeExports({ failMallocOnCall: 2 });
+    const argon2 = buildArgon2(ex);
+    const password = "whatever1";
+    const passwordBytes = new TextEncoder().encode(password.normalize("NFC"));
+
+    expect(() => argon2.verify(password, "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA")).toThrow(
+      "argon2: out of memory",
+    );
+
+    expect(freed).toEqual([8]);
+    expect(heap().subarray(8, 8 + passwordBytes.length)).toEqual(new Uint8Array(passwordBytes.length));
+  });
+
+  it("propagates the error without freeing anything when the very first allocation fails", () => {
+    // 1st malloc call (the password buffer itself) fails immediately.
+    const { ex, freed } = makeFakeExports({ failMallocOnCall: 1 });
+    const argon2 = buildArgon2(ex);
+
+    expect(() => argon2.hash("correct horse battery")).toThrow("argon2: out of memory");
+    expect(freed).toEqual([]);
   });
 });

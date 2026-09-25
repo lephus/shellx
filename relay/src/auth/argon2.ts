@@ -14,7 +14,10 @@ const ARGON2_TYPE_ID = 2;
 const ARGON2_VERSION_13 = 0x13;
 const ARGON2_OK = 0;
 
-interface Argon2Exports {
+// Exported so tests can construct a fake/instrumented instance (e.g. one whose
+// `malloc` fails on a chosen call) and drive it through `buildArgon2` without
+// needing a real WASM instance.
+export interface Argon2Exports {
   memory: WebAssembly.Memory;
   _initialize(): void;
   malloc(size: number): number;
@@ -41,11 +44,13 @@ export interface Argon2 {
 const utf8 = new TextEncoder();
 const utf8Decoder = new TextDecoder();
 
-export async function createArgon2(module: WebAssembly.Module): Promise<Argon2> {
-  const instance = await WebAssembly.instantiate(module, {});
-  const ex = instance.exports as unknown as Argon2Exports;
-  ex._initialize();
-
+/**
+ * Builds the Argon2 wrapper around an already-instantiated set of WASM exports.
+ * Exported alongside `createArgon2` so tests can pass a fake/instrumented
+ * `Argon2Exports` (e.g. a `malloc` that fails on a chosen call) to exercise
+ * cleanup paths that are impractical to force through the real WASM heap.
+ */
+export function buildArgon2(ex: Argon2Exports): Argon2 {
   const alloc = (size: number): number => {
     const ptr = ex.malloc(Math.max(size, 1));
     if (ptr === 0) throw new Error("argon2: out of memory");
@@ -56,7 +61,11 @@ export async function createArgon2(module: WebAssembly.Module): Promise<Argon2> 
     new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
     return ptr;
   };
+  // No-op for a null/never-allocated pointer, so callers can unconditionally
+  // wipe-and-free every pointer in a `finally` block regardless of how far
+  // allocation got before something threw.
   const wipeAndFree = (ptr: number, length: number): void => {
+    if (ptr === 0) return;
     new Uint8Array(ex.memory.buffer, ptr, length).fill(0);
     ex.free(ptr);
   };
@@ -69,11 +78,19 @@ export async function createArgon2(module: WebAssembly.Module): Promise<Argon2> 
       const encodedLen = ex.argon2_encodedlen(
         ARGON2_ITERATIONS, ARGON2_MEMORY_KIB, ARGON2_PARALLELISM, salt.length, ARGON2_HASH_BYTES, ARGON2_TYPE_ID,
       );
-      const pwdPtr = copyIn(pwd);
-      const saltPtr = copyIn(salt);
-      const hashPtr = alloc(ARGON2_HASH_BYTES);
-      const encodedPtr = alloc(encodedLen);
+      // Every pointer starts at 0 (== "nothing to clean up yet") and every
+      // allocation happens inside `try`, so if one fails partway through,
+      // `finally` still wipes and frees whatever was already copied in
+      // (the password buffer above all) instead of leaking it.
+      let pwdPtr = 0;
+      let saltPtr = 0;
+      let hashPtr = 0;
+      let encodedPtr = 0;
       try {
+        pwdPtr = copyIn(pwd);
+        saltPtr = copyIn(salt);
+        hashPtr = alloc(ARGON2_HASH_BYTES);
+        encodedPtr = alloc(encodedLen);
         const rc = ex.argon2_hash(
           ARGON2_ITERATIONS, ARGON2_MEMORY_KIB, ARGON2_PARALLELISM,
           pwdPtr, pwd.length, saltPtr, salt.length,
@@ -86,23 +103,32 @@ export async function createArgon2(module: WebAssembly.Module): Promise<Argon2> 
         return utf8Decoder.decode(encoded.slice(0, end < 0 ? encodedLen : end));
       } finally {
         wipeAndFree(pwdPtr, pwd.length);
-        ex.free(saltPtr);
+        wipeAndFree(saltPtr, salt.length);
         wipeAndFree(hashPtr, ARGON2_HASH_BYTES);
-        ex.free(encodedPtr);
+        wipeAndFree(encodedPtr, encodedLen);
       }
     },
     verify(password, phc) {
       if (!phc.startsWith("$argon2id$")) return false;
       const pwd = passwordBytes(password);
       const encoded = utf8.encode(`${phc}\0`);
-      const pwdPtr = copyIn(pwd);
-      const encodedPtr = copyIn(encoded);
+      let pwdPtr = 0;
+      let encodedPtr = 0;
       try {
+        pwdPtr = copyIn(pwd);
+        encodedPtr = copyIn(encoded);
         return ex.argon2_verify(encodedPtr, pwdPtr, pwd.length, ARGON2_TYPE_ID) === ARGON2_OK;
       } finally {
         wipeAndFree(pwdPtr, pwd.length);
-        ex.free(encodedPtr);
+        wipeAndFree(encodedPtr, encoded.length);
       }
     },
   };
+}
+
+export async function createArgon2(module: WebAssembly.Module): Promise<Argon2> {
+  const instance = await WebAssembly.instantiate(module, {});
+  const ex = instance.exports as unknown as Argon2Exports;
+  ex._initialize();
+  return buildArgon2(ex);
 }
