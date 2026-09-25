@@ -132,4 +132,49 @@ void main() {
     await tester.tap(keyCap(ExtraKey.up));
     expect(out, ['\x1b[A']);
   });
+
+  testWidgets('design: the one-shot outline replaces the drop shadow; plain and locked keep it', (tester) async {
+    await tester.pumpWidget(bar());
+    expect(capDecoration(tester, ExtraKey.ctrl).boxShadow, isNotEmpty);
+
+    await tester.tap(keyCap(ExtraKey.ctrl));
+    await tester.pump();
+    expect(capDecoration(tester, ExtraKey.ctrl).boxShadow, isNull);
+
+    now = now.add(const Duration(milliseconds: 150));
+    await tester.tap(keyCap(ExtraKey.ctrl));
+    await tester.pump();
+    expect(capDecoration(tester, ExtraKey.ctrl).boxShadow, isNotEmpty);
+  });
+
+  testWidgets('design: the locked dot sits at top:4/right:4 inside the cap, not overflowing above it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(bar());
+    await tester.tap(keyCap(ExtraKey.ctrl));
+    now = now.add(const Duration(milliseconds: 150));
+    await tester.tap(keyCap(ExtraKey.ctrl));
+    await tester.pump();
+
+    final positioned = tester.widget<Positioned>(
+      find.ancestor(of: find.byKey(const ValueKey('latch-locked')), matching: find.byType(Positioned)),
+    );
+    expect(positioned.top, 4);
+    expect(positioned.right, 4);
+  });
+
+  testWidgets('glyph-only caps have a localised screen-reader label instead of the raw glyph', (tester) async {
+    await tester.pumpWidget(bar());
+    expect(find.bySemanticsLabel('Mũi tên lên'), findsOneWidget);
+    expect(find.bySemanticsLabel('Mũi tên xuống'), findsOneWidget);
+    expect(find.bySemanticsLabel('Mũi tên trái'), findsOneWidget);
+    expect(find.bySemanticsLabel('Mũi tên phải'), findsOneWidget);
+    expect(find.bySemanticsLabel('Dấu gạch đứng'), findsOneWidget);
+    expect(find.bySemanticsLabel('Dấu ngã'), findsOneWidget);
+    expect(find.bySemanticsLabel('Dấu gạch chéo'), findsOneWidget);
+    expect(find.bySemanticsLabel('Dấu gạch ngang'), findsOneWidget);
+    expect(find.bySemanticsLabel('↑'), findsNothing);
+    // A word key keeps its own visible text as the label; no override needed.
+    expect(find.bySemanticsLabel('Esc'), findsOneWidget);
+  });
 }

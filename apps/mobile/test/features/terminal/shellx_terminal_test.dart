@@ -1,9 +1,14 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
 import 'package:shellx_mobile/features/terminal/domain/shellx_terminal.dart';
 import 'package:xterm/core.dart';
+import 'package:xterm/ui.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ExtraKeysController keys;
   late ShellxTerminal terminal;
   late List<String> out;
@@ -71,5 +76,43 @@ void main() {
     terminal.paste('a\r\nb');
     expect(out, ['echo 1\recho 2', '\x1b[200~a\rb\x1b[201~']);
     expect(keys.ctrl.value, ModifierLatch.oneShot);
+  });
+
+  group('hardware keyboard (TerminalView.keyInput has no textInput fallback)', () {
+    // TerminalView's raw KeyEvent path (`_handleKeyEvent`) calls only
+    // Terminal.keyInput and never falls back to textInput() the way the soft
+    // keyboard's `_onInsert` does, so a text key must be handled inside
+    // keyInput() itself when it truly comes from a physical key press.
+    Future<void> pumpTerminalView(WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(home: Material(child: TerminalView(terminal, autofocus: true))));
+      await tester.pump();
+    }
+
+    testWidgets('sticky Ctrl + a real KeyEvent for "c" sends ^C', (tester) async {
+      await pumpTerminalView(tester);
+      keys.tapModifier(ExtraKey.ctrl);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      expect(out, ['\x03']);
+      expect(keys.hasActiveModifiers, isFalse);
+    });
+
+    testWidgets('sticky Alt + a real KeyEvent for "x" sends ESC x', (tester) async {
+      await pumpTerminalView(tester);
+      keys.tapModifier(ExtraKey.alt);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
+      expect(out, ['\x1bx']);
+      expect(keys.hasActiveModifiers, isFalse);
+    });
+
+    testWidgets('the soft-keyboard path is unaffected: no KeyEvent means no hardware key is down', (tester) async {
+      await pumpTerminalView(tester);
+      keys.tapModifier(ExtraKey.alt);
+      // Calling keyInput() directly, like TerminalView's soft-keyboard
+      // `_onInsert` does, without a real KeyEvent: HardwareKeyboard reports
+      // the key as not pressed, so this must still fall back to textInput()
+      // and keep the real typed case.
+      typeOnSoftKeyboard('B', TerminalKey.keyB);
+      expect(out, ['\x1bB']);
+    });
   });
 }

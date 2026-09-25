@@ -27,6 +27,24 @@ class ExtraKeysBar extends StatelessWidget {
     }
   }
 
+  /// A screen reader label for the glyph-only key caps (`↑ ↓ ← → | ~ / -`);
+  /// null for keys whose visible text is already a word (Esc, Tab, Ctrl, Alt,
+  /// Home, End, PgUp, PgDn) or already localised (Dán/Paste).
+  static String? _semanticsLabel(BuildContext context, ExtraKey key) {
+    final s = S.of(context);
+    return switch (key) {
+      ExtraKey.up => s.keyArrowUp,
+      ExtraKey.down => s.keyArrowDown,
+      ExtraKey.left => s.keyArrowLeft,
+      ExtraKey.right => s.keyArrowRight,
+      ExtraKey.pipe => s.keyPipe,
+      ExtraKey.tilde => s.keyTilde,
+      ExtraKey.slash => s.keySlash,
+      ExtraKey.minus => s.keyMinus,
+      _ => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -44,6 +62,7 @@ class ExtraKeysBar extends StatelessWidget {
               key: ValueKey('extra-key-${key.name}'),
               (context) => _KeyCap(
                 label: extraKeyLabel(key) ?? S.of(context).keyPaste,
+                semanticsLabel: _semanticsLabel(context, key),
                 isPaste: key == ExtraKey.paste,
                 latch: switch (key) {
                   ExtraKey.ctrl => controller.ctrl.value,
@@ -60,9 +79,19 @@ class ExtraKeysBar extends StatelessWidget {
 }
 
 class _KeyCap extends StatelessWidget {
-  const _KeyCap({required this.label, required this.isPaste, required this.latch, required this.onTap});
+  const _KeyCap({
+    required this.label,
+    required this.semanticsLabel,
+    required this.isPaste,
+    required this.latch,
+    required this.onTap,
+  });
 
   final String label;
+
+  /// Screen-reader label for a glyph-only cap (see [ExtraKeysBar._semanticsLabel]); null keeps
+  /// the default (the visible [label] itself is read).
+  final String? semanticsLabel;
   final bool isPaste;
   final ModifierLatch? latch;
   final VoidCallback onTap;
@@ -81,6 +110,13 @@ class _KeyCap extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: foreground,
           );
+    Widget text = Text(label, style: textStyle);
+    if (semanticsLabel != null) {
+      text = Semantics(
+        label: semanticsLabel,
+        child: ExcludeSemantics(child: text),
+      );
+    }
     // The whole bar height (50 pt) is the touch target; the cap itself is 38 pt tall.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -96,17 +132,18 @@ class _KeyCap extends StatelessWidget {
             color: locked ? colors.primary : colors.keyboardKey,
             borderRadius: BorderRadius.circular(9),
             border: once ? Border.all(color: colors.primary, width: 2.5) : null,
-            boxShadow: const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
+            // Design: the one-shot outline replaces the base drop shadow entirely (`.k.mod.once`
+            // sets its own box-shadow); the plain and locked caps keep the base `.k` shadow.
+            boxShadow: once ? null : const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
           ),
           child: Stack(
-            clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Text(label, style: textStyle),
+              text,
               if (locked)
                 Positioned(
-                  top: -8,
-                  right: -6,
+                  top: 4,
+                  right: 4,
                   child: Container(
                     key: const ValueKey('latch-locked'),
                     width: 6,

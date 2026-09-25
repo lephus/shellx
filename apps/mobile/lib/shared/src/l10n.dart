@@ -1384,6 +1384,51 @@ class S {
     return Intl.message('Paste', name: 'keyPaste', desc: '', args: []);
   }
 
+  /// `Up arrow`
+  String get keyArrowUp {
+    return Intl.message('Up arrow', name: 'keyArrowUp', desc: '', args: []);
+  }
+
+  /// `Down arrow`
+  String get keyArrowDown {
+    return Intl.message('Down arrow', name: 'keyArrowDown', desc: '', args: []);
+  }
+
+  /// `Left arrow`
+  String get keyArrowLeft {
+    return Intl.message('Left arrow', name: 'keyArrowLeft', desc: '', args: []);
+  }
+
+  /// `Right arrow`
+  String get keyArrowRight {
+    return Intl.message(
+      'Right arrow',
+      name: 'keyArrowRight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Vertical bar`
+  String get keyPipe {
+    return Intl.message('Vertical bar', name: 'keyPipe', desc: '', args: []);
+  }
+
+  /// `Tilde`
+  String get keyTilde {
+    return Intl.message('Tilde', name: 'keyTilde', desc: '', args: []);
+  }
+
+  /// `Slash`
+  String get keySlash {
+    return Intl.message('Slash', name: 'keySlash', desc: '', args: []);
+  }
+
+  /// `Hyphen`
+  String get keyMinus {
+    return Intl.message('Hyphen', name: 'keyMinus', desc: '', args: []);
+  }
+
   /// `Settings`
   String get settingsTitle {
     return Intl.message('Settings', name: 'settingsTitle', desc: '', args: []);
