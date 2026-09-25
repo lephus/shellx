@@ -452,9 +452,8 @@ class FakeSessionHolder implements SessionHolder {
 
   set signOutReasonValue(SignOutReason? reason) => _signOutReason.value = reason;
 
-  /// What a finished sign-out leaves behind (Task 11): no session, no backend, and [reason]. Like
-  /// the real holder, the backend signal changes first thing, so [WorkspaceRegistry] disposes every
-  /// workspace at once.
+  /// What the end of a sign-out does (Task 11): session, backend and [reason] change in one batch,
+  /// and [WorkspaceRegistry] then disposes every workspace of the old backend at once.
   void signOut([SignOutReason reason = SignOutReason.revoked]) => batch(() {
     _session.value = null;
     _backend.value = null;

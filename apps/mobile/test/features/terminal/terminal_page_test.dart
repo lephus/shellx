@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_client/shellx_client.dart';
@@ -61,6 +63,52 @@ void main() {
 
   String lastInput() => utf8.decode(machine.inputs.last.data);
   String screen() => registry.forMachine(agentA).activeTab.value!.terminal.value.buffer.getText();
+
+  /// Answers `Clipboard.getData` with [text] and records every `Clipboard.setData`.
+  List<String?> mockClipboard(WidgetTester tester, {String text = 'echo 1\necho 2'}) {
+    final copied = <String?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') return <String, Object?>{'text': text};
+      if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map<Object?, Object?>)['text'] as String?);
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    return copied;
+  }
+
+  /// The platform's hardware copy/paste chord (Task 5): ⌘ on iOS, Ctrl+Shift on Android.
+  Future<void> pressShortcut(WidgetTester tester, LogicalKeyboardKey key) async {
+    final modifiers = defaultTargetPlatform == TargetPlatform.iOS
+        ? [LogicalKeyboardKey.metaLeft]
+        : [LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.shiftLeft];
+    for (final modifier in modifiers) {
+      await tester.sendKeyDownEvent(modifier);
+    }
+    await tester.sendKeyEvent(key);
+    for (final modifier in modifiers.reversed) {
+      await tester.sendKeyUpEvent(modifier);
+    }
+  }
+
+  /// Every line printed while [body] runs. signals_core 6.3.1 does not throw when a disposed
+  /// signal is read: it prints "… has been read after disposed" and returns the stale value (R4).
+  Future<List<String>> disposedReadsDuring(Future<void> Function() body) async {
+    final lines = <String>[];
+    await runZoned(
+      body,
+      zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) => lines.add(line)),
+    );
+    return [
+      for (final line in lines)
+        if (line.contains('read after disposed')) line.split('\n').first,
+    ];
+  }
+
+  /// Portrait → landscape: every widget that depends on the orientation or the layout builds again.
+  Future<void> rotate(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(2532, 1170);
+    await tester.pump();
+  }
 
   testWidgets('first open without sessions opens a tab automatically; the chrome shows the machine', (tester) async {
     await open(tester);
@@ -262,5 +310,201 @@ void main() {
       tester.getCenter(find.text('MacBook-Pro')).dy,
       moreOrLessEquals(tester.getCenter(find.text('zsh 1')).dy, epsilon: 4),
     );
+  });
+
+  // ---- Controller rulings (task-14-rulings.md) ----
+
+  testWidgets(
+    'R1: an untrusted handshake the client ran on its own closes the page once, never as "Phiên đã kết thúc"',
+    (
+      tester,
+    ) async {
+      final disposedReads = await disposedReadsDuring(() async {
+        await open(tester);
+        // What MachineClient does on HS2 `untrusted` after reconnecting by itself (no UI request):
+        // forget the pin, end every attached tab with session_not_found, then MachineFailed.
+        machine.onUntrusted!();
+        machine.handles.single.emit(const TabError(AppErrorCode.sessionNotFound, 'no longer trusted'));
+        machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          expect(find.text('Phiên đã kết thúc'), findsNothing);
+        }
+        await tester.pumpAndSettle();
+      });
+      expect(results, [TerminalExit.untrusted]);
+      expect(backend.unpaired, [agentA]);
+      expect(find.text('open'), findsOneWidget);
+      expect(disposedReads, isEmpty);
+    },
+  );
+
+  testWidgets('R1: proto_unsupported found by the client on its own closes the page asking for an update', (
+    tester,
+  ) async {
+    await open(tester);
+    machine.emitState(const MachineFailed(MachineConnectionFailure.protocolUnsupported));
+    await tester.pumpAndSettle();
+    expect(results, [TerminalExit.updateRequired]);
+    expect(backend.unpaired, isEmpty);
+  });
+
+  testWidgets('R1: the state event that follows a request that already handled untrusted does not unpair again', (
+    tester,
+  ) async {
+    await open(tester);
+    machine.openError = const MachineConnectionException(MachineConnectionFailure.untrusted);
+    await tester.tap(find.byTooltip('Mở phiên mới'));
+    await tester.pump();
+    expect(backend.unpaired, [agentA]);
+    machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+    await tester.pumpAndSettle();
+    expect(backend.unpaired, [agentA]);
+    expect(results, [TerminalExit.untrusted]);
+  });
+
+  testWidgets('R1: untrusted while the session sheet is open closes the sheet, then the page', (tester) async {
+    machine.sessions = [running];
+    await open(tester);
+    expect(find.text('Máy này đang có 1 phiên'), findsOneWidget);
+    machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(results, [TerminalExit.untrusted]);
+    expect(find.text('open'), findsOneWidget);
+    expect(machine.attached, isEmpty);
+  });
+
+  testWidgets('R2: "Gắn lại" without a channel shows the ErrorText notice; nothing is left unhandled', (tester) async {
+    await open(tester);
+    machine.reuseHandles = true;
+    machine.handles.single.emit(const TabDetached(DetachReason.takenOver));
+    await tester.pump();
+    machine.attachErrors[101] = const MachineConnectionException(MachineConnectionFailure.agentOffline);
+    await tester.tap(find.text('Gắn lại'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Máy đang offline.'), findsOneWidget);
+    expect(find.text('Phiên đang được mở trên thiết bị khác.'), findsOneWidget);
+
+    machine.attachErrors.remove(101);
+    await tester.tap(find.text('Gắn lại'));
+    await tester.pumpAndSettle();
+    expect(machine.attached.map((a) => a.id), [101, 101]);
+    expect(find.text('Phiên đang được mở trên thiết bị khác.'), findsNothing);
+    await tester.pump(TerminalPageController.noticeDuration);
+  });
+
+  testWidgets(
+    'R3: the hardware paste shortcut pastes like "Dán": CR line breaks, bracketed when enabled',
+    variant: const TargetPlatformVariant({TargetPlatform.iOS, TargetPlatform.android}),
+    (tester) async {
+      mockClipboard(tester, text: 'echo 1\r\necho 2\n');
+      await open(tester);
+      await pressShortcut(tester, LogicalKeyboardKey.keyV);
+      await tester.pumpAndSettle();
+      expect(lastInput(), 'echo 1\recho 2\r');
+      // Once: the chord is handled at the terminal, so no default ⌘V/Ctrl+V binding pastes again.
+      expect(machine.inputs, hasLength(1));
+
+      machine.handles.single.emit(const TabOutput('\x1b[?2004h'));
+      await pressShortcut(tester, LogicalKeyboardKey.keyV);
+      await tester.pumpAndSettle();
+      expect(lastInput(), '\x1b[200~echo 1\recho 2\r\x1b[201~');
+    },
+  );
+
+  testWidgets(
+    'R3: the hardware copy shortcut copies the selection like "Sao chép"',
+    variant: const TargetPlatformVariant({TargetPlatform.iOS, TargetPlatform.android}),
+    (tester) async {
+      final copied = mockClipboard(tester);
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('hello world'));
+      final tab = registry.forMachine(agentA).activeTab.value!;
+      final buffer = tab.terminal.value.buffer;
+      tab.selection.setSelection(buffer.createAnchor(0, 0), buffer.createAnchor(5, 0));
+      await tester.pump();
+      expect(find.text('Sao chép'), findsOneWidget);
+
+      await pressShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pumpAndSettle();
+      expect(copied, ['hello']);
+      expect((getIt<PopupHandler>() as FakePopupHandler).successes, ['Đã sao chép']);
+      expect(tab.selection.selection, isNull);
+      expect(find.text('Sao chép'), findsNothing);
+      expect(machine.inputs, isEmpty);
+    },
+  );
+
+  testWidgets('"Sao chép" copies the long-press selection', (tester) async {
+    final copied = mockClipboard(tester);
+    await open(tester);
+    machine.handles.single.emit(const TabOutput('hello world'));
+    final tab = registry.forMachine(agentA).activeTab.value!;
+    final buffer = tab.terminal.value.buffer;
+    tab.selection.setSelection(buffer.createAnchor(6, 0), buffer.createAnchor(11, 0));
+    await tester.pump();
+    await tester.tap(find.text('Sao chép'));
+    await tester.pumpAndSettle();
+    expect(copied, ['world']);
+    expect(tab.selection.selection, isNull);
+  });
+
+  testWidgets('R4: once the page leaves, nothing reads the dropped workspace (rotating while it closes)', (
+    tester,
+  ) async {
+    final disposedReads = await disposedReadsDuring(() async {
+      await open(tester);
+      // The channel dropped; the next request's handshake gets HS2 `untrusted`.
+      machine.emitState(const MachineIdle());
+      machine.connectFailure = MachineConnectionFailure.untrusted;
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pump();
+      await rotate(tester);
+      expect(find.text('Phiên đã kết thúc'), findsNothing);
+      await tester.pumpAndSettle();
+    });
+    expect(tester.takeException(), isNull);
+    expect(results, [TerminalExit.untrusted]);
+    expect(backend.unpaired, [agentA]);
+    expect(disposedReads, isEmpty);
+  });
+
+  testWidgets('R4: untrusted on the first visit reads nothing of the dropped workspace', (tester) async {
+    // The first frame's Watches subscribe after it (post-frame), when the workspace may be gone.
+    machine.connectFailure = MachineConnectionFailure.untrusted;
+    final disposedReads = await disposedReadsDuring(() async {
+      await open(tester);
+      await tester.pumpAndSettle();
+    });
+    expect(results, [TerminalExit.untrusted]);
+    expect(disposedReads, isEmpty);
+  });
+
+  testWidgets('R4: a sign-out while the page is open shows nothing of the disposed workspaces', (tester) async {
+    final disposedReads = await disposedReadsDuring(() async {
+      await open(tester);
+      session.signOut();
+      await tester.pump();
+      await rotate(tester);
+      await tester.pumpAndSettle();
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TerminalView), findsNothing);
+    expect(disposedReads, isEmpty);
+  });
+
+  testWidgets('R6: a machine that is no longer pinned closes the page as untrusted instead of crashing', (
+    tester,
+  ) async {
+    // Forgotten by an `untrusted` handshake while no terminal page was open.
+    machine.onUntrusted!();
+    await open(tester);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(results, [TerminalExit.untrusted]);
+    expect(find.text('open'), findsOneWidget);
+    expect(machine.connectCalls, 0);
   });
 }

@@ -30,17 +30,19 @@ class TerminalPage extends StatefulWidget {
 }
 
 class _TerminalPageState extends State<TerminalPage> {
+  /// Inside the terminal view, around the cells (design `.term`: `padding: 8px 10px 6px`).
+  static const EdgeInsets _terminalPadding = EdgeInsets.fromLTRB(10, 8, 10, 6);
+
   late final TerminalPageController _controller = getIt<TerminalPageController>(param1: widget.agentId);
   late final void Function() _stopExit;
   final FocusNode _terminalFocus = FocusNode();
   TerminalGrid _grid = fallbackGrid;
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
-    _stopExit = _controller.exit.subscribe((exit) {
-      if (exit != null && mounted) context.router.maybePop(exit);
-    });
+    _stopExit = _controller.exit.subscribe(_onExit);
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
@@ -52,14 +54,31 @@ class _TerminalPageState extends State<TerminalPage> {
     super.dispose();
   }
 
+  /// Pops this page with [exit] after the current frame: the exit can already be known while the
+  /// page is first built (R6), and navigating during a build is not allowed. A sheet or dialog
+  /// still open on top (the session picker, a confirmation, the font size) is closed first, or the
+  /// router would pop it with [exit] as its result.
+  void _onExit(TerminalExit? exit) {
+    if (exit == null || _leaving) return;
+    _leaving = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route is! PopupRoute);
+      context.router.maybePop(exit);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   Future<void> _prepare() async {
+    if (!mounted || _controller.closing.peek()) return;
     final sessions = await _controller.prepare();
-    if (sessions == null || !mounted) return;
+    if (sessions == null || !mounted || _controller.closing.peek()) return;
     if (sessions.isEmpty) {
       if (_controller.workspace.tabs.peek().isEmpty) await _controller.openNew(_grid);
       return;
     }
     final choice = await showSessionPicker(context, sessions);
+    if (!mounted || _controller.closing.peek()) return;
     switch (choice) {
       case AttachSession(:final session):
         await _controller.attach(session, _grid);
@@ -78,23 +97,27 @@ class _TerminalPageState extends State<TerminalPage> {
         message: strings.terminalCloseConfirm,
         confirmLabel: strings.terminalCloseTab,
       );
-      if (!confirmed) return;
+      if (!confirmed || !mounted) return;
     }
     await _controller.close(tab);
   }
 
+  /// "Dán" and the hardware paste shortcut (R3): `ShellxTerminal.paste` normalises the line breaks
+  /// and adds the bracketed-paste markers when the program asked for them.
   Future<void> _paste() async {
     final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
-    if (text != null) _controller.paste(text);
+    if (text != null && mounted) _controller.paste(text);
   }
 
+  /// "Sao chép" and the hardware copy shortcut (R3).
   Future<void> _copy(TerminalTabController tab) async {
     final range = tab.selection.selection;
     if (range == null) return;
     final copied = S.of(context).copied;
-    await Clipboard.setData(ClipboardData(text: tab.terminal.peek().buffer.getText(range)));
+    final text = tab.terminal.peek().buffer.getText(range);
     tab.selection.clearSelection();
-    _controller.popupHandler.showSuccess(title: copied);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) _controller.popupHandler.showSuccess(title: copied);
   }
 
   void _toggleKeyboard() {
@@ -148,122 +171,151 @@ class _TerminalPageState extends State<TerminalPage> {
 
   @override
   Widget build(BuildContext context) {
-    final landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
-    final workspace = _controller.workspace;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: TerminalColors.chrome,
-        body: Column(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: landscape
-                  ? _ChromeBar(
-                      onBack: () => context.router.maybePop(),
-                      title: Text(
-                        widget.machineName,
-                        style: context.typo.paragraph.bold.copyWith(color: TerminalColors.title),
-                      ),
-                      middle: _TabStrip(
-                        workspace: workspace,
-                        canOpen: _controller.canOpen,
-                        onOpen: () => _controller.openNew(_grid),
-                        onClose: _close,
-                        inline: true,
-                      ),
-                      trailing: IconButton(
-                        tooltip: S.of(context).keyboardTooltip,
-                        icon: const Icon(Icons.keyboard_outlined, color: TerminalColors.cyan),
-                        onPressed: _toggleKeyboard,
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        _ChromeBar(
-                          onBack: () => context.router.maybePop(),
-                          title: _TitleBlock(name: widget.machineName, controller: _controller),
-                          trailing: IconButton(
-                            tooltip: S.of(context).fontSizeTooltip,
-                            onPressed: _showFontSize,
-                            icon: Text(
-                              'Aa',
-                              style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.cyan),
-                            ),
-                          ),
-                        ),
-                        _TabStrip(
-                          workspace: workspace,
-                          canOpen: _controller.canOpen,
-                          onOpen: () => _controller.openNew(_grid),
-                          onClose: _close,
-                        ),
-                      ],
-                    ),
-            ),
-            ConnectionBanner(
-              backend: _controller.backend,
-              onReconnectReplaced: _controller.reconnectReplaced,
-              showReconnecting: false,
-            ),
-            Watch(
-              (context) =>
-                  _controller.busy.value ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
-            ),
-            Expanded(
-              child: ColoredBox(
-                color: TerminalColors.background,
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Watch((context) {
-                    final fontSize = _controller.fontSize.value;
-                    _grid =
-                        measureTerminalGrid(
-                          constraints.biggest,
-                          shellxTerminalStyle(fontSize),
-                          MediaQuery.textScalerOf(context),
-                        ) ??
-                        fallbackGrid;
-                    final active = workspace.activeTab.value;
-                    final notice = _controller.notice.value;
-                    return Stack(
-                      children: [
-                        Positioned.fill(
-                          child: active == null
-                              ? _NoTab(busy: _controller.busy.value, onOpen: () => _controller.openNew(_grid))
-                              : _TerminalPane(
-                                  key: ValueKey(active.id),
-                                  tab: active,
-                                  focusNode: _terminalFocus,
-                                  fontSize: fontSize,
-                                  onFontSize: _controller.setFontSize,
-                                  onCopy: () => _copy(active),
-                                  onCloseTab: () => _controller.close(active),
-                                  onOpenNew: () => _controller.replaceWithNew(active, _grid),
-                                ),
-                        ),
-                        if (notice != null)
-                          Positioned(
-                            top: 8,
-                            left: 12,
-                            right: 12,
-                            child: _FloatingNotice(text: notice, onTap: _controller.dismissNotice),
-                          ),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-            ),
-            Container(
-              color: context.colors.keyboardBackground,
-              child: SafeArea(
-                top: false,
-                child: ExtraKeysBar(controller: workspace.extraKeys, onKey: _controller.sendKey, onPaste: _paste),
-              ),
-            ),
-          ],
-        ),
+        // R4: once the page is leaving, the workspace may already be disposed; nothing below
+        // reads it again. Every Watch that does is inside [_body], replaced here in the next frame
+        // (a parent rebuilds before its children), and the controller writes none of the signals
+        // they read in the meantime.
+        body: Watch((context) => _controller.closing.value ? const SizedBox.expand() : _body(context)),
       ),
+    );
+  }
+
+  /// Only [Watch]es read signals below, so that [build]'s own Watch depends on
+  /// [TerminalPageController.closing] alone.
+  Widget _body(BuildContext context) {
+    final landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final workspace = _controller.workspace;
+    return Column(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: landscape
+              ? _ChromeBar(
+                  onBack: () => context.router.maybePop(),
+                  title: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    child: Text(
+                      widget.machineName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.paragraph.bold.copyWith(color: TerminalColors.title),
+                    ),
+                  ),
+                  middle: _TabStrip(
+                    workspace: workspace,
+                    closing: _controller.closing,
+                    canOpen: _controller.canOpen,
+                    onOpen: () => _controller.openNew(_grid),
+                    onClose: _close,
+                    inline: true,
+                  ),
+                  trailing: IconButton(
+                    tooltip: S.of(context).keyboardTooltip,
+                    icon: const Icon(Icons.keyboard_outlined, color: TerminalColors.cyan),
+                    onPressed: _toggleKeyboard,
+                  ),
+                )
+              : Column(
+                  children: [
+                    _ChromeBar(
+                      onBack: () => context.router.maybePop(),
+                      title: _TitleBlock(name: widget.machineName, controller: _controller),
+                      trailing: IconButton(
+                        tooltip: S.of(context).fontSizeTooltip,
+                        onPressed: _showFontSize,
+                        icon: Text(
+                          'Aa',
+                          style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.cyan),
+                        ),
+                      ),
+                    ),
+                    _TabStrip(
+                      workspace: workspace,
+                      closing: _controller.closing,
+                      canOpen: _controller.canOpen,
+                      onOpen: () => _controller.openNew(_grid),
+                      onClose: _close,
+                    ),
+                  ],
+                ),
+        ),
+        ConnectionBanner(
+          backend: _controller.backend,
+          onReconnectReplaced: _controller.reconnectReplaced,
+          showReconnecting: false,
+        ),
+        Watch(
+          (context) => _controller.busy.value ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
+        ),
+        Expanded(
+          child: ColoredBox(
+            color: TerminalColors.background,
+            // Landscape: keep the cells clear of the notch; top and bottom belong to the bars.
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) => Watch((context) {
+                  // Read first: set before the workspace is disposed (see [build]).
+                  if (_controller.closing.value) return const SizedBox.expand();
+                  final fontSize = _controller.fontSize.value;
+                  // The size the terminal view gives its cells, so the session opens at the size
+                  // the view then reports (Review Focus 4: never below 1×1, else the fallback).
+                  final cells = Size(
+                    (constraints.maxWidth - _terminalPadding.horizontal).clamp(0, double.infinity),
+                    (constraints.maxHeight - _terminalPadding.vertical).clamp(0, double.infinity),
+                  );
+                  _grid =
+                      measureTerminalGrid(cells, shellxTerminalStyle(fontSize), MediaQuery.textScalerOf(context)) ??
+                      fallbackGrid;
+                  final active = workspace.activeTab.value;
+                  final notice = _controller.notice.value;
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: active == null
+                            ? _NoTab(busy: _controller.busy.value, onOpen: () => _controller.openNew(_grid))
+                            : _TerminalPane(
+                                key: ValueKey(active.id),
+                                tab: active,
+                                closing: _controller.closing,
+                                focusNode: _terminalFocus,
+                                fontSize: fontSize,
+                                padding: _terminalPadding,
+                                onFontSize: _controller.setFontSize,
+                                onCopy: () => _copy(active),
+                                onPaste: _paste,
+                                onCloseTab: () => _controller.close(active),
+                                onOpenNew: () => _controller.replaceWithNew(active, _grid),
+                                onReattach: () => _controller.reattach(active),
+                              ),
+                      ),
+                      if (notice != null)
+                        Positioned(
+                          top: 8,
+                          left: 12,
+                          right: 12,
+                          child: _FloatingNotice(text: notice, onTap: _controller.dismissNotice),
+                        ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          color: context.colors.keyboardBackground,
+          child: SafeArea(
+            top: false,
+            child: ExtraKeysBar(controller: workspace.extraKeys, onKey: _controller.sendKey, onPaste: _paste),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -315,7 +367,8 @@ class _TitleBlock extends StatelessWidget {
     return Watch((context) {
       final relay = controller.relayState.value;
       final reconnecting = relay == RelayConnectionState.disconnected;
-      final ready = controller.machineState.value is MachineReady && !reconnecting;
+      // The channel only works while the relay does (the fakes keep the machine ready then).
+      final ready = controller.machineState.value is MachineReady && relay == RelayConnectionState.connected;
       final status = reconnecting
           ? strings.bannerReconnecting
           : ready
@@ -337,7 +390,8 @@ class _TitleBlock extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: ready ? context.colors.okDot : TerminalColors.dim,
+                  // Design: green when connected, amber while connecting or reconnecting.
+                  color: ready ? context.colors.okDot : TerminalColors.yellow,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -361,6 +415,7 @@ class _TitleBlock extends StatelessWidget {
 class _TabStrip extends StatelessWidget {
   const _TabStrip({
     required this.workspace,
+    required this.closing,
     required this.canOpen,
     required this.onOpen,
     required this.onClose,
@@ -368,6 +423,9 @@ class _TabStrip extends StatelessWidget {
   });
 
   final TerminalWorkspace workspace;
+
+  /// [TerminalPageController.closing]: read before [workspace], which may be disposed then.
+  final ReadonlySignal<bool> closing;
   final ReadonlySignal<bool> canOpen;
   final VoidCallback onOpen;
   final ValueChanged<TerminalTabController> onClose;
@@ -379,6 +437,7 @@ class _TabStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = S.of(context);
     return Watch((context) {
+      if (closing.value) return const SizedBox(height: 44);
       final tabs = workspace.tabs.value;
       final activeIndex = workspace.activeIndex.value;
       return Container(
@@ -397,6 +456,7 @@ class _TabStrip extends StatelessWidget {
               _TabChip(
                 key: ValueKey('tab-${tab.id}'),
                 tab: tab,
+                closing: closing,
                 selected: index == activeIndex,
                 onSelect: () => workspace.select(index),
                 onClose: () => onClose(tab),
@@ -418,6 +478,7 @@ class _TabChip extends StatelessWidget {
   const _TabChip({
     super.key,
     required this.tab,
+    required this.closing,
     required this.selected,
     required this.onSelect,
     required this.onClose,
@@ -425,6 +486,9 @@ class _TabChip extends StatelessWidget {
   });
 
   final TerminalTabController tab;
+
+  /// Read before [tab], which is disposed with the workspace.
+  final ReadonlySignal<bool> closing;
   final bool selected;
   final VoidCallback onSelect;
   final VoidCallback onClose;
@@ -433,6 +497,7 @@ class _TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Watch((context) {
+      if (closing.value) return const SizedBox.shrink();
       final live = tab.isLive.value;
       return Padding(
         padding: const EdgeInsets.only(top: 5, right: 2),
@@ -525,26 +590,37 @@ class _TerminalPane extends StatelessWidget {
   const _TerminalPane({
     super.key,
     required this.tab,
+    required this.closing,
     required this.focusNode,
     required this.fontSize,
+    required this.padding,
     required this.onFontSize,
     required this.onCopy,
+    required this.onPaste,
     required this.onCloseTab,
     required this.onOpenNew,
+    required this.onReattach,
   });
 
   final TerminalTabController tab;
+
+  /// Read before [tab], which is disposed with the workspace.
+  final ReadonlySignal<bool> closing;
   final FocusNode focusNode;
   final double fontSize;
+  final EdgeInsets padding;
   final ValueChanged<double> onFontSize;
   final VoidCallback onCopy;
+  final VoidCallback onPaste;
   final VoidCallback onCloseTab;
   final VoidCallback onOpenNew;
+  final VoidCallback onReattach;
 
   @override
   Widget build(BuildContext context) {
     final strings = S.of(context);
     return Watch((context) {
+      if (closing.value) return const SizedBox.expand();
       final banner = tab.banner.value;
       return Stack(
         children: [
@@ -552,17 +628,44 @@ class _TerminalPane extends StatelessWidget {
             child: PinchToZoom(
               fontSize: fontSize,
               onFontSize: onFontSize,
-              child: TerminalView(
-                tab.terminal.value,
-                controller: tab.selection,
-                focusNode: focusNode,
-                theme: TerminalColors.theme,
-                textStyle: shellxTerminalStyle(fontSize),
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-                autofocus: true,
-                deleteDetection: true,
-                readOnly: !tab.isLive.value,
-                shortcuts: terminalShortcuts(defaultTargetPlatform),
+              // R3: `terminalShortcuts` maps the hardware copy/paste chords to ShellX intents that
+              // xterm's own actions do not handle; they do what "Sao chép" and "Dán" do.
+              child: Actions(
+                actions: <Type, Action<Intent>>{
+                  ShellxPasteIntent: CallbackAction<ShellxPasteIntent>(
+                    onInvoke: (_) {
+                      onPaste();
+                      return null;
+                    },
+                  ),
+                  ShellxCopyIntent: CallbackAction<ShellxCopyIntent>(
+                    onInvoke: (_) {
+                      onCopy();
+                      return null;
+                    },
+                  ),
+                },
+                // xterm adds the MediaQuery padding (status bar, home indicator) inside the view;
+                // the bars around the terminal already keep clear of them.
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeLeft: true,
+                  removeTop: true,
+                  removeRight: true,
+                  removeBottom: true,
+                  child: TerminalView(
+                    tab.terminal.value,
+                    controller: tab.selection,
+                    focusNode: focusNode,
+                    theme: TerminalColors.theme,
+                    textStyle: shellxTerminalStyle(fontSize),
+                    padding: padding,
+                    autofocus: true,
+                    deleteDetection: true,
+                    readOnly: !tab.isLive.value,
+                    shortcuts: terminalShortcuts(defaultTargetPlatform),
+                  ),
+                ),
               ),
             ),
           ),
@@ -586,7 +689,7 @@ class _TerminalPane extends StatelessWidget {
               left: 12,
               right: 12,
               bottom: 12,
-              child: _EndedCard(banner: banner, onCloseTab: onCloseTab, onOpenNew: onOpenNew, onReattach: tab.reattach),
+              child: _EndedCard(banner: banner, onCloseTab: onCloseTab, onOpenNew: onOpenNew, onReattach: onReattach),
             ),
         ],
       );
