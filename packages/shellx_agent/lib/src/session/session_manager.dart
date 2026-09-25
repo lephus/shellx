@@ -251,6 +251,13 @@ final class SessionManager {
   }
 
   /// Kills every session attached to [mobileId] (used when revoking a phone).
+  ///
+  /// Precondition: no `session.open` is pending (awaiting the shell
+  /// resolver). The epoch bump is global, so it would also void an open
+  /// in flight for another phone. AgentService guarantees this: it calls
+  /// this from its inbox, which awaits every [handle] call, so no open is
+  /// in flight at that point. Only [closeAll] (called by the app outside
+  /// that inbox) can race an open, and it is meant to void every one.
   void closeSessionsAttachedTo(String mobileId) {
     _epoch++;
     for (final session in _sessions.values.toList()) {

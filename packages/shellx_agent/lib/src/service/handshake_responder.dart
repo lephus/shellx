@@ -26,7 +26,11 @@ final class HandshakeAnswer {
   /// Transport keys; non-null only when [status] is ok.
   final NoiseTransport? transport;
 
-  /// PSK of an accepted pairing handshake; null otherwise.
+  /// For an IKpsk2 HS1 answered ok: the pairing code that was active when
+  /// the HS1 arrived (used as the PSK); null otherwise. An ok answer does
+  /// not prove the phone has the code (the PSK is only mixed into message
+  /// 2): the proof is a `pair.confirm` decrypted on this channel, while
+  /// this code is still the active one.
   final Uint8List? pairingSecret;
 }
 
