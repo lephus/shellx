@@ -93,6 +93,45 @@ void main() {
     expect(workspace.activeTab.value, isNull);
   });
 
+  test('close: closing a tab before the active one keeps the same active tab', () async {
+    final a = await workspace.openNew(grid);
+    final b = await workspace.openNew(grid);
+    final c = await workspace.openNew(grid);
+    final d = await workspace.openNew(grid);
+    workspace.select(2); // c
+    expect(workspace.activeTab.value, same(c));
+
+    await workspace.close(a);
+    expect(workspace.tabs.value, [b, c, d]);
+    expect(workspace.activeTab.value, same(c));
+  });
+
+  test('close: closing a tab after the active one keeps it too', () async {
+    final a = await workspace.openNew(grid);
+    final b = await workspace.openNew(grid);
+    final c = await workspace.openNew(grid);
+    final d = await workspace.openNew(grid);
+    workspace.select(1); // b
+    expect(workspace.activeTab.value, same(b));
+
+    await workspace.close(d);
+    expect(workspace.tabs.value, [a, b, c]);
+    expect(workspace.activeTab.value, same(b));
+  });
+
+  test('close: closing the active tab in the middle selects the tab that takes its place', () async {
+    final a = await workspace.openNew(grid);
+    final b = await workspace.openNew(grid);
+    final c = await workspace.openNew(grid);
+    final d = await workspace.openNew(grid);
+    workspace.select(1); // b
+    expect(workspace.activeTab.value, same(b));
+
+    await workspace.close(b);
+    expect(workspace.tabs.value, [a, c, d]);
+    expect(workspace.activeTab.value, same(c));
+  });
+
   test('remove disposes the workspace of an unpaired machine', () async {
     await workspace.openNew(grid);
     registry.remove(agentA);

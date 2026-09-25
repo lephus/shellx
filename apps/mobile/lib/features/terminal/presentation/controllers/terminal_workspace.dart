@@ -37,6 +37,8 @@ class TerminalWorkspace extends Controller {
     try {
       await machine.connect();
     } catch (error) {
+      // Unreachable under the port contract (`connect()` throws `MachineConnectionException`,
+      // never the state object itself) — kept as defence in depth.
       if (error is MachineFailed) rethrow;
       final state = machine.state;
       if (state is MachineFailed) throw state;
@@ -111,12 +113,24 @@ class TerminalWorkspace extends Controller {
 
   /// `×`: sends `session.close` (spec §6.4) and drops the tab. Errors from an
   /// already-ended session are ignored — the tab must always be closable.
+  ///
+  /// The active tab is tracked by identity, not by index: removing a tab shifts every later
+  /// index down by one, so keeping the same index would silently select a different tab (e.g.
+  /// tabs [a, b, c, d] with c active at index 2 — closing a must keep c active, not land on d).
   Future<void> close(TerminalTabController tab) async {
     final tabs = [..._tabs.peek()];
-    if (!tabs.remove(tab)) return;
+    final closingIndex = tabs.indexOf(tab);
+    if (closingIndex < 0) return;
+    final activeTab = _activeTab.peek();
+    tabs.removeAt(closingIndex);
     batch(() {
       _tabs.value = List.unmodifiable(tabs);
-      if (_active.peek() >= tabs.length) _active.value = tabs.isEmpty ? 0 : tabs.length - 1;
+      if (identical(activeTab, tab)) {
+        // The closed tab was the active one: the neighbour that takes its place, clamped.
+        _active.value = tabs.isEmpty ? 0 : closingIndex.clamp(0, tabs.length - 1);
+      } else if (activeTab != null) {
+        _active.value = tabs.indexOf(activeTab);
+      }
     });
     tab.dispose();
     try {
