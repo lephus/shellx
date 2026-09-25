@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AppLifecycleWidget extends StatefulWidget {
@@ -25,7 +26,7 @@ class AppLifecycleWidgetState<T extends AppLifecycleWidget> extends State<T> wit
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (enableLifeCircleLog) print('DEBUG: App lifecycle state changed to $state');
+    if (enableLifeCircleLog && kDebugMode) debugPrint('DEBUG: App lifecycle state changed to $state');
     if (state == AppLifecycleState.paused) {
       flagLastVisible = DateTime.now();
       appIsPaused = true;
@@ -37,9 +38,11 @@ class AppLifecycleWidgetState<T extends AppLifecycleWidget> extends State<T> wit
       final duration = now.difference(flagLastVisible);
       if (duration > Duration(minutes: 1)) {
         onResume();
-        if (enableLifeCircleLog) print('DEBUG: App resumed, reloading configs');
+        if (enableLifeCircleLog && kDebugMode) debugPrint('DEBUG: App resumed, reloading configs');
       } else {
-        if (enableLifeCircleLog) print('DEBUG: App resumed, background < 1m -> dont reload config');
+        if (enableLifeCircleLog && kDebugMode) {
+          debugPrint('DEBUG: App resumed, background < 1m -> dont reload config');
+        }
       }
     }
   }

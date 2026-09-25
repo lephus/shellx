@@ -1,5 +1,5 @@
-import 'dart:developer';
 import 'package:async/async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shellx_mobile/core/core.dart';
 
 class PagingStateSignal<T extends Equatable> extends ListSignal<T> with StateSignalMixin<List<T>> {
@@ -83,7 +83,9 @@ class PagingStateSignal<T extends Equatable> extends ListSignal<T> with StateSig
     try {
       _cancellableFetch = CancelableOperation.fromFuture(
         delegateFetchPage(requestedCursor, limit),
-        onCancel: () => log('Fetch operation cancelled'),
+        onCancel: () {
+          if (kDebugMode) debugPrint('Fetch operation cancelled');
+        },
       );
 
       final page = await _cancellableFetch!.value;
@@ -113,7 +115,8 @@ class PagingStateSignal<T extends Equatable> extends ListSignal<T> with StateSig
 
   void _handleError(AppError error) {
     if (disposed) return;
-    log(error.toString());
+    // Only the type: the error may carry request details (overview §2).
+    if (kDebugMode) debugPrint('PagingStateSignal fetch error: ${error.runtimeType}');
     changeStateWithoutImpact(ErrorState(error));
     set(peek(), force: true); // Notify listeners of error state
   }
