@@ -370,6 +370,9 @@ abstract final class DeviceIdentity {
   static const String storageKey = 'device_private_key';     // base64url khóa bí mật
   static Future<NoiseKeyPair> loadOrCreate(KeyValueStore store);
 }
+// BẮT BUỘC (plan 04/05): mỗi app dùng MỘT instance KeyValueStore dùng chung cho cả tiến trình
+// (ví dụ một Riverpod provider duy nhất). Bảo đảm "chỉ sinh một khóa khi gọi đồng thời" chỉ đúng
+// với các lời gọi trên cùng một instance.
 
 // lib/src/api/…
 final class DeviceInfo {
