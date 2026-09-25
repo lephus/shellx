@@ -483,6 +483,67 @@ void main() {
     });
   });
 
+  // Final review M4: keystrokes for a tab not yet re-attached are held.
+  test('keystrokes typed after the new channel is up but before the tab is '
+      're-attached reach the shell once it is', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final pty = h.pty;
+      settle(async);
+      h.disconnectPhone();
+
+      // Stale tabs re-attach one at a time: while the first one's attach is
+      // answered, the second tab is still stale on the new channel.
+      var typed = false;
+      h.phoneMachine.states.listen((state) {
+        if (state is MachineReady && !typed) {
+          typed = true;
+          h.phoneMachine.input(tab.id, Uint8List.fromList('ls\r'.codeUnits));
+        }
+      });
+      h.reconnectPhone();
+      expect(typed, isTrue);
+      expect(tab.isAttached, isTrue);
+      expect(pty.writtenText, 'ls\r');
+
+      h.phoneMachine.input(tab.id, Uint8List.fromList('pwd\r'.codeUnits));
+      settle(async);
+      expect(pty.writtenText, 'ls\rpwd\r');
+    });
+  });
+
+  test('keystrokes typed while offline reach the shell after the re-attach, '
+      'at most the newest 64 KiB', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      settle(async);
+      h.disconnectPhone();
+
+      h.phoneMachine.input(
+        tab.id,
+        Uint8List.fromList(List.filled(40 << 10, 0x61)),
+      );
+      h.phoneMachine.input(
+        tab.id,
+        Uint8List.fromList(List.filled(40 << 10, 0x62)),
+      );
+      h.reconnectPhone();
+
+      final written = [for (final w in h.pty.writes) ...w];
+      expect(written, [
+        ...List.filled(24 << 10, 0x61),
+        ...List.filled(40 << 10, 0x62),
+      ]);
+      expect(
+        [for (final w in h.pty.writes) w.length].every((n) => n <= 16 << 10),
+        isTrue,
+      );
+    });
+  });
+
   test('stop() and start() of the phone service re-attach the open tab', () {
     fakeAsync((async) {
       final h = Harness(async, keys);

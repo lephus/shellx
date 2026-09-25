@@ -205,10 +205,21 @@ final class MachineClient {
   }
 
   /// Sends keystrokes; data larger than 16 KiB is split into several
-  /// `input` messages. Dropped while the channel is down.
+  /// `input` messages. While the tab is not attached on the current channel
+  /// (no channel, or its re-attach not sent yet) the agent would drop them:
+  /// they are held instead, at most the newest 64 KiB, and sent in order
+  /// once the agent answers `session.attached`.
   void input(int id, Uint8List data) {
     final tab = _tabs[id];
-    if (tab == null || !tab.isAttached || _secure == null) return;
+    if (tab == null || !tab.isAttached) return;
+    if (!_attachedHere.contains(tab) || tab.hasHeldInput) {
+      tab.holdInput(data);
+      return;
+    }
+    _sendInput(id, data);
+  }
+
+  void _sendInput(int id, Uint8List data) {
     for (var offset = 0; offset < data.length; offset += kMaxOutputChunk) {
       final end = min(offset + kMaxOutputChunk, data.length);
       _send([InputMessage(id: id, data: data.sublist(offset, end))]);
@@ -520,6 +531,11 @@ final class MachineClient {
         pending.completer.complete(tab);
       case SessionAttached(:final id):
         _takeAttach(id)?.complete();
+        // The agent takes this tab's input again: send what was held.
+        final tab = _tabs[id];
+        if (tab != null && _attachedHere.contains(tab) && tab.hasHeldInput) {
+          _sendInput(id, tab.takeHeldInput());
+        }
       case SessionReset(:final id):
         _tabs[id]?.handleReset();
       case OutputMessage(:final id, :final seq, :final data):

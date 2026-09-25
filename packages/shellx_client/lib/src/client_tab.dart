@@ -46,6 +46,10 @@ const int kAckThresholdBytes = 32 * 1024;
 /// Or this long after the last output while bytes are unacknowledged.
 const Duration kAckDelay = Duration(milliseconds: 100);
 
+/// Keystrokes held for a tab that is not attached on the current channel:
+/// at most this many, the oldest dropped first.
+const int _maxHeldInputBytes = 64 * 1024;
+
 /// One terminal tab attached to a session on a machine.
 ///
 /// Events emitted before the first listener subscribes are buffered and
@@ -82,6 +86,7 @@ final class ClientTab {
   int _acked = 0;
   bool _attached = true;
   Timer? _ackTimer;
+  final _heldInput = BytesBuilder();
 
   /// Total output bytes received: the `last_seq` for re-attaching.
   int get received => _received;
@@ -110,6 +115,25 @@ final class ClientTab {
     _attached = true;
     _acked = _received;
   }
+
+  /// Keystrokes are waiting for the agent to confirm the (re-)attach.
+  @internal
+  bool get hasHeldInput => _heldInput.isNotEmpty;
+
+  /// Holds [data] (copied) after the keystrokes already held, keeping only
+  /// the newest 64 KiB. Dropped when the tab ends.
+  @internal
+  void holdInput(Uint8List data) {
+    _heldInput.add(data);
+    final overflow = _heldInput.length - _maxHeldInputBytes;
+    if (overflow > 0) {
+      _heldInput.add(Uint8List.sublistView(_heldInput.takeBytes(), overflow));
+    }
+  }
+
+  /// The held keystrokes, oldest first; none are held afterwards.
+  @internal
+  Uint8List takeHeldInput() => _heldInput.takeBytes();
 
   @internal
   void handleOutput(int seq, Uint8List data) {
@@ -166,6 +190,7 @@ final class ClientTab {
   void _end() {
     _attached = false;
     _cancelAck();
+    _heldInput.clear();
   }
 
   void _flushAck() {

@@ -149,6 +149,27 @@ void main() {
     });
   });
 
+  // Final review M4.
+  test('held keystrokes keep the newest 64 KiB and are dropped when the tab '
+      'ends', () {
+    final tab = newTab([]);
+    final paste = bytes(List.filled(60 << 10, 0x61));
+    tab.holdInput(paste);
+    paste[0] = 0x7a; // The caller reuses its buffer: the held copy is kept.
+    tab.holdInput(bytes(List.filled(8 << 10, 0x62)));
+    expect(tab.takeHeldInput(), [
+      ...List.filled(56 << 10, 0x61),
+      ...List.filled(8 << 10, 0x62),
+    ]);
+    expect(tab.hasHeldInput, isFalse);
+
+    tab.holdInput(bytes([0x63]));
+    tab.handleDetached(DetachReason.takenOver);
+    expect(tab.hasHeldInput, isFalse);
+    tab.beginAttach(); // Re-attached later: nothing old is sent.
+    expect(tab.takeHeldInput(), isEmpty);
+  });
+
   test('events emitted before the first listener are replayed to it', () {
     fakeAsync((async) {
       final tab = newTab([]);
