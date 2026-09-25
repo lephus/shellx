@@ -239,12 +239,14 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "pairingSucceeded": MessageLookupByLibrary.simpleMessage("Paired"),
     "pairingSucceededBody": m12,
+    "passwordHide": MessageLookupByLibrary.simpleMessage("Hide password"),
     "passwordHint": MessageLookupByLibrary.simpleMessage("Password"),
     "passwordLabel": MessageLookupByLibrary.simpleMessage("Password"),
     "passwordMissing": m13,
     "passwordRule": MessageLookupByLibrary.simpleMessage(
       "8 to 128 characters.",
     ),
+    "passwordShow": MessageLookupByLibrary.simpleMessage("Show password"),
     "passwordTooLong": m14,
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "open on another device",

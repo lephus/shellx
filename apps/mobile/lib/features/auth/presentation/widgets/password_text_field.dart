@@ -111,6 +111,7 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
                 _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                 color: context.colors.disable,
               ),
+              tooltip: _obscureText ? S.of(context).passwordShow : S.of(context).passwordHide,
               onPressed: _toggleVisibility,
             ),
           ),

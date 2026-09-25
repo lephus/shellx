@@ -344,6 +344,26 @@ class S {
     return Intl.message('Password', name: 'passwordHint', desc: '', args: []);
   }
 
+  /// `Show password`
+  String get passwordShow {
+    return Intl.message(
+      'Show password',
+      name: 'passwordShow',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Hide password`
+  String get passwordHide {
+    return Intl.message(
+      'Hide password',
+      name: 'passwordHide',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Sign in`
   String get loginButton {
     return Intl.message('Sign in', name: 'loginButton', desc: '', args: []);

@@ -34,6 +34,8 @@
   "emailHint": "email@example.com",
   "passwordLabel": "Mật khẩu",
   "passwordHint": "Mật khẩu",
+  "passwordShow": "Hiện mật khẩu",
+  "passwordHide": "Ẩn mật khẩu",
   "loginButton": "Đăng nhập",
   "forgotPasswordHint": "Quên mật khẩu? Đổi mật khẩu trong ShellX trên máy tính đang đăng nhập.",
   "noAccountPrompt": "Chưa có tài khoản?",

@@ -232,10 +232,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "pairingSucceeded": MessageLookupByLibrary.simpleMessage("Đã ghép nối"),
     "pairingSucceededBody": m12,
+    "passwordHide": MessageLookupByLibrary.simpleMessage("Ẩn mật khẩu"),
     "passwordHint": MessageLookupByLibrary.simpleMessage("Mật khẩu"),
     "passwordLabel": MessageLookupByLibrary.simpleMessage("Mật khẩu"),
     "passwordMissing": m13,
     "passwordRule": MessageLookupByLibrary.simpleMessage("Từ 8 đến 128 ký tự."),
+    "passwordShow": MessageLookupByLibrary.simpleMessage("Hiện mật khẩu"),
     "passwordTooLong": m14,
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "đang mở trên thiết bị khác",

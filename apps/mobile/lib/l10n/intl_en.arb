@@ -55,6 +55,8 @@
   "emailHint": "email@example.com",
   "passwordLabel": "Password",
   "passwordHint": "Password",
+  "passwordShow": "Show password",
+  "passwordHide": "Hide password",
   "loginButton": "Sign in",
   "forgotPasswordHint": "Forgot your password? Change it in ShellX on a computer that is signed in.",
   "noAccountPrompt": "No account yet?",

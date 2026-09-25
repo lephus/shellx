@@ -17,11 +17,14 @@ class StatusCircle extends StatelessWidget {
       StatusTone.error => (colors.errorSoft, colors.error),
       StatusTone.warn => (colors.warnSoft, colors.warn),
     };
-    return Container(
-      width: 76,
-      height: 76,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
-      child: Icon(icon, size: 38, color: foreground),
+    // Decorative next to its own text in every design use; the text carries the meaning.
+    return ExcludeSemantics(
+      child: Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+        child: Icon(icon, size: 38, color: foreground),
+      ),
     );
   }
 }
