@@ -375,6 +375,130 @@ void main() {
       expect(stoppedAtLogout, isTrue);
     });
 
+    test('fail closed: local data is gone and the state is signed out '
+        'before the logout request has finished', () async {
+      boot();
+      await h.seedSignedIn();
+      await h.trusted.add(phone('m1', 'iPhone'));
+      await controller().bootstrap(watchForWake: false);
+      final logoutReply = Completer<void>();
+      h.relay.holds['POST /v1/auth/logout'] = logoutReply.future;
+
+      var done = false;
+      final signOut = controller().signOut().then((_) => done = true);
+      await pumpEventQueue();
+
+      // Quitting or crashing now must not come back signed in with the
+      // phones still trusted.
+      expect(state().phase, AuthPhase.signedOut);
+      expect(await h.trusted.list(), isEmpty);
+      expect(await h.secureStore.read('auth_token'), isNull);
+      expect(await h.secureStore.read('device_id'), isNull);
+      expect(await h.secureStore.read('user_id'), isNull);
+      expect(h.api.token, isNull);
+      expect(h.relay.routes, contains('POST /v1/auth/logout'));
+      expect(done, isFalse);
+
+      logoutReply.complete();
+      await signOut;
+    });
+
+    test(
+      'fail closed: local data goes before a slow relay stop settles',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await h.trusted.add(phone('m1', 'iPhone'));
+        await controller().bootstrap(watchForWake: false);
+        final runtime = h.runtime;
+        final gate = runtime.stopGate = Completer<void>();
+
+        final signOut = controller().signOut();
+        await pumpEventQueue();
+        expect(runtime.stopped, isTrue);
+        expect(state().phase, AuthPhase.signedOut);
+        expect(await h.trusted.list(), isEmpty);
+        expect(await h.secureStore.read('auth_token'), isNull);
+        // The logout still waits for the relay link to be fully stopped.
+        expect(h.relay.routes, isNot(contains('POST /v1/auth/logout')));
+
+        gate.complete();
+        await signOut;
+        expect(h.relay.routes, contains('POST /v1/auth/logout'));
+      },
+    );
+
+    test(
+      'the logout runs on a throwaway ShellxApi with the signed-out token: '
+      'a new sign-in meanwhile keeps its token and its stored data',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await controller().bootstrap(watchForWake: false);
+        final logoutReply = Completer<void>();
+        h.relay.holds['POST /v1/auth/logout'] = logoutReply.future;
+        final signOut = controller().signOut();
+        await pumpEventQueue();
+
+        h.relay.token = 'token-2';
+        await controller().signIn(
+          email: 'phu@example.com',
+          password: 'correct horse',
+          register: false,
+        );
+        logoutReply.complete();
+        await signOut;
+
+        final logout = h.relay.last('POST /v1/auth/logout');
+        expect(h.relay.bearerOf(logout), 'Bearer token-1');
+        expect(h.createdApis, hasLength(1));
+        expect(h.createdApis.single, isNot(same(h.api)));
+        expect(h.api.token, 'token-2');
+        expect(await h.secureStore.read('auth_token'), 'token-2');
+        expect(state().phase, AuthPhase.signedIn);
+      },
+    );
+
+    test('a keychain that refuses a delete still signs out, deletes the '
+        'rest and says so', () async {
+      boot();
+      await h.seedSignedIn();
+      await h.trusted.add(phone('m1', 'iPhone'));
+      await controller().bootstrap(watchForWake: false);
+      h.secureStore.failingDeletes.add('auth_token');
+
+      await controller().signOut();
+
+      expect(state().phase, AuthPhase.signedOut);
+      expect(await h.trusted.list(), isEmpty);
+      expect(await h.secureStore.read('device_id'), isNull);
+      expect(await h.secureStore.read('user_id'), isNull);
+      expect(h.api.token, isNull);
+      expect(
+        h.notifier.shown.single.title,
+        h.l10n.notifySignOutIncompleteTitle,
+      );
+      expect(h.notifier.shown.single.title, isNot(contains('SECRET')));
+    });
+
+    test(
+      'a trusted list that cannot be cleared still deletes the token',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await h.trusted.add(phone('m1', 'iPhone'));
+        await controller().bootstrap(watchForWake: false);
+        h.secureStore.failingWrites.add('trusted_devices');
+
+        await controller().signOut();
+
+        expect(state().phase, AuthPhase.signedOut);
+        expect(await h.secureStore.read('auth_token'), isNull);
+        expect(await h.secureStore.read('user_id'), isNull);
+        expect(h.notifier.shown, hasLength(1));
+      },
+    );
+
     test('keeps the device key', () async {
       boot();
       await h.seedSignedIn();
@@ -841,6 +965,7 @@ void main() {
         secureStore: base.secureStore,
         settings: base.settings,
         api: base.api,
+        createApi: base.createApi,
         runtimeFactory: base.runtimeFactory,
         keepAwake: base.keepAwake,
         launchAtLogin: base.launchAtLogin,
@@ -924,7 +1049,8 @@ void main() {
       expect(h.ptyKillWaits, 1);
     });
 
-    test('sign-out waits for the kills before reporting signed out', () async {
+    test('sign-out reports signed out at once and waits for the kills '
+        'before it completes', () async {
       boot();
       await h.seedSignedIn();
       await controller().bootstrap(watchForWake: false);
@@ -936,14 +1062,18 @@ void main() {
         return kills.future;
       };
 
-      final signOut = controller().signOut();
+      var done = false;
+      final signOut = controller().signOut().then((_) => done = true);
       await pumpEventQueue();
       expect(stoppedFirst, isTrue);
-      expect(state().phase, AuthPhase.signedIn);
+      // Fail closed (final review I4): local data first.
+      expect(state().phase, AuthPhase.signedOut);
+      expect(await h.secureStore.read('auth_token'), isNull);
+      expect(done, isFalse);
 
       kills.complete();
       await signOut;
-      expect(state().phase, AuthPhase.signedOut);
+      expect(done, isTrue);
     });
   });
 

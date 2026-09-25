@@ -376,6 +376,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'ShellX không đọc được thông tin đăng nhập đã lưu';
 
   @override
+  String get notifySignOutIncompleteTitle =>
+      'Đã đăng xuất, nhưng không xóa được một phần thông tin đăng nhập đã lưu';
+
+  @override
   String get startupFailed =>
       'ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.';
 

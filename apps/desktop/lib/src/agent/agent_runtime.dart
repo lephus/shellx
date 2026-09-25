@@ -36,9 +36,12 @@ abstract interface class AgentRuntime {
 
   /// Closes every session, stops AgentService and disconnects from the relay.
   ///
-  /// Once it completes the relay is `stopped` and nothing more is emitted
-  /// (no `AgentRevoked`), so `api.logout()` can follow. The shells are told
-  /// to die but not awaited: `Pty.kill()` returns nothing to wait for.
+  /// Takes effect when called (synchronously): the relay is `stopped` and
+  /// nothing more is emitted (no `AgentRevoked`). The future completes once
+  /// the socket is closed and an upgrade still in flight has settled
+  /// (RelayConnection.stop, bounded), so `api.logout()` and a new runtime's
+  /// relay link can follow. The shells are told to die but not awaited:
+  /// `Pty.kill()` returns nothing to wait for.
   Future<void> stop();
 
   RelayConnectionState get relayState;

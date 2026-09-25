@@ -51,7 +51,7 @@ void main() {
   late NoiseKeyPair identity;
   final now = DateTime(2026, 9, 25, 12);
 
-  Future<CoreAgentRuntime> build() async {
+  Future<CoreAgentRuntime> build({RelaySocketConnector? connector}) async {
     identity = await NoiseKeyPair.generate();
     final store = InMemoryKeyValueStore();
     return CoreAgentRuntime(
@@ -75,10 +75,12 @@ void main() {
       ),
       homeDirectory: '/Users/phu',
       baseEnvironment: const {'HOME': '/Users/phu'},
-      connector: (uri, headers) async {
-        connects.add((uri, headers));
-        return socket = FakeRelaySocket();
-      },
+      connector:
+          connector ??
+          (uri, headers) async {
+            connects.add((uri, headers));
+            return socket = FakeRelaySocket();
+          },
       now: () => now,
     );
   }
@@ -98,6 +100,29 @@ void main() {
       );
       expect(auth.value, 'Bearer agent-token');
       await runtime.stop();
+    },
+  );
+
+  test(
+    'stop() takes effect when called, and its future waits for an '
+    'upgrade still in flight (sign-out and remote access on rely on both)',
+    () async {
+      final dial = Completer<RelaySocket>();
+      final runtime = await build(connector: (uri, headers) => dial.future);
+      await runtime.start();
+      await pumpEventQueue();
+      expect(runtime.relayState, RelayConnectionState.connecting);
+
+      var done = false;
+      final stop = runtime.stop().then((_) => done = true);
+      expect(runtime.relayState, RelayConnectionState.stopped);
+      await pumpEventQueue();
+      expect(done, isFalse);
+
+      final late = FakeRelaySocket();
+      dial.complete(late);
+      await stop;
+      expect(late.closeCode, 1000);
     },
   );
 

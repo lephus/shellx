@@ -196,20 +196,35 @@ class AgentController extends Notifier<AgentViewState> {
   /// Spec §5.2 "Đăng xuất trên agent": close sessions, delete the token and
   /// the server-side pairings (POST /v1/auth/logout), clear the local trusted
   /// list. Keeps the device key and the email (pre-fills the login form).
+  ///
+  /// Fails closed: the relay link is stopped first (synchronously: from then
+  /// on nothing is emitted, so the logout cannot come back as a 4002, a
+  /// spurious AgentRevoked), then the local sign-in is deleted and the
+  /// state is signed out — before anything that can take time (the relay
+  /// stop settling, the PTY kills, the logout request). Quitting or
+  /// crashing meanwhile can never come back signed in with the phones still
+  /// trusted. A keychain that refuses a delete still ends signed out, with
+  /// a notification. The future completes once the stop, the kills (at most
+  /// `ptyKillTimeout`) and the logout (at most 10 s) are done. Never throws.
   Future<void> signOut() async {
+    final token = _credentials?.token;
     _credentials = null;
-    // The relay link goes first: once it is stopped nothing more is emitted,
-    // so logging out cannot come back as a 4002 (a spurious AgentRevoked).
-    await _stopRuntime();
-    await Future.wait([_settlePtyKills(), _logout()]);
-    await _clearSignedInData();
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      phase: AuthPhase.signedOut,
-      trusted: const <TrustedDevice>[],
-      signedOutNotice: false,
-    );
-    await _applyKeepAwake();
+    final stopped = _stopRuntime();
+    _s.api.token = null;
+    final cleared = await _clearSignedInData();
+    if (ref.mounted) {
+      state = state.copyWith(
+        phase: AuthPhase.signedOut,
+        trusted: const <TrustedDevice>[],
+        signedOutNotice: false,
+      );
+      if (!cleared) {
+        await _notify(title: _s.l10n.notifySignOutIncompleteTitle);
+      }
+      await _applyKeepAwake();
+    }
+    await stopped;
+    await Future.wait([_settlePtyKills(), _logout(token)]);
   }
 
   /// Throws [ApiException] (`weak_password`, `agent_only`, network, 429).
@@ -508,23 +523,48 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
-  Future<void> _logout() async {
+  /// Best effort, given up after 10 s: POST /v1/auth/logout with [token]
+  /// on a throwaway [ShellxApi]. The shared `api` may carry a new session's
+  /// token by the time this completes, and a late logout must not touch it
+  /// (final review I3/I4). A request still running after the give-up ends
+  /// on its own (its own 20 s timeout); the throwaway API is closed then.
+  Future<void> _logout(String? token) async {
+    if (token == null) return;
     try {
-      await _s.api.logout().timeout(const Duration(seconds: 10));
-    } on Exception {
-      // Best effort: the token is deleted locally either way.
+      final api = _s.createApi()..token = token;
+      final request = api.logout();
+      unawaited(
+        request
+            .then<void>((_) {}, onError: (Object _) {})
+            .whenComplete(api.close),
+      );
+      await request.timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Best effort: the sign-in is deleted locally either way.
     }
   }
 
-  /// Deletes token, device id, user id and the trusted list. Keeps the
-  /// device key (spec §5.1) and the email (pre-fills the login form).
-  Future<void> _clearSignedInData() async {
-    await _trusted.clear();
+  /// Deletes the trusted list, token, device id and user id, each on its
+  /// own so one refused delete does not keep the rest. Keeps the device key
+  /// (spec §5.1) and the email (pre-fills the login form). False when
+  /// anything could not be deleted (logged by type only).
+  Future<bool> _clearSignedInData() async {
     final store = _s.secureStore;
-    await store.delete(DesktopStorageKeys.token);
-    await store.delete(DesktopStorageKeys.deviceId);
-    await store.delete(DesktopStorageKeys.userId);
-    _s.api.token = null;
+    var cleared = true;
+    for (final step in <Future<void> Function()>[
+      _trusted.clear,
+      () => store.delete(DesktopStorageKeys.token),
+      () => store.delete(DesktopStorageKeys.deviceId),
+      () => store.delete(DesktopStorageKeys.userId),
+    ]) {
+      try {
+        await step();
+      } catch (error) {
+        cleared = false;
+        debugPrint('ShellX: deleting the sign-in failed: ${error.runtimeType}');
+      }
+    }
+    return cleared;
   }
 
   /// Waits for PTY tree kills in flight (DesktopServices.awaitPtyKills), at

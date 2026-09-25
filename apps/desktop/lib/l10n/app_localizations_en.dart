@@ -381,6 +381,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'ShellX could not read your saved sign-in';
 
   @override
+  String get notifySignOutIncompleteTitle =>
+      'Signed out, but some saved sign-in data could not be deleted';
+
+  @override
   String get startupFailed =>
       'ShellX could not start. Open it again; if this keeps happening, restart your computer.';
 

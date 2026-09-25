@@ -674,6 +674,12 @@ abstract class AppLocalizations {
   /// **'ShellX could not read your saved sign-in'**
   String get notifyStorageUnreadableTitle;
 
+  /// No description provided for @notifySignOutIncompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out, but some saved sign-in data could not be deleted'**
+  String get notifySignOutIncompleteTitle;
+
   /// No description provided for @startupFailed.
   ///
   /// In en, this message translates to:

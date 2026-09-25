@@ -23,6 +23,7 @@ final class DesktopServices {
     required this.secureStore,
     required this.settings,
     required this.api,
+    required this.createApi,
     required this.runtimeFactory,
     required this.keepAwake,
     required this.launchAtLogin,
@@ -49,6 +50,11 @@ final class DesktopServices {
   final TrustedStore trusted;
   final SettingsStore settings;
   final ShellxApi api;
+
+  /// A fresh [ShellxApi] for the same relay, for a call that must not share
+  /// [api]'s token: sign-out's logout, which may still be running when a
+  /// new session has set [api.token]. The caller closes it.
+  final ShellxApi Function() createApi;
   final AgentRuntimeFactory runtimeFactory;
   final KeepAwake keepAwake;
   final LaunchAtLogin launchAtLogin;

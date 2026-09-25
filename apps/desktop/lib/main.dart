@@ -120,6 +120,7 @@ Future<void> _start(
     secureStore: SecureKeyValueStore(),
     settings: await SharedPrefsSettingsStore.open(),
     api: ShellxApi(baseUri: relayBase),
+    createApi: () => ShellxApi(baseUri: relayBase),
     runtimeFactory: (params) => CoreAgentRuntime(
       params,
       relayBaseUri: relayBase,

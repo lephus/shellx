@@ -30,6 +30,9 @@ final class FakeRelayApi {
 
   /// `'POST /v1/auth/login'` → (status, error code) to fail that route with.
   final Map<String, (int, String)> failures = {};
+
+  /// `'POST /v1/auth/logout'` → a future the answer waits for (a slow relay).
+  final Map<String, Future<void>> holds = {};
   Map<String, Object?> version = {
     'min_agent': '1.0.0',
     'min_mobile': '1.0.0',
@@ -44,8 +47,10 @@ final class FakeRelayApi {
   late final MockClient client = MockClient((request) async {
     requests.add(request);
     onRequest?.call(request);
-    if (offline) throw http.ClientException('offline');
     final route = '${request.method} ${request.url.path}';
+    final hold = holds[route];
+    if (hold != null) await hold;
+    if (offline) throw http.ClientException('offline');
     final failure = failures[route];
     if (failure != null) {
       return http.Response(
@@ -205,6 +210,12 @@ final class FlakyKeyValueStore implements KeyValueStore {
   /// Keys whose reads throw.
   final Set<String> failingReads = {};
 
+  /// Keys whose writes throw.
+  final Set<String> failingWrites = {};
+
+  /// Keys whose deletes throw.
+  final Set<String> failingDeletes = {};
+
   @override
   Future<String?> read(String key) async {
     if (failingReads.contains(key)) {
@@ -214,10 +225,20 @@ final class FlakyKeyValueStore implements KeyValueStore {
   }
 
   @override
-  Future<void> write(String key, String value) => _values.write(key, value);
+  Future<void> write(String key, String value) async {
+    if (failingWrites.contains(key)) {
+      throw Exception('keychain refused writing $key: SECRET-DETAIL');
+    }
+    await _values.write(key, value);
+  }
 
   @override
-  Future<void> delete(String key) => _values.delete(key);
+  Future<void> delete(String key) async {
+    if (failingDeletes.contains(key)) {
+      throw Exception('keychain refused deleting $key: SECRET-DETAIL');
+    }
+    await _values.delete(key);
+  }
 }
 
 final class ShownNotification {
@@ -302,6 +323,9 @@ final class TestHarness {
     httpClient: relay.client,
   );
 
+  /// Every ShellxApi made through DesktopServices.createApi.
+  final List<ShellxApi> createdApis = [];
+
   /// The process's one TrustedStore (owned by [services]); tests seed and
   /// inspect trust through it.
   TrustedStore get trusted => services().trusted;
@@ -313,6 +337,14 @@ final class TestHarness {
     secureStore: secureStore,
     settings: settings,
     api: api,
+    createApi: () {
+      final created = ShellxApi(
+        baseUri: Uri.parse('https://relay.test'),
+        httpClient: relay.client,
+      );
+      createdApis.add(created);
+      return created;
+    },
     runtimeFactory: (params) {
       final runtime = FakeAgentRuntime(params);
       runtimes.add(runtime);

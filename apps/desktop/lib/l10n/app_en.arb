@@ -190,6 +190,7 @@
     }
   },
   "notifyStorageUnreadableTitle": "ShellX could not read your saved sign-in",
+  "notifySignOutIncompleteTitle": "Signed out, but some saved sign-in data could not be deleted",
   "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
   "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
 }
