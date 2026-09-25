@@ -7,5 +7,6 @@ workspace:
   - packages/shellx_agent
   - packages/shellx_client
   - packages/shellx_e2e
+  - apps/desktop
 dev_dependencies:
   lints: ^6.0.0

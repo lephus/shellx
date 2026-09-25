@@ -443,7 +443,7 @@ final class RelayConnection {
   Stream<RelayConnectionState> get states;   // broadcast
   Stream<RelayFrame> get frames;             // broadcast; khung hỏng bị bỏ qua
   void start();
-  Future<void> stop();                       // → stopped, không kết nối lại
+  Future<void> stop();                       // → stopped ngay, không kết nối lại; Future chờ (≤ connectTimeout) lần nâng cấp đang bay ổn định
   bool send(RelayFrame frame);               // false nếu chưa connected
   void reconnectNow();                       // bỏ qua backoff (mobile quay lại foreground)
 }
