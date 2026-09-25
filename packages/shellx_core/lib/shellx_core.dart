@@ -3,3 +3,5 @@
 library;
 
 export 'src/util/bytes.dart';
+export 'src/relay/channel_id.dart';
+export 'src/relay/frames.dart';
