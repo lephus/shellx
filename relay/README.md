@@ -101,13 +101,14 @@ Rate limiting `namespace_id`s must be unique within the account: 1001–1003 pro
 
   # supply your own password without it landing in shell history or a process list
   npm run reset-password -- --env production --email user@example.com --password - --revoke-tokens
-  # then type the password at the prompt; or non-interactively:
+  # then type the password at the prompt (it is not echoed); or non-interactively:
   SHELLX_RESET_PASSWORD='new password' npm run reset-password -- --env production --email user@example.com --revoke-tokens
   ```
 
   `--password <value>` directly on the command line also works but prints a warning, since it is
-  visible in shell history and process lists — prefer `--password -` (reads one line from stdin) or the
-  `SHELLX_RESET_PASSWORD` environment variable. Without any of these a random password is generated and
+  visible in shell history and process lists — prefer `--password -` (reads one line from stdin; on an
+  interactive terminal the typed password is not echoed) or the `SHELLX_RESET_PASSWORD` environment
+  variable. Without any of these a random password is generated and
   printed once. `--env staging` and `--env production` ask you to type the account's e-mail address to
   confirm before touching anything remote; pass `--yes` to skip that prompt for scripting. `--env local`
   never asks. `--revoke-tokens` signs out every device of the account (sockets already open stay up

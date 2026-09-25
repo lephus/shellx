@@ -5,18 +5,41 @@
 
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
-import { createLinePrompter, type Prompter } from "./line-prompter";
+import { Writable } from "node:stream";
+import { createLinePrompter, type AskOptions, type Prompter } from "./line-prompter";
 
 /**
  * Create a prompter for TTY (interactive) input.
  * Uses readline/promises with proper error handling for EOF.
+ *
+ * Hidden questions (final review M4): in terminal mode readline switches the TTY to raw mode — so
+ * the terminal itself echoes nothing — and echoes each typed character by writing it to its
+ * `output`. That output is a switchable pass-through to stderr: for a hidden question the prompt is
+ * written to stderr directly, the switch is turned off while the answer is typed (nothing typed
+ * reaches the screen, not even as `*`), then turned back on and the line ended.
  */
 export function createTtyPrompter(): Prompter {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  let muted = false;
+  const output = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      if (!muted) process.stderr.write(chunk);
+      callback();
+    },
+  });
+  // `terminal: true` is required: `output` is not a TTY itself, and without terminal mode readline
+  // would leave the TTY in cooked mode, where the terminal echoes every keystroke on its own.
+  const rl = createInterface({ input: process.stdin, output, terminal: true });
   let rejectPending: ((err: Error) => void) | null = null;
 
-  // Handle readline close event (EOF on pending question)
+  const unmute = () => {
+    if (!muted) return;
+    muted = false;
+    process.stderr.write("\n"); // readline's own end-of-line went to the muted output
+  };
+
+  // Handle readline close event (EOF or Ctrl+C on pending question)
   const onClose = () => {
+    unmute();
     if (rejectPending) {
       rejectPending(new Error("stdin ended before an answer was given"));
       rejectPending = null;
@@ -26,16 +49,24 @@ export function createTtyPrompter(): Prompter {
   rl.on("close", onClose);
 
   return {
-    async ask(question: string): Promise<string> {
+    async ask(question: string, options: AskOptions = {}): Promise<string> {
       return new Promise<string>((resolve, reject) => {
         rejectPending = reject;
-        rl.question(question)
+        let prompt = question;
+        if (options.hidden) {
+          process.stderr.write(question);
+          muted = true;
+          prompt = "";
+        }
+        rl.question(prompt)
           .then((answer: string) => {
             rejectPending = null;
+            unmute();
             resolve(answer);
           })
           .catch((err: unknown) => {
             rejectPending = null;
+            unmute();
             reject(err);
           });
       });
@@ -56,7 +87,7 @@ export function createPrompter(): Prompter {
   let prompter: Prompter | null = null;
 
   return {
-    async ask(question: string): Promise<string> {
+    async ask(question: string, options?: AskOptions): Promise<string> {
       if (!prompter) {
         if (process.stdin.isTTY) {
           prompter = createTtyPrompter();
@@ -65,7 +96,7 @@ export function createPrompter(): Prompter {
           prompter = createLinePrompter(input, (s) => process.stderr.write(s));
         }
       }
-      return prompter.ask(question);
+      return prompter.ask(question, options);
     },
     close(): void {
       if (prompter) {

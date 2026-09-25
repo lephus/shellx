@@ -49,8 +49,8 @@ let password: string;
 
 try {
   if (passwordSource === "stdin") {
-    // Read password from stdin
-    password = await prompter.ask("Password: ");
+    // Read password from stdin (not echoed on an interactive terminal)
+    password = await prompter.ask("Password: ", { hidden: true });
   } else if (passwordSource === "argv") {
     // From argv: print warning to stderr about visibility
     console.error("Warning: --password in argv is visible in shell history and process lists; consider --password - or SHELLX_RESET_PASSWORD env var");
