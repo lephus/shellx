@@ -145,7 +145,8 @@ shellx/
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
 - **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong D1, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị và danh sách máy đã ghim được giữ lại (lưu theo `user_id`), để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy dữ liệu đó.
-- **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002. Agent nhận 4002 thì xử lý như đăng xuất.
+- **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002.
+- **Agent nhận 4002 (hoặc bị từ chối 401 khi kết nối):** agent không phân biệt được "đổi mật khẩu" với "xóa tài khoản", nên luôn: xóa token, đóng mọi phiên, **giữ** khóa thiết bị và danh sách tin cậy, rồi hiện cửa sổ đăng nhập. Khi đăng nhập lại thành công, nếu `user_id` khác `user_id` đã lưu thì xóa danh sách tin cậy (đổi tài khoản hoặc tài khoản cũ đã bị xóa); cùng `user_id` thì giữ nguyên ghép nối.
 - **Hỗ trợ khẩn cấp:** script quản trị `relay/scripts/reset-password.ts` chạy qua `wrangler d1` để đặt lại mật khẩu thủ công.
 
 ### 5.3 Ghép nối bằng QR
@@ -230,7 +231,7 @@ Byte 1.. : Noise message
 
 ### 6.4 Tin nhắn ứng dụng
 
-Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi tin nhắn là map CBOR có khóa `t`. `id` của phiên là số nguyên do agent cấp, duy nhất trong vòng đời tiến trình agent.
+Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi tin nhắn là map CBOR có khóa `t`. `id` của phiên là số nguyên do agent cấp: bắt đầu từ một giá trị ngẫu nhiên trong `[1, 2^31)` mỗi lần agent khởi động rồi tăng dần, để điện thoại không gắn nhầm vào phiên mới trùng id sau khi agent khởi động lại.
 
 | `t` | Chiều | Trường | Ý nghĩa |
 |---|---|---|---|
@@ -441,7 +442,7 @@ CREATE TABLE pairings (
 
 ### 10.5 Vận hành
 
-- Hai môi trường `staging` và `production` trong `wrangler.toml`; migration bằng `wrangler d1 migrations`.
+- Hai môi trường `staging` và `production` trong `relay/wrangler.jsonc`; migration bằng `wrangler d1 migrations`.
 - Log chỉ ghi siêu dữ liệu (thời điểm, `device_id`, mã lỗi, kích thước khung). **Không bao giờ ghi payload, token hay mật khẩu.**
 
 ---
