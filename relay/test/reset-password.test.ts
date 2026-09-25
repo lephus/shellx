@@ -2,6 +2,7 @@ import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
+import { choosePasswordSource, confirmationMatches, needsConfirmation } from "../scripts/reset-cli";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
 
@@ -76,5 +77,76 @@ describe("accountExistsFromWranglerJson", () => {
   it("returns false when first result has no results property", () => {
     const output = JSON.stringify([{ error: "something" }]);
     expect(accountExistsFromWranglerJson(output)).toBe(false);
+  });
+});
+
+describe("needsConfirmation", () => {
+  it("returns false for local environment", () => {
+    expect(needsConfirmation("local", false)).toBe(false);
+    expect(needsConfirmation("local", true)).toBe(false);
+  });
+
+  it("returns true for staging without --yes", () => {
+    expect(needsConfirmation("staging", false)).toBe(true);
+  });
+
+  it("returns false for staging with --yes", () => {
+    expect(needsConfirmation("staging", true)).toBe(false);
+  });
+
+  it("returns true for production without --yes", () => {
+    expect(needsConfirmation("production", false)).toBe(true);
+  });
+
+  it("returns false for production with --yes", () => {
+    expect(needsConfirmation("production", true)).toBe(false);
+  });
+});
+
+describe("confirmationMatches", () => {
+  it("returns true when emails match exactly", () => {
+    expect(confirmationMatches("test@example.com", "test@example.com")).toBe(true);
+  });
+
+  it("returns true when emails match after trimming", () => {
+    expect(confirmationMatches("test@example.com", "  test@example.com  ")).toBe(true);
+  });
+
+  it("returns true when emails match after normalization (case-insensitive)", () => {
+    expect(confirmationMatches("test@example.com", "Test@Example.com")).toBe(true);
+  });
+
+  it("returns false when emails do not match", () => {
+    expect(confirmationMatches("test@example.com", "other@example.com")).toBe(false);
+  });
+
+  it("returns false with whitespace-only difference", () => {
+    expect(confirmationMatches("test@example.com", "test@example.com ")).toBe(true);
+  });
+});
+
+describe("choosePasswordSource", () => {
+  it("returns 'stdin' when argv is '-'", () => {
+    expect(choosePasswordSource("-")).toBe("stdin");
+  });
+
+  it("returns 'argv' when argv value is provided", () => {
+    expect(choosePasswordSource("mypassword")).toBe("argv");
+  });
+
+  it("returns 'env' when only env var is set", () => {
+    expect(choosePasswordSource(undefined, "envpassword")).toBe("env");
+  });
+
+  it("returns 'generate' when neither argv nor env is set", () => {
+    expect(choosePasswordSource()).toBe("generate");
+  });
+
+  it("prioritizes argv '-' over env var", () => {
+    expect(choosePasswordSource("-", "envpassword")).toBe("stdin");
+  });
+
+  it("prioritizes argv value over env var", () => {
+    expect(choosePasswordSource("argvpass", "envpassword")).toBe("argv");
   });
 });

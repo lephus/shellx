@@ -7,16 +7,18 @@
 // --revoke-tokens also signs out every device of the account (their open sockets stay up until they
 // reconnect). Pairings are never touched. Remote environments need `npx wrangler login` first.
 // --env staging and --env production require either interactive email confirmation or --yes flag.
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { createArgon2 } from "../src/auth/argon2";
 import { isValidEmail, normalizeEmail } from "../src/auth/email";
 import { isAcceptablePassword } from "../src/auth/password-policy";
 import { base64UrlEncode } from "../src/auth/tokens";
 import { accountExistsFromWranglerJson, buildResetSql } from "./reset-sql";
+import { choosePasswordSource, confirmationMatches, needsConfirmation } from "./reset-cli";
 
 const { values } = parseArgs({
   options: {
@@ -40,54 +42,77 @@ if (!isValidEmail(email)) {
   process.exit(1);
 }
 
-// Confirmation guard for remote environments (staging, production)
-if (target !== "local" && !values.yes) {
-  // Interactive confirmation: read typed email from TTY
-  process.stderr.write(`Confirm email for ${target}: `);
-  const confirmed = execSync("cat", { encoding: "utf8" }).trim();
-  if (confirmed !== email) {
-    console.error("Email mismatch; operation aborted.");
+// Create readline interface once for all interactive I/O
+const rl = createInterface({ input: process.stdin, output: process.stderr });
+
+// Password input first (if --password -, read from stdin before confirmation)
+const passwordSource = choosePasswordSource(values.password, process.env.SHELLX_RESET_PASSWORD);
+let password: string;
+
+try {
+  if (passwordSource === "stdin") {
+    // Read password from stdin (first line)
+    password = await rl.question("Password: ");
+  } else if (passwordSource === "argv") {
+    // From argv: print warning to stderr about visibility
+    console.error("Warning: --password in argv is visible in shell history and process lists; consider --password - or SHELLX_RESET_PASSWORD env var");
+    password = values.password!;
+  } else if (passwordSource === "env") {
+    // From env var
+    password = process.env.SHELLX_RESET_PASSWORD!;
+  } else {
+    // Generate random password
+    password = base64UrlEncode(crypto.getRandomValues(new Uint8Array(12)));
+  }
+
+  if (!isAcceptablePassword(password)) {
+    console.error("password must be 8-128 characters");
     process.exit(1);
   }
+
+  // Confirmation guard for remote environments (staging, production)
+  if (needsConfirmation(target, values.yes)) {
+    const typed = await rl.question(`Confirm email for ${target}: `);
+    if (!confirmationMatches(email, typed)) {
+      console.error("Email mismatch; operation aborted.");
+      process.exit(1);
+    }
+  } else if (values.yes && target !== "local") {
+    // Bypass confirmation with --yes: print note
+    console.error(`Confirmation bypassed with --yes for ${target}.`);
+  }
+
+  // Close readline interface
+  rl.close();
+
+  // Hash password and build SQL
+  const require = createRequire(import.meta.url);
+  const wasm = readFileSync(require.resolve("@phi-ag/argon2/argon2.wasm"));
+  const argon2 = await createArgon2(new WebAssembly.Module(wasm));
+  const sql = buildResetSql(email, argon2.hash(password), Date.now(), values["revoke-tokens"]);
+
+  // Execute via wrangler d1
+  const wrangler = join(dirname(require.resolve("wrangler/package.json")), "bin", "wrangler.js");
+  const where = target === "local" ? ["--local"] : ["--env", target, "--remote"];
+  const output = execFileSync(process.execPath, [wrangler, "d1", "execute", "DB", ...where, "--json", "--command", sql], {
+    encoding: "utf8",
+    stdio: ["inherit", "pipe", "inherit"],
+  });
+
+  // Use pure function to check if account exists
+  if (!accountExistsFromWranglerJson(output)) {
+    console.error(`No account with email ${email} in ${target}; nothing changed.`);
+    process.exit(1);
+  }
+
+  console.log(`Password reset for ${email} in ${target}.`);
+  if (passwordSource === "generate") console.log(`Temporary password: ${password}`);
+  if (values["revoke-tokens"]) console.log("All device tokens of this account were revoked.");
+} catch (err) {
+  rl.close();
+  if (err instanceof Error && err.message.includes("readline was closed")) {
+    // Expected when user cancels (Ctrl+C)
+    process.exit(1);
+  }
+  throw err;
 }
-
-// Password input: from env var, stdin (with --password -), argv (with warning), or generate random
-let password: string;
-if (values.password === "-") {
-  // Read from stdin
-  password = execSync("cat", { encoding: "utf8" }).trim();
-} else if (values.password) {
-  // From argv: print warning to stderr about visibility
-  console.error("Warning: --password in argv is visible in shell history and process lists; consider --password - or SHELLX_RESET_PASSWORD env var");
-  password = values.password;
-} else {
-  // Try env var or generate random
-  password = process.env.SHELLX_RESET_PASSWORD ?? base64UrlEncode(crypto.getRandomValues(new Uint8Array(12)));
-}
-
-if (!isAcceptablePassword(password)) {
-  console.error("password must be 8-128 characters");
-  process.exit(1);
-}
-
-const require = createRequire(import.meta.url);
-const wasm = readFileSync(require.resolve("@phi-ag/argon2/argon2.wasm"));
-const argon2 = await createArgon2(new WebAssembly.Module(wasm));
-const sql = buildResetSql(email, argon2.hash(password), Date.now(), values["revoke-tokens"]);
-
-const wrangler = join(dirname(require.resolve("wrangler/package.json")), "bin", "wrangler.js");
-const where = target === "local" ? ["--local"] : ["--env", target, "--remote"];
-const output = execFileSync(process.execPath, [wrangler, "d1", "execute", "DB", ...where, "--json", "--command", sql], {
-  encoding: "utf8",
-  stdio: ["inherit", "pipe", "inherit"],
-});
-
-// Use pure function to check if account exists
-if (!accountExistsFromWranglerJson(output)) {
-  console.error(`No account with email ${email} in ${target}; nothing changed.`);
-  process.exit(1);
-}
-
-console.log(`Password reset for ${email} in ${target}.`);
-if (values.password === undefined && !process.env.SHELLX_RESET_PASSWORD) console.log(`Temporary password: ${password}`);
-if (values["revoke-tokens"]) console.log("All device tokens of this account were revoked.");
