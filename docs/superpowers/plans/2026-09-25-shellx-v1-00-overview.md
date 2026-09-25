@@ -117,7 +117,7 @@ Byte 1 : type
 ```
 
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`. ERROR không gắn với peer dùng `device_id` = UUID nil và `channel_id` = 8 byte 0.
-- EVENT duy nhất ở v1.0: `{"event": "pairing_removed", "agent_id": "<uuid>", "mobile_id": "<uuid>"}`. Relay tự mã hóa CBOR tối giản (map major type 5, key/value text string major type 3); không dùng thư viện CBOR có "records"/tag mở rộng.
+- EVENT duy nhất ở v1.0: `{"event": "pairing_removed", "agent_id": "<uuid>", "mobile_id": "<uuid>"}`. Gửi trực tiếp cho cả hai bên đang kết nối; với agent, relay còn lưu một "bia mộ" (mỗi cặp agent/mobile một bản) và **phát lại ở mọi lần agent kết nối** (sau snapshot PRESENCE) cho tới khi cặp đó được ghép lại (`POST /v1/pairings`), agent đăng xuất hoặc tài khoản bị xóa. Agent phải xử lý lặp lại một cách vô hại (bỏ tin cậy một điện thoại đã không còn tin cậy là no-op). Relay tự mã hóa CBOR tối giản (map major type 5, key/value text string major type 3); không dùng thư viện CBOR có "records"/tag mở rộng.
 - Khung văn bản: chỉ `ping` (client → hub) và `pong` (hub → client, qua `setWebSocketAutoResponse`).
 - UUID trong JSON luôn là chuỗi chữ thường dạng `8-4-4-4-12`.
 
@@ -136,7 +136,7 @@ Byte 1.. : Noise message
 
 Đúng như spec mục 10.2 (kể cả `DELETE /v1/account {password}` → `204` / `401 invalid_credentials`, đóng WebSocket mọi thiết bị với 4002). Base URL cấu hình được (production `https://relay.shellx.pro`, dev `http://127.0.0.1:8787`).
 
-**Mã lỗi chung:** token thiếu/sai/hết hạn trên REST → `401 unauthorized`; sai email/mật khẩu → `401 invalid_credentials`; rate limit → `429 rate_limited` (client rẽ nhánh theo status 429). `GET /v1/ws` với token thiếu/sai bị từ chối bằng HTTP 401 **trước** khi nâng cấp WebSocket (client coi như `revoked`). `DELETE /v1/account` đọc body JSON `{"password"}`.
+**Mã lỗi chung:** token thiếu/sai/hết hạn trên REST → `401 unauthorized`; sai email/mật khẩu → `401 invalid_credentials`; rate limit → `429 rate_limited` (client rẽ nhánh theo status 429); body JSON lớn hơn 16 KiB → `413 payload_too_large`; mật khẩu dài hơn 128 ký tự (sau NFC) ở đăng nhập / xóa tài khoản → `401 invalid_credentials`. `GET /v1/ws` với token thiếu/sai bị từ chối bằng HTTP 401 **trước** khi nâng cấp WebSocket (client coi như `revoked`). `DELETE /v1/account` đọc body JSON `{"password"}`.
 
 **Giới hạn khung:** 64 KiB tính trên **toàn bộ** khung nhị phân, kể cả header 26 byte của DATA. `shellx_core` export `kMaxSealedBatchBytes = 65493`; `SecureChannel.seal` ném `ArgumentError` nếu batch CBOR vượt mức này, nên agent phải chia output chờ gửi thành nhiều TRANSPORT (tối đa 3 tin `output` 16 KiB mỗi batch).
 
