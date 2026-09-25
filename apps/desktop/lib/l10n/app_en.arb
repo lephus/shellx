@@ -181,5 +181,6 @@
       "platform": {"type": "String"}
     }
   },
+  "notifyTerminalProblemTitle": "Processes from a terminal session may still be running",
   "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
 }

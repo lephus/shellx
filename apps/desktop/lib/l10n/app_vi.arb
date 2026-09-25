@@ -93,5 +93,6 @@
   "notifySignedOutBody": "Đăng nhập lại để cho phép truy cập từ xa.",
   "notifyAlreadyRunningTitle": "ShellX đang chạy",
   "notifyAlreadyRunningBody": "{platform, select, macos{Tìm ShellX trên thanh menu.} other{Tìm ShellX trong khay hệ thống.}}",
+  "notifyTerminalProblemTitle": "Tiến trình của một phiên terminal có thể vẫn đang chạy",
   "windowsVersionUnsupported": "ShellX cần Windows 10 bản 1809 trở lên."
 }

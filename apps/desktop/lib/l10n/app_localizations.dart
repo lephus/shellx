@@ -656,6 +656,12 @@ abstract class AppLocalizations {
   /// **'{platform, select, macos{Find it in the menu bar.} other{Find it in the system tray.}}'**
   String notifyAlreadyRunningBody(String platform);
 
+  /// No description provided for @notifyTerminalProblemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Processes from a terminal session may still be running'**
+  String get notifyTerminalProblemTitle;
+
   /// No description provided for @windowsVersionUnsupported.
   ///
   /// In en, this message translates to:

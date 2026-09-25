@@ -358,6 +358,10 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get notifyTerminalProblemTitle =>
+      'Tiến trình của một phiên terminal có thể vẫn đang chạy';
+
+  @override
   String get windowsVersionUnsupported =>
       'ShellX cần Windows 10 bản 1809 trở lên.';
 }

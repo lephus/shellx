@@ -362,6 +362,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get notifyTerminalProblemTitle =>
+      'Processes from a terminal session may still be running';
+
+  @override
   String get windowsVersionUnsupported =>
       'ShellX requires Windows 10 version 1809 or later.';
 }
