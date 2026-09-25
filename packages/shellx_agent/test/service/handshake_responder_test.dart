@@ -57,6 +57,7 @@ void main() {
     String? prologueId,
     Uint8List? agentPublicKey,
     int proto = kAppProtocolVersion,
+    Uint8List? payload,
   }) async {
     final initiator = NoiseHandshake.initiator(
       pattern: pattern,
@@ -69,12 +70,13 @@ void main() {
       psk: psk,
     );
     final message = await initiator.writeMessage(
-      Hs1Payload(
-        proto: proto,
-        app: '1.0.0',
-        name: 'Pixel',
-        platform: DevicePlatform.android,
-      ).encode(),
+      payload ??
+          Hs1Payload(
+            proto: proto,
+            app: '1.0.0',
+            name: 'Pixel',
+            platform: DevicePlatform.android,
+          ).encode(),
     );
     final answer = await (using ?? responder()).answer(
       mobileId: claimedId,
@@ -160,6 +162,49 @@ void main() {
   test('HS1 addressed to another agent key cannot be answered', () async {
     final (answer, _) = await hello(agentPublicKey: otherKey.publicKey);
     expect(answer, isNull);
+  });
+
+  // Ledger T8.
+  test('an HS1 that decrypts but carries a malformed payload gets no '
+      'answer', () async {
+    final (answer, _) = await hello(payload: Uint8List.fromList([1, 2, 3]));
+    expect(answer, isNull);
+    final (withPsk, _) = await hello(
+      pattern: NoisePattern.ikPsk2,
+      psk: pairing.create().secret,
+      key: otherKey,
+      claimedId: tabletId,
+      payload: Uint8List.fromList([0xa0]), // An empty CBOR map.
+    );
+    expect(withPsk, isNull);
+  });
+
+  test('pairing with another protocol version gets proto_unsupported and '
+      'leaves the code usable', () async {
+    final secret = pairing.create().secret;
+    final (answer, initiator) = await hello(
+      pattern: NoisePattern.ikPsk2,
+      psk: secret,
+      key: otherKey,
+      claimedId: tabletId,
+      proto: 2,
+    );
+    expect(answer!.status, HandshakeStatus.protoUnsupported);
+    expect(answer.transport, isNull);
+    expect(answer.pairingSecret, isNull);
+    expect(
+      (await readReply(initiator, answer)).status,
+      HandshakeStatus.protoUnsupported,
+    );
+    expect(pairing.activeSecret, secret);
+
+    final (again, _) = await hello(
+      pattern: NoisePattern.ikPsk2,
+      psk: secret,
+      key: otherKey,
+      claimedId: tabletId,
+    );
+    expect(again!.status, HandshakeStatus.ok);
   });
 
   test('garbage and non-HS1 kinds are ignored', () async {

@@ -219,6 +219,13 @@ final class PairingPostControl extends http.BaseClient {
   /// `POST /v1/pairings` attempts, including failed ones.
   int attempts = 0;
 
+  /// How the next DELETEs fail, in order (0: network error, else that HTTP
+  /// status; the relay never sees them). Once used up, DELETEs pass.
+  final deleteFailures = <int>[];
+
+  /// `DELETE` attempts, including failed ones.
+  int deleteAttempts = 0;
+
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (request.method == 'POST' && request.url.path == '/v1/pairings') {
@@ -233,22 +240,26 @@ final class PairingPostControl extends http.BaseClient {
         await (await _inner.send(request)).stream.drain<void>();
         throw http.ClientException('connection reset');
       }
-      if (status != null) {
-        return http.StreamedResponse(
-          Stream.value(
-            utf8.encode('{"error":{"code":"test","message":"test"}}'),
-          ),
-          status,
-          headers: {'content-type': 'application/json'},
-        );
-      }
+      if (status != null) return _error(status);
     }
     if (request.method == 'DELETE') {
+      deleteAttempts++;
       final held = deleteGate;
       if (held != null) await held.future;
+      if (deleteFailures.isNotEmpty) {
+        final status = deleteFailures.removeAt(0);
+        if (status == 0) throw http.ClientException('network is down');
+        return _error(status);
+      }
     }
     return _inner.send(request);
   }
+
+  static http.StreamedResponse _error(int status) => http.StreamedResponse(
+    Stream.value(utf8.encode('{"error":{"code":"test","message":"test"}}')),
+    status,
+    headers: {'content-type': 'application/json'},
+  );
 }
 
 /// In-memory [KeyValueStore] whose reads can be held at a [gate] or made to
@@ -362,6 +373,31 @@ void main() {
       );
       final notice = rig.events.whereType<SessionOpenedByMobile>().single;
       expect((notice.mobileName, notice.sessionId), ('Test Phone', opened.id));
+    });
+  });
+
+  // Final review M3.
+  test('a message that fails to be handled does not drop the rest of its '
+      'batch', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final channel = rig.handshake(rig.phone).channel!;
+      rig.send(channel, [const SessionOpen(cols: 80, rows: 24)]);
+      final id = channel.messagesOf<SessionOpened>().single.id;
+      final pty = rig.ptys.ptys.single..failWrites = StateError('pty gone');
+
+      rig.send(channel, [
+        InputMessage(id: id, data: Uint8List.fromList([0x61])),
+        const SessionList(),
+      ]);
+      expect(channel.messagesOf<SessionListResult>(), hasLength(1));
+
+      pty.failWrites = null;
+      rig.send(channel, [
+        InputMessage(id: id, data: Uint8List.fromList([0x62])),
+      ]);
+      expect(pty.writtenText, 'b');
+      expect(rig.service.activeChannelCount, 1);
     });
   });
 
@@ -523,6 +559,17 @@ void main() {
       expect(rig.relay.pairings, {(agentId, tabletId): paired.pairingId});
       expect(rig.service.activeChannelCount, 0);
       expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
+    });
+  });
+
+  // Final review M5.
+  test('the pairing URI carries a copy of the agent key, not the identity’s '
+      'own bytes', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final uri = rig.service.startPairing();
+      expect(uri.agentPublicKey, agentKey.publicKey);
+      expect(uri.agentPublicKey, isNot(same(agentKey.publicKey)));
     });
   });
 
@@ -1173,6 +1220,34 @@ void main() {
         async.elapse(const Duration(seconds: 60));
         expect(rig.unregistered, isEmpty);
         expect(rig.relay.pairings, contains((agentId, tabletId)));
+      });
+    });
+
+    // Final review M2: the DELETE is retried like the phone's unpair.
+    test('revoke retries the pairing DELETE after a 5xx or a network error '
+        '(3 attempts in all), never after a 4xx', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        drive(async, rig.trusted.add(trustedTablet()));
+        rig.relay.pairings[(agentId, phoneId)] = phonePairingId;
+        rig.relay.pairings[(agentId, tabletId)] = tabletPairingId;
+
+        rig.posts.deleteFailures.addAll([503, 0]);
+        drive(async, rig.service.revoke(phoneId));
+        expect(rig.posts.deleteAttempts, 3);
+        expect(rig.relay.pairings.keys, [(agentId, tabletId)]);
+
+        rig.posts.deleteFailures.addAll([500, 500, 500]);
+        drive(async, rig.service.revoke(tabletId));
+        expect(rig.posts.deleteAttempts, 6); // Gave up after three.
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+
+        drive(async, rig.trusted.add(trustedTablet()));
+        rig.posts.deleteFailures.add(404);
+        drive(async, rig.service.revoke(tabletId));
+        async.elapse(const Duration(seconds: 5));
+        expect(rig.posts.deleteAttempts, 7);
+        expect(rig.posts.deleteFailures, isEmpty);
       });
     });
 

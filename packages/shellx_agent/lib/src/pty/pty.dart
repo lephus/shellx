@@ -6,7 +6,13 @@ import 'dart:typed_data';
 /// - [output] is a single-subscription stream that is closed (done) when the
 ///   process exits;
 /// - [exitCode] completes once the process has exited;
-/// - [kill] terminates the whole process tree.
+/// - [kill] terminates the whole process tree. Once the process has exited,
+///   [kill] must be a no-op: its process id may have been reused, and a tree
+///   kill would hit an unrelated process tree. `SessionManager` stops calling
+///   [kill], [write] and [resize] as soon as [exitCode] completes, but a call
+///   can still race the exit, so the adapter must check for itself
+///   (`dart:io`'s `Process.kill` already returns false once the process
+///   ended, which covers [ProcessPtyFactory]).
 abstract interface class Pty {
   Stream<Uint8List> get output;
   Future<int> get exitCode;

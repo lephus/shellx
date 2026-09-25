@@ -240,8 +240,10 @@ void main() {
       expect(rig.manager.sessions, isEmpty); // hidden from listing while
       // draining (spec item 4): it's still tracked internally, though.
 
-      // No further ack ever arrives.
-      async.elapse(const Duration(seconds: 30));
+      // No further ack ever arrives: nothing at 29 s, exited at 30 s.
+      async.elapse(const Duration(seconds: 29));
+      expect(rig.to(phone).whereType<SessionExited>(), isEmpty);
+      async.elapse(const Duration(seconds: 1));
 
       final messages = rig.to(phone);
       expect(messages.last, isA<SessionExited>());
@@ -265,9 +267,10 @@ void main() {
 
       rig.manager.mobileDisconnected(phone);
       expect(rig.manager.sessions, isEmpty);
+      expect(async.pendingTimers, isEmpty); // The 30 s drain timer is gone.
 
-      // The 30s drain timer must have been cancelled: elapsing well past
-      // it sends nothing more (there is no attached phone to send to).
+      // Elapsing well past it sends nothing more (there is no attached
+      // phone to send to).
       rig.clear();
       async.elapse(const Duration(seconds: 40));
       expect(rig.sent, isEmpty);
@@ -317,6 +320,74 @@ void main() {
     rig.manager.closeAll();
     await pumpEventQueue();
     expect(rig.factory.ptys.every((p) => p.killed), isTrue);
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  // Final review I1: once the shell has exited its pid may be reused, so
+  // the manager never kills, writes to or resizes that pty again.
+  test('a draining session (shell exited) is never killed, written to or '
+      'resized; acks still drain it', () async {
+    final rig = SessionRig(bufferCapacity: 1024 * 1024);
+    final id = await rig.open(phone);
+    rig.clear();
+    rig.pty(0).emitBytes(List.filled(300 * 1024, 0x61));
+    rig.pty(0).exit(0);
+    await pumpEventQueue();
+    expect(outputBytes(rig.to(phone), id), 256 * 1024); // Draining.
+
+    await rig.manager.handle(
+      phone,
+      InputMessage(id: id, data: Uint8List.fromList(utf8.encode('ls\r'))),
+    );
+    await rig.manager.handle(phone, ResizeMessage(id: id, cols: 100, rows: 30));
+    await rig.manager.handle(phone, SessionClose(id: id));
+    rig.manager.closeSessionsAttachedTo(phone);
+    expect(rig.pty(0).killed, isFalse);
+    expect(rig.pty(0).writes, isEmpty);
+    expect(rig.pty(0).resizes, isEmpty);
+
+    await rig.manager.handle(phone, AckMessage(id: id, seq: 256 * 1024));
+    await pumpEventQueue();
+    final messages = rig.to(phone);
+    expect(outputBytes(messages, id), 300 * 1024);
+    expect((messages.last as SessionExited).exitCode, 0);
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('while the output of an exited shell drains, a tray close, closeAll '
+      'and an attach never kill or resize its pty', () async {
+    final rig = SessionRig();
+    final first = await rig.open(phone);
+    final second = await rig.open(phone);
+    rig.pty(0).exit(0, closeOutput: false);
+    rig.pty(1).exit(5, closeOutput: false);
+    await pumpEventQueue();
+    rig.clear();
+
+    // Exit codes known, output still open (the 2 s output grace).
+    await rig.manager.handle(
+      phone,
+      SessionAttach(id: first, cols: 80, rows: 24, lastSeq: 0),
+    );
+    await rig.manager.handle(
+      phone,
+      InputMessage(id: first, data: Uint8List.fromList(utf8.encode('x'))),
+    );
+    rig.manager.closeSession(first);
+    rig.manager.closeAll();
+    expect(rig.pty(0).killed, isFalse);
+    expect(rig.pty(1).killed, isFalse);
+    expect(rig.pty(0).resizes, isEmpty);
+    expect(rig.pty(0).writes, isEmpty);
+
+    rig.pty(0).closeOutputStream();
+    rig.pty(1).closeOutputStream();
+    await pumpEventQueue();
+    final exits = {
+      for (final e in rig.to(phone).whereType<SessionExited>())
+        e.id: e.exitCode,
+    };
+    expect(exits, {first: 0, second: 5});
     expect(rig.manager.sessions, isEmpty);
   });
 

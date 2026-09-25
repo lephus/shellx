@@ -578,6 +578,115 @@ void main() {
       expect(h.sessions.sessions.single.attachedMobileId, tabletId);
     });
   });
+
+  // Final review M1: session.open has no request id; answers come back in
+  // request order.
+  test('a session.opened that arrives after its open timed out is closed, '
+      'not given to a newer open', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.connect());
+      final held = <DataFrame>[];
+      h.relay.onData = (from, to, frame) {
+        if (from == agentId &&
+            frame.payload.first == PayloadKind.transport.wire) {
+          held.add(frame);
+          return null;
+        }
+        return frame;
+      };
+      expect(
+        () => h.run(h.phoneMachine.openSession(cols: 80, rows: 24)),
+        failsWith(MachineConnectionFailure.timeout),
+      );
+      Object? second;
+      h.phoneMachine
+          .openSession(cols: 100, rows: 30)
+          .then(
+            (tab) {
+              second = tab;
+            },
+            onError: (Object e) {
+              second = e;
+            },
+          );
+      settle(async);
+      final [late, fresh] = h.ptys.ptys;
+
+      // The answers arrive at last, in order.
+      h.relay.onData = null;
+      held.forEach(h.phoneMachine.handleFrame);
+      settle(async);
+      final tab = second! as ClientTab;
+      expect(late.killed, isTrue);
+      expect(fresh.killed, isFalse);
+      final session = h.sessions.sessions.single;
+      expect((session.id, session.attachedMobileId), (tab.id, phoneId));
+      expect(h.phoneMachine.tabs.single, same(tab));
+    });
+  });
+
+  test('an open the agent never answers does not take the answer to the '
+      'next open', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.connect());
+      // The host closes every session while the first open's shell is
+      // starting: the agent kills it and answers nothing.
+      final gate = h.shellResolver.gate = Completer<void>();
+      Object? first;
+      h.phoneMachine
+          .openSession(cols: 80, rows: 24)
+          .then(
+            (tab) {
+              first = tab;
+            },
+            onError: (Object e) {
+              first = e;
+            },
+          );
+      settle(async);
+      h.sessions.closeAll();
+      h.shellResolver.gate = null;
+      gate.complete();
+      async.elapse(const Duration(seconds: 11));
+      expect(first, failure(MachineConnectionFailure.timeout));
+      expect(h.ptys.ptys.single.killed, isTrue);
+      expect(h.sessions.sessions, isEmpty);
+
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      expect(h.pty.killed, isFalse);
+      final session = h.sessions.sessions.single;
+      expect((session.id, session.attachedMobileId), (tab.id, phoneId));
+    });
+  });
+
+  // Task 14.
+
+  test('connect() called as an attempt fails starts a new attempt instead '
+      'of handing out the one that just ended', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.agent.stop();
+      settle(async);
+      final machine = h.phoneMachine;
+      var attempts = 0;
+      final retries = <Object>[];
+      machine.states.listen((state) {
+        if (state is MachineConnecting) attempts++;
+        if (state is MachineFailed && attempts == 1) {
+          machine.connect().catchError(retries.add); // The app retries.
+        }
+      });
+      expect(
+        () => h.run(machine.connect()),
+        failsWith(MachineConnectionFailure.agentOffline),
+      );
+      settle(async);
+      expect(attempts, 2);
+      expect(retries, [failure(MachineConnectionFailure.agentOffline)]);
+    });
+  });
 }
 
 /// A phone service (replacing the harness phone's relay connection) whose

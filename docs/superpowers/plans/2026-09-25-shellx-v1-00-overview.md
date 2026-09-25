@@ -458,8 +458,9 @@ abstract interface class Pty {
   Future<int> get exitCode;
   void write(Uint8List data);
   void resize(int cols, int rows);
-  void kill();                               // kết thúc cả cây tiến trình
+  void kill();                               // kết thúc cả cây tiến trình; no-op khi tiến trình đã thoát (PID có thể đã bị dùng lại)
 }
+// SessionManager không gọi kill/write/resize nữa từ khi exitCode hoàn tất; adapter vẫn phải tự chặn kill sau khi thoát.
 final class ShellCommand {
   const ShellCommand({required this.executable, required this.arguments, required this.name});
   final String executable; final List<String> arguments; final String name;   // name ví dụ "zsh", "pwsh"
@@ -615,9 +616,9 @@ final class MachineClient {
   Future<ClientTab> openSession({required int cols, required int rows}); // AppErrorException
   Future<ClientTab> attach(int id, {required int cols, required int rows});
   List<ClientTab> get tabs;
-  void input(int id, Uint8List data);                                 // cắt > 16 KiB
+  void input(int id, Uint8List data);                                 // cắt > 16 KiB; không có kênh: bỏ; kênh mới nhưng tab chưa gắn lại: giữ tối đa 64 KiB mới nhất, gửi một lần sau session.attached (bỏ nếu mất kênh, gắn lại lỗi hoặc đóng tab)
   void resize(int id, int cols, int rows);                            // bỏ qua nếu cols < 1 hoặc rows < 1
-  Future<void> closeTab(int id);
+  Future<void> closeTab(int id);                                      // tab đang gắn: gửi session.close; chưa có kênh thì gửi ngay trên kênh kế tiếp
   // Khi kết nối relay phục hồi: tự bắt tay lại và gắn lại mọi tab isAttached == true với lastSeq = received.
 }
 final class ClientService {

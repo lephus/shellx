@@ -65,6 +65,13 @@ final class AgentService {
          pairing: pairing,
        );
 
+  /// Waits before the second and third attempt of a pairing record's
+  /// DELETE (the same as the phone's unpair).
+  static const _deleteRetryDelays = [
+    Duration(milliseconds: 500),
+    Duration(seconds: 1),
+  ];
+
   final RelayConnection _relay;
   final DateTime Function() _clock;
   final PairingIdGenerator _pairingIds;
@@ -152,12 +159,14 @@ final class AgentService {
     await _relay.stop();
   }
 
-  /// Creates a single-use pairing code and the QR URI that carries it.
+  /// Creates a single-use pairing code and the QR URI that carries it. The
+  /// URI holds a copy of the public key: changing it cannot change the
+  /// identity the handshakes use.
   PairingUri startPairing() {
     final offer = _pairing.create();
     return PairingUri(
       agentDeviceId: _deviceId,
-      agentPublicKey: _identity.publicKey,
+      agentPublicKey: Uint8List.fromList(_identity.publicKey),
       secret: offer.secret,
     );
   }
@@ -308,7 +317,12 @@ final class AgentService {
     }
     for (final message in messages) {
       if (message is PairConfirm) continue;
-      await _sessions.handle(mobileId, message);
+      try {
+        await _sessions.handle(mobileId, message);
+      } catch (_) {
+        // For example a PTY write that throws: only this message is lost,
+        // not the rest of the batch (the channel itself is fine).
+      }
       if (!identical(_channels[mobileId], channel)) {
         // stop() dropped the channel meanwhile: undo any attach the
         // message made, so no session stays attached to a missing channel.
@@ -440,13 +454,22 @@ final class AgentService {
     return pass;
   }
 
-  /// `DELETE /v1/pairings` for pairing [pairingId] only. Failures are
-  /// ignored: the record is display-only and trust is already gone.
+  /// `DELETE /v1/pairings` for pairing [pairingId] only. A network error or
+  /// a 5xx is retried (3 attempts in all, as the phone's unpair); anything
+  /// else, and the last failure, is ignored: the record is display-only and
+  /// trust is already gone. Never throws.
   Future<void> _deletePairing(String mobileId, String pairingId) async {
-    try {
-      await _api.deletePairing(_deviceId, mobileId, pairingId: pairingId);
-    } catch (_) {
-      // Nothing else to do.
+    for (var attempt = 0; ; attempt++) {
+      try {
+        await _api.deletePairing(_deviceId, mobileId, pairingId: pairingId);
+        return;
+      } on ApiException catch (error) {
+        final retry = error.status == 0 || error.status >= 500;
+        if (!retry || attempt == _deleteRetryDelays.length) return;
+      } catch (_) {
+        return;
+      }
+      await Future<void>.delayed(_deleteRetryDelays[attempt]);
     }
   }
 

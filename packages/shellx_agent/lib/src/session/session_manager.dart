@@ -97,7 +97,24 @@ final class _Session {
   /// before [_finish] runs anyway (see [_drainTimeout]).
   Timer? drainTimer;
 
+  /// True as soon as [Pty.exitCode] has completed. From then on the pty is
+  /// never killed, written to or resized again: its process id may already
+  /// belong to another process (a tree kill would hit the wrong tree).
+  bool exited = false;
+
   StreamSubscription<Uint8List>? output;
+
+  void write(Uint8List data) {
+    if (!exited) pty.write(data);
+  }
+
+  void resize(int cols, int rows) {
+    if (!exited) pty.resize(cols, rows);
+  }
+
+  void kill() {
+    if (!exited) pty.kill();
+  }
 }
 
 /// Owns every terminal session of the agent (spec §6.5 and §7).
@@ -192,7 +209,7 @@ final class SessionManager {
       case SessionAttach(:final id, :final cols, :final rows, :final lastSeq):
         _attach(mobileId, id, cols, rows, lastSeq);
       case InputMessage(:final id, :final data):
-        _attachedTo(mobileId, id)?.pty.write(data);
+        _attachedTo(mobileId, id)?.write(data);
       case ResizeMessage(:final id, :final cols, :final rows):
         final session = _attachedTo(mobileId, id);
         if (session != null) _resize(session, cols, rows);
@@ -207,7 +224,7 @@ final class SessionManager {
           _notFound(mobileId, id);
           return;
         }
-        session.pty.kill();
+        session.kill();
       default:
         // pair.confirm is handled by AgentService; agent→phone types are
         // never accepted from a phone.
@@ -234,10 +251,17 @@ final class SessionManager {
   }
 
   /// Kills every session attached to [mobileId] (used when revoking a phone).
+  ///
+  /// Precondition: no `session.open` is pending (awaiting the shell
+  /// resolver). The epoch bump is global, so it would also void an open
+  /// in flight for another phone. AgentService guarantees this: it calls
+  /// this from its inbox, which awaits every [handle] call, so no open is
+  /// in flight at that point. Only [closeAll] (called by the app outside
+  /// that inbox) can race an open, and it is meant to void every one.
   void closeSessionsAttachedTo(String mobileId) {
     _epoch++;
     for (final session in _sessions.values.toList()) {
-      if (session.attachedMobileId == mobileId) session.pty.kill();
+      if (session.attachedMobileId == mobileId) session.kill();
     }
   }
 
@@ -259,7 +283,7 @@ final class SessionManager {
       session.exitRecipient = mobileId;
       _changes.add(null);
     }
-    session.pty.kill();
+    session.kill();
   }
 
   void closeAll() {
@@ -362,12 +386,12 @@ final class SessionManager {
     final r = _clampDimension(rows);
     if (c == session.cols && r == session.rows) {
       // Same size: bounce the height so full-screen programs redraw.
-      session.pty.resize(c, r > _minDimension ? r - 1 : r + 1);
-      session.pty.resize(c, r);
+      session.resize(c, r > _minDimension ? r - 1 : r + 1);
+      session.resize(c, r);
     } else {
       session.cols = c;
       session.rows = r;
-      session.pty.resize(c, r);
+      session.resize(c, r);
     }
     _send(mobileId, SessionAttached(id: id));
     if (previous != mobileId) _changes.add(null);
@@ -379,7 +403,7 @@ final class SessionManager {
     if (c == session.cols && r == session.rows) return;
     session.cols = c;
     session.rows = r;
-    session.pty.resize(c, r);
+    session.resize(c, r);
   }
 
   void _watch(_Session session) {
@@ -392,10 +416,17 @@ final class SessionManager {
       onDone: outputDone.complete,
       onError: (Object _) {},
     );
-    session.pty.exitCode.then((code) async {
-      await outputDone.future.timeout(_outputDrainGrace, onTimeout: () {});
-      _processExited(session, code);
-    }, onError: (Object _) => _processExited(session, -1));
+    session.pty.exitCode.then(
+      (code) async {
+        session.exited = true; // First: no kill/write/resize from here on.
+        await outputDone.future.timeout(_outputDrainGrace, onTimeout: () {});
+        _processExited(session, code);
+      },
+      onError: (Object _) {
+        session.exited = true;
+        _processExited(session, -1);
+      },
+    );
   }
 
   /// The shell process has exited. If nobody is attached, finishes right
