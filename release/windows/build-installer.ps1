@@ -11,6 +11,16 @@ $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path (Join-Path $SourceDir 'ShellX.exe'))) { throw "ShellX.exe not found in $SourceDir" }
 
+# A Flutter Windows app needs the Visual C++ runtime next to the exe on a clean PC
+# (https://docs.flutter.dev/platform-integration/windows/building). release-desktop.yml copies
+# these from the Visual Studio VC++ redistributable after signing; fail loudly if they are missing
+# so a clean-PC install cannot silently ship without them.
+foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+  if (-not (Test-Path (Join-Path $SourceDir $dll))) {
+    throw "$dll not found in $SourceDir (the Visual C++ runtime must ship next to ShellX.exe)"
+  }
+}
+
 # Inno Setup 6 only: Vietnamese.isl is pinned to the 6.7.1 message set.
 function Find-Iscc {
   Get-ChildItem -Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue |

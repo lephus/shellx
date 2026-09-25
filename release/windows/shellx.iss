@@ -74,6 +74,13 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags
 ; Stop the tray agent so its files can be deleted.
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
 
+[UninstallDelete]
+; The agent's per-user data folder: flutter_secure_storage's DPAPI-encrypted file (device key,
+; access token, trusted-phone list) and shared_preferences settings. CompanyName is "pro.shellx",
+; ProductName "ShellX" (Runner.rc, plan 04); path_provider's application-support directory
+; resolves to %APPDATA%\pro.shellx\ShellX (confirmed in plan 04's Task 1).
+Type: filesandordirs; Name: "{userappdata}\pro.shellx\ShellX"
+
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var

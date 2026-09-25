@@ -125,7 +125,11 @@ names fixed by `apps/desktop`: `ShellX.app` with bundle id `pro.shellx.desktop`,
    `dry_run` checked. Download the `macos-dmg` and `windows-installer` artifacts and smoke-test them
    (macOS: right-click → Open, because the dry-run app is ad-hoc signed; Windows: SmartScreen →
    More info → Run anyway): the agent starts in the tray, you can sign in, pair a phone and open a
-   session.
+   session. Also smoke-test the dry-run installer in **Windows Sandbox** (a clean Windows with no
+   Visual C++ runtime preinstalled): Windows Features → turn on "Windows Sandbox", paste the
+   installer in, run it, confirm the agent starts — this is what catches a missing
+   `msvcp140.dll`/`vcruntime140.dll`/`vcruntime140_1.dll` that a developer machine (which already
+   has the runtime installed) would not.
 3. **Tag:** `git switch main && git pull && git tag desktop-vX.Y.Z && git push origin desktop-vX.Y.Z`.
 4. Wait for the run to finish. Its summary lists both public URLs with SHA-256 hashes. On a clean
    Mac, download the dmg in a browser, drag ShellX to Applications and open it: macOS must show only

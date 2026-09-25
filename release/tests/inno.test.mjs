@@ -42,6 +42,10 @@ test('a running agent is stopped before files are replaced and before uninstall'
   assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe/);
 });
 
+test('uninstall removes the agent\'s per-user data folder (device key, trusted-phone list, settings)', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{userappdata\}\\pro\.shellx\\ShellX"/);
+});
+
 test('uninstall removes the launch-at-login registry value', () => {
   assert.ok(
     iss.includes("RegDeleteValue(HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Run', 'ShellX')"),

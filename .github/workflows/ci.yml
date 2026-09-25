@@ -270,6 +270,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Join-Path $source 'data') | Out-Null
           Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $source 'ShellX.exe')
           Set-Content -Path (Join-Path $source 'data\placeholder.txt') -Value 'stand-in for flutter_assets'
+          # build-installer.ps1 requires the Visual C++ runtime DLLs next to the exe; the real ones
+          # are copied by release-desktop.yml, so stand in with placeholders here.
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Set-Content -Path (Join-Path $source $dll) -Value 'stand-in for the VC++ runtime'
+          }
           ./release/windows/build-installer.ps1 -Version 0.0.0 -SourceDir $source -OutputDir (Join-Path $env:RUNNER_TEMP 'installer')
 
   ci-ok:

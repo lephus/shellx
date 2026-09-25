@@ -162,6 +162,28 @@ jobs:
           files-folder: ${{ env.RELEASE_DIR }}
           files-folder-filter: exe,dll
           files-folder-recurse: true
+      - name: Copy the Visual C++ runtime DLLs into the release folder
+        # Runs after signing (not before) so Microsoft's own Authenticode signatures on these
+        # DLLs are not re-signed by the files-folder-filter: exe,dll step above. A Flutter Windows
+        # app needs msvcp140.dll, vcruntime140.dll and vcruntime140_1.dll next to the exe on a
+        # clean PC: https://docs.flutter.dev/platform-integration/windows/building.
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+          $vsInstallPath = & $vswhere -latest -products * -property installationPath
+          if (-not $vsInstallPath) { throw 'vswhere found no Visual Studio installation' }
+          $redistRoot = Join-Path $vsInstallPath 'VC\Redist\MSVC'
+          if (-not (Test-Path $redistRoot)) { throw "$redistRoot not found" }
+          $crtDir = Get-ChildItem -Path $redistRoot -Directory | Sort-Object Name -Descending |
+            ForEach-Object { Get-ChildItem -Path (Join-Path $_.FullName 'x64') -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue } |
+            Select-Object -First 1
+          if (-not $crtDir) { throw "no x64\Microsoft.VC*.CRT folder found under $redistRoot" }
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            $src = Join-Path $crtDir.FullName $dll
+            if (-not (Test-Path $src)) { throw "$dll not found in $($crtDir.FullName)" }
+            Copy-Item $src -Destination $env:RELEASE_DIR
+          }
+          Write-Host "Copied VC++ runtime DLLs from $($crtDir.FullName)"
       - name: Build installer with Inno Setup
         run: |
           $out = Join-Path $env:GITHUB_WORKSPACE 'dist'
