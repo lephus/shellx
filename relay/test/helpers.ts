@@ -113,6 +113,41 @@ export async function loginDevice(app: TestApp, account: Account, kind: Kind, pu
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey };
 }
 
+/** A UUIDv7 (RFC 9562) for unix-millisecond timestamp `ms`, lower case, random in the other bits. */
+export function uuidv7(ms: number): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  for (let i = 0; i < 6; i++) bytes[i] = Math.floor(ms / 2 ** (8 * (5 - i))) % 256;
+  bytes[6] = 0x70 | (bytes[6]! & 0x0f); // version 7
+  bytes[8] = 0x80 | (bytes[8]! & 0x3f); // variant 10
+  const h = hex(bytes);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+let lastPairingMs = 0;
+/** A pairing id as the agent generates it (UUIDv7), strictly newer than every one returned before. */
+export function newPairingId(): string {
+  lastPairingMs = Math.max(Date.now(), lastPairingMs + 1);
+  return uuidv7(lastPairingMs);
+}
+
+/** POST /v1/pairings as `agentToken`, with a fresh agent-generated pairing id unless one is given. */
+export async function pair(
+  app: TestApp,
+  agentToken: string,
+  mobileId: string,
+  pairingId: string = newPairingId(),
+): Promise<Response> {
+  return call(app, "POST", "/v1/pairings", { token: agentToken, body: { mobile_id: mobileId, pairing_id: pairingId } });
+}
+
+/** The `pairing_id` of the D1 row for (agent, mobile), or null when there is no row. */
+export async function pairingIdOf(agentId: string, mobileId: string): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT pairing_id FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+    .bind(agentId, mobileId)
+    .first<{ pairing_id: string }>();
+  return row?.pairing_id ?? null;
+}
+
 export async function errorCode(res: Response): Promise<string> {
   const body = await res.json<{ error: { code: string; message: string } }>();
   return body.error.code;
