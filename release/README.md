@@ -127,8 +127,18 @@ names fixed by `apps/desktop`: `ShellX.app` with bundle id `pro.shellx.desktop`,
 2. Recommended: Settings → Rules → Rulesets → **New tag ruleset** targeting `desktop-v*`,
    restricting creation and deletion to maintainers.
 3. Run one dry run (next section, step 2) to validate the toolchain before the first real release.
+4. After the first full CI run on `feat/shellx-v1` → `main` finishes, make the `CI result` check
+   required on `main`: Settings → Branches (or Rules → Rulesets) → add a rule for `main` →
+   **Require status checks to pass before merging** → select `CI result`.
 
 ## Releasing version X.Y.Z
+
+**First release only (v1.0.0):** `web/src/site.config.json` already ships with
+`"desktopVersion": "1.0.0"` (see `web/README.md`). If the website is deployed before this
+procedure has published `1.0.0` to R2, its download buttons 404. Run this whole procedure for
+`1.0.0` — through step 5 (Relay) at least — before the branch containing `web/` is merged to `main`
+and deployed by Cloudflare Pages; step 6 below then only has to confirm the version already
+matches.
 
 1. Set `version: X.Y.Z+N` in `apps/desktop/pubspec.yaml` (increase `N` every release), merge to
    `main`, wait for CI.

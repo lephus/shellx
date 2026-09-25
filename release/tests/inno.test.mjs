@@ -39,7 +39,7 @@ test('AppId is fixed so upgrades replace the existing install', () => {
 
 test('a running agent is stopped before files are replaced and before uninstall', () => {
   assert.match(iss, /function PrepareToInstall[\s\S]*?taskkill\.exe[\s\S]*?\/F \/T \/IM/);
-  assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe/);
+  assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe[^[]*\/F \/T \/IM/);
 });
 
 test('uninstall removes the agent\'s per-user data folder (device key, trusted-phone list, settings)', () => {

@@ -11,7 +11,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel a superseded run on a PR (new pushes replace it), but never cancel a run on main: it
+  # may be the one about to satisfy the required "CI result" check.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FLUTTER_VERSION: 3.41.7
@@ -42,6 +44,7 @@ jobs:
           filters: |
             dart_shared: &dart_shared
               - 'pubspec.yaml'
+              - 'pubspec.lock'
               - 'analysis_options.yaml'
               - 'packages/**'
               - '.github/workflows/ci.yml'
