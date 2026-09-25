@@ -7,3 +7,5 @@ export 'src/relay/channel_id.dart';
 export 'src/relay/frames.dart';
 export 'src/noise/noise_key_pair.dart';
 export 'src/noise/handshake.dart';
+export 'src/protocol/handshake_payloads.dart';
+export 'src/protocol/messages.dart';
