@@ -73,6 +73,11 @@ final class MachineClient {
   /// flight must not install its channel.
   int _losses = 0;
 
+  /// Bumped by [dropChannel] when there is no live channel: a handshake
+  /// whose HS1 went out before must not install its channel either (the
+  /// agent may have replaced it), and starts over on a new channel id.
+  int _drops = 0;
+
   MachineConnectionState get state => _state;
 
   Stream<MachineConnectionState> get states => _states.stream;
@@ -212,15 +217,21 @@ final class MachineClient {
   }
 
   /// The agent may no longer hold this phone's channel (a `pairing_removed`
-  /// event, or a pairing handshake replaced it): a live channel is dropped,
-  /// after the frames received before this call, so the next handshake asks
-  /// the agent again. The pin and the tabs stay, as on any channel loss; a
-  /// handshake in flight is left alone.
+  /// event, or a pairing handshake may have replaced it). After the frames
+  /// received before this call, a live channel is dropped, and a handshake
+  /// in flight starts over on a new channel id instead of installing its
+  /// channel; then the open tabs resume, so the agent is asked again at
+  /// once. The pin and the tabs stay, as on any channel loss.
   @internal
   void dropChannel() {
     _inbox = _inbox
         .then((_) {
-          if (_secure != null) _channelLost();
+          if (_secure != null) {
+            _channelLost();
+          } else {
+            _drops++;
+          }
+          unawaited(_resume());
         })
         .catchError((Object _) {});
   }
@@ -237,9 +248,12 @@ final class MachineClient {
 
   /// Never leaves the state at [MachineConnecting]: an unexpected error
   /// fails the handshake with `timeout`, like an answer that never comes.
+  /// A handshake voided by [dropChannel] starts over; each restart needs a
+  /// new drop, so this cannot spin.
   Future<void> _handshakeNow() async {
+    final losses = _losses; // A loss from here on voids this attempt.
     try {
-      await _handshakeSteps();
+      while (!await _handshakeSteps(losses)) {}
     } on MachineConnectionException {
       rethrow;
     } catch (_) {
@@ -247,8 +261,9 @@ final class MachineClient {
     }
   }
 
-  Future<void> _handshakeSteps() async {
-    final losses = _losses; // A loss from here on voids this handshake.
+  /// One IK handshake on a new channel id: true once its channel is
+  /// installed, false when [dropChannel] voided it in flight.
+  Future<bool> _handshakeSteps(int losses) async {
     final key = _pinnedKey();
     if (key == null || key.length != 32) {
       await _forgetPinQuietly(); // An unusable pin is as good as none.
@@ -259,7 +274,7 @@ final class MachineClient {
       agentDeviceId: agentId,
       mobileDeviceId: _deviceId,
     );
-    _setState(const MachineConnecting());
+    if (_state is! MachineConnecting) _setState(const MachineConnecting());
     final handshake = NoiseHandshake.initiator(
       pattern: NoisePattern.ik,
       localStatic: _identity,
@@ -270,6 +285,7 @@ final class MachineClient {
     final channel = ChannelId.random();
     final reply = Completer<Uint8List?>();
     _handshake = (channel: channel, reply: reply);
+    final drops = _drops; // A drop from here on voids this channel.
     final sent = _relay.send(
       DataFrame(
         peer: agentId,
@@ -305,9 +321,11 @@ final class MachineClient {
       _fail(MachineConnectionFailure.untrusted);
     }
     if (losses != _losses) _failLost(); // Lost while in flight.
+    if (drops != _drops) return false; // The agent may have replaced it.
     _channelId = channel;
     _secure = SecureChannel(handshake.split());
     _setState(const MachineReady());
+    return true;
   }
 
   Future<void> _forgetPinQuietly() async {
@@ -499,8 +517,9 @@ final class MachineClient {
   /// taken over, exited or ended) with `last_seq = received`, one at a
   /// time. A call while a resume runs (the channel was lost again during
   /// its attaches) makes that resume do one more pass. Only ever triggered
-  /// by an event (relay back, PRESENCE online, decrypt error), so an agent
-  /// that stays offline costs one handshake per event.
+  /// by an event (relay back, PRESENCE online, decrypt error, a dropped
+  /// channel), so an agent that stays offline costs one handshake per
+  /// event.
   Future<void> _resume() async {
     if (_resuming) {
       _resumeAgain = true;

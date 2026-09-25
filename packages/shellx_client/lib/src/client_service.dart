@@ -154,12 +154,14 @@ final class ClientService {
     final channel = ChannelId.random();
     final reply = Completer<Uint8List>();
     _pairings[channel] = (agentId: agentId, reply: reply);
+    var sent = false;
     try {
       _sendPairing(
         agentId,
         channel,
         ChannelPayload(PayloadKind.hs1IkPsk2, hello).encode(),
       );
+      sent = true;
       final Uint8List message;
       try {
         // Fails early with agentOffline or timeout when the way is lost.
@@ -167,9 +169,6 @@ final class ClientService {
       } on TimeoutException {
         throw const PairingException(PairingFailure.timeout);
       }
-      // One channel per phone: an HS1 the agent accepted replaced this
-      // phone's channel, and a wrong code's HS2 cannot say whether it did.
-      _machines[agentId]?.dropChannel();
       final Uint8List plaintext;
       try {
         plaintext = await handshake.readMessage(message);
@@ -201,6 +200,11 @@ final class ClientService {
       _pins[agentId] = pin;
     } finally {
       _pairings.remove(channel);
+      // One channel per phone: an HS1 the agent accepted replaced this
+      // phone's machine channel, whatever became of the pairing (a lost or
+      // late HS2, a wrong code's HS2 cannot say). Dropped only now, after
+      // pair.confirm went out, so the new IK handshake cannot overtake it.
+      if (sent) _machines[agentId]?.dropChannel();
     }
   }
 
@@ -295,9 +299,10 @@ final class ClientService {
 
   /// `pairing_removed` for this phone may name an older pairing than the
   /// one the agent trusts now (the phone does not know pairing ids), so the
-  /// pin stays. A live channel to that machine is dropped instead: the next
-  /// handshake asks the agent, and only an `untrusted` answer forgets the
-  /// pin (spec §12). The relay can only take trust away.
+  /// pin stays. The machine's channel is dropped instead: the next
+  /// handshake (at once when tabs are open) asks the agent, and only an
+  /// `untrusted` answer forgets the pin (spec §12). The relay can only take
+  /// trust away.
   void _onEvent(Map<String, String> event) {
     if (event['event'] != 'pairing_removed' ||
         event['mobile_id'] != _deviceId) {

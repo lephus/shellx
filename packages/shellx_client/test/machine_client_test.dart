@@ -578,6 +578,33 @@ void main() {
       expect(h.sessions.sessions.single.attachedMobileId, tabletId);
     });
   });
+
+  // Task 14.
+
+  test('connect() called as an attempt fails starts a new attempt instead '
+      'of handing out the one that just ended', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.agent.stop();
+      settle(async);
+      final machine = h.phoneMachine;
+      var attempts = 0;
+      final retries = <Object>[];
+      machine.states.listen((state) {
+        if (state is MachineConnecting) attempts++;
+        if (state is MachineFailed && attempts == 1) {
+          machine.connect().catchError(retries.add); // The app retries.
+        }
+      });
+      expect(
+        () => h.run(machine.connect()),
+        failsWith(MachineConnectionFailure.agentOffline),
+      );
+      settle(async);
+      expect(attempts, 2);
+      expect(retries, [failure(MachineConnectionFailure.agentOffline)]);
+    });
+  });
 }
 
 /// A phone service (replacing the harness phone's relay connection) whose

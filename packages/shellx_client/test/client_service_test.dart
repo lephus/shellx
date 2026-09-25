@@ -375,6 +375,106 @@ void main() {
         expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
       });
     });
+
+    test('re-pairing with a tab open completes the pairing, then the tab '
+        're-attaches by itself on a new channel', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+        final recorder = TabRecorder(tab);
+        h.pty.emit('before ');
+        settle(async);
+
+        h.run(h.phone.pair(h.agent.startPairing()));
+        settle(async);
+        // pair.confirm reached the agent before the new IK handshake.
+        expect(h.agentEvents.whereType<MobilePaired>(), hasLength(1));
+        expect(
+          h.run(h.trusted.find(phoneId))!.pairingId,
+          isNot(phonePairingId),
+        );
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
+        expect(h.phoneMachine.state, isA<MachineReady>());
+
+        h.pty.emit('after');
+        settle(async);
+        expect(recorder.text, 'before after');
+        expect(tab.isAttached, isTrue);
+        expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+      });
+    });
+
+    test('a re-pair while the phone is still handshaking with the machine '
+        'makes that handshake start over instead of installing the channel '
+        'the agent replaced', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        ChannelId? firstIk;
+        DataFrame? late;
+        h.relay.onData = (from, to, frame) {
+          final kind = frame.payload.first;
+          if (from == phoneId && kind == PayloadKind.hs1Ik.wire) {
+            firstIk ??= frame.channel;
+          }
+          if (from == agentId &&
+              frame.channel == firstIk &&
+              kind == PayloadKind.hs2.wire &&
+              late == null) {
+            late = frame; // Held back: delivered after the pairing.
+            return null;
+          }
+          return frame;
+        };
+        final connecting = h.phoneMachine.connect();
+        settle(async);
+        expect(late, isNotNull);
+        expect(h.phoneMachine.state, isA<MachineConnecting>());
+
+        // The agent replaces the IK channel with the pairing channel, and
+        // drops that one after pair.confirm.
+        h.run(h.phone.pair(h.agent.startPairing()));
+        h.phoneMachine.handleFrame(late!);
+        h.run(connecting);
+
+        expect(h.phoneMachine.state, isA<MachineReady>());
+        expect(h.run(h.phoneMachine.listSessions()), isEmpty); // Not dead.
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
+      });
+    });
+
+    test('a pairing that gets no HS2 after the agent took its HS1 still '
+        'drops the machine channel; the open tab re-attaches', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+        final recorder = TabRecorder(tab);
+        h.pty.emit('before ');
+        settle(async);
+
+        ChannelId? pairing;
+        h.relay.onData = (from, to, frame) {
+          if (from == phoneId &&
+              frame.payload.first == PayloadKind.hs1IkPsk2.wire) {
+            pairing = frame.channel;
+          }
+          // The agent answers (and replaces the phone's channel), but its
+          // HS2 is lost on the way.
+          return from == agentId && frame.channel == pairing ? null : frame;
+        };
+        expect(
+          () => h.run(h.phone.pair(h.agent.startPairing())),
+          pairingFails(PairingFailure.timeout),
+        );
+        h.pty.emit('after');
+        settle(async);
+
+        expect(recorder.text, 'before after');
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
+        expect(h.phoneMachine.state, isA<MachineReady>());
+        expect(tab.isAttached, isTrue);
+        expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+      });
+    });
   });
 
   test('machine() needs a pin and returns one instance per agent', () {
@@ -530,8 +630,8 @@ void main() {
       });
     });
 
-    test('while a tab is open the channel is dropped and re-verified; the '
-        'tab re-attaches', () {
+    test('while a tab is open the channel is dropped and re-verified at '
+        'once; the tab re-attaches by itself', () {
       fakeAsync((async) {
         final h = Harness(async, keys);
         final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
@@ -540,10 +640,6 @@ void main() {
         settle(async);
 
         sendPairingRemoved(h, oldPairingId);
-        expect(h.phoneMachine.state, isA<MachineIdle>());
-        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(1));
-
-        h.run(h.phoneMachine.attach(tab.id, cols: 80, rows: 24));
         expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
         expect(h.phoneMachine.state, isA<MachineReady>());
         h.pty.emit('after');
@@ -551,6 +647,34 @@ void main() {
         expect(recorder.text, 'before after');
         expect(tab.isAttached, isTrue);
         expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+      });
+    });
+
+    test('after the agent revokes the phone with a tab open, the phone asks '
+        'again at once and forgets the pin on untrusted', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final machine = h.phoneMachine;
+        h.run(machine.openSession(cols: 80, rows: 24));
+        settle(async);
+        final states = <MachineConnectionState>[];
+        machine.states.listen(states.add);
+
+        h.run(h.agent.revoke(phoneId));
+        async.elapse(const Duration(minutes: 1));
+
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
+        expect(states.whereType<MachineConnecting>(), hasLength(1));
+        expect(
+          machine.state,
+          isA<MachineFailed>().having(
+            (s) => s.failure,
+            'failure',
+            MachineConnectionFailure.untrusted,
+          ),
+        );
+        expect(h.run(h.phonePins.find(agentId)), isNull);
+        expect(() => h.phone.machine(agentId), throwsStateError);
       });
     });
 

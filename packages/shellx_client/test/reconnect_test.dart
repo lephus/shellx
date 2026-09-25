@@ -302,6 +302,36 @@ void main() {
     });
   });
 
+  test('a channel dropped the moment it becomes ready is replaced by a new '
+      'one and the tab re-attaches', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final machine = h.phoneMachine;
+      final tab = h.run(machine.openSession(cols: 80, rows: 24));
+      final recorder = TabRecorder(tab);
+      settle(async);
+
+      // The channel goes without anything asking for a resume yet; the app
+      // connects, and the new channel is dropped as soon as it is ready.
+      machine.relayLost();
+      settle(async);
+      var drops = 0;
+      machine.states.listen((state) {
+        if (state is MachineReady && drops++ == 0) machine.dropChannel();
+      });
+      h.run(machine.connect());
+      settle(async);
+
+      h.pty.emit('after');
+      settle(async);
+      expect(drops, 2); // The replacement channel stayed.
+      expect(machine.state, isA<MachineReady>());
+      expect(recorder.text, 'after');
+      expect(tab.isAttached, isTrue);
+      expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+    });
+  });
+
   test('stop() and start() of the phone service re-attach the open tab', () {
     fakeAsync((async) {
       final h = Harness(async, keys);
