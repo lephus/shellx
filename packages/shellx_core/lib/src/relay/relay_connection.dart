@@ -396,7 +396,10 @@ final class RelayConnection {
       final RelayFrame frame;
       try {
         frame = RelayFrame.decode(message);
-      } on FrameFormatException {
+      } on Object {
+        // Any failure to decode (not just FrameFormatException) means the
+        // frame is dropped rather than crashing the connection: a same-
+        // account device or a compromised relay controls these bytes.
         return;
       }
       _frames.add(frame);
