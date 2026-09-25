@@ -101,8 +101,9 @@ void main() {
     test('EVENT decodes a minimal CBOR map built like the relay builds it', () {
       final agent = '11111111-2222-3333-4444-555555555555';
       final mobile = '66666666-7777-8888-9999-aaaaaaaaaaaa';
+      final pairing = 'c0ffee00-1234-4abc-9def-0123456789ab';
       final body = BytesBuilder()
-        ..addByte(0xa3) // map(3)
+        ..addByte(0xa4) // map(4)
         ..addByte(0x65) // text(5)
         ..add(utf8.encode('event'))
         ..addByte(0x6f) // text(15)
@@ -114,12 +115,17 @@ void main() {
         ..addByte(0x69) // text(9)
         ..add(utf8.encode('mobile_id'))
         ..add([0x78, 36])
-        ..add(utf8.encode(mobile));
+        ..add(utf8.encode(mobile))
+        ..addByte(0x6a) // text(10)
+        ..add(utf8.encode('pairing_id'))
+        ..add([0x78, 36])
+        ..add(utf8.encode(pairing));
       final wire = Uint8List.fromList([1, 4, ...body.takeBytes()]);
       final expected = EventFrame({
         'event': 'pairing_removed',
         'agent_id': agent,
         'mobile_id': mobile,
+        'pairing_id': pairing,
       });
       expect(RelayFrame.decode(wire), expected);
       expect(RelayFrame.decode(expected.encode()), expected);

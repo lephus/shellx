@@ -106,20 +106,38 @@ final class ShellxApi {
     });
   }
 
-  Future<void> createPairing(String mobileId) async {
+  /// Records pairing [pairingId] (a lower-case UUID v4 the agent generates
+  /// at `pair.confirm`, one per pairing) with the phone [mobileId]
+  /// (`POST /v1/pairings`, agent token). Sending the same id again is
+  /// idempotent. Fails with `410 pairing_removed` when the phone already
+  /// unpaired this very pairing (an earlier attempt committed but its
+  /// response was lost): the row is not recreated.
+  Future<void> createPairing(
+    String mobileId, {
+    required String pairingId,
+  }) async {
     await _send(
       'POST',
       '/v1/pairings',
       authenticated: true,
-      body: {'mobile_id': mobileId},
+      body: {'mobile_id': mobileId, 'pairing_id': pairingId},
     );
   }
 
-  Future<void> deletePairing(String agentId, String mobileId) async {
+  /// `DELETE /v1/pairings/:agent_id/:mobile_id`. With [pairingId] (the
+  /// agent's revoke) the relay removes the pairing only if it is still that
+  /// pairing, otherwise nothing happens; without it (the phone's unpair)
+  /// whatever pairing exists is removed. Idempotent (`204` either way).
+  Future<void> deletePairing(
+    String agentId,
+    String mobileId, {
+    String? pairingId,
+  }) async {
     await _send(
       'DELETE',
       '/v1/pairings/${Uri.encodeComponent(agentId)}/${Uri.encodeComponent(mobileId)}',
       authenticated: true,
+      query: pairingId == null ? null : {'pairing_id': pairingId},
     );
   }
 
@@ -172,11 +190,12 @@ final class ShellxApi {
     return result;
   }
 
-  Uri _endpoint(String path) {
+  Uri _endpoint(String path, Map<String, String>? query) {
     final basePath = _baseUri.path.endsWith('/')
         ? _baseUri.path.substring(0, _baseUri.path.length - 1)
         : _baseUri.path;
-    return _baseUri.replace(path: '$basePath$path');
+    final endpoint = _baseUri.replace(path: '$basePath$path');
+    return query == null ? endpoint : endpoint.replace(queryParameters: query);
   }
 
   Future<http.Response> _send(
@@ -184,8 +203,9 @@ final class ShellxApi {
     String path, {
     bool authenticated = false,
     Map<String, Object?>? body,
+    Map<String, String>? query,
   }) async {
-    final request = http.Request(method, _endpoint(path));
+    final request = http.Request(method, _endpoint(path, query));
     request.headers['Accept'] = 'application/json';
     if (authenticated) {
       final current = token;
