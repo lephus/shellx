@@ -166,6 +166,32 @@ void main() {
       expect(api.token, isNull);
     });
 
+    test('a logout that completes late keeps a token set meanwhile', () async {
+      final reply = Completer<http.Response>();
+      final recorder = _Recorder((_) => reply.future);
+      final api = recorder.api(token: 'A');
+      final logout = api.logout();
+      await pumpEventQueue();
+      expect(recorder.last.headers['authorization'], 'Bearer A');
+
+      // A new session signed in while the old logout was still in flight.
+      api.token = 'B';
+      reply.complete(http.Response('', 204));
+      await logout;
+      expect(api.token, 'B');
+    });
+
+    test('a late logout that fails keeps a token set meanwhile too', () async {
+      final reply = Completer<http.Response>();
+      final api = _Recorder((_) => reply.future).api(token: 'A');
+      final logout = api.logout();
+      await pumpEventQueue();
+      api.token = 'B';
+      reply.completeError(http.ClientException('offline'));
+      await expectLater(logout, throwsA(_apiError(0, 'network')));
+      expect(api.token, 'B');
+    });
+
     test('changePassword posts new_password', () async {
       final recorder = _Recorder((_) => http.Response('', 204));
       await recorder.api(token: 'tok').changePassword('new-password');
