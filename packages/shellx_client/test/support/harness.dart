@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:http/http.dart' as http;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -14,6 +15,11 @@ const agentId = 'a0000000-0000-4000-8000-000000000001';
 const phoneId = 'b0000000-0000-4000-8000-000000000002';
 const tabletId = 'b0000000-0000-4000-8000-000000000003';
 const foreignAgentId = 'c0000000-0000-4000-8000-000000000009';
+
+/// Pairing ids of the pre-paired phone and tablet (`paired: true`): lower-case
+/// UUIDv7, as the agent generates them at `pair.confirm`.
+const phonePairingId = '01920000-0001-7000-8000-000000000000';
+const tabletPairingId = '01920000-0002-7000-8000-000000000000';
 
 /// Static keys, generated once per test file in `setUpAll`.
 final class TestKeys {
@@ -30,7 +36,9 @@ final class TestKeys {
 
 /// A real [AgentService] (fake PTYs) and two real [ClientService]s (phone and
 /// tablet, same account) wired through a [FakeRelay]. With `paired: true`
-/// both phones are already trusted by the agent and have its key pinned.
+/// both phones are already trusted by the agent, have its key pinned and
+/// have their pairing recorded on the relay (as after the agent's
+/// `POST /v1/pairings`).
 final class Harness {
   Harness(this.async, this.keys, {bool paired = true}) {
     agentDevice = relay.addDevice(
@@ -63,7 +71,7 @@ final class Harness {
             publicKey: keys.phone.publicKey,
             name: 'Test Phone',
             pairedAt: DateTime.utc(2026),
-            pairingId: '01920000-0001-7000-8000-000000000000',
+            pairingId: phonePairingId,
           ),
         ),
       );
@@ -74,10 +82,12 @@ final class Harness {
             publicKey: keys.tablet.publicKey,
             name: 'Tablet',
             pairedAt: DateTime.utc(2026),
-            pairingId: '01920000-0002-7000-8000-000000000000',
+            pairingId: tabletPairingId,
           ),
         ),
       );
+      relay.pairings[(agentId, phoneId)] = phonePairingId;
+      relay.pairings[(agentId, tabletId)] = tabletPairingId;
     }
     startAgent();
     phonePins = PinnedStore(InMemoryKeyValueStore(), userId: userId);
@@ -92,6 +102,12 @@ final class Harness {
   final relay = FakeRelay();
   final agentEvents = <AgentEvent>[];
   DateTime now = DateTime.utc(2026, 9, 25, 12);
+
+  /// Consulted before each of the phone's HTTP requests reaches the relay:
+  /// return a response to answer with it instead, throw an
+  /// `http.ClientException` to fail like the network, or return null to let
+  /// the request through.
+  http.Response? Function(http.BaseRequest request)? phoneHttpFault;
   late final FakeDevice agentDevice;
   late final FakeDevice phoneDevice;
   late final FakeDevice tabletDevice;
@@ -191,8 +207,12 @@ final class Harness {
         connector: relay.connector,
         backoff: Backoff(random: Random(21)),
       ),
-      api: ShellxApi(baseUri: relay.baseUri, httpClient: relay.httpClient)
-        ..token = device.token,
+      api: ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: identical(device, phoneDevice)
+            ? _FaultyClient(relay.httpClient, () => phoneHttpFault)
+            : relay.httpClient,
+      )..token = device.token,
       deviceId: device.id,
       userId: userId,
       identity: identity,
@@ -203,6 +223,26 @@ final class Harness {
     );
     run(service.start());
     return service;
+  }
+}
+
+/// Answers a request with the fault's response, or passes it through.
+final class _FaultyClient extends http.BaseClient {
+  _FaultyClient(this._inner, this._fault);
+
+  final http.Client _inner;
+  final http.Response? Function(http.BaseRequest request)? Function() _fault;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final answer = _fault()?.call(request);
+    if (answer == null) return _inner.send(request);
+    return http.StreamedResponse(
+      Stream.value(answer.bodyBytes),
+      answer.statusCode,
+      headers: answer.headers,
+      request: request,
+    );
   }
 }
 

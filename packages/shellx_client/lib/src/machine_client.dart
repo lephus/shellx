@@ -201,6 +201,20 @@ final class MachineClient {
     _inbox = _inbox.then((_) => _channelLost()).catchError((Object _) {});
   }
 
+  /// The agent may no longer hold this phone's channel (a `pairing_removed`
+  /// event, or a pairing handshake replaced it): a live channel is dropped,
+  /// after the frames received before this call, so the next handshake asks
+  /// the agent again. The pin and the tabs stay, as on any channel loss; a
+  /// handshake in flight is left alone.
+  @internal
+  void dropChannel() {
+    _inbox = _inbox
+        .then((_) {
+          if (_secure != null) _channelLost();
+        })
+        .catchError((Object _) {});
+  }
+
   /// Unpaired: forget the channel and every tab without touching sessions.
   @internal
   void shutdown() {
