@@ -13,6 +13,7 @@ const userB = 'user-b';
 const agentId = 'a0000000-0000-4000-8000-000000000001';
 const phoneId = 'b0000000-0000-4000-8000-000000000002';
 const strangerId = 'c0000000-0000-4000-8000-000000000009';
+const observerId = 'd0000000-0000-4000-8000-000000000004';
 
 RelayConnection connect(FakeRelay relay, FakeDevice device) => RelayConnection(
   wsUri: relay.wsUri,
@@ -221,6 +222,290 @@ void main() {
         'POST /v1/pairings',
         'DELETE /v1/pairings/$agentId/$phoneId',
       ]);
+    });
+  });
+
+  test('a same-device reconnect announces only one online, never an offline, '
+      'to others', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      final observer = relay.addDevice(
+        id: observerId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final o = connect(relay, observer)..start();
+      settle(async);
+
+      final first = connect(relay, phone)..start();
+      settle(async);
+
+      final atObserver = <PresenceFrame>[];
+      o.frames.listen((f) {
+        if (f is PresenceFrame) atObserver.add(f);
+      });
+
+      final second = connect(relay, phone)..start();
+      settle(async);
+
+      expect(first.state, RelayConnectionState.replaced);
+      expect(second.state, RelayConnectionState.connected);
+      expect(
+        [for (final f in atObserver) (f.deviceId, f.online)],
+        [(phoneId, true)],
+      );
+    });
+  });
+
+  test(
+    'an offline agent receives pairing_removed once on its next connect',
+    () {
+      fakeAsync((async) {
+        final relay = FakeRelay();
+        final agent = relay.addDevice(
+          id: agentId,
+          userId: userA,
+          kind: DeviceKind.agent,
+        );
+        final phone = relay.addDevice(
+          id: phoneId,
+          userId: userA,
+          kind: DeviceKind.mobile,
+        );
+        final agentApi = ShellxApi(
+          baseUri: relay.baseUri,
+          httpClient: relay.httpClient,
+        )..token = agent.token;
+        final phoneApi = ShellxApi(
+          baseUri: relay.baseUri,
+          httpClient: relay.httpClient,
+        )..token = phone.token;
+        drive(async, agentApi.createPairing(phoneId));
+
+        // Unpair while the agent is offline.
+        drive(async, phoneApi.deletePairing(agentId, phoneId));
+        expect(relay.pairings, isEmpty);
+
+        final a = connect(relay, agent)..start();
+        final events = <EventFrame>[];
+        a.frames.listen((f) {
+          if (f is EventFrame) events.add(f);
+        });
+        settle(async);
+
+        expect(events.map((e) => e.event).toList(), [
+          {
+            'event': 'pairing_removed',
+            'agent_id': agentId,
+            'mobile_id': phoneId,
+          },
+        ]);
+
+        // Delivered and cleared: a later reconnect does not repeat it.
+        relay.dropConnection(agentId);
+        settle(async);
+        final events2 = <EventFrame>[];
+        final a2 = connect(relay, agent)..start();
+        a2.frames.listen((f) {
+          if (f is EventFrame) events2.add(f);
+        });
+        settle(async);
+        expect(events2, isEmpty);
+      });
+    },
+  );
+
+  test('an online agent gets pairing_removed live and again once on its next '
+      'connect', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      final agentApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = agent.token;
+      final phoneApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = phone.token;
+      drive(async, agentApi.createPairing(phoneId));
+
+      final a = connect(relay, agent)..start();
+      final events = <EventFrame>[];
+      a.frames.listen((f) {
+        if (f is EventFrame) events.add(f);
+      });
+      settle(async);
+
+      drive(async, phoneApi.deletePairing(agentId, phoneId));
+      settle(async);
+      expect(events.map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
+
+      // Durably queued even though the agent was online: a later reconnect
+      // still replays it once, then clears it.
+      relay.dropConnection(agentId);
+      settle(async);
+      final events2 = <EventFrame>[];
+      final a2 = connect(relay, agent)..start();
+      a2.frames.listen((f) {
+        if (f is EventFrame) events2.add(f);
+      });
+      settle(async);
+      expect(events2.map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
+
+      relay.dropConnection(agentId);
+      settle(async);
+      final events3 = <EventFrame>[];
+      final a3 = connect(relay, agent)..start();
+      a3.frames.listen((f) {
+        if (f is EventFrame) events3.add(f);
+      });
+      settle(async);
+      expect(events3, isEmpty);
+    });
+  });
+
+  test('the mobile side of a removed pairing is notified too', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      final agentApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = agent.token;
+      drive(async, agentApi.createPairing(phoneId));
+
+      final p = connect(relay, phone)..start();
+      final events = <EventFrame>[];
+      p.frames.listen((f) {
+        if (f is EventFrame) events.add(f);
+      });
+      settle(async);
+
+      drive(async, agentApi.deletePairing(agentId, phoneId));
+      settle(async);
+
+      expect(events.map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
+    });
+  });
+
+  test('deleting a pairing that does not exist sends no event', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      relay.addDevice(id: phoneId, userId: userA, kind: DeviceKind.mobile);
+      final agentApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = agent.token;
+      final a = connect(relay, agent)..start();
+      final events = <EventFrame>[];
+      a.frames.listen((f) {
+        if (f is EventFrame) events.add(f);
+      });
+      settle(async);
+
+      drive(async, agentApi.deletePairing(agentId, phoneId)); // never paired
+      settle(async);
+
+      expect(events, isEmpty);
+      expect(relay.pairings, isEmpty);
+    });
+  });
+
+  test('a revoked token ends a reconnect attempt in revoked state', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      final p = connect(relay, phone)..start();
+      settle(async);
+      expect(p.state, RelayConnectionState.connected);
+
+      relay.dropConnection(phoneId);
+      settle(async);
+      expect(p.state, RelayConnectionState.disconnected);
+
+      relay.revokeToken(phoneId);
+      p.reconnectNow();
+      settle(async);
+
+      expect(p.state, RelayConnectionState.revoked);
+    });
+  });
+
+  test("frame_too_large carries the sender's intended peer and channel when "
+      'the DATA header parses', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      connect(relay, agent).start();
+      final p = connect(relay, phone)..start();
+      final errors = <ErrorFrame>[];
+      p.frames.listen((f) {
+        if (f is ErrorFrame) errors.add(f);
+      });
+      settle(async);
+
+      final channel = ChannelId.random(Random(4));
+      p.send(
+        DataFrame(
+          peer: agentId,
+          channel: channel,
+          payload: Uint8List(kMaxFrameBytes),
+        ),
+      );
+      settle(async);
+
+      expect(errors.single.code, RelayErrorCode.frameTooLarge);
+      expect(errors.single.deviceId, agentId);
+      expect(errors.single.channel, channel);
+      expect(relay.delivered, isEmpty);
     });
   });
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -43,6 +45,19 @@ final class FakeRelay {
   final _devices = <String, FakeDevice>{};
   final _connections = <String, FakeRelaySocket>{};
   final _unreachable = <String>{};
+
+  /// Device ids whose token has been revoked (spec: password change, logout,
+  /// account deletion): the next connect attempt for that device is rejected
+  /// pre-upgrade with HTTP 401, like the real relay's `authenticate()`.
+  final _revokedDevices = <String>{};
+
+  /// Durable, deduplicated per-agent queue of pending `pairing_removed`
+  /// events, mirroring the real hub's `pending_pairing_removed` table:
+  /// mobile ids are added at most once per agent (a `LinkedHashSet` keeps
+  /// first-insertion order without moving a re-added entry, matching
+  /// `INSERT OR IGNORE ... ORDER BY rowid`) and the whole entry for an agent
+  /// is delivered and cleared on that agent's next connect.
+  final _pendingPairingRemoved = <String, LinkedHashSet<String>>{};
 
   /// Display-only pairing records: (agentId, mobileId).
   final pairings = <(String, String)>{};
@@ -99,22 +114,56 @@ final class FakeRelay {
     }
   }
 
+  /// Invalidates [deviceId]'s token: its next connect attempt is rejected
+  /// pre-upgrade with HTTP 401 (`RelayConnection` maps that to `revoked`),
+  /// like a password change or logout on the real relay. Does not affect an
+  /// already-open connection; combine with `dropConnection(id, code:
+  /// RelayCloseCode.revoked)` to also end its live socket with 4002.
+  void revokeToken(String deviceId) => _revokedDevices.add(deviceId);
+
   /// Sends an EVENT frame to one device (if online).
   void sendEvent(String deviceId, Map<String, String> event) =>
       _connections[deviceId]?.deliver(EventFrame(event).encode());
+
+  /// Mirrors the real hub's `notifyPairingRemoved`: sends the EVENT live to
+  /// both devices of the pairing (if connected), and always durably queues
+  /// it for the agent — even when the agent looks live — so a later
+  /// reconnect still replays it (a live socket can be silently dead).
+  void _notifyPairingRemoved(String agentId, String mobileId) {
+    (_pendingPairingRemoved[agentId] ??= LinkedHashSet<String>()).add(mobileId);
+    final event = {
+      'event': 'pairing_removed',
+      'agent_id': agentId,
+      'mobile_id': mobileId,
+    };
+    sendEvent(agentId, event);
+    if (mobileId != agentId) sendEvent(mobileId, event);
+  }
 
   Future<RelaySocket> _connect(Uri uri, Map<String, String> headers) async {
     final authorization =
         headers['Authorization'] ?? headers['authorization'] ?? '';
     final token = authorization.replaceFirst('Bearer ', '');
     final device = _devices.values.where((d) => d.token == token).firstOrNull;
-    if (device == null) throw StateError('unknown token');
+    // A missing/unknown/revoked token is refused with a plain pre-upgrade
+    // HTTP 401, exactly like the real relay's `webSocketRoute` (`shellx_core`
+    // maps that to `RelayConnectionState.revoked`).
+    if (device == null || _revokedDevices.contains(device.id)) {
+      throw const WebSocketException('unauthorized', 401);
+    }
     if (_unreachable.contains(device.id)) {
       throw FakeRelayUnreachable(device.id);
     }
-    _connections[device.id]?.serverClose(RelayCloseCode.replaced);
+    // One connection per device: register the new socket *before* closing
+    // the old one, so the old socket's own disconnect handling (below) sees
+    // itself already superseded and stays silent — the real hub achieves the
+    // same thing by marking the old socket `closing` before it ever closes.
+    // The old connection still gets 4001 (`replaced`); it just never causes
+    // a spurious PRESENCE offline for a device that in fact stayed online.
+    final previous = _connections[device.id];
     final socket = FakeRelaySocket._(this, device);
     _connections[device.id] = socket;
+    previous?.serverClose(RelayCloseCode.replaced);
     for (final other in _connections.values) {
       if (identical(other, socket) || other.device.userId != device.userId) {
         continue;
@@ -124,21 +173,51 @@ final class FakeRelay {
       );
       other.deliver(PresenceFrame(deviceId: device.id, online: true).encode());
     }
+    // Deliver this device's durably-queued pairing_removed events (if any;
+    // in practice only ever queued for an agent) right after the PRESENCE
+    // snapshot, then clear them — mirroring the real hub's `deliverPending`.
+    final pending = _pendingPairingRemoved.remove(device.id);
+    if (pending != null) {
+      for (final mobileId in pending) {
+        socket.deliver(
+          EventFrame({
+            'event': 'pairing_removed',
+            'agent_id': device.id,
+            'mobile_id': mobileId,
+          }).encode(),
+        );
+      }
+    }
     return socket;
   }
 
   void _onClientFrame(FakeRelaySocket from, Uint8List bytes) {
+    // Decode before checking the size limit, like the real hub (parses the
+    // DATA header first, then checks length): a too-large DATA frame's
+    // ERROR still carries the sender's intended peer/channel when the
+    // header itself decodes cleanly.
+    RelayFrame? decoded;
+    try {
+      decoded = RelayFrame.decode(bytes);
+    } on FrameFormatException {
+      decoded = null;
+    }
     if (bytes.length > kMaxFrameBytes) {
-      from.deliver(ErrorFrame(code: RelayErrorCode.frameTooLarge).encode());
+      final probe = decoded is DataFrame ? decoded : null;
+      from.deliver(
+        ErrorFrame(
+          code: RelayErrorCode.frameTooLarge,
+          deviceId: probe?.peer ?? nilUuid,
+          channel: probe?.channel,
+        ).encode(),
+      );
       return;
     }
-    final RelayFrame frame;
-    try {
-      frame = RelayFrame.decode(bytes);
-    } on FrameFormatException {
+    if (decoded == null) {
       from.deliver(ErrorFrame(code: RelayErrorCode.badFrame).encode());
       return;
     }
+    final frame = decoded;
     if (frame is! DataFrame) {
       from.deliver(ErrorFrame(code: RelayErrorCode.badFrame).encode());
       return;
@@ -236,13 +315,12 @@ final class FakeRelay {
       if (caller.id != agentId && caller.id != mobileId) {
         return _error(403, 'forbidden', 'Not part of this pairing');
       }
-      pairings.remove((agentId, mobileId));
-      final other = caller.id == agentId ? mobileId : agentId;
-      sendEvent(other, {
-        'event': 'pairing_removed',
-        'agent_id': agentId,
-        'mobile_id': mobileId,
-      });
+      // Notify (and durably queue) only if the pairing actually existed,
+      // exactly like the real relay's DELETE route; the request itself is
+      // idempotent either way.
+      if (pairings.remove((agentId, mobileId))) {
+        _notifyPairingRemoved(agentId, mobileId);
+      }
       return http.Response('', 204);
     }
     return _error(404, 'not_found', 'Not found');
