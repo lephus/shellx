@@ -39,6 +39,11 @@ List<List<AppMessage>> splitIntoBatches(List<AppMessage> messages) {
 /// pending `output` data reaches [kFlushThresholdBytes]. A flush produces as
 /// many TRANSPORT payloads as [splitIntoBatches] needs. Sealing is serialized
 /// so Noise nonces go out in order.
+///
+/// If a batch fails to seal, or the relay reports it could not be sent, the
+/// channel marks itself failed: it stops sending exactly like [close] (timer
+/// cancelled, pending output dropped, later [enqueue]/[flush] are no-ops) and
+/// calls [onFailure] exactly once. [close] itself never calls [onFailure].
 final class AgentChannel {
   AgentChannel({
     required this.mobileId,
@@ -48,6 +53,7 @@ final class AgentChannel {
     required SecureChannel secure,
     required bool Function(RelayFrame frame) send,
     this.pairingSecret,
+    this.onFailure,
     Duration flushInterval = const Duration(milliseconds: 16),
   }) : _secure = secure,
        _send = send,
@@ -64,6 +70,10 @@ final class AgentChannel {
 
   /// Pairing code used as PSK; non-null only for a pairing (IKpsk2) channel.
   final Uint8List? pairingSecret;
+
+  /// Called exactly once when a batch fails to seal or the relay reports it
+  /// could not be sent. Never called by [close].
+  final void Function()? onFailure;
 
   final SecureChannel _secure;
   final bool Function(RelayFrame frame) _send;
@@ -107,14 +117,29 @@ final class AgentChannel {
     for (final batch in batches) {
       _sendChain = _sendChain
           .then((_) async {
+            if (_closed) return;
             final payload = await _secure.seal(batch);
             if (_closed) return;
-            _send(
+            final ok = _send(
               DataFrame(peer: mobileId, channel: channelId, payload: payload),
             );
+            if (!ok) _fail();
           })
-          .catchError((Object _) {});
+          .catchError((Object _) {
+            _fail();
+          });
     }
+  }
+
+  /// A batch could not be sealed, or the relay rejected it. Stops the
+  /// channel exactly like [close] and notifies [onFailure] once.
+  void _fail() {
+    if (_closed) return;
+    _closed = true;
+    _timer?.cancel();
+    _timer = null;
+    _pending.clear();
+    onFailure?.call();
   }
 
   void close() {

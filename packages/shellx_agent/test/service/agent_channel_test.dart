@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -49,6 +50,8 @@ void main() {
     SecureChannel agentSide,
     List<DataFrame> sent, {
     Uint8List? pairingSecret,
+    bool Function(DataFrame frame)? sendResult,
+    void Function()? onFailure,
   }) => AgentChannel(
     mobileId: phoneId,
     channelId: channelId,
@@ -57,9 +60,10 @@ void main() {
     secure: agentSide,
     send: (frame) {
       sent.add(frame as DataFrame);
-      return true;
+      return sendResult == null ? true : sendResult(frame);
     },
     pairingSecret: pairingSecret,
+    onFailure: onFailure,
   );
 
   List<AppMessage> openFrame(
@@ -190,6 +194,77 @@ void main() {
       channel.enqueue(output(1, 1));
       async.elapse(const Duration(milliseconds: 50));
       expect(sent, isEmpty);
+    });
+  });
+
+  test('the relay rejecting a send marks the channel failed and calls '
+      'onFailure once', () {
+    fakeAsync((async) {
+      final (agentSide, _) = drive(async, securePair());
+      final sent = <DataFrame>[];
+      var failures = 0;
+      final channel = newChannel(
+        agentSide,
+        sent,
+        sendResult: (_) => false,
+        onFailure: () => failures++,
+      );
+      channel.enqueue(output(0, 1));
+      async.elapse(const Duration(milliseconds: 16));
+
+      expect(sent, hasLength(1));
+      expect(failures, 1);
+
+      // Further activity is a no-op: enqueue/flush stop working like close().
+      channel.enqueue(output(1, 1));
+      async.elapse(const Duration(milliseconds: 50));
+      expect(sent, hasLength(1));
+      expect(failures, 1);
+    });
+  });
+
+  test('a batch too large to seal marks the channel failed and calls '
+      'onFailure once, without sending', () {
+    fakeAsync((async) {
+      final (agentSide, _) = drive(async, securePair());
+      final sent = <DataFrame>[];
+      var failures = 0;
+      final channel = newChannel(agentSide, sent, onFailure: () => failures++);
+
+      // A single message this large makes splitIntoBatches hand
+      // SecureChannel.seal a batch over kMaxSealedBatchBytes, which throws
+      // ArgumentError — exercised through the public enqueue()/flush() API,
+      // no shellx_core change or test double needed.
+      channel.enqueue(output(0, kMaxSealedBatchBytes + 1024));
+      async.flushMicrotasks();
+
+      expect(sent, isEmpty);
+      expect(failures, 1);
+
+      channel.enqueue(output(1, 1));
+      async.elapse(const Duration(milliseconds: 50));
+      expect(sent, isEmpty);
+      expect(failures, 1);
+    });
+  });
+
+  test('close during an in-flight seal sends nothing and does not call '
+      'onFailure', () {
+    fakeAsync((async) {
+      final (agentSide, _) = drive(async, securePair());
+      final sent = <DataFrame>[];
+      var failures = 0;
+      final channel = newChannel(agentSide, sent, onFailure: () => failures++);
+
+      channel.enqueue(output(0, 1));
+      channel.flush();
+      // Runs after flush()'s _sendChain.then() has started sealing but
+      // before that seal (a genuinely async Noise encrypt) resolves.
+      scheduleMicrotask(channel.close);
+      async.flushMicrotasks();
+
+      expect(sent, isEmpty);
+      expect(failures, 0);
     });
   });
 
