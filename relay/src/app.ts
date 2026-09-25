@@ -4,6 +4,7 @@ import type { AuthContext } from "./auth/session";
 import type { Env } from "./env";
 import { ApiError, errorBody, Errors } from "./http/errors";
 import { logMeta } from "./log";
+import { accountRoutes } from "./routes/account";
 import { authRoutes } from "./routes/auth";
 import { deviceRoutes } from "./routes/devices";
 import { pairingRoutes } from "./routes/pairings";
@@ -43,6 +44,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   );
 
   app.route("/v1/auth", authRoutes);
+  app.route("/v1/account", accountRoutes);
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
   app.get("/v1/ws", webSocketRoute);

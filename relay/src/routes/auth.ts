@@ -4,10 +4,12 @@ import { parseDevice, type DeviceInput } from "../auth/device";
 import { checkEmail, normalizeEmail } from "../auth/email";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isAcceptablePassword } from "../auth/password-policy";
-import { insertTokenStatement } from "../auth/session";
-import { generateToken, hashToken } from "../auth/tokens";
+import { insertTokenStatement, requireAuth } from "../auth/session";
+import { generateToken, hashToken, parseBearer } from "../auth/tokens";
+import { hubFor } from "../hub/user-hub";
 import { Errors, readJsonObject } from "../http/errors";
 import { logMeta } from "../log";
+import { CloseCode } from "../protocol/frames";
 
 export const authRoutes = new Hono<AppEnv>();
 
@@ -104,4 +106,58 @@ authRoutes.post("/login", async (c) => {
   ]);
   logMeta("login", { device_id: deviceId });
   return c.json({ user_id: user.id, device_id: deviceId, token }, 200);
+});
+
+/** POST /v1/auth/logout — deletes this token; for an agent also every pairing it owns (spec §5.2). */
+authRoutes.post("/logout", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const db = c.env.DB;
+  const tokenHash = await hashToken(parseBearer(c.req.header("Authorization"))!);
+  const statements = [db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash)];
+  let removedMobiles: string[] = [];
+  if (auth.kind === "agent") {
+    const { results } = await db
+      .prepare("SELECT mobile_id FROM pairings WHERE agent_id = ?")
+      .bind(auth.deviceId)
+      .all<{ mobile_id: string }>();
+    removedMobiles = results.map((r) => r.mobile_id);
+    statements.push(db.prepare("DELETE FROM pairings WHERE agent_id = ?").bind(auth.deviceId));
+  }
+  await db.batch(statements);
+  if (removedMobiles.length > 0) {
+    const hub = hubFor(c.env, auth.userId);
+    for (const mobileId of removedMobiles) await hub.notifyPairingRemoved(auth.deviceId, mobileId);
+  }
+  logMeta("logout", { device_id: auth.deviceId });
+  return c.body(null, 204);
+});
+
+/**
+ * POST /v1/auth/password {new_password} — agent token only, no old password (spec §5.2).
+ * Revokes every other device's tokens and closes their sockets with 4002. Pairings are kept.
+ */
+authRoutes.post("/password", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  if (auth.kind !== "agent") throw Errors.agentOnly();
+  const body = await readJsonObject(c.req.raw);
+  if (!isAcceptablePassword(body.new_password)) throw Errors.weakPassword();
+
+  const db = c.env.DB;
+  const now = c.get("now")();
+  const passwordHash = await hashPassword(body.new_password);
+  const { results } = await db
+    .prepare("SELECT id FROM devices WHERE user_id = ? AND id != ?")
+    .bind(auth.userId, auth.deviceId)
+    .all<{ id: string }>();
+  await db.batch([
+    db.prepare("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?").bind(passwordHash, now, auth.userId),
+    db
+      .prepare("DELETE FROM tokens WHERE device_id IN (SELECT id FROM devices WHERE user_id = ? AND id != ?)")
+      .bind(auth.userId, auth.deviceId),
+  ]);
+  if (results.length > 0) {
+    await hubFor(c.env, auth.userId).disconnect(results.map((r) => r.id), CloseCode.revoked);
+  }
+  logMeta("password_changed", { device_id: auth.deviceId });
+  return c.body(null, 204);
 });
