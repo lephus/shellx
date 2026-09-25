@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,6 +235,18 @@ void main() {
       expect(h.keepAwake.last, isFalse);
       expect(h.quits, 1);
     });
+
+    test(
+      'quit always reaches quitApp, even when shutting down hangs',
+      () async {
+        await signedIn(settings: {'onboarding_done': true});
+        // A relay stop that never settles.
+        h.runtime.stopGate = Completer<void>();
+        await tray().handle(const Quit());
+        expect(h.runtime.stopped, isTrue);
+        expect(h.quits, 1);
+      },
+    );
 
     test('close one session / all sessions go to the runtime', () async {
       await signedIn(settings: {'onboarding_done': true});

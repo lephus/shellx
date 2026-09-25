@@ -1114,6 +1114,8 @@ void main() {
       final services = servicesWith('1.0.0');
       expect(services.ptyKillTimeout, const Duration(seconds: 3));
       expect(services.awaitPtyKills, isNull);
+      // Quit's deadline for shutdown() (final review F14).
+      expect(services.shutdownTimeout, const Duration(seconds: 10));
     });
   });
 

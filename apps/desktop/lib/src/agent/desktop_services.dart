@@ -35,6 +35,7 @@ final class DesktopServices {
     required this.deviceName,
     this.updateInterval = const Duration(hours: 24),
     this.quitApp,
+    this.shutdownTimeout = const Duration(seconds: 10),
     this.awaitPtyKills,
     this.ptyKillTimeout = const Duration(seconds: 3),
   }) : assert(
@@ -75,6 +76,10 @@ final class DesktopServices {
   /// releases the single-instance lock (each bounded, so quitting cannot
   /// hang), then exits the process, which closes the window.
   final Future<void> Function()? quitApp;
+
+  /// Quit waits at most this long for `AgentController.shutdown()` before
+  /// it runs [quitApp] anyway, so Quit always ends the process.
+  final Duration shutdownTimeout;
 
   /// Completes once every PTY process-tree kill started so far has settled.
   /// `main.dart` wires it to `FlutterPtyFactory.killsSettled()`

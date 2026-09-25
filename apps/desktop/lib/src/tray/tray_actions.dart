@@ -4,6 +4,7 @@ import 'package:shellx_core/shellx_core.dart';
 import '../agent/agent_controller.dart';
 import '../agent/agent_state.dart';
 import '../agent/desktop_services.dart';
+import '../startup.dart';
 import '../ui/window_router.dart';
 import 'tray_action.dart';
 
@@ -104,7 +105,13 @@ final class TrayActions {
           );
           if (!ok) return;
         }
-        await _agent.shutdown();
+        // Bounded: Quit must always reach exit (quitApp), even if closing
+        // the sessions or the relay link hangs.
+        await runBounded(
+          _agent.shutdown,
+          timeout: _services.shutdownTimeout,
+          label: 'shutting down',
+        );
         await _services.quitApp?.call();
     }
   }

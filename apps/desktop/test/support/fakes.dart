@@ -372,6 +372,7 @@ final class TestHarness {
     platform: platform,
     deviceName: 'Phus-MacBook-Pro',
     quitApp: () async => quits++,
+    shutdownTimeout: const Duration(milliseconds: 200),
     awaitPtyKills: () {
       ptyKillWaits++;
       return ptyKills();
