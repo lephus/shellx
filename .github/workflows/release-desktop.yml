@@ -1,0 +1,255 @@
+name: Release desktop
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version x.y.z (required on a branch; must equal the tag when run on a desktop-v* tag)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run: build and package only, skip signing, notarization and upload to R2'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.41.7
+  NODE_VERSION: 22
+  WRANGLER_VERSION: 4.139.0
+  R2_BUCKET: shellx-downloads
+  DOWNLOAD_BASE_URL: https://download.shellx.pro
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - id: resolve
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: node release/scripts/resolve-version.mjs
+
+  macos:
+    name: macOS dmg
+    needs: prepare
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: flutter build macos --release
+        working-directory: apps/desktop
+        run: flutter build macos --release
+      - name: Check the built app (ShellX.app, bundle id pro.shellx.desktop)
+        run: |
+          app=apps/desktop/build/macos/Build/Products/Release/ShellX.app
+          if [[ ! -d "$app" ]]; then
+            echo "::error::$app not found (apps/desktop must build ShellX.app)"
+            exit 1
+          fi
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+          if [[ "$bundle_id" != "pro.shellx.desktop" ]]; then
+            echo "::error::$app has bundle id '$bundle_id', expected pro.shellx.desktop"
+            exit 1
+          fi
+          echo "APP=$app" >> "$GITHUB_ENV"
+      - name: Import Developer ID certificate
+        if: env.DRY_RUN == 'false'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: release/macos/import-certificate.sh
+      - name: Use an ad-hoc signature for the dry run
+        if: env.DRY_RUN != 'false'
+        run: echo "MACOS_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+      - name: Sign ShellX.app (hardened runtime)
+        run: release/macos/sign-app.sh "$APP" apps/desktop/macos/Runner/Release.entitlements
+      - name: Decode App Store Connect API key
+        if: env.DRY_RUN == 'false'
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Notarize and staple ShellX.app
+        if: env.DRY_RUN == 'false'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: release/macos/notarize.sh "$APP"
+      - name: Build dmg
+        run: release/macos/make-dmg.sh "$APP" "dist/ShellX-$VERSION.dmg"
+      - name: Sign, notarize and staple the dmg
+        if: env.DRY_RUN == 'false'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          codesign --force --timestamp --sign "$MACOS_SIGNING_IDENTITY" "dist/ShellX-$VERSION.dmg"
+          release/macos/notarize.sh "dist/ShellX-$VERSION.dmg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: dist/ShellX-${{ env.VERSION }}.dmg
+          if-no-files-found: error
+      - name: Remove signing keychain and API key
+        if: always()
+        run: |
+          if [[ -n "${MACOS_KEYCHAIN:-}" ]]; then security delete-keychain "$MACOS_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+  windows:
+    name: Windows installer
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: flutter build windows --release
+        working-directory: apps/desktop
+        run: flutter build windows --release
+      - name: Check the built app (ShellX.exe)
+        run: |
+          $release = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\build\windows\x64\runner\Release'
+          if (-not (Test-Path (Join-Path $release 'ShellX.exe'))) { throw "ShellX.exe not found in $release (apps/desktop must build ShellX.exe)" }
+          "RELEASE_DIR=$release" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign app binaries (Azure Artifact Signing)
+        if: env.DRY_RUN == 'false'
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ env.RELEASE_DIR }}
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+      - name: Build installer with Inno Setup
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $icon = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\windows\runner\resources\app_icon.ico'
+          ./release/windows/build-installer.ps1 -Version $env:VERSION -SourceDir $env:RELEASE_DIR -OutputDir $out -AppIcon $icon
+          "SETUP_EXE=$(Join-Path $out "ShellX-Setup-$env:VERSION.exe")" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign installer (Azure Artifact Signing)
+        if: env.DRY_RUN == 'false'
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ env.SETUP_EXE }}
+      - name: Verify Authenticode signatures
+        if: env.DRY_RUN == 'false'
+        run: |
+          foreach ($file in @($env:SETUP_EXE, (Join-Path $env:RELEASE_DIR 'ShellX.exe'))) {
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne 'Valid') { throw "$file signature status: $($signature.Status)" }
+            Write-Host "$file signed by $($signature.SignerCertificate.Subject)"
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: dist/ShellX-Setup-${{ env.VERSION }}.exe
+          if-no-files-found: error
+
+  publish:
+    name: Upload to R2
+    needs: [prepare, macos, windows]
+    if: needs.prepare.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: false
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Refuse to overwrite a published version
+        run: |
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            test -f "dist/$name" || { echo "::error::missing artifact $name"; exit 1; }
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            # Unique query string: never read (or seed) a cached 404 for the real URL.
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$url?precheck=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" || true)"
+            case "$code" in
+              404) echo "$url is free" ;;
+              000) echo "::error::cannot reach $DOWNLOAD_BASE_URL (is the R2 custom domain set up?)"; exit 1 ;;
+              *) echo "::error::$url already answers HTTP $code; bump the version instead of overwriting"; exit 1 ;;
+            esac
+          done
+      - name: Upload installers
+        run: |
+          put() {
+            npx --yes "wrangler@$WRANGLER_VERSION" r2 object put "$R2_BUCKET/desktop/$VERSION/$1" \
+              --remote --file "dist/$1" --content-type "$2" \
+              --content-disposition "attachment; filename=\"$1\"" \
+              --cache-control "public, max-age=31536000, immutable"
+          }
+          put "ShellX-$VERSION.dmg" application/x-apple-diskimage
+          put "ShellX-Setup-$VERSION.exe" application/vnd.microsoft.portable-executable
+      - name: Verify public download URLs
+        run: |
+          {
+            echo "## ShellX desktop $VERSION"
+            echo
+            echo "| File | URL | SHA-256 |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            remote_size="$(curl -sfIL "$url?verify=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" | tr -d '\r' | awk 'tolower($1) == "content-length:" { size = $2 } END { print size }')"
+            local_size="$(stat -c %s "dist/$name")"
+            if [[ "$remote_size" != "$local_size" ]]; then
+              echo "::error::$url has size '$remote_size', expected $local_size"
+              exit 1
+            fi
+            echo "| $name | $url | $(sha256sum "dist/$name" | cut -d' ' -f1) |" >> "$GITHUB_STEP_SUMMARY"
+          done
