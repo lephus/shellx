@@ -1,0 +1,43 @@
+name: shellx_desktop
+description: "ShellX desktop agent for macOS and Windows."
+publish_to: none
+version: 1.0.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  ffi: ^2.2.0
+  flutter_pty: ^0.4.2
+  flutter_riverpod: ^3.3.2
+  flutter_secure_storage: ^10.3.4
+  http: ^1.5.0
+  intl: ^0.20.2
+  launch_at_startup: ^0.5.1
+  local_notifier: ^0.1.6
+  package_info_plus: ^9.0.1
+  path_provider: ^2.1.6
+  qr_flutter: ^4.1.0
+  shared_preferences: ^2.5.5
+  shellx_agent: any
+  shellx_core: any
+  tray_manager: ^0.5.3
+  win32: ^5.15.0
+  window_manager: ^0.5.2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.1
+
+flutter:
+  uses-material-design: true
