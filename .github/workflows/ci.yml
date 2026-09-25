@@ -59,6 +59,7 @@ jobs:
             desktop:
               - *dart_shared
               - 'apps/desktop/**'
+              - 'third_party/flutter_pty/**'
             mobile:
               - *dart_shared
               - 'apps/mobile/**'

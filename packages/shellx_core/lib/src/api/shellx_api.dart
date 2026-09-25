@@ -28,7 +28,8 @@ final class ShellxApi {
   final bool _ownsHttp;
 
   /// Bearer token for authenticated calls. [register] and [login] set it;
-  /// [logout] clears it (even when the request fails).
+  /// [logout] clears it (even when the request fails), unless it was
+  /// replaced while the request was in flight.
   String? token;
 
   Future<AuthResult> register(
@@ -40,11 +41,15 @@ final class ShellxApi {
   Future<AuthResult> login(String email, String password, DeviceInfo device) =>
       _authenticate('/v1/auth/login', email, password, device);
 
+  /// Logs out the token in use when called. A token set while the request
+  /// is in flight (a new sign-in) is kept: a late logout must not sign the
+  /// new session out.
   Future<void> logout() async {
+    final sent = token;
     try {
       await _send('POST', '/v1/auth/logout', authenticated: true);
     } finally {
-      token = null;
+      if (identical(token, sent)) token = null;
     }
   }
 

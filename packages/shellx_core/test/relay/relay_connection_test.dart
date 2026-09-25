@@ -400,6 +400,84 @@ void main() {
     });
   });
 
+  test('stop() completes only once an upgrade still in flight has settled, '
+      'so a new connection dialled after it can never be 4001ed by it', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      final hanging = Completer<RelaySocket>();
+      t.connector.nextAttempt = () => hanging.future;
+      t.relay.start();
+      async.flushMicrotasks();
+
+      var stopped = false;
+      unawaited(t.relay.stop().then((_) => stopped = true));
+      async.flushMicrotasks();
+      // Stopped at once (nothing more is emitted), but the upgrade may still
+      // register at the relay: whoever dials next must wait for it.
+      expect(t.relay.state, RelayConnectionState.stopped);
+      expect(stopped, isFalse);
+
+      final late = FakeRelaySocket();
+      hanging.complete(late);
+      async.flushMicrotasks();
+      expect(stopped, isTrue);
+      expect(late.closedByClient, isTrue);
+      expect(t.relay.state, RelayConnectionState.stopped);
+    });
+  });
+
+  test('stop() waits at most connectTimeout for an upgrade that never '
+      'settles', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      t.connector.nextAttempt = () => Completer<RelaySocket>().future;
+      t.relay.start();
+      async.flushMicrotasks();
+
+      var stopped = false;
+      unawaited(t.relay.stop().then((_) => stopped = true));
+      async.elapse(
+        RelayConnection.connectTimeout - const Duration(milliseconds: 1),
+      );
+      expect(stopped, isFalse);
+      async.elapse(const Duration(milliseconds: 1));
+      expect(stopped, isTrue);
+    });
+  });
+
+  test('a second stop() waits for the same in-flight upgrade', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      final hanging = Completer<RelaySocket>();
+      t.connector.nextAttempt = () => hanging.future;
+      t.relay.start();
+      async.flushMicrotasks();
+      unawaited(t.relay.stop());
+      async.flushMicrotasks();
+
+      var again = false;
+      unawaited(t.relay.stop().then((_) => again = true));
+      async.flushMicrotasks();
+      expect(again, isFalse);
+      hanging.completeError(const SocketException('refused'));
+      async.flushMicrotasks();
+      expect(again, isTrue);
+    });
+  });
+
+  test('stop() without an upgrade in flight completes at once', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.connected);
+      var stopped = false;
+      unawaited(t.relay.stop().then((_) => stopped = true));
+      async.flushMicrotasks();
+      expect(stopped, isTrue);
+    });
+  });
+
   test('a dial that never settles leaves connecting within connectTimeout, '
       'then recovers; reconnectNow works while waiting', () {
     fakeAsync((async) {

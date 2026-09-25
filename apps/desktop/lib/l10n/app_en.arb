@@ -1,0 +1,196 @@
+{
+  "@@locale": "en",
+  "appTitle": "ShellX",
+  "actionCancel": "Cancel",
+  "actionClose": "Close",
+  "authSignInTitle": "Sign in to ShellX",
+  "authRegisterTitle": "Create a ShellX account",
+  "authEmailLabel": "Email",
+  "authPasswordLabel": "Password",
+  "authConfirmPasswordLabel": "Re-enter password",
+  "authSignInButton": "Sign in",
+  "authRegisterButton": "Create account",
+  "authSwitchToRegister": "No account yet? Create one",
+  "authSwitchToSignIn": "Already have an account? Sign in",
+  "authForgotPasswordHint": "Forgot your password? Open ShellX on a computer that is still signed in and choose “Change password…” from its menu.",
+  "authSignedOutNotice": "You were signed out. Sign in again.",
+  "errorEmailInvalid": "Enter a valid email address.",
+  "errorPasswordLength": "Password must be 8–128 characters.",
+  "errorPasswordMismatch": "Passwords do not match.",
+  "errorDisposableEmail": "Temporary email addresses are not allowed. Use a permanent address.",
+  "errorEmailTaken": "This email is already registered. Sign in instead.",
+  "errorInvalidCredentials": "Incorrect email or password.",
+  "errorRateLimited": "Try again in a few minutes.",
+  "errorNetwork": "Cannot reach the ShellX server. Check your Internet connection.",
+  "errorAgentOnly": "Only a signed-in computer can change the password.",
+  "errorUnexpected": "Something went wrong ({code}). Try again.",
+  "@errorUnexpected": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "onboardingTitle": "Almost done",
+  "onboardingLaunchAtStartup": "Start ShellX when the computer starts",
+  "onboardingFullDiskTitle": "Full Disk Access (optional)",
+  "onboardingFullDiskBody": "Commands that touch Desktop, Documents or Downloads make macOS show a permission prompt on this computer's screen, which you cannot answer from your phone. Give ShellX Full Disk Access to avoid it.",
+  "onboardingOpenSettings": "Open System Settings",
+  "onboardingSleepTitle": "Sleep",
+  "onboardingSleepBody": "ShellX keeps the computer from sleeping while idle. Closing the laptop lid still puts it to sleep, and then your phone cannot reach it.",
+  "onboardingTrayHint": "{platform, select, macos{ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}",
+  "@onboardingTrayHint": {
+    "placeholders": {
+      "platform": {"type": "String"}
+    }
+  },
+  "onboardingFinish": "Finish",
+  "trayTooltip": "ShellX",
+  "trayStatusConnected": "Connected — {email}",
+  "@trayStatusConnected": {
+    "placeholders": {
+      "email": {"type": "String"}
+    }
+  },
+  "trayStatusConnecting": "Connecting — {email}",
+  "@trayStatusConnecting": {
+    "placeholders": {
+      "email": {"type": "String"}
+    }
+  },
+  "trayStatusReconnecting": "Disconnected — retrying…",
+  "trayStatusRemoteOff": "Remote access is off",
+  "trayStatusReplaced": "Another copy of ShellX took over this computer",
+  "trayStatusSignedOut": "Not signed in",
+  "trayReconnect": "Reconnect",
+  "trayRemoteAccess": "Allow remote access",
+  "traySessions": "Active sessions ({count})",
+  "@traySessions": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "traySessionItem": "{shell} {index}",
+  "@traySessionItem": {
+    "placeholders": {
+      "shell": {"type": "String"},
+      "index": {"type": "int"}
+    }
+  },
+  "traySessionItemAttached": "{shell} {index} — {device}",
+  "@traySessionItemAttached": {
+    "placeholders": {
+      "shell": {"type": "String"},
+      "index": {"type": "int"},
+      "device": {"type": "String"}
+    }
+  },
+  "traySessionClose": "Close",
+  "trayCloseAll": "Close all",
+  "trayPairPhone": "Pair phone…",
+  "trayPairedDevices": "Paired devices",
+  "trayRevoke": "Revoke",
+  "trayNoDevices": "No paired devices",
+  "trayKeepAwake": "Keep computer awake",
+  "trayLaunchAtStartup": "Start with system",
+  "trayChangePassword": "Change password…",
+  "traySignOut": "Sign out",
+  "traySignIn": "Sign in…",
+  "trayQuit": "Quit",
+  "trayDownloadUpdate": "Download ShellX {version}…",
+  "@trayDownloadUpdate": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "confirmRemoteOffTitle": "Turn off remote access?",
+  "confirmRemoteOffBody": "{count, plural, =1{1 open session will be closed.} other{{count} open sessions will be closed.}}",
+  "@confirmRemoteOffBody": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "confirmRemoteOffAction": "Turn off",
+  "confirmSignOutTitle": "Sign out of ShellX?",
+  "confirmSignOutBody": "All sessions will be closed and every paired phone will be removed. After signing in again you must pair your phones again.",
+  "confirmSignOutAction": "Sign out",
+  "confirmRevokeTitle": "Revoke {device}?",
+  "@confirmRevokeTitle": {
+    "placeholders": {
+      "device": {"type": "String"}
+    }
+  },
+  "confirmRevokeBody": "This phone loses access to this computer immediately and its sessions are closed. To use it again you must pair it again.",
+  "confirmRevokeAction": "Revoke",
+  "confirmQuitTitle": "Quit ShellX?",
+  "confirmQuitBody": "{count, plural, =1{1 open session will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open sessions will be closed. Your phones cannot reach this computer until ShellX runs again.}}",
+  "@confirmQuitBody": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "confirmQuitAction": "Quit",
+  "pairingTitle": "Pair a phone",
+  "pairingInstructions": "Open ShellX on your phone (signed in to the same account), tap this computer and scan the code.",
+  "pairingExpiresIn": "Code expires in {time}",
+  "@pairingExpiresIn": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "pairingExpired": "This code has expired.",
+  "pairingNewCode": "Create new code",
+  "pairingOfflineWarning": "Not connected to the ShellX server. Your phone can pair once the connection is back.",
+  "pairingSecretWarning": "Anyone who scans this code while signed in to your account can control this computer. Do not share it.",
+  "changePasswordTitle": "Change password",
+  "changePasswordNew": "New password",
+  "changePasswordConfirm": "Re-enter new password",
+  "changePasswordSubmit": "Change password",
+  "changePasswordNote": "Other devices will be signed out. Pairings are kept.",
+  "changePasswordDone": "Password changed. Your phones must sign in again with the new password.",
+  "notifySessionOpened": "{device} opened a terminal session",
+  "@notifySessionOpened": {
+    "placeholders": {
+      "device": {"type": "String"}
+    }
+  },
+  "notifyPaired": "Paired with {device}",
+  "@notifyPaired": {
+    "placeholders": {
+      "device": {"type": "String"}
+    }
+  },
+  "notifyUpdateAvailableTitle": "ShellX {version} is available",
+  "@notifyUpdateAvailableTitle": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "notifyUpdateAvailableBody": "Click to download.",
+  "notifyUpdateRequiredTitle": "ShellX needs to be updated",
+  "notifyUpdateRequiredBody": "This version is no longer supported. Click to download ShellX {version}.",
+  "@notifyUpdateRequiredBody": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "notifySignedOutTitle": "ShellX was signed out",
+  "notifySignedOutBody": "Sign in again to allow remote access.",
+  "notifyAlreadyRunningTitle": "ShellX is already running",
+  "notifyAlreadyRunningBody": "{platform, select, macos{Find it in the menu bar.} other{Find it in the system tray.}}",
+  "@notifyAlreadyRunningBody": {
+    "placeholders": {
+      "platform": {"type": "String"}
+    }
+  },
+  "notifyTerminalProblemTitle": "Processes from a terminal session may still be running",
+  "notifyTerminalProblemBody": "{count, plural, =1{Shell process ID: {pids}} other{Shell process IDs: {pids}}}",
+  "@notifyTerminalProblemBody": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "pids": {"type": "String"}
+    }
+  },
+  "notifyStorageUnreadableTitle": "ShellX could not read your saved sign-in",
+  "notifySignOutIncompleteTitle": "Signed out, but some saved sign-in data could not be deleted",
+  "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
+  "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
+}
