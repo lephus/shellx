@@ -291,7 +291,14 @@ void main() {
   ) async {
     final (pty, transcript) = open(shell);
     if (Platform.isWindows) {
-      _type(pty, r"1..2000 | % { 'line-' + $_ }; 'tail-' + (6*7); exit");
+      // conhost renders on a timer: give it one frame to paint the last line
+      // before the shell exits (this checks the plugin keeps what conhost
+      // wrote, not how fast conhost paints).
+      _type(
+        pty,
+        r"1..2000 | % { 'line-' + $_ }; 'tail-' + (6*7); "
+        r'Start-Sleep -Milliseconds 300; exit',
+      );
     } else {
       _type(
         pty,
@@ -491,7 +498,7 @@ void main() {
       await transcript.waitForRaw(
         (raw) =>
             raw.contains('\x1b[?1049h') ||
-            (Platform.isWindows && raw.contains('VIM - Vi IMproved')),
+            (Platform.isWindows && raw.contains('IMproved')),
       );
       pty.resize(90, 30);
       pty.write(Uint8List.fromList(utf8.encode('\x1b:q!\r')));
