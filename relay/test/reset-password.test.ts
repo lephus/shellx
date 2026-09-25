@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
 import { choosePasswordSource, confirmationMatches, needsConfirmation } from "../scripts/reset-cli";
-import { createLinePrompter } from "../scripts/prompter";
+import { createLinePrompter } from "../scripts/line-prompter";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
 

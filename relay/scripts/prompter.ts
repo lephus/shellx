@@ -5,39 +5,7 @@
 
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
-
-export interface Prompter {
-  ask(question: string): Promise<string>;
-  close(): void;
-}
-
-/**
- * Create a prompter for non-TTY (piped) input.
- * Splits input on newlines and returns each line on demand.
- * Rejects with "stdin ended" error when input is exhausted.
- */
-export function createLinePrompter(input: string, write: (s: string) => void): Prompter {
-  // Split on newlines and filter out the trailing empty line if input ends with newline
-  let lines = input.split(/\r?\n/);
-  if (lines.length > 0 && lines[lines.length - 1] === "") {
-    lines = lines.slice(0, -1);
-  }
-  let index = 0;
-
-  return {
-    async ask(question: string): Promise<string> {
-      write(question);
-      if (index >= lines.length) {
-        throw new Error("stdin ended before an answer was given");
-      }
-      const answer = lines[index++];
-      return answer ?? "";
-    },
-    close(): void {
-      // No-op for line prompter
-    },
-  };
-}
+import { createLinePrompter, type Prompter } from "./line-prompter";
 
 /**
  * Create a prompter for TTY (interactive) input.
