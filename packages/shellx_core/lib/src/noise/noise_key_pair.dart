@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:cryptography/dart.dart';
 
 /// Static or ephemeral X25519 key pair.
 final class NoiseKeyPair {
@@ -16,8 +17,14 @@ final class NoiseKeyPair {
   /// 32-byte X25519 public key.
   final Uint8List publicKey;
 
+  // Pinned to the pure-Dart backend (not the platform-selected `X25519()`
+  // default) so key generation/derivation behaves identically on every
+  // platform, matching the pin in primitives.dart. The Flutter apps
+  // otherwise swap in a native implementation via cryptography_flutter.
+  static final X25519 _x25519 = DartX25519();
+
   static Future<NoiseKeyPair> generate() async {
-    final keyPair = await X25519().newKeyPair();
+    final keyPair = await _x25519.newKeyPair();
     final privateKey = await keyPair.extractPrivateKeyBytes();
     final publicKey = await keyPair.extractPublicKey();
     return NoiseKeyPair(
@@ -35,7 +42,7 @@ final class NoiseKeyPair {
         'must be 32 bytes',
       );
     }
-    final keyPair = await X25519().newKeyPairFromSeed(privateKey);
+    final keyPair = await _x25519.newKeyPairFromSeed(privateKey);
     final publicKey = await keyPair.extractPublicKey();
     return NoiseKeyPair(
       privateKey: Uint8List.fromList(privateKey),
