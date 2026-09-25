@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { limitersFromEnv, type RateLimiters } from "./auth/rate-limit";
+import type { AuthContext } from "./auth/session";
 import type { Env } from "./env";
 import { ApiError, errorBody, Errors } from "./http/errors";
 import { logMeta } from "./log";
+import { authRoutes } from "./routes/auth";
 
 export interface AppDeps {
   /** Tests inject fakes; production uses the Workers rate limiting bindings. */
@@ -14,6 +16,8 @@ export interface AppDeps {
 export interface AppVariables {
   limiters: RateLimiters;
   now: () => number;
+  /** Set by `requireAuth` on authenticated routes only. */
+  auth: AuthContext;
 }
 
 export type AppEnv = { Bindings: Env; Variables: AppVariables };
@@ -34,6 +38,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       latest_agent: { version: c.env.LATEST_AGENT_VERSION, mac_url: c.env.MAC_URL, win_url: c.env.WIN_URL },
     }),
   );
+
+  app.route("/v1/auth", authRoutes);
 
   app.notFound((c) => {
     const e = Errors.notFound();
