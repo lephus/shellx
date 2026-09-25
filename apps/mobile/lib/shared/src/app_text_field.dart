@@ -1,5 +1,7 @@
 import 'package:shellx_mobile/core/core.dart';
 
+/// ShellX design `.field`: bold label, 52 pt input with radius 13; [errorText] (e.g. an answer
+/// from the relay) and [helperText] sit right under the field.
 class AppTextField extends StatefulWidget {
   final String label;
   final String? hintText;
@@ -13,6 +15,9 @@ class AppTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final void Function(String)? onChanged;
   final void Function(String)? onFieldSubmitted;
+  final String? errorText;
+  final String? helperText;
+  final Iterable<String>? autofillHints;
 
   const AppTextField({
     super.key,
@@ -28,6 +33,9 @@ class AppTextField extends StatefulWidget {
     this.textInputAction,
     this.onChanged,
     this.onFieldSubmitted,
+    this.errorText,
+    this.helperText,
+    this.autofillHints,
   });
 
   @override
@@ -69,9 +77,9 @@ class _AppTextFieldState extends State<AppTextField> {
       children: [
         Text(
           widget.label,
-          style: context.typo.paragraph.semiBold,
+          style: context.typo.paragraph13.bold.copyWith(color: context.colors.secondaryText),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 7),
         TextFormField(
           controller: widget.controller,
           focusNode: _focusNode,
@@ -95,69 +103,56 @@ class _AppTextFieldState extends State<AppTextField> {
           textInputAction: widget.textInputAction,
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onFieldSubmitted,
+          autofillHints: widget.autofillHints,
           autovalidateMode: _hasInteracted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
           style: context.typo.subHeader,
-          decoration: InputDecoration(
+          decoration: appInputDecoration(
+            context,
             hintText: widget.hintText,
-            hintStyle: context.typo.subHeader.copyWith(
-              color: context.colors.secondaryText.withValues(alpha: 0.5),
-            ),
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.suffixIcon,
-            filled: true,
-            fillColor: context.colors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.primary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.error,
-                width: 1,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.error,
-                width: 2,
-              ),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.border.withValues(alpha: 0.5),
-                width: 1,
-              ),
-            ),
-            errorStyle: context.typo.metadata12.copyWith(
-              color: context.colors.error,
-            ),
+            errorText: widget.errorText,
+            helperText: widget.helperText,
           ),
         ),
       ],
     );
   }
+}
+
+/// The input box of the ShellX design, shared by [AppTextField] and `PasswordTextField`.
+InputDecoration appInputDecoration(
+  BuildContext context, {
+  String? hintText,
+  Widget? prefixIcon,
+  Widget? suffixIcon,
+  String? errorText,
+  String? helperText,
+}) {
+  final colors = context.colors;
+  OutlineInputBorder outline(Color color, double width) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(13),
+    borderSide: BorderSide(color: color, width: width),
+  );
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: context.typo.subHeader.copyWith(color: colors.disable),
+    prefixIcon: prefixIcon,
+    suffixIcon: suffixIcon,
+    errorText: errorText,
+    helperText: helperText,
+    helperMaxLines: 3,
+    errorMaxLines: 3,
+    helperStyle: context.typo.paragraph13.copyWith(color: colors.secondaryText),
+    filled: true,
+    fillColor: colors.surface,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+    border: outline(colors.border, 1.5),
+    enabledBorder: outline(colors.border, 1.5),
+    focusedBorder: outline(colors.primary, 2),
+    errorBorder: outline(colors.error, 1.5),
+    focusedErrorBorder: outline(colors.error, 2),
+    disabledBorder: outline(colors.border.withValues(alpha: 0.5), 1.5),
+    errorStyle: context.typo.paragraph13.bold.copyWith(color: colors.error),
+  );
 }

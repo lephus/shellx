@@ -72,6 +72,40 @@ class LightColors extends AppColors {
   @override
   Color blueGrey = const Color.fromARGB(255, 6, 35, 47);
 
+  // ShellX design, light `--a-*` tokens.
+  @override
+  Color get onPrimary => const Color(0xFFFFFFFF);
+
+  @override
+  Color get primarySoft => const Color(0xFFDCF1F3);
+
+  @override
+  Color get ok => const Color(0xFF3E8A2B);
+
+  @override
+  Color get okDot => const Color(0xFF4CAF3A);
+
+  @override
+  Color get warn => const Color(0xFF9A5600);
+
+  @override
+  Color get warnSoft => const Color(0xFFFCF2E5);
+
+  @override
+  Color get errorSoft => const Color(0xFFFAE9EA);
+
+  @override
+  Color get scrim => const Color(0x730A1418);
+
+  @override
+  Color get keyboardBackground => const Color(0xFFD1D4DA);
+
+  @override
+  Color get keyboardKey => const Color(0xFFFFFFFF);
+
+  @override
+  Color get keyboardInk => const Color(0xFF000000);
+
   @override
   void setAccentColor(Color color) {
     accent = color;

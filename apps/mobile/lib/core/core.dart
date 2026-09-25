@@ -5,6 +5,7 @@ export 'design/light_colors.dart';
 export 'design/typography.dart';
 export 'design/design_system.dart';
 export 'design/theme_data_factory.dart';
+export 'design/terminal_colors.dart';
 export 'extensions/adaptive_theme_mode_x.dart';
 export 'router/app_router.dart';
 export 'architecture/error.dart';

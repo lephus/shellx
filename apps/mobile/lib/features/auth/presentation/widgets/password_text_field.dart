@@ -1,5 +1,7 @@
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/shared/shared.dart';
 
+/// Password field with the eye button (the ShellX design has no "repeat password" field).
 class PasswordTextField extends StatefulWidget {
   final String label;
   final String? hintText;
@@ -8,16 +10,22 @@ class PasswordTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final void Function(String)? onChanged;
   final void Function(String)? onFieldSubmitted;
+  final String? errorText;
+  final String? helperText;
+  final Iterable<String>? autofillHints;
 
   const PasswordTextField({
     super.key,
-    this.label = 'Password',
+    required this.label,
     this.hintText,
     this.controller,
     this.validator,
     this.textInputAction,
     this.onChanged,
     this.onFieldSubmitted,
+    this.errorText,
+    this.helperText,
+    this.autofillHints,
   });
 
   @override
@@ -66,9 +74,9 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
       children: [
         Text(
           widget.label,
-          style: context.typo.paragraph.semiBold,
+          style: context.typo.paragraph13.bold.copyWith(color: context.colors.secondaryText),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 7),
         TextFormField(
           controller: widget.controller,
           focusNode: _focusNode,
@@ -90,63 +98,20 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
           textInputAction: widget.textInputAction,
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onFieldSubmitted,
+          autofillHints: widget.autofillHints,
           autovalidateMode: _hasInteracted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
           style: context.typo.subHeader,
-          decoration: InputDecoration(
-            hintText: widget.hintText ?? 'Enter your password',
-            hintStyle: context.typo.subHeader.copyWith(
-              color: context.colors.secondaryText.withValues(alpha: 0.5),
-            ),
+          decoration: appInputDecoration(
+            context,
+            hintText: widget.hintText,
+            errorText: widget.errorText,
+            helperText: widget.helperText,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscureText ? Icons.visibility_off : Icons.visibility,
-                color: context.colors.secondaryText,
+                _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                color: context.colors.disable,
               ),
               onPressed: _toggleVisibility,
-            ),
-            filled: true,
-            fillColor: context.colors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.primary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.error,
-                width: 1,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colors.error,
-                width: 2,
-              ),
-            ),
-            errorStyle: context.typo.metadata12.copyWith(
-              color: context.colors.error,
             ),
           ),
         ),

@@ -16,3 +16,8 @@ export 'src/app_error_view.dart';
 export 'src/app_refresh.dart';
 export 'src/app_text_field.dart';
 export 'src/bottom_bouncing_scroll_physics.dart';
+export 'src/confirm_dialog.dart';
+export 'src/highlighted_text.dart';
+export 'src/notice_banner.dart';
+export 'src/shellx_logo.dart';
+export 'src/status_circle.dart';
