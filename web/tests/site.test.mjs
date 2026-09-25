@@ -76,3 +76,71 @@ test('installer URLs are live (only with CHECK_DOWNLOADS=1)', { skip: process.en
     assert.equal(response.status, 200, `${url} returned ${response.status}`);
   }
 });
+
+const legalPages = [
+  { path: '/privacy/', lang: 'vi', other: '/en/privacy/' },
+  { path: '/terms/', lang: 'vi', other: '/en/terms/' },
+  { path: '/en/privacy/', lang: 'en', other: '/privacy/' },
+  { path: '/en/terms/', lang: 'en', other: '/terms/' },
+];
+
+function allHtmlFiles(dir = dist) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) return allHtmlFiles(full);
+    return entry.name.endsWith('.html') ? [full] : [];
+  });
+}
+
+for (const page of legalPages) {
+  test(`legal page ${page.path} is built in ${page.lang} and links to its translation`, () => {
+    const html = readPage(page.path);
+    assert.match(html, new RegExp(`<html lang="${page.lang}"`));
+    assert.ok(hrefs(html).includes(page.other), `missing link to ${page.other}`);
+    assert.ok(hrefs(html).includes(`mailto:${config.supportEmail}`), 'missing support email link');
+  });
+}
+
+for (const [path, inApp] of [
+  ['/privacy/', 'Cài đặt → Xóa tài khoản'],
+  ['/en/privacy/', 'Settings → Delete account'],
+]) {
+  test(`privacy page ${path} documents account deletion and what is stored`, () => {
+    const html = readPage(path);
+    assert.match(html, /id="delete-account"/);
+    assert.ok(html.includes(inApp), `privacy page ${path} must describe in-app deletion (${inApp})`);
+    for (const fact of ['argon2id', 'SHA-256', 'X25519', '90', '256 KiB', 'Noise']) {
+      assert.ok(html.includes(fact), `privacy page ${path} no longer mentions "${fact}"`);
+    }
+  });
+}
+
+test('404 page exists so Cloudflare Pages does not fall back to SPA mode', () => {
+  assert.ok(existsSync(join(dist, '404.html')), 'missing dist/404.html');
+});
+
+test('every internal link resolves to a built file', () => {
+  const files = allHtmlFiles();
+  assert.ok(files.length >= 7, `expected at least 7 HTML files, found ${files.length}`);
+  for (const file of files) {
+    for (const href of hrefs(readFileSync(file, 'utf8'))) {
+      if (!href.startsWith('/') || href.startsWith('//')) continue;
+      const pathname = href.split('#')[0].split('?')[0];
+      assert.ok(existsSync(fileFor(pathname)), `${relative(dist, file)} links to missing ${href}`);
+    }
+  }
+});
+
+test('no third-party scripts, stylesheets or frames (the privacy policy promises no trackers)', () => {
+  for (const file of allHtmlFiles()) {
+    const html = readFileSync(file, 'utf8');
+    const where = relative(dist, file);
+    assert.doesNotMatch(html, /<iframe/i, `${where} embeds an iframe`);
+    for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]*)"/gi)) {
+      assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `${where} loads external script ${m[1]}`);
+    }
+    for (const m of html.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/gi)) {
+      assert.doesNotMatch(m[0], /href="(https?:)?\/\//, `${where} loads external stylesheet`);
+    }
+  }
+});
