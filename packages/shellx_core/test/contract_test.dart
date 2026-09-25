@@ -141,6 +141,12 @@ void main() {
     ]);
     expect(DeviceKind.values.map((k) => k.name), ['agent', 'mobile']);
     final String statusWire = HandshakeStatus.pairingInvalid.wire;
+    expect(HandshakeStatus.values.map((s) => s.wire), [
+      'ok',
+      'untrusted',
+      'pairing_invalid',
+      'proto_unsupported',
+    ]);
     final Hs1Payload hs1 = Hs1Payload(
       proto: 1,
       app: '1.0.0',
@@ -249,6 +255,7 @@ void main() {
     Future<void> Function(String) create = api.createPairing;
     Future<void> Function(String, String) remove = api.deletePairing;
     Future<VersionInfo> Function() version = api.version;
+    void Function() apiClose = api.close;
     int Function(String, String) compare = compareVersions;
 
     Stream<Object> Function(RelaySocket) messages = (s) => s.messages;

@@ -261,14 +261,25 @@ final class NoiseHandshake {
   }
 
   static Uint8List? _checkedPsk(NoisePattern pattern, Uint8List? psk) {
+    // ArgumentError.value keeps `invalidValue` around (for example in a
+    // crash report), so pass the length instead of the psk bytes themselves
+    // — the whole point of a pre-shared key is that it never leaks.
     if (pattern == NoisePattern.ik) {
       if (psk != null) {
-        throw ArgumentError.value(psk, 'psk', 'must be null for Noise_IK');
+        throw ArgumentError.value(
+          psk.length,
+          'psk',
+          'must be null for Noise_IK',
+        );
       }
       return null;
     }
     if (psk == null || psk.length != 32) {
-      throw ArgumentError.value(psk, 'psk', 'Noise_IKpsk2 needs a 32-byte psk');
+      throw ArgumentError.value(
+        psk?.length,
+        'psk',
+        'Noise_IKpsk2 needs a 32-byte psk',
+      );
     }
     return Uint8List.fromList(psk);
   }
