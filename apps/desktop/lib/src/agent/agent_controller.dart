@@ -25,6 +25,10 @@ final agentControllerProvider =
 class AgentController extends Notifier<AgentViewState> {
   late DesktopServices _s;
   AgentRuntime? _runtime;
+
+  /// The previous runtime's stop while it is still settling (its relay may
+  /// have an upgrade in flight); null otherwise. Never fails.
+  Future<void>? _stopping;
   final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
   StreamSubscription<void>? _trustedSubscription;
   Timer? _updateTimer;
@@ -370,9 +374,14 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Starts the runtime if signed in with remote access on and none runs.
-  /// Everything up to `runtime.start()` is synchronous (no await), so two
-  /// callers can never both create one.
+  ///
+  /// First waits for a previous runtime that is still stopping: its relay
+  /// may still have an upgrade in flight, which would replace (4001) a new
+  /// link dialled before it settled. From the checks on, everything up to
+  /// `runtime.start()` is synchronous (no await), so two callers can never
+  /// both create one.
   Future<void> _startRuntime() async {
+    if (_stopping != null) await _pendingStop();
     final credentials = _credentials;
     final identity = _identity;
     if (_runtime != null ||
@@ -405,29 +414,48 @@ class AgentController extends Notifier<AgentViewState> {
     await runtime.start();
   }
 
-  /// Closes every session and disconnects. Once it returns the relay is
-  /// stopped and emits nothing more (AgentRuntime.stop contract).
-  Future<void> _stopRuntime() async {
+  /// Closes every session and disconnects. The runtime is detached and
+  /// told to stop at once (synchronously: from then on it emits nothing,
+  /// AgentRuntime.stop contract), and the state shows it stopped. The
+  /// returned future completes when that stop has finished, which includes
+  /// the relay's wait for an upgrade still in flight; without a runtime it
+  /// is the stop still settling, if any. Never throws.
+  Future<void> _stopRuntime() {
     final runtime = _runtime;
-    if (runtime == null) return;
+    if (runtime == null) return _stopping ?? Future<void>.value();
     _runtime = null;
     for (final subscription in _runtimeSubscriptions) {
       unawaited(subscription.cancel());
     }
     _runtimeSubscriptions.clear();
-    try {
-      await runtime.stop();
-    } catch (_) {
-      // The runtime is dropped either way; a failed stop must not block
-      // signing out or quitting.
+    if (ref.mounted) {
+      state = state.copyWith(
+        relay: RelayConnectionState.stopped,
+        sessions: const <SessionSummary>[],
+        activeChannels: 0,
+        pairing: null,
+      );
     }
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      relay: RelayConnectionState.stopped,
-      sessions: const <SessionSummary>[],
-      activeChannels: 0,
-      pairing: null,
+    final stopping = _bestEffort(runtime.stop);
+    _stopping = stopping;
+    unawaited(
+      stopping.whenComplete(() {
+        if (identical(_stopping, stopping)) _stopping = null;
+      }),
     );
+    return stopping;
+  }
+
+  /// Completes once no runtime is stopping any more (also one that started
+  /// stopping while this waited).
+  Future<void> _pendingStop() async {
+    var stopping = _stopping;
+    while (stopping != null) {
+      await stopping;
+      final next = _stopping;
+      if (identical(next, stopping)) return;
+      stopping = next;
+    }
   }
 
   /// Relay said 4002, refused the upgrade with 401, or an API call got 401

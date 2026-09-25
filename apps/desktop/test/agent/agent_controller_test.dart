@@ -449,6 +449,47 @@ void main() {
       expect(h.runtimes, hasLength(1));
     });
 
+    test(
+      'on again while the old runtime is still stopping waits for that '
+      'stop before starting a new one (no overlapping relay links)',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await controller().bootstrap(watchForWake: false);
+        final first = h.runtime;
+        final gate = first.stopGate = Completer<void>();
+
+        final off = controller().setRemoteAccess(false);
+        await pumpEventQueue();
+        // Off shows at once, even though the relay stop is still settling.
+        expect(state().relay, RelayConnectionState.stopped);
+        final on = controller().setRemoteAccess(true);
+        await pumpEventQueue();
+        expect(h.runtimes, hasLength(1));
+
+        gate.complete();
+        await off;
+        await on;
+        expect(h.runtimes, hasLength(2));
+        expect(h.runtime.started, isTrue);
+        expect(state().relay, h.runtime.relayState);
+      },
+    );
+
+    test('off, on, off while stopping starts nothing', () async {
+      boot();
+      await h.seedSignedIn();
+      await controller().bootstrap(watchForWake: false);
+      final gate = h.runtime.stopGate = Completer<void>();
+      final first = controller().setRemoteAccess(false);
+      final second = controller().setRemoteAccess(true);
+      final third = controller().setRemoteAccess(false);
+      gate.complete();
+      await Future.wait([first, second, third]);
+      expect(h.runtimes, hasLength(1));
+      expect(state().relay, RelayConnectionState.stopped);
+    });
+
     test('while signed out it is only remembered', () async {
       boot();
       await controller().bootstrap(watchForWake: false);

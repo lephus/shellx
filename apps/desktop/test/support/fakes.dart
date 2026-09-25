@@ -118,10 +118,16 @@ final class FakeAgentRuntime implements AgentRuntime {
   @override
   Future<void> start() async => started = true;
 
+  /// While set and not completed, [stop] marks the runtime stopped at once
+  /// but its future completes only with this (a relay stop that waits for an
+  /// upgrade still in flight).
+  Completer<void>? stopGate;
+
   @override
   Future<void> stop() async {
     stopped = true;
     closedAll = true;
+    await stopGate?.future;
   }
 
   @override
