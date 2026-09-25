@@ -20,6 +20,15 @@ export 'router/app_router.gr.dart';
 export 'handler/event_notifier.dart';
 export 'router/app_transparent_route.dart';
 export 'router/app_route_observer.dart';
+// ShellX
+export 'auth/account_session.dart';
+export 'auth/auth_storage.dart';
+export 'config/app_config.dart';
+export 'platform/device_description.dart';
+export 'platform/external_links.dart';
+export 'platform/fresh_install.dart';
+export 'platform/secure_key_value_store.dart';
+export 'settings/app_settings.dart';
 
 // 3rd party
 export 'package:auto_route/auto_route.dart';
