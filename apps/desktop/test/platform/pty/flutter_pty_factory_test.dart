@@ -15,6 +15,7 @@ final class _FakeNativePty implements NativePty {
   final StreamController<Uint8List> out = StreamController<Uint8List>();
   final resizes = <(int, int)>[];
   final writes = <Uint8List>[];
+  var acceptWrites = true;
   var kills = 0;
   var killSucceeds = true;
   @override
@@ -27,7 +28,11 @@ final class _FakeNativePty implements NativePty {
   @override
   Future<int> get exitCode => exit.future;
   @override
-  void write(Uint8List data) => writes.add(data);
+  bool write(Uint8List data) {
+    writes.add(data);
+    return acceptWrites;
+  }
+
   @override
   void resize(int rows, int columns) => resizes.add((rows, columns));
   @override
@@ -268,6 +273,46 @@ void main() {
         await done.future.timeout(const Duration(seconds: 2));
       },
     );
+  });
+
+  group('FlutterPtyAdapter write', () {
+    test('passes input through', () {
+      final native = _FakeNativePty(_launch);
+      final pty = FlutterPtyAdapter(native, killer: _RecordingKiller());
+      pty.write(Uint8List.fromList([108, 115, 13]));
+      expect(native.writes, [
+        [108, 115, 13],
+      ]);
+    });
+
+    test('dropped input is reported once per pty, with the pid only', () {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..acceptWrites = false;
+      final pty = FlutterPtyAdapter(
+        native,
+        killer: _RecordingKiller(),
+        onError: errors.add,
+      );
+      pty.write(Uint8List.fromList('SECRET-INPUT'.codeUnits));
+      pty.write(Uint8List.fromList('more'.codeUnits));
+      native.acceptWrites = true;
+      pty.write(Uint8List.fromList('ok'.codeUnits));
+      expect(errors, ['pid 4321: input dropped: the shell is not reading it']);
+    });
+
+    test('input refused after the shell exited is not reported', () async {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..acceptWrites = false;
+      final pty = FlutterPtyAdapter(
+        native,
+        killer: _RecordingKiller(),
+        onError: errors.add,
+      );
+      native.exit.complete(0);
+      await Future<void>.delayed(Duration.zero);
+      pty.write(Uint8List.fromList([1]));
+      expect(errors, isEmpty);
+    });
   });
 
   group('FlutterPtyAdapter kill', () {

@@ -1,8 +1,10 @@
 
 #include <errno.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -19,6 +21,21 @@
 #include "include/dart_api_dl.h"
 #include "include/dart_native_api.h"
 
+// ShellX: input the writer thread has yet to write, oldest first.
+typedef struct WriteChunk
+{
+    struct WriteChunk *next;
+
+    size_t length;
+
+    char data[];
+
+} WriteChunk;
+
+// ShellX: at most this much input waits for a process that is not reading
+// its terminal; pty_write drops (and reports) what does not fit.
+#define WRITE_QUEUE_LIMIT (1024 * 1024)
+
 typedef struct PtyHandle
 {
     int ptm;
@@ -28,6 +45,23 @@ typedef struct PtyHandle
     pthread_mutex_t mutex;
 
     bool ackRead;
+
+    // ShellX: the writer thread and its queue (guarded by write_lock). A
+    // blocking write() on the master blocks for as long as the process does
+    // not read its input; upstream did it on the calling (UI) isolate.
+    pthread_t writer;
+
+    pthread_mutex_t write_lock;
+
+    pthread_cond_t write_ready;
+
+    WriteChunk *write_head;
+
+    WriteChunk *write_tail;
+
+    size_t write_queued;
+
+    bool write_stop;
 
 } PtyHandle;
 
@@ -104,6 +138,95 @@ static void *read_loop(void *arg)
     free(options);
 
     return NULL;
+}
+
+// ShellX: writes the queued input in order, retrying partial writes and
+// EINTR. A write that fails (EIO once the terminal is gone) drops the rest
+// of that chunk. Stops when write_stop is set, freeing what is left.
+static void *write_loop(void *arg)
+{
+    PtyHandle *handle = (PtyHandle *)arg;
+
+    pthread_mutex_lock(&handle->write_lock);
+
+    while (1)
+    {
+        while (!handle->write_stop && handle->write_head == NULL)
+        {
+            pthread_cond_wait(&handle->write_ready, &handle->write_lock);
+        }
+
+        if (handle->write_stop)
+        {
+            break;
+        }
+
+        // Stays at the head (and counted) while it is written, so pty_write
+        // only ever appends.
+        WriteChunk *chunk = handle->write_head;
+
+        pthread_mutex_unlock(&handle->write_lock);
+
+        size_t offset = 0;
+
+        while (offset < chunk->length)
+        {
+            ssize_t n = write(handle->ptm, chunk->data + offset, chunk->length - offset);
+
+            if (n < 0 && errno == EINTR)
+            {
+                continue;
+            }
+
+            if (n <= 0)
+            {
+                break;
+            }
+
+            offset += (size_t)n;
+        }
+
+        pthread_mutex_lock(&handle->write_lock);
+
+        handle->write_head = chunk->next;
+
+        if (handle->write_head == NULL)
+        {
+            handle->write_tail = NULL;
+        }
+
+        handle->write_queued -= chunk->length;
+
+        free(chunk);
+    }
+
+    while (handle->write_head != NULL)
+    {
+        WriteChunk *chunk = handle->write_head;
+        handle->write_head = chunk->next;
+        free(chunk);
+    }
+
+    handle->write_tail = NULL;
+    handle->write_queued = 0;
+
+    pthread_mutex_unlock(&handle->write_lock);
+
+    return NULL;
+}
+
+// ShellX: stops the writer thread and waits for it. Called only once the
+// process has exited and the output has ended, i.e. no process has the
+// terminal open any more: a write() still blocked on the master then fails
+// at once (EIO), so this never waits for a process that does not read.
+static void stop_writer(PtyHandle *handle)
+{
+    pthread_mutex_lock(&handle->write_lock);
+    handle->write_stop = true;
+    pthread_cond_signal(&handle->write_ready);
+    pthread_mutex_unlock(&handle->write_lock);
+
+    pthread_join(handle->writer, NULL);
 }
 
 static void start_read_thread(int fd, Dart_Port port, pthread_mutex_t *mutex, bool waitForReadAck)
@@ -360,12 +483,36 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     close(sync_pipe[1]);
 
-    PtyHandle *handle = (PtyHandle *)malloc(sizeof(PtyHandle));
+    PtyHandle *handle = (PtyHandle *)calloc(1, sizeof(PtyHandle));
 
     handle->ptm = ptm;
     handle->pid = pid;
     pthread_mutex_init(&handle->mutex, NULL);
     handle->ackRead = options->ackRead;
+    pthread_mutex_init(&handle->write_lock, NULL);
+    pthread_cond_init(&handle->write_ready, NULL);
+
+    // ShellX: without its writer the pty could not take input: end the
+    // child and fail the spawn.
+    if (pthread_create(&handle->writer, NULL, &write_loop, handle) != 0)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "cannot start the writer thread");
+        error_message = error_buffer;
+        kill(pid, SIGKILL);
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
+        {
+        }
+        if (kq >= 0)
+        {
+            close(kq);
+        }
+        close(ptm);
+        pthread_cond_destroy(&handle->write_ready);
+        pthread_mutex_destroy(&handle->write_lock);
+        pthread_mutex_destroy(&handle->mutex);
+        free(handle);
+        return NULL;
+    }
 
     start_read_thread(ptm, options->stdout_port, &handle->mutex, options->ackRead);
 
@@ -374,9 +521,56 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     return handle;
 }
 
-FFI_PLUGIN_EXPORT void pty_write(PtyHandle *handle, char *buffer, int length)
+// ShellX: never blocks. Queues a copy of the input for the writer thread;
+// returns 0 (the input is dropped) when that would put more than
+// WRITE_QUEUE_LIMIT bytes in the queue or memory runs out, else 1.
+FFI_PLUGIN_EXPORT int pty_write(PtyHandle *handle, char *buffer, int length)
 {
-    write(handle->ptm, buffer, length);
+    if (length <= 0)
+    {
+        return 1;
+    }
+
+    WriteChunk *chunk = malloc(sizeof(WriteChunk) + (size_t)length);
+
+    if (chunk == NULL)
+    {
+        return 0;
+    }
+
+    chunk->next = NULL;
+    chunk->length = (size_t)length;
+    memcpy(chunk->data, buffer, (size_t)length);
+
+    int accepted = 0;
+
+    pthread_mutex_lock(&handle->write_lock);
+
+    if (!handle->write_stop && handle->write_queued + chunk->length <= WRITE_QUEUE_LIMIT)
+    {
+        if (handle->write_tail != NULL)
+        {
+            handle->write_tail->next = chunk;
+        }
+        else
+        {
+            handle->write_head = chunk;
+        }
+
+        handle->write_tail = chunk;
+        handle->write_queued += chunk->length;
+        pthread_cond_signal(&handle->write_ready);
+        accepted = 1;
+    }
+
+    pthread_mutex_unlock(&handle->write_lock);
+
+    if (!accepted)
+    {
+        free(chunk);
+    }
+
+    return accepted;
 }
 
 FFI_PLUGIN_EXPORT void pty_ack_read(PtyHandle *handle)
@@ -410,7 +604,10 @@ FFI_PLUGIN_EXPORT char *pty_error(void)
 
 FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle)
 {
+    stop_writer(handle);
     close(handle->ptm);
+    pthread_cond_destroy(&handle->write_ready);
+    pthread_mutex_destroy(&handle->write_lock);
     pthread_mutex_destroy(&handle->mutex);
     free(handle);
 }

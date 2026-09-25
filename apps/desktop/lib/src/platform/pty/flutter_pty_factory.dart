@@ -34,7 +34,11 @@ abstract interface class NativePty {
   int get pid;
   Stream<Uint8List> get output;
   Future<int> get exitCode;
-  void write(Uint8List data);
+
+  /// Never blocks (vendored flutter_pty). False when the input was dropped:
+  /// the shell has not read the input already queued (1 MiB), or the pty
+  /// is gone.
+  bool write(Uint8List data);
 
   /// Note the flutter_pty argument order: rows first.
   void resize(int rows, int columns);
@@ -63,7 +67,7 @@ final class _FlutterNativePty implements NativePty {
   @override
   Future<int> get exitCode => _pty.exitCode;
   @override
-  void write(Uint8List data) => _pty.write(data);
+  bool write(Uint8List data) => _pty.write(data);
   @override
   void resize(int rows, int columns) => _pty.resize(rows, columns);
   @override
@@ -274,6 +278,7 @@ final class FlutterPtyAdapter implements Pty {
   late final StreamSubscription<Uint8List> _nativeSubscription;
   bool _killed = false;
   bool _exited = false;
+  bool _reportedDroppedInput = false;
 
   int get pid => _native.pid;
 
@@ -289,8 +294,15 @@ final class FlutterPtyAdapter implements Pty {
   @override
   Future<int> get exitCode => _native.exitCode;
 
+  /// Never blocks. Input the shell does not read piles up in the plugin's
+  /// queue; what does not fit is dropped and reported once per pty through
+  /// `onError` (the pid only, never the input).
   @override
-  void write(Uint8List data) => _native.write(data);
+  void write(Uint8List data) {
+    if (_native.write(data) || _exited || _reportedDroppedInput) return;
+    _reportedDroppedInput = true;
+    _onError('pid ${_native.pid}: input dropped: the shell is not reading it');
+  }
 
   @override
   void resize(int cols, int rows) => _native.resize(rows, cols);

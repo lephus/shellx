@@ -29,6 +29,12 @@ final _bindings = FlutterPtyBindings(_dylib);
 final _ptyRelease = _dylib.lookupFunction<Void Function(Pointer<PtyHandle>),
     void Function(Pointer<PtyHandle>)>('pty_release');
 
+// ShellX: pty_write returns whether the input was accepted (the generated
+// binding still declares upstream's void).
+final _ptyWrite = _dylib.lookupFunction<
+    Int Function(Pointer<PtyHandle>, Pointer<Char>, Int),
+    int Function(Pointer<PtyHandle>, Pointer<Char>, int)>('pty_write');
+
 final _ptyKill = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
     int Function(Pointer<PtyHandle>)>('pty_kill');
 
@@ -226,12 +232,21 @@ class Pty {
   late final int jobError;
 
   /// Write data to the pseudo-terminal.
-  void write(Uint8List data) {
-    if (_released) return;
+  ///
+  /// ShellX: never blocks the calling isolate, even when the process does
+  /// not read its input (upstream wrote synchronously: a few KB to e.g.
+  /// `sleep` froze the isolate). POSIX: the data is queued for a writer
+  /// thread, at most 1 MiB waiting; Windows: written to conhost's input
+  /// pipe, without a flush. Returns false when the data was dropped (the
+  /// queue is full, or the write failed) and once the pty is released.
+  bool write(Uint8List data) {
+    if (_released) return false;
+    if (data.isEmpty) return true;
     final buf = malloc<Int8>(data.length);
     buf.asTypedList(data.length).setAll(0, data);
-    _bindings.pty_write(_handle, buf.cast(), data.length);
+    final accepted = _ptyWrite(_handle, buf.cast(), data.length) != 0;
     malloc.free(buf);
+    return accepted;
   }
 
   /// Resize the pseudo-terminal.

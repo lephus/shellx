@@ -649,15 +649,15 @@ fail:
     return NULL;
 }
 
-FFI_PLUGIN_EXPORT void pty_write(PtyHandle *handle, char *buffer, int length)
+// ShellX: no FlushFileBuffers: it waits until conhost has read everything
+// written so far, which blocked the calling (UI) isolate. conhost reads its
+// input pipe continuously, whether or not the shell reads. Returns non-zero
+// when WriteFile succeeded.
+FFI_PLUGIN_EXPORT int pty_write(PtyHandle *handle, char *buffer, int length)
 {
-    DWORD bytesWritten;
+    DWORD bytesWritten = 0;
 
-    WriteFile(handle->inputWriteSide, buffer, length, &bytesWritten, NULL);
-
-    FlushFileBuffers(handle->inputWriteSide);
-
-    return;
+    return WriteFile(handle->inputWriteSide, buffer, (DWORD)length, &bytesWritten, NULL) ? 1 : 0;
 }
 
 FFI_PLUGIN_EXPORT void pty_ack_read(PtyHandle *handle)

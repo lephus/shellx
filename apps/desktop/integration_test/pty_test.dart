@@ -404,6 +404,93 @@ void main() {
     expect(_sessionLeftovers().difference(before), isEmpty);
   });
 
+  /// [count] lines of 63 'a's and a newline: complete lines fill the
+  /// terminal's input queue (a partial line would just be dropped by the
+  /// line discipline once full).
+  Uint8List lines(int count) {
+    final line = [...List<int>.filled(63, 0x61), 0x0a];
+    return Uint8List.fromList([for (var i = 0; i < count; i++) ...line]);
+  }
+
+  /// Starts a command in [pty] that never reads the terminal and waits
+  /// until it runs.
+  Future<void> startNotReading(Pty pty, Transcript transcript) async {
+    if (Platform.isWindows) {
+      _type(pty, r"'started-' + (40+2); Start-Sleep 30");
+    } else {
+      _type(pty, r'echo started-$((40+2)); sleep 30');
+    }
+    await transcript.waitForLine((line) => line == 'started-42');
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('writing to a shell that is not reading never blocks the agent', (
+    tester,
+  ) async {
+    final (pty, transcript) = open(shell);
+    await startNotReading(pty, transcript);
+
+    // 4 KB is well past what the terminal buffers for a command that
+    // does not read (about 1 KB on macOS).
+    final watch = Stopwatch()..start();
+    pty.write(lines(64));
+    expect(watch.elapsed, lessThan(const Duration(milliseconds: 100)));
+
+    // The isolate keeps running: relay pings, the tray, Ctrl+C.
+    final tick = Stopwatch()..start();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(tick.elapsed, lessThan(const Duration(seconds: 1)));
+    pty.write(Uint8List.fromList([3])); // Ctrl+C is queued too
+    expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+
+    // Releasing the pty (its writer is blocked on the full terminal)
+    // must not hang either.
+    pty.kill();
+    await pty.exitCode.timeout(const Duration(seconds: 15));
+    await transcript.done.timeout(const Duration(seconds: 5));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  });
+
+  testWidgets(
+    'input beyond the write queue is dropped and reported once, pid only',
+    (tester) async {
+      final errors = <String>[];
+      final reporting = FlutterPtyFactory(
+        isWindows: Platform.isWindows,
+        onError: errors.add,
+      );
+      final pty = reporting.spawn(
+        shell,
+        workingDirectory: _home,
+        environment: _environment(),
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(pty.kill);
+      final transcript = Transcript(pty.output);
+      addTearDown(transcript.close);
+      await startNotReading(pty, transcript);
+
+      // 2 MiB in 64 KB writes: more than the 1 MiB queue.
+      final chunk = lines(1024);
+      final watch = Stopwatch()..start();
+      for (var i = 0; i < 32; i++) {
+        pty.write(chunk);
+      }
+      expect(watch.elapsed, lessThan(const Duration(seconds: 1)));
+      expect(errors, [
+        matches(
+          RegExp(r'^pid \d+: input dropped: the shell is not reading it$'),
+        ),
+      ]);
+
+      pty.kill();
+      await pty.exitCode.timeout(const Duration(seconds: 15));
+      await transcript.done.timeout(const Duration(seconds: 5));
+    },
+    skip: Platform.isWindows,
+  );
+
   testWidgets('resize(cols, rows) reaches the terminal', (tester) async {
     final (pty, transcript) = open(shell);
     pty.resize(100, 30);

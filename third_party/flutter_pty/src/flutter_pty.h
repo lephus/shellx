@@ -39,7 +39,11 @@ typedef struct PtyHandle PtyHandle;
 
 FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options);
 
-FFI_PLUGIN_EXPORT void pty_write(PtyHandle *handle, char *buffer, int length);
+// ShellX: never blocks the caller (POSIX: queued for a writer thread, at
+// most 1 MiB waiting; Windows: written to conhost's input pipe without a
+// flush). Returns non-zero when the input was accepted, 0 when it was
+// dropped (upstream returned void).
+FFI_PLUGIN_EXPORT int pty_write(PtyHandle *handle, char *buffer, int length);
 
 FFI_PLUGIN_EXPORT void pty_ack_read(PtyHandle *handle);
 
