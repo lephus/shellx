@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
-  call, connect, errorCode, hex, loginDevice, makeApp, pair, pairingIdOf, registerAccount, type TestApp,
+  call, connect, errorCode, hex, loginDevice, makeApp, newPairingId, pair, pairingIdOf, registerAccount, type TestApp,
+  uuidv7,
 } from "./helpers";
 
 interface DeviceJson {
@@ -66,7 +67,7 @@ describe("GET /v1/devices", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
     const res = await call(app, "GET", "/v1/devices", { token: mobile.token });
     const text = await res.text();
@@ -80,7 +81,7 @@ describe("POST /v1/pairings", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
     expect((await pair(app, account.agent.token, mobile.deviceId.toUpperCase(), pairingId)).status).toBe(201);
 
@@ -116,7 +117,7 @@ describe("POST /v1/pairings", () => {
 });
 
 describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () => {
-  it("requires pairing_id to be a UUID string: 400 bad_request (usual error shape), nothing recorded", async () => {
+  it("requires pairing_id to be a UUIDv7 string: 400 bad_request (usual error shape), nothing recorded", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
@@ -126,7 +127,10 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
       { mobile_id: mobile.deviceId, pairing_id: "" },
       { mobile_id: mobile.deviceId, pairing_id: 42 },
       { mobile_id: mobile.deviceId, pairing_id: null },
-      { mobile_id: mobile.deviceId, pairing_id: [crypto.randomUUID()] },
+      { mobile_id: mobile.deviceId, pairing_id: [newPairingId()] },
+      { mobile_id: mobile.deviceId, pairing_id: crypto.randomUUID() }, // v4
+      { mobile_id: mobile.deviceId, pairing_id: "00000000-0000-0000-0000-000000000000" },
+      { mobile_id: mobile.deviceId, pairing_id: newPairingId().replace(/^(.{14})7/, (_, head: string) => `${head}8`) }, // v8
     ];
     for (const body of bodies) {
       const res = await call(app, "POST", "/v1/pairings", { token: account.agent.token, body });
@@ -140,7 +144,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId.toUpperCase())).status).toBe(201);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(pairingId);
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
@@ -152,7 +156,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     expect((await pair(app, account.agent.token, mobile.deviceId, x)).status).toBe(201);
     expect((await pair(app, account.agent.token, mobile.deviceId, y)).status).toBe(201);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(y);
@@ -167,7 +171,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
     expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
@@ -185,11 +189,11 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     await a.expectSilence();
   });
 
-  it("a POST with a different id clears the older pairing's tombstone and records the new id", async () => {
+  it("a POST with a newer id clears the older pairing's tombstone and records the new id", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
 
@@ -199,11 +203,59 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     await a.expectSilence(); // the tombstone of pairing x is gone
   });
 
+  it("refuses a stale POST whose id is older than the tombstone: 410, no row, the newer tombstone still replays", async () => {
+    // An old pairing's POST (x) was still in flight — or retried — after the user paired the phone
+    // again (y) and then unpaired it: it must neither clear y's tombstone nor record x.
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const [x, y] = [newPairingId(), newPairingId()];
+    expect((await pair(app, account.agent.token, mobile.deviceId, y)).status).toBe(201);
+    expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
+
+    const stale = await pair(app, account.agent.token, mobile.deviceId, x);
+    expect(stale.status).toBe(410);
+    expect(await errorCode(stale)).toBe("pairing_removed");
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
+    const a = await connect(app, account.agent.token);
+    expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, y)));
+    await a.expectSilence();
+  });
+
+  it("refuses a stale POST whose id is older than the current row: 410, the newer row is kept", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const [x, y] = [newPairingId(), newPairingId()];
+    expect((await pair(app, account.agent.token, mobile.deviceId, y)).status).toBe(201);
+
+    const stale = await pair(app, account.agent.token, mobile.deviceId, x);
+    expect(stale.status).toBe(410);
+    expect(await errorCode(stale)).toBe("pairing_removed");
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(y);
+    const a = await connect(app, account.agent.token);
+    await a.expectSilence(); // no tombstone either
+  });
+
+  it("orders ids by their UUIDv7 timestamp, not by when the requests arrive", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const later = uuidv7(Date.UTC(2031, 0, 1));
+    const earlier = uuidv7(Date.UTC(2030, 0, 1));
+    expect((await pair(app, account.agent.token, mobile.deviceId, later)).status).toBe(201);
+    expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
+    expect((await pair(app, account.agent.token, mobile.deviceId, earlier)).status).toBe(410);
+    const newest = uuidv7(Date.UTC(2031, 0, 1, 0, 0, 0, 1));
+    expect((await pair(app, account.agent.token, mobile.deviceId, newest)).status).toBe(201);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(newest);
+  });
+
   it("asks the hub before writing the row and again after, and answers 410 (removing the row) if the pairing was removed in between", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     const seen: { args: unknown[]; row: string | null }[] = [];
     // First answer: "fine to record"; second: "this pairing has been removed meanwhile" (a phone
     // DELETE that read the fresh row and wrote its tombstone between the upsert and the re-check).
@@ -234,7 +286,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     const refusingHub = {
       idFromName: (name: string) => name,
       get: () => ({ admitPairing: async () => false }),
@@ -269,7 +321,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     });
     const res = await call(app, "POST", "/v1/pairings", {
       token: account.agent.token,
-      body: { mobile_id: mobile.deviceId, pairing_id: crypto.randomUUID() },
+      body: { mobile_id: mobile.deviceId, pairing_id: newPairingId() },
       bindings: { USER_HUB: throwingHub },
     });
     spy.mockRestore();
@@ -287,7 +339,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const m = await connect(app, mobile.token);
 
@@ -304,7 +356,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const a = await connect(app, account.agent.token);
 
@@ -319,7 +371,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     const event = hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId));
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const m = await connect(app, mobile.token);
@@ -336,7 +388,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     const event = hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId));
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     // The agent is offline when the phone unpairs.
@@ -362,7 +414,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const a = await connect(app, account.agent.token);
 
@@ -396,7 +448,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     const event = hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId));
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const a = await connect(app, account.agent.token);
@@ -420,7 +472,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const ids = [newPairingId(), newPairingId(), newPairingId()];
     for (const id of ids) {
       expect((await pair(app, account.agent.token, mobile.deviceId, id)).status).toBe(201);
       expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
@@ -435,7 +487,7 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
 
@@ -472,7 +524,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     const event = hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId));
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const m = await connect(app, mobile.token);
@@ -492,7 +544,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     // The user revoked pairing x on the desktop and quickly paired the phone again (y) before the
     // revoke's DELETE reached the relay.
@@ -519,7 +571,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     await pair(app, account.agent.token, mobile.deviceId, y);
     const a = await connect(app, account.agent.token);
@@ -530,14 +582,14 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
   });
 
-  it("refuses an invalid pairing_id query with 400 bad_request and leaves the row alone", async () => {
+  it("refuses an invalid (or non-UUIDv7) pairing_id query with 400 bad_request and leaves the row alone", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const base = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    for (const query of ["?pairing_id=not-a-uuid", "?pairing_id=", "?pairing_id"]) {
+    for (const query of ["?pairing_id=not-a-uuid", "?pairing_id=", "?pairing_id", `?pairing_id=${crypto.randomUUID()}`]) {
       const res = await call(app, "DELETE", `${base}${query}`, { token: account.agent.token });
       expect(res.status).toBe(400);
       expect(await errorCode(res)).toBe("bad_request");
@@ -549,7 +601,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     const notified: unknown[][] = [];
     const racingHub = {
@@ -575,7 +627,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     const notified: unknown[][] = [];
     const racingHub = {
@@ -613,7 +665,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
         notifyPairingRemoved: async () => {
           calls++;
           await env.DB.prepare("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?")
-            .bind(crypto.randomUUID(), account.agent.deviceId, mobile.deviceId).run();
+            .bind(newPairingId(), account.agent.deviceId, mobile.deviceId).run();
         },
       }),
     } as unknown as typeof env.USER_HUB;
@@ -647,16 +699,17 @@ describe("UserHub RPC", () => {
     await a.expectSilence();
   });
 
-  it("keeps one tombstone per (agent, mobile): a newer removal overwrites the older one's id", async () => {
+  it("keeps one tombstone per (agent, mobile) holding the newest id: a newer removal overwrites it, an older one does not", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const other = await loginDevice(app, account, "mobile");
-    const [x, y, z] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const [w, x, y, z] = [newPairingId(), newPairingId(), newPairingId(), newPairingId()];
     const hub = hubFor(env, account.agent.userId);
     await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, x);
     await hub.notifyPairingRemoved(account.agent.deviceId, other.deviceId, z);
-    await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, y);
+    await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, y); // newer: overwrites x
+    await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, w); // older: y stays
 
     const a = await connect(app, account.agent.token);
     const replayed = [hex(await a.nextBinary()), hex(await a.nextBinary())].sort();
@@ -667,19 +720,20 @@ describe("UserHub RPC", () => {
     await a.expectSilence();
   });
 
-  it("admitPairing() refuses (keeping the tombstone) the removed pairing itself, and clears a tombstone of any other id", async () => {
+  it("admitPairing() refuses ids not newer than the tombstone (keeping it), and clears it for a newer id", async () => {
     const agentId = crypto.randomUUID();
     const mobileId = crypto.randomUUID();
-    const [x, y] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [w, x, y] = [newPairingId(), newPairingId(), newPairingId()];
     const hub = hubFor(env, crypto.randomUUID());
     expect(await hub.admitPairing(agentId, mobileId, x)).toBe(true); // no tombstone at all
     await hub.notifyPairingRemoved(agentId, mobileId, x);
-    expect(await hub.admitPairing(agentId, mobileId, x)).toBe(false);
+    expect(await hub.admitPairing(agentId, mobileId, x)).toBe(false); // the removed pairing itself
+    expect(await hub.admitPairing(agentId, mobileId, w)).toBe(false); // an older pairing
     expect(await hub.admitPairing(agentId, mobileId, x)).toBe(false); // still there
-    expect(await hub.admitPairing(crypto.randomUUID(), mobileId, y)).toBe(true); // other agent: untouched
+    expect(await hub.admitPairing(crypto.randomUUID(), mobileId, w)).toBe(true); // other agent: untouched
     expect(await hub.admitPairing(agentId, mobileId, x)).toBe(false);
-    expect(await hub.admitPairing(agentId, mobileId, y)).toBe(true); // clears x's tombstone
-    expect(await hub.admitPairing(agentId, mobileId, x)).toBe(true);
+    expect(await hub.admitPairing(agentId, mobileId, y)).toBe(true); // newer: clears x's tombstone
+    expect(await hub.admitPairing(agentId, mobileId, w)).toBe(true);
     expect(await hub.purgeAll()).toBe(0);
   });
 });

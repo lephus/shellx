@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
-  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, pair, registerAccount, TestSocket,
+  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, newPairingId, pair, registerAccount,
+  TestSocket,
   unlimited,
 } from "./helpers";
 
@@ -158,7 +159,7 @@ describe("POST /v1/auth/logout", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const mobile2 = await loginDevice(app, account, "mobile");
-    const [first, second] = [crypto.randomUUID(), crypto.randomUUID()];
+    const [first, second] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, first);
     await pair(app, account.agent.token, mobile2.deviceId, second);
     const m = await connect(app, mobile.token);
@@ -406,7 +407,7 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const pairingId = crypto.randomUUID();
+    const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
     // The tombstone (carrying the pairing's id) is replayed on connect (and kept) ...

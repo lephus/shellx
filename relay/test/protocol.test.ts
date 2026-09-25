@@ -4,7 +4,7 @@ import {
   CloseCode, encodeData, encodeError, encodeEvent, encodePresence, MAX_FRAME_BYTES,
   pairingRemovedEvent, parseDataHeader, RelayErrorCode, withPeer,
 } from "../src/protocol/frames";
-import { NIL_UUID, parseUuid, uuidFromBytes, uuidToBytes } from "../src/protocol/uuid";
+import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes } from "../src/protocol/uuid";
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string): Uint8Array => Uint8Array.from(h.match(/../g)!.map((x) => Number.parseInt(x, 16)));
@@ -13,13 +13,23 @@ const A = "0123abcd-4567-4def-8123-456789abcdef";
 const A_HEX = "0123abcd45674def8123456789abcdef";
 const B = "fedcba98-7654-4321-8fed-cba987654321";
 const B_HEX = "fedcba98765443218fedcba987654321";
-const P = "c0ffee00-1234-4abc-9def-0123456789ab";
+const P = "c0ffee00-1234-7abc-9def-0123456789ab"; // UUIDv7-shaped
 const CH = fromHex("0102030405060708");
 
 describe("uuid", () => {
   it("round-trips in textual byte order", () => {
     expect(hex(uuidToBytes(A))).toBe(A_HEX);
     expect(uuidFromBytes(uuidToBytes(A))).toBe(A);
+  });
+  it("parseUuidV7 accepts only version-7 UUIDs (canonical lower case)", () => {
+    const v7 = "0192d1f0-7a3b-7c4d-8e5f-0123456789ab";
+    expect(parseUuidV7(v7)).toBe(v7);
+    expect(parseUuidV7(v7.toUpperCase())).toBe(v7);
+    expect(parseUuidV7(A)).toBeNull(); // version 4
+    expect(parseUuidV7(NIL_UUID)).toBeNull();
+    expect(parseUuidV7("0192d1f0-7a3b-8c4d-8e5f-0123456789ab")).toBeNull(); // version 8
+    expect(parseUuidV7("not-a-uuid")).toBeNull();
+    expect(parseUuidV7(7)).toBeNull();
   });
   it("canonicalises to lowercase and rejects garbage", () => {
     expect(parseUuid(A.toUpperCase())).toBe(A);
@@ -83,7 +93,7 @@ describe("relay frames (overview §4.1)", () => {
       "0104a4656576656e746f70616972696e675f72656d6f766564686167656e745f6964782430313233616263642d34" +
         "3536372d346465662d383132332d343536373839616263646566696d6f62696c655f69647824666564636261" +
         "39382d373635342d343332312d386665642d6362613938373635343332316a70616972696e675f696478246330" +
-        "6666656530302d313233342d346162632d396465662d303132333435363738396162",
+        "6666656530302d313233342d376162632d396465662d303132333435363738396162",
     );
     expect(encodeEvent({})).toEqual(Uint8Array.from([1, 4, 0xa0]));
   });

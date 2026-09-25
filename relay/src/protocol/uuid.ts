@@ -9,6 +9,15 @@ export function parseUuid(value: unknown): string | null {
   return UUID_RE.test(lower) ? lower : null;
 }
 
+/**
+ * Like parseUuid, but only accepts version 7 (RFC 9562: 48-bit unix-ms timestamp first), the form
+ * of every pairing id. Canonical v7 strings of equal length sort by time when compared as strings.
+ */
+export function parseUuidV7(value: unknown): string | null {
+  const uuid = parseUuid(value);
+  return uuid !== null && uuid[14] === "7" ? uuid : null;
+}
+
 /** 16 bytes in textual order (the hex digits read left to right). Throws on malformed input. */
 export function uuidToBytes(uuid: string): Uint8Array {
   const canonical = parseUuid(uuid);
