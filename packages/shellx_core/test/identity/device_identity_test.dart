@@ -24,6 +24,32 @@ final class _CountingStore implements KeyValueStore {
   Future<void> delete(String key) => inner.delete(key);
 }
 
+/// Throws on the first write, then succeeds on retry.
+final class _FailingStore implements KeyValueStore {
+  final inner = InMemoryKeyValueStore();
+  int writes = 0;
+  bool failed = false;
+
+  @override
+  Future<String?> read(String key) async {
+    await Future<void>.delayed(Duration.zero);
+    return inner.read(key);
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    writes++;
+    if (!failed) {
+      failed = true;
+      throw Exception('Simulated write failure');
+    }
+    await inner.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) => inner.delete(key);
+}
+
 void main() {
   group('InMemoryKeyValueStore', () {
     test('read, write, overwrite, delete', () async {
@@ -103,5 +129,25 @@ void main() {
         );
       }
     });
+
+    test(
+      'clears in-flight guard on write failure, retry stores exactly one key',
+      () async {
+        final store = _FailingStore();
+        await expectLater(
+          DeviceIdentity.loadOrCreate(store),
+          throwsA(isA<Exception>()),
+        );
+        expect(store.writes, 1);
+        expect(store.inner.values, isEmpty);
+        final keys = await DeviceIdentity.loadOrCreate(store);
+        expect(store.writes, 2);
+        expect(keys.privateKey, hasLength(32));
+        expect(
+          fromBase64UrlNoPad(store.inner.values['device_private_key']!),
+          keys.privateKey,
+        );
+      },
+    );
   });
 }

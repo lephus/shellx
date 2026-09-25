@@ -14,6 +14,11 @@ abstract final class DeviceIdentity {
   /// use. Idempotent: later calls (and concurrent calls on the same [store])
   /// return the same key. A stored value that is not a 32-byte base64url key
   /// is replaced by a new key (the device must then pair again).
+  ///
+  /// **IMPORTANT:** Pass the same [KeyValueStore] instance for all calls on
+  /// the same underlying storage; the single-key guarantee only holds for
+  /// calls on the same store instance. If a write fails, the in-flight guard
+  /// clears, allowing a retry to succeed with exactly one key stored.
   static Future<NoiseKeyPair> loadOrCreate(KeyValueStore store) {
     final pending = _inFlight[store];
     if (pending != null) {

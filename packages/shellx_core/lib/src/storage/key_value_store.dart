@@ -1,4 +1,4 @@
-/// String key-value storage. Apps back it with flutter_secure_storage.
+/// String key-value storage. Apps back it with flutter_secure_storage; use a shared instance per underlying storage (e.g., for DeviceIdentity).
 abstract interface class KeyValueStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
