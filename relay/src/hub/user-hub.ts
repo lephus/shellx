@@ -6,6 +6,7 @@ import {
   CloseCode, encodeError, encodePresence, MAX_FRAME_BYTES, parseDataHeader, RelayErrorCode, withPeer,
 } from "../protocol/frames";
 import { parseUuid } from "../protocol/uuid";
+import { FRAMES_PER_SECOND, TokenBucket } from "./token-bucket";
 
 /** Set by the Worker after token validation; the hub is not reachable from the Internet directly. */
 export const DEVICE_ID_HEADER = "X-Shellx-Device-Id";
@@ -35,6 +36,14 @@ const CLOSE_REASONS: Record<CloseCode, string> = {
  * frames can only ever be routed between devices of the same account.
  */
 export class UserHub extends DurableObject<Env> {
+  /**
+   * Per-device frame budget, in memory only. It is lost when the object hibernates, which is
+   * harmless: hibernation needs ~10 s without events, after which a 500-token bucket refilling at
+   * 500/s is full anyway — exactly what a fresh bucket starts with. Persisting it would cost a
+   * storage write per frame.
+   */
+  private readonly buckets = new Map<string, TokenBucket>();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     // Heartbeat is answered by the runtime without waking the object (spec §6.1).
@@ -54,6 +63,7 @@ export class UserHub extends DurableObject<Env> {
 
     // One connection per device: the newest wins; the old socket gets 4001 and no offline is announced.
     for (const old of this.socketsOf(deviceId)) this.closeSocket(old, CloseCode.replaced);
+    this.buckets.delete(deviceId); // the new connection starts with a full budget
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server, [deviceId]);
@@ -69,6 +79,14 @@ export class UserHub extends DurableObject<Env> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const me = attachmentOf(ws);
     if (me === null || me.closing) return;
+
+    if (!this.takeToken(me.device_id)) {
+      safeSend(ws, encodeError(RelayErrorCode.rateLimited));
+      this.closeSocket(ws, CloseCode.rateLimited);
+      logMeta("ws_rate_limited", { device_id: me.device_id });
+      await this.markOffline(me.device_id);
+      return;
+    }
 
     if (typeof message === "string") {
       // Only "ping" is valid text, and the runtime answers it before we get here.
@@ -105,6 +123,16 @@ export class UserHub extends DurableObject<Env> {
 
   // ---- helpers -------------------------------------------------------------------------------
 
+  private takeToken(deviceId: string): boolean {
+    const now = Date.now();
+    let bucket = this.buckets.get(deviceId);
+    if (bucket === undefined) {
+      bucket = new TokenBucket(FRAMES_PER_SECOND, FRAMES_PER_SECOND, now);
+      this.buckets.set(deviceId, bucket);
+    }
+    return bucket.take(now);
+  }
+
   private async socketGone(ws: WebSocket): Promise<void> {
     const me = attachmentOf(ws);
     if (me === null || me.closing) return; // the hub closed it on purpose and already handled it
@@ -135,6 +163,7 @@ export class UserHub extends DurableObject<Env> {
    */
   private async markOffline(deviceId: string): Promise<void> {
     if (this.socketsOf(deviceId).length > 0) return;
+    this.buckets.delete(deviceId);
     this.broadcast(encodePresence(deviceId, false), deviceId);
     await this.env.DB.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").bind(Date.now(), deviceId).run();
   }
