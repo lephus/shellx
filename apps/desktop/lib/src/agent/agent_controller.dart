@@ -271,6 +271,12 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
+  /// Tray "Reconnect" (binding ruling, Task 8): the only way back after a
+  /// 4001 (`replaced`) close, since spec §12 forbids the relay from
+  /// reconnecting on its own then. A no-op without a runtime (signed out or
+  /// remote access off) or outside `disconnected`/`replaced`.
+  void reconnect() => _runtime?.reconnectNow();
+
   /// Spec §14 / §12. Never throws: a failure is retried when the relay next
   /// connects.
   Future<void> checkForUpdate() async {

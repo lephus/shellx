@@ -151,6 +151,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get trayStatusSignedOut => 'Chưa đăng nhập';
 
   @override
+  String get trayReconnect => 'Kết nối lại';
+
+  @override
   String get trayRemoteAccess => 'Cho phép truy cập từ xa';
 
   @override

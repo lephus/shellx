@@ -40,6 +40,7 @@
   "trayStatusRemoteOff": "Đã tắt truy cập từ xa",
   "trayStatusReplaced": "Một bản ShellX khác đã kết nối thay máy này",
   "trayStatusSignedOut": "Chưa đăng nhập",
+  "trayReconnect": "Kết nối lại",
   "trayRemoteAccess": "Cho phép truy cập từ xa",
   "traySessions": "Phiên đang hoạt động ({count})",
   "traySessionItem": "{shell} {index}",

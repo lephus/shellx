@@ -559,6 +559,24 @@ void main() {
     });
   });
 
+  group('reconnect (tray "Reconnect", binding ruling for 4001/replaced)', () {
+    test('replaced: calls runtime.reconnectNow()', () async {
+      boot();
+      await h.seedSignedIn();
+      await controller().bootstrap(watchForWake: false);
+      h.runtime.emitRelay(RelayConnectionState.replaced);
+      controller().reconnect();
+      expect(h.runtime.reconnects, 1);
+    });
+
+    test('no runtime (signed out): nothing happens', () async {
+      boot();
+      await controller().bootstrap(watchForWake: false);
+      controller().reconnect();
+      expect(h.runtimes, isEmpty);
+    });
+  });
+
   group('revoke', () {
     test('with the agent running, AgentService.revoke does the work', () async {
       boot();

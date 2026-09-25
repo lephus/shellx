@@ -152,6 +152,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trayStatusSignedOut => 'Not signed in';
 
   @override
+  String get trayReconnect => 'Reconnect';
+
+  @override
   String get trayRemoteAccess => 'Allow remote access';
 
   @override

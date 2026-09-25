@@ -60,6 +60,7 @@
   "trayStatusRemoteOff": "Remote access is off",
   "trayStatusReplaced": "Another copy of ShellX took over this computer",
   "trayStatusSignedOut": "Not signed in",
+  "trayReconnect": "Reconnect",
   "trayRemoteAccess": "Allow remote access",
   "traySessions": "Active sessions ({count})",
   "@traySessions": {

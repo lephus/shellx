@@ -338,6 +338,12 @@ abstract class AppLocalizations {
   /// **'Not signed in'**
   String get trayStatusSignedOut;
 
+  /// No description provided for @trayReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get trayReconnect;
+
   /// No description provided for @trayRemoteAccess.
   ///
   /// In en, this message translates to:
