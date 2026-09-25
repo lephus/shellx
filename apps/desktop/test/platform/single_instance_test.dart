@@ -48,10 +48,18 @@ void main() {
     final lock = SingleInstanceLock(dir);
     expect(await lock.acquire(), isTrue);
     var requests = 0;
-    final subscription = lock.activationRequests().listen((_) => requests++);
+    final first = Completer<void>();
+    final subscription = lock.activationRequests().listen((_) {
+      requests++;
+      if (!first.isCompleted) first.complete();
+    });
     await Future<void>.delayed(const Duration(milliseconds: 500));
     await SingleInstanceLock(dir).signalRunningInstance();
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    // However slow the watcher is, the request arrives...
+    await first.future.timeout(const Duration(seconds: 10));
+    // ...and the rest of that launch's events (the signal file's creation
+    // and its write may come separately) are all dropped.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     expect(requests, 1);
     await subscription.cancel();
     await lock.release();
