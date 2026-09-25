@@ -10,6 +10,7 @@ import 'package:shellx_desktop/src/agent/agent_state.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
+import 'package:shellx_desktop/src/ui/activation.dart';
 import 'package:shellx_desktop/src/ui/window_coordinator.dart';
 import 'package:shellx_desktop/src/ui/window_host.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -162,6 +163,37 @@ void main() {
         expect(window().visible, isFalse);
       },
     );
+  });
+
+  group('handleActivation (second launch, macOS reopen)', () {
+    test('signed out: the login window', () async {
+      h = TestHarness();
+      container = ProviderContainer.test(
+        overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+      );
+      await agent().bootstrap(watchForWake: false);
+      router().close();
+      expect(window().visible, isFalse);
+
+      await handleActivation(container, isWindows: false);
+      expect(window().route, isA<LoginRoute>());
+      expect(h.notifier.shown, isEmpty);
+    });
+
+    test('signed in: says where ShellX is', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await handleActivation(container, isWindows: false);
+      expect(window().visible, isFalse);
+      expect(h.notifier.shown.single.title, 'ShellX is already running');
+      expect(h.notifier.shown.single.body, 'Find it in the menu bar.');
+    });
+
+    test('a failing notification is not an unhandled error', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      h.notifier.fail = true;
+      await handleActivation(container, isWindows: true);
+      expect(h.notifier.shown, isEmpty);
+    });
   });
 
   group('TrayActions', () {

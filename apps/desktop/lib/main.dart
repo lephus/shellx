@@ -18,6 +18,7 @@ import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/config.dart';
 import 'src/l10n/locale.dart';
+import 'src/platform/app_reopen.dart';
 import 'src/platform/keep_awake.dart';
 import 'src/platform/launch_at_login.dart';
 import 'src/platform/notifier.dart';
@@ -31,6 +32,7 @@ import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
 import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
+import 'src/ui/activation.dart';
 import 'src/ui/app.dart';
 import 'src/ui/window_coordinator.dart';
 import 'src/ui/window_host.dart';
@@ -196,26 +198,16 @@ Future<void> _start(
 
   // A second launch (double-click while running) asks us to come forward;
   // one request per launch (activationRequests coalesces watcher events).
+  // On macOS, Finder/Spotlight reopen the running app instead of launching
+  // a second one: AppDelegate forwards that reopen, handled the same way.
+  void activate() =>
+      unawaited(handleActivation(container, isWindows: Platform.isWindows));
   lock.activationRequests().listen(
-    (_) {
-      final state = container.read(agentControllerProvider);
-      if (!state.signedIn) {
-        container.read(windowRouterProvider.notifier).open(const LoginRoute());
-      } else {
-        _unawaitedLogged(
-          notifier.show(
-            title: l10n.notifyAlreadyRunningTitle,
-            body: l10n.notifyAlreadyRunningBody(
-              Platform.isWindows ? 'windows' : 'macos',
-            ),
-          ),
-          'already-running notification',
-        );
-      }
-    },
+    (_) => activate(),
     onError: (Object error) =>
         debugPrint('ShellX: activation watch failed: ${error.runtimeType}'),
   );
+  if (Platform.isMacOS) listenForReopen(activate);
 
   runApp(
     UncontrolledProviderScope(
