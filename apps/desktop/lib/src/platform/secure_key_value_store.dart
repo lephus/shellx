@@ -3,12 +3,13 @@ import 'package:shellx_core/shellx_core.dart';
 
 /// [KeyValueStore] over flutter_secure_storage.
 ///
-/// The app must use a single shared [SecureKeyValueStore] instance
-/// process-wide: `DeviceIdentity.loadOrCreate`'s guarantee that the device
-/// key is generated exactly once under concurrent calls, and `TrustedStore`,
-/// both depend on all callers going through the same instance (and
-/// therefore the same in-flight-operation state) rather than separate
-/// instances that happen to point at the same underlying storage.
+/// The app must construct exactly one [SecureKeyValueStore] and share that
+/// same instance process-wide: `DeviceIdentity.loadOrCreate`'s guarantee that
+/// the device key is generated only once under concurrent calls, and
+/// `TrustedStore`, both rely on every caller going through the same
+/// instance (and therefore the same in-flight-operation state), not merely
+/// on separate instances that happen to point at the same underlying
+/// storage.
 ///
 /// * macOS: login keychain, service `pro.shellx.desktop`. The legacy
 ///   (file-based) keychain is used on purpose: the data-protection keychain
