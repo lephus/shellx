@@ -475,6 +475,82 @@ void main() {
         expect(h.sessions.sessions.single.attachedMobileId, phoneId);
       });
     });
+
+    test('an automatic resume triggered while re-pairing waits until the '
+        'pairing is over: the agent still records it, then the tab '
+        're-attaches', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+        final recorder = TabRecorder(tab);
+        h.pty.emit('before ');
+        settle(async);
+
+        var triggered = false;
+        h.relay.onData = (from, to, frame) {
+          if (!triggered &&
+              from == phoneId &&
+              frame.payload.first == PayloadKind.hs1IkPsk2.wire) {
+            triggered = true;
+            // Between the pairing HS1 and pair.confirm: an event that makes
+            // the machine drop its channel and resume the open tab.
+            h.relay.sendEvent(phoneId, {
+              'event': 'pairing_removed',
+              'agent_id': agentId,
+              'mobile_id': phoneId,
+              'pairing_id': oldPairingId,
+            });
+          }
+          return frame;
+        };
+        h.run(h.phone.pair(h.agent.startPairing()));
+        settle(async);
+
+        expect(h.agentEvents.whereType<MobilePaired>(), hasLength(1));
+        final trusted = h.run(h.trusted.find(phoneId))!;
+        expect(trusted.pairingId, isNot(phonePairingId));
+        expect(h.relay.pairings[(agentId, phoneId)], trusted.pairingId);
+        // The deferred resume ran once, after the pairing.
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(2));
+        expect(h.phoneMachine.state, isA<MachineReady>());
+        h.pty.emit('after');
+        settle(async);
+        expect(recorder.text, 'before after');
+        expect(tab.isAttached, isTrue);
+        expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+      });
+    });
+
+    test('a request the app makes while re-pairing waits until the pairing '
+        'is over, then handshakes with the new pin', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final lists = <List<SessionInfo>>[];
+        final errors = <Object>[];
+        var triggered = false;
+        h.relay.onData = (from, to, frame) {
+          if (!triggered &&
+              from == phoneId &&
+              frame.payload.first == PayloadKind.hs1IkPsk2.wire) {
+            triggered = true;
+            h.phoneMachine.listSessions().then(lists.add, onError: errors.add);
+          }
+          return frame;
+        };
+        h.run(h.phone.pair(h.agent.startPairing()));
+        settle(async);
+
+        expect(h.agentEvents.whereType<MobilePaired>(), hasLength(1));
+        expect(
+          h.run(h.trusted.find(phoneId))!.pairingId,
+          isNot(phonePairingId),
+        );
+        expect(errors, isEmpty);
+        expect(lists, [isEmpty]);
+        expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(1));
+        expect(h.phoneMachine.state, isA<MachineReady>());
+      });
+    });
   });
 
   test('machine() needs a pin and returns one instance per agent', () {

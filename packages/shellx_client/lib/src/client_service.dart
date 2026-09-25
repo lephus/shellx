@@ -62,6 +62,10 @@ final class ClientService {
   final _pairings =
       <ChannelId, ({String agentId, Completer<Uint8List> reply})>{};
 
+  /// Per agent id with a pairing in flight: what that machine's IK
+  /// handshakes wait for (see [pair]).
+  final _pairingGates = <String, _PairingGate>{};
+
   /// The start in flight, if any.
   Future<void>? _starting;
 
@@ -123,6 +127,7 @@ final class ClientService {
       timeout: _timeout,
       pinnedKey: () => _pins[agentId]?.publicKey,
       forgetPin: () => _forget(agentId),
+      pairing: () => _pairingGates[agentId]?.over.future,
     );
   }
 
@@ -154,6 +159,11 @@ final class ClientService {
     final channel = ChannelId.random();
     final reply = Completer<Uint8List>();
     _pairings[channel] = (agentId: agentId, reply: reply);
+    // From HS1 to pair.confirm the pairing channel is this phone's channel
+    // on the agent: an IK HS1 would replace it and the agent would ignore
+    // the confirm. The machine's handshakes wait until this is over.
+    final gate = _pairingGates[agentId] ??= _PairingGate();
+    gate.pairings++;
     var sent = false;
     try {
       _sendPairing(
@@ -203,8 +213,14 @@ final class ClientService {
       // One channel per phone: an HS1 the agent accepted replaced this
       // phone's machine channel, whatever became of the pairing (a lost or
       // late HS2, a wrong code's HS2 cannot say). Dropped only now, after
-      // pair.confirm went out, so the new IK handshake cannot overtake it.
-      if (sent) _machines[agentId]?.dropChannel();
+      // pair.confirm went out, and before the machine's waiting handshakes
+      // go, so this drop does not void their new HS1; the resume it starts
+      // joins them and runs once.
+      if (sent) await _machines[agentId]?.dropChannel();
+      if (--gate.pairings == 0) {
+        _pairingGates.remove(agentId);
+        gate.over.complete();
+      }
     }
   }
 
@@ -309,7 +325,7 @@ final class ClientService {
       return;
     }
     final agentId = event['agent_id'];
-    if (agentId != null) _machines[agentId]?.dropChannel();
+    if (agentId != null) unawaited(_machines[agentId]?.dropChannel());
   }
 
   void _onState(RelayConnectionState state) {
@@ -331,4 +347,10 @@ final class ClientService {
       machine.relayLost();
     }
   }
+}
+
+/// Pairings with one agent in flight; [over] completes when the last ends.
+final class _PairingGate {
+  int pairings = 0;
+  final over = Completer<void>();
 }

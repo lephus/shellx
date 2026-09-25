@@ -31,13 +31,15 @@ final class MachineClient {
     required Duration timeout,
     required Uint8List? Function() pinnedKey,
     required Future<void> Function() forgetPin,
+    required Future<void>? Function() pairing,
   }) : _relay = relay,
        _deviceId = deviceId,
        _identity = identity,
        _hello = hello,
        _timeout = timeout,
        _pinnedKey = pinnedKey,
-       _forgetPin = forgetPin;
+       _forgetPin = forgetPin,
+       _pairing = pairing;
 
   final String agentId;
   final RelayConnection _relay;
@@ -47,6 +49,10 @@ final class MachineClient {
   final Duration _timeout;
   final Uint8List? Function() _pinnedKey;
   final Future<void> Function() _forgetPin;
+
+  /// While the phone is pairing with this agent: completes when that is
+  /// over (see [ClientService.pair]); null otherwise.
+  final Future<void>? Function() _pairing;
 
   MachineConnectionState _state = const MachineIdle();
   final _states = StreamController<MachineConnectionState>.broadcast();
@@ -221,10 +227,11 @@ final class MachineClient {
   /// received before this call, a live channel is dropped, and a handshake
   /// in flight starts over on a new channel id instead of installing its
   /// channel; then the open tabs resume, so the agent is asked again at
-  /// once. The pin and the tabs stay, as on any channel loss.
+  /// once. The pin and the tabs stay, as on any channel loss. The returned
+  /// future completes once the drop is done.
   @internal
-  void dropChannel() {
-    _inbox = _inbox
+  Future<void> dropChannel() {
+    return _inbox = _inbox
         .then((_) {
           if (_secure != null) {
             _channelLost();
@@ -282,6 +289,12 @@ final class MachineClient {
       prologue: prologue,
     );
     final hello = await handshake.writeMessage(_hello.encode());
+    // Never while pairing with this agent: between the pairing's HS1 and
+    // pair.confirm this HS1 would replace the pairing channel on the agent,
+    // which would then ignore the confirm. Sent once the pairing is over.
+    for (var pairing = _pairing(); pairing != null; pairing = _pairing()) {
+      await pairing;
+    }
     final channel = ChannelId.random();
     final reply = Completer<Uint8List?>();
     _handshake = (channel: channel, reply: reply);
