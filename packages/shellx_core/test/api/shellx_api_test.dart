@@ -28,6 +28,7 @@ final class _TrackingClient extends http.BaseClient {
 
 const _userId = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const _deviceId = '11111111-2222-3333-4444-555555555555';
+const _pairingId = 'c0ffee00-1234-7abc-9def-0123456789ab';
 
 final _device = DeviceInfo(
   kind: DeviceKind.agent,
@@ -291,13 +292,19 @@ void main() {
       expect(devices.map((d) => d.name), ['Pixel']);
     });
 
-    test('createPairing posts mobile_id', () async {
+    test('createPairing posts mobile_id and pairing_id', () async {
       final recorder = _Recorder((_) => http.Response('', 201));
-      await recorder.api(token: 'tok').createPairing(_userId);
+      await recorder
+          .api(token: 'tok')
+          .createPairing(_userId, pairingId: _pairingId);
       expect(recorder.last.method, 'POST');
       expect(recorder.last.url.path, '/v1/pairings');
+      expect(recorder.last.url.query, isEmpty);
       expect(recorder.last.headers['authorization'], 'Bearer tok');
-      expect(recorder.lastJson, {'mobile_id': _userId});
+      expect(recorder.lastJson, {
+        'mobile_id': _userId,
+        'pairing_id': _pairingId,
+      });
     });
 
     test('createPairing maps device_not_found', () async {
@@ -305,8 +312,23 @@ void main() {
         (_) => _error(404, 'device_not_found', 'No such device'),
       ).api(token: 'tok');
       await expectLater(
-        api.createPairing(_userId),
+        api.createPairing(_userId, pairingId: _pairingId),
         throwsA(_apiError(404, 'device_not_found')),
+      );
+    });
+
+    test('createPairing maps 410 pairing_removed', () async {
+      final api = _Recorder(
+        (_) => _error(410, 'pairing_removed', 'Already removed'),
+      ).api(token: 'tok');
+      await expectLater(
+        api.createPairing(_userId, pairingId: _pairingId),
+        throwsA(
+          _apiError(
+            410,
+            'pairing_removed',
+          ).having((e) => e.message, 'message', 'Already removed'),
+        ),
       );
     });
 
@@ -317,9 +339,23 @@ void main() {
         await recorder.api(token: 'tok').deletePairing(_deviceId, _userId);
         expect(recorder.last.method, 'DELETE');
         expect(recorder.last.url.path, '/v1/pairings/$_deviceId/$_userId');
+        expect(recorder.last.url.hasQuery, isFalse);
         expect(recorder.last.headers['authorization'], 'Bearer tok');
       },
     );
+
+    test('deletePairing with pairingId adds ?pairing_id=', () async {
+      final recorder = _Recorder((_) => http.Response('', 204));
+      await recorder
+          .api(base: 'https://example.com/relay/', token: 'tok')
+          .deletePairing(_deviceId, _userId, pairingId: _pairingId);
+      expect(recorder.last.method, 'DELETE');
+      expect(
+        recorder.last.url.toString(),
+        'https://example.com/relay/v1/pairings/$_deviceId/$_userId'
+        '?pairing_id=$_pairingId',
+      );
+    });
 
     test('calls without a token fail locally with 401 unauthorized', () async {
       final recorder = _Recorder((_) => http.Response('', 204));
