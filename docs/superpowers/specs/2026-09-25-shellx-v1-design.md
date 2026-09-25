@@ -349,6 +349,15 @@ App dựng trên base Flutter của team (`flutter-base/yallabb`): kiến trúc 
 4. **Terminal của một máy:** hàng tab ở trên (`+` mở phiên mới, `×` đóng phiên), vùng `xterm.dart`, thanh phím phụ ngay trên bàn phím. Mở màn này lần đầu thì gửi `session.list` và cho phép gắn vào phiên có sẵn.
 5. **Cài đặt:** cỡ chữ mặc định, khóa sinh trắc học, bỏ ghép nối từng máy, đăng xuất, **xóa tài khoản** (nhập lại mật khẩu, cảnh báo không hoàn tác được), phiên bản app.
 
+**Thiết kế giao diện (người dùng đã duyệt 2026-09-25):** `docs/superpowers/design/2026-09-25-shellx-mobile-ui.html` quy định bố cục, câu chữ và trạng thái của từng màn hình, gồm cả bảng màu tối (base chưa có) và các chi tiết sau:
+- Nút "Aa" trên thanh terminal mở thanh trượt cỡ chữ (ngoài thao tác chụm hai ngón).
+- Thẻ máy hiện số tab đang mở trên điện thoại này.
+- Màn đăng nhập có câu "Quên mật khẩu? Đổi mật khẩu trong ShellX trên máy tính đang đăng nhập."
+- Phiên đã thoát: tab giữ nguyên nội dung và hiện thẻ "Phiên đã kết thúc" với hai nút "Đóng tab" / "Mở phiên mới".
+- Sau khi bị đóng với 4002, màn đăng nhập có băng rôn "Phiên đăng nhập đã hết hiệu lực. Hãy đăng nhập lại." và điền sẵn email.
+- Chọn phiên có sẵn là bottom sheet; máy chưa có phiên thì mở thẳng phiên mới. Lần đầu dùng (chưa có máy) hiện 3 bước ghép nối và nút "Quét mã QR".
+- Giao diện sáng/tối theo máy; vùng terminal luôn nền tối; mọi vùng chạm cao ít nhất 44 pt.
+
 ### 9.3 Thanh phím phụ
 
 Một hàng cuộn ngang: `Esc` `Tab` `Ctrl` `Alt` `↑` `↓` `←` `→` `|` `~` `/` `-` `Home` `End` `PgUp` `PgDn` `Dán`.

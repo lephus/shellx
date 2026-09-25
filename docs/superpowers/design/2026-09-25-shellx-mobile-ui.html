@@ -1,0 +1,999 @@
+<title>ShellX Mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Raleway:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  /* board */
+  --bg:#E7EEEF; --ink:#0F1719; --muted:#485A5E; --line:#C7D4D6; --accent:#007785; --panel:#F4F8F8; --chip:#D9E7E9;
+  /* app (base yallabb tokens, light) */
+  --a-bg:#F2F7F8; --a-surface:#FFFFFF; --a-text:#111111; --a-text2:#434B56; --a-muted:#8B8F95;
+  --a-border:#D8D9DB; --a-divider:#EBECED;
+  --a-primary:#0097A8; --a-on-primary:#FFFFFF; --a-primary-soft:#DCF1F3;
+  --a-ok:#3E8A2B; --a-ok-dot:#4CAF3A; --a-warn:#9A5600; --a-warn-soft:#FCF2E5;
+  --a-err:#CB232B; --a-err-soft:#FAE9EA; --a-scrim:rgba(10,20,24,.45);
+  /* iOS keyboard */
+  --kb-bg:#D1D4DA; --kb-key:#FFFFFF; --kb-key2:#ABB1BA; --kb-ink:#000000;
+  --frame:#1A2225;
+  /* terminal (same in both themes) */
+  --t-bg:#0B1215; --t-chrome:#111B1E; --t-chrome2:#1A272B; --t-line:#243337;
+  --t-fg:#D4E1E4; --t-dim:#6C8288; --t-green:#7ED492; --t-cyan:#5FD4E2; --t-yellow:#E9C46A;
+  --t-red:#F07178; --t-blue:#82AAFF; --t-magenta:#C792EA;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0A0F10; --ink:#E1EAEC; --muted:#93A5A9; --line:#233034; --accent:#46C9D7; --panel:#10181A; --chip:#15272A;
+    --a-bg:#0D1315; --a-surface:#172023; --a-text:#E8EFF1; --a-text2:#A7B6BA; --a-muted:#6F8186;
+    --a-border:#2B373A; --a-divider:#1F292C;
+    --a-primary:#2DBFCF; --a-on-primary:#04282D; --a-primary-soft:#0E363C;
+    --a-ok:#7CC45E; --a-ok-dot:#6BCB4E; --a-warn:#F0A94A; --a-warn-soft:#33250F;
+    --a-err:#F26A70; --a-err-soft:#3B1719; --a-scrim:rgba(0,0,0,.6);
+    --kb-bg:#1E1F21; --kb-key:#47484B; --kb-key2:#2E2F32; --kb-ink:#FFFFFF;
+    --frame:#030607;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0A0F10; --ink:#E1EAEC; --muted:#93A5A9; --line:#233034; --accent:#46C9D7; --panel:#10181A; --chip:#15272A;
+  --a-bg:#0D1315; --a-surface:#172023; --a-text:#E8EFF1; --a-text2:#A7B6BA; --a-muted:#6F8186;
+  --a-border:#2B373A; --a-divider:#1F292C;
+  --a-primary:#2DBFCF; --a-on-primary:#04282D; --a-primary-soft:#0E363C;
+  --a-ok:#7CC45E; --a-ok-dot:#6BCB4E; --a-warn:#F0A94A; --a-warn-soft:#33250F;
+  --a-err:#F26A70; --a-err-soft:#3B1719; --a-scrim:rgba(0,0,0,.6);
+  --kb-bg:#1E1F21; --kb-key:#47484B; --kb-key2:#2E2F32; --kb-ink:#FFFFFF;
+  --frame:#030607;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font:15px/1.6 'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding-inline:16px; padding-block:40px 64px}
+.wrap{max-width:1240px; margin-inline:auto; display:flex; flex-direction:column; gap:72px}
+h1,h2,h3{margin:0; text-wrap:balance; line-height:1.15}
+p{margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+code,.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; font-size:.92em}
+
+/* ---------- board header ---------- */
+.head{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:48px; align-items:start}
+.eyebrow{font-size:12.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--accent)}
+.head h1{font-size:clamp(34px,5vw,54px); font-weight:700; letter-spacing:-.02em; margin-top:10px}
+.head h1 .prompt{font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent); font-size:.62em; vertical-align:.28em; margin-right:.2em}
+.lead{margin-top:16px; max-width:58ch; color:var(--muted); font-size:16.5px}
+.meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px}
+.chip{font-size:12.5px; font-weight:500; padding:4px 10px; border-radius:999px; background:var(--chip); color:var(--ink)}
+.principles{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+.principles div{background:var(--panel); padding:18px 18px 20px; display:flex; flex-direction:column; gap:6px}
+.principles h3{font-size:15.5px; font-weight:700}
+.principles p{font-size:14px; color:var(--muted); line-height:1.55}
+
+.controls{display:flex; flex-wrap:wrap; align-items:center; gap:14px 24px; margin-top:28px}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel)}
+.seg button{font:inherit; font-size:13.5px; font-weight:500; color:var(--ink); background:none; border:0; padding:7px 14px; cursor:pointer}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent); color:var(--panel)}
+.ctl-label{font-size:13.5px; color:var(--muted)}
+
+.flow{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13.5px}
+.flow span{padding:5px 11px; border:1px solid var(--line); border-radius:8px; background:var(--panel); white-space:nowrap}
+.flow i{font-style:normal; color:var(--muted)}
+
+/* ---------- sections ---------- */
+.sec{display:flex; flex-direction:column; gap:28px}
+.sec-h{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px; border-top:1px solid var(--line); padding-top:22px}
+.sec-h h2{font-size:26px; font-weight:700; letter-spacing:-.01em}
+.sec-h p{color:var(--muted); max-width:70ch; flex-basis:100%}
+.ref{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:1px 7px}
+.row{display:flex; flex-wrap:wrap; gap:44px 36px; align-items:flex-start}
+.fig{margin:0; width:286px; display:flex; flex-direction:column; gap:14px}
+.fig.wide{width:auto; max-width:100%}
+.scroll-x{overflow-x:auto; max-width:100%; padding-bottom:6px}
+figcaption{display:flex; flex-direction:column; gap:6px; font-size:13.5px; line-height:1.5}
+figcaption strong{font-size:14.5px}
+figcaption ul{margin:0; padding-left:18px; color:var(--muted); display:flex; flex-direction:column; gap:3px}
+.tag{display:inline-block; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; padding:1px 7px; border-radius:5px; background:var(--a-warn-soft); color:var(--a-warn); vertical-align:1px; margin-left:4px}
+.live{font-size:13px; color:var(--accent); min-height:1.5em}
+
+/* ---------- phone ---------- */
+.phone{zoom:.72; width:375px; height:812px; padding:11px; border-radius:56px; background:var(--frame); box-shadow:0 30px 60px -30px rgba(6,28,33,.55), inset 0 0 0 2px rgba(255,255,255,.05)}
+.phone.land{width:812px; height:375px}
+.scr{position:relative; width:100%; height:100%; border-radius:46px; overflow:hidden; background:var(--a-bg); color:var(--a-text);
+  font-family:'Raleway',system-ui,-apple-system,sans-serif; font-variant-numeric:lining-nums; font-size:15px; line-height:1.45; display:flex; flex-direction:column}
+.scr::before{content:""; position:absolute; top:11px; left:50%; width:122px; height:35px; margin-left:-61px; border-radius:20px; background:#000; z-index:9}
+.land .scr::before{top:50%; left:11px; width:35px; height:122px; margin:-61px 0 0; }
+.scr::after{content:""; position:absolute; bottom:8px; left:50%; width:136px; height:5px; margin-left:-68px; border-radius:3px; background:var(--a-text); opacity:.85; z-index:9}
+.scr.dark::after, .scr.term-scr::after{background:#fff}
+.sb{height:54px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:6px 30px 0 34px; font:600 16px/1 system-ui,-apple-system,sans-serif}
+.sb svg{width:68px; height:13px; fill:currentColor}
+.ico{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; flex:none}
+
+/* app parts */
+.nav{height:52px; flex:none; display:flex; align-items:center; gap:6px; padding:0 12px}
+.nav .t{flex:1; text-align:center; font-weight:700; font-size:17px}
+.nav .icbtn{width:40px; height:40px; display:grid; place-items:center; border-radius:12px; color:var(--a-primary)}
+.big-t{font-size:32px; font-weight:800; letter-spacing:-.01em; padding:4px 20px 12px}
+.body{flex:1; min-height:0; padding:0 20px; display:flex; flex-direction:column; gap:16px}
+.logo{width:64px; height:64px; border-radius:18px; background:var(--a-primary); color:var(--a-on-primary); display:grid; place-items:center; font:700 24px/1 'JetBrains Mono',monospace; letter-spacing:-.04em}
+.logo.sm{width:44px; height:44px; border-radius:13px; font-size:17px}
+.h{font-size:28px; font-weight:800; letter-spacing:-.01em}
+.sub{color:var(--a-text2); font-size:15px}
+.field{display:flex; flex-direction:column; gap:7px}
+.field label{font-size:13.5px; font-weight:700; color:var(--a-text2)}
+.input{height:52px; border-radius:13px; border:1.5px solid var(--a-border); background:var(--a-surface); padding:0 14px; display:flex; align-items:center; gap:8px; font-size:16px; color:var(--a-text)}
+.input .ph{color:var(--a-muted)}
+.input.focus{border-color:var(--a-primary); box-shadow:0 0 0 4px var(--a-primary-soft)}
+.input.err{border-color:var(--a-err)}
+.input .dots{letter-spacing:.18em; font-size:18px; flex:1}
+.input .ico{color:var(--a-muted)}
+.help{font-size:13px; color:var(--a-text2)}
+.help.err{color:var(--a-err); font-weight:600}
+.btn{height:54px; border-radius:15px; background:var(--a-primary); color:var(--a-on-primary); font-weight:700; font-size:16.5px; display:flex; align-items:center; justify-content:center; gap:8px; flex:none}
+.btn.soft{background:var(--a-primary-soft); color:var(--a-primary)}
+.btn.ghost{background:none; color:var(--a-primary)}
+.btn.danger{background:var(--a-err); color:#fff}
+.btn.dim{opacity:.45}
+.link{color:var(--a-primary); font-weight:700}
+.fine{font-size:12.5px; color:var(--a-muted); text-align:center; line-height:1.5}
+.spacer{flex:1}
+.center{align-items:center; text-align:center}
+
+/* machine list */
+.list{display:flex; flex-direction:column; gap:10px}
+.m{display:grid; grid-template-columns:46px 1fr auto; align-items:center; gap:13px; background:var(--a-surface); border-radius:18px; padding:13px 14px 13px 13px; border:1px solid var(--a-divider)}
+.m .os{width:46px; height:46px; border-radius:13px; background:var(--a-primary-soft); color:var(--a-primary); display:grid; place-items:center}
+.m .os .ico{width:24px; height:24px}
+.m .n{font-weight:700; font-size:16px; line-height:1.25}
+.m .d{font-size:13px; color:var(--a-text2); display:flex; align-items:center; gap:6px; margin-top:3px; flex-wrap:wrap}
+.dot{width:8px; height:8px; border-radius:50%; background:var(--a-ok-dot); flex:none}
+.dot.off{background:var(--a-muted)}
+.m.off .os{background:var(--a-divider); color:var(--a-muted)}
+.m.off .n{color:var(--a-text2)}
+.m .chev{color:var(--a-muted)}
+.badge{font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; background:var(--a-primary-soft); color:var(--a-primary); white-space:nowrap}
+.badge.ok{background:transparent; color:var(--a-ok); padding:0}
+.pill-count{font-size:12px; font-weight:700; color:var(--a-text2); background:var(--a-divider); border-radius:999px; padding:2px 8px}
+.banner{display:flex; align-items:center; gap:10px; background:var(--a-warn-soft); color:var(--a-warn); font-weight:700; font-size:14px; padding:10px 14px; border-radius:13px}
+.spin{width:16px; height:16px; border-radius:50%; border:2.5px solid currentColor; border-right-color:transparent; animation:spin 1s linear infinite; flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.list-h{font-size:13px; font-weight:700; color:var(--a-text2); text-transform:uppercase; letter-spacing:.06em; margin:6px 2px -2px}
+
+/* steps (empty state) */
+.steps{display:flex; flex-direction:column; gap:14px; text-align:left; background:var(--a-surface); border:1px solid var(--a-divider); border-radius:18px; padding:18px}
+.steps div{display:grid; grid-template-columns:28px 1fr; gap:12px; align-items:start; font-size:15px}
+.steps b{width:28px; height:28px; border-radius:50%; background:var(--a-primary-soft); color:var(--a-primary); display:grid; place-items:center; font-size:14px}
+.illus{width:170px; height:110px; position:relative; margin:4px auto 0}
+.illus .lap{position:absolute; left:0; top:8px; width:118px; height:76px; border-radius:9px; border:3px solid var(--a-text2); background:var(--a-surface)}
+.illus .lap::after{content:"›_"; position:absolute; left:10px; top:8px; font:700 16px 'JetBrains Mono',monospace; color:var(--a-primary)}
+.illus .base{position:absolute; left:-10px; top:86px; width:138px; height:6px; border-radius:3px; background:var(--a-text2)}
+.illus .ph{position:absolute; right:6px; top:30px; width:44px; height:78px; border-radius:10px; border:3px solid var(--a-primary); background:var(--a-surface)}
+.illus .ph::after{content:""; position:absolute; inset:14px 8px; border-radius:3px; background:repeating-linear-gradient(90deg,var(--a-primary) 0 3px,transparent 3px 5px); opacity:.7}
+
+/* camera / QR */
+.scr.dark{background:#05090A; color:#fff}
+.cam{position:absolute; inset:0; background:
+  radial-gradient(120% 60% at 50% 42%, rgba(95,212,226,.18), transparent 60%),
+  radial-gradient(60% 40% at 20% 85%, rgba(255,210,150,.10), transparent 70%),
+  linear-gradient(180deg,#141c1e 0%, #0b1012 55%, #1b1612 100%)}
+.cam .screen{position:absolute; left:50%; top:320px; width:300px; height:200px; margin-left:-150px; border-radius:10px; background:linear-gradient(160deg,#e9f1f2,#c9d6d8); transform:perspective(600px) rotateX(9deg); box-shadow:0 0 60px rgba(95,212,226,.25); display:grid; place-items:center; opacity:.9}
+.cam canvas{width:132px; height:132px; image-rendering:pixelated}
+.frame{position:absolute; left:50%; top:282px; width:250px; height:250px; margin-left:-125px}
+.frame i{position:absolute; width:46px; height:46px; border:5px solid #fff; border-radius:4px}
+.frame i:nth-child(1){left:0; top:0; border-right:0; border-bottom:0; border-top-left-radius:22px}
+.frame i:nth-child(2){right:0; top:0; border-left:0; border-bottom:0; border-top-right-radius:22px}
+.frame i:nth-child(3){left:0; bottom:0; border-right:0; border-top:0; border-bottom-left-radius:22px}
+.frame i:nth-child(4){right:0; bottom:0; border-left:0; border-top:0; border-bottom-right-radius:22px}
+.scanline{position:absolute; left:14px; right:14px; top:14px; height:3px; border-radius:2px; background:var(--t-cyan); box-shadow:0 0 14px var(--t-cyan); animation:scan 2.4s ease-in-out infinite alternate}
+@keyframes scan{to{top:230px}}
+.cam-top{position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:0 16px}
+.round{width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.14); display:grid; place-items:center; color:#fff}
+.cam-title{position:relative; z-index:2; text-align:center; font-weight:800; font-size:20px; margin-top:14px}
+.cam-card{position:absolute; left:14px; right:14px; bottom:34px; z-index:2; background:rgba(16,24,27,.86); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.08); border-radius:20px; padding:16px 18px; display:flex; flex-direction:column; gap:8px; font-size:14.5px; color:#dfe8ea}
+.cam-card b{color:#fff}
+.kbd{font-family:'JetBrains Mono',monospace; font-size:12.5px; background:rgba(255,255,255,.12); border-radius:5px; padding:1px 6px; white-space:nowrap}
+
+.sheet{position:absolute; left:0; right:0; bottom:0; z-index:5; background:var(--a-surface); color:var(--a-text); border-radius:26px 26px 0 0; padding:10px 20px 40px; display:flex; flex-direction:column; gap:14px; box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+.grab{width:40px; height:5px; border-radius:3px; background:var(--a-border); margin:0 auto 4px}
+.scrim{position:absolute; inset:0; background:var(--a-scrim); z-index:4}
+.state-ic{width:76px; height:76px; border-radius:50%; display:grid; place-items:center; margin:0 auto}
+.state-ic .ico{width:38px; height:38px; stroke-width:2.4}
+.state-ic.ok{background:var(--a-primary-soft); color:var(--a-primary)}
+.state-ic.err{background:var(--a-err-soft); color:var(--a-err)}
+.state-ic.warn{background:var(--a-warn-soft); color:var(--a-warn)}
+
+/* alert dialog */
+.alert{position:absolute; z-index:6; left:50%; top:50%; width:290px; margin:-110px 0 0 -145px; background:var(--a-surface); border-radius:18px; overflow:hidden; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.alert .c{padding:20px 18px 16px; display:flex; flex-direction:column; gap:6px}
+.alert .c b{font-size:17px}
+.alert .c span{font-size:14px; color:var(--a-text2)}
+.alert .a{display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--a-divider)}
+.alert .a div{padding:13px; font-size:16px; color:var(--a-primary)}
+.alert .a div + div{border-left:1px solid var(--a-divider); font-weight:800}
+
+/* terminal screen */
+.scr.term-scr{background:var(--t-bg); color:var(--t-fg)}
+.tbar{height:50px; flex:none; display:flex; align-items:center; gap:4px; padding:0 8px; background:var(--t-chrome); color:#E8F0F2}
+.tbar .icbtn{width:40px; height:40px; display:grid; place-items:center; border-radius:11px; color:var(--t-cyan); background:none; border:0; padding:0; cursor:pointer}
+.tbar .ttl{flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; line-height:1.2}
+.tbar .ttl b{font-size:15.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+.tbar .ttl small{font-size:12px; color:var(--t-dim); display:flex; align-items:center; gap:5px}
+.aa{font:700 15px/1 'Raleway',sans-serif; color:var(--t-cyan)}
+.tabs{height:42px; flex:none; display:flex; align-items:stretch; gap:2px; padding:0 6px; background:var(--t-chrome); border-bottom:1px solid var(--t-line); overflow-x:auto}
+.tab{display:flex; align-items:center; gap:8px; padding:0 8px 0 12px; font:600 13px 'JetBrains Mono',monospace; color:var(--t-dim); border-radius:10px 10px 0 0; margin-top:5px; background:none; border:0; cursor:pointer; white-space:nowrap}
+.tab .x{width:20px; height:20px; display:grid; place-items:center; border-radius:6px; color:var(--t-dim)}
+.tab .x .ico{width:14px; height:14px; stroke-width:2.4}
+.tab[aria-selected="true"]{background:var(--t-bg); color:#EAF3F5}
+.tab .live-dot{width:6px; height:6px; border-radius:50%; background:var(--t-green)}
+.tab.add{padding:0 12px; color:var(--t-cyan)}
+.term{flex:1; min-height:0; overflow:hidden; padding:8px 10px 6px; font:13px/1.36 'JetBrains Mono',ui-monospace,Menlo,monospace; white-space:pre-wrap; word-break:break-all; color:var(--t-fg); position:relative}
+.term .g{color:var(--t-green)} .term .c{color:var(--t-cyan)} .term .y{color:var(--t-yellow)} .term .r{color:var(--t-red)}
+.term .b{color:var(--t-blue)} .term .mg{color:var(--t-magenta)} .term .dm{color:var(--t-dim)} .term .bold{font-weight:700}
+.term .inv{background:var(--t-cyan); color:var(--t-bg)}
+.cur{display:inline-block; width:.6em; height:1.2em; vertical-align:-.22em; background:var(--t-fg); animation:blink 1.06s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.xk{height:50px; flex:none; display:flex; align-items:center; gap:6px; padding:0 6px; background:var(--kb-bg); overflow-x:auto; scrollbar-width:none; border-top:1px solid rgba(0,0,0,.08)}
+.xk::-webkit-scrollbar{display:none}
+.k{min-width:46px; height:38px; padding:0 10px; border-radius:9px; border:0; background:var(--kb-key); color:var(--kb-ink); font:600 14px/1 'JetBrains Mono',monospace; box-shadow:0 1px 0 rgba(0,0,0,.28); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; flex:none; position:relative}
+.k.mod.once{background:var(--kb-key); color:var(--a-primary); box-shadow:inset 0 0 0 2.5px var(--a-primary)}
+.k.mod.locked{background:var(--a-primary); color:var(--a-on-primary)}
+.k.mod.locked::after{content:""; position:absolute; top:4px; right:4px; width:6px; height:6px; border-radius:50%; background:currentColor}
+.k.paste{font-family:'Raleway',sans-serif; font-weight:700}
+.k:active,.key:active{filter:brightness(.88)}
+.kb{flex:none; background:var(--kb-bg); padding:8px 3px 40px; display:flex; flex-direction:column; gap:12px; font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+.kr{display:flex; gap:6px; justify-content:center}
+.key{flex:1; max-width:34px; height:44px; border-radius:6px; border:0; padding:0; background:var(--kb-key); color:var(--kb-ink); font-size:22px; box-shadow:0 1px 0 rgba(0,0,0,.3); cursor:pointer}
+.key.fn{max-width:46px; background:var(--kb-key2); font-size:16px}
+.key.space{max-width:none; flex:5; font-size:15px}
+.key.ret{max-width:none; flex:2; background:var(--kb-key2); font-size:15px}
+.kr.mid{padding:0 18px}
+.ended{position:absolute; left:12px; right:12px; bottom:12px; background:var(--t-chrome2); border:1px solid var(--t-line); border-radius:16px; padding:14px; font-family:'Raleway',sans-serif; display:flex; flex-direction:column; gap:10px; white-space:normal}
+.ended b{font-size:15.5px; color:#fff}
+.ended span{font-size:13.5px; color:var(--t-dim)}
+.ended .acts{display:flex; gap:8px}
+.ended .acts div{flex:1; height:42px; border-radius:11px; display:grid; place-items:center; font-weight:700; font-size:14.5px; background:#23353A; color:#E6F0F2}
+.ended .acts div.pri{background:var(--t-cyan); color:#05282D}
+.toast{position:absolute; left:12px; right:12px; top:108px; z-index:5; background:#2A1416; color:#FFD9DB; border:1px solid #5a2a2e; border-radius:14px; padding:11px 13px; font:600 13.5px/1.4 'Raleway',sans-serif; display:flex; gap:10px; align-items:flex-start}
+.toast .ico{color:var(--t-red); width:20px; height:20px}
+
+/* landscape */
+.land .scr{flex-direction:column}
+.land .tbar{height:44px; padding-left:56px; padding-right:40px}
+.land .term{padding-left:56px; padding-right:40px}
+.land .xk{padding-left:56px; padding-right:40px; padding-bottom:0; height:52px}
+.land .scr::after{bottom:6px}
+
+/* settings */
+.grp{display:flex; flex-direction:column; gap:7px}
+.grp-h{font-size:13px; font-weight:700; color:var(--a-text2); text-transform:uppercase; letter-spacing:.06em; padding:0 6px}
+.card{background:var(--a-surface); border-radius:16px; border:1px solid var(--a-divider); overflow:hidden}
+.ri{display:flex; align-items:center; gap:10px; padding:13px 15px; font-size:15.5px; min-height:50px}
+.ri + .ri{border-top:1px solid var(--a-divider)}
+.ri .v{margin-left:auto; color:var(--a-text2); font-size:14.5px}
+.ri .act{margin-left:auto; color:var(--a-err); font-weight:700; font-size:14px}
+.ri.red{color:var(--a-err); font-weight:700}
+.ri .ico{color:var(--a-text2)}
+.grp-f{font-size:12.5px; color:var(--a-muted); padding:0 6px; line-height:1.45}
+.sw{width:51px; height:31px; border-radius:16px; background:var(--a-primary); position:relative; margin-left:auto; flex:none}
+.sw::after{content:""; position:absolute; top:2px; right:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.25)}
+.slider{display:flex; align-items:center; gap:12px; padding:4px 15px 14px; font-size:13px; color:var(--a-muted)}
+.slider .tr{flex:1; height:4px; border-radius:2px; background:linear-gradient(90deg,var(--a-primary) 0 36%, var(--a-border) 36% 100%); position:relative}
+.slider .tr::after{content:""; position:absolute; left:36%; top:50%; width:26px; height:26px; margin:-13px 0 0 -13px; border-radius:50%; background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.preview{margin:0 15px 14px; border-radius:10px; background:var(--t-bg); color:var(--t-fg); font:14px/1.3 'JetBrains Mono',monospace; padding:9px 11px}
+.warnbox{background:var(--a-err-soft); color:var(--a-text); border-radius:16px; padding:14px 15px; display:flex; flex-direction:column; gap:8px; font-size:14.5px}
+.warnbox b{color:var(--a-err)}
+.warnbox ul{margin:0; padding-left:18px; color:var(--a-text2); display:flex; flex-direction:column; gap:3px}
+
+/* proposals */
+.props{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px}
+.prop{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; display:flex; flex-direction:column; gap:6px}
+.prop h3{font-size:15.5px}
+.prop p{font-size:14px; color:var(--muted)}
+.notes{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px 28px; font-size:14px; color:var(--muted)}
+.notes b{color:var(--ink)}
+
+@media (max-width: 900px){
+  .head{grid-template-columns:1fr; gap:32px}
+}
+@media (max-width: 560px){
+  .principles{grid-template-columns:1fr}
+  .row{justify-content:center}
+}
+@media (prefers-reduced-motion: reduce){
+  .spin,.scanline,.cur{animation:none}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-status" viewBox="0 0 68 13"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3.5" width="3" height="8.5" rx="1"/><rect x="15" y="1" width="3" height="11" rx="1"/><path d="M31 3.2a9.5 9.5 0 0 1 12 0l-1.5 1.7a7.2 7.2 0 0 0-9 0zM33.3 6a6 6 0 0 1 7.4 0l-1.5 1.8a3.6 3.6 0 0 0-4.4 0zM35.6 8.8a2.5 2.5 0 0 1 2.8 0L37 10.6z"/><rect x="47" y="1" width="18" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/><rect x="48.8" y="2.8" width="12.5" height="6.4" rx="1.6"/><rect x="66" y="4.2" width="1.6" height="3.6" rx=".8" opacity=".5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2 19.5h20"/></symbol>
+  <symbol id="i-desktop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.6"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 19h1M19 14h1"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-face" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9.5v1.2M15 9.5v1.2M12 9.5v3.6h-1M9 15.6c1.8 1.4 4.2 1.4 6 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2l8.6 15.3H3.4z"/><path d="M12 10v4.2M12 17.2v.3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7.5 14h9"/></symbol>
+  <symbol id="i-update" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M9.5 14.5l5-5M10 6.5l1.2-1.2a4 4 0 0 1 5.6 5.6L15.6 12M8.4 12l-1.2 1.2a4 4 0 0 0 5.6 5.6l1.2-1.2M4 4l3 3M17 17l3 3"/></symbol>
+</svg>
+
+<div class="wrap">
+
+<!-- ===================== HEADER ===================== -->
+<header class="head">
+  <div>
+    <p class="eyebrow">Thiết kế giao diện · app mobile v1.0</p>
+    <h1><span class="prompt">›_</span>ShellX trên điện thoại</h1>
+    <p class="lead">Mở terminal của máy tính ngay trên điện thoại. Bản đề xuất gồm mọi màn hình trong spec §9 và mọi thông báo lỗi trong §12, dùng design system của base yallabb (màu <code>#0097A8</code>, font Raleway). Terminal dùng JetBrains Mono.</p>
+    <div class="meta">
+      <span class="chip">iOS 15+ · Android 8+</span>
+      <span class="chip">Tiếng Việt + English</span>
+      <span class="chip">17 màn hình · sáng và tối</span>
+    </div>
+    <div class="controls">
+      <span class="ctl-label" id="theme-l">Xem giao diện app:</span>
+      <div class="seg" role="group" aria-labelledby="theme-l">
+        <button type="button" id="th-light" data-th="light" aria-pressed="false">Sáng</button>
+        <button type="button" id="th-dark" data-th="dark" aria-pressed="false">Tối</button>
+        <button type="button" id="th-sys" data-th="system" aria-pressed="true">Theo máy</button>
+      </div>
+    </div>
+  </div>
+  <div class="principles">
+    <div><h3>Một chạm là vào việc</h3><p>Chạm vào máy đang online là mở terminal ngay. Máy chưa ghép nối dẫn thẳng tới màn quét mã.</p></div>
+    <div><h3>Luôn thấy trạng thái</h3><p>Chấm online/offline, băng rôn mất kết nối, phím Ctrl đang dính đều hiện rõ, không phải đoán.</p></div>
+    <div><h3>Phím to, dễ chạm</h3><p>Thanh phím phụ cao 44 pt, cuộn ngang, nằm sát bàn phím. Ctrl và Alt có ba trạng thái nhìn thấy được.</p></div>
+    <div><h3>Lỗi nào cũng kèm cách sửa</h3><p>Mỗi thông báo nói chuyện gì xảy ra, việc cần làm tiếp, và có nút để làm luôn việc đó.</p></div>
+  </div>
+</header>
+
+<nav class="flow" aria-label="Luồng chính">
+  <span>Đăng nhập</span><i>→</i><span>Mở khóa Face ID</span><i>→</i><span>Máy của bạn</span><i>→</i><span>Quét mã QR (lần đầu)</span><i>→</i><span>Terminal</span><i>·</i><span>Cài đặt</span>
+</nav>
+
+<!-- ===================== 1. VÀO APP ===================== -->
+<section class="sec" aria-labelledby="s1">
+  <div class="sec-h"><h2 id="s1">Vào app</h2><span class="ref">spec §5.2 · §5.6</span>
+    <p>Đăng nhập bằng email và mật khẩu, không OTP. Sau đó mỗi lần mở app hoặc quay lại sau hơn 5 phút chỉ cần Face ID / vân tay.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="body" style="padding-top:34px; gap:22px">
+          <div class="logo">›_</div>
+          <div style="display:flex; flex-direction:column; gap:6px"><div class="h">Đăng nhập</div><div class="sub">Dùng cùng tài khoản với ShellX trên máy tính.</div></div>
+          <div class="field"><label>Email</label><div class="input focus">phu@shellx.pro</div></div>
+          <div class="field"><label>Mật khẩu</label><div class="input"><span class="dots">••••••••••</span><svg class="ico"><use href="#i-eye"/></svg></div></div>
+          <div class="btn">Đăng nhập</div>
+          <p class="help" style="text-align:center">Quên mật khẩu? Đổi mật khẩu trong ShellX trên máy tính đang đăng nhập.</p>
+          <div class="spacer"></div>
+          <p style="text-align:center; font-size:15px; padding-bottom:40px">Chưa có tài khoản? <span class="link">Tạo tài khoản</span></p>
+        </div>
+      </div></div>
+      <figcaption><strong>Đăng nhập</strong><ul>
+        <li>Chỉ hai ô nhập; nút mắt để xem mật khẩu.</li>
+        <li>Không có "quên mật khẩu" qua email: câu gợi ý chỉ đúng chỗ đổi (spec §5.2).</li>
+        <li>Sai nhiều lần → "Thử lại sau ít phút." (HTTP 429).</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div class="icbtn"><svg class="ico"><use href="#i-back"/></svg></div><div class="t"></div><div style="width:40px"></div></div>
+        <div class="body" style="gap:20px">
+          <div style="display:flex; flex-direction:column; gap:6px"><div class="h">Tạo tài khoản</div><div class="sub">Một tài khoản cho điện thoại và mọi máy tính của bạn.</div></div>
+          <div class="field"><label>Email</label><div class="input err">ban@yopmail.com</div><p class="help err">Email tạm thời không dùng được. Hãy dùng email thật.</p></div>
+          <div class="field"><label>Mật khẩu</label><div class="input focus"><span class="dots">•••••</span><svg class="ico"><use href="#i-eye"/></svg></div><p class="help">Từ 8 đến 128 ký tự. Còn thiếu 3 ký tự.</p></div>
+          <div class="btn dim">Tạo tài khoản</div>
+          <p class="fine">Khi tạo tài khoản, bạn đồng ý với <span class="link">Điều khoản</span> và <span class="link">Chính sách quyền riêng tư</span>.</p>
+        </div>
+      </div></div>
+      <figcaption><strong>Tạo tài khoản</strong><ul>
+        <li>Kiểm tra ngay khi gõ: định dạng email, email tạm thời, độ dài mật khẩu.</li>
+        <li>Nút mờ tới khi hợp lệ, lỗi nằm ngay dưới ô bị sai.</li>
+        <li>Không có ô "nhập lại mật khẩu"; nút mắt thay cho nó.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="body center" style="justify-content:center; gap:18px; padding-bottom:40px">
+          <div class="logo">›_</div>
+          <div class="h" style="font-size:26px">ShellX đang khóa</div>
+          <p class="sub" style="max-width:26ch">Mở khóa để xem các máy và phiên terminal của bạn.</p>
+          <div class="state-ic ok" style="margin-top:10px"><svg class="ico"><use href="#i-face"/></svg></div>
+          <div class="btn" style="align-self:stretch; margin-top:14px">Mở khóa bằng Face ID</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Khóa app</strong><ul>
+        <li>Bật sẵn. Hỏi khi mở app và khi quay lại sau hơn 5 phút ở nền (§5.6).</li>
+        <li>Face ID lỗi thì hệ điều hành tự đề nghị mã máy.</li>
+        <li>Tắt được trong Cài đặt.</li></ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== 2. MÁY CỦA BẠN ===================== -->
+<section class="sec" aria-labelledby="s2">
+  <div class="sec-h"><h2 id="s2">Máy của bạn</h2><span class="ref">spec §9.2 · §12</span>
+    <p>Màn chính. Máy online nằm trên, offline nằm dưới. Mỗi thẻ cho biết ngay chạm vào sẽ làm gì.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div style="width:40px"></div><div class="t"></div><div class="icbtn"><svg class="ico"><use href="#i-gear"/></svg></div></div>
+        <div class="big-t">Máy của bạn</div>
+        <div class="body" style="gap:12px">
+          <div class="list">
+            <div class="m"><div class="os"><svg class="ico"><use href="#i-laptop"/></svg></div>
+              <div><div class="n">MacBook Pro của Phú</div><div class="d"><span class="dot"></span>Online · macOS <span class="pill-count">2 tab</span></div></div>
+              <svg class="ico chev"><use href="#i-chev"/></svg></div>
+            <div class="m"><div class="os"><svg class="ico"><use href="#i-desktop"/></svg></div>
+              <div><div class="n">MINI-HOME</div><div class="d"><span class="dot"></span>Online · macOS</div></div>
+              <svg class="ico chev"><use href="#i-chev"/></svg></div>
+            <div class="m"><div class="os"><svg class="ico"><use href="#i-desktop"/></svg></div>
+              <div><div class="n">PC-KETOAN</div><div class="d"><span class="dot"></span>Online · Windows</div></div>
+              <span class="badge">Chưa ghép nối</span></div>
+            <div class="list-h">Offline</div>
+            <div class="m off"><div class="os"><svg class="ico"><use href="#i-desktop"/></svg></div>
+              <div><div class="n">PC-VANPHONG</div><div class="d"><span class="dot off"></span>Lần cuối online: hôm qua, 18:05</div></div>
+              <span></span></div>
+          </div>
+          <div class="spacer"></div>
+          <div class="btn soft" style="margin-bottom:40px"><svg class="ico"><use href="#i-qr"/></svg>Ghép nối máy mới</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Danh sách máy</strong><ul>
+        <li>Chạm máy online → vào terminal. Có sẵn tab thì mở lại đúng tab đó.</li>
+        <li>"Chưa ghép nối" → mở màn quét mã. Máy offline mờ đi, không bấm được.</li>
+        <li>"2 tab" là số tab đang mở trên điện thoại này.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div style="width:40px"></div><div class="t"></div><div class="icbtn"><svg class="ico"><use href="#i-gear"/></svg></div></div>
+        <div class="big-t">Máy của bạn</div>
+        <div class="body" style="gap:12px">
+          <div class="banner"><span class="spin"></span>Mất kết nối, đang thử lại…</div>
+          <div class="list" style="opacity:.55">
+            <div class="m"><div class="os"><svg class="ico"><use href="#i-laptop"/></svg></div>
+              <div><div class="n">MacBook Pro của Phú</div><div class="d"><span class="dot off"></span>Đang chờ kết nối</div></div>
+              <span></span></div>
+            <div class="m"><div class="os"><svg class="ico"><use href="#i-desktop"/></svg></div>
+              <div><div class="n">MINI-HOME</div><div class="d"><span class="dot off"></span>Đang chờ kết nối</div></div>
+              <span></span></div>
+          </div>
+        </div>
+      </div></div>
+      <figcaption><strong>Khi mất mạng</strong><ul>
+        <li>Băng rôn cố định trên cùng, đúng chữ trong §12.</li>
+        <li>App tự thử lại (1 s → tối đa 30 s) khi đang mở; không cần bấm gì.</li>
+        <li>Có mạng lại: băng rôn biến mất, chấm trạng thái cập nhật.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div style="width:40px"></div><div class="t"></div><div class="icbtn"><svg class="ico"><use href="#i-gear"/></svg></div></div>
+        <div class="big-t">Máy của bạn</div>
+        <div class="body center" style="gap:16px">
+          <div class="illus" aria-hidden="true"><div class="lap"></div><div class="base"></div><div class="ph"></div></div>
+          <div style="font-size:20px; font-weight:800">Chưa có máy nào</div>
+          <div class="steps">
+            <div><b>1</b><span>Cài ShellX trên máy tính (macOS hoặc Windows) từ <span class="link">shellx.pro</span>.</span></div>
+            <div><b>2</b><span>Đăng nhập cùng tài khoản này.</span></div>
+            <div><b>3</b><span>Bấm biểu tượng ShellX → <b style="all:unset; font-weight:700">Ghép nối điện thoại…</b>, rồi quét mã.</span></div>
+          </div>
+          <div class="btn" style="align-self:stretch"><svg class="ico"><use href="#i-qr"/></svg>Quét mã QR</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Lần đầu dùng</strong><ul>
+        <li>Ba bước đúng thứ tự người dùng phải làm, không cần đọc hướng dẫn riêng.</li>
+        <li>Nút quét mã nằm ngay dưới bước cuối.</li></ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== 3. GHÉP NỐI ===================== -->
+<section class="sec" aria-labelledby="s3">
+  <div class="sec-h"><h2 id="s3">Ghép nối bằng mã QR</h2><span class="ref">spec §5.3 · §12</span>
+    <p>Chỉ làm một lần cho mỗi cặp điện thoại – máy tính. Mã có hiệu lực 5 phút.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr dark">
+        <div class="cam"><div class="screen"><canvas id="qr" width="33" height="33" aria-label="Mã QR mẫu"></canvas></div></div>
+        <div class="sb" style="position:relative; z-index:2"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="cam-top"><div class="round"><svg class="ico"><use href="#i-close"/></svg></div><div class="round" style="font:700 13px/1 system-ui">1×</div></div>
+        <div class="cam-title">Quét mã ghép nối</div>
+        <div class="frame"><i></i><i></i><i></i><i></i><div class="scanline"></div></div>
+        <div class="cam-card">
+          <b>Mã nằm trên máy tính của bạn</b>
+          <span>macOS: bấm biểu tượng ShellX trên thanh menu. Windows: bấm biểu tượng ở khay hệ thống. Chọn <span class="kbd">Ghép nối điện thoại…</span></span>
+        </div>
+      </div></div>
+      <figcaption><strong>Quét mã</strong><ul>
+        <li>Chỉ có một việc: đưa mã vào khung. Quét được là tự chạy tiếp.</li>
+        <li>Thẻ dưới nói rõ mã nằm ở đâu trên từng hệ điều hành.</li>
+        <li>Chưa cấp quyền camera → giải thích lý do và nút mở Cài đặt.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="body center" style="justify-content:center; gap:16px; padding-bottom:40px">
+          <div class="state-ic ok"><svg class="ico"><use href="#i-check"/></svg></div>
+          <div class="h" style="font-size:26px">Đã ghép nối</div>
+          <p class="sub" style="max-width:28ch"><b style="color:var(--a-text)">MacBook Pro của Phú</b> đã tin cậy điện thoại này. Từ giờ chỉ cần chạm vào máy để mở terminal.</p>
+          <div class="spacer" style="max-height:120px"></div>
+          <div class="btn" style="align-self:stretch">Mở terminal</div>
+          <div class="btn ghost" style="align-self:stretch">Về danh sách máy</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Ghép nối xong</strong><ul>
+        <li>Nút chính dẫn thẳng vào việc tiếp theo: mở terminal.</li>
+        <li>Máy tính cũng hiện "Đã ghép nối với &lt;tên điện thoại&gt;".</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr dark">
+        <div class="cam" style="filter:blur(3px) brightness(.7)"></div>
+        <div class="sb" style="position:relative; z-index:2"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="sheet center">
+          <div class="grab"></div>
+          <div class="state-ic err"><svg class="ico"><use href="#i-alert"/></svg></div>
+          <div style="font-size:20px; font-weight:800">Không ghép nối được</div>
+          <p class="sub">Mã QR không hợp lệ hoặc đã hết hạn. Hãy tạo mã mới trên máy tính.</p>
+          <div class="btn" style="align-self:stretch">Quét lại</div>
+          <div class="btn ghost" style="align-self:stretch; height:40px">Đóng</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Mã sai hoặc hết hạn</strong><ul>
+        <li>Câu thông báo lấy nguyên văn từ §12.</li>
+        <li>Cùng khung này cho lỗi "Máy này không thuộc tài khoản của bạn. Hãy đăng nhập cùng tài khoản trên máy tính."</li></ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== 4. TERMINAL ===================== -->
+<section class="sec" aria-labelledby="s4">
+  <div class="sec-h"><h2 id="s4">Terminal</h2><span class="ref">spec §9.2 · §9.3 · §9.4</span>
+    <p>Màn hình dùng nhiều nhất. Máy thứ nhất bấm thử được: chạm Ctrl một lần rồi chạm <b>c</b> để gửi Ctrl+C, chạm Ctrl hai lần để khóa. Gõ <code>ls</code>, <code>pwd</code>, <code>clear</code> rồi Enter, hoặc bấm Dán.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr term-scr" id="demo">
+        <div class="sb" style="background:var(--t-chrome); color:#fff"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="tbar">
+          <button class="icbtn" type="button" aria-label="Về danh sách máy"><svg class="ico"><use href="#i-back"/></svg></button>
+          <div class="ttl"><b>MacBook Pro của Phú</b><small><span class="dot"></span>Đã kết nối · mã hóa đầu cuối</small></div>
+          <button class="icbtn" type="button" aria-label="Cỡ chữ"><span class="aa">Aa</span></button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Phiên">
+          <button class="tab" type="button" role="tab" id="tab-zsh" aria-selected="true" data-tab="zsh"><span class="live-dot"></span>zsh<span class="x"><svg class="ico"><use href="#i-close"/></svg></span></button>
+          <button class="tab" type="button" role="tab" id="tab-htop" aria-selected="false" data-tab="htop"><span class="live-dot"></span>htop<span class="x"><svg class="ico"><use href="#i-close"/></svg></span></button>
+          <button class="tab add" type="button" aria-label="Mở phiên mới"><svg class="ico" style="width:18px;height:18px"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="term" id="term" aria-live="off"></div>
+        <div class="xk" id="xk" aria-label="Phím phụ">
+          <button class="k" type="button" data-x="Esc">Esc</button>
+          <button class="k" type="button" data-x="Tab">Tab</button>
+          <button class="k mod" type="button" data-mod="ctrl" aria-pressed="false">Ctrl</button>
+          <button class="k mod" type="button" data-mod="alt" aria-pressed="false">Alt</button>
+          <button class="k" type="button" data-x="↑">↑</button>
+          <button class="k" type="button" data-x="↓">↓</button>
+          <button class="k" type="button" data-x="←">←</button>
+          <button class="k" type="button" data-x="→">→</button>
+          <button class="k" type="button" data-x="|">|</button>
+          <button class="k" type="button" data-x="~">~</button>
+          <button class="k" type="button" data-x="/">/</button>
+          <button class="k" type="button" data-x="-">-</button>
+          <button class="k" type="button" data-x="Home">Home</button>
+          <button class="k" type="button" data-x="End">End</button>
+          <button class="k" type="button" data-x="PgUp">PgUp</button>
+          <button class="k" type="button" data-x="PgDn">PgDn</button>
+          <button class="k paste" type="button" data-x="paste">Dán</button>
+        </div>
+        <div class="kb" id="kb" aria-label="Bàn phím"></div>
+      </div></div>
+      <p class="live" id="live" aria-live="polite">Ctrl: tắt</p>
+      <figcaption><strong>Terminal dọc, có bàn phím</strong><ul>
+        <li>Hàng tab ở trên: chấm xanh là phiên đang chạy, <b>+</b> mở phiên mới, <b>×</b> đóng phiên.</li>
+        <li>Thanh phím phụ đúng thứ tự §9.3, nằm sát bàn phím, cuộn ngang.</li>
+        <li>Ctrl/Alt: viền = dính một lần, nền đậm có chấm = đã khóa.</li>
+        <li>Nhấn giữ để chọn và copy; chụm hai ngón để đổi cỡ chữ.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr term-scr">
+        <div class="sb" style="background:var(--t-chrome); color:#fff"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="tbar"><span class="icbtn"><svg class="ico"><use href="#i-back"/></svg></span><div class="ttl"><b>MINI-HOME</b><small><span class="dot"></span>Đã kết nối</small></div><span class="icbtn"><span class="aa">Aa</span></span></div>
+        <div class="term" style="opacity:.5"><span class="dm">Đang lấy danh sách phiên…</span></div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div style="font-size:19px; font-weight:800">Máy này đang có 2 phiên</div>
+          <p class="sub" style="margin-top:-8px">Mở lại phiên cũ để xem tiếp đúng chỗ đã dừng, hoặc tạo phiên mới.</p>
+          <div class="card">
+            <div class="ri" style="align-items:flex-start"><div style="display:flex; flex-direction:column; gap:2px"><b style="font-family:'JetBrains Mono',monospace; font-size:14.5px">zsh</b><span style="font-size:13px; color:var(--a-text2)">~/projects/api · hoạt động 3 phút trước</span></div><span class="v link" style="font-weight:700">Mở</span></div>
+            <div class="ri" style="align-items:flex-start"><div style="display:flex; flex-direction:column; gap:2px"><b style="font-family:'JetBrains Mono',monospace; font-size:14.5px">docker logs -f api</b><span style="font-size:13px; color:var(--a-text2)">hoạt động 1 giờ trước</span></div><span class="v link" style="font-weight:700">Mở</span></div>
+          </div>
+          <div class="btn"><svg class="ico"><use href="#i-plus"/></svg>Mở phiên mới</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Chọn phiên có sẵn</strong><ul>
+        <li>Chỉ hiện khi mở máy lần đầu mà máy đã có phiên chạy (§9.2).</li>
+        <li>Máy chưa có phiên nào → mở thẳng phiên mới, không hỏi.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr term-scr">
+        <div class="sb" style="background:var(--t-chrome); color:#fff"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="tbar"><span class="icbtn"><svg class="ico"><use href="#i-back"/></svg></span><div class="ttl"><b>MacBook Pro của Phú</b><small><span class="dot"></span>Đã kết nối</small></div><span class="icbtn"><span class="aa">Aa</span></span></div>
+        <div class="tabs"><span class="tab" aria-selected="true"><span class="live-dot" style="background:var(--t-dim)"></span>build<span class="x"><svg class="ico"><use href="#i-close"/></svg></span></span><span class="tab"><span class="live-dot"></span>zsh</span><span class="tab add"><svg class="ico" style="width:18px;height:18px"><use href="#i-plus"/></svg></span></div>
+        <div class="toast"><svg class="ico"><use href="#i-alert"/></svg><span>Máy đã mở tối đa 10 phiên. Hãy đóng bớt phiên.</span></div>
+        <div class="term"><span class="g">phu@macbook</span> <span class="c">app</span> <span class="dm">%</span> flutter build ios --release
+<span class="dm">Building com.example.app for device…</span>
+Running Xcode build...                 <span class="dm">84.2s</span>
+<span class="g">✓</span> Built build/ios/iphoneos/Runner.app
+<span class="g">phu@macbook</span> <span class="c">app</span> <span class="dm">%</span> exit
+<div class="ended"><b>Phiên đã kết thúc</b><span>Lệnh cuối thoát với mã 0. Nội dung ở trên vẫn đọc và copy được.</span><div class="acts"><div>Đóng tab</div><div class="pri">Mở phiên mới</div></div></div></div>
+        <div class="xk"><span class="k">Esc</span><span class="k">Tab</span><span class="k mod">Ctrl</span><span class="k mod">Alt</span><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div>
+        <div style="height:34px; background:var(--kb-bg)"></div>
+      </div></div>
+      <figcaption><strong>Phiên kết thúc và giới hạn 10 phiên</strong><ul>
+        <li>Phiên thoát → thẻ ở cuối tab, giữ nguyên nội dung cũ để còn copy.</li>
+        <li>Lỗi <code>session_limit</code> hiện dạng thông báo nổi, nói cách xử lý.</li>
+        <li><code>spawn_failed</code> hiện lý do ngay trong tab, cùng kiểu thẻ này.</li></ul></figcaption>
+    </figure>
+  </div>
+
+  <figure class="fig wide">
+    <div class="scroll-x">
+      <div class="phone land"><div class="scr term-scr">
+        <div class="tbar">
+          <span class="icbtn"><svg class="ico"><use href="#i-back"/></svg></span>
+          <b style="font-size:14.5px; margin-right:10px; white-space:nowrap">MacBook Pro của Phú</b>
+          <div class="tabs" style="height:44px; border:0; flex:1; background:none; padding:0"><span class="tab" aria-selected="true"><span class="live-dot"></span>vim</span><span class="tab"><span class="live-dot"></span>zsh</span><span class="tab"><span class="live-dot"></span>htop</span><span class="tab add"><svg class="ico" style="width:18px;height:18px"><use href="#i-plus"/></svg></span></div>
+          <span class="icbtn"><svg class="ico"><use href="#i-keyboard"/></svg></span>
+        </div>
+        <div class="term" style="font-size:12.5px"><span class="dm">  1 </span><span class="mg">import</span> <span class="y">'package:shellx_core/shellx_core.dart'</span>;
+<span class="dm">  2 </span>
+<span class="dm">  3 </span><span class="mg">Future</span>&lt;<span class="mg">void</span>&gt; <span class="b">main</span>() <span class="mg">async</span> {
+<span class="dm">  4 </span>  <span class="mg">final</span> api = <span class="b">ShellxApi</span>(baseUri: <span class="b">Uri</span>.<span class="b">parse</span>(<span class="y">'https://relay.shellx.pro'</span>));
+<span class="dm">  5 </span>  <span class="mg">final</span> session = <span class="mg">await</span> api.<span class="b">login</span>(email: email, password: password);
+<span class="dm">  6 </span>  print(session.userId);<span class="cur"></span>
+<span class="dm">  7 </span>}
+<span class="dm">~                                                                               </span>
+<span class="inv"> NORMAL </span> <span class="dm">lib/main.dart                                              6,24   All</span></div>
+        <div class="xk"><span class="k">Esc</span><span class="k">Tab</span><span class="k mod locked">Ctrl</span><span class="k mod">Alt</span><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span><span class="k">|</span><span class="k">~</span><span class="k">/</span><span class="k">-</span><span class="k">Home</span><span class="k">End</span><span class="k">PgUp</span><span class="k">PgDn</span><span class="k paste">Dán</span></div>
+      </div></div>
+    </div>
+    <figcaption style="max-width:600px"><strong>Xoay ngang</strong><ul>
+      <li>Tên máy và hàng tab gộp một dòng để terminal rộng hơn; app gửi <code>resize</code> ngay khi xoay (§9.4).</li>
+      <li>Bàn phím ẩn thì thanh phím phụ vẫn ở đáy; nút bàn phím bên phải để gọi lại. Dùng được bàn phím rời (iPad, Bluetooth).</li>
+      <li>Ảnh này đang khóa Ctrl (nền đậm, có chấm).</li></ul></figcaption>
+  </figure>
+</section>
+
+<!-- ===================== 5. CÀI ĐẶT ===================== -->
+<section class="sec" aria-labelledby="s5">
+  <div class="sec-h"><h2 id="s5">Cài đặt</h2><span class="ref">spec §9.2 · §5.2 · §5.5</span>
+    <p>Gom mọi thứ ít dùng vào một chỗ. Việc nguy hiểm (xóa tài khoản) nằm cuối, màu đỏ, và luôn hỏi lại mật khẩu.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div class="icbtn"><svg class="ico"><use href="#i-back"/></svg></div><div class="t">Cài đặt</div><div style="width:40px"></div></div>
+        <div class="body" style="gap:18px; padding:4px 16px 0">
+          <div class="grp"><div class="grp-h">Terminal</div>
+            <div class="card"><div class="ri">Cỡ chữ mặc định<span class="v">14</span></div>
+              <div class="slider"><span style="font-size:11px">A</span><div class="tr"></div><span style="font-size:17px">A</span></div>
+              <div class="preview"><span style="color:var(--t-green)">phu@macbook</span> <span style="color:var(--t-cyan)">~</span> <span style="color:var(--t-dim)">%</span> ls</div></div></div>
+          <div class="grp"><div class="grp-h">Bảo mật</div>
+            <div class="card"><div class="ri">Khóa bằng Face ID<span class="sw" role="img" aria-label="Đang bật"></span></div></div>
+            <div class="grp-f">Hỏi khi mở app và khi quay lại sau hơn 5 phút.</div></div>
+          <div class="grp"><div class="grp-h">Máy đã ghép nối</div>
+            <div class="card"><div class="ri">MacBook Pro của Phú<span class="act">Bỏ ghép nối</span></div><div class="ri">PC-VANPHONG<span class="act">Bỏ ghép nối</span></div></div></div>
+          <div class="grp"><div class="grp-h">Tài khoản</div>
+            <div class="card"><div class="ri">Email<span class="v">phu@shellx.pro</span></div><div class="ri"><svg class="ico"><use href="#i-logout"/></svg>Đăng xuất</div><div class="ri red"><svg class="ico" style="color:var(--a-err)"><use href="#i-trash"/></svg>Xóa tài khoản</div></div>
+            <div class="grp-f" style="text-align:center; margin-top:8px">ShellX 1.0.0 (1)</div></div>
+        </div>
+      </div></div>
+      <figcaption><strong>Cài đặt</strong><ul>
+        <li>Đổi cỡ chữ có dòng xem trước bằng font terminal thật.</li>
+        <li>"Bỏ ghép nối" hỏi lại một lần rồi mới xóa (§5.5).</li>
+        <li>Đăng xuất chỉ xóa token; đăng nhập lại cùng tài khoản thì các máy vẫn còn (§5.2).</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div class="icbtn"><svg class="ico"><use href="#i-back"/></svg></div><div class="t">Xóa tài khoản</div><div style="width:40px"></div></div>
+        <div class="body" style="gap:18px; padding-top:8px">
+          <div class="warnbox"><b>Không hoàn tác được</b>
+            <ul><li>Xóa tài khoản phu@shellx.pro, mọi máy và mọi ghép nối.</li><li>Mọi máy tính đang đăng nhập sẽ bị đăng xuất.</li><li>Phiên terminal đang mở sẽ đóng.</li></ul></div>
+          <div class="field"><label>Nhập mật khẩu để xác nhận</label><div class="input err"><span class="dots">••••••••</span><svg class="ico"><use href="#i-eye"/></svg></div><p class="help err">Mật khẩu không đúng.</p></div>
+          <div class="spacer"></div>
+          <div class="btn danger">Xóa vĩnh viễn</div>
+          <div class="btn ghost" style="margin-bottom:34px">Hủy</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Xóa tài khoản</strong><ul>
+        <li>Bắt buộc theo App Store 5.1.1(v); làm được ngay trong app.</li>
+        <li>Nói rõ sẽ mất những gì trước khi hỏi mật khẩu.</li>
+        <li>Xong thì về màn đăng nhập.</li></ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== 6. SỰ CỐ ===================== -->
+<section class="sec" aria-labelledby="s6">
+  <div class="sec-h"><h2 id="s6">Khi có sự cố</h2><span class="ref">spec §12</span>
+    <p>Các lỗi còn lại trong §12. Câu chữ giữ nguyên văn spec; mỗi lỗi có đúng một nút cho bước tiếp theo.</p></div>
+  <div class="row">
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="nav"><div style="width:40px"></div><div class="t"></div><div class="icbtn"><svg class="ico"><use href="#i-gear"/></svg></div></div>
+        <div class="big-t">Máy của bạn</div>
+        <div class="body"><div class="list">
+          <div class="m"><div class="os"><svg class="ico"><use href="#i-laptop"/></svg></div><div><div class="n">MacBook Pro của Phú</div><div class="d"><span class="dot"></span>Online · macOS</div></div><svg class="ico chev"><use href="#i-chev"/></svg></div>
+          <div class="m"><div class="os"><svg class="ico"><use href="#i-desktop"/></svg></div><div><div class="n">MINI-HOME</div><div class="d"><span class="dot"></span>Online · macOS</div></div><span class="badge">Chưa ghép nối</span></div>
+        </div></div>
+        <div class="scrim"></div>
+        <div class="alert"><div class="c"><b>Cần ghép nối lại</b><span>Máy không còn tin cậy điện thoại này. Hãy ghép nối lại.</span></div><div class="a"><div>Để sau</div><div>Quét mã</div></div></div>
+      </div></div>
+      <figcaption><strong>Máy đã thu hồi điện thoại</strong><ul>
+        <li>App xóa khóa đã ghim; thẻ máy chuyển sang "Chưa ghép nối".</li>
+        <li>"Quét mã" mở thẳng màn quét cho máy đó.</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="body center" style="justify-content:center; gap:16px; padding-bottom:40px">
+          <div class="state-ic warn"><svg class="ico"><use href="#i-update"/></svg></div>
+          <div class="h" style="font-size:26px">Cần cập nhật app</div>
+          <p class="sub" style="max-width:28ch">Phiên bản này không còn kết nối được với máy của bạn. Cập nhật để dùng tiếp.</p>
+          <div class="spacer" style="max-height:140px"></div>
+          <div class="btn" style="align-self:stretch">Mở App Store</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Lệch phiên bản</strong><ul>
+        <li>Hiện khi <code>/v1/version</code> cao hơn app hoặc máy trả <code>proto_unsupported</code>.</li>
+        <li>Android: nút đổi thành "Mở Google Play".</li></ul></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <div class="body" style="padding-top:34px; gap:22px">
+          <div class="logo">›_</div>
+          <div style="display:flex; flex-direction:column; gap:6px"><div class="h">Đăng nhập</div></div>
+          <div class="banner" style="background:var(--a-primary-soft); color:var(--a-primary)"><svg class="ico"><use href="#i-lock"/></svg>Phiên đăng nhập đã hết hiệu lực. Hãy đăng nhập lại.</div>
+          <div class="field"><label>Email</label><div class="input">phu@shellx.pro</div></div>
+          <div class="field"><label>Mật khẩu</label><div class="input focus"><span class="ph">Mật khẩu</span></div></div>
+          <div class="btn">Đăng nhập</div>
+        </div>
+      </div></div>
+      <figcaption><strong>Bị đăng xuất từ xa</strong><ul>
+        <li>WebSocket đóng với 4002 (đổi mật khẩu, xóa tài khoản) → xóa token, về đây.</li>
+        <li>Email điền sẵn; các máy đã ghép vẫn còn nếu đăng nhập lại cùng tài khoản.</li></ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== 7. ĐỀ XUẤT ===================== -->
+<section class="sec" aria-labelledby="s7">
+  <div class="sec-h"><h2 id="s7">Thêm ngoài spec, cần bạn duyệt</h2>
+    <p>Những chi tiết dưới đây chưa có trong spec. Chúng nhỏ và giúp app dễ dùng hơn, nhưng chỉ đưa vào plan 05 nếu bạn đồng ý.</p></div>
+  <div class="props">
+    <div class="prop"><h3>Nút "Aa" trên thanh terminal</h3><p>Mở thanh trượt cỡ chữ. Spec chỉ có thao tác chụm hai ngón, mà nhiều người không biết thao tác này.</p></div>
+    <div class="prop"><h3>Số tab trên thẻ máy</h3><p>"2 tab" cho biết máy nào đang có việc dở. Chỉ đếm tab trên điện thoại này, không cần hỏi máy tính.</p></div>
+    <div class="prop"><h3>Câu gợi ý khi quên mật khẩu</h3><p>Chỉ người dùng tới ShellX trên máy tính, nơi duy nhất đổi được mật khẩu theo §5.2.</p></div>
+    <div class="prop"><h3>Thẻ "Phiên đã kết thúc"</h3><p>Giữ nội dung cũ trong tab, kèm hai nút "Đóng tab" / "Mở phiên mới", thay vì tự đóng tab.</p></div>
+    <div class="prop"><h3>Băng rôn "Phiên đăng nhập đã hết hiệu lực"</h3><p>Giải thích vì sao người dùng bị đưa về màn đăng nhập sau mã 4002.</p></div>
+  </div>
+  <div class="notes">
+    <p><b>Màu.</b> Primary <code>#0097A8</code>, nền <code>#F2F7F8</code>, chữ <code>#111111</code>, đỏ/cam/xanh lá lấy từ <code>LightColors</code> của base. Base chưa có bảng màu tối thật (<code>DarkColors</code> đang là chữ đỏ trên nền đen), nên bản tối ở đây là đề xuất mới.</p>
+    <p><b>Chữ.</b> Raleway cho giao diện (bật số lining để giờ và phiên bản không bị lệch dòng), JetBrains Mono cho terminal. Cỡ chữ theo thang của <code>AppTypography</code>: 32 / 28 / 20 / 17 / 15 / 13.</p>
+    <p><b>Chạm.</b> Mọi nút và phím phụ cao ít nhất 44 pt. Terminal luôn nền tối ở cả hai giao diện; bàn phím và phím phụ theo giao diện của máy.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  /* ---------- theme preview ---------- */
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('.seg button');
+  function applyTheme(t){
+    if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+    btns.forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.th === t)); });
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('shellx-mobile-theme'); } catch(e) {}
+  if (saved) applyTheme(saved);
+  btns.forEach(function(b){ b.addEventListener('click', function(){
+    applyTheme(b.dataset.th);
+    try { localStorage.setItem('shellx-mobile-theme', b.dataset.th); } catch(e) {}
+  }); });
+
+  /* ---------- sample QR (decorative) ---------- */
+  var cv = document.getElementById('qr');
+  if (cv && cv.getContext){
+    var g = cv.getContext('2d'), n = 33, seed = 20260925;
+    function rnd(){ seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+    g.fillStyle = '#ffffff'; g.fillRect(0,0,n,n);
+    g.fillStyle = '#0b1215';
+    for (var y=2; y<n-2; y++) for (var x=2; x<n-2; x++) if (rnd() > .52) g.fillRect(x,y,1,1);
+    [[2,2],[n-9,2],[2,n-9]].forEach(function(p){
+      g.fillStyle='#ffffff'; g.fillRect(p[0]-1,p[1]-1,9,9);
+      g.fillStyle='#0b1215'; g.fillRect(p[0],p[1],7,7);
+      g.fillStyle='#ffffff'; g.fillRect(p[0]+1,p[1]+1,5,5);
+      g.fillStyle='#0b1215'; g.fillRect(p[0]+2,p[1]+2,3,3);
+    });
+  }
+
+  /* ---------- interactive terminal ---------- */
+  var term = document.getElementById('term');
+  var live = document.getElementById('live');
+  var kb = document.getElementById('kb');
+  if (!term) return;
+
+  var PROMPT_DIR = 'shellx';
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function prompt(dir){ return '<span class="g">phu@macbook</span> <span class="c">' + (dir || PROMPT_DIR) + '</span> <span class="dm">%</span> '; }
+
+  var zsh = [
+    '<span class="dm">Last login: Fri Sep 25 09:12 on ttys002</span>',
+    prompt('~') + 'cd projects/shellx',
+    prompt() + 'git status -sb',
+    '<span class="g">## feat/shellx-v1</span>',
+    ' <span class="r">M</span> apps/mobile/lib/main.dart',
+    '<span class="r">??</span> docs/design/',
+    prompt() + 'flutter test',
+    '<span class="dm">00:07</span> <span class="g">+128</span>: All tests passed!'
+  ];
+  var htop = [
+    '  <span class="c">1</span>[<span class="g">|||||||</span><span class="r">||</span>          <span class="dm">31.2%</span>]',
+    '  <span class="c">2</span>[<span class="g">||||</span>              <span class="dm">14.8%</span>]',
+    '  <span class="c">3</span>[<span class="g">|||||||||||</span><span class="r">|</span>     <span class="dm">52.0%</span>]',
+    '  <span class="c">4</span>[<span class="g">||</span>                 <span class="dm"> 6.1%</span>]',
+    '  <span class="c">Mem</span>[<span class="g">||||||||||</span><span class="b">|||</span><span class="y">||</span> <span class="dm">11.2G/16G</span>]',
+    '  <span class="c">Swp</span>[<span class="g">|</span>                 <span class="dm">0.4G/2G</span>]',
+    '',
+    '  <span class="c">Tasks:</span> 412, <span class="g">1 running</span>  <span class="c">Load:</span> 2.14 1.87',
+    '',
+    '<span class="inv">  PID USER   CPU% MEM%  COMMAND            </span>',
+    ' 8123 phu    48.2  6.1  <span class="bold">dart</span> test',
+    ' 2210 phu    12.7  3.4  <span class="bold">node</span> wrangler dev',
+    '  501 phu     4.9  2.2  <span class="bold">Code Helper</span>',
+    ' 9981 phu     1.1  0.3  <span class="bold">zsh</span>',
+    '',
+    '<span class="dm">F1</span><span class="inv">Help</span> <span class="dm">F3</span><span class="inv">Search</span> <span class="dm">F9</span><span class="inv">Kill</span> <span class="dm">F10</span><span class="inv">Quit</span>'
+  ];
+
+  var st = { tab:'zsh', input:'', ctrl:'off', alt:'off', shift:false, last:'' };
+
+  function render(){
+    if (st.tab === 'htop'){ term.innerHTML = htop.join('\n'); return; }
+    var lines = zsh.slice(-19);
+    term.innerHTML = lines.join('\n') + '\n' + prompt() + esc(st.input) + '<span class="cur"></span>';
+  }
+  function say(t){ if (live) live.textContent = t; }
+  function modLabel(){
+    var s = function(v){ return v === 'off' ? 'tắt' : (v === 'once' ? 'dính một lần' : 'đã khóa'); };
+    return 'Ctrl: ' + s(st.ctrl) + ' · Alt: ' + s(st.alt);
+  }
+  function paintMods(){
+    document.querySelectorAll('#xk .mod').forEach(function(b){
+      var v = st[b.dataset.mod];
+      b.classList.toggle('once', v === 'once');
+      b.classList.toggle('locked', v === 'locked');
+      b.setAttribute('aria-pressed', String(v !== 'off'));
+    });
+  }
+  function consumeMods(){
+    if (st.ctrl === 'once') st.ctrl = 'off';
+    if (st.alt === 'once') st.alt = 'off';
+    paintMods();
+  }
+  function run(cmd){
+    zsh.push(prompt() + esc(cmd));
+    var c = cmd.trim();
+    if (c === '') {}
+    else if (c === 'clear'){ zsh.length = 0; }
+    else if (c === 'ls'){ zsh.push('<span class="b bold">apps</span>  <span class="b bold">docs</span>  <span class="b bold">packages</span>  <span class="b bold">relay</span>  <span class="b bold">web</span>  README.md'); }
+    else if (c === 'pwd'){ zsh.push('/Users/phu/projects/shellx'); }
+    else if (c === 'whoami'){ zsh.push('phu'); }
+    else if (c.indexOf('git pull') === 0){ zsh.push('Already up to date.'); }
+    else { zsh.push('zsh: command not found: ' + esc(c.split(' ')[0])); }
+    if (c) st.last = c;
+    st.input = '';
+  }
+  function typeChar(ch){
+    if (st.tab !== 'zsh'){ say('Tab htop chỉ để xem. Chuyển sang tab zsh để gõ.'); return; }
+    if (st.ctrl !== 'off'){
+      var u = ch.toUpperCase();
+      if (u === 'C'){ zsh.push(prompt() + esc(st.input) + '^C'); st.input=''; say('Đã gửi Ctrl+C'); }
+      else if (u === 'L'){ zsh.length = 0; say('Đã gửi Ctrl+L (xóa màn hình)'); }
+      else if (u === 'U'){ st.input=''; say('Đã gửi Ctrl+U (xóa dòng đang gõ)'); }
+      else { say('Đã gửi Ctrl+' + u); }
+      consumeMods(); render(); return;
+    }
+    if (st.alt !== 'off'){ say('Đã gửi Alt+' + ch); consumeMods(); render(); return; }
+    st.input += ch; render();
+  }
+
+  // on-screen keyboard
+  var rows = ['qwertyuiop','asdfghjkl','⇧zxcvbnm⌫'];
+  rows.forEach(function(r, i){
+    var row = document.createElement('div'); row.className = 'kr' + (i === 1 ? ' mid' : '');
+    Array.from(r).forEach(function(ch){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'key' + ((ch === '⇧' || ch === '⌫') ? ' fn' : '');
+      b.textContent = ch; b.dataset.k = ch; b.setAttribute('aria-label', ch === '⇧' ? 'Shift' : ch === '⌫' ? 'Xóa' : ch);
+      row.appendChild(b);
+    });
+    kb.appendChild(row);
+  });
+  var last = document.createElement('div'); last.className = 'kr';
+  last.innerHTML = '<button type="button" class="key fn" data-k="123">123</button><button type="button" class="key space" data-k=" ">dấu cách</button><button type="button" class="key ret" data-k="enter">Enter</button>';
+  kb.appendChild(last);
+
+  kb.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    var k = b.dataset.k;
+    if (k === '⇧'){ st.shift = !st.shift; say(st.shift ? 'Shift: bật cho chữ tiếp theo' : 'Shift: tắt'); return; }
+    if (k === '⌫'){ st.input = st.input.slice(0,-1); render(); return; }
+    if (k === '123'){ say('Bàn phím số của hệ điều hành'); return; }
+    if (k === 'enter'){ if (st.tab === 'zsh'){ run(st.input); render(); say('Đã gửi Enter'); } return; }
+    var ch = k; if (st.shift){ ch = ch.toUpperCase(); st.shift = false; }
+    typeChar(ch);
+  });
+
+  // extra keys
+  document.getElementById('xk').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    var m = b.dataset.mod;
+    if (m){
+      st[m] = st[m] === 'off' ? 'once' : (st[m] === 'once' ? 'locked' : 'off');
+      paintMods(); say(modLabel()); return;
+    }
+    var x = b.dataset.x;
+    if (x === 'paste'){
+      if (st.tab === 'zsh'){ st.input += 'git pull --rebase'; render(); }
+      say('Đã dán "git pull --rebase" (bracketed paste nếu ứng dụng bật)'); consumeMods(); return;
+    }
+    if (x === '↑' && st.tab === 'zsh' && st.last && st.ctrl === 'off' && st.alt === 'off'){ st.input = st.last; render(); say('Đã gửi ↑ (lệnh trước)'); return; }
+    if (x === '|' || x === '~' || x === '/' || x === '-'){ if (st.ctrl === 'off' && st.alt === 'off'){ typeChar(x); say('Đã gửi ' + x); return; } }
+    var pre = (st.ctrl !== 'off' ? 'Ctrl+' : '') + (st.alt !== 'off' ? 'Alt+' : '');
+    say('Đã gửi ' + pre + x); consumeMods();
+  });
+
+  // tabs
+  document.querySelectorAll('#demo .tab[data-tab]').forEach(function(t){
+    t.addEventListener('click', function(){
+      st.tab = t.dataset.tab;
+      document.querySelectorAll('#demo .tab[data-tab]').forEach(function(o){ o.setAttribute('aria-selected', String(o === t)); });
+      render(); say('Đang xem tab ' + st.tab);
+    });
+  });
+
+  render(); paintMods();
+})();
+</script>
