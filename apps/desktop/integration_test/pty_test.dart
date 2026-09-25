@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -359,6 +360,50 @@ void main() {
     }
     await transcript.close();
   });
+
+  testWidgets(
+    'kill() also ends a child forked late by a process that ignores SIGHUP',
+    (tester) async {
+      // A sleep length no other process uses, to find the late child by.
+      final marker = 30000 + Random().nextInt(20000);
+      addTearDown(() => Process.run('/usr/bin/pkill', ['-f', 'sleep $marker']));
+      final pty = factory.spawn(
+        shell,
+        workingDirectory: _home,
+        environment: _environment(),
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(pty.kill);
+      final transcript = Transcript(pty.output);
+      // The subshell survives SIGHUP, is re-parented to launchd when the
+      // shell dies, and only forks the late child a second into the grace.
+      _type(
+        pty,
+        "(trap '' HUP; sleep 1; sleep $marker & wait) & echo child=\$!",
+      );
+      late int childPid;
+      await transcript.waitForLine((line) {
+        final match = RegExp(r'^child=(\d+)$').firstMatch(line);
+        if (match == null) return false;
+        childPid = int.parse(match[1]!);
+        return true;
+      });
+
+      pty.kill();
+      await pty.exitCode.timeout(const Duration(seconds: 15));
+      await Future<void>.delayed(const Duration(seconds: 4));
+
+      final ps = await Process.run('/bin/ps', ['-A', '-o', 'pid=,command=']);
+      final lateChildren = const LineSplitter()
+          .convert(ps.stdout as String)
+          .where((line) => line.contains('sleep $marker'));
+      expect(lateChildren, isEmpty, reason: 'late child survived kill()');
+      final probe = await Process.run('/bin/kill', ['-0', '$childPid']);
+      expect(probe.exitCode, isNot(0), reason: 'subshell survived kill()');
+    },
+    skip: Platform.isWindows,
+  );
 
   final vim = Platform.isWindows
       ? r'C:\Program Files\Git\usr\bin\vim.exe'

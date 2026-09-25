@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:shellx_agent/shellx_agent.dart' show ProcessRunner;
+
 /// One row of the operating system process table.
 final class ProcessEntry {
   const ProcessEntry({
@@ -14,8 +16,20 @@ final class ProcessEntry {
   final String name;
 }
 
-/// Source of process-table snapshots (macOS: `ps`, Windows: Toolhelp32).
+/// A process-table snapshot could not be taken. [message] never contains
+/// process output or arguments.
+final class ProcessTableException implements Exception {
+  const ProcessTableException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'ProcessTableException: $message';
+}
+
+/// Source of process-table snapshots (macOS: `ps`).
 abstract interface class ProcessTable {
+  /// Throws [ProcessTableException] when no snapshot can be taken.
   Future<List<ProcessEntry>> snapshot();
 }
 
@@ -62,16 +76,23 @@ List<ProcessEntry> parsePsOutput(String output) {
 
 /// macOS process table via `/bin/ps`.
 final class PsProcessTable implements ProcessTable {
-  const PsProcessTable();
+  const PsProcessTable({ProcessRunner run = Process.run}) : _run = run;
+
+  final ProcessRunner _run;
 
   @override
   Future<List<ProcessEntry>> snapshot() async {
-    final result = await Process.run('/bin/ps', [
-      '-A',
-      '-o',
-      'pid=,ppid=,comm=',
-    ]);
-    if (result.exitCode != 0) return const <ProcessEntry>[];
+    final ProcessResult result;
+    try {
+      result = await _run('/bin/ps', ['-A', '-o', 'pid=,ppid=,comm=']);
+    } on ProcessException catch (error) {
+      throw ProcessTableException(
+        'cannot run ps (OS error ${error.errorCode})',
+      );
+    }
+    if (result.exitCode != 0) {
+      throw ProcessTableException('ps exited with code ${result.exitCode}');
+    }
     return parsePsOutput(result.stdout as String);
   }
 }
