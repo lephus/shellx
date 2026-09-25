@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:http/http.dart' as http;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:test/test.dart';
@@ -25,15 +27,19 @@ late NoiseKeyPair spareKey;
 
 /// A real AgentService on a FakeRelay with three scripted phones. Only the
 /// phone is trusted initially. [store] backs the trust list (in-memory by
-/// default); [shellResolver] defaults to [FixedShellResolver].
+/// default); [shellResolver] defaults to [FixedShellResolver]. The agent's
+/// REST calls go through [posts], so `POST /v1/pairings` can be failed or
+/// held.
 final class AgentRig {
-  AgentRig(this.async, {KeyValueStore? store, ShellResolver? shellResolver}) {
+  AgentRig(this.async, {KeyValueStore? store, ShellResolver? shellResolver})
+    : store = store ?? InMemoryKeyValueStore() {
     agentDevice = relay.addDevice(
       id: agentId,
       userId: userId,
       kind: DeviceKind.agent,
     );
-    trusted = TrustedStore(store ?? InMemoryKeyValueStore());
+    posts = PairingPostControl(relay.httpClient);
+    trusted = TrustedStore(this.store);
     drive(
       async,
       trusted.add(
@@ -45,13 +51,37 @@ final class AgentRig {
         ),
       ),
     );
-    pairing = PairingCodeManager(now: () => now);
     sessions = SessionManager(
       ptyFactory: ptys,
       shellResolver: shellResolver ?? const FixedShellResolver(),
       homeDirectory: '/Users/test',
       baseEnvironment: const {},
     );
+    _startService();
+    phone = _mobile(phoneId, phoneKey);
+    tablet = _mobile(tabletId, tabletKey);
+    spare = _mobile(spareId, spareKey);
+    settle(async);
+  }
+
+  final FakeAsync async;
+  final KeyValueStore store;
+  final relay = FakeRelay();
+  final ptys = FakePtyFactory();
+  final events = <AgentEvent>[];
+  DateTime now = DateTime.utc(2026, 9, 25, 12);
+  late final FakeDevice agentDevice;
+  late final PairingPostControl posts;
+  late TrustedStore trusted;
+  late PairingCodeManager pairing;
+  late final SessionManager sessions;
+  late AgentService service;
+  late final TestMobile phone;
+  late final TestMobile tablet;
+  late final TestMobile spare;
+
+  void _startService() {
+    pairing = PairingCodeManager(now: () => now);
     service = AgentService(
       relay: RelayConnection(
         wsUri: relay.wsUri,
@@ -59,7 +89,7 @@ final class AgentRig {
         connector: relay.connector,
         backoff: Backoff(random: Random(11)),
       ),
-      api: ShellxApi(baseUri: relay.baseUri, httpClient: relay.httpClient)
+      api: ShellxApi(baseUri: relay.baseUri, httpClient: posts)
         ..token = agentDevice.token,
       deviceId: agentId,
       identity: agentKey,
@@ -70,25 +100,49 @@ final class AgentRig {
     );
     service.events.listen(events.add);
     drive(async, service.start());
-    phone = _mobile(phoneId, phoneKey);
-    tablet = _mobile(tabletId, tabletKey);
-    spare = _mobile(spareId, spareKey);
+  }
+
+  /// Quits and relaunches the agent: a new AgentService, TrustedStore and
+  /// PairingCodeManager over the same persisted [store]. (The session
+  /// manager is kept; restarts here are about trust.)
+  void restartAgent() {
+    service.stop();
+    settle(async);
+    trusted = TrustedStore(store);
+    _startService();
     settle(async);
   }
 
-  final FakeAsync async;
-  final relay = FakeRelay();
-  final ptys = FakePtyFactory();
-  final events = <AgentEvent>[];
-  DateTime now = DateTime.utc(2026, 9, 25, 12);
-  late final FakeDevice agentDevice;
-  late final TrustedStore trusted;
-  late final PairingCodeManager pairing;
-  late final SessionManager sessions;
-  late final AgentService service;
-  late final TestMobile phone;
-  late final TestMobile tablet;
-  late final TestMobile spare;
+  /// The phone-side unpair (Settings → unpair): `DELETE /v1/pairings`.
+  void unpairFromPhone(TestMobile mobile) {
+    final api = ShellxApi(baseUri: relay.baseUri, httpClient: relay.httpClient)
+      ..token = mobile.device.token;
+    drive(async, api.deletePairing(agentId, mobile.device.id));
+    settle(async);
+  }
+
+  /// Pairs [mobile] with a fresh code and pair.confirm.
+  void pair(TestMobile mobile, {String name = 'iPad'}) {
+    final uri = service.startPairing();
+    final result = handshake(
+      mobile,
+      pattern: NoisePattern.ikPsk2,
+      psk: uri.secret,
+      name: name,
+    );
+    send(result.channel!, [const PairConfirm()]);
+  }
+
+  /// Drops the agent's relay connection and waits for the reconnect (which
+  /// replays the relay's pairing_removed tombstones).
+  void reconnectAgent() {
+    relay.dropConnection(agentId);
+    async.elapse(const Duration(seconds: 2));
+    expect(relay.isOnline(agentId), isTrue);
+    settle(async);
+  }
+
+  Set<String> get unregistered => drive(async, trusted.unregistered());
 
   TestMobile _mobile(String id, NoiseKeyPair key) => TestMobile(
     relay: relay,
@@ -120,6 +174,41 @@ final class AgentRig {
   TrustedDevice? findTrusted(String id) => drive(async, trusted.find(id));
 }
 
+/// Wraps the fake relay's HTTP client so the agent's `POST /v1/pairings`
+/// can be failed ([failWith]: an HTTP status, or 0 for a network error) or
+/// held at [gate]. Everything else passes through.
+final class PairingPostControl extends http.BaseClient {
+  PairingPostControl(this._inner);
+
+  final http.Client _inner;
+  int? failWith;
+  Completer<void>? gate;
+
+  /// `POST /v1/pairings` attempts, including failed ones.
+  int attempts = 0;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request.method == 'POST' && request.url.path == '/v1/pairings') {
+      attempts++;
+      final held = gate;
+      if (held != null) await held.future;
+      final status = failWith;
+      if (status == 0) throw http.ClientException('network is down');
+      if (status != null) {
+        return http.StreamedResponse(
+          Stream.value(
+            utf8.encode('{"error":{"code":"test","message":"test"}}'),
+          ),
+          status,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    }
+    return _inner.send(request);
+  }
+}
+
 /// In-memory [KeyValueStore] whose reads can be held at a [gate] or made to
 /// fail (a locked keychain), to interleave work with trust-list reads.
 final class ControllableStore implements KeyValueStore {
@@ -134,8 +223,12 @@ final class ControllableStore implements KeyValueStore {
   /// Reads currently waiting at [gate].
   int waitingReads = 0;
 
+  /// Every read and write/delete so far.
+  int reads = 0, writes = 0;
+
   @override
   Future<String?> read(String key) async {
+    reads++;
     final pending = gate;
     if (pending != null) {
       waitingReads++;
@@ -147,10 +240,16 @@ final class ControllableStore implements KeyValueStore {
   }
 
   @override
-  Future<void> write(String key, String value) => _inner.write(key, value);
+  Future<void> write(String key, String value) {
+    writes++;
+    return _inner.write(key, value);
+  }
 
   @override
-  Future<void> delete(String key) => _inner.delete(key);
+  Future<void> delete(String key) {
+    writes++;
+    return _inner.delete(key);
+  }
 }
 
 /// A [ShellResolver] that answers only once [gate] completes.
@@ -735,10 +834,9 @@ void main() {
   test('pairing_removed repeated for an already-untrusted phone (live or '
       'replayed on reconnect) is a harmless no-op', () {
     fakeAsync((async) {
-      final rig = AgentRig(async);
+      final store = ControllableStore();
+      final rig = AgentRig(async, store: store);
       drive(async, rig.trusted.add(trustedTablet()));
-      var trustWrites = 0;
-      rig.trusted.changes.listen((_) => trustWrites++);
       rig.relay.pairings.add((agentId, phoneId));
       rig.handshake(rig.phone);
       final tablet = rig.handshake(rig.tablet).channel!;
@@ -749,25 +847,155 @@ void main() {
       settle(async);
       expect(rig.service.activeChannelCount, 1);
       final eventCount = rig.events.length;
-      final writes = trustWrites;
+      final reads = store.reads;
+      final writes = store.writes;
 
       rig.relay.sendEvent(agentId, pairingRemoved(phoneId));
       rig.relay.sendEvent(agentId, pairingRemoved(phoneId));
       settle(async);
-      expect(trustWrites, writes + 2); // Both duplicates were processed...
-      expect(rig.events.length, eventCount); // ...and changed nothing.
+      expect(store.reads, greaterThan(reads)); // Both were processed...
+      expect(store.writes, writes); // ...without a storage write...
+      expect(rig.events.length, eventCount); // ...or any event.
       expect(rig.service.activeChannelCount, 1);
       rig.send(tablet, [const SessionList()]);
       expect(tablet.messagesOf<SessionListResult>(), hasLength(1));
 
-      rig.relay.dropConnection(agentId);
-      async.elapse(const Duration(seconds: 2));
-      expect(rig.relay.isOnline(agentId), isTrue);
-      expect(trustWrites, writes + 3); // The queued copy was replayed.
+      // The tombstone is replayed on every connect.
+      rig.reconnectAgent();
+      rig.reconnectAgent();
+      expect(store.writes, writes);
       expect(rig.findTrusted(phoneId), isNull);
       expect(rig.findTrusted(tabletId), isNotNull);
       expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
       expect(rig.handshake(rig.phone).status, HandshakeStatus.untrusted);
+    });
+  });
+
+  // Controller ruling (pre-review): a fresh pairing is protected from a
+  // replayed pairing_removed tombstone until the relay registers it.
+  group('unregistered pairings', () {
+    test('a re-pair whose POST keeps failing survives the tombstone replayed '
+        'on reconnect; once registered, a real unpair removes trust', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.pair(rig.tablet);
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+        expect(rig.unregistered, isEmpty);
+        rig.unpairFromPhone(rig.tablet); // Leaves a tombstone at the relay.
+        expect(rig.findTrusted(tabletId), isNull);
+
+        rig.posts.failWith = 0; // POST /v1/pairings: network error.
+        final attempts = rig.posts.attempts;
+        rig.pair(rig.tablet);
+        expect(rig.findTrusted(tabletId), isNotNull);
+        expect(rig.posts.attempts, greaterThan(attempts));
+        expect(rig.unregistered, {tabletId});
+
+        rig.reconnectAgent(); // Replays the tombstone: ignored.
+        expect(rig.findTrusted(tabletId), isNotNull);
+        expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
+
+        rig.posts.failWith = null;
+        async.elapse(const Duration(seconds: 60));
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+
+        rig.reconnectAgent(); // The POST cleared the tombstone.
+        expect(rig.findTrusted(tabletId), isNotNull);
+
+        rig.unpairFromPhone(rig.tablet);
+        expect(rig.findTrusted(tabletId), isNull);
+        expect(rig.handshake(rig.tablet).status, HandshakeStatus.untrusted);
+      });
+    });
+
+    test('an unregistered pairing survives an agent restart and stays '
+        'protected until the relay registers it', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.pair(rig.tablet);
+        rig.unpairFromPhone(rig.tablet);
+        rig.posts.failWith = 503;
+        rig.pair(rig.tablet);
+        expect(rig.unregistered, {tabletId});
+
+        rig.restartAgent(); // The new connection replays the tombstone.
+        expect(rig.unregistered, {tabletId});
+        expect(rig.findTrusted(tabletId), isNotNull);
+        expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
+
+        final attempts = rig.posts.attempts;
+        rig.posts.failWith = null;
+        async.elapse(const Duration(seconds: 60));
+        expect(rig.posts.attempts, greaterThan(attempts));
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+      });
+    });
+
+    test('a POST refused with another 4xx is dropped, trust is kept', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.posts.failWith = 404;
+        rig.pair(rig.tablet);
+        expect(rig.unregistered, isEmpty);
+        expect(rig.findTrusted(tabletId), isNotNull);
+
+        final attempts = rig.posts.attempts;
+        async.elapse(const Duration(seconds: 60));
+        rig.reconnectAgent();
+        expect(rig.posts.attempts, attempts);
+      });
+    });
+
+    test('a 401 waits for the next connect; 429 is retried with backoff', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.posts.failWith = 401;
+        rig.pair(rig.tablet);
+        expect(rig.unregistered, {tabletId});
+        var attempts = rig.posts.attempts;
+        async.elapse(const Duration(seconds: 60));
+        expect(rig.posts.attempts, attempts); // No retry while connected.
+
+        rig.posts.failWith = 429;
+        rig.reconnectAgent();
+        expect(
+          rig.posts.attempts,
+          greaterThan(attempts),
+        ); // Retried on connect.
+        attempts = rig.posts.attempts;
+        async.elapse(const Duration(seconds: 30));
+        expect(rig.posts.attempts, greaterThan(attempts + 1)); // Backoff.
+        expect(rig.unregistered, {tabletId});
+
+        rig.posts.failWith = null;
+        async.elapse(const Duration(seconds: 60));
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+      });
+    });
+
+    test('revoke drops the unregistered mark; a POST that lands after the '
+        'revoke is taken back', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        final gate = rig.posts.gate = Completer<void>();
+        rig.pair(rig.tablet); // Its POST is held in flight.
+        expect(rig.unregistered, {tabletId});
+
+        drive(async, rig.service.revoke(tabletId));
+        expect(rig.unregistered, isEmpty);
+        rig.posts.gate = null;
+        gate.complete();
+        settle(async);
+        expect(rig.relay.pairings, isEmpty);
+
+        final attempts = rig.posts.attempts;
+        rig.reconnectAgent();
+        expect(rig.posts.attempts, attempts);
+        expect(rig.findTrusted(tabletId), isNull);
+      });
     });
   });
 }

@@ -132,4 +132,86 @@ void main() {
     original[0] = 99; // Mutate the original.
     expect(device.publicKey[0], 42); // Device's copy should be unchanged.
   });
+
+  group('unregistered pairings', () {
+    test('add(unregistered: true) marks the phone; markRegistered clears it '
+        'and reports whether it was pending', () async {
+      final store = TrustedStore(InMemoryKeyValueStore());
+      await store.add(device('m1', 1), unregistered: true);
+      await store.add(device('m2', 2));
+      expect(await store.unregistered(), {'m1'});
+      expect(await store.find('m1'), isNotNull);
+
+      expect(await store.markRegistered('m1'), isTrue);
+      expect(await store.markRegistered('m1'), isFalse);
+      expect(await store.unregistered(), isEmpty);
+      expect(await store.find('m1'), isNotNull); // Trust is untouched.
+    });
+
+    test('persist as a JSON array under pending_pairing_posts', () async {
+      final kv = InMemoryKeyValueStore();
+      await TrustedStore(kv).add(device('m1', 1), unregistered: true);
+      expect(TrustedStore.unregisteredKey, 'pending_pairing_posts');
+      expect(jsonDecode(kv.values[TrustedStore.unregisteredKey]!), ['m1']);
+      expect(await TrustedStore(kv).unregistered(), {'m1'});
+    });
+
+    test('remove and clear drop pending entries too', () async {
+      final store = TrustedStore(InMemoryKeyValueStore());
+      await store.add(device('m1', 1), unregistered: true);
+      await store.add(device('m2', 2), unregistered: true);
+      await store.remove('m1');
+      expect(await store.unregistered(), {'m2'});
+      await store.clear();
+      expect(await store.unregistered(), isEmpty);
+      expect(await store.list(), isEmpty);
+    });
+
+    test('corrupt pending data counts as nothing pending', () async {
+      final kv = InMemoryKeyValueStore();
+      await kv.write(TrustedStore.unregisteredKey, '{not json');
+      expect(await TrustedStore(kv).unregistered(), isEmpty);
+    });
+  });
+
+  test('removing a phone that is not trusted writes nothing and fires no '
+      'change', () async {
+    final kv = CountingStore();
+    final store = TrustedStore(kv);
+    await store.add(device('m1', 1));
+    var changes = 0;
+    store.changes.listen((_) => changes++);
+    final writes = kv.writes;
+
+    await store.remove('m9');
+    await pumpEventQueue();
+    expect(kv.writes, writes);
+    expect(changes, 0);
+
+    await store.remove('m1');
+    await pumpEventQueue();
+    expect(kv.writes, greaterThan(writes));
+    expect(changes, 1);
+  });
+}
+
+/// Counts writes to an in-memory store.
+final class CountingStore implements KeyValueStore {
+  final _inner = InMemoryKeyValueStore();
+  int writes = 0;
+
+  @override
+  Future<String?> read(String key) => _inner.read(key);
+
+  @override
+  Future<void> write(String key, String value) {
+    writes++;
+    return _inner.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) {
+    writes++;
+    return _inner.delete(key);
+  }
 }
