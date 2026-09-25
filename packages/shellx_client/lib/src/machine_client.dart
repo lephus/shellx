@@ -8,11 +8,31 @@ import 'package:shellx_core/shellx_core.dart';
 import 'client_tab.dart';
 import 'client_types.dart';
 
+/// A `session.open` waiting for its answer. `session.open` has no request
+/// id: the agent answers requests in order, so answers are matched to the
+/// oldest entry.
 final class _PendingOpen {
   _PendingOpen(this.cols, this.rows);
   final int cols;
   final int rows;
   final completer = Completer<ClientTab>();
+
+  /// Timed out: nobody waits any more, but the entry keeps its place so a
+  /// late answer is not taken for a newer open's.
+  bool abandoned = false;
+}
+
+/// A `session.list` waiting for its answer (matched in order, like opens).
+final class _PendingList {
+  _PendingList({this.retires = const [], this.abandoned = false});
+  final completer = Completer<List<SessionInfo>>();
+
+  /// Abandoned opens this list was sent after: the agent answers in order,
+  /// so one still unanswered when this list's answer arrives never will be.
+  final List<_PendingOpen> retires;
+
+  /// Nobody waits for the answer (timed out, or sent only to retire opens).
+  bool abandoned;
 }
 
 /// The phone's connection to one pinned machine: IK handshake, request /
@@ -78,7 +98,7 @@ final class MachineClient {
   /// their `session.close` goes out first thing on the next channel.
   final _pendingCloses = <int>{};
   final _pendingOpens = <_PendingOpen>[];
-  final _pendingLists = <Completer<List<SessionInfo>>>[];
+  final _pendingLists = <_PendingList>[];
 
   /// Per session id, in the order the `session.attach` messages were sent.
   final _pendingAttaches = <int, List<Completer<void>>>{};
@@ -110,12 +130,13 @@ final class MachineClient {
 
   Future<List<SessionInfo>> listSessions() async {
     await connect();
-    final completer = Completer<List<SessionInfo>>();
-    _pendingLists.add(completer);
+    final pending = _PendingList();
+    _pendingLists.add(pending);
     return _request(
-      completer,
+      pending.completer,
       const SessionList(),
-      () => _pendingLists.remove(completer),
+      () => _pendingLists.remove(pending),
+      abandon: () => pending.abandoned = true,
     );
   }
 
@@ -129,6 +150,7 @@ final class MachineClient {
       pending.completer,
       SessionOpen(cols: cols, rows: rows),
       () => _pendingOpens.remove(pending),
+      abandon: () => _abandonOpen(pending),
     );
   }
 
@@ -470,12 +492,21 @@ final class MachineClient {
     switch (message) {
       case SessionListResult(:final sessions):
         _known = {for (final s in sessions) s.id: s};
-        if (_pendingLists.isNotEmpty) {
-          _pendingLists.removeAt(0).complete(sessions);
-        }
+        if (_pendingLists.isEmpty) return;
+        final pending = _pendingLists.removeAt(0);
+        pending.retires.forEach(_pendingOpens.remove);
+        if (!pending.abandoned) pending.completer.complete(sessions);
       case SessionOpened(:final id, :final index, :final shell):
-        if (_pendingOpens.isEmpty) return;
-        final pending = _pendingOpens.removeAt(0);
+        final pending = _pendingOpens.isEmpty
+            ? null
+            : _pendingOpens.removeAt(0);
+        if (pending == null || pending.abandoned) {
+          // Nobody waits for this session (its open timed out): close it
+          // instead of leaving it attached to this phone, where it would
+          // stall its send window and count toward the session limit.
+          _send([SessionClose(id: id)]);
+          return;
+        }
         final tab = ClientTab(
           id: id,
           index: index,
@@ -500,9 +531,10 @@ final class MachineClient {
       case ErrorMessage(:final code, :final message, :final id):
         final error = AppErrorException(code, message);
         if (id == null) {
-          if (_pendingOpens.isNotEmpty) {
-            _pendingOpens.removeAt(0).completer.completeError(error);
-          }
+          // session_limit or spawn_failed: the answer to the oldest open.
+          if (_pendingOpens.isEmpty) return;
+          final pending = _pendingOpens.removeAt(0);
+          if (!pending.abandoned) pending.completer.completeError(error);
           return;
         }
         _takeAttach(id)?.completeError(error);
@@ -546,13 +578,15 @@ final class MachineClient {
 
   /// Sends [message] and waits for its reply on [completer], already queued
   /// by the caller; [forget] removes it from that queue again. Fails with
-  /// `timeout` after the handshake timeout and with `agentOffline` when
-  /// there is no channel (or it is lost before the reply).
+  /// `timeout` after the handshake timeout (calling [abandon] instead of
+  /// [forget] when given: the reply may still come) and with `agentOffline`
+  /// when there is no channel (or it is lost before the reply).
   Future<T> _request<T>(
     Completer<T> completer,
     AppMessage message,
-    void Function() forget,
-  ) {
+    void Function() forget, {
+    void Function()? abandon,
+  }) {
     if (!_send([message])) {
       forget();
       return Future.error(
@@ -562,12 +596,28 @@ final class MachineClient {
     return completer.future.timeout(
       _timeout,
       onTimeout: () {
-        forget();
+        (abandon ?? forget)();
         throw const MachineConnectionException(
           MachineConnectionFailure.timeout,
         );
       },
     );
+  }
+
+  /// [open] timed out on a live channel (a loss would have failed it
+  /// first). Its entry stays, so its answer, if it comes, is closed rather
+  /// than taken for a newer open's. The agent sends none when the host
+  /// closed every session while the shell was starting, so a
+  /// `session.list` goes out now: once it is answered, every earlier
+  /// request has been, and the entry is dropped.
+  void _abandonOpen(_PendingOpen open) {
+    open.abandoned = true;
+    final barrier = _PendingList(retires: [open], abandoned: true);
+    _pendingLists.add(barrier);
+    if (!_send([const SessionList()])) {
+      _pendingLists.remove(barrier);
+      _pendingOpens.remove(open);
+    }
   }
 
   /// Re-handshake and re-attach every stale tab (still attached, i.e. not
@@ -650,10 +700,10 @@ final class MachineClient {
     _pendingLists.clear();
     _pendingAttaches.clear();
     for (final pending in opens) {
-      pending.completer.completeError(lost);
+      if (!pending.abandoned) pending.completer.completeError(lost);
     }
     for (final pending in lists) {
-      pending.completeError(lost);
+      if (!pending.abandoned) pending.completer.completeError(lost);
     }
     for (final pending in attaches) {
       pending.completeError(lost);

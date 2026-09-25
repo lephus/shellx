@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -121,6 +122,9 @@ final class Harness {
   late AgentService agent;
   int _agentStarts = 0;
 
+  /// The agent's shell resolver; set its gate to hold `session.open`s.
+  final shellResolver = GateableShellResolver();
+
   /// Drives [future] to completion in fake time.
   T run<T>(Future<T> future) => drive(async, future);
 
@@ -136,7 +140,7 @@ final class Harness {
     ptys = FakePtyFactory();
     sessions = SessionManager(
       ptyFactory: ptys,
-      shellResolver: const FixedShellResolver(),
+      shellResolver: shellResolver,
       homeDirectory: '/Users/test',
       baseEnvironment: const {},
       random: Random(1000 + _agentStarts++),
@@ -243,6 +247,19 @@ final class _FaultyClient extends http.BaseClient {
       headers: answer.headers,
       request: request,
     );
+  }
+}
+
+/// Resolves the fake shell at once, or once [gate] completes while it is
+/// set.
+final class GateableShellResolver implements ShellResolver {
+  Completer<void>? gate;
+
+  @override
+  Future<ShellCommand> resolve() async {
+    final pending = gate;
+    if (pending != null) await pending.future;
+    return const FixedShellResolver().command;
   }
 }
 
