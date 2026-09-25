@@ -15,7 +15,8 @@
     "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
-    "domains:update": "tsx scripts/update-disposable-domains.ts"
+    "domains:update": "tsx scripts/update-disposable-domains.ts",
+    "reset-password": "tsx scripts/reset-password.ts"
   },
   "dependencies": {
     "@phi-ag/argon2": "0.5.28",
