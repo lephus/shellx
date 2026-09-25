@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
 import { choosePasswordSource, confirmationMatches, needsConfirmation } from "../scripts/reset-cli";
+import { createLinePrompter } from "../scripts/prompter";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
 
@@ -148,5 +149,57 @@ describe("choosePasswordSource", () => {
 
   it("prioritizes argv value over env var", () => {
     expect(choosePasswordSource("argvpass", "envpassword")).toBe("argv");
+  });
+});
+
+describe("createLinePrompter", () => {
+  it("returns answers in order for sequential asks", async () => {
+    const written: string[] = [];
+    const prompter = createLinePrompter("answer1\nanswer2\n", (s) => written.push(s));
+
+    const first = await prompter.ask("Question 1: ");
+    const second = await prompter.ask("Question 2: ");
+
+    expect(first).toBe("answer1");
+    expect(second).toBe("answer2");
+    expect(written).toEqual(["Question 1: ", "Question 2: "]);
+  });
+
+  it("rejects when input is exhausted", async () => {
+    const prompter = createLinePrompter("only_one_line\n", () => {});
+
+    await prompter.ask("First: ");
+    await expect(prompter.ask("Second: ")).rejects.toThrow("stdin ended before an answer was given");
+  });
+
+  it("handles CRLF line endings", async () => {
+    const prompter = createLinePrompter("answer1\r\nanswer2\r\n", () => {});
+
+    const first = await prompter.ask("Q1: ");
+    const second = await prompter.ask("Q2: ");
+
+    expect(first).toBe("answer1");
+    expect(second).toBe("answer2");
+  });
+
+  it("handles empty input", async () => {
+    const prompter = createLinePrompter("", () => {});
+
+    await expect(prompter.ask("Q: ")).rejects.toThrow("stdin ended before an answer was given");
+  });
+
+  it("writes prompts to write callback", async () => {
+    const written: string[] = [];
+    const prompter = createLinePrompter("ans1\nans2\n", (s) => written.push(s));
+
+    await prompter.ask("Prompt 1: ");
+    await prompter.ask("Prompt 2: ");
+
+    expect(written).toEqual(["Prompt 1: ", "Prompt 2: "]);
+  });
+
+  it("close() is a no-op for line prompter", () => {
+    const prompter = createLinePrompter("answer\n", () => {});
+    expect(() => prompter.close()).not.toThrow();
   });
 });

@@ -11,7 +11,6 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { createArgon2 } from "../src/auth/argon2";
 import { isValidEmail, normalizeEmail } from "../src/auth/email";
@@ -19,6 +18,7 @@ import { isAcceptablePassword } from "../src/auth/password-policy";
 import { base64UrlEncode } from "../src/auth/tokens";
 import { accountExistsFromWranglerJson, buildResetSql } from "./reset-sql";
 import { choosePasswordSource, confirmationMatches, needsConfirmation } from "./reset-cli";
+import { createPrompter } from "./prompter";
 
 const { values } = parseArgs({
   options: {
@@ -42,17 +42,15 @@ if (!isValidEmail(email)) {
   process.exit(1);
 }
 
-// Create readline interface once for all interactive I/O
-const rl = createInterface({ input: process.stdin, output: process.stderr });
-
 // Password input first (if --password -, read from stdin before confirmation)
 const passwordSource = choosePasswordSource(values.password, process.env.SHELLX_RESET_PASSWORD);
+const prompter = createPrompter();
 let password: string;
 
 try {
   if (passwordSource === "stdin") {
-    // Read password from stdin (first line)
-    password = await rl.question("Password: ");
+    // Read password from stdin
+    password = await prompter.ask("Password: ");
   } else if (passwordSource === "argv") {
     // From argv: print warning to stderr about visibility
     console.error("Warning: --password in argv is visible in shell history and process lists; consider --password - or SHELLX_RESET_PASSWORD env var");
@@ -72,7 +70,7 @@ try {
 
   // Confirmation guard for remote environments (staging, production)
   if (needsConfirmation(target, values.yes)) {
-    const typed = await rl.question(`Confirm email for ${target}: `);
+    const typed = await prompter.ask(`Confirm email for ${target}: `);
     if (!confirmationMatches(email, typed)) {
       console.error("Email mismatch; operation aborted.");
       process.exit(1);
@@ -82,8 +80,8 @@ try {
     console.error(`Confirmation bypassed with --yes for ${target}.`);
   }
 
-  // Close readline interface
-  rl.close();
+  // Close prompter before spawning wrangler
+  prompter.close();
 
   // Hash password and build SQL
   const require = createRequire(import.meta.url);
@@ -109,10 +107,11 @@ try {
   if (passwordSource === "generate") console.log(`Temporary password: ${password}`);
   if (values["revoke-tokens"]) console.log("All device tokens of this account were revoked.");
 } catch (err) {
-  rl.close();
-  if (err instanceof Error && err.message.includes("readline was closed")) {
-    // Expected when user cancels (Ctrl+C)
-    process.exit(1);
+  prompter.close();
+  if (err instanceof Error) {
+    console.error(err.message);
+  } else {
+    console.error("An unknown error occurred");
   }
-  throw err;
+  process.exit(1);
 }
