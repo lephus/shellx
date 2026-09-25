@@ -458,8 +458,9 @@ abstract interface class Pty {
   Future<int> get exitCode;
   void write(Uint8List data);
   void resize(int cols, int rows);
-  void kill();                               // kết thúc cả cây tiến trình
+  void kill();                               // kết thúc cả cây tiến trình; no-op khi tiến trình đã thoát (PID có thể đã bị dùng lại)
 }
+// SessionManager không gọi kill/write/resize nữa từ khi exitCode hoàn tất; adapter vẫn phải tự chặn kill sau khi thoát.
 final class ShellCommand {
   const ShellCommand({required this.executable, required this.arguments, required this.name});
   final String executable; final List<String> arguments; final String name;   // name ví dụ "zsh", "pwsh"

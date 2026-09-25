@@ -53,11 +53,16 @@ final class FakePty implements Pty {
     if (!_output.isClosed) _output.add(Uint8List.fromList(bytes));
   }
 
-  void exit(int code) {
+  /// Ends the process with [code]. With [closeOutput] false the exit code is
+  /// known while the output stream stays open (a PTY whose output drains
+  /// late) until [closeOutputStream] is called.
+  void exit(int code, {bool closeOutput = true}) {
     if (_exitCode.isCompleted) return;
-    _output.close();
+    if (closeOutput) _output.close();
     _exitCode.complete(code);
   }
+
+  void closeOutputStream() => _output.close();
 
   /// Everything written to the shell, decoded as UTF-8.
   String get writtenText => utf8.decode([for (final w in writes) ...w]);
