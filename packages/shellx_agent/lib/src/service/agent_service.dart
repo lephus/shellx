@@ -17,6 +17,11 @@ import 'handshake_responder.dart';
 /// [start] subscribes and calls `relay.start()`. [stop] drops every channel
 /// and calls `relay.stop()`; it does not close sessions (call
 /// `SessionManager.closeAll()` for that).
+///
+/// Frames, relay state changes, channel failures and [revoke] all run one
+/// at a time through a single inbox, so trust decisions and the channel
+/// table never interleave. Only [stop] acts immediately; work it interrupts
+/// re-checks the channel table after every await.
 final class AgentService {
   AgentService({
     required RelayConnection relay,
@@ -60,6 +65,10 @@ final class AgentService {
   Future<void> _inbox = Future.value();
   bool _running = false;
 
+  /// Bumped by [start] and [stop]: inbox work queued under an older value
+  /// is skipped, and an HS1 answered across a stop installs no channel.
+  int _epoch = 0;
+
   Stream<AgentEvent> get events => _events.stream;
 
   int get activeChannelCount => _channels.length;
@@ -67,6 +76,7 @@ final class AgentService {
   Future<void> start() async {
     if (_running) return;
     _running = true;
+    _epoch++;
     _subscriptions
       ..add(_relay.frames.listen((frame) => _enqueue(() => _onFrame(frame))))
       ..add(
@@ -101,6 +111,7 @@ final class AgentService {
   Future<void> stop() async {
     if (!_running) return;
     _running = false;
+    _epoch++;
     for (final subscription in _subscriptions) {
       // Not awaited: cancel() may return a root-zone future.
       unawaited(subscription.cancel());
@@ -123,11 +134,17 @@ final class AgentService {
   /// The QR window was closed: the code stops working immediately.
   void cancelPairing() => _pairing.invalidate();
 
-  /// Tray → "Paired devices" → Revoke (spec §5.5).
+  /// Tray → "Paired devices" → Revoke (spec §5.5). Works whether or not the
+  /// service is running. The local part runs through the inbox, after any
+  /// HS1 already being answered, so no channel for [mobileId] survives it;
+  /// the display-only server record is deleted afterwards, outside the
+  /// inbox, so a slow request never stalls frame handling.
   Future<void> revoke(String mobileId) async {
-    await _trusted.remove(mobileId);
-    _sessions.closeSessionsAttachedTo(mobileId);
-    _dropChannel(mobileId);
+    await _serialize(() async {
+      await _trusted.remove(mobileId);
+      _sessions.closeSessionsAttachedTo(mobileId);
+      _dropChannel(mobileId);
+    });
     try {
       await _api.deletePairing(_deviceId, mobileId);
     } on ApiException {
@@ -135,13 +152,21 @@ final class AgentService {
     }
   }
 
+  /// Runs [task] after every task queued before it. The returned future
+  /// carries [task]'s outcome; the inbox itself never stops on an error.
+  Future<T> _serialize<T>(Future<T> Function() task) {
+    final result = _inbox.then((_) => task());
+    _inbox = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
+
+  /// Queues [task] unless [start]/[stop] runs before its turn. Errors are
+  /// dropped: a failed frame must not break the ones after it.
   void _enqueue(Future<void> Function() task) {
-    _inbox = _inbox
-        .then((_) {
-          if (!_running) return null;
-          return task();
-        })
-        .catchError((Object _) {});
+    final epoch = _epoch;
+    _serialize(() async {
+      if (epoch == _epoch) await task();
+    }).ignore();
   }
 
   Future<void> _onFrame(RelayFrame frame) async {
@@ -178,13 +203,20 @@ final class AgentService {
   }
 
   Future<void> _onHello(DataFrame frame, ChannelPayload payload) async {
+    final epoch = _epoch;
     final mobileId = frame.peer;
-    final answer = await _responder.answer(
-      mobileId: mobileId,
-      kind: payload.kind,
-      message: payload.noiseMessage,
-    );
-    if (answer == null || !_running) return;
+    HandshakeAnswer? answer;
+    try {
+      answer = await _responder.answer(
+        mobileId: mobileId,
+        kind: payload.kind,
+        message: payload.noiseMessage,
+      );
+    } catch (_) {
+      // For example the trust list could not be read: fail closed, silently.
+      answer = null;
+    }
+    if (answer == null || epoch != _epoch) return;
     _relay.send(
       DataFrame(peer: mobileId, channel: frame.channel, payload: answer.reply),
     );
@@ -196,7 +228,8 @@ final class AgentService {
       previous.close();
       _sessions.mobileDisconnected(mobileId);
     }
-    _channels[mobileId] = AgentChannel(
+    late final AgentChannel channel;
+    channel = AgentChannel(
       mobileId: mobileId,
       channelId: frame.channel,
       name: answer.hello.name,
@@ -204,8 +237,13 @@ final class AgentService {
       secure: SecureChannel(transport),
       send: _relay.send,
       pairingSecret: answer.pairingSecret,
+      // A batch that could not be sealed or sent leaves a gap in the
+      // stream: drop the channel like a decrypt error. The phone
+      // re-handshakes and re-attaches from last_seq.
+      onFailure: () => _enqueue(() async => _dropChannel(mobileId, channel)),
       flushInterval: _flushInterval,
     );
+    _channels[mobileId] = channel;
     _events.add(ActiveChannelsChanged(_channels.length));
   }
 
@@ -217,31 +255,36 @@ final class AgentService {
     try {
       messages = await channel.open(noiseMessage);
     } catch (_) {
-      _dropChannel(mobileId); // Any decrypt/decode error kills the channel.
+      // Any decrypt/decode error kills the channel.
+      _dropChannel(mobileId, channel);
+      return;
+    }
+    if (!identical(_channels[mobileId], channel)) return;
+    if (channel.isPairing) {
+      // A pairing channel carries exactly one payload, whatever it holds.
+      _dropChannel(mobileId, channel);
+      if (messages.firstOrNull is PairConfirm) await _completePairing(channel);
       return;
     }
     for (final message in messages) {
-      if (!identical(_channels[mobileId], channel)) return;
-      if (channel.isPairing) {
-        await _completePairing(channel, message);
-        return;
-      }
       if (message is PairConfirm) continue;
       await _sessions.handle(mobileId, message);
+      if (!identical(_channels[mobileId], channel)) {
+        // stop() dropped the channel meanwhile: undo any attach the
+        // message made, so no session stays attached to a missing channel.
+        _sessions.mobileDisconnected(mobileId);
+        return;
+      }
     }
   }
 
   /// Pairing succeeds only on a decrypted `pair.confirm` while the code used
-  /// for the handshake is still the active one (spec §5.3 step 5).
-  Future<void> _completePairing(
-    AgentChannel channel,
-    AppMessage message,
-  ) async {
-    _dropChannel(channel.mobileId); // A pairing channel carries one message.
+  /// for the handshake is still the active one (spec §5.3 step 5). An ok
+  /// IKpsk2 answer only meant a code was active at HS1: the PSK is mixed
+  /// into message 2, so this message is the first proof the phone has it.
+  Future<void> _completePairing(AgentChannel channel) async {
     final active = _pairing.activeSecret;
-    if (message is! PairConfirm ||
-        active == null ||
-        !constantTimeEquals(active, channel.pairingSecret!)) {
+    if (active == null || !constantTimeEquals(active, channel.pairingSecret!)) {
       return;
     }
     _pairing.invalidate();
@@ -253,13 +296,22 @@ final class AgentService {
     );
     await _trusted.add(device);
     _events.add(MobilePaired(device));
+    unawaited(_recordPairing(channel.mobileId));
+  }
+
+  /// `POST /v1/pairings`, outside the inbox so a slow request never stalls
+  /// frame handling. Failures are ignored: the pairing is already effective
+  /// locally and the server record is display-only.
+  Future<void> _recordPairing(String mobileId) async {
     try {
-      await _api.createPairing(channel.mobileId);
-    } on ApiException {
-      // Display-only record; the pairing is already effective locally.
+      await _api.createPairing(mobileId);
+    } catch (_) {
+      // Nothing to do; see above.
     }
   }
 
+  /// Idempotent: the relay replays `pairing_removed` on every connect, so a
+  /// phone that is already untrusted (and has no channel) is left as is.
   Future<void> _onEvent(Map<String, String> event) async {
     if (event['event'] != 'pairing_removed' || event['agent_id'] != _deviceId) {
       return;
@@ -270,9 +322,14 @@ final class AgentService {
     _dropChannel(mobileId);
   }
 
-  void _dropChannel(String mobileId) {
-    final channel = _channels.remove(mobileId);
-    if (channel == null) return;
+  /// Drops [mobileId]'s channel; when [only] is given, only if that exact
+  /// channel is still the current one.
+  void _dropChannel(String mobileId, [AgentChannel? only]) {
+    final channel = _channels[mobileId];
+    if (channel == null || (only != null && !identical(channel, only))) {
+      return;
+    }
+    _channels.remove(mobileId);
     channel.close();
     _sessions.mobileDisconnected(mobileId);
     _events.add(ActiveChannelsChanged(_channels.length));
