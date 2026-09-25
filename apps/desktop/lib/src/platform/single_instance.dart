@@ -48,6 +48,16 @@ final class SingleInstanceLock {
   /// Fires when a second launch called [signalRunningInstance].
   Stream<void> activationRequests() => directory
       .watch(events: FileSystemEvent.create | FileSystemEvent.modify)
-      .where((event) => event.path.endsWith(activationFileName))
+      .where((event) => _basename(event.path) == activationFileName)
       .map((_) {});
+
+  /// The final path component, independent of which separator style the
+  /// platform's directory watcher reports (avoids matching e.g.
+  /// `notactivate.signal`, which `endsWith` would wrongly accept, and avoids
+  /// adding a dependency on `package:path` for this one call).
+  static String _basename(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final index = normalized.lastIndexOf('/');
+    return index == -1 ? normalized : normalized.substring(index + 1);
+  }
 }

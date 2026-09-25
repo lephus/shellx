@@ -42,4 +42,21 @@ void main() {
       await lock.release();
     },
   );
+
+  test(
+    'activation events require an exact file name match, not just a suffix',
+    () async {
+      final lock = SingleInstanceLock(dir);
+      expect(await lock.acquire(), isTrue);
+      final events = <void>[];
+      final subscription = lock.activationRequests().listen(events.add);
+      await File(
+        '${dir.path}${Platform.pathSeparator}notactivate.signal',
+      ).writeAsString('x', flush: true);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(events, isEmpty);
+      await subscription.cancel();
+      await lock.release();
+    },
+  );
 }

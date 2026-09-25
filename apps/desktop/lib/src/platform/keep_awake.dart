@@ -24,8 +24,15 @@ final class CaffeinateKeepAwake implements KeepAwake {
   Future<void> _queue = Future<void>.value();
 
   @override
-  Future<void> setEnabled(bool enabled) =>
-      _queue = _queue.then((_) => _apply(enabled));
+  Future<void> setEnabled(bool enabled) {
+    // Each call gets its own result so a caller can observe a failure, but
+    // the queue itself must never stay poisoned by a past error, or every
+    // later call would rethrow the same stale error forever (keep-awake is
+    // default-on per spec §8).
+    final next = _queue.then((_) => _apply(enabled));
+    _queue = next.catchError((Object _) {});
+    return next;
+  }
 
   Future<void> _apply(bool enabled) async {
     if (enabled) {
@@ -63,6 +70,11 @@ final class WindowsKeepAwake implements KeepAwake {
 
   @override
   Future<void> setEnabled(bool enabled) async {
-    _setState(enabled ? (esContinuous | esSystemRequired) : esContinuous);
+    final result = _setState(
+      enabled ? (esContinuous | esSystemRequired) : esContinuous,
+    );
+    if (result == 0) {
+      throw StateError('SetThreadExecutionState failed');
+    }
   }
 }

@@ -60,6 +60,39 @@ void main() {
         expect(started, hasLength(2));
       },
     );
+
+    test('recovers after a failed spawn', () async {
+      final started = <List<String>>[];
+      final processes = <_FakeProcess>[];
+      var shouldThrow = true;
+      final keepAwake = CaffeinateKeepAwake(
+        agentPid: 4242,
+        start: (exe, args) async {
+          started.add([exe, ...args]);
+          if (shouldThrow) {
+            shouldThrow = false;
+            throw const ProcessException('/usr/bin/caffeinate', [
+              '-i',
+              '-w',
+              '4242',
+            ], 'spawn failed');
+          }
+          return processes.last;
+        },
+      );
+
+      await expectLater(
+        keepAwake.setEnabled(true),
+        throwsA(isA<ProcessException>()),
+      );
+
+      processes.add(_FakeProcess());
+      await keepAwake.setEnabled(true);
+      expect(started, hasLength(2));
+
+      await keepAwake.setEnabled(false);
+      expect(processes.single.killed, isTrue);
+    });
   });
 
   test(
@@ -77,6 +110,11 @@ void main() {
       expect(flags, [0x80000001, 0x80000000]);
     },
   );
+
+  test('WindowsKeepAwake throws when SetThreadExecutionState fails', () async {
+    final keepAwake = WindowsKeepAwake(setState: (f) => 0);
+    await expectLater(keepAwake.setEnabled(true), throwsA(isA<StateError>()));
+  });
 
   test('SystemUrlOpener uses open on macOS and rundll32 on Windows', () async {
     final calls = <List<String>>[];
