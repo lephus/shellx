@@ -47,10 +47,16 @@ final class InMemorySettingsStore implements SettingsStore {
 
   final Map<String, bool> values;
 
+  /// Simulates a storage failure (a tray action that fails, Task 9).
+  bool fail = false;
+
   @override
   bool getBool(String key, {required bool defaultValue}) =>
       values[key] ?? defaultValue;
 
   @override
-  Future<void> setBool(String key, bool value) async => values[key] = value;
+  Future<void> setBool(String key, bool value) async {
+    if (fail) throw StateError('settings write failed');
+    values[key] = value;
+  }
 }
