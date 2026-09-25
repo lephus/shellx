@@ -339,7 +339,7 @@ Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ li�
 
 ### 9.1 Package chính
 
-`xterm`, `mobile_scanner`, `local_auth`, `flutter_secure_storage`, `flutter_riverpod`, `flutter_localizations`/`intl`. Font JetBrains Mono đóng gói sẵn. Không dùng `cryptography_flutter`: `shellx_core` ghim backend Dart thuần (DartX25519, DartChacha20, DartBlake2s) để mọi nền tảng chạy đúng phần mã đã kiểm bằng test vector.
+App dựng trên base Flutter của team (`flutter-base/yallabb`): kiến trúc feature-first (data/domain/presentation), `get_it` + `injectable` (DI), `auto_route` (điều hướng), `signals_flutter` (`Controller` + `StateSignal`), `intl_utils` (`S.of(context)`), design system/`adaptive_theme`/`toastification` của base. Package riêng của ShellX: `xterm`, `mobile_scanner`, `local_auth`, `flutter_secure_storage`, `flutter_localizations`/`intl`. REST và relay đi qua `shellx_core` (`package:http`), không dùng tầng `dio`/refresh token của base. Font JetBrains Mono đóng gói sẵn cho terminal. Không dùng `cryptography_flutter`: `shellx_core` ghim backend Dart thuần (DartX25519, DartChacha20, DartBlake2s) để mọi nền tảng chạy đúng phần mã đã kiểm bằng test vector.
 
 ### 9.2 Màn hình
 

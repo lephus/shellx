@@ -371,7 +371,7 @@ abstract final class DeviceIdentity {
   static Future<NoiseKeyPair> loadOrCreate(KeyValueStore store);
 }
 // BẮT BUỘC (plan 04/05): mỗi app dùng MỘT instance KeyValueStore dùng chung cho cả tiến trình
-// (ví dụ một Riverpod provider duy nhất). Bảo đảm "chỉ sinh một khóa khi gọi đồng thời" chỉ đúng
+// (ví dụ một Riverpod provider duy nhất ở desktop, một @lazySingleton get_it ở mobile). Bảo đảm "chỉ sinh một khóa khi gọi đồng thời" chỉ đúng
 // với các lời gọi trên cùng một instance.
 
 // lib/src/api/…
