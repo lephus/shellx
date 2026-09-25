@@ -217,8 +217,13 @@ final class FlakyKeyValueStore implements KeyValueStore {
   /// Keys whose deletes throw.
   final Set<String> failingDeletes = {};
 
+  /// Key → a future its reads wait for (a keychain prompt still open).
+  final Map<String, Future<void>> readHolds = {};
+
   @override
   Future<String?> read(String key) async {
+    final hold = readHolds[key];
+    if (hold != null) await hold;
     if (failingReads.contains(key)) {
       throw Exception('keychain refused $key: SECRET-DETAIL');
     }

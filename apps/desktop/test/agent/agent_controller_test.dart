@@ -110,6 +110,59 @@ void main() {
       expect(h.runtime.started, isTrue);
     });
 
+    test(
+      'bootstrap runs once: concurrent and later calls join the first',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await Future.wait([
+          controller().bootstrap(watchForWake: false),
+          controller().bootstrap(watchForWake: false),
+        ]);
+        await controller().bootstrap(watchForWake: false);
+        await pumpEventQueue();
+        expect(h.runtimes, hasLength(1));
+        expect(
+          h.relay.routes.where((r) => r == 'GET /v1/version'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test('a sign-in that finishes while startup still reads the keychain is '
+        'not undone by what startup then reads', () async {
+      boot();
+      await h.seedSignedIn();
+      final keychain = Completer<void>();
+      h.secureStore.readHolds['auth_token'] = keychain.future;
+      final starting = controller().bootstrap(watchForWake: false);
+      await pumpEventQueue();
+      expect(state().phase, AuthPhase.loading);
+
+      h.relay.token = 'token-2';
+      await controller().signIn(
+        email: 'phu@example.com',
+        password: 'correct horse',
+        register: false,
+      );
+      expect(state().phase, AuthPhase.signedIn);
+
+      // The startup read then fails (the keychain prompt was denied).
+      h.secureStore.failingReads.add('auth_token');
+      keychain.complete();
+      await starting;
+
+      expect(state().phase, AuthPhase.signedIn);
+      expect(h.notifier.shown, isEmpty);
+      expect(h.runtimes, hasLength(1));
+      expect(h.runtime.stopped, isFalse);
+      expect(h.api.token, 'token-2');
+      // The identity survived: remote access off and on again works.
+      await controller().setRemoteAccess(false);
+      await controller().setRemoteAccess(true);
+      expect(h.runtimes, hasLength(2));
+    });
+
     test('a token without device or user id counts as signed out', () async {
       boot();
       await h.secureStore.write('auth_token', h.relay.token);

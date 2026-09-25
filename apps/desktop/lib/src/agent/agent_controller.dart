@@ -13,6 +13,12 @@ import 'desktop_services.dart';
 import 'storage_keys.dart';
 import 'update_check.dart';
 
+typedef _SavedSignIn = ({
+  AgentCredentials? credentials,
+  String? email,
+  NoiseKeyPair? identity,
+});
+
 final agentControllerProvider =
     NotifierProvider<AgentController, AgentViewState>(AgentController.new);
 
@@ -38,6 +44,9 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// The sign-in in flight, if any (see [signIn]).
   Future<void>? _signingIn;
+
+  /// The one [bootstrap] run.
+  Future<void>? _bootstrap;
 
   /// The signed-in account, set with the stored copy by [bootstrap] and
   /// [signIn] and dropped as soon as a sign-out starts. A runtime starts
@@ -66,7 +75,16 @@ class AgentController extends Notifier<AgentViewState> {
   /// Loads settings and stored credentials; starts the agent when signed in
   /// and remote access is on; schedules update checks (startup + every 24 h).
   /// An unreadable secure store starts it signed out, with a notification.
-  Future<void> bootstrap({bool watchForWake = true}) async {
+  ///
+  /// Runs once: a second call (concurrent or later) returns the first one's
+  /// future, so there is one update timer and one wake detector. A sign-in
+  /// that completes while the keychain is still being read (the tray offers
+  /// "Sign in…" while loading) is kept: what the read returns is then
+  /// ignored.
+  Future<void> bootstrap({bool watchForWake = true}) =>
+      _bootstrap ??= _runBootstrap(watchForWake: watchForWake);
+
+  Future<void> _runBootstrap({required bool watchForWake}) async {
     final settings = _s.settings;
     state = state.copyWith(
       remoteAccess: settings.getBool(
@@ -92,30 +110,33 @@ class AgentController extends Notifier<AgentViewState> {
         // Keep the stored value if the OS cannot be queried.
       }
     }
-    ({AgentCredentials? credentials, String? email})? saved;
+    _SavedSignIn? saved;
+    Object? readError;
     try {
       saved = await _loadSavedSignIn();
     } catch (error) {
+      readError = error;
+    }
+    if (!ref.mounted) return;
+    if (state.phase != AuthPhase.loading) {
+      // Signed in (or out) while the keychain was being read: that wins.
+    } else if (saved == null) {
       // An unreadable keychain must not leave the app stuck loading: it
       // starts signed out (deleting nothing: it may work next time) and
       // says so, without details.
       debugPrint(
-        'ShellX: reading the saved sign-in failed: ${error.runtimeType}',
+        'ShellX: reading the saved sign-in failed: ${readError.runtimeType}',
       );
-      _identity = null;
-    }
-    if (!ref.mounted) return;
-    final credentials = saved?.credentials;
-    if (saved == null) {
       state = state.copyWith(phase: AuthPhase.signedOut);
       await _notify(
         title: _s.l10n.notifyStorageUnreadableTitle,
         body: _s.l10n.notifySignedOutBody,
       );
-    } else if (credentials == null) {
-      state = state.copyWith(phase: AuthPhase.signedOut, email: saved.email);
-    } else {
+    } else if (saved.credentials case final credentials?) {
+      _identity = saved.identity;
       await _enterSignedIn(credentials, email: saved.email);
+    } else {
+      state = state.copyWith(phase: AuthPhase.signedOut, email: saved.email);
     }
     await _applyKeepAwake();
     if (!ref.mounted) return;
@@ -130,19 +151,18 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// The stored credentials (none unless token, device id and user id are
-  /// all there) and email; loads the device key when signed in. Throws when
-  /// the secure store cannot be read.
-  Future<({AgentCredentials? credentials, String? email})>
-  _loadSavedSignIn() async {
+  /// all there) and email, with the device key when signed in. Throws when
+  /// the secure store cannot be read. Changes nothing: [bootstrap] applies
+  /// the result only if nobody signed in or out meanwhile.
+  Future<_SavedSignIn> _loadSavedSignIn() async {
     final store = _s.secureStore;
     final token = await store.read(DesktopStorageKeys.token);
     final deviceId = await store.read(DesktopStorageKeys.deviceId);
     final userId = await store.read(DesktopStorageKeys.userId);
     final email = await store.read(DesktopStorageKeys.email);
     if (token == null || deviceId == null || userId == null) {
-      return (credentials: null, email: email);
+      return (credentials: null, email: email, identity: null);
     }
-    _identity = await DeviceIdentity.loadOrCreate(store);
     return (
       credentials: AgentCredentials(
         token: token,
@@ -151,6 +171,7 @@ class AgentController extends Notifier<AgentViewState> {
         email: email ?? '',
       ),
       email: email,
+      identity: await DeviceIdentity.loadOrCreate(store),
     );
   }
 
@@ -691,7 +712,11 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
+  /// Also runs when the provider rebuilds, which keeps this instance: the
+  /// next lifecycle bootstraps again.
   void _dispose() {
+    _bootstrap = null;
+    _signingIn = null;
     _updateTimer?.cancel();
     _wakeDetector?.stop();
     unawaited(_trustedSubscription?.cancel());
