@@ -17,3 +17,4 @@ export 'src/identity/device_identity.dart';
 export 'src/api/compare_versions.dart';
 export 'src/api/models.dart';
 export 'src/api/shellx_api.dart';
+export 'src/relay/relay_connection.dart';
