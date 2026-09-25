@@ -45,6 +45,11 @@ const int _maxDimension = 1000;
 const int _idUpperBound = 1 << 31;
 const Duration _outputDrainGrace = Duration(seconds: 2);
 
+/// How long a session whose shell has exited waits for the send window to
+/// clear before giving up on the blocked tail and delivering
+/// `session.exited` anyway.
+const Duration _drainTimeout = Duration(seconds: 30);
+
 int _clampDimension(int value) => value.clamp(_minDimension, _maxDimension);
 
 final class _Session {
@@ -78,6 +83,19 @@ final class _Session {
 
   /// Highest position acknowledged by the attached phone.
   int acked = 0;
+
+  /// True once the session is being torn down: a host-initiated close set
+  /// this immediately, or the shell has already exited. A closing session
+  /// rejects new `session.attach` calls and is hidden from listings, but
+  /// stays in the manager (routing acks) until [_finish] removes it.
+  bool closing = false;
+
+  /// The shell's exit code, known once the process has actually exited.
+  int? finishedExitCode;
+
+  /// Bounds how long a closing session waits for the send window to clear
+  /// before [_finish] runs anyway (see [_drainTimeout]).
+  Timer? drainTimer;
 
   StreamSubscription<Uint8List>? output;
 }
@@ -122,7 +140,16 @@ final class SessionManager {
   int _nextId;
   int _pendingOpens = 0;
 
-  /// Messages to deliver, in order. Synchronous broadcast stream.
+  /// Bumped by [closeAll] and [closeSessionsAttachedTo] so an open that is
+  /// still awaiting [_shellResolver] can tell it was told to tear down
+  /// everything in the meantime and kill the pty instead of registering it.
+  int _epoch = 0;
+
+  /// Messages to deliver, in order. A synchronous broadcast stream: a
+  /// listener must not call back into the manager (e.g. `handle`)
+  /// synchronously from its callback. [_pump] tolerates this (it updates
+  /// its own bookkeeping before each send), but other callers are not
+  /// guaranteed to be reentrant-safe.
   Stream<OutboundMessage> get outbound => _outbound.stream;
 
   /// Fires whenever the session list or an attachment changes.
@@ -132,13 +159,14 @@ final class SessionManager {
 
   List<SessionSummary> get sessions => [
     for (final s in _sessions.values)
-      SessionSummary(
-        id: s.id,
-        index: s.index,
-        shell: s.shell,
-        createdAt: s.createdAt,
-        attachedMobileId: s.attachedMobileId,
-      ),
+      if (!s.closing)
+        SessionSummary(
+          id: s.id,
+          index: s.index,
+          shell: s.shell,
+          createdAt: s.createdAt,
+          attachedMobileId: s.attachedMobileId,
+        ),
   ];
 
   /// Handles one decrypted message from phone [mobileId].
@@ -149,13 +177,14 @@ final class SessionManager {
           mobileId,
           SessionListResult([
             for (final s in _sessions.values)
-              SessionInfo(
-                id: s.id,
-                index: s.index,
-                shell: s.shell,
-                createdAt: s.createdAt.millisecondsSinceEpoch,
-                attached: s.attachedMobileId != null,
-              ),
+              if (!s.closing)
+                SessionInfo(
+                  id: s.id,
+                  index: s.index,
+                  shell: s.shell,
+                  createdAt: s.createdAt.millisecondsSinceEpoch,
+                  attached: s.attachedMobileId != null,
+                ),
           ]),
         );
       case SessionOpen(:final cols, :final rows):
@@ -187,31 +216,39 @@ final class SessionManager {
   }
 
   /// The channel to [mobileId] is gone: its sessions become unattached
-  /// (no message is sent).
+  /// (no message is sent). A session that was already draining after its
+  /// shell exited (spec: no attached phone) finishes immediately instead of
+  /// waiting out the send window or the drain timeout.
   void mobileDisconnected(String mobileId) {
     var changed = false;
-    for (final session in _sessions.values) {
-      if (session.attachedMobileId == mobileId) {
+    for (final session in _sessions.values.toList()) {
+      final wasAttached = session.attachedMobileId == mobileId;
+      if (wasAttached) {
         session.attachedMobileId = null;
         changed = true;
       }
       if (session.exitRecipient == mobileId) session.exitRecipient = null;
+      if (wasAttached && session.closing) _finish(session);
     }
     if (changed) _changes.add(null);
   }
 
   /// Kills every session attached to [mobileId] (used when revoking a phone).
   void closeSessionsAttachedTo(String mobileId) {
+    _epoch++;
     for (final session in _sessions.values.toList()) {
       if (session.attachedMobileId == mobileId) session.pty.kill();
     }
   }
 
   /// Closes a session from the tray: `session.detached {closed_by_host}`
-  /// now, `session.exited` once the shell is gone.
+  /// now, `session.exited` once the shell is gone. Marks the session
+  /// closing immediately so a `session.attach` racing the kill cannot steal
+  /// [_Session.exitRecipient] before the shell has actually exited.
   void closeSession(int id) {
     final session = _sessions[id];
-    if (session == null) return;
+    if (session == null || session.closing) return;
+    session.closing = true;
     final mobileId = session.attachedMobileId;
     if (mobileId != null) {
       _send(
@@ -226,6 +263,7 @@ final class SessionManager {
   }
 
   void closeAll() {
+    _epoch++;
     for (final id in _sessions.keys.toList()) {
       closeSession(id);
     }
@@ -244,6 +282,7 @@ final class SessionManager {
     }
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
+    final epoch = _epoch;
     _pendingOpens++;
     final ShellCommand command;
     final Pty pty;
@@ -264,6 +303,14 @@ final class SessionManager {
       return;
     } finally {
       _pendingOpens--;
+    }
+    if (epoch != _epoch) {
+      // closeAll or closeSessionsAttachedTo ran while the shell was still
+      // spawning: don't resurrect a session behind that request's back.
+      // The opener already isn't getting a new session either way, so we
+      // drop this silently rather than answering spawn_failed.
+      pty.kill();
+      return;
     }
     final session = _Session(
       id: _nextId++,
@@ -288,7 +335,11 @@ final class SessionManager {
 
   void _attach(String mobileId, int id, int cols, int rows, int lastSeq) {
     final session = _sessions[id];
-    if (session == null) {
+    if (session == null || session.closing) {
+      // A closing session (host-initiated close, or the shell already
+      // exited) is not attachable: answering not_found here, instead of
+      // letting the attach succeed, keeps `exitRecipient` intact so the
+      // phone the host closed still gets `session.exited`.
       _notFound(mobileId, id);
       return;
     }
@@ -343,24 +394,51 @@ final class SessionManager {
     );
     session.pty.exitCode.then((code) async {
       await outputDone.future.timeout(_outputDrainGrace, onTimeout: () {});
-      _finish(session, code);
-    }, onError: (Object _) => _finish(session, -1));
+      _processExited(session, code);
+    }, onError: (Object _) => _processExited(session, -1));
   }
 
-  void _finish(_Session session, int exitCode) {
+  /// The shell process has exited. If nobody is attached, finishes right
+  /// away as before. Otherwise, marks the session closing (spec item 4: it
+  /// stops being listable/attachable from here on) and, if the send window
+  /// still has buffered bytes to deliver, keeps draining as further acks
+  /// arrive rather than dropping the tail — until it is fully drained, the
+  /// phone detaches ([mobileDisconnected]), or [_drainTimeout] elapses.
+  void _processExited(_Session session, int exitCode) {
     if (!identical(_sessions[session.id], session)) return;
-    _pump(session);
+    session.closing = true;
+    session.finishedExitCode = exitCode;
+    _pump(session); // may already finish (and remove) the session below.
+    if (!_sessions.containsKey(session.id)) return;
+    if (session.attachedMobileId == null) {
+      _finish(session);
+      return;
+    }
+    session.drainTimer = Timer(_drainTimeout, () => _finish(session));
+  }
+
+  /// Removes the session and delivers `session.exited` to whoever should
+  /// still hear about it. Safe to call more than once for the same session.
+  void _finish(_Session session) {
+    if (!identical(_sessions[session.id], session)) return;
+    session.drainTimer?.cancel();
+    session.drainTimer = null;
     final recipient = session.attachedMobileId ?? session.exitRecipient;
     _sessions.remove(session.id);
     session.output?.cancel();
     if (recipient != null) {
-      _send(recipient, SessionExited(id: session.id, exitCode: exitCode));
+      _send(
+        recipient,
+        SessionExited(id: session.id, exitCode: session.finishedExitCode ?? -1),
+      );
     }
     _changes.add(null);
   }
 
   /// Sends buffered output to the attached phone while the send window
   /// allows. Data overwritten before it could be sent triggers a reset.
+  /// Once a closing session (its shell has exited) has every buffered byte
+  /// queued to send, hands off to [_finish].
   void _pump(_Session session) {
     final mobileId = session.attachedMobileId;
     if (mobileId == null) return;
@@ -376,12 +454,14 @@ final class SessionManager {
       final room = _sendWindow - (session.sent - session.acked);
       final count = min(min(kMaxOutputChunk, buffer.end - session.sent), room);
       final data = buffer.read(session.sent, count);
-      _send(
-        mobileId,
-        OutputMessage(id: session.id, seq: session.sent, data: data),
-      );
+      final seq = session.sent;
+      // Advance before sending: `outbound` is a synchronous broadcast
+      // stream, so a listener may call back into the manager (e.g. to ack)
+      // before `_send` returns.
       session.sent += count;
+      _send(mobileId, OutputMessage(id: session.id, seq: seq, data: data));
     }
+    if (session.closing && session.sent >= buffer.end) _finish(session);
   }
 
   _Session? _attachedTo(String mobileId, int id) {

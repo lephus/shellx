@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:test/test.dart';
@@ -76,6 +77,25 @@ void main() {
     expect(error.code, AppErrorCode.spawnFailed);
     expect(error.message, contains('no pty'));
     expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('closeAll racing a pending open kills the new pty instead of leaking a '
+      'session behind it', () async {
+    final rig = SessionRig();
+    // The shell resolver's `resolve()` always suspends at least once
+    // (`async` with no synchronous return), so nothing is registered yet
+    // when this call returns control here.
+    final openFuture = rig.manager.handle(
+      phone,
+      const SessionOpen(cols: 80, rows: 24),
+    );
+    rig.manager.closeAll();
+    await openFuture;
+    await pumpEventQueue();
+
+    expect(rig.manager.sessions, isEmpty);
+    expect(rig.factory.ptys.single.killed, isTrue);
+    expect(rig.sent, isEmpty);
   });
 
   test('ids start at a random value in [1, 2^31) and increase by one; '
@@ -177,6 +197,81 @@ void main() {
     expect(messages.last, isA<SessionExited>());
     expect((messages.last as SessionExited).exitCode, 7);
     expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('shell exit drains a send-window-blocked tail before session.exited '
+      'instead of dropping it', () async {
+    final rig = SessionRig(bufferCapacity: 1024 * 1024);
+    final id = await rig.open(phone);
+    rig.clear();
+    rig.pty(0).emitBytes(List.filled(300 * 1024, 0x61));
+    rig.pty(0).exit(0);
+    await pumpEventQueue();
+
+    // The shell has already exited, but 300 KiB - 256 KiB = 44 KiB is
+    // still blocked by the default send window: session.exited must not
+    // jump the queue and the tail must not be dropped.
+    expect(outputBytes(rig.to(phone), id), 256 * 1024);
+    expect(rig.to(phone).whereType<SessionExited>(), isEmpty);
+
+    await rig.manager.handle(phone, AckMessage(id: id, seq: 256 * 1024));
+    await pumpEventQueue();
+
+    final messages = rig.to(phone);
+    expect(outputBytes(messages, id), 300 * 1024);
+    expect(messages.last, isA<SessionExited>());
+    expect((messages.last as SessionExited).exitCode, 0);
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('a draining session gives up after 30s and delivers session.exited '
+      'even if the phone never finishes acking', () {
+    fakeAsync((async) {
+      final rig = SessionRig(bufferCapacity: 1024 * 1024);
+      rig.manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+      async.flushMicrotasks();
+      final id = rig.to(phone).whereType<SessionOpened>().last.id;
+      rig.clear();
+
+      rig.pty(0).emitBytes(List.filled(300 * 1024, 0x61));
+      rig.pty(0).exit(0);
+      async.flushMicrotasks();
+      expect(outputBytes(rig.to(phone), id), 256 * 1024);
+      expect(rig.manager.sessions, isEmpty); // hidden from listing while
+      // draining (spec item 4): it's still tracked internally, though.
+
+      // No further ack ever arrives.
+      async.elapse(const Duration(seconds: 30));
+
+      final messages = rig.to(phone);
+      expect(messages.last, isA<SessionExited>());
+      expect((messages.last as SessionExited).exitCode, 0);
+    });
+  });
+
+  test('a draining session finishes immediately if the phone disconnects, '
+      'without waiting for the drain timeout', () {
+    fakeAsync((async) {
+      final rig = SessionRig(bufferCapacity: 1024 * 1024);
+      rig.manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+      async.flushMicrotasks();
+      final id = rig.to(phone).whereType<SessionOpened>().last.id;
+      rig.clear();
+
+      rig.pty(0).emitBytes(List.filled(300 * 1024, 0x61));
+      rig.pty(0).exit(0);
+      async.flushMicrotasks();
+      expect(outputBytes(rig.to(phone), id), 256 * 1024);
+
+      rig.manager.mobileDisconnected(phone);
+      expect(rig.manager.sessions, isEmpty);
+
+      // The 30s drain timer must have been cancelled: elapsing well past
+      // it sends nothing more (there is no attached phone to send to).
+      rig.clear();
+      async.elapse(const Duration(seconds: 40));
+      expect(rig.sent, isEmpty);
+    });
   });
 
   test(
