@@ -212,17 +212,38 @@ final class RelayConnection {
   }
 
   /// Disconnects for good (until [start] is called again).
+  ///
+  /// The state is `stopped` and nothing more is emitted as soon as this is
+  /// called. The returned future also waits, at most [connectTimeout], for
+  /// an upgrade still in flight to settle (its socket, if any, is then
+  /// closed): until it has, it may still register at the relay, which keeps
+  /// only the newest connection per device, so a connection dialled by
+  /// another [RelayConnection] of the same device after this completes is
+  /// never replaced (4001) by it.
   Future<void> stop() async {
-    if (_state == RelayConnectionState.stopped) {
+    if (_state != RelayConnectionState.stopped) {
+      final socket = _abandonSocket();
+      _reconnectTimer?.cancel();
+      _reconnectTimer = null;
+      _setState(RelayConnectionState.stopped);
+      if (socket != null) {
+        await _closeQuietly(socket, 1000);
+      }
+    }
+    await _dialSettled();
+  }
+
+  /// Waits, at most [connectTimeout], for the upgrade in flight (if any) to
+  /// settle. A dial already given up on after a full [connectTimeout] is
+  /// not waited for again (see [_connect]). Never throws.
+  Future<void> _dialSettled() async {
+    final dialing = _dialing;
+    if (dialing == null || identical(dialing, _dialGivenUpOn)) {
       return;
     }
-    final socket = _abandonSocket();
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-    _setState(RelayConnectionState.stopped);
-    if (socket != null) {
-      await _closeQuietly(socket, 1000);
-    }
+    await dialing
+        .then<void>((_) {}, onError: (Object _) {})
+        .timeout(connectTimeout, onTimeout: () {});
   }
 
   /// Sends a frame; false (nothing sent) unless connected.
