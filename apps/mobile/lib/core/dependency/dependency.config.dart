@@ -17,6 +17,8 @@ import 'package:package_info_plus/package_info_plus.dart' as _i655;
 import 'package:shared_preferences/shared_preferences.dart' as _i460;
 import 'package:shellx_core/shellx_core.dart' as _i145;
 
+import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
+import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
 import '../auth/auth_storage.dart' as _i657;
 import '../core.dart' as _i351;
 import '../handler/popup_handler.dart' as _i695;
@@ -48,6 +50,9 @@ extension GetItInjectableX on _i174.GetIt {
       preResolve: true,
     );
     gh.lazySingleton<_i145.ShellxApi>(() => module.api);
+    gh.lazySingleton<_i870.BiometricAuthenticator>(
+      () => _i870.LocalAuthBiometricAuthenticator(),
+    );
     gh.lazySingleton<_i618.ExternalLinks>(() => _i618.UrlLauncherLinks());
     gh.factory<_i409.BuildContext>(() => module.context(gh<_i81.AppRouter>()));
     await gh.lazySingletonAsync<_i145.KeyValueStore>(
@@ -64,6 +69,12 @@ extension GetItInjectableX on _i174.GetIt {
       final i = _i620.AppSettings(gh<_i145.KeyValueStore>());
       return i.load().then((_) => i);
     }, preResolve: true);
+    gh.lazySingleton<_i306.AppLockController>(
+      () => _i306.AppLockController.create(
+        gh<_i870.BiometricAuthenticator>(),
+        gh<_i351.AppSettings>(),
+      ),
+    );
     return this;
   }
 }

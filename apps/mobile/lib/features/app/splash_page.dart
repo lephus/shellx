@@ -1,5 +1,7 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/app/launch.dart';
+
 import 'app.dart';
 
 @RoutePage()
@@ -21,7 +23,7 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> initialize() async {
     WidgetsFlutterBinding.ensureInitialized();
     await configureDependencies();
-    await Future.delayed(const Duration(seconds: 1));
+    await prepareLaunch();
     if (!mounted) return;
     navigatorKey.currentState?.pushReplacement(
       PageRouteBuilder(
