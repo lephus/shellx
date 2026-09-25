@@ -618,7 +618,7 @@ final class MachineClient {
   List<ClientTab> get tabs;
   void input(int id, Uint8List data);                                 // cắt > 16 KiB
   void resize(int id, int cols, int rows);                            // bỏ qua nếu cols < 1 hoặc rows < 1
-  Future<void> closeTab(int id);
+  Future<void> closeTab(int id);                                      // tab đang gắn: gửi session.close; chưa có kênh thì gửi ngay trên kênh kế tiếp
   // Khi kết nối relay phục hồi: tự bắt tay lại và gắn lại mọi tab isAttached == true với lastSeq = received.
 }
 final class ClientService {

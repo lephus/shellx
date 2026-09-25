@@ -446,6 +446,43 @@ void main() {
     });
   });
 
+  // Final review I2: a tab closed with no channel still closes its session.
+  test('a tab closed while the phone is offline closes its session once the '
+      'phone is back', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      settle(async);
+
+      // No other tab is open: nothing but the close needs a channel.
+      h.disconnectPhone();
+      h.run(h.phoneMachine.closeTab(tab.id));
+      expect(h.phoneMachine.tabs, isEmpty);
+      expect(h.pty.killed, isFalse);
+
+      h.reconnectPhone();
+      expect(h.pty.killed, isTrue);
+      expect(h.sessions.sessions, isEmpty);
+    });
+  });
+
+  test('a tab closed while its machine has no channel (relay up) closes its '
+      'session without waiting for another event', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      settle(async);
+
+      h.phoneMachine.relayLost(); // The channel goes; nothing resumes it.
+      settle(async);
+      expect(h.phoneMachine.state, isA<MachineIdle>());
+      h.run(h.phoneMachine.closeTab(tab.id));
+      settle(async);
+      expect(h.pty.killed, isTrue);
+      expect(h.sessions.sessions, isEmpty);
+    });
+  });
+
   test('stop() and start() of the phone service re-attach the open tab', () {
     fakeAsync((async) {
       final h = Harness(async, keys);

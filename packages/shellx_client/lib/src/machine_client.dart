@@ -73,6 +73,10 @@ final class MachineClient {
   /// is lost. An attached tab missing here is stale: the agent does not
   /// send it anything until it is re-attached.
   final _attachedHere = <ClientTab>{};
+
+  /// Sessions whose attached tab was closed while there was no channel:
+  /// their `session.close` goes out first thing on the next channel.
+  final _pendingCloses = <int>{};
   final _pendingOpens = <_PendingOpen>[];
   final _pendingLists = <Completer<List<SessionInfo>>>[];
 
@@ -199,15 +203,25 @@ final class MachineClient {
     _send([ResizeMessage(id: id, cols: cols, rows: rows)]);
   }
 
-  /// Removes the tab. An attached tab also closes its session on the agent;
-  /// a detached or ended tab is only removed locally.
+  /// Removes the tab. An attached tab also closes its session on the agent:
+  /// at once, or with no channel on the next one (asked for now when the
+  /// relay is up, else when it is back). A detached or ended tab is only
+  /// removed locally.
   Future<void> closeTab(int id) async {
     final tab = _tabs.remove(id);
     if (tab == null) return;
     _attachedHere.remove(tab);
     final wasAttached = tab.isAttached;
     tab.dispose();
-    if (wasAttached && _send([SessionClose(id: id)])) await _outbox;
+    if (!wasAttached) return;
+    if (_send([SessionClose(id: id)])) {
+      await _outbox;
+      return;
+    }
+    // Otherwise the session would run unattached until closed from the
+    // tray, counting toward the agent's session limit.
+    _pendingCloses.add(id);
+    if (_relay.state == RelayConnectionState.connected) unawaited(_resume());
   }
 
   /// Routed here by [ClientService]: DATA from this agent, ERROR and
@@ -254,6 +268,7 @@ final class MachineClient {
   @internal
   void shutdown() {
     _channelLost();
+    _pendingCloses.clear();
     for (final tab in _tabs.values) {
       tab.dispose();
     }
@@ -347,6 +362,7 @@ final class MachineClient {
     if (drops != _drops) return false; // The agent may have replaced it.
     _channelId = channel;
     _secure = SecureChannel(handshake.split());
+    _sendPendingCloses();
     _setState(const MachineReady());
     // Whoever asked for this channel, stale tabs re-attach on it.
     unawaited(_resume());
@@ -556,11 +572,13 @@ final class MachineClient {
 
   /// Re-handshake and re-attach every stale tab (still attached, i.e. not
   /// taken over, exited or ended, but not on the current channel) with
-  /// `last_seq = received`, one at a time. A call while a resume runs (the
-  /// channel was lost again during its attaches) makes that resume do one
-  /// more pass. Only ever triggered by an event (relay back, PRESENCE
-  /// online, decrypt error, a dropped channel, a new channel installed by
-  /// anyone), so an agent that stays offline costs one handshake per event.
+  /// `last_seq = received`, one at a time; a pending `session.close` also
+  /// needs the handshake (it is sent on install). A call while a resume
+  /// runs (the channel was lost again during its attaches) makes that
+  /// resume do one more pass. Only ever triggered by an event (relay back,
+  /// PRESENCE online, decrypt error, a dropped channel, a new channel
+  /// installed by anyone, a tab closed with no channel), so an agent that
+  /// stays offline costs one handshake per event.
   Future<void> _resume() async {
     if (_resuming) {
       _resumeAgain = true;
@@ -579,7 +597,7 @@ final class MachineClient {
 
   Future<void> _resumeOnce() async {
     if (_pinnedKey() == null) return; // Untrusted or unpaired: nothing to do.
-    if (!_tabs.values.any(_isStale)) return;
+    if (!_tabs.values.any(_isStale) && _pendingCloses.isEmpty) return;
     try {
       await connect(); // Joins a handshake the app already started.
       // Tabs opened or attached on this channel since are not stale.
@@ -604,6 +622,14 @@ final class MachineClient {
   /// Attached as far as the phone knows, but not on the current channel.
   bool _isStale(ClientTab tab) =>
       tab.isAttached && !_attachedHere.contains(tab);
+
+  /// On a new channel: `session.close` for the tabs closed while there was
+  /// none, before anything else is sent on it.
+  void _sendPendingCloses() {
+    if (_pendingCloses.isEmpty) return;
+    _send([for (final id in _pendingCloses) SessionClose(id: id)]);
+    _pendingCloses.clear();
+  }
 
   void _channelLost() {
     _losses++;
