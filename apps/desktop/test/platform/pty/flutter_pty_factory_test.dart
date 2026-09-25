@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/platform/pty/flutter_pty_factory.dart';
+import 'package:shellx_desktop/src/platform/pty/process_table.dart';
 import 'package:shellx_desktop/src/platform/pty/process_tree_killer.dart';
 import 'package:shellx_desktop/src/platform/pty/windows_text.dart';
 
@@ -38,6 +39,16 @@ final class _RecordingKiller implements ProcessTreeKiller {
   final killed = <int>[];
   @override
   Future<void> killTree(int rootPid) async => killed.add(rootPid);
+}
+
+final class _FailingKiller implements ProcessTreeKiller {
+  _FailingKiller(this.error);
+  final Object error;
+  @override
+  Future<void> killTree(int rootPid) async {
+    await Future<void>.delayed(Duration.zero);
+    throw error;
+  }
 }
 
 const _zsh = ShellCommand(
@@ -213,5 +224,97 @@ void main() {
         await done.future.timeout(const Duration(seconds: 2));
       },
     );
+  });
+
+  group('FlutterPtyAdapter kill', () {
+    test(
+      'macOS: kill after the shell exited leaves the stale pid alone',
+      () async {
+        final native = _FakeNativePty(_launch);
+        final killer = _RecordingKiller();
+        final pty = FlutterPtyAdapter(native, killer: killer);
+        native.exit.complete(0);
+        await Future<void>.delayed(Duration.zero);
+
+        pty.kill();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(killer.killed, isEmpty);
+        expect(native.kills, 0);
+      },
+    );
+
+    test(
+      'Windows: kill after the shell exited still terminates the job',
+      () async {
+        final native = _FakeNativePty(_launch);
+        final pty = FlutterPtyAdapter(native);
+        native.exit.complete(0);
+        await Future<void>.delayed(Duration.zero);
+
+        pty.kill();
+
+        expect(native.kills, 1);
+      },
+    );
+
+    test('a failing tree kill is reported with the pid, not thrown', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyAdapter(
+        _FakeNativePty(_launch),
+        killer: _FailingKiller(
+          const ProcessTableException('ps exited with code 1'),
+        ),
+        onError: errors.add,
+      );
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: ps exited with code 1']);
+    });
+
+    test('other kill errors are reported by type only', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyAdapter(
+        _FakeNativePty(_launch),
+        killer: _FailingKiller(StateError('/bin/zsh -l SECRET=1')),
+        onError: errors.add,
+      );
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: StateError']);
+    });
+
+    test('Windows: a failed job kill is reported', () {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..killSucceeds = false;
+      final pty = FlutterPtyAdapter(native, onError: errors.add);
+
+      pty.kill();
+
+      expect(errors, [
+        'kill of pid 4321 failed: could not terminate the job object',
+      ]);
+    });
+
+    test('the factory hands onError to its ptys', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyFactory(
+        isWindows: false,
+        killer: _FailingKiller(
+          const ProcessTableException('cannot run ps (OS error 2)'),
+        ),
+        start: _FakeNativePty.new,
+        onError: errors.add,
+      ).spawn(_zsh, workingDirectory: '/', environment: {}, cols: 80, rows: 24);
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: cannot run ps (OS error 2)']);
+    });
   });
 }

@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_pty/flutter_pty.dart' as fp;
 import 'package:shellx_agent/shellx_agent.dart';
 
+import 'process_table.dart';
 import 'process_tree_killer.dart';
 import 'windows_text.dart';
 
@@ -86,23 +88,29 @@ NativePty startFlutterPty(PtyLaunch launch) {
 ///   every process it started.
 final class FlutterPtyFactory implements PtyFactory {
   /// [killer] is used on macOS only (default [PosixProcessTreeKiller]).
+  /// [onError] receives kill failures (pid and reason only; default:
+  /// `debugPrint`).
   FlutterPtyFactory({
     required bool isWindows,
     ProcessTreeKiller? killer,
     NativePtyStarter start = startFlutterPty,
     Duration outputGrace = const Duration(milliseconds: 500),
+    void Function(String message)? onError,
   }) : _isWindows = isWindows,
        _killer = isWindows ? null : killer ?? PosixProcessTreeKiller(),
        _start = start,
-       _outputGrace = outputGrace;
+       _outputGrace = outputGrace,
+       _onError = onError;
 
-  factory FlutterPtyFactory.forCurrentPlatform() =>
-      FlutterPtyFactory(isWindows: Platform.isWindows);
+  factory FlutterPtyFactory.forCurrentPlatform({
+    void Function(String message)? onError,
+  }) => FlutterPtyFactory(isWindows: Platform.isWindows, onError: onError);
 
   final bool _isWindows;
   final ProcessTreeKiller? _killer;
   final NativePtyStarter _start;
   final Duration _outputGrace;
+  final void Function(String message)? _onError;
 
   /// Windows: the plugin writes the executable and the arguments into the
   /// command line as given, so each is quoted. Paths and environment values
@@ -149,6 +157,7 @@ final class FlutterPtyFactory implements PtyFactory {
       _start(launch),
       killer: _killer,
       outputGrace: _outputGrace,
+      onError: _onError,
     );
   }
 }
@@ -162,13 +171,20 @@ final class FlutterPtyFactory implements PtyFactory {
 /// 2 s for it).
 ///
 /// `kill()` runs [killer]'s tree kill on the shell's pid (macOS) or, without
-/// a killer, the plugin's job-object kill (Windows).
+/// a killer, the plugin's job-object kill (Windows). Once the shell has
+/// exited, the tree kill is skipped (its pid may already belong to another
+/// process); the job-object kill stays valid and ends anything left in the
+/// job. Kill failures never throw: they go to [onError] as
+/// `kill of pid <pid> failed: <reason>` — never output, arguments or
+/// environment.
 final class FlutterPtyAdapter implements Pty {
   FlutterPtyAdapter(
     this._native, {
     ProcessTreeKiller? killer,
     this.outputGrace = const Duration(milliseconds: 500),
-  }) : _killer = killer {
+    void Function(String message)? onError,
+  }) : _killer = killer,
+       _onError = onError ?? _debugPrintError {
     _nativeSubscription = _native.output.listen(
       _output.add,
       onError: _output.addError,
@@ -176,18 +192,24 @@ final class FlutterPtyAdapter implements Pty {
     );
     unawaited(
       _native.exitCode.then((_) async {
+        _exited = true;
         await Future<void>.delayed(outputGrace);
         _closeOutput();
       }),
     );
   }
 
+  static void _debugPrintError(String message) =>
+      debugPrint('ShellX PTY: $message');
+
   final NativePty _native;
   final ProcessTreeKiller? _killer;
+  final void Function(String message) _onError;
   final Duration outputGrace;
   final StreamController<Uint8List> _output = StreamController<Uint8List>();
   late final StreamSubscription<Uint8List> _nativeSubscription;
   bool _killed = false;
+  bool _exited = false;
 
   int get pid => _native.pid;
 
@@ -215,9 +237,36 @@ final class FlutterPtyAdapter implements Pty {
     _killed = true;
     final killer = _killer;
     if (killer == null) {
-      _native.kill();
-    } else {
-      unawaited(killer.killTree(_native.pid));
+      _killJob();
+    } else if (!_exited) {
+      final target = _native.pid;
+      unawaited(
+        killer
+            .killTree(target)
+            .catchError((Object error) => _reportKillError(target, error)),
+      );
     }
+  }
+
+  void _killJob() {
+    try {
+      // False after exit is expected: the plugin released the job, which
+      // ended everything left in it.
+      if (!_native.kill() && !_exited) {
+        _onError(
+          'kill of pid ${_native.pid} failed: '
+          'could not terminate the job object',
+        );
+      }
+    } catch (error) {
+      _reportKillError(_native.pid, error);
+    }
+  }
+
+  void _reportKillError(int target, Object error) {
+    final reason = error is ProcessTableException
+        ? error.message
+        : '${error.runtimeType}';
+    _onError('kill of pid $target failed: $reason');
   }
 }
