@@ -508,20 +508,29 @@ final class SessionManager {
 // cols/rows nhận từ mobile được kẹp vào [1, 1000].
 
 final class TrustedDevice {
-  TrustedDevice({required this.mobileId, required Uint8List publicKey, required this.name, required this.pairedAt}); // copies publicKey (not const)
+  TrustedDevice({required this.mobileId, required Uint8List publicKey, required this.name, required this.pairedAt,
+      required this.pairingId}); // copies publicKey (not const); ArgumentError nếu pairingId không phải UUIDv7 chữ thường
   final String mobileId; final Uint8List publicKey; final String name; final DateTime pairedAt;
-  Map<String, Object?> toJson(); static TrustedDevice fromJson(Map<String, Object?> json);
+  final String pairingId;                                // id lần ghép nối (4.3), sinh lúc pair.confirm
+  Map<String, Object?> toJson(); static TrustedDevice fromJson(Map<String, Object?> json);   // thiếu/sai pairing_id → FormatException
 }
 final class TrustedStore {
-  TrustedStore(KeyValueStore store);
-  static const String storageKey = 'trusted_devices';    // JSON array
+  TrustedStore(KeyValueStore store);                     // một instance dùng chung cho cả app
+  static const String storageKey = 'trusted_devices';    // JSON array; mục thiếu/sai pairing_id bị bỏ qua (fail closed)
   Future<List<TrustedDevice>> list();
   Future<TrustedDevice?> find(String mobileId);
-  Future<void> add(TrustedDevice device);                // thay thế nếu trùng mobileId
-  Future<void> remove(String mobileId);
+  Future<void> add(TrustedDevice device, {bool unregistered = false});   // thay thế nếu trùng mobileId (kể cả dấu unregistered)
+  Future<bool> remove(String mobileId, {String? pairingId});             // có pairingId: chỉ xóa nếu mục vẫn mang id đó; true nếu đã xóa; không ghi gì nếu không có gì để xóa
   Future<void> clear();
-  Stream<void> get changes;
+  Future<List<TrustedDevice>> unregistered();            // các mục mà POST /v1/pairings chưa được relay xác nhận
+  Future<bool> markRegistered(String mobileId, String pairingId);        // bỏ dấu unregistered; false nếu mục đã bị thay/xóa
+  Stream<void> get changes;                              // danh sách tin cậy đổi (không phát khi chỉ bỏ dấu unregistered)
 }
+final class PairingIdGenerator {                         // UUIDv7 chữ thường; tăng dần trong một instance
+  PairingIdGenerator({DateTime Function()? now, Random? random});   // random mặc định Random.secure()
+  String next();
+}
+bool isPairingId(String value);                          // UUIDv7 chuẩn chữ thường (version 7, variant 10)
 final class PairingOffer { const PairingOffer({required this.secret, required this.expiresAt}); final Uint8List secret; final DateTime expiresAt; }
 final class PairingCodeManager {
   PairingCodeManager({DateTime Function()? now, Random? random});
@@ -543,7 +552,9 @@ final class AgentService {
   AgentService({required RelayConnection relay, required ShellxApi api, required String deviceId,
       required NoiseKeyPair identity, required TrustedStore trusted, required SessionManager sessions,
       required PairingCodeManager pairing, required String appVersion,
-      Duration flushInterval = const Duration(milliseconds: 16)});
+      Duration flushInterval = const Duration(milliseconds: 16),
+      DateTime Function()? clock,                        // đồng hồ cho pairing_id và pairedAt (mặc định DateTime.now)
+      Backoff? registrationBackoff});                    // thử lại POST /v1/pairings khi đang kết nối (mặc định Backoff())
   Future<void> start();
   Future<void> stop();
   Stream<AgentEvent> get events;
