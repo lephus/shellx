@@ -1,0 +1,75 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
+import 'package:shellx_mobile/features/terminal/domain/shellx_terminal.dart';
+import 'package:xterm/core.dart';
+
+void main() {
+  late ExtraKeysController keys;
+  late ShellxTerminal terminal;
+  late List<String> out;
+
+  setUp(() {
+    keys = ExtraKeysController();
+    out = [];
+    terminal = ShellxTerminal(modifiers: keys)..onOutput = out.add;
+  });
+
+  tearDown(() => keys.dispose());
+
+  /// What TerminalView does with a soft-keyboard character.
+  void typeOnSoftKeyboard(String char, TerminalKey key) {
+    if (!terminal.keyInput(key)) terminal.textInput(char);
+  }
+
+  test('soft keyboard: sticky Ctrl turns "c" into ^C', () {
+    keys.tapModifier(ExtraKey.ctrl);
+    typeOnSoftKeyboard('c', TerminalKey.keyC);
+    expect(out, ['\x03']);
+    expect(keys.hasActiveModifiers, isFalse);
+  });
+
+  test('soft keyboard: sticky Alt keeps the typed case', () {
+    keys.tapModifier(ExtraKey.alt);
+    typeOnSoftKeyboard('B', TerminalKey.keyB);
+    expect(out, ['\x1bB']);
+    keys.tapModifier(ExtraKey.alt);
+    typeOnSoftKeyboard('b', TerminalKey.keyB);
+    expect(out.last, '\x1bb');
+  });
+
+  test('soft keyboard without modifiers sends the text, Return as CR', () {
+    typeOnSoftKeyboard('q', TerminalKey.keyQ);
+    terminal.textInput('\n');
+    terminal.textInput('xin chào');
+    expect(out, ['q', '\r', 'xin chào']);
+  });
+
+  test('sticky Alt applies to non-text keys such as arrows', () {
+    keys.tapModifier(ExtraKey.alt);
+    expect(terminal.keyInput(TerminalKey.arrowLeft), isTrue);
+    expect(out, ['\x1b[1;3D']);
+    expect(keys.hasActiveModifiers, isFalse);
+  });
+
+  test('hardware Ctrl works on its own and leaves sticky modifiers alone', () {
+    keys.tapModifier(ExtraKey.alt);
+    expect(terminal.keyInput(TerminalKey.keyC, ctrl: true), isTrue);
+    expect(out, ['\x03']);
+    expect(keys.alt.value, ModifierLatch.oneShot);
+  });
+
+  test('application cursor mode comes from DECCKM', () {
+    terminal.write('\x1b[?1h');
+    terminal.keyInput(TerminalKey.arrowUp);
+    expect(out, ['\x1bOA']);
+  });
+
+  test('paste: bracketed when enabled, CR line breaks, never modified', () {
+    keys.tapModifier(ExtraKey.ctrl);
+    terminal.paste('echo 1\necho 2');
+    terminal.write('\x1b[?2004h');
+    terminal.paste('a\r\nb');
+    expect(out, ['echo 1\recho 2', '\x1b[200~a\rb\x1b[201~']);
+    expect(keys.ctrl.value, ModifierLatch.oneShot);
+  });
+}
