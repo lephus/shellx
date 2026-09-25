@@ -219,6 +219,13 @@ final class PairingPostControl extends http.BaseClient {
   /// `POST /v1/pairings` attempts, including failed ones.
   int attempts = 0;
 
+  /// How the next DELETEs fail, in order (0: network error, else that HTTP
+  /// status; the relay never sees them). Once used up, DELETEs pass.
+  final deleteFailures = <int>[];
+
+  /// `DELETE` attempts, including failed ones.
+  int deleteAttempts = 0;
+
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (request.method == 'POST' && request.url.path == '/v1/pairings') {
@@ -233,22 +240,26 @@ final class PairingPostControl extends http.BaseClient {
         await (await _inner.send(request)).stream.drain<void>();
         throw http.ClientException('connection reset');
       }
-      if (status != null) {
-        return http.StreamedResponse(
-          Stream.value(
-            utf8.encode('{"error":{"code":"test","message":"test"}}'),
-          ),
-          status,
-          headers: {'content-type': 'application/json'},
-        );
-      }
+      if (status != null) return _error(status);
     }
     if (request.method == 'DELETE') {
+      deleteAttempts++;
       final held = deleteGate;
       if (held != null) await held.future;
+      if (deleteFailures.isNotEmpty) {
+        final status = deleteFailures.removeAt(0);
+        if (status == 0) throw http.ClientException('network is down');
+        return _error(status);
+      }
     }
     return _inner.send(request);
   }
+
+  static http.StreamedResponse _error(int status) => http.StreamedResponse(
+    Stream.value(utf8.encode('{"error":{"code":"test","message":"test"}}')),
+    status,
+    headers: {'content-type': 'application/json'},
+  );
 }
 
 /// In-memory [KeyValueStore] whose reads can be held at a [gate] or made to
@@ -1173,6 +1184,34 @@ void main() {
         async.elapse(const Duration(seconds: 60));
         expect(rig.unregistered, isEmpty);
         expect(rig.relay.pairings, contains((agentId, tabletId)));
+      });
+    });
+
+    // Final review M2: the DELETE is retried like the phone's unpair.
+    test('revoke retries the pairing DELETE after a 5xx or a network error '
+        '(3 attempts in all), never after a 4xx', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        drive(async, rig.trusted.add(trustedTablet()));
+        rig.relay.pairings[(agentId, phoneId)] = phonePairingId;
+        rig.relay.pairings[(agentId, tabletId)] = tabletPairingId;
+
+        rig.posts.deleteFailures.addAll([503, 0]);
+        drive(async, rig.service.revoke(phoneId));
+        expect(rig.posts.deleteAttempts, 3);
+        expect(rig.relay.pairings.keys, [(agentId, tabletId)]);
+
+        rig.posts.deleteFailures.addAll([500, 500, 500]);
+        drive(async, rig.service.revoke(tabletId));
+        expect(rig.posts.deleteAttempts, 6); // Gave up after three.
+        expect(rig.relay.pairings, contains((agentId, tabletId)));
+
+        drive(async, rig.trusted.add(trustedTablet()));
+        rig.posts.deleteFailures.add(404);
+        drive(async, rig.service.revoke(tabletId));
+        async.elapse(const Duration(seconds: 5));
+        expect(rig.posts.deleteAttempts, 7);
+        expect(rig.posts.deleteFailures, isEmpty);
       });
     });
 
