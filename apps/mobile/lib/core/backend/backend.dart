@@ -36,9 +36,13 @@ abstract interface class TabHandle {
 abstract interface class MachineSession {
   String get agentId;
 
-  /// [MachineIdle] → [MachineConnecting] → [MachineReady], or
-  /// [MachineFailed]; back to [MachineIdle] when the channel is lost (relay
-  /// down, machine offline, [ShellxBackend.suspend]).
+  /// [MachineIdle] → [MachineConnecting] → [MachineReady] or
+  /// [MachineFailed]. Only [MachineReady] falls back to [MachineIdle], when
+  /// the channel is lost (relay down, machine offline,
+  /// [ShellxBackend.suspend]); [MachineFailed] stays until the next
+  /// handshake. The automatic resume runs that handshake itself (relay back,
+  /// machine online), so the state can change without the UI calling
+  /// [connect].
   MachineConnectionState get state;
   Stream<MachineConnectionState> get states;
 
@@ -131,7 +135,8 @@ abstract interface class ShellxBackend {
 
   /// Pairing initiator (spec §5.3); throws [PairingException] (`shellx_client`)
   /// or the [ApiException] of `GET /v1/devices`. On success the machine is
-  /// pinned; its channel is dropped and its tabs re-attach.
+  /// pinned. Once the pairing handshake was sent, the machine's channel is
+  /// dropped whether pairing succeeds or not, and its open tabs re-attach.
   Future<void> pair(PairingUri uri);
 
   /// The same [MachineSession] per [agentId] while it stays pinned. Throws
@@ -143,11 +148,17 @@ abstract interface class ShellxBackend {
   /// running on the computer), forget the pin, then delete the pairing
   /// record (3 attempts for network/5xx errors). May still throw
   /// [ApiException] after the pin is gone: show it and offer a retry —
-  /// calling this again only repeats the delete. A `pairing_removed` event
-  /// from the relay never unpairs; only an `untrusted` handshake forgets a pin.
+  /// calling this again only repeats the delete. A [MachineSession] kept
+  /// from before is dead either way: its tabs are closed and [connect] and
+  /// requests throw [MachineConnectionException]; ask [machine] again after
+  /// pairing again. A `pairing_removed` event from the relay never unpairs;
+  /// only an `untrusted` handshake forgets a pin.
   Future<void> unpair(String agentId);
 
-  /// Stops the client and the relay connection for good (sign-out).
+  /// Stops the client and the relay connection for good (sign-out). After
+  /// it, [suspend], [resume] and [reconnectNow] do nothing — the relay never
+  /// dials again — and [devices], [pair] and [unpair] throw [StateError]:
+  /// the shared [ShellxApi] may already hold the next account's token.
   Future<void> dispose();
 }
 

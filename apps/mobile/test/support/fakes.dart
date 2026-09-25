@@ -83,7 +83,7 @@ class FakeTabHandle implements TabHandle {
 
 /// Scriptable [MachineSession]. Unlike `shellx_client`, [input] and [resize] record every call
 /// (the real client drops input without a channel and sizes below 1×1), so tests can check the
-/// UI's own gating.
+/// UI's own gating. [FakeBackend.unpair] shuts it down for good ([shutDown]).
 class FakeMachineSession implements MachineSession {
   FakeMachineSession(this.agentId);
 
@@ -107,6 +107,8 @@ class FakeMachineSession implements MachineSession {
   /// Thrown by [attach]; an [AppErrorException] also ends an existing tab of that id with
   /// [TabError], as the agent's `error` does in `shellx_client`.
   final Map<int, Object> attachErrors = {};
+
+  /// The open tabs; closed and cleared by [shutDown].
   final List<FakeTabHandle> handles = [];
   final List<({int cols, int rows})> opened = [];
   final List<({int id, int cols, int rows})> attached = [];
@@ -121,8 +123,32 @@ class FakeMachineSession implements MachineSession {
   /// Like shellx_client: re-attaching an existing tab returns the same handle.
   bool reuseHandles = false;
   int _nextId = 1;
+  bool _shutDown = false;
 
-  void _setState(MachineConnectionState state) {
+  bool get isShutDown => _shutDown;
+
+  /// What unpairing does to `MachineClient`, also when the DELETE then fails: the channel is
+  /// dropped ([MachineReady] → [MachineIdle]), every tab is closed and removed, and the session is
+  /// dead — [connect] and requests throw `MachineConnectionException(untrusted)` (no pin left).
+  void shutDown() {
+    _shutDown = true;
+    for (final handle in handles) {
+      handle.close();
+    }
+    handles.clear();
+    if (stateValue is MachineReady) emitState(const MachineIdle());
+  }
+
+  /// A shut-down session fails every handshake like a machine without a pin.
+  void _failIfShutDown() {
+    if (!_shutDown) return;
+    emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+    throw const MachineConnectionException(MachineConnectionFailure.untrusted);
+  }
+
+  /// Scripts a state change the real client makes on its own (channel lost → [MachineIdle],
+  /// automatic resume → [MachineConnecting] / [MachineReady] / [MachineFailed]).
+  void emitState(MachineConnectionState state) {
     stateValue = state;
     _states.add(state);
   }
@@ -136,8 +162,9 @@ class FakeMachineSession implements MachineSession {
   @override
   Future<void> connect() async {
     connectCalls++;
+    _failIfShutDown();
     if (stateValue is MachineReady) return;
-    _setState(const MachineConnecting());
+    emitState(const MachineConnecting());
     final failure = connectFailure;
     if (failure != null) {
       if (failure == MachineConnectionFailure.untrusted) {
@@ -146,21 +173,23 @@ class FakeMachineSession implements MachineSession {
           handle.emit(const TabError(AppErrorCode.sessionNotFound, 'This machine no longer trusts this phone'));
         }
       }
-      _setState(MachineFailed(failure));
+      emitState(MachineFailed(failure));
       throw MachineConnectionException(failure);
     }
-    _setState(const MachineReady());
+    emitState(const MachineReady());
   }
 
   @override
   Future<List<SessionInfo>> listSessions() async {
     listCalls++;
+    _failIfShutDown();
     return sessions;
   }
 
   @override
   Future<TabHandle> openSession({required int cols, required int rows}) async {
     opened.add((cols: cols, rows: rows));
+    _failIfShutDown();
     final error = openError;
     if (error != null) throw error;
     final id = _nextId++;
@@ -172,6 +201,7 @@ class FakeMachineSession implements MachineSession {
   @override
   Future<TabHandle> attach(int id, {required int cols, required int rows}) async {
     attached.add((id: id, cols: cols, rows: rows));
+    _failIfShutDown();
     final existing = handles.where((h) => h.id == id).firstOrNull;
     final error = attachErrors[id];
     if (error != null) {
@@ -213,8 +243,23 @@ class FakeMachineSession implements MachineSession {
   FakeTabHandle handle(int id) => handles.firstWhere((h) => h.id == id);
 }
 
-/// Scriptable [ShellxBackend]. The relay knobs ([emitRelay], [relayStateValue]) change only the
-/// relay state: unlike `shellx_client` they do not turn presence offline — use [emitPresence].
+/// Scriptable [ShellxBackend]. [unpair] (whether or not [unpairError] is set) and an `untrusted`
+/// handshake behave like `shellx_client`. Known divergences from the real client:
+/// - relay loss, [suspend] and [emitRelay] reach neither the machine states (real: a lost channel
+///   moves [MachineReady] to [MachineIdle]; script it with [FakeMachineSession.emitState]) nor
+///   presence (real: an offline frame for every online machine; use [emitPresence]);
+/// - requests do not connect first, and `attach` of an unknown id succeeds (real:
+///   `AppErrorException(sessionNotFound)`);
+/// - [resume] emits `connected` even when not suspended;
+/// - [dispose] only sets [disposed];
+/// - [pair] neither calls [devices] nor drops the machine's channel;
+/// - after `untrusted`, pairing again gives a fresh session (real: the same session, still
+///   [MachineFailed]);
+/// - [FakeMachineSession.reuseHandles] is false by default (real: a re-attach always returns the
+///   same tab);
+/// - pins ([pinnedList]) and sessions ([machines]) are tracked separately: [addMachine] pins
+///   nothing, and [machine] works for any added machine;
+/// - every stream is synchronous.
 class FakeBackend implements ShellxBackend {
   FakeBackend({List<RemoteDevice>? devices, List<PinnedMachine>? pinnedList})
     : deviceList = devices ?? [],
@@ -228,10 +273,14 @@ class FakeBackend implements ShellxBackend {
   final StreamController<RelayConnectionState> _relay = StreamController<RelayConnectionState>.broadcast(sync: true);
   final StreamController<PresenceFrame> _presence = StreamController<PresenceFrame>.broadcast(sync: true);
   final Map<String, FakeMachineSession> machines = {};
+
+  /// Sessions forgotten by an `untrusted` handshake: `ClientService` keeps them until [unpair]
+  /// shuts them down.
+  final Map<String, FakeMachineSession> _untrusted = {};
   Object? pairError;
 
-  /// Thrown by [unpair] after the pin and the machine are dropped, like a DELETE that failed
-  /// three times in `shellx_client`.
+  /// Thrown by [unpair] after the machine is shut down and its pin dropped, like a DELETE that
+  /// failed three times in `shellx_client`.
   Object? unpairError;
   final List<PairingUri> paired = [];
   final List<String> unpaired = [];
@@ -254,8 +303,14 @@ class FakeBackend implements ShellxBackend {
   /// pin ([machine] then throws, [pinnedMachines] no longer lists it).
   FakeMachineSession addMachine(String agentId) => machines.putIfAbsent(
     agentId,
-    () => FakeMachineSession(agentId)..onUntrusted = () => _forget(agentId),
+    () => FakeMachineSession(agentId)..onUntrusted = () => _forgetUntrusted(agentId),
   );
+
+  void _forgetUntrusted(String agentId) {
+    final session = machines[agentId];
+    if (session != null) _untrusted[agentId] = session;
+    _forget(agentId);
+  }
 
   void _forget(String agentId) {
     pinnedList = pinnedList.where((m) => m.agentId != agentId).toList();
@@ -315,6 +370,9 @@ class FakeBackend implements ShellxBackend {
   @override
   Future<void> unpair(String agentId) async {
     unpaired.add(agentId);
+    // Like `ClientService.unpair`: shut down and forgotten before the DELETE, which may fail.
+    machines[agentId]?.shutDown();
+    _untrusted.remove(agentId)?.shutDown();
     _forget(agentId);
     final error = unpairError;
     if (error != null) throw error;

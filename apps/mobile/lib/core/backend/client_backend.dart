@@ -43,6 +43,7 @@ final class ClientBackend implements ShellxBackend {
   final ClientService _client;
   final PinnedStore _pinned;
   final Map<String, _MachineSessionAdapter> _machines = {};
+  bool _disposed = false;
 
   /// Builds the relay connection and client for a signed-in account and
   /// starts the client (plan 03: `ClientService.start()` loads the pins,
@@ -88,16 +89,21 @@ final class ClientBackend implements ShellxBackend {
   @override
   void reconnectNow() => _relay.reconnectNow();
 
+  /// A no-op after [dispose].
   @override
-  Future<void> suspend() => _client.stop();
+  Future<void> suspend() => _disposed ? Future.value() : _client.stop();
 
   /// `ClientService.start()` may run again after `stop()` and then restarts the relay; while the
-  /// client is running (the relay `replaced` included) it returns at once.
+  /// client is running (the relay `replaced` included) it returns at once. A no-op after [dispose]:
+  /// the relay would dial with the shared [ShellxApi]'s token, which may be the next account's.
   @override
-  Future<void> resume() => _client.start();
+  Future<void> resume() => _disposed ? Future.value() : _client.start();
 
   @override
-  Future<List<RemoteDevice>> devices() => _api.devices();
+  Future<List<RemoteDevice>> devices() async {
+    _checkNotDisposed();
+    return _api.devices();
+  }
 
   @override
   bool isOnline(String agentId) => _client.isOnline(agentId);
@@ -109,7 +115,10 @@ final class ClientBackend implements ShellxBackend {
   Future<List<PinnedMachine>> pinnedMachines() => _pinned.list();
 
   @override
-  Future<void> pair(PairingUri uri) => _client.pair(uri);
+  Future<void> pair(PairingUri uri) async {
+    _checkNotDisposed();
+    return _client.pair(uri);
+  }
 
   /// Asks [ClientService] every time, so a machine forgotten by an `untrusted` handshake or an
   /// unpair throws [StateError]; the session is kept while the [MachineClient] stays the same.
@@ -123,13 +132,23 @@ final class ClientBackend implements ShellxBackend {
 
   /// `ClientService.unpair` shuts the machine down before its DELETE, which may still fail.
   @override
-  Future<void> unpair(String agentId) {
+  Future<void> unpair(String agentId) async {
+    _checkNotDisposed();
     _machines.remove(agentId);
     return _client.unpair(agentId);
   }
 
   @override
-  Future<void> dispose() => _client.stop();
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    await _client.stop();
+  }
+
+  /// REST after [dispose] would go out with the shared [ShellxApi]'s token.
+  void _checkNotDisposed() {
+    if (_disposed) throw StateError('The backend of a signed-out account');
+  }
 }
 
 final class _MachineSessionAdapter implements MachineSession {
@@ -172,10 +191,13 @@ final class _MachineSessionAdapter implements MachineSession {
   @override
   void resize(int id, int cols, int rows) => _client.resize(id, cols, rows);
 
+  /// Drops the wrapper of the tab closed here only: a tab attached under the same id meanwhile
+  /// keeps its handle.
   @override
   Future<void> closeTab(int id) async {
+    final closing = _client.tabs.where((tab) => tab.id == id).firstOrNull;
     await _client.closeTab(id);
-    _tabs.removeWhere((tab, _) => tab.id == id);
+    if (closing != null) _tabs.remove(closing);
   }
 }
 

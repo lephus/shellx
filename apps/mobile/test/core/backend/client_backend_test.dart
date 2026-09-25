@@ -67,11 +67,13 @@ void main() {
     await pin(agentB, userId: 'user-2');
 
     final backend = await start();
+    addTearDown(backend.dispose);
 
     expect((await backend.pinnedMachines()).map((m) => m.agentId), [agentA]);
     expect(() => backend.machine('44444444-4444-4444-8444-444444444444'), throwsStateError);
     await pumpEventQueue();
-    // ClientService.start() started the relay with the api's token.
+    // ClientService.start() started the relay with the api's token. The failed dial is retried
+    // after the first backoff (at least 500 ms), so the dial counts here are exact.
     expect(dials.single.uri, Uri.parse('ws://127.0.0.1:8787/v1/ws'));
     expect(dials.single.headers['Authorization'], 'Bearer token-1');
     expect(backend.relayState, isNot(RelayConnectionState.stopped));
@@ -85,6 +87,26 @@ void main() {
 
     await backend.dispose();
     expect(backend.relayState, RelayConnectionState.stopped);
+  });
+
+  test('a disposed backend never dials again and refuses REST calls', () async {
+    await pin(agentA);
+    final backend = await start();
+    await pumpEventQueue();
+    await backend.dispose();
+    // The next account signs in on the shared ShellxApi.
+    api.token = 'token-2';
+
+    await backend.resume();
+    await backend.suspend();
+    await backend.resume();
+    await pumpEventQueue();
+
+    expect(dials, hasLength(1));
+    expect(backend.relayState, RelayConnectionState.stopped);
+    expect(backend.devices, throwsStateError);
+    expect(() => backend.unpair(agentA), throwsStateError);
+    expect(requests, isEmpty);
   });
 
   test('one session per pinned machine; with the relay down connect fails at once', () async {
