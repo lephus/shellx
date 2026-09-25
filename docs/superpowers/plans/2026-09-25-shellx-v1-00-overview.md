@@ -87,6 +87,9 @@ dev_dependencies:
 
 Mỗi package/app thành viên có `resolution: workspace` trong pubspec và được thêm vào danh sách `workspace:` bởi plan tạo ra nó.
 
+- Dev dependency cho mọi package Dart thuần: `test: ^1.30.0`, `fake_async: ^1.3.3` (Flutter 3.41.7 ghim `test_api 0.7.10`; `test` mới hơn làm hỏng việc giải phụ thuộc khi app Flutter vào workspace). App Flutter dùng `flutter_test` của SDK.
+- `pubspec.lock` nằm trong `.gitignore` trong giai đoạn phát triển song song v1.0 (tránh xung đột merge); sẽ commit lockfile gốc trước khi phát hành.
+
 **Lệnh test chuẩn** (plan 06 dùng trong CI):
 - `dart test` trong `packages/shellx_core`, `packages/shellx_agent`, `packages/shellx_client`.
 - `dart test` trong `packages/shellx_e2e` (cần relay chạy tại `http://127.0.0.1:8787`, bật bằng biến môi trường `SHELLX_E2E_RELAY=http://127.0.0.1:8787`; không có biến thì các test bị skip).
@@ -132,6 +135,10 @@ Byte 1.. : Noise message
 ### 4.3 REST API
 
 Đúng như spec mục 10.2 (kể cả `DELETE /v1/account {password}` → `204` / `401 invalid_credentials`, đóng WebSocket mọi thiết bị với 4002). Base URL cấu hình được (production `https://relay.shellx.pro`, dev `http://127.0.0.1:8787`).
+
+**Mã lỗi chung:** token thiếu/sai/hết hạn trên REST → `401 unauthorized`; sai email/mật khẩu → `401 invalid_credentials`; rate limit → `429 rate_limited` (client rẽ nhánh theo status 429). `GET /v1/ws` với token thiếu/sai bị từ chối bằng HTTP 401 **trước** khi nâng cấp WebSocket (client coi như `revoked`). `DELETE /v1/account` đọc body JSON `{"password"}`.
+
+**Giới hạn khung:** 64 KiB tính trên **toàn bộ** khung nhị phân, kể cả header 26 byte của DATA. `shellx_core` export `kMaxSealedBatchBytes = 65493`; `SecureChannel.seal` ném `ArgumentError` nếu batch CBOR vượt mức này, nên agent phải chia output chờ gửi thành nhiều TRANSPORT (tối đa 3 tin `output` 16 KiB mỗi batch).
 
 **Relay dev server (plan 01 sở hữu, plan 03 E2E và plan 06 CI dùng):** trong `relay/`, `npm run dev` phải áp dụng D1 migrations cục bộ trước rồi phục vụ tại `127.0.0.1:8787` (chấp nhận thêm `-- --ip 127.0.0.1 --port 8787`). Môi trường dev đặt biến `RATE_LIMITS_ENABLED = "false"` để tắt mọi rate limit (E2E tạo nhiều tài khoản từ cùng IP); production/staging luôn bật. Cấu hình wrangler dùng file `relay/wrangler.jsonc`; các biến phiên bản là `MIN_AGENT`, `MIN_MOBILE`, `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL`. Lỗi luôn là `{"error": {"code": "<snake_case>", "message": "<text>"}}`. Timestamp trong JSON là số nguyên unix **mili giây** (hoặc `null`).
 
