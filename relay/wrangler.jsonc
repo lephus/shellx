@@ -5,7 +5,11 @@
   // Must not be newer than the workerd bundled with @cloudflare/vitest-pool-workers,
   // otherwise `npm test` fails with "This Worker requires compatibility date ...".
   "compatibility_date": "2026-08-15",
-  "observability": { "enabled": true },
+  // Invocation logs (per-request metadata, including the client IP via cf-connecting-ip) are
+  // disabled on purpose: the privacy policy says the IP is used only transiently for rate limiting.
+  // Our own console.log lines still go to Workers Logs. Inherited by env.staging/env.production
+  // (neither sets its own "observability" block).
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } },
   // Inherited by every environment. SQLite-backed class (required for new Durable Objects).
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserHub"] }],
 
