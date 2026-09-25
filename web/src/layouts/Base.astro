@@ -1,0 +1,121 @@
+---
+import { otherLang, pathFor, ui, type Lang, type Page } from '../i18n/ui';
+import { supportEmail } from '../lib/site';
+
+interface Props {
+  lang: Lang;
+  /** null for pages without a translated counterpart (404). */
+  page: Page | null;
+  title: string;
+  description: string;
+}
+
+const { lang, page, title, description } = Astro.props;
+const t = ui[lang];
+const other = otherLang(lang);
+const switchHref = pathFor(other, page ?? 'home');
+const site = Astro.site ?? new URL('https://shellx.pro');
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {page && <link rel="canonical" href={new URL(pathFor(lang, page), site).href} />}
+    {page && <link rel="alternate" hreflang="vi" href={new URL(pathFor('vi', page), site).href} />}
+    {page && <link rel="alternate" hreflang="en" href={new URL(pathFor('en', page), site).href} />}
+    {page && <link rel="alternate" hreflang="x-default" href={new URL(pathFor('vi', page), site).href} />}
+  </head>
+  <body>
+    <header class="wrap top">
+      <a class="brand" href={pathFor(lang, 'home')}>ShellX</a>
+      <a class="lang-switch" href={switchHref} hreflang={other} lang={other}>{ui[other].languageName}</a>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="wrap bottom">
+      <nav>
+        <a href={pathFor(lang, 'privacy')}>{t.privacy}</a>
+        <a href={pathFor(lang, 'terms')}>{t.terms}</a>
+        <a href={`mailto:${supportEmail}`}>{t.contact}: {supportEmail}</a>
+      </nav>
+      <p>© {year} ShellX</p>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #0f172a;
+    --muted: #475569;
+    --accent: #0e7490;
+    --card: #f1f5f9;
+    --border: #cbd5e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120;
+      --fg: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #22d3ee;
+      --card: #111827;
+      --border: #334155;
+    }
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+  }
+  a {
+    color: var(--accent);
+  }
+  .wrap {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  .brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .bottom {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .bottom nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+  code {
+    font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+</style>
