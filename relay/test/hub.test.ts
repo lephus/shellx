@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub";
+import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub";
 import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
 import { buildHubHeaders } from "../src/routes/ws";
 import {
@@ -56,10 +56,14 @@ describe("GET /v1/ws", () => {
       // DEVICE_ID_HEADER ("X-Shellx-Device-Id") — proves case doesn't let a spoof slip through.
       ["x-shellx-device-id", "11111111-1111-1111-1111-111111111111"],
       ["X-Shellx-Device-Kind", "agent"],
+      // Fix round 2: a client-supplied connection id must never reach the hub either — it's the
+      // Worker's own per-upgrade random id (see CONN_ID_HEADER), not something the client picks.
+      ["X-Shellx-Conn-Id", "44444444-4444-4444-4444-444444444444"],
     ]);
     const auth = { deviceId: "22222222-2222-2222-2222-222222222222", kind: "mobile" as const };
+    const connId = "33333333-3333-3333-3333-333333333333";
 
-    const headers = buildHubHeaders(clientHeaders, auth);
+    const headers = buildHubHeaders(clientHeaders, auth, connId);
 
     // Allowlisted upgrade headers pass through unchanged.
     expect(headers.get("Upgrade")).toBe("websocket");
@@ -73,6 +77,8 @@ describe("GET /v1/ws", () => {
     // Identity headers come from the validated token, not the client's spoof attempt.
     expect(headers.get(DEVICE_ID_HEADER)).toBe(auth.deviceId);
     expect(headers.get(DEVICE_KIND_HEADER)).toBe(auth.kind);
+    // The connection id comes from the Worker's own random generation, not the client's spoof.
+    expect(headers.get(CONN_ID_HEADER)).toBe(connId);
 
     // Everything else the client sent is gone, including Authorization and the spoofed identity.
     expect(headers.has("Cookie")).toBe(false);
@@ -80,10 +86,11 @@ describe("GET /v1/ws", () => {
     expect(headers.has("X-Evil")).toBe(false);
     expect(headers.has("Authorization")).toBe(false);
 
-    // Exhaustive: exactly these six headers reach the hub, nothing more.
-    expect([...headers.keys()].sort()).toEqual(
-      ["connection", "sec-websocket-key", "sec-websocket-version", "upgrade", "x-shellx-device-id", "x-shellx-device-kind"],
-    );
+    // Exhaustive: exactly these seven headers reach the hub, nothing more.
+    expect([...headers.keys()].sort()).toEqual([
+      "connection", "sec-websocket-key", "sec-websocket-version", "upgrade",
+      "x-shellx-conn-id", "x-shellx-device-id", "x-shellx-device-kind",
+    ]);
   });
 
   it("integration: an upgrade carrying hostile extra headers still connects and identifies the token's device", async () => {
@@ -131,7 +138,7 @@ describe("GET /v1/ws", () => {
           await env.DB.prepare("DELETE FROM tokens WHERE device_id = ?").bind(mobile.deviceId).run();
           return realHub.fetch(request);
         },
-        disconnect: (ids: string[], code: CloseCode) => realHub.disconnect(ids, code),
+        closeConnection: (connId: string, code: CloseCode) => realHub.closeConnection(connId, code),
       }),
     } as unknown as typeof env.USER_HUB;
 
@@ -143,6 +150,76 @@ describe("GET /v1/ws", () => {
     expect(res.status).toBe(101); // the upgrade itself still succeeds...
     const socket = new TestSocket(res.webSocket!);
     expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // ...but is then closed
+  });
+
+  it("fails closed (no 500) if the post-upgrade re-check itself errors, e.g. a D1 outage", async () => {
+    // Fix round 2, item 1: once hub.fetch() returns 101 the socket already exists in the hub —
+    // accepted, announced online, its queue delivered — so a re-check that can't complete (D1 down)
+    // must never turn that into an HTTP 500 (which would discard the response while leaving a
+    // phantom live device behind). It must instead be treated exactly like "revoked": the upgrade
+    // response still comes back untouched, and the socket it created gets closed with 4002.
+    const { app, mobile } = await accountWithAgentAndMobile();
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    let calls = 0;
+    const spy = vi.spyOn(env.DB, "prepare").mockImplementation((query: string) => {
+      calls++;
+      // Call 1 is webSocketRoute's own pre-upgrade authenticate(); call 2 is the post-upgrade
+      // re-check — exactly the one this fix must tolerate failing. Anything after that (e.g. the
+      // hub's own D1 write once it closes the connection) must keep working normally.
+      if (calls === 2) throw new Error("D1 is down");
+      return realPrepare(query);
+    });
+
+    const res = await call(app, "GET", "/v1/ws", { token: mobile.token, headers: { Upgrade: "websocket" } });
+    spy.mockRestore();
+
+    expect(calls).toBeGreaterThanOrEqual(2); // the injected failure actually ran
+    expect(res.status).toBe(101); // never a 500, despite the re-check itself throwing
+    const socket = new TestSocket(res.webSocket!);
+    expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // failed closed anyway
+  });
+
+  it("targets only the stale connection: a legitimate reconnect that already replaced it is untouched", async () => {
+    // Fix round 2, item 2: disconnect(deviceIds, code) closes *whatever socket this device
+    // currently has* — wrong for the re-check, because the same device can legitimately reconnect
+    // with a fresh, valid token (replacing the stale socket via fetch()'s own "newest wins" logic)
+    // before a stale request's re-check gets around to running. closeConnection targets the exact
+    // connection id instead, so the stale re-check is a no-op once that socket is already gone.
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const stale = await loginDevice(app, account, "mobile");
+    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(account.agent.userId));
+    let freshSocket: TestSocket | undefined;
+    const racingHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (request: Request) => {
+          const upgrade = await realHub.fetch(request); // creates the stale request's own socket
+          // The same device (same public key => same device id) logs in again — invalidating the
+          // stale token as a side effect of /login itself — and actually connects, replacing the
+          // stale socket with 4001 via fetch()'s own logic, independent of anything below.
+          const fresh = await loginDevice(app, account, "mobile", stale.publicKey);
+          freshSocket = await connect(app, fresh.token);
+          return upgrade;
+        },
+        closeConnection: (connId: string, code: CloseCode) => realHub.closeConnection(connId, code),
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const res = await call(app, "GET", "/v1/ws", {
+      token: stale.token,
+      headers: { Upgrade: "websocket" },
+      bindings: { USER_HUB: racingHub },
+    });
+    expect(res.status).toBe(101);
+    const staleSocket = new TestSocket(res.webSocket!);
+
+    expect(await staleSocket.closed).toEqual({ code: 4001, reason: "replaced" }); // not the re-check
+    // Proves the fresh socket is still open and functional, not silently closed by the stale
+    // request's re-check (expectSilence alone wouldn't catch a close — only an unexpected message).
+    await freshSocket!.expectSilence(100);
+    freshSocket!.send("ping");
+    expect(await freshSocket!.next()).toBe("pong");
   });
 });
 

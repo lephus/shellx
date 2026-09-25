@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
+import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
   call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, unlimited,
@@ -207,6 +207,7 @@ describe("DELETE /v1/account", () => {
             Upgrade: "websocket",
             [DEVICE_ID_HEADER]: mobile.deviceId,
             [DEVICE_KIND_HEADER]: "mobile",
+            [CONN_ID_HEADER]: crypto.randomUUID(),
           });
           const upgrade = await realHub.fetch(new Request("https://user-hub/connect", { headers }));
           lateSocket = new TestSocket(upgrade.webSocket!);
