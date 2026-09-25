@@ -1,4 +1,5 @@
 import type { Env } from "../env";
+import { logMeta } from "../log";
 
 /** Returns true when the call is allowed, false when the key is over its limit. */
 export interface RateLimiter {
@@ -11,11 +12,20 @@ export interface RateLimiters {
   registerIp: RateLimiter;
 }
 
-export function bindingLimiter(binding: RateLimit): RateLimiter {
+/**
+ * Wraps a raw Workers rate-limiting binding. Fails open (allows the request) when the binding
+ * itself errors (outage), logging only the limiter's name — never the key, IP or email.
+ */
+export function bindingLimiter(binding: RateLimit, name: string = "unknown"): RateLimiter {
   return {
     async limit(key) {
-      const { success } = await binding.limit({ key });
-      return success;
+      try {
+        const { success } = await binding.limit({ key });
+        return success;
+      } catch {
+        logMeta("rate_limit_error", { limiter: name });
+        return true;
+      }
     },
   };
 }
@@ -31,8 +41,8 @@ export function limitersFromEnv(env: Env): RateLimiters {
     return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll };
   }
   return {
-    loginIp: bindingLimiter(env.LOGIN_IP_LIMITER),
-    loginEmail: bindingLimiter(env.LOGIN_EMAIL_LIMITER),
-    registerIp: bindingLimiter(env.REGISTER_IP_LIMITER),
+    loginIp: bindingLimiter(env.LOGIN_IP_LIMITER, "loginIp"),
+    loginEmail: bindingLimiter(env.LOGIN_EMAIL_LIMITER, "loginEmail"),
+    registerIp: bindingLimiter(env.REGISTER_IP_LIMITER, "registerIp"),
   };
 }

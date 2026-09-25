@@ -253,3 +253,43 @@ describe("token lifetime", () => {
     expect(await authenticate(env.DB, "A".repeat(43), Date.now())).toBeNull();
   });
 });
+
+// Controller ruling (not in the brief): a rate-limit binding outage must fail open — the
+// request is allowed, and only limiter-name metadata is logged (never the key, IP or email).
+describe("rate-limit binding failures fail open", () => {
+  const throwing: RateLimit = { limit: async () => { throw new Error("binding unavailable"); } };
+
+  it("still registers when the register-IP limiter binding throws, logging only the limiter name", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
+    const ip = "203.0.113.42";
+    const res = await call(createApp(), "POST", "/v1/auth/register", {
+      ip,
+      bindings: { REGISTER_IP_LIMITER: throwing, RATE_LIMITS_ENABLED: "true" },
+      body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
+    });
+    expect(res.status).toBe(201);
+    const output = lines.join("\n");
+    expect(output).toContain("rate_limit_error");
+    expect(output).toContain("registerIp");
+    expect(output).not.toContain(ip);
+  });
+
+  it("still logs in when the login-IP and login-email limiter bindings throw, logging only the limiter name", async () => {
+    const account = await registerAccount(makeApp());
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
+    const ip = "203.0.113.43";
+    const res = await call(createApp(), "POST", "/v1/auth/login", {
+      ip,
+      bindings: { LOGIN_IP_LIMITER: throwing, LOGIN_EMAIL_LIMITER: throwing, RATE_LIMITS_ENABLED: "true" },
+      body: { email: account.email, password: account.password, device: deviceBody("mobile") },
+    });
+    expect(res.status).toBe(200);
+    const output = lines.join("\n");
+    expect(output).toContain("rate_limit_error");
+    expect(output).toContain("loginIp");
+    expect(output).not.toContain(ip);
+    expect(output).not.toContain(account.email);
+  });
+});
