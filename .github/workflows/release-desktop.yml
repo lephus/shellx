@@ -52,12 +52,16 @@ jobs:
     needs: prepare
     runs-on: macos-latest
     timeout-minutes: 60
+    # The 13 signing/publish secrets live only in this GitHub Environment, restricted to
+    # desktop-v* tags (release/README.md § GitHub secrets); a run from any other ref cannot
+    # read them, so dry runs from a branch fall back to ad-hoc signing further down.
+    environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
     steps:
       - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -128,6 +132,8 @@ jobs:
     needs: prepare
     runs-on: windows-latest
     timeout-minutes: 60
+    # See the comment on the macos job: the signing secrets live only in this Environment.
+    environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
@@ -136,7 +142,7 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -151,7 +157,7 @@ jobs:
           "RELEASE_DIR=$release" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Sign app binaries (Azure Artifact Signing)
         if: env.DRY_RUN == 'false'
-        uses: azure/artifact-signing-action@v2
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -192,7 +198,7 @@ jobs:
           "SETUP_EXE=$(Join-Path $out "ShellX-Setup-$env:VERSION.exe")" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Sign installer (Azure Artifact Signing)
         if: env.DRY_RUN == 'false'
-        uses: azure/artifact-signing-action@v2
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -218,9 +224,14 @@ jobs:
   publish:
     name: Upload to R2
     needs: [prepare, macos, windows]
-    if: needs.prepare.outputs.dry_run == 'false'
+    # Defense in depth: dry_run == 'false' already requires a desktop-v* tag (resolve-version.mjs
+    # refuses a manual real release from a branch), but require the tag here too so publish never
+    # runs from anywhere else even if that check regresses.
+    if: needs.prepare.outputs.dry_run == 'false' && startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # See the comment on the macos job: the Cloudflare secrets live only in this Environment.
+    environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
