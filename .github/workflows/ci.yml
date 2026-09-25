@@ -1,0 +1,286 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.41.7
+  NODE_VERSION: 22
+  ASTRO_TELEMETRY_DISABLED: 1
+  WRANGLER_SEND_METRICS: false
+
+jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      dart: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.dart }}
+      relay: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.relay }}
+      e2e: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.e2e }}
+      desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop }}
+      mobile: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.mobile }}
+      web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web }}
+      release: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            dart_shared: &dart_shared
+              - 'pubspec.yaml'
+              - 'analysis_options.yaml'
+              - 'packages/**'
+              - '.github/workflows/ci.yml'
+            dart:
+              - *dart_shared
+            relay:
+              - 'relay/**'
+              - '.github/workflows/ci.yml'
+            e2e:
+              - *dart_shared
+              - 'relay/**'
+            desktop:
+              - *dart_shared
+              - 'apps/desktop/**'
+            mobile:
+              - *dart_shared
+              - 'apps/mobile/**'
+            web:
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+            release:
+              - 'release/**'
+              - '.github/workflows/**'
+
+  dart:
+    name: Dart packages
+    needs: changes
+    if: needs.changes.outputs.dart == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Resolve the pub workspace
+        run: flutter pub get
+      - name: shellx_core
+        working-directory: packages/shellx_core
+        run: dart test
+      - name: shellx_agent
+        working-directory: packages/shellx_agent
+        run: dart test
+      - name: shellx_client
+        working-directory: packages/shellx_client
+        run: dart test
+
+  relay:
+    name: Relay
+    needs: changes
+    if: needs.changes.outputs.relay == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: relay
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  e2e:
+    name: End-to-end (agent + client + local relay)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install relay dependencies
+        working-directory: relay
+        run: npm ci
+      - name: Start relay on 127.0.0.1:8787
+        working-directory: relay
+        run: |
+          nohup npm run dev -- --ip 127.0.0.1 --port 8787 > "$RUNNER_TEMP/relay.log" 2>&1 &
+          echo "RELAY_PID=$!" >> "$GITHUB_ENV"
+      - name: Wait until GET /v1/version answers 200
+        run: |
+          for second in $(seq 1 120); do
+            if curl -sf -o /dev/null http://127.0.0.1:8787/v1/version; then
+              echo "relay ready after ${second}s"
+              exit 0
+            fi
+            if ! kill -0 "$RELAY_PID" 2> /dev/null; then
+              echo "::error::npm run dev exited before the relay became ready"
+              cat "$RUNNER_TEMP/relay.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "::error::relay did not answer http://127.0.0.1:8787/v1/version within 120 s"
+          cat "$RUNNER_TEMP/relay.log"
+          exit 1
+      - name: Resolve the pub workspace
+        run: flutter pub get
+      - name: shellx_e2e
+        working-directory: packages/shellx_e2e
+        env:
+          SHELLX_E2E_RELAY: http://127.0.0.1:8787
+        run: dart test
+      - name: Relay log
+        if: always()
+        run: cat "$RUNNER_TEMP/relay.log" || true
+
+  desktop:
+    name: Desktop (${{ matrix.device }})
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            device: macos
+          - os: windows-latest
+            device: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Widget tests
+        run: flutter test
+      - name: Integration tests (real PTY)
+        run: flutter test integration_test -d ${{ matrix.device }}
+
+  mobile:
+    name: Mobile widget tests
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+
+  web:
+    name: Website
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Build and check pages/links
+        run: npm run build
+
+  release:
+    name: Release tooling
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Release script tests (macOS-only tests skip here)
+        run: node --test release/tests/*.test.mjs
+      - name: shellcheck
+        run: shellcheck release/macos/*.sh
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12 "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint" -color
+
+  installer:
+    name: Installer compiles (Inno Setup)
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compile shellx.iss against a stand-in app folder
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'fake-release'
+          New-Item -ItemType Directory -Force -Path (Join-Path $source 'data') | Out-Null
+          Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $source 'ShellX.exe')
+          Set-Content -Path (Join-Path $source 'data\placeholder.txt') -Value 'stand-in for flutter_assets'
+          ./release/windows/build-installer.ps1 -Version 0.0.0 -SourceDir $source -OutputDir (Join-Path $env:RUNNER_TEMP 'installer')
+
+  ci-ok:
+    name: CI result
+    needs: [changes, dart, relay, e2e, desktop, mobile, web, release, installer]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::At least one CI job failed or was cancelled"
+          exit 1
+      - run: echo "All required jobs passed or were skipped (no relevant changes)."
