@@ -251,7 +251,7 @@ class FakeMachineSession implements MachineSession {
 /// - requests do not connect first, and `attach` of an unknown id succeeds (real:
 ///   `AppErrorException(sessionNotFound)`);
 /// - [resume] emits `connected` even when not suspended;
-/// - [dispose] only sets [disposed];
+/// - [dispose] only sets [disposed] (and counts [disposeCalls]);
 /// - [pair] neither calls [devices] nor drops the machine's channel;
 /// - after `untrusted`, pairing again gives a fresh session (real: the same session, still
 ///   [MachineFailed]);
@@ -287,6 +287,7 @@ class FakeBackend implements ShellxBackend {
   int reconnectCalls = 0;
   int suspendCalls = 0;
   int resumeCalls = 0;
+  int disposeCalls = 0;
   bool disposed = false;
 
   void emitRelay(RelayConnectionState state) {
@@ -379,7 +380,10 @@ class FakeBackend implements ShellxBackend {
   }
 
   @override
-  Future<void> dispose() async => disposed = true;
+  Future<void> dispose() async {
+    disposeCalls++;
+    disposed = true;
+  }
 }
 
 /// Hands out a new [FakeBackend] per sign-in and records what it was asked for.
