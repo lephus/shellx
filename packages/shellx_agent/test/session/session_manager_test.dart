@@ -1,0 +1,254 @@
+import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_core/shellx_core.dart';
+import 'package:test/test.dart';
+
+import '../support/fake_pty.dart';
+import '../support/session_rig.dart';
+
+void main() {
+  test(
+    'open spawns the shell in the home directory with the session env',
+    () async {
+      final rig = SessionRig();
+      await rig.manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+
+      final opened = rig.to(phone).single as SessionOpened;
+      expect((opened.index, opened.shell), (1, 'zsh'));
+      expect(rig.manager.sessions.single.id, opened.id);
+      final pty = rig.pty(0);
+      expect(pty.command.executable, '/bin/zsh');
+      expect(pty.command.arguments, ['-l']);
+      expect(pty.workingDirectory, '/Users/test');
+      expect(pty.environment['PATH'], '/usr/bin');
+      expect(pty.environment['TERM'], 'xterm-256color');
+      expect(pty.environment['SHELLX'], '1');
+      expect((pty.initialCols, pty.initialRows), (80, 24));
+      expect(rig.manager.sessions.single.attachedMobileId, phone);
+    },
+  );
+
+  test('open clamps zero and huge terminal sizes into [1, 1000]', () async {
+    final rig = SessionRig();
+    await rig.open(phone, cols: 0, rows: -3);
+    await rig.open(phone, cols: 5000, rows: 100000);
+    expect((rig.pty(0).initialCols, rig.pty(0).initialRows), (1, 1));
+    expect((rig.pty(1).initialCols, rig.pty(1).initialRows), (1000, 1000));
+  });
+
+  test('output is sent in chunks of at most 16 KiB numbered by byte', () async {
+    final rig = SessionRig();
+    final id = await rig.open(phone);
+    rig.clear();
+    rig.pty(0).emitBytes(List.filled(40 * 1024, 0x61));
+    await pumpEventQueue();
+
+    final outputs = rig.to(phone).whereType<OutputMessage>().toList();
+    expect(
+      [for (final o in outputs) (o.id, o.seq, o.data.length)],
+      [(id, 0, 16384), (id, 16384, 16384), (id, 32768, 8192)],
+    );
+  });
+
+  test('the 11th session is refused with session_limit', () async {
+    final rig = SessionRig();
+    for (var i = 0; i < 10; i++) {
+      await rig.open(phone);
+    }
+    rig.clear();
+    await rig.manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+
+    final error = rig.to(phone).single as ErrorMessage;
+    expect(error.code, AppErrorCode.sessionLimit);
+    expect(error.id, isNull);
+    expect(rig.manager.sessions, hasLength(10));
+  });
+
+  test('a spawn failure answers spawn_failed and creates no session', () async {
+    final rig = SessionRig();
+    rig.factory.failWith = StateError('no pty');
+    await rig.manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+
+    final error = rig.to(phone).single as ErrorMessage;
+    expect(error.code, AppErrorCode.spawnFailed);
+    expect(error.message, contains('no pty'));
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('ids start at a random value in [1, 2^31) and increase by one; '
+      'indexes reuse the lowest free number', () async {
+    final rig = SessionRig();
+    final first = await rig.open(phone);
+    await rig.open(phone);
+    rig.pty(0).exit(0);
+    await pumpEventQueue();
+    await rig.open(phone);
+
+    expect(first, inInclusiveRange(1, (1 << 31) - 1));
+    final opened = rig.to(phone).whereType<SessionOpened>().toList();
+    expect(
+      [for (final o in opened) (o.id, o.index)],
+      [(first, 1), (first + 1, 2), (first + 2, 1)],
+    );
+  });
+
+  test('each manager instance picks its own starting id', () async {
+    final a = SessionRig(random: Random(1));
+    final b = SessionRig(random: Random(2));
+    expect(await a.open(phone), isNot(await b.open(phone)));
+
+    // Without an injected Random the manager uses Random.secure().
+    final manager = SessionManager(
+      ptyFactory: FakePtyFactory(),
+      shellResolver: const FixedShellResolver(),
+      homeDirectory: '/Users/test',
+      baseEnvironment: const {},
+    );
+    final sent = <OutboundMessage>[];
+    manager.outbound.listen(sent.add);
+    await manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+    expect(
+      (sent.single.message as SessionOpened).id,
+      inInclusiveRange(1, (1 << 31) - 1),
+    );
+  });
+
+  test(
+    'session.list reports every session and whether it is attached',
+    () async {
+      final rig = SessionRig();
+      final first = await rig.open(phone);
+      final second = await rig.open(phone);
+      rig.manager.mobileDisconnected(phone);
+      await rig.manager.handle(
+        tablet,
+        SessionAttach(id: second, cols: 80, rows: 24, lastSeq: 0),
+      );
+      rig.clear();
+      await rig.manager.handle(tablet, const SessionList());
+
+      final result = rig.to(tablet).single as SessionListResult;
+      expect(
+        [for (final s in result.sessions) (s.id, s.index, s.shell, s.attached)],
+        [(first, 1, 'zsh', false), (second, 2, 'zsh', true)],
+      );
+      expect(result.sessions.first.createdAt, greaterThan(0));
+    },
+  );
+
+  test(
+    'input and resize only come from the attached phone; sizes are clamped',
+    () async {
+      final rig = SessionRig();
+      final id = await rig.open(phone);
+      final data = Uint8List.fromList(utf8.encode('ls\r'));
+      await rig.manager.handle(phone, InputMessage(id: id, data: data));
+      await rig.manager.handle(tablet, InputMessage(id: id, data: data));
+      await rig.manager.handle(
+        phone,
+        ResizeMessage(id: id, cols: 100, rows: 30),
+      );
+      await rig.manager.handle(
+        phone,
+        ResizeMessage(id: id, cols: 0, rows: 5000),
+      );
+      await rig.manager.handle(
+        tablet,
+        ResizeMessage(id: id, cols: 50, rows: 50),
+      );
+
+      expect(rig.pty(0).writtenText, 'ls\r');
+      expect(rig.pty(0).resizes, [(100, 30), (1, 1000)]);
+    },
+  );
+
+  test('shell exit sends session.exited and removes the session', () async {
+    final rig = SessionRig();
+    final id = await rig.open(phone);
+    rig.pty(0).emit('bye\r\n');
+    rig.pty(0).exit(7);
+    await pumpEventQueue();
+
+    final messages = rig.to(phone);
+    expect(outputText(messages, id), 'bye\r\n');
+    expect(messages.last, isA<SessionExited>());
+    expect((messages.last as SessionExited).exitCode, 7);
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  test(
+    'session.close kills the shell; an unknown id answers session_not_found',
+    () async {
+      final rig = SessionRig();
+      final id = await rig.open(phone);
+      await rig.manager.handle(phone, SessionClose(id: id));
+      await pumpEventQueue();
+      await rig.manager.handle(phone, SessionClose(id: id + 1));
+
+      expect(rig.pty(0).killed, isTrue);
+      final messages = rig.to(phone);
+      expect(messages[messages.length - 2], isA<SessionExited>());
+      final error = messages.last as ErrorMessage;
+      expect((error.code, error.id), (AppErrorCode.sessionNotFound, id + 1));
+    },
+  );
+
+  test(
+    'closeSession from the tray sends detached(closed_by_host) then exited',
+    () async {
+      final rig = SessionRig();
+      final id = await rig.open(phone);
+      rig.clear();
+      rig.manager.closeSession(id);
+      await pumpEventQueue();
+
+      final messages = rig.to(phone);
+      expect(messages, hasLength(2));
+      final detached = messages[0] as SessionDetached;
+      expect((detached.id, detached.reason), (id, DetachReason.closedByHost));
+      final exited = messages[1] as SessionExited;
+      expect((exited.id, exited.exitCode), (id, FakePty.killExitCode));
+      expect(rig.manager.sessions, isEmpty);
+    },
+  );
+
+  test('closeAll closes every session', () async {
+    final rig = SessionRig();
+    await rig.open(phone);
+    await rig.open(tablet);
+    rig.manager.closeAll();
+    await pumpEventQueue();
+    expect(rig.factory.ptys.every((p) => p.killed), isTrue);
+    expect(rig.manager.sessions, isEmpty);
+  });
+
+  test('sessions keep running and buffering with no phone attached', () async {
+    final rig = SessionRig();
+    final id = await rig.open(phone);
+    rig.manager.mobileDisconnected(phone);
+    rig.clear();
+    rig.pty(0).emit('still here');
+    await pumpEventQueue();
+
+    expect(rig.sent, isEmpty);
+    expect(rig.manager.sessions.single.id, id);
+    expect(rig.manager.sessions.single.attachedMobileId, isNull);
+  });
+
+  test('changes and opened streams report activity', () async {
+    final rig = SessionRig();
+    var changes = 0;
+    final opened = <SessionOpenedEvent>[];
+    rig.manager.changes.listen((_) => changes++);
+    rig.manager.opened.listen(opened.add);
+    final id = await rig.open(phone);
+    rig.pty(0).exit(0);
+    await pumpEventQueue();
+
+    expect([for (final e in opened) (e.mobileId, e.sessionId)], [(phone, id)]);
+    expect(changes, 2);
+  });
+}
