@@ -46,7 +46,7 @@ To replay output produced while your phone is briefly disconnected, the agent ke
 
 ## 3. Data that stays on your devices
 
-The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain on macOS/iOS, DPAPI-encrypted storage on Windows, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
+The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain on macOS/iOS, Windows Credential Manager with AES-encrypted files on Windows, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
 
 - **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
