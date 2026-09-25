@@ -1,0 +1,12 @@
+name: shellx_e2e
+description: Headless end-to-end tests for ShellX (agent + client + relay).
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.11.0
+dev_dependencies:
+  http: ^1.2.0
+  shellx_agent: any
+  shellx_client: any
+  shellx_core: any
+  test: ^1.30.0
