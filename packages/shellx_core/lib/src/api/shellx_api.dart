@@ -106,12 +106,14 @@ final class ShellxApi {
     });
   }
 
-  /// Records pairing [pairingId] (a lower-case UUID v4 the agent generates
-  /// at `pair.confirm`, one per pairing) with the phone [mobileId]
-  /// (`POST /v1/pairings`, agent token). Sending the same id again is
-  /// idempotent. Fails with `410 pairing_removed` when the phone already
-  /// unpaired this very pairing (an earlier attempt committed but its
-  /// response was lost): the row is not recreated.
+  /// Records pairing [pairingId] with the phone [mobileId]
+  /// (`POST /v1/pairings`, agent token). [pairingId] must be a lower-case
+  /// UUIDv7 the agent generates at `pair.confirm`, one per pairing (the relay
+  /// orders pairings by it; anything else is `400 bad_request`). Sending the
+  /// same id again is idempotent. Fails with `410 pairing_removed` when the
+  /// relay already removed this pairing or a newer one of the same phone
+  /// (for example an earlier attempt committed, its response was lost and
+  /// the phone unpaired): the row is not recreated.
   Future<void> createPairing(
     String mobileId, {
     required String pairingId,

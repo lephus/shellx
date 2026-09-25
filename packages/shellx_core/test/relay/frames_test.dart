@@ -101,7 +101,7 @@ void main() {
     test('EVENT decodes a minimal CBOR map built like the relay builds it', () {
       final agent = '11111111-2222-3333-4444-555555555555';
       final mobile = '66666666-7777-8888-9999-aaaaaaaaaaaa';
-      final pairing = 'c0ffee00-1234-4abc-9def-0123456789ab';
+      final pairing = 'c0ffee00-1234-7abc-9def-0123456789ab';
       final body = BytesBuilder()
         ..addByte(0xa4) // map(4)
         ..addByte(0x65) // text(5)

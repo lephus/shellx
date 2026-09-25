@@ -157,10 +157,10 @@ shellx/
 3. Điện thoại (đã đăng nhập) quét QR. Nếu `d` không có trong `GET /v1/devices` của tài khoản, báo *"Máy này không thuộc tài khoản của bạn. Hãy đăng nhập cùng tài khoản trên máy tính."* và dừng.
 4. Điện thoại bắt tay **Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s** với agent qua hub: khóa công khai của agent lấy **từ QR**, mã ghép nối làm PSK.
 5. Ngay sau bắt tay, điện thoại gửi tin `pair.confirm`. Agent giải mã thành công tin này (chứng minh điện thoại có đúng mã ghép nối) thì:
-   - sinh `pairing_id` (UUID v4 ngẫu nhiên, chữ thường; mỗi lần ghép nối một id mới, kể cả khi ghép lại cùng điện thoại);
+   - sinh `pairing_id` (**UUIDv7**, chữ thường, theo đồng hồ của agent; mỗi lần ghép nối một id mới, kể cả khi ghép lại cùng điện thoại; id sau luôn lớn hơn id trước);
    - lưu `{mobile_device_id, public_key, name, paired_at, pairing_id}` vào **danh sách tin cậy cục bộ** (secure storage);
    - vô hiệu hóa mã ghép nối;
-   - gọi `POST /v1/pairings {mobile_id, pairing_id}` (bản ghi chỉ để hiển thị; thử lại cùng id nếu lỗi). Relay trả `410 pairing_removed` nghĩa là điện thoại đã bỏ ghép chính lần ghép này trước khi agent nhận được response → agent xóa mục tin cậy;
+   - gọi `POST /v1/pairings {mobile_id, pairing_id}` (bản ghi chỉ để hiển thị; thử lại cùng id nếu lỗi). Relay từ chối id không mới hơn bia mộ của cặp này: `410 pairing_removed` nghĩa là điện thoại đã bỏ ghép chính lần ghép này (hoặc một lần ghép mới hơn) trước khi agent nhận được response → agent xóa mục tin cậy;
    - hiện thông báo "Đã ghép nối với <tên điện thoại>" và đóng cửa sổ QR.
 6. Điện thoại ghim `{agent_device_id, agent_public_key}`.
 
@@ -175,6 +175,7 @@ Sai mã ghép nối làm điện thoại không giải mã được tin bắt ta
 
 - **Tray → "Thiết bị đã ghép" → Thu hồi:** agent xóa khóa khỏi danh sách tin cậy (hiệu lực ngay), đóng các kênh và phiên đang gắn với điện thoại đó, rồi gọi `DELETE /v1/pairings/:agent_id/:mobile_id?pairing_id=<id>`. Relay chỉ xóa bản ghi nếu nó vẫn mang đúng `pairing_id` đó, nên lệnh thu hồi đến muộn sau một lần ghép lại không xóa lần ghép mới.
 - **Mobile → Cài đặt → Bỏ ghép nối một máy:** điện thoại xóa khóa đã ghim và gọi API xóa ghép nối (không kèm `pairing_id`: xóa bản ghi hiện có). Hub gửi sự kiện `pairing_removed` mang `pairing_id` của bản ghi bị xóa cho agent (trực tiếp và qua bia mộ phát lại ở mỗi lần agent kết nối); agent chỉ xóa khóa khỏi danh sách tin cậy khi id trùng id của mục tin cậy hiện tại, id khác (của lần ghép cũ) thì bỏ qua. (Relay chỉ có thể *bớt* tin cậy, không bao giờ *thêm* được.)
+- **Giới hạn đã biết của v1:** nếu điện thoại bỏ ghép trước khi `POST /v1/pairings` đầu tiên của agent tới relay, relay chưa có bản ghi nên không có bia mộ, và agent vẫn tin điện thoại đó; mục "Thiết bị đã ghép" trên tray vẫn hiện điện thoại này để người dùng thu hồi.
 
 ### 5.6 Khóa app mobile
 
@@ -398,8 +399,8 @@ Mọi lỗi trả JSON `{error: {code, message}}`.
 | `POST /v1/auth/password` | token agent | `{new_password}` | `204`; `403 agent_only`, `400 weak_password` |
 | `DELETE /v1/account` | token | `{password}` | `204`; `401 invalid_credentials`. Xóa người dùng (cascade thiết bị, token, ghép nối) và đóng WebSocket mọi thiết bị với 4002 |
 | `GET /v1/devices` | token | — | `200 [{id, kind, name, platform, online, last_seen_at, paired_with_me}]` (không trả khóa công khai) |
-| `POST /v1/pairings` | token agent | `{mobile_id, pairing_id}` | `201` (gửi lại cùng id → `201`); `400 bad_request` (`pairing_id` không phải UUID), `404 device_not_found`, `410 pairing_removed` (bia mộ mang cùng `pairing_id`: điện thoại đã bỏ ghép lần ghép này; không tạo bản ghi). Bia mộ mang id khác bị xóa |
-| `DELETE /v1/pairings/:agent_id/:mobile_id[?pairing_id=]` | token của một trong hai bên | — | `204`. Có `pairing_id` (agent thu hồi): chỉ xóa nếu bản ghi mang đúng id, không thì không làm gì. Không có (điện thoại): xóa bản ghi hiện có. Khi xóa, hub gửi `pairing_removed` (kèm `pairing_id` của bản ghi) cho cả hai bên và lưu bia mộ cho agent; `400 bad_request` nếu `pairing_id` sai định dạng |
+| `POST /v1/pairings` | token agent | `{mobile_id, pairing_id}` | `201` (gửi lại cùng id → `201`); `400 bad_request` (`pairing_id` không phải UUIDv7), `404 device_not_found`, `410 pairing_removed` (bia mộ hoặc bản ghi hiện có mang id bằng hoặc mới hơn: lần ghép này đã bị bỏ hoặc đã cũ; không tạo bản ghi). Bia mộ cũ hơn bị xóa |
+| `DELETE /v1/pairings/:agent_id/:mobile_id[?pairing_id=]` | token của một trong hai bên | — | `204`. Có `pairing_id` (agent thu hồi): chỉ xóa nếu bản ghi mang đúng id, không thì không làm gì. Không có (điện thoại): xóa bản ghi hiện có. Khi xóa, hub gửi `pairing_removed` (kèm `pairing_id` của bản ghi) cho cả hai bên và lưu bia mộ cho agent; `400 bad_request` nếu `pairing_id` không phải UUIDv7 |
 | `GET /v1/ws` | token | — | `101` → chuyển vào `UserHub` |
 | `GET /v1/version` | — | — | `{min_agent, min_mobile, latest_agent: {version, mac_url, win_url}}` (lấy từ biến môi trường) |
 
@@ -438,7 +439,7 @@ CREATE TABLE tokens (
 CREATE TABLE pairings (
   agent_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
   mobile_id  TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  pairing_id TEXT NOT NULL,                       -- UUID v4 chữ thường do agent sinh lúc pair.confirm
+  pairing_id TEXT NOT NULL,                       -- UUIDv7 chữ thường do agent sinh lúc pair.confirm
   created_at INTEGER NOT NULL,
   PRIMARY KEY (agent_id, mobile_id)
 );
@@ -449,7 +450,7 @@ CREATE TABLE pairings (
 - Nhận WebSocket từ Worker kèm `device_id` và `kind` đã xác thực; `ctx.acceptWebSocket(ws)` và lưu `{device_id, kind}` bằng `serializeAttachment`.
 - Thiết bị đã có kết nối mà kết nối lần nữa: đóng kết nối cũ với mã 4001.
 - Chuyển khung DATA, gửi PRESENCE, áp giới hạn khung (mục 6.2).
-- Phương thức RPC cho Worker: `online(): string[]`, `disconnect(deviceIds: string[], code: number)`, `notifyPairingRemoved(agentId, mobileId, pairingId)` (gửi EVENT và ghi bia mộ mang `pairingId`, mỗi cặp agent/mobile một bia mộ), `admitPairing(agentId, mobileId, pairingId)` (false nếu bia mộ mang đúng id đó; ngược lại xóa bia mộ của id khác).
+- Phương thức RPC cho Worker: `online(): string[]`, `disconnect(deviceIds: string[], code: number)`, `notifyPairingRemoved(agentId, mobileId, pairingId)` (gửi EVENT và ghi bia mộ mang `pairingId`; mỗi cặp agent/mobile một bia mộ, giữ id mới nhất), `admitPairing(agentId, mobileId, pairingId)` (false nếu bia mộ mang id bằng hoặc mới hơn; ngược lại xóa bia mộ cũ hơn).
 
 ### 10.5 Vận hành
 

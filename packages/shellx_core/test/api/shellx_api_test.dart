@@ -28,7 +28,7 @@ final class _TrackingClient extends http.BaseClient {
 
 const _userId = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const _deviceId = '11111111-2222-3333-4444-555555555555';
-const _pairingId = 'c0ffee00-1234-4abc-9def-0123456789ab';
+const _pairingId = 'c0ffee00-1234-7abc-9def-0123456789ab';
 
 final _device = DeviceInfo(
   kind: DeviceKind.agent,
