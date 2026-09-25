@@ -19,7 +19,7 @@ Tài liệu này đủ để một phiên Claude mới (hoặc chính phiên cũ
 | 01 | Relay | đã merge (bfa442b), worktree đã xóa | ✅ Xong (211 test). Ledger: `docs/superpowers/ledgers/plan01-relay.md`. Việc tiếp: merge `feat/shellx-v1` vào nhánh plan 03 (sau khi Task 9 xong) để E2E Task 15 chạy relay thật |
 | 03 | `shellx_agent` + `shellx_client` + E2E | `feat/shellx-v1-agent-client` · `.worktrees/agent-client` | Task 1–5 xong. **Task 6 đã sửa xong (1cc10c6), chưa chạy review lại**. Còn Task 7–15 |
 | 04 | Desktop (Flutter) | `feat/shellx-v1-desktop` · `.worktrees/desktop` (tách từ nhánh plan 03) | Task 1 xong. **Task 2 dở dang** — commit WIP `wip(desktop): Task 2 l10n…`. Làm tiếp Task 2–5; **dừng trước Task 6** cho tới khi plan 03 Task 9 (`AgentService`) được merge vào nhánh này |
-| 05 | Mobile (Flutter) | chưa bắt đầu | **Dựng trên base `flutter-base/yallabb`** (yêu cầu người dùng 2026-09-25) — plan 05 đang được viết lại theo base này (xem §6). Task phụ thuộc `ClientService` chờ plan 03 |
+| 05 | Mobile (Flutter) | `feat/shellx-v1-mobile` · `.worktrees/mobile` | Plan đã viết lại trên base yallabb + thiết kế đã duyệt (efbfb1c, 19 task, đã replay xanh). Task 1–8 chỉ cần core; Task 9 cần plan 03 Task 10; Task 10–19 cần plan 03 Task 11–14 và pairing id |
 
 Ledger chi tiết (mỗi task, mọi phán quyết "Ruling", mọi lỗi nhỏ hoãn lại):
 - Đang chạy: `.worktrees/<relay|agent-client|desktop>/.superpowers/sdd/<plan>/progress.md` (gitignored, trên đĩa).
