@@ -155,5 +155,32 @@ void main() {
         );
       },
     );
+
+    test('a stalled upgrade that never responds still settles inside the '
+        'overall deadline', () async {
+      // `HttpClient.connectionTimeout` only bounds DNS/TCP/TLS, not a
+      // server that accepts the connection and reads the upgrade GET but
+      // never writes a response (or a stuck HTTPS proxy CONNECT), so this
+      // must be bounded by the connector's own overall deadline instead.
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {
+        // Deliberately never touch `request.response`: the client's
+        // upgrade request is read but never answered.
+      });
+
+      final stopwatch = Stopwatch()..start();
+      await expectLater(
+        ioRelaySocketConnector(
+          Uri.parse('ws://127.0.0.1:${server.port}/v1/ws'),
+          const {'Authorization': 'Bearer secret-token'},
+        ),
+        throwsA(isA<TimeoutException>()),
+      );
+      stopwatch.stop();
+      // Bounded by the connector's ~12 s overall deadline, not by never
+      // settling at all; generous to avoid flakiness from test-runner
+      // scheduling jitter when run alongside other real-IO tests.
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 25)));
+    }, timeout: const Timeout(Duration(seconds: 30)));
   });
 }

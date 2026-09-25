@@ -22,13 +22,42 @@ typedef RelaySocketConnector =
 
 /// Connects with `dart:io` [WebSocket]. A rejected upgrade (for example
 /// HTTP 401 for a bad token) throws [WebSocketException] whose
-/// `httpStatusCode` is the HTTP status.
+/// `httpStatusCode` is the HTTP status. Uses a fresh [HttpClient] per
+/// attempt with a bounded `connectionTimeout` so a stalled TCP/TLS connect
+/// settles instead of hanging indefinitely, plus an overall deadline on
+/// the whole upgrade (`connectionTimeout` only covers DNS/TCP/TLS, not a
+/// slow or silent HTTP response — for example a stuck HTTPS proxy
+/// `CONNECT` — so the upgrade GET/response is bounded separately): on
+/// expiry the in-flight connection is force-closed so it can never
+/// register with the relay later, and the returned future fails with a
+/// [TimeoutException]. [RelayConnection] relies on every dial eventually
+/// completing to keep at most one upgrade attempt outstanding at a time.
 Future<RelaySocket> ioRelaySocketConnector(
   Uri uri,
   Map<String, String> headers,
 ) async {
-  final socket = await WebSocket.connect(uri.toString(), headers: headers);
-  return _IoRelaySocket(socket);
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  try {
+    final socket =
+        await WebSocket.connect(
+          uri.toString(),
+          headers: headers,
+          customClient: client,
+        ).timeout(
+          const Duration(seconds: 12),
+          onTimeout: () {
+            // Destroy the in-flight connection so it cannot complete the
+            // upgrade and register with the relay after we've moved on.
+            client.close(force: true);
+            throw TimeoutException(
+              'WebSocket upgrade to $uri did not complete in time',
+            );
+          },
+        );
+    return _IoRelaySocket(socket);
+  } finally {
+    client.close();
+  }
 }
 
 final class _IoRelaySocket implements RelaySocket {
@@ -110,6 +139,12 @@ enum RelayConnectionState {
 ///   reconnect after [Backoff.next]. The backoff resets when a `pong` is
 ///   received, so a relay that accepts and immediately drops us is not
 ///   hammered.
+/// * Never has two upgrade attempts outstanding at once: the relay keeps
+///   only the newest connection per device, so a new attempt (a backoff
+///   retry, [reconnectNow], or [start] after [stop]) waits for any attempt
+///   still outstanding at the network level to settle — and lets it be
+///   closed — before dialing again, instead of racing it and risking the
+///   live connection being replaced by a stale one that registers late.
 /// * Binary frames that fail [RelayFrame.decode] are dropped silently.
 final class RelayConnection {
   RelayConnection({
@@ -145,6 +180,17 @@ final class RelayConnection {
   Timer? _pingTimer;
   Timer? _pongTimer;
   Timer? _reconnectTimer;
+
+  /// The raw connector call currently in flight, if any. A new attempt
+  /// waits for this to settle before dialing again, so at most one
+  /// upgrade is ever outstanding (see [_connect]).
+  Future<RelaySocket>? _dialing;
+
+  /// Set to the [_dialing] value we already waited out a full
+  /// [connectTimeout] for, without it settling. Once a specific stale
+  /// dial is marked this way, later attempts stop waiting on it (see
+  /// [_connect]) instead of blocking forever on a dial that never settles.
+  Future<RelaySocket>? _dialGivenUpOn;
 
   /// Incremented whenever the current attempt/socket is abandoned, so late
   /// callbacks from an old socket are ignored.
@@ -208,13 +254,71 @@ final class RelayConnection {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     final generation = ++_generation;
-    final token = _token();
+
+    // Never have two upgrade attempts outstanding at once: if an attempt
+    // we already gave up on locally (after `connectTimeout`, or because
+    // `stop()`/a fresh `start()` superseded it) hasn't actually settled at
+    // the network level yet, wait for it here before dialing again.
+    // Whoever gave up on that attempt remains responsible for closing
+    // whatever it eventually produces (see the two `_closeQuietly` calls
+    // below) — this wait only stops a second upgrade from racing it.
+    //
+    // The wait itself is bounded by `connectTimeout`: a dial that never
+    // settles (the real connector is bounded — see `ioRelaySocketConnector`
+    // — but a test double might not be) would otherwise wedge every future
+    // attempt forever, and `reconnectNow`/`start` would stay no-ops since
+    // `state` would never leave `connecting`. If the stale dial still
+    // hasn't settled after one full `connectTimeout`, treat this attempt
+    // as failed (disconnected + backoff, so `reconnectNow` works again),
+    // and remember it so the *next* attempt stops waiting on it entirely
+    // and dials fresh instead — the relay's newest-wins behavior then
+    // favors the new dial, and the stale socket, if it ever arrives, is
+    // still closed by the existing stale-generation cleanup below.
+    final stale = _dialing;
+    if (stale != null && !identical(stale, _dialGivenUpOn)) {
+      // We're genuinely attempting a (re)connection even though we haven't
+      // dialed yet, so reflect that immediately instead of leaving `state`
+      // on whatever it was while we wait for the stale dial to clear.
+      _setState(RelayConnectionState.connecting);
+      final cleared = await stale
+          .then<bool>((_) => true, onError: (Object _) => true)
+          .timeout(connectTimeout, onTimeout: () => false);
+      if (generation != _generation) {
+        return;
+      }
+      if (!cleared) {
+        _dialGivenUpOn = stale;
+        _scheduleReconnect();
+        return;
+      }
+    }
+
+    final String? token;
+    try {
+      token = _token();
+    } on Object {
+      _scheduleReconnect();
+      return;
+    }
     if (token == null) {
       _setState(RelayConnectionState.revoked);
       return;
     }
+    // Reached only once we're actually about to dial: a null token never
+    // flashes through `connecting` on its way to `revoked` (no-op if the
+    // stale-dial wait above already set it).
     _setState(RelayConnectionState.connecting);
-    final pending = _connector(_wsUri, {'Authorization': 'Bearer $token'});
+    final pending = Future.sync(
+      () => _connector(_wsUri, {'Authorization': 'Bearer $token'}),
+    );
+    _dialing = pending;
+    void clearDialing(Object? _) {
+      if (identical(_dialing, pending)) {
+        _dialing = null;
+      }
+    }
+
+    unawaited(pending.then(clearDialing, onError: clearDialing));
     final RelaySocket socket;
     try {
       socket = await pending.timeout(connectTimeout);
@@ -251,7 +355,11 @@ final class RelayConnection {
     );
     _setState(RelayConnectionState.connected);
     _sendPing(generation);
-    _pingTimer = Timer.periodic(_pingInterval, (_) => _sendPing(generation));
+    // Only keep pinging if the first ping actually went out for this
+    // generation; a throw already dropped and rescheduled the connection.
+    if (generation == _generation) {
+      _pingTimer = Timer.periodic(_pingInterval, (_) => _sendPing(generation));
+    }
   }
 
   void _sendPing(int generation) {
@@ -300,6 +408,7 @@ final class RelayConnection {
       return;
     }
     _abandonSocket();
+    unawaited(_closeQuietly(socket, 1000));
     switch (socket.closeCode) {
       case RelayCloseCode.revoked:
         _setState(RelayConnectionState.revoked);
