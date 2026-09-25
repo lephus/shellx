@@ -108,12 +108,15 @@ final class ShellxApi {
 
   /// Records pairing [pairingId] with the phone [mobileId]
   /// (`POST /v1/pairings`, agent token). [pairingId] must be a lower-case
-  /// UUIDv7 the agent generates at `pair.confirm`, one per pairing (the relay
-  /// orders pairings by it; anything else is `400 bad_request`). Sending the
-  /// same id again is idempotent. Fails with `410 pairing_removed` when the
-  /// relay already removed this pairing or a newer one of the same phone
-  /// (for example an earlier attempt committed, its response was lost and
-  /// the phone unpaired): the row is not recreated.
+  /// canonical UUIDv7 the agent generates at `pair.confirm`, one per pairing
+  /// (the relay orders pairings by it and does not fold case; anything else
+  /// is `400 bad_request`). Sending the same id again is idempotent. Fails
+  /// with `410 pairing_removed` when the relay already removed this pairing
+  /// or a newer one of the same phone (for example an earlier attempt
+  /// committed, its response was lost and the phone unpaired), or when the
+  /// id's timestamp is more than 24 h ahead of the relay's clock: the row is
+  /// not recreated. A `500` may come after the row was recorded; retry with
+  /// the same id (only while it is still the current pairing).
   Future<void> createPairing(
     String mobileId, {
     required String pairingId,
@@ -129,7 +132,9 @@ final class ShellxApi {
   /// `DELETE /v1/pairings/:agent_id/:mobile_id`. With [pairingId] (the
   /// agent's revoke) the relay removes the pairing only if it is still that
   /// pairing, otherwise nothing happens; without it (the phone's unpair)
-  /// whatever pairing exists is removed. Idempotent (`204` either way).
+  /// whatever pairing exists is removed. Idempotent (`204` either way). A
+  /// `500` leaves the pairing in place: retry it (the phone's unpair
+  /// especially, since that is how the agent learns about it).
   Future<void> deletePairing(
     String agentId,
     String mobileId, {
