@@ -11,9 +11,19 @@ import 'package:tray_manager/tray_manager.dart';
 final class _FakeTrayHost implements TrayHost {
   final List<(String, bool)> icons = [];
   final List<Menu> menus = [];
+
+  /// setIcon calls that fail before one succeeds.
+  int iconFailures = 0;
+
   @override
-  Future<void> setIcon(String asset, {required bool isTemplate}) async =>
-      icons.add((asset, isTemplate));
+  Future<void> setIcon(String asset, {required bool isTemplate}) async {
+    if (iconFailures > 0) {
+      iconFailures--;
+      throw StateError('tray not ready');
+    }
+    icons.add((asset, isTemplate));
+  }
+
   @override
   Future<void> setToolTip(String text) async {}
   @override
@@ -47,6 +57,22 @@ void main() {
       expect(host.menus, hasLength(3));
     },
   );
+
+  test('an icon that failed to set is set again on the next render', () async {
+    final host = _FakeTrayHost()..iconFailures = 1;
+    final presenter = TrayPresenter(
+      host: host,
+      l10n: lookupAppLocalizations(const Locale('en')),
+      isWindows: false,
+      onAction: (_) async {},
+    );
+    await expectLater(presenter.render(connected), throwsStateError);
+    expect(host.icons, isEmpty);
+
+    await presenter.render(connected);
+    expect(host.icons, [('assets/tray/tray_normal.png', true)]);
+    expect(host.menus, hasLength(1));
+  });
 
   test('clicks are translated to actions; unknown keys are ignored', () async {
     final actions = <TrayAction>[];

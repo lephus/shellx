@@ -53,11 +53,12 @@ final class TrayPresenter {
   Future<void> _render(AgentViewState state) async {
     final icon = trayIconFor(state);
     if (icon != _icon) {
-      _icon = icon;
       await _host.setIcon(
         trayIconAsset(icon, windows: _isWindows),
         isTemplate: !_isWindows && icon != TrayIconState.active,
       );
+      // Only once it is set: a failed setIcon is retried on the next render.
+      _icon = icon;
       await _host.setToolTip(_l10n.trayTooltip);
     }
     await _host.setMenu(buildTrayMenu(state, _l10n, _ids));
