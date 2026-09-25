@@ -339,7 +339,7 @@ Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ li�
 
 ### 9.1 Package chính
 
-`xterm`, `mobile_scanner`, `local_auth`, `flutter_secure_storage`, `cryptography_flutter`, `flutter_riverpod`, `flutter_localizations`/`intl`. Font JetBrains Mono đóng gói sẵn.
+`xterm`, `mobile_scanner`, `local_auth`, `flutter_secure_storage`, `flutter_riverpod`, `flutter_localizations`/`intl`. Font JetBrains Mono đóng gói sẵn. Không dùng `cryptography_flutter`: `shellx_core` ghim backend Dart thuần (DartX25519, DartChacha20, DartBlake2s) để mọi nền tảng chạy đúng phần mã đã kiểm bằng test vector.
 
 ### 9.2 Màn hình
 
