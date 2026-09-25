@@ -41,9 +41,10 @@ mandatory: without it Wrangler 4 writes to a local simulated bucket and still re
 ## GitHub secrets
 
 All 13 secrets below must be created as **Environment secrets** of a GitHub Environment named
-`release`, restricted to the tag pattern `desktop-v*` (Settings → Environments → **New environment**
-→ name `release` → **Deployment branches and tags** → **Selected branches and tags** → add rule
-`desktop-v*`; optionally add **Required reviewers** for a manual approval gate before signing runs).
+`release`, allowing the tag pattern `desktop-v*` and branch `main` (Settings → Environments → **New environment**
+→ name `release` → **Deployment branches and tags** → **Selected branches and tags** → add rules
+`desktop-v*` and `main`; main is protected by PR review, and dry-run steps never use these secrets;
+optionally add **Required reviewers** for a manual approval gate before signing runs).
 Do **not** add them as repository secrets: `release-desktop.yml`'s `macos`, `windows` and `publish`
 jobs declare `environment: release`, so only workflow runs that match the environment's deployment
 rule can read them — a run from an arbitrary branch (for example a `workflow_dispatch` dry run) has
@@ -121,8 +122,9 @@ names fixed by `apps/desktop`: `ShellX.app` with bundle id `pro.shellx.desktop`,
 
 ### 4. GitHub
 
-1. Settings → Environments → **New environment** → name `release`, restrict deployment to tags
-   matching `desktop-v*` (optionally add required reviewers), then add the 13 secrets above to it
+1. Settings → Environments → **New environment** → name `release`, allow deployment for tags
+   matching `desktop-v*` and branch `main` (main is protected by PR review; dry-run steps do not
+   access secrets; optionally add required reviewers), then add the 13 secrets above to it
    as Environment secrets (see "GitHub secrets" above).
 2. Recommended: Settings → Rules → Rulesets → **New tag ruleset** targeting `desktop-v*`,
    restricting creation and deletion to maintainers.
