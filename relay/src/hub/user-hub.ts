@@ -3,7 +3,8 @@ import type { DeviceKind } from "../auth/device";
 import type { Env } from "../env";
 import { logMeta } from "../log";
 import {
-  CloseCode, encodeError, encodePresence, MAX_FRAME_BYTES, parseDataHeader, RelayErrorCode, withPeer,
+  CloseCode, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, parseDataHeader, RelayErrorCode,
+  withPeer,
 } from "../protocol/frames";
 import { parseUuid } from "../protocol/uuid";
 import { FRAMES_PER_SECOND, TokenBucket } from "./token-bucket";
@@ -49,6 +50,10 @@ export class UserHub extends DurableObject<Env> {
     super(ctx, env);
     // Heartbeat is answered by the runtime without waking the object (spec §6.1).
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+    // Durable (SQLite-backed) queue of EVENT frames for an agent that was offline when they happened.
+    ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS pending_events (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, frame BLOB NOT NULL)",
+    );
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -77,7 +82,40 @@ export class UserHub extends DurableObject<Env> {
       if (other !== deviceId) server.send(encodePresence(other, true));
     }
     this.broadcast(encodePresence(deviceId, true), deviceId);
+    this.deliverPending(server, deviceId);
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  // ---- RPC for the Worker (spec §10.4) -------------------------------------------------------
+
+  /** Device ids that currently have a live connection. */
+  online(): string[] {
+    return this.liveDeviceIds();
+  }
+
+  /** Closes every connection of `deviceIds` with `code` (4002 after a password change) and announces offline. */
+  async disconnect(deviceIds: string[], code: CloseCode): Promise<void> {
+    for (const deviceId of new Set(deviceIds)) {
+      const sockets = this.socketsOf(deviceId);
+      if (sockets.length === 0) continue;
+      for (const ws of sockets) this.closeSocket(ws, code);
+      await this.markOffline(deviceId);
+    }
+  }
+
+  /**
+   * Sends EVENT pairing_removed to both devices if connected (clients handle it idempotently).
+   * If the agent is offline the event is queued durably and delivered on its next connection,
+   * because the agent is the source of truth for trust (spec §5.4–5.5).
+   */
+  notifyPairingRemoved(agentId: string, mobileId: string): void {
+    const frame = pairingRemovedEvent(agentId, mobileId);
+    const agentSockets = this.socketsOf(agentId);
+    if (agentSockets.length === 0) {
+      this.ctx.storage.sql.exec("INSERT INTO pending_events (device_id, frame) VALUES (?, ?)", agentId, frame.buffer);
+    }
+    for (const ws of agentSockets) safeSend(ws, frame);
+    if (mobileId !== agentId) for (const ws of this.socketsOf(mobileId)) safeSend(ws, frame);
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -126,6 +164,15 @@ export class UserHub extends DurableObject<Env> {
   }
 
   // ---- helpers -------------------------------------------------------------------------------
+
+  private deliverPending(ws: WebSocket, deviceId: string): void {
+    const rows = this.ctx.storage.sql
+      .exec<{ frame: ArrayBuffer }>("SELECT frame FROM pending_events WHERE device_id = ? ORDER BY id", deviceId)
+      .toArray();
+    if (rows.length === 0) return;
+    for (const row of rows) ws.send(new Uint8Array(row.frame));
+    this.ctx.storage.sql.exec("DELETE FROM pending_events WHERE device_id = ?", deviceId);
+  }
 
   private takeToken(deviceId: string): boolean {
     const now = Date.now();
