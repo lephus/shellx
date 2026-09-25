@@ -21,3 +21,16 @@ export function buildResetSql(email: string, phc: string, now: number, revokeTok
   }
   return statements.join("\n");
 }
+
+/**
+ * Parse wrangler d1 execute --json output and check if account exists.
+ * Returns true if the first result set has exactly one row with n=1.
+ */
+export function accountExistsFromWranglerJson(stdout: string): boolean {
+  try {
+    const results = JSON.parse(stdout) as { results?: { n?: number }[] }[];
+    return results[0]?.results?.[0]?.n === 1;
+  } catch {
+    return false;
+  }
+}

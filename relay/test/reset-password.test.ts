@@ -1,7 +1,7 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { buildResetSql, sqlString } from "../scripts/reset-sql";
+import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
 
@@ -40,5 +40,41 @@ describe("reset-password SQL", () => {
 
   it("rejects a non-integer timestamp", () => {
     expect(() => buildResetSql("a@b.co", "x", 1.5, false)).toThrow(TypeError);
+  });
+});
+
+describe("accountExistsFromWranglerJson", () => {
+  it("returns true when account exists (n=1)", () => {
+    const output = JSON.stringify([{ results: [{ n: 1 }] }]);
+    expect(accountExistsFromWranglerJson(output)).toBe(true);
+  });
+
+  it("returns false when account does not exist (n=0)", () => {
+    const output = JSON.stringify([{ results: [{ n: 0 }] }]);
+    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  });
+
+  it("returns false with empty results array", () => {
+    const output = JSON.stringify([{ results: [] }]);
+    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  });
+
+  it("returns false with missing results property", () => {
+    const output = JSON.stringify([{}]);
+    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  });
+
+  it("returns false with invalid JSON", () => {
+    expect(accountExistsFromWranglerJson("not valid json")).toBe(false);
+  });
+
+  it("returns false with empty array", () => {
+    const output = JSON.stringify([]);
+    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  });
+
+  it("returns false when first result has no results property", () => {
+    const output = JSON.stringify([{ error: "something" }]);
+    expect(accountExistsFromWranglerJson(output)).toBe(false);
   });
 });
