@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter_pty/flutter_pty.dart' as fp;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -136,6 +138,51 @@ bool _windowsProcessRunning(int processId) {
     'CSV',
   ]);
   return (result.stdout as String).contains('"$processId"');
+}
+
+final DynamicLibrary _libc = DynamicLibrary.process();
+
+final int Function(int, int) _signal = _libc
+    .lookupFunction<IntPtr Function(Int, IntPtr), int Function(int, int)>(
+      'signal',
+    );
+
+final int Function(int, Pointer<Uint32>, Pointer<Uint32>) _pthreadSigmask =
+    _libc.lookupFunction<
+      Int Function(Int, Pointer<Uint32>, Pointer<Uint32>),
+      int Function(int, Pointer<Uint32>, Pointer<Uint32>)
+    >('pthread_sigmask');
+
+const int _sigpipe = 13;
+const int _sigusr2 = 31;
+const int _sigDfl = 0;
+const int _sigIgn = 1;
+const int _sigBlock = 1;
+const int _sigSetmask = 3;
+
+/// macOS: runs [body] with SIGPIPE set to [sigpipe] (SIG_IGN or SIG_DFL)
+/// and [blocked] blocked on this thread — the state an agent process may be
+/// in when it spawns a shell — then restores both.
+T _withSignals<T>(
+  T Function() body, {
+  required int sigpipe,
+  List<int> blocked = const [],
+}) {
+  final previous = _signal(_sigpipe, sigpipe);
+  final set = calloc<Uint32>();
+  final old = calloc<Uint32>();
+  for (final signal in blocked) {
+    set.value |= 1 << (signal - 1);
+  }
+  _pthreadSigmask(_sigBlock, set, old);
+  try {
+    return body();
+  } finally {
+    _pthreadSigmask(_sigSetmask, old, nullptr);
+    _signal(_sigpipe, previous);
+    calloc.free(set);
+    calloc.free(old);
+  }
 }
 
 /// Whether a process with [processId] is running.
@@ -434,6 +481,55 @@ void main() {
       skip: Platform.isWindows,
     );
   }
+
+  testWidgets(
+    'the shell starts with default signal handling and nothing blocked',
+    (tester) async {
+      // As if the agent ignored SIGPIPE and blocked SIGUSR2 on this thread:
+      // exec keeps both. An interactive zsh resets SIGPIPE itself, bash and
+      // `sh -c` do not, so the probe runs as the pty's command.
+      const probe = ShellCommand(
+        executable: '/bin/sh',
+        arguments: [
+          '-c',
+          // yes dies of SIGPIPE when head exits; SIGUSR2 ends sh unless it
+          // is blocked (macOS `ps -o blocked` does not show thread masks).
+          '( yes; echo "yes-status=\$?" >&2 ) | head -n 1 >/dev/null; '
+              r'kill -USR2 $$; echo still-running',
+        ],
+        name: 'sh',
+      );
+      final (pty, transcript) = _withSignals(
+        () => open(probe),
+        sigpipe: _sigIgn,
+        blocked: [_sigusr2],
+      );
+      // Killed by SIGPIPE (128 + 13), not "Broken pipe" and status 1.
+      await transcript.waitForLine((line) => line == 'yes-status=141');
+      // Killed by the SIGUSR2 it sent itself.
+      expect(await pty.exitCode.timeout(const Duration(seconds: 15)), -31);
+      await transcript.done.timeout(const Duration(seconds: 2));
+      expect(transcript.lines, isNot(contains('still-running')));
+    },
+    skip: Platform.isWindows,
+  );
+
+  testWidgets(
+    'a child that exits before it is let go cannot kill the agent with '
+    'SIGPIPE',
+    (tester) async {
+      // Step 5: the child exits before it reads the sync pipe (as when
+      // TIOCSCTTY fails), so the parent's write to it has no reader. With
+      // SIGPIPE at its default, that write must not kill this process.
+      final (pty, transcript) = _withSignals(() {
+        fp.Pty.debugFailNextStart(5);
+        return open(shell);
+      }, sigpipe: _sigDfl);
+      expect(await pty.exitCode.timeout(const Duration(seconds: 15)), 1);
+      await transcript.done.timeout(const Duration(seconds: 2));
+    },
+    skip: Platform.isWindows,
+  );
 
   testWidgets('finished sessions leave nothing behind', (tester) async {
     Future<void> runOne() async {

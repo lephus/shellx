@@ -348,6 +348,31 @@ static void *wait_exit_thread(void *arg)
     return NULL;
 }
 
+// ShellX, in the forked child: every signal back to its default action and
+// nothing blocked. exec keeps ignored signals and the signal mask, so the
+// shell and its commands would otherwise inherit the agent's (e.g. SIGPIPE
+// ignored: `yes | head` then fails with "Broken pipe" instead of ending).
+// Only async-signal-safe calls (sigaction, sigprocmask).
+static void reset_signals(void)
+{
+    struct sigaction action;
+
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = SIG_DFL;
+    sigemptyset(&action.sa_mask);
+
+    for (int sig = 1; sig < NSIG; sig++)
+    {
+        // Fails, harmlessly, for SIGKILL and SIGSTOP.
+        sigaction(sig, &action, NULL);
+    }
+
+    sigset_t none;
+
+    sigemptyset(&none);
+    sigprocmask(SIG_SETMASK, &none, NULL);
+}
+
 static void set_environment(char **environment)
 {
     if (environment == NULL)
@@ -397,6 +422,13 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     fcntl(sync_pipe[0], F_SETFD, FD_CLOEXEC);
     fcntl(sync_pipe[1], F_SETFD, FD_CLOEXEC);
 
+#ifdef F_SETNOSIGPIPE
+    // ShellX: the child may exit before it reads the pipe (TIOCSCTTY
+    // failed): writing to it must then fail with EPIPE, not raise SIGPIPE,
+    // which kills the agent unless something ignores it.
+    fcntl(sync_pipe[1], F_SETNOSIGPIPE, 1);
+#endif
+
     int pid = pty_forkpty(&ptm, &pts, NULL, &ws);
 
     if (pid < 0)
@@ -411,6 +443,13 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     if (pid == 0)
     {
         char go;
+
+        reset_signals();
+
+        if (fail_step == 5)
+        {
+            _exit(1);
+        }
 
         close(sync_pipe[1]);
 
@@ -505,6 +544,12 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     }
 
     pthread_detach(thread);
+
+    if (fail_step == 5)
+    {
+        // Make sure the child has exited (its end of the pipe is closed).
+        usleep(200 * 1000);
+    }
 
     // Let the child go on.
     char go = 1;

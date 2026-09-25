@@ -64,7 +64,8 @@ FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle);
 // ShellX, tests only (apps/desktop/integration_test/pty_test.dart): the next
 // pty_create fails as if [step] had failed: 1 allocating the handle, 2
 // starting the writer thread, 3 starting the exit thread, 4 starting the
-// output reader. 0 turns it off; pty_create resets it.
+// output reader; 5: the child exits (code 1) before it reads the sync pipe,
+// as when TIOCSCTTY fails. 0 turns it off; pty_create resets it.
 FFI_PLUGIN_EXPORT void pty_debug_fail(int step);
 #endif
 
