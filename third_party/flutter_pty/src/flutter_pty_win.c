@@ -158,8 +158,17 @@ typedef struct PtyHandle
 
     SRWLOCK lock;
 
-    // ShellX: job object holding the process and everything it starts.
+    // ShellX: job object holding the process and everything it starts, or
+    // NULL when it could not be set up (jobError says why).
     HANDLE job;
+
+    DWORD jobError;
+
+    // ShellX: set by pty_kill; see pty_release.
+    BOOL killed;
+
+    // ShellX: kept open until pty_release so pty_kill can still use it.
+    HANDLE hProcess;
 
     DWORD dwProcessId;
 
@@ -257,8 +266,6 @@ static DWORD WINAPI wait_exit_thread(LPVOID arg)
 
     GetExitCodeProcess(options->pid, &exit_code);
 
-    CloseHandle(options->pid);
-
     // ShellX: close the pseudo console once the process has exited, so conhost
     // ends and the output pipe reaches end of file (upstream never closed it
     // and leaked a conhost.exe per session). ClosePseudoConsole may wait for
@@ -299,12 +306,27 @@ static void set_error_hresult(const char *what, HRESULT code)
     error_message = error_buffer;
 }
 
+static DWORD last_error_or_failure(void)
+{
+    DWORD error = GetLastError();
+
+    return error != 0 ? error : ERROR_GEN_FAILURE;
+}
+
+// ShellX: the whole job, or only the process when it has no job.
+static BOOL terminate_tree(HANDLE job, HANDLE process)
+{
+    return job != NULL ? TerminateJobObject(job, 1) : TerminateProcess(process, 1);
+}
+
 // ShellX: rewritten for correctness; every failure path releases what was
 // created before it (upstream leaked the pseudo console, i.e. a conhost.exe,
 // and the pipes whenever a step failed).
 //
 // Order: pipes -> pseudo console -> job object -> process created suspended
 // -> process assigned to the job -> exit thread -> output reader -> resume.
+// A job object that cannot be set up does not fail the spawn: the process
+// runs without one, pty_kill ends the process only, and pty_job_error tells.
 // The shell runs no instruction before the reader is running, which is what
 // upstream's Sleep(1000) on the calling (UI) thread tried to approximate; the
 // sleep is gone.
@@ -316,6 +338,7 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     HANDLE outputWriteSide = NULL;
     HPCON hPty = NULL;
     HANDLE job = NULL;
+    DWORD job_error = 0;
     HANDLE mutex = NULL;
     LPWSTR command = NULL;
     LPWSTR environment_block = NULL;
@@ -441,16 +464,18 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     if (job == NULL)
     {
-        set_error("Failed to create job object", GetLastError());
-        goto fail;
+        job_error = last_error_or_failure();
     }
-
-    jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-
-    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)))
+    else
     {
-        set_error("Failed to configure job object", GetLastError());
-        goto fail;
+        jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)))
+        {
+            job_error = last_error_or_failure();
+            CloseHandle(job);
+            job = NULL;
+        }
     }
 
     // Suspended until it is in the job, so it cannot start a child outside it.
@@ -471,10 +496,12 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     process_created = TRUE;
 
-    if (!AssignProcessToJobObject(job, processInfo.hProcess))
+    // E.g. the agent itself runs in a job that refuses a nested one.
+    if (job != NULL && !AssignProcessToJobObject(job, processInfo.hProcess))
     {
-        set_error("Failed to assign process to job object", GetLastError());
-        goto fail;
+        job_error = last_error_or_failure();
+        CloseHandle(job);
+        job = NULL;
     }
 
     mutex = CreateSemaphoreW(NULL, 1, 1, NULL);
@@ -499,6 +526,9 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     pty->hPty = hPty;
     InitializeSRWLock(&pty->lock);
     pty->job = job;
+    pty->jobError = job_error;
+    pty->killed = FALSE;
+    pty->hProcess = processInfo.hProcess;
     pty->dwProcessId = processInfo.dwProcessId;
     pty->ackRead = options->ackRead;
     pty->hMutex = mutex;
@@ -527,15 +557,13 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
         set_error("Failed to start the output reader", GetLastError());
 
         // The process never ran. Ending it lets the exit thread close the
-        // process handle and the pseudo console and free its options; closing
-        // the output read side first means conhost cannot block writing to it.
-        TerminateJobObject(job, 1);
+        // pseudo console and free its options; closing the output read side
+        // first means conhost cannot block writing to it.
+        TerminateProcess(processInfo.hProcess, 1);
         CloseHandle(outputReadSide);
         outputReadSide = NULL;
         WaitForSingleObject(waitThread, INFINITE);
         CloseHandle(waitThread);
-        CloseHandle(processInfo.hThread);
-        process_created = FALSE;
         hPty = NULL;
         waitOptions = NULL;
         goto fail;
@@ -547,7 +575,7 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     if (ResumeThread(processInfo.hThread) == (DWORD)-1)
     {
         // Surfaces as an immediate exit with code 1.
-        TerminateJobObject(job, 1);
+        terminate_tree(job, processInfo.hProcess);
     }
 
     CloseHandle(processInfo.hThread);
@@ -673,15 +701,37 @@ FFI_PLUGIN_EXPORT char *pty_error()
 
 FFI_PLUGIN_EXPORT int pty_kill(PtyHandle *handle)
 {
-    return TerminateJobObject(handle->job, 1) ? 1 : 0;
+    handle->killed = TRUE;
+
+    return terminate_tree(handle->job, handle->hProcess) ? 1 : 0;
+}
+
+FFI_PLUGIN_EXPORT int pty_job_error(PtyHandle *handle)
+{
+    return (int)handle->jobError;
 }
 
 FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle)
 {
-    // The exit thread has closed the pseudo console and the process handle,
-    // and the reader the output pipe. KILL_ON_JOB_CLOSE ends any process
-    // still in the job.
-    CloseHandle(handle->job);
+    // The exit thread has closed the pseudo console, and the reader the
+    // output pipe.
+    if (handle->job != NULL)
+    {
+        if (!handle->killed)
+        {
+            // The process exited on its own: what it left behind keeps
+            // running, as on POSIX, instead of KILL_ON_JOB_CLOSE ending it.
+            // After pty_kill the flag stays, so closing the job also ends
+            // anything that slipped past TerminateJobObject.
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+            ZeroMemory(&limits, sizeof(limits));
+            SetInformationJobObject(handle->job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
+        }
+
+        CloseHandle(handle->job);
+    }
+
+    CloseHandle(handle->hProcess);
     CloseHandle(handle->inputWriteSide);
     CloseHandle(handle->hMutex);
     free(handle);

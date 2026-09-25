@@ -40,8 +40,13 @@ abstract interface class NativePty {
   void resize(int rows, int columns);
 
   /// Windows (vendored flutter_pty): terminates the job object holding the
-  /// shell and every process it started. False when that failed.
+  /// shell and every process it started, or only the shell when it runs
+  /// without one (see [jobError]). False when that failed.
   bool kill();
+
+  /// Windows: 0 when the shell runs in the plugin's job object; otherwise
+  /// the Win32 error that prevented it, and [kill] ends the shell only.
+  int get jobError;
 }
 
 typedef NativePtyStarter = NativePty Function(PtyLaunch launch);
@@ -63,6 +68,8 @@ final class _FlutterNativePty implements NativePty {
   void resize(int rows, int columns) => _pty.resize(rows, columns);
   @override
   bool kill() => _pty.kill();
+  @override
+  int get jobError => _pty.jobError;
 }
 
 NativePty startFlutterPty(PtyLaunch launch) {
@@ -85,7 +92,9 @@ NativePty startFlutterPty(PtyLaunch launch) {
 /// * macOS: [PosixProcessTreeKiller] — freeze the shell's process tree,
 ///   SIGHUP it, SIGKILL what is left after 2 s.
 /// * Windows: the plugin's job object — TerminateJobObject ends the shell and
-///   every process it started.
+///   every process it started. Should the job object be unavailable, the
+///   shell still starts and `kill()` ends the shell only; that is reported
+///   once through `onError`.
 final class FlutterPtyFactory implements PtyFactory {
   /// [killer] is used on macOS only (default [PosixProcessTreeKiller]).
   /// [onError] receives kill failures (pid and reason only; default:
@@ -100,7 +109,7 @@ final class FlutterPtyFactory implements PtyFactory {
        _killer = isWindows ? null : killer ?? PosixProcessTreeKiller(),
        _start = start,
        _outputGrace = outputGrace,
-       _onError = onError;
+       _onError = onError ?? FlutterPtyAdapter.debugPrintError;
 
   factory FlutterPtyFactory.forCurrentPlatform({
     void Function(String message)? onError,
@@ -110,7 +119,8 @@ final class FlutterPtyFactory implements PtyFactory {
   final ProcessTreeKiller? _killer;
   final NativePtyStarter _start;
   final Duration _outputGrace;
-  final void Function(String message)? _onError;
+  final void Function(String message) _onError;
+  bool _reportedNoJob = false;
 
   /// Windows: the plugin writes the executable and the arguments into the
   /// command line as given, so each is quoted. Paths and environment values
@@ -153,8 +163,16 @@ final class FlutterPtyFactory implements PtyFactory {
       cols: cols,
       rows: rows,
     );
+    final native = _start(launch);
+    if (_isWindows && native.jobError != 0 && !_reportedNoJob) {
+      _reportedNoJob = true;
+      _onError(
+        'pid ${native.pid} started without a job object '
+        '(error ${native.jobError}): kill() ends the shell only',
+      );
+    }
     return FlutterPtyAdapter(
-      _start(launch),
+      native,
       killer: _killer,
       outputGrace: _outputGrace,
       onError: _onError,
@@ -173,10 +191,11 @@ final class FlutterPtyFactory implements PtyFactory {
 /// `kill()` runs [killer]'s tree kill on the shell's pid (macOS) or, without
 /// a killer, the plugin's job-object kill (Windows). Once the shell has
 /// exited, the tree kill is skipped (its pid may already belong to another
-/// process); the job-object kill stays valid and ends anything left in the
-/// job. Kill failures never throw: they go to [onError] as
-/// `kill of pid <pid> failed: <reason>` — never output, arguments or
-/// environment.
+/// process); the job-object kill stays valid until the plugin releases the
+/// pty right after the exit, and what the shell left behind then keeps
+/// running (on both platforms). Kill failures never throw: they go to
+/// [onError] as `kill of pid <pid> failed: <reason>` — never output,
+/// arguments or environment.
 final class FlutterPtyAdapter implements Pty {
   FlutterPtyAdapter(
     this._native, {
@@ -184,7 +203,7 @@ final class FlutterPtyAdapter implements Pty {
     this.outputGrace = const Duration(milliseconds: 500),
     void Function(String message)? onError,
   }) : _killer = killer,
-       _onError = onError ?? _debugPrintError {
+       _onError = onError ?? debugPrintError {
     _nativeSubscription = _native.output.listen(
       _output.add,
       onError: _output.addError,
@@ -199,7 +218,8 @@ final class FlutterPtyAdapter implements Pty {
     );
   }
 
-  static void _debugPrintError(String message) =>
+  /// The default error reporter.
+  static void debugPrintError(String message) =>
       debugPrint('ShellX PTY: $message');
 
   final NativePty _native;
@@ -250,8 +270,7 @@ final class FlutterPtyAdapter implements Pty {
 
   void _killJob() {
     try {
-      // False after exit is expected: the plugin released the job, which
-      // ended everything left in it.
+      // False after exit is expected: the plugin has released the pty.
       if (!_native.kill() && !_exited) {
         _onError(
           'kill of pid ${_native.pid} failed: '

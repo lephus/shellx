@@ -17,6 +17,8 @@ final class _FakeNativePty implements NativePty {
   final writes = <Uint8List>[];
   var kills = 0;
   var killSucceeds = true;
+  @override
+  var jobError = 0;
 
   @override
   int get pid => 4321;
@@ -173,6 +175,33 @@ void main() {
       expect(native.resizes, [(50, 132)]);
       expect(killer.killed, [4321]);
       expect(native.kills, 0);
+    });
+
+    test('Windows: a shell started without a job object is reported once', () {
+      final errors = <String>[];
+      var jobError = 5;
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => _FakeNativePty(launch)..jobError = jobError,
+        onError: errors.add,
+      );
+      void spawn() => factory.spawn(
+        _pwsh,
+        workingDirectory: r'C:\',
+        environment: {},
+        cols: 80,
+        rows: 24,
+      );
+
+      spawn();
+      spawn();
+      jobError = 0;
+      spawn();
+
+      expect(errors, [
+        'pid 4321 started without a job object (error 5): '
+            'kill() ends the shell only',
+      ]);
     });
 
     test('Windows kill terminates the job through the plugin, once', () async {

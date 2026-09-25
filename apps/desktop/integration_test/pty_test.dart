@@ -144,6 +144,16 @@ Future<bool> _running(int processId) async {
   return probe.exitCode == 0;
 }
 
+/// Keeps a dart:io child process running until the test ends, the way the
+/// agent keeps `caffeinate` running: dart:io then reaps any child that exits.
+Future<void> _keepDartIoChildRunning() async {
+  final other = await Process.start('/bin/sleep', ['30']);
+  addTearDown(() async {
+    other.kill();
+    await other.exitCode;
+  });
+}
+
 /// Windows: the conhost.exe processes this process started — one per open
 /// pseudo console.
 Set<int> _conhostChildren() {
@@ -182,11 +192,26 @@ Set<String> _ptyFds() {
   return fds;
 }
 
+/// macOS: children of this process that exited but were never reaped.
+Set<String> _zombieChildren() {
+  final result = Process.runSync('/bin/ps', ['-A', '-o', 'pid=,ppid=,stat=']);
+  return {
+    for (final line in const LineSplitter().convert(result.stdout as String))
+      if (line.trim().split(RegExp(r'\s+')) case [
+        final child,
+        final parent,
+        final stat,
+      ] when parent == '$pid' && stat.startsWith('Z'))
+        'zombie $child',
+  };
+}
+
 /// What an ended session could leave behind in this process: pty
-/// descriptors (macOS) or conhost.exe children (Windows).
+/// descriptors and unreaped shells (macOS) or conhost.exe children
+/// (Windows).
 Set<String> _sessionLeftovers() => Platform.isWindows
     ? {for (final host in _conhostChildren()) 'conhost.exe $host'}
-    : _ptyFds();
+    : {..._ptyFds(), ..._zombieChildren()};
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -312,20 +337,16 @@ void main() {
   });
 
   testWidgets(
-    'exitCode completes while a dart:io child process is running',
+    'the exact exit code arrives while a dart:io child process is running',
     (tester) async {
       // dart:io reaps any child while a Process it started runs (the agent
-      // keeps `caffeinate` running), which can take the shell's exit status.
-      final other = await Process.start('/bin/sleep', ['30']);
-      addTearDown(() async {
-        other.kill();
-        // Let dart:io reap it before the next test spawns a shell.
-        await other.exitCode;
-      });
+      // keeps `caffeinate` running); the plugin still gets the shell's
+      // status, from kqueue.
+      await _keepDartIoChildRunning();
       final (pty, transcript) = open(shell);
       _type(pty, 'exit 3');
       final code = await pty.exitCode.timeout(const Duration(seconds: 15));
-      expect(code, anyOf(3, -1));
+      expect(code, 3);
       await transcript.done.timeout(const Duration(seconds: 2));
     },
     skip: Platform.isWindows,
@@ -355,13 +376,10 @@ void main() {
       expect(_conhostChildren().difference(before), isEmpty);
     } else {
       // execvp fails in the forked child, which must exit (127) instead of
-      // running on as a copy of the agent. (-1: dart:io reaped it first, see
-      // the dart:io child test above.)
+      // running on as a copy of the agent — also while dart:io reaps.
+      await _keepDartIoChildRunning();
       final (pty, transcript) = open(missing);
-      expect(
-        await pty.exitCode.timeout(const Duration(seconds: 15)),
-        anyOf(127, -1),
-      );
+      expect(await pty.exitCode.timeout(const Duration(seconds: 15)), 127);
       await transcript.done.timeout(const Duration(seconds: 2));
     }
   });
@@ -408,11 +426,18 @@ void main() {
     final (pty, transcript) = open(shell);
     final children = <int>[];
     if (Platform.isWindows) {
+      // One child on the session's console, and one in a console of its own
+      // that closing the pseudo console would not end: only the job does.
       _type(
         pty,
         r"$p = Start-Process -PassThru -NoNewWindow ping.exe -ArgumentList '-n','300','127.0.0.1'; 'child=' + $p.Id",
       );
       children.add(await transcript.waitForNumber('child'));
+      _type(
+        pty,
+        r"$q = Start-Process -PassThru -WindowStyle Hidden ping.exe -ArgumentList '-n','300','127.0.0.1'; 'detached=' + $q.Id",
+      );
+      children.add(await transcript.waitForNumber('detached'));
     } else {
       // Both ignore SIGHUP, so only the SIGKILL pass can end them.
       _type(
@@ -451,6 +476,36 @@ void main() {
       );
     }
   });
+
+  testWidgets(
+    'a process left behind by a shell that exits on its own keeps running',
+    (tester) async {
+      final (pty, transcript) = open(shell);
+      if (Platform.isWindows) {
+        // Its own (hidden) console, so closing the pseudo console does not
+        // end it; it is in the job, which must not kill it on release.
+        _type(
+          pty,
+          r"$q = Start-Process -PassThru -WindowStyle Hidden ping.exe -ArgumentList '-n','60','127.0.0.1'; 'child=' + $q.Id",
+        );
+      } else {
+        _type(pty, r"(trap '' HUP; sleep 60) &! echo child=$!");
+      }
+      final child = await transcript.waitForNumber('child');
+      addTearDown(() async {
+        if (await _running(child)) {
+          Process.killPid(child, ProcessSignal.sigkill);
+        }
+      });
+
+      _type(pty, 'exit');
+      await pty.exitCode.timeout(const Duration(seconds: 15));
+      await transcript.done.timeout(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(seconds: 3));
+
+      expect(await _running(child), isTrue, reason: 'left-behind child died');
+    },
+  );
 
   testWidgets(
     'kill() also ends a child forked late by a process that ignores SIGHUP',

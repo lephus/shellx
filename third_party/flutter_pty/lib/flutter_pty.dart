@@ -25,12 +25,15 @@ final DynamicLibrary _dylib = () {
 final _bindings = FlutterPtyBindings(_dylib);
 
 // ShellX: native functions added by the ShellX patches (SHELLX_PATCHES.md).
-// Looked up on first use; pty_kill exists on Windows only.
+// Looked up on first use; pty_kill and pty_job_error exist on Windows only.
 final _ptyRelease = _dylib.lookupFunction<Void Function(Pointer<PtyHandle>),
     void Function(Pointer<PtyHandle>)>('pty_release');
 
 final _ptyKill = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
     int Function(Pointer<PtyHandle>)>('pty_kill');
+
+final _ptyJobError = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
+    int Function(Pointer<PtyHandle>)>('pty_job_error');
 
 final _init = () {
   return _bindings.Dart_InitializeApiDL(NativeApi.initializeApiDLData);
@@ -151,6 +154,7 @@ class Pty {
     }
 
     pid = _bindings.pty_getpid(_handle);
+    jobError = Platform.isWindows ? _ptyJobError(_handle) : 0;
 
     // ShellX: the native reader posts a null once the output has ended; the
     // stream closes then, not when the exit code arrives, so the tail of the
@@ -216,6 +220,11 @@ class Pty {
   /// is released.
   late final int pid;
 
+  /// ShellX, Windows: 0 when the process runs in a job object, so [kill]
+  /// ends it and every process it started; otherwise the Win32 error that
+  /// prevented the job, and [kill] ends the process only. 0 on POSIX.
+  late final int jobError;
+
   /// Write data to the pseudo-terminal.
   void write(Uint8List data) {
     if (_released) return;
@@ -239,9 +248,11 @@ class Pty {
   ///
   /// ShellX: on Windows this terminates the job object the process was
   /// started in: the process and every process it started ([signal] is
-  /// ignored). Once the process has exited this returns false without
-  /// signalling (POSIX: its pid may have been reused; Windows: releasing the
-  /// handle already ended whatever was left in the job).
+  /// ignored); without a job (see [jobError]) it terminates the process only.
+  /// It returns false without signalling once the process has exited
+  /// (POSIX: its pid may have been reused) or, on Windows, once the handle
+  /// is released (the job is closed; what the process left behind keeps
+  /// running).
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
     if (Platform.isWindows) {
       if (_released) return false;

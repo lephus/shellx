@@ -4,9 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <termios.h>
+#include <sys/event.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 
@@ -133,9 +135,83 @@ typedef struct WaitExitOptions
 {
     int pid;
 
+    // ShellX: kqueue watching the process for NOTE_EXIT, or -1.
+    int kq;
+
     Dart_Port port;
 
 } WaitExitOptions;
+
+// ShellX: a kqueue that reports the exit status of child [pid], or -1.
+static int watch_exit(pid_t pid)
+{
+    int kq = kqueue();
+
+    if (kq < 0)
+    {
+        return -1;
+    }
+
+    struct kevent change;
+    EV_SET(&change, pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT | NOTE_EXITSTATUS, 0, NULL);
+
+    if (kevent(kq, &change, 1, NULL, 0, NULL) < 0)
+    {
+        close(kq);
+        return -1;
+    }
+
+    return kq;
+}
+
+// ShellX: waits for the process to exit and stores its wait(2) status;
+// returns 0 when the status is lost.
+//
+// dart:io's exit code thread calls wait() for any child while a Process it
+// started is running (the agent always runs caffeinate), so it can reap the
+// shell before waitpid() here does. The kqueue (NOTE_EXIT | NOTE_EXITSTATUS)
+// reports the status whoever reaps. waitpid() still reaps the zombie when we
+// are the reaper (it returns at once with ECHILD when dart:io was), and
+// supplies the status when the kqueue could not be set up.
+static int wait_for_exit_status(WaitExitOptions *options, int *status)
+{
+    int have_status = 0;
+
+    if (options->kq >= 0)
+    {
+        struct kevent event;
+        int n;
+
+        do
+        {
+            n = kevent(options->kq, NULL, 0, &event, 1, NULL);
+        } while (n < 0 && errno == EINTR);
+
+        if (n == 1 && (event.fflags & NOTE_EXIT))
+        {
+            *status = (int)event.data;
+            have_status = 1;
+        }
+
+        close(options->kq);
+    }
+
+    int reaped_status = 0;
+    pid_t waited;
+
+    do
+    {
+        waited = waitpid(options->pid, &reaped_status, 0);
+    } while (waited < 0 && errno == EINTR);
+
+    if (!have_status && waited == options->pid)
+    {
+        *status = reaped_status;
+        have_status = 1;
+    }
+
+    return have_status;
+}
 
 static void *wait_exit_thread(void *arg)
 {
@@ -143,18 +219,9 @@ static void *wait_exit_thread(void *arg)
 
     int status = 0;
 
-    pid_t waited;
-
-    do
+    if (!wait_for_exit_status(options, &status))
     {
-        waited = waitpid(options->pid, &status, 0);
-    } while (waited < 0 && errno == EINTR);
-
-    if (waited < 0)
-    {
-        // ShellX: someone else reaped the process (dart:io's exit code thread
-        // calls wait() for any child while a Process it started is running).
-        // It has exited but its code is lost; still report the exit.
+        // ShellX: it has exited but its status is lost; still report the exit.
         Dart_PostInteger_DL(options->port, -1);
     }
     else if (WIFEXITED(status))
@@ -175,11 +242,13 @@ static void *wait_exit_thread(void *arg)
     return NULL;
 }
 
-static void start_wait_exit_thread(int pid, Dart_Port port)
+static void start_wait_exit_thread(int pid, int kq, Dart_Port port)
 {
     WaitExitOptions *options = malloc(sizeof(WaitExitOptions));
 
     options->pid = pid;
+
+    options->kq = kq;
 
     options->port = port;
 
@@ -191,6 +260,10 @@ static void start_wait_exit_thread(int pid, Dart_Port port)
     }
     else
     {
+        if (kq >= 0)
+        {
+            close(kq);
+        }
         free(options);
     }
 }
@@ -220,17 +293,43 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     int pts;
 
+    // ShellX: the child waits on this pipe until the parent watches it with
+    // kqueue, so it cannot exit (and be reaped by someone else) unwatched.
+    int sync_pipe[2];
+
+    if (pipe(sync_pipe) < 0)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "pipe failed (errno %d)", errno);
+        error_message = error_buffer;
+        return NULL;
+    }
+
+    fcntl(sync_pipe[0], F_SETFD, FD_CLOEXEC);
+    fcntl(sync_pipe[1], F_SETFD, FD_CLOEXEC);
+
     int pid = pty_forkpty(&ptm, &pts, NULL, &ws);
 
     if (pid < 0)
     {
         snprintf(error_buffer, sizeof(error_buffer), "pty_forkpty failed (errno %d)", errno);
         error_message = error_buffer;
+        close(sync_pipe[0]);
+        close(sync_pipe[1]);
         return NULL;
     }
 
     if (pid == 0)
     {
+        char go;
+
+        close(sync_pipe[1]);
+
+        while (read(sync_pipe[0], &go, 1) < 0 && errno == EINTR)
+        {
+        }
+
+        close(sync_pipe[0]);
+
         set_environment(options->environment);
 
         if (options->working_directory != NULL && strlen(options->working_directory) > 0)
@@ -249,6 +348,18 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     // meant reading the master could never reach end of file.
     close(pts);
 
+    close(sync_pipe[0]);
+
+    int kq = watch_exit(pid);
+
+    char go = 1;
+
+    while (write(sync_pipe[1], &go, 1) < 0 && errno == EINTR)
+    {
+    }
+
+    close(sync_pipe[1]);
+
     PtyHandle *handle = (PtyHandle *)malloc(sizeof(PtyHandle));
 
     handle->ptm = ptm;
@@ -258,7 +369,7 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     start_read_thread(ptm, options->stdout_port, &handle->mutex, options->ackRead);
 
-    start_wait_exit_thread(pid, options->exit_port);
+    start_wait_exit_thread(pid, kq, options->exit_port);
 
     return handle;
 }

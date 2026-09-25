@@ -50,16 +50,21 @@ FFI_PLUGIN_EXPORT int pty_getpid(PtyHandle *handle);
 FFI_PLUGIN_EXPORT char *pty_error(void);
 
 // ShellX: frees everything the handle still holds (POSIX: the master fd;
-// Windows: the job object, which ends any process left in it, and the input
-// pipe). Call once, only after the exit code and the end-of-output message
-// (a null posted to stdout_port) have both arrived; the handle is invalid
+// Windows: the job object, the process handle and the input pipe). Call
+// once, only after the exit code and the end-of-output message (a null
+// posted to stdout_port) have both arrived; the handle is invalid
 // afterwards.
 FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle);
 
 #if _WIN32
 // ShellX: terminates the job object the process was started in, i.e. the
-// process and every process it started. Returns non-zero on success.
+// process and every process it started, or only the process when it has no
+// job (see pty_job_error). Returns non-zero on success.
 FFI_PLUGIN_EXPORT int pty_kill(PtyHandle *handle);
+
+// ShellX: 0 when the process runs in the pty's job object; otherwise the
+// Win32 error that prevented it (the process runs without one).
+FFI_PLUGIN_EXPORT int pty_job_error(PtyHandle *handle);
 #endif
 
 #endif
