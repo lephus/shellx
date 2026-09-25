@@ -15,6 +15,7 @@ final class UpdateNotice {
 }
 
 final RegExp _semver = RegExp(r'^\d+\.\d+\.\d+$');
+final RegExp _hostname = RegExp(r'^[a-z0-9-]+(\.[a-z0-9-]+)*$');
 
 /// Spec §14: notify when `/v1/version` offers a newer agent; §12: "Cần cập
 /// nhật app" when this build is below `min_agent`. Returns null when up to
@@ -50,11 +51,15 @@ UpdateNotice? evaluateUpdate(
 }
 
 /// An absolute `https` URL on `shellx.pro` or one of its subdomains (e.g.
-/// `download.shellx.pro`), without user info.
+/// `download.shellx.pro`), without user info. The host must also be a plain
+/// ASCII hostname (letters, digits and hyphens in dot-separated labels), so a
+/// percent-encoded host such as `evil.com%2F.shellx.pro` — which merely ends
+/// with the right characters — is rejected rather than treated as trusted.
 bool isTrustedDownloadUrl(Uri url) {
   if (!url.isAbsolute || url.scheme != 'https' || url.userInfo.isNotEmpty) {
     return false;
   }
   final host = url.host.toLowerCase();
+  if (!_hostname.hasMatch(host)) return false;
   return host == 'shellx.pro' || host.endsWith('.shellx.pro');
 }

@@ -115,6 +115,7 @@ void main() {
       'https://user@download.shellx.pro/ShellX-1.1.0.dmg',
       'smb://download.shellx.pro/ShellX-1.1.0.dmg',
       'x-apple.systempreferences:com.apple.preference.security',
+      'https://evil.com%2F.shellx.pro/x',
     ];
     for (final url in rejected) {
       test('rejected: $url', () {
@@ -144,6 +145,7 @@ void main() {
       'https://download.shellx.pro/desktop/1.1.0/ShellX-1.1.0.dmg',
       'https://shellx.pro/download',
       'https://DOWNLOAD.ShellX.pro/x.dmg',
+      'https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg',
     ]) {
       test('accepted: $url', () {
         final notice = evaluateUpdate(
