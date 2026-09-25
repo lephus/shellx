@@ -296,6 +296,38 @@ void main() {
     });
   });
 
+  test('ERROR peer_offline drops the channel it names, not a newer one', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final result = rig.handshake(rig.phone);
+      rig.send(result.channel!, [const SessionOpen(cols: 80, rows: 24)]);
+
+      rig.relay.sendError(
+        agentId,
+        ErrorFrame(
+          code: RelayErrorCode.peerOffline,
+          deviceId: phoneId,
+          channel: ChannelId.random(Random(1)), // A stale channel.
+        ),
+      );
+      settle(async);
+      expect(rig.service.activeChannelCount, 1);
+
+      rig.relay.sendError(
+        agentId,
+        ErrorFrame(
+          code: RelayErrorCode.peerOffline,
+          deviceId: phoneId,
+          channel: result.channelId,
+        ),
+      );
+      settle(async);
+      expect(rig.service.activeChannelCount, 0);
+      expect(rig.sessions.sessions.single.attachedMobileId, isNull);
+      expect(rig.ptys.ptys.single.killed, isFalse);
+    });
+  });
+
   test('losing the agent relay connection drops every channel', () {
     fakeAsync((async) {
       final rig = AgentRig(async);

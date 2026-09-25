@@ -262,65 +262,76 @@ void main() {
     });
   });
 
-  test(
-    'an offline agent receives pairing_removed once on its next connect',
-    () {
-      fakeAsync((async) {
-        final relay = FakeRelay();
-        final agent = relay.addDevice(
-          id: agentId,
-          userId: userA,
-          kind: DeviceKind.agent,
-        );
-        final phone = relay.addDevice(
-          id: phoneId,
-          userId: userA,
-          kind: DeviceKind.mobile,
-        );
-        final agentApi = ShellxApi(
-          baseUri: relay.baseUri,
-          httpClient: relay.httpClient,
-        )..token = agent.token;
-        final phoneApi = ShellxApi(
-          baseUri: relay.baseUri,
-          httpClient: relay.httpClient,
-        )..token = phone.token;
-        drive(async, agentApi.createPairing(phoneId));
+  test('an offline agent gets pairing_removed on every connect until the pair '
+      'is re-created', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      final agentApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = agent.token;
+      final phoneApi = ShellxApi(
+        baseUri: relay.baseUri,
+        httpClient: relay.httpClient,
+      )..token = phone.token;
+      drive(async, agentApi.createPairing(phoneId));
 
-        // Unpair while the agent is offline.
-        drive(async, phoneApi.deletePairing(agentId, phoneId));
-        expect(relay.pairings, isEmpty);
+      // Unpair while the agent is offline.
+      drive(async, phoneApi.deletePairing(agentId, phoneId));
+      expect(relay.pairings, isEmpty);
 
-        final a = connect(relay, agent)..start();
-        final events = <EventFrame>[];
-        a.frames.listen((f) {
-          if (f is EventFrame) events.add(f);
-        });
-        settle(async);
+      final a = connect(relay, agent)..start();
+      final events = <EventFrame>[];
+      a.frames.listen((f) {
+        if (f is EventFrame) events.add(f);
+      });
+      settle(async);
 
-        expect(events.map((e) => e.event).toList(), [
-          {
-            'event': 'pairing_removed',
-            'agent_id': agentId,
-            'mobile_id': phoneId,
-          },
-        ]);
+      expect(events.map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
 
-        // Delivered and cleared: a later reconnect does not repeat it.
+      // A tombstone: delivering it does not clear it.
+      List<EventFrame> reconnect() {
         relay.dropConnection(agentId);
         settle(async);
-        final events2 = <EventFrame>[];
-        final a2 = connect(relay, agent)..start();
-        a2.frames.listen((f) {
-          if (f is EventFrame) events2.add(f);
-        });
+        final received = <EventFrame>[];
+        connect(relay, agent)
+          ..frames.listen((f) {
+            if (f is EventFrame) received.add(f);
+          })
+          ..start();
         settle(async);
-        expect(events2, isEmpty);
-      });
-    },
-  );
+        return received;
+      }
 
-  test('an online agent gets pairing_removed live and again once on its next '
+      expect(reconnect().map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
+
+      // Re-pairing (POST /v1/pairings) clears it.
+      drive(async, agentApi.createPairing(phoneId));
+      expect(reconnect(), isEmpty);
+
+      // Unpair / re-pair / unpair cycles collapse into one tombstone.
+      drive(async, phoneApi.deletePairing(agentId, phoneId));
+      drive(async, agentApi.createPairing(phoneId));
+      drive(async, phoneApi.deletePairing(agentId, phoneId));
+      expect(reconnect(), hasLength(1));
+    });
+  });
+
+  test('an online agent gets pairing_removed live and again on every later '
       'connect', () {
     fakeAsync((async) {
       final relay = FakeRelay();
@@ -357,8 +368,8 @@ void main() {
         {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
       ]);
 
-      // Durably queued even though the agent was online: a later reconnect
-      // still replays it once, then clears it.
+      // Recorded even though the agent was online: every later connect
+      // replays it.
       relay.dropConnection(agentId);
       settle(async);
       final events2 = <EventFrame>[];
@@ -379,7 +390,36 @@ void main() {
         if (f is EventFrame) events3.add(f);
       });
       settle(async);
-      expect(events3, isEmpty);
+      expect(events3.map((e) => e.event).toList(), [
+        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
+      ]);
+    });
+  });
+
+  test('sendError delivers an ERROR frame to a connected device', () {
+    fakeAsync((async) {
+      final relay = FakeRelay();
+      final agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final a = connect(relay, agent)..start();
+      final errors = <ErrorFrame>[];
+      a.frames.listen((f) {
+        if (f is ErrorFrame) errors.add(f);
+      });
+      settle(async);
+
+      final error = ErrorFrame(
+        code: RelayErrorCode.peerOffline,
+        deviceId: phoneId,
+        channel: ChannelId(Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8])),
+      );
+      relay.sendError(agentId, error);
+      relay.sendError(strangerId, error); // Not connected: dropped.
+      settle(async);
+      expect(errors, [error]);
     });
   });
 

@@ -51,12 +51,14 @@ final class FakeRelay {
   /// pre-upgrade with HTTP 401, like the real relay's `authenticate()`.
   final _revokedDevices = <String>{};
 
-  /// Durable, deduplicated per-agent queue of pending `pairing_removed`
-  /// events, mirroring the real hub's `pending_pairing_removed` table:
-  /// mobile ids are added at most once per agent (a `LinkedHashSet` keeps
-  /// first-insertion order without moving a re-added entry, matching
-  /// `INSERT OR IGNORE ... ORDER BY rowid`) and the whole entry for an agent
-  /// is delivered and cleared on that agent's next connect.
+  /// Durable, deduplicated per-agent `pairing_removed` tombstones, mirroring
+  /// the real hub's `pending_pairing_removed` table: mobile ids are added at
+  /// most once per agent (a `LinkedHashSet` keeps first-insertion order
+  /// without moving a re-added entry, matching `INSERT OR IGNORE ... ORDER BY
+  /// rowid`). Every tombstone is replayed on EVERY connect of its agent and
+  /// is never cleared on send; only `POST /v1/pairings` for that exact
+  /// (agent, mobile) pair clears it. (The real hub also purges them on the
+  /// agent's logout and on account deletion; this fake models neither.)
   final _pendingPairingRemoved = <String, LinkedHashSet<String>>{};
 
   /// Display-only pairing records: (agentId, mobileId).
@@ -125,10 +127,17 @@ final class FakeRelay {
   void sendEvent(String deviceId, Map<String, String> event) =>
       _connections[deviceId]?.deliver(EventFrame(event).encode());
 
+  /// Sends an ERROR frame to one device (if online), as the hub would for a
+  /// frame it could not route (for example `peer_offline` for a peer whose
+  /// socket died before its PRESENCE offline was sent).
+  void sendError(String deviceId, ErrorFrame error) =>
+      _connections[deviceId]?.deliver(error.encode());
+
   /// Mirrors the real hub's `notifyPairingRemoved`: sends the EVENT live to
-  /// both devices of the pairing (if connected), and always durably queues
-  /// it for the agent — even when the agent looks live — so a later
-  /// reconnect still replays it (a live socket can be silently dead).
+  /// both devices of the pairing (if connected), and always records a
+  /// tombstone for the agent — even when the agent looks live — so every
+  /// later connect replays it (a live socket can be silently dead) until the
+  /// pair is re-created.
   void _notifyPairingRemoved(String agentId, String mobileId) {
     (_pendingPairingRemoved[agentId] ??= LinkedHashSet<String>()).add(mobileId);
     final event = {
@@ -173,10 +182,10 @@ final class FakeRelay {
       );
       other.deliver(PresenceFrame(deviceId: device.id, online: true).encode());
     }
-    // Deliver this device's durably-queued pairing_removed events (if any;
-    // in practice only ever queued for an agent) right after the PRESENCE
-    // snapshot, then clear them — mirroring the real hub's `deliverPending`.
-    final pending = _pendingPairingRemoved.remove(device.id);
+    // Replay this device's pairing_removed tombstones (if any; in practice
+    // only ever recorded for an agent) right after the PRESENCE snapshot,
+    // keeping them — mirroring the real hub's `deliverPending`.
+    final pending = _pendingPairingRemoved[device.id];
     if (pending != null) {
       for (final mobileId in pending) {
         socket.deliver(
@@ -303,6 +312,9 @@ final class FakeRelay {
           mobile.kind != DeviceKind.mobile) {
         return _error(404, 'device_not_found', 'Device not found');
       }
+      // Re-pairing clears that pair's tombstone first, like the real route
+      // (`clearPairingRemoved` before the upsert).
+      _pendingPairingRemoved[caller.id]?.remove(mobile.id);
       pairings.add((caller.id, mobile.id));
       return http.Response('', 201);
     }
