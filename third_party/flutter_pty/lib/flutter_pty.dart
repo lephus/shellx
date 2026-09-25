@@ -249,16 +249,14 @@ class Pty {
   /// ShellX: on Windows this terminates the job object the process was
   /// started in: the process and every process it started ([signal] is
   /// ignored); without a job (see [jobError]) it terminates the process only.
-  /// It returns false without signalling once the process has exited
-  /// (POSIX: its pid may have been reused) or, on Windows, once the handle
-  /// is released (the job is closed; what the process left behind keeps
-  /// running).
+  /// It returns false without signalling once the process has exited, on
+  /// both platforms: POSIX, its pid may have been reused; Windows, what the
+  /// process left behind is not killed, as on POSIX.
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    if (_exited || _released) return false;
     if (Platform.isWindows) {
-      if (_released) return false;
       return _ptyKill(_handle) != 0;
     }
-    if (_exited) return false;
     return Process.killPid(pid, signal);
   }
 

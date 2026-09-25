@@ -288,19 +288,19 @@ void main() {
       },
     );
 
-    test(
-      'Windows: kill after the shell exited still terminates the job',
-      () async {
-        final native = _FakeNativePty(_launch);
-        final pty = FlutterPtyAdapter(native);
-        native.exit.complete(0);
-        await Future<void>.delayed(Duration.zero);
+    test('Windows: kill after the shell exited is a no-op (overview §5.6: '
+        'what it left behind keeps running, as on macOS)', () async {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch);
+      final pty = FlutterPtyAdapter(native, onError: errors.add);
+      native.exit.complete(0);
+      await Future<void>.delayed(Duration.zero);
 
-        pty.kill();
+      pty.kill();
 
-        expect(native.kills, 1);
-      },
-    );
+      expect(native.kills, 0);
+      expect(errors, isEmpty);
+    });
 
     test('a failing tree kill is reported with the pid, not thrown', () async {
       final errors = <String>[];

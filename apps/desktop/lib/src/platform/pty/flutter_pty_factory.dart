@@ -225,10 +225,10 @@ final class FlutterPtyFactory implements PtyFactory {
 ///
 /// `kill()` runs [killer]'s tree kill on the shell's pid (macOS) or, without
 /// a killer, the plugin's job-object kill (Windows). Once the shell has
-/// exited, the tree kill is skipped (its pid may already belong to another
-/// process); the job-object kill stays valid until the plugin releases the
-/// pty right after the exit, and what the shell left behind then keeps
-/// running (on both platforms). Kill failures never throw: they go to
+/// exited it is a no-op on both (overview §5.6 Pty contract): the pid may
+/// already belong to another process, and what the shell left behind is
+/// not killed (on Windows only what is still attached to the closed pseudo
+/// console ends with it). Kill failures never throw: they go to
 /// [onError] as `kill of pid <pid> failed: <reason>` — never output,
 /// arguments or environment — and to [onProblem] as the pid alone (what the
 /// user is shown). Each tree kill (a Future that never fails) is
@@ -295,14 +295,15 @@ final class FlutterPtyAdapter implements Pty {
   @override
   void resize(int cols, int rows) => _native.resize(rows, cols);
 
+  /// A no-op once the shell has exited (overview §5.6), on both paths.
   @override
   void kill() {
-    if (_killed) return;
+    if (_killed || _exited) return;
     _killed = true;
     final killer = _killer;
     if (killer == null) {
       _killJob();
-    } else if (!_exited) {
+    } else {
       final target = _native.pid;
       final kill = killer
           .killTree(target)
@@ -314,7 +315,8 @@ final class FlutterPtyAdapter implements Pty {
 
   void _killJob() {
     try {
-      // False after exit is expected: the plugin has released the pty.
+      // False once the shell has exited is expected (the plugin no longer
+      // signals then): it can race the exit.
       if (!_native.kill() && !_exited) {
         _report(
           _native.pid,
