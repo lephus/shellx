@@ -14,7 +14,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   ffi: ^2.2.0
-  flutter_pty: ^0.4.2
+  # Vendored and patched, see third_party/flutter_pty/SHELLX_PATCHES.md.
+  flutter_pty:
+    path: ../../third_party/flutter_pty
   flutter_riverpod: ^3.3.2
   flutter_secure_storage: ^10.3.4
   http: ^1.5.0
