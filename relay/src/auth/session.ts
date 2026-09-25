@@ -24,6 +24,23 @@ export function insertTokenStatement(db: D1Database, tokenHash: ArrayBuffer, dev
 }
 
 /**
+ * Inserts the token only while the user's password hash is still `verifiedHash` — the one the
+ * login just verified against. A password change that commits in between (argon2 takes tens of
+ * milliseconds) makes this insert nothing (`meta.changes === 0`), so no token is ever minted under
+ * a password that is no longer valid (final review M1).
+ */
+export function insertTokenIfPasswordUnchangedStatement(
+  db: D1Database, tokenHash: ArrayBuffer, deviceId: string, now: number, userId: string, verifiedHash: string,
+) {
+  return db
+    .prepare(
+      `INSERT INTO tokens (token_hash, device_id, created_at, last_used_at)
+       SELECT ?, ?, ?, ? WHERE (SELECT password_hash FROM users WHERE id = ?) = ?`,
+    )
+    .bind(tokenHash, deviceId, now, now, userId, verifiedHash);
+}
+
+/**
  * Resolves a bearer token. Tokens idle for more than 90 days are deleted and rejected;
  * `last_used_at` is refreshed at most once per hour.
  */

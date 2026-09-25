@@ -121,6 +121,16 @@ export class UserHub extends DurableObject<Env> {
   }
 
   /**
+   * Closes every currently-live socket except those of `exceptDeviceId` with `code` and announces
+   * them offline: called after a password change commits (4002 for every device but the caller).
+   * Like `closeAccount`, it takes the hub's own live list at the moment it runs rather than a
+   * device-id list read by the caller earlier, which could miss a device that connected meanwhile.
+   */
+  async disconnectAllExcept(exceptDeviceId: string, code: CloseCode): Promise<void> {
+    await this.disconnect(this.liveDeviceIds().filter((id) => id !== exceptDeviceId), code);
+  }
+
+  /**
    * Sends EVENT pairing_removed to both devices if connected (clients handle it idempotently).
    * The event is *always* durably recorded for the agent too, as a tombstone — even when it looks
    * live — because a live socket can be silently dead (e.g. a peer that vanished without a close

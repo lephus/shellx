@@ -4,7 +4,7 @@ import { parseDevice, type DeviceInput } from "../auth/device";
 import { checkEmail, normalizeEmail } from "../auth/email";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy";
-import { insertTokenStatement, requireAuth } from "../auth/session";
+import { insertTokenIfPasswordUnchangedStatement, insertTokenStatement, requireAuth } from "../auth/session";
 import { generateToken, hashToken, parseBearer } from "../auth/tokens";
 import { hubFor } from "../hub/user-hub";
 import { jsonBodyLimit } from "../http/body-limit";
@@ -105,11 +105,18 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
   const row = await upsertDeviceStatement(db, user.id, device, now).first<{ id: string }>();
   const deviceId = row!.id;
   const token = generateToken();
-  // One live token per device: logging in again replaces the previous token.
-  await db.batch([
-    db.prepare("DELETE FROM tokens WHERE device_id = ?").bind(deviceId),
-    insertTokenStatement(db, await hashToken(token), deviceId, now),
+  // One live token per device: logging in again replaces the previous token. Both statements only
+  // apply while the password is still the one verified above: a change that committed meanwhile
+  // (M1) must neither get a token minted under the old password nor sign this device out.
+  const unchanged = "(SELECT password_hash FROM users WHERE id = ?) = ?";
+  const [, inserted] = await db.batch([
+    db.prepare(`DELETE FROM tokens WHERE device_id = ? AND ${unchanged}`).bind(deviceId, user.id, user.password_hash),
+    insertTokenIfPasswordUnchangedStatement(db, await hashToken(token), deviceId, now, user.id, user.password_hash),
   ]);
+  if (inserted?.meta.changes !== 1) {
+    logMeta("login_failed", { device_id: deviceId });
+    throw Errors.invalidCredentials();
+  }
   logMeta("login", { device_id: deviceId });
   return c.json({ user_id: user.id, device_id: deviceId, token }, 200);
 });
@@ -158,6 +165,11 @@ authRoutes.post("/logout", requireAuth, async (c) => {
 /**
  * POST /v1/auth/password {new_password} — agent token only, no old password (spec §5.2).
  * Revokes every other device's tokens and closes their sockets with 4002. Pairings are kept.
+ *
+ * The sockets are closed by the hub from its own live list once the change has committed
+ * (`disconnectAllExcept`), not from a device list read before it (final review M1): a device that
+ * signed in and connected in between would otherwise keep its socket. A socket that lands in the
+ * hub only after this runs is caught by the ws route's post-upgrade token re-check.
  */
 authRoutes.post("/password", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
@@ -168,19 +180,13 @@ authRoutes.post("/password", requireAuth, jsonBodyLimit, async (c) => {
   const db = c.env.DB;
   const now = c.get("now")();
   const passwordHash = await hashPassword(body.new_password);
-  const { results } = await db
-    .prepare("SELECT id FROM devices WHERE user_id = ? AND id != ?")
-    .bind(auth.userId, auth.deviceId)
-    .all<{ id: string }>();
   await db.batch([
     db.prepare("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?").bind(passwordHash, now, auth.userId),
     db
       .prepare("DELETE FROM tokens WHERE device_id IN (SELECT id FROM devices WHERE user_id = ? AND id != ?)")
       .bind(auth.userId, auth.deviceId),
   ]);
-  if (results.length > 0) {
-    await hubFor(c.env, auth.userId).disconnect(results.map((r) => r.id), CloseCode.revoked);
-  }
+  await hubFor(c.env, auth.userId).disconnectAllExcept(auth.deviceId, CloseCode.revoked);
   logMeta("password_changed", { device_id: auth.deviceId });
   return c.body(null, 204);
 });

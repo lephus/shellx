@@ -66,6 +66,78 @@ describe("POST /v1/auth/password", () => {
   });
 });
 
+/**
+ * The real D1 binding, except that the route's first `batch()` first runs `hook` — a concurrent
+ * request landing between the route's reads and its write, deterministically.
+ */
+function dbRacingFirstBatch(hook: () => Promise<void>): D1Database {
+  let fired = false;
+  return {
+    prepare: (query: string) => env.DB.prepare(query),
+    batch: async (statements: D1PreparedStatement[]) => {
+      if (!fired) {
+        fired = true;
+        await hook();
+      }
+      return env.DB.batch(statements);
+    },
+  } as unknown as D1Database;
+}
+
+async function settle<T>(promise: Promise<T>, ms = 1500): Promise<T | "timeout"> {
+  return Promise.race([promise, new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms))]);
+}
+
+describe("password change races (final review M1)", () => {
+  it("a login that verified the old password gets no token once the change has committed", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const device = deviceBody("mobile");
+    // Between this login's argon2 verify (old hash) and its token insert, the agent changes the password.
+    const racingDb = dbRacingFirstBatch(async () => {
+      const changed = await call(app, "POST", "/v1/auth/password", { token: account.agent.token, body: { new_password: NEW_PASSWORD } });
+      expect(changed.status).toBe(204);
+    });
+    const res = await call(app, "POST", "/v1/auth/login", {
+      body: { email: account.email, password: account.password, device },
+      bindings: { DB: racingDb },
+    });
+    expect(res.status).toBe(401);
+    expect(await errorCode(res)).toBe("invalid_credentials");
+    const tokens = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM tokens t JOIN devices d ON d.id = t.device_id WHERE d.user_id = ? AND d.public_key = ?",
+    ).bind(account.agent.userId, device.public_key as string).first<{ n: number }>();
+    expect(tokens?.n).toBe(0);
+    // The caller of the change is unaffected, and the new password works.
+    expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
+    const fresh = await call(app, "POST", "/v1/auth/login", {
+      body: { email: account.email, password: NEW_PASSWORD, device: deviceBody("mobile") },
+    });
+    expect(fresh.status).toBe(200);
+  });
+
+  it("closes a device that connected after any device list would have been read, but keeps the caller", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const caller = await connect(app, account.agent.token);
+    let late: TestSocket | undefined;
+    // A phone signs in and connects after the route read its device list but before the change commits.
+    const racingDb = dbRacingFirstBatch(async () => {
+      const mobile = await loginDevice(app, account, "mobile");
+      late = await connect(app, mobile.token);
+    });
+    const res = await call(app, "POST", "/v1/auth/password", {
+      token: account.agent.token,
+      body: { new_password: NEW_PASSWORD },
+      bindings: { DB: racingDb },
+    });
+    expect(res.status).toBe(204);
+    expect(late).toBeDefined();
+    expect(await settle(late!.closed)).toEqual({ code: 4002, reason: "revoked" });
+    expect(await settle(caller.closed, 300)).toBe("timeout"); // the caller's own socket stays up
+  });
+});
+
 describe("POST /v1/auth/logout", () => {
   it("mobile: deletes only its token; pairings stay", async () => {
     const app = makeApp();
