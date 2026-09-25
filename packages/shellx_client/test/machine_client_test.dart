@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -426,36 +427,14 @@ void main() {
       'forgotten', () {
     fakeAsync((async) {
       final h = Harness(async, keys, paired: false);
-      final pins = PinnedStore(InMemoryKeyValueStore(), userId: userId);
-      h.run(
-        pins.add(
-          PinnedMachine(
-            agentId: agentId,
-            publicKey: Uint8List(16),
-            pairedAt: DateTime.utc(2026),
-          ),
+      final (service, pins) = phoneWithPin(
+        h,
+        PinnedMachine(
+          agentId: agentId,
+          publicKey: Uint8List(16),
+          pairedAt: DateTime.utc(2026),
         ),
       );
-      final service = ClientService(
-        relay: RelayConnection(
-          wsUri: h.relay.wsUri,
-          token: () => h.phoneDevice.token,
-          connector: h.relay.connector,
-        ),
-        api: ShellxApi(
-          baseUri: h.relay.baseUri,
-          httpClient: h.relay.httpClient,
-        ),
-        deviceId: phoneId,
-        userId: userId,
-        identity: keys.phone,
-        pinned: pins,
-        appVersion: '1.0.0',
-        deviceName: 'Test Phone',
-        platform: DevicePlatform.ios,
-      );
-      h.run(service.start());
-      settle(async);
       final machine = service.machine(agentId);
       expect(
         () => h.run(machine.connect()),
@@ -467,4 +446,161 @@ void main() {
       expect(h.relay.delivered, isEmpty);
     });
   });
+
+  // Fix round 1.
+
+  test('a loss while HS1 is being written installs no channel', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final machine = h.phoneMachine;
+      final connecting = machine.connect(); // Runs up to its first await.
+      machine.shutdown();
+      expect(
+        () => h.run(connecting),
+        failsWith(MachineConnectionFailure.agentOffline),
+      );
+      settle(async);
+      expect(machine.state, isA<MachineFailed>());
+    });
+  });
+
+  test('an unexpected handshake error (a malformed pinned agent id) fails '
+      'with timeout instead of staying connecting', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys, paired: false);
+      const badId = 'not-a-uuid';
+      final (service, _) = phoneWithPin(
+        h,
+        PinnedMachine(
+          agentId: badId,
+          publicKey: keys.agent.publicKey,
+          pairedAt: DateTime.utc(2026),
+        ),
+      );
+      final machine = service.machine(badId);
+      final states = <MachineConnectionState>[];
+      machine.states.listen(states.add);
+      expect(
+        () => h.run(machine.connect()),
+        failsWith(MachineConnectionFailure.timeout),
+      );
+      settle(async);
+      expect(states.map((s) => s.runtimeType), [MachineFailed]);
+      expect(h.relay.delivered, isEmpty);
+    });
+  });
+
+  test('a stale channel failing to decrypt does not break a newer '
+      'handshake', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final channels = <ChannelId>[];
+      h.relay.onData = (from, to, frame) {
+        if (from == phoneId) channels.add(frame.channel);
+        return frame;
+      };
+      final machine = h.phoneMachine;
+      h.run(machine.connect());
+      settle(async);
+      final stale = channels.single;
+
+      // A corrupted TRANSPORT frame on the current channel starts to
+      // decrypt; before that fails, the channel is dropped and a new
+      // handshake starts (microtasks run in order).
+      machine.handleFrame(
+        DataFrame(
+          peer: agentId,
+          channel: stale,
+          payload: ChannelPayload(
+            PayloadKind.transport,
+            Uint8List(64),
+          ).encode(),
+        ),
+      );
+      late Future<void> reconnecting;
+      scheduleMicrotask(() {
+        machine.shutdown();
+        reconnecting = machine.connect();
+      });
+      async.flushMicrotasks();
+      h.run(reconnecting);
+      settle(async);
+      expect(machine.state, isA<MachineReady>());
+      expect(channels, hasLength(2));
+    });
+  });
+
+  test('attach to an id missing from the list sends session.list only, never '
+      'session.attach', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.tabletMachine.connect());
+      settle(async);
+      int sentByTablet() =>
+          h.relay.delivered.where((d) => d.from == tabletId).length;
+
+      var before = sentByTablet();
+      expect(
+        () => h.run(h.tabletMachine.attach(77, cols: 80, rows: 24)),
+        appError(AppErrorCode.sessionNotFound),
+      );
+      settle(async);
+      expect(sentByTablet() - before, 1); // The session.list refresh.
+
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      before = sentByTablet();
+      h.run(h.tabletMachine.attach(tab.id, cols: 80, rows: 24));
+      settle(async);
+      expect(sentByTablet() - before, 2); // session.list, then session.attach.
+    });
+  });
+
+  test('closeTab of a detached or exited tab sends nothing', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final exited = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      h.pty.exit(0);
+      final taken = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      h.run(h.tabletMachine.listSessions());
+      h.run(h.tabletMachine.attach(taken.id, cols: 80, rows: 24));
+      settle(async);
+      expect((exited.isAttached, taken.isAttached), (false, false));
+
+      final before = h.relay.delivered.length;
+      h.run(h.phoneMachine.closeTab(exited.id));
+      h.run(h.phoneMachine.closeTab(taken.id));
+      settle(async);
+      expect(
+        h.relay.delivered.skip(before).where((d) => d.from == phoneId),
+        isEmpty,
+      );
+      expect(h.phoneMachine.tabs, isEmpty);
+      expect(h.sessions.sessions.single.attachedMobileId, tabletId);
+    });
+  });
+}
+
+/// A phone service (replacing the harness phone's relay connection) whose
+/// only pinned machine is [pin].
+(ClientService, PinnedStore) phoneWithPin(Harness h, PinnedMachine pin) {
+  final pins = PinnedStore(InMemoryKeyValueStore(), userId: userId);
+  h.run(pins.add(pin));
+  final service = ClientService(
+    relay: RelayConnection(
+      wsUri: h.relay.wsUri,
+      token: () => h.phoneDevice.token,
+      connector: h.relay.connector,
+    ),
+    api: ShellxApi(baseUri: h.relay.baseUri, httpClient: h.relay.httpClient),
+    deviceId: phoneId,
+    userId: userId,
+    identity: h.keys.phone,
+    pinned: pins,
+    appVersion: '1.0.0',
+    deviceName: 'Test Phone',
+    platform: DevicePlatform.ios,
+  );
+  h.run(service.start());
+  settle(h.async);
+  return (service, pins);
 }

@@ -48,13 +48,33 @@ final class ClientService {
   final _subscriptions = <StreamSubscription<Object?>>[];
   bool _connected = false;
 
+  /// The start in flight, if any.
+  Future<void>? _starting;
+
+  /// Bumped by [stop] so a start still loading the pins gives up.
+  int _generation = 0;
+
   Stream<PresenceFrame> get presence => _presence.stream;
 
   bool isOnline(String agentId) => _online.contains(agentId);
 
-  Future<void> start() async {
-    if (_subscriptions.isNotEmpty) return;
-    for (final machine in await _pinned.list()) {
+  /// Re-entrant: a call while a start is in flight joins it, and a [stop]
+  /// made meanwhile wins (the pending start then subscribes to nothing).
+  Future<void> start() {
+    if (_subscriptions.isNotEmpty) return Future.value();
+    final pending = _starting;
+    if (pending != null) return pending;
+    late final Future<void> starting;
+    starting = _start(_generation).whenComplete(() {
+      if (identical(_starting, starting)) _starting = null;
+    });
+    return _starting = starting;
+  }
+
+  Future<void> _start(int generation) async {
+    final pinned = await _pinned.list();
+    if (generation != _generation) return; // stop() ran meanwhile.
+    for (final machine in pinned) {
       _pins[machine.agentId] = machine;
     }
     _subscriptions
@@ -64,6 +84,8 @@ final class ClientService {
   }
 
   Future<void> stop() async {
+    _generation++;
+    _starting = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel()); // May return a root-zone future.
     }

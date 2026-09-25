@@ -211,26 +211,40 @@ final class MachineClient {
     _tabs.clear();
   }
 
+  /// Never leaves the state at [MachineConnecting]: an unexpected error
+  /// fails the handshake with `timeout`, like an answer that never comes.
   Future<void> _handshakeNow() async {
+    try {
+      await _handshakeSteps();
+    } on MachineConnectionException {
+      rethrow;
+    } catch (_) {
+      _fail(MachineConnectionFailure.timeout);
+    }
+  }
+
+  Future<void> _handshakeSteps() async {
+    final losses = _losses; // A loss from here on voids this handshake.
     final key = _pinnedKey();
     if (key == null || key.length != 32) {
       await _forgetPinQuietly(); // An unusable pin is as good as none.
       _fail(MachineConnectionFailure.untrusted);
     }
+    // Throws FormatException for a malformed id: before MachineConnecting.
+    final prologue = buildPrologue(
+      agentDeviceId: agentId,
+      mobileDeviceId: _deviceId,
+    );
     _setState(const MachineConnecting());
     final handshake = NoiseHandshake.initiator(
       pattern: NoisePattern.ik,
       localStatic: _identity,
       remoteStatic: key,
-      prologue: buildPrologue(
-        agentDeviceId: agentId,
-        mobileDeviceId: _deviceId,
-      ),
+      prologue: prologue,
     );
     final hello = await handshake.writeMessage(_hello.encode());
     final channel = ChannelId.random();
     final reply = Completer<Uint8List?>();
-    final losses = _losses;
     _handshake = (channel: channel, reply: reply);
     final sent = _relay.send(
       DataFrame(
@@ -266,7 +280,7 @@ final class MachineClient {
       await _forgetPinQuietly(); // Spec §12: untrusted → drop the pinned key.
       _fail(MachineConnectionFailure.untrusted);
     }
-    if (losses != _losses) _failLost(); // Lost after HS2 arrived.
+    if (losses != _losses) _failLost(); // Lost while in flight.
     _channelId = channel;
     _secure = SecureChannel(handshake.split());
     _setState(const MachineReady());
@@ -321,7 +335,8 @@ final class MachineClient {
         try {
           messages = await secure.open(decoded.noiseMessage);
         } catch (_) {
-          _channelLost(); // Spec §6.3: any decrypt error drops the channel.
+          // Spec §6.3: any decrypt error drops the channel — if still ours.
+          if (identical(secure, _secure)) _channelLost();
           return;
         }
         if (!identical(secure, _secure)) return;
