@@ -36,6 +36,9 @@ class AgentController extends Notifier<AgentViewState> {
   bool _updateCheckFailed = false;
   bool _revoking = false;
 
+  /// The sign-in in flight, if any (see [signIn]).
+  Future<void>? _signingIn;
+
   /// The signed-in account, set with the stored copy by [bootstrap] and
   /// [signIn] and dropped as soon as a sign-out starts. A runtime starts
   /// only from these, synchronously, so there is never a second runtime and
@@ -151,8 +154,30 @@ class AgentController extends Notifier<AgentViewState> {
     );
   }
 
-  /// Login or register (spec §5.2). Throws [ApiException] for the UI to show.
+  /// Login or register (spec §5.2). Throws [ApiException] for the UI to show
+  /// (and whatever the keychain throws). A call while one is in flight
+  /// joins it (same future, its arguments ignored): two concurrent logins
+  /// would each null the shared token and race each other's credentials.
   Future<void> signIn({
+    required String email,
+    required String password,
+    required bool register,
+  }) {
+    final pending = _signingIn;
+    if (pending != null) return pending;
+    final attempt = _signIn(
+      email: email,
+      password: password,
+      register: register,
+    );
+    _signingIn = attempt;
+    attempt.whenComplete(() {
+      if (identical(_signingIn, attempt)) _signingIn = null;
+    }).ignore();
+    return attempt;
+  }
+
+  Future<void> _signIn({
     required String email,
     required String password,
     required bool register,

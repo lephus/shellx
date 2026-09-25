@@ -185,6 +185,57 @@ void main() {
       expect(h.runtimes, isEmpty);
     });
 
+    test('a second sign-in while one is in flight joins it (one login, one '
+        'runtime)', () async {
+      boot();
+      await controller().bootstrap(watchForWake: false);
+      final reply = Completer<void>();
+      h.relay.holds['POST /v1/auth/login'] = reply.future;
+
+      final first = controller().signIn(
+        email: 'phu@example.com',
+        password: 'correct horse',
+        register: false,
+      );
+      await pumpEventQueue();
+      final second = controller().signIn(
+        email: 'phu@example.com',
+        password: 'correct horse',
+        register: false,
+      );
+      await pumpEventQueue();
+      expect(
+        h.relay.routes.where((r) => r == 'POST /v1/auth/login'),
+        hasLength(1),
+      );
+
+      reply.complete();
+      await Future.wait([first, second]);
+      expect(h.runtimes, hasLength(1));
+      expect(state().phase, AuthPhase.signedIn);
+      expect(h.api.token, h.relay.token);
+    });
+
+    test('a failed sign-in does not block the next one', () async {
+      boot();
+      h.relay.failures['POST /v1/auth/login'] = (401, 'invalid_credentials');
+      await expectLater(
+        controller().signIn(
+          email: 'a@b.co',
+          password: 'wrongpass',
+          register: false,
+        ),
+        throwsA(isA<ApiException>()),
+      );
+      h.relay.failures.clear();
+      await controller().signIn(
+        email: 'a@b.co',
+        password: 'rightpass',
+        register: false,
+      );
+      expect(state().phase, AuthPhase.signedIn);
+    });
+
     test('signing in to a different account clears the trusted list', () async {
       boot();
       await h.secureStore.write('user_id', 'old-user');
