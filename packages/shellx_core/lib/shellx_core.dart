@@ -12,3 +12,5 @@ export 'src/protocol/messages.dart';
 export 'src/channel/payload.dart';
 export 'src/channel/secure_channel.dart';
 export 'src/pairing/pairing_uri.dart';
+export 'src/storage/key_value_store.dart';
+export 'src/identity/device_identity.dart';
