@@ -20,6 +20,8 @@ import 'package:shellx_core/shellx_core.dart' as _i145;
 import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
 import '../auth/auth_storage.dart' as _i657;
+import '../backend/backend.dart' as _i120;
+import '../backend/client_backend.dart' as _i139;
 import '../core.dart' as _i351;
 import '../handler/popup_handler.dart' as _i695;
 import '../platform/device_description.dart' as _i814;
@@ -58,6 +60,14 @@ extension GetItInjectableX on _i174.GetIt {
     await gh.lazySingletonAsync<_i145.KeyValueStore>(
       () => module.keyValueStore(gh<_i460.SharedPreferences>()),
       preResolve: true,
+    );
+    gh.lazySingleton<_i120.BackendFactory>(
+      () => _i139.ClientBackendFactory(
+        gh<_i145.ShellxApi>(),
+        gh<_i145.KeyValueStore>(),
+        gh<_i814.DeviceDescription>(),
+        gh<_i655.PackageInfo>(),
+      ),
     );
     gh.lazySingleton<_i695.PopupHandler>(
       () => _i695.PopupHandler(gh<_i351.BuildContext>()),

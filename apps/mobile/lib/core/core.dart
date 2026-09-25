@@ -24,6 +24,8 @@ export 'router/app_route_observer.dart';
 // ShellX
 export 'auth/account_session.dart';
 export 'auth/auth_storage.dart';
+export 'backend/backend.dart';
+export 'backend/client_backend.dart';
 export 'config/app_config.dart';
 export 'platform/device_description.dart';
 export 'platform/external_links.dart';
