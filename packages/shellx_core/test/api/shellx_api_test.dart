@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fake_async/fake_async.dart';
@@ -7,6 +8,23 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:test/test.dart';
+
+/// Wraps a client so tests can observe whether [close] reached it.
+final class _TrackingClient extends http.BaseClient {
+  _TrackingClient(this._inner);
+  final http.Client _inner;
+  bool closed = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      _inner.send(request);
+
+  @override
+  void close() {
+    closed = true;
+    _inner.close();
+  }
+}
 
 const _userId = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const _deviceId = '11111111-2222-3333-4444-555555555555';
@@ -365,6 +383,25 @@ void main() {
       );
     });
 
+    test(
+      'TLS handshake failures become status 0, code "network" '
+      '(IOClient only wraps SocketException/HttpException, not TLS errors)',
+      () async {
+        final api = _Recorder(
+          (_) => throw const HandshakeException('certificate verify failed'),
+        ).api();
+        await expectLater(api.version(), throwsA(_apiError(0, 'network')));
+      },
+    );
+
+    test(
+      'other TLS failures (TlsException) become status 0, code "network"',
+      () async {
+        final api = _Recorder((_) => throw const TlsException('x')).api();
+        await expectLater(api.version(), throwsA(_apiError(0, 'network')));
+      },
+    );
+
     test('a request that never answers times out after 20 s as "network"', () {
       fakeAsync((async) {
         final api = _Recorder((_) => Completer<http.Response>().future).api();
@@ -420,6 +457,60 @@ void main() {
         garbage.version(),
         throwsA(_apiError(200, 'bad_response')),
       );
+    });
+
+    test(
+      'a truncated success body never leaks response text into the message',
+      () async {
+        // jsonDecode's FormatException embeds a source excerpt around the
+        // parse failure; a real truncated login/register reply would cut
+        // off mid-token here.
+        final api = _Recorder(
+          (_) => http.Response('{"token": "SECRETTOKEN1234567890"', 200),
+        ).api();
+        Object? caught;
+        try {
+          await api.version();
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught, isA<ApiException>());
+        final error = caught! as ApiException;
+        expect(error.message, isNot(contains('SECRET')));
+        expect(error.status, 200);
+        expect(error.code, 'bad_response');
+      },
+    );
+  });
+
+  group('close', () {
+    test('closes a client it created itself without throwing', () {
+      final api = ShellxApi(baseUri: Uri.parse('https://relay.shellx.pro'));
+      expect(api.close, returnsNormally);
+    });
+
+    test('leaves an injected client open', () async {
+      final tracking = _TrackingClient(
+        MockClient(
+          (_) async => _json({
+            'min_agent': '1.0.0',
+            'min_mobile': '1.0.0',
+            'latest_agent': {
+              'version': '1.0.0',
+              'mac_url': 'https://x',
+              'win_url': 'https://y',
+            },
+          }, 200),
+        ),
+      );
+      final api = ShellxApi(
+        baseUri: Uri.parse('https://relay.shellx.pro'),
+        httpClient: tracking,
+      );
+      api.close();
+      expect(tracking.closed, isFalse);
+      // The client still works after close(), proving it was left open.
+      await api.version();
     });
   });
 

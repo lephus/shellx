@@ -19,6 +19,10 @@ final class ChannelId {
   /// All-zero id, used by relay ERROR frames that are not tied to a channel.
   static final ChannelId zero = ChannelId(Uint8List(8));
 
+  /// Unmodifiable: an in-place write (`channelId.bytes[0] = 7`) would
+  /// otherwise corrupt every [ChannelId] built from the same source bytes —
+  /// most notably [ChannelId.zero], a single shared instance every
+  /// zero-channel [ErrorFrame] defaults to.
   final Uint8List bytes;
 
   static Uint8List _checked(Uint8List bytes) {
@@ -29,7 +33,7 @@ final class ChannelId {
         'ChannelId must be 8 bytes',
       );
     }
-    return Uint8List.fromList(bytes);
+    return Uint8List.fromList(bytes).asUnmodifiableView();
   }
 
   @override

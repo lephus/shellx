@@ -498,7 +498,7 @@ final class SessionManager {
 // cols/rows nhận từ mobile được kẹp vào [1, 1000].
 
 final class TrustedDevice {
-  const TrustedDevice({required this.mobileId, required this.publicKey, required this.name, required this.pairedAt});
+  TrustedDevice({required this.mobileId, required Uint8List publicKey, required this.name, required this.pairedAt}); // copies publicKey (not const)
   final String mobileId; final Uint8List publicKey; final String name; final DateTime pairedAt;
   Map<String, Object?> toJson(); static TrustedDevice fromJson(Map<String, Object?> json);
 }

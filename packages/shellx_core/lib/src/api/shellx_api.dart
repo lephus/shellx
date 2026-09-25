@@ -15,12 +15,17 @@ import 'models.dart';
 final class ShellxApi {
   ShellxApi({required Uri baseUri, http.Client? httpClient})
     : _baseUri = baseUri,
-      _http = httpClient ?? http.Client();
+      _http = httpClient ?? http.Client(),
+      _ownsHttp = httpClient == null;
 
   static const Duration _timeout = Duration(seconds: 20);
 
   final Uri _baseUri;
   final http.Client _http;
+
+  /// Whether this [ShellxApi] created [_http] itself (no client was passed
+  /// in), and therefore owns its lifecycle.
+  final bool _ownsHttp;
 
   /// Bearer token for authenticated calls. [register] and [login] set it;
   /// [logout] clears it (even when the request fails).
@@ -118,6 +123,15 @@ final class ShellxApi {
     );
   }
 
+  /// Closes the underlying [http.Client], but only if this [ShellxApi]
+  /// created it itself: a client passed to the constructor is left open,
+  /// since its lifecycle belongs to whoever created and passed it in.
+  void close() {
+    if (_ownsHttp) {
+      _http.close();
+    }
+  }
+
   Future<VersionInfo> version() async {
     final response = await _send('GET', '/v1/version');
     return _parse(response, (json) {
@@ -194,8 +208,14 @@ final class ShellxApi {
       response = await http.Response.fromStream(streamed).timeout(_timeout);
     } on http.ClientException catch (error) {
       throw ApiException(status: 0, code: 'network', message: error.message);
-    } on SocketException catch (error) {
-      throw ApiException(status: 0, code: 'network', message: error.message);
+    } on IOException catch (error) {
+      // Covers SocketException, HttpException, WebSocketException and TLS
+      // failures (TlsException/HandshakeException): IOClient only wraps
+      // SocketException/HttpException as http.ClientException, so a TLS
+      // failure (an expired cert, a MITM proxy, a bad handshake) would
+      // otherwise escape as a raw dart:io exception instead of the
+      // ApiException the contract promises for every failure.
+      throw ApiException(status: 0, code: 'network', message: error.toString());
     } on TimeoutException {
       throw const ApiException(
         status: 0,
@@ -216,10 +236,14 @@ final class ShellxApi {
       if (error is ApiException) {
         rethrow;
       }
+      // Never interpolate `error` here: a jsonDecode FormatException embeds
+      // a source excerpt around the parse failure, so a truncated response
+      // body (for example a login/register reply cut off mid-token) would
+      // otherwise leak secret text straight into this message.
       throw ApiException(
         status: response.statusCode,
         code: 'bad_response',
-        message: 'Unexpected response body: $error',
+        message: 'Malformed response',
       );
     }
   }

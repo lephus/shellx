@@ -35,6 +35,16 @@ void main() {
       expect(ChannelId.random(Random(1)), ChannelId.random(Random(1)));
       expect(ChannelId.random(), isNot(ChannelId.random()));
     });
+
+    test(
+      'bytes is unmodifiable, so it cannot be used to corrupt ChannelId.zero',
+      () {
+        final id = ChannelId(_hex('0102030405060708'));
+        expect(() => id.bytes[0] = 99, throwsUnsupportedError);
+        expect(() => ChannelId.zero.bytes[0] = 7, throwsUnsupportedError);
+        expect(ChannelId.zero.bytes, Uint8List(8));
+      },
+    );
   });
 
   group('RelayFrame golden bytes (must match relay/ byte-for-byte)', () {
@@ -190,6 +200,103 @@ void main() {
 
     test('refuses to encode unsupported types', () {
       expect(() => encodeCbor(1.5), throwsArgumentError);
+    });
+  });
+
+  group('cbor_values rejects excessive nesting (before decoding, not after)', () {
+    /// `depth` nested one-element arrays, e.g. depth=2 -> `[[0]]`.
+    Uint8List nestedArrays(int depth) {
+      final builder = BytesBuilder();
+      for (var i = 0; i < depth; i++) {
+        builder.addByte(0x81); // array(1)
+      }
+      builder.addByte(0x00); // innermost item: unsigned int 0
+      return builder.toBytes();
+    }
+
+    test(
+      'decodeCbor rejects 10,000-deep nesting in well under a second '
+      '(the recursive decode path takes ~1s of CPU and can stack-overflow)',
+      () {
+        final deep = nestedArrays(10000);
+        final stopwatch = Stopwatch()..start();
+        expect(() => decodeCbor(deep), throwsFormatException);
+        expect(
+          stopwatch.elapsedMilliseconds,
+          lessThan(100),
+          reason: 'must reject before ever calling the slow recursive decode',
+        );
+      },
+    );
+
+    test('decodeBatch rejects the same deep nesting quickly', () {
+      final deep = nestedArrays(10000);
+      final stopwatch = Stopwatch()..start();
+      expect(() => decodeBatch(deep), throwsFormatException);
+      expect(stopwatch.elapsedMilliseconds, lessThan(100));
+    });
+
+    test(
+      'Hs1Payload.decode and Hs2Payload.decode reject deep nesting quickly',
+      () {
+        final deep = nestedArrays(10000);
+        final stopwatch = Stopwatch()..start();
+        expect(() => Hs1Payload.decode(deep), throwsFormatException);
+        expect(() => Hs2Payload.decode(deep), throwsFormatException);
+        expect(stopwatch.elapsedMilliseconds, lessThan(200));
+      },
+    );
+
+    test('RelayFrame.decode (EVENT) rejects deep nesting quickly instead of '
+        'crashing the relay connection', () {
+      final deep = Uint8List.fromList([1, 4, ...nestedArrays(10000)]);
+      final stopwatch = Stopwatch()..start();
+      expect(
+        () => RelayFrame.decode(deep),
+        throwsA(isA<FrameFormatException>()),
+      );
+      expect(stopwatch.elapsedMilliseconds, lessThan(100));
+    });
+
+    test(
+      'a legitimate depth-4 shape (array -> map -> array -> map) still decodes',
+      () {
+        const message = SessionListResult([
+          SessionInfo(
+            id: 1,
+            index: 1,
+            shell: 's',
+            createdAt: 0,
+            attached: true,
+          ),
+        ]);
+        expect(decodeBatch(encodeBatch([message])), [message]);
+      },
+    );
+
+    test('exactly 8 levels of nesting is still accepted', () {
+      expect(decodeCbor(nestedArrays(8)), [
+        [
+          [
+            [
+              [
+                [
+                  [
+                    [0],
+                  ],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ]);
+    });
+
+    test('values above int64 throw instead of silently saturating', () {
+      // Major type 0 (unsigned int), additional info 27 (8-byte length),
+      // value = 2^63 -- one past the largest representable signed int64.
+      final bignum = _hex('1b8000000000000000');
+      expect(() => decodeCbor(bignum), throwsFormatException);
     });
   });
 }

@@ -364,6 +364,53 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test(
+      'a rejected psk never appears in the ArgumentError (only its length)',
+      () async {
+        final keys = await NoiseKeyPair.generate();
+        final psk = Uint8List.fromList(List.generate(31, (i) => i + 1));
+
+        try {
+          NoiseHandshake.responder(
+            pattern: NoisePattern.ikPsk2,
+            localStatic: keys,
+            prologue: Uint8List(0),
+            psk: psk,
+          );
+          fail('expected ArgumentError');
+        } on ArgumentError catch (e) {
+          expect(e.invalidValue, isNot(isA<Uint8List>()));
+          expect(e.invalidValue, psk.length);
+        }
+
+        try {
+          NoiseHandshake.initiator(
+            pattern: NoisePattern.ik,
+            localStatic: keys,
+            remoteStatic: keys.publicKey,
+            prologue: Uint8List(0),
+            psk: psk,
+          );
+          fail('expected ArgumentError');
+        } on ArgumentError catch (e) {
+          expect(e.invalidValue, isNot(isA<Uint8List>()));
+          expect(e.invalidValue, psk.length);
+        }
+
+        try {
+          NoiseHandshake.responder(
+            pattern: NoisePattern.ikPsk2,
+            localStatic: keys,
+            prologue: Uint8List(0),
+          );
+          fail('expected ArgumentError');
+        } on ArgumentError catch (e) {
+          expect(e.invalidValue, isNot(isA<Uint8List>()));
+          expect(e.invalidValue, isNull);
+        }
+      },
+    );
   });
 
   group('transport', () {
