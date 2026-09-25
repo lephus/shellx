@@ -174,6 +174,17 @@ void main() {
       async.flushMicrotasks();
       expect(t.relay.state, RelayConnectionState.revoked);
       expect(t.connector.attempts, 0);
+      // No `connecting` flash on the way to `revoked`, and repeated
+      // start() calls don't re-emit revoked (which would re-trigger an
+      // app's revoked handler) since the state never actually changes.
+      expect(t.states, [RelayConnectionState.revoked]);
+      t.relay.start();
+      async.flushMicrotasks();
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.revoked);
+      expect(t.connector.attempts, 0);
+      expect(t.states, [RelayConnectionState.revoked]);
     });
   });
 
@@ -386,6 +397,42 @@ void main() {
       expect(late.closedByClient, isTrue);
       expect(t.connector.attempts, 2);
       expect(t.relay.state, RelayConnectionState.connected);
+    });
+  });
+
+  test('a dial that never settles leaves connecting within connectTimeout, '
+      'then recovers; reconnectNow works while waiting', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      final hangingCompleter = Completer<RelaySocket>();
+      t.connector.nextAttempt = () => hangingCompleter.future;
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.connecting);
+
+      // The dial never settles: give up locally after connectTimeout and
+      // schedule a reconnect instead of staying wedged in `connecting`.
+      async.elapse(RelayConnection.connectTimeout);
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      expect(t.connector.attempts, 1);
+
+      // reconnectNow() works again now that we're disconnected: the
+      // retry gates on the same still-outstanding dial for up to another
+      // connectTimeout before giving up on it for good.
+      t.relay.reconnectNow();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.connecting);
+      expect(t.connector.attempts, 1);
+      async.elapse(RelayConnection.connectTimeout);
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      expect(t.connector.attempts, 1);
+
+      // Hard cap reached on this stale dial: the very next attempt no
+      // longer waits on it at all, dials fresh immediately, and
+      // connects.
+      async.elapse(const Duration(seconds: 2));
+      expect(t.relay.state, RelayConnectionState.connected);
+      expect(t.connector.attempts, 2);
     });
   });
 
