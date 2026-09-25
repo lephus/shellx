@@ -63,6 +63,7 @@ final class Harness {
             publicKey: keys.phone.publicKey,
             name: 'Test Phone',
             pairedAt: DateTime.utc(2026),
+            pairingId: '01920000-0001-7000-8000-000000000000',
           ),
         ),
       );
@@ -73,6 +74,7 @@ final class Harness {
             publicKey: keys.tablet.publicKey,
             name: 'Tablet',
             pairedAt: DateTime.utc(2026),
+            pairingId: '01920000-0002-7000-8000-000000000000',
           ),
         ),
       );

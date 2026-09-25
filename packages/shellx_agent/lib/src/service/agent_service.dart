@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../pairing/pairing_code_manager.dart';
+import '../pairing/pairing_id.dart';
 import '../session/session_manager.dart';
 import '../trust/trusted_store.dart';
 import 'agent_channel.dart';
@@ -23,11 +24,15 @@ import 'handshake_responder.dart';
 /// table never interleave. Only [stop] acts immediately; work it interrupts
 /// re-checks the channel table after every await.
 ///
-/// A phone paired here stays "unregistered" (persisted in [TrustedStore])
-/// until the relay acknowledges its `POST /v1/pairings`. Until then a
-/// `pairing_removed` for it is ignored: the relay replays the tombstone of
-/// an earlier unpair on every connect until that POST clears it. The POST
-/// is retried after every relay connect and, while connected, with backoff.
+/// Every pairing has a pairing id (UUIDv7 from `clock`, generated at
+/// `pair.confirm`, stored in the trust entry). `pairing_removed`, the
+/// relay's `410` and the agent's own revoke all act on one pairing id, so a
+/// tombstone of an older pairing of the same phone (replayed on every
+/// connect until a newer `POST /v1/pairings` lands) never undoes a newer
+/// one. A new pairing stays marked unregistered in [TrustedStore] until the
+/// relay acknowledges its POST, which is retried after every relay connect
+/// and, while connected, with `registrationBackoff` — only for the phone's
+/// current pairing id.
 final class AgentService {
   AgentService({
     required RelayConnection relay,
@@ -39,7 +44,12 @@ final class AgentService {
     required PairingCodeManager pairing,
     required String appVersion,
     Duration flushInterval = const Duration(milliseconds: 16),
+    DateTime Function()? clock,
+    Backoff? registrationBackoff,
   }) : _relay = relay,
+       _clock = clock ?? DateTime.now,
+       _pairingIds = PairingIdGenerator(now: clock),
+       _registrationBackoff = registrationBackoff ?? Backoff(),
        _api = api,
        _deviceId = deviceId,
        _identity = identity,
@@ -56,6 +66,9 @@ final class AgentService {
        );
 
   final RelayConnection _relay;
+  final DateTime Function() _clock;
+  final PairingIdGenerator _pairingIds;
+  final Backoff _registrationBackoff;
   final ShellxApi _api;
   final String _deviceId;
   final NoiseKeyPair _identity;
@@ -75,7 +88,6 @@ final class AgentService {
   /// is skipped, and an HS1 answered across a stop installs no channel.
   int _epoch = 0;
 
-  final _registrationBackoff = Backoff();
   Timer? _registrationTimer;
   bool _registering = false;
   bool _registerAgain = false;
@@ -159,21 +171,23 @@ final class AgentService {
   /// the display-only server record is deleted afterwards, outside the
   /// inbox, so a slow request never stalls frame handling.
   ///
-  /// Removes trust and any unregistered mark, and kills the sessions
-  /// attached to that phone (spec §5.5: "phiên đang gắn với điện thoại
-  /// đó"). Unattached sessions belong to no phone, and the revoked phone can
-  /// no longer attach, so they keep running until closed from the tray.
+  /// Removes the trust entry (and its unregistered mark), and kills the
+  /// sessions attached to that phone (spec §5.5: "phiên đang gắn với điện
+  /// thoại đó"). Unattached sessions belong to no phone, and the revoked
+  /// phone can no longer attach, so they keep running until closed from the
+  /// tray. The DELETE carries the entry's pairing id, so a revoke that lands
+  /// after a quick re-pair never removes the newer pairing.
   Future<void> revoke(String mobileId) async {
-    await _serialize(() async {
-      await _trusted.remove(mobileId);
+    final removed = await _serialize(() async {
+      final device = await _trusted.find(mobileId);
+      if (device != null) {
+        await _trusted.remove(mobileId, pairingId: device.pairingId);
+      }
       _sessions.closeSessionsAttachedTo(mobileId);
       _dropChannel(mobileId);
+      return device;
     });
-    try {
-      await _api.deletePairing(_deviceId, mobileId);
-    } on ApiException {
-      // The server record is display-only; local trust is already gone.
-    }
+    if (removed != null) await _deletePairing(mobileId, removed.pairingId);
   }
 
   /// Runs [task] after every task queued before it. The returned future
@@ -241,11 +255,13 @@ final class AgentService {
       answer = null;
     }
     if (answer == null || epoch != _epoch) return;
-    _relay.send(
+    final sent = _relay.send(
       DataFrame(peer: mobileId, channel: frame.channel, payload: answer.reply),
     );
     final transport = answer.transport;
-    if (transport == null) return; // Status was not ok: no channel.
+    // Status not ok: no channel. HS2 not sent: the phone cannot use a new
+    // channel, so the existing one (if any) stays.
+    if (transport == null || !sent) return;
     // One channel per phone: a new accepted HS1 replaces the old channel.
     final previous = _channels.remove(mobileId);
     if (previous != null) {
@@ -316,28 +332,35 @@ final class AgentService {
       mobileId: channel.mobileId,
       publicKey: channel.remoteStatic,
       name: channel.name,
-      pairedAt: DateTime.now().toUtc(),
+      pairedAt: _clock().toUtc(),
+      pairingId: _pairingIds.next(),
     );
-    // Unregistered until the relay acknowledges POST /v1/pairings, so a
-    // replayed tombstone of an earlier unpair cannot undo this trust.
+    // Unregistered until the relay acknowledges POST /v1/pairings.
     await _trusted.add(device, unregistered: true);
     _events.add(MobilePaired(device));
     _registerSoon();
   }
 
-  /// Idempotent: the relay replays `pairing_removed` on every connect, so a
-  /// phone that is already untrusted (and has no channel) is left as is
-  /// (and [TrustedStore.remove] writes nothing). Ignored for an unregistered
-  /// phone: it may be the tombstone of an unpair from before this pairing.
+  /// Removes trust only when the event names the pairing the phone is
+  /// trusted under: a tombstone of an older pairing (replayed on every
+  /// connect until a newer POST lands) or a duplicate changes nothing and
+  /// writes nothing.
   Future<void> _onEvent(Map<String, String> event) async {
     if (event['event'] != 'pairing_removed' || event['agent_id'] != _deviceId) {
       return;
     }
     final mobileId = event['mobile_id'];
-    if (mobileId == null) return;
-    if ((await _trusted.unregistered()).contains(mobileId)) return;
-    await _trusted.remove(mobileId);
-    _dropChannel(mobileId);
+    final pairingId = event['pairing_id'];
+    if (mobileId == null || pairingId == null) return;
+    await _pairingRemoved(mobileId, pairingId);
+  }
+
+  /// The phone unpaired pairing [pairingId] (EVENT or `410`): if it is still
+  /// the phone's trusted pairing, trust and the channel go.
+  Future<void> _pairingRemoved(String mobileId, String pairingId) async {
+    if (await _trusted.remove(mobileId, pairingId: pairingId)) {
+      _dropChannel(mobileId);
+    }
   }
 
   bool get _connected =>
@@ -345,11 +368,10 @@ final class AgentService {
 
   void _registerSoon() => unawaited(_registerPairings());
 
-  /// `POST /v1/pairings` for every unregistered phone, while connected.
+  /// `POST /v1/pairings` for every unregistered pairing, while connected.
   /// HTTP runs outside the inbox (a slow request must not stall frames);
-  /// the bookkeeping runs inside it, after any frame already received — the
-  /// relay sends its tombstones right after the upgrade, before any POST
-  /// response can arrive. Never throws.
+  /// the bookkeeping runs inside it and acts only on the same pairing id.
+  /// Never throws.
   Future<void> _registerPairings() async {
     if (_registering) {
       _registerAgain = true;
@@ -382,38 +404,49 @@ final class AgentService {
 
   Future<_Pass> _registerOnce() async {
     var pass = _Pass.done;
-    for (final mobileId in await _trusted.unregistered()) {
+    for (final device in await _trusted.unregistered()) {
       if (!_connected) return _Pass.retry;
+      final mobileId = device.mobileId;
+      final pairingId = device.pairingId;
+      // Only the phone's current pairing is ever (re)sent: an earlier POST
+      // of this pass may have taken long enough for a re-pair or revoke.
+      if ((await _trusted.find(mobileId))?.pairingId != pairingId) continue;
       try {
-        await _api.createPairing(mobileId);
+        await _api.createPairing(mobileId, pairingId: pairingId);
       } on ApiException catch (error) {
         final status = error.status;
         if (status == 401) return _Pass.unauthorized;
-        if (status >= 400 && status < 500 && status != 429) {
-          // The relay refused the pairing record: stop asking. Local trust
-          // stays as it is.
-          await _serialize(() => _trusted.markRegistered(mobileId));
-          continue;
+        if (status == 410) {
+          // The phone already unpaired this pairing (or the id is refused).
+          await _serialize(() => _pairingRemoved(mobileId, pairingId));
+        } else if (status >= 400 && status < 500 && status != 429) {
+          // The relay refused the record for good: stop asking. Local
+          // trust stays as it is.
+          await _serialize(() => _trusted.markRegistered(mobileId, pairingId));
+        } else {
+          pass = _Pass.retry; // Network (0), 429 or 5xx: same id again.
         }
-        pass = _Pass.retry; // Network (0), 429 or 5xx.
         continue;
       }
-      final wasUnregistered = await _serialize(
-        () => _trusted.markRegistered(mobileId),
+      final current = await _serialize(
+        () => _trusted.markRegistered(mobileId, pairingId),
       );
-      if (!wasUnregistered) {
-        // Revoked while the POST was in flight: take the record back.
-        unawaited(_deletePairingQuietly(mobileId));
+      if (!current) {
+        // Revoked or re-paired while the POST was in flight: take this
+        // pairing's record back (a newer pairing's record is untouched).
+        unawaited(_deletePairing(mobileId, pairingId));
       }
     }
     return pass;
   }
 
-  Future<void> _deletePairingQuietly(String mobileId) async {
+  /// `DELETE /v1/pairings` for pairing [pairingId] only. Failures are
+  /// ignored: the record is display-only and trust is already gone.
+  Future<void> _deletePairing(String mobileId, String pairingId) async {
     try {
-      await _api.deletePairing(_deviceId, mobileId);
+      await _api.deletePairing(_deviceId, mobileId, pairingId: pairingId);
     } catch (_) {
-      // Display-only record; nothing else to do.
+      // Nothing else to do.
     }
   }
 

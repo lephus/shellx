@@ -32,6 +32,7 @@ void main() {
         publicKey: phoneKey.publicKey,
         name: 'Pixel',
         pairedAt: DateTime.utc(2026),
+        pairingId: '01920000-0001-7000-8000-000000000000',
       ),
     );
   });

@@ -20,6 +20,14 @@ const phoneId = 'b0000000-0000-4000-8000-000000000002';
 const tabletId = 'b0000000-0000-4000-8000-000000000003';
 const spareId = 'b0000000-0000-4000-8000-000000000004';
 
+/// Pairing ids of the pre-seeded trust entries (September 2024: older than
+/// anything the rig's agent clock generates).
+const phonePairingId = '01920000-0001-7000-8000-000000000000';
+const tabletPairingId = '01920000-0002-7000-8000-000000000000';
+
+/// The agent's clock in the rig: fake time since this instant.
+final agentEpoch = DateTime.utc(2026, 9, 25, 12);
+
 late NoiseKeyPair agentKey;
 late NoiseKeyPair phoneKey;
 late NoiseKeyPair tabletKey;
@@ -48,6 +56,7 @@ final class AgentRig {
           publicKey: phoneKey.publicKey,
           name: 'Test Phone',
           pairedAt: DateTime.utc(2026),
+          pairingId: phonePairingId,
         ),
       ),
     );
@@ -97,6 +106,8 @@ final class AgentRig {
       sessions: sessions,
       pairing: pairing,
       appVersion: '1.0.0',
+      clock: () => agentEpoch.add(async.elapsed),
+      registrationBackoff: Backoff(random: Random(13)),
     );
     service.events.listen(events.add);
     drive(async, service.start());
@@ -142,7 +153,13 @@ final class AgentRig {
     settle(async);
   }
 
-  Set<String> get unregistered => drive(async, trusted.unregistered());
+  /// Mobile ids whose pairing the relay has not acknowledged yet.
+  Set<String> get unregistered => {
+    for (final d in drive(async, trusted.unregistered())) d.mobileId,
+  };
+
+  /// The pairing id of [mobileId]'s trust entry.
+  String pairingIdOf(String mobileId) => findTrusted(mobileId)!.pairingId;
 
   TestMobile _mobile(String id, NoiseKeyPair key) => TestMobile(
     relay: relay,
@@ -174,15 +191,30 @@ final class AgentRig {
   TrustedDevice? findTrusted(String id) => drive(async, trusted.find(id));
 }
 
-/// Wraps the fake relay's HTTP client so the agent's `POST /v1/pairings`
-/// can be failed ([failWith]: an HTTP status, or 0 for a network error) or
-/// held at [gate]. Everything else passes through.
+/// Wraps the fake relay's HTTP client so the agent's pairing requests can
+/// be scripted: [outcome] decides each `POST /v1/pairings` by its pairing
+/// id, [gate] holds POSTs and [deleteGate] holds DELETEs. Everything else
+/// passes through.
 final class PairingPostControl extends http.BaseClient {
   PairingPostControl(this._inner);
 
+  /// [outcome] value: the relay records the POST, then the response is lost.
+  static const int lostResponse = -1;
+
   final http.Client _inner;
-  int? failWith;
+
+  /// null: the relay answers. 0: network error, the relay never sees it.
+  /// [lostResponse]: see there. Any other value: answered with that HTTP
+  /// status, the relay never sees it.
+  int? Function(String pairingId) outcome = _relayAnswers;
+
+  static int? _relayAnswers(String _) => null;
+
+  /// Scripts every POST alike (see [outcome]).
+  set failWith(int? status) => outcome = (_) => status;
+
   Completer<void>? gate;
+  Completer<void>? deleteGate;
 
   /// `POST /v1/pairings` attempts, including failed ones.
   int attempts = 0;
@@ -191,10 +223,16 @@ final class PairingPostControl extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (request.method == 'POST' && request.url.path == '/v1/pairings') {
       attempts++;
+      final body = jsonDecode((request as http.Request).body) as Map;
+      final pairingId = body['pairing_id'] as String;
       final held = gate;
       if (held != null) await held.future;
-      final status = failWith;
+      final status = outcome(pairingId);
       if (status == 0) throw http.ClientException('network is down');
+      if (status == lostResponse) {
+        await (await _inner.send(request)).stream.drain<void>();
+        throw http.ClientException('connection reset');
+      }
       if (status != null) {
         return http.StreamedResponse(
           Stream.value(
@@ -204,6 +242,10 @@ final class PairingPostControl extends http.BaseClient {
           headers: {'content-type': 'application/json'},
         );
       }
+    }
+    if (request.method == 'DELETE') {
+      final held = deleteGate;
+      if (held != null) await held.future;
     }
     return _inner.send(request);
   }
@@ -268,12 +310,14 @@ TrustedDevice trustedTablet() => TrustedDevice(
   publicKey: tabletKey.publicKey,
   name: 'iPad',
   pairedAt: DateTime.utc(2026),
+  pairingId: tabletPairingId,
 );
 
-Map<String, String> pairingRemoved(String mobileId) => {
+Map<String, String> pairingRemoved(String mobileId, String pairingId) => {
   'event': 'pairing_removed',
   'agent_id': agentId,
   'mobile_id': mobileId,
+  'pairing_id': pairingId,
 };
 
 void main() {
@@ -476,7 +520,7 @@ void main() {
       expect((paired.mobileId, paired.name), (tabletId, 'iPad'));
       expect(rig.findTrusted(tabletId)!.publicKey, tabletKey.publicKey);
       expect(rig.pairing.activeSecret, isNull);
-      expect(rig.relay.pairings, {(agentId, tabletId)});
+      expect(rig.relay.pairings, {(agentId, tabletId): paired.pairingId});
       expect(rig.service.activeChannelCount, 0);
       expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
     });
@@ -545,7 +589,7 @@ void main() {
       'and deletes the pairing record', () {
     fakeAsync((async) {
       final rig = AgentRig(async);
-      rig.relay.pairings.add((agentId, phoneId));
+      rig.relay.pairings[(agentId, phoneId)] = phonePairingId;
       final channel = rig.handshake(rig.phone).channel!;
       rig.send(channel, [const SessionOpen(cols: 80, rows: 24)]);
 
@@ -564,28 +608,39 @@ void main() {
     });
   });
 
-  test('EVENT pairing_removed for this agent removes trust', () {
-    fakeAsync((async) {
-      final rig = AgentRig(async);
-      rig.handshake(rig.phone);
-      rig.relay.sendEvent(agentId, {
-        'event': 'pairing_removed',
-        'agent_id': 'a0000000-0000-4000-8000-00000000ffff',
-        'mobile_id': phoneId,
-      });
-      settle(async);
-      expect(rig.findTrusted(phoneId), isNotNull);
+  test(
+    'EVENT pairing_removed for this agent and this pairing removes trust',
+    () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.handshake(rig.phone);
+        rig.relay.sendEvent(agentId, {
+          'event': 'pairing_removed',
+          'agent_id': 'a0000000-0000-4000-8000-00000000ffff',
+          'mobile_id': phoneId,
+          'pairing_id': phonePairingId,
+        });
+        // An older pairing of the same phone, or no id at all: not this one.
+        rig.relay.sendEvent(
+          agentId,
+          pairingRemoved(phoneId, '01910000-0001-7000-8000-000000000000'),
+        );
+        rig.relay.sendEvent(agentId, {
+          'event': 'pairing_removed',
+          'agent_id': agentId,
+          'mobile_id': phoneId,
+        });
+        settle(async);
+        expect(rig.findTrusted(phoneId), isNotNull);
+        expect(rig.service.activeChannelCount, 1);
 
-      rig.relay.sendEvent(agentId, {
-        'event': 'pairing_removed',
-        'agent_id': agentId,
-        'mobile_id': phoneId,
+        rig.relay.sendEvent(agentId, pairingRemoved(phoneId, phonePairingId));
+        settle(async);
+        expect(rig.findTrusted(phoneId), isNull);
+        expect(rig.service.activeChannelCount, 0);
       });
-      settle(async);
-      expect(rig.findTrusted(phoneId), isNull);
-      expect(rig.service.activeChannelCount, 0);
-    });
-  });
+    },
+  );
 
   test('stop drops channels and disconnects without closing sessions', () {
     fakeAsync((async) {
@@ -837,7 +892,7 @@ void main() {
       final store = ControllableStore();
       final rig = AgentRig(async, store: store);
       drive(async, rig.trusted.add(trustedTablet()));
-      rig.relay.pairings.add((agentId, phoneId));
+      rig.relay.pairings[(agentId, phoneId)] = phonePairingId;
       rig.handshake(rig.phone);
       final tablet = rig.handshake(rig.tablet).channel!;
 
@@ -850,8 +905,8 @@ void main() {
       final reads = store.reads;
       final writes = store.writes;
 
-      rig.relay.sendEvent(agentId, pairingRemoved(phoneId));
-      rig.relay.sendEvent(agentId, pairingRemoved(phoneId));
+      rig.relay.sendEvent(agentId, pairingRemoved(phoneId, phonePairingId));
+      rig.relay.sendEvent(agentId, pairingRemoved(phoneId, phonePairingId));
       settle(async);
       expect(store.reads, greaterThan(reads)); // Both were processed...
       expect(store.writes, writes); // ...without a storage write...
@@ -871,37 +926,101 @@ void main() {
     });
   });
 
-  // Controller ruling (pre-review): a fresh pairing is protected from a
-  // replayed pairing_removed tombstone until the relay registers it.
-  group('unregistered pairings', () {
-    test('a re-pair whose POST keeps failing survives the tombstone replayed '
-        'on reconnect; once registered, a real unpair removes trust', () {
+  // Fix round 1: pairings carry agent-generated UUIDv7 ids; trust entries,
+  // events, 410s and revokes are matched by id.
+  group('pairing ids', () {
+    test('pair.confirm stores a fresh UUIDv7 pairing id and registers it', () {
       fakeAsync((async) {
         final rig = AgentRig(async);
         rig.pair(rig.tablet);
-        expect(rig.relay.pairings, contains((agentId, tabletId)));
+        final id = rig.pairingIdOf(tabletId);
+        expect(isPairingId(id), isTrue);
+        expect(id.compareTo(phonePairingId), greaterThan(0));
+        expect(
+          rig.events.whereType<MobilePaired>().single.device.pairingId,
+          id,
+        );
+        expect(rig.relay.pairings, {(agentId, tabletId): id});
         expect(rig.unregistered, isEmpty);
-        rig.unpairFromPhone(rig.tablet); // Leaves a tombstone at the relay.
+
+        rig.pair(rig.tablet); // Re-pairing makes a newer id.
+        expect(rig.pairingIdOf(tabletId).compareTo(id), greaterThan(0));
+      });
+    });
+
+    // Review I1: POST#1 commits but its response is lost, the phone unpairs,
+    // and the retry must not bring the pairing back.
+    test('an unpair after a POST whose response was lost removes trust; the '
+        'retry does not re-create the pairing', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.posts.failWith = PairingPostControl.lostResponse;
+        rig.pair(rig.tablet);
+        final id = rig.pairingIdOf(tabletId);
+        expect(rig.relay.pairings, {(agentId, tabletId): id}); // Committed.
+        expect(rig.unregistered, {tabletId}); // The agent does not know.
+
+        rig.posts.failWith = null;
+        rig.unpairFromPhone(rig.tablet);
+        expect(rig.findTrusted(tabletId), isNull); // The event has its id.
+        async.elapse(const Duration(seconds: 60)); // Any retry has run.
+        expect(rig.findTrusted(tabletId), isNull);
+        expect(rig.relay.pairings, isEmpty);
+        rig.reconnectAgent();
+        expect(rig.findTrusted(tabletId), isNull);
+        expect(rig.handshake(rig.tablet).status, HandshakeStatus.untrusted);
+      });
+    });
+
+    test('an unpair missed while offline ends the pairing on reconnect: the '
+        'tombstone and the retried POST (410) both carry its id', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.posts.failWith = PairingPostControl.lostResponse;
+        rig.pair(rig.tablet);
+        rig.posts.failWith = null;
+
+        rig.relay.setReachable(agentId, false);
+        rig.relay.dropConnection(agentId);
+        rig.unpairFromPhone(rig.tablet);
+        rig.relay.setReachable(agentId, true);
+        async.elapse(const Duration(seconds: 30));
+        expect(rig.relay.isOnline(agentId), isTrue);
+        expect(rig.findTrusted(tabletId), isNull);
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, isEmpty);
+      });
+    });
+
+    test('a stale tombstone with an older id is ignored after a re-pair (POST '
+        'still failing); once registered, a real unpair removes trust', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.pair(rig.tablet);
+        final oldId = rig.pairingIdOf(tabletId);
+        rig.unpairFromPhone(rig.tablet); // Tombstone with oldId.
         expect(rig.findTrusted(tabletId), isNull);
 
-        rig.posts.failWith = 0; // POST /v1/pairings: network error.
-        final attempts = rig.posts.attempts;
+        rig.posts.failWith = 0;
         rig.pair(rig.tablet);
-        expect(rig.findTrusted(tabletId), isNotNull);
-        expect(rig.posts.attempts, greaterThan(attempts));
+        final newId = rig.pairingIdOf(tabletId);
         expect(rig.unregistered, {tabletId});
 
-        rig.reconnectAgent(); // Replays the tombstone: ignored.
-        expect(rig.findTrusted(tabletId), isNotNull);
+        rig.reconnectAgent(); // Replays the tombstone (oldId): ignored.
+        rig.relay.sendEvent(agentId, pairingRemoved(tabletId, oldId));
+        settle(async);
+        expect(rig.pairingIdOf(tabletId), newId);
         expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
 
         rig.posts.failWith = null;
         async.elapse(const Duration(seconds: 60));
         expect(rig.unregistered, isEmpty);
-        expect(rig.relay.pairings, contains((agentId, tabletId)));
-
-        rig.reconnectAgent(); // The POST cleared the tombstone.
-        expect(rig.findTrusted(tabletId), isNotNull);
+        expect(rig.relay.pairings, {(agentId, tabletId): newId});
+        rig.reconnectAgent(); // The newer POST cleared the tombstone.
+        // A late event of the old pairing, now that nothing is pending.
+        rig.relay.sendEvent(agentId, pairingRemoved(tabletId, oldId));
+        settle(async);
+        expect(rig.pairingIdOf(tabletId), newId);
 
         rig.unpairFromPhone(rig.tablet);
         expect(rig.findTrusted(tabletId), isNull);
@@ -909,19 +1028,100 @@ void main() {
       });
     });
 
-    test('an unregistered pairing survives an agent restart and stays '
-        'protected until the relay registers it', () {
+    test('a 410 removes trust only while the entry still has that id', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        var trustChanges = 0;
+        rig.trusted.changes.listen((_) => trustChanges++);
+
+        // A 410 for a pairing that was replaced meanwhile: ignored.
+        final gate = rig.posts.gate = Completer<void>();
+        rig.pair(rig.tablet); // POST (first id) held.
+        final firstId = rig.pairingIdOf(tabletId);
+        rig.pair(rig.tablet);
+        final secondId = rig.pairingIdOf(tabletId);
+        rig.posts.outcome = (id) => id == firstId ? 410 : null;
+        rig.posts.gate = null;
+        gate.complete();
+        settle(async);
+        expect(rig.pairingIdOf(tabletId), secondId);
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, {(agentId, tabletId): secondId});
+
+        // A 410 for the current pairing: trust goes, the tray hears of it.
+        rig.posts.failWith = 410;
+        final changes = trustChanges;
+        rig.pair(rig.spare);
+        expect(rig.findTrusted(spareId), isNull);
+        expect(rig.unregistered, isEmpty);
+        expect(trustChanges, changes + 2); // Added, then removed.
+        expect(rig.handshake(rig.spare).status, HandshakeStatus.untrusted);
+      });
+    });
+
+    test('a stale 2xx for an old id does not mark the new pairing', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        final first = rig.posts.gate = Completer<void>();
+        rig.pair(rig.tablet); // POST (first id) held.
+        rig.pair(rig.tablet); // Re-paired: a newer id.
+        final newId = rig.pairingIdOf(tabletId);
+
+        final second = rig.posts.gate = Completer<void>();
+        first.complete(); // The old POST succeeds; the new one is held.
+        settle(async);
+        expect(rig.unregistered, {tabletId});
+        expect(rig.pairingIdOf(tabletId), newId);
+
+        rig.posts.gate = null;
+        second.complete();
+        settle(async);
+        expect(rig.unregistered, isEmpty);
+        expect(rig.relay.pairings, {(agentId, tabletId): newId});
+        expect(rig.pairingIdOf(tabletId), newId);
+      });
+    });
+
+    test('revoke then a quick re-pair: the late DELETE (old id) does not '
+        'delete the new pairing', () {
+      fakeAsync((async) {
+        final rig = AgentRig(async);
+        rig.pair(rig.tablet);
+        final oldId = rig.pairingIdOf(tabletId);
+        final gate = rig.posts.deleteGate = Completer<void>();
+        final revoked = rig.service.revoke(tabletId);
+        settle(async);
+        expect(rig.findTrusted(tabletId), isNull);
+
+        rig.pair(rig.tablet);
+        final newId = rig.pairingIdOf(tabletId);
+        expect(newId, isNot(oldId));
+        expect(rig.relay.pairings, {(agentId, tabletId): newId});
+
+        rig.posts.deleteGate = null;
+        gate.complete();
+        drive(async, revoked);
+        settle(async);
+        expect(rig.relay.pairings, {(agentId, tabletId): newId});
+        expect(rig.pairingIdOf(tabletId), newId);
+        expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
+      });
+    });
+
+    test('an unregistered pairing survives an agent restart and its POST '
+        'resumes', () {
       fakeAsync((async) {
         final rig = AgentRig(async);
         rig.pair(rig.tablet);
         rig.unpairFromPhone(rig.tablet);
         rig.posts.failWith = 503;
         rig.pair(rig.tablet);
+        final id = rig.pairingIdOf(tabletId);
         expect(rig.unregistered, {tabletId});
 
-        rig.restartAgent(); // The new connection replays the tombstone.
+        rig.restartAgent(); // The new connection replays the old tombstone.
         expect(rig.unregistered, {tabletId});
-        expect(rig.findTrusted(tabletId), isNotNull);
+        expect(rig.pairingIdOf(tabletId), id);
         expect(rig.handshake(rig.tablet).status, HandshakeStatus.ok);
 
         final attempts = rig.posts.attempts;
@@ -929,7 +1129,7 @@ void main() {
         async.elapse(const Duration(seconds: 60));
         expect(rig.posts.attempts, greaterThan(attempts));
         expect(rig.unregistered, isEmpty);
-        expect(rig.relay.pairings, contains((agentId, tabletId)));
+        expect(rig.relay.pairings, {(agentId, tabletId): id});
       });
     });
 
@@ -996,6 +1196,26 @@ void main() {
         expect(rig.posts.attempts, attempts);
         expect(rig.findTrusted(tabletId), isNull);
       });
+    });
+  });
+
+  // Review M3.
+  test('an HS2 that cannot be sent installs no channel: the previous one '
+      'keeps working', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final channel = rig.handshake(rig.phone).channel!;
+      rig.send(channel, [const SessionOpen(cols: 80, rows: 24)]);
+      rig.relay.onData = (from, to, frame) =>
+          from == agentId && frame.payload.first == PayloadKind.hs2.wire
+          ? throw StateError('socket write failed')
+          : frame;
+
+      expect(rig.handshake(rig.phone).status, isNull); // No HS2.
+      expect(rig.service.activeChannelCount, 1);
+      expect(rig.sessions.sessions.single.attachedMobileId, phoneId);
+      rig.send(channel, [const SessionList()]);
+      expect(channel.messagesOf<SessionListResult>(), hasLength(1));
     });
   });
 }

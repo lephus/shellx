@@ -2,6 +2,7 @@
 library;
 
 export 'src/pairing/pairing_code_manager.dart';
+export 'src/pairing/pairing_id.dart';
 export 'src/pty/process_pty.dart';
 export 'src/pty/pty.dart';
 export 'src/pty/session_environment.dart';
