@@ -1,11 +1,15 @@
 import { evictDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FRAMES_PER_SECOND, TokenBucket } from "../src/hub/token-bucket";
 import { encodeData, encodeError, encodePresence, RelayErrorCode } from "../src/protocol/frames";
 import { connect, hex, loginDevice, makeApp, registerAccount } from "./helpers";
 
 const CH = Uint8Array.from([1, 1, 2, 3, 5, 8, 13, 21]);
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("TokenBucket", () => {
   it("allows a burst of `capacity`, then refills at the configured rate", () => {
@@ -67,6 +71,34 @@ describe("per-connection frame rate limit", () => {
   });
 });
 
+describe("budget survives reconnects", () => {
+  it("keeps the exhausted budget across a reconnect instead of granting a fresh one", async () => {
+    // Freeze Date.now() (shared with the Durable Object — see task-7-report.md) so the token math
+    // below is exact regardless of how long these round trips actually take on the host: a naive
+    // real-clock version that waits for 450 individual responses can, under load, let enough of the
+    // bucket refill before the reconnect that the "still limited" flood below never trips it.
+    vi.useFakeTimers();
+    const { app, agent, mobile, a, m } = await hubWithTwoDevices();
+
+    // Spend 450 of the 500 tokens on the first connection.
+    for (let i = 0; i < 450; i++) m.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
+    for (let i = 0; i < 450; i++) await a.nextBinary();
+
+    // Reconnect the same device (same token => same device id): the hub replaces the old socket.
+    const m2 = await connect(app, mobile.token);
+    expect((await m.closed).code).toBe(4001);
+    expect(hex(await m2.nextBinary())).toBe(hex(encodePresence(agent.deviceId, true)));
+
+    // The clock never advanced, so exactly 50 tokens remain. A fresh (buggy) reset would allow
+    // 500 more; the persisted bucket allows exactly 50 more before tripping.
+    for (let i = 0; i < 50; i++) m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
+    for (let i = 0; i < 50; i++) await a.nextBinary();
+    m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4, 1)));
+    expect(hex(await m2.nextBinary())).toBe(hex(encodeError(RelayErrorCode.rateLimited)));
+    expect(await m2.closed).toEqual({ code: 4003, reason: "rate_limited" });
+  });
+});
+
 describe("hibernation", () => {
   it("keeps routing, presence, replacement, heartbeat and rate limiting working after eviction", async () => {
     const { app, agent, mobile, a, m, stub } = await hubWithTwoDevices();
@@ -83,9 +115,22 @@ describe("hibernation", () => {
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
 
     await evictDurableObject(stub);
+    // Freeze the clock (same trick as "budget survives reconnects" above — see task-7-report.md for
+    // why this works: the Durable Object's Date.now() is the same faked clock as the test's) so the
+    // rebuilt post-hibernation bucket is exercised exactly, regardless of host speed. A real-clock
+    // version that waits for 400 individual responses before flooding can, under load, let enough of
+    // the fresh bucket refill that the flood never trips the limiter (hanging until timeout); one big
+    // enough to out-race any plausible refill instead risks blowing the test's own wall-clock budget
+    // while it processes thousands of messages under that same load.
+    vi.useFakeTimers();
     for (let i = 0; i < 400; i++) m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
     for (let i = 0; i < 400; i++) await a.nextBinary();
-    for (let i = 0; i < 1000; i++) m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
-    expect((await m2.closed).code).toBe(4003);
+    // Exactly 100 tokens remain of the fresh 500-token capacity (clock frozen, so no refill since
+    // hibernation); spend them, then one more must trip the limiter.
+    for (let i = 0; i < 100; i++) m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
+    for (let i = 0; i < 100; i++) await a.nextBinary();
+    m2.send(encodeData(agent.deviceId, CH, Uint8Array.of(4, 9)));
+    expect(hex(await m2.nextBinary())).toBe(hex(encodeError(RelayErrorCode.rateLimited)));
+    expect(await m2.closed).toEqual({ code: 4003, reason: "rate_limited" });
   });
 });

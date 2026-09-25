@@ -37,10 +37,11 @@ const CLOSE_REASONS: Record<CloseCode, string> = {
  */
 export class UserHub extends DurableObject<Env> {
   /**
-   * Per-device frame budget, in memory only. It is lost when the object hibernates, which is
-   * harmless: hibernation needs ~10 s without events, after which a 500-token bucket refilling at
-   * 500/s is full anyway — exactly what a fresh bucket starts with. Persisting it would cost a
-   * storage write per frame.
+   * Per-device frame budget, in memory only, keyed by device id and kept across that device's
+   * reconnects (see fetch()/markOffline() below) so reconnecting cannot be used to reset it. It is
+   * lost when the object hibernates, which is harmless: hibernation needs ~10 s without events,
+   * after which a 500-token bucket refilling at 500/s is full anyway — exactly what a fresh bucket
+   * starts with. Persisting it would cost a storage write per frame.
    */
   private readonly buckets = new Map<string, TokenBucket>();
 
@@ -63,7 +64,10 @@ export class UserHub extends DurableObject<Env> {
 
     // One connection per device: the newest wins; the old socket gets 4001 and no offline is announced.
     for (const old of this.socketsOf(deviceId)) this.closeSocket(old, CloseCode.replaced);
-    this.buckets.delete(deviceId); // the new connection starts with a full budget
+    // Deliberately not resetting the device's bucket here: doing so let a client sustain more than
+    // FRAMES_PER_SECOND by reconnecting (or getting itself "replaced") rapidly, each time starting
+    // over with a full budget. The bucket instead persists across reconnects for as long as this
+    // object stays warm; only hibernation clears it, which is harmless (see the field doc above).
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server, [deviceId]);
@@ -163,7 +167,7 @@ export class UserHub extends DurableObject<Env> {
    */
   private async markOffline(deviceId: string): Promise<void> {
     if (this.socketsOf(deviceId).length > 0) return;
-    this.buckets.delete(deviceId);
+    // The bucket is kept here too (see fetch()): a full disconnect+reconnect must not refill it.
     this.broadcast(encodePresence(deviceId, false), deviceId);
     try {
       await this.env.DB.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").bind(Date.now(), deviceId).run();

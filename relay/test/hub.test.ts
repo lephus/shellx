@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub";
 import { encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
+import { buildHubHeaders } from "../src/routes/ws";
 import {
   call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, type TestApp, waitFor,
 } from "./helpers";
@@ -38,16 +40,65 @@ describe("GET /v1/ws", () => {
     }
   });
 
-  it("identifies the connection by the token's device, ignoring spoofed X-Shellx-* headers from the client", async () => {
+  it("buildHubHeaders forwards only the allowlisted upgrade headers, never arbitrary client headers", () => {
+    // A hostile client's raw request: real upgrade headers, plus a session cookie, a forwarded-for
+    // header, a made-up header, and a duplicate-cased spoof attempt at the hub's own identity headers.
+    const clientHeaders = new Headers([
+      ["Upgrade", "websocket"],
+      ["Connection", "Upgrade"],
+      ["Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="],
+      ["Sec-WebSocket-Version", "13"],
+      ["Cookie", "session=abc123"],
+      ["X-Forwarded-For", "203.0.113.7"],
+      ["X-Evil", "haxx"],
+      ["Authorization", "Bearer should-never-be-forwarded"],
+      // lower-cased on purpose: Headers is case-insensitive, so this is the same header as
+      // DEVICE_ID_HEADER ("X-Shellx-Device-Id") — proves case doesn't let a spoof slip through.
+      ["x-shellx-device-id", "11111111-1111-1111-1111-111111111111"],
+      ["X-Shellx-Device-Kind", "agent"],
+    ]);
+    const auth = { deviceId: "22222222-2222-2222-2222-222222222222", kind: "mobile" as const };
+
+    const headers = buildHubHeaders(clientHeaders, auth);
+
+    // Allowlisted upgrade headers pass through unchanged.
+    expect(headers.get("Upgrade")).toBe("websocket");
+    expect(headers.get("Connection")).toBe("Upgrade");
+    expect(headers.get("Sec-WebSocket-Key")).toBe("dGhlIHNhbXBsZSBub25jZQ==");
+    expect(headers.get("Sec-WebSocket-Version")).toBe("13");
+    // Not sent by the client, so absent (not merely empty).
+    expect(headers.has("Sec-WebSocket-Protocol")).toBe(false);
+    expect(headers.has("Sec-WebSocket-Extensions")).toBe(false);
+
+    // Identity headers come from the validated token, not the client's spoof attempt.
+    expect(headers.get(DEVICE_ID_HEADER)).toBe(auth.deviceId);
+    expect(headers.get(DEVICE_KIND_HEADER)).toBe(auth.kind);
+
+    // Everything else the client sent is gone, including Authorization and the spoofed identity.
+    expect(headers.has("Cookie")).toBe(false);
+    expect(headers.has("X-Forwarded-For")).toBe(false);
+    expect(headers.has("X-Evil")).toBe(false);
+    expect(headers.has("Authorization")).toBe(false);
+
+    // Exhaustive: exactly these six headers reach the hub, nothing more.
+    expect([...headers.keys()].sort()).toEqual(
+      ["connection", "sec-websocket-key", "sec-websocket-version", "upgrade", "x-shellx-device-id", "x-shellx-device-kind"],
+    );
+  });
+
+  it("integration: an upgrade carrying hostile extra headers still connects and identifies the token's device", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();
     const a = await connect(app, agent.token);
     await a.expectSilence(100);
 
-    // A client connecting with mobile's token but claiming (via headers) to be the agent device.
+    // A client connecting with mobile's token, sending a cookie, a spoofed device id/kind, and
+    // claiming (via headers) to be the agent device — buildHubHeaders is what actually stops this;
+    // this end-to-end check just confirms the wiring still works after the refactor.
     const res = await call(app, "GET", "/v1/ws", {
       token: mobile.token,
       headers: {
         Upgrade: "websocket",
+        Cookie: "session=abc123",
         "X-Shellx-Device-Id": agent.deviceId,
         "X-Shellx-Device-Kind": "agent",
       },
