@@ -11,7 +11,13 @@ const testDeviceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 class FakeRelayHttp {
   String minMobile = '1.0.0';
   bool versionOffline = false;
+
+  /// `GET /v1/version` answers only once this completes.
+  Completer<void>? versionGate;
   Map<String, Object?>? loginError;
+
+  /// `POST /v1/auth/login` and `/v1/auth/register` answer only once this completes.
+  Completer<void>? loginGate;
   bool logoutOffline = false;
 
   /// `POST /v1/auth/logout` answers only once this completes (never, if it never does).
@@ -31,6 +37,8 @@ class FakeRelayHttp {
     final path = request.url.path;
     if (path == '/v1/version') {
       if (versionOffline) throw http.ClientException('offline');
+      final gate = versionGate;
+      if (gate != null) await gate.future;
       return http.Response(
         jsonEncode({
           'min_agent': '1.0.0',
@@ -45,6 +53,8 @@ class FakeRelayHttp {
       );
     }
     if (path == '/v1/auth/login' || path == '/v1/auth/register') {
+      final gate = loginGate;
+      if (gate != null) await gate.future;
       final error = loginError;
       if (error != null) return http.Response(jsonEncode({'error': error}), error['status'] as int);
       return http.Response(

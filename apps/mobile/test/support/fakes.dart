@@ -251,7 +251,8 @@ class FakeMachineSession implements MachineSession {
 /// - requests do not connect first, and `attach` of an unknown id succeeds (real:
 ///   `AppErrorException(sessionNotFound)`);
 /// - [resume] emits `connected` even when not suspended;
-/// - [dispose] only sets [disposed] (and counts [disposeCalls]);
+/// - [dispose] only sets [disposed] (and counts [disposeCalls]); [disposeGate] holds its future
+///   back like a relay dial still settling, [disposeError] then makes it fail;
 /// - [pair] neither calls [devices] nor drops the machine's channel;
 /// - after `untrusted`, pairing again gives a fresh session (real: the same session, still
 ///   [MachineFailed]);
@@ -289,6 +290,16 @@ class FakeBackend implements ShellxBackend {
   int resumeCalls = 0;
   int disposeCalls = 0;
   bool disposed = false;
+
+  /// [dispose] completes only once this does (real: `RelayConnection.stop()` waits up to 15 s for
+  /// a dial in flight).
+  Completer<void>? disposeGate;
+
+  /// Thrown by [dispose] after it disposed (and after [disposeGate]).
+  Object? disposeError;
+
+  /// Thrown by [resume] instead of reconnecting (real: e.g. a Keychain error loading the pins).
+  Object? resumeError;
 
   void emitRelay(RelayConnectionState state) {
     relayStateValue = state;
@@ -336,6 +347,8 @@ class FakeBackend implements ShellxBackend {
   @override
   Future<void> resume() async {
     resumeCalls++;
+    final error = resumeError;
+    if (error != null) throw error;
     emitRelay(RelayConnectionState.connected);
   }
 
@@ -383,6 +396,10 @@ class FakeBackend implements ShellxBackend {
   Future<void> dispose() async {
     disposeCalls++;
     disposed = true;
+    final gate = disposeGate;
+    if (gate != null) await gate.future;
+    final error = disposeError;
+    if (error != null) throw error;
   }
 }
 

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -31,6 +34,19 @@ void main() {
     final offline = gate('1.0.0');
     await offline.check();
     expect(offline.requiredVersion.value, isNull);
+  });
+
+  test('a /v1/version that never answers holds the launch for 5 s at most', () {
+    fakeAsync((async) {
+      relay.versionGate = Completer<void>();
+      final hanging = gate('1.0.0');
+      var done = false;
+      unawaited(hanging.check().then((_) => done = true));
+
+      async.elapse(const Duration(seconds: 5));
+      expect(done, isTrue);
+      expect(hanging.requiredVersion.value, isNull);
+    });
   });
 
   test('a min_mobile that is not a version does not block the app', () async {

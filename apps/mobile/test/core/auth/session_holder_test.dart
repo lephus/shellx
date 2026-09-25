@@ -196,7 +196,7 @@ void main() {
     expect((events.single as SignedOutEvent).reason, SignOutReason.loggedOut);
   });
 
-  test('a second logout, or a 4002, during a sign-out joins it: one sign-out, one dispose', () async {
+  test('a second logout during a sign-out joins it: one sign-out, one dispose', () async {
     await saveSession();
     relay.logoutGate = Completer<void>();
     final session = holder();
@@ -206,7 +206,6 @@ void main() {
     final first = session.logout();
     await pumpEventQueue();
     final second = session.logout();
-    backend.emitRelay(RelayConnectionState.revoked);
     expect(second, same(first));
 
     relay.logoutGate!.complete();
@@ -233,6 +232,114 @@ void main() {
     expect(logoutRequests(), isEmpty);
     expect(session.signOutReason.value, SignOutReason.revoked);
     expect(events.whereType<SignedOutEvent>().map((e) => e.reason), [SignOutReason.revoked]);
+  });
+
+  test('the re-entrancy guard resets: sign out, sign in, sign out again', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+
+    await session.logout();
+    await session.login('a@b.co', 'correct horse');
+    await session.logout();
+
+    expect(backends.backends, hasLength(2));
+    expect(backends.backends.map((b) => b.disposeCalls), [1, 1]);
+    expect(logoutRequests(), hasLength(2));
+    expect(session.isAuthenticated.value, isFalse);
+    expect(events.map((e) => e.runtimeType), [SignedOutEvent, SignedInEvent, SignedOutEvent]);
+  });
+
+  test('the saved token is deleted without waiting for the relay to settle', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+    final backend = backends.backends.single..disposeGate = Completer<void>();
+
+    final signingOut = session.logout();
+    await pumpEventQueue();
+
+    // A dial in flight may hold dispose() for 15 s; a kill now still comes back signed out.
+    expect(backend.disposeCalls, 1);
+    expect(await store.read(AuthStorage.tokenKey), isNull);
+    expect(logoutRequests(), hasLength(1));
+    // Signed out only once the old relay has settled, so a new sign-in's dial is never raced.
+    expect(session.isAuthenticated.value, isTrue);
+    expect(events, isEmpty);
+
+    backend.disposeGate!.complete();
+    await signingOut;
+    expect(session.isAuthenticated.value, isFalse);
+    expect((events.single as SignedOutEvent).reason, SignOutReason.loggedOut);
+  });
+
+  test('a dispose that throws still completes the sign-out of a 4002', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+    final backend = backends.backends.single..disposeError = StateError('stop failed');
+
+    backend.emitRelay(RelayConnectionState.revoked);
+    await pumpEventQueue();
+
+    expect(await store.read(AuthStorage.tokenKey), isNull);
+    expect(session.isAuthenticated.value, isFalse);
+    expect((events.single as SignedOutEvent).reason, SignOutReason.revoked);
+  });
+
+  test('a login during a sign-out waits for it; the new session survives', () async {
+    await saveSession();
+    relay.logoutGate = Completer<void>();
+    final session = holder();
+    await session.restore();
+    final old = backends.backends.single;
+
+    final signingOut = session.logout();
+    await pumpEventQueue();
+    final login = session.login('a@b.co', 'correct horse');
+    await pumpEventQueue();
+    expect(backends.backends, [old]);
+
+    relay.logoutGate!.complete();
+    await signingOut;
+    await login;
+
+    final fresh = backends.backends.last;
+    expect(fresh, isNot(same(old)));
+    expect(fresh.disposed, isFalse);
+    expect(session.requireBackend, same(fresh));
+    expect(session.isAuthenticated.value, isTrue);
+    expect(api.token, 'token-1');
+    expect(await store.read(AuthStorage.tokenKey), 'token-1');
+    expect(events.map((e) => e.runtimeType), [SignedOutEvent, SignedInEvent]);
+  });
+
+  test('a sign-in that completes during a sign-out is not wiped by it', () async {
+    await saveSession();
+    relay
+      ..loginGate = Completer<void>()
+      ..logoutGate = Completer<void>();
+    final session = holder();
+    await session.restore();
+    final old = backends.backends.single;
+
+    final login = session.login('a@b.co', 'correct horse');
+    await pumpEventQueue();
+    final signingOut = session.logout();
+    await pumpEventQueue();
+    relay.loginGate!.complete();
+    await login;
+    relay.logoutGate!.complete();
+    await signingOut;
+
+    final fresh = backends.backends.last;
+    expect(old.disposed, isTrue);
+    expect(fresh, isNot(same(old)));
+    expect(fresh.disposed, isFalse);
+    expect(session.requireBackend, same(fresh));
+    expect(session.isAuthenticated.value, isTrue);
+    expect(api.token, 'token-1');
+    expect(events.map((e) => e.runtimeType), [SignedInEvent]);
   });
 
   test('close code 4002 (revoked) deletes the token and signs out (spec §12)', () async {
@@ -294,6 +401,24 @@ void main() {
     expect(backend.suspendCalls, 0);
     expect(backend.resumeCalls, 0);
     expect(backend.reconnectCalls, 0);
+  });
+
+  test('a resume that fails is logged, and the next foreground tries again', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+    final backend = backends.backends.single..resumeError = StateError('keychain');
+
+    session.onBackground();
+    session.onForeground();
+    await pumpEventQueue();
+    expect(backend.resumeCalls, 1);
+
+    backend.resumeError = null;
+    session.onForeground();
+    await pumpEventQueue();
+    expect(backend.resumeCalls, 2);
+    expect(backend.relayState, RelayConnectionState.connected);
   });
 
   test('foreground without a background skips the backoff of a disconnected relay', () async {
@@ -369,6 +494,45 @@ void main() {
 
       expect(session.signOutReason.value, SignOutReason.accountDeleted);
       expect(events.whereType<SignedOutEvent>().map((e) => e.reason), [SignOutReason.accountDeleted]);
+    });
+
+    test('the account data is forgotten without waiting for the relay to settle', () async {
+      await saveSession();
+      await store.write(DeviceIdentity.storageKey, 'private-key');
+      final session = holder();
+      await session.restore();
+      final backend = backends.backends.single..disposeGate = Completer<void>();
+
+      final deletion = session.deleteAccount('correct horse');
+      await pumpEventQueue();
+
+      expect(backend.disposeCalls, 1);
+      expect(await store.read(AuthStorage.tokenKey), isNull);
+      expect(await store.read(DeviceIdentity.storageKey), isNull);
+      expect(events, isEmpty);
+
+      backend.disposeGate!.complete();
+      await deletion;
+      expect(session.isAuthenticated.value, isFalse);
+      expect((events.single as SignedOutEvent).reason, SignOutReason.accountDeleted);
+    });
+
+    test('during a sign-out it waits for it and sends nothing', () async {
+      await saveSession();
+      relay.logoutGate = Completer<void>();
+      final session = holder();
+      await session.restore();
+
+      final signingOut = session.logout();
+      await pumpEventQueue();
+      final deletion = session.deleteAccount('correct horse');
+      await pumpEventQueue();
+      relay.logoutGate!.complete();
+      await signingOut;
+      await deletion;
+
+      expect(relay.requests.where((r) => r.url.path == '/v1/account'), isEmpty);
+      expect(events.whereType<SignedOutEvent>().map((e) => e.reason), [SignOutReason.loggedOut]);
     });
 
     test('a lost response after the relay already revoked signs out as revoked and rethrows', () async {
