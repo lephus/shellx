@@ -24,6 +24,14 @@ final DynamicLibrary _dylib = () {
 
 final _bindings = FlutterPtyBindings(_dylib);
 
+// ShellX: native functions added by the ShellX patches (SHELLX_PATCHES.md).
+// Looked up on first use; pty_kill exists on Windows only.
+final _ptyRelease = _dylib.lookupFunction<Void Function(Pointer<PtyHandle>),
+    void Function(Pointer<PtyHandle>)>('pty_release');
+
+final _ptyKill = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
+    int Function(Pointer<PtyHandle>)>('pty_kill');
+
 final _init = () {
   return _bindings.Dart_InitializeApiDL(NativeApi.initializeApiDLData);
 }();
@@ -117,12 +125,37 @@ class Pty {
 
     _handle = _bindings.pty_create(options);
 
+    // ShellX: pty_create has copied what it needs (the POSIX child has its
+    // own copy since fork), so free the native strings instead of leaking
+    // them on every spawn.
+    for (var i = 0; i <= arguments.length; i++) {
+      malloc.free(argv[i]);
+    }
+    calloc.free(argv);
+    for (var i = 0; i < effectiveEnv.length; i++) {
+      malloc.free(envp[i]);
+    }
+    calloc.free(envp);
+    malloc.free(options.ref.executable);
+    if (options.ref.working_directory != nullptr) {
+      malloc.free(options.ref.working_directory);
+    }
+
     calloc.free(options);
 
     if (_handle == nullptr) {
+      // ShellX: nothing will ever arrive on the ports.
+      _stdoutPort.close();
+      _exitPort.close();
       throw StateError('Failed to create PTY: ${_getPtyError()}');
     }
 
+    pid = _bindings.pty_getpid(_handle);
+
+    // ShellX: the native reader posts a null once the output has ended; the
+    // stream closes then, not when the exit code arrives, so the tail of the
+    // output is not dropped.
+    _stdoutPort.listen(_onOutput);
     _exitPort.first.then(_onExitCode);
   }
 
@@ -134,9 +167,20 @@ class Pty {
 
   late final Pointer<PtyHandle> _handle;
 
+  final _output = StreamController<Uint8List>();
+
+  bool _exited = false;
+
+  bool _outputEnded = false;
+
+  bool _released = false;
+
   /// The output stream from the pseudo-terminal. Note that pseudo-terminals
   /// do not distinguish between stdout and stderr.
-  Stream<Uint8List> get output => _stdoutPort.cast();
+  ///
+  /// ShellX: closes once every process that had the terminal open has closed
+  /// it (end of file), which is normally right after the process exits.
+  Stream<Uint8List> get output => _output.stream;
 
   /// A `Future` which completes with the exit code of the process
   /// when the process completes.
@@ -167,10 +211,14 @@ class Pty {
   Future<int> get exitCode => _exitCodeCompleter.future;
 
   /// The process id of the process running in the pseudo-terminal.
-  int get pid => _bindings.pty_getpid(_handle);
+  ///
+  /// ShellX: read once at start, so it stays valid after the native handle
+  /// is released.
+  late final int pid;
 
   /// Write data to the pseudo-terminal.
   void write(Uint8List data) {
+    if (_released) return;
     final buf = malloc<Int8>(data.length);
     buf.asTypedList(data.length).setAll(0, data);
     _bindings.pty_write(_handle, buf.cast(), data.length);
@@ -179,6 +227,7 @@ class Pty {
 
   /// Resize the pseudo-terminal.
   void resize(int rows, int cols) {
+    if (_released) return;
     _bindings.pty_resize(_handle, rows, cols);
   }
 
@@ -187,7 +236,18 @@ class Pty {
   /// When possible, [signal] will be sent to the process. This includes
   /// Linux and OS X. The default signal is [ProcessSignal.sigterm]
   /// which will normally terminate the process.
+  ///
+  /// ShellX: on Windows this terminates the job object the process was
+  /// started in: the process and every process it started ([signal] is
+  /// ignored). Once the process has exited this returns false without
+  /// signalling (POSIX: its pid may have been reused; Windows: releasing the
+  /// handle already ended whatever was left in the job).
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    if (Platform.isWindows) {
+      if (_released) return false;
+      return _ptyKill(_handle) != 0;
+    }
+    if (_exited) return false;
     return Process.killPid(pid, signal);
   }
 
@@ -195,13 +255,35 @@ class Pty {
   /// This is needed when ackRead is set to true as the pty will wait for this signal to happen
   /// before any additional data is sent.
   void ackRead() {
+    if (_released) return;
     _bindings.pty_ack_read(_handle);
   }
 
-  void _onExitCode(dynamic exitCode) {
+  void _onOutput(dynamic message) {
+    if (message is Uint8List) {
+      _output.add(message);
+      return;
+    }
+    // ShellX: null from the native reader: end of output.
     _stdoutPort.close();
+    _output.close();
+    _outputEnded = true;
+    _releaseWhenDone();
+  }
+
+  void _onExitCode(dynamic exitCode) {
     _exitPort.close();
+    _exited = true;
     _exitCodeCompleter.complete(exitCode);
+    _releaseWhenDone();
+  }
+
+  /// ShellX: frees the native handle (POSIX: the master fd; Windows: the job
+  /// object and pipes) once neither native thread can touch it any more.
+  void _releaseWhenDone() {
+    if (_released || !_exited || !_outputEnded) return;
+    _released = true;
+    _ptyRelease(_handle);
   }
 }
 

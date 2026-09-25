@@ -1,4 +1,5 @@
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +43,9 @@ typedef struct ReadLoopOptions
 
 char *error_message = NULL;
 
+// ShellX: pty_error() returns this, with errno, instead of always NULL.
+static char error_buffer[128];
+
 static void *read_loop(void *arg)
 {
     ReadLoopOptions *options = (ReadLoopOptions *)arg;
@@ -58,14 +62,23 @@ static void *read_loop(void *arg)
         }
         ssize_t n = read(options->fd, buffer, sizeof(buffer));
 
-        if (n < 0)
+        if (n < 0 && errno == EINTR)
         {
-            // TODO: handle error
-            break;
+            if (options->waitForReadAck)
+            {
+                pthread_mutex_unlock(options->mutex);
+            }
+            continue;
         }
 
-        if (n == 0)
+        // ShellX: EOF (0) or EIO (-1): every process that had the slave open
+        // has closed it.
+        if (n <= 0)
         {
+            if (options->waitForReadAck)
+            {
+                pthread_mutex_unlock(options->mutex);
+            }
             break;
         }
 
@@ -77,6 +90,16 @@ static void *read_loop(void *arg)
 
         Dart_PostCObject_DL(options->port, &result);
     }
+
+    // ShellX: tell Dart the output has ended (a null message), so it closes
+    // the stream only after the last chunk. The handle (options->mutex) may be
+    // released as soon as Dart has this and the exit code: no access to it
+    // from here on.
+    Dart_CObject end;
+    end.type = Dart_CObject_kNull;
+    Dart_PostCObject_DL(options->port, &end);
+
+    free(options);
 
     return NULL;
 }
@@ -95,7 +118,15 @@ static void start_read_thread(int fd, Dart_Port port, pthread_mutex_t *mutex, bo
 
     pthread_t _thread;
 
-    pthread_create(&_thread, NULL, &read_loop, options);
+    // ShellX: detached, so the thread's resources are freed when it ends.
+    if (pthread_create(&_thread, NULL, &read_loop, options) == 0)
+    {
+        pthread_detach(_thread);
+    }
+    else
+    {
+        free(options);
+    }
 }
 
 typedef struct WaitExitOptions
@@ -110,11 +141,23 @@ static void *wait_exit_thread(void *arg)
 {
     WaitExitOptions *options = (WaitExitOptions *)arg;
 
-    int status;
+    int status = 0;
 
-    waitpid(options->pid, &status, 0);
+    pid_t waited;
 
-    if (WIFEXITED(status))
+    do
+    {
+        waited = waitpid(options->pid, &status, 0);
+    } while (waited < 0 && errno == EINTR);
+
+    if (waited < 0)
+    {
+        // ShellX: someone else reaped the process (dart:io's exit code thread
+        // calls wait() for any child while a Process it started is running).
+        // It has exited but its code is lost; still report the exit.
+        Dart_PostInteger_DL(options->port, -1);
+    }
+    else if (WIFEXITED(status))
     {
         Dart_PostInteger_DL(options->port, WEXITSTATUS(status));
     }
@@ -122,6 +165,12 @@ static void *wait_exit_thread(void *arg)
     {
         Dart_PostInteger_DL(options->port, -WTERMSIG(status));
     }
+    else
+    {
+        Dart_PostInteger_DL(options->port, -1);
+    }
+
+    free(options);
 
     return NULL;
 }
@@ -136,7 +185,14 @@ static void start_wait_exit_thread(int pid, Dart_Port port)
 
     pthread_t _thread;
 
-    pthread_create(&_thread, NULL, &wait_exit_thread, options);
+    if (pthread_create(&_thread, NULL, &wait_exit_thread, options) == 0)
+    {
+        pthread_detach(_thread);
+    }
+    else
+    {
+        free(options);
+    }
 }
 
 static void set_environment(char **environment)
@@ -162,12 +218,14 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     int ptm;
 
-    int pid = pty_forkpty(&ptm, NULL, NULL, &ws);
+    int pts;
+
+    int pid = pty_forkpty(&ptm, &pts, NULL, &ws);
 
     if (pid < 0)
     {
-        error_message = "pty_forkpty failed";
-        perror("pty_forkpty");
+        snprintf(error_buffer, sizeof(error_buffer), "pty_forkpty failed (errno %d)", errno);
+        error_message = error_buffer;
         return NULL;
     }
 
@@ -180,13 +238,16 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
             chdir(options->working_directory);
         }
 
-        int ok = execvp(options->executable, options->arguments);
+        execvp(options->executable, options->arguments);
 
-        if (ok < 0)
-        {
-            perror("execvp");
-        }
+        // ShellX: never fall through into the parent's code in the child.
+        perror("execvp");
+        _exit(127);
     }
+
+    // ShellX: the parent never uses the slave. Keeping it open leaked it and
+    // meant reading the master could never reach end of file.
+    close(pts);
 
     PtyHandle *handle = (PtyHandle *)malloc(sizeof(PtyHandle));
 
@@ -233,5 +294,12 @@ FFI_PLUGIN_EXPORT int pty_getpid(PtyHandle *handle)
 
 FFI_PLUGIN_EXPORT char *pty_error(void)
 {
-    return NULL;
+    return error_message;
+}
+
+FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle)
+{
+    close(handle->ptm);
+    pthread_mutex_destroy(&handle->mutex);
+    free(handle);
 }

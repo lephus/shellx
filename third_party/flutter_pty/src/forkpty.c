@@ -14,17 +14,18 @@ pid_t pty_forkpty(
     const struct termios *termp,
     const struct winsize *winp)
 {
-    int ptm = open("/dev/ptmx", O_RDWR | O_NOCTTY);
+    // ShellX: O_CLOEXEC on both ends, set atomically, so no process started
+    // by another thread (or by a later session) inherits them.
+    int ptm = open("/dev/ptmx", O_RDWR | O_NOCTTY | O_CLOEXEC);
 
     if (ptm < 0)
     {
         return -1;
     }
 
-    fcntl(ptm, F_SETFD, FD_CLOEXEC);
-
     if (grantpt(ptm) || unlockpt(ptm))
     {
+        close(ptm);
         return -1;
     }
 
@@ -32,12 +33,14 @@ pid_t pty_forkpty(
 
     if ((devname = ptsname(ptm)) == NULL)
     {
+        close(ptm);
         return -1;
     }
 
-    int pts = open(devname, O_RDWR | O_NOCTTY);
+    int pts = open(devname, O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (pts < 0)
     {
+        close(ptm);
         return -1;
     }
 
@@ -55,14 +58,17 @@ pid_t pty_forkpty(
 
     if (pid < 0)
     {
+        close(pts);
+        close(ptm);
         return -1;
     }
 
     if (pid == 0)
     {
         setsid();
+        // ShellX: _exit, not exit: this is a fork of a multi-threaded process.
         if (ioctl(pts, TIOCSCTTY, (char *)NULL) == -1)
-            exit(-1);
+            _exit(1);
 
         dup2(pts, STDIN_FILENO);
         dup2(pts, STDOUT_FILENO);

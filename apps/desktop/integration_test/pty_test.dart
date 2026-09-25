@@ -174,6 +174,116 @@ void main() {
     await transcript.done.timeout(const Duration(seconds: 2));
   });
 
+  testWidgets('output written right before the shell exits is delivered', (
+    tester,
+  ) async {
+    final pty = factory.spawn(
+      shell,
+      workingDirectory: _home,
+      environment: _environment(),
+      cols: 80,
+      rows: 24,
+    );
+    addTearDown(pty.kill);
+    final transcript = Transcript(pty.output);
+    if (Platform.isWindows) {
+      _type(pty, r"1..2000 | % { 'line-' + $_ }; 'tail-' + (6*7); exit");
+    } else {
+      _type(
+        pty,
+        r'i=0; while [ $i -lt 2000 ]; do echo line-$i; i=$((i+1)); done; '
+        r'echo tail-$((6*7)); exit',
+      );
+    }
+    await pty.exitCode.timeout(const Duration(seconds: 15));
+    await transcript.done.timeout(const Duration(seconds: 2));
+    expect(transcript.lines, contains('tail-42'));
+  });
+
+  testWidgets(
+    'exitCode completes while a dart:io child process is running',
+    (tester) async {
+      // dart:io reaps any child while a Process it started runs (the agent
+      // keeps `caffeinate` running), which can take the shell's exit status.
+      final other = await Process.start('/bin/sleep', ['30']);
+      addTearDown(other.kill);
+      final pty = factory.spawn(
+        shell,
+        workingDirectory: _home,
+        environment: _environment(),
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(pty.kill);
+      final transcript = Transcript(pty.output);
+      _type(pty, 'exit 3');
+      final code = await pty.exitCode.timeout(const Duration(seconds: 15));
+      expect(code, anyOf(3, -1));
+      await transcript.done.timeout(const Duration(seconds: 2));
+    },
+    skip: Platform.isWindows,
+  );
+
+  testWidgets('finished sessions leave no file descriptors behind', (
+    tester,
+  ) async {
+    // Pseudo-terminal descriptors of this process as "fd name" (lsof): the
+    // master is /dev/ptmx, a slave /dev/ttysNNN or, once its session has
+    // ended, "(revoked)".
+    Set<String> ptyFds() {
+      final result = Process.runSync('/usr/sbin/lsof', [
+        '-p',
+        '$pid',
+        '-F',
+        'fn',
+      ]);
+      final fds = <String>{};
+      String? fd;
+      for (final line in const LineSplitter().convert(
+        result.stdout as String,
+      )) {
+        if (line.startsWith('f')) {
+          fd = int.tryParse(line.substring(1)) == null
+              ? null
+              : line.substring(1);
+        } else if (line.startsWith('n') && fd != null) {
+          final name = line.substring(1);
+          if (name == '/dev/ptmx' ||
+              name.startsWith('/dev/tty') ||
+              name == '(revoked)') {
+            fds.add('$fd $name');
+          }
+        }
+      }
+      return fds;
+    }
+
+    Future<void> runOne() async {
+      final pty = factory.spawn(
+        shell,
+        workingDirectory: _home,
+        environment: _environment(),
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(pty.kill);
+      final transcript = Transcript(pty.output);
+      _type(pty, 'exit');
+      await pty.exitCode.timeout(const Duration(seconds: 15));
+      await transcript.done.timeout(const Duration(seconds: 2));
+    }
+
+    await runOne();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final before = ptyFds();
+    for (var i = 0; i < 5; i++) {
+      await runOne();
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final added = ptyFds().difference(before);
+    expect(added, isEmpty);
+  }, skip: Platform.isWindows);
+
   testWidgets('resize(cols, rows) reaches the terminal', (tester) async {
     final pty = factory.spawn(
       shell,

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <Windows.h>
 
 #include "flutter_pty.h"
@@ -7,147 +9,165 @@
 #include "include/dart_api_dl.h"
 #include "include/dart_native_api.h"
 
+// ShellX: the command line, environment block and working directory arrive as
+// UTF-8 and are converted with MultiByteToWideChar (upstream widened every
+// byte on its own, which mangled any non-ASCII text).
+static LPWSTR utf8_to_wide(const char *text)
+{
+    int length = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
+
+    if (length <= 0)
+    {
+        return NULL;
+    }
+
+    LPWSTR wide = malloc(length * sizeof(WCHAR));
+
+    if (wide == NULL)
+    {
+        return NULL;
+    }
+
+    if (MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, length) != length)
+    {
+        free(wide);
+        return NULL;
+    }
+
+    return wide;
+}
+
+// ShellX: arguments[0] duplicates executable (the Dart side builds argv the
+// POSIX way), so it is skipped; upstream put the executable on the command
+// line twice. The executable and the arguments are written exactly as given:
+// the caller quotes them (CommandLineToArgvW rules).
 static LPWSTR build_command(char *executable, char **arguments)
 {
-    int command_length = 0;
+    size_t command_length = 0;
 
     if (executable != NULL)
     {
-        command_length += (int)strlen(executable);
+        command_length += strlen(executable);
     }
 
-    if (arguments != NULL)
+    if (arguments != NULL && arguments[0] != NULL)
     {
-        int i = 0;
+        int i = 1;
 
         while (arguments[i] != NULL)
         {
-            command_length += (int)strlen(arguments[i]) + 1;
+            command_length += strlen(arguments[i]) + 1;
             i++;
         }
     }
 
-    LPWSTR command = malloc((command_length + 1) * sizeof(WCHAR));
+    char *command = malloc(command_length + 1);
 
-    if (command != NULL)
+    if (command == NULL)
     {
-        int i = 0;
-
-        if (executable != NULL)
-        {
-            int j = 0;
-
-            while (executable[j] != 0)
-            {
-                command[i] = (WCHAR)executable[j];
-                i++;
-                j++;
-            }
-        }
-
-        if (arguments != NULL)
-        {
-            int j = 0;
-
-            while (arguments[j] != NULL)
-            {
-                command[i++] = ' ';
-
-                int k = 0;
-
-                while (arguments[j][k] != 0)
-                {
-                    command[i] = (WCHAR)arguments[j][k];
-                    i++;
-                    k++;
-                }
-
-                j++;
-            }
-        }
-
-        command[i] = 0;
+        return NULL;
     }
 
-    return command;
+    size_t length = 0;
+
+    if (executable != NULL)
+    {
+        memcpy(command, executable, strlen(executable));
+        length += strlen(executable);
+    }
+
+    if (arguments != NULL && arguments[0] != NULL)
+    {
+        int i = 1;
+
+        while (arguments[i] != NULL)
+        {
+            command[length++] = ' ';
+            memcpy(command + length, arguments[i], strlen(arguments[i]));
+            length += strlen(arguments[i]);
+            i++;
+        }
+    }
+
+    command[length] = 0;
+
+    LPWSTR wide = utf8_to_wide(command);
+
+    free(command);
+
+    return wide;
 }
 
 static LPWSTR build_environment(char **environment)
 {
-    LPWSTR environment_block = NULL;
-    int environment_block_length = 0;
+    size_t environment_block_length = 0;
 
-    if (environment != NULL)
+    int i = 0;
+
+    while (environment[i] != NULL)
     {
-        int i = 0;
+        int length = MultiByteToWideChar(CP_UTF8, 0, environment[i], -1, NULL, 0);
 
-        while (environment[i] != NULL)
+        if (length <= 0)
         {
-            environment_block_length += (int)strlen(environment[i]) + 1;
-            i++;
+            return NULL;
         }
+
+        environment_block_length += length;
+        i++;
     }
 
-    environment_block = malloc((environment_block_length + 1) * sizeof(WCHAR));
+    // Each entry ends with its own NUL; the block ends with one more. The
+    // extra element keeps an empty block double-NUL terminated.
+    LPWSTR environment_block = calloc(environment_block_length + 2, sizeof(WCHAR));
 
-    if (environment_block != NULL)
+    if (environment_block == NULL)
     {
-        int i = 0;
+        return NULL;
+    }
 
-        if (environment != NULL)
+    size_t offset = 0;
+
+    i = 0;
+
+    while (environment[i] != NULL)
+    {
+        int length = MultiByteToWideChar(CP_UTF8, 0, environment[i], -1, NULL, 0);
+
+        if (length <= 0 ||
+            MultiByteToWideChar(CP_UTF8, 0, environment[i], -1, environment_block + offset, length) != length)
         {
-            int j = 0;
-
-            while (environment[j] != NULL)
-            {
-                int k = 0;
-
-                while (environment[j][k] != 0)
-                {
-                    environment_block[i] = (WCHAR)environment[j][k];
-                    i++;
-                    k++;
-                }
-
-                environment_block[i++] = 0;
-
-                j++;
-            }
+            free(environment_block);
+            return NULL;
         }
 
-        environment_block[i] = 0;
+        offset += length;
+        i++;
     }
 
     return environment_block;
 }
 
-static LPWSTR build_working_directory(char *working_directory)
+typedef struct PtyHandle
 {
-    if (working_directory == NULL)
-    {
-        return NULL;
-    }
+    HANDLE inputWriteSide;
 
-    int working_directory_length = (int)strlen(working_directory);
+    // ShellX: closed by the exit thread as soon as the process exits;
+    // guarded by lock so pty_resize never uses a closed pseudo console.
+    HPCON hPty;
 
-    LPWSTR working_directory_block = malloc((working_directory_length + 1) * sizeof(WCHAR));
+    SRWLOCK lock;
 
-    if (working_directory_block == NULL)
-    {
-        return NULL;
-    }
+    // ShellX: job object holding the process and everything it starts.
+    HANDLE job;
 
-    int i = 0;
+    DWORD dwProcessId;
 
-    while (working_directory[i] != 0)
-    {
-        working_directory_block[i] = (WCHAR)working_directory[i++];
-    }
+    BOOL ackRead;
 
-    working_directory_block[i] = 0;
+    HANDLE hMutex;
 
-    return working_directory_block;
-}
+} PtyHandle;
 
 typedef struct ReadLoopOptions
 {
@@ -178,14 +198,20 @@ static DWORD WINAPI read_loop(LPVOID arg)
 
         BOOL ok = ReadFile(options->fd, buffer, sizeof(buffer), &readlen, NULL);
 
+        // ShellX: fails (ERROR_BROKEN_PIPE) once the pseudo console has been
+        // closed and conhost has written its last output.
         if (!ok)
         {
             break;
         }
 
-        if (readlen <= 0)
+        if (readlen == 0)
         {
-            break;
+            if (options->ackRead)
+            {
+                ReleaseSemaphore(options->hMutex, 1, NULL);
+            }
+            continue;
         }
 
         Dart_CObject result;
@@ -197,26 +223,18 @@ static DWORD WINAPI read_loop(LPVOID arg)
         Dart_PostCObject_DL(options->port, &result);
     }
 
+    // ShellX: the reader owns the read side of the output pipe. Then tell
+    // Dart the output has ended (a null message); the handle may be released
+    // as soon as Dart has this and the exit code.
+    CloseHandle(options->fd);
+
+    Dart_CObject end;
+    end.type = Dart_CObject_kNull;
+    Dart_PostCObject_DL(options->port, &end);
+
+    free(options);
+
     return 0;
-}
-
-static void start_read_thread(HANDLE fd, Dart_Port port, HANDLE mutex, BOOL ackRead)
-{
-    ReadLoopOptions *options = malloc(sizeof(ReadLoopOptions));
-
-    options->fd = fd;
-    options->port = port;
-    options->hMutex = mutex;
-    options->ackRead = ackRead;
-
-    DWORD thread_id;
-
-    HANDLE thread = CreateThread(NULL, 0, read_loop, options, 0, &thread_id);
-
-    if (thread == NULL)
-    {
-        free(options);
-    }
 }
 
 typedef struct WaitExitOptions
@@ -225,7 +243,8 @@ typedef struct WaitExitOptions
 
     Dart_Port port;
 
-    HANDLE hMutex;
+    PtyHandle *pty;
+
 } WaitExitOptions;
 
 static DWORD WINAPI wait_exit_thread(LPVOID arg)
@@ -239,195 +258,367 @@ static DWORD WINAPI wait_exit_thread(LPVOID arg)
     GetExitCodeProcess(options->pid, &exit_code);
 
     CloseHandle(options->pid);
-    CloseHandle(options->hMutex);
 
+    // ShellX: close the pseudo console once the process has exited, so conhost
+    // ends and the output pipe reaches end of file (upstream never closed it
+    // and leaked a conhost.exe per session). ClosePseudoConsole may wait for
+    // conhost to flush; the reader thread keeps draining meanwhile.
+    AcquireSRWLockExclusive(&options->pty->lock);
+    HPCON hPty = options->pty->hPty;
+    options->pty->hPty = NULL;
+    ReleaseSRWLockExclusive(&options->pty->lock);
+
+    if (hPty != NULL)
+    {
+        ClosePseudoConsole(hPty);
+    }
+
+    // Last access to the handle is above: once Dart has the exit code and the
+    // end of output it may release the handle.
     Dart_PostInteger_DL(options->port, exit_code);
+
+    free(options);
 
     return 0;
 }
 
-static void start_wait_exit_thread(HANDLE pid, Dart_Port port, HANDLE mutex)
-{
-    WaitExitOptions *options = malloc(sizeof(WaitExitOptions));
-
-    options->pid = pid;
-    options->port = port;
-    options->hMutex = mutex;
-
-    DWORD thread_id;
-
-    HANDLE thread = CreateThread(NULL, 0, wait_exit_thread, options, 0, &thread_id);
-
-    if (thread == NULL)
-    {
-        free(options);
-    }
-}
-
-typedef struct PtyHandle
-{
-    PHANDLE inputWriteSide;
-
-    PHANDLE outputReadSide;
-
-    HPCON hPty;
-
-    DWORD dwProcessId;
-
-    BOOL ackRead;
-
-    HANDLE hMutex;
-
-} PtyHandle;
-
 char *error_message = NULL;
 
+// ShellX: pty_error() reports the failing step with its Win32 error code.
+static char error_buffer[160];
+
+static void set_error(const char *what, DWORD code)
+{
+    snprintf(error_buffer, sizeof(error_buffer), "%s (error %lu)", what, (unsigned long)code);
+    error_message = error_buffer;
+}
+
+static void set_error_hresult(const char *what, HRESULT code)
+{
+    snprintf(error_buffer, sizeof(error_buffer), "%s (HRESULT 0x%08lx)", what, (unsigned long)code);
+    error_message = error_buffer;
+}
+
+// ShellX: rewritten for correctness; every failure path releases what was
+// created before it (upstream leaked the pseudo console, i.e. a conhost.exe,
+// and the pipes whenever a step failed).
+//
+// Order: pipes -> pseudo console -> job object -> process created suspended
+// -> process assigned to the job -> exit thread -> output reader -> resume.
+// The shell runs no instruction before the reader is running, which is what
+// upstream's Sleep(1000) on the calling (UI) thread tried to approximate; the
+// sleep is gone.
 FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 {
     HANDLE inputReadSide = NULL;
     HANDLE inputWriteSide = NULL;
-
     HANDLE outputReadSide = NULL;
     HANDLE outputWriteSide = NULL;
+    HPCON hPty = NULL;
+    HANDLE job = NULL;
+    HANDLE mutex = NULL;
+    LPWSTR command = NULL;
+    LPWSTR environment_block = NULL;
+    LPWSTR working_directory = NULL;
+    BOOL attributes_initialized = FALSE;
+    BOOL process_created = FALSE;
+    STARTUPINFOEXW startupInfo;
+    PROCESS_INFORMATION processInfo;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits;
+    SIZE_T bytesRequired = 0;
+    COORD size;
+    HRESULT result;
+    PtyHandle *pty = NULL;
+    ReadLoopOptions *readOptions = NULL;
+    WaitExitOptions *waitOptions = NULL;
+    HANDLE waitThread = NULL;
+    HANDLE readThread = NULL;
+
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    ZeroMemory(&processInfo, sizeof(processInfo));
+    ZeroMemory(&jobLimits, sizeof(jobLimits));
 
     if (!CreatePipe(&inputReadSide, &inputWriteSide, NULL, 0))
     {
-        error_message = "Failed to create input pipe";
-        return NULL;
+        set_error("Failed to create input pipe", GetLastError());
+        goto fail;
     }
 
     if (!CreatePipe(&outputReadSide, &outputWriteSide, NULL, 0))
     {
-        error_message = "Failed to create output pipe";
-        return NULL;
+        set_error("Failed to create output pipe", GetLastError());
+        goto fail;
     }
 
-    COORD size;
+    size.X = (SHORT)options->cols;
+    size.Y = (SHORT)options->rows;
 
-    size.X = options->cols;
-    size.Y = options->rows;
-
-    HPCON hPty;
-
-    HRESULT result = CreatePseudoConsole(size, inputReadSide, outputWriteSide, 0, &hPty);
+    result = CreatePseudoConsole(size, inputReadSide, outputWriteSide, 0, &hPty);
 
     if (FAILED(result))
     {
-        error_message = "Failed to create pseudo console";
-        return NULL;
+        hPty = NULL;
+        set_error_hresult("Failed to create pseudo console", result);
+        goto fail;
     }
 
-    STARTUPINFOEX startupInfo;
+    // The pseudo console has its own duplicates of these. Keeping ours open
+    // would keep the output pipe from ever reporting end of file.
+    CloseHandle(inputReadSide);
+    inputReadSide = NULL;
+    CloseHandle(outputWriteSide);
+    outputWriteSide = NULL;
 
-    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    command = build_command(options->executable, options->arguments);
+
+    if (command == NULL)
+    {
+        set_error("Failed to build the command line", GetLastError());
+        goto fail;
+    }
+
+    if (options->environment != NULL)
+    {
+        environment_block = build_environment(options->environment);
+
+        if (environment_block == NULL)
+        {
+            set_error("Failed to build the environment block", GetLastError());
+            goto fail;
+        }
+    }
+
+    if (options->working_directory != NULL && options->working_directory[0] != 0)
+    {
+        working_directory = utf8_to_wide(options->working_directory);
+
+        if (working_directory == NULL)
+        {
+            set_error("Failed to convert the working directory", GetLastError());
+            goto fail;
+        }
+    }
+
     startupInfo.StartupInfo.cb = sizeof(startupInfo);
-
     startupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
     startupInfo.StartupInfo.hStdInput = NULL;
     startupInfo.StartupInfo.hStdOutput = NULL;
     startupInfo.StartupInfo.hStdError = NULL;
 
-    SIZE_T bytesRequired;
     InitializeProcThreadAttributeList(NULL, 1, 0, &bytesRequired);
-    startupInfo.lpAttributeList = (PPROC_THREAD_ATTRIBUTE_LIST)malloc(bytesRequired);
+    startupInfo.lpAttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)malloc(bytesRequired);
 
-    BOOL ok = InitializeProcThreadAttributeList(startupInfo.lpAttributeList, 1, 0, &bytesRequired);
-
-    if (!ok)
+    if (startupInfo.lpAttributeList == NULL)
     {
-        error_message = "Failed to initialize proc thread attribute list";
-        return NULL;
+        set_error("Failed to allocate proc thread attribute list", ERROR_NOT_ENOUGH_MEMORY);
+        goto fail;
     }
 
-    ok = UpdateProcThreadAttribute(startupInfo.lpAttributeList,
+    if (!InitializeProcThreadAttributeList(startupInfo.lpAttributeList, 1, 0, &bytesRequired))
+    {
+        set_error("Failed to initialize proc thread attribute list", GetLastError());
+        goto fail;
+    }
+
+    attributes_initialized = TRUE;
+
+    if (!UpdateProcThreadAttribute(startupInfo.lpAttributeList,
                                    0,
                                    PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
                                    hPty,
                                    sizeof(hPty),
                                    NULL,
-                                   NULL);
-
-    if (!ok)
+                                   NULL))
     {
-        error_message = "Failed to update proc thread attribute list";
-        return NULL;
+        set_error("Failed to update proc thread attribute list", GetLastError());
+        goto fail;
     }
 
-    LPWSTR command = build_command(options->executable, options->arguments);
+    // ShellX: a job object that kills everything in it when its last handle
+    // closes: pty_kill terminates the whole tree, and nothing outlives the
+    // released pty (or the agent, if it crashes).
+    job = CreateJobObjectW(NULL, NULL);
 
-    LPWSTR environment_block = build_environment(options->environment);
+    if (job == NULL)
+    {
+        set_error("Failed to create job object", GetLastError());
+        goto fail;
+    }
 
-    LPWSTR working_directory = build_working_directory(options->working_directory);
+    jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 
-    PROCESS_INFORMATION processInfo;
-    ZeroMemory(&processInfo, sizeof(processInfo));
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)))
+    {
+        set_error("Failed to configure job object", GetLastError());
+        goto fail;
+    }
 
-    Sleep(1000);
-
-    ok = CreateProcessW(NULL,
+    // Suspended until it is in the job, so it cannot start a child outside it.
+    if (!CreateProcessW(NULL,
                         command,
                         NULL,
                         NULL,
                         FALSE,
-                        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+                        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,
                         environment_block,
                         working_directory,
                         &startupInfo.StartupInfo,
-                        &processInfo);
-
-    if (command != NULL)
+                        &processInfo))
     {
-        free(command);
+        set_error("Failed to create process", GetLastError());
+        goto fail;
     }
 
-    if (environment_block != NULL)
+    process_created = TRUE;
+
+    if (!AssignProcessToJobObject(job, processInfo.hProcess))
     {
-        free(environment_block);
+        set_error("Failed to assign process to job object", GetLastError());
+        goto fail;
     }
 
-    if (working_directory != NULL)
+    mutex = CreateSemaphoreW(NULL, 1, 1, NULL);
+
+    if (mutex == NULL)
     {
-        free(working_directory);
+        set_error("Failed to create semaphore", GetLastError());
+        goto fail;
     }
 
-    if (!ok)
+    pty = malloc(sizeof(PtyHandle));
+    readOptions = malloc(sizeof(ReadLoopOptions));
+    waitOptions = malloc(sizeof(WaitExitOptions));
+
+    if (pty == NULL || readOptions == NULL || waitOptions == NULL)
     {
-        error_message = "Failed to create process";
-        DWORD error = GetLastError();
-        printf("error no: %d\n", error);
-        return NULL;
-    }
-
-    // free(startupInfo.lpAttributeList);
-
-    // CloseHandle(processInfo.hThread);
-
-    HANDLE mutex = CreateSemaphore(
-        NULL, // default security attributes
-        1,    // initial count
-        1,    // maximum count
-        NULL);
-
-    start_read_thread(outputReadSide, options->stdout_port, mutex, options->ackRead);
-
-    start_wait_exit_thread(processInfo.hProcess, options->exit_port, mutex);
-
-    PtyHandle *pty = malloc(sizeof(PtyHandle));
-
-    if (pty == NULL)
-    {
-        error_message = "Failed to allocate pty handle";
-        return NULL;
+        set_error("Failed to allocate pty handle", ERROR_NOT_ENOUGH_MEMORY);
+        goto fail;
     }
 
     pty->inputWriteSide = inputWriteSide;
-    pty->outputReadSide = outputReadSide;
     pty->hPty = hPty;
+    InitializeSRWLock(&pty->lock);
+    pty->job = job;
     pty->dwProcessId = processInfo.dwProcessId;
     pty->ackRead = options->ackRead;
     pty->hMutex = mutex;
 
+    waitOptions->pid = processInfo.hProcess;
+    waitOptions->port = options->exit_port;
+    waitOptions->pty = pty;
+
+    readOptions->fd = outputReadSide;
+    readOptions->port = options->stdout_port;
+    readOptions->hMutex = mutex;
+    readOptions->ackRead = options->ackRead;
+
+    waitThread = CreateThread(NULL, 0, wait_exit_thread, waitOptions, 0, NULL);
+
+    if (waitThread == NULL)
+    {
+        set_error("Failed to start the exit thread", GetLastError());
+        goto fail;
+    }
+
+    readThread = CreateThread(NULL, 0, read_loop, readOptions, 0, NULL);
+
+    if (readThread == NULL)
+    {
+        set_error("Failed to start the output reader", GetLastError());
+
+        // The process never ran. Ending it lets the exit thread close the
+        // process handle and the pseudo console and free its options; closing
+        // the output read side first means conhost cannot block writing to it.
+        TerminateJobObject(job, 1);
+        CloseHandle(outputReadSide);
+        outputReadSide = NULL;
+        WaitForSingleObject(waitThread, INFINITE);
+        CloseHandle(waitThread);
+        CloseHandle(processInfo.hThread);
+        process_created = FALSE;
+        hPty = NULL;
+        waitOptions = NULL;
+        goto fail;
+    }
+
+    CloseHandle(waitThread);
+    CloseHandle(readThread);
+
+    if (ResumeThread(processInfo.hThread) == (DWORD)-1)
+    {
+        // Surfaces as an immediate exit with code 1.
+        TerminateJobObject(job, 1);
+    }
+
+    CloseHandle(processInfo.hThread);
+
+    DeleteProcThreadAttributeList(startupInfo.lpAttributeList);
+    free(startupInfo.lpAttributeList);
+    free(command);
+    free(environment_block);
+    free(working_directory);
+
     return pty;
+
+fail:
+    if (process_created)
+    {
+        TerminateProcess(processInfo.hProcess, 1);
+        CloseHandle(processInfo.hThread);
+        CloseHandle(processInfo.hProcess);
+    }
+
+    if (job != NULL)
+    {
+        CloseHandle(job);
+    }
+
+    // Close our read side before the pseudo console so a conhost with output
+    // left to write cannot block ClosePseudoConsole.
+    if (outputReadSide != NULL)
+    {
+        CloseHandle(outputReadSide);
+    }
+
+    if (hPty != NULL)
+    {
+        ClosePseudoConsole(hPty);
+    }
+
+    if (inputReadSide != NULL)
+    {
+        CloseHandle(inputReadSide);
+    }
+
+    if (inputWriteSide != NULL)
+    {
+        CloseHandle(inputWriteSide);
+    }
+
+    if (outputWriteSide != NULL)
+    {
+        CloseHandle(outputWriteSide);
+    }
+
+    if (mutex != NULL)
+    {
+        CloseHandle(mutex);
+    }
+
+    if (attributes_initialized)
+    {
+        DeleteProcThreadAttributeList(startupInfo.lpAttributeList);
+    }
+
+    free(startupInfo.lpAttributeList);
+    free(command);
+    free(environment_block);
+    free(working_directory);
+    free(pty);
+    free(readOptions);
+    free(waitOptions);
+
+    return NULL;
 }
 
 FFI_PLUGIN_EXPORT void pty_write(PtyHandle *handle, char *buffer, int length)
@@ -456,7 +647,18 @@ FFI_PLUGIN_EXPORT int pty_resize(PtyHandle *handle, int rows, int cols)
     size.X = cols;
     size.Y = rows;
 
-    return ResizePseudoConsole(handle->hPty, size);
+    HRESULT result = E_HANDLE;
+
+    AcquireSRWLockShared(&handle->lock);
+
+    if (handle->hPty != NULL)
+    {
+        result = ResizePseudoConsole(handle->hPty, size);
+    }
+
+    ReleaseSRWLockShared(&handle->lock);
+
+    return (int)result;
 }
 
 FFI_PLUGIN_EXPORT int pty_getpid(PtyHandle *handle)
@@ -467,4 +669,20 @@ FFI_PLUGIN_EXPORT int pty_getpid(PtyHandle *handle)
 FFI_PLUGIN_EXPORT char *pty_error()
 {
     return error_message;
+}
+
+FFI_PLUGIN_EXPORT int pty_kill(PtyHandle *handle)
+{
+    return TerminateJobObject(handle->job, 1) ? 1 : 0;
+}
+
+FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle)
+{
+    // The exit thread has closed the pseudo console and the process handle,
+    // and the reader the output pipe. KILL_ON_JOB_CLOSE ends any process
+    // still in the job.
+    CloseHandle(handle->job);
+    CloseHandle(handle->inputWriteSide);
+    CloseHandle(handle->hMutex);
+    free(handle);
 }
