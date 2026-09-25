@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
 import {
-  call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, type TestApp, waitFor,
+  call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, type TestApp, waitFor,
 } from "./helpers";
 
 const CH = Uint8Array.from([9, 8, 7, 6, 5, 4, 3, 2]);
@@ -36,6 +36,31 @@ describe("GET /v1/ws", () => {
       expect(res.webSocket).toBeNull();
       expect(await errorCode(res)).toBe("unauthorized");
     }
+  });
+
+  it("identifies the connection by the token's device, ignoring spoofed X-Shellx-* headers from the client", async () => {
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    await a.expectSilence(100);
+
+    // A client connecting with mobile's token but claiming (via headers) to be the agent device.
+    const res = await call(app, "GET", "/v1/ws", {
+      token: mobile.token,
+      headers: {
+        Upgrade: "websocket",
+        "X-Shellx-Device-Id": agent.deviceId,
+        "X-Shellx-Device-Kind": "agent",
+      },
+    });
+    if (res.status !== 101 || res.webSocket === null) throw new Error(`upgrade failed: ${res.status}`);
+    const m = new TestSocket(res.webSocket);
+
+    // Presence announces the token's real device (mobile), never the spoofed agent id.
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
+
+    // Frames it sends arrive at the peer sourced from the token's device, not the spoofed one.
+    m.send(encodeData(agent.deviceId, CH, Uint8Array.of(4, 9)));
+    expect(hex(await a.nextBinary())).toBe(hex(encodeData(mobile.deviceId, CH, Uint8Array.of(4, 9))));
   });
 });
 
@@ -155,6 +180,30 @@ describe("UserHub presence and routing", () => {
         .first<{ last_seen_at: number | null }>())?.last_seen_at,
     );
     expect(lastSeen).toBeGreaterThanOrEqual(before);
+  });
+
+  it("tolerates a failing last_seen_at write, logging metadata only and still announcing offline", async () => {
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    const m = await connect(app, mobile.token);
+    await m.nextBinary();
+    await a.nextBinary();
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    vi.spyOn(env.DB, "prepare").mockImplementation(() => {
+      throw new Error("D1 is down");
+    });
+
+    m.close();
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, false)));
+
+    const output = lines.join("\n");
+    expect(output).toContain("last_seen_write_failed");
+    expect(output).toContain(mobile.deviceId);
+    expect(output).not.toContain("D1 is down");
   });
 
   it("logs frame metadata but never the payload", async () => {

@@ -165,7 +165,12 @@ export class UserHub extends DurableObject<Env> {
     if (this.socketsOf(deviceId).length > 0) return;
     this.buckets.delete(deviceId);
     this.broadcast(encodePresence(deviceId, false), deviceId);
-    await this.env.DB.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").bind(Date.now(), deviceId).run();
+    try {
+      await this.env.DB.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").bind(Date.now(), deviceId).run();
+    } catch {
+      // Best-effort bookkeeping: a D1 outage must not stop the hub from routing/presence.
+      logMeta("last_seen_write_failed", { device_id: deviceId });
+    }
   }
 
   /** Open, not-being-closed sockets of one device (normally zero or one). */
