@@ -98,28 +98,37 @@ NativePty startFlutterPty(PtyLaunch launch) {
 final class FlutterPtyFactory implements PtyFactory {
   /// [killer] is used on macOS only (default [PosixProcessTreeKiller]).
   /// [onError] receives kill failures (pid and reason only; default:
-  /// `debugPrint`).
+  /// `debugPrint`). [onProblem] receives the same events as just the shell's
+  /// pid, for telling the user that processes may be left behind.
   FlutterPtyFactory({
     required bool isWindows,
     ProcessTreeKiller? killer,
     NativePtyStarter start = startFlutterPty,
     Duration outputGrace = const Duration(milliseconds: 500),
     void Function(String message)? onError,
+    void Function(int pid)? onProblem,
   }) : _isWindows = isWindows,
        _killer = isWindows ? null : killer ?? PosixProcessTreeKiller(),
        _start = start,
        _outputGrace = outputGrace,
-       _onError = onError ?? FlutterPtyAdapter.debugPrintError;
+       _onError = onError ?? FlutterPtyAdapter.debugPrintError,
+       _onProblem = onProblem;
 
   factory FlutterPtyFactory.forCurrentPlatform({
     void Function(String message)? onError,
-  }) => FlutterPtyFactory(isWindows: Platform.isWindows, onError: onError);
+    void Function(int pid)? onProblem,
+  }) => FlutterPtyFactory(
+    isWindows: Platform.isWindows,
+    onError: onError,
+    onProblem: onProblem,
+  );
 
   final bool _isWindows;
   final ProcessTreeKiller? _killer;
   final NativePtyStarter _start;
   final Duration _outputGrace;
   final void Function(String message) _onError;
+  final void Function(int pid)? _onProblem;
   bool _reportedNoJob = false;
 
   /// Tree kills started by this factory's ptys that have not finished yet.
@@ -193,12 +202,14 @@ final class FlutterPtyFactory implements PtyFactory {
         'pid ${native.pid} started without a job object '
         '(error ${native.jobError}): kill() ends the shell only',
       );
+      _onProblem?.call(native.pid);
     }
     return FlutterPtyAdapter(
       native,
       killer: _killer,
       outputGrace: _outputGrace,
       onError: _onError,
+      onProblem: _onProblem,
       onKillStarted: _trackKill,
     );
   }
@@ -219,7 +230,8 @@ final class FlutterPtyFactory implements PtyFactory {
 /// pty right after the exit, and what the shell left behind then keeps
 /// running (on both platforms). Kill failures never throw: they go to
 /// [onError] as `kill of pid <pid> failed: <reason>` — never output,
-/// arguments or environment. Each tree kill (a Future that never fails) is
+/// arguments or environment — and to [onProblem] as the pid alone (what the
+/// user is shown). Each tree kill (a Future that never fails) is
 /// handed to [onKillStarted] so its owner can wait for it
 /// ([FlutterPtyFactory.killsSettled]).
 final class FlutterPtyAdapter implements Pty {
@@ -228,9 +240,11 @@ final class FlutterPtyAdapter implements Pty {
     ProcessTreeKiller? killer,
     this.outputGrace = const Duration(milliseconds: 500),
     void Function(String message)? onError,
+    void Function(int pid)? onProblem,
     void Function(Future<void> kill)? onKillStarted,
   }) : _killer = killer,
        _onError = onError ?? debugPrintError,
+       _onProblem = onProblem,
        _onKillStarted = onKillStarted {
     _nativeSubscription = _native.output.listen(
       _output.add,
@@ -253,6 +267,7 @@ final class FlutterPtyAdapter implements Pty {
   final NativePty _native;
   final ProcessTreeKiller? _killer;
   final void Function(String message) _onError;
+  final void Function(int pid)? _onProblem;
   final void Function(Future<void> kill)? _onKillStarted;
   final Duration outputGrace;
   final StreamController<Uint8List> _output = StreamController<Uint8List>();
@@ -301,7 +316,8 @@ final class FlutterPtyAdapter implements Pty {
     try {
       // False after exit is expected: the plugin has released the pty.
       if (!_native.kill() && !_exited) {
-        _onError(
+        _report(
+          _native.pid,
           'kill of pid ${_native.pid} failed: '
           'could not terminate the job object',
         );
@@ -315,6 +331,11 @@ final class FlutterPtyAdapter implements Pty {
     final reason = error is ProcessTableException
         ? error.message
         : '${error.runtimeType}';
-    _onError('kill of pid $target failed: $reason');
+    _report(target, 'kill of pid $target failed: $reason');
+  }
+
+  void _report(int target, String message) {
+    _onError(message);
+    _onProblem?.call(target);
   }
 }

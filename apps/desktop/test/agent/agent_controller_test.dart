@@ -70,6 +70,46 @@ void main() {
       },
     );
 
+    for (final key in ['auth_token', 'device_private_key']) {
+      test('an unreadable keychain ($key) signs out and says so, without '
+          'details', () async {
+        boot();
+        await h.seedSignedIn();
+        h.secureStore.failingReads.add(key);
+
+        await controller().bootstrap(watchForWake: false);
+
+        expect(state().phase, AuthPhase.signedOut);
+        expect(h.runtimes, isEmpty);
+        expect(h.keepAwake.last, isFalse);
+        final shown = h.notifier.shown.single;
+        expect(shown.title, 'ShellX could not read your saved sign-in');
+        expect(shown.body, 'Sign in again to allow remote access.');
+        // Nothing is deleted: the keychain may work again next time.
+        h.secureStore.failingReads.clear();
+        expect(await h.secureStore.read('auth_token'), h.relay.token);
+        // The rest of startup still ran: the update check went out.
+        await pumpEventQueue();
+        expect(h.relay.last('GET /v1/version'), isNotNull);
+      });
+    }
+
+    test('signing in works after an unreadable keychain at startup', () async {
+      boot();
+      h.secureStore.failingReads.add('auth_token');
+      await controller().bootstrap(watchForWake: false);
+      h.secureStore.failingReads.clear();
+
+      await controller().signIn(
+        email: 'phu@example.com',
+        password: 'correct horse',
+        register: false,
+      );
+
+      expect(state().phase, AuthPhase.signedIn);
+      expect(h.runtime.started, isTrue);
+    });
+
     test('a token without device or user id counts as signed out', () async {
       boot();
       await h.secureStore.write('auth_token', h.relay.token);

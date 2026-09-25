@@ -362,6 +362,73 @@ void main() {
     });
   });
 
+  group('onProblem (user-facing: the pid only)', () {
+    test(
+      'a failed tree kill reports the pid; a good one reports nothing',
+      () async {
+        final problems = <int>[];
+        final failing =
+            FlutterPtyFactory(
+              isWindows: false,
+              killer: _FailingKiller(StateError('/bin/zsh -l SECRET=1')),
+              start: _FakeNativePty.new,
+              onError: (_) {},
+              onProblem: problems.add,
+            ).spawn(
+              _zsh,
+              workingDirectory: '/',
+              environment: {},
+              cols: 80,
+              rows: 24,
+            );
+        final fine =
+            FlutterPtyFactory(
+              isWindows: false,
+              killer: _RecordingKiller(),
+              start: _FakeNativePty.new,
+              onError: (_) {},
+              onProblem: problems.add,
+            ).spawn(
+              _zsh,
+              workingDirectory: '/',
+              environment: {},
+              cols: 80,
+              rows: 24,
+            );
+
+        failing.kill();
+        fine.kill();
+        await pumpEventQueue();
+
+        expect(problems, [4321]);
+      },
+    );
+
+    test('Windows: a failed job kill and a shell without a job object each '
+        'report the pid', () {
+      final problems = <int>[];
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => _FakeNativePty(launch)
+          ..jobError = 5
+          ..killSucceeds = false,
+        onError: (_) {},
+        onProblem: problems.add,
+      );
+      final pty = factory.spawn(
+        _pwsh,
+        workingDirectory: r'C:\',
+        environment: {},
+        cols: 80,
+        rows: 24,
+      );
+      expect(problems, [4321]);
+
+      pty.kill();
+      expect(problems, [4321, 4321]);
+    });
+  });
+
   group('FlutterPtyFactory.killsSettled', () {
     var nextPid = 100;
     Pty spawn(FlutterPtyFactory factory) => factory.spawn(

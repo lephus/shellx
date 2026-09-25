@@ -65,7 +65,9 @@ final class DesktopServices {
   final String deviceName;
   final Duration updateInterval;
 
-  /// Destroys the tray icon and the window, then exits the process.
+  /// Runs after `AgentController.shutdown()`: removes the tray icon and
+  /// releases the single-instance lock (each bounded, so quitting cannot
+  /// hang), then exits the process, which closes the window.
   final Future<void> Function()? quitApp;
 
   /// Completes once every PTY process-tree kill started so far has settled.

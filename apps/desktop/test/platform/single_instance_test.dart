@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,43 @@ void main() {
       await lock.release();
     },
   );
+
+  test('one second launch is one activation request', () async {
+    final lock = SingleInstanceLock(dir);
+    expect(await lock.acquire(), isTrue);
+    var requests = 0;
+    final subscription = lock.activationRequests().listen((_) => requests++);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await SingleInstanceLock(dir).signalRunningInstance();
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    expect(requests, 1);
+    await subscription.cancel();
+    await lock.release();
+  });
+
+  test('coalesceEvents passes the first event of a burst and drops the '
+      'rest of it', () async {
+    var now = DateTime(2026, 9, 26);
+    final source = StreamController<void>(sync: true);
+    final passed = <DateTime>[];
+    coalesceEvents(
+      source.stream,
+      window: const Duration(seconds: 1),
+      now: () => now,
+    ).listen((_) => passed.add(now));
+    final start = now;
+
+    source.add(null); // create
+    now = now.add(const Duration(milliseconds: 5));
+    source.add(null); // modify, same launch
+    now = start.add(const Duration(milliseconds: 999));
+    source.add(null);
+    now = start.add(const Duration(seconds: 1));
+    source.add(null); // a later launch
+    await source.close();
+
+    expect(passed, [start, start.add(const Duration(seconds: 1))]);
+  });
 
   test(
     'activation events require an exact file name match, not just a suffix',

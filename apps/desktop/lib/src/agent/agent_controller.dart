@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -57,6 +58,7 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Loads settings and stored credentials; starts the agent when signed in
   /// and remote access is on; schedules update checks (startup + every 24 h).
+  /// An unreadable secure store starts it signed out, with a notification.
   Future<void> bootstrap({bool watchForWake = true}) async {
     final settings = _s.settings;
     state = state.copyWith(
@@ -83,26 +85,30 @@ class AgentController extends Notifier<AgentViewState> {
         // Keep the stored value if the OS cannot be queried.
       }
     }
-    final store = _s.secureStore;
-    final token = await store.read(DesktopStorageKeys.token);
-    final deviceId = await store.read(DesktopStorageKeys.deviceId);
-    final userId = await store.read(DesktopStorageKeys.userId);
-    final email = await store.read(DesktopStorageKeys.email);
-    if (!ref.mounted) return;
-    if (token == null || deviceId == null || userId == null) {
-      state = state.copyWith(phase: AuthPhase.signedOut, email: email);
-    } else {
-      _identity = await DeviceIdentity.loadOrCreate(store);
-      if (!ref.mounted) return;
-      await _enterSignedIn(
-        AgentCredentials(
-          token: token,
-          deviceId: deviceId,
-          userId: userId,
-          email: email ?? '',
-        ),
-        email: email,
+    ({AgentCredentials? credentials, String? email})? saved;
+    try {
+      saved = await _loadSavedSignIn();
+    } catch (error) {
+      // An unreadable keychain must not leave the app stuck loading: it
+      // starts signed out (deleting nothing: it may work next time) and
+      // says so, without details.
+      debugPrint(
+        'ShellX: reading the saved sign-in failed: ${error.runtimeType}',
       );
+      _identity = null;
+    }
+    if (!ref.mounted) return;
+    final credentials = saved?.credentials;
+    if (saved == null) {
+      state = state.copyWith(phase: AuthPhase.signedOut);
+      await _notify(
+        title: _s.l10n.notifyStorageUnreadableTitle,
+        body: _s.l10n.notifySignedOutBody,
+      );
+    } else if (credentials == null) {
+      state = state.copyWith(phase: AuthPhase.signedOut, email: saved.email);
+    } else {
+      await _enterSignedIn(credentials, email: saved.email);
     }
     await _applyKeepAwake();
     if (!ref.mounted) return;
@@ -114,6 +120,31 @@ class AgentController extends Notifier<AgentViewState> {
     if (watchForWake) {
       _wakeDetector = WakeDetector(onWake: handleWake)..start();
     }
+  }
+
+  /// The stored credentials (none unless token, device id and user id are
+  /// all there) and email; loads the device key when signed in. Throws when
+  /// the secure store cannot be read.
+  Future<({AgentCredentials? credentials, String? email})>
+  _loadSavedSignIn() async {
+    final store = _s.secureStore;
+    final token = await store.read(DesktopStorageKeys.token);
+    final deviceId = await store.read(DesktopStorageKeys.deviceId);
+    final userId = await store.read(DesktopStorageKeys.userId);
+    final email = await store.read(DesktopStorageKeys.email);
+    if (token == null || deviceId == null || userId == null) {
+      return (credentials: null, email: email);
+    }
+    _identity = await DeviceIdentity.loadOrCreate(store);
+    return (
+      credentials: AgentCredentials(
+        token: token,
+        deviceId: deviceId,
+        userId: userId,
+        email: email ?? '',
+      ),
+      email: email,
+    );
   }
 
   /// Login or register (spec §5.2). Throws [ApiException] for the UI to show.

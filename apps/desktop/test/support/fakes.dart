@@ -191,6 +191,29 @@ final class FakeLaunchAtLogin implements LaunchAtLogin {
   }
 }
 
+/// The in-memory secure store, able to fail like a keychain that refuses
+/// access.
+final class FlakyKeyValueStore implements KeyValueStore {
+  final InMemoryKeyValueStore _values = InMemoryKeyValueStore();
+
+  /// Keys whose reads throw.
+  final Set<String> failingReads = {};
+
+  @override
+  Future<String?> read(String key) async {
+    if (failingReads.contains(key)) {
+      throw Exception('keychain refused $key: SECRET-DETAIL');
+    }
+    return _values.read(key);
+  }
+
+  @override
+  Future<void> write(String key, String value) => _values.write(key, value);
+
+  @override
+  Future<void> delete(String key) => _values.delete(key);
+}
+
 final class ShownNotification {
   const ShownNotification(this.title, this.body, this.onClick);
   final String title;
@@ -243,7 +266,7 @@ final class TestHarness {
   }) : settings = InMemorySettingsStore(settings),
        l10n = lookupAppLocalizations(locale);
 
-  final InMemoryKeyValueStore secureStore = InMemoryKeyValueStore();
+  final FlakyKeyValueStore secureStore = FlakyKeyValueStore();
   final InMemorySettingsStore settings;
   final FakeRelayApi relay = FakeRelayApi();
   final RecordingKeepAwake keepAwake = RecordingKeepAwake();

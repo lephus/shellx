@@ -662,6 +662,24 @@ abstract class AppLocalizations {
   /// **'Processes from a terminal session may still be running'**
   String get notifyTerminalProblemTitle;
 
+  /// No description provided for @notifyTerminalProblemBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Shell process ID: {pids}} other{Shell process IDs: {pids}}}'**
+  String notifyTerminalProblemBody(int count, String pids);
+
+  /// No description provided for @notifyStorageUnreadableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX could not read your saved sign-in'**
+  String get notifyStorageUnreadableTitle;
+
+  /// No description provided for @startupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX could not start. Open it again; if this keeps happening, restart your computer.'**
+  String get startupFailed;
+
   /// No description provided for @windowsVersionUnsupported.
   ///
   /// In en, this message translates to:

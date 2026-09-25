@@ -26,7 +26,9 @@ import 'src/platform/secure_key_value_store.dart';
 import 'src/platform/settings_store.dart';
 import 'src/platform/single_instance.dart';
 import 'src/platform/system_info.dart';
+import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
+import 'src/startup.dart';
 import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/app.dart';
@@ -45,12 +47,41 @@ Future<void> main() async {
     exit(1);
   }
 
+  // Whatever fails from here on must not leave an invisible process holding
+  // the single-instance lock (every later launch would exit silently).
+  final startup = _Startup();
+  await runGuardedStartup(
+    start: () => _start(startup, locale, l10n),
+    releaseLock: () async {
+      await startup.lock?.release();
+    },
+    showError: () => _showStartupError(startup, l10n),
+    exit: exit,
+  );
+}
+
+/// How long each step of quitting may take before it is skipped.
+const Duration _quitStepTimeout = Duration(seconds: 2);
+
+/// What the failure path of [runGuardedStartup] needs from a start that
+/// stopped halfway.
+final class _Startup {
+  SingleInstanceLock? lock;
+  SystemNotifier? notifier;
+}
+
+Future<void> _start(
+  _Startup startup,
+  Locale locale,
+  AppLocalizations l10n,
+) async {
   // Spec §8.2: only one agent at a time.
   final lock = SingleInstanceLock(await getApplicationSupportDirectory());
   if (!await lock.acquire()) {
     await lock.signalRunningInstance();
     exit(0);
   }
+  startup.lock = lock;
 
   // The close button hides the window to the tray (the router closes what
   // is open); it never quits the app.
@@ -69,18 +100,17 @@ Future<void> main() async {
       environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'] ??
       Directory.current.path;
   final relayBase = Uri.parse(kRelayBaseUrl);
-  final notifier = await LocalSystemNotifier.setup();
+  final notifier = startup.notifier = await LocalSystemNotifier.setup();
   // A failed tree kill (or, on Windows, a shell without a job object) may
-  // leave processes behind: log it and tell the user. The message holds a
-  // pid and a reason only — never output, arguments or environment.
+  // leave processes behind: the debug log gets the pid and the reason
+  // (onError's default), the user one notification per burst with the pids
+  // only — never output, arguments or environment.
+  final terminalProblems = TerminalProblemNotifier(
+    notifier: notifier,
+    l10n: l10n,
+  );
   final ptyFactory = FlutterPtyFactory.forCurrentPlatform(
-    onError: (message) {
-      FlutterPtyAdapter.debugPrintError(message);
-      _unawaitedLogged(
-        notifier.show(title: l10n.notifyTerminalProblemTitle, body: message),
-        'terminal problem notification',
-      );
-    },
+    onProblem: terminalProblems.report,
   );
   late final TrayManagerHost trayHost;
 
@@ -114,14 +144,20 @@ Future<void> main() async {
     deviceName: deviceNameFromHostname(Platform.localHostname),
     // Sign-out and quit wait (at most 3 s) for PTY tree kills in flight.
     awaitPtyKills: ptyFactory.killsSettled,
-    // Runs after AgentController.shutdown(); exits even if cleanup fails.
+    // Runs after AgentController.shutdown(). Each step is bounded, so
+    // quitting always ends in exit(0).
     quitApp: () async {
-      try {
-        await trayHost.destroy();
-        await lock.release();
-      } finally {
-        exit(0);
-      }
+      await runBounded(
+        trayHost.destroy,
+        timeout: _quitStepTimeout,
+        label: 'removing the tray icon',
+      );
+      await runBounded(
+        lock.release,
+        timeout: _quitStepTimeout,
+        label: 'releasing the lock',
+      );
+      exit(0);
     },
   );
 
@@ -157,7 +193,8 @@ Future<void> main() async {
     );
   }, fireImmediately: true);
 
-  // A second launch (double-click while running) asks us to come forward.
+  // A second launch (double-click while running) asks us to come forward;
+  // one request per launch (activationRequests coalesces watcher events).
   lock.activationRequests().listen(
     (_) {
       final state = container.read(agentControllerProvider);
@@ -185,8 +222,24 @@ Future<void> main() async {
       child: ShellxDesktopApp(locale: locale),
     ),
   );
-  // The only bootstrap() call.
+  // The only bootstrap() call. An unreadable keychain does not throw: the
+  // controller starts signed out and notifies.
   await container.read(agentControllerProvider.notifier).bootstrap();
+}
+
+/// The app failed to start, so there may be no window or tray icon to show
+/// the error in. Windows: a message box, like the version check. macOS:
+/// best effort, a notification.
+Future<void> _showStartupError(_Startup startup, AppLocalizations l10n) async {
+  if (Platform.isWindows) {
+    _windowsErrorBox(l10n.startupFailed);
+    return;
+  }
+  final notifier = startup.notifier ?? await LocalSystemNotifier.setup();
+  await notifier.show(title: 'ShellX', body: l10n.startupFailed);
+  // Give the notification a moment to reach Notification Center before
+  // the process exits.
+  await Future<void>.delayed(const Duration(seconds: 1));
 }
 
 /// Fire-and-forget for tray, window and notification calls: a failure is

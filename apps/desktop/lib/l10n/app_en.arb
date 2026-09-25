@@ -182,5 +182,14 @@
     }
   },
   "notifyTerminalProblemTitle": "Processes from a terminal session may still be running",
+  "notifyTerminalProblemBody": "{count, plural, =1{Shell process ID: {pids}} other{Shell process IDs: {pids}}}",
+  "@notifyTerminalProblemBody": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "pids": {"type": "String"}
+    }
+  },
+  "notifyStorageUnreadableTitle": "ShellX could not read your saved sign-in",
+  "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
   "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
 }

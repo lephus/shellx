@@ -362,6 +362,24 @@ class AppLocalizationsVi extends AppLocalizations {
       'Tiến trình của một phiên terminal có thể vẫn đang chạy';
 
   @override
+  String notifyTerminalProblemBody(int count, String pids) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mã tiến trình shell: $pids',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notifyStorageUnreadableTitle =>
+      'ShellX không đọc được thông tin đăng nhập đã lưu';
+
+  @override
+  String get startupFailed =>
+      'ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.';
+
+  @override
   String get windowsVersionUnsupported =>
       'ShellX cần Windows 10 bản 1809 trở lên.';
 }

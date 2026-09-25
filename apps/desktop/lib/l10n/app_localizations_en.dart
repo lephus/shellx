@@ -366,6 +366,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Processes from a terminal session may still be running';
 
   @override
+  String notifyTerminalProblemBody(int count, String pids) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Shell process IDs: $pids',
+      one: 'Shell process ID: $pids',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notifyStorageUnreadableTitle =>
+      'ShellX could not read your saved sign-in';
+
+  @override
+  String get startupFailed =>
+      'ShellX could not start. Open it again; if this keeps happening, restart your computer.';
+
+  @override
   String get windowsVersionUnsupported =>
       'ShellX requires Windows 10 version 1809 or later.';
 }

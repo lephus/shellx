@@ -45,11 +45,19 @@ final class SingleInstanceLock {
     _activationPath,
   ).writeAsString('${DateTime.now().microsecondsSinceEpoch}', flush: true);
 
-  /// Fires when a second launch called [signalRunningInstance].
-  Stream<void> activationRequests() => directory
-      .watch(events: FileSystemEvent.create | FileSystemEvent.modify)
-      .where((event) => _basename(event.path) == activationFileName)
-      .map((_) {});
+  /// Fires once per second launch that called [signalRunningInstance]. The
+  /// watcher may report the signal file's creation and its write as two
+  /// events, so events within [coalesce] of the last one delivered are
+  /// dropped.
+  Stream<void> activationRequests({
+    Duration coalesce = const Duration(seconds: 1),
+  }) => coalesceEvents(
+    directory
+        .watch(events: FileSystemEvent.create | FileSystemEvent.modify)
+        .where((event) => _basename(event.path) == activationFileName)
+        .map((_) {}),
+    window: coalesce,
+  );
 
   /// The final path component, independent of which separator style the
   /// platform's directory watcher reports (avoids matching e.g.
@@ -60,4 +68,21 @@ final class SingleInstanceLock {
     final index = normalized.lastIndexOf('/');
     return index == -1 ? normalized : normalized.substring(index + 1);
   }
+}
+
+/// Passes an event through, then drops every event that arrives within
+/// [window] of it (leading-edge throttle).
+Stream<void> coalesceEvents(
+  Stream<void> events, {
+  required Duration window,
+  DateTime Function() now = DateTime.now,
+}) {
+  DateTime? last;
+  return events.where((_) {
+    final time = now();
+    final previous = last;
+    if (previous != null && time.difference(previous) < window) return false;
+    last = time;
+    return true;
+  });
 }
