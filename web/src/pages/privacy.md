@@ -80,11 +80,13 @@ Chúng tôi chỉ cung cấp dữ liệu cho cơ quan nhà nước khi pháp lu�
 
 <h2 id="delete-account">8. Xóa tài khoản</h2>
 
-Bạn có thể tự xóa tài khoản ngay trong ứng dụng di động: mở **Cài đặt → Xóa tài khoản** và nhập lại mật khẩu để xác nhận. Việc xóa có hiệu lực ngay và không thể hoàn tác: máy chủ xóa vĩnh viễn tài khoản cùng toàn bộ thiết bị, mã truy cập và bản ghi ghép nối; mọi thiết bị đang kết nối bị đăng xuất, và agent trên máy tính xử lý như khi bạn đăng xuất (xóa danh sách điện thoại được tin cậy và đóng mọi phiên terminal).
+Bạn có thể tự xóa tài khoản ngay trong ứng dụng di động: mở **Cài đặt → Xóa tài khoản** và nhập lại mật khẩu để xác nhận. Việc xóa có hiệu lực ngay và không thể hoàn tác: máy chủ xóa vĩnh viễn tài khoản cùng toàn bộ thiết bị, mã truy cập và bản ghi ghép nối; mọi thiết bị đang kết nối bị đăng xuất. Agent trên máy tính không phân biệt được việc này với đổi mật khẩu, nên luôn xóa mã truy cập của nó, đóng mọi phiên terminal rồi hiện lại màn hình đăng nhập — nó **giữ nguyên** khóa thiết bị và danh sách điện thoại được tin cậy. Danh sách đó chỉ bị xóa khi bạn đăng nhập lại bằng một tài khoản khác, khi bạn đăng xuất khỏi agent từ tray, hoặc khi bạn gỡ cài đặt agent.
 
 Nếu bạn không còn dùng được ứng dụng di động, hãy gửi email tới [support@shellx.pro](mailto:support@shellx.pro) **từ chính địa chỉ email của tài khoản**, tiêu đề "Xóa tài khoản ShellX". Chúng tôi có thể hỏi thêm thông tin để xác minh bạn là chủ tài khoản, xóa tài khoản trong vòng 30 ngày kể từ khi xác minh, rồi gửi email xác nhận.
 
-Nhật ký vận hành (không chứa nội dung terminal, mật khẩu hay mã truy cập) tự hết hạn trong vòng 30 ngày. Dữ liệu nằm trên thiết bị của bạn (mục 3) được xóa khi bạn gỡ cài đặt ứng dụng.
+Nhật ký vận hành (không chứa nội dung terminal, mật khẩu hay mã truy cập) tự hết hạn trong vòng 30 ngày. Dữ liệu đã xóa cũng có thể còn tồn tại tối đa 30 ngày trong bản sao lưu khôi phục theo thời điểm (point-in-time recovery) của nhà cung cấp cơ sở dữ liệu trước khi tự hết hạn.
+
+Dữ liệu nằm trên thiết bị của bạn (mục 3): trên Windows, gỡ cài đặt agent sẽ xóa dữ liệu này; trên Android, gỡ cài đặt ứng dụng cũng xóa dữ liệu. Trên macOS và iOS, các mục trong Keychain có thể vẫn còn sau khi bạn gỡ ứng dụng — trên iOS, ShellX tự xóa các mục đó ở lần cài đặt tiếp theo; trên macOS, chúng có thể được dùng lại nếu bạn cài lại ShellX — và bạn có thể xóa sớm hơn bằng công cụ quản lý Keychain của hệ điều hành.
 
 ## 9. Quyền của bạn
 

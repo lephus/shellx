@@ -80,11 +80,13 @@ We disclose data to authorities only when the law requires it. Because terminal 
 
 <h2 id="delete-account">8. Deleting your account</h2>
 
-You can delete your account yourself in the mobile app: open **Settings → Delete account** and enter your password again to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, access tokens and pairing records; every connected device is signed out, and the desktop agent handles it like a sign-out (it clears its list of trusted phones and closes all terminal sessions).
+You can delete your account yourself in the mobile app: open **Settings → Delete account** and enter your password again to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, access tokens and pairing records; every connected device is signed out. The desktop agent cannot tell this apart from a password change, so it always deletes its access token, closes all terminal sessions and shows the sign-in screen again — it **keeps** its device key and its list of trusted phones. That list is cleared only when you sign in again with a different account, when you sign out of the agent from the tray, or when you uninstall the agent.
 
 If you can no longer use the mobile app, email [support@shellx.pro](mailto:support@shellx.pro) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
 
-Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Data stored on your devices (section 3) is removed when you uninstall the apps.
+Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Deleted data may also remain for up to 30 days in the database provider's point-in-time recovery backups before it expires.
+
+Data stored on your devices (section 3): on Windows, uninstalling the agent removes it; on Android, uninstalling the app removes it. On macOS and iOS, Keychain entries may remain after you remove the app — on iOS, ShellX clears them the next time you install the app; on macOS, they may be reused if you reinstall ShellX — and you can remove them sooner with the operating system's keychain management tools.
 
 ## 9. Your rights
 
