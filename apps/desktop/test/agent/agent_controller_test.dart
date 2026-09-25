@@ -598,10 +598,36 @@ void main() {
 
         expect(state().phase, AuthPhase.signedOut);
         expect(await h.secureStore.read('auth_token'), isNull);
-        expect(await h.secureStore.read('user_id'), isNull);
+        // The user id is kept: the next sign-in's account-switch check must
+        // still see this account so it can retry clearing the stale list.
+        expect(await h.secureStore.read('user_id'), h.relay.userId);
         expect(h.notifier.shown, hasLength(1));
       },
     );
+
+    test('a trusted list that failed to clear at sign-out still clears when '
+        'signing in to a different account', () async {
+      boot();
+      await h.seedSignedIn();
+      await h.trusted.add(phone('m1', 'iPhone'));
+      await controller().bootstrap(watchForWake: false);
+      h.secureStore.failingWrites.add('trusted_devices');
+
+      await controller().signOut();
+      expect(await h.trusted.list(), hasLength(1));
+      expect(await h.secureStore.read('user_id'), h.relay.userId);
+
+      // The store works again, and the sign-in is to a different account.
+      h.secureStore.failingWrites.clear();
+      h.relay.userId = '22222222-2222-4222-8222-222222222222';
+      await controller().signIn(
+        email: 'other@example.com',
+        password: '12345678',
+        register: false,
+      );
+
+      expect(await h.trusted.list(), isEmpty);
+    });
 
     test('keeps the device key', () async {
       boot();

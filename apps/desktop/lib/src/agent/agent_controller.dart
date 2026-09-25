@@ -607,25 +607,37 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
-  /// Deletes the trusted list, token, device id and user id, each on its
-  /// own so one refused delete does not keep the rest. Keeps the device key
-  /// (spec §5.1) and the email (pre-fills the login form). False when
-  /// anything could not be deleted (logged by type only).
+  /// Deletes the trusted list, token and device id, each on its own so one
+  /// refused delete does not keep the rest. Keeps the device key (spec
+  /// §5.1) and the email (pre-fills the login form). The user id is deleted
+  /// too, unless the trusted list failed to clear: then the user id is kept
+  /// so the next `signIn`'s account-switch check still sees this account and
+  /// clears the stale trusted list instead of letting it carry over to
+  /// another account (spec §5.2). False when anything could not be deleted
+  /// (logged by type only).
   Future<bool> _clearSignedInData() async {
     final store = _s.secureStore;
     var cleared = true;
-    for (final step in <Future<void> Function()>[
-      _trusted.clear,
-      () => store.delete(DesktopStorageKeys.token),
-      () => store.delete(DesktopStorageKeys.deviceId),
-      () => store.delete(DesktopStorageKeys.userId),
-    ]) {
+    var trustedFailed = false;
+
+    Future<void> step(
+      Future<void> Function() action, {
+      bool trusted = false,
+    }) async {
       try {
-        await step();
+        await action();
       } catch (error) {
         cleared = false;
+        if (trusted) trustedFailed = true;
         debugPrint('ShellX: deleting the sign-in failed: ${error.runtimeType}');
       }
+    }
+
+    await step(_trusted.clear, trusted: true);
+    await step(() => store.delete(DesktopStorageKeys.token));
+    await step(() => store.delete(DesktopStorageKeys.deviceId));
+    if (!trustedFailed) {
+      await step(() => store.delete(DesktopStorageKeys.userId));
     }
     return cleared;
   }
