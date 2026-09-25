@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import { call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers";
@@ -141,11 +141,100 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const a = await connect(app, account.agent.token);
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
     expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    await a.expectSilence();
+  });
+
+  it("replays a queued event (tombstone) on every agent connect until that pair is re-created", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const event = hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId));
+    await pair(app, account.agent.token, mobile.deviceId);
+    // The agent is offline when the phone unpairs.
+    expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
+
+    // Not deleted on send: a connect whose socket dies right after the replay must not lose it.
+    for (let i = 0; i < 3; i++) {
+      const a = await connect(app, account.agent.token);
+      expect(hex(await a.nextBinary())).toBe(event);
+      await a.expectSilence();
+      a.close();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    // Re-pairing the same phone clears the tombstone.
+    expect((await pair(app, account.agent.token, mobile.deviceId)).status).toBe(201);
+    const after = await connect(app, account.agent.token);
+    await after.expectSilence();
+  });
+
+  it("never replays a stale event after unpair → re-pair of the same phone (agent online throughout)", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
+    await pair(app, account.agent.token, mobile.deviceId);
+    const a = await connect(app, account.agent.token);
+
+    expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
+    expect(hex(await a.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    // The user pairs the same phone again (same device ids), then the desktop reconnects.
+    expect((await pair(app, account.agent.token, mobile.deviceId)).status).toBe(201);
     a.close();
     await new Promise((resolve) => setTimeout(resolve, 50));
+
     const again = await connect(app, account.agent.token);
-    expect(hex(await again.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
-    await again.expectSilence(); // delivered exactly once
+    await again.expectSilence(); // a replayed pairing_removed would drop the freshly re-paired phone
+  });
+
+  it("clears the tombstone before recording the pairing, and still answers 201 if that hub call fails", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const pairingRow = () =>
+      env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+        .bind(account.agent.deviceId, mobile.deviceId).first();
+
+    // Order: a DELETE racing between the clear and the upsert must leave a tombstone behind (the
+    // relay may only ever remove trust), so the clear has to run while the row is still absent.
+    const seenRowAtClear: unknown[] = [];
+    const recordingHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        clearPairingRemoved: async () => {
+          seenRowAtClear.push(await pairingRow());
+          return 0;
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+    const first = await call(app, "POST", "/v1/pairings", {
+      token: account.agent.token, body: { mobile_id: mobile.deviceId }, bindings: { USER_HUB: recordingHub },
+    });
+    expect(first.status).toBe(201);
+    expect(seenRowAtClear).toEqual([null]);
+    expect(await pairingRow()).not.toBeNull();
+
+    // Best-effort: a hub outage must not fail the pairing; only metadata is logged.
+    const throwingHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        clearPairingRemoved: async () => {
+          throw new Error("hub is down");
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    const second = await call(app, "POST", "/v1/pairings", {
+      token: account.agent.token, body: { mobile_id: mobile.deviceId }, bindings: { USER_HUB: throwingHub },
+    });
+    spy.mockRestore();
+    expect(second.status).toBe(201);
+    const output = lines.join("\n");
+    expect(output).toContain("pairing_clear_failed");
+    expect(output).not.toContain("hub is down");
   });
 
   it("is idempotent and forbidden to devices that are not a party", async () => {

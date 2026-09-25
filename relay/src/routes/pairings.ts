@@ -3,11 +3,21 @@ import type { AppEnv } from "../app";
 import { requireAuth } from "../auth/session";
 import { hubFor } from "../hub/user-hub";
 import { Errors, readJsonObject } from "../http/errors";
+import { logMeta } from "../log";
 import { parseUuid } from "../protocol/uuid";
 
 export const pairingRoutes = new Hono<AppEnv>();
 
-/** POST /v1/pairings {mobile_id} — agent only; the record is informational (trust lives on the agent). */
+/**
+ * POST /v1/pairings {mobile_id} — agent only; the record is informational (trust lives on the agent).
+ *
+ * Re-pairing a phone that was unpaired earlier must not be undone by that unpair's tombstone, which
+ * the hub replays on every agent connect (final review I1). So the tombstone for this exact pair is
+ * cleared first — BEFORE the D1 upsert, so a DELETE racing in between re-creates it and the agent
+ * still drops the phone (the relay may only ever remove trust). Best-effort: if the hub call fails
+ * the pairing is still recorded (the worst case is the old bug — the agent drops the phone on its
+ * next connect and the user pairs again — never extra trust); only metadata is logged.
+ */
 pairingRoutes.post("/", requireAuth, async (c) => {
   const auth = c.get("auth");
   if (auth.kind !== "agent") throw Errors.agentOnly();
@@ -20,6 +30,11 @@ pairingRoutes.post("/", requireAuth, async (c) => {
     .bind(mobileId, auth.userId)
     .first();
   if (mobile === null) throw Errors.deviceNotFound();
+  try {
+    await hubFor(c.env, auth.userId).clearPairingRemoved(auth.deviceId, mobileId);
+  } catch {
+    logMeta("pairing_clear_failed", { device_id: auth.deviceId });
+  }
   await db
     .prepare(
       `INSERT INTO pairings (agent_id, mobile_id, created_at) VALUES (?, ?, ?)

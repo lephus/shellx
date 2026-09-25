@@ -320,6 +320,26 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     expect(await hub.purgeAgent(account.agent.deviceId)).toBe(0);
   });
 
+  it("an agent that signs in again after logout gets no replay of tombstones from before the logout", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    // The tombstone is replayed on connect (and kept) ...
+    const before = await connect(app, account.agent.token);
+    expect(hex(await before.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    before.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // ... until the agent logs out, which purges it.
+    expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
+    const again = await loginDevice(app, account, "agent", account.agent.publicKey);
+    expect(again.deviceId).toBe(account.agent.deviceId);
+    const after = await connect(app, again.token);
+    await after.expectSilence();
+  });
+
   it("still logs the agent out (204) if purging its queue afterward throws, logging metadata only", async () => {
     // Fix round 1: same best-effort treatment as account deletion's closeAccount() — the token and
     // pairings are already gone by this point, so a hub outage here must not turn a successful
