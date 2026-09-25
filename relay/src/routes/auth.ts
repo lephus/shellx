@@ -137,11 +137,11 @@ authRoutes.post("/logout", requireAuth, async (c) => {
   const tokenHash = await hashToken(parseBearer(c.req.header("Authorization"))!);
   if (auth.kind === "agent") {
     const { results } = await db
-      .prepare("SELECT mobile_id FROM pairings WHERE agent_id = ?")
+      .prepare("SELECT mobile_id, pairing_id FROM pairings WHERE agent_id = ?")
       .bind(auth.deviceId)
-      .all<{ mobile_id: string }>();
+      .all<{ mobile_id: string; pairing_id: string }>();
     const hub = hubFor(c.env, auth.userId);
-    for (const { mobile_id: mobileId } of results) await hub.notifyPairingRemoved(auth.deviceId, mobileId);
+    for (const row of results) await hub.notifyPairingRemoved(auth.deviceId, row.mobile_id, row.pairing_id);
     await db.batch([
       db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash),
       db.prepare("DELETE FROM pairings WHERE agent_id = ?").bind(auth.deviceId),

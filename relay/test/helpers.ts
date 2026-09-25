@@ -113,6 +113,24 @@ export async function loginDevice(app: TestApp, account: Account, kind: Kind, pu
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey };
 }
 
+/** POST /v1/pairings as `agentToken`, with a fresh agent-generated pairing id unless one is given. */
+export async function pair(
+  app: TestApp,
+  agentToken: string,
+  mobileId: string,
+  pairingId: string = crypto.randomUUID(),
+): Promise<Response> {
+  return call(app, "POST", "/v1/pairings", { token: agentToken, body: { mobile_id: mobileId, pairing_id: pairingId } });
+}
+
+/** The `pairing_id` of the D1 row for (agent, mobile), or null when there is no row. */
+export async function pairingIdOf(agentId: string, mobileId: string): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT pairing_id FROM pairings WHERE agent_id = ? AND mobile_id = ?")
+    .bind(agentId, mobileId)
+    .first<{ pairing_id: string }>();
+  return row?.pairing_id ?? null;
+}
+
 export async function errorCode(res: Response): Promise<string> {
   const body = await res.json<{ error: { code: string; message: string } }>();
   return body.error.code;

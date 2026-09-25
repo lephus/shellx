@@ -21,7 +21,10 @@ npm run dev         # applies local D1 migrations, then serves http://127.0.0.1:
   itself: wrangler rejects a flag given twice.
 - The first run in an interactive terminal asks to confirm applying the migrations (answer `y`);
   non-interactive shells (CI) skip the prompt.
-- Local state lives in `.wrangler/state/`; delete that directory to start from an empty database.
+- Local state lives in `.wrangler/state/`; delete that directory to start from an empty database. Do so
+  once if it was created before pairing ids existed: `pairings.pairing_id` was added by editing
+  `0001_init.sql` in place, and the hub's tombstone table by editing its `CREATE TABLE IF NOT EXISTS`
+  (both only safe because nothing had been deployed yet).
 - Rate limits are off locally (`RATE_LIMITS_ENABLED = "false"` in the top-level `vars`) because the E2E
   suite creates many accounts from 127.0.0.1. Staging and production set `"true"`; only the exact
   string `"false"` disables them.

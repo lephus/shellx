@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
-  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, unlimited,
+  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, pair, registerAccount, TestSocket,
+  unlimited,
 } from "./helpers";
 
 const NEW_PASSWORD = "brand new password";
@@ -27,7 +28,7 @@ describe("POST /v1/auth/password", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const secondAgent = await loginDevice(app, account, "agent");
-    expect((await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } })).status).toBe(201);
+    expect((await pair(app, account.agent.token, mobile.deviceId)).status).toBe(201);
 
     const a = await connect(app, account.agent.token);
     const m = await connect(app, mobile.token);
@@ -143,7 +144,7 @@ describe("POST /v1/auth/logout", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await pair(app, account.agent.token, mobile.deviceId);
     expect((await call(app, "POST", "/v1/auth/logout", { token: mobile.token })).status).toBe(204);
     expect((await call(app, "GET", "/v1/devices", { token: mobile.token })).status).toBe(401);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
@@ -152,19 +153,28 @@ describe("POST /v1/auth/logout", () => {
     expect(pairing?.n).toBe(1);
   });
 
-  it("agent: deletes its token and all its pairings, and tells connected mobiles", async () => {
+  it("agent: deletes its token and all its pairings, and tells each connected mobile its pairing's id", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    const mobile2 = await loginDevice(app, account, "mobile");
+    const [first, second] = [crypto.randomUUID(), crypto.randomUUID()];
+    await pair(app, account.agent.token, mobile.deviceId, first);
+    await pair(app, account.agent.token, mobile2.deviceId, second);
     const m = await connect(app, mobile.token);
+    const m2 = await connect(app, mobile2.token);
+    expect(hex(await m.nextBinary())).toBe(hex(encodePresence(mobile2.deviceId, true)));
+    expect(hex(await m2.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
 
     expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
     const pairing = await env.DB.prepare("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?")
       .bind(account.agent.deviceId).first<{ n: number }>();
     expect(pairing?.n).toBe(0);
-    expect(hex(await m.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    expect(hex(await m.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, first)));
+    expect(hex(await m2.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile2.deviceId, second)));
+    await m.expectSilence();
+    await m2.expectSilence();
   });
 
   it("requires a token", async () => {
@@ -201,7 +211,7 @@ describe("DELETE /v1/account", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await pair(app, account.agent.token, mobile.deviceId);
     const a = await connect(app, account.agent.token);
     const m = await connect(app, mobile.token);
 
@@ -241,7 +251,7 @@ describe("DELETE /v1/account", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await pair(app, account.agent.token, mobile.deviceId);
     // The agent never connects: unpairing from the mobile side durably queues the event for it
     // (Task 8's pending_pairing_removed table).
     const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
@@ -336,7 +346,7 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await pair(app, account.agent.token, mobile.deviceId);
 
     let calls = 0;
     // Unlike devices-pairings.test.ts's "failingOnce" (which succeeds after its first failure),
@@ -377,14 +387,14 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    await pair(app, account.agent.token, mobile.deviceId);
     // The agent never connects: removing the pairing from the mobile side durably queues the event
     // for the agent (Task 8). Re-pair with a *different* mobile so the agent still has a current
     // pairing at logout time — proving the purge isn't limited to pairings this same logout deleted.
     const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
     expect(unpaired.status).toBe(204);
     const mobile2 = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile2.deviceId } });
+    await pair(app, account.agent.token, mobile2.deviceId);
 
     expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
 
@@ -396,11 +406,12 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    const pairingId = crypto.randomUUID();
+    await pair(app, account.agent.token, mobile.deviceId, pairingId);
     await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
-    // The tombstone is replayed on connect (and kept) ...
+    // The tombstone (carrying the pairing's id) is replayed on connect (and kept) ...
     const before = await connect(app, account.agent.token);
-    expect(hex(await before.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId)));
+    expect(hex(await before.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId)));
     before.close();
     await new Promise((resolve) => setTimeout(resolve, 50));
 

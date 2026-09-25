@@ -13,6 +13,7 @@ const A = "0123abcd-4567-4def-8123-456789abcdef";
 const A_HEX = "0123abcd45674def8123456789abcdef";
 const B = "fedcba98-7654-4321-8fed-cba987654321";
 const B_HEX = "fedcba98765443218fedcba987654321";
+const P = "c0ffee00-1234-4abc-9def-0123456789ab";
 const CH = fromHex("0102030405060708");
 
 describe("uuid", () => {
@@ -77,11 +78,12 @@ describe("relay frames (overview §4.1)", () => {
     expect(hex(encodeError(RelayErrorCode.frameTooLarge).slice(2, 4))).toBe("0002");
     expect(hex(encodeError(RelayErrorCode.rateLimited).slice(2, 4))).toBe("0003");
   });
-  it("EVENT pairing_removed matches the byte-for-byte vector", () => {
-    expect(hex(pairingRemovedEvent(A, B))).toBe(
-      "0104a3656576656e746f70616972696e675f72656d6f766564686167656e745f6964782430313233616263642d34" +
+  it("EVENT pairing_removed matches the byte-for-byte vector (4 text entries, pairing_id last)", () => {
+    expect(hex(pairingRemovedEvent(A, B, P))).toBe(
+      "0104a4656576656e746f70616972696e675f72656d6f766564686167656e745f6964782430313233616263642d34" +
         "3536372d346465662d383132332d343536373839616263646566696d6f62696c655f69647824666564636261" +
-        "39382d373635342d343332312d386665642d636261393837363534333231",
+        "39382d373635342d343332312d386665642d6362613938373635343332316a70616972696e675f696478246330" +
+        "6666656530302d313233342d346162632d396465662d303132333435363738396162",
     );
     expect(encodeEvent({})).toEqual(Uint8Array.from([1, 4, 0xa0]));
   });
