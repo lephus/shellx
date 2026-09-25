@@ -17,8 +17,13 @@ const int hashLen = 32;
 const int blockLen = 64;
 const int tagLen = 16;
 
-final X25519 _x25519 = X25519();
-final Cipher _chachaPoly = Chacha20.poly1305Aead();
+// Pinned to the pure-Dart backends (not the platform-selected `X25519()` /
+// `Chacha20.poly1305Aead()` defaults) so shellx_core behaves identically on
+// every platform. The Flutter apps otherwise swap in native implementations
+// via cryptography_flutter, which are not exercised by the official Noise
+// test vectors this package is tested against.
+final X25519 _x25519 = DartX25519();
+final Cipher _chachaPoly = DartChacha20.poly1305Aead();
 final DartBlake2s _blake2s = DartBlake2s();
 
 /// BLAKE2s-256 of [data].
