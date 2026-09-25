@@ -16,8 +16,8 @@ import { createArgon2 } from "../src/auth/argon2";
 import { isValidEmail, normalizeEmail } from "../src/auth/email";
 import { isAcceptablePassword } from "../src/auth/password-policy";
 import { base64UrlEncode } from "../src/auth/tokens";
-import { accountExistsFromWranglerJson, buildResetSql } from "./reset-sql";
-import { choosePasswordSource, confirmationMatches, needsConfirmation, wranglerFailureMessage } from "./reset-cli";
+import { buildResetSql, resetOutcomeFromWranglerJson } from "./reset-sql";
+import { choosePasswordSource, confirmationMatches, needsConfirmation, resetReport, wranglerFailureMessage } from "./reset-cli";
 import { createPrompter } from "./prompter";
 
 const { values } = parseArgs({
@@ -103,15 +103,16 @@ try {
     throw new Error(wranglerFailureMessage(err));
   }
 
-  // Use pure function to check if account exists
-  if (!accountExistsFromWranglerJson(output)) {
-    console.error(`No account with email ${email} in ${target}; nothing changed.`);
-    process.exit(1);
-  }
-
-  console.log(`Password reset for ${email} in ${target}.`);
-  if (passwordSource === "generate") console.log(`Temporary password: ${password}`);
-  if (values["revoke-tokens"]) console.log("All device tokens of this account were revoked.");
+  // Pure decision + report (unit-tested): reset, no account, or unconfirmed (output unreadable).
+  const report = resetReport(resetOutcomeFromWranglerJson(output), {
+    email,
+    target,
+    generatedPassword: passwordSource === "generate" ? password : undefined,
+    revokeTokens: values["revoke-tokens"],
+  });
+  for (const line of report.stderr) console.error(line);
+  for (const line of report.stdout) console.log(line);
+  if (report.exitCode !== 0) process.exit(report.exitCode);
 } catch (err) {
   prompter.close();
   if (err instanceof Error) {

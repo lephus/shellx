@@ -23,14 +23,30 @@ export function buildResetSql(email: string, phc: string, now: number, revokeTok
 }
 
 /**
- * Parse wrangler d1 execute --json output and check if account exists.
- * Returns true if the first result set has exactly one row with n=1.
+ * What a `wrangler d1 execute --json` run of `buildResetSql` did, as far as its output tells:
+ * - `reset`: the first statement counted exactly one account, so the UPDATE matched it;
+ * - `no_account`: it counted none, so nothing changed;
+ * - `unconfirmed`: the output is not JSON or not the expected shape. wrangler exited 0, so the
+ *   UPDATE may well have run — never report "nothing changed" for this (final review M2).
  */
-export function accountExistsFromWranglerJson(stdout: string): boolean {
+export type ResetOutcome = "reset" | "no_account" | "unconfirmed";
+
+export function resetOutcomeFromWranglerJson(stdout: string): ResetOutcome {
+  let parsed: unknown;
   try {
-    const results = JSON.parse(stdout) as { results?: { n?: number }[] }[];
-    return results[0]?.results?.[0]?.n === 1;
+    parsed = JSON.parse(stdout);
   } catch {
-    return false;
+    return "unconfirmed";
   }
+  if (!Array.isArray(parsed)) return "unconfirmed";
+  const first: unknown = parsed[0];
+  if (typeof first !== "object" || first === null) return "unconfirmed";
+  const rows = (first as { results?: unknown }).results;
+  if (!Array.isArray(rows) || rows.length !== 1) return "unconfirmed";
+  const row: unknown = rows[0];
+  if (typeof row !== "object" || row === null) return "unconfirmed";
+  const n = (row as { n?: unknown }).n;
+  if (n === 1) return "reset";
+  if (n === 0) return "no_account";
+  return "unconfirmed";
 }

@@ -4,6 +4,7 @@
  */
 
 import { normalizeEmail } from "../src/auth/email";
+import type { ResetOutcome } from "./reset-sql";
 
 /**
  * Determine if confirmation is required for this environment.
@@ -43,4 +44,49 @@ export function wranglerFailureMessage(err: unknown): string {
   if (typeof e.signal === "string" && /^SIG[A-Z0-9]+$/.test(e.signal)) return `wrangler d1 execute failed (${e.signal})`;
   if (typeof e.code === "string" && /^[A-Z0-9_]+$/.test(e.code)) return `wrangler d1 execute failed (${e.code})`;
   return "wrangler d1 execute failed";
+}
+
+/** Exit status when wrangler succeeded but its output could not confirm the reset. */
+export const EXIT_UNCONFIRMED = 2;
+
+export interface ResetReport {
+  stdout: string[];
+  stderr: string[];
+  exitCode: number;
+}
+
+/**
+ * What the script prints and its exit status for an outcome. A generated password is printed
+ * whenever the UPDATE may have run — including `unconfirmed`, where dropping it could lock the user
+ * out with a password nobody knows (final review M2) — and never for `no_account`.
+ */
+export function resetReport(
+  outcome: ResetOutcome,
+  ctx: { email: string; target: string; generatedPassword?: string; revokeTokens: boolean },
+): ResetReport {
+  const temporary = ctx.generatedPassword === undefined ? [] : [`Temporary password: ${ctx.generatedPassword}`];
+  switch (outcome) {
+    case "reset":
+      return {
+        stdout: [
+          `Password reset for ${ctx.email} in ${ctx.target}.`,
+          ...temporary,
+          ...(ctx.revokeTokens ? ["All device tokens of this account were revoked."] : []),
+        ],
+        stderr: [],
+        exitCode: 0,
+      };
+    case "no_account":
+      return { stdout: [], stderr: [`No account with email ${ctx.email} in ${ctx.target}; nothing changed.`], exitCode: 1 };
+    case "unconfirmed":
+      return {
+        stdout: temporary,
+        stderr: [
+          `Warning: could not confirm the result from wrangler's output. The password for ${ctx.email} in ${ctx.target} ` +
+            `may have been changed${ctx.revokeTokens ? " and its device tokens revoked" : ""} — verify manually ` +
+            "(e.g. log in with the new password).",
+        ],
+        exitCode: EXIT_UNCONFIRMED,
+      };
+  }
 }

@@ -1,8 +1,10 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { accountExistsFromWranglerJson, buildResetSql, sqlString } from "../scripts/reset-sql";
-import { choosePasswordSource, confirmationMatches, needsConfirmation, wranglerFailureMessage } from "../scripts/reset-cli";
+import { buildResetSql, resetOutcomeFromWranglerJson, sqlString } from "../scripts/reset-sql";
+import {
+  choosePasswordSource, confirmationMatches, EXIT_UNCONFIRMED, needsConfirmation, resetReport, wranglerFailureMessage,
+} from "../scripts/reset-cli";
 import { createLinePrompter } from "../scripts/line-prompter";
 import { createArgon2 } from "../src/auth/argon2";
 import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
@@ -45,39 +47,83 @@ describe("reset-password SQL", () => {
   });
 });
 
-describe("accountExistsFromWranglerJson", () => {
-  it("returns true when account exists (n=1)", () => {
-    const output = JSON.stringify([{ results: [{ n: 1 }] }]);
-    expect(accountExistsFromWranglerJson(output)).toBe(true);
+describe("resetOutcomeFromWranglerJson", () => {
+  const json = (value: unknown) => JSON.stringify(value);
+
+  it("reset when the first statement counted one account", () => {
+    expect(resetOutcomeFromWranglerJson(json([{ results: [{ n: 1 }] }]))).toBe("reset");
   });
 
-  it("returns false when account does not exist (n=0)", () => {
-    const output = JSON.stringify([{ results: [{ n: 0 }] }]);
-    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  it("no_account when it counted none", () => {
+    expect(resetOutcomeFromWranglerJson(json([{ results: [{ n: 0 }] }]))).toBe("no_account");
   });
 
-  it("returns false with empty results array", () => {
-    const output = JSON.stringify([{ results: [] }]);
-    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  it("reads real D1 batch results of the reset SQL (the shape wrangler --json prints)", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const argon2 = await createArgon2(argon2Module);
+    const existing = await runSql(buildResetSql(account.email, argon2.hash("reset by support"), 1_900_000_000_000, true));
+    expect(resetOutcomeFromWranglerJson(json(existing))).toBe("reset");
+    const missing = await runSql(buildResetSql("nobody@example.com", "$argon2id$x", 1, false));
+    expect(resetOutcomeFromWranglerJson(json(missing))).toBe("no_account");
   });
 
-  it("returns false with missing results property", () => {
-    const output = JSON.stringify([{}]);
-    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  it.each([
+    ["invalid JSON", "not valid json"],
+    ["truncated JSON", '[{"results":[{"n":1}]'],
+    ["a banner before the JSON", 'wrangler 4.139.0\n[{"results":[{"n":1}]}]'],
+    ["empty output", ""],
+    ["not an array", json({ results: [{ n: 1 }] })],
+    ["an empty array", json([])],
+    ["a null first result", json([null])],
+    ["a first result without results", json([{ error: "something" }])],
+    ["an empty results array", json([{ results: [] }])],
+    ["a null row", json([{ results: [null] }])],
+    ["an unexpected count", json([{ results: [{ n: 2 }] }])],
+    ["a count as a string", json([{ results: [{ n: "1" }] }])],
+  ])("unconfirmed (never 'nothing changed') for %s", (_, output) => {
+    expect(resetOutcomeFromWranglerJson(output)).toBe("unconfirmed");
+  });
+});
+
+describe("resetReport", () => {
+  const ctx = { email: "user@example.com", target: "production", revokeTokens: false };
+
+  it("reset: confirms, prints a generated password and the revocation note, exit 0", () => {
+    expect(resetReport("reset", { ...ctx, generatedPassword: "Tmp-Pass_123", revokeTokens: true })).toEqual({
+      stdout: [
+        "Password reset for user@example.com in production.",
+        "Temporary password: Tmp-Pass_123",
+        "All device tokens of this account were revoked.",
+      ],
+      stderr: [],
+      exitCode: 0,
+    });
+    expect(resetReport("reset", ctx).stdout).toEqual(["Password reset for user@example.com in production."]);
   });
 
-  it("returns false with invalid JSON", () => {
-    expect(accountExistsFromWranglerJson("not valid json")).toBe(false);
+  it("no_account: says nothing changed, never prints the password, exit 1", () => {
+    const report = resetReport("no_account", { ...ctx, generatedPassword: "Tmp-Pass_123" });
+    expect(report).toEqual({
+      stdout: [],
+      stderr: ["No account with email user@example.com in production; nothing changed."],
+      exitCode: 1,
+    });
   });
 
-  it("returns false with empty array", () => {
-    const output = JSON.stringify([]);
-    expect(accountExistsFromWranglerJson(output)).toBe(false);
-  });
-
-  it("returns false when first result has no results property", () => {
-    const output = JSON.stringify([{ error: "something" }]);
-    expect(accountExistsFromWranglerJson(output)).toBe(false);
+  it("unconfirmed: warns to verify manually and still prints the generated password, distinct exit status", () => {
+    const report = resetReport("unconfirmed", { ...ctx, generatedPassword: "Tmp-Pass_123", revokeTokens: true });
+    expect(report.stdout).toEqual(["Temporary password: Tmp-Pass_123"]);
+    expect(report.stderr).toHaveLength(1);
+    expect(report.stderr[0]).toContain("could not confirm");
+    expect(report.stderr[0]).toContain("verify manually");
+    expect(report.stderr[0]).toContain("device tokens revoked");
+    expect(report.stderr.join(" ")).not.toContain("nothing changed");
+    expect(report.exitCode).toBe(EXIT_UNCONFIRMED);
+    expect(EXIT_UNCONFIRMED).not.toBe(0);
+    expect(EXIT_UNCONFIRMED).not.toBe(1);
+    // A password the operator supplied is never echoed back.
+    expect(resetReport("unconfirmed", ctx).stdout).toEqual([]);
   });
 });
 

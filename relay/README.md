@@ -112,6 +112,12 @@ Rate limiting `namespace_id`s must be unique within the account: 1001–1003 pro
   confirm before touching anything remote; pass `--yes` to skip that prompt for scripting. `--env local`
   never asks. `--revoke-tokens` signs out every device of the account (sockets already open stay up
   until they reconnect). Pairings are kept.
+
+  Exit status: `0` password reset; `1` nothing changed (unknown e-mail address, a wrong confirmation, bad
+  arguments) or wrangler failed (printed as a single line such as `wrangler d1 execute failed (exit 1)`,
+  never the SQL); `2` wrangler ran but its output could not be read, so the reset **may or may not**
+  have happened. On `2` the script prints a warning and still prints the generated temporary password
+  (if it generated one): check by logging in with it before telling the user.
 - Roll back code: `npx wrangler rollback --env production`. D1 migrations are not rolled back; write a
   new forward migration instead.
 
