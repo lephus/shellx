@@ -332,6 +332,120 @@ void main() {
     });
   });
 
+  // Fix round 1.
+
+  test('a re-attach that times out on a live channel does not end the pass: '
+      'the next tab still re-attaches', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final first = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final firstPty = h.pty;
+      final second = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final secondPty = h.pty;
+      final firstEvents = TabRecorder(first);
+      final secondEvents = TabRecorder(second);
+      settle(async);
+
+      // The phone comes back while the agent's answers are lost: the
+      // automatic resume fails (the relay and PRESENCE triggers coalesce
+      // into at most two attempts) and nothing else asks for one.
+      h.relay.onData = (from, to, frame) => from == agentId ? null : frame;
+      h.disconnectPhone();
+      h.reconnectPhone();
+      async.elapse(const Duration(seconds: 30));
+      expect(h.phoneMachine.state, isA<MachineFailed>());
+
+      // The app asks again. The agent's answers now arrive, but only after
+      // the request timeout (in order): the first tab's re-attach times out
+      // while the channel stays up.
+      final held = <DataFrame>[];
+      h.relay.onData = (from, to, frame) {
+        if (from == agentId &&
+            frame.payload.first == PayloadKind.transport.wire) {
+          held.add(frame);
+          return null;
+        }
+        return frame;
+      };
+      final listed = <Object>[];
+      h.phoneMachine.listSessions().then(listed.add, onError: listed.add);
+      async.elapse(const Duration(seconds: 12));
+      expect(h.phoneMachine.state, isA<MachineReady>());
+      expect(listed, [failure(MachineConnectionFailure.timeout)]);
+      h.relay.onData = null;
+      held.forEach(h.phoneMachine.handleFrame);
+      settle(async);
+
+      firstPty.emit('one');
+      secondPty.emit('two');
+      settle(async);
+      expect(firstEvents.text, 'one');
+      expect(secondEvents.text, 'two');
+      expect((first.isAttached, second.isAttached), (true, true));
+      expect(h.sessions.sessions.map((s) => s.attachedMobileId), [
+        phoneId,
+        phoneId,
+      ]);
+    });
+  });
+
+  test('after a resume that failed, a channel the app asks for re-attaches '
+      'the stale tab', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final recorder = TabRecorder(tab);
+      h.pty.emit('before ');
+      settle(async);
+
+      // The agent's answers are lost while the phone comes back: the
+      // resume's handshake times out.
+      h.relay.onData = (from, to, frame) => from == agentId ? null : frame;
+      h.disconnectPhone();
+      h.reconnectPhone();
+      async.elapse(const Duration(seconds: 30));
+      expect(
+        h.phoneMachine.state,
+        isA<MachineFailed>().having(
+          (s) => s.failure,
+          'failure',
+          MachineConnectionFailure.timeout,
+        ),
+      );
+      h.relay.onData = null;
+
+      expect(h.run(h.phoneMachine.listSessions()), hasLength(1));
+      h.pty.emit('after');
+      settle(async);
+      expect(recorder.text, 'before after');
+      expect(tab.isAttached, isTrue);
+      expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+    });
+  });
+
+  test('a tab opened while the others re-attach is not attached twice', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      settle(async);
+      h.disconnectPhone();
+
+      // The app opens a tab as soon as the machine is ready again.
+      final opened = <ClientTab>[];
+      h.phoneMachine.states.listen((state) {
+        if (state is MachineReady && opened.isEmpty) {
+          h.phoneMachine.openSession(cols: 80, rows: 24).then(opened.add);
+        }
+      });
+      h.reconnectPhone();
+
+      expect(opened, hasLength(1));
+      expect(h.ptys.ptys, hasLength(2));
+      expect(h.ptys.ptys.last.resizes, isEmpty); // Never re-attached.
+      expect(h.ptys.ptys.first.resizes, [(80, 23), (80, 24)]);
+    });
+  });
+
   test('stop() and start() of the phone service re-attach the open tab', () {
     fakeAsync((async) {
       final h = Harness(async, keys);
@@ -355,6 +469,13 @@ void main() {
     });
   });
 }
+
+Matcher failure(MachineConnectionFailure failure) =>
+    isA<MachineConnectionException>().having(
+      (e) => e.failure,
+      'failure',
+      failure,
+    );
 
 /// [frame] with its last byte flipped: the Noise tag no longer matches.
 DataFrame corrupted(DataFrame frame) {

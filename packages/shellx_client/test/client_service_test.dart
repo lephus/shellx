@@ -81,6 +81,31 @@ void sendPairingRemoved(Harness h, String pairingId) {
   settle(h.async);
 }
 
+/// Replaces the agent with a reinstalled one: same device id, trust list and
+/// sessions, but a new identity key.
+void reinstallAgent(Harness h, NoiseKeyPair identity) {
+  h.agent.stop();
+  settle(h.async);
+  h.agent = AgentService(
+    relay: RelayConnection(
+      wsUri: h.relay.wsUri,
+      token: () => h.agentDevice.token,
+      connector: h.relay.connector,
+    ),
+    api: ShellxApi(baseUri: h.relay.baseUri, httpClient: h.relay.httpClient)
+      ..token = h.agentDevice.token,
+    deviceId: agentId,
+    identity: identity,
+    trusted: h.trusted,
+    sessions: h.sessions,
+    pairing: PairingCodeManager(now: () => h.now),
+    appVersion: '1.0.0',
+  );
+  h.agent.events.listen(h.agentEvents.add);
+  h.run(h.agent.start());
+  settle(h.async);
+}
+
 http.Response relayError(int status) => http.Response(
   jsonEncode({
     'error': {'code': 'test_$status', 'message': 'Injected by the test'},
@@ -525,6 +550,9 @@ void main() {
         'is over, then handshakes with the new pin', () {
       fakeAsync((async) {
         final h = Harness(async, keys);
+        // The machine was reinstalled with a new key: the pin is stale until
+        // the phone pairs again.
+        reinstallAgent(h, keys.other);
         final lists = <List<SessionInfo>>[];
         final errors = <Object>[];
         var triggered = false;
@@ -545,10 +573,39 @@ void main() {
           h.run(h.trusted.find(phoneId))!.pairingId,
           isNot(phonePairingId),
         );
+        expect(
+          h.run(h.phonePins.find(agentId))!.publicKey,
+          keys.other.publicKey,
+        );
         expect(errors, isEmpty);
         expect(lists, [isEmpty]);
         expect(fromPhone(h, PayloadKind.hs1Ik), hasLength(1));
         expect(h.phoneMachine.state, isA<MachineReady>());
+      });
+    });
+
+    test('a handshake waiting for a pairing sends nothing when the machine '
+        'is unpaired meanwhile', () {
+      fakeAsync((async) {
+        final h = Harness(async, keys);
+        final machine = h.phoneMachine;
+        final errors = <Object>[];
+        var triggered = false;
+        h.relay.onData = (from, to, frame) {
+          if (!triggered &&
+              from == phoneId &&
+              frame.payload.first == PayloadKind.hs1IkPsk2.wire) {
+            triggered = true;
+            machine.connect().catchError(errors.add);
+            h.phone.unpair(agentId).ignore();
+          }
+          return frame;
+        };
+        h.run(h.phone.pair(h.agent.startPairing()));
+        settle(async);
+
+        expect(errors, [isA<MachineConnectionException>()]);
+        expect(fromPhone(h, PayloadKind.hs1Ik), isEmpty);
       });
     });
   });
@@ -731,7 +788,8 @@ void main() {
       fakeAsync((async) {
         final h = Harness(async, keys);
         final machine = h.phoneMachine;
-        h.run(machine.openSession(cols: 80, rows: 24));
+        final tab = h.run(machine.openSession(cols: 80, rows: 24));
+        final recorder = TabRecorder(tab);
         settle(async);
         final states = <MachineConnectionState>[];
         machine.states.listen(states.add);
@@ -751,6 +809,16 @@ void main() {
         );
         expect(h.run(h.phonePins.find(agentId)), isNull);
         expect(() => h.phone.machine(agentId), throwsStateError);
+        // The tab can never re-attach: it ends, and later reconnects and
+        // PRESENCE ask nothing more.
+        expect(tab.isAttached, isFalse);
+        expect(recorder.events.whereType<TabError>(), hasLength(1));
+        h.disconnectPhone();
+        h.reconnectPhone();
+        h.restartAgent();
+        async.elapse(const Duration(minutes: 1));
+        expect(states.whereType<MachineConnecting>(), hasLength(1));
+        expect(states.whereType<MachineFailed>(), hasLength(1));
       });
     });
 

@@ -68,6 +68,11 @@ final class MachineClient {
   bool _resumeAgain = false;
 
   final _tabs = <int, ClientTab>{};
+
+  /// Tabs opened or (re-)attached on the current channel; cleared when it
+  /// is lost. An attached tab missing here is stale: the agent does not
+  /// send it anything until it is re-attached.
+  final _attachedHere = <ClientTab>{};
   final _pendingOpens = <_PendingOpen>[];
   final _pendingLists = <Completer<List<SessionInfo>>>[];
 
@@ -165,6 +170,7 @@ final class MachineClient {
     } catch (_) {
       if (isNew && identical(_tabs[id], tab)) {
         _tabs.remove(id);
+        _attachedHere.remove(tab);
         tab.dispose();
       }
       rethrow;
@@ -198,6 +204,7 @@ final class MachineClient {
   Future<void> closeTab(int id) async {
     final tab = _tabs.remove(id);
     if (tab == null) return;
+    _attachedHere.remove(tab);
     final wasAttached = tab.isAttached;
     tab.dispose();
     if (wasAttached && _send([SessionClose(id: id)])) await _outbox;
@@ -255,8 +262,9 @@ final class MachineClient {
 
   /// Never leaves the state at [MachineConnecting]: an unexpected error
   /// fails the handshake with `timeout`, like an answer that never comes.
-  /// A handshake voided by [dropChannel] starts over; each restart needs a
-  /// new drop, so this cannot spin.
+  /// A handshake voided by [dropChannel], or that waited for a pairing,
+  /// starts over; each restart needs a new drop or pairing, so this cannot
+  /// spin.
   Future<void> _handshakeNow() async {
     final losses = _losses; // A loss from here on voids this attempt.
     try {
@@ -269,12 +277,12 @@ final class MachineClient {
   }
 
   /// One IK handshake on a new channel id: true once its channel is
-  /// installed, false when [dropChannel] voided it in flight.
+  /// installed, false when it must start over.
   Future<bool> _handshakeSteps(int losses) async {
+    if (losses != _losses) _failLost(); // Lost while waiting for a pairing.
     final key = _pinnedKey();
     if (key == null || key.length != 32) {
-      await _forgetPinQuietly(); // An unusable pin is as good as none.
-      _fail(MachineConnectionFailure.untrusted);
+      await _untrusted(); // An unusable pin is as good as none.
     }
     // Throws FormatException for a malformed id: before MachineConnecting.
     final prologue = buildPrologue(
@@ -291,9 +299,12 @@ final class MachineClient {
     final hello = await handshake.writeMessage(_hello.encode());
     // Never while pairing with this agent: between the pairing's HS1 and
     // pair.confirm this HS1 would replace the pairing channel on the agent,
-    // which would then ignore the confirm. Sent once the pairing is over.
-    for (var pairing = _pairing(); pairing != null; pairing = _pairing()) {
+    // which would then ignore the confirm. Once the pairing is over, start
+    // again: it may have changed the pin, or the machine may be gone.
+    final pairing = _pairing();
+    if (pairing != null) {
       await pairing;
+      return false;
     }
     final channel = ChannelId.random();
     final reply = Completer<Uint8List?>();
@@ -330,15 +341,30 @@ final class MachineClient {
       _fail(MachineConnectionFailure.protocolUnsupported);
     }
     if (answer.status != HandshakeStatus.ok) {
-      await _forgetPinQuietly(); // Spec §12: untrusted → drop the pinned key.
-      _fail(MachineConnectionFailure.untrusted);
+      await _untrusted(); // Spec §12: untrusted → drop the pinned key.
     }
     if (losses != _losses) _failLost(); // Lost while in flight.
     if (drops != _drops) return false; // The agent may have replaced it.
     _channelId = channel;
     _secure = SecureChannel(handshake.split());
     _setState(const MachineReady());
+    // Whoever asked for this channel, stale tabs re-attach on it.
+    unawaited(_resume());
     return true;
+  }
+
+  /// The agent does not trust this phone (or there is no usable pin):
+  /// forget the pin and end every attached tab, which can never re-attach,
+  /// so later reconnects and PRESENCE leave this machine alone.
+  Future<Never> _untrusted() async {
+    await _forgetPinQuietly();
+    for (final tab in _tabs.values.where((t) => t.isAttached).toList()) {
+      tab.handleError(
+        AppErrorCode.sessionNotFound,
+        'This machine no longer trusts this phone',
+      );
+    }
+    _fail(MachineConnectionFailure.untrusted);
   }
 
   Future<void> _forgetPinQuietly() async {
@@ -443,6 +469,7 @@ final class MachineClient {
           sendAck: _sendAck,
         );
         _tabs[id] = tab;
+        _attachedHere.add(tab);
         pending.completer.complete(tab);
       case SessionAttached(:final id):
         _takeAttach(id)?.complete();
@@ -471,6 +498,7 @@ final class MachineClient {
 
   Future<void> _attach(ClientTab tab) {
     tab.beginAttach();
+    if (_secure != null) _attachedHere.add(tab); // Sent on this channel.
     final done = Completer<void>();
     final id = tab.id;
     (_pendingAttaches[id] ??= []).add(done);
@@ -526,13 +554,13 @@ final class MachineClient {
     );
   }
 
-  /// Re-handshake and re-attach every tab that is still attached (not
-  /// taken over, exited or ended) with `last_seq = received`, one at a
-  /// time. A call while a resume runs (the channel was lost again during
-  /// its attaches) makes that resume do one more pass. Only ever triggered
-  /// by an event (relay back, PRESENCE online, decrypt error, a dropped
-  /// channel), so an agent that stays offline costs one handshake per
-  /// event.
+  /// Re-handshake and re-attach every stale tab (still attached, i.e. not
+  /// taken over, exited or ended, but not on the current channel) with
+  /// `last_seq = received`, one at a time. A call while a resume runs (the
+  /// channel was lost again during its attaches) makes that resume do one
+  /// more pass. Only ever triggered by an event (relay back, PRESENCE
+  /// online, decrypt error, a dropped channel, a new channel installed by
+  /// anyone), so an agent that stays offline costs one handshake per event.
   Future<void> _resume() async {
     if (_resuming) {
       _resumeAgain = true;
@@ -550,17 +578,21 @@ final class MachineClient {
   }
 
   Future<void> _resumeOnce() async {
-    if (_state is MachineReady) return; // Nothing lost since the last pass.
-    final wanted = _tabs.values.where((t) => t.isAttached).toList();
-    if (wanted.isEmpty) return;
+    if (_pinnedKey() == null) return; // Untrusted or unpaired: nothing to do.
+    if (!_tabs.values.any(_isStale)) return;
     try {
       await connect(); // Joins a handshake the app already started.
-      for (final tab in wanted) {
-        if (!tab.isAttached || !identical(_tabs[tab.id], tab)) continue;
+      // Tabs opened or attached on this channel since are not stale.
+      for (final tab in _tabs.values.where(_isStale).toList()) {
+        if (!_isStale(tab) || !identical(_tabs[tab.id], tab)) continue;
         try {
           await _attach(tab);
         } on AppErrorException {
           // The tab already received TabError (session_not_found).
+        } on MachineConnectionException {
+          if (_secure == null) rethrow; // The channel is gone: pass over.
+          // A slow answer on a live channel: the agent has the attach (it
+          // answers after replaying up to 256 KiB); go on with the next.
         }
       }
     } on MachineConnectionException {
@@ -569,8 +601,13 @@ final class MachineClient {
     }
   }
 
+  /// Attached as far as the phone knows, but not on the current channel.
+  bool _isStale(ClientTab tab) =>
+      tab.isAttached && !_attachedHere.contains(tab);
+
   void _channelLost() {
     _losses++;
+    _attachedHere.clear();
     final handshake = _handshake;
     if (handshake != null && !handshake.reply.isCompleted) {
       handshake.reply.complete(null); // Fails the handshake now.
