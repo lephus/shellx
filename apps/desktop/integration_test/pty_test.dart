@@ -13,7 +13,8 @@ final RegExp _ansi = RegExp(
   r'\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1B]*(?:\x07|\x1B\\)|[@-Z\\-_])',
 );
 
-/// Accumulates PTY output (ANSI stripped) and waits for a whole line.
+/// Accumulates PTY output and waits for a whole line (ANSI stripped) or for
+/// a raw sequence.
 final class Transcript {
   Transcript(Stream<Uint8List> output) {
     // Chunked decoding: a character may be split across output chunks.
@@ -39,8 +40,10 @@ final class Transcript {
   final StreamController<void> _changes = StreamController<void>.broadcast();
   late final StreamSubscription<String> _subscription;
 
-  List<String> get lines => _raw
-      .toString()
+  /// Everything received so far, escape sequences included.
+  String get raw => _raw.toString();
+
+  List<String> get lines => raw
       .replaceAll(_ansi, '')
       .split(RegExp(r'\r?\n|\r'))
       .map((line) => line.trim())
@@ -49,15 +52,36 @@ final class Transcript {
   Future<void> waitForLine(
     bool Function(String line) test, {
     Duration timeout = const Duration(seconds: 30),
-  }) async {
+  }) => _waitFor(() => lines.any(test), timeout);
+
+  Future<void> waitForRaw(
+    bool Function(String raw) test, {
+    Duration timeout = const Duration(seconds: 30),
+  }) => _waitFor(() => test(raw), timeout);
+
+  Future<void> _waitFor(bool Function() test, Duration timeout) async {
     final deadline = DateTime.now().add(timeout);
-    while (!lines.any(test)) {
+    while (!test()) {
       final left = deadline.difference(DateTime.now());
       if (left <= Duration.zero) {
         fail('Timed out. Transcript:\n${lines.join('\n')}');
       }
       await _changes.stream.first.timeout(left, onTimeout: () {});
     }
+  }
+
+  /// Waits for a line ending in `<name>=<digits>` (a background job may
+  /// print it after the prompt) and returns the number.
+  Future<int> waitForNumber(String name) async {
+    final pattern = RegExp('\\b$name=(\\d+)\$');
+    late int value;
+    await waitForLine((line) {
+      final match = pattern.firstMatch(line);
+      if (match == null) return false;
+      value = int.parse(match[1]!);
+      return true;
+    });
+    return value;
   }
 
   Future<void> close() => _subscription.cancel();
@@ -113,6 +137,13 @@ bool _windowsProcessRunning(int processId) {
   return (result.stdout as String).contains('"$processId"');
 }
 
+/// Whether a process with [processId] is running.
+Future<bool> _running(int processId) async {
+  if (Platform.isWindows) return _windowsProcessRunning(processId);
+  final probe = await Process.run('/bin/kill', ['-0', '$processId']);
+  return probe.exitCode == 0;
+}
+
 /// Windows: the conhost.exe processes this process started — one per open
 /// pseudo console.
 Set<int> _conhostChildren() {
@@ -129,27 +160,67 @@ Set<int> _conhostChildren() {
   };
 }
 
+/// macOS: pseudo-terminal descriptors of this process as "fd name" (lsof):
+/// the master is /dev/ptmx, a slave /dev/ttysNNN or, once its session has
+/// ended, "(revoked)".
+Set<String> _ptyFds() {
+  final result = Process.runSync('/usr/sbin/lsof', ['-p', '$pid', '-F', 'fn']);
+  final fds = <String>{};
+  String? fd;
+  for (final line in const LineSplitter().convert(result.stdout as String)) {
+    if (line.startsWith('f')) {
+      fd = int.tryParse(line.substring(1)) == null ? null : line.substring(1);
+    } else if (line.startsWith('n') && fd != null) {
+      final name = line.substring(1);
+      if (name == '/dev/ptmx' ||
+          name.startsWith('/dev/tty') ||
+          name == '(revoked)') {
+        fds.add('$fd $name');
+      }
+    }
+  }
+  return fds;
+}
+
+/// What an ended session could leave behind in this process: pty
+/// descriptors (macOS) or conhost.exe children (Windows).
+Set<String> _sessionLeftovers() => Platform.isWindows
+    ? {for (final host in _conhostChildren()) 'conhost.exe $host'}
+    : _ptyFds();
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final factory = FlutterPtyFactory.forCurrentPlatform();
+
+  /// Spawns [shell]; the pty is killed and its transcript closed when the
+  /// test ends, whatever happens.
+  (Pty, Transcript) open(
+    ShellCommand shell, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) {
+    final pty = factory.spawn(
+      shell,
+      workingDirectory: workingDirectory ?? _home,
+      environment: environment ?? _environment(),
+      cols: 80,
+      rows: 24,
+    );
+    addTearDown(pty.kill);
+    final transcript = Transcript(pty.output);
+    addTearDown(transcript.close);
+    return (pty, transcript);
+  }
 
   for (final shell in _shells()) {
     testWidgets('${shell.name}: echo shellx-ok comes back on its own line', (
       tester,
     ) async {
-      final pty = factory.spawn(
-        shell,
-        workingDirectory: _home,
-        environment: _environment(),
-        cols: 80,
-        rows: 24,
-      );
-      final transcript = Transcript(pty.output);
+      final (pty, transcript) = open(shell);
       _type(pty, 'echo shellx-ok');
       await transcript.waitForLine((line) => line == 'shellx-ok');
       pty.kill();
       await pty.exitCode.timeout(const Duration(seconds: 15));
-      await transcript.close();
     });
   }
 
@@ -159,17 +230,11 @@ void main() {
     tester,
   ) async {
     final dir = await Directory.systemTemp.createTemp('shellx-thư-mục-');
+    addTearDown(() => dir.delete(recursive: true));
     await File(
       '${dir.path}${Platform.pathSeparator}marker.txt',
     ).writeAsString('x');
-    final pty = factory.spawn(
-      shell,
-      workingDirectory: dir.path,
-      environment: _environment(),
-      cols: 80,
-      rows: 24,
-    );
-    final transcript = Transcript(pty.output);
+    final (pty, transcript) = open(shell, workingDirectory: dir.path);
     if (Platform.isWindows) {
       _type(
         pty,
@@ -187,8 +252,6 @@ void main() {
     await transcript.waitForLine((line) => line == 'env-1');
     pty.kill();
     await pty.exitCode.timeout(const Duration(seconds: 15));
-    await transcript.close();
-    await dir.delete(recursive: true);
   });
 
   testWidgets(
@@ -197,16 +260,11 @@ void main() {
       final dir = await Directory.systemTemp.createTemp('shellx-Nguyễn-Văn-');
       addTearDown(() => dir.delete(recursive: true));
       final name = dir.path.split(Platform.pathSeparator).last;
-      final pty = factory.spawn(
+      final (pty, transcript) = open(
         shell,
         workingDirectory: dir.path,
         environment: {..._environment(), 'SHELLX_TEN': 'Lê Hữu Phú'},
-        cols: 80,
-        rows: 24,
       );
-      addTearDown(pty.kill);
-      final transcript = Transcript(pty.output);
-      addTearDown(transcript.close);
       if (Platform.isWindows) {
         _type(
           pty,
@@ -222,14 +280,7 @@ void main() {
   );
 
   testWidgets('output closes within 2 s after the shell exits', (tester) async {
-    final pty = factory.spawn(
-      shell,
-      workingDirectory: _home,
-      environment: _environment(),
-      cols: 80,
-      rows: 24,
-    );
-    final transcript = Transcript(pty.output);
+    final (pty, transcript) = open(shell);
     _type(pty, 'exit');
     await pty.exitCode.timeout(const Duration(seconds: 15));
     await transcript.done.timeout(const Duration(seconds: 2));
@@ -238,15 +289,7 @@ void main() {
   testWidgets('output written right before the shell exits is delivered', (
     tester,
   ) async {
-    final pty = factory.spawn(
-      shell,
-      workingDirectory: _home,
-      environment: _environment(),
-      cols: 80,
-      rows: 24,
-    );
-    addTearDown(pty.kill);
-    final transcript = Transcript(pty.output);
+    final (pty, transcript) = open(shell);
     if (Platform.isWindows) {
       _type(pty, r"1..2000 | % { 'line-' + $_ }; 'tail-' + (6*7); exit");
     } else {
@@ -267,16 +310,12 @@ void main() {
       // dart:io reaps any child while a Process it started runs (the agent
       // keeps `caffeinate` running), which can take the shell's exit status.
       final other = await Process.start('/bin/sleep', ['30']);
-      addTearDown(other.kill);
-      final pty = factory.spawn(
-        shell,
-        workingDirectory: _home,
-        environment: _environment(),
-        cols: 80,
-        rows: 24,
-      );
-      addTearDown(pty.kill);
-      final transcript = Transcript(pty.output);
+      addTearDown(() async {
+        other.kill();
+        // Let dart:io reap it before the next test spawns a shell.
+        await other.exitCode;
+      });
+      final (pty, transcript) = open(shell);
       _type(pty, 'exit 3');
       final code = await pty.exitCode.timeout(const Duration(seconds: 15));
       expect(code, anyOf(3, -1));
@@ -285,75 +324,63 @@ void main() {
     skip: Platform.isWindows,
   );
 
-  testWidgets('finished sessions leave no file descriptors behind', (
-    tester,
-  ) async {
-    // Pseudo-terminal descriptors of this process as "fd name" (lsof): the
-    // master is /dev/ptmx, a slave /dev/ttysNNN or, once its session has
-    // ended, "(revoked)".
-    Set<String> ptyFds() {
-      final result = Process.runSync('/usr/sbin/lsof', [
-        '-p',
-        '$pid',
-        '-F',
-        'fn',
-      ]);
-      final fds = <String>{};
-      String? fd;
-      for (final line in const LineSplitter().convert(
-        result.stdout as String,
-      )) {
-        if (line.startsWith('f')) {
-          fd = int.tryParse(line.substring(1)) == null
-              ? null
-              : line.substring(1);
-        } else if (line.startsWith('n') && fd != null) {
-          final name = line.substring(1);
-          if (name == '/dev/ptmx' ||
-              name.startsWith('/dev/tty') ||
-              name == '(revoked)') {
-            fds.add('$fd $name');
-          }
-        }
-      }
-      return fds;
-    }
-
-    Future<void> runOne() async {
-      final pty = factory.spawn(
-        shell,
-        workingDirectory: _home,
-        environment: _environment(),
-        cols: 80,
-        rows: 24,
+  testWidgets('a shell that cannot be started', (tester) async {
+    const missing = ShellCommand(
+      executable: 'shellx-no-such-shell',
+      arguments: [],
+      name: 'missing',
+    );
+    if (Platform.isWindows) {
+      // CreateProcessW fails: spawn throws and the pseudo console created
+      // before it is closed again.
+      final before = _conhostChildren();
+      expect(
+        () => factory.spawn(
+          missing,
+          workingDirectory: _home,
+          environment: _environment(),
+          cols: 80,
+          rows: 24,
+        ),
+        throwsStateError,
       );
-      addTearDown(pty.kill);
-      final transcript = Transcript(pty.output);
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(_conhostChildren().difference(before), isEmpty);
+    } else {
+      // execvp fails in the forked child, which must exit (127) instead of
+      // running on as a copy of the agent. (-1: dart:io reaped it first, see
+      // the dart:io child test above.)
+      final (pty, transcript) = open(missing);
+      expect(
+        await pty.exitCode.timeout(const Duration(seconds: 15)),
+        anyOf(127, -1),
+      );
+      await transcript.done.timeout(const Duration(seconds: 2));
+    }
+  });
+
+  testWidgets('finished sessions leave nothing behind', (tester) async {
+    Future<void> runOne() async {
+      final (pty, transcript) = open(shell);
       _type(pty, 'exit');
       await pty.exitCode.timeout(const Duration(seconds: 15));
       await transcript.done.timeout(const Duration(seconds: 2));
     }
 
     await runOne();
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    final before = ptyFds();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final before = _sessionLeftovers();
     for (var i = 0; i < 5; i++) {
       await runOne();
     }
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    final added = ptyFds().difference(before);
-    expect(added, isEmpty);
-  }, skip: Platform.isWindows);
+    await Future<void>.delayed(
+      Duration(milliseconds: Platform.isWindows ? 3000 : 500),
+    );
+    expect(_sessionLeftovers().difference(before), isEmpty);
+  });
 
   testWidgets('resize(cols, rows) reaches the terminal', (tester) async {
-    final pty = factory.spawn(
-      shell,
-      workingDirectory: _home,
-      environment: _environment(),
-      cols: 80,
-      rows: 24,
-    );
-    final transcript = Transcript(pty.output);
+    final (pty, transcript) = open(shell);
     pty.resize(100, 30);
     await Future<void>.delayed(const Duration(milliseconds: 300));
     if (Platform.isWindows) {
@@ -365,57 +392,57 @@ void main() {
     }
     pty.kill();
     await pty.exitCode.timeout(const Duration(seconds: 15));
-    await transcript.close();
   });
 
   testWidgets('kill() ends the shell and the processes it started', (
     tester,
   ) async {
     final hostsBefore = Platform.isWindows ? _conhostChildren() : <int>{};
-    final pty = factory.spawn(
-      shell,
-      workingDirectory: _home,
-      environment: _environment(),
-      cols: 80,
-      rows: 24,
-    );
-    final transcript = Transcript(pty.output);
+    final (pty, transcript) = open(shell);
+    final children = <int>[];
     if (Platform.isWindows) {
       _type(
         pty,
         r"$p = Start-Process -PassThru -NoNewWindow ping.exe -ArgumentList '-n','300','127.0.0.1'; 'child=' + $p.Id",
       );
+      children.add(await transcript.waitForNumber('child'));
     } else {
-      _type(pty, r'sleep 300 & echo child=$!');
+      // Both ignore SIGHUP, so only the SIGKILL pass can end them.
+      _type(
+        pty,
+        r"(trap '' HUP; sleep 300 & echo grandchild=$!; wait) & "
+        r'echo child=$!',
+      );
+      children
+        ..add(await transcript.waitForNumber('child'))
+        ..add(await transcript.waitForNumber('grandchild'));
     }
-    late int childPid;
-    await transcript.waitForLine((line) {
-      final match = RegExp(r'^child=(\d+)$').firstMatch(line);
-      if (match == null) return false;
-      childPid = int.parse(match[1]!);
-      return true;
+    addTearDown(() async {
+      for (final child in children) {
+        if (await _running(child)) {
+          Process.killPid(child, ProcessSignal.sigkill);
+        }
+      }
     });
 
     pty.kill();
     await pty.exitCode.timeout(const Duration(seconds: 15));
     await Future<void>.delayed(const Duration(seconds: 4));
 
-    if (Platform.isWindows) {
+    for (final child in children) {
       expect(
-        _windowsProcessRunning(childPid),
+        await _running(child),
         isFalse,
-        reason: 'child process survived kill()',
+        reason: 'process $child survived kill()',
       );
+    }
+    if (Platform.isWindows) {
       expect(
         _conhostChildren().difference(hostsBefore),
         isEmpty,
         reason: 'conhost.exe of the closed PTY is still running',
       );
-    } else {
-      final probe = await Process.run('/bin/kill', ['-0', '$childPid']);
-      expect(probe.exitCode, isNot(0), reason: 'child process survived kill()');
     }
-    await transcript.close();
   });
 
   testWidgets(
@@ -424,28 +451,14 @@ void main() {
       // A sleep length no other process uses, to find the late child by.
       final marker = 30000 + Random().nextInt(20000);
       addTearDown(() => Process.run('/usr/bin/pkill', ['-f', 'sleep $marker']));
-      final pty = factory.spawn(
-        shell,
-        workingDirectory: _home,
-        environment: _environment(),
-        cols: 80,
-        rows: 24,
-      );
-      addTearDown(pty.kill);
-      final transcript = Transcript(pty.output);
+      final (pty, transcript) = open(shell);
       // The subshell survives SIGHUP, is re-parented to launchd when the
       // shell dies, and only forks the late child a second into the grace.
       _type(
         pty,
         "(trap '' HUP; sleep 1; sleep $marker & wait) & echo child=\$!",
       );
-      late int childPid;
-      await transcript.waitForLine((line) {
-        final match = RegExp(r'^child=(\d+)$').firstMatch(line);
-        if (match == null) return false;
-        childPid = int.parse(match[1]!);
-        return true;
-      });
+      final child = await transcript.waitForNumber('child');
 
       pty.kill();
       await pty.exitCode.timeout(const Duration(seconds: 15));
@@ -456,8 +469,7 @@ void main() {
           .convert(ps.stdout as String)
           .where((line) => line.contains('sleep $marker'));
       expect(lateChildren, isEmpty, reason: 'late child survived kill()');
-      final probe = await Process.run('/bin/kill', ['-0', '$childPid']);
-      expect(probe.exitCode, isNot(0), reason: 'subshell survived kill()');
+      expect(await _running(child), isFalse, reason: 'subshell survived');
     },
     skip: Platform.isWindows,
   );
@@ -468,22 +480,27 @@ void main() {
   testWidgets(
     'a full-screen program (vim) runs, takes keys and exits',
     (tester) async {
-      final pty = factory.spawn(
-        shell,
-        workingDirectory: _home,
-        environment: _environment(),
-        cols: 80,
-        rows: 24,
-      );
-      final transcript = Transcript(pty.output);
+      final (pty, transcript) = open(shell);
       _type(
         pty,
         Platform.isWindows ? "& '$vim' -u NONE -N" : '$vim -u NONE -N',
       );
-      await Future<void>.delayed(const Duration(seconds: 2));
+      // vim switches to the alternate screen. ConPTY before Windows 11 22H2
+      // re-renders it instead of passing the switch through, so Windows also
+      // accepts vim's start screen.
+      await transcript.waitForRaw(
+        (raw) =>
+            raw.contains('\x1b[?1049h') ||
+            (Platform.isWindows && raw.contains('VIM - Vi IMproved')),
+      );
       pty.resize(90, 30);
       pty.write(Uint8List.fromList(utf8.encode('\x1b:q!\r')));
-      await Future<void>.delayed(const Duration(seconds: 1));
+      // Type the next command only once vim is gone, or vim may read it.
+      if (Platform.isWindows) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      } else {
+        await transcript.waitForRaw((raw) => raw.contains('\x1b[?1049l'));
+      }
       _type(
         pty,
         Platform.isWindows ? "'after-' + 'vim'" : r'echo after-$((0))vim',
@@ -493,7 +510,6 @@ void main() {
       );
       pty.kill();
       await pty.exitCode.timeout(const Duration(seconds: 15));
-      await transcript.close();
     },
     skip: !File(vim).existsSync(),
   );
