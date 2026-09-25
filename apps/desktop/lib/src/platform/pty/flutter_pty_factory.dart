@@ -122,6 +122,29 @@ final class FlutterPtyFactory implements PtyFactory {
   final void Function(String message) _onError;
   bool _reportedNoJob = false;
 
+  /// Tree kills started by this factory's ptys that have not finished yet.
+  final Set<Future<void>> _kills = {};
+
+  /// Completes once every process-tree kill started by this factory's ptys
+  /// has finished (successfully or not) — including kills that start while
+  /// it waits. Never throws; failures went to `onError` already.
+  ///
+  /// The agent awaits this (bounded) before it signs out or exits, so it
+  /// never dies halfway through a macOS tree kill (a frozen survivor would
+  /// stay stopped). Windows kills (job object) are synchronous: nothing to
+  /// wait for.
+  Future<void> killsSettled() async {
+    while (_kills.isNotEmpty) {
+      await Future.wait(_kills.toList());
+    }
+  }
+
+  void _trackKill(Future<void> kill) {
+    final settled = kill.catchError((Object _) {});
+    _kills.add(settled);
+    unawaited(settled.whenComplete(() => _kills.remove(settled)));
+  }
+
   /// Windows: the plugin writes the executable and the arguments into the
   /// command line as given, so each is quoted. Paths and environment values
   /// are passed as they are (the plugin converts UTF-8 to UTF-16).
@@ -176,6 +199,7 @@ final class FlutterPtyFactory implements PtyFactory {
       killer: _killer,
       outputGrace: _outputGrace,
       onError: _onError,
+      onKillStarted: _trackKill,
     );
   }
 }
@@ -195,15 +219,19 @@ final class FlutterPtyFactory implements PtyFactory {
 /// pty right after the exit, and what the shell left behind then keeps
 /// running (on both platforms). Kill failures never throw: they go to
 /// [onError] as `kill of pid <pid> failed: <reason>` — never output,
-/// arguments or environment.
+/// arguments or environment. Each tree kill (a Future that never fails) is
+/// handed to [onKillStarted] so its owner can wait for it
+/// ([FlutterPtyFactory.killsSettled]).
 final class FlutterPtyAdapter implements Pty {
   FlutterPtyAdapter(
     this._native, {
     ProcessTreeKiller? killer,
     this.outputGrace = const Duration(milliseconds: 500),
     void Function(String message)? onError,
+    void Function(Future<void> kill)? onKillStarted,
   }) : _killer = killer,
-       _onError = onError ?? debugPrintError {
+       _onError = onError ?? debugPrintError,
+       _onKillStarted = onKillStarted {
     _nativeSubscription = _native.output.listen(
       _output.add,
       onError: _output.addError,
@@ -225,6 +253,7 @@ final class FlutterPtyAdapter implements Pty {
   final NativePty _native;
   final ProcessTreeKiller? _killer;
   final void Function(String message) _onError;
+  final void Function(Future<void> kill)? _onKillStarted;
   final Duration outputGrace;
   final StreamController<Uint8List> _output = StreamController<Uint8List>();
   late final StreamSubscription<Uint8List> _nativeSubscription;
@@ -260,11 +289,11 @@ final class FlutterPtyAdapter implements Pty {
       _killJob();
     } else if (!_exited) {
       final target = _native.pid;
-      unawaited(
-        killer
-            .killTree(target)
-            .catchError((Object error) => _reportKillError(target, error)),
-      );
+      final kill = killer
+          .killTree(target)
+          .catchError((Object error) => _reportKillError(target, error));
+      _onKillStarted?.call(kill);
+      unawaited(kill);
     }
   }
 

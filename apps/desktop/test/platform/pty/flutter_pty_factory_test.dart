@@ -43,6 +43,21 @@ final class _RecordingKiller implements ProcessTreeKiller {
   Future<void> killTree(int rootPid) async => killed.add(rootPid);
 }
 
+/// A tree kill that finishes only when the test says so.
+final class _GatedKiller implements ProcessTreeKiller {
+  final gates = <int, Completer<void>>{};
+  @override
+  Future<void> killTree(int rootPid) =>
+      (gates[rootPid] = Completer<void>()).future;
+}
+
+final class _PidNativePty extends _FakeNativePty {
+  _PidNativePty(this._pid) : super(_launch);
+  final int _pid;
+  @override
+  int get pid => _pid;
+}
+
 final class _FailingKiller implements ProcessTreeKiller {
   _FailingKiller(this.error);
   final Object error;
@@ -344,6 +359,121 @@ void main() {
       await pumpEventQueue();
 
       expect(errors, ['kill of pid 4321 failed: cannot run ps (OS error 2)']);
+    });
+  });
+
+  group('FlutterPtyFactory.killsSettled', () {
+    var nextPid = 100;
+    Pty spawn(FlutterPtyFactory factory) => factory.spawn(
+      _zsh,
+      workingDirectory: '/',
+      environment: {},
+      cols: 80,
+      rows: 24,
+    );
+    FlutterPtyFactory macFactory(
+      ProcessTreeKiller killer, {
+      void Function(String message)? onError,
+    }) => FlutterPtyFactory(
+      isWindows: false,
+      killer: killer,
+      start: (_) => _PidNativePty(nextPid++),
+      onError: onError,
+    );
+
+    test('completes at once when no kill is in flight', () async {
+      final factory = macFactory(_GatedKiller());
+      spawn(factory);
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+    });
+
+    test('waits for every tree kill in flight, then completes', () async {
+      final killer = _GatedKiller();
+      final factory = macFactory(killer);
+      final first = spawn(factory);
+      final second = spawn(factory);
+      first.kill();
+      second.kill();
+      final firstPid = killer.gates.keys.first;
+      final secondPid = killer.gates.keys.last;
+
+      var settled = false;
+      final done = factory.killsSettled().then((_) => settled = true);
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates[firstPid]!.complete();
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates[secondPid]!.complete();
+      await done.timeout(const Duration(seconds: 1));
+      expect(settled, isTrue);
+      // Nothing left in flight: a later call returns at once.
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+    });
+
+    test('also waits for a kill that starts while it is waiting', () async {
+      final killer = _GatedKiller();
+      final factory = macFactory(killer);
+      final first = spawn(factory);
+      final later = spawn(factory);
+      first.kill();
+
+      var settled = false;
+      final done = factory.killsSettled().then((_) => settled = true);
+      later.kill();
+      killer.gates.values.first.complete();
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates.values.last.complete();
+      await done.timeout(const Duration(seconds: 1));
+    });
+
+    test('a failed kill counts as settled: reported, never thrown', () async {
+      final errors = <String>[];
+      final factory = macFactory(
+        _FailingKiller(const ProcessTableException('ps exited with code 1')),
+        onError: errors.add,
+      );
+      spawn(factory).kill();
+
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+
+      expect(errors, [startsWith('kill of pid ')]);
+      expect(errors.single, endsWith('failed: ps exited with code 1'));
+    });
+
+    test(
+      'a kill skipped after the shell exited leaves nothing to wait for',
+      () async {
+        late _FakeNativePty native;
+        final factory = FlutterPtyFactory(
+          isWindows: false,
+          killer: _GatedKiller(),
+          start: (launch) => native = _FakeNativePty(launch),
+        );
+        final pty = spawn(factory);
+        native.exit.complete(0);
+        await pumpEventQueue();
+
+        pty.kill();
+
+        await factory.killsSettled().timeout(const Duration(seconds: 1));
+      },
+    );
+
+    test('Windows: the job kill is synchronous, nothing to wait for', () async {
+      late _FakeNativePty native;
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => native = _FakeNativePty(launch),
+      );
+      spawn(factory).kill();
+
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+      expect(native.kills, 1);
     });
   });
 }
