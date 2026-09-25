@@ -421,3 +421,95 @@ class FakeBackendFactory implements BackendFactory {
     return backend;
   }
 }
+
+/// A [SessionHolder] for page tests: signed in around [backend] (or signed out without one),
+/// recording what the pages ask of it.
+class FakeSessionHolder implements SessionHolder {
+  FakeSessionHolder([ShellxBackend? backend])
+    : _backend = signal<ShellxBackend?>(backend),
+      _session = signal<AccountSession?>(
+        backend == null
+            ? null
+            : const AccountSession(userId: 'user-1', deviceId: 'device-1', token: 'token-1', email: 'me@example.com'),
+      );
+
+  final Signal<ShellxBackend?> _backend;
+  final Signal<AccountSession?> _session;
+  final Signal<SignOutReason?> _signOutReason = signal(null);
+  late final Computed<bool> _authenticated = computed(() => _session.value != null);
+  int reconnectCalls = 0;
+  int logoutCalls = 0;
+  int restoreCalls = 0;
+  int backgroundCalls = 0;
+  int foregroundCalls = 0;
+  final List<String> deletePasswords = [];
+  Object? deleteError;
+  final List<(String, String, String)> authCalls = [];
+  Object? authError;
+
+  @override
+  String? lastEmail;
+
+  set signOutReasonValue(SignOutReason? reason) => _signOutReason.value = reason;
+
+  /// What a finished sign-out leaves behind (Task 11): no session, no backend, and [reason]. Like
+  /// the real holder, the backend signal changes first thing, so [WorkspaceRegistry] disposes every
+  /// workspace at once.
+  void signOut([SignOutReason reason = SignOutReason.revoked]) => batch(() {
+    _session.value = null;
+    _backend.value = null;
+    _signOutReason.value = reason;
+  });
+
+  @override
+  ReadonlySignal<ShellxBackend?> get backend => _backend;
+
+  @override
+  ShellxBackend get requireBackend => _backend.peek() ?? (throw StateError('Not signed in'));
+
+  @override
+  ReadonlySignal<AccountSession?> get session => _session;
+
+  @override
+  ReadonlySignal<bool> get isAuthenticated => _authenticated;
+
+  @override
+  ReadonlySignal<SignOutReason?> get signOutReason => _signOutReason;
+
+  @override
+  String get appVersion => '1.0.0';
+
+  @override
+  Future<void> restore() async => restoreCalls++;
+
+  @override
+  Future<void> login(String email, String password) => _auth('login', email, password);
+
+  @override
+  Future<void> register(String email, String password) => _auth('register', email, password);
+
+  Future<void> _auth(String kind, String email, String password) async {
+    authCalls.add((kind, email, password));
+    final error = authError;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<void> reconnectReplaced() async => reconnectCalls++;
+
+  @override
+  Future<void> logout() async => logoutCalls++;
+
+  @override
+  Future<void> deleteAccount(String password) async {
+    deletePasswords.add(password);
+    final error = deleteError;
+    if (error != null) throw error;
+  }
+
+  @override
+  void onBackground() => backgroundCalls++;
+
+  @override
+  void onForeground() => foregroundCalls++;
+}

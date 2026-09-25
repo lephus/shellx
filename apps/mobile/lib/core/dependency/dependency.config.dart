@@ -19,6 +19,8 @@ import 'package:shellx_core/shellx_core.dart' as _i145;
 
 import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
+import '../../features/terminal/presentation/controllers/terminal_page_controller.dart'
+    as _i229;
 import '../../features/terminal/presentation/controllers/terminal_workspace.dart'
     as _i667;
 import '../auth/auth_event.dart' as _i909;
@@ -108,6 +110,14 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i667.WorkspaceRegistry>(
       () => _i667.WorkspaceRegistry.create(gh<_i351.SessionHolder>()),
       dispose: (i) => i.dispose(),
+    );
+    gh.factoryParam<_i229.TerminalPageController, String, dynamic>(
+      (agentId, _) => _i229.TerminalPageController(
+        agentId,
+        gh<_i667.WorkspaceRegistry>(),
+        gh<_i351.SessionHolder>(),
+        gh<_i351.AppSettings>(),
+      ),
     );
     return this;
   }
