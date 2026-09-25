@@ -6,16 +6,20 @@ import 'package:shellx_desktop/src/config.dart';
 VersionInfo _info({
   String min = '1.0.0',
   String latest = '1.0.0',
+  String? macUrl,
+  String? winUrl,
 }) => VersionInfo(
   minAgent: min,
   minMobile: '1.0.0',
   latestAgent: LatestAgent(
     version: latest,
     macUrl: Uri.parse(
-      'https://download.shellx.pro/desktop/$latest/ShellX-$latest.dmg',
+      macUrl ??
+          'https://download.shellx.pro/desktop/$latest/ShellX-$latest.dmg',
     ),
     winUrl: Uri.parse(
-      'https://download.shellx.pro/desktop/$latest/ShellX-Setup-$latest.exe',
+      winUrl ??
+          'https://download.shellx.pro/desktop/$latest/ShellX-Setup-$latest.exe',
     ),
   ),
 );
@@ -92,6 +96,89 @@ void main() {
         reason: bad,
       );
     }
+  });
+
+  group('the download link must be https on shellx.pro (the relay can only '
+      'reduce trust)', () {
+    const rejected = <String>[
+      'file:///Applications/Calculator.app',
+      'file://evil-host/share/ShellX.exe',
+      r'\\evil-host\share\ShellX.exe',
+      '/desktop/ShellX-1.1.0.dmg',
+      'download.shellx.pro/desktop/ShellX-1.1.0.dmg',
+      '-aCalculator',
+      'http://download.shellx.pro/desktop/ShellX-1.1.0.dmg',
+      'https://evil.example/ShellX-1.1.0.dmg',
+      'https://shellx.pro.evil.example/ShellX-1.1.0.dmg',
+      'https://evilshellx.pro/ShellX-1.1.0.dmg',
+      'https://shellx.pro@evil.example/ShellX-1.1.0.dmg',
+      'https://user@download.shellx.pro/ShellX-1.1.0.dmg',
+      'smb://download.shellx.pro/ShellX-1.1.0.dmg',
+      'x-apple.systempreferences:com.apple.preference.security',
+    ];
+    for (final url in rejected) {
+      test('rejected: $url', () {
+        for (final platform in DevicePlatform.values) {
+          final info = _info(latest: '1.1.0', macUrl: url, winUrl: url);
+          expect(
+            evaluateUpdate(info, appVersion: '1.0.0', platform: platform),
+            isNull,
+            reason: '$platform',
+          );
+          final required = _info(
+            min: '1.1.0',
+            latest: '1.1.0',
+            macUrl: url,
+            winUrl: url,
+          );
+          expect(
+            evaluateUpdate(required, appVersion: '1.0.0', platform: platform),
+            isNull,
+            reason: '$platform, required',
+          );
+        }
+      });
+    }
+
+    for (final url in [
+      'https://download.shellx.pro/desktop/1.1.0/ShellX-1.1.0.dmg',
+      'https://shellx.pro/download',
+      'https://DOWNLOAD.ShellX.pro/x.dmg',
+    ]) {
+      test('accepted: $url', () {
+        final notice = evaluateUpdate(
+          _info(latest: '1.1.0', macUrl: url),
+          appVersion: '1.0.0',
+          platform: DevicePlatform.macos,
+        );
+        expect(notice, isNotNull);
+        expect(notice!.url, Uri.parse(url));
+      });
+    }
+
+    test('only the platform\'s own link counts', () {
+      final info = _info(
+        latest: '1.1.0',
+        macUrl: 'https://download.shellx.pro/ShellX-1.1.0.dmg',
+        winUrl: 'file:///C:/Windows/System32/calc.exe',
+      );
+      expect(
+        evaluateUpdate(
+          info,
+          appVersion: '1.0.0',
+          platform: DevicePlatform.macos,
+        ),
+        isNotNull,
+      );
+      expect(
+        evaluateUpdate(
+          info,
+          appVersion: '1.0.0',
+          platform: DevicePlatform.windows,
+        ),
+        isNull,
+      );
+    });
   });
 
   test('relay WebSocket URI follows the base URL scheme', () {

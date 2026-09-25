@@ -144,6 +144,54 @@ void main() {
     ]);
   });
 
+  group('SystemUrlOpener refuses anything but https (and its own settings '
+      'pane)', () {
+    for (final url in [
+      'file:///Applications/Calculator.app',
+      'file://evil-host/share/ShellX.exe',
+      r'\\evil-host\share\ShellX.exe',
+      '/Applications/Calculator.app',
+      '-aCalculator',
+      'http://download.shellx.pro/x.dmg',
+      'smb://evil-host/share',
+      'x-apple.systempreferences:com.apple.preference.network',
+    ]) {
+      for (final isWindows in [false, true]) {
+        test('${isWindows ? 'Windows' : 'macOS'}: $url', () async {
+          final calls = <List<String>>[];
+          final opener = SystemUrlOpener(
+            isWindows: isWindows,
+            run: (exe, args) async {
+              calls.add([exe, ...args]);
+              return ProcessResult(0, 0, '', '');
+            },
+          );
+          await expectLater(
+            opener.open(Uri.parse(url)),
+            throwsA(isA<ArgumentError>()),
+          );
+          expect(calls, isEmpty);
+        });
+      }
+    }
+
+    test('Windows never opens the macOS settings pane', () async {
+      final calls = <List<String>>[];
+      final opener = SystemUrlOpener(
+        isWindows: true,
+        run: (exe, args) async {
+          calls.add([exe, ...args]);
+          return ProcessResult(0, 0, '', '');
+        },
+      );
+      await expectLater(
+        opener.open(SystemUrlOpener.fullDiskAccessPane),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(calls, isEmpty);
+    });
+  });
+
   test(
     'WakeDetector fires only when the wall clock jumps past interval + tolerance',
     () {

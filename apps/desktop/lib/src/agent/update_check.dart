@@ -18,7 +18,10 @@ final RegExp _semver = RegExp(r'^\d+\.\d+\.\d+$');
 
 /// Spec §14: notify when `/v1/version` offers a newer agent; §12: "Cần cập
 /// nhật app" when this build is below `min_agent`. Returns null when up to
-/// date or when any version is not `x.y.z` (never crash on server data).
+/// date, when any version is not `x.y.z` (never crash on server data), or
+/// when this platform's download link is not [isTrustedDownloadUrl]: the
+/// link is opened with the OS, and the relay must only be able to reduce
+/// trust, never to make the agent open a file, a share or another site.
 UpdateNotice? evaluateUpdate(
   VersionInfo info, {
   required String appVersion,
@@ -31,6 +34,7 @@ UpdateNotice? evaluateUpdate(
   final url = platform == DevicePlatform.windows
       ? latest.winUrl
       : latest.macUrl;
+  if (!isTrustedDownloadUrl(url)) return null;
   try {
     if (compareVersions(appVersion, info.minAgent) < 0) {
       return UpdateNotice(version: latest.version, url: url, required: true);
@@ -43,4 +47,14 @@ UpdateNotice? evaluateUpdate(
     return null;
   }
   return null;
+}
+
+/// An absolute `https` URL on `shellx.pro` or one of its subdomains (e.g.
+/// `download.shellx.pro`), without user info.
+bool isTrustedDownloadUrl(Uri url) {
+  if (!url.isAbsolute || url.scheme != 'https' || url.userInfo.isNotEmpty) {
+    return false;
+  }
+  final host = url.host.toLowerCase();
+  return host == 'shellx.pro' || host.endsWith('.shellx.pro');
 }
