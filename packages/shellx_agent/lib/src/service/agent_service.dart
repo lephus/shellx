@@ -315,7 +315,12 @@ final class AgentService {
     }
     for (final message in messages) {
       if (message is PairConfirm) continue;
-      await _sessions.handle(mobileId, message);
+      try {
+        await _sessions.handle(mobileId, message);
+      } catch (_) {
+        // For example a PTY write that throws: only this message is lost,
+        // not the rest of the batch (the channel itself is fine).
+      }
       if (!identical(_channels[mobileId], channel)) {
         // stop() dropped the channel meanwhile: undo any attach the
         // message made, so no session stays attached to a missing channel.

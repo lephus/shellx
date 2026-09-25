@@ -376,6 +376,31 @@ void main() {
     });
   });
 
+  // Final review M3.
+  test('a message that fails to be handled does not drop the rest of its '
+      'batch', () {
+    fakeAsync((async) {
+      final rig = AgentRig(async);
+      final channel = rig.handshake(rig.phone).channel!;
+      rig.send(channel, [const SessionOpen(cols: 80, rows: 24)]);
+      final id = channel.messagesOf<SessionOpened>().single.id;
+      final pty = rig.ptys.ptys.single..failWrites = StateError('pty gone');
+
+      rig.send(channel, [
+        InputMessage(id: id, data: Uint8List.fromList([0x61])),
+        const SessionList(),
+      ]);
+      expect(channel.messagesOf<SessionListResult>(), hasLength(1));
+
+      pty.failWrites = null;
+      rig.send(channel, [
+        InputMessage(id: id, data: Uint8List.fromList([0x62])),
+      ]);
+      expect(pty.writtenText, 'b');
+      expect(rig.service.activeChannelCount, 1);
+    });
+  });
+
   test('output is batched per channel: 16 ms timer, immediate at 16 KiB', () {
     fakeAsync((async) {
       final rig = AgentRig(async);

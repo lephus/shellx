@@ -26,6 +26,9 @@ final class FakePty implements Pty {
   final resizes = <(int, int)>[];
   bool killed = false;
 
+  /// When set, [write] throws this.
+  Object? failWrites;
+
   /// Exit code reported when the session is killed (SIGTERM on POSIX).
   static const int killExitCode = -15;
 
@@ -36,7 +39,11 @@ final class FakePty implements Pty {
   Future<int> get exitCode => _exitCode.future;
 
   @override
-  void write(Uint8List data) => writes.add(Uint8List.fromList(data));
+  void write(Uint8List data) {
+    final error = failWrites;
+    if (error != null) throw error;
+    writes.add(Uint8List.fromList(data));
+  }
 
   @override
   void resize(int cols, int rows) => resizes.add((cols, rows));
