@@ -311,7 +311,12 @@ final class ClientService {
     final connected = state == RelayConnectionState.connected;
     if (connected == _connected) return;
     _connected = connected;
-    if (connected) return;
+    if (connected) {
+      for (final machine in _machines.values) {
+        machine.relayConnected();
+      }
+      return;
+    }
     _abortPairings(PairingFailure.timeout); // Relay down.
     for (final deviceId in _online.toList()) {
       _presence.add(PresenceFrame(deviceId: deviceId, online: false));

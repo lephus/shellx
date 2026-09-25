@@ -57,6 +57,10 @@ final class MachineClient {
   Future<void> _inbox = Future.value();
   Future<void> _outbox = Future.value();
 
+  /// A resume is running; [_resumeAgain] asks it for one more pass.
+  bool _resuming = false;
+  bool _resumeAgain = false;
+
   final _tabs = <int, ClientTab>{};
   final _pendingOpens = <_PendingOpen>[];
   final _pendingLists = <Completer<List<SessionInfo>>>[];
@@ -199,6 +203,12 @@ final class MachineClient {
   @internal
   void relayLost() {
     _inbox = _inbox.then((_) => _channelLost()).catchError((Object _) {});
+  }
+
+  /// The phone's relay connection is back: re-handshake and re-attach.
+  @internal
+  void relayConnected() {
+    _inbox = _inbox.then((_) => unawaited(_resume())).catchError((Object _) {});
   }
 
   /// The agent may no longer hold this phone's channel (a `pairing_removed`
@@ -350,7 +360,10 @@ final class MachineClient {
           messages = await secure.open(decoded.noiseMessage);
         } catch (_) {
           // Spec §6.3: any decrypt error drops the channel — if still ours.
-          if (identical(secure, _secure)) _channelLost();
+          if (identical(secure, _secure)) {
+            _channelLost();
+            unawaited(_resume());
+          }
           return;
         }
         if (!identical(secure, _secure)) return;
@@ -366,7 +379,15 @@ final class MachineClient {
           _channelLost();
         }
       case PresenceFrame(:final online):
-        if (!online) _channelLost();
+        if (online) {
+          // The hub announces a device only when it connects, and an agent
+          // that (re)connects has dropped every channel: a live channel is
+          // stale even without an offline first (its socket was replaced).
+          if (_secure != null) _channelLost();
+          unawaited(_resume()); // Never awaited here: it waits for HS2.
+        } else {
+          _channelLost();
+        }
       case EventFrame():
         break;
     }
@@ -472,6 +493,48 @@ final class MachineClient {
         );
       },
     );
+  }
+
+  /// Re-handshake and re-attach every tab that is still attached (not
+  /// taken over, exited or ended) with `last_seq = received`, one at a
+  /// time. A call while a resume runs (the channel was lost again during
+  /// its attaches) makes that resume do one more pass. Only ever triggered
+  /// by an event (relay back, PRESENCE online, decrypt error), so an agent
+  /// that stays offline costs one handshake per event.
+  Future<void> _resume() async {
+    if (_resuming) {
+      _resumeAgain = true;
+      return;
+    }
+    _resuming = true;
+    try {
+      do {
+        _resumeAgain = false;
+        await _resumeOnce();
+      } while (_resumeAgain);
+    } finally {
+      _resuming = false;
+    }
+  }
+
+  Future<void> _resumeOnce() async {
+    if (_state is MachineReady) return; // Nothing lost since the last pass.
+    final wanted = _tabs.values.where((t) => t.isAttached).toList();
+    if (wanted.isEmpty) return;
+    try {
+      await connect(); // Joins a handshake the app already started.
+      for (final tab in wanted) {
+        if (!tab.isAttached || !identical(_tabs[tab.id], tab)) continue;
+        try {
+          await _attach(tab);
+        } on AppErrorException {
+          // The tab already received TabError (session_not_found).
+        }
+      }
+    } on MachineConnectionException {
+      // MachineFailed, or the channel was lost again: the next event (or
+      // the pass that loss asked for) retries.
+    }
   }
 
   void _channelLost() {
