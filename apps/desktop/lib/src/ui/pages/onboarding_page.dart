@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -34,7 +36,8 @@ class OnboardingPage extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: Text(l10n.onboardingLaunchAtStartup),
             value: launch,
-            onChanged: (value) => agent.setLaunchAtStartup(value),
+            // Never throws (reverts or notifies on failure).
+            onChanged: (value) => unawaited(agent.setLaunchAtStartup(value)),
           ),
           if (isMac) ...[
             const SizedBox(height: 16),
@@ -48,8 +51,7 @@ class OnboardingPage extends ConsumerWidget {
               alignment: Alignment.centerLeft,
               child: TextButton(
                 key: const Key('onboarding.fda'),
-                onPressed: () =>
-                    services.urlOpener.open(SystemUrlOpener.fullDiskAccessPane),
+                onPressed: () => unawaited(_openPrivacySettings(services)),
                 child: Text(l10n.onboardingOpenSettings),
               ),
             ),
@@ -66,6 +68,7 @@ class OnboardingPage extends ConsumerWidget {
           const SizedBox(height: 16),
           FilledButton(
             key: const Key('onboarding.finish'),
+            // completeOnboarding never throws.
             onPressed: () async {
               await agent.completeOnboarding();
               ref.read(windowRouterProvider.notifier).close();
@@ -75,5 +78,24 @@ class OnboardingPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Opening System Settings may fail (e.g. `open` cannot be started):
+  /// never an unhandled error, a notification instead.
+  static Future<void> _openPrivacySettings(DesktopServices services) async {
+    try {
+      await services.urlOpener.open(SystemUrlOpener.fullDiskAccessPane);
+    } catch (error) {
+      debugPrint(
+        'ShellX: opening System Settings failed: ${error.runtimeType}',
+      );
+      try {
+        await services.notifier.show(
+          title: services.l10n.errorUnexpected('internal'),
+        );
+      } catch (_) {
+        // Nothing else to do here.
+      }
+    }
   }
 }

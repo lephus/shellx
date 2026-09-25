@@ -866,6 +866,29 @@ void main() {
       },
     );
 
+    test('finishing onboarding never throws: a failed settings write says '
+        'so and still finishes it for this run', () async {
+      boot();
+      await controller().bootstrap(watchForWake: false);
+      h.settings.fail = true;
+      await controller().completeOnboarding();
+      expect(state().onboardingDone, isTrue);
+      expect(h.launchAtLogin.enabled, isTrue);
+      expect(state().launchAtStartup, isTrue);
+      expect(h.notifier.shown.first.title, h.l10n.errorUnexpected('settings'));
+    });
+
+    test('launch at startup never throws: a failed settings write keeps '
+        'what the OS applied and says so', () async {
+      boot();
+      await controller().bootstrap(watchForWake: false);
+      h.settings.fail = true;
+      await controller().setLaunchAtStartup(false);
+      expect(h.launchAtLogin.enabled, isFalse);
+      expect(state().launchAtStartup, isFalse);
+      expect(h.notifier.shown.single.title, h.l10n.errorUnexpected('settings'));
+    });
+
     test('after onboarding, the OS decides launch at startup', () async {
       boot(TestHarness(settings: {SettingKeys.onboardingDone: true}));
       h.launchAtLogin.enabled = false;

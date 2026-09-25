@@ -240,6 +240,36 @@ void main() {
       );
     });
 
+    testWidgets('a Full Disk Access button that cannot open System Settings '
+        'says so instead of failing unhandled', (tester) async {
+      await pumpApp(tester, TestHarness());
+      h.urlOpener.fail = true;
+      router().open(const OnboardingRoute());
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('onboarding.fda')));
+      await settle(tester);
+      expect(
+        h.notifier.shown.single.title,
+        'Something went wrong (internal). Try again.',
+      );
+    });
+
+    testWidgets('the launch switch and Finish never fail unhandled when '
+        'settings cannot be saved', (tester) async {
+      await pumpApp(tester, TestHarness());
+      router().open(const OnboardingRoute());
+      await settle(tester);
+      h.settings.fail = true;
+      await tester.tap(find.byKey(const Key('onboarding.launch')));
+      await settle(tester);
+      expect(agentState().launchAtStartup, isFalse);
+      await tester.tap(find.byKey(const Key('onboarding.finish')));
+      await settle(tester);
+      expect(agentState().onboardingDone, isTrue);
+      expect(container.read(windowRouterProvider).visible, isFalse);
+      expect(h.notifier.shown, isNotEmpty);
+    });
+
     testWidgets('Windows: no Full Disk Access section', (tester) async {
       await pumpApp(tester, TestHarness(platform: DevicePlatform.windows));
       router().open(const OnboardingRoute());

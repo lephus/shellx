@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -267,8 +268,15 @@ final class RecordingNotifier implements SystemNotifier {
 
 final class RecordingUrlOpener implements UrlOpener {
   final List<Uri> opened = [];
+
+  /// Throws instead of opening (e.g. `open` could not be started).
+  bool fail = false;
+
   @override
-  Future<void> open(Uri uri) async => opened.add(uri);
+  Future<void> open(Uri uri) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    opened.add(uri);
+  }
 }
 
 final PairingIdGenerator _pairingIds = PairingIdGenerator();

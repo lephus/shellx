@@ -105,7 +105,7 @@ class WindowRouter extends Notifier<WindowState> {
     if (current is OnboardingRoute &&
         next is! OnboardingRoute &&
         !ref.read(agentControllerProvider).onboardingDone) {
-      unawaited(agent.completeOnboarding());
+      unawaited(agent.completeOnboarding()); // Never throws.
     }
   }
 }

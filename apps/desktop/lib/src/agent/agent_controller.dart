@@ -260,23 +260,40 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Applies the switch to the OS first; persists it only if that worked.
+  /// Never throws (the onboarding page and the window router call it
+  /// without a handler): the OS refusing reverts the switch; a failed
+  /// settings write keeps what the OS applied (which [bootstrap] reads back
+  /// once onboarding is done) and says so.
   Future<void> setLaunchAtStartup(bool enabled) async {
     try {
       await _s.launchAtLogin.setEnabled(enabled);
-    } on Exception {
+    } catch (_) {
       if (ref.mounted) state = state.copyWith(launchAtStartup: !enabled);
       return;
     }
-    await _s.settings.setBool(SettingKeys.launchAtStartup, enabled);
+    await _saveSetting(SettingKeys.launchAtStartup, enabled);
     if (!ref.mounted) return;
     state = state.copyWith(launchAtStartup: enabled);
   }
 
+  /// Never throws: if the settings cannot be saved, onboarding is still
+  /// done for this run (and shows again at the next start), with a
+  /// notification.
   Future<void> completeOnboarding() async {
     await setLaunchAtStartup(state.launchAtStartup);
-    await _s.settings.setBool(SettingKeys.onboardingDone, true);
+    await _saveSetting(SettingKeys.onboardingDone, true);
     if (!ref.mounted) return;
     state = state.copyWith(onboardingDone: true);
+  }
+
+  /// Best effort: a failed write is logged by type and notified.
+  Future<void> _saveSetting(String key, bool value) async {
+    try {
+      await _s.settings.setBool(key, value);
+    } catch (error) {
+      debugPrint('ShellX: saving a setting failed: ${error.runtimeType}');
+      await _notify(title: _s.l10n.errorUnexpected('settings'));
+    }
   }
 
   /// Null when there is no runtime (signed out or remote access off).

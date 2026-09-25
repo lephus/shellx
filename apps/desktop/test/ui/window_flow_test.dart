@@ -97,6 +97,16 @@ void main() {
       expect(agentState().onboardingDone, isTrue);
       expect(h.launchAtLogin.enabled, isTrue);
     });
+
+    test('closing onboarding when settings cannot be saved is no unhandled '
+        'error', () async {
+      await signedIn();
+      h.settings.fail = true;
+      router().close();
+      await pumpEventQueue();
+      expect(agentState().onboardingDone, isTrue);
+      expect(h.notifier.shown, isNotEmpty);
+    });
   });
 
   group('coordinateWindows', () {
