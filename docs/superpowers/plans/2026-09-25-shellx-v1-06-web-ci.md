@@ -929,7 +929,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 ## 3. Dữ liệu chỉ nằm trên thiết bị của bạn
 
-Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại được tin cậy (trên máy tính), danh sách máy đã ghép nối (trên điện thoại) và các cài đặt được lưu trong kho bảo mật của hệ điều hành (Keychain, Windows Credential Manager, Android Keystore) hoặc vùng cài đặt của ứng dụng. Những dữ liệu này không được gửi lên máy chủ, trừ mã truy cập được gửi kèm mỗi yêu cầu để xác thực.
+Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại được tin cậy (trên máy tính), danh sách máy đã ghép nối (trên điện thoại) và các cài đặt được lưu trong kho bảo mật của hệ điều hành (Keychain trên macOS/iOS, bộ nhớ mã hóa DPAPI trên Windows, Android Keystore) hoặc vùng cài đặt của ứng dụng. Những dữ liệu này không được gửi lên máy chủ, trừ mã truy cập được gửi kèm mỗi yêu cầu để xác thực.
 
 - **Camera:** ứng dụng di động chỉ dùng camera để quét mã QR ghép nối. Hình ảnh không được lưu hay gửi đi.
 - **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
@@ -1045,7 +1045,7 @@ To replay output produced while your phone is briefly disconnected, the agent ke
 
 ## 3. Data that stays on your devices
 
-The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain, Windows Credential Manager, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
+The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain on macOS/iOS, DPAPI-encrypted storage on Windows, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
 
 - **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
@@ -2051,7 +2051,7 @@ test('AppId is fixed so upgrades replace the existing install', () => {
 });
 
 test('a running agent is stopped before files are replaced and before uninstall', () => {
-  assert.match(iss, /function PrepareToInstall[\s\S]*?taskkill\.exe[\s\S]*?\/F \/IM/);
+  assert.match(iss, /function PrepareToInstall[\s\S]*?taskkill\.exe[\s\S]*?\/F \/T \/IM/);
   assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe/);
 });
 
@@ -2166,7 +2166,7 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags
 
 [UninstallRun]
 ; Stop the tray agent so its files can be deleted.
-Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -2175,7 +2175,7 @@ var
 begin
   { Stop a running agent: it keeps its exe and DLLs locked. Its terminal sessions end,
     exactly as when the agent quits (spec 7). }
-  if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM "{#AppExeName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM "{#AppExeName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     Log('taskkill could not be started');
   Result := '';
 end;

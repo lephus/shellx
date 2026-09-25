@@ -1,0 +1,43 @@
+---
+import Base from './Base.astro';
+import { ui, type Lang, type Page } from '../i18n/ui';
+
+interface Props {
+  frontmatter: {
+    lang: Lang;
+    page: Page;
+    title: string;
+    description: string;
+    updated: string;
+  };
+}
+
+const { lang, page, title, description, updated } = Astro.props.frontmatter;
+const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+---
+
+<Base lang={lang} page={page} title={`${title} — ShellX`} description={description}>
+  <article class="legal">
+    <h1>{title}</h1>
+    <p class="updated">{ui[lang].lastUpdated}: <time datetime={updated}>{updatedLabel}</time></p>
+    <slot />
+  </article>
+</Base>
+
+<style>
+  .legal h1 {
+    margin-bottom: 0.25rem;
+  }
+  .updated {
+    color: var(--muted);
+    margin-top: 0;
+  }
+  .legal :global(h2) {
+    margin-top: 2rem;
+  }
+</style>

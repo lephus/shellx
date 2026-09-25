@@ -1,0 +1,85 @@
+---
+import { ui, type Lang } from '../i18n/ui';
+import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const stores = [
+  { id: 'app-store', label: t.appStore, requirement: t.appStoreRequirement, url: appStoreUrl },
+  { id: 'google-play', label: t.googlePlay, requirement: t.googlePlayRequirement, url: googlePlayUrl },
+];
+---
+
+<section class="downloads">
+  <div class="group">
+    <h2>{t.desktopHeading}</h2>
+    <p class="muted">{t.version} {desktopVersion}</p>
+    <a class="button" data-platform="macos" href={macDownloadUrl()}>
+      <strong>{t.macos}</strong><span>{t.macosRequirement}</span>
+    </a>
+    <a class="button" data-platform="windows" href={windowsDownloadUrl()}>
+      <strong>{t.windows}</strong><span>{t.windowsRequirement}</span>
+    </a>
+  </div>
+  <div class="group">
+    <h2>{t.mobileHeading}</h2>
+    {
+      stores.map((store) =>
+        store.url ? (
+          <a class="button" data-store={store.id} href={store.url} rel="noopener">
+            <strong>{store.label}</strong>
+            <span>{store.requirement}</span>
+          </a>
+        ) : (
+          <span class="button disabled" data-store={store.id} aria-disabled="true">
+            <strong>{store.label}</strong>
+            <span>
+              {store.requirement} · {t.comingSoon}
+            </span>
+          </span>
+        ),
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .downloads {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .group h2 {
+    margin-bottom: 0.25rem;
+  }
+  .muted {
+    color: var(--muted);
+    margin-top: 0;
+  }
+  .button {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card);
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .button span {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  a.button:hover {
+    border-color: var(--accent);
+  }
+  .disabled {
+    opacity: 0.6;
+  }
+</style>
