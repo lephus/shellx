@@ -10,8 +10,6 @@ abstract interface class ProcessTreeKiller {
 }
 
 typedef SignalSender = bool Function(int pid, ProcessSignal signal);
-typedef CommandRunner =
-    Future<ProcessResult> Function(String executable, List<String> arguments);
 
 /// macOS: closes a terminal session the way closing a terminal window does
 /// (SIGHUP), then SIGKILLs whatever from the session survived.
@@ -157,19 +155,5 @@ final class PosixProcessTreeKiller implements ProcessTreeKiller {
       }
       if (_expand(victims, table).isEmpty) return;
     }
-  }
-}
-
-/// Windows: `taskkill /PID <pid> /T /F` terminates the shell and every
-/// descendant still linked to it by parent PID (TerminateProcess, no graceful
-/// signal exists for console processes started under ConPTY).
-final class WindowsProcessTreeKiller implements ProcessTreeKiller {
-  WindowsProcessTreeKiller({CommandRunner? run}) : _run = run ?? Process.run;
-
-  final CommandRunner _run;
-
-  @override
-  Future<void> killTree(int rootPid) async {
-    await _run('taskkill', ['/PID', '$rootPid', '/T', '/F']);
   }
 }

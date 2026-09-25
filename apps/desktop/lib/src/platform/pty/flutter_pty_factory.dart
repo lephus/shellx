@@ -5,9 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_pty/flutter_pty.dart' as fp;
 import 'package:shellx_agent/shellx_agent.dart';
 
-import 'process_table.dart';
 import 'process_tree_killer.dart';
-import 'windows_native.dart';
 import 'windows_text.dart';
 
 /// Arguments handed to the native PTY, after platform fix-ups.
@@ -38,6 +36,10 @@ abstract interface class NativePty {
 
   /// Note the flutter_pty argument order: rows first.
   void resize(int rows, int columns);
+
+  /// Windows (vendored flutter_pty): terminates the job object holding the
+  /// shell and every process it started. False when that failed.
+  bool kill();
 }
 
 typedef NativePtyStarter = NativePty Function(PtyLaunch launch);
@@ -57,6 +59,8 @@ final class _FlutterNativePty implements NativePty {
   void write(Uint8List data) => _pty.write(data);
   @override
   void resize(int rows, int columns) => _pty.resize(rows, columns);
+  @override
+  bool kill() => _pty.kill();
 }
 
 NativePty startFlutterPty(PtyLaunch launch) {
@@ -72,95 +76,37 @@ NativePty startFlutterPty(PtyLaunch launch) {
   );
 }
 
-/// Finds the ConPTY host process (`conhost.exe`) that CreatePseudoConsole
-/// starts as a child of this process. flutter_pty 0.4.2 never calls
-/// ClosePseudoConsole, so the adapter terminates that host itself.
-final class ConsoleHostTracker {
-  ConsoleHostTracker({
-    required List<ProcessEntry> Function() snapshot,
-    required int ownPid,
-    CommandRunner? run,
-  }) : _snapshot = snapshot,
-       _ownPid = ownPid,
-       _run = run ?? Process.run;
-
-  final List<ProcessEntry> Function() _snapshot;
-  final int _ownPid;
-  final CommandRunner _run;
-
-  Set<int> hostsNow() => consoleHostChildren(_ownPid, _snapshot());
-
-  /// The single host that appeared since [before], or null if not exactly one.
-  int? newHostSince(Set<int> before) {
-    final added = hostsNow().difference(before);
-    return added.length == 1 ? added.single : null;
-  }
-
-  Future<void> terminate(int hostPid) async {
-    await _run('taskkill', ['/PID', '$hostPid', '/F']);
-  }
-}
-
-Set<int> consoleHostChildren(int parentPid, List<ProcessEntry> table) {
-  return {
-    for (final entry in table)
-      if (entry.parentPid == parentPid && _isConsoleHost(entry.name)) entry.pid,
-  };
-}
-
-bool _isConsoleHost(String name) {
-  final lower = name.toLowerCase();
-  return lower == 'conhost.exe' || lower == 'openconsole.exe';
-}
-
-/// [PtyFactory] backed by package flutter_pty.
+/// [PtyFactory] backed by the vendored flutter_pty
+/// (`third_party/flutter_pty`, see its SHELLX_PATCHES.md).
 ///
 /// What `kill()` does:
-/// * macOS: [PosixProcessTreeKiller] — SIGHUP to the shell and all
-///   descendants, SIGKILL to survivors after 2 s.
-/// * Windows: [WindowsProcessTreeKiller] (`taskkill /T /F`), then terminates
-///   the session's conhost.exe so the pseudo console and its pipes are freed.
+/// * macOS: [PosixProcessTreeKiller] — freeze the shell's process tree,
+///   SIGHUP it, SIGKILL what is left after 2 s.
+/// * Windows: the plugin's job object — TerminateJobObject ends the shell and
+///   every process it started.
 final class FlutterPtyFactory implements PtyFactory {
+  /// [killer] is used on macOS only (default [PosixProcessTreeKiller]).
   FlutterPtyFactory({
     required bool isWindows,
-    required ProcessTreeKiller killer,
+    ProcessTreeKiller? killer,
     NativePtyStarter start = startFlutterPty,
-    String Function(String path)? shortPath,
-    ConsoleHostTracker? consoleHosts,
     Duration outputGrace = const Duration(milliseconds: 500),
   }) : _isWindows = isWindows,
-       _outputGrace = outputGrace,
-       _killer = killer,
+       _killer = isWindows ? null : killer ?? PosixProcessTreeKiller(),
        _start = start,
-       _shortPath = shortPath ?? ((path) => path),
-       _consoleHosts = consoleHosts;
+       _outputGrace = outputGrace;
 
-  factory FlutterPtyFactory.forCurrentPlatform() {
-    if (Platform.isWindows) {
-      final table = WindowsProcessTable();
-      return FlutterPtyFactory(
-        isWindows: true,
-        killer: WindowsProcessTreeKiller(),
-        shortPath: windowsShortPath,
-        consoleHosts: ConsoleHostTracker(
-          snapshot: table.snapshotSync,
-          ownPid: pid,
-        ),
-      );
-    }
-    return FlutterPtyFactory(
-      isWindows: false,
-      killer: PosixProcessTreeKiller(),
-    );
-  }
+  factory FlutterPtyFactory.forCurrentPlatform() =>
+      FlutterPtyFactory(isWindows: Platform.isWindows);
 
   final bool _isWindows;
-  final ProcessTreeKiller _killer;
+  final ProcessTreeKiller? _killer;
   final NativePtyStarter _start;
-  final String Function(String path) _shortPath;
-  final ConsoleHostTracker? _consoleHosts;
   final Duration _outputGrace;
 
+  /// Windows: the plugin writes the executable and the arguments into the
+  /// command line as given, so each is quoted. Paths and environment values
+  /// are passed as they are (the plugin converts UTF-8 to UTF-16).
   PtyLaunch launchFor(
     ShellCommand command, {
     required String workingDirectory,
@@ -168,28 +114,22 @@ final class FlutterPtyFactory implements PtyFactory {
     required int cols,
     required int rows,
   }) {
-    if (!_isWindows) {
-      return PtyLaunch(
-        executable: command.executable,
-        arguments: command.arguments,
-        workingDirectory: workingDirectory,
-        environment: environment,
-        columns: cols,
-        rows: rows,
-      );
-    }
     return PtyLaunch(
-      executable: windowsQuoteArg(
-        asciiSafePathList(command.executable, _shortPath),
-      ),
-      arguments: [for (final a in command.arguments) windowsQuoteArg(a)],
-      workingDirectory: asciiSafePathList(workingDirectory, _shortPath),
-      environment: asciiSafeEnvironment(environment, _shortPath),
+      executable: _isWindows
+          ? windowsQuoteArg(command.executable)
+          : command.executable,
+      arguments: _isWindows
+          ? [for (final a in command.arguments) windowsQuoteArg(a)]
+          : command.arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
       columns: cols,
       rows: rows,
     );
   }
 
+  /// Throws (e.g. `StateError` from flutter_pty) when the shell cannot be
+  /// started; SessionManager reports that as `spawn_failed`.
   @override
   Pty spawn(
     ShellCommand command, {
@@ -205,14 +145,9 @@ final class FlutterPtyFactory implements PtyFactory {
       cols: cols,
       rows: rows,
     );
-    final hosts = _consoleHosts;
-    final before = hosts?.hostsNow();
-    final native = _start(launch);
-    final hostPid = before == null ? null : hosts!.newHostSince(before);
     return FlutterPtyAdapter(
-      native,
+      _start(launch),
       killer: _killer,
-      onExit: hostPid == null ? null : () => hosts!.terminate(hostPid),
       outputGrace: _outputGrace,
     );
   }
@@ -220,15 +155,18 @@ final class FlutterPtyFactory implements PtyFactory {
 
 /// Adapts a [NativePty] to the `shellx_agent` [Pty] contract.
 ///
-/// `output` is guaranteed to close at most [outputGrace] after the process
-/// exits (SessionManager waits up to 2 s for it). flutter_pty 0.4.2 already
-/// closes its ReceivePort when the exit code arrives; the grace timer covers
-/// any native stream that stays open.
+/// `output` closes when the native stream ends (the vendored flutter_pty ends
+/// it once every process holding the terminal has closed it, after the last
+/// chunk), and at the latest [outputGrace] after the process exits — a
+/// background process can keep the terminal open (SessionManager waits up to
+/// 2 s for it).
+///
+/// `kill()` runs [killer]'s tree kill on the shell's pid (macOS) or, without
+/// a killer, the plugin's job-object kill (Windows).
 final class FlutterPtyAdapter implements Pty {
   FlutterPtyAdapter(
     this._native, {
-    required ProcessTreeKiller killer,
-    Future<void> Function()? onExit,
+    ProcessTreeKiller? killer,
     this.outputGrace = const Duration(milliseconds: 500),
   }) : _killer = killer {
     _nativeSubscription = _native.output.listen(
@@ -240,13 +178,12 @@ final class FlutterPtyAdapter implements Pty {
       _native.exitCode.then((_) async {
         await Future<void>.delayed(outputGrace);
         _closeOutput();
-        if (onExit != null) await onExit();
       }),
     );
   }
 
   final NativePty _native;
-  final ProcessTreeKiller _killer;
+  final ProcessTreeKiller? _killer;
   final Duration outputGrace;
   final StreamController<Uint8List> _output = StreamController<Uint8List>();
   late final StreamSubscription<Uint8List> _nativeSubscription;
@@ -276,6 +213,11 @@ final class FlutterPtyAdapter implements Pty {
   void kill() {
     if (_killed) return;
     _killed = true;
-    unawaited(_killer.killTree(_native.pid));
+    final killer = _killer;
+    if (killer == null) {
+      _native.kill();
+    } else {
+      unawaited(killer.killTree(_native.pid));
+    }
   }
 }

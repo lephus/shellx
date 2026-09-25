@@ -317,21 +317,4 @@ void main() {
       expect(sent, isEmpty);
     });
   });
-
-  test(
-    'WindowsProcessTreeKiller runs taskkill /T /F on the shell pid',
-    () async {
-      final calls = <List<String>>[];
-      final killer = WindowsProcessTreeKiller(
-        run: (exe, args) async {
-          calls.add([exe, ...args]);
-          return ProcessResult(0, 0, '', '');
-        },
-      );
-      await killer.killTree(777);
-      expect(calls, [
-        ['taskkill', '/PID', '777', '/T', '/F'],
-      ]);
-    },
-  );
 }

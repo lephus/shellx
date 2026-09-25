@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/platform/pty/flutter_pty_factory.dart';
-import 'package:shellx_desktop/src/platform/pty/windows_native.dart';
 
 final RegExp _ansi = RegExp(
   r'\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1B]*(?:\x07|\x1B\\)|[@-Z\\-_])',
@@ -17,15 +16,18 @@ final RegExp _ansi = RegExp(
 /// Accumulates PTY output (ANSI stripped) and waits for a whole line.
 final class Transcript {
   Transcript(Stream<Uint8List> output) {
-    _subscription = output.listen(
-      (chunk) {
-        _raw.write(utf8.decode(chunk, allowMalformed: true));
-        _changes.add(null);
-      },
-      onDone: () {
-        if (!_done.isCompleted) _done.complete();
-      },
-    );
+    // Chunked decoding: a character may be split across output chunks.
+    _subscription = const Utf8Decoder(allowMalformed: true)
+        .bind(output)
+        .listen(
+          (text) {
+            _raw.write(text);
+            _changes.add(null);
+          },
+          onDone: () {
+            if (!_done.isCompleted) _done.complete();
+          },
+        );
   }
 
   final Completer<void> _done = Completer<void>();
@@ -35,7 +37,7 @@ final class Transcript {
 
   final StringBuffer _raw = StringBuffer();
   final StreamController<void> _changes = StreamController<void>.broadcast();
-  late final StreamSubscription<Uint8List> _subscription;
+  late final StreamSubscription<String> _subscription;
 
   List<String> get lines => _raw
       .toString()
@@ -99,6 +101,34 @@ String get _home =>
 void _type(Pty pty, String line) =>
     pty.write(Uint8List.fromList(utf8.encode('$line\r')));
 
+/// Windows: whether a process with [processId] is running.
+bool _windowsProcessRunning(int processId) {
+  final result = Process.runSync('tasklist.exe', [
+    '/FI',
+    'PID eq $processId',
+    '/NH',
+    '/FO',
+    'CSV',
+  ]);
+  return (result.stdout as String).contains('"$processId"');
+}
+
+/// Windows: the conhost.exe processes this process started — one per open
+/// pseudo console.
+Set<int> _conhostChildren() {
+  final result = Process.runSync('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    "Get-CimInstance Win32_Process -Filter 'ParentProcessId=$pid' | "
+        "Where-Object Name -eq 'conhost.exe' | ForEach-Object ProcessId",
+  ]);
+  return {
+    for (final line in const LineSplitter().convert(result.stdout as String))
+      ?int.tryParse(line.trim()),
+  };
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final factory = FlutterPtyFactory.forCurrentPlatform();
@@ -160,6 +190,36 @@ void main() {
     await transcript.close();
     await dir.delete(recursive: true);
   });
+
+  testWidgets(
+    'a Vietnamese working directory name and environment value arrive intact',
+    (tester) async {
+      final dir = await Directory.systemTemp.createTemp('shellx-Nguyễn-Văn-');
+      addTearDown(() => dir.delete(recursive: true));
+      final name = dir.path.split(Platform.pathSeparator).last;
+      final pty = factory.spawn(
+        shell,
+        workingDirectory: dir.path,
+        environment: {..._environment(), 'SHELLX_TEN': 'Lê Hữu Phú'},
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(pty.kill);
+      final transcript = Transcript(pty.output);
+      addTearDown(transcript.close);
+      if (Platform.isWindows) {
+        _type(
+          pty,
+          r"'cwd=' + (Split-Path -Leaf (Get-Location).Path); "
+          r"'ten=' + $env:SHELLX_TEN",
+        );
+      } else {
+        _type(pty, r'echo "cwd=$(basename "$PWD")"; echo "ten=$SHELLX_TEN"');
+      }
+      await transcript.waitForLine((line) => line == 'cwd=$name');
+      await transcript.waitForLine((line) => line == 'ten=Lê Hữu Phú');
+    },
+  );
 
   testWidgets('output closes within 2 s after the shell exits', (tester) async {
     final pty = factory.spawn(
@@ -311,9 +371,7 @@ void main() {
   testWidgets('kill() ends the shell and the processes it started', (
     tester,
   ) async {
-    final hostsBefore = Platform.isWindows
-        ? consoleHostChildren(pid, WindowsProcessTable().snapshotSync())
-        : <int>{};
+    final hostsBefore = Platform.isWindows ? _conhostChildren() : <int>{};
     final pty = factory.spawn(
       shell,
       workingDirectory: _home,
@@ -343,14 +401,13 @@ void main() {
     await Future<void>.delayed(const Duration(seconds: 4));
 
     if (Platform.isWindows) {
-      final table = WindowsProcessTable().snapshotSync();
       expect(
-        table.any((e) => e.pid == childPid),
+        _windowsProcessRunning(childPid),
         isFalse,
         reason: 'child process survived kill()',
       );
       expect(
-        consoleHostChildren(pid, table).difference(hostsBefore),
+        _conhostChildren().difference(hostsBefore),
         isEmpty,
         reason: 'conhost.exe of the closed PTY is still running',
       );
