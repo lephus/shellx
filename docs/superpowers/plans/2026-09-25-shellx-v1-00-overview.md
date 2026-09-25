@@ -616,7 +616,7 @@ final class MachineClient {
   Future<ClientTab> openSession({required int cols, required int rows}); // AppErrorException
   Future<ClientTab> attach(int id, {required int cols, required int rows});
   List<ClientTab> get tabs;
-  void input(int id, Uint8List data);                                 // cắt > 16 KiB; tab chưa gắn trên kênh hiện tại: giữ tối đa 64 KiB mới nhất, gửi sau session.attached
+  void input(int id, Uint8List data);                                 // cắt > 16 KiB; không có kênh: bỏ; kênh mới nhưng tab chưa gắn lại: giữ tối đa 64 KiB mới nhất, gửi một lần sau session.attached (bỏ nếu mất kênh, gắn lại lỗi hoặc đóng tab)
   void resize(int id, int cols, int rows);                            // bỏ qua nếu cols < 1 hoặc rows < 1
   Future<void> closeTab(int id);                                      // tab đang gắn: gửi session.close; chưa có kênh thì gửi ngay trên kênh kế tiếp
   // Khi kết nối relay phục hồi: tự bắt tay lại và gắn lại mọi tab isAttached == true với lastSeq = received.

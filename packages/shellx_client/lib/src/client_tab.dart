@@ -136,6 +136,9 @@ final class ClientTab {
   Uint8List takeHeldInput() => _heldInput.takeBytes();
 
   @internal
+  void dropHeldInput() => _heldInput.clear();
+
+  @internal
   void handleOutput(int seq, Uint8List data) {
     if (!_attached) return;
     final end = seq + data.length;
@@ -190,7 +193,7 @@ final class ClientTab {
   void _end() {
     _attached = false;
     _cancelAck();
-    _heldInput.clear();
+    dropHeldInput();
   }
 
   void _flushAck() {

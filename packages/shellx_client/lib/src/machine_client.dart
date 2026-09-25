@@ -205,13 +205,15 @@ final class MachineClient {
   }
 
   /// Sends keystrokes; data larger than 16 KiB is split into several
-  /// `input` messages. While the tab is not attached on the current channel
-  /// (no channel, or its re-attach not sent yet) the agent would drop them:
-  /// they are held instead, at most the newest 64 KiB, and sent in order
-  /// once the agent answers `session.attached`.
+  /// `input` messages. Dropped while there is no channel (the app shows it
+  /// is reconnecting): nothing typed then runs later. On a new channel,
+  /// until the tab's re-attach is answered, the agent would drop them:
+  /// they are held instead, at most the newest 64 KiB, and sent once, in
+  /// order, right after `session.attached`. Held keystrokes are dropped if
+  /// the channel is lost again, the re-attach fails or the tab is closed.
   void input(int id, Uint8List data) {
     final tab = _tabs[id];
-    if (tab == null || !tab.isAttached) return;
+    if (tab == null || !tab.isAttached || _secure == null) return;
     if (!_attachedHere.contains(tab) || tab.hasHeldInput) {
       tab.holdInput(data);
       return;
@@ -700,6 +702,9 @@ final class MachineClient {
   void _channelLost() {
     _losses++;
     _attachedHere.clear();
+    for (final tab in _tabs.values) {
+      tab.dropHeldInput(); // Typed before an outage: never run after it.
+    }
     final handshake = _handshake;
     if (handshake != null && !handshake.reply.isCompleted) {
       handshake.reply.complete(null); // Fails the handshake now.

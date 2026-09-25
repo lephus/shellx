@@ -168,6 +168,16 @@ void main() {
     expect(tab.hasHeldInput, isFalse);
     tab.beginAttach(); // Re-attached later: nothing old is sent.
     expect(tab.takeHeldInput(), isEmpty);
+
+    // A failed re-attach (session_not_found) or closing the tab drops them.
+    tab.holdInput(bytes([0x64]));
+    tab.handleError(AppErrorCode.sessionNotFound, 'gone');
+    expect(tab.hasHeldInput, isFalse);
+    tab
+      ..beginAttach()
+      ..holdInput(bytes([0x65]))
+      ..dispose();
+    expect(tab.hasHeldInput, isFalse);
   });
 
   test('events emitted before the first listener are replayed to it', () {

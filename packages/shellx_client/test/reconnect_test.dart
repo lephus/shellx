@@ -514,33 +514,87 @@ void main() {
     });
   });
 
-  test('keystrokes typed while offline reach the shell after the re-attach, '
-      'at most the newest 64 KiB', () {
+  test('keystrokes typed during the re-attach window keep only the newest '
+      '64 KiB', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final pty = h.pty;
+      settle(async);
+      h.disconnectPhone();
+
+      var typed = false;
+      h.phoneMachine.states.listen((state) {
+        if (state is MachineReady && !typed) {
+          typed = true;
+          h.phoneMachine
+            ..input(tab.id, Uint8List.fromList(List.filled(40 << 10, 0x61)))
+            ..input(tab.id, Uint8List.fromList(List.filled(40 << 10, 0x62)));
+        }
+      });
+      h.reconnectPhone();
+      expect(typed, isTrue);
+      expect(
+        [for (final w in pty.writes) ...w],
+        [...List.filled(24 << 10, 0x61), ...List.filled(40 << 10, 0x62)],
+      );
+      expect(
+        [for (final w in pty.writes) w.length].every((n) => n <= 16 << 10),
+        isTrue,
+      );
+    });
+  });
+
+  test('keystrokes typed while the phone has no channel are dropped, never '
+      'run after the reconnect', () {
     fakeAsync((async) {
       final h = Harness(async, keys);
       final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
       settle(async);
       h.disconnectPhone();
 
-      h.phoneMachine.input(
-        tab.id,
-        Uint8List.fromList(List.filled(40 << 10, 0x61)),
-      );
-      h.phoneMachine.input(
-        tab.id,
-        Uint8List.fromList(List.filled(40 << 10, 0x62)),
-      );
+      // Typed during the outage: nothing happened, the user moved on.
+      h.phoneMachine.input(tab.id, Uint8List.fromList('rm -r x\r'.codeUnits));
       h.reconnectPhone();
+      expect(tab.isAttached, isTrue);
+      expect(h.sessions.sessions.single.attachedMobileId, phoneId);
+      expect(h.pty.writtenText, isEmpty);
 
-      final written = [for (final w in h.pty.writes) ...w];
-      expect(written, [
-        ...List.filled(24 << 10, 0x61),
-        ...List.filled(40 << 10, 0x62),
+      h.phoneMachine.input(tab.id, Uint8List.fromList('ls\r'.codeUnits));
+      settle(async);
+      expect(h.pty.writtenText, 'ls\r');
+    });
+  });
+
+  test('keystrokes held for a re-attach are dropped when the channel is lost '
+      'before it', () {
+    fakeAsync((async) {
+      final h = Harness(async, keys);
+      h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+      final pty = h.pty;
+      settle(async);
+      h.disconnectPhone();
+
+      var typed = false;
+      h.phoneMachine.states.listen((state) {
+        if (state is MachineReady && !typed) {
+          typed = true; // Held: the second tab is not re-attached yet.
+          h.phoneMachine.input(tab.id, Uint8List.fromList('ls\r'.codeUnits));
+          h.phoneMachine.relayLost(); // Lost again before its re-attach.
+        }
+      });
+      h.reconnectPhone();
+      h.run(h.phoneMachine.connect());
+      settle(async);
+      expect(typed, isTrue);
+      expect(tab.isAttached, isTrue);
+      expect(h.sessions.sessions.map((s) => s.attachedMobileId), [
+        phoneId,
+        phoneId,
       ]);
-      expect(
-        [for (final w in h.pty.writes) w.length].every((n) => n <= 16 << 10),
-        isTrue,
-      );
+      expect(pty.writtenText, isEmpty);
     });
   });
 
