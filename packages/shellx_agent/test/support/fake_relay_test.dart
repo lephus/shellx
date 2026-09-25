@@ -15,6 +15,19 @@ const phoneId = 'b0000000-0000-4000-8000-000000000002';
 const strangerId = 'c0000000-0000-4000-8000-000000000009';
 const observerId = 'd0000000-0000-4000-8000-000000000004';
 
+/// Pairing id number [n]: a lower-case UUIDv7 whose timestamp grows with
+/// [n] (September 2024, so never ahead of the relay's clock).
+String pid(int n) =>
+    '01920000-${n.toRadixString(16).padLeft(4, '0')}-7000-8000-000000000000';
+
+/// The pairing_removed event for (agentId, phoneId, [pairingId]).
+Map<String, String> removed(String pairingId) => {
+  'event': 'pairing_removed',
+  'agent_id': agentId,
+  'mobile_id': phoneId,
+  'pairing_id': pairingId,
+};
+
 RelayConnection connect(FakeRelay relay, FakeDevice device) => RelayConnection(
   wsUri: relay.wsUri,
   token: () => device.token,
@@ -207,16 +220,12 @@ void main() {
       expect({for (final d in devices) d.id}, {agentId, phoneId});
       expect(devices.firstWhere((d) => d.id == agentId).online, isTrue);
 
-      drive(async, agentApi.createPairing(phoneId));
-      expect(relay.pairings, {(agentId, phoneId)});
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(1)));
+      expect(relay.pairings, {(agentId, phoneId): pid(1)});
       drive(async, phoneApi.deletePairing(agentId, phoneId));
       settle(async);
       expect(relay.pairings, isEmpty);
-      expect(events.single.event, {
-        'event': 'pairing_removed',
-        'agent_id': agentId,
-        'mobile_id': phoneId,
-      });
+      expect(events.single.event, removed(pid(1)));
       expect(relay.requests, [
         'GET /v1/devices',
         'POST /v1/pairings',
@@ -284,7 +293,7 @@ void main() {
         baseUri: relay.baseUri,
         httpClient: relay.httpClient,
       )..token = phone.token;
-      drive(async, agentApi.createPairing(phoneId));
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(1)));
 
       // Unpair while the agent is offline.
       drive(async, phoneApi.deletePairing(agentId, phoneId));
@@ -297,9 +306,7 @@ void main() {
       });
       settle(async);
 
-      expect(events.map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(events.map((e) => e.event).toList(), [removed(pid(1))]);
 
       // A tombstone: delivering it does not clear it.
       List<EventFrame> reconnect() {
@@ -315,19 +322,18 @@ void main() {
         return received;
       }
 
-      expect(reconnect().map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(reconnect().map((e) => e.event).toList(), [removed(pid(1))]);
 
-      // Re-pairing (POST /v1/pairings) clears it.
-      drive(async, agentApi.createPairing(phoneId));
+      // Re-pairing (POST /v1/pairings with a newer id) clears it.
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(2)));
       expect(reconnect(), isEmpty);
 
-      // Unpair / re-pair / unpair cycles collapse into one tombstone.
+      // Unpair / re-pair / unpair cycles collapse into one tombstone that
+      // carries the newest id.
       drive(async, phoneApi.deletePairing(agentId, phoneId));
-      drive(async, agentApi.createPairing(phoneId));
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(3)));
       drive(async, phoneApi.deletePairing(agentId, phoneId));
-      expect(reconnect(), hasLength(1));
+      expect(reconnect().map((e) => e.event).toList(), [removed(pid(3))]);
     });
   });
 
@@ -353,7 +359,7 @@ void main() {
         baseUri: relay.baseUri,
         httpClient: relay.httpClient,
       )..token = phone.token;
-      drive(async, agentApi.createPairing(phoneId));
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(1)));
 
       final a = connect(relay, agent)..start();
       final events = <EventFrame>[];
@@ -364,9 +370,7 @@ void main() {
 
       drive(async, phoneApi.deletePairing(agentId, phoneId));
       settle(async);
-      expect(events.map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(events.map((e) => e.event).toList(), [removed(pid(1))]);
 
       // Recorded even though the agent was online: every later connect
       // replays it.
@@ -378,9 +382,7 @@ void main() {
         if (f is EventFrame) events2.add(f);
       });
       settle(async);
-      expect(events2.map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(events2.map((e) => e.event).toList(), [removed(pid(1))]);
 
       relay.dropConnection(agentId);
       settle(async);
@@ -390,9 +392,7 @@ void main() {
         if (f is EventFrame) events3.add(f);
       });
       settle(async);
-      expect(events3.map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(events3.map((e) => e.event).toList(), [removed(pid(1))]);
     });
   });
 
@@ -440,7 +440,7 @@ void main() {
         baseUri: relay.baseUri,
         httpClient: relay.httpClient,
       )..token = agent.token;
-      drive(async, agentApi.createPairing(phoneId));
+      drive(async, agentApi.createPairing(phoneId, pairingId: pid(1)));
 
       final p = connect(relay, phone)..start();
       final events = <EventFrame>[];
@@ -452,9 +452,7 @@ void main() {
       drive(async, agentApi.deletePairing(agentId, phoneId));
       settle(async);
 
-      expect(events.map((e) => e.event).toList(), [
-        {'event': 'pairing_removed', 'agent_id': agentId, 'mobile_id': phoneId},
-      ]);
+      expect(events.map((e) => e.event).toList(), [removed(pid(1))]);
     });
   });
 
@@ -546,6 +544,153 @@ void main() {
       expect(errors.single.deviceId, agentId);
       expect(errors.single.channel, channel);
       expect(relay.delivered, isEmpty);
+    });
+  });
+
+  group('pairing ids', () {
+    late FakeRelay relay;
+    late FakeDevice agent;
+    late ShellxApi agentApi;
+    late ShellxApi phoneApi;
+
+    // Plain objects only: nothing here chains futures outside fakeAsync.
+    setUp(() {
+      relay = FakeRelay();
+      agent = relay.addDevice(
+        id: agentId,
+        userId: userA,
+        kind: DeviceKind.agent,
+      );
+      final phone = relay.addDevice(
+        id: phoneId,
+        userId: userA,
+        kind: DeviceKind.mobile,
+      );
+      agentApi = ShellxApi(baseUri: relay.baseUri, httpClient: relay.httpClient)
+        ..token = agent.token;
+      phoneApi = ShellxApi(baseUri: relay.baseUri, httpClient: relay.httpClient)
+        ..token = phone.token;
+    });
+
+    Matcher failsWith(int status, String code) => throwsA(
+      isA<ApiException>()
+          .having((e) => e.status, 'status', status)
+          .having((e) => e.code, 'code', code),
+    );
+
+    List<EventFrame> connectAndCollect(FakeAsync async) {
+      relay.dropConnection(agentId);
+      settle(async);
+      final received = <EventFrame>[];
+      connect(relay, agent)
+        ..frames.listen((f) {
+          if (f is EventFrame) received.add(f);
+        })
+        ..start();
+      settle(async);
+      return received;
+    }
+
+    test('POST refuses (410) an id not newer than the tombstone, keeping '
+        'it; a newer id clears it; the same id again is 201', () {
+      fakeAsync((async) {
+        drive(async, agentApi.createPairing(phoneId, pairingId: pid(2)));
+        drive(async, agentApi.createPairing(phoneId, pairingId: pid(2)));
+        expect(relay.pairings, {(agentId, phoneId): pid(2)});
+        drive(async, phoneApi.deletePairing(agentId, phoneId));
+
+        for (final stale in [pid(1), pid(2)]) {
+          expect(
+            () =>
+                drive(async, agentApi.createPairing(phoneId, pairingId: stale)),
+            failsWith(410, 'pairing_removed'),
+          );
+        }
+        expect(relay.pairings, isEmpty);
+        expect(connectAndCollect(async).map((e) => e.event).toList(), [
+          removed(pid(2)),
+        ]);
+
+        drive(async, agentApi.createPairing(phoneId, pairingId: pid(3)));
+        expect(relay.pairings, {(agentId, phoneId): pid(3)});
+        expect(connectAndCollect(async), isEmpty);
+      });
+    });
+
+    test('POST refuses (410) an id older than the existing row and keeps the '
+        'row', () {
+      fakeAsync((async) {
+        drive(async, agentApi.createPairing(phoneId, pairingId: pid(5)));
+        expect(
+          () =>
+              drive(async, agentApi.createPairing(phoneId, pairingId: pid(4))),
+          failsWith(410, 'pairing_removed'),
+        );
+        expect(relay.pairings, {(agentId, phoneId): pid(5)});
+      });
+    });
+
+    test('POST validates the id: upper case or not version 7 is 400; more '
+        'than 24 h ahead of the relay clock is 410', () {
+      fakeAsync((async) {
+        for (final bad in [
+          '0192abcd-0001-7000-8000-00000000000a'.toUpperCase(),
+          '01920000-0001-4000-8000-000000000000', // Version 4.
+          'not-a-uuid',
+        ]) {
+          expect(
+            () => drive(async, agentApi.createPairing(phoneId, pairingId: bad)),
+            failsWith(400, 'bad_request'),
+          );
+        }
+        relay.now = () => DateTime.fromMillisecondsSinceEpoch(
+          0x019200000001 - const Duration(hours: 25).inMilliseconds,
+        );
+        expect(
+          () =>
+              drive(async, agentApi.createPairing(phoneId, pairingId: pid(1))),
+          failsWith(410, 'pairing_removed'),
+        );
+        expect(relay.pairings, isEmpty);
+      });
+    });
+
+    test('DELETE with a pairing id removes only that pairing; the event and '
+        'tombstone carry the id of the row deleted', () {
+      fakeAsync((async) {
+        final a = connect(relay, agent)..start();
+        final events = <EventFrame>[];
+        a.frames.listen((f) {
+          if (f is EventFrame) events.add(f);
+        });
+        settle(async);
+        drive(async, agentApi.createPairing(phoneId, pairingId: pid(2)));
+
+        drive(
+          async,
+          agentApi.deletePairing(agentId, phoneId, pairingId: pid(1)),
+        );
+        settle(async);
+        expect(relay.pairings, {(agentId, phoneId): pid(2)});
+        expect(events, isEmpty);
+
+        expect(
+          () => drive(
+            async,
+            agentApi.deletePairing(agentId, phoneId, pairingId: 'NOPE'),
+          ),
+          failsWith(400, 'bad_request'),
+        );
+
+        drive(
+          async,
+          agentApi.deletePairing(agentId, phoneId, pairingId: pid(2)),
+        );
+        settle(async);
+        expect(relay.pairings, isEmpty);
+        expect(events.map((e) => e.event).toList(), [removed(pid(2))]);
+        expect(relay.requests.last, 'DELETE /v1/pairings/$agentId/$phoneId');
+      });
     });
   });
 }
