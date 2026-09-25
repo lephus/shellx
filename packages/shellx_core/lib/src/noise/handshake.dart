@@ -36,8 +36,8 @@ final class NoiseHandshake {
        _psk = _checkedPsk(pattern, psk),
        _presetEphemeral = ephemeral,
        _symmetric = NoiseSymmetricState(pattern.protocolName) {
-    _symmetric.mixHash(prologue);
-    _symmetric.mixHash(remoteStatic); // pre-message "<- s"
+    _symmetric!.mixHash(prologue);
+    _symmetric!.mixHash(remoteStatic); // pre-message "<- s"
   }
 
   NoiseHandshake.responder({
@@ -52,34 +52,44 @@ final class NoiseHandshake {
        _psk = _checkedPsk(pattern, psk),
        _presetEphemeral = ephemeral,
        _symmetric = NoiseSymmetricState(pattern.protocolName) {
-    _symmetric.mixHash(prologue);
-    _symmetric.mixHash(localStatic.publicKey); // pre-message "<- s"
+    _symmetric!.mixHash(prologue);
+    _symmetric!.mixHash(localStatic.publicKey); // pre-message "<- s"
   }
 
   final NoisePattern _pattern;
   final bool _initiator;
   final NoiseKeyPair _s;
-  final Uint8List? _psk;
-  final NoiseKeyPair? _presetEphemeral;
-  final NoiseSymmetricState _symmetric;
+  Uint8List? _psk;
+  NoiseKeyPair? _presetEphemeral;
+
+  /// Null once [split] has run (Noise rev 34 §5.3: the HandshakeState,
+  /// including its chaining key/hash, is discarded after Split so it cannot
+  /// be reused to derive transport keys a second time).
+  NoiseSymmetricState? _symmetric;
   Uint8List? _rs;
   NoiseKeyPair? _e;
   Uint8List? _re;
+  Uint8List? _cachedHandshakeHash;
 
   /// 0 = before message 1, 1 = before message 2, 2 = complete.
   int _messageIndex = 0;
   bool _busy = false;
   bool _failed = false;
+  bool _split = false;
 
   bool get _pskMode => _pattern == NoisePattern.ikPsk2;
 
   bool get isComplete => _messageIndex == 2;
 
   /// Initiator: the key given to the constructor. Responder: set after
-  /// reading message 1.
-  Uint8List? get remoteStatic => _rs == null ? null : Uint8List.fromList(_rs!);
+  /// reading message 1 once `ss` and the payload tag have authenticated it.
+  /// Null when the handshake has failed, even if a peer claimed a static key
+  /// before authentication was checked.
+  Uint8List? get remoteStatic =>
+      _failed || _rs == null ? null : Uint8List.fromList(_rs!);
 
-  Uint8List get handshakeHash => _symmetric.handshakeHash;
+  Uint8List get handshakeHash =>
+      _cachedHandshakeHash ?? _symmetric!.handshakeHash;
 
   /// Writes the next handshake message. Fails with [StateError] when it is
   /// not this side's turn or the handshake already failed.
@@ -108,12 +118,29 @@ final class NoiseHandshake {
     );
   }
 
-  /// Derives the transport keys. Throws [StateError] before completion.
+  /// Derives the transport keys. Throws [StateError] before completion or if
+  /// called more than once: split() is one-shot, matching Noise rev 34 §5.3
+  /// (Split discards the HandshakeState). A second call must not be allowed
+  /// to re-derive the same keys from the same chaining key, which would
+  /// produce two transports with identical keys starting at nonce 0.
   NoiseTransport split() {
     if (!isComplete) {
       throw StateError('Handshake not complete');
     }
-    final (c1, c2) = _symmetric.split();
+    if (_split) {
+      throw StateError('split() already called');
+    }
+    _split = true;
+    final symmetric = _symmetric!;
+    final (c1, c2) = symmetric.split();
+    // Discard the handshake state now that the transport keys are derived:
+    // nothing may read the ephemeral key, psk or symmetric state again.
+    _cachedHandshakeHash = symmetric.handshakeHash;
+    _symmetric = null;
+    _e = null;
+    _re = null;
+    _psk = null;
+    _presetEphemeral = null;
     return _initiator ? NoiseTransport._(c1, c2) : NoiseTransport._(c2, c1);
   }
 
@@ -145,10 +172,10 @@ final class NoiseHandshake {
     final e = await _ephemeral();
     final out = BytesBuilder(copy: false);
     _writeE(e, out);
-    _symmetric.mixKey(await dh(e, _rs!)); // es
-    out.add(await _symmetric.encryptAndHash(_s.publicKey)); // s
-    _symmetric.mixKey(await dh(_s, _rs!)); // ss
-    out.add(await _symmetric.encryptAndHash(payload));
+    _symmetric!.mixKey(await dh(e, _rs!)); // es
+    out.add(await _symmetric!.encryptAndHash(_s.publicKey)); // s
+    _symmetric!.mixKey(await dh(_s, _rs!)); // ss
+    out.add(await _symmetric!.encryptAndHash(payload));
     return out.takeBytes();
   }
 
@@ -158,15 +185,22 @@ final class NoiseHandshake {
       throw const NoiseException('Handshake message 1 too short');
     }
     _readE(Uint8List.sublistView(message, 0, dhLen));
-    _symmetric.mixKey(await dh(_s, _re!)); // es
-    final rs = await _symmetric.decryptAndHash(
+    _symmetric!.mixKey(await dh(_s, _re!)); // es
+    final rs = await _symmetric!.decryptAndHash(
       Uint8List.sublistView(message, dhLen, dhLen + encryptedStaticLength),
     );
-    _rs = rs; // s
-    _symmetric.mixKey(await dh(_s, rs)); // ss
-    return _symmetric.decryptAndHash(
+    _symmetric!.mixKey(await dh(_s, rs)); // ss
+    final payload = await _symmetric!.decryptAndHash(
       Uint8List.sublistView(message, dhLen + encryptedStaticLength),
     );
+    // Only trust `rs` as the peer's static key once `ss` and the payload
+    // tag have authenticated it (Noise rev 34 §7.2): a peer who does not
+    // hold the private key matching a claimed static key cannot compute the
+    // same `ss` we just mixed in, so it cannot forge that tag. Assigning
+    // `_rs` any earlier would let an unauthenticated, attacker-chosen key
+    // leak through `remoteStatic` even though the message never verifies.
+    _rs = rs; // s
+    return payload;
   }
 
   // <- e, ee, se [, psk]
@@ -174,12 +208,12 @@ final class NoiseHandshake {
     final e = await _ephemeral();
     final out = BytesBuilder(copy: false);
     _writeE(e, out);
-    _symmetric.mixKey(await dh(e, _re!)); // ee
-    _symmetric.mixKey(await dh(e, _rs!)); // se
+    _symmetric!.mixKey(await dh(e, _re!)); // ee
+    _symmetric!.mixKey(await dh(e, _rs!)); // se
     if (_pskMode) {
-      _symmetric.mixKeyAndHash(_psk!); // psk
+      _symmetric!.mixKeyAndHash(_psk!); // psk
     }
-    out.add(await _symmetric.encryptAndHash(payload));
+    out.add(await _symmetric!.encryptAndHash(payload));
     return out.takeBytes();
   }
 
@@ -188,12 +222,12 @@ final class NoiseHandshake {
       throw const NoiseException('Handshake message 2 too short');
     }
     _readE(Uint8List.sublistView(message, 0, dhLen));
-    _symmetric.mixKey(await dh(_e!, _re!)); // ee
-    _symmetric.mixKey(await dh(_s, _re!)); // se
+    _symmetric!.mixKey(await dh(_e!, _re!)); // ee
+    _symmetric!.mixKey(await dh(_s, _re!)); // se
     if (_pskMode) {
-      _symmetric.mixKeyAndHash(_psk!); // psk
+      _symmetric!.mixKeyAndHash(_psk!); // psk
     }
-    return _symmetric.decryptAndHash(Uint8List.sublistView(message, dhLen));
+    return _symmetric!.decryptAndHash(Uint8List.sublistView(message, dhLen));
   }
 
   Future<NoiseKeyPair> _ephemeral() async {
@@ -204,18 +238,18 @@ final class NoiseHandshake {
 
   void _writeE(NoiseKeyPair e, BytesBuilder out) {
     out.add(e.publicKey);
-    _symmetric.mixHash(e.publicKey);
+    _symmetric!.mixHash(e.publicKey);
     if (_pskMode) {
-      _symmetric.mixKey(e.publicKey);
+      _symmetric!.mixKey(e.publicKey);
     }
   }
 
   void _readE(Uint8List re) {
     final copy = Uint8List.fromList(re);
     _re = copy;
-    _symmetric.mixHash(copy);
+    _symmetric!.mixHash(copy);
     if (_pskMode) {
-      _symmetric.mixKey(copy);
+      _symmetric!.mixKey(copy);
     }
   }
 

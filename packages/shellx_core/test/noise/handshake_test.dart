@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
+import 'package:shellx_core/src/noise/primitives.dart';
+import 'package:shellx_core/src/noise/symmetric_state.dart';
 import 'package:test/test.dart';
 
 Uint8List _hex(String hex) => hexToBytes(hex);
@@ -40,6 +42,32 @@ Future<(NoiseHandshake, NoiseHandshake)> _pair(
   return (initiator, responder);
 }
 
+/// Hand-crafts a Noise_IK message 1 the way `_writeMessage1` does, except the
+/// `s` field claims [claimedStaticPublic] (e.g. a victim's public key) while
+/// the `ss` DH is computed with [attackerStatic]'s real private key. A
+/// responder must reject this: it cannot succeed unless the sender actually
+/// holds the private key matching the identity it claims.
+Future<Uint8List> _forgeMessage1({
+  required Uint8List prologue,
+  required Uint8List responderStaticPublic,
+  required NoiseKeyPair attackerStatic,
+  required Uint8List claimedStaticPublic,
+  required NoiseKeyPair attackerEphemeral,
+  Uint8List? payload,
+}) async {
+  final symmetric = NoiseSymmetricState(NoisePattern.ik.protocolName);
+  symmetric.mixHash(prologue);
+  symmetric.mixHash(responderStaticPublic); // pre-message "<- s"
+  final out = BytesBuilder(copy: false);
+  out.add(attackerEphemeral.publicKey);
+  symmetric.mixHash(attackerEphemeral.publicKey);
+  symmetric.mixKey(await dh(attackerEphemeral, responderStaticPublic)); // es
+  out.add(await symmetric.encryptAndHash(claimedStaticPublic)); // forged s
+  symmetric.mixKey(await dh(attackerStatic, responderStaticPublic)); // ss
+  out.add(await symmetric.encryptAndHash(payload ?? Uint8List(0)));
+  return out.takeBytes();
+}
+
 void main() {
   group('official cacophony vectors', () {
     final fixture =
@@ -60,11 +88,12 @@ void main() {
         final pattern = NoisePattern.values.singleWhere(
           (p) => p.protocolName == vector['protocol_name'],
         );
+        final initiatorStatic = await NoiseKeyPair.fromPrivateKey(
+          _hex(vector['init_static'] as String),
+        );
         final initiator = NoiseHandshake.initiator(
           pattern: pattern,
-          localStatic: await NoiseKeyPair.fromPrivateKey(
-            _hex(vector['init_static'] as String),
-          ),
+          localStatic: initiatorStatic,
           remoteStatic: _hex(vector['init_remote_static'] as String),
           prologue: _hex(vector['init_prologue'] as String),
           psk: _firstPsk(vector, 'init_psks'),
@@ -92,7 +121,7 @@ void main() {
         final message1 = await initiator.writeMessage(payload1);
         expect(bytesToHex(message1), messages[0]['ciphertext']);
         expect(await responder.readMessage(message1), payload1);
-        expect(responder.remoteStatic, isNotNull);
+        expect(responder.remoteStatic, initiatorStatic.publicKey);
 
         // Message 2: responder -> initiator.
         final payload2 = _hex(messages[1]['payload'] as String);
@@ -229,6 +258,35 @@ void main() {
       },
     );
 
+    test('attacker claims a victim static key it does not hold the private '
+        'key for: message 1 fails and remoteStatic stays null', () async {
+      final agent = await NoiseKeyPair.generate(); // responder
+      final attacker = await NoiseKeyPair.generate();
+      final victim = await NoiseKeyPair.generate();
+      final attackerEphemeral = await NoiseKeyPair.generate();
+      final prologue = Uint8List.fromList(utf8.encode('prologue'));
+
+      final responder = NoiseHandshake.responder(
+        pattern: NoisePattern.ik,
+        localStatic: agent,
+        prologue: prologue,
+      );
+
+      final forged = await _forgeMessage1(
+        prologue: prologue,
+        responderStaticPublic: agent.publicKey,
+        attackerStatic: attacker,
+        claimedStaticPublic: victim.publicKey,
+        attackerEphemeral: attackerEphemeral,
+      );
+
+      await expectLater(
+        responder.readMessage(forged),
+        throwsA(isA<NoiseException>()),
+      );
+      expect(responder.remoteStatic, isNull);
+    });
+
     test('tampered and truncated handshake messages', () async {
       final (initiator, responder) = await _pair(NoisePattern.ik);
       final m1 = await initiator.writeMessage();
@@ -315,6 +373,20 @@ void main() {
       await initiator.readMessage(await responder.writeMessage());
       return (initiator.split(), responder.split());
     }
+
+    test(
+      'split() is one-shot: a second call throws instead of reusing keys',
+      () async {
+        final (initiator, responder) = await _pair(NoisePattern.ik);
+        await responder.readMessage(await initiator.writeMessage());
+        await initiator.readMessage(await responder.writeMessage());
+
+        initiator.split();
+        expect(() => initiator.split(), throwsStateError);
+        responder.split();
+        expect(() => responder.split(), throwsStateError);
+      },
+    );
 
     test('replayed, reordered and tampered messages are rejected', () async {
       final (a, b) = await transports();
