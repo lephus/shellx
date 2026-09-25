@@ -145,6 +145,7 @@ shellx/
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
 - **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong D1, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị và danh sách máy đã ghim được giữ lại (lưu theo `user_id`), để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy dữ liệu đó.
+- **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002. Agent nhận 4002 thì xử lý như đăng xuất.
 - **Hỗ trợ khẩn cấp:** script quản trị `relay/scripts/reset-password.ts` chạy qua `wrangler d1` để đặt lại mật khẩu thủ công.
 
 ### 5.3 Ghép nối bằng QR
@@ -345,7 +346,7 @@ Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ li�
 2. **Danh sách máy** (agent của tài khoản): tên, icon hệ điều hành, chấm online/offline (từ `GET /v1/devices` + PRESENCE), "Lần cuối online: …" khi offline. Máy chưa ghép có nhãn "Chưa ghép nối"; bấm vào mở màn quét QR.
 3. **Quét QR.**
 4. **Terminal của một máy:** hàng tab ở trên (`+` mở phiên mới, `×` đóng phiên), vùng `xterm.dart`, thanh phím phụ ngay trên bàn phím. Mở màn này lần đầu thì gửi `session.list` và cho phép gắn vào phiên có sẵn.
-5. **Cài đặt:** cỡ chữ mặc định, khóa sinh trắc học, bỏ ghép nối từng máy, đăng xuất, phiên bản app.
+5. **Cài đặt:** cỡ chữ mặc định, khóa sinh trắc học, bỏ ghép nối từng máy, đăng xuất, **xóa tài khoản** (nhập lại mật khẩu, cảnh báo không hoàn tác được), phiên bản app.
 
 ### 9.3 Thanh phím phụ
 
@@ -384,6 +385,7 @@ Mọi lỗi trả JSON `{error: {code, message}}`.
 | `POST /v1/auth/login` | — | `{email, password, device}` | `200 {user_id, device_id, token}`; `401 invalid_credentials`, `429` |
 | `POST /v1/auth/logout` | token | — | `204`. Token agent: xóa thêm ghép nối của agent |
 | `POST /v1/auth/password` | token agent | `{new_password}` | `204`; `403 agent_only`, `400 weak_password` |
+| `DELETE /v1/account` | token | `{password}` | `204`; `401 invalid_credentials`. Xóa người dùng (cascade thiết bị, token, ghép nối) và đóng WebSocket mọi thiết bị với 4002 |
 | `GET /v1/devices` | token | — | `200 [{id, kind, name, platform, online, last_seen_at, paired_with_me}]` (không trả khóa công khai) |
 | `POST /v1/pairings` | token agent | `{mobile_id}` | `201`; `404 device_not_found` |
 | `DELETE /v1/pairings/:agent_id/:mobile_id` | token của một trong hai bên | — | `204`; hub gửi `pairing_removed` cho bên còn lại |
