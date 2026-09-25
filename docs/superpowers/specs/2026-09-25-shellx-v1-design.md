@@ -144,7 +144,7 @@ shellx/
 - **Giới hạn tần suất** (rate limiting binding của Workers, chu kỳ 60 giây): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP. Vượt giới hạn trả HTTP 429.
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
 - **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong D1, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
-- **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị và danh sách máy đã ghim được giữ lại (lưu theo `user_id`), để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy dữ liệu đó.
+- **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị (một khóa chung cho điện thoại, vì lúc đăng nhập phải gửi khóa công khai trước khi biết `user_id`) và danh sách máy đã ghim (lưu theo `user_id`) được giữ lại, để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy danh sách máy đã ghim đó.
 - **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002.
 - **Agent nhận 4002 (hoặc bị từ chối 401 khi kết nối):** agent không phân biệt được "đổi mật khẩu" với "xóa tài khoản", nên luôn: xóa token, đóng mọi phiên, **giữ** khóa thiết bị và danh sách tin cậy, rồi hiện cửa sổ đăng nhập. Khi đăng nhập lại thành công, nếu `user_id` khác `user_id` đã lưu thì xóa danh sách tin cậy (đổi tài khoản hoặc tài khoản cũ đã bị xóa); cùng `user_id` thì giữ nguyên ghép nối.
 - **Hỗ trợ khẩn cấp:** script quản trị `relay/scripts/reset-password.ts` chạy qua `wrangler d1` để đặt lại mật khẩu thủ công.
@@ -163,7 +163,7 @@ shellx/
    - hiện thông báo "Đã ghép nối với <tên điện thoại>" và đóng cửa sổ QR.
 6. Điện thoại ghim `{agent_device_id, agent_public_key}`.
 
-Sai mã ghép nối làm điện thoại không giải mã được tin bắt tay thứ hai; điện thoại báo *"Mã QR không hợp lệ hoặc đã hết hạn."*
+Sai mã ghép nối làm điện thoại không giải mã được tin bắt tay thứ hai; điện thoại báo *"Mã QR không hợp lệ hoặc đã hết hạn. Hãy tạo mã mới trên máy tính."* (cùng câu với mục 12).
 
 ### 5.4 Kết nối hằng ngày
 

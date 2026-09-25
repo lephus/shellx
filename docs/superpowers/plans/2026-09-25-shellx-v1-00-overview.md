@@ -566,6 +566,9 @@ final class MachineConnecting extends MachineConnectionState { const MachineConn
 final class MachineReady extends MachineConnectionState { const MachineReady(); }
 final class MachineFailed extends MachineConnectionState { const MachineFailed(this.failure); final MachineConnectionFailure failure; }
 final class AppErrorException implements Exception { const AppErrorException(this.code, this.message); final AppErrorCode code; final String message; }
+final class MachineConnectionException implements Exception { const MachineConnectionException(this.failure); final MachineConnectionFailure failure; }
+// MachineClient.connect() và các request khi kênh mất ném MachineConnectionException.
+// ClientService.start()/stop() tự start/stop RelayConnection; gọi lại start() sau stop() được (mobile dùng khi vào/ra foreground).
 
 sealed class TabEvent { const TabEvent(); }
 final class TabOutput extends TabEvent { const TabOutput(this.text); final String text; }  // đã giải mã UTF-8 dạng luồng
