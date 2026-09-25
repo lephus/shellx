@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
   call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, registerAccount, unlimited,
@@ -162,5 +163,84 @@ describe("DELETE /v1/account", () => {
     const blocked = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: { password: account.password } });
     expect(blocked.status).toBe(429);
     expect(loginEmail.calls).toEqual(Array(6).fill(account.email));
+  });
+
+  it("purges the hub's durable pairing_removed queue once the account is gone", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    // The agent never connects: unpairing from the mobile side durably queues the event for it
+    // (Task 8's pending_pairing_removed table).
+    await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+
+    const res = await call(app, "DELETE", "/v1/account", { token: mobile.token, body: { password: account.password } });
+    expect(res.status).toBe(204);
+
+    // The account (and every device/token) is gone, so we can't reconnect through the normal HTTP
+    // auth path to observe redelivery; call the hub RPC directly instead, as the "UserHub RPC" tests
+    // in devices-pairings.test.ts do. purgeAll() run here a second time proves the route's own call
+    // already emptied the queue: a leftover row would make it return more than 0.
+    const hub = hubFor(env, account.agent.userId);
+    expect(await hub.purgeAll()).toBe(0);
+  });
+});
+
+describe("agent logout: safe notify-then-delete order and queue purge", () => {
+  it("keeps the token and pairing intact when a hub RPC fails, so a retried logout can still deliver the event", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+
+    let calls = 0;
+    const failingOnce = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        online: async () => [],
+        disconnect: async () => {},
+        notifyPairingRemoved: async () => {
+          calls++;
+          throw new Error("boom");
+        },
+        purgeAgent: async () => 0,
+        purgeAll: async () => 0,
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const failed = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: failingOnce } });
+    expect(failed.status).toBe(500);
+    expect(await errorCode(failed)).toBe("internal_error");
+    expect(calls).toBe(1);
+    // Nothing was deleted: the token is still valid and the pairing row survives.
+    expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
+    const stillPaired = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ?")
+      .bind(account.agent.deviceId).first();
+    expect(stillPaired).not.toBeNull();
+
+    const retried = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token });
+    expect(retried.status).toBe(204);
+    expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
+    const gone = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ?")
+      .bind(account.agent.deviceId).first();
+    expect(gone).toBeNull();
+  });
+
+  it("purges any pairing_removed rows still queued for the agent, even ones unrelated to this logout's own pairings", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
+    // The agent never connects: removing the pairing from the mobile side durably queues the event
+    // for the agent (Task 8). Re-pair with a *different* mobile so the agent still has a current
+    // pairing at logout time — proving the purge isn't limited to pairings this same logout deleted.
+    await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    const mobile2 = await loginDevice(app, account, "mobile");
+    await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile2.deviceId } });
+
+    expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
+
+    const hub = hubFor(env, account.agent.userId);
+    expect(await hub.purgeAgent(account.agent.deviceId)).toBe(0);
   });
 });

@@ -108,25 +108,37 @@ authRoutes.post("/login", async (c) => {
   return c.json({ user_id: user.id, device_id: deviceId, token }, 200);
 });
 
-/** POST /v1/auth/logout — deletes this token; for an agent also every pairing it owns (spec §5.2). */
+/**
+ * POST /v1/auth/logout — deletes this token; for an agent also every pairing it owns (spec §5.2).
+ *
+ * Notify-before-delete (task 9 ruling, same safe order as `DELETE /v1/pairings`): every pairing is
+ * reported to the hub — which durably queues the event for the agent before doing anything live —
+ * before any D1 row is deleted. If a hub RPC throws, nothing here has been deleted yet, so a retried
+ * logout can still notify and delete it; the relay may only ever *remove* trust, so a lost
+ * pairing_removed is unsafe but a duplicate (from a retry re-notifying an already-queued pair) is
+ * not (spec §5.4–5.5, constraint 8).
+ */
 authRoutes.post("/logout", requireAuth, async (c) => {
   const auth = c.get("auth");
   const db = c.env.DB;
   const tokenHash = await hashToken(parseBearer(c.req.header("Authorization"))!);
-  const statements = [db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash)];
-  let removedMobiles: string[] = [];
   if (auth.kind === "agent") {
     const { results } = await db
       .prepare("SELECT mobile_id FROM pairings WHERE agent_id = ?")
       .bind(auth.deviceId)
       .all<{ mobile_id: string }>();
-    removedMobiles = results.map((r) => r.mobile_id);
-    statements.push(db.prepare("DELETE FROM pairings WHERE agent_id = ?").bind(auth.deviceId));
-  }
-  await db.batch(statements);
-  if (removedMobiles.length > 0) {
     const hub = hubFor(c.env, auth.userId);
-    for (const mobileId of removedMobiles) await hub.notifyPairingRemoved(auth.deviceId, mobileId);
+    for (const { mobile_id: mobileId } of results) await hub.notifyPairingRemoved(auth.deviceId, mobileId);
+    await db.batch([
+      db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash),
+      db.prepare("DELETE FROM pairings WHERE agent_id = ?").bind(auth.deviceId),
+    ]);
+    // This agent's own pairings are all gone now, so it has no trust list left to reconcile against
+    // any row still queued for it from before this logout — drop them rather than let the queue
+    // grow for a device that will resync its trust list from scratch next time it signs in.
+    await hub.purgeAgent(auth.deviceId);
+  } else {
+    await db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash).run();
   }
   logMeta("logout", { device_id: auth.deviceId });
   return c.body(null, 204);

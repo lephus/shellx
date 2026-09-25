@@ -52,6 +52,12 @@ describe("per-connection frame rate limit", () => {
   });
 
   it("sends ERROR rate_limited, then closes with 4003 and announces offline", async () => {
+    // Freeze Date.now() (shared with the Durable Object — see task-7-report.md) so the token math
+    // below is exact regardless of how long these 1000 sends actually take on the host: a naive
+    // real-clock version can, under load, let enough of the bucket refill mid-flood that fewer than
+    // `FRAMES_PER_SECOND` frames get delivered before the limiter trips, or (rarely) enough to blow
+    // past the 1000-message budget entirely — this is the flaky test flagged in task-8-report.md.
+    vi.useFakeTimers();
     const { agent, mobile, a, m } = await hubWithTwoDevices();
     for (let i = 0; i < 1000; i++) m.send(encodeData(agent.deviceId, CH, Uint8Array.of(4)));
     expect(hex(await m.nextBinary())).toBe(hex(encodeError(RelayErrorCode.rateLimited)));
@@ -66,8 +72,9 @@ describe("per-connection frame rate limit", () => {
       }
       delivered++;
     }
-    expect(delivered).toBeGreaterThanOrEqual(FRAMES_PER_SECOND);
-    expect(delivered).toBeLessThan(1000);
+    // With the clock frozen, exactly the fresh bucket's capacity is delivered before the 501st send
+    // trips the limiter — no more, no less.
+    expect(delivered).toBe(FRAMES_PER_SECOND);
   });
 });
 

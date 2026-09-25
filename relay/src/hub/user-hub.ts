@@ -125,6 +125,25 @@ export class UserHub extends DurableObject<Env> {
     if (mobileId !== agentId) for (const ws of this.socketsOf(mobileId)) safeSend(ws, frame);
   }
 
+  /**
+   * Deletes every row queued for one agent: called on that agent's own logout, once its current
+   * pairings have already been notified and dropped, so there is no longer a trust list on this
+   * device for stale removals (queued from *before* this logout) to reconcile against. Returns the
+   * number of rows removed, purely so tests/ops can observe that the queue is actually empty.
+   */
+  purgeAgent(agentId: string): number {
+    return this.ctx.storage.sql.exec("DELETE FROM pending_pairing_removed WHERE agent_id = ?", agentId).rowsWritten;
+  }
+
+  /**
+   * Deletes every row in the durable queue, regardless of agent: called once when the whole
+   * account is deleted, since nothing is left to ever deliver it to. Returns the number of rows
+   * removed, purely so tests/ops can observe that the queue is actually empty.
+   */
+  purgeAll(): number {
+    return this.ctx.storage.sql.exec("DELETE FROM pending_pairing_removed").rowsWritten;
+  }
+
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const me = attachmentOf(ws);
     if (me === null || me.closing) return;

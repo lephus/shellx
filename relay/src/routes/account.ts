@@ -32,7 +32,11 @@ accountRoutes.delete("/", requireAuth, async (c) => {
 
   const { results } = await db.prepare("SELECT id FROM devices WHERE user_id = ?").bind(auth.userId).all<{ id: string }>();
   await db.prepare("DELETE FROM users WHERE id = ?").bind(auth.userId).run();
-  await hubFor(c.env, auth.userId).disconnect(results.map((r) => r.id), CloseCode.revoked);
+  const hub = hubFor(c.env, auth.userId);
+  await hub.disconnect(results.map((r) => r.id), CloseCode.revoked);
+  // The account is gone; nothing will ever connect to this hub to receive a queued pairing_removed
+  // event again, so the durable queue (Task 8) would otherwise sit there forever.
+  await hub.purgeAll();
   logMeta("account_deleted", { device_id: auth.deviceId });
   return c.body(null, 204);
 });
