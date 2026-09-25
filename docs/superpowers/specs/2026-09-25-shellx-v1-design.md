@@ -132,8 +132,8 @@ shellx/
 ### 5.1 Khóa thiết bị
 
 - Lần đầu chạy, mỗi thiết bị tạo một cặp khóa **X25519** tĩnh.
-- Khóa bí mật không bao giờ rời thiết bị; lưu qua `flutter_secure_storage` (Keychain trên macOS/iOS, Credential Manager trên Windows, Keystore trên Android).
-- Cài lại app sinh khóa mới, nên phải ghép nối lại.
+- Khóa bí mật không bao giờ rời thiết bị; lưu qua `flutter_secure_storage` (Keychain trên macOS/iOS, file mã hóa DPAPI trên Windows, Keystore trên Android).
+- Cài lại app thường sinh khóa mới nên phải ghép nối lại (trên macOS, mục Keychain có thể còn sau khi gỡ app, khi đó khóa cũ được dùng lại và ghép nối vẫn còn hiệu lực).
 
 ### 5.2 Tài khoản
 

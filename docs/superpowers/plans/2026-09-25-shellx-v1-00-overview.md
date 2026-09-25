@@ -521,6 +521,11 @@ sealed class AgentEvent { const AgentEvent(); }
 final class MobilePaired extends AgentEvent { const MobilePaired(this.device); final TrustedDevice device; }
 final class SessionOpenedByMobile extends AgentEvent { const SessionOpenedByMobile({required this.mobileName, required this.sessionId}); final String mobileName; final int sessionId; }
 final class ActiveChannelsChanged extends AgentEvent { const ActiveChannelsChanged(this.count); final int count; }
+final class AgentRevoked extends AgentEvent { const AgentRevoked(); }   // relay → revoked (4002 hoặc 401 khi kết nối)
+// AgentService.start()/stop() chỉ bật/tắt kết nối relay, KHÔNG đóng phiên: app phải gọi sessions.closeAll()
+// khi tắt truy cập từ xa, đăng xuất, AgentRevoked và thoát.
+// SessionManager nhận thêm `Random? random`; id phiên đầu tiên ngẫu nhiên trong [1, 2^31) rồi tăng dần.
+// Pty.output phải đóng khi tiến trình kết thúc.
 final class AgentService {
   AgentService({required RelayConnection relay, required ShellxApi api, required String deviceId,
       required NoiseKeyPair identity, required TrustedStore trusted, required SessionManager sessions,
