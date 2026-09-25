@@ -18,11 +18,21 @@ final class FakeRelaySocket implements RelaySocket {
   int? clientCloseCode;
   bool closedByClient = false;
 
+  /// When true, [sendText] throws instead of recording the text (used to
+  /// simulate a socket that is already dead by the time the first ping is
+  /// sent).
+  bool throwOnSendText = false;
+
   @override
   Stream<Object> get messages => _incoming.stream;
 
   @override
-  void sendText(String text) => sentText.add(text);
+  void sendText(String text) {
+    if (throwOnSendText) {
+      throw StateError('socket closed');
+    }
+    sentText.add(text);
+  }
 
   @override
   void sendBytes(Uint8List bytes) => sentBytes.add(bytes);
@@ -50,6 +60,14 @@ final class FakeRelaySocket implements RelaySocket {
     _closeCode = code;
     if (!_incoming.isClosed) {
       unawaited(_incoming.close());
+    }
+  }
+
+  /// Delivers a stream error (for example a mid-connection socket reset)
+  /// instead of a clean close.
+  void serverError() {
+    if (!_incoming.isClosed) {
+      _incoming.addError(const SocketException('reset'));
     }
   }
 }
@@ -326,13 +344,177 @@ void main() {
       async.elapse(const Duration(seconds: 1));
       expect(t.relay.state, RelayConnectionState.disconnected);
       async.elapse(const Duration(seconds: 1));
-      expect(t.connector.attempts, 2);
-      expect(t.relay.state, RelayConnectionState.connected);
-      // The late socket is closed, never used.
+      // The retry never lets a second upgrade race the still-outstanding
+      // first one: it is gated behind it, so no second dial has happened.
+      expect(t.connector.attempts, 1);
+      expect(t.relay.state, RelayConnectionState.connecting);
+      // The late socket from the abandoned attempt finally arrives: it is
+      // closed, never used, and only then does the retry actually dial.
       final late = FakeRelaySocket();
       hanging.complete(late);
       async.flushMicrotasks();
       expect(late.closedByClient, isTrue);
+      expect(t.connector.attempts, 2);
+      expect(t.relay.state, RelayConnectionState.connected);
+    });
+  });
+
+  test('stop() then start() while connecting never overlaps two dials; the '
+      'late socket is closed and does not disturb the fresh connection', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      final hanging = Completer<RelaySocket>();
+      t.connector.nextAttempt = () => hanging.future;
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.connector.attempts, 1);
+
+      t.relay.stop();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.stopped);
+
+      t.relay.start();
+      async.flushMicrotasks();
+      // The abandoned attempt hasn't settled yet: start() must not dial a
+      // second upgrade while the first is still outstanding.
+      expect(t.connector.attempts, 1);
+      expect(t.relay.state, RelayConnectionState.connecting);
+
+      final late = FakeRelaySocket();
+      hanging.complete(late);
+      async.flushMicrotasks();
+      expect(late.closedByClient, isTrue);
+      expect(t.connector.attempts, 2);
+      expect(t.relay.state, RelayConnectionState.connected);
+    });
+  });
+
+  test('a relay that keeps only the newest connection per device never 4001s '
+      'the live socket because of a slow, abandoned attempt', () {
+    fakeAsync((async) {
+      // Models the real relay: it keeps only the newest connection per
+      // device and closes whatever it currently considers live with 4001
+      // the moment a new connection registers. If RelayConnection ever
+      // let an abandoned attempt's upgrade race a fresh one, the
+      // abandoned attempt could register *after* the fresh one and get
+      // the live, fresh connection replaced.
+      final pendingReplies = <Completer<RelaySocket>>[];
+      final registrations = <FakeRelaySocket>[];
+      FakeRelaySocket? liveAtRelay;
+      Future<RelaySocket> connector(Uri uri, Map<String, String> headers) {
+        final reply = Completer<RelaySocket>();
+        pendingReplies.add(reply);
+        return reply.future;
+      }
+
+      void deliver(int index) {
+        final socket = FakeRelaySocket();
+        registrations.add(socket);
+        final previous = liveAtRelay;
+        liveAtRelay = socket;
+        previous?.serverClose(RelayCloseCode.replaced);
+        pendingReplies[index].complete(socket);
+      }
+
+      final relay = RelayConnection(
+        wsUri: _wsUri,
+        token: () => 'tok-123',
+        connector: connector,
+        backoff: Backoff(random: _MaxRandom()),
+      );
+      relay.start();
+      async.flushMicrotasks();
+      relay.stop();
+      relay.start();
+      async.flushMicrotasks();
+      // Restart is gated behind the abandoned first attempt: still one
+      // dial outstanding.
+      expect(pendingReplies, hasLength(1));
+
+      // The abandoned dial "arrives at the relay" and would register
+      // there, but RelayConnection has already moved on locally — it
+      // must close this socket instead of adopting it.
+      deliver(0);
+      async.flushMicrotasks();
+      expect(registrations[0].closedByClient, isTrue);
+
+      // Only now does the retry actually dial, and its registration is
+      // the only one left standing at the relay.
+      expect(pendingReplies, hasLength(2));
+      deliver(1);
+      async.flushMicrotasks();
+      expect(relay.state, RelayConnectionState.connected);
+      expect(relay.state, isNot(RelayConnectionState.replaced));
+    });
+  });
+
+  test('a first ping that throws does not leak a periodic timer', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      t.connector.nextAttempt = () {
+        final socket = FakeRelaySocket()..throwOnSendText = true;
+        return Future.value(socket);
+      };
+      t.relay.start();
+      async.flushMicrotasks();
+      // The first ping threw, dropping the connection immediately: no
+      // periodic timer should have been created for that dead generation.
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      expect(async.periodicTimerCount, 0);
+      async.elapse(const Duration(seconds: 1));
+      expect(t.relay.state, RelayConnectionState.connected);
+      expect(async.periodicTimerCount, 1);
+    });
+  });
+
+  test('a connector that throws synchronously still backs off and retries', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      t.connector.nextAttempt = () {
+        throw ArgumentError('bad uri');
+      };
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      async.elapse(const Duration(seconds: 1));
+      expect(t.relay.state, RelayConnectionState.connected);
+      expect(t.connector.attempts, 2);
+    });
+  });
+
+  test('a token() that throws still backs off and retries', () {
+    fakeAsync((async) {
+      var calls = 0;
+      final t = _setUp(
+        token: () {
+          calls++;
+          if (calls == 1) {
+            throw StateError('keychain unavailable');
+          }
+          return 'tok-123';
+        },
+      );
+      t.relay.start();
+      async.flushMicrotasks();
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      expect(t.connector.attempts, 0);
+      async.elapse(const Duration(seconds: 1));
+      expect(t.relay.state, RelayConnectionState.connected);
+      expect(t.connector.attempts, 1);
+    });
+  });
+
+  test('a stream error closes the abandoned socket before reconnecting', () {
+    fakeAsync((async) {
+      final t = _setUp();
+      t.relay.start();
+      async.flushMicrotasks();
+      final socket = t.connector.last;
+      socket.serverError();
+      async.flushMicrotasks();
+      expect(socket.closedByClient, isTrue);
+      expect(t.relay.state, RelayConnectionState.disconnected);
+      async.elapse(const Duration(seconds: 1));
       expect(t.relay.state, RelayConnectionState.connected);
     });
   });
