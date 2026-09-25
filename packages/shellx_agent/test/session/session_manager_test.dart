@@ -240,8 +240,10 @@ void main() {
       expect(rig.manager.sessions, isEmpty); // hidden from listing while
       // draining (spec item 4): it's still tracked internally, though.
 
-      // No further ack ever arrives.
-      async.elapse(const Duration(seconds: 30));
+      // No further ack ever arrives: nothing at 29 s, exited at 30 s.
+      async.elapse(const Duration(seconds: 29));
+      expect(rig.to(phone).whereType<SessionExited>(), isEmpty);
+      async.elapse(const Duration(seconds: 1));
 
       final messages = rig.to(phone);
       expect(messages.last, isA<SessionExited>());
@@ -265,9 +267,10 @@ void main() {
 
       rig.manager.mobileDisconnected(phone);
       expect(rig.manager.sessions, isEmpty);
+      expect(async.pendingTimers, isEmpty); // The 30 s drain timer is gone.
 
-      // The 30s drain timer must have been cancelled: elapsing well past
-      // it sends nothing more (there is no attached phone to send to).
+      // Elapsing well past it sends nothing more (there is no attached
+      // phone to send to).
       rig.clear();
       async.elapse(const Duration(seconds: 40));
       expect(rig.sent, isEmpty);
