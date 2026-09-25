@@ -161,7 +161,7 @@ void main() {
   });
 
   group('PosixProcessTreeKiller', () {
-    test('stops and hangs up the root before looking at the table', () async {
+    test('hangs up the shell first, without stopping it beforehand', () async {
       final sent = <(int, ProcessSignal)>[];
       await _killer(
         _FakeTable([
@@ -169,10 +169,7 @@ void main() {
         ]),
         sent,
       ).killTree(100);
-      expect(sent.take(2), [
-        (100, ProcessSignal.sigstop),
-        (100, ProcessSignal.sighup),
-      ]);
+      expect(sent.first, (100, ProcessSignal.sighup));
     });
 
     test(
@@ -187,17 +184,23 @@ void main() {
 
         await _killer(table, sent).killTree(100);
 
-        expect(_pids(sent, ProcessSignal.sigstop), {100, 101, 102});
+        expect(_pids(sent, ProcessSignal.sigstop), containsAll([101, 102]));
         expect(_pids(sent, ProcessSignal.sighup), {100, 101, 102});
         expect(_pids(sent, ProcessSignal.sigcont), {100, 101, 102});
         expect(_pids(sent, ProcessSignal.sigkill), {100, 101, 102});
         expect(sent.map((s) => s.$1), isNot(contains(200)));
         expect(sent.map((s) => s.$1), isNot(contains(1)));
+        final shellHangUp = _first(sent, 100, ProcessSignal.sighup);
+        expect(
+          sent.take(shellHangUp).map((s) => s.$1),
+          isNot(contains(100)),
+          reason: 'the shell keeps running until it is hung up',
+        );
         for (final pid in [101, 102]) {
           expect(
             _first(sent, pid, ProcessSignal.sigstop),
-            lessThan(_first(sent, 100, ProcessSignal.sigcont)),
-            reason: '$pid is frozen before anything resumes',
+            lessThan(shellHangUp),
+            reason: '$pid is frozen before the shell is hung up',
           );
         }
         for (final pid in [100, 101, 102]) {
@@ -281,7 +284,7 @@ void main() {
           _killer(_FailingTable(), sent).killTree(100),
           throwsA(isA<ProcessTableException>()),
         );
-        expect(sent.first, (100, ProcessSignal.sigstop));
+        expect(sent.first, (100, ProcessSignal.sighup));
         expect(sent.map((s) => s.$1).toSet(), {100});
         expect(
           _first(sent, 100, ProcessSignal.sighup),

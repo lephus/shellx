@@ -19,20 +19,24 @@ typedef SignalSender = bool Function(int pid, ProcessSignal signal);
 /// re-parented to launchd when the shell dies is still found, and so are the
 /// children it starts later:
 ///
-/// 1. SIGSTOP, then SIGHUP, the shell — before and independently of any
-///    `ps` snapshot. Stopped, it can neither exit (which would re-parent its
-///    children out of reach) nor fork; the SIGHUP waits for SIGCONT.
-/// 2. Freeze: snapshot the process table and SIGSTOP every running
+/// 1. Freeze: snapshot the process table and SIGSTOP every running
 ///    descendant of every running victim, repeating until a snapshot shows
-///    nothing new (at most [maxFreezeRounds] rounds).
-/// 3. SIGHUP, then SIGCONT, every victim.
-/// 4. Wait up to [grace] (polling every [pollInterval], returning early once
+///    nothing new (at most [maxFreezeRounds] rounds). The shell itself keeps
+///    running, so its children stay linked to it.
+/// 2. SIGHUP the shell, then every other victim, then SIGCONT them all — in
+///    one synchronous step, and even when `ps` failed.
+/// 3. Wait up to [grace] (polling every [pollInterval], returning early once
 ///    no victim is left); children started meanwhile become victims.
-/// 5. Freeze again, then SIGKILL every victim still running.
+/// 4. Freeze again, then SIGKILL every victim still running.
 ///
-/// Processes that left the tree before step 2 saw them (double-forked
-/// daemons) are out of reach. Never signals pid 0, launchd (1) or this
-/// process.
+/// The shell is not stopped before it is hung up: were the agent to exit
+/// mid-freeze, the pty hang-up still ends the shell, and the kernel then
+/// continues (SIGHUP + SIGCONT) the stopped jobs it orphans. Hanging the
+/// shell up before step 1 instead would let it exit before the first
+/// snapshot and re-parent its children out of reach. The shell may still
+/// fork between the last snapshot and its SIGHUP (a narrow race); processes
+/// that left the tree before a snapshot saw them (double-forked daemons) are
+/// out of reach too. Never signals pid 0, launchd (1) or this process.
 final class PosixProcessTreeKiller implements ProcessTreeKiller {
   PosixProcessTreeKiller({
     ProcessTable table = const PsProcessTable(),
@@ -57,8 +61,6 @@ final class PosixProcessTreeKiller implements ProcessTreeKiller {
   @override
   Future<void> killTree(int rootPid) async {
     if (!_safe(rootPid)) return;
-    _signal(rootPid, ProcessSignal.sigstop);
-    _signal(rootPid, ProcessSignal.sighup);
 
     final victims = <int>{rootPid};
     Object? error;
@@ -69,13 +71,15 @@ final class PosixProcessTreeKiller implements ProcessTreeKiller {
     }
 
     try {
-      await _freeze(victims);
+      await _freeze(victims, spare: rootPid);
     } catch (e, s) {
       record(e, s);
     }
-    // Everything in [victims] is stopped, so it is still there to signal.
+    // No await from here to the last SIGCONT. Every victim but the shell is
+    // stopped, so it is still there to signal.
+    _signal(rootPid, ProcessSignal.sighup);
     for (final target in victims) {
-      _signal(target, ProcessSignal.sighup);
+      if (target != rootPid) _signal(target, ProcessSignal.sighup);
     }
     for (final target in victims) {
       _signal(target, ProcessSignal.sigcont);
@@ -121,10 +125,11 @@ final class PosixProcessTreeKiller implements ProcessTreeKiller {
     return running;
   }
 
-  /// SIGSTOPs the running victims and their descendants until a snapshot
-  /// shows no new process; returns the victims running in the last one.
-  Future<Set<int>> _freeze(Set<int> victims) async {
-    final stopped = <int>{};
+  /// SIGSTOPs the running victims (except [spare]) and their descendants
+  /// until a snapshot shows no new process; returns the victims running in
+  /// the last one.
+  Future<Set<int>> _freeze(Set<int> victims, {int? spare}) async {
+    final stopped = <int>{?spare};
     var running = <int>{};
     for (var round = 0; round < maxFreezeRounds; round++) {
       running = _expand(victims, await _table.snapshot());
