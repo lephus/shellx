@@ -60,6 +60,14 @@ FFI_PLUGIN_EXPORT char *pty_error(void);
 // afterwards.
 FFI_PLUGIN_EXPORT void pty_release(PtyHandle *handle);
 
+#if !_WIN32
+// ShellX, tests only (apps/desktop/integration_test/pty_test.dart): the next
+// pty_create fails as if [step] had failed: 1 allocating the handle, 2
+// starting the writer thread, 3 starting the exit thread, 4 starting the
+// output reader. 0 turns it off; pty_create resets it.
+FFI_PLUGIN_EXPORT void pty_debug_fail(int step);
+#endif
+
 #if _WIN32
 // ShellX: terminates the job object the process was started in, i.e. the
 // process and every process it started, or only the process when it has no

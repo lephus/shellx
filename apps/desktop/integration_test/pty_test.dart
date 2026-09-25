@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter_pty/flutter_pty.dart' as fp;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -206,6 +207,21 @@ Set<String> _zombieChildren() {
   };
 }
 
+/// macOS: child processes of this process (running or not) that run a
+/// shell, as "pid command".
+Set<String> _shellChildren() {
+  final result = Process.runSync('/bin/ps', ['-A', '-o', 'pid=,ppid=,comm=']);
+  return {
+    for (final line in const LineSplitter().convert(result.stdout as String))
+      if (line.trim().split(RegExp(r'\s+')) case [
+        final child,
+        final parent,
+        final command,
+      ] when parent == '$pid' && command.endsWith('zsh'))
+        '$child $command',
+  };
+}
+
 /// What an ended session could leave behind in this process: pty
 /// descriptors and unreaped shells (macOS) or conhost.exe children
 /// (Windows).
@@ -383,6 +399,41 @@ void main() {
       await transcript.done.timeout(const Duration(seconds: 2));
     }
   });
+
+  for (final (step, what) in const [
+    (1, 'allocating the pty'),
+    (2, 'starting the writer thread'),
+    (3, 'starting the exit thread'),
+    (4, 'starting the output reader'),
+  ]) {
+    testWidgets(
+      'a spawn that fails $what throws and leaves no process or fd behind',
+      (tester) async {
+        final before = _sessionLeftovers();
+        final shellsBefore = _shellChildren();
+        fp.Pty.debugFailNextStart(step);
+        expect(
+          () => factory.spawn(
+            shell,
+            workingDirectory: _home,
+            environment: _environment(),
+            cols: 80,
+            rows: 24,
+          ),
+          throwsStateError,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        expect(_shellChildren().difference(shellsBefore), isEmpty);
+        expect(_sessionLeftovers().difference(before), isEmpty);
+
+        // The next spawn works.
+        final (pty, transcript) = open(shell);
+        _type(pty, 'echo shellx-ok');
+        await transcript.waitForLine((line) => line == 'shellx-ok');
+      },
+      skip: Platform.isWindows,
+    );
+  }
 
   testWidgets('finished sessions leave nothing behind', (tester) async {
     Future<void> runOne() async {

@@ -27,13 +27,13 @@ session leaks two file descriptors and the end of the output can be dropped.
 | New `jobError` (Windows, from `pty_job_error`): 0 when the process runs in the job object, else the Win32 error that prevented it. | Lets the app report that `kill()` ends the shell only. |
 | Native strings (argv, environment, executable, working directory) are freed after `pty_create`; the ports are closed when `pty_create` fails. | Upstream leaked them on every spawn. |
 | `write()` never blocks and returns whether the input was accepted (false when dropped, and once released). It calls `pty_write` through its own `lookupFunction` (it now returns `int`). | Upstream wrote synchronously on the calling (UI) isolate: a few KB of input to a process that does not read (`sleep`, a server, `tail -f`) froze the whole agent — relay pings, tray, and the Ctrl+C that could have ended it. |
-| `pty_release` / `pty_kill` / `pty_job_error` / `pty_write` are looked up with `lookupFunction` in `flutter_pty.dart`; `lib/src/flutter_pty_bindings_generated.dart` is untouched (it still declares upstream's `void pty_write`, which is no longer called). | Keeps the generated file as generated. |
+| `pty_release` / `pty_kill` / `pty_job_error` / `pty_write` / `pty_debug_fail` are looked up with `lookupFunction` in `flutter_pty.dart`; `lib/src/flutter_pty_bindings_generated.dart` is untouched (it still declares upstream's `void pty_write`, which is no longer called). | Keeps the generated file as generated. |
 
 ## Native, shared (`src/flutter_pty.h`)
 
 | Change | Why |
 |---|---|
-| Declares `pty_release` (both platforms), `pty_kill` and `pty_job_error` (Windows). | See above. |
+| Declares `pty_release` (both platforms), `pty_kill` and `pty_job_error` (Windows), `pty_debug_fail` (POSIX, tests only). | See above. |
 | `pty_write` returns `int`: non-zero when the input was accepted, 0 when it was dropped. | See `write()` above. |
 
 ## Native, POSIX (`src/flutter_pty_unix.c`, `src/forkpty.c`)
@@ -47,6 +47,8 @@ session leaks two file descriptors and the end of the output can be dropped.
 | The child calls `_exit(127)` when `execvp` fails and `_exit(1)` when `TIOCSCTTY` fails. | Upstream fell through into the parent's code (starting threads in a forked copy of the VM) or ran `exit()` handlers. |
 | A writer thread per pty: `pty_write` copies the input into a FIFO queue and returns at once; the writer writes it in order, retrying partial writes and `EINTR` (a failed write, `EIO` once the terminal is gone, drops the rest of that chunk). At most 1 MiB waits; input that does not fit is dropped, `pty_write` returns 0 and the app reports it once per pty (pid only). `pty_release` stops and joins the writer: it runs only after the end of output, when no process has the terminal open any more, and a `write()` still blocked on the master then fails at once with `EIO` (measured on macOS: about 2 ms after the last slave closes). | Upstream's blocking `write()` on the calling isolate (see `write()` above). |
 | `forkpty` closes its fds on every failure path. | Leak on failure. |
+| `pty_create` starts every thread (writer, exit, output reader) while the child still waits on the sync pipe. If memory or `pthread_create` fails, it kills the child (`SIGKILL`, before it runs anything), reaps it (or leaves that to the exit thread if it already runs), stops the writer, closes the master, frees everything and returns NULL, so the spawn fails with a reason. | Upstream (and the first ShellX patches) reported success with a pty whose output or exit code never arrived; a failed `malloc` of the handle crashed. |
+| `pty_debug_fail(step)` (POSIX, exported, tests only): the next `pty_create` fails as if step 1–4 (handle allocation, writer, exit thread, reader) had failed; `Pty.debugFailNextStart` in Dart (`@visibleForTesting`). | The failure paths above cannot be reached otherwise; `apps/desktop/integration_test/pty_test.dart` checks each leaves no process, zombie or pty fd behind. |
 | `pty_error()` returns the error message (with `errno`); upstream always returned NULL. | `spawn_failed` gets a reason. |
 
 ## Native, Windows (`src/flutter_pty_win.c`)

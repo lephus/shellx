@@ -5,6 +5,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_pty/src/flutter_pty_bindings_generated.dart';
 
 const _libName = 'flutter_pty';
@@ -40,6 +41,9 @@ final _ptyKill = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
 
 final _ptyJobError = _dylib.lookupFunction<Int Function(Pointer<PtyHandle>),
     int Function(Pointer<PtyHandle>)>('pty_job_error');
+
+final _ptyDebugFail = _dylib.lookupFunction<Void Function(Int),
+    void Function(int)>('pty_debug_fail');
 
 final _init = () {
   return _bindings.Dart_InitializeApiDL(NativeApi.initializeApiDLData);
@@ -168,6 +172,11 @@ class Pty {
     _stdoutPort.listen(_onOutput);
     _exitPort.first.then(_onExitCode);
   }
+
+  /// ShellX, tests only (POSIX): the next [Pty.start] fails as if [step]
+  /// had failed natively (see `pty_debug_fail` in `src/flutter_pty.h`).
+  @visibleForTesting
+  static void debugFailNextStart(int step) => _ptyDebugFail(step);
 
   final _stdoutPort = ReceivePort();
 

@@ -79,6 +79,14 @@ typedef struct ReadLoopOptions
 
 char *error_message = NULL;
 
+// ShellX, tests only: see pty_debug_fail in flutter_pty.h.
+static int debug_fail_step = 0;
+
+FFI_PLUGIN_EXPORT void pty_debug_fail(int step)
+{
+    debug_fail_step = step;
+}
+
 // ShellX: pty_error() returns this, with errno, instead of always NULL.
 static char error_buffer[128];
 
@@ -229,31 +237,6 @@ static void stop_writer(PtyHandle *handle)
     pthread_join(handle->writer, NULL);
 }
 
-static void start_read_thread(int fd, Dart_Port port, pthread_mutex_t *mutex, bool waitForReadAck)
-{
-    ReadLoopOptions *options = malloc(sizeof(ReadLoopOptions));
-
-    options->fd = fd;
-
-    options->port = port;
-
-    options->mutex = mutex;
-
-    options->waitForReadAck = waitForReadAck;
-
-    pthread_t _thread;
-
-    // ShellX: detached, so the thread's resources are freed when it ends.
-    if (pthread_create(&_thread, NULL, &read_loop, options) == 0)
-    {
-        pthread_detach(_thread);
-    }
-    else
-    {
-        free(options);
-    }
-}
-
 typedef struct WaitExitOptions
 {
     int pid;
@@ -365,32 +348,6 @@ static void *wait_exit_thread(void *arg)
     return NULL;
 }
 
-static void start_wait_exit_thread(int pid, int kq, Dart_Port port)
-{
-    WaitExitOptions *options = malloc(sizeof(WaitExitOptions));
-
-    options->pid = pid;
-
-    options->kq = kq;
-
-    options->port = port;
-
-    pthread_t _thread;
-
-    if (pthread_create(&_thread, NULL, &wait_exit_thread, options) == 0)
-    {
-        pthread_detach(_thread);
-    }
-    else
-    {
-        if (kq >= 0)
-        {
-            close(kq);
-        }
-        free(options);
-    }
-}
-
 static void set_environment(char **environment)
 {
     if (environment == NULL)
@@ -405,6 +362,11 @@ static void set_environment(char **environment)
     }
 }
 
+// ShellX: every thread the pty needs (writer, exit, output reader) is
+// started while the child still waits on the sync pipe; if anything fails
+// (memory, pthread_create), the child is killed before it runs anything,
+// everything is released and the spawn fails (upstream reported success
+// with a pty that never delivered output or its exit).
 FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 {
     struct winsize ws;
@@ -412,12 +374,17 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
     ws.ws_row = options->rows;
     ws.ws_col = options->cols;
 
+    int fail_step = debug_fail_step;
+
+    debug_fail_step = 0;
+
     int ptm;
 
     int pts;
 
     // ShellX: the child waits on this pipe until the parent watches it with
-    // kqueue, so it cannot exit (and be reaped by someone else) unwatched.
+    // kqueue and has started its threads, so it cannot exit (and be reaped
+    // by someone else) unwatched, and it never runs without them.
     int sync_pipe[2];
 
     if (pipe(sync_pipe) < 0)
@@ -475,6 +442,71 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     int kq = watch_exit(pid);
 
+    PtyHandle *handle = fail_step == 1 ? NULL : (PtyHandle *)calloc(1, sizeof(PtyHandle));
+    ReadLoopOptions *read_options = malloc(sizeof(ReadLoopOptions));
+    WaitExitOptions *wait_options = malloc(sizeof(WaitExitOptions));
+    bool handle_ready = false;
+    bool writer_started = false;
+    bool exit_thread_started = false;
+    pthread_t thread;
+
+    if (handle == NULL || read_options == NULL || wait_options == NULL)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "out of memory");
+        error_message = error_buffer;
+        goto fail;
+    }
+
+    handle->ptm = ptm;
+    handle->pid = pid;
+    pthread_mutex_init(&handle->mutex, NULL);
+    handle->ackRead = options->ackRead;
+    pthread_mutex_init(&handle->write_lock, NULL);
+    pthread_cond_init(&handle->write_ready, NULL);
+    handle_ready = true;
+
+    if (fail_step == 2 || pthread_create(&handle->writer, NULL, &write_loop, handle) != 0)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "cannot start the writer thread");
+        error_message = error_buffer;
+        goto fail;
+    }
+
+    writer_started = true;
+
+    wait_options->pid = pid;
+    wait_options->kq = kq;
+    wait_options->port = options->exit_port;
+
+    if (fail_step == 3 || pthread_create(&thread, NULL, &wait_exit_thread, wait_options) != 0)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "cannot start the exit thread");
+        error_message = error_buffer;
+        goto fail;
+    }
+
+    // Detached: its resources are freed when it ends. It owns the kqueue
+    // and its options from here on, and reaps the child.
+    pthread_detach(thread);
+    wait_options = NULL;
+    kq = -1;
+    exit_thread_started = true;
+
+    read_options->fd = ptm;
+    read_options->port = options->stdout_port;
+    read_options->mutex = &handle->mutex;
+    read_options->waitForReadAck = options->ackRead;
+
+    if (fail_step == 4 || pthread_create(&thread, NULL, &read_loop, read_options) != 0)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "cannot start the output reader");
+        error_message = error_buffer;
+        goto fail;
+    }
+
+    pthread_detach(thread);
+
+    // Let the child go on.
     char go = 1;
 
     while (write(sync_pipe[1], &go, 1) < 0 && errno == EINTR)
@@ -483,42 +515,48 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     close(sync_pipe[1]);
 
-    PtyHandle *handle = (PtyHandle *)calloc(1, sizeof(PtyHandle));
+    return handle;
 
-    handle->ptm = ptm;
-    handle->pid = pid;
-    pthread_mutex_init(&handle->mutex, NULL);
-    handle->ackRead = options->ackRead;
-    pthread_mutex_init(&handle->write_lock, NULL);
-    pthread_cond_init(&handle->write_ready, NULL);
+fail:
+    // The child still waits on the sync pipe: kill it before closing the
+    // pipe (end of file would let it run).
+    kill(pid, SIGKILL);
+    close(sync_pipe[1]);
 
-    // ShellX: without its writer the pty could not take input: end the
-    // child and fail the spawn.
-    if (pthread_create(&handle->writer, NULL, &write_loop, handle) != 0)
+    if (!exit_thread_started)
     {
-        snprintf(error_buffer, sizeof(error_buffer), "cannot start the writer thread");
-        error_message = error_buffer;
-        kill(pid, SIGKILL);
-        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
-        {
-        }
         if (kq >= 0)
         {
             close(kq);
         }
-        close(ptm);
+
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
+        {
+        }
+    }
+
+    // Otherwise the exit thread reaps it and posts to the exit port, which
+    // Dart closes when this returns NULL. It never touches the handle.
+
+    if (writer_started)
+    {
+        stop_writer(handle);
+    }
+
+    close(ptm);
+
+    if (handle_ready)
+    {
         pthread_cond_destroy(&handle->write_ready);
         pthread_mutex_destroy(&handle->write_lock);
         pthread_mutex_destroy(&handle->mutex);
-        free(handle);
-        return NULL;
     }
 
-    start_read_thread(ptm, options->stdout_port, &handle->mutex, options->ackRead);
+    free(handle);
+    free(read_options);
+    free(wait_options);
 
-    start_wait_exit_thread(pid, kq, options->exit_port);
-
-    return handle;
+    return NULL;
 }
 
 // ShellX: never blocks. Queues a copy of the input for the writer thread;
