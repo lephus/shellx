@@ -66,6 +66,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           );
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = apiErrorText(error, l10n));
+    } on Object catch (error) {
+      // E.g. the keychain refused the device key or the token: never an
+      // unhandled error, never its message (it may hold secrets).
+      debugPrint('ShellX: sign-in failed: ${error.runtimeType}');
+      if (mounted) setState(() => _error = l10n.errorUnexpected('internal'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

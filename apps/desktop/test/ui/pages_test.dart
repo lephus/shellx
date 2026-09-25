@@ -170,6 +170,43 @@ void main() {
       expect(h.relay.routes, contains('POST /v1/auth/register'));
     });
 
+    for (final (what, breakStore) in <(String, void Function(TestHarness))>[
+      (
+        'the device key cannot be read',
+        (h) => h.secureStore.failingReads.add('device_private_key'),
+      ),
+      (
+        'the token cannot be stored',
+        (h) => h.secureStore.failingWrites.add('auth_token'),
+      ),
+    ]) {
+      testWidgets('a keychain failure ($what) is shown as an unexpected '
+          'error, never left unhandled', (tester) async {
+        await pumpApp(tester, TestHarness());
+        breakStore(h);
+        router().open(const LoginRoute());
+        await settle(tester);
+        await tester.enterText(find.byKey(const Key('login.email')), 'a@b.co');
+        await tester.enterText(
+          find.byKey(const Key('login.password')),
+          '12345678',
+        );
+        await tester.tap(find.byKey(const Key('login.submit')));
+        await settle(tester);
+        expect(
+          find.text('Something went wrong (internal). Try again.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('SECRET'), findsNothing);
+        expect(agentState().phase, isNot(AuthPhase.signedIn));
+        // Not stuck busy: the button works again.
+        final submit = tester.widget<FilledButton>(
+          find.byKey(const Key('login.submit')),
+        );
+        expect(submit.onPressed, isNotNull);
+      });
+    }
+
     testWidgets('after a 4002 the login window explains the sign-out', (
       tester,
     ) async {
