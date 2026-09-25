@@ -10,6 +10,8 @@ ProcessRunner fakeRun(String stdout, {int exitCode = 0, List<String>? calls}) {
   };
 }
 
+Future<bool> fakeFileExists(String path) async => true;
+
 void main() {
   group('buildSessionEnvironment', () {
     test('sets TERM, COLORTERM, SHELLX and keeps the base environment', () {
@@ -46,6 +48,7 @@ void main() {
         operatingSystem: 'macos',
         environment: {'USER': 'phu'},
         run: fakeRun('UserShell: /opt/homebrew/bin/fish\n', calls: calls),
+        fileExists: fakeFileExists,
       );
       final shell = await resolver.resolve();
       expect(calls, ['dscl . -read /Users/phu UserShell']);
@@ -64,6 +67,7 @@ void main() {
         operatingSystem: 'macos',
         environment: {'USER': 'phu'},
         run: fakeRun('UserShell:\n /bin/bash\n'),
+        fileExists: fakeFileExists,
       );
       expect((await resolver.resolve()).executable, '/bin/bash');
     });
@@ -98,6 +102,75 @@ void main() {
         environment: {},
       );
       expect(await noUser.resolve(), PlatformShellResolver.macFallback);
+    });
+
+    test('uses LOGNAME when USER is absent', () async {
+      final calls = <String>[];
+      final resolver = PlatformShellResolver(
+        operatingSystem: 'macos',
+        environment: {'LOGNAME': 'alice'},
+        run: fakeRun('UserShell: /bin/bash\n', calls: calls),
+        fileExists: fakeFileExists,
+      );
+      final shell = await resolver.resolve();
+      expect(calls, ['dscl . -read /Users/alice UserShell']);
+      expect(shell.executable, '/bin/bash');
+    });
+
+    test('uses id -un when USER and LOGNAME are absent', () async {
+      final calls = <String>[];
+      var callIndex = 0;
+      final resolver = PlatformShellResolver(
+        operatingSystem: 'macos',
+        environment: {},
+        run: (executable, arguments) async {
+          calls.add('$executable ${arguments.join(' ')}');
+          if (callIndex == 0) {
+            // id -un call
+            callIndex++;
+            return ProcessResult(1, 0, 'bob\n', '');
+          } else {
+            // dscl call
+            return ProcessResult(1, 0, 'UserShell: /bin/zsh\n', '');
+          }
+        },
+        fileExists: fakeFileExists,
+      );
+      final shell = await resolver.resolve();
+      expect(calls, ['id -un', 'dscl . -read /Users/bob UserShell']);
+      expect(shell.executable, '/bin/zsh');
+    });
+
+    test('falls back when id -un returns empty', () async {
+      final resolver = PlatformShellResolver(
+        operatingSystem: 'macos',
+        environment: {},
+        run: fakeRun(''),
+      );
+      expect(await resolver.resolve(), PlatformShellResolver.macFallback);
+    });
+
+    test(
+      'accepts dscl output with leading whitespace before UserShell:',
+      () async {
+        final resolver = PlatformShellResolver(
+          operatingSystem: 'macos',
+          environment: {'USER': 'phu'},
+          run: fakeRun('  UserShell: /bin/zsh\n'),
+          fileExists: fakeFileExists,
+        );
+        expect((await resolver.resolve()).executable, '/bin/zsh');
+      },
+    );
+
+    test('falls back when the UserShell path does not exist', () async {
+      final resolver = PlatformShellResolver(
+        operatingSystem: 'macos',
+        environment: {'USER': 'phu'},
+        run: fakeRun('UserShell: /nonexistent/shell\n'),
+        fileExists: (path) async => false,
+      );
+      expect(await resolver.resolve(), PlatformShellResolver.macFallback);
     });
   });
 

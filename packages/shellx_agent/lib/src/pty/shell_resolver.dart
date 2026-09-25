@@ -21,10 +21,12 @@ final class PlatformShellResolver implements ShellResolver {
     required Map<String, String> environment,
     ProcessRunner? run,
     Future<bool> Function(String executable)? isOnPath,
+    Future<bool> Function(String path)? fileExists,
   }) : _operatingSystem = operatingSystem,
        _environment = environment,
        _run = run ?? _runProcess,
-       _isOnPath = isOnPath;
+       _isOnPath = isOnPath,
+       _fileExists = fileExists ?? _checkFileExists;
 
   static const ShellCommand macFallback = ShellCommand(
     executable: '/bin/zsh',
@@ -36,11 +38,14 @@ final class PlatformShellResolver implements ShellResolver {
   final Map<String, String> _environment;
   final ProcessRunner _run;
   final Future<bool> Function(String executable)? _isOnPath;
+  final Future<bool> Function(String path) _fileExists;
 
   static Future<ProcessResult> _runProcess(
     String executable,
     List<String> arguments,
   ) => Process.run(executable, arguments);
+
+  static Future<bool> _checkFileExists(String path) => File(path).exists();
 
   @override
   Future<ShellCommand> resolve() async {
@@ -70,8 +75,16 @@ final class PlatformShellResolver implements ShellResolver {
   }
 
   Future<ShellCommand> _resolveMac() async {
-    final user = _environment['USER'] ?? _environment['LOGNAME'];
-    if (user == null || user.isEmpty) return macFallback;
+    var user = _environment['USER'] ?? _environment['LOGNAME'];
+    if (user == null || user.isEmpty) {
+      try {
+        final result = await _run('id', ['-un']);
+        user = result.stdout.toString().trim();
+        if (user.isEmpty) return macFallback;
+      } catch (_) {
+        return macFallback;
+      }
+    }
     try {
       final result = await _run('dscl', [
         '.',
@@ -82,6 +95,8 @@ final class PlatformShellResolver implements ShellResolver {
       if (result.exitCode != 0) return macFallback;
       final shell = _parseUserShell('${result.stdout}');
       if (shell == null) return macFallback;
+      final shellExists = await _fileExists(shell);
+      if (!shellExists) return macFallback;
       return ShellCommand(
         executable: shell,
         arguments: const ['-l'],
