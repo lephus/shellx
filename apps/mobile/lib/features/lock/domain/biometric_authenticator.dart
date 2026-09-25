@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -26,7 +25,9 @@ final class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
   Future<bool> isAvailable() async {
     try {
       return await _auth.isDeviceSupported();
-    } on PlatformException {
+    } catch (_) {
+      // A detection failure (PlatformException, LocalAuthException, …) must never lock the
+      // user out of their own app: treat it as "cannot authenticate", which unlock() bypasses.
       return false;
     }
   }
@@ -36,7 +37,10 @@ final class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
     final List<BiometricType> types;
     try {
       types = await _auth.getAvailableBiometrics();
-    } on PlatformException {
+    } catch (_) {
+      // local_auth_android throws LocalAuthException(uiUnavailable) instead of returning an
+      // empty list when no Activity is available yet; any detection failure falls back the
+      // same way an empty list would, and must never freeze the launch sequence.
       return BiometricKind.passcode;
     }
     if (Platform.isIOS) {

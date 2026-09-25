@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 
@@ -77,6 +79,22 @@ void main() {
     final lock = controller()..lockOnLaunch();
     enabled = false;
     lock.settingChanged();
+    expect(lock.isLocked.value, isFalse);
+  });
+
+  test('a second unlock while the first is still in progress returns false and does not prompt again', () async {
+    final gate = Completer<bool>();
+    auth.authenticateGate = gate;
+    final lock = controller()..lockOnLaunch();
+
+    final first = lock.unlock('reason');
+    // Let the first call reach and await authenticate() before starting the second.
+    await Future<void>.delayed(Duration.zero);
+    expect(await lock.unlock('reason'), isFalse);
+    expect(auth.prompts, 1);
+
+    gate.complete(true);
+    expect(await first, isTrue);
     expect(lock.isLocked.value, isFalse);
   });
 }

@@ -86,4 +86,26 @@ void main() {
     await tester.pump();
     expect(find.text('Mở khóa bằng vân tay'), findsOneWidget);
   });
+
+  testWidgets('taps on the content beneath the lock overlay do nothing while locked', (tester) async {
+    var taps = 0;
+    lock.lockOnLaunch();
+    await tester.pumpWidget(
+      localized(
+        Scaffold(
+          body: Center(
+            child: TextButton(onPressed: () => taps++, child: const Text('secret button')),
+          ),
+        ),
+        builder: (context, child) => LockGate(lock: lock, child: child!),
+      ),
+    );
+    await tester.pump();
+
+    // The button is still in the tree (painted below the overlay) but must not be hittable.
+    await tester.tap(find.text('secret button'), warnIfMissed: false);
+    await tester.pump();
+
+    expect(taps, 0);
+  });
 }
