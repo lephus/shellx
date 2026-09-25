@@ -99,7 +99,33 @@ void main() {
     test('iOS uses the Command key', () {
       final ios = activators(TargetPlatform.iOS);
       expect(ios.every((a) => a.meta && !a.control), isTrue);
-      expect(terminalShortcuts(TargetPlatform.iOS).values.whereType<PasteTextIntent>(), hasLength(1));
+      expect(terminalShortcuts(TargetPlatform.iOS).values.whereType<ShellxPasteIntent>(), hasLength(1));
+    });
+
+    test('shortcuts use ShellX intents, not Flutter built-ins', () {
+      for (final platform in TargetPlatform.values) {
+        final shortcuts = terminalShortcuts(platform);
+        expect(
+          shortcuts.values.whereType<PasteTextIntent>(),
+          isEmpty,
+          reason: '$platform should not use Flutter PasteTextIntent',
+        );
+        expect(
+          shortcuts.values.whereType<CopySelectionTextIntent>(),
+          isEmpty,
+          reason: '$platform should not use Flutter CopySelectionTextIntent',
+        );
+        expect(
+          shortcuts.values.whereType<ShellxPasteIntent>(),
+          hasLength(1),
+          reason: '$platform should have exactly one ShellxPasteIntent',
+        );
+        expect(
+          shortcuts.values.whereType<ShellxCopyIntent>(),
+          hasLength(1),
+          reason: '$platform should have exactly one ShellxCopyIntent',
+        );
+      }
     });
   });
 }
