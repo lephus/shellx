@@ -10,6 +10,7 @@ export 'extensions/adaptive_theme_mode_x.dart';
 export 'router/app_router.dart';
 export 'architecture/error.dart';
 export 'architecture/error_factory.dart';
+export 'architecture/error_text.dart';
 export 'architecture/controller.dart';
 export 'architecture/state_signal.dart';
 export 'handler/popup_handler.dart';
