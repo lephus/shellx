@@ -4,5 +4,6 @@ environment:
   sdk: ^3.11.0
 workspace:
   - packages/shellx_core
+  - apps/mobile
 dev_dependencies:
   lints: ^6.0.0
