@@ -144,6 +144,19 @@ export class UserHub extends DurableObject<Env> {
     return this.ctx.storage.sql.exec("DELETE FROM pending_pairing_removed").rowsWritten;
   }
 
+  /**
+   * Closes every currently-live socket in this hub with 4002 and purges the durable queue: called
+   * once when the whole account is deleted, since every device is gone and nothing is left to ever
+   * receive a queued event again. Unlike `disconnect(deviceIds, code)`, this takes no device-id
+   * list — it closes whatever is actually connected *right now*, so a device whose socket lands
+   * after some caller took a snapshot of `devices` (fix round 1: the account-deletion route used to
+   * read `SELECT id FROM devices` before the delete, then close only that list) is still caught.
+   */
+  async closeAccount(): Promise<void> {
+    await this.disconnect(this.liveDeviceIds(), CloseCode.revoked);
+    this.purgeAll();
+  }
+
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const me = attachmentOf(ws);
     if (me === null || me.closing) return;

@@ -133,10 +133,15 @@ authRoutes.post("/logout", requireAuth, async (c) => {
       db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash),
       db.prepare("DELETE FROM pairings WHERE agent_id = ?").bind(auth.deviceId),
     ]);
-    // This agent's own pairings are all gone now, so it has no trust list left to reconcile against
-    // any row still queued for it from before this logout — drop them rather than let the queue
-    // grow for a device that will resync its trust list from scratch next time it signs in.
-    await hub.purgeAgent(auth.deviceId);
+    // The token and pairings are already gone (fix round 1): a hub outage from here on must not
+    // turn a successful logout into a 500. This agent's own pairings are all gone now, so it has no
+    // trust list left to reconcile against any row still queued for it from before this logout —
+    // drop them best-effort, logging metadata only on failure.
+    try {
+      await hub.purgeAgent(auth.deviceId);
+    } catch {
+      logMeta("agent_purge_failed", { device_id: auth.deviceId });
+    }
   } else {
     await db.prepare("DELETE FROM tokens WHERE token_hash = ?").bind(tokenHash).run();
   }

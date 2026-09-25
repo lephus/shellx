@@ -5,7 +5,6 @@ import { requireAuth } from "../auth/session";
 import { hubFor } from "../hub/user-hub";
 import { Errors, readJsonObject } from "../http/errors";
 import { logMeta } from "../log";
-import { CloseCode } from "../protocol/frames";
 
 export const accountRoutes = new Hono<AppEnv>();
 
@@ -30,13 +29,16 @@ accountRoutes.delete("/", requireAuth, async (c) => {
     throw Errors.invalidCredentials();
   }
 
-  const { results } = await db.prepare("SELECT id FROM devices WHERE user_id = ?").bind(auth.userId).all<{ id: string }>();
   await db.prepare("DELETE FROM users WHERE id = ?").bind(auth.userId).run();
-  const hub = hubFor(c.env, auth.userId);
-  await hub.disconnect(results.map((r) => r.id), CloseCode.revoked);
-  // The account is gone; nothing will ever connect to this hub to receive a queued pairing_removed
-  // event again, so the durable queue (Task 8) would otherwise sit there forever.
-  await hub.purgeAll();
+  // The delete is irreversible (fix round 1): a hub outage from here on must not turn a successful
+  // account deletion into a 500. closeAccount() closes every socket *currently* live in the hub
+  // (no stale device-id snapshot to go stale — see UserHub.closeAccount) and purges the durable
+  // queue; best-effort only, logging metadata (no email) on failure.
+  try {
+    await hubFor(c.env, auth.userId).closeAccount();
+  } catch {
+    logMeta("account_close_failed", { device_id: auth.deviceId });
+  }
   logMeta("account_deleted", { device_id: auth.deviceId });
   return c.body(null, 204);
 });

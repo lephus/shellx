@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
-import { hubFor } from "../src/hub/user-hub";
+import { describe, expect, it, vi } from "vitest";
+import { DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
 import {
-  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, registerAccount, unlimited,
+  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, unlimited,
 } from "./helpers";
 
 const NEW_PASSWORD = "brand new password";
@@ -172,7 +172,8 @@ describe("DELETE /v1/account", () => {
     await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
     // The agent never connects: unpairing from the mobile side durably queues the event for it
     // (Task 8's pending_pairing_removed table).
-    await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    expect(unpaired.status).toBe(204);
 
     const res = await call(app, "DELETE", "/v1/account", { token: mobile.token, body: { password: account.password } });
     expect(res.status).toBe(204);
@@ -184,6 +185,77 @@ describe("DELETE /v1/account", () => {
     const hub = hubFor(env, account.agent.userId);
     expect(await hub.purgeAll()).toBe(0);
   });
+
+  it("closes a device whose socket lands in the hub only after any device-id snapshot would have been taken", async () => {
+    // Fix round 1: the old implementation read `SELECT id FROM devices` *before* the D1 delete and
+    // closed only that list. closeAccount() (see UserHub.closeAccount) takes no such list — it
+    // closes whatever is actually live in the hub at the moment it runs. Simulate a device whose
+    // socket is only created *after* the point such a snapshot would have been read (and after the
+    // D1 delete has already committed) by driving the Durable Object's own `fetch()` directly —
+    // exactly how a WebSocket upgrade that already passed `authenticate()` earlier, but is only now
+    // landing in the hub, would look from the hub's point of view (see also the TOCTOU test above).
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(account.agent.userId));
+    let lateSocket: TestSocket | undefined;
+    const lateConnectHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        closeAccount: async () => {
+          const headers = new Headers({
+            Upgrade: "websocket",
+            [DEVICE_ID_HEADER]: mobile.deviceId,
+            [DEVICE_KIND_HEADER]: "mobile",
+          });
+          const upgrade = await realHub.fetch(new Request("https://user-hub/connect", { headers }));
+          lateSocket = new TestSocket(upgrade.webSocket!);
+          return realHub.closeAccount();
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const res = await call(app, "DELETE", "/v1/account", {
+      token: account.agent.token,
+      body: { password: account.password },
+      bindings: { USER_HUB: lateConnectHub },
+    });
+    expect(res.status).toBe(204);
+    expect((await lateSocket!.closed).code).toBe(4002);
+  });
+
+  it("still deletes the account and returns 204 if closing the hub afterward throws, logging metadata only", async () => {
+    // Fix round 1: the delete is irreversible; a hub outage after it must not turn a successful
+    // account deletion into a 500.
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const throwingHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        closeAccount: async () => {
+          throw new Error("hub is down");
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    const res = await call(app, "DELETE", "/v1/account", {
+      token: account.agent.token,
+      body: { password: account.password },
+      bindings: { USER_HUB: throwingHub },
+    });
+    spy.mockRestore();
+
+    expect(res.status).toBe(204);
+    const gone = await env.DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(account.agent.userId).first();
+    expect(gone).toBeNull();
+    const output = lines.join("\n");
+    expect(output).toContain("account_close_failed");
+    expect(output).not.toContain("hub is down");
+  });
 });
 
 describe("agent logout: safe notify-then-delete order and queue purge", () => {
@@ -194,7 +266,9 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId } });
 
     let calls = 0;
-    const failingOnce = {
+    // Unlike devices-pairings.test.ts's "failingOnce" (which succeeds after its first failure),
+    // this fake fails notifyPairingRemoved on *every* call — the test only ever exercises one.
+    const alwaysFailingNotify = {
       idFromName: (name: string) => name,
       get: () => ({
         online: async () => [],
@@ -208,7 +282,7 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
       }),
     } as unknown as typeof env.USER_HUB;
 
-    const failed = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: failingOnce } });
+    const failed = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: alwaysFailingNotify } });
     expect(failed.status).toBe(500);
     expect(await errorCode(failed)).toBe("internal_error");
     expect(calls).toBe(1);
@@ -234,7 +308,8 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     // The agent never connects: removing the pairing from the mobile side durably queues the event
     // for the agent (Task 8). Re-pair with a *different* mobile so the agent still has a current
     // pairing at logout time — proving the purge isn't limited to pairings this same logout deleted.
-    await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
+    expect(unpaired.status).toBe(204);
     const mobile2 = await loginDevice(app, account, "mobile");
     await call(app, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile2.deviceId } });
 
@@ -242,5 +317,35 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
 
     const hub = hubFor(env, account.agent.userId);
     expect(await hub.purgeAgent(account.agent.deviceId)).toBe(0);
+  });
+
+  it("still logs the agent out (204) if purging its queue afterward throws, logging metadata only", async () => {
+    // Fix round 1: same best-effort treatment as account deletion's closeAccount() — the token and
+    // pairings are already gone by this point, so a hub outage here must not turn a successful
+    // logout into a 500.
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const throwingPurge = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        notifyPairingRemoved: async () => {},
+        purgeAgent: async () => {
+          throw new Error("hub is down");
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    const res = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: throwingPurge } });
+    spy.mockRestore();
+
+    expect(res.status).toBe(204);
+    expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
+    const output = lines.join("\n");
+    expect(output).toContain("agent_purge_failed");
+    expect(output).not.toContain("hub is down");
   });
 });

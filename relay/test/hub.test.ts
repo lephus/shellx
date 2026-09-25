@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub";
-import { encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
+import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
 import { buildHubHeaders } from "../src/routes/ws";
 import {
   call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, type TestApp, waitFor,
@@ -112,6 +112,37 @@ describe("GET /v1/ws", () => {
     // Frames it sends arrive at the peer sourced from the token's device, not the spoofed one.
     m.send(encodeData(agent.deviceId, CH, Uint8Array.of(4, 9)));
     expect(hex(await a.nextBinary())).toBe(hex(encodeData(mobile.deviceId, CH, Uint8Array.of(4, 9))));
+  });
+
+  it("closes the socket with 4002 if the token is revoked in the gap between auth and the upgrade landing", async () => {
+    // TOCTOU fix (round 1): a password change or account deletion that revokes this token can
+    // commit to D1 — and run its own hub.disconnect()/closeAccount() — in the window between
+    // webSocketRoute's authenticate() and hub.fetch() actually returning the 101 upgrade. If that
+    // revocation's own close ran before this socket existed to be closed by it, the device would
+    // otherwise stay connected forever (the runtime auto-answers "ping" without waking the object).
+    // Wrapping USER_HUB.get().fetch() lets us revoke the token at exactly that point: after the
+    // route's own auth check already passed, but before its upgrade call returns.
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(agent.userId));
+    const racingHub = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (request: Request) => {
+          await env.DB.prepare("DELETE FROM tokens WHERE device_id = ?").bind(mobile.deviceId).run();
+          return realHub.fetch(request);
+        },
+        disconnect: (ids: string[], code: CloseCode) => realHub.disconnect(ids, code),
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const res = await call(app, "GET", "/v1/ws", {
+      token: mobile.token,
+      headers: { Upgrade: "websocket" },
+      bindings: { USER_HUB: racingHub },
+    });
+    expect(res.status).toBe(101); // the upgrade itself still succeeds...
+    const socket = new TestSocket(res.webSocket!);
+    expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // ...but is then closed
   });
 });
 
