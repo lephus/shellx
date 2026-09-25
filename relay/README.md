@@ -29,6 +29,17 @@ npm run dev         # applies local D1 migrations, then serves http://127.0.0.1:
   `@cloudflare/vitest-pool-workers`, otherwise `npm test` fails with
   "This Worker requires compatibility date …". Bump both together.
 
+## Request limits
+
+- JSON request bodies (register, login, password change, account deletion, `POST /v1/pairings`) are
+  capped at **16 KiB**. A larger body is refused with HTTP **413** and the usual error shape,
+  `{"error": {"code": "payload_too_large", "message": "Request body is too large"}}` (the spec has no
+  code for this; clients treat it as any other API error). Authenticated routes still answer
+  `401 unauthorized` first when the token is missing or invalid.
+- Login and `DELETE /v1/account` refuse a password longer than 128 characters (Unicode code points after
+  NFC, the same count as the 8–128 registration rule) with `401 invalid_credentials` without hashing it,
+  so oversized passwords cannot grow the argon2 WASM memory of an isolate.
+
 ## Deployment runbook
 
 ### Prerequisites (once)

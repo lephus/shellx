@@ -3,10 +3,11 @@ import type { AppEnv } from "../app";
 import { parseDevice, type DeviceInput } from "../auth/device";
 import { checkEmail, normalizeEmail } from "../auth/email";
 import { hashPassword, verifyPassword } from "../auth/password";
-import { isAcceptablePassword } from "../auth/password-policy";
+import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy";
 import { insertTokenStatement, requireAuth } from "../auth/session";
 import { generateToken, hashToken, parseBearer } from "../auth/tokens";
 import { hubFor } from "../hub/user-hub";
+import { jsonBodyLimit } from "../http/body-limit";
 import { Errors, readJsonObject } from "../http/errors";
 import { logMeta } from "../log";
 import { CloseCode } from "../protocol/frames";
@@ -36,7 +37,7 @@ function dummyHash(): Promise<string> {
   return dummyPhc;
 }
 
-authRoutes.post("/register", async (c) => {
+authRoutes.post("/register", jsonBodyLimit, async (c) => {
   if (!(await c.get("limiters").registerIp.limit(clientIp(c)))) throw Errors.rateLimited();
   const body = await readJsonObject(c.req.raw);
   const email = checkEmail(body.email);
@@ -74,7 +75,7 @@ authRoutes.post("/register", async (c) => {
   return c.json({ user_id: userId, device_id: deviceId, token }, 201);
 });
 
-authRoutes.post("/login", async (c) => {
+authRoutes.post("/login", jsonBodyLimit, async (c) => {
   const limiters = c.get("limiters");
   if (!(await limiters.loginIp.limit(clientIp(c)))) throw Errors.rateLimited();
   const body = await readJsonObject(c.req.raw);
@@ -83,6 +84,11 @@ authRoutes.post("/login", async (c) => {
   const device = parseDevice(body.device);
   if (device === null) throw Errors.invalidDevice();
   const password = typeof body.password === "string" ? body.password : "";
+  // No account can have a password over 128 code points; refuse it before argon2 sees it (I2).
+  if (isOverlongPassword(password)) {
+    logMeta("login_failed");
+    throw Errors.invalidCredentials();
+  }
 
   const db = c.env.DB;
   const user = await db
@@ -153,7 +159,7 @@ authRoutes.post("/logout", requireAuth, async (c) => {
  * POST /v1/auth/password {new_password} — agent token only, no old password (spec §5.2).
  * Revokes every other device's tokens and closes their sockets with 4002. Pairings are kept.
  */
-authRoutes.post("/password", requireAuth, async (c) => {
+authRoutes.post("/password", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   if (auth.kind !== "agent") throw Errors.agentOnly();
   const body = await readJsonObject(c.req.raw);

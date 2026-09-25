@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { requireAuth } from "../auth/session";
 import { hubFor } from "../hub/user-hub";
+import { jsonBodyLimit } from "../http/body-limit";
 import { Errors, readJsonObject } from "../http/errors";
 import { logMeta } from "../log";
 import { parseUuid } from "../protocol/uuid";
@@ -18,7 +19,7 @@ export const pairingRoutes = new Hono<AppEnv>();
  * the pairing is still recorded (the worst case is the old bug — the agent drops the phone on its
  * next connect and the user pairs again — never extra trust); only metadata is logged.
  */
-pairingRoutes.post("/", requireAuth, async (c) => {
+pairingRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   if (auth.kind !== "agent") throw Errors.agentOnly();
   const body = await readJsonObject(c.req.raw);

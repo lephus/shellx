@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { verifyPassword } from "../auth/password";
+import { isOverlongPassword } from "../auth/password-policy";
 import { requireAuth } from "../auth/session";
 import { hubFor } from "../hub/user-hub";
+import { jsonBodyLimit } from "../http/body-limit";
 import { Errors, readJsonObject } from "../http/errors";
 import { logMeta } from "../log";
 
@@ -13,7 +15,7 @@ export const accountRoutes = new Hono<AppEnv>();
  * Deletes the user; devices, tokens and pairings go with it (ON DELETE CASCADE), then every
  * device's socket is closed with 4002. Password attempts share the 5/email/60 s login budget.
  */
-accountRoutes.delete("/", requireAuth, async (c) => {
+accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   const body = await readJsonObject(c.req.raw);
   const db = c.env.DB;
@@ -24,7 +26,8 @@ accountRoutes.delete("/", requireAuth, async (c) => {
   if (user === null) throw Errors.unauthorized();
   if (!(await c.get("limiters").loginEmail.limit(user.email))) throw Errors.rateLimited();
   const password = typeof body.password === "string" ? body.password : "";
-  if (!(await verifyPassword(password, user.password_hash))) {
+  // Over 128 code points can never match; refuse it before argon2 sees it (final review I2).
+  if (isOverlongPassword(password) || !(await verifyPassword(password, user.password_hash))) {
     logMeta("account_delete_denied", { device_id: auth.deviceId });
     throw Errors.invalidCredentials();
   }
