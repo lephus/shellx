@@ -9,6 +9,21 @@ export function parseUuid(value: unknown): string | null {
   return UUID_RE.test(lower) ? lower : null;
 }
 
+/**
+ * A pairing id: a version-7 UUID (RFC 9562: 48-bit unix-ms timestamp first) that is ALREADY in
+ * canonical lower-case form, returned unchanged; null otherwise. Unlike parseUuid there is no case
+ * folding: pairing ids are matched byte-for-byte on both ends, so an agent that stored another
+ * spelling would never match its own events. Canonical v7 strings sort by time as strings.
+ */
+export function parseUuidV7(value: unknown): string | null {
+  return typeof value === "string" && UUID_RE.test(value) && value[14] === "7" ? value : null;
+}
+
+/** The unix-millisecond timestamp in the first 48 bits of a (canonical) UUIDv7. */
+export function uuidV7Millis(uuid: string): number {
+  return Number.parseInt(uuid.slice(0, 8) + uuid.slice(9, 13), 16);
+}
+
 /** 16 bytes in textual order (the hex digits read left to right). Throws on malformed input. */
 export function uuidToBytes(uuid: string): Uint8Array {
   const canonical = parseUuid(uuid);

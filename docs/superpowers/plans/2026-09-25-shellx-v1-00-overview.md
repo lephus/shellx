@@ -117,7 +117,7 @@ Byte 1 : type
 ```
 
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`. ERROR không gắn với peer dùng `device_id` = UUID nil và `channel_id` = 8 byte 0.
-- EVENT duy nhất ở v1.0: `{"event": "pairing_removed", "agent_id": "<uuid>", "mobile_id": "<uuid>"}`. Gửi trực tiếp cho cả hai bên đang kết nối; với agent, relay còn lưu một "bia mộ" (mỗi cặp agent/mobile một bản) và **phát lại ở mọi lần agent kết nối** (sau snapshot PRESENCE) cho tới khi cặp đó được ghép lại (`POST /v1/pairings`), agent đăng xuất hoặc tài khoản bị xóa. Agent phải xử lý lặp lại một cách vô hại (bỏ tin cậy một điện thoại đã không còn tin cậy là no-op). Relay tự mã hóa CBOR tối giản (map major type 5, key/value text string major type 3); không dùng thư viện CBOR có "records"/tag mở rộng.
+- EVENT duy nhất ở v1.0: `{"event": "pairing_removed", "agent_id": "<uuid>", "mobile_id": "<uuid>", "pairing_id": "<uuid>"}` (vẫn là map CBOR chỉ gồm text; `pairing_id` là id của lần ghép nối vừa bị xóa, xem 4.3). Gửi trực tiếp cho cả hai bên đang kết nối; với agent, relay còn lưu một "bia mộ" mang `pairing_id` đó (mỗi cặp agent/mobile một bản, giữ id **mới nhất**: id mới hơn ghi đè, id cũ hơn không) và **phát lại ở mọi lần agent kết nối** (sau snapshot PRESENCE) cho tới khi agent ghi nhận một lần ghép có `pairing_id` **mới hơn** cho cặp đó (`POST /v1/pairings`), agent đăng xuất hoặc tài khoản bị xóa. Agent so khớp theo `pairing_id`: chỉ bỏ tin cậy khi id trùng id của lần ghép nó đang tin; id khác là của lần ghép cũ và bị bỏ qua; nhận lặp lại là vô hại. Relay tự mã hóa CBOR tối giản (map major type 5, key/value text string major type 3); không dùng thư viện CBOR có "records"/tag mở rộng.
 - Khung văn bản: chỉ `ping` (client → hub) và `pong` (hub → client, qua `setWebSocketAutoResponse`).
 - UUID trong JSON luôn là chuỗi chữ thường dạng `8-4-4-4-12`.
 
@@ -141,6 +141,16 @@ Byte 1.. : Noise message
 **Giới hạn khung:** 64 KiB tính trên **toàn bộ** khung nhị phân, kể cả header 26 byte của DATA. `shellx_core` export `kMaxSealedBatchBytes = 65493`; `SecureChannel.seal` ném `ArgumentError` nếu batch CBOR vượt mức này, nên agent phải chia output chờ gửi thành nhiều TRANSPORT (tối đa 3 tin `output` 16 KiB mỗi batch).
 
 **Relay dev server (plan 01 sở hữu, plan 03 E2E và plan 06 CI dùng):** trong `relay/`, `npm run dev` phải áp dụng D1 migrations cục bộ trước rồi phục vụ tại `127.0.0.1:8787` (chấp nhận thêm `-- --ip 127.0.0.1 --port 8787`). Môi trường dev đặt biến `RATE_LIMITS_ENABLED = "false"` để tắt mọi rate limit (E2E tạo nhiều tài khoản từ cùng IP); production/staging luôn bật. Cấu hình wrangler dùng file `relay/wrangler.jsonc`; các biến phiên bản là `MIN_AGENT`, `MIN_MOBILE`, `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL`. Lỗi luôn là `{"error": {"code": "<snake_case>", "message": "<text>"}}`. Timestamp trong JSON là số nguyên unix **mili giây** (hoặc `null`).
+
+**Ghép nối và `pairing_id`:** mỗi lần ghép nối có một `pairing_id` là **UUIDv7 chuẩn, chữ thường** (RFC 9562, dạng `8-4-4-4-12`) do agent sinh lúc nhận `pair.confirm` theo đồng hồ của chính nó; mọi id của một cặp (agent, mobile) đều do agent đó sinh, nên so sánh chuỗi = so sánh thời điểm (id lớn hơn là lần ghép mới hơn). Relay lưu id đúng như nhận (không đổi chữ hoa/thường; id có chữ hoa bị `400`) trên bản ghi `pairings` và trên bia mộ; EVENT `pairing_removed` và lệnh thu hồi của agent so khớp theo id từng byte, còn POST bị từ chối nếu id không mới hơn bia mộ, nên thứ tự đến của các request không còn gây nhầm lẫn. `shellx_core` không sinh id; agent (plan 03) tự sinh UUIDv7.
+
+Yêu cầu với agent: `410` trên POST chỉ xóa mục tin cậy nếu mục đó **vẫn mang đúng** `pairing_id` này; agent chỉ thử lại POST cho id của mục tin cậy **hiện tại** của điện thoại đó và bỏ mọi POST đang chờ của lần ghép đã bị thay thế hoặc thu hồi (không bao giờ thử lại POST cho id không còn là id của mục hiện tại).
+
+Đồng hồ agent: **lùi** → id của lần ghép mới có thể nhỏ hơn bia mộ cũ, relay trả `410` tới khi thời gian vượt id cũ (hướng an toàn: chỉ bớt tin cậy; agent đăng xuất sẽ xóa bia mộ). **Nhảy tới trước** → relay trả `410 pairing_removed` (không ghi gì) cho POST có timestamp UUIDv7 vượt đồng hồ relay **hơn 24 giờ**, nên một id "tương lai" không thể chặn các lần ghép sau trong nhiều năm; agent bỏ tin cậy và người dùng ghép lại sau khi chỉnh đồng hồ.
+
+- `POST /v1/pairings` (token agent) body `{"mobile_id": "<uuid>", "pairing_id": "<uuidv7>"}`: `pairing_id` thiếu, không phải UUID phiên bản 7 hoặc không phải chữ thường → `400 bad_request`; mobile không thuộc tài khoản → `404 device_not_found`; timestamp của id vượt đồng hồ relay hơn 24 giờ → `410 pairing_removed` (không ghi gì); bia mộ của cặp (agent, mobile) có id **bằng hoặc mới hơn** `pairing_id` → `410 pairing_removed` (điện thoại đã bỏ ghép chính lần ghép này — ví dụ POST trước đã ghi xong nhưng mất response — hoặc một lần ghép mới hơn; POST này đã cũ): không tạo bản ghi, bia mộ giữ nguyên. Bản ghi hiện có mang id mới hơn → cũng `410`, bản ghi đó giữ nguyên. Ngược lại relay xóa bia mộ cũ hơn rồi upsert bản ghi với `pairing_id` này → `201`; gửi lại cùng id → `201` (idempotent). Relay hỏi hub cả trước lẫn sau khi ghi D1 (nếu điện thoại bỏ ghép xen giữa thì vẫn `410` và bản ghi bị gỡ). Không hỏi được hub → `500`; bản ghi có thể **đã** được ghi (khi lần hỏi thứ hai lỗi); client thử lại với **cùng** id, kết quả hội tụ về `201` hoặc `410`.
+- `DELETE /v1/pairings/:agent_id/:mobile_id` nhận query tùy chọn `?pairing_id=<uuidv7>`. Có (agent thu hồi): chỉ xóa nếu bản ghi mang đúng id đó, không thì `204` và không làm gì (không bia mộ, không EVENT) — lệnh thu hồi đến sau một lần ghép lại nhanh không xóa lần ghép mới. Không có (điện thoại bỏ ghép): xóa bản ghi hiện có. Khi xóa, EVENT mang `pairing_id` của bản ghi bị xóa và bia mộ lưu id đó (trừ khi bia mộ đang giữ id mới hơn). `pairing_id` không phải UUID phiên bản 7 chữ thường → `400 bad_request`. Không có gì để xóa → `204`. `500` khi hub lỗi (bản ghi giữ nguyên) hoặc khi bản ghi vẫn đổi sau 3 vòng đọc lại (bản ghi giữ nguyên): bên gọi **phải** thử lại DELETE — nhất là lệnh bỏ ghép của điện thoại, vì đó là cách duy nhất agent biết được.
+- `GET /v1/devices` không đổi: chỉ có `paired_with_me`, không trả `pairing_id`.
 
 `GET /v1/devices` trả:
 
@@ -402,8 +412,8 @@ final class ShellxApi {
   Future<void> changePassword(String newPassword);
   Future<void> deleteAccount(String password);   // DELETE /v1/account
   Future<List<RemoteDevice>> devices();
-  Future<void> createPairing(String mobileId);
-  Future<void> deletePairing(String agentId, String mobileId);
+  Future<void> createPairing(String mobileId, {required String pairingId});   // pairingId: UUIDv7 do agent sinh; body {mobile_id, pairing_id}; 410 → ApiException(status 410, code 'pairing_removed')
+  Future<void> deletePairing(String agentId, String mobileId, {String? pairingId});   // pairingId != null → ?pairing_id= (agent thu hồi)
   Future<VersionInfo> version();
 }
 int compareVersions(String a, String b);   // semver "x.y.z": âm/0/dương

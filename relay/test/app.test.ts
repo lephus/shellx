@@ -31,6 +31,17 @@ describe("app skeleton", () => {
     expect(results.map((r) => r.name)).toEqual(["devices", "pairings", "tokens", "users"]);
   });
 
+  it("pairings carries the agent-generated pairing_id (TEXT NOT NULL) and keeps its (agent, mobile) key", async () => {
+    const { results } = await env.DB.prepare("PRAGMA table_info(pairings)")
+      .all<{ name: string; type: string; notnull: number; pk: number }>();
+    expect(results.map((c) => [c.name, c.type, c.notnull, c.pk])).toEqual([
+      ["agent_id", "TEXT", 1, 1],
+      ["mobile_id", "TEXT", 1, 2],
+      ["pairing_id", "TEXT", 1, 0],
+      ["created_at", "INTEGER", 1, 0],
+    ]);
+  });
+
   it("bindingLimiter maps the binding outcome and passes the key through", async () => {
     const seen: string[] = [];
     const limiter = bindingLimiter({

@@ -4,7 +4,7 @@ import {
   CloseCode, encodeData, encodeError, encodeEvent, encodePresence, MAX_FRAME_BYTES,
   pairingRemovedEvent, parseDataHeader, RelayErrorCode, withPeer,
 } from "../src/protocol/frames";
-import { NIL_UUID, parseUuid, uuidFromBytes, uuidToBytes } from "../src/protocol/uuid";
+import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes, uuidV7Millis } from "../src/protocol/uuid";
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string): Uint8Array => Uint8Array.from(h.match(/../g)!.map((x) => Number.parseInt(x, 16)));
@@ -13,12 +13,29 @@ const A = "0123abcd-4567-4def-8123-456789abcdef";
 const A_HEX = "0123abcd45674def8123456789abcdef";
 const B = "fedcba98-7654-4321-8fed-cba987654321";
 const B_HEX = "fedcba98765443218fedcba987654321";
+const P = "c0ffee00-1234-7abc-9def-0123456789ab"; // UUIDv7-shaped
 const CH = fromHex("0102030405060708");
 
 describe("uuid", () => {
   it("round-trips in textual byte order", () => {
     expect(hex(uuidToBytes(A))).toBe(A_HEX);
     expect(uuidFromBytes(uuidToBytes(A))).toBe(A);
+  });
+  it("parseUuidV7 accepts only version-7 UUIDs already in canonical lower case", () => {
+    const v7 = "0192d1f0-7a3b-7c4d-8e5f-0123456789ab";
+    expect(parseUuidV7(v7)).toBe(v7);
+    expect(parseUuidV7(v7.toUpperCase())).toBeNull(); // no silent case folding
+    expect(parseUuidV7("0192D1F0-7a3b-7c4d-8e5f-0123456789ab")).toBeNull();
+    expect(parseUuidV7(A)).toBeNull(); // version 4
+    expect(parseUuidV7(NIL_UUID)).toBeNull();
+    expect(parseUuidV7("0192d1f0-7a3b-8c4d-8e5f-0123456789ab")).toBeNull(); // version 8
+    expect(parseUuidV7("not-a-uuid")).toBeNull();
+    expect(parseUuidV7(7)).toBeNull();
+  });
+  it("uuidV7Millis reads the 48-bit unix-ms timestamp", () => {
+    expect(uuidV7Millis("0192d1f0-7a3b-7c4d-8e5f-0123456789ab")).toBe(0x0192d1f07a3b);
+    expect(uuidV7Millis("ffffffff-ffff-7fff-bfff-ffffffffffff")).toBe(2 ** 48 - 1);
+    expect(uuidV7Millis("00000000-0000-7000-8000-000000000000")).toBe(0);
   });
   it("canonicalises to lowercase and rejects garbage", () => {
     expect(parseUuid(A.toUpperCase())).toBe(A);
@@ -77,11 +94,12 @@ describe("relay frames (overview §4.1)", () => {
     expect(hex(encodeError(RelayErrorCode.frameTooLarge).slice(2, 4))).toBe("0002");
     expect(hex(encodeError(RelayErrorCode.rateLimited).slice(2, 4))).toBe("0003");
   });
-  it("EVENT pairing_removed matches the byte-for-byte vector", () => {
-    expect(hex(pairingRemovedEvent(A, B))).toBe(
-      "0104a3656576656e746f70616972696e675f72656d6f766564686167656e745f6964782430313233616263642d34" +
+  it("EVENT pairing_removed matches the byte-for-byte vector (4 text entries, pairing_id last)", () => {
+    expect(hex(pairingRemovedEvent(A, B, P))).toBe(
+      "0104a4656576656e746f70616972696e675f72656d6f766564686167656e745f6964782430313233616263642d34" +
         "3536372d346465662d383132332d343536373839616263646566696d6f62696c655f69647824666564636261" +
-        "39382d373635342d343332312d386665642d636261393837363534333231",
+        "39382d373635342d343332312d386665642d6362613938373635343332316a70616972696e675f696478246330" +
+        "6666656530302d313233342d376162632d396465662d303132333435363738396162",
     );
     expect(encodeEvent({})).toEqual(Uint8Array.from([1, 4, 0xa0]));
   });

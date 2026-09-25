@@ -252,8 +252,10 @@ void main() {
     Future<void> Function(String) change = api.changePassword;
     Future<void> Function(String) deleteAccount = api.deleteAccount;
     Future<List<RemoteDevice>> Function() devices = api.devices;
-    Future<void> Function(String) create = api.createPairing;
-    Future<void> Function(String, String) remove = api.deletePairing;
+    Future<void> Function(String, {required String pairingId}) create =
+        api.createPairing;
+    Future<void> Function(String, String, {String? pairingId}) remove =
+        api.deletePairing;
     Future<VersionInfo> Function() version = api.version;
     void Function() apiClose = api.close;
     int Function(String, String) compare = compareVersions;

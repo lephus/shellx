@@ -24,6 +24,7 @@ export const Errors = {
   deviceNotFound: () => new ApiError(404, "device_not_found", "Device not found"),
   notFound: () => new ApiError(404, "not_found", "Not found"),
   emailTaken: () => new ApiError(409, "email_taken", "Email is already registered"),
+  pairingRemoved: () => new ApiError(410, "pairing_removed", "This pairing has already been removed"),
   payloadTooLarge: () => new ApiError(413, "payload_too_large", "Request body is too large"),
   upgradeRequired: () => new ApiError(426, "upgrade_required", "Expected a WebSocket upgrade"),
   rateLimited: () => new ApiError(429, "rate_limited", "Too many requests, try again later"),

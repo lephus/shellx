@@ -80,6 +80,7 @@ export function encodeEvent(event: Readonly<Record<string, string>>): Uint8Array
   return out;
 }
 
-export function pairingRemovedEvent(agentId: string, mobileId: string): Uint8Array {
-  return encodeEvent({ event: "pairing_removed", agent_id: agentId, mobile_id: mobileId });
+/** EVENT pairing_removed for one pairing, identified by the id its agent generated (overview §4.1). */
+export function pairingRemovedEvent(agentId: string, mobileId: string, pairingId: string): Uint8Array {
+  return encodeEvent({ event: "pairing_removed", agent_id: agentId, mobile_id: mobileId, pairing_id: pairingId });
 }

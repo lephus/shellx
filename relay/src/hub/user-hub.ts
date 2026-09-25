@@ -61,13 +61,15 @@ export class UserHub extends DurableObject<Env> {
     // Heartbeat is answered by the runtime without waking the object (spec §6.1).
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     // Durable (SQLite-backed) pairing_removed tombstones for agents: at most one row per
-    // (agent, mobile) pair, so repeated pair/unpair cycles collapse into a single row. Each row is
+    // (agent, mobile) pair, holding the newest removed pairing_id (ids are UUIDv7, so newest = the
+    // greatest string), so repeated pair/unpair cycles collapse into a single row. Each row is
     // replayed on EVERY connect of that agent and is never deleted on send; it only goes away when
-    // the pair is re-created (clearPairingRemoved, called by POST /v1/pairings), on that agent's
-    // logout (purgeAgent) or on account deletion (purgeAll). The frame is encoded at delivery time,
+    // the agent records a pairing with a newer id (admitPairing, called by POST /v1/pairings), on
+    // that agent's logout (purgeAgent) or on account deletion (purgeAll). The frame is encoded at delivery time,
     // not stored, so a protocol change cannot leave stale encoded bytes behind.
     ctx.storage.sql.exec(
-      "CREATE TABLE IF NOT EXISTS pending_pairing_removed (agent_id TEXT NOT NULL, mobile_id TEXT NOT NULL, UNIQUE (agent_id, mobile_id))",
+      `CREATE TABLE IF NOT EXISTS pending_pairing_removed (
+         agent_id TEXT NOT NULL, mobile_id TEXT NOT NULL, pairing_id TEXT NOT NULL, UNIQUE (agent_id, mobile_id))`,
     );
   }
 
@@ -131,40 +133,55 @@ export class UserHub extends DurableObject<Env> {
   }
 
   /**
-   * Sends EVENT pairing_removed to both devices if connected (clients handle it idempotently).
-   * The event is *always* durably recorded for the agent too, as a tombstone — even when it looks
-   * live — because a live socket can be silently dead (e.g. a peer that vanished without a close
-   * frame), and the relay may only ever remove trust: a lost pairing_removed is unsafe, a duplicate
-   * is not (spec §5.4–5.5, constraint 8). The tombstone is replayed on every one of the agent's
-   * future connects, right after the PRESENCE snapshot, until `clearPairingRemoved` (re-pair),
-   * `purgeAgent` (logout) or `purgeAll` (account deletion) removes it. Deleting it on send instead
-   * would lose it whenever the new socket died right after the replay.
+   * Sends EVENT pairing_removed for pairing `pairingId` to both devices if connected (clients
+   * handle it idempotently and match it by id). The event is *always* durably recorded for the
+   * agent too, as a tombstone — even when it looks live — because a live socket can be silently
+   * dead (e.g. a peer that vanished without a close frame), and the relay may only ever remove
+   * trust: a lost pairing_removed is unsafe, a duplicate is not (spec §5.4–5.5). One tombstone per
+   * (agent, mobile), keeping the newest pairing id: a newer removal overwrites it, an older one
+   * (a DELETE that read an old row before a re-pair replaced it) does not, so it can never hide the
+   * removal of the newer pairing. It is replayed on every one of the agent's future connects, right
+   * after the PRESENCE snapshot, until `admitPairing` (a pairing with a newer id), `purgeAgent`
+   * (logout) or `purgeAll` (account deletion) removes it. Deleting it on send instead would lose it
+   * whenever the new socket died right after the replay.
    */
-  notifyPairingRemoved(agentId: string, mobileId: string): void {
-    const frame = pairingRemovedEvent(agentId, mobileId);
+  notifyPairingRemoved(agentId: string, mobileId: string, pairingId: string): void {
+    const frame = pairingRemovedEvent(agentId, mobileId, pairingId);
     this.ctx.storage.sql.exec(
-      "INSERT OR IGNORE INTO pending_pairing_removed (agent_id, mobile_id) VALUES (?, ?)",
+      `INSERT INTO pending_pairing_removed (agent_id, mobile_id, pairing_id) VALUES (?, ?, ?)
+       ON CONFLICT (agent_id, mobile_id) DO UPDATE SET pairing_id = excluded.pairing_id
+       WHERE excluded.pairing_id > pending_pairing_removed.pairing_id`,
       agentId,
       mobileId,
+      pairingId,
     );
     for (const ws of this.socketsOf(agentId)) safeSend(ws, frame);
     if (mobileId !== agentId) for (const ws of this.socketsOf(mobileId)) safeSend(ws, frame);
   }
 
   /**
-   * Deletes the tombstone for one (agent, mobile) pair: called by POST /v1/pairings *before* it
-   * records the pairing in D1, so re-pairing the same phone is never undone by a stale
-   * pairing_removed replayed on the agent's next connect (final review I1). Running it before the
-   * upsert keeps the safe failure direction: a DELETE racing in between re-creates the tombstone
-   * after this clear, so the agent is still told to drop the phone. Returns the number of rows
-   * removed (0 or 1), purely so tests/ops can observe it.
+   * Asked by POST /v1/pairings, before and again after it writes the D1 row: may pairing
+   * `pairingId` of (agent, mobile) be recorded? Pairing ids are UUIDv7 from the agent's clock, so
+   * canonical ids compare by age as strings. False when the tombstone's id is the same or newer:
+   * the phone unpaired this very pairing (after an earlier attempt of the same POST committed), or
+   * this is a stale POST of an older pairing than one already removed; the tombstone is kept.
+   * Otherwise the tombstone, if any, belongs to an older pairing: it is deleted — so re-pairing is
+   * never undone by a stale replay (final review I1) — and the answer is true. Check and delete run
+   * synchronously in one call, so no notifyPairingRemoved can interleave between them.
    */
-  clearPairingRemoved(agentId: string, mobileId: string): number {
-    return this.ctx.storage.sql.exec(
-      "DELETE FROM pending_pairing_removed WHERE agent_id = ? AND mobile_id = ?",
-      agentId,
-      mobileId,
-    ).rowsWritten;
+  admitPairing(agentId: string, mobileId: string, pairingId: string): boolean {
+    const sql = this.ctx.storage.sql;
+    const [tombstone] = sql
+      .exec<{ pairing_id: string }>(
+        "SELECT pairing_id FROM pending_pairing_removed WHERE agent_id = ? AND mobile_id = ?",
+        agentId,
+        mobileId,
+      )
+      .toArray();
+    if (tombstone === undefined) return true;
+    if (tombstone.pairing_id >= pairingId) return false;
+    sql.exec("DELETE FROM pending_pairing_removed WHERE agent_id = ? AND mobile_id = ?", agentId, mobileId);
+    return true;
   }
 
   /**
@@ -267,15 +284,15 @@ export class UserHub extends DurableObject<Env> {
 
   // ---- helpers -------------------------------------------------------------------------------
 
-  /** Replays every tombstone of this agent; rows are kept (see notifyPairingRemoved). */
+  /** Replays every tombstone of this agent, with its pairing id; rows are kept (see notifyPairingRemoved). */
   private deliverPending(ws: WebSocket, deviceId: string): void {
     const rows = this.ctx.storage.sql
-      .exec<{ mobile_id: string }>(
-        "SELECT mobile_id FROM pending_pairing_removed WHERE agent_id = ? ORDER BY rowid",
+      .exec<{ mobile_id: string; pairing_id: string }>(
+        "SELECT mobile_id, pairing_id FROM pending_pairing_removed WHERE agent_id = ? ORDER BY rowid",
         deviceId,
       )
       .toArray();
-    for (const row of rows) ws.send(pairingRemovedEvent(deviceId, row.mobile_id));
+    for (const row of rows) ws.send(pairingRemovedEvent(deviceId, row.mobile_id, row.pairing_id));
   }
 
   private takeToken(deviceId: string): boolean {

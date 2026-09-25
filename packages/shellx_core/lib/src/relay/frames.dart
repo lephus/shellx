@@ -215,7 +215,8 @@ final class ErrorFrame extends RelayFrame {
 final class EventFrame extends RelayFrame {
   const EventFrame(this.event);
 
-  /// For example `{"event": "pairing_removed", "agent_id": ..., "mobile_id": ...}`.
+  /// For example `{"event": "pairing_removed", "agent_id": ...,
+  /// "mobile_id": ..., "pairing_id": ...}`.
   final Map<String, String> event;
 
   @override
