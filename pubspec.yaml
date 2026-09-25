@@ -1,0 +1,8 @@
+name: shellx_workspace
+publish_to: none
+environment:
+  sdk: ^3.11.0
+workspace:
+  - packages/shellx_core
+dev_dependencies:
+  lints: ^6.0.0
