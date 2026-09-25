@@ -117,7 +117,7 @@ describe("POST /v1/pairings", () => {
 });
 
 describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () => {
-  it("requires pairing_id to be a UUIDv7 string: 400 bad_request (usual error shape), nothing recorded", async () => {
+  it("requires pairing_id to be a lower-case canonical UUIDv7 string: 400 bad_request (usual error shape), nothing recorded", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
@@ -131,6 +131,7 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
       { mobile_id: mobile.deviceId, pairing_id: crypto.randomUUID() }, // v4
       { mobile_id: mobile.deviceId, pairing_id: "00000000-0000-0000-0000-000000000000" },
       { mobile_id: mobile.deviceId, pairing_id: newPairingId().replace(/^(.{14})7/, (_, head: string) => `${head}8`) }, // v8
+      { mobile_id: mobile.deviceId, pairing_id: newPairingId().toUpperCase() }, // not lower case
     ];
     for (const body of bodies) {
       const res = await call(app, "POST", "/v1/pairings", { token: account.agent.token, body });
@@ -140,12 +141,12 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     expect(await countPairings(account.agent.deviceId)).toBe(0);
   });
 
-  it("stores the id in canonical lower case; the same id again is 201 and changes nothing", async () => {
+  it("stores the id exactly as sent; the same id again is 201 and changes nothing", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const pairingId = newPairingId();
-    expect((await pair(app, account.agent.token, mobile.deviceId, pairingId.toUpperCase())).status).toBe(201);
+    expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(pairingId);
     expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(pairingId);
@@ -176,8 +177,8 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
     expect((await call(app, "DELETE", path, { token: mobile.token })).status).toBe(204);
 
-    for (const id of [pairingId, pairingId.toUpperCase()]) {
-      const retry = await pair(app, account.agent.token, mobile.deviceId, id);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const retry = await pair(app, account.agent.token, mobile.deviceId, pairingId);
       expect(retry.status).toBe(410);
       expect(await retry.json()).toEqual({ error: { code: "pairing_removed", message: expect.any(String) } });
     }
@@ -241,14 +242,36 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const later = uuidv7(Date.UTC(2031, 0, 1));
-    const earlier = uuidv7(Date.UTC(2030, 0, 1));
+    const base = Date.now() - 60 * 60 * 1000;
+    const later = uuidv7(base);
+    const earlier = uuidv7(base - 24 * 60 * 60 * 1000);
     expect((await pair(app, account.agent.token, mobile.deviceId, later)).status).toBe(201);
     expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
     expect((await pair(app, account.agent.token, mobile.deviceId, earlier)).status).toBe(410);
-    const newest = uuidv7(Date.UTC(2031, 0, 1, 0, 0, 0, 1));
+    const newest = uuidv7(base + 1);
     expect((await pair(app, account.agent.token, mobile.deviceId, newest)).status).toBe(201);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(newest);
+  });
+
+  it("refuses (410) an id whose UUIDv7 timestamp is more than 24 h ahead of the relay's clock: no row, no tombstone", async () => {
+    const now = Date.UTC(2027, 5, 1);
+    const app = makeApp({ now: () => now });
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const day = 24 * 60 * 60 * 1000;
+
+    const tooFar = await pair(app, account.agent.token, mobile.deviceId, uuidv7(now + day + 1));
+    expect(tooFar.status).toBe(410);
+    expect(await errorCode(tooFar)).toBe("pairing_removed");
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
+    const a = await connect(app, account.agent.token);
+    await a.expectSilence(); // no tombstone was written for it
+    a.close();
+
+    // Exactly 24 h ahead is still accepted (clock skew), and later ids keep working.
+    const edge = uuidv7(now + day);
+    expect((await pair(app, account.agent.token, mobile.deviceId, edge)).status).toBe(201);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(edge);
   });
 
   it("asks the hub before writing the row and again after, and answers 410 (removing the row) if the pairing was removed in between", async () => {
@@ -331,6 +354,68 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const output = lines.join("\n");
     expect(output).not.toContain("hub is down");
     expect(output).not.toContain(account.agent.token);
+  });
+});
+
+describe("POST /v1/pairings: hub failure after the row was written", () => {
+  it("answers 500 if the re-check throws (the row may already be recorded); a retry with the same id converges to 201", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const pairingId = newPairingId();
+    let calls = 0;
+    const failingRecheck = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        admitPairing: async () => {
+          calls++;
+          if (calls === 2) throw new Error("hub is down");
+          return true;
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+
+    const failed = await call(app, "POST", "/v1/pairings", {
+      token: account.agent.token,
+      body: { mobile_id: mobile.deviceId, pairing_id: pairingId },
+      bindings: { USER_HUB: failingRecheck },
+    });
+    expect(failed.status).toBe(500);
+    expect(await errorCode(failed)).toBe("internal_error");
+    expect(calls).toBe(2);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(pairingId); // already recorded
+
+    expect((await pair(app, account.agent.token, mobile.deviceId, pairingId)).status).toBe(201);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(pairingId);
+    expect(await countPairings(account.agent.deviceId)).toBe(1);
+  });
+
+  it("a retry after that 500 still answers 410 if the phone unpaired meanwhile", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const pairingId = newPairingId();
+    let calls = 0;
+    const failingRecheck = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        admitPairing: async () => {
+          calls++;
+          if (calls === 2) throw new Error("hub is down");
+          return true;
+        },
+      }),
+    } as unknown as typeof env.USER_HUB;
+    await call(app, "POST", "/v1/pairings", {
+      token: account.agent.token,
+      body: { mobile_id: mobile.deviceId, pairing_id: pairingId },
+      bindings: { USER_HUB: failingRecheck },
+    });
+    expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
+
+    const retry = await pair(app, account.agent.token, mobile.deviceId, pairingId);
+    expect(retry.status).toBe(410);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
   });
 });
 
@@ -529,7 +614,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const m = await connect(app, mobile.token);
 
-    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}?pairing_id=${pairingId.toUpperCase()}`;
+    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}?pairing_id=${pairingId}`;
     expect((await call(app, "DELETE", path, { token: account.agent.token })).status).toBe(204);
     expect(hex(await m.nextBinary())).toBe(event);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
@@ -567,6 +652,27 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     await again.expectSilence(); // no tombstone was written
   });
 
+  it("with an id but no row at all is a no-op: 204, no tombstone, no event", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    const mobile = await loginDevice(app, account, "mobile");
+    const m = await connect(app, mobile.token);
+    const a = await connect(app, account.agent.token);
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
+    expect(hex(await m.nextBinary())).toBe(hex(encodePresence(account.agent.deviceId, true)));
+
+    const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}?pairing_id=${newPairingId()}`;
+    expect((await call(app, "DELETE", path, { token: account.agent.token })).status).toBe(204);
+    expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
+    await m.expectSilence();
+    await a.expectSilence();
+    a.close();
+    await settle();
+    const again = await connect(app, account.agent.token);
+    expect(hex(await again.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
+    await again.expectSilence(); // no tombstone was written
+  });
+
   it("without an id deletes whatever row exists and reports that row's id", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
@@ -582,14 +688,18 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBeNull();
   });
 
-  it("refuses an invalid (or non-UUIDv7) pairing_id query with 400 bad_request and leaves the row alone", async () => {
+  it("refuses an invalid (non-UUIDv7 or not lower case) pairing_id query with 400 bad_request and leaves the row alone", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     const base = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    for (const query of ["?pairing_id=not-a-uuid", "?pairing_id=", "?pairing_id", `?pairing_id=${crypto.randomUUID()}`]) {
+    const queries = [
+      "?pairing_id=not-a-uuid", "?pairing_id=", "?pairing_id", `?pairing_id=${crypto.randomUUID()}`,
+      `?pairing_id=${pairingId.toUpperCase()}`,
+    ];
+    for (const query of queries) {
       const res = await call(app, "DELETE", `${base}${query}`, { token: account.agent.token });
       expect(res.status).toBe(400);
       expect(await errorCode(res)).toBe("bad_request");

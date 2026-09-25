@@ -4,7 +4,7 @@ import {
   CloseCode, encodeData, encodeError, encodeEvent, encodePresence, MAX_FRAME_BYTES,
   pairingRemovedEvent, parseDataHeader, RelayErrorCode, withPeer,
 } from "../src/protocol/frames";
-import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes } from "../src/protocol/uuid";
+import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes, uuidV7Millis } from "../src/protocol/uuid";
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string): Uint8Array => Uint8Array.from(h.match(/../g)!.map((x) => Number.parseInt(x, 16)));
@@ -21,15 +21,21 @@ describe("uuid", () => {
     expect(hex(uuidToBytes(A))).toBe(A_HEX);
     expect(uuidFromBytes(uuidToBytes(A))).toBe(A);
   });
-  it("parseUuidV7 accepts only version-7 UUIDs (canonical lower case)", () => {
+  it("parseUuidV7 accepts only version-7 UUIDs already in canonical lower case", () => {
     const v7 = "0192d1f0-7a3b-7c4d-8e5f-0123456789ab";
     expect(parseUuidV7(v7)).toBe(v7);
-    expect(parseUuidV7(v7.toUpperCase())).toBe(v7);
+    expect(parseUuidV7(v7.toUpperCase())).toBeNull(); // no silent case folding
+    expect(parseUuidV7("0192D1F0-7a3b-7c4d-8e5f-0123456789ab")).toBeNull();
     expect(parseUuidV7(A)).toBeNull(); // version 4
     expect(parseUuidV7(NIL_UUID)).toBeNull();
     expect(parseUuidV7("0192d1f0-7a3b-8c4d-8e5f-0123456789ab")).toBeNull(); // version 8
     expect(parseUuidV7("not-a-uuid")).toBeNull();
     expect(parseUuidV7(7)).toBeNull();
+  });
+  it("uuidV7Millis reads the 48-bit unix-ms timestamp", () => {
+    expect(uuidV7Millis("0192d1f0-7a3b-7c4d-8e5f-0123456789ab")).toBe(0x0192d1f07a3b);
+    expect(uuidV7Millis("ffffffff-ffff-7fff-bfff-ffffffffffff")).toBe(2 ** 48 - 1);
+    expect(uuidV7Millis("00000000-0000-7000-8000-000000000000")).toBe(0);
   });
   it("canonicalises to lowercase and rejects garbage", () => {
     expect(parseUuid(A.toUpperCase())).toBe(A);
