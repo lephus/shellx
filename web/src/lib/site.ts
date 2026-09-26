@@ -1,7 +1,7 @@
 import config from '../site.config.json';
 
 // The single source of truth for download and store links is src/site.config.json.
-// Installer file names must match what release/ uploads to R2:
+// Installer file names must match what release-desktop.yml uploads to download.shellx.pro:
 //   desktop/<version>/ShellX-<version>.dmg
 //   desktop/<version>/ShellX-Setup-<version>.exe
 export const desktopVersion: string = config.desktopVersion;

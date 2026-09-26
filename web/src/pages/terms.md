@@ -4,7 +4,7 @@ lang: vi
 page: terms
 title: Điều khoản sử dụng
 description: Điều khoản áp dụng khi bạn sử dụng ShellX.
-updated: "2026-09-25"
+updated: "2026-09-27"
 ---
 
 Điều khoản này là thỏa thuận giữa bạn và ShellX ("chúng tôi") khi bạn sử dụng agent trên máy tính, ứng dụng di động, máy chủ chuyển tiếp và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Khi tạo tài khoản hoặc sử dụng Dịch vụ, bạn đồng ý với các điều khoản này và với [Chính sách quyền riêng tư](/privacy/).
@@ -61,7 +61,7 @@ Chúng tôi cấp cho bạn quyền cá nhân, không độc quyền, không chu
 
 ## 9. Dịch vụ của bên thứ ba
 
-Dịch vụ chạy trên hạ tầng của Cloudflare. Ứng dụng di động được phân phối qua App Store và Google Play và cũng chịu điều khoản của Apple và Google. Với ứng dụng tải từ App Store, Thỏa thuận cấp phép người dùng cuối tiêu chuẩn của Apple (Standard EULA) cũng được áp dụng.
+Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **[quốc gia]**. Ứng dụng di động được phân phối qua App Store và Google Play và cũng chịu điều khoản của Apple và Google. Với ứng dụng tải từ App Store, Thỏa thuận cấp phép người dùng cuối tiêu chuẩn của Apple (Standard EULA) cũng được áp dụng.
 
 ## 10. Chấm dứt
 

@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: What data ShellX collects, why, how long it is kept, and your rights.
-updated: "2026-09-25"
+updated: "2026-09-27"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -65,7 +65,7 @@ We use the data listed in section 1 only to: create and authenticate your accoun
 
 ## 6. Infrastructure provider and where data is processed
 
-The Service runs on Cloudflare, Inc. infrastructure (Workers, Durable Objects, D1, R2, Pages). Data may be processed in Cloudflare data centers outside Vietnam. Cloudflare processes data on our behalf, and also processes IP addresses and connection metadata to deliver traffic and block attacks, under Cloudflare's own policies.
+The Service runs on a private server rented by ShellX in **[quốc gia]**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **[quốc gia]**. We use no content delivery network (CDN) and no third-party analytics.
 
 When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies.
 
@@ -77,6 +77,7 @@ We disclose data to authorities only when the law requires it. Because terminal 
 - **Access tokens:** deleted when you sign out on that device or when revoked (changing your password revokes the tokens of all other devices); a token expires after 90 days without use.
 - **Pairing records:** deleted when you revoke or unpair, or when you sign out of the agent on that computer.
 - **Operational logs:** no longer than 30 days.
+- **Database backups:** one per day; the 14 most recent are kept.
 
 <h2 id="delete-account">8. Deleting your account</h2>
 
@@ -84,7 +85,7 @@ You can delete your account yourself in the mobile app: open **Settings → Dele
 
 If you can no longer use the mobile app, email [support@shellx.pro](mailto:support@shellx.pro) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
 
-Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Deleted data may also remain for up to 30 days in the database provider's point-in-time recovery backups before it expires.
+Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Deleted data may also remain in the daily database backups for up to 14 days, and is removed together with those backups.
 
 Data stored on your devices (section 3): on Windows, uninstalling the agent removes it; on Android, uninstalling the app removes it. On macOS and iOS, Keychain entries may remain after you remove the app — on iOS, ShellX clears them the next time you install the app; on macOS, they may be reused if you reinstall ShellX — and you can remove them sooner with the operating system's keychain management tools.
 

@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu và quyền của bạn.
-updated: "2026-09-25"
+updated: "2026-09-27"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -65,7 +65,7 @@ Chúng tôi chỉ dùng dữ liệu nêu ở mục 1 để: tạo và xác thự
 
 ## 6. Bên cung cấp hạ tầng và nơi xử lý dữ liệu
 
-Dịch vụ chạy trên hạ tầng của Cloudflare, Inc. (Workers, Durable Objects, D1, R2, Pages). Dữ liệu có thể được xử lý tại các trung tâm dữ liệu của Cloudflare bên ngoài Việt Nam. Cloudflare xử lý dữ liệu thay mặt chúng tôi và cũng xử lý địa chỉ IP cùng thông tin kỹ thuật của kết nối để vận chuyển dữ liệu và chống tấn công, theo chính sách của Cloudflare.
+Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **[quốc gia]**: máy chủ chuyển tiếp, cơ sở dữ liệu tài khoản cùng các bản sao lưu, trang web và bản cài đặt. Dữ liệu được lưu và xử lý tại **[quốc gia]**. Chúng tôi không dùng mạng phân phối nội dung (CDN) hay dịch vụ phân tích của bên thứ ba.
 
 Khi bạn tải ứng dụng từ App Store hoặc Google Play, Apple và Google xử lý dữ liệu theo chính sách riêng của họ.
 
@@ -77,6 +77,7 @@ Chúng tôi chỉ cung cấp dữ liệu cho cơ quan nhà nước khi pháp lu�
 - **Mã truy cập:** bị xóa khi bạn đăng xuất trên thiết bị đó hoặc khi bị thu hồi (đổi mật khẩu thu hồi mã của mọi thiết bị khác); mã hết hiệu lực sau 90 ngày không dùng.
 - **Bản ghi ghép nối:** bị xóa khi bạn thu hồi hoặc bỏ ghép nối, hoặc khi bạn đăng xuất khỏi agent trên máy tính đó.
 - **Nhật ký vận hành:** không quá 30 ngày.
+- **Bản sao lưu cơ sở dữ liệu:** mỗi ngày một bản, giữ 14 bản gần nhất.
 
 <h2 id="delete-account">8. Xóa tài khoản</h2>
 
@@ -84,7 +85,7 @@ Bạn có thể tự xóa tài khoản ngay trong ứng dụng di động: mở 
 
 Nếu bạn không còn dùng được ứng dụng di động, hãy gửi email tới [support@shellx.pro](mailto:support@shellx.pro) **từ chính địa chỉ email của tài khoản**, tiêu đề "Xóa tài khoản ShellX". Chúng tôi có thể hỏi thêm thông tin để xác minh bạn là chủ tài khoản, xóa tài khoản trong vòng 30 ngày kể từ khi xác minh, rồi gửi email xác nhận.
 
-Nhật ký vận hành (không chứa nội dung terminal, mật khẩu hay mã truy cập) tự hết hạn trong vòng 30 ngày. Dữ liệu đã xóa cũng có thể còn tồn tại tối đa 30 ngày trong bản sao lưu khôi phục theo thời điểm (point-in-time recovery) của nhà cung cấp cơ sở dữ liệu trước khi tự hết hạn.
+Nhật ký vận hành (không chứa nội dung terminal, mật khẩu hay mã truy cập) tự hết hạn trong vòng 30 ngày. Dữ liệu đã xóa cũng có thể còn trong các bản sao lưu hằng ngày của cơ sở dữ liệu tối đa 14 ngày, rồi bị xóa cùng bản sao lưu đó.
 
 Dữ liệu nằm trên thiết bị của bạn (mục 3): trên Windows, gỡ cài đặt agent sẽ xóa dữ liệu này; trên Android, gỡ cài đặt ứng dụng cũng xóa dữ liệu. Trên macOS và iOS, các mục trong Keychain có thể vẫn còn sau khi bạn gỡ ứng dụng — trên iOS, ShellX tự xóa các mục đó ở lần cài đặt tiếp theo; trên macOS, chúng có thể được dùng lại nếu bạn cài lại ShellX — và bạn có thể xóa sớm hơn bằng công cụ quản lý Keychain của hệ điều hành.
 

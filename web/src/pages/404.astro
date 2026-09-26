@@ -2,8 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { ui } from '../i18n/ui';
 
-// Cloudflare Pages serves dist/404.html for unknown paths. Without it, Pages would treat the
-// site as a single-page app and answer every unknown path with the home page and HTTP 200.
+// nginx serves dist/404.html with status 404 for unknown paths (deploy/web/nginx.conf).
 const vi = ui.vi;
 const en = ui.en;
 ---

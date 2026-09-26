@@ -115,7 +115,7 @@ for (const [path, inApp] of [
   });
 }
 
-test('404 page exists so Cloudflare Pages does not fall back to SPA mode', () => {
+test('404 page exists (nginx answers unknown paths with it and status 404)', () => {
   assert.ok(existsSync(join(dist, '404.html')), 'missing dist/404.html');
 });
 
