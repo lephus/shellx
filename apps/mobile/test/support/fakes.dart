@@ -294,6 +294,9 @@ class FakeBackend implements ShellxBackend {
   /// failed three times in `shellx_client`.
   Object? unpairError;
   final List<PairingUri> paired = [];
+
+  /// Every [pair] call, failed ones included.
+  int pairCalls = 0;
   final List<String> unpaired = [];
   int reconnectCalls = 0;
   int suspendCalls = 0;
@@ -400,6 +403,7 @@ class FakeBackend implements ShellxBackend {
 
   @override
   Future<void> pair(PairingUri uri) async {
+    pairCalls++;
     final error = pairError;
     if (error != null) throw error;
     paired.add(uri);

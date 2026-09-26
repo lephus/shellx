@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_scanner/mobile_scanner.dart' hide Address;
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
@@ -12,6 +13,7 @@ import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
 import '../../support/fake_popup_handler.dart';
+import '../../support/fake_scanner_platform.dart';
 import '../../support/fakes.dart';
 
 void main() {
@@ -212,5 +214,123 @@ void main() {
         expect(find.text('Không ghép nối được'), findsNothing);
       },
     );
+
+    testWidgets('the same code can be scanned again after "Quét lại"', (tester) async {
+      backend.pairError = const PairingException(PairingFailure.agentOffline);
+      await openScanner(tester);
+
+      scan(validCode);
+      await tester.pumpAndSettle();
+      expect(find.text('Không ghép nối được'), findsOneWidget);
+      expect(backend.pairCalls, 1);
+
+      await tester.tap(find.text('Quét lại'));
+      await tester.pumpAndSettle();
+      backend.pairError = null;
+      scan(validCode);
+      await tester.pumpAndSettle();
+      expect(backend.pairCalls, 2);
+      expect(find.text('Đã ghép nối'), findsOneWidget);
+    });
+
+    testWidgets('an unexpected error while pairing shows the failure sheet instead of hanging', (tester) async {
+      backend.pairError = StateError('keychain write failed');
+      await openScanner(tester);
+      scan(validCode);
+      await tester.pumpAndSettle();
+      expect(find.text('Đang ghép nối…'), findsNothing);
+      expect(find.text('Không ghép nối được'), findsOneWidget);
+      expect(find.text('Đã có lỗi xảy ra (StateError).'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('QrScannerPage with the camera', () {
+    late FakeScannerPlatform camera;
+    late List<Object?> results;
+
+    setUp(() {
+      camera = FakeScannerPlatform.install(addTearDown);
+      backend.deviceList = [agentDevice(agentA, 'MacBook Pro của Phú')];
+      results = [];
+      final session = FakeSessionHolder(backend);
+      getIt
+        ..registerSingleton<PopupHandler>(FakePopupHandler())
+        ..registerFactory<QrScannerController>(() => QrScannerController(session));
+    });
+
+    tearDown(getIt.reset);
+
+    Future<void> openCamera(WidgetTester tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(
+        disableAnimations: true,
+      );
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await tester.pumpWidget(
+        routedApp(
+          open: QrScannerRoute.new,
+          routes: [AutoRoute(page: QrScannerRoute.page)],
+          results: results,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openPushed(tester);
+    }
+
+    Future<void> leaveAndComeBack(WidgetTester tester) async {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('every detection reaches the app, so "Quét lại" re-scans the same code', (tester) async {
+      await openCamera(tester);
+      // noDuplicates would make the plugin drop a code equal to the last one on Android.
+      expect(camera.starts.single.detectionSpeed, DetectionSpeed.normal);
+
+      backend.pairError = const PairingException(PairingFailure.timeout);
+      camera.detect(validCode);
+      await tester.pumpAndSettle();
+      expect(find.text('Không ghép nối được'), findsOneWidget);
+
+      await tester.tap(find.text('Quét lại'));
+      await tester.pumpAndSettle();
+      backend.pairError = null;
+      camera.detect(validCode);
+      await tester.pumpAndSettle();
+      expect(backend.pairCalls, 2);
+      expect(find.text('Đã ghép nối'), findsOneWidget);
+    });
+
+    testWidgets('after the camera permission is granted in Settings, coming back starts the camera', (tester) async {
+      camera.startError = FakeScannerPlatform.permissionDenied;
+      await openCamera(tester);
+      expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsOneWidget);
+
+      camera.startError = null;
+      await leaveAndComeBack(tester);
+      expect(camera.starts, hasLength(2));
+      expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsNothing);
+    });
+
+    testWidgets('coming back while the permission is still denied fails quietly and keeps the notice', (
+      tester,
+    ) async {
+      camera.startError = FakeScannerPlatform.permissionDenied;
+      await openCamera(tester);
+
+      await leaveAndComeBack(tester);
+      expect(camera.starts, hasLength(2));
+      expect(tester.takeException(), isNull);
+      expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsOneWidget);
+    });
   });
 }

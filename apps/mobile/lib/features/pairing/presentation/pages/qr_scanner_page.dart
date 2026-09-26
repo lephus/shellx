@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -33,15 +35,10 @@ class _QrScannerPageState extends State<QrScannerPage> {
     super.dispose();
   }
 
-  /// Fire-and-forget: [MobileScanner.onDetect] cannot await it. [QrScannerController.onCode] is
-  /// itself race-safe, but this is a second net — closing the scanner never lets a
-  /// stray error surface as an unhandled Future error.
-  void _onCode(String raw) {
-    final strings = S.of(context);
-    _controller.onCode(raw, strings).catchError((Object error, StackTrace stackTrace) {
-      if (!_controller.isDisposed) throw error;
-    });
-  }
+  /// Fire-and-forget: [MobileScanner.onDetect] cannot await it. [QrScannerController.onCode]
+  /// never throws — every failure becomes the failure sheet, and a result arriving after the
+  /// page closed is dropped.
+  void _onCode(String raw) => unawaited(_controller.onCode(raw, S.of(context)));
 
   @override
   Widget build(BuildContext context) {
@@ -406,14 +403,38 @@ class _CameraScanner extends StatefulWidget {
 }
 
 class _CameraScannerState extends State<_CameraScanner> {
+  // Every detection is delivered: with `noDuplicates` the Android plugin drops a code equal to
+  // the last one, so "Quét lại" after a failed pairing could never scan the same code again.
+  // [QrScannerController.onCode] already ignores codes unless it is scanning.
   final MobileScannerController _scanner = MobileScannerController(
     formats: const [BarcodeFormat.qrCode],
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    detectionSpeed: DetectionSpeed.normal,
   );
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _restartAfterPermission);
+  }
+
+  /// `MobileScanner` does not restart a controller it was given, and its own lifecycle handling
+  /// skips a camera without permission anyway: after the user grants the permission in the
+  /// phone's Settings and comes back, start the camera here. Starting may fail again (still
+  /// denied); the error builder then keeps showing the notice.
+  void _restartAfterPermission() {
+    if (_scanner.value.error?.errorCode != MobileScannerErrorCode.permissionDenied) return;
+    unawaited(
+      _scanner.start().catchError((Object error) {
+        if (kDebugMode) debugPrint('Camera restart failed: ${error.runtimeType}');
+      }),
+    );
+  }
 
   @override
   void dispose() {
-    _scanner.dispose();
+    _lifecycle.dispose();
+    unawaited(_scanner.dispose());
     super.dispose();
   }
 

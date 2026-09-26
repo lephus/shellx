@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/pairing/domain/pairing_flow.dart';
 import 'package:shellx_mobile/shared/shared.dart';
@@ -38,22 +39,25 @@ class QrScannerController extends Controller {
 
   ReadonlySignal<ScannerStep> get step => _step;
 
-  /// True once [dispose] has run; the page's own [onCode] call checks this to swallow the race
-  /// below instead of leaking an unhandled error.
-  bool get isDisposed => _disposed;
-
   /// Pairs with the scanned machine; codes seen while pairing or while a result is shown are
-  /// ignored.
+  /// ignored. Never throws: an unexpected error (a Keychain write while pinning, no backend, …)
+  /// becomes [PairingFailed] with its [ErrorText], so the scanner never hangs on "Đang ghép nối…".
   ///
   /// Every `await` below can outlive the page — closing the scanner while pairing (or while the
   /// machine-name lookup that follows a success) is in flight disposes
   /// [_step] out from under this call. So [_disposed] is (re-)checked immediately after *every*
   /// await, right before the next signal write, never just once up front.
   Future<void> onCode(String raw, S strings) async {
-    if (_step.peek() is! Scanning) return;
+    if (_disposed || _step.peek() is! Scanning) return;
     _step.value = const Pairing();
-    final backend = _session.requireBackend;
-    final outcome = await pairFromQrCode(raw, backend, ErrorText(strings));
+    final PairingOutcome outcome;
+    try {
+      outcome = await pairFromQrCode(raw, _session.requireBackend, ErrorText(strings));
+    } catch (error) {
+      if (kDebugMode) debugPrint('Pairing failed: ${error.runtimeType}');
+      if (!_disposed) _step.value = PairingFailed(ErrorText(strings).describe(error));
+      return;
+    }
     if (_disposed) return;
     switch (outcome) {
       case PairingSucceeded(:final agentId):
