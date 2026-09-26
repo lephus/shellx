@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +37,15 @@ test('writes relay-<date>.db with the data, and keeps only the 14 newest', { ski
   assert.equal(files[0], 'relay-2026-01-03.db');
   assert.equal(files.at(-1), 'relay-2026-01-16.db');
   assert.equal(w.sql(join(w.dir, 'relay-2026-01-16.db'), 'SELECT id FROM users;'), 'u1');
+});
+
+test('writes the backup file as mode 0600 (M9: umask 077, the database holds emails and password hashes)', { skip: !hasSqlite }, () => {
+  const w = world();
+  w.sql(w.db, "PRAGMA journal_mode=WAL; CREATE TABLE users (id TEXT); INSERT INTO users VALUES ('u1');");
+  const result = w.backup('2026-03-01');
+  assert.equal(result.status, 0, result.stderr);
+  const mode = statSync(join(w.dir, 'relay-2026-03-01.db')).mode & 0o777;
+  assert.equal(mode.toString(8), '600');
 });
 
 test('a missing database is skipped with one line: no empty database, no backup, nothing rotated', { skip: !hasSqlite }, () => {

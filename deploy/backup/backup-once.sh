@@ -3,9 +3,11 @@
 # Uses SQLite's online backup, so it is consistent while the relay keeps writing. /data is mounted
 # read-only: that works while the relay runs (it holds the WAL files open); while the relay is
 # stopped the read fails, nothing is written, and nothing is lost either (a stopped relay changes
-# nothing) — the next day's run tries again. Overridable for tests: DATA_DB, BACKUP_DIR, KEEP,
-# BACKUP_DATE.
+# nothing) — the next day's run tries again. `umask 077` makes every file this script writes 0600
+# (the database holds user emails and password hashes). Overridable for tests: DATA_DB, BACKUP_DIR,
+# KEEP, BACKUP_DATE.
 set -eu
+umask 077
 db="${DATA_DB:-/data/relay.db}"
 dir="${BACKUP_DIR:-/backups}"
 keep="${KEEP:-14}"
