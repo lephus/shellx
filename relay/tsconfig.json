@@ -13,7 +13,5 @@
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src", "test", "scripts", "vitest.config.ts"],
-  // Still Cloudflare code; removed from this list by the plan task that ports each file.
-  "exclude": ["scripts/reset-password.ts", "test/reset-password.test.ts"]
+  "include": ["src", "test", "scripts", "vitest.config.ts"]
 }

@@ -11,6 +11,9 @@ import { createApp, type AppDeps } from "./app.js";
  */
 export const MAX_WS_MESSAGE_BYTES = 1024 * 1024;
 
+/** Shutdown waits at most this long for sockets to close and requests to finish (spec §4.3). */
+export const SHUTDOWN_GRACE_MS = 5000;
+
 export interface ListenOptions {
   host: string;
   /** 0 picks a free port (tests). */
@@ -22,6 +25,32 @@ export interface RunningRelay {
   readonly port: number;
   /** `http://<host>:<port>` */
   readonly url: string;
+  /**
+   * Graceful stop (spec §4.3): stops accepting connections, closes every socket with 1001, waits
+   * for in-flight requests and hub queues (at most `graceMs`), then drops whatever is left. The
+   * caller closes the database afterwards.
+   */
+  shutdown(graceMs?: number): Promise<void>;
+}
+
+/** Counts requests in flight so shutdown can wait for them. */
+class Inflight {
+  private count = 0;
+  private waiters: (() => void)[] = [];
+
+  async track<T>(work: () => Promise<T>): Promise<T> {
+    this.count++;
+    try {
+      return await work();
+    } finally {
+      this.count--;
+      if (this.count === 0) for (const resolve of this.waiters.splice(0)) resolve();
+    }
+  }
+
+  idle(): Promise<void> {
+    return this.count === 0 ? Promise.resolve() : new Promise((resolve) => this.waiters.push(resolve));
+  }
 }
 
 /**
@@ -30,13 +59,18 @@ export interface RunningRelay {
  */
 export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<RunningRelay> {
   const app = createApp(deps);
+  const inflight = new Inflight();
   const wss = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_WS_MESSAGE_BYTES,
     perMessageDeflate: false,
     clientTracking: false,
   });
-  const server = createAdaptorServer({ fetch: app.fetch, websocket: { server: wss } }) as Server;
+  const server = createAdaptorServer({
+    fetch: (request, env) => inflight.track(async () => app.fetch(request, env)),
+    websocket: { server: wss },
+  }) as Server;
+
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(listen.port, listen.host, () => {
@@ -46,5 +80,26 @@ export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<
   });
   const { port } = server.address() as AddressInfo;
   const host = listen.host.includes(":") ? `[${listen.host}]` : listen.host;
-  return { server, port, url: `http://${host}:${port}` };
+
+  let stopping: Promise<void> | null = null;
+  return {
+    server,
+    port,
+    url: `http://${host}:${port}`,
+    shutdown(graceMs = SHUTDOWN_GRACE_MS) {
+      stopping ??= (async () => {
+        server.close(); // no new connections; idle keep-alive connections are closed too
+        server.closeIdleConnections();
+        let timer: NodeJS.Timeout | undefined;
+        const deadline = new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, graceMs);
+        });
+        await Promise.race([Promise.all([deps.hubs.goAway(), inflight.idle()]), deadline]);
+        clearTimeout(timer);
+        deps.hubs.terminateAll();
+        server.closeAllConnections();
+      })();
+      return stopping;
+    },
+  };
 }

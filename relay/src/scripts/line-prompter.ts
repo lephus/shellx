@@ -1,8 +1,6 @@
 /**
- * The prompter interface and its pure, non-TTY implementation. Deliberately free of Node imports:
- * `test/reset-password.test.ts` imports it from the Worker project (tsconfig.json), which must not
- * carry Node types — otherwise `src/` could use `Buffer`/`process` and only crash at runtime.
- * The Node-backed prompters live in `prompter.ts` (checked by scripts/tsconfig.json only).
+ * The prompter interface and its pure, non-TTY implementation (unit-tested in
+ * `test/reset-password.test.ts`). The TTY-backed prompters live in `prompter.ts`.
  */
 
 export interface AskOptions {
