@@ -1,5 +1,6 @@
+import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
-import { call, db, makeApp } from "./helpers.js";
+import { call, db, makeApp, upgradeStatus } from "./helpers.js";
 
 describe("app skeleton", () => {
   it("GET /v1/version returns the configured versions", async () => {
@@ -40,5 +41,33 @@ describe("app skeleton", () => {
       ["pairing_id", "TEXT", 1, 0],
       ["created_at", "INTEGER", 1, 0],
     ]);
+  });
+
+  it("answers a non-WebSocket Upgrade request with 400 instead of hanging the socket, and a WebSocket upgrade with a bad token still gets 401", async () => {
+    const app = makeApp();
+    const relay = await app.ready;
+
+    const response = await new Promise<string>((resolve, reject) => {
+      const socket = connect(relay.port, "127.0.0.1", () => {
+        socket.write(
+          "GET /v1/version HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n",
+        );
+      });
+      let data = "";
+      const timer = setTimeout(() => {
+        socket.destroy();
+        reject(new Error(`no response within 2s (got: ${JSON.stringify(data)})`));
+      }, 2000);
+      socket.on("data", (chunk: Buffer) => {
+        data += chunk.toString("utf8");
+        clearTimeout(timer);
+        socket.destroy();
+        resolve(data);
+      });
+      socket.on("error", reject);
+    });
+    expect(response.startsWith("HTTP/1.1 400")).toBe(true);
+
+    expect(await upgradeStatus(app, "not-a-real-token")).toBe(401);
   });
 });

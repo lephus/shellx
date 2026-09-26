@@ -71,6 +71,26 @@ export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<
     websocket: { server: wss },
   }) as Server;
 
+  // The adaptor's own `upgrade` listener only ever handles a WebSocket upgrade; any other Upgrade
+  // request (e.g. `Upgrade: h2c`) is left unanswered and the socket hangs until nginx's 120s
+  // timeout, or forever if the port is exposed directly — an unauthenticated way to exhaust file
+  // descriptors. Answer anything that isn't a WebSocket upgrade with 400 ourselves, and delegate
+  // everything else to the adaptor's listener unchanged. The adaptor relies on exactly one
+  // `upgrade` listener being registered (its reject path checks `listenerCount === 1`), so we
+  // replace it in place rather than adding a second one.
+  const [adaptorUpgrade] = server.listeners("upgrade");
+  if (adaptorUpgrade) {
+    server.removeListener("upgrade", adaptorUpgrade as (...args: unknown[]) => void);
+    server.on("upgrade", (req, socket, head) => {
+      const upgrade = req.headers.upgrade;
+      if (typeof upgrade !== "string" || upgrade.toLowerCase() !== "websocket") {
+        socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        return;
+      }
+      (adaptorUpgrade as (...args: unknown[]) => void).call(server, req, socket, head);
+    });
+  }
+
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(listen.port, listen.host, () => {
