@@ -46,7 +46,7 @@ void main() {
           lock,
           biometrics,
           registry,
-          PackageInfo(appName: 'ShellX', packageName: 'pro.shellx.mobile', version: '1.0.0', buildNumber: '1'),
+          PackageInfo(appName: 'ShellX', packageName: 'com.shellx.prod', version: '1.0.0', buildNumber: '1'),
         ),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));

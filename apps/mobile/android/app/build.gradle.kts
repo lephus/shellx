@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "pro.shellx.mobile"
+    namespace = "com.shellx.prod"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "pro.shellx.mobile"
+        applicationId = "com.shellx.prod"
         // Spec §3.1: Android 8.0 (API 26)+.
         minSdk = 26
         targetSdk = flutter.targetSdkVersion

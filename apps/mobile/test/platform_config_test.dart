@@ -14,11 +14,13 @@ void main() {
       expect(readFile('ios/Podfile'), contains("platform :ios, '15.0'"));
     });
 
-    test('bundle identifier is pro.shellx.mobile', () {
+    test('bundle identifier is com.shellx.prod', () {
       final project = readFile('ios/Runner.xcodeproj/project.pbxproj');
-      expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.mobile;'));
-      expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.mobile.RunnerTests;'));
+      expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod;'));
+      expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod.RunnerTests;'));
+      expect(RegExp(r'PRODUCT_BUNDLE_IDENTIFIER = (?!com\.shellx\.prod[.;])').hasMatch(project), isFalse);
       expect(project, isNot(contains('com.example')));
+      expect(project, isNot(contains('pro.shellx.mobile')));
     });
 
     test('Info.plist declares camera, Face ID, display name and both UI languages', () {
@@ -32,10 +34,10 @@ void main() {
   });
 
   group('Android', () {
-    test('application id pro.shellx.mobile, minSdk 26 (Android 8.0)', () {
+    test('application id and namespace com.shellx.prod, minSdk 26 (Android 8.0)', () {
       final gradle = readFile('android/app/build.gradle.kts');
-      expect(gradle, contains('applicationId = "pro.shellx.mobile"'));
-      expect(gradle, contains('namespace = "pro.shellx.mobile"'));
+      expect(gradle, contains('applicationId = "com.shellx.prod"'));
+      expect(gradle, contains('namespace = "com.shellx.prod"'));
       expect(gradle, contains('minSdk = 26'));
     });
 
@@ -48,12 +50,12 @@ void main() {
       expect(manifest, contains('android:label="ShellX"'));
     });
 
-    test('MainActivity is a FlutterFragmentActivity with AppCompat themes', () {
-      expect(
-        readFile('android/app/src/main/kotlin/pro/shellx/mobile/MainActivity.kt'),
-        contains('class MainActivity : FlutterFragmentActivity()'),
-      );
-      expect(Directory('android/app/src/main/kotlin/com').existsSync(), isFalse);
+    test('MainActivity (package com.shellx.prod) is a FlutterFragmentActivity with AppCompat themes', () {
+      final activity = readFile('android/app/src/main/kotlin/com/shellx/prod/MainActivity.kt');
+      expect(activity, contains('package com.shellx.prod\n'));
+      expect(activity, contains('class MainActivity : FlutterFragmentActivity()'));
+      expect(Directory('android/app/src/main/kotlin/com/example').existsSync(), isFalse);
+      expect(Directory('android/app/src/main/kotlin/pro').existsSync(), isFalse);
       expect(readFile('android/app/src/main/res/values/styles.xml'), contains('Theme.AppCompat'));
       expect(readFile('android/app/src/main/res/values-night/styles.xml'), contains('Theme.AppCompat'));
     });

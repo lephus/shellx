@@ -17,8 +17,8 @@ abstract final class AppConfig {
     const String.fromEnvironment('SHELLX_APP_STORE_URL', defaultValue: 'https://shellx.pro/'),
   );
 
-  /// "Mở Google Play": the listing of `pro.shellx.mobile`.
-  static final Uri playStorePage = Uri.parse('https://play.google.com/store/apps/details?id=pro.shellx.mobile');
+  /// "Mở Google Play": the listing of `com.shellx.prod`.
+  static final Uri playStorePage = Uri.parse('https://play.google.com/store/apps/details?id=com.shellx.prod');
 
   /// Linked from the registration form (spec §3.1, §11).
   static final Uri termsPage = Uri.parse('https://shellx.pro/terms');

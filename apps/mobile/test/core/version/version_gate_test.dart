@@ -13,7 +13,7 @@ void main() {
 
   VersionGate gate(String appVersion) => VersionGate(
     ShellxApi(baseUri: Uri.parse('http://127.0.0.1:8787'), httpClient: relay.client),
-    PackageInfo(appName: 'ShellX', packageName: 'pro.shellx.mobile', version: appVersion, buildNumber: '1'),
+    PackageInfo(appName: 'ShellX', packageName: 'com.shellx.prod', version: appVersion, buildNumber: '1'),
   );
 
   setUp(() => relay = FakeRelayHttp());

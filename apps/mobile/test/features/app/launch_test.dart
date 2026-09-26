@@ -25,7 +25,7 @@ void main() {
     final api = ShellxApi(baseUri: Uri.parse('http://127.0.0.1:8787'), httpClient: relay.client);
     final packageInfo = PackageInfo(
       appName: 'ShellX',
-      packageName: 'pro.shellx.mobile',
+      packageName: 'com.shellx.prod',
       version: '1.0.0',
       buildNumber: '1',
     );

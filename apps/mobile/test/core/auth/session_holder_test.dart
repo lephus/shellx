@@ -13,7 +13,7 @@ import '../../support/fake_relay_http.dart';
 import '../../support/fakes.dart';
 
 PackageInfo packageInfo(String version) =>
-    PackageInfo(appName: 'ShellX', packageName: 'pro.shellx.mobile', version: version, buildNumber: '1');
+    PackageInfo(appName: 'ShellX', packageName: 'com.shellx.prod', version: version, buildNumber: '1');
 
 /// Secure storage whose deletes fail, as a locked or broken Keychain/Keystore can.
 class _FailingDeletes extends AuthStorageImpl {

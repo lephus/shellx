@@ -1,4 +1,4 @@
-package pro.shellx.mobile
+package com.shellx.prod
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
