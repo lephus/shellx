@@ -1,12 +1,15 @@
-import { env } from "cloudflare:workers";
+import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app";
-import { authenticate } from "../src/auth/session";
-import { hashToken, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "../src/auth/tokens";
+import { createRateLimiters } from "../src/auth/rate-limit.js";
+import { authenticate } from "../src/auth/session.js";
+import { hashToken, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "../src/auth/tokens.js";
+import { Db } from "../src/db/db.js";
+import { HubRegistry } from "../src/hub/registry.js";
 import {
-  call, CountingLimiter, deviceBody, errorCode, loginDevice, makeApp, PASSWORD, randomEmail, randomPublicKey,
-  registerAccount, unlimited,
-} from "./helpers";
+  call, CountingLimiter, db, deviceBody, errorCode, loginDevice, makeApp, PASSWORD, randomEmail, randomPublicKey,
+  registerAccount, tempDir, unlimited,
+} from "./helpers.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -26,16 +29,13 @@ describe("POST /v1/auth/register", () => {
     expect(body.device_id).toMatch(UUID_RE);
     expect(body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
-    const user = await env.DB.prepare("SELECT email, password_hash FROM users WHERE id = ?")
-      .bind(body.user_id).first<{ email: string; password_hash: string }>();
+    const user = db().get<{ email: string; password_hash: string }>("SELECT email, password_hash FROM users WHERE id = ?", body.user_id);
     expect(user?.email).toBe(email);
     expect(user?.password_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
 
-    const tokenRow = await env.DB.prepare("SELECT device_id FROM tokens WHERE token_hash = ?")
-      .bind(await hashToken(body.token)).first<{ device_id: string }>();
+    const tokenRow = db().get<{ device_id: string }>("SELECT device_id FROM tokens WHERE token_hash = ?", await hashToken(body.token));
     expect(tokenRow?.device_id).toBe(body.device_id);
-    const rawToken = await env.DB.prepare("SELECT COUNT(*) AS n FROM tokens WHERE token_hash = ?")
-      .bind(body.token).first<{ n: number }>();
+    const rawToken = db().get<{ n: number }>("SELECT COUNT(*) AS n FROM tokens WHERE token_hash = ?", body.token);
     expect(rawToken?.n).toBe(0);
   });
 
@@ -47,7 +47,7 @@ describe("POST /v1/auth/register", () => {
     });
     expect(res.status).toBe(201);
     const { user_id } = await res.json<{ user_id: string }>();
-    const row = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(user_id).first<{ email: string }>();
+    const row = db().get<{ email: string }>("SELECT email FROM users WHERE id = ?", user_id);
     expect(row?.email).toBe(`${local.toLowerCase()}@example.com`);
   });
 
@@ -92,7 +92,7 @@ describe("POST /v1/auth/register", () => {
 
   it("returns 429 rate_limited once the per-IP register limiter refuses", async () => {
     const registerIp = new CountingLimiter(3);
-    const app = makeApp({ limiters: () => ({ ...unlimited, registerIp }) });
+    const app = makeApp({ limiters: { ...unlimited, registerIp } });
     for (let i = 0; i < 3; i++) {
       const ok = await call(app, "POST", "/v1/auth/register", {
         ip: "198.51.100.1",
@@ -110,23 +110,46 @@ describe("POST /v1/auth/register", () => {
   });
 });
 
-describe("production rate-limit wiring (no injected fakes)", () => {
-  const refuse: RateLimit = { limit: async () => ({ success: false }) };
-  const refusing = { LOGIN_IP_LIMITER: refuse, LOGIN_EMAIL_LIMITER: refuse, REGISTER_IP_LIMITER: refuse };
-  const register = (flag: string) =>
-    call(createApp(), "POST", "/v1/auth/register", {
-      bindings: { ...refusing, RATE_LIMITS_ENABLED: flag },
+describe("production rate limits (createRateLimiters, keyed by X-Real-IP)", () => {
+  const register = (app: ReturnType<typeof makeApp>, ip?: string) =>
+    call(app, "POST", "/v1/auth/register", {
+      ip,
       body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
     });
 
-  it('answers 429 when RATE_LIMITS_ENABLED is "true" and the binding refuses', async () => {
-    const res = await register("true");
-    expect(res.status).toBe(429);
-    expect(await errorCode(res)).toBe("rate_limited");
+  it("allows 3 registrations per X-Real-IP per minute, then answers 429; another IP is unaffected", async () => {
+    const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: true }) });
+    for (let i = 0; i < 3; i++) expect((await register(app, "198.51.100.10")).status).toBe(201);
+    const refused = await register(app, "198.51.100.10");
+    expect(refused.status).toBe(429);
+    expect(await errorCode(refused)).toBe("rate_limited");
+    expect((await register(app, "198.51.100.11")).status).toBe(201);
   });
 
-  it('ignores the bindings when RATE_LIMITS_ENABLED is "false"', async () => {
-    expect((await register("false")).status).toBe(201);
+  it('turns every limit off when RATE_LIMITS_ENABLED is "false"', async () => {
+    const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: false }) });
+    for (let i = 0; i < 5; i++) expect((await register(app, "198.51.100.12")).status).toBe(201);
+  });
+
+  it("logs neither the IP nor the email of a refused request", async () => {
+    const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: true }) });
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    const email = randomEmail();
+    const statuses: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      const res = await call(app, "POST", "/v1/auth/login", {
+        ip: "198.51.100.13",
+        body: { email, password: "wrong password", device: deviceBody("mobile") },
+      });
+      statuses.push(res.status);
+    }
+    expect(statuses).toContain(429); // otherwise this proves nothing about a refused request
+    const output = lines.join("\n");
+    expect(output).not.toContain("198.51.100.13");
+    expect(output).not.toContain(email);
   });
 });
 
@@ -151,8 +174,8 @@ describe("POST /v1/auth/login", () => {
     const second = await loginDevice(app, account, "mobile", first.publicKey);
     expect(second.deviceId).toBe(first.deviceId);
     const now = Date.now();
-    expect(await authenticate(env.DB, first.token, now)).toBeNull();
-    expect(await authenticate(env.DB, second.token, now)).toEqual({
+    expect(await authenticate(db(), first.token, now)).toBeNull();
+    expect(await authenticate(db(), second.token, now)).toEqual({
       userId: account.agent.userId, deviceId: first.deviceId, kind: "mobile",
     });
   });
@@ -185,28 +208,37 @@ describe("POST /v1/auth/login", () => {
   it("rate limits per IP (10) and per normalised email (5)", async () => {
     const loginIp = new CountingLimiter(10);
     const loginEmail = new CountingLimiter(5);
-    const app = makeApp({ limiters: () => ({ ...unlimited, loginIp, loginEmail }) });
+    const app = makeApp({ limiters: { ...unlimited, loginIp, loginEmail } });
     const account = await registerAccount(app);
     const attempt = (email: string, ip: string) =>
       call(app, "POST", "/v1/auth/login", { ip, body: { email, password: "wrong password", device: deviceBody("mobile") } });
 
-    // 5 attempts for one email from 5 different IPs (with case variants) are allowed ...
     for (let i = 0; i < 5; i++) expect((await attempt(i % 2 ? account.email.toUpperCase() : account.email, `192.0.2.${i}`)).status).toBe(401);
-    // ... the 6th for the same email is refused even from a fresh IP.
     const sixth = await attempt(` ${account.email} `, "192.0.2.99");
     expect(sixth.status).toBe(429);
     expect(await errorCode(sixth)).toBe("rate_limited");
     expect(new Set(loginEmail.calls)).toEqual(new Set([account.email]));
 
-    // 10 attempts from one IP (different emails) are allowed, the 11th is refused.
     for (let i = 0; i < 10; i++) expect((await attempt(randomEmail(), "198.51.100.200")).status).toBe(401);
     const eleventh = await attempt(randomEmail(), "198.51.100.200");
     expect(eleventh.status).toBe(429);
   });
 
+  it("keys a request without X-Real-IP by its socket address", async () => {
+    const loginIp = new CountingLimiter(10);
+    const app = makeApp({ limiters: { ...unlimited, loginIp } });
+    await call(app, "POST", "/v1/auth/login", {
+      ip: null,
+      body: { email: randomEmail(), password: "wrong password", device: deviceBody("mobile") },
+    });
+    expect(loginIp.calls).toEqual(["127.0.0.1"]);
+  });
+
   it("never logs passwords, tokens or email addresses", async () => {
     const lines: string[] = [];
-    const capture = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+    const capture = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "info").mockImplementation(capture);
     vi.spyOn(console, "warn").mockImplementation(capture);
@@ -232,64 +264,56 @@ describe("token lifetime", () => {
     const app = makeApp({ now: () => t0 });
     const account = await registerAccount(app);
     const hash = await hashToken(account.agent.token);
-    const lastUsed = async () =>
-      (await env.DB.prepare("SELECT last_used_at FROM tokens WHERE token_hash = ?").bind(hash)
-        .first<{ last_used_at: number }>())?.last_used_at;
+    const lastUsed = () => db().get<{ last_used_at: number }>("SELECT last_used_at FROM tokens WHERE token_hash = ?", hash)?.last_used_at;
 
-    expect(await authenticate(env.DB, account.agent.token, t0 + 30 * 60 * 1000)).not.toBeNull();
-    expect(await lastUsed()).toBe(t0);
+    expect(await authenticate(db(), account.agent.token, t0 + 30 * 60 * 1000)).not.toBeNull();
+    expect(lastUsed()).toBe(t0);
     const t1 = t0 + TOKEN_TOUCH_INTERVAL_MS;
-    expect(await authenticate(env.DB, account.agent.token, t1)).not.toBeNull();
-    expect(await lastUsed()).toBe(t1);
+    expect(await authenticate(db(), account.agent.token, t1)).not.toBeNull();
+    expect(lastUsed()).toBe(t1);
 
-    expect(await authenticate(env.DB, account.agent.token, t1 + TOKEN_IDLE_TTL_MS)).not.toBeNull();
+    expect(await authenticate(db(), account.agent.token, t1 + TOKEN_IDLE_TTL_MS)).not.toBeNull();
     const t2 = t1 + TOKEN_IDLE_TTL_MS;
-    expect(await authenticate(env.DB, account.agent.token, t2 + TOKEN_IDLE_TTL_MS + 1)).toBeNull();
-    expect(await lastUsed()).toBeUndefined();
+    expect(await authenticate(db(), account.agent.token, t2 + TOKEN_IDLE_TTL_MS + 1)).toBeNull();
+    expect(lastUsed()).toBeUndefined();
   });
 
   it("rejects missing and malformed tokens", async () => {
-    expect(await authenticate(env.DB, null, Date.now())).toBeNull();
-    expect(await authenticate(env.DB, "A".repeat(43), Date.now())).toBeNull();
+    expect(await authenticate(db(), null, Date.now())).toBeNull();
+    expect(await authenticate(db(), "A".repeat(43), Date.now())).toBeNull();
   });
 });
 
-// Controller ruling (not in the brief): a rate-limit binding outage must fail open — the
-// request is allowed, and only limiter-name metadata is logged (never the key, IP or email).
-describe("rate-limit binding failures fail open", () => {
-  const throwing: RateLimit = { limit: async () => { throw new Error("binding unavailable"); } };
-
-  it("still registers when the register-IP limiter binding throws, logging only the limiter name", async () => {
+describe("database contention", () => {
+  it("answers 500 internal_error while another process holds the write lock, logs only SQLITE_BUSY, and recovers", async () => {
+    db(); // create the test database file
+    const path = join(tempDir(), "relay.db");
+    const impatient = Db.open(path, { busyTimeoutMs: 100 });
+    const app = makeApp({ db: impatient, hubs: new HubRegistry({ db: impatient }) });
     const lines: string[] = [];
-    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
-    const ip = "203.0.113.42";
-    const res = await call(createApp(), "POST", "/v1/auth/register", {
-      ip,
-      bindings: { REGISTER_IP_LIMITER: throwing, RATE_LIMITS_ENABLED: "true" },
-      body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
     });
-    expect(res.status).toBe(201);
+    const other = new Database(path); // e.g. the reset-password script in the same volume
+    const email = randomEmail();
+    const register = () =>
+      call(app, "POST", "/v1/auth/register", { body: { email, password: PASSWORD, device: deviceBody("agent") } });
+    try {
+      other.exec("BEGIN IMMEDIATE");
+      const blocked = await register();
+      expect(blocked.status).toBe(500);
+      expect(await blocked.json()).toEqual({ error: { code: "internal_error", message: "Internal error" } });
+      expect((await call(app, "GET", "/v1/version")).status).toBe(200); // still serving
+      other.exec("ROLLBACK");
+      expect((await register()).status).toBe(201); // nothing half-written by the failed attempt
+    } finally {
+      other.close();
+      impatient.close();
+    }
     const output = lines.join("\n");
-    expect(output).toContain("rate_limit_error");
-    expect(output).toContain("registerIp");
-    expect(output).not.toContain(ip);
-  });
-
-  it("still logs in when the login-IP and login-email limiter bindings throw, logging only the limiter name", async () => {
-    const account = await registerAccount(makeApp());
-    const lines: string[] = [];
-    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
-    const ip = "203.0.113.43";
-    const res = await call(createApp(), "POST", "/v1/auth/login", {
-      ip,
-      bindings: { LOGIN_IP_LIMITER: throwing, LOGIN_EMAIL_LIMITER: throwing, RATE_LIMITS_ENABLED: "true" },
-      body: { email: account.email, password: account.password, device: deviceBody("mobile") },
-    });
-    expect(res.status).toBe(200);
-    const output = lines.join("\n");
-    expect(output).toContain("rate_limit_error");
-    expect(output).toContain("loginIp");
-    expect(output).not.toContain(ip);
-    expect(output).not.toContain(account.email);
+    expect(output).toContain('"event":"unhandled_error"');
+    expect(output).toContain('"error":"SQLITE_BUSY"');
+    expect(output).not.toContain(email);
+    expect(output).not.toContain("INSERT");
   });
 });

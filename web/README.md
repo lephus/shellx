@@ -17,7 +17,7 @@ download links, the privacy policy and the terms of use, in Vietnamese (default,
 |---|---|
 | `npm ci` | Install the locked dependencies |
 | `npm run dev` | Dev server at http://localhost:4321 |
-| `npm run build` | `astro build` into `dist/`, then `tests/site.test.mjs` checks pages and links |
+| `npm run build` | Refuse the `[quốc gia]` placeholder, `astro build` into `dist/`, then check pages and links (`tests/`) |
 | `npm test` | Re-run the checks against an existing `dist/` |
 | `CHECK_DOWNLOADS=1 npm test` | Also sends HEAD requests to the installer URLs (needs network) |
 
@@ -41,30 +41,20 @@ Legal text lives in `src/pages/privacy.md`, `src/pages/terms.md` and the English
 privacy policy promises no analytics, cookies or third-party scripts; the build checks fail if a
 page loads an external script, stylesheet or iframe.
 
-## Cloudflare Pages (one-time setup)
+## Deployment
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create application** → **Pages** →
-   **Connect to Git** → repository `lephus/shellx`.
-2. Project name `shellx-web`, production branch `main`.
-3. Build settings:
-   - Framework preset: **Astro**
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Root directory (advanced): `web`
-   - Environment variable: `NODE_VERSION` = `22` (the build image also reads `web/.node-version`)
-4. **Save and Deploy**. The first build is published at `https://shellx-web.pages.dev`.
-5. Project → **Settings** → **Build** → **Build watch paths** → include `web/*`, so commits that
-   do not touch the site do not rebuild it.
-6. Project → **Custom domains** → **Set up a custom domain** → `shellx.pro` → **Activate domain**.
-   The `shellx.pro` zone is in the same Cloudflare account, so the DNS record is created
-   automatically. Wait until the domain shows **Active**.
-7. Keep **Web Analytics** for the project disabled, and do not turn on zone features that add
-   cookies or scripts to `shellx.pro` pages (for example Bot Fight Mode's `__cf_bm` cookie or
-   injected analytics). The privacy policy promises no cookies and no analytics, and the build
-   checks cannot see anything Cloudflare injects at the edge.
+The site runs on the VPS as the `web` container (nginx:alpine with `dist/` and
+`deploy/web/nginx.conf`), built by `web/Dockerfile` and deployed by `.github/workflows/deploy.yml`
+on every push to `main` that changes `web/`, `relay/` or `deploy/`. See `deploy/README.md`.
 
-Every non-production branch that changes `web/` gets a preview at
-`https://<branch>.shellx-web.pages.dev`.
+- `npm run build` first runs `scripts/check-placeholders.mjs`, which refuses to build while any page
+  still contains `[quốc gia]`: the privacy policy and terms must name the country where the VPS is
+  hosted before the site is public (VPS spec §9). Replace every occurrence (vi and en), update
+  `updated:` in their front matter, and commit.
+- nginx answers `/privacy` with `301 /privacy/`, unknown paths with `dist/404.html` and status 404,
+  `www.shellx.pro` with `301 https://shellx.pro…`, and serves `download.shellx.pro` from the VPS
+  folder `downloads/` (files only, always as downloads). It writes no access log.
+- Build the image locally from the repository root: `docker build -f web/Dockerfile -t shellx-web .`
 
 ## Verify production
 
@@ -74,7 +64,9 @@ curl -sIL https://shellx.pro/privacy | grep -iE '^(HTTP|location)'
 curl -s -o /dev/null -w '%{http_code}\n' https://shellx.pro/en/terms/
 # Expected: 200
 curl -s -o /dev/null -w '%{http_code}\n' https://shellx.pro/no-such-page
-# Expected: 404 (dist/404.html; without it Pages would answer 200 with the home page)
+# Expected: 404 (dist/404.html)
+curl -sI https://www.shellx.pro/terms/ | grep -i '^location'
+# Expected: location: https://shellx.pro/terms/
 ```
 
 ## URLs for the store listings

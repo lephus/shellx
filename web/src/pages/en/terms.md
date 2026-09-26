@@ -4,7 +4,7 @@ lang: en
 page: terms
 title: Terms of Use
 description: The terms that apply when you use ShellX.
-updated: "2026-09-25"
+updated: "2026-09-27"
 ---
 
 These terms are an agreement between you and ShellX ("we") covering your use of the desktop agent, the mobile app, the relay server and the website `shellx.pro` (together, the "Service"). By creating an account or using the Service, you agree to these terms and to the [Privacy Policy](/en/privacy/).
@@ -61,7 +61,7 @@ We grant you a personal, non-exclusive, non-transferable, revocable license to i
 
 ## 9. Third-party services
 
-The Service runs on Cloudflare infrastructure. The mobile app is distributed through the App Store and Google Play and is also subject to Apple's and Google's terms. For apps downloaded from the App Store, Apple's Standard End User License Agreement (Standard EULA) also applies.
+The Service runs on a private server rented by ShellX in **[quốc gia]**. The mobile app is distributed through the App Store and Google Play and is also subject to Apple's and Google's terms. For apps downloaded from the App Store, Apple's Standard End User License Agreement (Standard EULA) also applies.
 
 ## 10. Termination
 

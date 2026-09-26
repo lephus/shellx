@@ -1,0 +1,166 @@
+name: Deploy
+
+# Continuous deployment to the VPS (VPS spec §6.1). There is no CI (decision V5): building the relay
+# image runs every relay test, so a failing test stops the deploy before anything is pushed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'relay/**'
+      - 'web/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Full 40-character commit SHA, tag or branch to deploy (empty = the selected branch). Pick an older commit to roll back.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  RELAY_IMAGE: ghcr.io/lephus/shellx-relay
+  WEB_IMAGE: ghcr.io/lephus/shellx-web
+
+jobs:
+  deploy:
+    name: Build, push and roll out
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Restricted to the main branch in the runbook (deploy/README.md); shares its four VPS_* secrets
+    # and the VPS_APP_DIR variable with the release Environment used by release-desktop.yml's publish
+    # job, since both write to the same VPS.
+    environment: production
+    env:
+      # ShellX's one folder on the VPS, relative to the deploy user's home (decision V8). Declared at
+      # job level (not workflow level): `vars` only resolves an Environment-scoped variable inside a
+      # job that declares that `environment`, so this has to live here to ever see an override.
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      # Optional; only needed if sshd on the VPS does not listen on the default port 22.
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a workflow_dispatch ref that is not merged to main (M2)
+        if: github.event_name == 'workflow_dispatch'
+        # origin/main comes from the checkout itself (fetch-depth: 0 fetches every branch). No extra
+        # `git fetch` here: persist-credentials: false leaves none, so it would fail on a private repo.
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::the requested ref is not an ancestor of origin/main; merge it to main first, or pick an older commit that is already on main to roll back"
+            exit 1
+          fi
+
+      - name: Resolve the commit and check VPS_APP_DIR and VPS_SSH_PORT
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          # Relative, no leading '-' (could be read as a flag) and no '.'/'..' path segment. The
+          # dotdot check is kept in a variable: some bash versions strip backslash escapes from an
+          # inline =~ pattern, which would silently turn \.\.? into an unescaped, near-universal ..?.
+          dotdot_re='(^|/)\.\.?(/|$)'
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
+            exit 1
+          fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build the relay image (runs the relay tests)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: docker build -t "$RELAY_IMAGE:$SHA" relay
+
+      - name: Build the web image (refuses the [quốc gia] placeholder, checks pages and links)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: docker build -f web/Dockerfile -t "$WEB_IMAGE:$SHA" .
+
+      - name: Preflight (compose file and relay config), before anything is pushed or synced
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          IMAGE_TAG=x PROXY_NETWORK=x docker compose -f deploy/docker-compose.yml config -q
+          docker run --rm --env-file deploy/relay.env "$RELAY_IMAGE:$SHA" \
+            node -e "import('./dist/config.js').then(({ loadConfig }) => loadConfig(process.env)).catch((err) => { console.error(err.message); process.exit(1); })"
+
+      - name: Push both images
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          docker push "$RELAY_IMAGE:$SHA"
+          docker push "$WEB_IMAGE:$SHA"
+
+      - name: Install the deploy SSH key (host key pinned by VPS_KNOWN_HOSTS)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  IdentityFile $RUNNER_TEMP/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
+            echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
+          } > "$RUNNER_TEMP/ssh_config"
+          echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
+
+      - name: Stage the deploy files into VPS_APP_DIR/.incoming/
+        run: |
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/.incoming/nginx-proxy' '$APP_DIR/.incoming/backup'"
+          rsync -rt -e "ssh -F $SSH_CONFIG" --chmod=D755,F644 deploy/docker-compose.yml deploy/relay.env "vps:$APP_DIR/.incoming/"
+          rsync -rt -e "ssh -F $SSH_CONFIG" --delete --chmod=D755,F644 deploy/nginx-proxy/ "vps:$APP_DIR/.incoming/nginx-proxy/"
+          rsync -rt -e "ssh -F $SSH_CONFIG" --delete --chmod=D755,F644 deploy/backup/ "vps:$APP_DIR/.incoming/backup/"
+
+      - name: Roll out (swaps in the staged config; the previous config and IMAGE_TAG come back if relay or web is not healthy within 60 s)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: ssh -F "$SSH_CONFIG" vps bash -s -- "$SHA" "$APP_DIR" < deploy/rollout.sh
+
+      - name: Check the public endpoints (retries while a first certificate is issued)
+        run: |
+          check() {
+            for attempt in $(seq 1 10); do
+              if curl -fsS --connect-timeout 10 --max-time 30 -o /dev/null "$1"; then
+                echo "$1 answers"
+                return 0
+              fi
+              echo "$1 not answering yet (attempt $attempt/10)"
+              if (( attempt < 10 )); then sleep 15; fi
+            done
+            echo "::error::$1 did not answer after 10 attempts"
+            return 1
+          }
+          check https://relay.shellx.pro/v1/version
+          check https://shellx.pro/
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts" "$RUNNER_TEMP/ssh_config"

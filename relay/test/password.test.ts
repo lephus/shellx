@@ -1,24 +1,31 @@
-import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { describe, expect, it } from "vitest";
-import { ARGON2_SALT_BYTES, buildArgon2, createArgon2, type Argon2Exports } from "../src/auth/argon2";
-import { hashPassword, verifyPassword } from "../src/auth/password";
+import {
+  createPasswordHasher, HasherBusyError, hashPassword, MAX_CONCURRENT_HASHES, MAX_QUEUED_HASHES, nodeArgon2, passwordBytes,
+  Semaphore, verifyPassword,
+} from "../src/auth/password.js";
+import { gatedBackend } from "./helpers.js";
 
-// Known answers computed independently with Node's crypto.argon2Sync and @noble/hashes argon2id.
+// Known answers computed with the relay's former argon2 WASM build and cross-checked with Node's
+// crypto.argon2Sync and @noble/hashes: hashes stored by the Cloudflare relay still verify.
 const SALT = new TextEncoder().encode("shellx-kat-salt!");
 const KAT_ASCII =
   "$argon2id$v=19$m=19456,t=2,p=1$c2hlbGx4LWthdC1zYWx0IQ$luGaBaUIJTDe62MbzyomlSXbM2S500nqgv2BH+y/TeA";
 const KAT_VIETNAMESE =
   "$argon2id$v=19$m=19456,t=2,p=1$c2hlbGx4LWthdC1zYWx0IQ$V9qO2xHVO7Iw1zYXHNX5/Txu9PgL0V1DtJajq+T+7vk";
 
-describe("argon2id (static WASM in workerd)", () => {
+describe("argon2id (@node-rs/argon2)", () => {
   it("matches the ASCII known-answer vector", async () => {
-    const argon2 = await createArgon2(argon2Module);
-    expect(argon2.hash("correct horse battery", SALT)).toBe(KAT_ASCII);
+    expect(await nodeArgon2.hash(passwordBytes("correct horse battery"), SALT)).toBe(KAT_ASCII);
   });
 
   it("hashes every UTF-8 byte of a Vietnamese password", async () => {
-    const argon2 = await createArgon2(argon2Module);
-    expect(argon2.hash("mậtkhẩuđẹplắm1", SALT)).toBe(KAT_VIETNAMESE);
+    expect(await nodeArgon2.hash(passwordBytes("mậtkhẩuđẹplắm1"), SALT)).toBe(KAT_VIETNAMESE);
+  });
+
+  it("verifies hashes written by the former WASM implementation", async () => {
+    expect(await verifyPassword("correct horse battery", KAT_ASCII)).toBe(true);
+    expect(await verifyPassword("mậtkhẩuđẹplắm1", KAT_VIETNAMESE)).toBe(true);
+    expect(await verifyPassword("correct horse batterY", KAT_ASCII)).toBe(false);
   });
 
   it("produces a PHC string with the spec parameters and verifies it", async () => {
@@ -41,7 +48,7 @@ describe("argon2id (static WASM in workerd)", () => {
     expect(await verifyPassword(nfc, phc)).toBe(true);
   });
 
-  it("returns false for malformed PHC strings", async () => {
+  it("returns false (never throws) for malformed or non-argon2id PHC strings", async () => {
     expect(await verifyPassword("whatever1", "")).toBe(false);
     expect(await verifyPassword("whatever1", "not-a-phc")).toBe(false);
     expect(await verifyPassword("whatever1", "$argon2id$v=19$m=19456,t=2,p=1$garbage")).toBe(false);
@@ -49,7 +56,7 @@ describe("argon2id (static WASM in workerd)", () => {
   });
 
   it("hash + verify stays within the 500 ms budget (median of 5)", async () => {
-    await hashPassword("warm-up-password"); // instantiate the module outside the measurement
+    await hashPassword("warm-up-password");
     const samples: number[] = [];
     for (let i = 0; i < 5; i++) {
       const started = performance.now();
@@ -58,92 +65,104 @@ describe("argon2id (static WASM in workerd)", () => {
       samples.push(performance.now() - started);
     }
     samples.sort((a, b) => a - b);
-    const median = samples[2]!;
-    console.log(JSON.stringify({ event: "argon2_timing", median_ms: median, samples_ms: samples }));
-    expect(median).toBeGreaterThan(0);
-    expect(median).toBeLessThan(500);
+    expect(samples[2]!).toBeGreaterThan(0);
+    expect(samples[2]!).toBeLessThan(500);
   });
 });
 
-/**
- * A fake `Argon2Exports` backed by a plain ArrayBuffer "heap" and a bump allocator,
- * so tests can force `malloc` to fail on a chosen call (simulating real WASM
- * allocation failure) without needing to exhaust the real WASM instance's memory.
- */
-function makeFakeExports(opts: { failMallocOnCall: number }): {
-  ex: Argon2Exports;
-  freed: number[];
-  heap: () => Uint8Array;
-} {
-  const buffer = new ArrayBuffer(1 << 16);
-  const freed: number[] = [];
-  let nextPtr = 8; // keep 0 reserved for "null"/allocation failure
-  let mallocCalls = 0;
+const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-  const ex: Argon2Exports = {
-    memory: { buffer } as unknown as WebAssembly.Memory,
-    _initialize() {},
-    malloc(size) {
-      mallocCalls++;
-      if (mallocCalls === opts.failMallocOnCall) return 0;
-      const ptr = nextPtr;
-      nextPtr += Math.max(size, 1);
-      return ptr;
-    },
-    free(ptr) {
-      freed.push(ptr);
-    },
-    argon2_hash() {
-      throw new Error("argon2_hash must not run once an earlier allocation has failed");
-    },
-    argon2_verify() {
-      throw new Error("argon2_verify must not run once an earlier allocation has failed");
-    },
-    argon2_encodedlen() {
-      return 128;
-    },
-  };
+describe("concurrency cap (risk R-VPS4)", () => {
+  it("runs at most 4 hashes at once; the 5th waits for a free slot", async () => {
+    expect(MAX_CONCURRENT_HASHES).toBe(4);
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend);
+    const results = Array.from({ length: 5 }, (_, i) => hasher.hash(`password-${i}`));
+    await tick();
+    expect(gated.started()).toBe(4);
 
-  return { ex, freed, heap: () => new Uint8Array(buffer) };
-}
+    gated.releaseOne();
+    await tick();
+    expect(gated.started()).toBe(4); // three still running + the 5th, which just started
 
-describe("argon2 buffer cleanup on allocation failure", () => {
-  it("wipes and frees the password buffer when a later allocation fails during hash()", () => {
-    // 1st malloc call copies in the password (succeeds); 2nd copies in the salt (fails).
-    const { ex, freed, heap } = makeFakeExports({ failMallocOnCall: 2 });
-    const argon2 = buildArgon2(ex);
-    const password = "correct horse battery";
-    const passwordBytes = new TextEncoder().encode(password.normalize("NFC"));
-
-    expect(() => argon2.hash(password, new Uint8Array(ARGON2_SALT_BYTES))).toThrow("argon2: out of memory");
-
-    // The password pointer (the first, and only successful, allocation) must have
-    // been freed, and its bytes zeroed before that free — not leaked in the heap.
-    expect(freed).toEqual([8]);
-    expect(heap().subarray(8, 8 + passwordBytes.length)).toEqual(new Uint8Array(passwordBytes.length));
+    for (let i = 0; i < 4; i++) {
+      gated.releaseOne();
+      await tick();
+    }
+    await Promise.all(results);
+    expect(gated.peak()).toBe(4);
   });
 
-  it("wipes and frees the password buffer when a later allocation fails during verify()", () => {
-    // 1st malloc call copies in the password (succeeds); 2nd copies in the encoded PHC (fails).
-    const { ex, freed, heap } = makeFakeExports({ failMallocOnCall: 2 });
-    const argon2 = buildArgon2(ex);
-    const password = "whatever1";
-    const passwordBytes = new TextEncoder().encode(password.normalize("NFC"));
+  it("counts verifications against the same cap as hashes", async () => {
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend);
+    const work = [
+      hasher.hash("a-password"),
+      hasher.verify("b-password", "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
+      hasher.hash("c-password"),
+      hasher.verify("d-password", "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
+      hasher.verify("e-password", "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
+    ];
+    await tick();
+    expect(gated.started()).toBe(4);
+    while (gated.started() > 0) {
+      gated.releaseOne();
+      await tick();
+    }
+    await Promise.all(work);
+    expect(gated.peak()).toBe(4);
+  });
 
-    expect(() => argon2.verify(password, "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA")).toThrow(
-      "argon2: out of memory",
+  it("hands a freed slot to the waiters in arrival order (FIFO)", async () => {
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend, 1);
+    const finished: string[] = [];
+    const work = ["first", "second", "third"].map((name) => hasher.hash(name).then(() => finished.push(name)));
+    await tick();
+    expect(gated.startedWith()).toEqual(["first"]); // two callers are waiting at the same time
+    gated.releaseOne();
+    await tick();
+    expect(gated.startedWith()).toEqual(["first", "second"]);
+    gated.releaseOne();
+    await tick();
+    expect(gated.startedWith()).toEqual(["first", "second", "third"]);
+    gated.releaseOne();
+    await Promise.all(work);
+    expect(finished).toEqual(["first", "second", "third"]);
+  });
+
+  it("refuses a new caller with HasherBusyError once 32 are waiting behind the 4 running; verify too", async () => {
+    expect(MAX_QUEUED_HASHES).toBe(32);
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend);
+    const accepted = Array.from({ length: MAX_CONCURRENT_HASHES + MAX_QUEUED_HASHES }, (_, i) => hasher.hash(`password-${i}`));
+    await tick();
+    expect(gated.started()).toBe(4);
+    await expect(hasher.hash("one-too-many")).rejects.toBeInstanceOf(HasherBusyError);
+    // A full queue is not a wrong password: verify must not answer false.
+    await expect(hasher.verify("one-too-many", "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA")).rejects.toBeInstanceOf(
+      HasherBusyError,
     );
 
-    expect(freed).toEqual([8]);
-    expect(heap().subarray(8, 8 + passwordBytes.length)).toEqual(new Uint8Array(passwordBytes.length));
+    gated.releaseOne(); // one finishes, a waiter takes its slot: one place in the queue is free again
+    await tick();
+    const next = hasher.hash("fits-again");
+    await expect(hasher.hash("full-again")).rejects.toBeInstanceOf(HasherBusyError);
+    while (gated.started() > 0) {
+      gated.releaseOne();
+      await tick();
+    }
+    await Promise.all([...accepted, next]);
+    expect(gated.peak()).toBe(4);
   });
 
-  it("propagates the error without freeing anything when the very first allocation fails", () => {
-    // 1st malloc call (the password buffer itself) fails immediately.
-    const { ex, freed } = makeFakeExports({ failMallocOnCall: 1 });
-    const argon2 = buildArgon2(ex);
-
-    expect(() => argon2.hash("correct horse battery")).toThrow("argon2: out of memory");
-    expect(freed).toEqual([]);
+  it("frees the slot when an operation fails", async () => {
+    const slots = new Semaphore(1);
+    await expect(slots.run(async () => {
+      throw new Error("backend failed");
+    })).rejects.toThrow("backend failed");
+    expect(await slots.run(async () => "next")).toBe("next");
+    expect(slots.running).toBe(0);
+    expect(slots.queued).toBe(0);
   });
 });

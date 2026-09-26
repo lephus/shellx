@@ -1,5 +1,5 @@
-// Static checks on the Inno Setup script. The script is compiled for real on Windows by the
-// "Installer compiles" CI job and by release-desktop.yml; these checks pin the spec values.
+// Static checks on the Inno Setup script. The script is compiled for real on Windows by
+// release-desktop.yml (there is no CI, decision V5); these checks pin the spec values.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

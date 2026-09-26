@@ -1,12 +1,35 @@
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
-import { env } from "cloudflare:workers";
-import { createApp, type AppDeps } from "../src/app";
-import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit";
+import { mkdtempSync, rmSync } from "node:fs";
+import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, expect } from "vitest";
+import { WebSocket } from "ws";
+import type { AppDeps } from "../src/app.js";
+import type { Argon2Backend } from "../src/auth/password.js";
+import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
+import type { Config } from "../src/config.js";
+import { Db } from "../src/db/db.js";
+import { migrate } from "../src/db/migrate.js";
+import { HubRegistry } from "../src/hub/registry.js";
+import type { HubSocket } from "../src/hub/user-hub.js";
+import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
-export const BASE = "http://relay.test";
+// ---- configuration used by every test relay ---------------------------------------------------
+
+export const TEST_CONFIG: Config = {
+  host: "127.0.0.1",
+  port: 0,
+  dbPath: "unused-in-tests.db",
+  minAgent: "1.0.0",
+  minMobile: "1.0.0",
+  latestAgentVersion: "1.0.0",
+  macUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg",
+  winUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe",
+  rateLimitsEnabled: false,
+};
 
 export const allowAll: RateLimiter = { limit: async () => true };
-export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll };
+export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
 export class CountingLimiter implements RateLimiter {
@@ -21,35 +44,175 @@ export class CountingLimiter implements RateLimiter {
   }
 }
 
-export type TestApp = ReturnType<typeof createApp>;
+// ---- per-test environment: a temp directory with a migrated SQLite DB and a hub registry -------
 
-export function makeApp(deps: AppDeps = {}): TestApp {
-  return createApp({ limiters: () => unlimited, ...deps });
+interface TestEnv {
+  dir: string;
+  db: Db;
+  hubs: HubRegistry;
+  registries: HubRegistry[];
+}
+
+let current: TestEnv | null = null;
+const cleanups: (() => unknown)[] = [];
+
+function testEnv(): TestEnv {
+  if (current === null) {
+    const dir = mkdtempSync(join(tmpdir(), "shellx-relay-test-"));
+    const db = Db.open(join(dir, "relay.db"));
+    migrate(db);
+    const hubs = new HubRegistry({ db });
+    current = { dir, db, hubs, registries: [hubs] };
+  }
+  return current;
+}
+
+/** This test's database (created, and migrated, on first use). */
+export function db(): Db {
+  return testEnv().db;
+}
+
+/** This test's hub registry, shared by every app of the test (like the Durable Object namespace). */
+export function hubs(): HubRegistry {
+  return testEnv().hubs;
+}
+
+/** This test's temporary directory (deleted after the test). */
+export function tempDir(): string {
+  return testEnv().dir;
+}
+
+/** A second registry over this test's database (e.g. with a frozen clock); drained after the test. */
+export function newHubRegistry(now?: () => number): HubRegistry {
+  const env = testEnv();
+  const registry = new HubRegistry({ db: env.db, now });
+  env.registries.push(registry);
+  return registry;
+}
+
+/** Runs `fn` after the current test, before its database is closed (last registered runs first). */
+export function onCleanup(fn: () => unknown): void {
+  cleanups.push(fn);
+}
+
+afterEach(async () => {
+  for (const fn of cleanups.splice(0).reverse()) await fn();
+  if (current === null) return;
+  const env = current;
+  current = null;
+  // Server-side close events of the sockets just terminated still update last_seen_at.
+  await Promise.race([
+    Promise.all(env.registries.map((registry) => registry.whenEmpty())),
+    new Promise((resolve) => setTimeout(resolve, 1000)),
+  ]);
+  env.db.close();
+  rmSync(env.dir, { recursive: true, force: true });
+});
+
+// ---- test relays --------------------------------------------------------------------------------
+
+/** A relay listening on a random 127.0.0.1 port; started in the background by `makeApp`. */
+export interface TestApp {
+  readonly ready: Promise<RunningRelay>;
+}
+
+/**
+ * Starts a real relay (HTTP server + WebSocket upgrade) for this test, over the test's database and
+ * hub registry, with rate limits off. `deps` overrides any dependency for this app only; `listen`
+ * overrides listen options other than the address.
+ */
+export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
+  const ready = startRelay(
+    { config: TEST_CONFIG, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { ...listen, host: "127.0.0.1", port: 0 },
+  );
+  onCleanup(async () => {
+    const relay = await ready;
+    relay.server.closeAllConnections();
+    await new Promise<void>((resolve) => relay.server.close(() => resolve()));
+  });
+  return { ready };
+}
+
+/** A buffered HTTP response (`json<T>()` is generic, like the Workers `Response` the tests were written for). */
+export class TestResponse {
+  constructor(
+    readonly status: number,
+    readonly headers: Headers,
+    private readonly body: Buffer,
+  ) {}
+
+  async text(): Promise<string> {
+    return this.body.toString("utf8");
+  }
+
+  async json<T = any>(): Promise<T> {
+    return JSON.parse(this.body.toString("utf8")) as T;
+  }
 }
 
 export interface CallOptions {
   body?: unknown;
   token?: string;
-  ip?: string;
+  /**
+   * Sent as X-Real-IP (default 203.0.113.7; the test client connects from 127.0.0.1, a trusted
+   * proxy address). `null` sends no X-Real-IP at all.
+   */
+  ip?: string | null;
   headers?: Record<string, string>;
-  /** Overrides individual bindings/vars for this request only. */
-  bindings?: Partial<typeof env>;
 }
 
-export async function call(app: TestApp, method: string, path: string, options: CallOptions = {}): Promise<Response> {
-  const headers = new Headers(options.headers);
-  if (options.body !== undefined) headers.set("Content-Type", "application/json");
-  if (options.token !== undefined) headers.set("Authorization", `Bearer ${options.token}`);
-  headers.set("CF-Connecting-IP", options.ip ?? "203.0.113.7");
-  const request = new Request(`${BASE}${path}`, {
-    method,
-    headers,
-    body: options.body === undefined ? undefined : typeof options.body === "string" ? options.body : JSON.stringify(options.body),
+/**
+ * One HTTP request to the relay with `node:http` (fetch() refuses headers like `Upgrade`). A JSON
+ * body gets `Content-Type: application/json` and a `Content-Length`; `chunks` sends a streamed
+ * (chunked) body without one.
+ */
+export async function call(app: TestApp, method: string, path: string, options: CallOptions = {}): Promise<TestResponse> {
+  const headers: Record<string, string> = { ...options.headers };
+  if (options.token !== undefined) headers.Authorization = `Bearer ${options.token}`;
+  if (options.ip !== null) headers["X-Real-IP"] = options.ip ?? "203.0.113.7";
+  let body: Buffer | undefined;
+  if (options.body !== undefined) {
+    body = Buffer.from(typeof options.body === "string" ? options.body : JSON.stringify(options.body), "utf8");
+    headers["Content-Type"] = "application/json";
+    headers["Content-Length"] = String(body.length);
+  }
+  return request(app, method, path, headers, body === undefined ? [] : [body]);
+}
+
+/** Like `call`, but the body is streamed in `chunks` with no Content-Length (chunked encoding). */
+export async function callStreamed(app: TestApp, method: string, path: string, chunks: Uint8Array[]): Promise<TestResponse> {
+  return request(app, method, path, { "Content-Type": "application/json", "X-Real-IP": "203.0.113.7" }, chunks, (req) => {
+    // The old Workers fixture asserted this on the Request object before sending it: prove this
+    // harness genuinely exercises the no-Content-Length (counted-as-it-streams) code path too,
+    // rather than accidentally taking the same fast path as a request with a known length.
+    expect(req.getHeader("content-length")).toBeUndefined();
   });
-  const ctx = createExecutionContext();
-  const response = await app.fetch(request, { ...env, ...options.bindings }, ctx);
-  await waitOnExecutionContext(ctx);
-  return response;
+}
+
+async function request(
+  app: TestApp, method: string, path: string, headers: Record<string, string>, chunks: Uint8Array[],
+  onRequest?: (req: http.ClientRequest) => void,
+): Promise<TestResponse> {
+  const { port } = await app.ready;
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port, method, path, headers, agent: false }, (res) => {
+      const received: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => received.push(chunk));
+      res.on("end", () => {
+        const responseHeaders = new Headers();
+        for (const [name, value] of Object.entries(res.headers)) {
+          if (value !== undefined) responseHeaders.set(name, Array.isArray(value) ? value.join(", ") : value);
+        }
+        resolve(new TestResponse(res.statusCode ?? 0, responseHeaders, Buffer.concat(received)));
+      });
+      res.on("error", reject);
+    });
+    onRequest?.(req);
+    req.on("error", reject);
+    for (const chunk of chunks) req.write(chunk);
+    req.end();
+  });
 }
 
 export const PASSWORD = "correct horse battery";
@@ -136,19 +299,17 @@ export async function pair(
   agentToken: string,
   mobileId: string,
   pairingId: string = newPairingId(),
-): Promise<Response> {
+): Promise<TestResponse> {
   return call(app, "POST", "/v1/pairings", { token: agentToken, body: { mobile_id: mobileId, pairing_id: pairingId } });
 }
 
-/** The `pairing_id` of the D1 row for (agent, mobile), or null when there is no row. */
+/** The `pairing_id` of the row for (agent, mobile), or null when there is no row. */
 export async function pairingIdOf(agentId: string, mobileId: string): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT pairing_id FROM pairings WHERE agent_id = ? AND mobile_id = ?")
-    .bind(agentId, mobileId)
-    .first<{ pairing_id: string }>();
-  return row?.pairing_id ?? null;
+  return db().get<{ pairing_id: string }>("SELECT pairing_id FROM pairings WHERE agent_id = ? AND mobile_id = ?", agentId, mobileId)
+    ?.pairing_id ?? null;
 }
 
-export async function errorCode(res: Response): Promise<string> {
+export async function errorCode(res: TestResponse): Promise<string> {
   const body = await res.json<{ error: { code: string; message: string } }>();
   return body.error.code;
 }
@@ -158,23 +319,23 @@ export interface CloseInfo {
   reason: string;
 }
 
-/** Client end of a relay WebSocket with an awaitable message queue. */
+/** Client end of a relay WebSocket (the `ws` library) with an awaitable message queue. */
 export class TestSocket {
   private readonly queue: (Uint8Array | string)[] = [];
   private notify: (() => void) | null = null;
   readonly closed: Promise<CloseInfo>;
 
   constructor(readonly ws: WebSocket) {
-    // With current compatibility dates the standard default is "blob"; frames are easier as bytes.
-    ws.binaryType = "arraybuffer";
-    ws.accept();
-    ws.addEventListener("message", (event) => {
-      this.queue.push(typeof event.data === "string" ? event.data : new Uint8Array(event.data as ArrayBuffer));
+    ws.on("message", (data: Buffer, isBinary: boolean) => {
+      this.queue.push(isBinary ? new Uint8Array(data) : data.toString("utf8"));
       this.notify?.();
     });
+    ws.on("error", () => {
+      // surfaced through `closed` (ws always emits "close" after "error")
+    });
     this.closed = new Promise((resolve) => {
-      ws.addEventListener("close", (event) => {
-        resolve({ code: event.code, reason: event.reason });
+      ws.on("close", (code: number, reason: Buffer) => {
+        resolve({ code, reason: reason.toString("utf8") });
         this.notify?.();
       });
     });
@@ -218,10 +379,43 @@ export class TestSocket {
   }
 }
 
-export async function connect(app: TestApp, token: string | undefined): Promise<TestSocket> {
-  const res = await call(app, "GET", "/v1/ws", { token, headers: { Upgrade: "websocket" } });
-  if (res.status !== 101 || res.webSocket === null) throw new Error(`upgrade failed: ${res.status}`);
-  return new TestSocket(res.webSocket);
+function openSocket(relay: RunningRelay, headers: Record<string, string>): WebSocket {
+  const ws = new WebSocket(`ws://127.0.0.1:${relay.port}/v1/ws`, { headers });
+  onCleanup(() => ws.terminate());
+  return ws;
+}
+
+/** Opens a real WebSocket to /v1/ws with `token`; throws `upgrade failed: <status>` if refused. */
+export async function connect(app: TestApp, token: string | undefined, headers: Record<string, string> = {}): Promise<TestSocket> {
+  const relay = await app.ready;
+  const ws = openSocket(relay, { ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }), ...headers });
+  const socket = new TestSocket(ws); // listens before "open": the hub may send PRESENCE right away
+  await new Promise<void>((resolve, reject) => {
+    ws.once("open", () => resolve());
+    ws.once("unexpected-response", (_req, res) => reject(new Error(`upgrade failed: ${res.statusCode}`)));
+    ws.once("error", reject);
+  });
+  return socket;
+}
+
+/** The HTTP status a refused WebSocket upgrade got (101 means it was accepted, and is closed again). */
+export async function upgradeStatus(app: TestApp, token: string | undefined, headers: Record<string, string> = {}): Promise<number> {
+  const relay = await app.ready;
+  const ws = openSocket(relay, { ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }), ...headers });
+  return new Promise((resolve) => {
+    ws.once("open", () => {
+      ws.terminate();
+      resolve(101);
+    });
+    ws.once("unexpected-response", (_req, res) => {
+      resolve(res.statusCode ?? 0);
+      res.resume();
+      ws.terminate();
+    });
+    ws.on("error", () => {
+      // reported through the status above
+    });
+  });
 }
 
 export function hex(bytes: Uint8Array): string {
@@ -235,5 +429,67 @@ export async function waitFor<T>(probe: () => Promise<T | null | undefined>, tim
     if (value !== null && value !== undefined) return value;
     if (Date.now() > deadline) throw new Error("condition not met in time");
     await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+/**
+ * An argon2 backend whose operations finish only when the test says so (in start order), recording
+ * how many ran at once and which passwords started, in order.
+ */
+export function gatedBackend() {
+  const gates: (() => void)[] = [];
+  const startedWith: string[] = [];
+  let running = 0;
+  let peak = 0;
+  const run = async <T>(password: Uint8Array, value: T): Promise<T> => {
+    running++;
+    peak = Math.max(peak, running);
+    startedWith.push(Buffer.from(password).toString("utf8"));
+    await new Promise<void>((resolve) => gates.push(resolve));
+    running--;
+    return value;
+  };
+  const backend: Argon2Backend = {
+    hash: (password) => run(password, "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
+    verify: (_phc, password) => run(password, true),
+  };
+  return {
+    backend,
+    /** Operations running right now (started and not yet released). */
+    started: () => gates.length,
+    startedWith: () => [...startedWith],
+    peak: () => peak,
+    releaseOne: () => gates.shift()?.(),
+  };
+}
+
+/** In-memory stand-in for a `ws` socket: records what the hub sends and how it closes it. */
+export class FakeSocket implements HubSocket {
+  readyState = 1;
+  /** Bytes queued but not yet written to the network (a slow receiver has a lot); set by tests. */
+  bufferedAmount = 0;
+  readonly sent: (Uint8Array | string)[] = [];
+  closedWith: { code: number; reason: string } | null = null;
+  terminated = false;
+
+  send(data: Uint8Array | string): void {
+    if (this.readyState !== 1) throw new Error("socket is not open");
+    this.sent.push(data);
+  }
+
+  close(code: number, reason: string): void {
+    if (this.readyState !== 1) return;
+    this.closedWith = { code, reason };
+    this.readyState = 2;
+  }
+
+  terminate(): void {
+    this.terminated = true;
+    this.readyState = 3;
+  }
+
+  /** Hex of every binary frame received so far, then forgets them. */
+  take(): string[] {
+    return this.sent.splice(0).map((m) => (typeof m === "string" ? `text:${m}` : hex(m)));
   }
 }

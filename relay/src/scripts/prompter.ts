@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
-import { createLinePrompter, type AskOptions, type Prompter } from "./line-prompter";
+import { createLinePrompter, type AskOptions, type Prompter } from "./line-prompter.js";
 
 /**
  * Create a prompter for TTY (interactive) input.

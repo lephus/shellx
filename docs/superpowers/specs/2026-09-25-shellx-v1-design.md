@@ -2,13 +2,14 @@
 
 - **Ngày:** 2026-09-25
 - **Trạng thái:** Đã chốt qua brainstorming; chuyển sang lập kế hoạch triển khai
-- **Phạm vi:** Desktop agent (macOS/Windows), mobile app (iOS/Android), relay trên Cloudflare, vị trí landing page trong kiến trúc
+- **Phạm vi:** Desktop agent (macOS/Windows), mobile app (iOS/Android), relay trên VPS riêng, vị trí landing page trong kiến trúc
+- **Sửa đổi 2026-09-26/27:** hạ tầng chuyển từ Cloudflare sang VPS riêng theo `2026-09-26-shellx-vps-infra-design.md`. Các mục D7, D8, §1, §4, §5.2, §6.1, §6.2, §10, §11, §13, §14 và §15 đã được sửa theo tài liệu đó; khi hai tài liệu khác nhau về hạ tầng, tài liệu VPS là chuẩn.
 
 ---
 
 ## 1. Mục tiêu
 
-ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS/Windows) từ điện thoại, ở bất kỳ đâu có Internet, mà không cần mang laptop theo. Máy tính chạy một agent nền ở tray; điện thoại mở các phiên terminal trên máy đó thông qua một relay trên Cloudflare, với kênh mã hóa đầu cuối mà relay không đọc được.
+ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS/Windows) từ điện thoại, ở bất kỳ đâu có Internet, mà không cần mang laptop theo. Máy tính chạy một agent nền ở tray; điện thoại mở các phiên terminal trên máy đó thông qua một relay chạy trên VPS riêng, với kênh mã hóa đầu cuối mà relay không đọc được.
 
 **Đối tượng:** sản phẩm phát hành công khai, ai cũng đăng ký tài khoản được.
 
@@ -32,8 +33,8 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 | D4 | Tin cậy thiết bị | Đăng nhập **và** quét QR một lần cho mỗi cặp (điện thoại, máy). Một điện thoại điều khiển được nhiều máy; một máy ghép được với nhiều điện thoại |
 | D5 | Tính năng v1.0 | Nhiều phiên dạng tab; thanh phím phụ; copy/paste, chỉnh cỡ chữ, xoay ngang; giữ máy không ngủ |
 | D6 | Công nghệ | Flutter cho desktop và mobile; các package Dart thuần dùng chung cho giao thức và mã hóa; relay viết bằng TypeScript |
-| D7 | Hạ tầng | Cloudflare (Workers, Durable Objects, D1, R2, Pages) thay cho VPS. Tên miền `shellx.pro` |
-| D8 | Landing page | Astro, triển khai trên Cloudflare Pages. Nội dung marketing làm ở spec riêng |
+| D7 | Hạ tầng | VPS riêng của người dùng (Docker sau `nginx-proxy` + letsencrypt-companion): relay Node.js + SQLite, trang web và nơi tải bản cài, tất cả trong thư mục `~/phu/shellx`. Tên miền `shellx.pro`. Sửa 2026-09-26 (trước đây: Cloudflare), xem `2026-09-26-shellx-vps-infra-design.md` |
+| D8 | Landing page | Astro, xuất trang tĩnh, phục vụ bằng nginx trong container `web` trên VPS. Nội dung marketing làm ở spec riêng |
 | D9 | Ngôn ngữ giao diện | Tiếng Việt và tiếng Anh ngay từ v1.0 |
 
 ---
@@ -66,11 +67,12 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 
 ```
                          ┌──────────────────────────────────────────────┐
-                         │  Cloudflare                                  │
-                         │  shellx.pro           → Landing page (Astro) │
-                         │  download.shellx.pro  → R2: bản cài desktop  │
-                         │  relay.shellx.pro     → Worker + Durable     │
-                         │                         Object + D1          │
+                         │  VPS (nginx-proxy, HTTPS Let's Encrypt)      │
+                         │  shellx.pro           → web: Astro (nginx)   │
+                         │  download.shellx.pro  → web: bản cài desktop │
+                         │  relay.shellx.pro     → relay: Node.js, hub  │
+                         │                         trong tiến trình,    │
+                         │                         SQLite               │
                          └───────▲──────────────────────────▲───────────┘
                            WSS   │                          │  WSS
                     ┌────────────┴──┐                ┌──────┴─────────┐
@@ -82,14 +84,14 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 
 - Cả điện thoại và agent đều **chủ động kết nối ra** relay; không cần mở port ở router nhà người dùng.
 - Mỗi thiết bị giữ đúng **một** kết nối WebSocket tới relay.
-- Worker xác thực token rồi chuyển WebSocket vào **Durable Object `UserHub` của tài khoản** (mỗi tài khoản đúng một hub, `idFromName(user_id)`). Vì mọi thiết bị của một tài khoản nối vào cùng một hub, việc "chỉ chuyển gói tin trong cùng tài khoản" được đảm bảo bởi cấu trúc.
+- Relay xác thực token rồi chuyển WebSocket vào **`UserHub` của tài khoản** trong tiến trình relay (mỗi tài khoản đúng một hub, `registry.forUser(user_id)`). Vì mọi thiết bị của một tài khoản nối vào cùng một hub, việc "chỉ chuyển gói tin trong cùng tài khoản" được đảm bảo bởi cấu trúc.
 - Relay chỉ thấy khung có payload đã mã hóa; không biết nội dung terminal, kể cả số tab đang mở.
 
 ### 4.1 Thành phần
 
 | Thành phần | Trách nhiệm |
 |---|---|
-| **Relay** (`relay/`, TypeScript) | Đăng ký/đăng nhập, lưu thiết bị và ghép nối trong D1, theo dõi online/offline, chuyển tiếp khung giữa các thiết bị cùng tài khoản |
+| **Relay** (`relay/`, TypeScript, Node.js) | Đăng ký/đăng nhập, lưu thiết bị và ghép nối trong SQLite, theo dõi online/offline, chuyển tiếp khung giữa các thiết bị cùng tài khoản |
 | **`shellx_core`** (Dart thuần) | Khung relay, tin nhắn ứng dụng (CBOR), giao thức Noise, client REST, client WebSocket có tự kết nối lại |
 | **`shellx_agent`** (Dart thuần) | Quản lý phiên terminal, bộ đệm vòng, gom output, kiểm soát lưu lượng, bên nhận khi ghép nối, danh sách thiết bị tin cậy. Làm việc với PTY qua interface `Pty` |
 | **`shellx_client`** (Dart thuần) | Kết nối tới từng máy, trạng thái tab và gắn lại phiên, bên khởi tạo khi ghép nối |
@@ -103,10 +105,9 @@ Tách `shellx_agent` và `shellx_client` thành Dart thuần để chạy đư�
 
 | Tên miền | Dịch vụ |
 |---|---|
-| `shellx.pro` | Landing page (Cloudflare Pages) |
-| `relay.shellx.pro` | Worker production |
-| `relay-staging.shellx.pro` | Worker staging |
-| `download.shellx.pro` | R2 bucket công khai chứa bản cài desktop |
+| `shellx.pro` | Landing page (container `web` trên VPS); `www.shellx.pro` chuyển về đây |
+| `relay.shellx.pro` | Relay (container `relay` trên VPS). Không có môi trường staging |
+| `download.shellx.pro` | Bản cài desktop (container `web`, thư mục `downloads/` trên VPS) |
 
 ### 4.3 Cấu trúc repo
 
@@ -120,8 +121,9 @@ shellx/
   apps/
     desktop/
     mobile/
-  relay/                     # Worker (Hono) + Durable Object UserHub + D1 migrations (wrangler)
+  relay/                     # Node.js (Hono) + UserHub trong tiến trình + SQLite migrations
   web/                       # Astro
+  deploy/                    # docker-compose, cấu hình nginx, sao lưu, runbook VPS
   docs/
 ```
 
@@ -137,17 +139,17 @@ shellx/
 
 ### 5.2 Tài khoản
 
-- **Email:** cắt khoảng trắng, chuyển chữ thường, kiểm tra bằng biểu thức chính quy thực dụng (một phần của RFC 5322). Domain và mọi domain cha của nó không được nằm trong danh sách `disposable-email-domains`; danh sách được đóng gói vào Worker lúc build bằng script.
+- **Email:** cắt khoảng trắng, chuyển chữ thường, kiểm tra bằng biểu thức chính quy thực dụng (một phần của RFC 5322). Domain và mọi domain cha của nó không được nằm trong danh sách `disposable-email-domains`; danh sách được đóng gói vào relay lúc build bằng script.
 - **Mật khẩu:** 8–128 ký tự. Băm bằng **argon2id** (m = 19 456 KiB, t = 2, p = 1), lưu dạng chuỗi PHC.
 - **Đăng ký / đăng nhập** luôn kèm thông tin thiết bị `{kind, name, platform, public_key}`. Nếu khóa công khai đó đã có trong tài khoản thì dùng lại `device_id` cũ; nếu chưa thì tạo thiết bị mới. `name` là hostname (agent) hoặc tên model máy (mobile).
-- **Token thiết bị:** 32 byte ngẫu nhiên, mã hóa base64url, gửi qua header `Authorization: Bearer <token>`. D1 chỉ lưu SHA-256 của token. Token hết hạn khi `last_used_at` cũ hơn 90 ngày; `last_used_at` cập nhật tối đa một lần mỗi giờ.
-- **Giới hạn tần suất** (rate limiting binding của Workers, chu kỳ 60 giây): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP. Vượt giới hạn trả HTTP 429.
+- **Token thiết bị:** 32 byte ngẫu nhiên, mã hóa base64url, gửi qua header `Authorization: Bearer <token>`. Cơ sở dữ liệu chỉ lưu SHA-256 của token. Token hết hạn khi `last_used_at` cũ hơn 90 ngày; `last_used_at` cập nhật tối đa một lần mỗi giờ.
+- **Giới hạn tần suất** (bộ giới hạn cửa sổ trượt trong bộ nhớ của relay, cửa sổ 60 giây; IP lấy từ `X-Real-IP` của nginx-proxy): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP; nâng cấp WebSocket (`/v1/ws`) 60 lần/IP, tính mọi lần thử, trước khi kiểm tra token. Vượt giới hạn trả HTTP 429 (với nâng cấp WebSocket: từ chối nâng cấp bằng HTTP 429, client thử lại theo backoff).
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
-- **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong D1, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
+- **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong cơ sở dữ liệu, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị (một khóa chung cho điện thoại, vì lúc đăng nhập phải gửi khóa công khai trước khi biết `user_id`) và danh sách máy đã ghim (lưu theo `user_id`) được giữ lại, để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy danh sách máy đã ghim đó.
 - **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002.
 - **Agent nhận 4002 (hoặc bị từ chối 401 khi kết nối):** agent không phân biệt được "đổi mật khẩu" với "xóa tài khoản", nên luôn: xóa token, đóng mọi phiên, **giữ** khóa thiết bị và danh sách tin cậy, rồi hiện cửa sổ đăng nhập. Khi đăng nhập lại thành công, nếu `user_id` khác `user_id` đã lưu thì xóa danh sách tin cậy (đổi tài khoản hoặc tài khoản cũ đã bị xóa); cùng `user_id` thì giữ nguyên ghép nối.
-- **Hỗ trợ khẩn cấp:** script quản trị `relay/scripts/reset-password.ts` chạy qua `wrangler d1` để đặt lại mật khẩu thủ công.
+- **Hỗ trợ khẩn cấp:** script quản trị `relay/src/scripts/reset-password.ts` đặt lại mật khẩu thủ công, chạy trong container: `docker compose exec relay node dist/scripts/reset-password.js`.
 
 ### 5.3 Ghép nối bằng QR
 
@@ -188,7 +190,7 @@ Face ID / vân tay / mã máy qua `local_auth`. Mặc định bật. Yêu cầu 
 ### 6.1 WebSocket
 
 - URL: `wss://relay.shellx.pro/v1/ws`, header `Authorization: Bearer <token>`.
-- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, hub trả `pong` bằng `setWebSocketAutoResponse` (không đánh thức Durable Object). Không nhận `pong` trong 10 giây thì client coi như mất kết nối.
+- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, relay trả `pong` ngay trong handler nhận tin, không qua hàng đợi của hub. Không nhận `pong` trong 10 giây thì client coi như mất kết nối.
 - **Khung nhị phân** là khung relay (mục 6.2).
 
 ### 6.2 Khung relay
@@ -209,8 +211,9 @@ Byte 1 : type
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`.
 - Sự kiện: `{event: "pairing_removed", agent_id, mobile_id, pairing_id}`.
 - Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`.
-- Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
-- Khi một thiết bị kết nối, hub gửi cho nó PRESENCE của mọi thiết bị đang online trong tài khoản và báo thiết bị mới online cho các thiết bị còn lại. Khi ngắt, hub báo offline và ghi `last_seen_at` vào D1.
+- Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket, tính cả `ping`). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
+- Thiết bị nhận chậm: khi còn hơn 4 MiB chưa gửi được tới một socket, hub đóng socket đó với mã 1013 (`try again later`) và ngắt hẳn sau 1 giây nếu nó vẫn chưa đóng; client kết nối lại theo backoff như mọi mã đóng khác ngoài 4001/4002.
+- Khi một thiết bị kết nối, hub gửi cho nó PRESENCE của mọi thiết bị đang online trong tài khoản và báo thiết bị mới online cho các thiết bị còn lại. Khi ngắt, hub báo offline và ghi `last_seen_at` vào cơ sở dữ liệu.
 
 ### 6.3 Kênh mã hóa (payload của DATA)
 
@@ -385,7 +388,7 @@ Secure storage: khóa bí mật thiết bị, token, `device_id`, danh sách má
 
 ### 10.1 Công nghệ
 
-TypeScript, Hono, wrangler, D1, Durable Object dùng SQLite storage và WebSocket Hibernation API, rate limiting binding. argon2id chạy bằng module WASM **import tĩnh** (Workers không cho biên dịch WASM động lúc chạy). Cần gói Workers Paid.
+Node.js 22 + TypeScript, Hono trên `@hono/node-server`, WebSocket bằng `ws`, SQLite bằng `better-sqlite3` (WAL), argon2id bằng `@node-rs/argon2` (tối đa 4 lần băm cùng lúc), bộ giới hạn tần suất trong bộ nhớ. Một tiến trình, một container `relay` trên VPS (chi tiết: `2026-09-26-shellx-vps-infra-design.md` §4).
 
 ### 10.2 API
 
@@ -401,12 +404,14 @@ Mọi lỗi trả JSON `{error: {code, message}}`.
 | `GET /v1/devices` | token | — | `200 [{id, kind, name, platform, online, last_seen_at, paired_with_me}]` (không trả khóa công khai) |
 | `POST /v1/pairings` | token agent | `{mobile_id, pairing_id}` | `201` (bản ghi hiện có mang cùng id → vẫn `201`, idempotent); `400 bad_request` (`pairing_id` không phải UUIDv7 chữ thường), `404 device_not_found`; `410 pairing_removed` khi bia mộ mang id bằng hoặc mới hơn, hoặc bản ghi hiện có mang id mới hơn, hoặc timestamp của id vượt đồng hồ relay hơn 24 giờ (không tạo bản ghi). Bia mộ cũ hơn bị xóa. `500` khi hub lỗi (bản ghi có thể đã được ghi): client thử lại cùng id |
 | `DELETE /v1/pairings/:agent_id/:mobile_id[?pairing_id=]` | token của một trong hai bên | — | `204`. Có `pairing_id` (agent thu hồi): chỉ xóa nếu bản ghi mang đúng id, không thì không làm gì. Không có (điện thoại): xóa bản ghi hiện có. Khi xóa, hub gửi `pairing_removed` (kèm `pairing_id` của bản ghi) cho cả hai bên và lưu bia mộ cho agent; `400 bad_request` nếu `pairing_id` không phải UUIDv7 chữ thường. `500` khi hub lỗi hoặc bản ghi vẫn đổi sau 3 vòng đọc lại (bản ghi giữ nguyên): bên gọi phải thử lại, nhất là điện thoại |
-| `GET /v1/ws` | token | — | `101` → chuyển vào `UserHub` |
+| `GET /v1/ws` | token | — | `101` → chuyển vào `UserHub` của tài khoản |
 | `GET /v1/version` | — | — | `{min_agent, min_mobile, latest_agent: {version, mac_url, win_url}}` (lấy từ biến môi trường) |
 
 `device` = `{kind: "agent" | "mobile", name, platform: "macos" | "windows" | "ios" | "android", public_key}` với `public_key` là base64url 32 byte.
 
-### 10.3 D1
+### 10.3 Cơ sở dữ liệu (SQLite)
+
+`relay/migrations/0001_init.sql` (bên dưới) và `0002_hub_state.sql` (bảng bia mộ `pending_pairing_removed` của hub, có thêm `user_id`). Relay tự chạy migration khi khởi động, ghi vào `schema_migrations`.
 
 ```sql
 CREATE TABLE users (
@@ -445,23 +450,24 @@ CREATE TABLE pairings (
 );
 ```
 
-### 10.4 Durable Object `UserHub`
+### 10.4 `UserHub` trong tiến trình
 
-- Nhận WebSocket từ Worker kèm `device_id` và `kind` đã xác thực; `ctx.acceptWebSocket(ws)` và lưu `{device_id, kind}` bằng `serializeAttachment`.
+- `HubRegistry` giữ tối đa một hub cho mỗi tài khoản, tạo khi cần và bỏ khi không còn socket. Mọi thao tác của hub (socket vào/ra, khung đến, lời gọi từ route REST) đi qua một hàng đợi tuần tự.
+- Nhận WebSocket từ route `/v1/ws` kèm `device_id` và `kind` đã xác thực, lưu `{device_id, kind, conn_id, closing}` cho socket đó.
 - Thiết bị đã có kết nối mà kết nối lần nữa: đóng kết nối cũ với mã 4001.
 - Chuyển khung DATA, gửi PRESENCE, áp giới hạn khung (mục 6.2).
-- Phương thức RPC cho Worker: `online(): string[]`, `disconnect(deviceIds: string[], code: number)`, `notifyPairingRemoved(agentId, mobileId, pairingId)` (gửi EVENT và ghi bia mộ mang `pairingId`; mỗi cặp agent/mobile một bia mộ, giữ id mới nhất), `admitPairing(agentId, mobileId, pairingId)` (false nếu bia mộ mang id bằng hoặc mới hơn; ngược lại xóa bia mộ cũ hơn).
+- Phương thức cho các route REST (`registry.forUser(userId).<method>()`): `online(): string[]`, `disconnect(deviceIds: string[], code: number)`, `notifyPairingRemoved(agentId, mobileId, pairingId)` (gửi EVENT và ghi bia mộ mang `pairingId`; mỗi cặp agent/mobile một bia mộ, giữ id mới nhất), `admitPairing(agentId, mobileId, pairingId)` (false nếu bia mộ mang id bằng hoặc mới hơn; ngược lại xóa bia mộ cũ hơn).
 
 ### 10.5 Vận hành
 
-- Hai môi trường `staging` và `production` trong `relay/wrangler.jsonc`; migration bằng `wrangler d1 migrations`.
+- Một môi trường production trên VPS, triển khai bằng `.github/workflows/deploy.yml` khi push `main`; runbook ở `deploy/README.md`. Sao lưu SQLite hằng ngày, giữ 14 bản.
 - Log chỉ ghi siêu dữ liệu (thời điểm, `device_id`, mã lỗi, kích thước khung). **Không bao giờ ghi payload, token hay mật khẩu.**
 
 ---
 
 ## 11. Landing page (`web/`)
 
-- Astro, xuất trang tĩnh, triển khai trên Cloudflare Pages tại `shellx.pro`.
+- Astro, xuất trang tĩnh, phục vụ bằng nginx trong container `web` trên VPS tại `shellx.pro` (triển khai bằng `deploy.yml`).
 - v1.0 tối thiểu: trang chủ đơn giản có link tải (macOS, Windows, App Store, Google Play), `/privacy`, `/terms`, song ngữ Việt/Anh.
 - Nội dung và thiết kế marketing đầy đủ: spec riêng.
 
@@ -490,19 +496,19 @@ CREATE TABLE pairings (
 - **`shellx_core`:** Noise IK và IKpsk2 với bộ test vector chính thức; mã hóa/giải mã khung relay và tin nhắn CBOR; logic kết nối lại với đồng hồ giả lập.
 - **`shellx_agent`:** quản lý phiên với `Pty` giả; bộ đệm vòng, `seq`, gắn lại, reset, cửa sổ gửi; danh sách tin cậy; giới hạn 10 phiên; luồng ghép nối bên nhận.
 - **`shellx_client`:** trạng thái tab, gắn lại theo `last_seq`, xử lý `session.reset`, luồng ghép nối bên khởi tạo, lịch gửi `ack`.
-- **Relay:** Vitest với `@cloudflare/vitest-pool-workers` (workerd thật, có D1 và Durable Object): đăng ký/đăng nhập, kiểm tra email và domain tạm, token, đổi mật khẩu thu hồi token, **không chuyển khung giữa hai tài khoản**, PRESENCE, giới hạn khung, mã đóng 4001/4002/4003.
+- **Relay:** Vitest trên Node (mỗi test một cơ sở dữ liệu SQLite tạm, server thật trên cổng ngẫu nhiên, client `ws` thật; chạy cả trong bước build image): đăng ký/đăng nhập, kiểm tra email và domain tạm, token, đổi mật khẩu thu hồi token, **không chuyển khung giữa hai tài khoản**, PRESENCE, giới hạn khung, mã đóng 4001/4002/4003.
 - **Desktop:** test tích hợp PTY thật (`flutter_pty`) chạy trên máy macOS và Windows trong CI; test widget cho các cửa sổ.
 - **Mobile:** test widget cho thanh phím phụ (logic phím dính), quản lý tab.
-- **End-to-end (không giao diện):** `shellx_agent` (với adapter `Pty` dùng `Process` của `dart:io`) và `shellx_client` chạy với relay cục bộ `wrangler dev`: đăng ký → ghép nối → mở phiên → `echo hello` → kiểm tra output → ngắt kết nối → gắn lại → kiểm tra output bù. Các ca bảo mật: khóa lạ bị từ chối, mã QR hết hạn, mã QR sai.
+- **End-to-end (không giao diện):** `shellx_agent` (với adapter `Pty` dùng `Process` của `dart:io`) và `shellx_client` chạy với relay cục bộ `npm run dev` (Node.js, `127.0.0.1:8787`): đăng ký → ghép nối → mở phiên → `echo hello` → kiểm tra output → ngắt kết nối → gắn lại → kiểm tra output bù. Các ca bảo mật: khóa lạ bị từ chối, mã QR hết hạn, mã QR sai.
 
 ---
 
 ## 14. Phát hành và CI
 
-- **CI (GitHub Actions):** test Dart packages, test relay, test tích hợp desktop trên `macos-latest` và `windows-latest`, test widget mobile, test end-to-end.
+- **Không có CI** (quyết định V5 ngày 2026-09-26): test Dart, desktop, mobile và end-to-end chạy ở máy dev trước khi push. GitHub Actions chỉ còn CD: `deploy.yml` (push `main`: build image, chạy test relay, deploy lên VPS) và `release-desktop.yml` (tag `desktop-v*`).
 - **macOS:** `.dmg`, ký Developer ID, notarize bằng `notarytool`.
 - **Windows:** bộ cài Inno Setup `.exe`, ký code (chứng chỉ OV hoặc Azure Trusted Signing).
-- Bản cài desktop tải lên R2 theo đường dẫn `desktop/<version>/…`, phục vụ qua `download.shellx.pro`.
+- Bản cài desktop được `rsync` lên VPS vào `downloads/desktop/<version>/…`, phục vụ qua `download.shellx.pro`.
 - **Mobile:** App Store và Google Play, trỏ tới `https://shellx.pro/privacy`.
 - **Cập nhật:** agent gọi `/v1/version` khi khởi động và mỗi 24 giờ; có bản mới thì hiện thông báo kèm link tải. Mobile chặn sử dụng khi phiên bản thấp hơn `min_mobile`.
 
@@ -512,8 +518,7 @@ CREATE TABLE pairings (
 
 | # | Rủi ro | Cách xử lý |
 |---|---|---|
-| R1 | argon2id trên Workers: module WASM phải import tĩnh và vừa giới hạn CPU/bộ nhớ | Làm spike đầu tiên khi dựng relay; đo thời gian băm với tham số ở mục 5.2 |
-| R2 | Chi phí Cloudflare tính theo số tin nhắn WebSocket vào Durable Object | Kiểm bảng giá hiện hành và ước tính chi phí mỗi người dùng trước khi mở đăng ký công khai; thiết kế đã gom tin 16 ms và giới hạn cửa sổ gửi |
+| R1, R2 | (Đã thay) Rủi ro của Cloudflare Workers | Thay bằng R-VPS1…R-VPS6 trong `2026-09-26-shellx-vps-infra-design.md` §10: một VPS là điểm lỗi duy nhất, không có lớp chống DDoS, không có CI, RAM của argon2, deploy làm rớt WebSocket, chứng chỉ khi DNS chưa đồng bộ |
 | R3 | `flutter_pty` trên Windows (ConPTY) | Test tích hợp trên Windows trong CI ngay từ đầu, với `pwsh`, `powershell` và một ứng dụng toàn màn hình |
 | R4 | Noise tự cài đặt trên package `cryptography` | Bắt buộc vượt test vector chính thức trước khi dùng; review riêng phần này |
 | R5 | App Flutter tốn RAM khi chỉ nằm ở tray | Đo trên macOS và Windows; chấp nhận cho v1.0 |

@@ -1,11 +1,10 @@
-import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { hubFor } from "../src/hub/user-hub";
-import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
+import type { HubRegistry } from "../src/hub/registry.js";
+import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
-  call, connect, errorCode, hex, loginDevice, makeApp, newPairingId, pair, pairingIdOf, registerAccount, type TestApp,
-  uuidv7,
-} from "./helpers";
+  call, connect, db, errorCode, hex, hubs, loginDevice, makeApp, newPairingId, pair, pairingIdOf, registerAccount,
+  type TestApp, uuidv7,
+} from "./helpers.js";
 
 interface DeviceJson {
   id: string;
@@ -24,9 +23,12 @@ async function listDevices(app: TestApp, token: string): Promise<DeviceJson[]> {
 }
 
 async function countPairings(agentId: string): Promise<number> {
-  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?")
-    .bind(agentId).first<{ n: number }>();
-  return row?.n ?? 0;
+  return db().get<{ n: number }>("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?", agentId)?.n ?? 0;
+}
+
+/** A registry whose `forUser(...)` returns `hub` for every account (the hub methods a test fakes). */
+function fakeHubs(hub: Record<string, unknown>): HubRegistry {
+  return { forUser: () => hub } as unknown as HubRegistry;
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
@@ -59,7 +61,7 @@ describe("GET /v1/devices", () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    await env.DB.prepare("DELETE FROM tokens WHERE device_id = ?").bind(mobile.deviceId).run();
+    db().run("DELETE FROM tokens WHERE device_id = ?", mobile.deviceId);
     expect((await listDevices(app, account.agent.token)).map((d) => d.id)).toEqual([account.agent.deviceId]);
   });
 
@@ -283,20 +285,18 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     // First answer: "fine to record"; second: "this pairing has been removed meanwhile" (a phone
     // DELETE that read the fresh row and wrote its tombstone between the upsert and the re-check).
     const answers = [true, false];
-    const racingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const racing = makeApp({
+      hubs: fakeHubs({
         admitPairing: async (...args: unknown[]) => {
           seen.push({ args, row: await pairingIdOf(account.agent.deviceId, mobile.deviceId) });
           return answers.shift();
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
-    const res = await call(app, "POST", "/v1/pairings", {
+    const res = await call(racing, "POST", "/v1/pairings", {
       token: account.agent.token,
       body: { mobile_id: mobile.deviceId, pairing_id: pairingId },
-      bindings: { USER_HUB: racingHub },
     });
     expect(res.status).toBe(410);
     expect(await errorCode(res)).toBe("pairing_removed");
@@ -310,14 +310,9 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     const [x, y] = [newPairingId(), newPairingId()];
-    const refusingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({ admitPairing: async () => false }),
-    } as unknown as typeof env.USER_HUB;
+    const refusing = makeApp({ hubs: fakeHubs({ admitPairing: async () => false }) });
     const post = (id: string) =>
-      call(app, "POST", "/v1/pairings", {
-        token: account.agent.token, body: { mobile_id: mobile.deviceId, pairing_id: id }, bindings: { USER_HUB: refusingHub },
-      });
+      call(refusing, "POST", "/v1/pairings", { token: account.agent.token, body: { mobile_id: mobile.deviceId, pairing_id: id } });
 
     await pair(app, account.agent.token, mobile.deviceId, x);
     expect((await post(y)).status).toBe(410);
@@ -330,22 +325,20 @@ describe("POST /v1/pairings: pairing_id (agent-generated, one per pairing)", () 
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const throwingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const throwing = makeApp({
+      hubs: fakeHubs({
         admitPairing: async () => {
           throw new Error("hub is down");
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
     const lines: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       lines.push(args.map(String).join(" "));
     });
-    const res = await call(app, "POST", "/v1/pairings", {
+    const res = await call(throwing, "POST", "/v1/pairings", {
       token: account.agent.token,
       body: { mobile_id: mobile.deviceId, pairing_id: newPairingId() },
-      bindings: { USER_HUB: throwingHub },
     });
     spy.mockRestore();
     expect(res.status).toBe(500);
@@ -364,21 +357,19 @@ describe("POST /v1/pairings: hub failure after the row was written", () => {
     const mobile = await loginDevice(app, account, "mobile");
     const pairingId = newPairingId();
     let calls = 0;
-    const failingRecheck = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const failingRecheck = makeApp({
+      hubs: fakeHubs({
         admitPairing: async () => {
           calls++;
           if (calls === 2) throw new Error("hub is down");
           return true;
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
-    const failed = await call(app, "POST", "/v1/pairings", {
+    const failed = await call(failingRecheck, "POST", "/v1/pairings", {
       token: account.agent.token,
       body: { mobile_id: mobile.deviceId, pairing_id: pairingId },
-      bindings: { USER_HUB: failingRecheck },
     });
     expect(failed.status).toBe(500);
     expect(await errorCode(failed)).toBe("internal_error");
@@ -396,20 +387,18 @@ describe("POST /v1/pairings: hub failure after the row was written", () => {
     const mobile = await loginDevice(app, account, "mobile");
     const pairingId = newPairingId();
     let calls = 0;
-    const failingRecheck = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const failingRecheck = makeApp({
+      hubs: fakeHubs({
         admitPairing: async () => {
           calls++;
           if (calls === 2) throw new Error("hub is down");
           return true;
         },
       }),
-    } as unknown as typeof env.USER_HUB;
-    await call(app, "POST", "/v1/pairings", {
+    });
+    await call(failingRecheck, "POST", "/v1/pairings", {
       token: account.agent.token,
       body: { mobile_id: mobile.deviceId, pairing_id: pairingId },
-      bindings: { USER_HUB: failingRecheck },
     });
     expect((await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token })).status).toBe(204);
 
@@ -577,19 +566,16 @@ describe("DELETE /v1/pairings/:agent_id/:mobile_id", () => {
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
 
     let calls = 0;
-    const failingOnce = {
-      idFromName: (name: string) => name,
-      get: () => ({
-        online: async () => [],
-        disconnect: async () => {},
+    const failingOnce = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async () => {
           calls++;
           if (calls === 1) throw new Error("boom");
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
-    const failed = await call(app, "DELETE", path, { token: mobile.token, bindings: { USER_HUB: failingOnce } });
+    const failed = await call(failingOnce, "DELETE", path, { token: mobile.token });
     expect(failed.status).toBe(500);
     expect(await errorCode(failed)).toBe("internal_error");
     // The failed hub call must not have deleted the row.
@@ -714,20 +700,18 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     const notified: unknown[][] = [];
-    const racingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const racing = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async (...args: unknown[]) => {
           notified.push(args);
           // A re-pair's POST lands between the DELETE's read and its delete.
-          await env.DB.prepare("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?")
-            .bind(y, account.agent.deviceId, mobile.deviceId).run();
+          db().run("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?", y, account.agent.deviceId, mobile.deviceId);
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}?pairing_id=${x}`;
-    const res = await call(app, "DELETE", path, { token: account.agent.token, bindings: { USER_HUB: racingHub } });
+    const res = await call(racing, "DELETE", path, { token: account.agent.token });
     expect(res.status).toBe(204);
     expect(notified).toEqual([[account.agent.deviceId, mobile.deviceId, x]]);
     expect(await pairingIdOf(account.agent.deviceId, mobile.deviceId)).toBe(y);
@@ -740,21 +724,19 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const [x, y] = [newPairingId(), newPairingId()];
     await pair(app, account.agent.token, mobile.deviceId, x);
     const notified: unknown[][] = [];
-    const racingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const racing = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async (...args: unknown[]) => {
           notified.push(args);
           if (notified.length === 1) {
-            await env.DB.prepare("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?")
-              .bind(y, account.agent.deviceId, mobile.deviceId).run();
+            db().run("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?", y, account.agent.deviceId, mobile.deviceId);
           }
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    const res = await call(app, "DELETE", path, { token: mobile.token, bindings: { USER_HUB: racingHub } });
+    const res = await call(racing, "DELETE", path, { token: mobile.token });
     expect(res.status).toBe(204);
     expect(notified).toEqual([
       [account.agent.deviceId, mobile.deviceId, x],
@@ -769,19 +751,17 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
     const mobile = await loginDevice(app, account, "mobile");
     await pair(app, account.agent.token, mobile.deviceId);
     let calls = 0;
-    const churningHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const churning = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async () => {
           calls++;
-          await env.DB.prepare("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?")
-            .bind(newPairingId(), account.agent.deviceId, mobile.deviceId).run();
+          db().run("UPDATE pairings SET pairing_id = ? WHERE agent_id = ? AND mobile_id = ?", newPairingId(), account.agent.deviceId, mobile.deviceId);
         },
       }),
-    } as unknown as typeof env.USER_HUB;
+    });
 
     const path = `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`;
-    const res = await call(app, "DELETE", path, { token: mobile.token, bindings: { USER_HUB: churningHub } });
+    const res = await call(churning, "DELETE", path, { token: mobile.token });
     expect(res.status).toBe(500);
     expect(await errorCode(res)).toBe("internal_error");
     expect(calls).toBe(3);
@@ -789,7 +769,7 @@ describe("DELETE /v1/pairings: ?pairing_id= (the agent's revoke) and the phone's
   });
 });
 
-describe("UserHub RPC", () => {
+describe("UserHub calls from routes", () => {
   it("online() lists connected devices and disconnect() closes them with the given code", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
@@ -798,7 +778,7 @@ describe("UserHub RPC", () => {
     const m = await connect(app, mobile.token);
     await m.nextBinary();
     await a.nextBinary();
-    const hub = hubFor(env, account.agent.userId);
+    const hub = hubs().forUser(account.agent.userId);
     expect((await hub.online()).sort()).toEqual([account.agent.deviceId, mobile.deviceId].sort());
 
     await hub.disconnect([mobile.deviceId], 4002);
@@ -815,7 +795,7 @@ describe("UserHub RPC", () => {
     const mobile = await loginDevice(app, account, "mobile");
     const other = await loginDevice(app, account, "mobile");
     const [w, x, y, z] = [newPairingId(), newPairingId(), newPairingId(), newPairingId()];
-    const hub = hubFor(env, account.agent.userId);
+    const hub = hubs().forUser(account.agent.userId);
     await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, x);
     await hub.notifyPairingRemoved(account.agent.deviceId, other.deviceId, z);
     await hub.notifyPairingRemoved(account.agent.deviceId, mobile.deviceId, y); // newer: overwrites x
@@ -834,7 +814,7 @@ describe("UserHub RPC", () => {
     const agentId = crypto.randomUUID();
     const mobileId = crypto.randomUUID();
     const [w, x, y] = [newPairingId(), newPairingId(), newPairingId()];
-    const hub = hubFor(env, crypto.randomUUID());
+    const hub = hubs().forUser(crypto.randomUUID());
     expect(await hub.admitPairing(agentId, mobileId, x)).toBe(true); // no tombstone at all
     await hub.notifyPairingRemoved(agentId, mobileId, x);
     expect(await hub.admitPairing(agentId, mobileId, x)).toBe(false); // the removed pairing itself

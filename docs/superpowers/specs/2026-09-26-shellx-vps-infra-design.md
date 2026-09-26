@@ -98,7 +98,7 @@ Toàn bộ quy tắc trong spec v1 §5, §6, §10.2 vẫn là chuẩn.
 | Storage SQL của DO (tombstone `pending_pairing_removed`) | Bảng mới trong migration `0002_hub_state.sql`: cùng các cột như bảng của DO, thêm `user_id` và index `(user_id, agent_id)`. Tombstone giữ nguyên ngữ nghĩa: phát lại mỗi khi agent kết nối, cho tới khi có POST mới hơn, agent đăng xuất hoặc tài khoản bị xóa. |
 | `setWebSocketAutoResponse("ping","pong")` | Frame text `ping` được trả `pong` ngay trong handler `message`, không qua hàng đợi của hub. |
 | `serializeAttachment` | Metadata `{device_id, kind, conn_id, closing}` lưu trên đối tượng socket; không còn hibernation. |
-| Rate limiting binding | `SlidingWindowLimiter` trong bộ nhớ: khóa là IP hoặc email, cửa sổ 60 giây, cùng mức cũ (đăng nhập 10/IP và 5/email, đăng ký 3/IP). Định kỳ dọn khóa hết hạn. `RATE_LIMITS_ENABLED=false` chỉ dùng khi chạy local hoặc e2e. |
+| Rate limiting binding | `SlidingWindowLimiter` trong bộ nhớ: khóa là IP hoặc email, cửa sổ 60 giây, cùng mức cũ (đăng nhập 10/IP và 5/email, đăng ký 3/IP), thêm nâng cấp WebSocket 60/IP (tính mọi lần thử, trước khi kiểm tra token; vượt thì từ chối nâng cấp bằng HTTP 429). Định kỳ dọn khóa hết hạn. `RATE_LIMITS_ENABLED=false` chỉ dùng khi chạy local hoặc e2e. |
 | argon2id WASM | `@node-rs/argon2`, cùng tham số (m = 19456 KiB, t = 2, p = 1). Tối đa 4 lần băm cùng lúc; lần thứ 5 phải xếp hàng, để giới hạn RAM (4 × 19 MiB). Hash lưu theo chuẩn PHC `$argon2id$…`. |
 | `env` binding | `src/config.ts` đọc biến môi trường một lần lúc khởi động: `PORT` (8080), `DB_PATH`, `MIN_AGENT`, `MIN_MOBILE`, `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL`, `RATE_LIMITS_ENABLED`. Thiếu biến bắt buộc thì thoát với lỗi một dòng. |
 | IP client (`CF-Connecting-IP`) | Header `X-Real-IP` do nginx-proxy gắn. Khi chạy local không có header thì dùng địa chỉ socket. IP chỉ dùng cho bộ giới hạn tần suất trong bộ nhớ, không ghi log. |
@@ -117,7 +117,8 @@ Toàn bộ quy tắc trong spec v1 §5, §6, §10.2 vẫn là chuẩn.
   - PRESENCE khi thiết bị vào và ra;
   - chuyển tiếp DATA giữa các thiết bị cùng tài khoản;
   - EVENT `pairing_removed`;
-  - giới hạn 500 frame/giây.
+  - giới hạn 500 frame/giây (tính cả `ping`);
+  - thiết bị nhận chậm: còn hơn 4 MiB chưa gửi được thì socket bị đóng với mã 1013 và ngắt hẳn sau 1 giây nếu vẫn chưa đóng.
 - Route REST gọi thẳng `registry.forUser(userId).<method>()`, thay cho `stub.fetch(...)`.
 - **Tắt an toàn:** khi nhận SIGTERM/SIGINT, relay:
   1. ngừng nhận kết nối HTTP và WebSocket mới;
@@ -187,14 +188,14 @@ Image `web` (`web/Dockerfile`): build Astro bằng Node 22 (`npm ci && npm run b
 - Muốn app hiện "có bản mới" thì sửa `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL` trong `deploy/relay.env` và push `main`. Có thể làm cùng lúc với tag.
 
 ### 6.3 GitHub secrets
-- Mới:
+- Mới, là **Environment secret** của cả hai GitHub Environment `production` (dùng bởi `deploy.yml`, giới hạn deploy ở nhánh `main`) và `release` (dùng bởi job `publish` trong `release-desktop.yml`) — không phải repository secret:
   - `VPS_HOST`, `VPS_USER`;
   - `VPS_SSH_KEY`: key ed25519 chỉ dùng cho deploy;
   - `VPS_KNOWN_HOSTS`: kết quả `ssh-keyscan` của VPS, người dùng tự đối chiếu dấu vân tay.
 - Bỏ: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
-- Giữ: các secret ký/notarize Apple và Azure.
+- Giữ: các secret ký/notarize Apple và Azure (Environment `release`).
 
-Thêm biến (không phải secret) `VPS_APP_DIR`, mặc định `phu/shellx`. User deploy trên VPS thuộc nhóm `docker` và sở hữu thư mục đó; không cần sudo cho mỗi lần deploy.
+Thêm biến (không phải secret) `VPS_APP_DIR`, là **Environment variable** của cả `production` và `release`, mặc định `phu/shellx`. User deploy trên VPS thuộc nhóm `docker` và sở hữu thư mục đó; không cần sudo cho mỗi lần deploy.
 
 ## 7. Dựng VPS lần đầu (runbook trong `deploy/README.md`)
 Người dùng tự chạy các bước này; Claude chỉ chạy qua SSH khi người dùng cho phép rõ ràng.

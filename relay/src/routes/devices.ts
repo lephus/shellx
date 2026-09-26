@@ -1,9 +1,8 @@
 import { Hono } from "hono";
-import type { AppEnv } from "../app";
-import type { DeviceKind, DevicePlatform } from "../auth/device";
-import { requireAuth } from "../auth/session";
-import { TOKEN_IDLE_TTL_MS } from "../auth/tokens";
-import { hubFor } from "../hub/user-hub";
+import type { AppEnv } from "../app.js";
+import type { DeviceKind, DevicePlatform } from "../auth/device.js";
+import { requireAuth } from "../auth/session.js";
+import { TOKEN_IDLE_TTL_MS } from "../auth/tokens.js";
 
 interface DeviceRow {
   id: string;
@@ -22,7 +21,7 @@ export const deviceRoutes = new Hono<AppEnv>();
  */
 deviceRoutes.get("/", requireAuth, async (c) => {
   const auth = c.get("auth");
-  const { results } = await c.env.DB.prepare(
+  const results = c.get("db").all<DeviceRow>(
     `SELECT d.id, d.kind, d.name, d.platform, d.last_seen_at,
             EXISTS (SELECT 1 FROM pairings p
                      WHERE (p.agent_id = d.id AND p.mobile_id = ?)
@@ -31,10 +30,12 @@ deviceRoutes.get("/", requireAuth, async (c) => {
       WHERE d.user_id = ?
         AND EXISTS (SELECT 1 FROM tokens t WHERE t.device_id = d.id AND t.last_used_at >= ?)
       ORDER BY d.created_at, d.id`,
-  )
-    .bind(auth.deviceId, auth.deviceId, auth.userId, c.get("now")() - TOKEN_IDLE_TTL_MS)
-    .all<DeviceRow>();
-  const online = new Set(await hubFor(c.env, auth.userId).online());
+    auth.deviceId,
+    auth.deviceId,
+    auth.userId,
+    c.get("now")() - TOKEN_IDLE_TTL_MS,
+  );
+  const online = new Set(await c.get("hubs").forUser(auth.userId).online());
   return c.json(
     results.map((d) => ({
       id: d.id,

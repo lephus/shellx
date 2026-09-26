@@ -1,4 +1,4 @@
-import disposableDomains from "./disposable-domains.json";
+import disposableDomains from "./disposable-domains.json" with { type: "json" };
 
 const DISPOSABLE = new Set<string>(disposableDomains);
 

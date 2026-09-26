@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseBlocklist, renderDomainsJson } from "../scripts/blocklist";
-import disposableDomains from "../src/auth/disposable-domains.json";
-import { checkEmail, isDisposableDomain, isValidEmail, normalizeEmail } from "../src/auth/email";
-import { isAcceptablePassword } from "../src/auth/password-policy";
+import { parseBlocklist, renderDomainsJson } from "../scripts/blocklist.js";
+import disposableDomains from "../src/auth/disposable-domains.json" with { type: "json" };
+import { checkEmail, isDisposableDomain, isValidEmail, normalizeEmail } from "../src/auth/email.js";
+import { isAcceptablePassword } from "../src/auth/password-policy.js";
 
 describe("email normalisation and validation", () => {
   it("trims whitespace (including NBSP and newlines) and lowercases", () => {

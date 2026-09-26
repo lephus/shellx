@@ -1,19 +1,12 @@
-import { fileURLToPath } from "node:url";
-import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [
-    cloudflareTest(async () => ({
-      wrangler: { configPath: "./wrangler.jsonc" },
-      miniflare: {
-        bindings: {
-          TEST_MIGRATIONS: await readD1Migrations(fileURLToPath(new URL("./migrations", import.meta.url))),
-        },
-      },
-    })),
-  ],
   test: {
-    setupFiles: ["./test/apply-migrations.ts"],
+    // Each test file runs in its own child process: better-sqlite3 and @node-rs/argon2 are native
+    // addons, and the server tests spawn `src/server.ts` with signals.
+    pool: "forks",
+    include: ["test/**/*.test.ts"],
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
   },
 });

@@ -1,10 +1,11 @@
-# ShellX v1.0 — Bàn giao để tiếp tục (cập nhật 2026-09-26: cả 6 plan đã merge)
+# ShellX v1.0 — Bàn giao để tiếp tục (cập nhật 2026-09-27: 6 plan đã merge; hạ tầng đã chuyển sang VPS trong code, chưa deploy)
 
 Tài liệu này đủ để một phiên Claude mới (hoặc chính phiên cũ khi resume) tiếp tục đúng chỗ. Đọc hết trước khi làm gì.
 
 ## 1. Bối cảnh
 
-- Sản phẩm: điều khiển terminal máy tính (macOS/Windows) từ điện thoại, qua relay Cloudflare, mã hóa đầu cuối Noise.
+- Sản phẩm: điều khiển terminal máy tính (macOS/Windows) từ điện thoại, qua relay chạy trên VPS riêng (Node.js + SQLite trong Docker), mã hóa đầu cuối Noise.
+- Hạ tầng: `docs/superpowers/specs/2026-09-26-shellx-vps-infra-design.md` (thay các phần Cloudflare của spec v1); plan `docs/superpowers/plans/2026-09-26-shellx-vps-infra.md`; runbook `deploy/README.md`.
 - Spec: `docs/superpowers/specs/2026-09-25-shellx-v1-design.md` (đã sửa nhiều lần theo các quyết định trong lúc làm).
 - Kế hoạch: `docs/superpowers/plans/2026-09-25-shellx-v1-0*-*.md`; **file tổng quan + hợp đồng interface bắt buộc**: `…-00-overview.md`.
 - Quy trình: superpowers `subagent-driven-development` — mỗi task: implementer (subagent) → task review → vòng sửa (tối đa 5) → ledger; cuối mỗi plan: review toàn nhánh (opus) → MỘT lượt sửa → review ngắn → merge.
@@ -20,6 +21,7 @@ Tài liệu này đủ để một phiên Claude mới (hoặc chính phiên cũ
 | 03 | `shellx_agent` + `shellx_client` + E2E | đã merge (e5aecb0), worktree đã xóa | ✅ Xong (agent 167, client 98, e2e 7 trên relay local). Ledger: `docs/superpowers/ledgers/plan03-agent-client.md` |
 | 04 | Desktop (Flutter) | đã merge (25ddd75), worktree đã xóa | ✅ Xong (desktop 269, PTY integration 21 trên macOS). Windows **chưa kiểm chứng** cho tới khi chạy Windows CI (checklist trong ledger). Ledger: `docs/superpowers/ledgers/plan04-desktop.md` |
 | 05 | Mobile (Flutter) | đã merge (0e9ca47), worktree đã xóa | ✅ Xong (mobile 501 test; build debug APK + iOS đã chạy). App id `com.shellx.prod`, logo mới. Ledger: `docs/superpowers/ledgers/plan05-mobile.md` |
+| VPS | Chuyển hạ tầng Cloudflare → VPS | `docs/superpowers/plans/2026-09-26-shellx-vps-infra.md` | ✅ Code xong: relay chạy Node.js (265 test, cũng chạy trong bước build image), e2e 7/7 với `npm run dev`; `deploy/`, `deploy.yml`, image relay/web. **Chưa deploy** (xem mục 4) |
 
 Ledger chi tiết (mỗi task, mọi phán quyết "Ruling", mọi lỗi nhỏ hoãn lại):
 - Bản sao trong repo: `docs/superpowers/ledgers/` (plan01–06 đầy đủ; các file `.snapshot.md` là bản lúc tạm dừng).
@@ -29,23 +31,28 @@ Ledger chi tiết (mỗi task, mọi phán quyết "Ruling", mọi lỗi nhỏ h
 Toàn bộ code v1.0 đã nằm trên `feat/shellx-v1` (chưa push). Kiểm chứng trên máy lúc merge plan 05: core 261, client 98, agent 167, desktop 269, mobile 501 test xanh; `flutter analyze` sạch cho mọi package/app; relay (238) và web không đổi kể từ lúc merge; e2e 7/7 lúc merge plan 03.
 
 Việc còn lại — tất cả cần người dùng quyết/cung cấp:
-1. **Push + PR vào `main`** để CI chạy trên Windows (desktop Windows chưa kiểm chứng; checklist trong `ledgers/plan04-desktop.md`), rồi bật check "CI result" bắt buộc.
-2. **Triển khai Cloudflare** (mục 4).
+1. **Không còn CI** (quyết định V5): desktop Windows chưa kiểm chứng — chạy test trên một máy Windows thật (checklist trong `ledgers/plan04-desktop.md`) trước khi phát hành.
+2. **Dựng VPS và deploy lần đầu** theo `deploy/README.md` (mục 4). Push `main` là deploy.
 3. **Kiểm tra thủ công trên thiết bị thật** — mobile: đăng nhập, quét QR (kể cả Android "Quét lại" cùng mã, cấp quyền camera từ Cài đặt), Face ID khi mở lại, IME tiếng Việt / phím cứng gửi trùng, dán từ gợi ý clipboard của bàn phím; desktop: đăng nhập GUI, ghép nối, banner thông báo, ⌘Q.
 4. Việc gia cố nên làm sau (không chặn phát hành): một test tích hợp mobile chạy `ClientBackend` → `TerminalPageController` qua relay trong bộ nhớ của `shellx_e2e` với `SessionManager` thật; khoảng hẹp `PendingUnpairs.retry` có thể xóa một lần ghép nối lại diễn ra đúng lúc đăng nhập (xem ledger plan 05).
 
 ## 4. Việc chờ người dùng (không chặn code)
 
-- **Cloudflare**: mua `shellx.pro` (DNS trên Cloudflare), gói Workers Paid; khi relay xong sẽ nhờ chạy `! npx wrangler login` (OAuth, không gửi key qua chat). Mọi thao tác tạo tài nguyên/deploy phải hỏi trước.
-- **GitHub Environment `release`** (tag `desktop-v*` + nhánh `main`) với 13 secret — xem `release/README.md`.
+- **VPS** (runbook `deploy/README.md`): quốc gia đặt VPS — thay mọi `[quốc gia]` trong `web/src/pages/{privacy,terms}.md` và `web/src/pages/en/{privacy,terms}.md` (bước build web từ chối build tới khi điền); user deploy trong nhóm `docker`, `~/phu/shellx/data` thuộc uid 1000; tên network của nginx-proxy vào `~/phu/shellx/.env`; 4 secret `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` và biến `VPS_APP_DIR` (mặc định `phu/shellx`), `VPS_SSH_PORT` (tuỳ chọn, chỉ số, mặc định `22`) — tất cả là Environment secret/variable của hai GitHub Environment `production` (dùng bởi `deploy.yml`) và `release` (dùng bởi `publish`), không phải repository secret; sau lần deploy đầu: công khai 2 package GHCR `shellx-relay`, `shellx-web` và chép (không symlink) 4 file `~/phu/shellx/nginx-proxy/*` vào `vhost.d` của nginx-proxy rồi tạo lại container ShellX. Mọi lệnh trên VPS do người dùng chạy hoặc cho phép rõ ràng.
+- **Dọn Cloudflare** (khi nameserver đã về nhà đăng ký): xóa zone `shellx.pro` trên Cloudflare, `npx wrangler logout`, xóa secret `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+- **GitHub Environment `release`** (tag `desktop-v*` + nhánh `main`) với 11 secret ký — xem `release/README.md`.
 - **Pháp lý**: tên pháp nhân/địa chỉ cho privacy/terms; nhờ người có chuyên môn xem lại (hiện ghi "ShellX", luật Việt Nam, 16 tuổi, log ≤ 30 ngày).
+- Chính sách quyền riêng tư hứa log vận hành ≤ 30 ngày, nhưng Docker xoay vòng log theo dung lượng (10 MB × 3) nên khi ít traffic log có thể lâu hơn 30 ngày — người dùng chọn: sửa câu chữ, hoặc định kỳ tạo lại container.
+- **nginx-proxy vẫn log IP client ở khối redirect HTTP→HTTPS (I3):** các file `deploy/nginx-proxy/*` chỉ tắt `access_log` trong khối server HTTPS (khối duy nhất nginx-proxy include chúng vào) — khối cổng 80 (dùng chung cho mọi site sau nginx-proxy) vẫn giữ access log mặc định, và không thể sửa an toàn từ file của ShellX. Xem `deploy/README.md` bước 6 để kiểm chứng (`nginx -T`, `curl -sI http://shellx.pro/`, `docker logs`) và ba lựa chọn: bật `DISABLE_ACCESS_LOGS` toàn proxy (ảnh hưởng site khác), công bố việc này trong chính sách quyền riêng tư, hoặc giới hạn log retention của nginx-proxy. Người dùng chọn một, code chưa tự quyết và văn bản quyền riêng tư chưa đổi.
+- **Trước lần deploy công khai đầu tiên, còn một việc code (review cuối ghi nhận, có từ trước và không do bản port gây ra):** một kết nối bị kẹt vẫn có thể giữ khoảng 57 MB heap của relay qua các reply ERROR và frame DATA nhỏ (đo được +56,6 MB với 142k frame lỗi; khoảng 4,7 phút với giới hạn 500 frame/giây). Tài khoản không giới hạn số thiết bị, nên nên thêm một trong hai: ngưỡng bộ nhớ theo số lượng frame, hoặc giới hạn số thiết bị/kết nối mỗi tài khoản. Probe: `scratchpad/gate-error-amp.mts` (ledger VPS).
+- **Kiểm chứng cần Docker/VPS** (danh sách đầy đủ trong `docs/superpowers/ledgers/vps-infra.md`): build hai image; diễn tập rollout/rollback thật; backup qua mount chỉ đọc và `chown`; `--force-recreate backup`; `X-Real-IP` và 429 sau nginx-proxy thật; `pong` qua đường truyền chậm; `workflow_dispatch` thấy `origin/main`. Docker Desktop trên máy dev từng bị treo; cần khởi động lại trước khi chạy.
 - **Ký Windows**: Azure Trusted Signing có thể không nhận nhà phát hành ở Việt Nam → phương án chứng chỉ OV.
 - **Icon/thương hiệu**: mobile đã dùng logo người dùng gửi (2026-09-26); cần bản 1024×1024 hoặc SVG để icon App Store nét (thay `apps/mobile/assets/branding/*` rồi chạy `apps/mobile/tool/gen_app_icons.py`). Desktop/web chưa đổi logo.
 
 ## 5. Quy tắc làm việc đã thống nhất
 
 - Người dùng nói tiếng Việt; trả lời bằng tiếng Việt.
-- Không push, không deploy, không tạo tài nguyên Cloudflare khi chưa hỏi.
+- Không push, không deploy, không chạy lệnh trên VPS khi chưa hỏi.
 - Mỗi phán quyết của controller ghi vào ledger dạng `Ruling: <quyết định> — <lý do> — <cái giá nếu sai>`; cuối mỗi plan liệt kê hết cho người dùng.
 
 ## 6. Mobile dựng trên base yallabb (quyết định 2026-09-25)
@@ -66,3 +73,9 @@ Người dùng: "Mobile bạn hãy lấy /Users/lehuuphu/Documents/workspace/Dig
 
 - App mobile: bundle id iOS và applicationId/namespace Android là **`com.shellx.prod`** (thay `pro.shellx.mobile` trong plan/ledger cũ). Desktop giữ `pro.shellx.desktop`.
 - Logo mobile: nguồn `apps/mobile/assets/branding/logo_shellx_{rounded,square}.png`; icon iOS (RGB, không alpha), Android adaptive (+ monochrome) và logo trong app sinh bằng `apps/mobile/tool/gen_app_icons.py`.
+
+## 8. Hạ tầng VPS (quyết định 2026-09-26/27)
+
+- V1–V7 (2026-09-26): bỏ Cloudflare; relay, trang web và nơi tải bản cài chạy trên VPS của người dùng (Ubuntu, Docker, `jwilder/nginx-proxy` + letsencrypt-companion); relay chuyển sang Node.js giữ nguyên giao thức; không CI, chỉ CD (`deploy.yml` khi push `main`, `release-desktop.yml` khi tag `desktop-v*`); build image relay chạy toàn bộ test relay.
+- V8 (2026-09-27): mọi thứ của ShellX trên VPS nằm trong **một thư mục `~/phu/shellx`** (biến GitHub `VPS_APP_DIR`), kể cả database (`./data`, bind mount). Ngoại lệ duy nhất: các file vhost của nginx-proxy trong `vhost.d` (bản gốc ở `~/phu/shellx/nginx-proxy/`, chép — không symlink — vào đó).
+- Việc còn mở: quốc gia đặt VPS (điền `[quốc gia]`), tên network của nginx-proxy.

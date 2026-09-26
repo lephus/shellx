@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node --test tests/site.test.mjs",
+    "build": "node scripts/check-placeholders.mjs && astro build && node --test tests/site.test.mjs tests/placeholders.test.mjs",
     "preview": "astro preview",
-    "test": "node --test tests/site.test.mjs",
+    "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs",
     "astro": "astro"
   },
   "dependencies": {

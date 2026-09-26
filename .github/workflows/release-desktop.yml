@@ -10,7 +10,7 @@ on:
         required: false
         type: string
       dry_run:
-        description: 'Dry run: build and package only, skip signing, notarization and upload to R2'
+        description: 'Dry run: build and package only, skip signing, notarization and upload to download.shellx.pro'
         required: false
         type: boolean
         default: true
@@ -25,8 +25,6 @@ concurrency:
 env:
   FLUTTER_VERSION: 3.41.7
   NODE_VERSION: 22
-  WRANGLER_VERSION: 4.139.0
-  R2_BUCKET: shellx-downloads
   DOWNLOAD_BASE_URL: https://download.shellx.pro
 
 jobs:
@@ -52,9 +50,9 @@ jobs:
     needs: prepare
     runs-on: macos-latest
     timeout-minutes: 60
-    # The 13 signing/publish secrets live only in this GitHub Environment, admitted for
-    # desktop-v* tags and main branch (dry runs on main use no secrets; publish also requires
-    # a desktop-v* tag). Non-dry-run steps access secrets; dry runs fall back to ad-hoc signing.
+    # The 11 signing secrets live only in this GitHub Environment, admitted for desktop-v* tags and
+    # main branch (dry runs on main use no secrets; publish also requires a desktop-v* tag). Non-dry-run
+    # steps access secrets; dry runs fall back to ad-hoc signing.
     environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -222,7 +220,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Upload to R2
+    name: Upload to download.shellx.pro
     needs: [prepare, macos, windows]
     # Defense in depth: dry_run == 'false' already requires a desktop-v* tag (resolve-version.mjs
     # refuses a manual real release from a branch), but require the tag here too so publish never
@@ -230,17 +228,19 @@ jobs:
     if: needs.prepare.outputs.dry_run == 'false' && startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # See the comment on the macos job: the Cloudflare secrets live only in this Environment.
+    # Same Environment gate as the signing jobs. The VPS_* secrets and the VPS_APP_DIR variable are
+    # Environment secrets/variables shared with the production Environment deploy.yml uses (see
+    # deploy/README.md); this job only ever writes into $APP_DIR/downloads on the VPS.
     environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WRANGLER_SEND_METRICS: false
+      # ShellX's one folder on the VPS, relative to the deploy user's home (VPS spec V8). Declared at
+      # job level (not workflow level): `vars` only resolves an Environment-scoped variable inside a
+      # job that declares that `environment`, so this has to live here to ever see an override.
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      # Optional; only needed if sshd on the VPS does not listen on the default port 22.
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
     steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -254,20 +254,52 @@ jobs:
             code="$(curl -s -o /dev/null -w '%{http_code}' "$url?precheck=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" || true)"
             case "$code" in
               404) echo "$url is free" ;;
-              000) echo "::error::cannot reach $DOWNLOAD_BASE_URL (is the R2 custom domain set up?)"; exit 1 ;;
+              000) echo "::error::cannot reach $DOWNLOAD_BASE_URL (is the web container on the VPS running?)"; exit 1 ;;
               *) echo "::error::$url already answers HTTP $code; bump the version instead of overwriting"; exit 1 ;;
             esac
           done
-      - name: Upload installers
+      - name: Install the deploy SSH key (host key pinned by VPS_KNOWN_HOSTS)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
-          put() {
-            npx --yes "wrangler@$WRANGLER_VERSION" r2 object put "$R2_BUCKET/desktop/$VERSION/$1" \
-              --remote --file "dist/$1" --content-type "$2" \
-              --content-disposition "attachment; filename=\"$1\"" \
-              --cache-control "public, max-age=31536000, immutable"
-          }
-          put "ShellX-$VERSION.dmg" application/x-apple-diskimage
-          put "ShellX-Setup-$VERSION.exe" application/vnd.microsoft.portable-executable
+          # Relative, no leading '-' (could be read as a flag) and no '.'/'..' path segment. The
+          # dotdot check is kept in a variable: some bash versions strip backslash escapes from an
+          # inline =~ pattern, which would silently turn \.\.? into an unescaped, near-universal ..?.
+          dotdot_re='(^|/)\.\.?(/|$)'
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
+            exit 1
+          fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  IdentityFile $RUNNER_TEMP/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
+            echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
+          } > "$RUNNER_TEMP/ssh_config"
+          echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
+      - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
+        run: |
+          # mode 755 on every level (not the VPS user's umask; `mkdir -m` would only set the last one):
+          # nginx (uid 101, in the web image) must be able to traverse downloads/, desktop/ and this
+          # version folder to serve the files inside it (M6).
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION' && chmod 755 '$APP_DIR/downloads' '$APP_DIR/downloads/desktop' '$APP_DIR/downloads/desktop/$VERSION'"
+          rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
+            "vps:$APP_DIR/downloads/desktop/$VERSION/"
       - name: Verify public download URLs
         run: |
           {
@@ -286,3 +318,6 @@ jobs:
             fi
             echo "| $name | $url | $(sha256sum "dist/$name" | cut -d' ' -f1) |" >> "$GITHUB_STEP_SUMMARY"
           done
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts" "$RUNNER_TEMP/ssh_config"

@@ -1,14 +1,48 @@
-import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
-import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
+import { passwords, type PasswordHasher } from "../src/auth/password.js";
+import type { HubRegistry } from "../src/hub/registry.js";
+import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
-  call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, newPairingId, pair, registerAccount,
-  TestSocket,
-  unlimited,
-} from "./helpers";
+  call, connect, CountingLimiter, db, deviceBody, errorCode, FakeSocket, hex, hubs, loginDevice, makeApp, newPairingId,
+  pair, registerAccount, type TestSocket, unlimited,
+} from "./helpers.js";
 
 const NEW_PASSWORD = "brand new password";
+
+/** A registry whose `forUser(...)` returns `hub` for every account (hub methods the test fakes). */
+function fakeHubs(hub: Record<string, unknown>): HubRegistry {
+  return { forUser: () => hub } as unknown as HubRegistry;
+}
+
+/**
+ * The real argon2id hasher, except that the first `hash` (or `verify`) finishes only after `hook`
+ * ran: a concurrent request landing between a route's password check and its write, deterministically.
+ */
+function hasherRacing(on: "hash" | "verify", hook: () => Promise<void>): PasswordHasher {
+  let fired = false;
+  const race = async () => {
+    if (!fired) {
+      fired = true;
+      await hook();
+    }
+  };
+  return {
+    async hash(password) {
+      const phc = await passwords.hash(password);
+      if (on === "hash") await race();
+      return phc;
+    },
+    async verify(password, phc) {
+      const ok = await passwords.verify(password, phc);
+      if (on === "verify") await race();
+      return ok;
+    },
+  };
+}
+
+async function settle<T>(promise: Promise<T>, ms = 1500): Promise<T | "timeout"> {
+  return Promise.race([promise, new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms))]);
+}
 
 describe("POST /v1/auth/password", () => {
   it("is agent-only and validates the new password", async () => {
@@ -41,7 +75,6 @@ describe("POST /v1/auth/password", () => {
     expect((await m.closed).code).toBe(4002);
     expect((await a2.closed).code).toBe(4002);
 
-    // The caller keeps its token and its socket; the others' tokens are gone.
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
     expect((await call(app, "GET", "/v1/devices", { token: mobile.token })).status).toBe(401);
     expect((await call(app, "GET", "/v1/devices", { token: secondAgent.token })).status).toBe(401);
@@ -52,43 +85,20 @@ describe("POST /v1/auth/password", () => {
     }
     expect(offline).toEqual(new Set([hex(encodePresence(mobile.deviceId, false)), hex(encodePresence(secondAgent.deviceId, false))]));
 
-    // Old password is dead, new one works; pairing survived.
     const oldLogin = await call(app, "POST", "/v1/auth/login", { body: { email: account.email, password: account.password, device: deviceBody("mobile") } });
     expect(oldLogin.status).toBe(401);
     const newLogin = await call(app, "POST", "/v1/auth/login", {
       body: { email: account.email, password: NEW_PASSWORD, device: deviceBody("mobile", { public_key: mobile.publicKey }) },
     });
     expect(newLogin.status).toBe(200);
-    const pairing = await env.DB.prepare("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ? AND mobile_id = ?")
-      .bind(account.agent.deviceId, mobile.deviceId).first<{ n: number }>();
+    const pairing = db().get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ? AND mobile_id = ?", account.agent.deviceId, mobile.deviceId,
+    );
     expect(pairing?.n).toBe(1);
-    const changed = await env.DB.prepare("SELECT password_changed_at FROM users WHERE id = ?")
-      .bind(account.agent.userId).first<{ password_changed_at: number }>();
+    const changed = db().get<{ password_changed_at: number }>("SELECT password_changed_at FROM users WHERE id = ?", account.agent.userId);
     expect(changed?.password_changed_at).toBeGreaterThanOrEqual(before);
   });
 });
-
-/**
- * The real D1 binding, except that the route's first `batch()` first runs `hook` — a concurrent
- * request landing between the route's reads and its write, deterministically.
- */
-function dbRacingFirstBatch(hook: () => Promise<void>): D1Database {
-  let fired = false;
-  return {
-    prepare: (query: string) => env.DB.prepare(query),
-    batch: async (statements: D1PreparedStatement[]) => {
-      if (!fired) {
-        fired = true;
-        await hook();
-      }
-      return env.DB.batch(statements);
-    },
-  } as unknown as D1Database;
-}
-
-async function settle<T>(promise: Promise<T>, ms = 1500): Promise<T | "timeout"> {
-  return Promise.race([promise, new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms))]);
-}
 
 describe("password change races (final review M1)", () => {
   it("a login that verified the old password gets no token once the change has committed", async () => {
@@ -96,21 +106,21 @@ describe("password change races (final review M1)", () => {
     const account = await registerAccount(app);
     const device = deviceBody("mobile");
     // Between this login's argon2 verify (old hash) and its token insert, the agent changes the password.
-    const racingDb = dbRacingFirstBatch(async () => {
-      const changed = await call(app, "POST", "/v1/auth/password", { token: account.agent.token, body: { new_password: NEW_PASSWORD } });
-      expect(changed.status).toBe(204);
+    const racing = makeApp({
+      passwords: hasherRacing("verify", async () => {
+        const changed = await call(app, "POST", "/v1/auth/password", { token: account.agent.token, body: { new_password: NEW_PASSWORD } });
+        expect(changed.status).toBe(204);
+      }),
     });
-    const res = await call(app, "POST", "/v1/auth/login", {
-      body: { email: account.email, password: account.password, device },
-      bindings: { DB: racingDb },
-    });
+    const res = await call(racing, "POST", "/v1/auth/login", { body: { email: account.email, password: account.password, device } });
     expect(res.status).toBe(401);
     expect(await errorCode(res)).toBe("invalid_credentials");
-    const tokens = await env.DB.prepare(
+    const tokens = db().get<{ n: number }>(
       "SELECT COUNT(*) AS n FROM tokens t JOIN devices d ON d.id = t.device_id WHERE d.user_id = ? AND d.public_key = ?",
-    ).bind(account.agent.userId, device.public_key as string).first<{ n: number }>();
+      account.agent.userId,
+      Buffer.from(device.public_key as string, "base64url"),
+    );
     expect(tokens?.n).toBe(0);
-    // The caller of the change is unaffected, and the new password works.
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
     const fresh = await call(app, "POST", "/v1/auth/login", {
       body: { email: account.email, password: NEW_PASSWORD, device: deviceBody("mobile") },
@@ -123,20 +133,21 @@ describe("password change races (final review M1)", () => {
     const account = await registerAccount(app);
     const caller = await connect(app, account.agent.token);
     let late: TestSocket | undefined;
-    // A phone signs in and connects after the route read its device list but before the change commits.
-    const racingDb = dbRacingFirstBatch(async () => {
-      const mobile = await loginDevice(app, account, "mobile");
-      late = await connect(app, mobile.token);
+    // A phone signs in and connects after the route hashed the new password but before the change commits.
+    const racing = makeApp({
+      passwords: hasherRacing("hash", async () => {
+        const mobile = await loginDevice(app, account, "mobile");
+        late = await connect(app, mobile.token);
+      }),
     });
-    const res = await call(app, "POST", "/v1/auth/password", {
+    const res = await call(racing, "POST", "/v1/auth/password", {
       token: account.agent.token,
       body: { new_password: NEW_PASSWORD },
-      bindings: { DB: racingDb },
     });
     expect(res.status).toBe(204);
     expect(late).toBeDefined();
     expect(await settle(late!.closed)).toEqual({ code: 4002, reason: "revoked" });
-    expect(await settle(caller.closed, 300)).toBe("timeout"); // the caller's own socket stays up
+    expect(await settle(caller.closed, 300)).toBe("timeout");
   });
 });
 
@@ -149,9 +160,7 @@ describe("POST /v1/auth/logout", () => {
     expect((await call(app, "POST", "/v1/auth/logout", { token: mobile.token })).status).toBe(204);
     expect((await call(app, "GET", "/v1/devices", { token: mobile.token })).status).toBe(401);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
-    const pairing = await env.DB.prepare("SELECT COUNT(*) AS n FROM pairings WHERE mobile_id = ?")
-      .bind(mobile.deviceId).first<{ n: number }>();
-    expect(pairing?.n).toBe(1);
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM pairings WHERE mobile_id = ?", mobile.deviceId)?.n).toBe(1);
   });
 
   it("agent: deletes its token and all its pairings, and tells each connected mobile its pairing's id", async () => {
@@ -169,9 +178,7 @@ describe("POST /v1/auth/logout", () => {
 
     expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
-    const pairing = await env.DB.prepare("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?")
-      .bind(account.agent.deviceId).first<{ n: number }>();
-    expect(pairing?.n).toBe(0);
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?", account.agent.deviceId)?.n).toBe(0);
     expect(hex(await m.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, first)));
     expect(hex(await m2.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile2.deviceId, second)));
     await m.expectSilence();
@@ -185,8 +192,7 @@ describe("POST /v1/auth/logout", () => {
 });
 
 describe("DELETE /v1/account", () => {
-  const countRows = async (sql: string, id: string) =>
-    (await env.DB.prepare(sql).bind(id).first<{ n: number }>())?.n;
+  const countRows = (sql: string, id: string) => db().get<{ n: number }>(sql, id)?.n;
 
   it("refuses a wrong password with 401 invalid_credentials and deletes nothing", async () => {
     const app = makeApp();
@@ -196,7 +202,7 @@ describe("DELETE /v1/account", () => {
     expect(await errorCode(res)).toBe("invalid_credentials");
     const missing = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: {} });
     expect(missing.status).toBe(401);
-    expect(await countRows("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)).toBe(1);
+    expect(countRows("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)).toBe(1);
   });
 
   it("requires a token and a JSON body", async () => {
@@ -221,14 +227,13 @@ describe("DELETE /v1/account", () => {
     expect((await a.closed).code).toBe(4002);
     expect((await m.closed).code).toBe(4002);
 
-    expect(await countRows("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)).toBe(0);
-    expect(await countRows("SELECT COUNT(*) AS n FROM devices WHERE user_id = ?", account.agent.userId)).toBe(0);
-    expect(await countRows("SELECT COUNT(*) AS n FROM tokens WHERE device_id = ?", mobile.deviceId)).toBe(0);
-    expect(await countRows("SELECT COUNT(*) AS n FROM tokens WHERE device_id = ?", account.agent.deviceId)).toBe(0);
-    expect(await countRows("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?", account.agent.deviceId)).toBe(0);
+    expect(countRows("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)).toBe(0);
+    expect(countRows("SELECT COUNT(*) AS n FROM devices WHERE user_id = ?", account.agent.userId)).toBe(0);
+    expect(countRows("SELECT COUNT(*) AS n FROM tokens WHERE device_id = ?", mobile.deviceId)).toBe(0);
+    expect(countRows("SELECT COUNT(*) AS n FROM tokens WHERE device_id = ?", account.agent.deviceId)).toBe(0);
+    expect(countRows("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?", account.agent.deviceId)).toBe(0);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
 
-    // The e-mail address is free again.
     const again = await call(app, "POST", "/v1/auth/register", {
       body: { email: account.email, password: "a fresh password", device: deviceBody("agent") },
     });
@@ -237,7 +242,7 @@ describe("DELETE /v1/account", () => {
 
   it("rate limits password attempts per account email", async () => {
     const loginEmail = new CountingLimiter(5);
-    const app = makeApp({ limiters: () => ({ ...unlimited, loginEmail }) });
+    const app = makeApp({ limiters: { ...unlimited, loginEmail } });
     const account = await registerAccount(app);
     for (let i = 0; i < 5; i++) {
       const res = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: { password: "wrong password" } });
@@ -253,89 +258,56 @@ describe("DELETE /v1/account", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     await pair(app, account.agent.token, mobile.deviceId);
-    // The agent never connects: unpairing from the mobile side durably queues the event for it
-    // (Task 8's pending_pairing_removed table).
     const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
     expect(unpaired.status).toBe(204);
 
     const res = await call(app, "DELETE", "/v1/account", { token: mobile.token, body: { password: account.password } });
     expect(res.status).toBe(204);
-
-    // The account (and every device/token) is gone, so we can't reconnect through the normal HTTP
-    // auth path to observe redelivery; call the hub RPC directly instead, as the "UserHub RPC" tests
-    // in devices-pairings.test.ts do. purgeAll() run here a second time proves the route's own call
-    // already emptied the queue: a leftover row would make it return more than 0.
-    const hub = hubFor(env, account.agent.userId);
-    expect(await hub.purgeAll()).toBe(0);
+    // A leftover row would make this second purge return more than 0.
+    expect(await hubs().forUser(account.agent.userId).purgeAll()).toBe(0);
   });
 
   it("closes a device whose socket lands in the hub only after any device-id snapshot would have been taken", async () => {
-    // Fix round 1: the old implementation read `SELECT id FROM devices` *before* the D1 delete and
-    // closed only that list. closeAccount() (see UserHub.closeAccount) takes no such list — it
-    // closes whatever is actually live in the hub at the moment it runs. Simulate a device whose
-    // socket is only created *after* the point such a snapshot would have been read (and after the
-    // D1 delete has already committed) by driving the Durable Object's own `fetch()` directly —
-    // exactly how a WebSocket upgrade that already passed `authenticate()` earlier, but is only now
-    // landing in the hub, would look from the hub's point of view (see also the TOCTOU test above).
+    // closeAccount takes no device list: it closes whatever is live when it runs. Simulate a socket
+    // that joins the hub after the user row is already gone (its upgrade passed authenticate()
+    // earlier) by joining it directly, right before the real closeAccount runs.
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
-    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(account.agent.userId));
-    let lateSocket: TestSocket | undefined;
-    const lateConnectHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const late = new FakeSocket();
+    const lateJoin = makeApp({
+      hubs: fakeHubs({
         closeAccount: async () => {
-          const headers = new Headers({
-            Upgrade: "websocket",
-            [DEVICE_ID_HEADER]: mobile.deviceId,
-            [DEVICE_KIND_HEADER]: "mobile",
-            [CONN_ID_HEADER]: crypto.randomUUID(),
-          });
-          const upgrade = await realHub.fetch(new Request("https://user-hub/connect", { headers }));
-          lateSocket = new TestSocket(upgrade.webSocket!);
-          return realHub.closeAccount();
+          const hub = hubs().forUser(account.agent.userId);
+          await hub.connect(late, { deviceId: mobile.deviceId, kind: "mobile", connId: crypto.randomUUID() });
+          return hub.closeAccount();
         },
       }),
-    } as unknown as typeof env.USER_HUB;
-
-    const res = await call(app, "DELETE", "/v1/account", {
-      token: account.agent.token,
-      body: { password: account.password },
-      bindings: { USER_HUB: lateConnectHub },
     });
+    const res = await call(lateJoin, "DELETE", "/v1/account", { token: account.agent.token, body: { password: account.password } });
     expect(res.status).toBe(204);
-    expect((await lateSocket!.closed).code).toBe(4002);
+    expect(late.closedWith).toEqual({ code: 4002, reason: "revoked" });
   });
 
   it("still deletes the account and returns 204 if closing the hub afterward throws, logging metadata only", async () => {
-    // Fix round 1: the delete is irreversible; a hub outage after it must not turn a successful
-    // account deletion into a 500.
     const app = makeApp();
     const account = await registerAccount(app);
-    const throwingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const throwing = makeApp({
+      hubs: fakeHubs({
         closeAccount: async () => {
           throw new Error("hub is down");
         },
       }),
-    } as unknown as typeof env.USER_HUB;
-
+    });
     const lines: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       lines.push(args.map(String).join(" "));
     });
-    const res = await call(app, "DELETE", "/v1/account", {
-      token: account.agent.token,
-      body: { password: account.password },
-      bindings: { USER_HUB: throwingHub },
-    });
+    const res = await call(throwing, "DELETE", "/v1/account", { token: account.agent.token, body: { password: account.password } });
     spy.mockRestore();
 
     expect(res.status).toBe(204);
-    const gone = await env.DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(account.agent.userId).first();
-    expect(gone).toBeNull();
+    expect(db().get("SELECT 1 FROM users WHERE id = ?", account.agent.userId)).toBeUndefined();
     const output = lines.join("\n");
     expect(output).toContain("account_close_failed");
     expect(output).not.toContain("hub is down");
@@ -343,45 +315,33 @@ describe("DELETE /v1/account", () => {
 });
 
 describe("agent logout: safe notify-then-delete order and queue purge", () => {
-  it("keeps the token and pairing intact when a hub RPC fails, so a retried logout can still deliver the event", async () => {
+  it("keeps the token and pairing intact when a hub call fails, so a retried logout can still deliver the event", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     await pair(app, account.agent.token, mobile.deviceId);
 
     let calls = 0;
-    // Unlike devices-pairings.test.ts's "failingOnce" (which succeeds after its first failure),
-    // this fake fails notifyPairingRemoved on *every* call — the test only ever exercises one.
-    const alwaysFailingNotify = {
-      idFromName: (name: string) => name,
-      get: () => ({
-        online: async () => [],
-        disconnect: async () => {},
+    const failing = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async () => {
           calls++;
           throw new Error("boom");
         },
         purgeAgent: async () => 0,
-        purgeAll: async () => 0,
       }),
-    } as unknown as typeof env.USER_HUB;
-
-    const failed = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: alwaysFailingNotify } });
+    });
+    const failed = await call(failing, "POST", "/v1/auth/logout", { token: account.agent.token });
     expect(failed.status).toBe(500);
     expect(await errorCode(failed)).toBe("internal_error");
     expect(calls).toBe(1);
-    // Nothing was deleted: the token is still valid and the pairing row survives.
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(200);
-    const stillPaired = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ?")
-      .bind(account.agent.deviceId).first();
-    expect(stillPaired).not.toBeNull();
+    expect(db().get("SELECT 1 FROM pairings WHERE agent_id = ?", account.agent.deviceId)).toBeDefined();
 
     const retried = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token });
     expect(retried.status).toBe(204);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
-    const gone = await env.DB.prepare("SELECT 1 FROM pairings WHERE agent_id = ?")
-      .bind(account.agent.deviceId).first();
-    expect(gone).toBeNull();
+    expect(db().get("SELECT 1 FROM pairings WHERE agent_id = ?", account.agent.deviceId)).toBeUndefined();
   });
 
   it("purges any pairing_removed rows still queued for the agent, even ones unrelated to this logout's own pairings", async () => {
@@ -389,18 +349,13 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const account = await registerAccount(app);
     const mobile = await loginDevice(app, account, "mobile");
     await pair(app, account.agent.token, mobile.deviceId);
-    // The agent never connects: removing the pairing from the mobile side durably queues the event
-    // for the agent (Task 8). Re-pair with a *different* mobile so the agent still has a current
-    // pairing at logout time — proving the purge isn't limited to pairings this same logout deleted.
     const unpaired = await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
     expect(unpaired.status).toBe(204);
     const mobile2 = await loginDevice(app, account, "mobile");
     await pair(app, account.agent.token, mobile2.deviceId);
 
     expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
-
-    const hub = hubFor(env, account.agent.userId);
-    expect(await hub.purgeAgent(account.agent.deviceId)).toBe(0);
+    expect(await hubs().forUser(account.agent.userId).purgeAgent(account.agent.deviceId)).toBe(0);
   });
 
   it("an agent that signs in again after logout gets no replay of tombstones from before the logout", async () => {
@@ -410,13 +365,11 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const pairingId = newPairingId();
     await pair(app, account.agent.token, mobile.deviceId, pairingId);
     await call(app, "DELETE", `/v1/pairings/${account.agent.deviceId}/${mobile.deviceId}`, { token: mobile.token });
-    // The tombstone (carrying the pairing's id) is replayed on connect (and kept) ...
     const before = await connect(app, account.agent.token);
     expect(hex(await before.nextBinary())).toBe(hex(pairingRemovedEvent(account.agent.deviceId, mobile.deviceId, pairingId)));
     before.close();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await before.closed;
 
-    // ... until the agent logs out, which purges it.
     expect((await call(app, "POST", "/v1/auth/logout", { token: account.agent.token })).status).toBe(204);
     const again = await loginDevice(app, account, "agent", account.agent.publicKey);
     expect(again.deviceId).toBe(account.agent.deviceId);
@@ -425,26 +378,21 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
   });
 
   it("still logs the agent out (204) if purging its queue afterward throws, logging metadata only", async () => {
-    // Fix round 1: same best-effort treatment as account deletion's closeAccount() — the token and
-    // pairings are already gone by this point, so a hub outage here must not turn a successful
-    // logout into a 500.
     const app = makeApp();
     const account = await registerAccount(app);
-    const throwingPurge = {
-      idFromName: (name: string) => name,
-      get: () => ({
+    const throwing = makeApp({
+      hubs: fakeHubs({
         notifyPairingRemoved: async () => {},
         purgeAgent: async () => {
           throw new Error("hub is down");
         },
       }),
-    } as unknown as typeof env.USER_HUB;
-
+    });
     const lines: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       lines.push(args.map(String).join(" "));
     });
-    const res = await call(app, "POST", "/v1/auth/logout", { token: account.agent.token, bindings: { USER_HUB: throwingPurge } });
+    const res = await call(throwing, "POST", "/v1/auth/logout", { token: account.agent.token });
     spy.mockRestore();
 
     expect(res.status).toBe(204);

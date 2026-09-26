@@ -1,142 +1,123 @@
 # ShellX relay
 
-Cloudflare Worker (Hono) + Durable Object `UserHub` (SQLite-backed, WebSocket Hibernation API) + D1.
-It stores accounts, devices and pairings, and forwards end-to-end encrypted frames between devices of
-the same account. Design: `docs/superpowers/specs/2026-09-25-shellx-v1-design.md` §5, §6, §10.
+Node.js 22 + TypeScript: [Hono](https://hono.dev) on `@hono/node-server`, WebSockets with `ws`,
+SQLite with `better-sqlite3`, argon2id with `@node-rs/argon2`. It stores accounts, devices and
+pairings, and forwards end-to-end encrypted frames between devices of the same account through one
+in-process hub per account. Design: `docs/superpowers/specs/2026-09-25-shellx-v1-design.md` §5, §6,
+§10 and `docs/superpowers/specs/2026-09-26-shellx-vps-infra-design.md` §4. It runs on the VPS as the
+`relay` container of `deploy/docker-compose.yml`; `deploy/README.md` is the runbook.
 
 ## Local development
 
-Requires Node.js ≥ 22.
+Requires Node.js 22 or later (the container runs Node 22).
 
 ```bash
 cd relay
 npm ci
-npm test            # Vitest inside workerd (real D1 + Durable Objects); no network needed
-npm run typecheck   # Worker/test sources and Node scripts
-npm run dev         # applies local D1 migrations, then serves http://127.0.0.1:8787
+npm test            # Vitest on Node: a temp SQLite database, a real server and real WebSockets per test
+npm run typecheck   # src/, test/ and scripts/
+npm run dev         # http://127.0.0.1:8787 with .data/relay.db (created on first run)
+npm run build       # tsc → dist/ (what the image runs: node dist/server.js)
 ```
 
-- Host and port come from the `dev` block of `wrangler.jsonc`; `npm run dev -- --ip 127.0.0.1 --port 8787`
-  (what CI and the plan-03 E2E suite run) is equivalent. Do not add `--ip`/`--port` to the npm script
-  itself: wrangler rejects a flag given twice.
-- The first run in an interactive terminal asks to confirm applying the migrations (answer `y`);
-  non-interactive shells (CI) skip the prompt.
-- Local state lives in `.wrangler/state/`; delete that directory to start from an empty database. Do so
-  once if it was created before pairing ids existed: `pairings.pairing_id` was added by editing
-  `0001_init.sql` in place, and the hub's tombstone table by editing its `CREATE TABLE IF NOT EXISTS`
-  (both only safe because nothing had been deployed yet).
-- Rate limits are off locally (`RATE_LIMITS_ENABLED = "false"` in the top-level `vars`) because the E2E
-  suite creates many accounts from 127.0.0.1. Staging and production set `"true"`; only the exact
-  string `"false"` disables them.
-- `compatibility_date` must not be newer than the workerd bundled with
-  `@cloudflare/vitest-pool-workers`, otherwise `npm test` fails with
-  "This Worker requires compatibility date …". Bump both together.
-
-## Request limits
-
-- JSON request bodies (register, login, password change, account deletion, `POST /v1/pairings`) are
-  capped at **16 KiB**. A larger body is refused with HTTP **413** and the usual error shape,
-  `{"error": {"code": "payload_too_large", "message": "Request body is too large"}}` (the spec has no
-  code for this; clients treat it as any other API error). Authenticated routes still answer
-  `401 unauthorized` first when the token is missing or invalid.
-- Login and `DELETE /v1/account` refuse a password longer than 128 characters (Unicode code points after
-  NFC, the same count as the 8–128 registration rule) with `401 invalid_credentials` without hashing it,
-  so oversized passwords cannot grow the argon2 WASM memory of an isolate.
-
-## Deployment runbook
-
-### Prerequisites (once)
-
-1. A Cloudflare account on the **Workers Paid** plan. Password hashing (argon2id, m = 19456 KiB,
-   t = 2) needs tens of milliseconds of CPU per login/registration, beyond the Free plan's 10 ms CPU limit.
-2. The `shellx.pro` zone is active in the same Cloudflare account (its DNS is served by Cloudflare).
-3. `npx wrangler login` on the machine that deploys (or `CLOUDFLARE_API_TOKEN` with permission to edit
-   Workers scripts, D1, and Workers custom domains/routes on `shellx.pro`).
-
-### Create an environment (staging first, then production)
-
-1. Create the database close to the users (Vietnam → `apac`):
-
-   ```bash
-   npx wrangler d1 create shellx-staging --location apac
-   ```
-
-   Copy the printed `database_id` into `env.staging.d1_databases[0].database_id` in `wrangler.jsonc`
-   and commit it. (Production: `shellx-production` → `env.production.d1_databases[0].database_id`.)
-2. Apply the schema: `npm run db:migrate:staging` (production: `npm run db:migrate:production`).
-3. Deploy: `npm run deploy:staging` (production: `npm run deploy:production`). This creates the Worker
-   `shellx-relay-staging` / `shellx-relay-production`, the `UserHub` Durable Object namespace
-   (migration tag `v1`), and the custom domain `relay-staging.shellx.pro` / `relay.shellx.pro`.
-4. DNS: custom domains create their DNS record and certificate automatically. If a DNS record named
-   `relay` or `relay-staging` already exists in the zone, delete it first or the deploy fails.
-5. Verify:
-
-   ```bash
-   curl https://relay-staging.shellx.pro/v1/version
-   curl https://relay.shellx.pro/v1/version
-   ```
-
-Rate limiting `namespace_id`s must be unique within the account: 1001–1003 production,
-2001–2003 staging, 9001–9003 local only.
-
-### Every release
-
-1. Refresh the disposable-domain list: `npm run domains:update`, review the diff, `npm test`, commit.
-2. Staging first: `npm run db:migrate:staging && npm run deploy:staging`, check `/v1/version`, then the
-   same for production. Always apply migrations before deploying code that needs them.
-3. New desktop build or minimum versions: edit `MIN_AGENT`, `MIN_MOBILE`, `LATEST_AGENT_VERSION`,
-   `MAC_URL`, `WIN_URL` in the environment's `vars` block and deploy.
-
-### Operations
-
-- Live logs: `npx wrangler tail --env production`. Logs carry metadata only (time, device_id, error
-  codes, frame sizes); never payloads, tokens, passwords or e-mail addresses. Workers Logs
-  **invocation logs are turned off** on purpose (`observability.logs.invocation_logs: false` in
-  `wrangler.jsonc`): invocation logs record request metadata for every call, including the client IP
-  (`cf-connecting-ip`), and the privacy policy only allows using the IP transiently for rate limiting —
-  not storing it in logs. Our own structured `console.log` lines (the metadata above) are unaffected
-  and still show up in `wrangler tail` and Workers Logs.
-- Emergency password reset (spec §5.2):
+- `npm run dev` reads `dev.env`: `HOST=127.0.0.1`, `PORT=8787`, `DB_PATH=.data/relay.db`,
+  `RATE_LIMITS_ENABLED=false` (the E2E suite creates many accounts from 127.0.0.1) and the version
+  variables. Delete `.data/` to start from an empty database. Ctrl-C stops it gracefully.
+- End-to-end check with the Dart packages, while `npm run dev` runs:
 
   ```bash
-  # generates a temporary password and prints it once
-  npm run reset-password -- --env production --email user@example.com
-
-  # supply your own password without it landing in shell history or a process list
-  npm run reset-password -- --env production --email user@example.com --password - --revoke-tokens
-  # then type the password at the prompt (it is not echoed); or non-interactively:
-  SHELLX_RESET_PASSWORD='new password' npm run reset-password -- --env production --email user@example.com --revoke-tokens
+  flutter pub get                 # from the repository root, once
+  cd packages/shellx_e2e && SHELLX_E2E_RELAY=http://127.0.0.1:8787 dart test   # 7 tests
   ```
+- `relay/.npmrc` sets `ignore-scripts=true`: `better-sqlite3` and `@node-rs/argon2` ship prebuilt
+  binaries, and npm 10 (bundled with Node 22) would otherwise try to compile `better-sqlite3`.
 
-  `--password <value>` directly on the command line also works but prints a warning, since it is
-  visible in shell history and process lists — prefer `--password -` (reads one line from stdin; on an
-  interactive terminal the typed password is not echoed) or the `SHELLX_RESET_PASSWORD` environment
-  variable. Without any of these a random password is generated and
-  printed once. `--env staging` and `--env production` ask you to type the account's e-mail address to
-  confirm before touching anything remote; pass `--yes` to skip that prompt for scripting. `--env local`
-  never asks. `--revoke-tokens` signs out every device of the account (sockets already open stay up
-  until they reconnect). Pairings are kept.
+## Configuration
 
-  Exit status: `0` password reset; `1` nothing changed (unknown e-mail address, a wrong confirmation, bad
-  arguments) or wrangler failed (printed as a single line such as `wrangler d1 execute failed (exit 1)`,
-  never the SQL); `2` wrangler ran but its output could not be read, so the reset **may or may not**
-  have happened. On `2` the script prints a warning and still prints the generated temporary password
-  (if it generated one): check by logging in with it before telling the user.
-- Roll back code: `npx wrangler rollback --env production`. D1 migrations are not rolled back; write a
-  new forward migration instead.
+Read once at startup from environment variables (`src/config.ts`); a missing or malformed value
+stops the relay with one line on stderr and exit status 1.
 
-## Cost check before opening public sign-up (spec §15, risk R2)
+| Variable | Default | Meaning |
+|---|---|---|
+| `MIN_AGENT`, `MIN_MOBILE`, `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL` | required | Served by `GET /v1/version` |
+| `PORT` | `8080` | Listening port (`0` = any free port) |
+| `HOST` | `0.0.0.0` | Listening address (`npm run dev` uses `127.0.0.1`) |
+| `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
+| `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade limits off |
 
-Check the current prices on Cloudflare's pricing pages; do not rely on numbers copied from elsewhere.
+On startup the relay applies every `migrations/*.sql` not yet listed in `schema_migrations`, in
+file-name order, one transaction per file. There are no down-migrations: fix a mistake with a new
+file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub's
+`pairing_removed` tombstones.
 
-- **Durable Objects:** requests (incoming WebSocket messages are billed as requests at a reduced
-  ratio: check the current ratio), duration (GB-s: hibernation stops idle sockets from accruing it),
-  and whether `setWebSocketAutoResponse` ping/pong counts as a request.
-- **Workers:** requests (REST calls and WebSocket upgrades) and CPU time (argon2id on register/login).
-- **D1:** rows read/written (token lookups on every authenticated request, `last_seen_at` on every
-  disconnect) and storage.
-- **R2 (`download.shellx.pro`, plan 06):** storage and Class B (read) operations; confirm egress is still free.
-- **Per-user estimate:** an interactive session sends at most ~62 frames/s per open channel from the
-  agent (16 ms batching) plus one frame per keystroke from the phone; every connected device sends a
-  `ping` every 30 s. Monthly messages ≈ active-session-seconds × average frames/s + connected-minutes × 2.
-  Write the estimate and the assumptions into this section before launch.
+## Behaviour worth knowing
+
+- **Hub:** one `HubState` per account with a serial queue for everything that touches it (sockets
+  joining/closing, frames, REST calls). Routes reach it with `registry.forUser(userId).<method>()`.
+  Text `ping` is answered with `pong` immediately, outside the queue — but it counts against the
+  device's 500 frames/s budget like any frame, and it goes unanswered once more than 64 KiB wait to
+  be sent to that socket (a slow but healthy link keeps its heartbeat; a client that stops reading
+  cannot pile up pongs, and its own heartbeat times out).
+- **Slow receivers:** before sending anything (DATA, ERROR, PRESENCE, EVENT, `pong`) the hub checks
+  the socket's unsent backlog; over 4 MiB it sends nothing more and closes the socket with 1013
+  "try again later" (logged as `slow_receiver`). Its close frame waits behind that backlog, so the
+  socket is dropped outright (the client sees 1006) if it has not closed 1 s later. Clients reconnect
+  with backoff on either code and catch up from the agent's replay buffer; frames are never skipped
+  (that would break the Noise stream). When a device connects, any earlier socket of it that is still
+  closing is dropped too, so a device reconnecting in a loop never piles up closing sockets.
+- **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP,
+  WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
+  upgrade is refused with HTTP 429 and clients retry with backoff). The IP is `X-Real-IP` when the
+  TCP peer is a private or loopback address (nginx-proxy), otherwise the peer address; an IPv6
+  address counts as its /64. IPs and e-mail addresses are never logged.
+- **argon2id:** m = 19456 KiB, t = 2, p = 1; at most 4 hashes run at once and up to 32 wait; beyond
+  that register, login and password change answer 429 `rate_limited`. The image sets
+  `UV_THREADPOOL_SIZE=8` so the 4 hashes never take the whole libuv thread pool.
+- **Refused upgrades:** a WebSocket upgrade with a bad token (401), over the upgrade limit (429) or
+  with any other `Upgrade` (400) is answered and its socket destroyed after 5 s if the client does
+  not close it. A client that resets the connection (RST) at any point of an upgrade, even while its
+  valid token is still being checked, does not crash the relay and leaves nothing pending behind
+  (@hono/node-server's waiter for that socket is released too); the per-IP upgrade limit bounds how
+  fast one address can repeat that.
+- **Limits:** JSON bodies over 16 KiB → 413 `payload_too_large`; a password over 128 code points is
+  refused as `invalid_credentials` before hashing; WebSocket frames over 64 KiB → ERROR
+  `frame_too_large`, messages over 1 MiB close the socket with 1009; 500 frames/s per device (text
+  `ping` included) → ERROR `rate_limited`, close 4003.
+- **Shutdown:** on SIGTERM/SIGINT the relay stops accepting connections, closes every socket with
+  1001 "going away" (recording `last_seen_at` of those devices), waits at most 5 s for requests and
+  hub queues, closes the database and exits 0 (1 if the shutdown failed; logged by kind). A second
+  signal is ignored. Clients reconnect with their usual backoff.
+- **Logs:** one JSON line per event with metadata only (time, `device_id`, error kind). Never
+  payloads, tokens, passwords, e-mail or IP addresses.
+
+## Healthcheck
+
+Compose runs `node dist/scripts/healthcheck.js` in the container. It exits 0 and prints nothing
+when `GET http://127.0.0.1:$PORT/v1/version` answers 200 within 3 s and the database at `$DB_PATH`
+opens read-only (it is never created) and answers `SELECT 1`. Otherwise it prints one line such as
+`healthcheck: version ECONNREFUSED; database SQLITE_CANTOPEN` (error kinds only) and exits 1.
+
+## Emergency password reset (spec §5.2)
+
+On the VPS, inside the running container (it uses the same `DB_PATH`):
+
+```bash
+cd ~/phu/shellx
+# generates a temporary password and prints it once
+docker compose exec relay node dist/scripts/reset-password.js --email user@example.com
+# your own password, not echoed and not in shell history; --revoke-tokens signs every device out
+docker compose exec relay node dist/scripts/reset-password.js --email user@example.com --password - --revoke-tokens
+```
+
+The script asks you to type the account's e-mail address to confirm (skip with `--yes`). The
+password can also come from `SHELLX_RESET_PASSWORD` (`docker compose exec -e SHELLX_RESET_PASSWORD=…`).
+`--password <value>` works too but warns that it is visible in shell history. Sockets that are
+already open stay up until they reconnect; pairings are kept. Exit status: `0` reset, `1` nothing
+changed (unknown address, wrong confirmation, bad arguments, database error — printed as one line
+such as `database error (SQLITE_BUSY)`, never SQL). Locally: `npm run reset-password -- --email …`
+works on `.data/relay.db`.
+
+## Disposable e-mail domains
+
+`npm run domains:update` downloads the upstream blocklist into `src/auth/disposable-domains.json`;
+review the diff, run `npm test`, commit. A deploy ships it.
