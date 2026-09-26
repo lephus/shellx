@@ -7792,7 +7792,7 @@ server {
 Start Docker if needed (`open -a Docker` on the Mac, then wait until `docker info` succeeds). From the repository root:
 
 ```bash
-docker build --progress=plain -t shellx-relay:local relay 2>&1 | grep -E "Test Files|Tests "
+docker build --no-cache --progress=plain -t shellx-relay:local relay 2>&1 | grep -E "Test Files|Tests "
 docker run --rm shellx-relay:local sh -c 'id -u; node -v; ls /app; stat -c %u /data'
 ```
 
