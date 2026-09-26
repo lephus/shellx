@@ -22,6 +22,7 @@ Người dùng không muốn trả Workers Paid. Các quyết định (2026-09-2
 | V5 | Không có CI. Chỉ có CD: push `main` → build, test trong bước build image, deploy. Tag `desktop-v*` → phát hành bản cài. |
 | V6 | Bước build image relay chạy toàn bộ test relay. Test fail thì không deploy. |
 | V7 | Database D1 `shellx-production` đã tạo nhầm đã được xóa theo đồng ý của người dùng. |
+| V8 | (2026-09-27) Mọi thứ của ShellX trên VPS nằm trong **một thư mục `phu/shellx`**, nằm trong home của user SSH dùng để deploy. Workflow đọc đường dẫn từ biến GitHub `VPS_APP_DIR`, mặc định `phu/shellx`. Database cũng nằm trong thư mục này (bind mount `./data`). Chỉ có một ngoại lệ: file cấu hình riêng cho vhost của nginx-proxy phải đặt trong thư mục `vhost.d` của proxy. |
 
 ## 2. Mục tiêu và ngoài phạm vi
 
@@ -37,24 +38,26 @@ Người dùng không muốn trả Workers Paid. Các quyết định (2026-09-2
 
 ## 3. Bố trí trên VPS
 
-Thư mục triển khai là `/opt/shellx`, do workflow deploy đồng bộ từ thư mục `deploy/` trong repo:
+Thư mục triển khai là `~/phu/shellx`, trong home của user deploy, lấy theo biến GitHub `VPS_APP_DIR` (V8). Workflow deploy đồng bộ thư mục này từ `deploy/` trong repo. Tên compose project được cố định là `shellx`:
 
 ```
-/opt/shellx/
-  docker-compose.yml     # từ deploy/docker-compose.yml
+~/phu/shellx/
+  docker-compose.yml     # từ deploy/docker-compose.yml (name: shellx)
   relay.env              # từ deploy/relay.env (phiên bản tối thiểu, link bản cài; không chứa bí mật)
   .env                   # do workflow ghi: IMAGE_TAG=<commit SHA>, PROXY_NETWORK=<tên network của nginx-proxy>
-  downloads/desktop/<version>/ShellX-<version>.dmg | ShellX-Setup-<version>.exe
+  data/relay.db          # SQLite (bind mount ./data:/data, thuộc uid 1000)
   backups/relay-<YYYY-MM-DD>.db
+  downloads/desktop/<version>/ShellX-<version>.dmg | ShellX-Setup-<version>.exe
+  nginx-proxy/relay.shellx.pro   # bản gốc của file vhost; một bản sao đặt trong vhost.d của nginx-proxy
 ```
 
 Compose project `shellx` gồm các service:
 
 | Service | Image | Vai trò |
 |---|---|---|
-| `relay` | `ghcr.io/lephus/shellx-relay:${IMAGE_TAG}` | Node 22, user không phải root, lắng nghe 8080 trong container, không publish cổng. Env `VIRTUAL_HOST=relay.shellx.pro`, `VIRTUAL_PORT=8080`, `LETSENCRYPT_HOST=relay.shellx.pro`, cộng thêm `relay.env`. Volume `shellx-data:/data` (SQLite `/data/relay.db`). Healthcheck `GET /v1/version`. `restart: unless-stopped`. |
+| `relay` | `ghcr.io/lephus/shellx-relay:${IMAGE_TAG}` | Node 22, user không phải root, lắng nghe 8080 trong container, không publish cổng. Env `VIRTUAL_HOST=relay.shellx.pro`, `VIRTUAL_PORT=8080`, `LETSENCRYPT_HOST=relay.shellx.pro`, cộng thêm `relay.env`. Bind mount `./data:/data` (SQLite `/data/relay.db`). Healthcheck `GET /v1/version`. `restart: unless-stopped`. |
 | `web` | `ghcr.io/lephus/shellx-web:${IMAGE_TAG}` | nginx:alpine chứa bản build Astro. `VIRTUAL_HOST=shellx.pro,www.shellx.pro,download.shellx.pro`, `LETSENCRYPT_HOST` cùng danh sách. Mount `./downloads:/srv/downloads:ro`. |
-| `backup` | `alpine` + `sqlite` | Chạy mỗi ngày lúc 03:00 (giờ VPS): `sqlite3 /data/relay.db ".backup /backups/relay-<ngày>.db"`, giữ 14 bản gần nhất. Mount volume `shellx-data` chỉ đọc và `./backups`. |
+| `backup` | `alpine` + `sqlite` | Chạy mỗi ngày lúc 03:00 (giờ VPS): `sqlite3 /data/relay.db ".backup /backups/relay-<ngày>.db"`, giữ 14 bản gần nhất. Mount `./data` chỉ đọc và `./backups`. |
 
 Cả ba service gắn vào network ngoài `${PROXY_NETWORK}` của nginx-proxy; `backup` không cần.
 
@@ -64,7 +67,7 @@ Cả ba service gắn vào network ngoài `${PROXY_NETWORK}` của nginx-proxy; 
 - `download.shellx.pro`: `/srv/downloads`, không liệt kê thư mục, `Content-Disposition: attachment`.
 - `access_log off` cho cả ba, giữ cam kết của chính sách quyền riêng tư.
 
-**nginx-proxy**: file `vhost.d/relay.shellx.pro`, đặt một lần khi dựng VPS, gồm:
+**nginx-proxy**: file `vhost.d/relay.shellx.pro`. Bản gốc nằm ở `deploy/nginx-proxy/relay.shellx.pro` trong repo và `~/phu/shellx/nginx-proxy/`. Khi dựng VPS, chép hoặc symlink một lần vào `vhost.d` của proxy. CD không bao giờ ghi ra ngoài `phu/shellx`. Nội dung file:
 - `access_log off;`
 - `proxy_read_timeout 120s;` và `proxy_send_timeout 120s;`. Client ping mỗi 30 giây nên WebSocket không bị cắt.
 - `client_max_body_size 32k;`. Relay tự giới hạn 16 KiB và trả 413 đúng mã lỗi; nginx chỉ chặn body quá lớn từ sớm.
@@ -165,7 +168,7 @@ Image `web` (`web/Dockerfile`): build Astro bằng Node 22 (`npm ci && npm run b
 - Một job duy nhất, `concurrency: deploy-production` (không hủy lần đang chạy):
   1. Đăng nhập GHCR bằng `GITHUB_TOKEN`. Build và push `shellx-relay:<sha>` (có bước test) và `shellx-web:<sha>`.
   2. Nạp SSH key từ secret `VPS_SSH_KEY`, `known_hosts` từ `VPS_KNOWN_HOSTS` (bắt buộc kiểm tra host).
-  3. `rsync` `deploy/docker-compose.yml`, `deploy/relay.env`, `deploy/web/` lên `/opt/shellx/`.
+  3. `rsync` `deploy/docker-compose.yml`, `deploy/relay.env`, `deploy/nginx-proxy/` lên `$VPS_APP_DIR`.
   4. Trên VPS, qua SSH:
      1. lưu `IMAGE_TAG` cũ;
      2. ghi `IMAGE_TAG=<sha>` vào `.env`;
@@ -179,7 +182,7 @@ Image `web` (`web/Dockerfile`): build Astro bằng Node 22 (`npm ci && npm run b
 
 ### 6.2 `release-desktop.yml` (tag `desktop-v*`)
 - Giữ nguyên phần build, ký, notarize macOS và ký Windows.
-- Bước "Upload to R2" đổi thành `rsync` lên `/opt/shellx/downloads/desktop/<version>/`, dùng cùng các secret SSH. Sau đó kiểm tra `https://download.shellx.pro/desktop/<version>/<file>` trả 200 và đúng kích thước.
+- Bước "Upload to R2" đổi thành `rsync` lên `$VPS_APP_DIR/downloads/desktop/<version>/`, dùng cùng các secret SSH. Sau đó kiểm tra `https://download.shellx.pro/desktop/<version>/<file>` trả 200 và đúng kích thước.
 - Bỏ `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `R2_BUCKET`.
 - Muốn app hiện "có bản mới" thì sửa `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL` trong `deploy/relay.env` và push `main`. Có thể làm cùng lúc với tag.
 
@@ -191,13 +194,13 @@ Image `web` (`web/Dockerfile`): build Astro bằng Node 22 (`npm ci && npm run b
 - Bỏ: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 - Giữ: các secret ký/notarize Apple và Azure.
 
-User deploy trên VPS thuộc nhóm `docker` và sở hữu `/opt/shellx`; không cần sudo cho mỗi lần deploy.
+Thêm biến (không phải secret) `VPS_APP_DIR`, mặc định `phu/shellx`. User deploy trên VPS thuộc nhóm `docker` và sở hữu thư mục đó; không cần sudo cho mỗi lần deploy.
 
 ## 7. Dựng VPS lần đầu (runbook trong `deploy/README.md`)
 Người dùng tự chạy các bước này; Claude chỉ chạy qua SSH khi người dùng cho phép rõ ràng.
-1. Tạo user deploy, thêm vào nhóm `docker`, đặt public key deploy vào `authorized_keys`, tạo `/opt/shellx` thuộc user đó.
-2. Tìm tên network của nginx-proxy: `docker network ls`, ghi vào `/opt/shellx/.env` dạng `PROXY_NETWORK=…`.
-3. Tạo `vhost.d/relay.shellx.pro` theo §3 trong thư mục vhost của nginx-proxy.
+1. Chọn user SSH để deploy (user hiện có hoặc user riêng), đảm bảo user thuộc nhóm `docker`, đặt public key deploy vào `authorized_keys`, rồi chạy `mkdir -p ~/phu/shellx/{data,backups,downloads,nginx-proxy}` và `sudo chown 1000:1000 ~/phu/shellx/data`.
+2. Tìm tên network của nginx-proxy: `docker network ls`, ghi vào `~/phu/shellx/.env` dạng `PROXY_NETWORK=…`.
+3. Sau lần deploy đầu (khi `~/phu/shellx/nginx-proxy/relay.shellx.pro` đã có), chép hoặc symlink file đó vào thư mục `vhost.d` của nginx-proxy rồi reload proxy. Đây là file duy nhất nằm ngoài `phu/shellx`.
 4. Chạy `ssh-keyscan <VPS>` trên máy người dùng, đối chiếu dấu vân tay, rồi thêm 4 secret vào GitHub.
 5. Push `main` (hoặc chạy lại `deploy.yml`) để deploy lần đầu. Kiểm tra `curl https://relay.shellx.pro/v1/version`.
 
@@ -205,7 +208,7 @@ Phải làm sau khi DNS đã đồng bộ, vì letsencrypt-companion cần tên 
 
 ## 8. Vận hành
 - **Log:** `docker compose logs relay`. Relay chỉ ghi metadata (thời gian, `device_id`, loại lỗi), không ghi IP, email, token hay payload. Docker giới hạn log ở `max-size 10m`, `max-file 3`.
-- **Sao lưu:** container `backup` chạy hằng ngày (§3). Khôi phục: dừng `relay`, chép bản sao lưu vào volume, rồi chạy lại. Chép bản sao lưu ra ngoài VPS là tùy người dùng, runbook ghi cách làm bằng `rsync`.
+- **Sao lưu:** container `backup` chạy hằng ngày (§3). Khôi phục: dừng `relay`, chép bản sao lưu vào `~/phu/shellx/data/relay.db`, rồi chạy lại. Chép bản sao lưu ra ngoài VPS là tùy người dùng, runbook ghi cách làm bằng `rsync`.
 - **Quay lại bản cũ:** chạy lại `deploy.yml` ở commit cũ (workflow_dispatch với input `ref`), hoặc trên VPS sửa `IMAGE_TAG` trong `.env` rồi `docker compose up -d`.
 - **Cập nhật phiên bản tối thiểu hoặc link bản cài:** sửa `deploy/relay.env` rồi push.
 
