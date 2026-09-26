@@ -1,5 +1,5 @@
-// Static checks on the Inno Setup build script. ISCC.exe only runs for real on Windows (CI's
-// "Installer compiles" job and release-desktop.yml); these checks pin the Visual C++ runtime
+// Static checks on the Inno Setup build script. ISCC.exe only runs for real on Windows, in
+// release-desktop.yml (there is no CI, decision V5); these checks pin the Visual C++ runtime
 // guard: a Flutter Windows app needs msvcp140.dll, vcruntime140.dll and vcruntime140_1.dll next
 // to the exe on a clean PC (https://docs.flutter.dev/platform-integration/windows/building).
 import { test } from 'node:test';

@@ -25,7 +25,9 @@ fi
 exit 0
 `;
 
-function setup({ env = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', ownData = true } = {}) {
+function setup({
+  env = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', ownData = true, live = null, incoming = null,
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), 'shellx-rollout-'));
   const home = join(root, 'home');
   const app = join(home, 'phu', 'shellx');
@@ -38,6 +40,20 @@ function setup({ env = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', ownData = tru
   chmodSync(join(bin, 'docker'), 0o755);
   const calls = join(root, 'calls.log');
   writeFileSync(calls, '');
+  // Writes the four items rollout.sh swaps together (deploy.yml stages these into .incoming/;
+  // .prev/ is where the previous ones land): docker-compose.yml, relay.env and two directories
+  // (nginx-proxy/, backup/) each holding one marker file, so a directory swap is exercised too.
+  const writeConfig = (dir, content) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'docker-compose.yml'), content.compose);
+    writeFileSync(join(dir, 'relay.env'), content.relayEnv);
+    mkdirSync(join(dir, 'nginx-proxy'), { recursive: true });
+    writeFileSync(join(dir, 'nginx-proxy', 'marker'), content.nginxMarker);
+    mkdirSync(join(dir, 'backup'), { recursive: true });
+    writeFileSync(join(dir, 'backup', 'marker'), content.backupMarker);
+  };
+  if (live) writeConfig(app, live);
+  if (incoming) writeConfig(join(app, '.incoming'), incoming);
   const run = (tag, appDir = 'phu/shellx', relayUid = String(process.getuid())) =>
     spawnSync('bash', [script, tag, appDir], {
       encoding: 'utf8',
@@ -45,8 +61,21 @@ function setup({ env = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', ownData = tru
         PATH: `${bin}:${process.env.PATH}`, HOME: home, CALLS: calls, HEALTH_TIMEOUT_SECONDS: '3', RELAY_UID: relayUid,
       },
     });
-  return { app, run, env: () => readFileSync(join(app, '.env'), 'utf8'), calls: () => readFileSync(calls, 'utf8') };
+  return {
+    app,
+    run,
+    env: () => readFileSync(join(app, '.env'), 'utf8'),
+    calls: () => readFileSync(calls, 'utf8'),
+    read: (relPath) => readFileSync(join(app, relPath), 'utf8'),
+  };
 }
+
+const OLD_CONFIG = {
+  compose: 'old compose\n', relayEnv: 'old relay env\n', nginxMarker: 'old nginx\n', backupMarker: 'old backup\n',
+};
+const NEW_CONFIG = {
+  compose: 'new compose\n', relayEnv: 'new relay env\n', nginxMarker: 'new nginx\n', backupMarker: 'new backup\n',
+};
 
 test('healthy: pulls with the new tag, then writes it to .env and restarts once; keeps PROXY_NETWORK', () => {
   const s = setup();
@@ -136,4 +165,66 @@ test('refuses to deploy when data/ does not exist yet, and creates nothing', () 
   assert.throws(() => statSync(join(s.app, 'data')));
   assert.throws(() => statSync(join(s.app, 'backups')));
   assert.equal(s.calls(), '');
+});
+
+// --- Staged config (deploy.yml's .incoming/), swapped with a .prev/ backup (fix round 1, item 1b) ---
+
+test('a bad deploy restores the old relay.env and docker-compose.yml byte-for-byte, and the old tag', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const result = s.run('broken');
+  assert.equal(result.status, 1);
+  assert.equal(s.read('docker-compose.yml'), OLD_CONFIG.compose);
+  assert.equal(s.read('relay.env'), OLD_CONFIG.relayEnv);
+  assert.equal(s.read('nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
+  assert.equal(s.read('backup/marker'), OLD_CONFIG.backupMarker);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+  assert.throws(() => statSync(join(s.app, '.incoming')));
+});
+
+test('a failed pull leaves the live files unchanged', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const result = s.run('unpullable');
+  assert.equal(result.status, 1);
+  assert.equal(s.read('docker-compose.yml'), OLD_CONFIG.compose);
+  assert.equal(s.read('relay.env'), OLD_CONFIG.relayEnv);
+  assert.equal(s.read('nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
+  assert.equal(s.read('backup/marker'), OLD_CONFIG.backupMarker);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+  assert.doesNotMatch(s.calls(), /compose up/);
+});
+
+test('a successful deploy leaves the new files live and the old ones in .prev/', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const result = s.run('abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose);
+  assert.equal(s.read('relay.env'), NEW_CONFIG.relayEnv);
+  assert.equal(s.read('nginx-proxy/marker'), NEW_CONFIG.nginxMarker);
+  assert.equal(s.read('backup/marker'), NEW_CONFIG.backupMarker);
+  assert.equal(s.read('.prev/docker-compose.yml'), OLD_CONFIG.compose);
+  assert.equal(s.read('.prev/relay.env'), OLD_CONFIG.relayEnv);
+  assert.equal(s.read('.prev/nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
+  assert.equal(s.read('.prev/backup/marker'), OLD_CONFIG.backupMarker);
+  assert.throws(() => statSync(join(s.app, '.incoming')));
+});
+
+test('a second staged deploy replaces the older .prev/ instead of merging with it', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const first = s.run('abc123');
+  assert.equal(first.status, 0, first.stderr);
+  const NEWER_CONFIG = {
+    compose: 'newer compose\n', relayEnv: 'newer relay env\n', nginxMarker: 'newer nginx\n', backupMarker: 'newer backup\n',
+  };
+  mkdirSync(join(s.app, '.incoming'));
+  writeFileSync(join(s.app, '.incoming', 'docker-compose.yml'), NEWER_CONFIG.compose);
+  writeFileSync(join(s.app, '.incoming', 'relay.env'), NEWER_CONFIG.relayEnv);
+  mkdirSync(join(s.app, '.incoming', 'nginx-proxy'));
+  writeFileSync(join(s.app, '.incoming', 'nginx-proxy', 'marker'), NEWER_CONFIG.nginxMarker);
+  mkdirSync(join(s.app, '.incoming', 'backup'));
+  writeFileSync(join(s.app, '.incoming', 'backup', 'marker'), NEWER_CONFIG.backupMarker);
+  const second = s.run('def456');
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(s.read('docker-compose.yml'), NEWER_CONFIG.compose);
+  assert.equal(s.read('.prev/docker-compose.yml'), NEW_CONFIG.compose);
+  assert.equal(s.read('.prev/relay.env'), NEW_CONFIG.relayEnv);
 });

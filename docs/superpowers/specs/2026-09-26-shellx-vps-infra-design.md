@@ -187,14 +187,14 @@ Image `web` (`web/Dockerfile`): build Astro bằng Node 22 (`npm ci && npm run b
 - Muốn app hiện "có bản mới" thì sửa `LATEST_AGENT_VERSION`, `MAC_URL`, `WIN_URL` trong `deploy/relay.env` và push `main`. Có thể làm cùng lúc với tag.
 
 ### 6.3 GitHub secrets
-- Mới:
+- Mới, là **Environment secret** của cả hai GitHub Environment `production` (dùng bởi `deploy.yml`, giới hạn deploy ở nhánh `main`) và `release` (dùng bởi job `publish` trong `release-desktop.yml`) — không phải repository secret:
   - `VPS_HOST`, `VPS_USER`;
   - `VPS_SSH_KEY`: key ed25519 chỉ dùng cho deploy;
   - `VPS_KNOWN_HOSTS`: kết quả `ssh-keyscan` của VPS, người dùng tự đối chiếu dấu vân tay.
 - Bỏ: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
-- Giữ: các secret ký/notarize Apple và Azure.
+- Giữ: các secret ký/notarize Apple và Azure (Environment `release`).
 
-Thêm biến (không phải secret) `VPS_APP_DIR`, mặc định `phu/shellx`. User deploy trên VPS thuộc nhóm `docker` và sở hữu thư mục đó; không cần sudo cho mỗi lần deploy.
+Thêm biến (không phải secret) `VPS_APP_DIR`, là **Environment variable** của cả `production` và `release`, mặc định `phu/shellx`. User deploy trên VPS thuộc nhóm `docker` và sở hữu thư mục đó; không cần sudo cho mỗi lần deploy.
 
 ## 7. Dựng VPS lần đầu (runbook trong `deploy/README.md`)
 Người dùng tự chạy các bước này; Claude chỉ chạy qua SSH khi người dùng cho phép rõ ràng.

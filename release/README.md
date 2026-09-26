@@ -67,8 +67,10 @@ Settings → Environments → `release` → **Environment secrets** → **Add se
 | `AZURE_SIGNING_ENDPOINT` | windows | Signing account endpoint for its region, e.g. `https://weu.codesigning.azure.net/` |
 | `AZURE_SIGNING_ACCOUNT_NAME` | windows | Artifact Signing account name |
 | `AZURE_CERTIFICATE_PROFILE_NAME` | windows | Certificate profile name (Public Trust) |
-The `publish` job also reads the **repository** secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`,
-`VPS_KNOWN_HOSTS` and the variable `VPS_APP_DIR`, shared with `deploy.yml` (see `deploy/README.md`).
+
+The `publish` job also reads the `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` secrets and
+the `VPS_APP_DIR` variable of this same `release` Environment, shared with the `production`
+Environment `deploy.yml` uses (see `deploy/README.md`) — **not** repository secrets or variables.
 Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 
 The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinned in the workflow's
@@ -115,7 +117,7 @@ The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinne
 ### 3. `download.shellx.pro` on the VPS
 
 1. Set up the VPS as described in `deploy/README.md`: the `web` container serves
-   `~/phu/shellx/downloads/` at `download.shellx.pro`, and the four `VPS_*` repository secrets let
+   `~/phu/shellx/downloads/` at `download.shellx.pro`, and the four `VPS_*` Environment secrets let
    the `publish` job upload into it.
 2. Check: `curl -s -o /dev/null -w '%{http_code}\n' https://download.shellx.pro/desktop/0.0.0/none`
    prints `404`.
@@ -135,11 +137,19 @@ The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinne
 ## Releasing version X.Y.Z
 
 **First release only (v1.0.0):** `web/src/site.config.json` already ships with
-`"desktopVersion": "1.0.0"` (see `web/README.md`). If the website is deployed before this
-procedure has published `1.0.0` to `download.shellx.pro`, its download buttons 404. Run this whole
-procedure for `1.0.0` — through step 5 (Relay) at least — before the branch containing `web/` is
-merged to `main` and deployed by `deploy.yml`; step 6 below then only has to confirm the version
-already matches.
+`"desktopVersion": "1.0.0"` (see `web/README.md`). `download.shellx.pro` is served by the `web`
+container that only `deploy.yml`'s first run creates, so the installers cannot be published before
+that — the general "installers, then relay, then website" order below does not apply to this one
+release. Instead:
+
+- **Merge and deploy first:** merge the branch containing `web/` to `main` and let `deploy.yml`
+  deploy it (`deploy/README.md`, "First-time setup"). The website's download buttons 404 until the
+  next step.
+- **Tag `desktop-v1.0.0` right away** (step 3 of the numbered procedure below): `release-desktop.yml`
+  publishes the installers to the now-running `download.shellx.pro`.
+- Set `LATEST_AGENT_VERSION`, `MAC_URL` and `WIN_URL` in `deploy/relay.env` and push (step 5, Relay,
+  below). Step 6 (Website) below then only has to confirm the version already matches, since
+  `web/src/site.config.json` already ships with `1.0.0`.
 
 1. Set `version: X.Y.Z+N` in `apps/desktop/pubspec.yaml` (increase `N` every release), run the
    desktop tests locally, merge to `main`.
@@ -170,8 +180,9 @@ already matches.
    `npm ci && CHECK_DOWNLOADS=1 npm run build` in `web/` (the "installer URLs are live" check must
    pass), merge to `main`; `deploy.yml` deploys it.
 
-Order matters: installers first, then the relay (which tells running agents to update), then the
-website. The relay and the website must never link to files that are not on `download.shellx.pro` yet.
+After the first release, order matters: installers first, then the relay (which tells running
+agents to update), then the website. The relay and the website must never link to files that are
+not on `download.shellx.pro` yet.
 
 ## When something goes wrong
 

@@ -14,6 +14,9 @@ The only exception is four small files copied once into nginx-proxy's `vhost.d` 
   downloads/desktop/<version>/    # installers, uploaded by release-desktop.yml
   nginx-proxy/           # from deploy/nginx-proxy/: the originals of the vhost.d files (step 5)
   backup/                # from deploy/backup/: the backup container's scripts
+  .incoming/             # deploy.yml stages docker-compose.yml, relay.env, nginx-proxy/, backup/
+                         # here before rollout.sh swaps them into place (transient)
+  .prev/                 # the four items above, as they were before the last swap (manual rollback)
 ```
 
 | Container | Image | What it does |
@@ -24,11 +27,16 @@ The only exception is four small files copied once into nginx-proxy's `vhost.d` 
 
 Pushing to `main` a change under `relay/`, `web/`, `deploy/` or `.github/workflows/deploy.yml` runs
 `.github/workflows/deploy.yml`: build both images (the relay build runs every relay test; the web
-build refuses the `[quốc gia]` placeholder and checks pages and links), push them to GHCR, rsync
-`docker-compose.yml`, `relay.env`, `nginx-proxy/` and `backup/` into `~/phu/shellx`, then run
-`deploy/rollout.sh` over SSH: pull, set `IMAGE_TAG`, `docker compose up -d --remove-orphans`, wait
-up to 60 s for the relay's healthcheck, and put the previous `IMAGE_TAG` back if it never turns
-healthy. Finally it checks `https://relay.shellx.pro/v1/version` and `https://shellx.pro/`.
+build refuses the `[quốc gia]` placeholder and checks pages and links), a cheap preflight (the
+compose file resolves, and the freshly built relay image's config loads from `deploy/relay.env`),
+push both images to GHCR, rsync `docker-compose.yml`, `relay.env`, `nginx-proxy/` and `backup/` into
+`~/phu/shellx/.incoming/` (a staging folder, still inside the app dir), then run
+`deploy/rollout.sh` over SSH: swap `.incoming/` into place (moving the current four items into
+`~/phu/shellx/.prev/` first), pull, set `IMAGE_TAG`, `docker compose up -d --remove-orphans`, wait
+up to 60 s for the relay's healthcheck. If the pull fails, or the relay never turns healthy, it
+restores `.prev/` (so a bad `relay.env` or `docker-compose.yml` never outlives its `IMAGE_TAG`) and,
+on the health failure path, the previous `IMAGE_TAG` too. Finally it checks
+`https://relay.shellx.pro/v1/version` and `https://shellx.pro/`.
 
 ## First-time setup
 
@@ -53,11 +61,17 @@ the VPS as the deploy user unless a step says otherwise.
    ```
 3. **GitHub.** On your machine run `ssh-keyscan -t ed25519 <VPS address>` and compare the printed key
    with the VPS's own `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` fingerprint (`ssh-keygen -lf -`
-   on the scanned line). Then, in the repository: Settings → Secrets and variables → Actions:
-   - **Repository secrets:** `VPS_HOST` (address), `VPS_USER` (deploy user), `VPS_SSH_KEY` (the whole
-     private key file `shellx-deploy`), `VPS_KNOWN_HOSTS` (the verified `ssh-keyscan` line).
-   - **Variables:** `VPS_APP_DIR` = `phu/shellx` (optional: that is the default). It is relative to
-     the deploy user's home.
+   on the scanned line). Then, in the repository:
+   - Settings → Environments → **New environment** → name `production` → **Deployment branches and
+     tags** → **Selected branches and tags** → add `main` (the `deploy` job declares
+     `environment: production`, so only a run on `main` can read what you add next).
+   - Add as **Environment secrets** of `production`: `VPS_HOST` (address), `VPS_USER` (deploy user),
+     `VPS_SSH_KEY` (the whole private key file `shellx-deploy`), `VPS_KNOWN_HOSTS` (the verified
+     `ssh-keyscan` line). Add as an **Environment variable** of `production`: `VPS_APP_DIR` =
+     `phu/shellx` (optional: that is the default; relative to the deploy user's home).
+   - Repeat the same four secrets and the variable on the existing `release` Environment (see
+     `release/README.md`): `release-desktop.yml`'s `publish` job uploads installers to the same VPS
+     and needs them too. None of these are **repository** secrets or variables.
    - Remove the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 4. **First deploy.** Push to `main` or run **Actions → Deploy → Run workflow**. The first run pushes
    the two images to GHCR as *private* packages, so the VPS cannot pull them and the run fails at
@@ -108,9 +122,15 @@ All commands run in `~/phu/shellx`.
 
 - **Logs:** `docker compose logs -f relay` (metadata only: time, `device_id`, error kind; never IPs,
   e-mail addresses, tokens or payloads). Docker keeps at most 3 × 10 MB per container.
-- **Roll back:** Actions → Deploy → Run workflow with `ref` = an older commit SHA (images are rebuilt
-  from that commit), or on the VPS set `IMAGE_TAG=<older sha>` in `.env` and run
-  `docker compose up -d`. Images of every deployed commit stay in GHCR.
+- **Roll back:** Actions → Deploy → Run workflow with `ref` = an older, full 40-character commit SHA
+  (images are rebuilt from that commit; this also re-stages and re-swaps `docker-compose.yml`,
+  `relay.env`, `nginx-proxy/` and `backup/` as they were at that commit), or on the VPS set
+  `IMAGE_TAG=<older sha>` in `.env` and run `docker compose up -d` (this alone does not touch the
+  four config items). Images of every deployed commit stay in GHCR. A failed automatic rollout
+  already restores `~/phu/shellx/.prev/` and the previous `IMAGE_TAG` on its own (see above); to redo
+  that by hand after a *successful* deploy you regret, on the VPS: `cd ~/phu/shellx && for f in
+  docker-compose.yml relay.env nginx-proxy backup; do rm -rf "$f" && mv ".prev/$f" "./$f"; done` and
+  set `IMAGE_TAG` back in `.env`, then `docker compose up -d --remove-orphans`.
 - **Versions and download links:** edit `deploy/relay.env` and push `main`.
 - **Emergency password reset:** see `relay/README.md` (`docker compose exec relay node dist/scripts/reset-password.js …`).
 - **Backups:** `backups/relay-<date>.db`, written at 03:00 VPS time; the 14 newest are kept. The
@@ -133,5 +153,6 @@ All commands run in `~/phu/shellx`.
 ## Tests of the deploy scripts
 
 `node --test deploy/tests/*.test.mjs` runs `rollout.sh` against a fake `docker` (health, rollback,
-pull failure, missing `PROXY_NETWORK`, wrong `data/` owner) and `backup/backup-once.sh` with the
-local `sqlite3` (rotation, missing and unreadable databases).
+pull failure, missing `PROXY_NETWORK`, wrong `data/` owner, staging and restoring `.incoming/`/
+`.prev/` config) and `backup/backup-once.sh` with the local `sqlite3` (rotation, missing and
+unreadable databases).

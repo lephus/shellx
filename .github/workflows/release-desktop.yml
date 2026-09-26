@@ -230,8 +230,9 @@ jobs:
     if: needs.prepare.outputs.dry_run == 'false' && startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Same Environment gate as the signing jobs. The VPS_* secrets are repository secrets shared
-    # with deploy.yml; this job only ever writes into $APP_DIR/downloads on the VPS.
+    # Same Environment gate as the signing jobs. The VPS_* secrets and the VPS_APP_DIR variable are
+    # Environment secrets/variables shared with the production Environment deploy.yml uses (see
+    # deploy/README.md); this job only ever writes into $APP_DIR/downloads on the VPS.
     environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -260,30 +261,32 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
-          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /"
+          # Relative, no leading '-' (could be read as a flag) and no '.'/'..' path segment. The
+          # dotdot check is kept in a variable: some bash versions strip backslash escapes from an
+          # inline =~ pattern, which would silently turn \.\.? into an unescaped, near-universal ..?.
+          dotdot_re='(^|/)\.\.?(/|$)'
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
             exit 1
           fi
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
           {
             echo "Host vps"
             echo "  HostName $VPS_HOST"
             echo "  User $VPS_USER"
-            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentityFile $RUNNER_TEMP/deploy_key"
             echo "  IdentitiesOnly yes"
             echo "  StrictHostKeyChecking yes"
-            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
             echo "  BatchMode yes"
-          } > ~/.ssh/config
-          chmod 600 ~/.ssh/config
+          } > "$RUNNER_TEMP/ssh_config"
+          echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
       - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
         run: |
-          ssh vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION'"
-          rsync -t --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION'"
+          rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
             "vps:$APP_DIR/downloads/desktop/$VERSION/"
       - name: Verify public download URLs
         run: |
@@ -305,4 +308,4 @@ jobs:
           done
       - name: Remove the SSH key
         if: always()
-        run: rm -f ~/.ssh/deploy_key ~/.ssh/config
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts" "$RUNNER_TEMP/ssh_config"
