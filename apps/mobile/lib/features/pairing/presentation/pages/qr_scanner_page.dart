@@ -411,6 +411,14 @@ class _CameraScannerState extends State<_CameraScanner> {
   );
   late final AppLifecycleListener _lifecycle;
 
+  /// Armed only by [_openSettings]. On Android, `start()` itself requests the permission, and
+  /// `requestPermissions` launches `GrantPermissionsActivity`, which pauses and resumes the app
+  /// exactly like leaving for the phone's Settings does. Restarting on *that* resume too would
+  /// ask for the permission again at once and loop: only the resume right after the user's own
+  /// tap on "Mở Cài đặt" may restart the camera, and this is cleared as soon as it does, denied
+  /// again or not.
+  bool _awaitingSettingsResume = false;
+
   @override
   void initState() {
     super.initState();
@@ -422,9 +430,16 @@ class _CameraScannerState extends State<_CameraScanner> {
   /// phone's Settings and comes back, start the camera here. Starting may fail again (still
   /// denied); the error builder then keeps showing the notice.
   void _restartAfterPermission() {
+    if (!_awaitingSettingsResume) return;
+    _awaitingSettingsResume = false;
     if (_scanner.value.error?.errorCode != MobileScannerErrorCode.permissionDenied) return;
     // Still denied (or the camera is busy): the error builder keeps showing why.
     unawaited(_scanner.start().catchError((Object _) {}));
+  }
+
+  void _openSettings() {
+    _awaitingSettingsResume = true;
+    unawaited(getIt<ExternalLinks>().openAppSettingsOrToast());
   }
 
   @override
@@ -462,7 +477,7 @@ class _CameraScannerState extends State<_CameraScanner> {
                     16.sizedHeight,
                     AppButton(
                       title: strings.openSettings,
-                      onTap: () => getIt<ExternalLinks>().openAppSettingsOrToast(),
+                      onTap: _openSettings,
                     ),
                   ],
                 ],

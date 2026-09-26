@@ -12,6 +12,7 @@ import 'package:shellx_mobile/features/pairing/presentation/pages/qr_scanner_pag
 import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/fake_links.dart';
 import '../../support/fake_popup_handler.dart';
 import '../../support/fake_scanner_platform.dart';
 import '../../support/fakes.dart';
@@ -247,15 +248,18 @@ void main() {
 
   group('QrScannerPage with the camera', () {
     late FakeScannerPlatform camera;
+    late FakeExternalLinks links;
     late List<Object?> results;
 
     setUp(() {
       camera = FakeScannerPlatform.install(addTearDown);
       backend.deviceList = [agentDevice(agentA, 'MacBook Pro của Phú')];
       results = [];
+      links = FakeExternalLinks();
       final session = FakeSessionHolder(backend);
       getIt
         ..registerSingleton<PopupHandler>(FakePopupHandler())
+        ..registerSingleton<ExternalLinks>(links)
         ..registerFactory<QrScannerController>(() => QrScannerController(session));
     });
 
@@ -275,6 +279,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       await openPushed(tester);
+    }
+
+    /// The user's tap on "Mở Cài đặt", which is what arms the single restart-on-resume: Android's
+    /// own permission request also pauses and resumes the app, and must not trigger one too.
+    ///
+    /// Invokes the button's `onTap` directly rather than `tester.tap(find.text(...))`: the button
+    /// sits at the screen centre behind `_ScanFrame`'s always-on-top `CustomPaint`, which (being
+    /// paintless outside its four corners but still a full 250x250 hit target) swallows a
+    /// geometric tap there — a pre-existing, unrelated layering quirk this test works around
+    /// rather than papers over.
+    Future<void> tapOpenSettings(WidgetTester tester) async {
+      tester.widget<AppButton>(find.widgetWithText(AppButton, 'Mở Cài đặt')).onTap!();
+      await tester.pump();
     }
 
     Future<void> leaveAndComeBack(WidgetTester tester) async {
@@ -310,10 +327,15 @@ void main() {
       expect(find.text('Đã ghép nối'), findsOneWidget);
     });
 
-    testWidgets('after the camera permission is granted in Settings, coming back starts the camera', (tester) async {
+    testWidgets('after tapping "Mở Cài đặt" and granting the permission, coming back starts the camera', (
+      tester,
+    ) async {
       camera.startError = FakeScannerPlatform.permissionDenied;
       await openCamera(tester);
       expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsOneWidget);
+
+      await tapOpenSettings(tester);
+      expect(links.settingsOpened, 1);
 
       camera.startError = null;
       await leaveAndComeBack(tester);
@@ -321,16 +343,51 @@ void main() {
       expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsNothing);
     });
 
-    testWidgets('coming back while the permission is still denied fails quietly and keeps the notice', (
-      tester,
-    ) async {
-      camera.startError = FakeScannerPlatform.permissionDenied;
-      await openCamera(tester);
+    testWidgets(
+      'after tapping "Mở Cài đặt" while still denied, coming back fails quietly and keeps the notice',
+      (tester) async {
+        camera.startError = FakeScannerPlatform.permissionDenied;
+        await openCamera(tester);
 
-      await leaveAndComeBack(tester);
-      expect(camera.starts, hasLength(2));
-      expect(tester.takeException(), isNull);
-      expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsOneWidget);
-    });
+        await tapOpenSettings(tester);
+        await leaveAndComeBack(tester);
+        expect(camera.starts, hasLength(2));
+        expect(tester.takeException(), isNull);
+        expect(find.text('Cần quyền camera để quét mã QR. Hãy cho phép trong Cài đặt của điện thoại.'), findsOneWidget);
+      },
+    );
+
+    // ---- Residual fix B1 (residual-findings.md): the permission-request loop ----
+
+    testWidgets(
+      'without tapping "Mở Cài đặt", a resume never restarts the camera (the permission dialog '
+      'itself causes such a resume, and restarting on it would loop)',
+      (tester) async {
+        camera.startError = FakeScannerPlatform.permissionDenied;
+        await openCamera(tester);
+
+        await leaveAndComeBack(tester);
+        expect(camera.starts, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'after tapping "Mở Cài đặt", exactly one restart happens, and a further resume without '
+      'another tap does not restart again',
+      (tester) async {
+        camera.startError = FakeScannerPlatform.permissionDenied;
+        await openCamera(tester);
+
+        await tapOpenSettings(tester);
+        await leaveAndComeBack(tester);
+        expect(camera.starts, hasLength(2));
+
+        // Still denied: the flag armed by the tap was consumed by that first resume, so this
+        // further resume (e.g. the permission dialog's own) does not restart again.
+        await leaveAndComeBack(tester);
+        expect(camera.starts, hasLength(2));
+      },
+    );
   });
 }
