@@ -1,4 +1,4 @@
-# ShellX v1.0 — Bàn giao để tiếp tục (tạm dừng 2026-09-25)
+# ShellX v1.0 — Bàn giao để tiếp tục (cập nhật 2026-09-26: cả 6 plan đã merge)
 
 Tài liệu này đủ để một phiên Claude mới (hoặc chính phiên cũ khi resume) tiếp tục đúng chỗ. Đọc hết trước khi làm gì.
 
@@ -19,20 +19,20 @@ Tài liệu này đủ để một phiên Claude mới (hoặc chính phiên cũ
 | 01 | Relay | đã merge (bfa442b), worktree đã xóa | ✅ Xong (211 test). Ledger: `docs/superpowers/ledgers/plan01-relay.md`. Việc tiếp: merge `feat/shellx-v1` vào nhánh plan 03 (sau khi Task 9 xong) để E2E Task 15 chạy relay thật |
 | 03 | `shellx_agent` + `shellx_client` + E2E | đã merge (e5aecb0), worktree đã xóa | ✅ Xong (agent 167, client 98, e2e 7 trên relay local). Ledger: `docs/superpowers/ledgers/plan03-agent-client.md` |
 | 04 | Desktop (Flutter) | đã merge (25ddd75), worktree đã xóa | ✅ Xong (desktop 269, PTY integration 21 trên macOS). Windows **chưa kiểm chứng** cho tới khi chạy Windows CI (checklist trong ledger). Ledger: `docs/superpowers/ledgers/plan04-desktop.md` |
-| 05 | Mobile (Flutter) | `feat/shellx-v1-mobile` · `.worktrees/mobile` | Plan đã viết lại trên base yallabb + thiết kế đã duyệt (efbfb1c, 19 task, đã replay xanh). Task 1–8 chỉ cần core; Task 9 cần plan 03 Task 10; Task 10–19 cần plan 03 Task 11–14 và pairing id |
+| 05 | Mobile (Flutter) | đã merge (0e9ca47), worktree đã xóa | ✅ Xong (mobile 501 test; build debug APK + iOS đã chạy). App id `com.shellx.prod`, logo mới. Ledger: `docs/superpowers/ledgers/plan05-mobile.md` |
 
 Ledger chi tiết (mỗi task, mọi phán quyết "Ruling", mọi lỗi nhỏ hoãn lại):
-- Đang chạy: `.worktrees/<relay|agent-client|desktop>/.superpowers/sdd/<plan>/progress.md` (gitignored, trên đĩa).
-- Bản sao trong repo: `docs/superpowers/ledgers/` (plan01, 02, 03, 04, 06 đầy đủ; các file `.snapshot.md` là bản lúc tạm dừng).
+- Bản sao trong repo: `docs/superpowers/ledgers/` (plan01–06 đầy đủ; các file `.snapshot.md` là bản lúc tạm dừng).
 
-## 3. Việc cần làm ngay khi tiếp tục (theo thứ tự)
+## 3. Trạng thái và việc tiếp theo
 
-1. **Relay Task 10 vòng sửa 3**: giao implementer mới (sonnet) hoàn tất từ commit WIP, theo thiết kế: `relay/scripts/prompter.ts` với `createLinePrompter` (stdin không phải TTY: đọc `fs.readFileSync(0)` một lần, lười — chỉ khi cần hỏi), `createTtyPrompter` (readline/promises, reject khi 'close'), `createPrompter()`; mật khẩu trước, xác nhận sau; lỗi một dòng + exit 1; 4 lệnh smoke (xem ledger relay). Sau đó review ngắn.
-2. **Relay Task 11**: README/runbook + phán quyết: kiểm tra Workers Logs (observability) có ghi IP/header client không; nếu có thì tắt invocation logs trong `relay/wrangler.jsonc` (privacy policy cam kết IP chỉ dùng tạm cho rate limit). Rồi review cuối toàn nhánh relay (opus) → một lượt sửa → merge vào `feat/shellx-v1`, và merge `feat/shellx-v1` vào nhánh plan 03 (E2E Task 15 cần relay thật: `cd relay && npm run dev -- --ip 127.0.0.1 --port 8787`).
-3. **Plan 03**: chạy review ngắn cho Task 6 (base c29cbdd → 1cc10c6), rồi Task 7 → 15. Gộp vào lượt sửa cuối của plan 03 các lỗi nhỏ đã ghi "FOLD INTO FINAL FIX WAVE" (Task 4: N1–N4).
-4. **Plan 04**: hoàn tất Task 2 (từ WIP), Task 3–5; chờ plan 03 Task 9 rồi merge và làm Task 6–11. Ghi nhớ các điểm mang theo trong ledger desktop (một `SecureKeyValueStore`/`TrustedStore` dùng chung; đường phục hồi từ `replaced`; dừng relay trước `api.logout()`; Windows `SetQuitOnClose(true)` phải thành ẩn xuống tray).
-5. **Plan 05**: dùng bản plan đã viết lại theo base yallabb (§6). Các task không cần `ClientService` (scaffold, adapter nền tảng, text lỗi, phím/extra keys, khóa sinh trắc) có thể làm trước; phần còn lại chờ plan 03 Task 12–14.
-6. Cuối cùng: chạy CI đầy đủ trên `feat/shellx-v1`, bật check "CI result" bắt buộc, rồi hỏi người dùng về PR vào `main` và việc triển khai Cloudflare.
+Toàn bộ code v1.0 đã nằm trên `feat/shellx-v1` (chưa push). Kiểm chứng trên máy lúc merge plan 05: core 261, client 98, agent 167, desktop 269, mobile 501 test xanh; `flutter analyze` sạch cho mọi package/app; relay (238) và web không đổi kể từ lúc merge; e2e 7/7 lúc merge plan 03.
+
+Việc còn lại — tất cả cần người dùng quyết/cung cấp:
+1. **Push + PR vào `main`** để CI chạy trên Windows (desktop Windows chưa kiểm chứng; checklist trong `ledgers/plan04-desktop.md`), rồi bật check "CI result" bắt buộc.
+2. **Triển khai Cloudflare** (mục 4).
+3. **Kiểm tra thủ công trên thiết bị thật** — mobile: đăng nhập, quét QR (kể cả Android "Quét lại" cùng mã, cấp quyền camera từ Cài đặt), Face ID khi mở lại, IME tiếng Việt / phím cứng gửi trùng, dán từ gợi ý clipboard của bàn phím; desktop: đăng nhập GUI, ghép nối, banner thông báo, ⌘Q.
+4. Việc gia cố nên làm sau (không chặn phát hành): một test tích hợp mobile chạy `ClientBackend` → `TerminalPageController` qua relay trong bộ nhớ của `shellx_e2e` với `SessionManager` thật; khoảng hẹp `PendingUnpairs.retry` có thể xóa một lần ghép nối lại diễn ra đúng lúc đăng nhập (xem ledger plan 05).
 
 ## 4. Việc chờ người dùng (không chặn code)
 
@@ -40,7 +40,7 @@ Ledger chi tiết (mỗi task, mọi phán quyết "Ruling", mọi lỗi nhỏ h
 - **GitHub Environment `release`** (tag `desktop-v*` + nhánh `main`) với 13 secret — xem `release/README.md`.
 - **Pháp lý**: tên pháp nhân/địa chỉ cho privacy/terms; nhờ người có chuyên môn xem lại (hiện ghi "ShellX", luật Việt Nam, 16 tuổi, log ≤ 30 ngày).
 - **Ký Windows**: Azure Trusted Signing có thể không nhận nhà phát hành ở Việt Nam → phương án chứng chỉ OV.
-- **Icon/thương hiệu**: chưa có kế hoạch nào; app đang dùng icon mặc định Flutter.
+- **Icon/thương hiệu**: mobile đã dùng logo người dùng gửi (2026-09-26); cần bản 1024×1024 hoặc SVG để icon App Store nét (thay `apps/mobile/assets/branding/*` rồi chạy `apps/mobile/tool/gen_app_icons.py`). Desktop/web chưa đổi logo.
 
 ## 5. Quy tắc làm việc đã thống nhất
 
@@ -61,3 +61,8 @@ Người dùng: "Mobile bạn hãy lấy /Users/lehuuphu/Documents/workspace/Dig
 - Mọi hành vi ShellX (text §12, hợp đồng overview §5, Review Focus, ba port `ShellxBackend`/`MachineSession`/`TabHandle`) giữ nguyên; chỉ đổi khung ứng dụng.
 
 - Thiết kế UI mobile đã được người dùng duyệt ("quá tốt, làm theo design đi", 2026-09-25): `docs/superpowers/design/2026-09-25-shellx-mobile-ui.html` (artifact: https://claude.ai/artifact/PiUZitLBpKWQmkjuesTmJ7), gồm bảng màu tối mới và 5 chi tiết ngoài spec (nay đã ghi vào spec §9.2). Plan 05 phải bám theo thiết kế này.
+
+## 7. Quyết định ngày 2026-09-26
+
+- App mobile: bundle id iOS và applicationId/namespace Android là **`com.shellx.prod`** (thay `pro.shellx.mobile` trong plan/ledger cũ). Desktop giữ `pro.shellx.desktop`.
+- Logo mobile: nguồn `apps/mobile/assets/branding/logo_shellx_{rounded,square}.png`; icon iOS (RGB, không alpha), Android adaptive (+ monochrome) và logo trong app sinh bằng `apps/mobile/tool/gen_app_icons.py`.
