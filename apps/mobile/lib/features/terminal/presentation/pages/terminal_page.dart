@@ -57,14 +57,17 @@ class _TerminalPageState extends State<TerminalPage> {
   /// Pops this page with [exit] after the current frame: the exit can already be known while the
   /// page is first built (R6), and navigating during a build is not allowed. A sheet or dialog
   /// still open on top (the session picker, a confirmation, the font size) is closed first, or the
-  /// router would pop it with [exit] as its result.
+  /// router would pop it with [exit] as its result. A page that another navigation already took off
+  /// the stack (a sign-out replaces it with the login page) pops nothing: the top route is not its.
   void _onExit(TerminalExit? exit) {
     if (exit == null || _leaving) return;
     _leaving = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route is! PopupRoute);
-      context.router.maybePop(exit);
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      Navigator.of(context).popUntil((other) => other is! PopupRoute);
+      if (route.isCurrent) context.router.maybePop(exit);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }

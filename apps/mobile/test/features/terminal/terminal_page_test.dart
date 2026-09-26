@@ -9,6 +9,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
+import 'package:shellx_mobile/features/terminal/presentation/pages/terminal_page.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:xterm/xterm.dart';
 
@@ -506,5 +507,38 @@ void main() {
     expect(results, [TerminalExit.untrusted]);
     expect(find.text('open'), findsOneWidget);
     expect(machine.connectCalls, 0);
+  });
+
+  testWidgets('R1: a page that another navigation already took off the stack pops nothing on its way out', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      routedApp(
+        open: () => TerminalRoute(agentId: agentA, machineName: 'MacBook-Pro'),
+        routes: [
+          AutoRoute(page: TerminalRoute.page),
+          stubRoute('FirstStub'),
+          stubRoute('SecondStub'),
+        ],
+        results: results,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await openPushed(tester);
+    final router = AutoRouter.of(tester.element(find.byType(TerminalPage))).root;
+
+    // The page's exit is known (it pops after this frame) while a sign-out replaces the whole
+    // stack, as `SessionEnforcer` does.
+    machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+    unawaited(router.replaceAll(const [PageRouteInfo('FirstStub'), PageRouteInfo('SecondStub')]));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect([for (final page in router.stack) page.routeData.name], ['FirstStub', 'SecondStub']);
+    expect(find.text('SecondStub stub'), findsOneWidget);
+    expect(find.byType(TerminalPage), findsNothing);
   });
 }
