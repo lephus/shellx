@@ -52,7 +52,11 @@ class _QrScannerPageState extends State<QrScannerPage> {
             fit: StackFit.expand,
             children: [
               widget.scannerBuilder(context, _onCode),
-              const _ScanFrame(),
+              // Purely decorative: without this, its CustomPaint (whose painter never overrides
+              // `hitTest`, so `RenderCustomPaint.hitTestSelf` defaults to true) absorbs every tap
+              // in its centred 250x250 box, including "Mở Cài đặt" underneath when the camera
+              // permission is denied — a user who denied it once could never recover.
+              const IgnorePointer(child: _ScanFrame()),
               SafeArea(
                 child: Column(
                   children: [

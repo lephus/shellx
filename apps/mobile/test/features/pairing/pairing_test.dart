@@ -282,15 +282,11 @@ void main() {
     }
 
     /// The user's tap on "Mở Cài đặt", which is what arms the single restart-on-resume: Android's
-    /// own permission request also pauses and resumes the app, and must not trigger one too.
-    ///
-    /// Invokes the button's `onTap` directly rather than `tester.tap(find.text(...))`: the button
-    /// sits at the screen centre behind `_ScanFrame`'s always-on-top `CustomPaint`, which (being
-    /// paintless outside its four corners but still a full 250x250 hit target) swallows a
-    /// geometric tap there — a pre-existing, unrelated layering quirk this test works around
-    /// rather than papers over.
+    /// own permission request also pauses and resumes the app, and must not trigger one too. A
+    /// real geometric tap: the button sits at the screen centre, under `_ScanFrame`'s
+    /// always-on-top decoration, and must actually be reachable there.
     Future<void> tapOpenSettings(WidgetTester tester) async {
-      tester.widget<AppButton>(find.widgetWithText(AppButton, 'Mở Cài đặt')).onTap!();
+      await tester.tap(find.text('Mở Cài đặt'));
       await tester.pump();
     }
 
