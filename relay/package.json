@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.1",
-    "@phi-ag/argon2": "0.5.28",
+    "@node-rs/argon2": "2.2.1",
     "better-sqlite3": "13.0.3",
     "hono": "^4.13.9"
   },

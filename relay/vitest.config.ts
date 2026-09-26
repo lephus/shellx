@@ -7,7 +7,6 @@ const NOT_YET_PORTED = [
   "test/devices-pairings.test.ts",
   "test/hub.test.ts",
   "test/limits.test.ts",
-  "test/password.test.ts",
   "test/rate-limit.test.ts",
   "test/reset-password.test.ts",
 ];
