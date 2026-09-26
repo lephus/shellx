@@ -166,6 +166,31 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
     });
+
+    testWidgets('a focused field keeps focus across inactive -> resumed while the lock is on but not engaged', (
+      tester,
+    ) async {
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      await tester.pumpWidget(
+        localized(
+          Scaffold(body: TextField(focusNode: focusNode, autofocus: true)),
+          builder: (context, child) => LockGate(lock: lock, child: child!),
+        ),
+      );
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsOneWidget);
+      expect(focusNode.hasFocus, isTrue);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsNothing);
+      expect(focusNode.hasFocus, isTrue);
+    });
   });
 
   group('system back while locked', () {

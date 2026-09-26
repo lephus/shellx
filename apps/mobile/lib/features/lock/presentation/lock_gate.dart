@@ -90,7 +90,10 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
       final locked = widget.lock.isLocked.value;
       return Stack(
         children: [
-          ExcludeFocus(excluding: locked || _covered, child: widget.child),
+          // The cover is visual only: excluding focus while merely `_covered` (not `locked`)
+          // would drop the terminal's soft-keyboard focus every time the app switcher snapshot
+          // is taken, and it never comes back.
+          ExcludeFocus(excluding: locked, child: widget.child),
           // BlockSemantics drops the hidden terminal's accessibility nodes too, not only its
           // focus (a screen reader must not be able to swipe past the lock screen).
           if (locked)
