@@ -10,23 +10,43 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i5;
-import 'package:flutter/foundation.dart' as _i7;
-import 'package:shellx_mobile/core/core.dart' as _i6;
-import 'package:shellx_mobile/features/app/splash_page.dart' as _i2;
-import 'package:shellx_mobile/features/app/start_page.dart' as _i3;
+import 'package:auto_route/auto_route.dart' as _i7;
+import 'package:flutter/foundation.dart' as _i9;
+import 'package:shellx_mobile/core/core.dart' as _i8;
+import 'package:shellx_mobile/features/app/splash_page.dart' as _i4;
+import 'package:shellx_mobile/features/app/start_page.dart' as _i5;
 import 'package:shellx_mobile/features/pairing/presentation/pages/qr_scanner_page.dart'
+    as _i2;
+import 'package:shellx_mobile/features/settings/presentation/pages/delete_account_page.dart'
     as _i1;
+import 'package:shellx_mobile/features/settings/presentation/pages/settings_page.dart'
+    as _i3;
 import 'package:shellx_mobile/features/terminal/presentation/pages/terminal_page.dart'
-    as _i4;
+    as _i6;
 
 /// generated route for
-/// [_i1.QrScannerPage]
-class QrScannerRoute extends _i5.PageRouteInfo<QrScannerRouteArgs> {
+/// [_i1.DeleteAccountPage]
+class DeleteAccountRoute extends _i7.PageRouteInfo<void> {
+  const DeleteAccountRoute({List<_i7.PageRouteInfo>? children})
+    : super(DeleteAccountRoute.name, initialChildren: children);
+
+  static const String name = 'DeleteAccountRoute';
+
+  static _i7.PageInfo page = _i7.PageInfo(
+    name,
+    builder: (data) {
+      return const _i1.DeleteAccountPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i2.QrScannerPage]
+class QrScannerRoute extends _i7.PageRouteInfo<QrScannerRouteArgs> {
   QrScannerRoute({
-    _i6.Key? key,
-    _i1.ScannerViewBuilder scannerBuilder = _i1.cameraScannerView,
-    List<_i5.PageRouteInfo>? children,
+    _i8.Key? key,
+    _i2.ScannerViewBuilder scannerBuilder = _i2.cameraScannerView,
+    List<_i7.PageRouteInfo>? children,
   }) : super(
          QrScannerRoute.name,
          args: QrScannerRouteArgs(key: key, scannerBuilder: scannerBuilder),
@@ -35,13 +55,13 @@ class QrScannerRoute extends _i5.PageRouteInfo<QrScannerRouteArgs> {
 
   static const String name = 'QrScannerRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<QrScannerRouteArgs>(
         orElse: () => const QrScannerRouteArgs(),
       );
-      return _i1.QrScannerPage(
+      return _i2.QrScannerPage(
         key: args.key,
         scannerBuilder: args.scannerBuilder,
       );
@@ -52,12 +72,12 @@ class QrScannerRoute extends _i5.PageRouteInfo<QrScannerRouteArgs> {
 class QrScannerRouteArgs {
   const QrScannerRouteArgs({
     this.key,
-    this.scannerBuilder = _i1.cameraScannerView,
+    this.scannerBuilder = _i2.cameraScannerView,
   });
 
-  final _i6.Key? key;
+  final _i8.Key? key;
 
-  final _i1.ScannerViewBuilder scannerBuilder;
+  final _i2.ScannerViewBuilder scannerBuilder;
 
   @override
   String toString() {
@@ -76,45 +96,61 @@ class QrScannerRouteArgs {
 }
 
 /// generated route for
-/// [_i2.SplashPage]
-class SplashRoute extends _i5.PageRouteInfo<void> {
-  const SplashRoute({List<_i5.PageRouteInfo>? children})
+/// [_i3.SettingsPage]
+class SettingsRoute extends _i7.PageRouteInfo<void> {
+  const SettingsRoute({List<_i7.PageRouteInfo>? children})
+    : super(SettingsRoute.name, initialChildren: children);
+
+  static const String name = 'SettingsRoute';
+
+  static _i7.PageInfo page = _i7.PageInfo(
+    name,
+    builder: (data) {
+      return const _i3.SettingsPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i4.SplashPage]
+class SplashRoute extends _i7.PageRouteInfo<void> {
+  const SplashRoute({List<_i7.PageRouteInfo>? children})
     : super(SplashRoute.name, initialChildren: children);
 
   static const String name = 'SplashRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i2.SplashPage();
+      return const _i4.SplashPage();
     },
   );
 }
 
 /// generated route for
-/// [_i3.StartPage]
-class StartRoute extends _i5.PageRouteInfo<void> {
-  const StartRoute({List<_i5.PageRouteInfo>? children})
+/// [_i5.StartPage]
+class StartRoute extends _i7.PageRouteInfo<void> {
+  const StartRoute({List<_i7.PageRouteInfo>? children})
     : super(StartRoute.name, initialChildren: children);
 
   static const String name = 'StartRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i3.StartPage();
+      return const _i5.StartPage();
     },
   );
 }
 
 /// generated route for
-/// [_i4.TerminalPage]
-class TerminalRoute extends _i5.PageRouteInfo<TerminalRouteArgs> {
+/// [_i6.TerminalPage]
+class TerminalRoute extends _i7.PageRouteInfo<TerminalRouteArgs> {
   TerminalRoute({
-    _i7.Key? key,
+    _i9.Key? key,
     required String agentId,
     required String machineName,
-    List<_i5.PageRouteInfo>? children,
+    List<_i7.PageRouteInfo>? children,
   }) : super(
          TerminalRoute.name,
          args: TerminalRouteArgs(
@@ -127,11 +163,11 @@ class TerminalRoute extends _i5.PageRouteInfo<TerminalRouteArgs> {
 
   static const String name = 'TerminalRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<TerminalRouteArgs>();
-      return _i4.TerminalPage(
+      return _i6.TerminalPage(
         key: args.key,
         agentId: args.agentId,
         machineName: args.machineName,
@@ -147,7 +183,7 @@ class TerminalRouteArgs {
     required this.machineName,
   });
 
-  final _i7.Key? key;
+  final _i9.Key? key;
 
   final String agentId;
 

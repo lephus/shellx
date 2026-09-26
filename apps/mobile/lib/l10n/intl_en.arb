@@ -340,6 +340,7 @@
       }
     }
   },
+  "settingsUnpairFailed": "Couldn't unpair yet.",
   "settingsAccountGroup": "Account",
   "settingsEmail": "Email",
   "settingsLogout": "Sign out",

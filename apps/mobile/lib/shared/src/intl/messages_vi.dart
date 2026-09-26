@@ -316,6 +316,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Cài đặt"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Bỏ ghép nối"),
     "settingsUnpairConfirm": m20,
+    "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
+      "Chưa bỏ ghép nối được.",
+    ),
     "settingsVersion": m21,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Tài khoản đã được xóa.",

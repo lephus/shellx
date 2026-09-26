@@ -1529,6 +1529,16 @@ class S {
     );
   }
 
+  /// `Couldn't unpair yet.`
+  String get settingsUnpairFailed {
+    return Intl.message(
+      'Couldn\'t unpair yet.',
+      name: 'settingsUnpairFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Account`
   String get settingsAccountGroup {
     return Intl.message(

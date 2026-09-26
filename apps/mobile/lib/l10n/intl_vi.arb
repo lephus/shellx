@@ -163,6 +163,7 @@
   "settingsNoPairedMachines": "Chưa ghép nối máy nào.",
   "settingsUnpair": "Bỏ ghép nối",
   "settingsUnpairConfirm": "Bỏ ghép nối {name}? Bạn sẽ phải quét lại mã QR để dùng máy này.",
+  "settingsUnpairFailed": "Chưa bỏ ghép nối được.",
   "settingsAccountGroup": "Tài khoản",
   "settingsEmail": "Email",
   "settingsLogout": "Đăng xuất",

@@ -325,6 +325,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Unpair"),
     "settingsUnpairConfirm": m20,
+    "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
+      "Couldn\'t unpair yet.",
+    ),
     "settingsVersion": m21,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Your account has been deleted.",

@@ -450,6 +450,10 @@ class FakeSessionHolder implements SessionHolder {
   int foregroundCalls = 0;
   final List<String> deletePasswords = [];
   Object? deleteError;
+
+  /// [deleteAccount] completes only once this does, so a test can observe [DeleteAccountController]
+  /// while a deletion is still pending.
+  Completer<void>? deleteGate;
   final List<(String, String, String)> authCalls = [];
   Object? authError;
 
@@ -508,6 +512,8 @@ class FakeSessionHolder implements SessionHolder {
   @override
   Future<void> deleteAccount(String password) async {
     deletePasswords.add(password);
+    final gate = deleteGate;
+    if (gate != null) await gate.future;
     final error = deleteError;
     if (error != null) throw error;
   }

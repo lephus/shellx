@@ -21,6 +21,10 @@ import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
 import '../../features/pairing/presentation/controllers/qr_scanner_controller.dart'
     as _i1044;
+import '../../features/settings/presentation/controllers/delete_account_controller.dart'
+    as _i907;
+import '../../features/settings/presentation/controllers/settings_controller.dart'
+    as _i1035;
 import '../../features/terminal/presentation/controllers/terminal_page_controller.dart'
     as _i229;
 import '../../features/terminal/presentation/controllers/terminal_workspace.dart'
@@ -112,6 +116,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i1044.QrScannerController>(
       () => _i1044.QrScannerController(gh<_i351.SessionHolder>()),
     );
+    gh.factory<_i907.DeleteAccountController>(
+      () => _i907.DeleteAccountController(gh<_i351.SessionHolder>()),
+    );
     gh.lazySingleton<_i667.WorkspaceRegistry>(
       () => _i667.WorkspaceRegistry.create(gh<_i351.SessionHolder>()),
       dispose: (i) => i.dispose(),
@@ -122,6 +129,16 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i667.WorkspaceRegistry>(),
         gh<_i351.SessionHolder>(),
         gh<_i351.AppSettings>(),
+      ),
+    );
+    gh.factory<_i1035.SettingsController>(
+      () => _i1035.SettingsController(
+        gh<_i351.SessionHolder>(),
+        gh<_i351.AppSettings>(),
+        gh<_i306.AppLockController>(),
+        gh<_i870.BiometricAuthenticator>(),
+        gh<_i667.WorkspaceRegistry>(),
+        gh<_i655.PackageInfo>(),
       ),
     );
     return this;
