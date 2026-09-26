@@ -51,6 +51,29 @@ function destroyAfterLinger(socket: Duplex, ms: number): void {
   socket.once("close", () => clearTimeout(timer));
 }
 
+/**
+ * Residual R2: when a client resets the connection while its (valid) token is still being checked,
+ * the socket is destroyed — and its one `close` event already emitted — before @hono/node-server
+ * 2.1.1 registers `socket.once("close", reclaimWaiterOnClose)` and hands the socket to `ws`, which
+ * refuses a destroyed socket without a word. The adaptor's pending waiter for that upgrade (and the
+ * request context it holds) would then never be released. So once the adaptor's handler has settled,
+ * a socket that had already closed by then — `ws` never takes over a closed socket — gets `close`
+ * emitted on it once more, which runs the adaptor's cleanup. Never twice, and never for a socket
+ * that was still open when the handler settled (its own close event is still to come).
+ */
+function watchEarlyClose(socket: Duplex): () => void {
+  let closed = false;
+  socket.once("close", () => {
+    closed = true;
+  });
+  let reemitted = false;
+  return () => {
+    if (!closed || reemitted || !socket.destroyed) return;
+    reemitted = true;
+    socket.emit("close", false);
+  };
+}
+
 /** Counts requests in flight so shutdown can wait for them. */
 class Inflight {
   private count = 0;
@@ -112,15 +135,18 @@ export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<
         destroyAfterLinger(socket, lingerMs);
         return;
       }
+      const reclaimIfClosedEarly = watchEarlyClose(socket);
       const handled = (adaptorUpgrade as (...args: unknown[]) => unknown).call(server, req, socket, head);
       void Promise.resolve(handled).then(
         () => {
-          // The adaptor refused the upgrade (401, 426, 500): it wrote the status and ended its side.
+          // The adaptor refused the upgrade (401, 426, 429, 500): it wrote the status and ended its side.
           if (socket.writableEnded) destroyAfterLinger(socket, lingerMs);
+          reclaimIfClosedEarly();
         },
         (err: unknown) => {
           logMeta("ws_upgrade_failed", { error: errorKind(err) });
           socket.destroy();
+          reclaimIfClosedEarly();
         },
       );
     });

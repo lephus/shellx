@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientIp } from "../src/auth/client-ip.js";
 import {
-  createRateLimiters, LOGIN_PER_EMAIL, LOGIN_PER_IP, RATE_WINDOW_MS, REGISTER_PER_IP, SlidingWindowLimiter,
+  createRateLimiters, LOGIN_PER_EMAIL, LOGIN_PER_IP, RATE_WINDOW_MS, REGISTER_PER_IP, SlidingWindowLimiter, UPGRADES_PER_IP,
 } from "../src/auth/rate-limit.js";
 
 function clock(start = 1_800_000_000_000) {
@@ -75,6 +75,17 @@ describe("createRateLimiters (production wiring)", () => {
     expect(await count(limiters.registerIp)).toBe(3);
   });
 
+  it("limits WebSocket upgrades to 60 per IP per 60 s (R2)", async () => {
+    expect(UPGRADES_PER_IP).toBe(60);
+    const t = clock();
+    const limiters = createRateLimiters({ rateLimitsEnabled: true }, t.now);
+    for (let i = 0; i < 60; i++) expect(await limiters.upgradeIp.limit("198.51.100.1")).toBe(true);
+    expect(await limiters.upgradeIp.limit("198.51.100.1")).toBe(false);
+    expect(await limiters.upgradeIp.limit("198.51.100.2")).toBe(true); // per IP
+    t.advance(RATE_WINDOW_MS);
+    expect(await limiters.upgradeIp.limit("198.51.100.1")).toBe(true); // the window slid
+  });
+
   it("RATE_LIMITS_ENABLED=false turns every limiter off", async () => {
     const limiters = createRateLimiters({ rateLimitsEnabled: false });
     for (let i = 0; i < 20; i++) {
@@ -82,6 +93,7 @@ describe("createRateLimiters (production wiring)", () => {
       expect(await limiters.loginEmail.limit("k")).toBe(true);
       expect(await limiters.registerIp.limit("k")).toBe(true);
     }
+    for (let i = 0; i < 100; i++) expect(await limiters.upgradeIp.limit("k")).toBe(true);
   });
 });
 

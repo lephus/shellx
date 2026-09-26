@@ -67,6 +67,21 @@ describe("per-connection frame rate limit", () => {
     // With the clock frozen, exactly the fresh bucket's capacity is delivered.
     expect(delivered).toBe(FRAMES_PER_SECOND);
   });
+
+  it("counts text pings too: a ping flood gets ERROR rate_limited and 4003 like any other frame (R1)", async () => {
+    const { mobile, a, m } = await hubWithTwoDevices();
+    for (let i = 0; i < 2 * FRAMES_PER_SECOND; i++) m.send("ping");
+    let pongs = 0;
+    let reply = await m.next();
+    while (reply === "pong") {
+      pongs++;
+      reply = await m.next();
+    }
+    expect(hex(reply as Uint8Array)).toBe(hex(encodeError(RelayErrorCode.rateLimited)));
+    expect(pongs).toBeLessThanOrEqual(FRAMES_PER_SECOND); // never one past the budget
+    expect(await m.closed).toEqual({ code: 4003, reason: "rate_limited" });
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, false)));
+  });
 });
 
 describe("budget survives reconnects", () => {

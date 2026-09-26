@@ -37,7 +37,7 @@ function registryRacingConnect(before: () => Promise<void>, after?: () => Promis
           await after?.();
         },
         receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
-        ping: (socket: HubSocket) => hub.ping(socket),
+        ping: (socket: HubSocket, deviceId: string) => hub.ping(socket, deviceId),
         disconnected: (socket: HubSocket) => hub.disconnected(socket),
         closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
       };
@@ -70,7 +70,7 @@ function registryBarrierForConnects(count: number, onArrival: (pending: number) 
           return hub.connect(socket, meta);
         },
         receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
-        ping: (socket: HubSocket) => hub.ping(socket),
+        ping: (socket: HubSocket, deviceId: string) => hub.ping(socket, deviceId),
         disconnected: (socket: HubSocket) => hub.disconnected(socket),
         closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
       };

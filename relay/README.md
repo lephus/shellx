@@ -43,7 +43,7 @@ stops the relay with one line on stderr and exit status 1.
 | `PORT` | `8080` | Listening port (`0` = any free port) |
 | `HOST` | `0.0.0.0` | Listening address (`npm run dev` uses `127.0.0.1`) |
 | `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
-| `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register limits off |
+| `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade limits off |
 
 On startup the relay applies every `migrations/*.sql` not yet listed in `schema_migrations`, in
 file-name order, one transaction per file. There are no down-migrations: fix a mistake with a new
@@ -54,24 +54,34 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
 
 - **Hub:** one `HubState` per account with a serial queue for everything that touches it (sockets
   joining/closing, frames, REST calls). Routes reach it with `registry.forUser(userId).<method>()`.
-  Text `ping` is answered with `pong` immediately, outside the queue.
+  Text `ping` is answered with `pong` immediately, outside the queue — but it counts against the
+  device's 500 frames/s budget like any frame, and it goes unanswered while the socket still has
+  unsent bytes (so a client that stops reading cannot pile up pongs; its own heartbeat times out).
 - **Slow receivers:** before sending anything (DATA, ERROR, PRESENCE, EVENT, `pong`) the hub checks
   the socket's unsent backlog; over 4 MiB it sends nothing more and closes the socket with 1013
-  "try again later" (logged as `slow_receiver`). Clients reconnect with backoff and catch up from
-  the agent's replay buffer; frames are never skipped (that would break the Noise stream).
-- **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP. The
-  IP is `X-Real-IP` when the TCP peer is a private or loopback address (nginx-proxy), otherwise the
-  peer address; an IPv6 address counts as its /64. IPs and e-mail addresses are never logged.
+  "try again later" (logged as `slow_receiver`). Its close frame waits behind that backlog, so the
+  socket is dropped outright (the client sees 1006) if it has not closed 1 s later. Clients reconnect
+  with backoff on either code and catch up from the agent's replay buffer; frames are never skipped
+  (that would break the Noise stream). When a device connects, any earlier socket of it that is still
+  closing is dropped too, so a device reconnecting in a loop never piles up closing sockets.
+- **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP,
+  WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
+  upgrade is refused with HTTP 429 and clients retry with backoff). The IP is `X-Real-IP` when the
+  TCP peer is a private or loopback address (nginx-proxy), otherwise the peer address; an IPv6
+  address counts as its /64. IPs and e-mail addresses are never logged.
 - **argon2id:** m = 19456 KiB, t = 2, p = 1; at most 4 hashes run at once and up to 32 wait; beyond
   that register, login and password change answer 429 `rate_limited`. The image sets
   `UV_THREADPOOL_SIZE=8` so the 4 hashes never take the whole libuv thread pool.
-- **Refused upgrades:** a WebSocket upgrade with a bad token (401) or any other `Upgrade` (400) is
-  answered and its socket destroyed after 5 s if the client does not close it; a client resetting
-  the connection never affects the relay.
+- **Refused upgrades:** a WebSocket upgrade with a bad token (401), over the upgrade limit (429) or
+  with any other `Upgrade` (400) is answered and its socket destroyed after 5 s if the client does
+  not close it. A client that resets the connection (RST) at any point of an upgrade, even while its
+  valid token is still being checked, does not crash the relay and leaves nothing pending behind
+  (@hono/node-server's waiter for that socket is released too); the per-IP upgrade limit bounds how
+  fast one address can repeat that.
 - **Limits:** JSON bodies over 16 KiB → 413 `payload_too_large`; a password over 128 code points is
   refused as `invalid_credentials` before hashing; WebSocket frames over 64 KiB → ERROR
-  `frame_too_large`, messages over 1 MiB close the socket with 1009; 500 frames/s per device →
-  ERROR `rate_limited`, close 4003.
+  `frame_too_large`, messages over 1 MiB close the socket with 1009; 500 frames/s per device (text
+  `ping` included) → ERROR `rate_limited`, close 4003.
 - **Shutdown:** on SIGTERM/SIGINT the relay stops accepting connections, closes every socket with
   1001 "going away" (recording `last_seen_at` of those devices), waits at most 5 s for requests and
   hub queues, closes the database and exits 0 (1 if the shutdown failed; logged by kind). A second

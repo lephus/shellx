@@ -35,6 +35,12 @@ export const TRY_AGAIN_LATER = 1013;
  * whose frames are authenticated in sequence.
  */
 export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+/**
+ * How long a slow receiver's 1013 close handshake may take before the socket is dropped outright.
+ * Its close frame waits behind the very backlog that made it slow, so `ws` would otherwise hold that
+ * backlog for its own 30 s close timeout. shellx_core treats the resulting 1006 like 1013.
+ */
+export const SLOW_RECEIVER_CLOSE_MS = 1000;
 
 /** Identity of one connection, set by the ws route from the validated token. */
 export interface ConnectionMeta {
@@ -85,6 +91,8 @@ const CLOSE_REASONS: Record<CloseCode, string> = {
  */
 export class HubState {
   private readonly sockets = new Map<HubSocket, Attachment>();
+  /** Slow receivers closed with 1013, dropped if their close event has not come in time. */
+  private readonly dropTimers = new Map<HubSocket, NodeJS.Timeout>();
   private tail: Promise<unknown> = Promise.resolve();
   private pending = 0;
 
@@ -102,9 +110,12 @@ export class HubState {
 
   /**
    * Adds a freshly upgraded socket. One connection per device: the newest wins, the old socket gets
-   * 4001 and no offline is announced. The newcomer gets a PRESENCE snapshot of the other online
-   * devices, then (for an agent) every pairing_removed tombstone; the others see it come online.
-   * Rejects (with the socket untouched) if the tombstones cannot be read, so the caller can close it.
+   * 4001 and no offline is announced. Any earlier socket of the device that is still closing (a 4001,
+   * 4003 or 1013 whose close event has not arrived) is terminated first, so a device reconnecting in
+   * a loop never has more than one closing socket holding relay memory. The newcomer gets a PRESENCE
+   * snapshot of the other online devices, then (for an agent) every pairing_removed tombstone; the
+   * others see it come online. Rejects (with the socket untouched) if the tombstones cannot be read,
+   * so the caller can close it.
    */
   connect(socket: HubSocket, meta: ConnectionMeta): Promise<void> {
     return this.enqueue("connect", () => {
@@ -114,6 +125,9 @@ export class HubState {
         return;
       }
       const tombstones = this.tombstonesOf(meta.deviceId); // may throw: nothing has changed yet
+      for (const [old, me] of this.sockets) {
+        if (me.device_id === meta.deviceId && !isLive(old, me)) safeTerminate(old);
+      }
       for (const old of this.socketsOf(meta.deviceId)) this.closeSocket(old, CloseCode.replaced);
       // The device's frame budget is deliberately NOT reset here (see FrameBudgets).
       this.sockets.set(socket, { device_id: meta.deviceId, kind: meta.kind, conn_id: meta.connId, closing: false });
@@ -137,8 +151,18 @@ export class HubState {
     void this.enqueue("slow_receiver", () => this.dropSlowReceiver(socket));
   }
 
+  /** A ping from `socket` found its device's frame budget spent: ERROR rate_limited, then 4003. */
+  rateLimited(socket: HubSocket): void {
+    void this.enqueue("rate_limited", () => this.dropRateLimited(socket));
+  }
+
   /** The socket's close event: forget it and announce the device offline unless the hub closed it. */
   disconnected(socket: HubSocket): void {
+    const timer = this.dropTimers.get(socket);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.dropTimers.delete(socket);
+    }
     void this.enqueue("close", () => {
       const me = this.sockets.get(socket);
       if (me === undefined) return;
@@ -276,13 +300,7 @@ export class HubState {
 
   /** Last step of a shutdown that ran out of time: drops every socket without a close handshake. */
   terminateAll(): void {
-    for (const socket of this.sockets.keys()) {
-      try {
-        socket.terminate();
-      } catch {
-        // already gone
-      }
-    }
+    for (const socket of this.sockets.keys()) safeTerminate(socket);
   }
 
   /** Resolves once every operation queued so far has run. */
@@ -326,10 +344,7 @@ export class HubState {
     if (me === undefined || me.closing) return;
 
     if (!this.host.budgets.take(me.device_id)) {
-      safeSend(socket, encodeError(RelayErrorCode.rateLimited));
-      this.closeSocket(socket, CloseCode.rateLimited);
-      logMeta("ws_rate_limited", { device_id: me.device_id });
-      this.markOffline(me.device_id);
+      this.dropRateLimited(socket);
       return;
     }
     if (typeof data === "string") {
@@ -428,11 +443,32 @@ export class HubState {
     else safeSend(socket, frame);
   }
 
+  /** Over the frame budget (a frame or a ping): ERROR rate_limited, close 4003, announce offline. */
+  private dropRateLimited(socket: HubSocket): void {
+    const me = this.sockets.get(socket);
+    if (me === undefined || me.closing) return;
+    safeSend(socket, encodeError(RelayErrorCode.rateLimited));
+    this.closeSocket(socket, CloseCode.rateLimited);
+    logMeta("ws_rate_limited", { device_id: me.device_id });
+    this.markOffline(me.device_id);
+  }
+
+  /**
+   * Closes a slow receiver with 1013 and announces it offline. Its close frame waits behind the
+   * backlog, so the socket is terminated if its close event has not come SLOW_RECEIVER_CLOSE_MS
+   * later (the timer is unref'd and cleared by `disconnected`).
+   */
   private dropSlowReceiver(socket: HubSocket): void {
     const me = this.sockets.get(socket);
     if (me === undefined || !isLive(socket, me)) return;
     me.closing = true;
     safeClose(socket, TRY_AGAIN_LATER, "try again later");
+    const timer = setTimeout(() => {
+      this.dropTimers.delete(socket);
+      safeTerminate(socket);
+    }, SLOW_RECEIVER_CLOSE_MS);
+    timer.unref();
+    this.dropTimers.set(socket, timer);
     logMeta("slow_receiver", { device_id: me.device_id });
     this.markOffline(me.device_id);
   }
@@ -462,6 +498,15 @@ function safeClose(socket: HubSocket, code: number, reason: string): void {
   }
 }
 
+/** Drops the connection without a close handshake; its close event still reaches `disconnected`. */
+function safeTerminate(socket: HubSocket): void {
+  try {
+    socket.terminate();
+  } catch {
+    // already gone
+  }
+}
+
 /**
  * One account's hub, as routes see it: `registry.forUser(userId).<method>()` (spec §4.3). A thin
  * handle with no state of its own: every call reaches the account's live `HubState`, creating it
@@ -488,13 +533,19 @@ export class UserHub {
   }
 
   /**
-   * The text heartbeat: "pong" goes out right away, outside the queue (spec §4.2) — except to a slow
-   * receiver, which is closed through the queue instead (pings are not budgeted, so a client that
-   * never reads could otherwise pile up pongs without bound).
+   * The text heartbeat of `deviceId` (the ws route's validated device): "pong" goes out right away,
+   * outside the queue (spec §4.2). A ping spends one frame of the device's 500 frames/s budget like
+   * any frame; over it, the socket gets ERROR rate_limited and 4003 through the queue. No pong is
+   * ever queued behind unsent bytes: while `bufferedAmount` is above 0 the ping goes unanswered, so
+   * a client that stops reading cannot pile up pongs (each costs far more heap than the 4 bytes
+   * `bufferedAmount` counts for it) and its own heartbeat fails on the stuck socket instead. A socket
+   * over the 4 MiB cap is closed with 1013 through the queue.
    */
-  ping(socket: HubSocket): void {
-    if (isSlow(socket)) this.state.slowReceiver(socket);
-    else safeSend(socket, "pong");
+  ping(socket: HubSocket, deviceId: string): void {
+    if (socket.readyState !== SOCKET_OPEN) return; // being closed: nothing more to answer
+    if (!this.host.budgets.take(deviceId)) this.state.rateLimited(socket);
+    else if (isSlow(socket)) this.state.slowReceiver(socket);
+    else if (socket.bufferedAmount === 0) safeSend(socket, "pong");
   }
 
   disconnected(socket: HubSocket): void {

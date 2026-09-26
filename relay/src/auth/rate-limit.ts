@@ -9,6 +9,8 @@ export interface RateLimiters {
   loginIp: RateLimiter;
   loginEmail: RateLimiter;
   registerIp: RateLimiter;
+  /** Every WebSocket upgrade attempt on /v1/ws, counted before its token is checked. */
+  upgradeIp: RateLimiter;
 }
 
 /** Spec §5.2: 60-second window; login 10/IP and 5/email, register 3/IP. */
@@ -16,6 +18,11 @@ export const RATE_WINDOW_MS = 60_000;
 export const LOGIN_PER_IP = 10;
 export const LOGIN_PER_EMAIL = 5;
 export const REGISTER_PER_IP = 3;
+/**
+ * WebSocket upgrades per IP per window (residual R2, defence in depth): far above what reconnecting
+ * clients with backoff need, low enough that one address cannot churn upgrades against the relay.
+ */
+export const UPGRADES_PER_IP = 60;
 
 export interface SlidingWindowOptions {
   /** Allowed calls per key within any window of `windowMs`. */
@@ -74,12 +81,13 @@ export class SlidingWindowLimiter implements RateLimiter {
 
 const allowAll: RateLimiter = { limit: async () => true };
 
-/** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all three off. */
+/** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all four off. */
 export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, now: () => number = Date.now): RateLimiters {
-  if (!config.rateLimitsEnabled) return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll };
+  if (!config.rateLimitsEnabled) return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll };
   return {
     loginIp: new SlidingWindowLimiter({ limit: LOGIN_PER_IP, now }),
     loginEmail: new SlidingWindowLimiter({ limit: LOGIN_PER_EMAIL, now }),
     registerIp: new SlidingWindowLimiter({ limit: REGISTER_PER_IP, now }),
+    upgradeIp: new SlidingWindowLimiter({ limit: UPGRADES_PER_IP, now }),
   };
 }

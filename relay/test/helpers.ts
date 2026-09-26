@@ -29,7 +29,7 @@ export const TEST_CONFIG: Config = {
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
-export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll };
+export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
 export class CountingLimiter implements RateLimiter {
@@ -399,9 +399,9 @@ export async function connect(app: TestApp, token: string | undefined, headers: 
 }
 
 /** The HTTP status a refused WebSocket upgrade got (101 means it was accepted, and is closed again). */
-export async function upgradeStatus(app: TestApp, token: string | undefined): Promise<number> {
+export async function upgradeStatus(app: TestApp, token: string | undefined, headers: Record<string, string> = {}): Promise<number> {
   const relay = await app.ready;
-  const ws = openSocket(relay, token === undefined ? {} : { Authorization: `Bearer ${token}` });
+  const ws = openSocket(relay, { ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }), ...headers });
   return new Promise((resolve) => {
     ws.once("open", () => {
       ws.terminate();

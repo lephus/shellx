@@ -4,7 +4,9 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import { FRAMES_PER_SECOND } from "../src/hub/token-bucket.js";
-import { GOING_AWAY, MAX_BUFFERED_BYTES, TRY_AGAIN_LATER, type UserHub } from "../src/hub/user-hub.js";
+import {
+  GOING_AWAY, MAX_BUFFERED_BYTES, SLOW_RECEIVER_CLOSE_MS, TRY_AGAIN_LATER, type UserHub,
+} from "../src/hub/user-hub.js";
 import {
   CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, RelayErrorCode,
 } from "../src/protocol/frames.js";
@@ -211,6 +213,38 @@ describe("frame budget (500 frames/s per device)", () => {
     // ...but the device still had only 50 frames left: the 51st trips the limit.
     expect(again.closedWith).toEqual({ code: 4003, reason: "rate_limited" });
   });
+
+  it("counts text pings against the same budget: the 501st gets ERROR rate_limited and 4003, not a pong (R1)", async () => {
+    const frozen = 1_900_000_000_000;
+    const { hub, agentId, mobileId } = setup(() => frozen);
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, m, mobileId);
+    a.take();
+    m.take();
+    for (let i = 0; i < FRAMES_PER_SECOND + 1; i++) hub.ping(m, mobileId);
+    await hub.idle();
+    const replies = m.take();
+    expect(replies.slice(0, FRAMES_PER_SECOND)).toEqual(Array<string>(FRAMES_PER_SECOND).fill("text:pong"));
+    expect(replies.slice(FRAMES_PER_SECOND)).toEqual([hex(encodeError(RelayErrorCode.rateLimited))]);
+    expect(m.closedWith).toEqual({ code: 4003, reason: "rate_limited" });
+    expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
+  });
+
+  it("shares the budget between pings and binary frames (R1)", async () => {
+    const frozen = 1_900_000_000_000;
+    const { hub, agentId, mobileId } = setup(() => frozen);
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    for (let i = 0; i < 400; i++) hub.ping(m, mobileId);
+    for (let i = 0; i < 100; i++) hub.receive(m, encodeData(agentId, CH, Uint8Array.of(4)));
+    await hub.idle();
+    expect(m.closedWith).toBeNull(); // exactly 500 so far
+    hub.ping(m, mobileId);
+    await hub.idle();
+    expect(m.closedWith).toEqual({ code: 4003, reason: "rate_limited" });
+  });
 });
 
 describe("slow receivers (backpressure)", () => {
@@ -305,15 +339,122 @@ describe("slow receivers (backpressure)", () => {
     await joinHub(hub, m, mobileId);
     a.take();
     m.take();
-    hub.ping(m);
+    hub.ping(m, mobileId);
     expect(m.take()).toEqual(["text:pong"]); // synchronously, not through the queue
 
     m.bufferedAmount = MAX_BUFFERED_BYTES + 1;
-    hub.ping(m);
+    hub.ping(m, mobileId);
     await hub.idle();
     expect(m.sent).toEqual([]);
     expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
     expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
+  });
+
+  it("never answers a ping while the socket still has unsent bytes, and keeps the socket open (R1)", async () => {
+    const { hub, mobileId } = setup();
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    m.bufferedAmount = 1; // a pong would queue behind it: bufferedAmount counts 4 bytes, the heap far more
+    hub.ping(m, mobileId);
+    hub.ping(m, mobileId);
+    await hub.idle();
+    expect(m.sent).toEqual([]);
+    expect(m.closedWith).toBeNull(); // the client's own heartbeat times out on a stuck socket
+
+    m.bufferedAmount = 0; // drained: heartbeats are answered again
+    hub.ping(m, mobileId);
+    expect(m.take()).toEqual(["text:pong"]);
+  });
+
+  it("terminates a slow receiver that has not finished closing 1 s after its 1013, with an unref'd timer (R1)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Spies on the fake setTimeout; restored before the real timers come back (see finally).
+    const setTimer = vi.spyOn(globalThis, "setTimeout");
+    try {
+      const { hub, agentId, mobileId } = setup();
+      const a = new FakeSocket();
+      const m = new FakeSocket();
+      await joinHub(hub, a, agentId, "agent");
+      await joinHub(hub, m, mobileId);
+      m.bufferedAmount = MAX_BUFFERED_BYTES + 1; // never drains
+      hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(1)));
+      await hub.idle();
+      expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+      expect(SLOW_RECEIVER_CLOSE_MS).toBe(1000);
+      const timer = setTimer.mock.results.find((r, i) => setTimer.mock.calls[i]![1] === SLOW_RECEIVER_CLOSE_MS)?.value as NodeJS.Timeout;
+      expect(timer.hasRef()).toBe(false); // never keeps the process alive
+
+      vi.advanceTimersByTime(SLOW_RECEIVER_CLOSE_MS - 1);
+      expect(m.terminated).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(m.terminated).toBe(true);
+      expect(a.terminated).toBe(false);
+    } finally {
+      setTimer.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not terminate a slow receiver whose close completes within 1 s: the timer is cleared on close (R1)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { hub, agentId, mobileId } = setup();
+      const a = new FakeSocket();
+      const m = new FakeSocket();
+      await joinHub(hub, a, agentId, "agent");
+      await joinHub(hub, m, mobileId);
+      m.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+      hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(1)));
+      await hub.idle();
+      vi.advanceTimersByTime(SLOW_RECEIVER_CLOSE_MS - 1);
+      clientCloses(hub, m); // the close handshake finished in time
+      await hub.idle();
+      expect(vi.getTimerCount()).toBe(0);
+      vi.advanceTimersByTime(10 * SLOW_RECEIVER_CLOSE_MS);
+      expect(m.terminated).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("lingering sockets (R1)", () => {
+  it("a reconnect terminates the device's earlier socket that is still closing; the one it replaces still gets 4001", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    const m1 = new FakeSocket();
+    const m2 = new FakeSocket();
+    const m3 = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, m1, mobileId);
+    await joinHub(hub, m2, mobileId);
+    expect(m1.closedWith).toEqual({ code: 4001, reason: "replaced" }); // closing; its close event has not arrived
+    expect(m1.terminated).toBe(false);
+
+    await joinHub(hub, m3, mobileId);
+    expect(m1.terminated).toBe(true); // at most one earlier socket per device is left holding memory
+    expect(m2.closedWith).toEqual({ code: 4001, reason: "replaced" }); // the normal close handshake
+    expect(m2.terminated).toBe(false);
+    expect(a.terminated).toBe(false); // other devices are never touched
+    expect(a.closedWith).toBeNull();
+  });
+
+  it("a reconnect terminates the device's slow receiver still stuck in its 1013 close", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    const slow = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, slow, mobileId);
+    slow.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+    hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(1)));
+    await hub.idle();
+    expect(slow.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+
+    const again = new FakeSocket();
+    await joinHub(hub, again, mobileId);
+    expect(slow.terminated).toBe(true);
+    expect(again.closedWith).toBeNull();
+    expect(await hub.online()).toEqual(expect.arrayContaining([agentId, mobileId]));
   });
 });
 
