@@ -28,8 +28,10 @@ dependencies:
   intl: ^0.20.2
   shared_preferences: ^2.5.5
   # Pinned exactly, like xterm below: pubspec.lock is not committed, and the controllers rely on
-  # this version's behaviour (a signal written after dispose throws). Bump signals_flutter and
-  # xterm together, with a full test run.
+  # this version's behaviour (a signal written after dispose throws). signals_core is signals_flutter's
+  # own dependency and carries that behaviour, so it is pinned to the same version rather than left
+  # to resolve on its own. Bump signals_flutter, signals_core and xterm together, with a full test run.
+  signals_core: 6.3.1
   signals_flutter: 6.3.1
   sliver_tools: ^0.2.12
   toastification: ^3.0.3
