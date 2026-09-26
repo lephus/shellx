@@ -104,6 +104,10 @@ class FakeMachineSession implements MachineSession {
   int listCalls = 0;
   Object? openError;
 
+  /// [openSession] completes only once this does — an open still in flight when something else
+  /// runs (the page is left, the workspace dropped).
+  Completer<void>? openGate;
+
   /// Thrown by [attach]; an [AppErrorException] also ends an existing tab of that id with
   /// [TabError], as the agent's `error` does in `shellx_client`.
   final Map<int, Object> attachErrors = {};
@@ -189,6 +193,8 @@ class FakeMachineSession implements MachineSession {
   @override
   Future<TabHandle> openSession({required int cols, required int rows}) async {
     opened.add((cols: cols, rows: rows));
+    final gate = openGate;
+    if (gate != null) await gate.future;
     _failIfShutDown();
     final error = openError;
     if (error != null) throw error;

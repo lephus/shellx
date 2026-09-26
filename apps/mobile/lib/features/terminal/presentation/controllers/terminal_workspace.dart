@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -20,6 +22,10 @@ class TerminalWorkspace extends Controller {
     return tabs.isEmpty ? null : tabs[_active.value];
   });
   bool _listedSessions = false;
+  bool _disposed = false;
+
+  /// Local ids of [TerminalTabController.failed] tabs: negative, so never a session's.
+  int _nextFailedId = -1;
 
   ReadonlySignal<List<TerminalTabController>> get tabs => _tabs;
   ReadonlySignal<int> get activeIndex => _active;
@@ -60,10 +66,20 @@ class TerminalWorkspace extends Controller {
     ];
   }
 
-  /// Throws [AppErrorException] (`session_limit`, `spawn_failed`).
+  /// Spec §12: `spawn_failed` shows its reason inside a tab, so it becomes a
+  /// [TerminalTabController.failed] tab. Throws any other [AppErrorException] (`session_limit`,
+  /// shown as the floating notice) and connection failures.
   Future<TerminalTabController> openNew(TerminalGrid grid) async {
     await ensureConnected();
-    final handle = await machine.openSession(cols: grid.cols, rows: grid.rows);
+    final TabHandle handle;
+    try {
+      handle = await machine.openSession(cols: grid.cols, rows: grid.rows);
+    } on AppErrorException catch (error) {
+      if (error.code != AppErrorCode.spawnFailed) rethrow;
+      return _add(
+        TerminalTabController.failed(machine: machine, id: _nextFailedId--, error: error, modifiers: extraKeys),
+      );
+    }
     return _add(
       TerminalTabController(
         machine: machine,
@@ -102,7 +118,14 @@ class TerminalWorkspace extends Controller {
     }
   }
 
+  /// A request that was still in flight when the workspace was dropped (sign-out, unpair, an
+  /// untrusted machine) adds nothing: the new tab is closed again and [StateError] thrown.
   TerminalTabController _add(TerminalTabController tab) {
+    if (_disposed) {
+      tab.dispose();
+      if (tab.hasSession) unawaited(machine.closeTab(tab.id).catchError((Object _) {}));
+      throw StateError('The workspace was dropped');
+    }
     final tabs = [..._tabs.peek(), tab];
     batch(() {
       _tabs.value = List.unmodifiable(tabs);
@@ -118,6 +141,7 @@ class TerminalWorkspace extends Controller {
   /// index down by one, so keeping the same index would silently select a different tab (e.g.
   /// tabs [a, b, c, d] with c active at index 2 — closing a must keep c active, not land on d).
   Future<void> close(TerminalTabController tab) async {
+    if (_disposed) return;
     final tabs = [..._tabs.peek()];
     final closingIndex = tabs.indexOf(tab);
     if (closingIndex < 0) return;
@@ -133,6 +157,7 @@ class TerminalWorkspace extends Controller {
       }
     });
     tab.dispose();
+    if (!tab.hasSession) return;
     try {
       await machine.closeTab(tab.id);
     } on Object {
@@ -141,6 +166,7 @@ class TerminalWorkspace extends Controller {
   }
 
   void dispose() {
+    _disposed = true;
     for (final tab in _tabs.peek()) {
       tab.dispose();
     }

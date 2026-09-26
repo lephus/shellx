@@ -356,6 +356,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Connected · end-to-end encrypted",
     ),
     "terminalConnecting": MessageLookupByLibrary.simpleMessage("Connecting…"),
+    "terminalFailedTabTitle": MessageLookupByLibrary.simpleMessage("shell"),
     "terminalNoTabs": MessageLookupByLibrary.simpleMessage("No open sessions."),
     "terminalOpenNew": MessageLookupByLibrary.simpleMessage(
       "Open a new session",

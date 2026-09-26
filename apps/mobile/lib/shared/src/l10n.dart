@@ -1252,6 +1252,16 @@ class S {
     );
   }
 
+  /// `shell`
+  String get terminalFailedTabTitle {
+    return Intl.message(
+      'shell',
+      name: 'terminalFailedTabTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Getting the session list…`
   String get sessionsLoading {
     return Intl.message(

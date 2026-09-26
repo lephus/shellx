@@ -202,7 +202,50 @@ void main() {
     expect(find.text('Phiên đã kết thúc'), findsNothing);
   });
 
-  testWidgets('spawn_failed shows the reason in the tab', (tester) async {
+  testWidgets('spawn_failed on the first open shows the reason in a tab, not a floating notice (spec §12)', (
+    tester,
+  ) async {
+    machine.openError = const AppErrorException(AppErrorCode.spawnFailed, 'pwsh.exe not found');
+    await open(tester);
+    expect(find.text('Không mở được shell: pwsh.exe not found'), findsOneWidget);
+    expect(find.text('Đóng tab'), findsOneWidget);
+    expect(find.text('Mở phiên mới'), findsOneWidget);
+    expect(find.text('shell'), findsOneWidget);
+    expect(find.text('Chưa có phiên nào đang mở.'), findsNothing);
+    await tester.pump(TerminalPageController.noticeDuration);
+    expect(find.text('Không mở được shell: pwsh.exe not found'), findsOneWidget);
+
+    // "Mở phiên mới" replaces the failed tab once the shell starts.
+    machine.openError = null;
+    await tester.tap(find.text('Mở phiên mới'));
+    await tester.pumpAndSettle();
+    expect(find.text('Không mở được shell: pwsh.exe not found'), findsNothing);
+    expect(find.text('zsh 1'), findsOneWidget);
+    expect(machine.closed, isEmpty);
+  });
+
+  testWidgets('"+" on an empty machine with a spawn failure shows the card with the reason', (tester) async {
+    await open(tester);
+    await tester.tap(find.byTooltip('Đóng phiên'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đóng phiên'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chưa có phiên nào đang mở.'), findsOneWidget);
+
+    machine.openError = const AppErrorException(AppErrorCode.spawnFailed, 'pwsh.exe not found');
+    await tester.tap(find.byTooltip('Mở phiên mới'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chưa có phiên nào đang mở.'), findsNothing);
+    expect(find.text('Không mở được shell: pwsh.exe not found'), findsOneWidget);
+
+    await tester.tap(find.text('Đóng tab'));
+    await tester.pumpAndSettle();
+    expect(find.text('Không mở được shell: pwsh.exe not found'), findsNothing);
+    expect(find.text('Chưa có phiên nào đang mở.'), findsOneWidget);
+    expect(machine.closed, [101]);
+  });
+
+  testWidgets('a live tab that ever gets TabError(spawn_failed) shows the reason too', (tester) async {
     await open(tester);
     machine.handles.single.emit(const TabError(AppErrorCode.spawnFailed, 'pwsh.exe not found'));
     await tester.pump();
@@ -231,11 +274,14 @@ void main() {
     expect(find.text('Máy đã mở tối đa 10 phiên. Hãy đóng bớt phiên.'), findsNothing);
   });
 
-  testWidgets('an untrusted machine is unpaired and the page closes with the reason (spec §12)', (tester) async {
+  testWidgets('an untrusted machine closes the page with the reason and is not unpaired again (spec §12)', (
+    tester,
+  ) async {
     machine.connectFailure = MachineConnectionFailure.untrusted;
     await open(tester);
     await tester.pumpAndSettle();
-    expect(backend.unpaired, [agentA]);
+    // The client already forgot the pin; a DELETE now could remove a pairing made right after.
+    expect(backend.unpaired, isEmpty);
     expect(results, [TerminalExit.untrusted]);
     expect(find.text('open'), findsOneWidget);
   });
@@ -294,7 +340,8 @@ void main() {
 
     backend.emitRelay(RelayConnectionState.replaced);
     await tester.pump();
-    expect(find.text('Một phiên bản khác của app đã kết nối.'), findsOneWidget);
+    // The banner and the status line both say it.
+    expect(find.text('Một phiên bản khác của app đã kết nối.'), findsNWidgets(2));
     await tester.tap(find.text('Kết nối lại'));
     expect(session.reconnectCalls, 1);
     await tester.pump(const Duration(seconds: 1)); // let the debounced resize fire
@@ -334,7 +381,7 @@ void main() {
         await tester.pumpAndSettle();
       });
       expect(results, [TerminalExit.untrusted]);
-      expect(backend.unpaired, [agentA]);
+      expect(backend.unpaired, isEmpty);
       expect(find.text('open'), findsOneWidget);
       expect(disposedReads, isEmpty);
     },
@@ -350,17 +397,17 @@ void main() {
     expect(backend.unpaired, isEmpty);
   });
 
-  testWidgets('R1: the state event that follows a request that already handled untrusted does not unpair again', (
+  testWidgets('R1: the state event that follows a request that already handled untrusted is handled once', (
     tester,
   ) async {
     await open(tester);
     machine.openError = const MachineConnectionException(MachineConnectionFailure.untrusted);
     await tester.tap(find.byTooltip('Mở phiên mới'));
     await tester.pump();
-    expect(backend.unpaired, [agentA]);
     machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
     await tester.pumpAndSettle();
-    expect(backend.unpaired, [agentA]);
+    expect(tester.takeException(), isNull);
+    expect(backend.unpaired, isEmpty);
     expect(results, [TerminalExit.untrusted]);
   });
 
@@ -468,7 +515,7 @@ void main() {
     });
     expect(tester.takeException(), isNull);
     expect(results, [TerminalExit.untrusted]);
-    expect(backend.unpaired, [agentA]);
+    expect(backend.unpaired, isEmpty);
     expect(disposedReads, isEmpty);
   });
 
@@ -541,4 +588,126 @@ void main() {
     expect(find.text('SecondStub stub'), findsOneWidget);
     expect(find.byType(TerminalPage), findsNothing);
   });
+
+  group('the status line says why the machine is not connected', () {
+    Color dot(WidgetTester tester) =>
+        (tester.widget<Container>(find.byKey(const ValueKey('terminal-status-dot'))).decoration! as BoxDecoration)
+            .color!;
+
+    testWidgets('green when connected, amber while connecting', (tester) async {
+      await open(tester);
+      expect(dot(tester), isNot(TerminalColors.yellow));
+      expect(dot(tester), isNot(TerminalColors.red));
+
+      machine.emitState(const MachineConnecting());
+      await tester.pump();
+      expect(find.text('Đang kết nối…'), findsOneWidget);
+      expect(dot(tester), TerminalColors.yellow);
+    });
+
+    testWidgets('an offline machine says so, in red', (tester) async {
+      await open(tester);
+      machine.emitState(const MachineFailed(MachineConnectionFailure.agentOffline));
+      await tester.pump();
+      expect(find.text('Máy đang offline.'), findsOneWidget);
+      expect(find.text('Đang kết nối…'), findsNothing);
+      expect(dot(tester), TerminalColors.red);
+    });
+
+    testWidgets('another failure shows its ErrorText, in red', (tester) async {
+      await open(tester);
+      machine.emitState(const MachineFailed(MachineConnectionFailure.timeout));
+      await tester.pump();
+      expect(find.text('Máy tính không phản hồi. Hãy thử lại.'), findsOneWidget);
+      expect(dot(tester), TerminalColors.red);
+    });
+
+    testWidgets('a replaced relay says another instance connected, in red', (tester) async {
+      await open(tester);
+      backend.emitRelay(RelayConnectionState.replaced);
+      await tester.pump();
+      expect(find.text('Đang kết nối…'), findsNothing);
+      expect(find.text('Một phiên bản khác của app đã kết nối.'), findsNWidgets(2));
+      expect(dot(tester), TerminalColors.red);
+      await tester.pump(const Duration(seconds: 1)); // let the debounced resize fire
+    });
+  });
+
+  testWidgets('"Mở phiên mới" still replaces the ended tab when the page was left while it opened', (tester) async {
+    await open(tester);
+    machine.handles.single.emit(const TabExited(0));
+    await tester.pump();
+    final gate = machine.openGate = Completer<void>();
+    await tester.tap(find.text('Mở phiên mới'));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Về danh sách máy'));
+    await tester.pumpAndSettle();
+    expect(find.text('open'), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final workspace = registry.forMachine(agentA);
+    expect(workspace.tabs.value, hasLength(1));
+    expect(workspace.tabs.value.single.isLive.value, isTrue);
+    expect(machine.closed, [101]);
+  });
+
+  testWidgets('leaving the page while "+" is still opening writes nothing to the page and keeps the tab', (
+    tester,
+  ) async {
+    await open(tester);
+    final gate = machine.openGate = Completer<void>();
+    await tester.tap(find.byTooltip('Mở phiên mới'));
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Về danh sách máy'));
+    await tester.pumpAndSettle();
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(registry.forMachine(agentA).tabs.value, hasLength(2));
+
+    machine.openGate = null;
+    await openPushed(tester);
+    expect(find.text('zsh 2'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('a page built after a sign-out closes quietly instead of crashing', (tester) async {
+    session.signOut();
+    await open(tester);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TerminalView), findsNothing);
+    expect(results, isEmpty);
+    expect(machine.connectCalls, 0);
+  });
+
+  testWidgets('an error while dropping the workspace of an untrusted machine still leaves the page', (tester) async {
+    final throwing = _RemoveThrowsRegistry(session.backend);
+    addTearDown(throwing.dispose);
+    final settings = AppSettings(InMemoryKeyValueStore());
+    getIt
+      ..unregister<TerminalPageController>()
+      ..registerFactoryParam<TerminalPageController, String, void>(
+        (agentId, _) => TerminalPageController(agentId, throwing, session, settings),
+      );
+    await open(tester);
+    machine.emitState(const MachineFailed(MachineConnectionFailure.untrusted));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(results, [TerminalExit.untrusted]);
+  });
+}
+
+/// A registry whose [remove] fails, like a workspace whose disposal throws.
+class _RemoveThrowsRegistry extends WorkspaceRegistry {
+  _RemoveThrowsRegistry(super.backend);
+
+  @override
+  void remove(String agentId) => throw StateError('dispose failed');
 }

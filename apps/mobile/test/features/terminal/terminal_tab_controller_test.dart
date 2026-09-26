@@ -112,11 +112,29 @@ void main() {
     expect(tab.banner.value?.notice, TabNotice.closedByHost);
   });
 
-  test('spawn_failed keeps the reason for the banner', () {
+  test('a TabError(spawn_failed) on a live tab keeps the reason for the banner', () {
     handle.emit(const TabError(AppErrorCode.spawnFailed, 'pwsh.exe not found'));
     expect(tab.banner.value?.notice, TabNotice.failed);
     expect(tab.banner.value?.errorCode, AppErrorCode.spawnFailed);
     expect(tab.banner.value?.detail, 'pwsh.exe not found');
+  });
+
+  test('a failed open is a tab without a session that shows the reason and sends nothing', () {
+    final failed = TerminalTabController.failed(
+      machine: machine,
+      id: -1,
+      error: const AppErrorException(AppErrorCode.spawnFailed, 'pwsh.exe not found'),
+      modifiers: keys,
+    );
+    addTearDown(failed.dispose);
+    expect(failed.hasSession, isFalse);
+    expect(failed.isLive.value, isFalse);
+    expect(failed.banner.value?.notice, TabNotice.failed);
+    expect(failed.banner.value?.errorCode, AppErrorCode.spawnFailed);
+    expect(failed.banner.value?.detail, 'pwsh.exe not found');
+    failed.terminal.value.textInput('ls\n');
+    expect(machine.inputs, isEmpty);
+    expect(tab.hasSession, isTrue);
   });
 
   test('Review Focus 3: session_not_found while reattaching ends the tab', () {

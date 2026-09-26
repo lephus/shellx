@@ -33,6 +33,7 @@ class TerminalTabController extends Controller {
   }) : _machine = machine,
        _modifiers = modifiers,
        id = handle.id,
+       hasSession = true,
        _shell = handle.shell,
        _index = handle.index {
     _terminal = signal(_createTerminal(cols, rows));
@@ -50,13 +51,37 @@ class TerminalTabController extends Controller {
   }) : _machine = machine,
        _modifiers = modifiers,
        id = session.id,
+       hasSession = true,
        _shell = session.shell,
        _index = session.index {
     _terminal = signal(_createTerminal(80, 24));
     _banner.value = const TabBanner(TabNotice.sessionEnded);
   }
 
+  /// Opening a new session failed on the computer (spec §12 `spawn_failed`: the agent answers
+  /// the open with an error that carries no session id). No session exists: the tab shows the
+  /// reason with "Đóng tab" / "Mở phiên mới" and never sends anything. [id] is a local id the
+  /// workspace hands out (negative, so it never matches a session of the machine).
+  TerminalTabController.failed({
+    required MachineSession machine,
+    required this.id,
+    required AppErrorException error,
+    required ModifierSource modifiers,
+    this.resizeDebounce = const Duration(milliseconds: 150),
+  }) : _machine = machine,
+       _modifiers = modifiers,
+       hasSession = false,
+       _shell = '',
+       _index = 0 {
+    _terminal = signal(_createTerminal(80, 24));
+    _banner.value = TabBanner(TabNotice.failed, errorCode: error.code, detail: error.message);
+  }
+
   final int id;
+
+  /// False for a [TerminalTabController.failed] tab: there is no session on the machine to close,
+  /// and its title is left to the UI (empty [title]).
+  final bool hasSession;
   final Duration resizeDebounce;
   final MachineSession _machine;
   final ModifierSource _modifiers;
@@ -70,7 +95,7 @@ class TerminalTabController extends Controller {
   final Signal<bool> _bound = signal(false);
   final Signal<String?> _oscTitle = signal(null);
   late final Computed<bool> _isLive = computed(() => _bound.value && _banner.value == null);
-  late final Computed<String> _title = computed(() => _oscTitle.value ?? '$_shell $_index');
+  late final Computed<String> _title = computed(() => _oscTitle.value ?? (hasSession ? '$_shell $_index' : ''));
   TabHandle? _handle;
   StreamSubscription<TabEvent>? _events;
   Timer? _resizeTimer;
@@ -82,7 +107,8 @@ class TerminalTabController extends Controller {
   ReadonlySignal<TabBanner?> get banner => _banner;
   ReadonlySignal<bool> get isLive => _isLive;
 
-  /// Spec §7: the terminal title (OSC 0/2) if the shell set one, else "`<shell> <index>`".
+  /// Spec §7: the terminal title (OSC 0/2) if the shell set one, else "`<shell> <index>`"; empty
+  /// for a tab without a session ([hasSession]), which has neither.
   ReadonlySignal<String> get title => _title;
 
   ShellxTerminal _createTerminal(int cols, int rows) {

@@ -370,14 +370,18 @@ class _TitleBlock extends StatelessWidget {
     final strings = S.of(context);
     return Watch((context) {
       final relay = controller.relayState.value;
-      final reconnecting = relay == RelayConnectionState.disconnected;
+      final machine = controller.machineState.value;
       // The channel only works while the relay does (the fakes keep the machine ready then).
-      final ready = controller.machineState.value is MachineReady && relay == RelayConnectionState.connected;
-      final status = reconnecting
-          ? strings.bannerReconnecting
-          : ready
-          ? strings.terminalConnected
-          : strings.terminalConnecting;
+      final ready = machine is MachineReady && relay == RelayConnectionState.connected;
+      // Design: green when connected, amber while connecting or reconnecting, red when it failed
+      // and the user has to act (another instance took the connection, the machine is offline, …).
+      final (String status, Color dot) = switch ((relay, machine)) {
+        (RelayConnectionState.replaced, _) => (strings.bannerReplaced, TerminalColors.red),
+        (RelayConnectionState.disconnected, _) => (strings.bannerReconnecting, TerminalColors.yellow),
+        (_, MachineFailed(:final failure)) => (ErrorText(strings).machine(failure), TerminalColors.red),
+        _ when ready => (strings.terminalConnected, context.colors.okDot),
+        _ => (strings.terminalConnecting, TerminalColors.yellow),
+      };
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -391,13 +395,10 @@ class _TitleBlock extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
+                key: const ValueKey('terminal-status-dot'),
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                  // Design: green when connected, amber while connecting or reconnecting.
-                  color: ready ? context.colors.okDot : TerminalColors.yellow,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -525,7 +526,8 @@ class _TabChip extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    tab.title.value,
+                    // A tab whose session never started has no shell name or index to show.
+                    tab.hasSession ? tab.title.value : S.of(context).terminalFailedTabTitle,
                     style: TextStyle(
                       fontFamily: FontFamily.jetBrainsMono,
                       fontSize: 13,
@@ -701,7 +703,8 @@ class _TerminalPane extends StatelessWidget {
   }
 }
 
-/// Design "Phiên đã kết thúc": the tab keeps its content; the card offers the next step.
+/// Design "Phiên đã kết thúc": the tab keeps its content; the card offers the next step. A
+/// `spawn_failed` shows its reason in the same card (spec §12).
 class _EndedCard extends StatelessWidget {
   const _EndedCard({required this.banner, required this.onCloseTab, required this.onOpenNew, required this.onReattach});
 

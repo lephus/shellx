@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -29,14 +30,23 @@ enum TerminalExit {
 @injectable
 class TerminalPageController extends Controller {
   TerminalPageController(@factoryParam this.agentId, this._registry, this._session, AppSettings settings)
-    : backend = _session.requireBackend,
+    : _backend = _session.backend.peek(),
       _fontSize = signal(settings.fontSize.peek()) {
-    _relayState = signal(backend.relayState);
-    _relayStates = backend.relayStates.listen(_onRelayState);
+    final backend = _backend;
+    _relayState = signal(backend?.relayState ?? RelayConnectionState.stopped);
+    _relayStates = backend?.relayStates.listen(_onRelayState);
     // A sign-out (or another account) disposes every workspace of this backend ([WorkspaceRegistry]).
     _stopSessionWatch = _session.backend.subscribe((current) {
       if (!identical(current, backend)) _startClosing();
     });
+    if (backend == null) {
+      // Signed out before the page was built (a sign-out racing the tap on a machine): nothing to
+      // connect to, like a machine that is not pinned. No exit: the session enforcer takes every
+      // page to the login screen.
+      _machineState = signal(const MachineIdle());
+      _startClosing();
+      return;
+    }
     final TerminalWorkspace workspace;
     try {
       workspace = _registry.forMachine(agentId);
@@ -60,8 +70,7 @@ class TerminalPageController extends Controller {
   final WorkspaceRegistry _registry;
   final SessionHolder _session;
 
-  /// The backend of the account this page was opened for.
-  final ShellxBackend backend;
+  final ShellxBackend? _backend;
   final Signal<double> _fontSize;
   final Signal<bool> _busy = signal(false);
   final Signal<String?> _notice = signal(null);
@@ -70,7 +79,7 @@ class TerminalPageController extends Controller {
   late final Signal<MachineConnectionState> _machineState;
   late final Signal<RelayConnectionState> _relayState;
   StreamSubscription<MachineConnectionState>? _machineStates;
-  late final StreamSubscription<RelayConnectionState> _relayStates;
+  StreamSubscription<RelayConnectionState>? _relayStates;
   late final void Function() _stopSessionWatch;
   late final Computed<bool> _canOpen = computed(() => !_busy.value);
   TerminalWorkspace? _workspace;
@@ -84,8 +93,16 @@ class TerminalPageController extends Controller {
   /// Leaving or disposed: no more signal writes, no more machine operations.
   bool _closed = false;
 
-  /// The machine's tabs. Throws [StateError] when the machine was not pinned when the page opened
-  /// ([closing] is then true from the start).
+  /// The page is leaving because the workspace is being dropped ([closing]); unlike [_closed],
+  /// not set when the page is merely left: the workspace outlives the page.
+  bool _dropped = false;
+
+  /// The backend of the account this page was opened for. Throws [StateError] when the page was
+  /// built signed out ([closing] is then true from the start).
+  ShellxBackend get backend => _backend ?? (throw StateError('Not signed in'));
+
+  /// The machine's tabs. Throws [StateError] when the machine was not pinned (or nobody was signed
+  /// in) when the page opened ([closing] is then true from the start).
   TerminalWorkspace get workspace => _workspace ?? (throw StateError('The machine is not pinned'));
 
   /// Font size of this page (pinch or "Aa"); the default comes from Settings (spec §9.2 #5).
@@ -131,10 +148,12 @@ class TerminalPageController extends Controller {
     await workspace.close(tab);
   }
 
-  /// "Mở phiên mới" on an ended tab: the new session takes the ended tab's place.
+  /// "Mở phiên mới" on an ended or failed tab: the new session takes that tab's place. The
+  /// workspace outlives the page, so the ended tab is removed even when the user left the page
+  /// while the session was opening; only a dropped workspace is left alone.
   Future<void> replaceWithNew(TerminalTabController ended, TerminalGrid grid) async {
     final opened = await _run(() => workspace.openNew(grid));
-    if (opened != null && !_closed) await workspace.close(ended);
+    if (opened != null && !_dropped) await workspace.close(ended);
   }
 
   void sendKey(ExtraKey key) {
@@ -166,7 +185,13 @@ class TerminalPageController extends Controller {
   void _onMachineState(MachineConnectionState state) {
     if (_disposed) return;
     _machineState.value = state;
-    if (state is MachineFailed) unawaited(_onMachineFailure(state.failure));
+    if (state is! MachineFailed) return;
+    // A stream callback: nothing may escape it as an unhandled error.
+    try {
+      _onMachineFailure(state.failure);
+    } catch (error) {
+      if (kDebugMode) debugPrint('TerminalPageController machine failure: ${error.runtimeType}');
+    }
   }
 
   /// Runs a machine operation with the progress bar; failures become the notice.
@@ -195,41 +220,38 @@ class TerminalPageController extends Controller {
       MachineFailed(:final failure) || MachineConnectionException(:final failure) => failure,
       _ => null,
     };
-    if (failure != null && await _onMachineFailure(failure)) return;
+    if (failure != null && _onMachineFailure(failure)) return;
     if (_closed) return; // Leaving: a failure of a request still in flight says nothing new.
     _show(errorFactory.fromException(error).title);
   }
 
-  /// Spec §12: `untrusted` → the workspace is dropped, the machine unpaired, the page leaves with
+  /// Spec §12: `untrusted` → the workspace is dropped and the page leaves with
   /// [TerminalExit.untrusted]; `proto_unsupported` → it leaves with [TerminalExit.updateRequired].
   /// Handled once, whichever way it arrives first (a request can meet the failure while the
   /// same failure also arrives on the machine's states). True when [failure] is one of these two.
-  Future<bool> _onMachineFailure(MachineConnectionFailure failure) async {
+  ///
+  /// The machine is not unpaired from here: the agent already dropped its trust, and the client
+  /// already forgot the pin and failed the machine. A DELETE of the pairing (retried on a slow
+  /// network) could land after the user paired again and delete the new pairing.
+  bool _onMachineFailure(MachineConnectionFailure failure) {
     final untrusted = failure == MachineConnectionFailure.untrusted;
     if (!untrusted && failure != MachineConnectionFailure.protocolUnsupported) return false;
     if (_machineFailureHandled) return true;
     _machineFailureHandled = true;
     // Before the workspace is disposed: from here on nothing on the page reads it.
     _startClosing();
-    if (!untrusted) {
-      if (!_disposed) _exit.value = TerminalExit.updateRequired;
-      return true;
-    }
-    // The machine-level failure wins over the tabs' own `session_not_found` (spec §12).
-    _registry.remove(agentId);
-    // The client already forgot the pin; unpairing also deletes the pairing on the relay, with
-    // retries. The page does not wait for that.
-    final unpairing = Future.sync(() => backend.unpair(agentId));
-    if (!_disposed) _exit.value = TerminalExit.untrusted;
     try {
-      await unpairing;
-    } on Object {
-      // The pin is gone locally even if the relay call failed.
+      // The machine-level failure wins over the tabs' own `session_not_found` (spec §12).
+      if (untrusted) _registry.remove(agentId);
+    } finally {
+      // The page leaves even if dropping the workspace failed.
+      if (!_disposed) _exit.value = untrusted ? TerminalExit.untrusted : TerminalExit.updateRequired;
     }
     return true;
   }
 
   void _startClosing() {
+    _dropped = true;
     if (_closed) return;
     _closed = true;
     _noticeTimer?.cancel();
@@ -250,7 +272,7 @@ class TerminalPageController extends Controller {
     _stopSessionWatch();
     // Cancelling takes effect at once; the futures only report cleanup (never awaited: fake_async).
     unawaited(_machineStates?.cancel());
-    unawaited(_relayStates.cancel());
+    unawaited(_relayStates?.cancel());
     _canOpen.dispose();
     _fontSize.dispose();
     _busy.dispose();

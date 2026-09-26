@@ -63,6 +63,35 @@ void main() {
     expect(workspace.tabs.value, isEmpty);
   });
 
+  test('spawn_failed (the agent answers the open with an id-less error) adds a failed tab with the reason', () async {
+    machine.openError = const AppErrorException(AppErrorCode.spawnFailed, 'pwsh.exe not found');
+    final tab = await workspace.openNew(grid);
+    expect(workspace.tabs.value, [tab]);
+    expect(workspace.activeTab.value, same(tab));
+    expect(tab.isLive.value, isFalse);
+    expect(tab.hasSession, isFalse);
+    expect(tab.banner.value?.notice, TabNotice.failed);
+    expect(tab.banner.value?.errorCode, AppErrorCode.spawnFailed);
+    expect(tab.banner.value?.detail, 'pwsh.exe not found');
+
+    // A second failure gets its own tab: the tabs never share an id.
+    final again = await workspace.openNew(grid);
+    expect(again.id, isNot(tab.id));
+
+    // Nothing runs on the machine: closing it sends no session.close.
+    await workspace.close(tab);
+    await workspace.close(again);
+    expect(workspace.tabs.value, isEmpty);
+    expect(machine.closed, isEmpty);
+  });
+
+  test('a close after the workspace was disposed does nothing', () async {
+    final tab = await workspace.openNew(grid);
+    registry.remove(agentA);
+    await workspace.close(tab);
+    expect(machine.closed, isEmpty);
+  });
+
   test('attach adds a live tab; attaching the same session again just selects it', () async {
     machine.sessions = [running];
     final tab = await workspace.attach(running, grid);

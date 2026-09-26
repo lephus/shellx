@@ -347,6 +347,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Đã kết nối · mã hóa đầu cuối",
     ),
     "terminalConnecting": MessageLookupByLibrary.simpleMessage("Đang kết nối…"),
+    "terminalFailedTabTitle": MessageLookupByLibrary.simpleMessage("shell"),
     "terminalNoTabs": MessageLookupByLibrary.simpleMessage(
       "Chưa có phiên nào đang mở.",
     ),

@@ -270,6 +270,7 @@
   "terminalCloseTab": "Close session",
   "terminalCloseConfirm": "Close this session? Programs running in it will be stopped.",
   "terminalNoTabs": "No open sessions.",
+  "terminalFailedTabTitle": "shell",
   "sessionsLoading": "Getting the session list…",
   "pickerTitle": "{count, plural, =1{This computer has 1 session} other{This computer has {count} sessions}}",
   "@pickerTitle": {

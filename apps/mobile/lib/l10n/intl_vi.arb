@@ -128,6 +128,7 @@
   "terminalCloseTab": "Đóng phiên",
   "terminalCloseConfirm": "Đóng phiên này? Mọi chương trình đang chạy trong phiên sẽ bị dừng.",
   "terminalNoTabs": "Chưa có phiên nào đang mở.",
+  "terminalFailedTabTitle": "shell",
   "sessionsLoading": "Đang lấy danh sách phiên…",
   "pickerTitle": "{count, plural, other{Máy này đang có {count} phiên}}",
   "pickerSubtitle": "Mở lại phiên cũ để xem tiếp đúng chỗ đã dừng, hoặc tạo phiên mới.",
