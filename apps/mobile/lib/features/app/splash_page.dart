@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -17,48 +19,55 @@ Future<void> guardLaunch(Future<void> Function() action) async {
   }
 }
 
+/// Dependency injection, then [prepareLaunch].
+Future<void> startApp() async {
+  await configureDependencies();
+  await guardLaunch(prepareLaunch);
+}
+
 @RoutePage()
-class SplashPage extends StatefulWidget {
+class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
   @override
-  State<SplashPage> createState() => _SplashPageState();
+  Widget build(BuildContext context) => const AppLaunch(prepare: startApp);
 }
 
-class _SplashPageState extends State<SplashPage> {
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+/// The splash background until [prepare] completes, then [RootApp] in its place.
+///
+/// [RootApp] replaces the splash's [MaterialApp] instead of being pushed onto its navigator: the
+/// router's navigator must be the root one. `showDialog` opens on the root navigator, and a
+/// navigator around the router would put dialogs outside the design system, the ShellX strings
+/// and the lock screen.
+class AppLaunch extends StatefulWidget {
+  const AppLaunch({super.key, required this.prepare});
+
+  final Future<void> Function() prepare;
+
+  @override
+  State<AppLaunch> createState() => _AppLaunchState();
+}
+
+class _AppLaunchState extends State<AppLaunch> {
+  bool _ready = false;
+
   @override
   void initState() {
-    initialize();
     super.initState();
+    unawaited(_start());
   }
 
-  Future<void> initialize() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    await configureDependencies();
-    await guardLaunch(prepareLaunch);
-    if (!mounted) return;
-    navigatorKey.currentState?.pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const RootApp(),
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
-    );
+  Future<void> _start() async {
+    await widget.prepare();
+    if (mounted) setState(() => _ready = true);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_ready) return const RootApp();
     return MaterialApp(
-      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: brightness.appColors.background,
-      ),
+      home: Scaffold(backgroundColor: AdaptiveTheme.of(context).mode.brightness.appColors.background),
     );
-  }
-
-  Brightness get brightness {
-    return AdaptiveTheme.of(context).mode.brightness;
   }
 }

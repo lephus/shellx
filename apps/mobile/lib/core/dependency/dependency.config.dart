@@ -17,6 +17,10 @@ import 'package:package_info_plus/package_info_plus.dart' as _i655;
 import 'package:shared_preferences/shared_preferences.dart' as _i460;
 import 'package:shellx_core/shellx_core.dart' as _i145;
 
+import '../../features/auth/presentation/controllers/login_controller.dart'
+    as _i729;
+import '../../features/auth/presentation/controllers/register_controller.dart'
+    as _i145;
 import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
 import '../../features/machines/presentation/controllers/machine_list_controller.dart'
@@ -33,6 +37,7 @@ import '../../features/terminal/presentation/controllers/terminal_workspace.dart
     as _i667;
 import '../auth/auth_event.dart' as _i909;
 import '../auth/auth_storage.dart' as _i657;
+import '../auth/session_enforcer.dart' as _i954;
 import '../auth/session_holder.dart' as _i56;
 import '../backend/backend.dart' as _i120;
 import '../backend/client_backend.dart' as _i139;
@@ -41,6 +46,8 @@ import '../handler/popup_handler.dart' as _i695;
 import '../platform/device_description.dart' as _i814;
 import '../platform/external_links.dart' as _i618;
 import '../router/app_router.dart' as _i81;
+import '../router/auth_guard.dart' as _i313;
+import '../router/update_guard.dart' as _i56;
 import '../settings/app_settings.dart' as _i620;
 import '../version/version_gate.dart' as _i505;
 import 'module.dart' as _i946;
@@ -53,7 +60,6 @@ extension GetItInjectableX on _i174.GetIt {
   }) async {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
     final module = _$Module();
-    gh.singleton<_i81.AppRouter>(() => _i81.AppRouter());
     gh.lazySingleton<_i909.AuthEventNotifier>(() => _i909.AuthEventNotifier());
     await gh.lazySingletonAsync<_i460.SharedPreferences>(
       () => module.sharedPref,
@@ -75,7 +81,6 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i870.LocalAuthBiometricAuthenticator(),
     );
     gh.lazySingleton<_i618.ExternalLinks>(() => _i618.UrlLauncherLinks());
-    gh.factory<_i409.BuildContext>(() => module.context(gh<_i81.AppRouter>()));
     await gh.lazySingletonAsync<_i145.KeyValueStore>(
       () => module.keyValueStore(gh<_i460.SharedPreferences>()),
       preResolve: true,
@@ -88,8 +93,8 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i655.PackageInfo>(),
       ),
     );
-    gh.lazySingleton<_i695.PopupHandler>(
-      () => _i695.PopupHandler(gh<_i351.BuildContext>()),
+    gh.factory<_i56.UpdateGuard>(
+      () => _i56.UpdateGuard(gh<_i505.VersionGate>()),
     );
     gh.lazySingleton<_i657.AuthStorage>(
       () => _i657.AuthStorageImpl(gh<_i145.KeyValueStore>()),
@@ -121,10 +126,26 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i907.DeleteAccountController>(
       () => _i907.DeleteAccountController(gh<_i351.SessionHolder>()),
     );
+    gh.factory<_i313.AuthGuard>(
+      () => _i313.AuthGuard(gh<_i56.SessionHolder>()),
+    );
+    gh.factory<_i729.LoginController>(
+      () => _i729.LoginController(gh<_i351.SessionHolder>()),
+    );
+    gh.factory<_i145.RegisterController>(
+      () => _i145.RegisterController(gh<_i351.SessionHolder>()),
+    );
+    gh.singleton<_i81.AppRouter>(
+      () => _i81.AppRouter(
+        authGuard: gh<_i313.AuthGuard>(),
+        updateGuard: gh<_i56.UpdateGuard>(),
+      ),
+    );
     gh.lazySingleton<_i667.WorkspaceRegistry>(
       () => _i667.WorkspaceRegistry.create(gh<_i351.SessionHolder>()),
       dispose: (i) => i.dispose(),
     );
+    gh.factory<_i409.BuildContext>(() => module.context(gh<_i81.AppRouter>()));
     gh.factoryParam<_i229.TerminalPageController, String, dynamic>(
       (agentId, _) => _i229.TerminalPageController(
         agentId,
@@ -132,6 +153,13 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.SessionHolder>(),
         gh<_i351.AppSettings>(),
       ),
+    );
+    gh.singleton<_i954.SessionEnforcer>(
+      () => _i954.SessionEnforcerImpl(
+        gh<_i351.AuthEventNotifier>(),
+        gh<_i351.AppRouter>(),
+      )..initialize(),
+      dispose: (i) => i.dispose(),
     );
     gh.factory<_i70.MachineListController>(
       () => _i70.MachineListController.create(
@@ -148,6 +176,9 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i667.WorkspaceRegistry>(),
         gh<_i655.PackageInfo>(),
       ),
+    );
+    gh.lazySingleton<_i695.PopupHandler>(
+      () => _i695.PopupHandler(gh<_i351.BuildContext>()),
     );
     return this;
   }

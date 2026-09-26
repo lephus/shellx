@@ -25,6 +25,7 @@ export 'router/app_route_observer.dart';
 export 'auth/account_session.dart';
 export 'auth/auth_event.dart';
 export 'auth/auth_storage.dart';
+export 'auth/session_enforcer.dart';
 export 'auth/session_holder.dart';
 export 'backend/backend.dart';
 export 'backend/client_backend.dart';

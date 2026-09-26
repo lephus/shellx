@@ -481,6 +481,10 @@ class FakeSessionHolder implements SessionHolder {
   final List<(String, String, String)> authCalls = [];
   Object? authError;
 
+  /// [login] and [register] complete only once this does, so a test can observe a form while its
+  /// request is still pending.
+  Completer<void>? authGate;
+
   @override
   String? lastEmail;
 
@@ -512,8 +516,15 @@ class FakeSessionHolder implements SessionHolder {
   @override
   String get appVersion => '1.0.0';
 
+  /// Thrown by [restore] after counting the call (e.g. a Keychain/Keystore read failure).
+  Object? restoreError;
+
   @override
-  Future<void> restore() async => restoreCalls++;
+  Future<void> restore() async {
+    restoreCalls++;
+    final error = restoreError;
+    if (error != null) throw error;
+  }
 
   @override
   Future<void> login(String email, String password) => _auth('login', email, password);
@@ -523,6 +534,8 @@ class FakeSessionHolder implements SessionHolder {
 
   Future<void> _auth(String kind, String email, String password) async {
     authCalls.add((kind, email, password));
+    final gate = authGate;
+    if (gate != null) await gate.future;
     final error = authError;
     if (error != null) throw error;
   }

@@ -19,6 +19,7 @@ class _RootAppState extends State<RootApp> {
   //
   final appRouter = getIt<AppRouter>();
   final lock = getIt<AppLockController>();
+  final session = getIt<SessionHolder>();
 
   @override
   Widget build(BuildContext context) {
@@ -47,8 +48,14 @@ class _RootAppState extends State<RootApp> {
             navigatorObservers: () => [AppRouteObserver()],
           ),
           theme: ThemeDataFactory.create(computedBrightness),
-          // Spec §5.6: the lock covers every route and dialog.
-          builder: (context, child) => LockGate(lock: lock, child: child!),
+          // Spec §5.6: the lock covers every route and dialog. Spec §9.4/§12: the relay is
+          // suspended in the background and reconnected right away when the app comes back.
+          builder: (context, child) => LockGate(
+            lock: lock,
+            onBackground: session.onBackground,
+            onForeground: session.onForeground,
+            child: child!,
+          ),
         ),
       ),
     );
