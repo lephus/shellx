@@ -1,6 +1,19 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+
+/// A Keychain/Keystore that cannot be read (locked, corrupted, or a platform error).
+class _UnreadableStore implements KeyValueStore {
+  @override
+  Future<String?> read(String key) => Future.error(PlatformException(code: 'keychain'));
+
+  @override
+  Future<void> write(String key, String value) async {}
+
+  @override
+  Future<void> delete(String key) async {}
+}
 
 void main() {
   test('defaults: font size 14 and biometric lock on (spec §5.6)', () async {
@@ -36,5 +49,15 @@ void main() {
     final settings = AppSettings(store);
     await settings.load();
     expect(settings.fontSize.value, AppSettings.defaultFontSize);
+  });
+
+  test('a store that cannot be read keeps the defaults: the biometric lock stays on', () async {
+    final settings = AppSettings(_UnreadableStore());
+
+    // Must complete instead of propagating the storage error (it runs before the first frame).
+    await settings.load();
+
+    expect(settings.fontSize.value, AppSettings.defaultFontSize);
+    expect(settings.biometricLock.value, isTrue);
   });
 }

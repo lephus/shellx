@@ -101,8 +101,8 @@ void main() {
       events: events,
     );
     final versionGate = VersionGate(api, packageInfo);
+    // Loaded at launch, as dependency injection does before the first frame.
     settings = AppSettings(store);
-    await settings.load();
     clock = DateTime(2026, 9, 26, 9);
     lock = AppLockController(
       authenticator: biometrics,
@@ -137,18 +137,24 @@ void main() {
     await getIt.reset();
   });
 
-  /// What `SplashPage` does after `configureDependencies()`: [prepareLaunch], then the app itself
-  /// in the splash's place.
-  Future<void> launch(WidgetTester tester) async {
+  /// What `SplashPage` does: the part of `configureDependencies()` that reads storage (the
+  /// settings), [prepareLaunch], then the app itself in the splash's place. [prepare] replaces
+  /// those steps.
+  Future<void> launch(WidgetTester tester, {Future<void> Function()? prepare}) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
+    Future<void> start() async {
+      await settings.load();
+      await prepareLaunch();
+    }
+
     await tester.pumpWidget(
       AdaptiveTheme(
         light: ThemeDataFactory.create(Brightness.light),
         dark: ThemeDataFactory.create(Brightness.dark),
         initial: AdaptiveThemeMode.light,
-        builder: (light, dark) => const AppLaunch(prepare: prepareLaunch),
+        builder: (light, dark) => AppLaunch(prepare: prepare ?? start),
       ),
     );
     await tester.pumpAndSettle();
@@ -344,10 +350,14 @@ void main() {
     expect(find.text('ShellX is locked'), findsNothing);
   });
 
-  testWidgets('R4: a keychain error while restoring still locks, then lands on the login page', (tester) async {
+  testWidgets('R4: a keychain that cannot be read at launch, settings included: locked, then login', (
+    tester,
+  ) async {
     await AuthStorageImpl(store).save(
       const AccountSession(userId: testUserId, deviceId: testDeviceId, token: 'saved', email: 'me@example.com'),
     );
+    await store.write(AppSettings.biometricLockKey, 'false');
+    // Fails before the settings load, as the Keychain would under dependency injection.
     store.readError = PlatformException(code: 'keychain');
     biometrics.result = false;
     await launch(tester);
@@ -360,6 +370,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(stack(), [LoginRoute.name]);
     expect(backends.backends, isEmpty);
+    await signIn(tester);
+    expect(find.text('Your computers'), findsOneWidget);
+  });
+
+  testWidgets('a launch step that fails outright still opens the app locked, then on the login page', (
+    tester,
+  ) async {
+    biometrics.result = false;
+    await launch(tester, prepare: () async => throw PlatformException(code: 'keychain'));
+    expect(find.text('ShellX is locked'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    biometrics.result = true;
+    // The biometric kind was never detected: the button names the conservative default.
+    await tester.tap(find.textContaining('Unlock with'));
+    await tester.pumpAndSettle();
+    expect(stack(), [LoginRoute.name]);
     await signIn(tester);
     expect(find.text('Your computers'), findsOneWidget);
   });

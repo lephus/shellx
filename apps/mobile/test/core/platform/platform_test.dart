@@ -42,6 +42,27 @@ void main() {
       expect(wipes, 1);
       expect(prefs.getBool(installMarkerKey), isTrue);
     });
+
+    test('a wipe that fails does not block launch and runs again on the next launch', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      var wipes = 0;
+      Object? error = StateError('keychain');
+      Future<void> wipe() async {
+        wipes++;
+        final failure = error;
+        if (failure != null) throw failure;
+      }
+
+      // Must complete instead of propagating the storage error.
+      await wipeSecureStorageOnFreshInstall(prefs: prefs, wipe: wipe);
+      expect(prefs.getBool(installMarkerKey), isNull);
+
+      error = null;
+      await wipeSecureStorageOnFreshInstall(prefs: prefs, wipe: wipe);
+      expect(wipes, 2);
+      expect(prefs.getBool(installMarkerKey), isTrue);
+    });
   });
 
   group('formatAndroidModelName', () {

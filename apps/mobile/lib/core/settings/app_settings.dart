@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 
@@ -24,10 +25,19 @@ class AppSettings {
 
   static double clampFontSize(double value) => value.clamp(minFontSize, maxFontSize).toDouble();
 
+  /// Runs before the first frame. A store that cannot be read keeps the defaults — the biometric
+  /// lock on — so the app still starts, locked.
   @PostConstruct(preResolve: true)
   Future<void> load() async {
-    final storedSize = double.tryParse(await _store.read(fontSizeKey) ?? '');
-    final biometricLock = await _store.read(biometricLockKey) != 'false';
+    final double? storedSize;
+    final bool biometricLock;
+    try {
+      storedSize = double.tryParse(await _store.read(fontSizeKey) ?? '');
+      biometricLock = await _store.read(biometricLockKey) != 'false';
+    } catch (error) {
+      if (kDebugMode) debugPrint('AppSettings load error: ${error.runtimeType}');
+      return;
+    }
     batch(() {
       _fontSize.value = clampFontSize(storedSize ?? defaultFontSize);
       _biometricLock.value = biometricLock;
