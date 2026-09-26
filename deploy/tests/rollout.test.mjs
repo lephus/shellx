@@ -12,18 +12,41 @@ const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'rollout.sh')
 
 // Fake docker: logs every call; `compose pull` fails for tag "unpullable"; `compose up -d` itself
 // fails outright (exit 17, unrelated to health) whenever .env's IMAGE_TAG starts with "crash"; the
-// relay container is healthy unless .env's IMAGE_TAG is "broken".
+// relay container is unhealthy when .env's IMAGE_TAG is "broken", the web container is unhealthy
+// when it is "webbroken" (both healthy otherwise); `compose ps -q <service>` returns
+// "<service>-container-id" so `inspect` (given that id as its last argument) can tell them apart.
 const FAKE_DOCKER = `#!/usr/bin/env bash
 echo "docker $* [IMAGE_TAG=\${IMAGE_TAG:-}]" >> "$CALLS"
 if [[ "$1 $2" == "compose pull" && "\${IMAGE_TAG:-}" == unpullable ]]; then exit 1; fi
 if [[ "$1 $2" == "compose up" ]] && grep -q '^IMAGE_TAG=crash' .env; then exit 17; fi
-if [[ "$1 $2" == "compose ps" ]]; then echo relay-container-id; exit 0; fi
+if [[ "$1 $2" == "compose ps" ]]; then echo "\${@: -1}-container-id"; exit 0; fi
 if [[ "$1" == inspect ]]; then
-  if grep -q '^IMAGE_TAG=broken$' .env; then echo unhealthy; else echo healthy; fi
+  id="\${@: -1}"
+  if [[ "$id" == relay-container-id ]] && grep -q '^IMAGE_TAG=broken$' .env; then
+    echo unhealthy
+  elif [[ "$id" == web-container-id ]] && grep -q '^IMAGE_TAG=webbroken$' .env; then
+    echo unhealthy
+  else
+    echo healthy
+  fi
   exit 0
 fi
 exit 0
 `;
+
+// Writes the four items rollout.sh swaps together (deploy.yml stages these into .incoming/; .prev/
+// is where the previous ones land): docker-compose.yml, relay.env and two directories (nginx-proxy/,
+// backup/) each holding one marker file, so a directory swap is exercised too. Exported so tests can
+// also build a .prev/ or a partial .incoming/ directly, to simulate a crash mid-swap.
+function writeConfigAt(dir, content) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'docker-compose.yml'), content.compose);
+  writeFileSync(join(dir, 'relay.env'), content.relayEnv);
+  mkdirSync(join(dir, 'nginx-proxy'), { recursive: true });
+  writeFileSync(join(dir, 'nginx-proxy', 'marker'), content.nginxMarker);
+  mkdirSync(join(dir, 'backup'), { recursive: true });
+  writeFileSync(join(dir, 'backup', 'marker'), content.backupMarker);
+}
 
 function setup({
   env = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', ownData = true, live = null, incoming = null,
@@ -40,20 +63,8 @@ function setup({
   chmodSync(join(bin, 'docker'), 0o755);
   const calls = join(root, 'calls.log');
   writeFileSync(calls, '');
-  // Writes the four items rollout.sh swaps together (deploy.yml stages these into .incoming/;
-  // .prev/ is where the previous ones land): docker-compose.yml, relay.env and two directories
-  // (nginx-proxy/, backup/) each holding one marker file, so a directory swap is exercised too.
-  const writeConfig = (dir, content) => {
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'docker-compose.yml'), content.compose);
-    writeFileSync(join(dir, 'relay.env'), content.relayEnv);
-    mkdirSync(join(dir, 'nginx-proxy'), { recursive: true });
-    writeFileSync(join(dir, 'nginx-proxy', 'marker'), content.nginxMarker);
-    mkdirSync(join(dir, 'backup'), { recursive: true });
-    writeFileSync(join(dir, 'backup', 'marker'), content.backupMarker);
-  };
-  if (live) writeConfig(app, live);
-  if (incoming) writeConfig(join(app, '.incoming'), incoming);
+  if (live) writeConfigAt(app, live);
+  if (incoming) writeConfigAt(join(app, '.incoming'), incoming);
   const run = (tag, appDir = 'phu/shellx', relayUid = String(process.getuid())) =>
     spawnSync('bash', [script, tag, appDir], {
       encoding: 'utf8',
@@ -81,11 +92,46 @@ test('healthy: pulls with the new tag, then writes it to .env and restarts once;
   const s = setup();
   const result = s.run('abc123');
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /relay is healthy on abc123/);
+  assert.match(result.stdout, /relay and web are healthy on abc123/);
   assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=abc123\n');
   const calls = s.calls();
   assert.match(calls, /docker compose pull \[IMAGE_TAG=abc123\]/);
-  assert.equal(calls.match(/compose up -d --remove-orphans/g).length, 1);
+  assert.equal(calls.match(/compose up -d --remove-orphans --force-recreate/g).length, 1);
+  // Both services are checked, not just the relay (M3).
+  assert.match(calls, /compose ps -q relay/);
+  assert.match(calls, /compose ps -q web/);
+});
+
+test('rolls back when the web container is unhealthy even though the relay is healthy', () => {
+  const s = setup();
+  const result = s.run('webbroken');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not healthy within 3s on webbroken; rolling back to old/);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+  assert.doesNotMatch(s.calls(), /image prune/);
+});
+
+test('does not print container logs into the caller output, only a hint to run them on the VPS', () => {
+  const s = setup();
+  const result = s.run('broken');
+  assert.equal(result.status, 1);
+  assert.doesNotMatch(s.calls(), /compose logs/);
+  assert.match(result.stderr, /see why on the VPS: docker compose logs --tail 50 relay web/);
+});
+
+test('prunes old images labelled as ShellX only after a healthy rollout, never after a rollback', () => {
+  const healthy = setup();
+  const healthyResult = healthy.run('abc123');
+  assert.equal(healthyResult.status, 0, healthyResult.stderr);
+  assert.match(
+    healthy.calls(),
+    /image prune -af --filter label=org\.opencontainers\.image\.source=https:\/\/github\.com\/lephus\/shellx --filter until=168h/,
+  );
+
+  const failing = setup();
+  const failingResult = failing.run('broken');
+  assert.equal(failingResult.status, 1);
+  assert.doesNotMatch(failing.calls(), /image prune/);
 });
 
 test('unhealthy: puts the previous tag back, restarts again and fails', () => {
@@ -227,4 +273,58 @@ test('a second staged deploy replaces the older .prev/ instead of merging with i
   assert.equal(s.read('docker-compose.yml'), NEWER_CONFIG.compose);
   assert.equal(s.read('.prev/docker-compose.yml'), NEW_CONFIG.compose);
   assert.equal(s.read('.prev/relay.env'), NEW_CONFIG.relayEnv);
+});
+
+// --- M5: skip a no-op swap; T8 fold: crash-safe stage_config via .prev.new ---
+
+test('a re-deploy of an identical config keeps the older .prev/ untouched', () => {
+  const s = setup({ live: NEW_CONFIG, incoming: NEW_CONFIG });
+  // A .prev/ already on disk from an earlier, unrelated swap must survive a no-op restage.
+  writeConfigAt(join(s.app, '.prev'), OLD_CONFIG);
+  const result = s.run('abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose);
+  assert.equal(s.read('relay.env'), NEW_CONFIG.relayEnv);
+  assert.equal(s.read('.prev/docker-compose.yml'), OLD_CONFIG.compose);
+  assert.equal(s.read('.prev/relay.env'), OLD_CONFIG.relayEnv);
+  assert.throws(() => statSync(join(s.app, '.incoming')));
+});
+
+test('discards a stale .prev.new left by a crash before staging, and deploys normally', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  writeConfigAt(join(s.app, '.prev.new'), {
+    compose: 'garbage\n', relayEnv: 'garbage\n', nginxMarker: 'garbage\n', backupMarker: 'garbage\n',
+  });
+  const result = s.run('abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose);
+  assert.equal(s.read('.prev/docker-compose.yml'), OLD_CONFIG.compose);
+  assert.throws(() => statSync(join(s.app, '.prev.new')));
+});
+
+test('heals a live item left missing by a crash between removing it and moving its replacement in', () => {
+  const s = setup();
+  // Simulates a run that crashed mid-swap: docker-compose.yml, nginx-proxy/ and backup/ had already
+  // been swapped to the new config; relay.env was removed but its replacement never arrived (still
+  // sitting in .incoming/); .prev/ (built before any of that, in one piece) still holds the full old
+  // config.
+  writeFileSync(join(s.app, 'docker-compose.yml'), NEW_CONFIG.compose);
+  mkdirSync(join(s.app, 'nginx-proxy'), { recursive: true });
+  writeFileSync(join(s.app, 'nginx-proxy', 'marker'), NEW_CONFIG.nginxMarker);
+  mkdirSync(join(s.app, 'backup'), { recursive: true });
+  writeFileSync(join(s.app, 'backup', 'marker'), NEW_CONFIG.backupMarker);
+  // relay.env is deliberately absent from the live app dir: the crashed run removed it.
+  writeConfigAt(join(s.app, '.prev'), OLD_CONFIG);
+  mkdirSync(join(s.app, '.incoming'), { recursive: true });
+  writeFileSync(join(s.app, '.incoming', 'relay.env'), NEW_CONFIG.relayEnv);
+
+  const result = s.run('abc123');
+  assert.equal(result.status, 0, result.stderr);
+  // The live config ends up fully consistent (nothing missing), whichever of the four items the
+  // crashed run had already replaced before it died.
+  assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose);
+  assert.equal(s.read('relay.env'), NEW_CONFIG.relayEnv);
+  assert.equal(s.read('nginx-proxy/marker'), NEW_CONFIG.nginxMarker);
+  assert.equal(s.read('backup/marker'), NEW_CONFIG.backupMarker);
+  assert.throws(() => statSync(join(s.app, '.incoming')));
 });

@@ -25,7 +25,9 @@ services:
       # SQLite database; the directory must belong to uid 1000 (the image's `node` user).
       - ./data:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/v1/version').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      # dist/scripts/healthcheck.js (relay/src/scripts/healthcheck.ts) checks both the HTTP endpoint
+      # and that the SQLite database opens read-only, and prints nothing on success.
+      test: ["CMD", "node", "dist/scripts/healthcheck.js"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -44,6 +46,12 @@ services:
       LETSENCRYPT_HOST: shellx.pro,www.shellx.pro,download.shellx.pro
     volumes:
       - ./downloads:/srv/downloads:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--header", "Host: shellx.pro", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging: *logging
     networks: [proxy]
 

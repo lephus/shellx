@@ -16,3 +16,4 @@ FROM nginx:alpine AS runtime
 LABEL org.opencontainers.image.source="https://github.com/lephus/shellx"
 COPY deploy/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /web/dist /usr/share/nginx/html
+RUN nginx -t
