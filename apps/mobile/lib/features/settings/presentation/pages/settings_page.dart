@@ -191,12 +191,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               }),
               Divider(height: 1, color: colors.divider),
-              _Row(
-                title: strings.settingsDeleteAccount,
-                leading: Icon(Icons.delete_outline, color: colors.error),
-                danger: true,
-                onTap: () => context.router.push(const DeleteAccountRoute()),
-              ),
+              Watch((context) {
+                final loggingOut = _controller.loggingOut.value;
+                return _Row(
+                  title: strings.settingsDeleteAccount,
+                  leading: Icon(Icons.delete_outline, color: loggingOut ? colors.disable : colors.error),
+                  danger: true,
+                  onTap: loggingOut ? null : () => context.router.push(const DeleteAccountRoute()),
+                );
+              }),
             ],
           ),
         ],

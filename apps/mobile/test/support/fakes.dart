@@ -270,6 +270,10 @@ class FakeBackend implements ShellxBackend {
   List<PinnedMachine> pinnedList;
   Object? devicesError;
 
+  /// Thrown by [pinnedMachines] instead of returning [pinnedList] (e.g. a Keychain/Keystore read
+  /// failure).
+  Object? pinnedError;
+
   /// [devices] completes only once this does — a `GET /v1/devices` still in flight when something
   /// else runs (e.g. the caller is disposed).
   Completer<void>? devicesGate;
@@ -372,7 +376,11 @@ class FakeBackend implements ShellxBackend {
   Stream<PresenceFrame> get presence => _presence.stream;
 
   @override
-  Future<List<PinnedMachine>> pinnedMachines() async => pinnedList;
+  Future<List<PinnedMachine>> pinnedMachines() async {
+    final error = pinnedError;
+    if (error != null) throw error;
+    return pinnedList;
+  }
 
   @override
   Future<void> pair(PairingUri uri) async {

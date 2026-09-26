@@ -1,4 +1,5 @@
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/domain/biometric_authenticator.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
@@ -50,34 +51,55 @@ class SettingsController extends Controller {
   ReadonlySignal<bool> get loggingOut => _loggingOut;
 
   Future<void> load() async {
-    final available = await _biometrics.isAvailable();
+    await guard(() async {
+      final available = await _biometrics.isAvailable();
+      if (_disposed) return;
+      _biometricsAvailable.value = available;
+    });
     if (_disposed) return;
-    _biometricsAvailable.value = available;
     await _loadPaired();
   }
 
+  /// `backend.pinnedMachines()` reads secure storage and can throw (Keychain/Keystore error): the
+  /// whole reload is guarded, so the toast shows and the page never spins forever. On that
+  /// failure, [paired] falls back to whatever is already known to have failed to unpair, or an
+  /// empty list — never null again once [load] has run once.
   Future<void> _loadPaired() async {
-    final backend = _session.requireBackend;
-    final pins = await backend.pinnedMachines();
-    var names = <String, String>{};
-    try {
-      names = {for (final device in await backend.devices()) device.id: device.name};
-    } on Object {
-      // Offline: still list the pinned machines, without names.
-    }
-    if (_disposed) return;
-    final pinnedIds = pins.map((pin) => pin.agentId).toSet();
-    // A machine that got paired again (fresh pin) is no longer a failed unpair.
-    _failedNames.removeWhere((agentId, _) => pinnedIds.contains(agentId));
-    final combined = [
-      for (final pin in pins) (agentId: pin.agentId, name: names[pin.agentId]),
-      for (final entry in _failedNames.entries) (agentId: entry.key, name: entry.value),
-    ];
-    batch(() {
-      _paired.value = combined;
-      _failedUnpair.value = Set.unmodifiable(_failedNames.keys);
+    await guard(() async {
+      final backend = _session.requireBackend;
+      final List<PinnedMachine> pins;
+      try {
+        pins = await backend.pinnedMachines();
+      } catch (_) {
+        if (!_disposed) _showFailedOnly();
+        rethrow;
+      }
+      if (_disposed) return;
+      var names = <String, String>{};
+      try {
+        names = {for (final device in await backend.devices()) device.id: device.name};
+      } on Object {
+        // Offline: still list the pinned machines, without names.
+      }
+      if (_disposed) return;
+      final pinnedIds = pins.map((pin) => pin.agentId).toSet();
+      // A machine that got paired again (fresh pin) is no longer a failed unpair.
+      _failedNames.removeWhere((agentId, _) => pinnedIds.contains(agentId));
+      final combined = [
+        for (final pin in pins) (agentId: pin.agentId, name: names[pin.agentId]),
+        for (final entry in _failedNames.entries) (agentId: entry.key, name: entry.value),
+      ];
+      batch(() {
+        _paired.value = combined;
+        _failedUnpair.value = Set.unmodifiable(_failedNames.keys);
+      });
     });
   }
+
+  void _showFailedOnly() => batch(() {
+    _paired.value = [for (final entry in _failedNames.entries) (agentId: entry.key, name: entry.value)];
+    _failedUnpair.value = Set.unmodifiable(_failedNames.keys);
+  });
 
   String? _nameOf(String agentId) {
     for (final machine in _paired.peek() ?? const <PairedMachine>[]) {

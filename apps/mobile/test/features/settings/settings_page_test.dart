@@ -152,6 +152,63 @@ void main() {
     expect(find.text('Chưa ghép nối máy nào.'), findsOneWidget);
   });
 
+  testWidgets('two machines failing to unpair both keep their row; retrying one leaves the other', (tester) async {
+    registry.forMachine(agentA);
+    backend.pinnedList = [...backend.pinnedList, pinned(agentB)];
+    backend.addMachine(agentB);
+    registry.forMachine(agentB);
+    backend.unpairError = const ApiException(status: 0, code: 'network', message: 'offline');
+    await openSettings(tester);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').last);
+    await tester.pumpAndSettle();
+    // Only one "Bỏ ghép nối" button remains: the other row already turned into a retry.
+    await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('MacBook-Pro'), findsOneWidget);
+    expect(find.text('DESKTOP-42'), findsOneWidget);
+    expect(find.text('Chưa bỏ ghép nối được.'), findsNWidgets(2));
+    expect(find.text('Thử lại'), findsNWidgets(2));
+
+    backend.unpairError = null;
+    await tester.tap(find.text('Thử lại').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chưa bỏ ghép nối được.'), findsOneWidget);
+    expect(find.text('MacBook-Pro'), findsNothing); // retried and gone
+    expect(find.text('DESKTOP-42'), findsOneWidget); // the other one is left alone
+  });
+
+  testWidgets('a failed unpair whose name was never known shows the fallback, not blank', (tester) async {
+    registry.forMachine(agentA);
+    backend.devicesError = const ApiException(status: 0, code: 'network', message: 'offline');
+    backend.unpairError = const ApiException(status: 0, code: 'network', message: 'offline');
+    await openSettings(tester);
+    // devices() failed on the very first load, so the pinned machine has no known name yet.
+    expect(find.text('Máy không xác định'), findsOneWidget);
+
+    await tester.tap(find.text('Bỏ ghép nối'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Máy không xác định'), findsOneWidget); // still the fallback, not blank
+    expect(find.text('Chưa bỏ ghép nối được.'), findsOneWidget);
+  });
+
+  testWidgets('pinnedMachines() failing shows the toast, not an endless spinner', (tester) async {
+    backend.pinnedError = const ApiException(status: 0, code: 'network', message: 'offline');
+    await openSettings(tester);
+    expect(find.byType(AppCircularProgress), findsNothing);
+    expect(find.text('Chưa ghép nối máy nào.'), findsOneWidget);
+    expect(popups.errors, isNotEmpty);
+  });
+
   testWidgets('sign out asks for confirmation', (tester) async {
     await openSettings(tester);
     await tester.tap(find.text('Đăng xuất'));
