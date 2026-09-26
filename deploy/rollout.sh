@@ -7,14 +7,22 @@
 # If deploy.yml staged new config into <app-dir>/.incoming/ (docker-compose.yml, relay.env,
 # nginx-proxy/, backup/), swaps it into place first, moving the current files into <app-dir>/.prev/
 # so a bad relay.env or docker-compose.yml rolls back together with IMAGE_TAG instead of restarting
-# the old image with the new, broken config. Then pulls the new images, points .env at them, restarts
-# the stack with --force-recreate (so a container whose own config did not change, such as `backup`,
-# is recreated too — otherwise it keeps its old bind-mount inode, which a later `rm -rf .prev` deletes
-# out from under it, and its cron job silently stops working) and waits up to 60 s for BOTH the
-# relay's and the web's healthcheck. If the pull fails, or either service does not come up healthy,
-# restores .prev/ and the previous IMAGE_TAG, restarts again and fails. On success, best-effort prunes
-# older ShellX images so the disk does not fill up. Touches nothing outside <app-dir> (relative paths
-# are under $HOME).
+# the old image with the new, broken config. A staged config identical to the live one is not swapped
+# at all (M5), and then .prev/ keeps the config from before the last deploy that did change it. Then
+# pulls the new images, points .env at them, restarts the stack with --force-recreate and waits up to
+# 60 s for BOTH the relay's and the web's healthcheck. If the pull fails, or either service does not
+# come up healthy, puts back the config IT swapped in (only if this run swapped: restoring .prev/ after
+# a code-only deploy would bring back an older, stale config — R3) and the previous IMAGE_TAG,
+# restarts again and fails. On success, best-effort prunes older ShellX images so the disk does not
+# fill up. Touches nothing outside <app-dir> (relative paths are under $HOME).
+#
+# The `backup` container bind-mounts backup/, i.e. the directory inode it saw when it was created. The
+# swap and the restore replace backup/ (rm -rf + mv), so the running container would be left with a
+# deleted, empty directory and its cron job would silently stop (C2). Keeping that inode stable would
+# mean rewriting backup/'s contents in place, which the crash recovery below could not detect
+# half-done; so instead every config change is followed by a recreate of `backup`: the deploy's own
+# `up --force-recreate`, the rollback's `up --force-recreate`, or — where neither follows (a failed
+# pull, a failed first deploy) — `up -d --no-deps --force-recreate backup`, best effort.
 #
 # Crash safety of the config swap (stage_config): the backup of the live config is first built into
 # <app-dir>/.prev.new/ by COPYING (not moving) the live items, so the live config stays untouched
@@ -30,8 +38,10 @@
 #     from .prev/ (copy, not move, so .prev/ is left intact) before the swap is attempted again. This
 #     guarantees the live config is never left with a missing file. It does not guarantee .prev/ ends
 #     up byte-for-byte the config from before the crashed run for every item — an item the crashed run
-#     had already fully swapped in keeps its new value in the rebuilt .prev/ too — so a manual rollback
-#     right after such a double failure may be a no-op for that one item; deploying again fixes it.
+#     had already fully swapped in keeps its new value in the rebuilt .prev/ too. So any rollback right
+#     after such a double failure — the AUTOMATIC one, if this very deploy then fails, as well as a
+#     manual one — restores a mix: that one item keeps its new value while the others go back.
+#     Deploying again (a good release) fixes it.
 set -euo pipefail
 
 main() {
@@ -39,6 +49,9 @@ main() {
   local app_dir="$2"
   local health_timeout="${HEALTH_TIMEOUT_SECONDS:-60}"
   local relay_uid="${RELAY_UID:-1000}"
+  # 1 once stage_config has really swapped the staged config in; only then is there anything of this
+  # run's to restore (R3).
+  local swapped=0
   case "$app_dir" in
     /*) ;;
     *) app_dir="$HOME/$app_dir" ;;
@@ -100,10 +113,11 @@ main() {
   }
 
   # Moves the current four items into .prev/ (replacing any older .prev/), then moves .incoming/'s
-  # items into place. A no-op if deploy.yml did not stage anything (no .incoming/), which keeps every
-  # caller that never creates .incoming/ byte-for-byte identical to before this change. Also a no-op
-  # beyond discarding .incoming/ when the staged config is identical to the live one, so redeploying
-  # the same config (only a new image) never disturbs .prev/.
+  # items into place, and sets `swapped`. A no-op if deploy.yml did not stage anything (no
+  # .incoming/), which keeps every caller that never creates .incoming/ byte-for-byte identical to
+  # before this change. Also a no-op beyond discarding .incoming/ when the staged config is identical
+  # to the live one, so redeploying the same config (only a new image) never disturbs .prev/ — and a
+  # failure of that deploy restores nothing.
   stage_config() {
     if [[ -d .incoming ]]; then
       if items_identical; then
@@ -125,10 +139,12 @@ main() {
         fi
       done
       rm -rf .incoming
+      swapped=1
     fi
   }
 
-  # Moves .prev/'s items back into place. A no-op if there is nothing staged this run (no .prev/).
+  # Moves .prev/'s items back into place: the config this run swapped out. Only ever called when
+  # `swapped` is 1 — otherwise .prev/ belongs to an older deploy and is stale for this one (R3).
   restore_config() {
     if [[ -d .prev ]]; then
       local item
@@ -138,6 +154,15 @@ main() {
           mv ".prev/$item" "./$item"
         fi
       done
+    fi
+  }
+
+  # Best effort, never fails the run: recreates only the `backup` container, so its bind mount
+  # follows the backup/ directory now in place (see the header). For a restore that no full
+  # `up --force-recreate` follows.
+  recreate_backup() {
+    if ! docker compose up -d --no-deps --force-recreate backup; then
+      echo "::warning::could not recreate the backup container; on the VPS run: docker compose up -d --no-deps --force-recreate backup" >&2
     fi
   }
 
@@ -193,10 +218,14 @@ main() {
   # (image references may have changed) and the relay needs the new relay.env once it restarts.
   stage_config
 
-  # Pull first: if the images cannot be pulled, restore the staged config and leave .env and the
-  # running stack as they were.
+  # Pull first: if the images cannot be pulled, put back the config this run swapped in (if any) and
+  # leave .env and the running relay and web as they were; `backup` is recreated because the swap and
+  # the restore replaced its bind-mounted backup/ directory.
   if ! IMAGE_TAG="$new_tag" docker compose pull; then
-    restore_config
+    if ((swapped)); then
+      restore_config
+      recreate_backup
+    fi
     exit 1
   fi
   set_tag "$new_tag"
@@ -210,12 +239,17 @@ main() {
   fi
 
   echo "::error::relay/web not healthy within ${health_timeout}s on $new_tag; rolling back to ${old_tag:-nothing} (see why on the VPS: docker compose logs --tail 50 relay web)" >&2
-  restore_config
+  if ((swapped)); then
+    restore_config
+  fi
   if [[ -n "$old_tag" ]]; then
     set_tag "$old_tag"
+    # --force-recreate: `backup` too, whose backup/ the restore just replaced.
     if ! docker compose up -d --remove-orphans --force-recreate || ! wait_healthy; then
       echo "::error::the previous release ($old_tag) is not healthy either" >&2
     fi
+  elif ((swapped)); then
+    recreate_backup
   fi
   exit 1
 }

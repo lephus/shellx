@@ -4,8 +4,10 @@
 # read-only: that works while the relay runs (it holds the WAL files open); while the relay is
 # stopped the read fails, nothing is written, and nothing is lost either (a stopped relay changes
 # nothing) — the next day's run tries again. `umask 077` makes every file this script writes 0600
-# (the database holds user emails and password hashes). Overridable for tests: DATA_DB, BACKUP_DIR,
-# KEEP, BACKUP_DATE.
+# (the database holds user emails and password hashes); each finished backup is then handed to the
+# owner of the backups folder (the deploy user, since this container runs as root), so that user can
+# copy it off the VPS without sudo while nobody else can read it. Overridable for tests: DATA_DB,
+# BACKUP_DIR, KEEP, BACKUP_DATE.
 set -eu
 umask 077
 db="${DATA_DB:-/data/relay.db}"
@@ -32,6 +34,10 @@ if [ "$(sqlite3 "$tmp" 'PRAGMA integrity_check;')" != "ok" ]; then
   exit 1
 fi
 mv "$tmp" "$target"
+owner="$(ls -nd "$dir" | awk '{print $3 ":" $4}')"
+if ! chown "$owner" "$target" 2>/dev/null; then
+  echo "backup: could not hand $target to the owner of $dir ($owner); it stays root's" >&2
+fi
 echo "backup: wrote $target"
 
 # Names sort by date: keep the KEEP newest, delete the rest.

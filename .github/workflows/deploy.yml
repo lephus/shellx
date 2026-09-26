@@ -54,8 +54,9 @@ jobs:
 
       - name: Refuse a workflow_dispatch ref that is not merged to main (M2)
         if: github.event_name == 'workflow_dispatch'
+        # origin/main comes from the checkout itself (fetch-depth: 0 fetches every branch). No extra
+        # `git fetch` here: persist-credentials: false leaves none, so it would fail on a private repo.
         run: |
-          git fetch --no-tags origin main
           if ! git merge-base --is-ancestor HEAD origin/main; then
             echo "::error::the requested ref is not an ancestor of origin/main; merge it to main first, or pick an older commit that is already on main to roll back"
             exit 1

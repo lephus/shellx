@@ -72,8 +72,8 @@ The `publish` job also reads the `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNO
 the `VPS_APP_DIR` and (optional, digits only, default `22`) `VPS_SSH_PORT` variables of this same
 `release` Environment, shared with the `production` Environment `deploy.yml` uses (see
 `deploy/README.md`) — **not** repository secrets or variables. It uploads installers into a version
-folder created with mode 755, so nginx (uid 101, in the `web` image) can read it under a hardened
-umask. Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
+folder and sets mode 755 on it and on its parents `downloads/` and `downloads/desktop/`, so nginx
+(uid 101, in the `web` image) can reach them under a hardened umask. Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 
 The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinned in the workflow's
 `env:` block. The workflow expects the names fixed by `apps/desktop`: `ShellX.app` with bundle id

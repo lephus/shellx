@@ -143,6 +143,17 @@ test('unhealthy: puts the previous tag back, restarts again and fails', () => {
   assert.equal(s.calls().match(/compose up -d --remove-orphans/g).length, 2);
 });
 
+test('the rollback `compose up` recreates every container too, backup included (R3, C2 test gap)', () => {
+  const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const result = s.run('broken');
+  assert.equal(result.status, 1);
+  const ups = s.calls().split('\n').filter((line) => line.includes('compose up'));
+  assert.deepEqual(ups, [
+    'docker compose up -d --remove-orphans --force-recreate [IMAGE_TAG=]', // broken, from .env
+    'docker compose up -d --remove-orphans --force-recreate [IMAGE_TAG=]', // old, after the restore
+  ]);
+});
+
 test('first deploy unhealthy: nothing to roll back to, fails without a second restart', () => {
   const s = setup({ env: 'PROXY_NETWORK=proxy-net\n' });
   const result = s.run('broken');
@@ -227,7 +238,7 @@ test('a bad deploy restores the old relay.env and docker-compose.yml byte-for-by
   assert.throws(() => statSync(join(s.app, '.incoming')));
 });
 
-test('a failed pull leaves the live files unchanged', () => {
+test('a failed pull after a real swap restores the live files and recreates the backup container (R3)', () => {
   const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
   const result = s.run('unpullable');
   assert.equal(result.status, 1);
@@ -236,7 +247,10 @@ test('a failed pull leaves the live files unchanged', () => {
   assert.equal(s.read('nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
   assert.equal(s.read('backup/marker'), OLD_CONFIG.backupMarker);
   assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
-  assert.doesNotMatch(s.calls(), /compose up/);
+  // The swap and the restore replaced backup/, so the running backup container's bind mount points
+  // at a deleted directory: only that container is recreated, the relay and web are left running.
+  const ups = s.calls().split('\n').filter((line) => line.includes('compose up'));
+  assert.deepEqual(ups, ['docker compose up -d --no-deps --force-recreate backup [IMAGE_TAG=]']);
 });
 
 test('a successful deploy leaves the new files live and the old ones in .prev/', () => {
@@ -288,6 +302,59 @@ test('a re-deploy of an identical config keeps the older .prev/ untouched', () =
   assert.equal(s.read('.prev/docker-compose.yml'), OLD_CONFIG.compose);
   assert.equal(s.read('.prev/relay.env'), OLD_CONFIG.relayEnv);
   assert.throws(() => statSync(join(s.app, '.incoming')));
+});
+
+for (const failingTag of ['broken', 'unpullable', 'crashnew']) {
+  test(`a failing code-only deploy (${failingTag}) leaves the live config and the older .prev/ untouched (R3)`, () => {
+    // Deploy 1 swapped config OLD -> NEW (so .prev/ holds OLD); deploy 2 stages NEW again and fails.
+    const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+    const first = s.run('abc123');
+    assert.equal(first.status, 0, first.stderr);
+    writeConfigAt(join(s.app, '.incoming'), NEW_CONFIG);
+    const backupInode = statSync(join(s.app, 'backup')).ino;
+
+    const second = s.run(failingTag);
+    assert.equal(second.status, 1);
+    assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose); // not the stale OLD config
+    assert.equal(s.read('relay.env'), NEW_CONFIG.relayEnv);
+    assert.equal(s.read('nginx-proxy/marker'), NEW_CONFIG.nginxMarker);
+    assert.equal(s.read('backup/marker'), NEW_CONFIG.backupMarker);
+    assert.equal(s.read('.prev/docker-compose.yml'), OLD_CONFIG.compose);
+    assert.equal(s.read('.prev/relay.env'), OLD_CONFIG.relayEnv);
+    assert.equal(s.read('.prev/nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
+    assert.equal(s.read('.prev/backup/marker'), OLD_CONFIG.backupMarker);
+    assert.equal(statSync(join(s.app, 'backup')).ino, backupInode); // the running container's mount
+    assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=abc123\n');
+    assert.throws(() => statSync(join(s.app, '.incoming')));
+  });
+}
+
+test('fresh VPS: a failing code-only deploy after the first good one keeps the backup scripts (R3)', () => {
+  // As after runbook step 1: empty nginx-proxy/ and backup/, no compose file or relay.env yet.
+  const s = setup({ env: 'PROXY_NETWORK=proxy-net\n', incoming: NEW_CONFIG });
+  mkdirSync(join(s.app, 'nginx-proxy'));
+  mkdirSync(join(s.app, 'backup'));
+  const first = s.run('abc123');
+  assert.equal(first.status, 0, first.stderr);
+  writeConfigAt(join(s.app, '.incoming'), NEW_CONFIG);
+  const second = s.run('broken');
+  assert.equal(second.status, 1);
+  assert.equal(s.read('backup/marker'), NEW_CONFIG.backupMarker); // not the empty backup/ from before
+  assert.equal(s.read('docker-compose.yml'), NEW_CONFIG.compose);
+});
+
+test('a failed first deploy after a swap restores the config and recreates the backup container (R3)', () => {
+  const s = setup({ env: 'PROXY_NETWORK=proxy-net\n', live: OLD_CONFIG, incoming: NEW_CONFIG });
+  const result = s.run('broken');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /rolling back to nothing/);
+  assert.equal(s.read('relay.env'), OLD_CONFIG.relayEnv);
+  assert.equal(s.read('backup/marker'), OLD_CONFIG.backupMarker);
+  const ups = s.calls().split('\n').filter((line) => line.includes('compose up'));
+  assert.deepEqual(ups, [
+    'docker compose up -d --remove-orphans --force-recreate [IMAGE_TAG=]',
+    'docker compose up -d --no-deps --force-recreate backup [IMAGE_TAG=]',
+  ]);
 });
 
 test('discards a stale .prev.new left by a crash before staging, and deploys normally', () => {

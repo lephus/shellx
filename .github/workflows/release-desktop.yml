@@ -294,9 +294,10 @@ jobs:
           echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
       - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
         run: |
-          # mode 755 (not the runner's default umask): nginx (uid 101, in the web image) must be able
-          # to traverse this version folder to serve the files inside it (M6).
-          ssh -F "$SSH_CONFIG" vps "mkdir -m 755 -p '$APP_DIR/downloads/desktop/$VERSION'"
+          # mode 755 on every level (not the VPS user's umask; `mkdir -m` would only set the last one):
+          # nginx (uid 101, in the web image) must be able to traverse downloads/, desktop/ and this
+          # version folder to serve the files inside it (M6).
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION' && chmod 755 '$APP_DIR/downloads' '$APP_DIR/downloads/desktop' '$APP_DIR/downloads/desktop/$VERSION'"
           rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
             "vps:$APP_DIR/downloads/desktop/$VERSION/"
       - name: Verify public download URLs

@@ -16,7 +16,8 @@ The only exception is four small files copied once into nginx-proxy's `vhost.d` 
   backup/                # from deploy/backup/: the backup container's scripts
   .incoming/             # deploy.yml stages docker-compose.yml, relay.env, nginx-proxy/, backup/
                          # here before rollout.sh swaps them into place (transient)
-  .prev/                 # the four items above, as they were before the last swap (manual rollback)
+  .prev/                 # the four items above, as they were before the last deploy that CHANGED
+                         # them (a code-only deploy leaves it alone, so it can be older — R3)
   .prev.new/             # rollout.sh builds .prev/'s replacement here first, so a crash mid-swap
                          # never leaves a partially written .prev/ (transient; see rollout.sh's header)
 ```
@@ -39,10 +40,12 @@ the live one, in which case neither is touched — M5), pull, set `IMAGE_TAG`, `
 --remove-orphans --force-recreate` (so every container is recreated, not only the ones whose own
 config changed — this is what keeps the `backup` container's bind mount fresh across deploys — C2),
 wait up to 60 s for BOTH the relay's and the web's healthcheck (M3). If the pull fails, or either
-service never turns healthy, it restores `.prev/` (so a bad `relay.env` or `docker-compose.yml` never
-outlives its `IMAGE_TAG`) and, on the health failure path, the previous `IMAGE_TAG` too — printing
-only a hint to check the logs on the VPS yourself, never the logs' own content, into the Actions
-output (M11). On success it best-effort prunes old ShellX images (I4). A `workflow_dispatch` run is
+service never turns healthy, it puts back the config it swapped in — only if this deploy swapped one
+(so a bad `relay.env` or `docker-compose.yml` never outlives its `IMAGE_TAG`, while a failed code-only
+deploy leaves the live config and `.prev/` alone instead of restoring an older, stale `.prev/` — R3)
+— and, on the health failure path, the previous `IMAGE_TAG` too, recreating the `backup` container
+after any restore (its bind-mounted `backup/` was replaced). It prints only a hint to check the logs
+on the VPS yourself, never the logs' own content, into the Actions output (M11). On success it best-effort prunes old ShellX images (I4). A `workflow_dispatch` run is
 refused unless the requested `ref` is already an ancestor of `origin/main` (M2), so it can only
 deploy code that has actually been merged. Finally it checks `https://relay.shellx.pro/v1/version`
 and `https://shellx.pro/`.
@@ -72,9 +75,11 @@ the VPS as the deploy user unless a step says otherwise.
    ```bash
    mkdir -p ~/phu/shellx/{data,backups,downloads/desktop,nginx-proxy,backup}
    sudo chown 1000:1000 ~/phu/shellx/data      # the relay runs as uid 1000 (node) and must write here
-   chmod 700 ~/phu/shellx/data ~/phu/shellx/backups   # both hold the database or its backups, which
-     # carry user emails and password hashes (M9). uid 1000 still owns and can write data/, and the
-     # backup container (it runs as root inside its own container) can still read and write both.
+   sudo chmod 700 ~/phu/shellx/data            # sudo: data/ now belongs to uid 1000, not to you
+   chmod 700 ~/phu/shellx/backups
+     # Both hold the database or its backups, which carry user emails and password hashes (M9).
+     # uid 1000 still owns and can write data/, and the backup container (it runs as root inside its
+     # own container) can still read and write both.
    ```
 2. **Proxy network.** Find the Docker network of nginx-proxy (`docker network ls`; it is the network
    the `nginx-proxy` container is attached to, see `docker inspect nginx-proxy`) and record it:
@@ -186,26 +191,39 @@ All commands run in `~/phu/shellx`.
   run `docker compose up -d --force-recreate` (this alone does not touch the four config items). Images of every
   deployed commit stay in GHCR (the VPS's local Docker cache only keeps images from the last 7 days
   after a healthy deploy — see "Disk usage" below — so an older rollback may need to re-pull). A
-  failed automatic rollout already restores `~/phu/shellx/.prev/` and the previous `IMAGE_TAG` on its
-  own (see above); to redo that by hand after a *successful* deploy you regret, on the VPS: `cd
+  failed automatic rollout already restores the config it swapped in and the previous `IMAGE_TAG` on
+  its own (see above); to redo that by hand after a *successful* deploy you regret, on the VPS: `cd
   ~/phu/shellx && for f in docker-compose.yml relay.env nginx-proxy backup; do [ -e ".prev/$f" ] &&
   rm -rf "$f" && mv ".prev/$f" "./$f"; done` (the `[ -e ".prev/$f" ]` guard skips any item `.prev/`
   does not have, instead of deleting the live item and then failing to restore it — M5) and set
   `IMAGE_TAG` back in `.env`, then `docker compose up -d --remove-orphans --force-recreate`.
+  **Check `.prev/` first:** it holds the config from before the last deploy that *changed* the config,
+  not necessarily from before the last deploy — code-only deploys leave it alone, so after a few of
+  them it can be much older than the release you are rolling back to. Compare before restoring
+  (`for f in docker-compose.yml relay.env nginx-proxy backup; do diff -r ".prev/$f" "$f"; done`);
+  if it is not the config you want, roll back with the workflow instead (it re-stages the config of
+  the chosen commit).
 - **Versions and download links:** edit `deploy/relay.env` and push `main`.
 - **Emergency password reset:** see `relay/README.md` (`docker compose exec relay node dist/scripts/reset-password.js …`).
 - **Backups:** `backups/relay-<date>.db`, written at 03:00 VPS time (mode 0600 — `umask 077` in
-  `backup-once.sh`, M9), the 14 newest are kept. The backup reads the live database through a
-  read-only mount, which needs the relay running; while the relay is stopped the backup is skipped
-  (`docker compose logs backup` says so) and nothing is lost, since a stopped relay changes nothing.
-  Copy them off the VPS if you like, e.g. from your machine: `rsync -a <user>@<vps>:phu/shellx/backups/
-  ./shellx-backups/` — and delete copies older than 14 days, because the privacy policy says deleted
-  data survives in backups for at most 14 days.
+  `backup-once.sh`, M9), the 14 newest are kept. The backup container runs as root, so
+  `backup-once.sh` hands each finished file to the owner of `backups/` (the deploy user) — readable by
+  that user only, never by anyone else. The backup reads the live database through a read-only mount,
+  which needs the relay running; while the relay is stopped the backup is skipped (`docker compose
+  logs backup` says so) and nothing is lost, since a stopped relay changes nothing. Copy them off the
+  VPS as the deploy user if you like, e.g. from your machine: `rsync -a
+  <deploy-user>@<vps>:phu/shellx/backups/ ./shellx-backups/` (no sudo needed; if `docker compose logs
+  backup` ever says a file "stays root's", use `ssh <deploy-user>@<vps> sudo cat
+  phu/shellx/backups/relay-<date>.db > relay-<date>.db` for that one, which needs passwordless sudo)
+  — and delete copies older than 14 days, because the privacy policy says deleted data survives in
+  backups for at most 14 days.
 - **Backup freshness:** `ls -lt backups | head -2` should always show a file from within the last day
   or two. If it does not, the nightly cron stopped running — check `docker compose logs backup`. This
   used to fail silently from the third deploy on, because `docker compose up -d` (without
   `--force-recreate`) never recreated the `backup` container even though its bind-mounted `backup/`
-  scripts had changed underneath it; `rollout.sh` now always passes `--force-recreate` (C2).
+  scripts had changed underneath it; `rollout.sh` now always passes `--force-recreate` (C2), and
+  recreates `backup` alone after a restore that no full restart follows (a failed pull — R3). If you
+  ever swap `backup/` by hand, run `docker compose up -d --no-deps --force-recreate backup` too.
 - **Restore a backup:**
 
   ```bash
@@ -229,6 +247,8 @@ All commands run in `~/phu/shellx`.
 
 `node --test deploy/tests/*.test.mjs` runs `rollout.sh` against a fake `docker` (health of both
 relay and web, rollback, pull failure, missing `PROXY_NETWORK`, wrong `data/` owner, staging and
-restoring `.incoming/`/`.prev/` config, skipping a no-op restage, recovering from a crash mid-swap,
-pruning images only after success) and `backup/backup-once.sh` with the local `sqlite3` (rotation,
-missing and unreadable databases, 0600 file mode).
+restoring `.incoming/`/`.prev/` config, restoring only a config this run swapped in, recreating
+`backup` after a restore, `--force-recreate` on the rollback too, skipping a no-op restage,
+recovering from a crash mid-swap, pruning images only after success) and `backup/backup-once.sh`
+with the local `sqlite3` (rotation, missing and unreadable databases, 0600 file mode, handing each
+file to the owner of `backups/`).
