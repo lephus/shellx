@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/machines/domain/machine_entry.dart';
@@ -44,8 +45,10 @@ class MachineListController extends Controller {
   late final StreamSubscription<RelayConnectionState> _relay;
   bool _disposed = false;
 
-  /// Bumped by every [refresh]; a call whose requests come back after a later one started
-  /// discards its own result instead of applying it (see [_load]).
+  /// Bumped by every [refresh]; a call whose generation no longer matches by the time its
+  /// requests come back is superseded and writes nothing — neither [StateSignal.complete] nor
+  /// [StateSignal.failure] — so it can neither apply stale data nor erase whatever the newer
+  /// refresh already decided, success or failure (see [refresh]).
   int _refreshGeneration = 0;
 
   /// Online machines first, then offline, each sorted by name; agents only. A failed refresh
@@ -71,25 +74,27 @@ class MachineListController extends Controller {
   /// guarded so that failure shows the spec §12 text as a toast instead of going unhandled.
   void reconnectReplaced() => unawaited(guard(() async => _onReconnectReplaced?.call()));
 
-  Future<void> refresh() {
+  /// Not [mainStateGuard]: a superseded generation must write nothing at all, and
+  /// [mainStateGuard] always ends in either `state.complete` or `state.failure`. Checking the
+  /// generation right before each write, instead of turning a stale result into whichever of
+  /// the two it resembles, is what keeps a stale outcome from ever overwriting a newer one.
+  Future<void> refresh() async {
     final generation = ++_refreshGeneration;
-    return mainStateGuard(() => _load(generation), state: state);
+    state.loading();
+    try {
+      final result = await _load();
+      if (generation == _refreshGeneration) state.complete(result);
+    } catch (e, stackTrace) {
+      if (generation != _refreshGeneration) return;
+      final error = e is AppError ? e : errorFactory.fromException(e, stackTrace: stackTrace);
+      if (kDebugMode) debugPrint('Guard error: ${(error.originalError ?? error).runtimeType}');
+      state.failure(error);
+    }
   }
 
-  Future<MachineList> _load(int generation) async {
-    final List<RemoteDevice> devices;
-    final Set<String> pinned;
-    try {
-      devices = await _backend.devices();
-      pinned = {for (final machine in await _backend.pinnedMachines()) machine.agentId};
-    } catch (_) {
-      // Stale as well: the later refresh's outcome, success or failure, is the one to show.
-      if (generation != _refreshGeneration) return state.peek();
-      rethrow;
-    }
-    // A later refresh() may already have started (or finished) by the time this one's requests
-    // come back: let it win rather than overwrite it with this now-stale snapshot.
-    if (generation != _refreshGeneration) return state.peek();
+  Future<MachineList> _load() async {
+    final devices = await _backend.devices();
+    final pinned = {for (final machine in await _backend.pinnedMachines()) machine.agentId};
     final live = _backend.relayState == RelayConnectionState.connected;
     return _sorted([
       for (final device in devices)

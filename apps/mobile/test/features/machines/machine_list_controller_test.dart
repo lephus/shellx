@@ -188,6 +188,26 @@ void main() {
     expect(names(), ['second-result']);
   });
 
+  test('an earlier refresh that fails after a later one already failed keeps the newer error', () async {
+    final gate = Completer<void>();
+    backend.devicesGate = gate;
+    final first = controller.refresh(); // generation 1, blocked inside devices()
+
+    backend.devicesGate = null;
+    backend.devicesError = const ApiException(status: 429, code: 'rate_limited', message: 'slow');
+    await controller.refresh(); // generation 2, fails at once
+    expect(controller.state.hasError, isTrue);
+    expect(controller.state.error?.title, 'Thử lại sau ít phút.');
+
+    // What generation 1 sees once released: a different (older, stale) failure.
+    backend.devicesError = const ApiException(status: 0, code: 'network', message: 'offline');
+    gate.complete();
+    await first;
+
+    expect(controller.state.hasError, isTrue);
+    expect(controller.state.error?.title, 'Thử lại sau ít phút.');
+  });
+
   test('an earlier refresh that fails after a later one succeeded does not show its error', () async {
     backend.deviceList = [agentDevice(agentA, 'first-result')];
     final gate = Completer<void>();
