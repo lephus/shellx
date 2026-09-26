@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub";
-import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
+import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../src/hub/user-hub.js";
+import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
   call, connect, CountingLimiter, deviceBody, errorCode, hex, loginDevice, makeApp, newPairingId, pair, registerAccount,
   TestSocket,
   unlimited,
-} from "./helpers";
+} from "./helpers.js";
 
 const NEW_PASSWORD = "brand new password";
 

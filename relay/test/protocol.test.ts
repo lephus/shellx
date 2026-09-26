@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { encodeTextMap } from "../src/protocol/cbor";
+import { encodeTextMap } from "../src/protocol/cbor.js";
 import {
   CloseCode, encodeData, encodeError, encodeEvent, encodePresence, MAX_FRAME_BYTES,
   pairingRemovedEvent, parseDataHeader, RelayErrorCode, withPeer,
-} from "../src/protocol/frames";
-import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes, uuidV7Millis } from "../src/protocol/uuid";
+} from "../src/protocol/frames.js";
+import { NIL_UUID, parseUuid, parseUuidV7, uuidFromBytes, uuidToBytes, uuidV7Millis } from "../src/protocol/uuid.js";
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string): Uint8Array => Uint8Array.from(h.match(/../g)!.map((x) => Number.parseInt(x, 16)));

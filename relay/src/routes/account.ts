@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import type { AppEnv } from "../app";
-import { verifyPassword } from "../auth/password";
-import { isOverlongPassword } from "../auth/password-policy";
-import { requireAuth } from "../auth/session";
-import { hubFor } from "../hub/user-hub";
-import { jsonBodyLimit } from "../http/body-limit";
-import { Errors, readJsonObject } from "../http/errors";
-import { logMeta } from "../log";
+import type { AppEnv } from "../app.js";
+import { verifyPassword } from "../auth/password.js";
+import { isOverlongPassword } from "../auth/password-policy.js";
+import { requireAuth } from "../auth/session.js";
+import { hubFor } from "../hub/user-hub.js";
+import { jsonBodyLimit } from "../http/body-limit.js";
+import { Errors, readJsonObject } from "../http/errors.js";
+import { logMeta } from "../log.js";
 
 export const accountRoutes = new Hono<AppEnv>();
 

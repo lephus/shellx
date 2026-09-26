@@ -1,5 +1,5 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
-import { createArgon2, type Argon2 } from "./argon2";
+import { createArgon2, type Argon2 } from "./argon2.js";
 
 let hasher: Promise<Argon2> | undefined;
 

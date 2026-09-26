@@ -1,8 +1,8 @@
 import type { MiddlewareHandler } from "hono";
-import type { AppEnv } from "../app";
-import { Errors } from "../http/errors";
-import type { DeviceKind } from "./device";
-import { hashToken, parseBearer, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "./tokens";
+import type { AppEnv } from "../app.js";
+import { Errors } from "../http/errors.js";
+import type { DeviceKind } from "./device.js";
+import { hashToken, parseBearer, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "./tokens.js";
 
 export interface AuthContext {
   userId: string;

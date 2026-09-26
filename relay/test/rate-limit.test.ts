@@ -1,9 +1,9 @@
 import { evictDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FRAMES_PER_SECOND, TokenBucket } from "../src/hub/token-bucket";
-import { encodeData, encodeError, encodePresence, RelayErrorCode } from "../src/protocol/frames";
-import { connect, hex, loginDevice, makeApp, registerAccount } from "./helpers";
+import { FRAMES_PER_SECOND, TokenBucket } from "../src/hub/token-bucket.js";
+import { encodeData, encodeError, encodePresence, RelayErrorCode } from "../src/protocol/frames.js";
+import { connect, hex, loginDevice, makeApp, registerAccount } from "./helpers.js";
 
 const CH = Uint8Array.from([1, 1, 2, 3, 5, 8, 13, 21]);
 

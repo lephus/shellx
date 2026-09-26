@@ -1,13 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
-import type { DeviceKind } from "../auth/device";
-import type { Env } from "../env";
-import { logMeta } from "../log";
+import type { DeviceKind } from "../auth/device.js";
+import type { Env } from "../env.js";
+import { logMeta } from "../log.js";
 import {
   CloseCode, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, parseDataHeader, RelayErrorCode,
   withPeer,
-} from "../protocol/frames";
-import { parseUuid } from "../protocol/uuid";
-import { FRAMES_PER_SECOND, TokenBucket } from "./token-bucket";
+} from "../protocol/frames.js";
+import { parseUuid } from "../protocol/uuid.js";
+import { FRAMES_PER_SECOND, TokenBucket } from "./token-bucket.js";
 
 /** Set by the Worker after token validation; the hub is not reachable from the Internet directly. */
 export const DEVICE_ID_HEADER = "X-Shellx-Device-Id";

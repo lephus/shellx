@@ -1,7 +1,7 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { describe, expect, it } from "vitest";
-import { ARGON2_SALT_BYTES, buildArgon2, createArgon2, type Argon2Exports } from "../src/auth/argon2";
-import { hashPassword, verifyPassword } from "../src/auth/password";
+import { ARGON2_SALT_BYTES, buildArgon2, createArgon2, type Argon2Exports } from "../src/auth/argon2.js";
+import { hashPassword, verifyPassword } from "../src/auth/password.js";
 
 // Known answers computed independently with Node's crypto.argon2Sync and @noble/hashes argon2id.
 const SALT = new TextEncoder().encode("shellx-kat-salt!");

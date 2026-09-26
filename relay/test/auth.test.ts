@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app";
-import { authenticate } from "../src/auth/session";
-import { hashToken, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "../src/auth/tokens";
+import { createApp } from "../src/app.js";
+import { authenticate } from "../src/auth/session.js";
+import { hashToken, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "../src/auth/tokens.js";
 import {
   call, CountingLimiter, deviceBody, errorCode, loginDevice, makeApp, PASSWORD, randomEmail, randomPublicKey,
   registerAccount, unlimited,
-} from "./helpers";
+} from "./helpers.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

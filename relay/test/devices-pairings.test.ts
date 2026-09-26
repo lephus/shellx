@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { hubFor } from "../src/hub/user-hub";
-import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames";
+import { hubFor } from "../src/hub/user-hub.js";
+import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
   call, connect, errorCode, hex, loginDevice, makeApp, newPairingId, pair, pairingIdOf, registerAccount, type TestApp,
   uuidv7,
-} from "./helpers";
+} from "./helpers.js";
 
 interface DeviceJson {
   id: string;

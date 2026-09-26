@@ -1,4 +1,4 @@
-import { base64UrlDecode } from "./tokens";
+import { base64UrlDecode } from "./tokens.js";
 
 export type DeviceKind = "agent" | "mobile";
 export type DevicePlatform = "macos" | "windows" | "ios" | "android";

@@ -1,7 +1,7 @@
 // Refreshes src/auth/disposable-domains.json from the upstream blocklist.
 // Usage: npm run domains:update   (then review the diff and commit it)
 import { writeFile } from "node:fs/promises";
-import { parseBlocklist, renderDomainsJson } from "./blocklist";
+import { parseBlocklist, renderDomainsJson } from "./blocklist.js";
 
 const SOURCE_URL =
   "https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf";

@@ -12,13 +12,13 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
-import { createArgon2 } from "../src/auth/argon2";
-import { isValidEmail, normalizeEmail } from "../src/auth/email";
-import { isAcceptablePassword } from "../src/auth/password-policy";
-import { base64UrlEncode } from "../src/auth/tokens";
-import { buildResetSql, resetOutcomeFromWranglerJson } from "./reset-sql";
-import { choosePasswordSource, confirmationMatches, needsConfirmation, resetReport, wranglerFailureMessage } from "./reset-cli";
-import { createPrompter } from "./prompter";
+import { createArgon2 } from "../src/auth/argon2.js";
+import { isValidEmail, normalizeEmail } from "../src/auth/email.js";
+import { isAcceptablePassword } from "../src/auth/password-policy.js";
+import { base64UrlEncode } from "../src/auth/tokens.js";
+import { buildResetSql, resetOutcomeFromWranglerJson } from "./reset-sql.js";
+import { choosePasswordSource, confirmationMatches, needsConfirmation, resetReport, wranglerFailureMessage } from "./reset-cli.js";
+import { createPrompter } from "./prompter.js";
 
 const { values } = parseArgs({
   options: {

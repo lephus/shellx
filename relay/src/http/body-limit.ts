@@ -1,5 +1,5 @@
 import { bodyLimit } from "hono/body-limit";
-import { Errors } from "./errors";
+import { Errors } from "./errors.js";
 
 /** Largest JSON request body any route accepts; real bodies are well under 1 KiB. */
 export const MAX_JSON_BODY_BYTES = 16 * 1024;

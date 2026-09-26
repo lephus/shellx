@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "wrangler d1 migrations apply DB --local && wrangler dev",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:staging": "wrangler d1 migrations apply DB --env staging --remote",
     "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
@@ -19,13 +19,14 @@
     "reset-password": "tsx scripts/reset-password.ts"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.1",
     "@phi-ag/argon2": "0.5.28",
+    "better-sqlite3": "13.0.3",
     "hono": "^4.13.9"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
-    "@cloudflare/workers-types": "^5.20260925.1",
-    "@types/node": "^24.13.6",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "22.20.4",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "~4.1.11",

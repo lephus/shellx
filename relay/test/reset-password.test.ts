@@ -1,13 +1,13 @@
 import argon2Module from "@phi-ag/argon2/argon2.wasm";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { buildResetSql, resetOutcomeFromWranglerJson, sqlString } from "../scripts/reset-sql";
+import { buildResetSql, resetOutcomeFromWranglerJson, sqlString } from "../scripts/reset-sql.js";
 import {
   choosePasswordSource, confirmationMatches, EXIT_UNCONFIRMED, needsConfirmation, resetReport, wranglerFailureMessage,
-} from "../scripts/reset-cli";
-import { createLinePrompter } from "../scripts/line-prompter";
-import { createArgon2 } from "../src/auth/argon2";
-import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers";
+} from "../scripts/reset-cli.js";
+import { createLinePrompter } from "../scripts/line-prompter.js";
+import { createArgon2 } from "../src/auth/argon2.js";
+import { call, deviceBody, loginDevice, makeApp, registerAccount } from "./helpers.js";
 
 async function runSql(sql: string): Promise<D1Result[]> {
   return env.DB.batch(sql.split("\n").map((statement) => env.DB.prepare(statement)));

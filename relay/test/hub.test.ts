@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub";
-import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames";
-import { buildHubHeaders } from "../src/routes/ws";
+import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub.js";
+import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames.js";
+import { buildHubHeaders } from "../src/routes/ws.js";
 import {
   call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, type TestApp, waitFor,
-} from "./helpers";
+} from "./helpers.js";
 
 const CH = Uint8Array.from([9, 8, 7, 6, 5, 4, 3, 2]);
 

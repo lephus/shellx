@@ -3,8 +3,8 @@
  * Extracted for testability (no I/O side effects).
  */
 
-import { normalizeEmail } from "../src/auth/email";
-import type { ResetOutcome } from "./reset-sql";
+import { normalizeEmail } from "../src/auth/email.js";
+import type { ResetOutcome } from "./reset-sql.js";
 
 /**
  * Determine if confirmation is required for this environment.

@@ -1,8 +1,8 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { hashPassword } from "../src/auth/password";
-import { BASE, call, deviceBody, errorCode, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers";
+import { hashPassword } from "../src/auth/password.js";
+import { BASE, call, deviceBody, errorCode, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers.js";
 
 // Final review I2: login and DELETE /v1/account passed any-length passwords to argon2 (whose WASM
 // memory grows and never shrinks), and no route capped its request body.

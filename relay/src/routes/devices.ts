@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import type { AppEnv } from "../app";
-import type { DeviceKind, DevicePlatform } from "../auth/device";
-import { requireAuth } from "../auth/session";
-import { TOKEN_IDLE_TTL_MS } from "../auth/tokens";
-import { hubFor } from "../hub/user-hub";
+import type { AppEnv } from "../app.js";
+import type { DeviceKind, DevicePlatform } from "../auth/device.js";
+import { requireAuth } from "../auth/session.js";
+import { TOKEN_IDLE_TTL_MS } from "../auth/tokens.js";
+import { hubFor } from "../hub/user-hub.js";
 
 interface DeviceRow {
   id: string;

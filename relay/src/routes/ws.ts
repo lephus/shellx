@@ -1,12 +1,12 @@
 import type { Context } from "hono";
-import type { AppEnv } from "../app";
-import type { AuthContext } from "../auth/session";
-import { authenticate } from "../auth/session";
-import { parseBearer } from "../auth/tokens";
-import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../hub/user-hub";
-import { Errors } from "../http/errors";
-import { logMeta } from "../log";
-import { CloseCode } from "../protocol/frames";
+import type { AppEnv } from "../app.js";
+import type { AuthContext } from "../auth/session.js";
+import { authenticate } from "../auth/session.js";
+import { parseBearer } from "../auth/tokens.js";
+import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER, hubFor } from "../hub/user-hub.js";
+import { Errors } from "../http/errors.js";
+import { logMeta } from "../log.js";
+import { CloseCode } from "../protocol/frames.js";
 
 /**
  * The only client headers forwarded to the Durable Object: what the WebSocket upgrade itself

@@ -1,5 +1,5 @@
-import type { Env } from "../env";
-import { logMeta } from "../log";
+import type { Env } from "../env.js";
+import { logMeta } from "../log.js";
 
 /** Returns true when the call is allowed, false when the key is over its limit. */
 export interface RateLimiter {

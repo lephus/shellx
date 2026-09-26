@@ -1,16 +1,16 @@
 import { Hono, type Context } from "hono";
-import type { AppEnv } from "../app";
-import { parseDevice, type DeviceInput } from "../auth/device";
-import { checkEmail, normalizeEmail } from "../auth/email";
-import { hashPassword, verifyPassword } from "../auth/password";
-import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy";
-import { insertTokenIfPasswordUnchangedStatement, insertTokenStatement, requireAuth } from "../auth/session";
-import { generateToken, hashToken, parseBearer } from "../auth/tokens";
-import { hubFor } from "../hub/user-hub";
-import { jsonBodyLimit } from "../http/body-limit";
-import { Errors, readJsonObject } from "../http/errors";
-import { logMeta } from "../log";
-import { CloseCode } from "../protocol/frames";
+import type { AppEnv } from "../app.js";
+import { parseDevice, type DeviceInput } from "../auth/device.js";
+import { checkEmail, normalizeEmail } from "../auth/email.js";
+import { hashPassword, verifyPassword } from "../auth/password.js";
+import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy.js";
+import { insertTokenIfPasswordUnchangedStatement, insertTokenStatement, requireAuth } from "../auth/session.js";
+import { generateToken, hashToken, parseBearer } from "../auth/tokens.js";
+import { hubFor } from "../hub/user-hub.js";
+import { jsonBodyLimit } from "../http/body-limit.js";
+import { Errors, readJsonObject } from "../http/errors.js";
+import { logMeta } from "../log.js";
+import { CloseCode } from "../protocol/frames.js";
 
 export const authRoutes = new Hono<AppEnv>();
 

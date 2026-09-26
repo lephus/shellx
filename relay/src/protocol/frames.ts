@@ -1,5 +1,5 @@
-import { encodeTextMap } from "./cbor";
-import { NIL_UUID, uuidFromBytes, uuidToBytes } from "./uuid";
+import { encodeTextMap } from "./cbor.js";
+import { NIL_UUID, uuidFromBytes, uuidToBytes } from "./uuid.js";
 
 export const RELAY_PROTOCOL_VERSION = 1;
 export const MAX_FRAME_BYTES = 64 * 1024;
