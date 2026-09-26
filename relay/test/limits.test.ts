@@ -1,18 +1,16 @@
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
-import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { hashPassword } from "../src/auth/password.js";
-import { BASE, call, deviceBody, errorCode, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers.js";
+import { call, callStreamed, db, deviceBody, errorCode, loginDevice, makeApp, registerAccount } from "./helpers.js";
 
-// Final review I2: login and DELETE /v1/account passed any-length passwords to argon2 (whose WASM
-// memory grows and never shrinks), and no route capped its request body.
+// Final review I2: login and DELETE /v1/account passed any-length passwords to argon2, and no route
+// capped its request body.
 
 const BODY_LIMIT = 16 * 1024;
 const TOO_LONG = "x".repeat(129); // 129 code points: one over the 8-128 policy
 
 /** Stores the argon2id hash of `password` for the user directly, bypassing the policy check. */
 async function plantPassword(userId: string, password: string): Promise<void> {
-  await env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), userId).run();
+  db().run("UPDATE users SET password_hash = ? WHERE id = ?", await hashPassword(password), userId);
 }
 
 /** A JSON object with the fields of `base` plus padding, exactly `bytes` UTF-8 bytes long. */
@@ -61,8 +59,7 @@ describe("password length cap on login and account deletion", () => {
     const res = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: { password: TOO_LONG } });
     expect(res.status).toBe(401);
     expect(await errorCode(res)).toBe("invalid_credentials");
-    const user = await env.DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(account.agent.userId).first();
-    expect(user).not.toBeNull();
+    expect(db().get("SELECT 1 FROM users WHERE id = ?", account.agent.userId)).toBeDefined();
   });
 });
 
@@ -106,24 +103,8 @@ describe("request body limit (16 KiB) on the JSON routes", () => {
   });
 
   it("also caps a streamed body that has no Content-Length", async () => {
-    const app: TestApp = makeApp();
     const chunk = new TextEncoder().encode(" ".repeat(4096));
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        for (let i = 0; i < 5; i++) controller.enqueue(chunk);
-        controller.close();
-      },
-    });
-    const request = new Request(`${BASE}/v1/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
-      body: stream,
-      duplex: "half",
-    } as RequestInit);
-    expect(request.headers.has("content-length")).toBe(false);
-    const ctx = createExecutionContext();
-    const res = await app.fetch(request, env, ctx);
-    await waitOnExecutionContext(ctx);
+    const res = await callStreamed(makeApp(), "POST", "/v1/auth/login", Array(5).fill(chunk));
     expect(res.status).toBe(413);
     expect(await errorCode(res)).toBe("payload_too_large");
   });

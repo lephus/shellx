@@ -1,10 +1,10 @@
-import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONN_ID_HEADER, DEVICE_ID_HEADER, DEVICE_KIND_HEADER } from "../src/hub/user-hub.js";
+import type { HubRegistry } from "../src/hub/registry.js";
+import type { ConnectionMeta, HubSocket } from "../src/hub/user-hub.js";
 import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames.js";
-import { buildHubHeaders } from "../src/routes/ws.js";
 import {
-  call, connect, errorCode, hex, loginDevice, makeApp, registerAccount, TestSocket, type TestApp, waitFor,
+  call, connect, db, errorCode, hex, hubs, loginDevice, makeApp, registerAccount, type TestApp, TestSocket, upgradeStatus,
+  waitFor,
 } from "./helpers.js";
 
 const CH = Uint8Array.from([9, 8, 7, 6, 5, 4, 3, 2]);
@@ -18,6 +18,29 @@ async function accountWithAgentAndMobile() {
   const account = await registerAccount(app);
   const mobile = await loginDevice(app, account, "mobile");
   return { app, account, agent: account.agent, mobile };
+}
+
+/**
+ * A registry that behaves like the test's real one, except that `connect` first runs `before` —
+ * the point between the ws route's authenticate() and the socket landing in the hub.
+ */
+function registryRacingConnect(before: () => Promise<void>, after?: () => Promise<void>): HubRegistry {
+  const real = hubs();
+  return {
+    forUser: (userId: string) => {
+      const hub = real.forUser(userId);
+      return {
+        connect: async (socket: HubSocket, meta: ConnectionMeta) => {
+          await before();
+          await hub.connect(socket, meta);
+          await after?.();
+        },
+        receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
+        disconnected: (socket: HubSocket) => hub.disconnected(socket),
+        closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
+      };
+    },
+  } as unknown as HubRegistry;
 }
 
 describe("GET /v1/ws", () => {
@@ -35,199 +58,115 @@ describe("GET /v1/ws", () => {
     for (const [client, token] of attempts) {
       const res = await call(client, "GET", "/v1/ws", { token, headers: { Upgrade: "websocket" } });
       expect(res.status).toBe(401);
-      expect(res.webSocket).toBeNull();
       expect(await errorCode(res)).toBe("unauthorized");
+      expect(await upgradeStatus(client, token)).toBe(401); // a real WebSocket handshake gets the same status
     }
   });
 
-  it("buildHubHeaders forwards only the allowlisted upgrade headers, never arbitrary client headers", () => {
-    // A hostile client's raw request: real upgrade headers, plus a session cookie, a forwarded-for
-    // header, a made-up header, and a duplicate-cased spoof attempt at the hub's own identity headers.
-    const clientHeaders = new Headers([
-      ["Upgrade", "websocket"],
-      ["Connection", "Upgrade"],
-      ["Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="],
-      ["Sec-WebSocket-Version", "13"],
-      ["Cookie", "session=abc123"],
-      ["X-Forwarded-For", "203.0.113.7"],
-      ["X-Evil", "haxx"],
-      ["Authorization", "Bearer should-never-be-forwarded"],
-      // lower-cased on purpose: Headers is case-insensitive, so this is the same header as
-      // DEVICE_ID_HEADER ("X-Shellx-Device-Id") — proves case doesn't let a spoof slip through.
-      ["x-shellx-device-id", "11111111-1111-1111-1111-111111111111"],
-      ["X-Shellx-Device-Kind", "agent"],
-      // Fix round 2: a client-supplied connection id must never reach the hub either — it's the
-      // Worker's own per-upgrade random id (see CONN_ID_HEADER), not something the client picks.
-      ["X-Shellx-Conn-Id", "44444444-4444-4444-4444-444444444444"],
-    ]);
-    const auth = { deviceId: "22222222-2222-2222-2222-222222222222", kind: "mobile" as const };
-    const connId = "33333333-3333-3333-3333-333333333333";
-
-    const headers = buildHubHeaders(clientHeaders, auth, connId);
-
-    // Allowlisted upgrade headers pass through unchanged.
-    expect(headers.get("Upgrade")).toBe("websocket");
-    expect(headers.get("Connection")).toBe("Upgrade");
-    expect(headers.get("Sec-WebSocket-Key")).toBe("dGhlIHNhbXBsZSBub25jZQ==");
-    expect(headers.get("Sec-WebSocket-Version")).toBe("13");
-    // Not sent by the client, so absent (not merely empty).
-    expect(headers.has("Sec-WebSocket-Protocol")).toBe(false);
-    expect(headers.has("Sec-WebSocket-Extensions")).toBe(false);
-
-    // Identity headers come from the validated token, not the client's spoof attempt.
-    expect(headers.get(DEVICE_ID_HEADER)).toBe(auth.deviceId);
-    expect(headers.get(DEVICE_KIND_HEADER)).toBe(auth.kind);
-    // The connection id comes from the Worker's own random generation, not the client's spoof.
-    expect(headers.get(CONN_ID_HEADER)).toBe(connId);
-
-    // Everything else the client sent is gone, including Authorization and the spoofed identity.
-    expect(headers.has("Cookie")).toBe(false);
-    expect(headers.has("X-Forwarded-For")).toBe(false);
-    expect(headers.has("X-Evil")).toBe(false);
-    expect(headers.has("Authorization")).toBe(false);
-
-    // Exhaustive: exactly these seven headers reach the hub, nothing more.
-    expect([...headers.keys()].sort()).toEqual([
-      "connection", "sec-websocket-key", "sec-websocket-version", "upgrade",
-      "x-shellx-conn-id", "x-shellx-device-id", "x-shellx-device-kind",
-    ]);
+  it("answers 426 to a valid token on a request that is not a real upgrade (no Connection: upgrade)", async () => {
+    const { app, agent } = await accountWithAgentAndMobile();
+    const res = await call(app, "GET", "/v1/ws", { token: agent.token, headers: { Upgrade: "websocket" } });
+    expect(res.status).toBe(426);
+    expect(await errorCode(res)).toBe("upgrade_required");
   });
 
-  it("integration: an upgrade carrying hostile extra headers still connects and identifies the token's device", async () => {
+  it("an upgrade carrying hostile extra headers still connects and identifies the token's device", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();
     const a = await connect(app, agent.token);
     await a.expectSilence(100);
 
-    // A client connecting with mobile's token, sending a cookie, a spoofed device id/kind, and
-    // claiming (via headers) to be the agent device — buildHubHeaders is what actually stops this;
-    // this end-to-end check just confirms the wiring still works after the refactor.
-    const res = await call(app, "GET", "/v1/ws", {
-      token: mobile.token,
-      headers: {
-        Upgrade: "websocket",
-        Cookie: "session=abc123",
-        "X-Shellx-Device-Id": agent.deviceId,
-        "X-Shellx-Device-Kind": "agent",
-      },
+    // Mobile's token, plus a cookie and headers claiming to be the agent device: only the token counts.
+    const m = await connect(app, mobile.token, {
+      Cookie: "session=abc123",
+      "X-Shellx-Device-Id": agent.deviceId,
+      "X-Shellx-Device-Kind": "agent",
+      "X-Shellx-Conn-Id": "44444444-4444-4444-4444-444444444444",
     });
-    if (res.status !== 101 || res.webSocket === null) throw new Error(`upgrade failed: ${res.status}`);
-    const m = new TestSocket(res.webSocket);
-
-    // Presence announces the token's real device (mobile), never the spoofed agent id.
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
-
-    // Frames it sends arrive at the peer sourced from the token's device, not the spoofed one.
     m.send(encodeData(agent.deviceId, CH, Uint8Array.of(4, 9)));
     expect(hex(await a.nextBinary())).toBe(hex(encodeData(mobile.deviceId, CH, Uint8Array.of(4, 9))));
   });
 
-  it("closes the socket with 4002 if the token is revoked in the gap between auth and the upgrade landing", async () => {
-    // TOCTOU fix (round 1): a password change or account deletion that revokes this token can
-    // commit to D1 — and run its own hub.disconnect()/closeAccount() — in the window between
-    // webSocketRoute's authenticate() and hub.fetch() actually returning the 101 upgrade. If that
-    // revocation's own close ran before this socket existed to be closed by it, the device would
-    // otherwise stay connected forever (the runtime auto-answers "ping" without waking the object).
-    // Wrapping USER_HUB.get().fetch() lets us revoke the token at exactly that point: after the
-    // route's own auth check already passed, but before its upgrade call returns.
-    const { app, agent, mobile } = await accountWithAgentAndMobile();
-    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(agent.userId));
-    const racingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
-        fetch: async (request: Request) => {
-          await env.DB.prepare("DELETE FROM tokens WHERE device_id = ?").bind(mobile.deviceId).run();
-          return realHub.fetch(request);
-        },
-        closeConnection: (connId: string, code: CloseCode) => realHub.closeConnection(connId, code),
+  it("closes the socket with 4002 if the token is revoked in the gap between auth and the socket joining the hub", async () => {
+    const { app, mobile } = await accountWithAgentAndMobile();
+    const racing = makeApp({
+      hubs: registryRacingConnect(async () => {
+        db().run("DELETE FROM tokens WHERE device_id = ?", mobile.deviceId);
       }),
-    } as unknown as typeof env.USER_HUB;
-
-    const res = await call(app, "GET", "/v1/ws", {
-      token: mobile.token,
-      headers: { Upgrade: "websocket" },
-      bindings: { USER_HUB: racingHub },
     });
-    expect(res.status).toBe(101); // the upgrade itself still succeeds...
-    const socket = new TestSocket(res.webSocket!);
+    const socket = await connect(racing, mobile.token); // the upgrade itself still succeeds...
     expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // ...but is then closed
+    await call(app, "GET", "/v1/version"); // the normal app is unaffected
   });
 
-  it("fails closed (no 500) if the post-upgrade re-check itself errors, e.g. a D1 outage", async () => {
-    // Fix round 2, item 1: once hub.fetch() returns 101 the socket already exists in the hub —
-    // accepted, announced online, its queue delivered — so a re-check that can't complete (D1 down)
-    // must never turn that into an HTTP 500 (which would discard the response while leaving a
-    // phantom live device behind). It must instead be treated exactly like "revoked": the upgrade
-    // response still comes back untouched, and the socket it created gets closed with 4002.
+  it("fails closed if the post-join re-check itself errors, e.g. a database error", async () => {
     const { app, mobile } = await accountWithAgentAndMobile();
-    const realPrepare = env.DB.prepare.bind(env.DB);
+    const realGet = db().get.bind(db());
     let calls = 0;
-    const spy = vi.spyOn(env.DB, "prepare").mockImplementation((query: string) => {
-      calls++;
-      // Call 1 is webSocketRoute's own pre-upgrade authenticate(); call 2 is the post-upgrade
-      // re-check — exactly the one this fix must tolerate failing. Anything after that (e.g. the
-      // hub's own D1 write once it closes the connection) must keep working normally.
-      if (calls === 2) throw new Error("D1 is down");
-      return realPrepare(query);
+    const spy = vi.spyOn(db(), "get").mockImplementation((sql: string, ...params) => {
+      if (sql.includes("FROM tokens t JOIN devices d")) {
+        calls++;
+        // Call 1 is the route's own authenticate(); call 2 is the re-check after the join.
+        if (calls === 2) throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+      }
+      return realGet(sql, ...params);
     });
-
-    const res = await call(app, "GET", "/v1/ws", { token: mobile.token, headers: { Upgrade: "websocket" } });
+    const socket = await connect(app, mobile.token);
+    expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" });
     spy.mockRestore();
-
-    expect(calls).toBeGreaterThanOrEqual(2); // the injected failure actually ran
-    expect(res.status).toBe(101); // never a 500, despite the re-check itself throwing
-    const socket = new TestSocket(res.webSocket!);
-    expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // failed closed anyway
+    expect(calls).toBe(2);
   });
 
   it("targets only the stale connection: a legitimate reconnect that already replaced it is untouched", async () => {
-    // Fix round 2, item 2: disconnect(deviceIds, code) closes *whatever socket this device
-    // currently has* — wrong for the re-check, because the same device can legitimately reconnect
-    // with a fresh, valid token (replacing the stale socket via fetch()'s own "newest wins" logic)
-    // before a stale request's re-check gets around to running. closeConnection targets the exact
-    // connection id instead, so the stale re-check is a no-op once that socket is already gone.
     const app = makeApp();
     const account = await registerAccount(app);
     const stale = await loginDevice(app, account, "mobile");
-    const realHub = env.USER_HUB.get(env.USER_HUB.idFromName(account.agent.userId));
-    let freshSocket: TestSocket | undefined;
-    const racingHub = {
-      idFromName: (name: string) => name,
-      get: () => ({
-        fetch: async (request: Request) => {
-          const upgrade = await realHub.fetch(request); // creates the stale request's own socket
-          // The same device (same public key => same device id) logs in again — invalidating the
-          // stale token as a side effect of /login itself — and actually connects, replacing the
-          // stale socket with 4001 via fetch()'s own logic, independent of anything below.
-          const fresh = await loginDevice(app, account, "mobile", stale.publicKey);
-          freshSocket = await connect(app, fresh.token);
-          return upgrade;
+    let fresh: TestSocket | undefined;
+    const racing = makeApp({
+      hubs: registryRacingConnect(
+        async () => {},
+        async () => {
+          // After the stale socket joined: the same device logs in again (invalidating the stale
+          // token) and connects through the normal app, replacing the stale socket with 4001.
+          const again = await loginDevice(app, account, "mobile", stale.publicKey);
+          fresh = await connect(app, again.token);
         },
-        closeConnection: (connId: string, code: CloseCode) => realHub.closeConnection(connId, code),
-      }),
-    } as unknown as typeof env.USER_HUB;
-
-    const res = await call(app, "GET", "/v1/ws", {
-      token: stale.token,
-      headers: { Upgrade: "websocket" },
-      bindings: { USER_HUB: racingHub },
+      ),
     });
-    expect(res.status).toBe(101);
-    const staleSocket = new TestSocket(res.webSocket!);
-
+    const staleSocket = await connect(racing, stale.token);
     expect(await staleSocket.closed).toEqual({ code: 4001, reason: "replaced" }); // not the re-check
-    // Proves the fresh socket is still open and functional, not silently closed by the stale
-    // request's re-check (expectSilence alone wouldn't catch a close — only an unexpected message).
-    await freshSocket!.expectSilence(100);
-    freshSocket!.send("ping");
-    expect(await freshSocket!.next()).toBe("pong");
+    await waitFor(async () => fresh);
+    await fresh!.expectSilence(100);
+    fresh!.send("ping");
+    expect(await fresh!.next()).toBe("pong");
+  });
+
+  it("two sockets of the same device racing in one tick: exactly one survives, peers never see it offline", async () => {
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    const [first, second] = await Promise.all([connect(app, mobile.token), connect(app, mobile.token)]);
+    const closed = await Promise.race([
+      first.closed.then((info) => ({ loser: first, winner: second, info })),
+      second.closed.then((info) => ({ loser: second, winner: first, info })),
+    ]);
+    expect(closed.info).toEqual({ code: 4001, reason: "replaced" });
+    closed.winner.send("ping");
+    let reply = await closed.winner.next();
+    while (reply !== "pong") reply = await closed.winner.next(); // skip its PRESENCE snapshot
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
+    await a.expectSilence(); // no offline in between or after
+    const devices = await call(app, "GET", "/v1/devices", { token: agent.token });
+    const listed = await devices.json<{ id: string; online: boolean }[]>();
+    expect(listed.find((d) => d.id === mobile.deviceId)?.online).toBe(true);
   });
 });
 
-describe("UserHub presence and routing", () => {
+describe("hub presence and routing over real sockets", () => {
   it("sends a presence snapshot to the newcomer and announces it to the others", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();
     const a = await connect(app, agent.token);
-    await a.expectSilence(100); // alone in the hub: nothing to report
+    await a.expectSilence(100);
     const m = await connect(app, mobile.token);
     expect(hex(await m.nextBinary())).toBe(hex(encodePresence(agent.deviceId, true)));
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
@@ -267,7 +206,7 @@ describe("UserHub presence and routing", () => {
     const bob = await registerAccount(app);
     const bobAgent = await connect(app, bob.agent.token);
     const attacker = await connect(app, aliceMobile.token);
-    await attacker.expectSilence(100); // Bob's agent is not in Alice's presence snapshot
+    await attacker.expectSilence(100);
     attacker.send(encodeData(bob.agent.deviceId, CH, Uint8Array.of(4, 1, 2, 3)));
     expect(hex(await attacker.nextBinary())).toBe(hex(encodeError(RelayErrorCode.peerOffline, bob.agent.deviceId, CH)));
     await bobAgent.expectSilence();
@@ -286,6 +225,17 @@ describe("UserHub presence and routing", () => {
     m.send(encodeData(agent.deviceId, CH, new Uint8Array(MAX_FRAME_BYTES - 25)));
     expect(hex(await m.nextBinary())).toBe(hex(encodeError(RelayErrorCode.frameTooLarge, agent.deviceId, CH)));
     await a.expectSilence();
+  });
+
+  it("closes a socket that sends a message over 1 MiB with 1009 (ws maxPayload)", async () => {
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    const m = await connect(app, mobile.token);
+    await m.nextBinary();
+    await a.nextBinary();
+    m.send(new Uint8Array(1024 * 1024 + 1));
+    expect((await m.closed).code).toBe(1009);
+    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, false)));
   });
 
   it("answers malformed frames with ERROR bad_frame and keeps the connection", async () => {
@@ -319,7 +269,7 @@ describe("UserHub presence and routing", () => {
     expect(await m1.closed).toEqual({ code: 4001, reason: "replaced" });
     expect(hex(await m2.nextBinary())).toBe(hex(encodePresence(agent.deviceId, true)));
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, true)));
-    await a.expectSilence(); // no "offline" for the replaced socket
+    await a.expectSilence();
 
     a.send(encodeData(mobile.deviceId, CH, Uint8Array.of(4)));
     expect((await m2.nextBinary()).length).toBe(27);
@@ -335,34 +285,9 @@ describe("UserHub presence and routing", () => {
     m.close();
     expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, false)));
     const lastSeen = await waitFor(async () =>
-      (await env.DB.prepare("SELECT last_seen_at FROM devices WHERE id = ?").bind(mobile.deviceId)
-        .first<{ last_seen_at: number | null }>())?.last_seen_at,
+      db().get<{ last_seen_at: number | null }>("SELECT last_seen_at FROM devices WHERE id = ?", mobile.deviceId)?.last_seen_at,
     );
     expect(lastSeen).toBeGreaterThanOrEqual(before);
-  });
-
-  it("tolerates a failing last_seen_at write, logging metadata only and still announcing offline", async () => {
-    const { app, agent, mobile } = await accountWithAgentAndMobile();
-    const a = await connect(app, agent.token);
-    const m = await connect(app, mobile.token);
-    await m.nextBinary();
-    await a.nextBinary();
-
-    const lines: string[] = [];
-    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-    });
-    vi.spyOn(env.DB, "prepare").mockImplementation(() => {
-      throw new Error("D1 is down");
-    });
-
-    m.close();
-    expect(hex(await a.nextBinary())).toBe(hex(encodePresence(mobile.deviceId, false)));
-
-    const output = lines.join("\n");
-    expect(output).toContain("last_seen_write_failed");
-    expect(output).toContain(mobile.deviceId);
-    expect(output).not.toContain("D1 is down");
   });
 
   it("logs frame metadata but never the payload", async () => {

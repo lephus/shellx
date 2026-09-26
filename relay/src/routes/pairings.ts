@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
 import { requireAuth } from "../auth/session.js";
-import { hubFor } from "../hub/user-hub.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
 import { parseUuid, parseUuidV7, uuidV7Millis } from "../protocol/uuid.js";
@@ -31,7 +30,7 @@ export const MAX_PAIRING_ID_LEAD_MS = 24 * 60 * 60 * 1000;
  * refused with 410 (nothing written): the agent drops the pairing and the user pairs again once the
  * clock is fixed.
  *
- * The hub is asked before the D1 upsert (UserHub.admitPairing): a tombstone with the same or a
+ * The hub is asked before the upsert (UserHub.admitPairing): a tombstone with the same or a
  * newer id means the phone already unpaired this pairing (an earlier attempt of this POST
  * committed, its response was lost) or a newer one (this POST is stale) → 410 `pairing_removed`,
  * no row; an older tombstone is cleared, so re-pairing is never undone by a stale replay. The
@@ -51,34 +50,29 @@ pairingRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
   if (pairingId === null) throw Errors.badRequest();
   const mobileId = parseUuid(body.mobile_id);
   if (mobileId === null) throw Errors.deviceNotFound();
-  const db = c.env.DB;
-  const mobile = await db
-    .prepare("SELECT 1 FROM devices WHERE id = ? AND user_id = ? AND kind = 'mobile'")
-    .bind(mobileId, auth.userId)
-    .first();
-  if (mobile === null) throw Errors.deviceNotFound();
+  const db = c.get("db");
+  const hubs = c.get("hubs");
+  const mobile = db.get("SELECT 1 FROM devices WHERE id = ? AND user_id = ? AND kind = 'mobile'", mobileId, auth.userId);
+  if (mobile === undefined) throw Errors.deviceNotFound();
   if (uuidV7Millis(pairingId) > c.get("now")() + MAX_PAIRING_ID_LEAD_MS) throw Errors.pairingRemoved();
 
-  const hub = hubFor(c.env, auth.userId);
-  if (await hub.admitPairing(auth.deviceId, mobileId, pairingId)) {
-    const upserted = await db
-      .prepare(
-        `INSERT INTO pairings (agent_id, mobile_id, pairing_id, created_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (agent_id, mobile_id) DO UPDATE SET pairing_id = excluded.pairing_id, created_at = excluded.created_at
-         WHERE excluded.pairing_id >= pairings.pairing_id`,
-      )
-      .bind(auth.deviceId, mobileId, pairingId, c.get("now")())
-      .run();
+  if (await hubs.forUser(auth.userId).admitPairing(auth.deviceId, mobileId, pairingId)) {
+    const upserted = db.run(
+      `INSERT INTO pairings (agent_id, mobile_id, pairing_id, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (agent_id, mobile_id) DO UPDATE SET pairing_id = excluded.pairing_id, created_at = excluded.created_at
+       WHERE excluded.pairing_id >= pairings.pairing_id`,
+      auth.deviceId,
+      mobileId,
+      pairingId,
+      c.get("now")(),
+    );
     // No change means the row already holds a newer pairing: this POST is stale.
-    if (upserted.meta.changes > 0 && (await hub.admitPairing(auth.deviceId, mobileId, pairingId))) {
+    if (upserted.changes > 0 && (await hubs.forUser(auth.userId).admitPairing(auth.deviceId, mobileId, pairingId))) {
       return c.body(null, 201);
     }
   }
   // A tombstone (or the newer row) already tells the agent, so no new event is needed here.
-  await db
-    .prepare("DELETE FROM pairings WHERE agent_id = ? AND mobile_id = ? AND pairing_id = ?")
-    .bind(auth.deviceId, mobileId, pairingId)
-    .run();
+  db.run("DELETE FROM pairings WHERE agent_id = ? AND mobile_id = ? AND pairing_id = ?", auth.deviceId, mobileId, pairingId);
   throw Errors.pairingRemoved();
 });
 
@@ -92,7 +86,7 @@ pairingRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
  * Notify-before-delete: the relay may only ever *remove* trust, so a failure must never lose a
  * pairing_removed event. We first read the row (scoped to the caller's account, defence in depth),
  * then call the hub — which durably records the tombstone for the agent before doing anything
- * live (see UserHub.notifyPairingRemoved) — and only then delete the D1 row, and only if it still
+ * live (see UserHub.notifyPairingRemoved) — and only then delete the row, and only if it still
  * carries the id we notified about. If the hub call throws, the row is left in place so a retry
  * finds it again and can still deliver the event; the worst case is a duplicate delivery, which
  * clients handle idempotently, never a lost one. If a re-pair replaced the row in between, nothing
@@ -112,20 +106,14 @@ pairingRoutes.delete("/:agent_id/:mobile_id", requireAuth, async (c) => {
   const only = query === undefined ? null : parseUuidV7(query);
   if (query !== undefined && only === null) throw Errors.badRequest();
 
-  const db = c.env.DB;
+  const db = c.get("db");
   const scope = "agent_id = ? AND mobile_id = ? AND agent_id IN (SELECT id FROM devices WHERE user_id = ?)";
   for (let round = 0; round < MAX_DELETE_ROUNDS; round++) {
-    const row = await db
-      .prepare(`SELECT pairing_id FROM pairings WHERE ${scope}`)
-      .bind(agentId, mobileId, auth.userId)
-      .first<{ pairing_id: string }>();
-    if (row === null || (only !== null && row.pairing_id !== only)) return c.body(null, 204);
-    await hubFor(c.env, auth.userId).notifyPairingRemoved(agentId, mobileId, row.pairing_id);
-    const deleted = await db
-      .prepare(`DELETE FROM pairings WHERE ${scope} AND pairing_id = ?`)
-      .bind(agentId, mobileId, auth.userId, row.pairing_id)
-      .run();
-    if (deleted.meta.changes > 0) return c.body(null, 204);
+    const row = db.get<{ pairing_id: string }>(`SELECT pairing_id FROM pairings WHERE ${scope}`, agentId, mobileId, auth.userId);
+    if (row === undefined || (only !== null && row.pairing_id !== only)) return c.body(null, 204);
+    await c.get("hubs").forUser(auth.userId).notifyPairingRemoved(agentId, mobileId, row.pairing_id);
+    const deleted = db.run(`DELETE FROM pairings WHERE ${scope} AND pairing_id = ?`, agentId, mobileId, auth.userId, row.pairing_id);
+    if (deleted.changes > 0) return c.body(null, 204);
   }
   throw new Error("pairing row kept changing");
 });

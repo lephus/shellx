@@ -3,10 +3,13 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach } from "vitest";
+import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
+import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
 import type { Config } from "../src/config.js";
 import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
+import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
 import { startRelay, type RunningRelay } from "../src/relay.js";
 
@@ -24,11 +27,29 @@ export const TEST_CONFIG: Config = {
   rateLimitsEnabled: false,
 };
 
-// ---- per-test environment: a temp directory with a migrated SQLite DB -------------------------
+export const allowAll: RateLimiter = { limit: async () => true };
+export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll };
+
+/** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
+export class CountingLimiter implements RateLimiter {
+  readonly calls: string[] = [];
+  private readonly counts = new Map<string, number>();
+  constructor(private readonly max: number) {}
+  async limit(key: string): Promise<boolean> {
+    this.calls.push(key);
+    const next = (this.counts.get(key) ?? 0) + 1;
+    this.counts.set(key, next);
+    return next <= this.max;
+  }
+}
+
+// ---- per-test environment: a temp directory with a migrated SQLite DB and a hub registry -------
 
 interface TestEnv {
   dir: string;
   db: Db;
+  hubs: HubRegistry;
+  registries: HubRegistry[];
 }
 
 let current: TestEnv | null = null;
@@ -39,7 +60,8 @@ function testEnv(): TestEnv {
     const dir = mkdtempSync(join(tmpdir(), "shellx-relay-test-"));
     const db = Db.open(join(dir, "relay.db"));
     migrate(db);
-    current = { dir, db };
+    const hubs = new HubRegistry({ db });
+    current = { dir, db, hubs, registries: [hubs] };
   }
   return current;
 }
@@ -49,9 +71,22 @@ export function db(): Db {
   return testEnv().db;
 }
 
+/** This test's hub registry, shared by every app of the test (like the Durable Object namespace). */
+export function hubs(): HubRegistry {
+  return testEnv().hubs;
+}
+
 /** This test's temporary directory (deleted after the test). */
 export function tempDir(): string {
   return testEnv().dir;
+}
+
+/** A second registry over this test's database (e.g. with a frozen clock); drained after the test. */
+export function newHubRegistry(now?: () => number): HubRegistry {
+  const env = testEnv();
+  const registry = new HubRegistry({ db: env.db, now });
+  env.registries.push(registry);
+  return registry;
 }
 
 /** Runs `fn` after the current test, before its database is closed (last registered runs first). */
@@ -64,6 +99,11 @@ afterEach(async () => {
   if (current === null) return;
   const env = current;
   current = null;
+  // Server-side close events of the sockets just terminated still update last_seen_at.
+  await Promise.race([
+    Promise.all(env.registries.map((registry) => registry.whenEmpty())),
+    new Promise((resolve) => setTimeout(resolve, 1000)),
+  ]);
   env.db.close();
   rmSync(env.dir, { recursive: true, force: true });
 });
@@ -76,11 +116,14 @@ export interface TestApp {
 }
 
 /**
- * Starts a real relay (HTTP server) for this test, over the test's database. `deps` overrides any
- * dependency for this app only.
+ * Starts a real relay (HTTP server + WebSocket upgrade) for this test, over the test's database and
+ * hub registry, with rate limits off. `deps` overrides any dependency for this app only.
  */
 export function makeApp(deps: Partial<AppDeps> = {}): TestApp {
-  const ready = startRelay({ config: TEST_CONFIG, db: db(), ...deps }, { host: "127.0.0.1", port: 0 });
+  const ready = startRelay(
+    { config: TEST_CONFIG, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { host: "127.0.0.1", port: 0 },
+  );
   onCleanup(async () => {
     const relay = await ready;
     relay.server.closeAllConnections();
@@ -260,6 +303,110 @@ export async function pairingIdOf(agentId: string, mobileId: string): Promise<st
 export async function errorCode(res: TestResponse): Promise<string> {
   const body = await res.json<{ error: { code: string; message: string } }>();
   return body.error.code;
+}
+
+export interface CloseInfo {
+  code: number;
+  reason: string;
+}
+
+/** Client end of a relay WebSocket (the `ws` library) with an awaitable message queue. */
+export class TestSocket {
+  private readonly queue: (Uint8Array | string)[] = [];
+  private notify: (() => void) | null = null;
+  readonly closed: Promise<CloseInfo>;
+
+  constructor(readonly ws: WebSocket) {
+    ws.on("message", (data: Buffer, isBinary: boolean) => {
+      this.queue.push(isBinary ? new Uint8Array(data) : data.toString("utf8"));
+      this.notify?.();
+    });
+    ws.on("error", () => {
+      // surfaced through `closed` (ws always emits "close" after "error")
+    });
+    this.closed = new Promise((resolve) => {
+      ws.on("close", (code: number, reason: Buffer) => {
+        resolve({ code, reason: reason.toString("utf8") });
+        this.notify?.();
+      });
+    });
+  }
+
+  async next(timeoutMs = 2000): Promise<Uint8Array | string> {
+    const deadline = Date.now() + timeoutMs;
+    while (this.queue.length === 0) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error("timed out waiting for a message");
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, remaining);
+        this.notify = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      this.notify = null;
+    }
+    return this.queue.shift()!;
+  }
+
+  async nextBinary(timeoutMs = 2000): Promise<Uint8Array> {
+    const message = await this.next(timeoutMs);
+    if (typeof message === "string") throw new Error(`expected a binary frame, got text ${JSON.stringify(message)}`);
+    return message;
+  }
+
+  /** Resolves if nothing arrives within `ms`; throws with the unexpected message otherwise. */
+  async expectSilence(ms = 250): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    if (this.queue.length > 0) throw new Error(`unexpected message: ${String(this.queue[0])}`);
+  }
+
+  send(data: Uint8Array | string): void {
+    this.ws.send(data);
+  }
+
+  close(code = 1000): void {
+    this.ws.close(code, "bye");
+  }
+}
+
+function openSocket(relay: RunningRelay, headers: Record<string, string>): WebSocket {
+  const ws = new WebSocket(`ws://127.0.0.1:${relay.port}/v1/ws`, { headers });
+  onCleanup(() => ws.terminate());
+  return ws;
+}
+
+/** Opens a real WebSocket to /v1/ws with `token`; throws `upgrade failed: <status>` if refused. */
+export async function connect(app: TestApp, token: string | undefined, headers: Record<string, string> = {}): Promise<TestSocket> {
+  const relay = await app.ready;
+  const ws = openSocket(relay, { ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }), ...headers });
+  const socket = new TestSocket(ws); // listens before "open": the hub may send PRESENCE right away
+  await new Promise<void>((resolve, reject) => {
+    ws.once("open", () => resolve());
+    ws.once("unexpected-response", (_req, res) => reject(new Error(`upgrade failed: ${res.statusCode}`)));
+    ws.once("error", reject);
+  });
+  return socket;
+}
+
+/** The HTTP status a refused WebSocket upgrade got (101 means it was accepted, and is closed again). */
+export async function upgradeStatus(app: TestApp, token: string | undefined): Promise<number> {
+  const relay = await app.ready;
+  const ws = openSocket(relay, token === undefined ? {} : { Authorization: `Bearer ${token}` });
+  return new Promise((resolve) => {
+    ws.once("open", () => {
+      ws.terminate();
+      resolve(101);
+    });
+    ws.once("unexpected-response", (_req, res) => {
+      resolve(res.statusCode ?? 0);
+      res.resume();
+      ws.terminate();
+    });
+    ws.on("error", () => {
+      // reported through the status above
+    });
+  });
 }
 
 export function hex(bytes: Uint8Array): string {

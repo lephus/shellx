@@ -15,16 +15,5 @@
   },
   "include": ["src", "test", "scripts", "vitest.config.ts"],
   // Still Cloudflare code; removed from this list by the plan task that ports each file.
-  "exclude": [
-    "src/auth/session.ts",
-    "src/routes",
-    "scripts/reset-password.ts",
-    "test/account.test.ts",
-    "test/auth.test.ts",
-    "test/devices-pairings.test.ts",
-    "test/hub.test.ts",
-    "test/limits.test.ts",
-    "test/rate-limit.test.ts",
-    "test/reset-password.test.ts"
-  ]
+  "exclude": ["scripts/reset-password.ts", "test/reset-password.test.ts"]
 }

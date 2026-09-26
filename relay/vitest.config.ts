@@ -2,12 +2,6 @@ import { defineConfig } from "vitest/config";
 
 /** Test files still written for the Workers pool; removed from this list as each is ported. */
 const NOT_YET_PORTED = [
-  "test/account.test.ts",
-  "test/auth.test.ts",
-  "test/devices-pairings.test.ts",
-  "test/hub.test.ts",
-  "test/limits.test.ts",
-  "test/rate-limit.test.ts",
   "test/reset-password.test.ts",
 ];
 
