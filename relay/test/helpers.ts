@@ -434,6 +434,8 @@ export async function waitFor<T>(probe: () => Promise<T | null | undefined>, tim
 /** In-memory stand-in for a `ws` socket: records what the hub sends and how it closes it. */
 export class FakeSocket implements HubSocket {
   readyState = 1;
+  /** Bytes queued but not yet written to the network (a slow receiver has a lot); set by tests. */
+  bufferedAmount = 0;
   readonly sent: (Uint8Array | string)[] = [];
   closedWith: { code: number; reason: string } | null = null;
   terminated = false;

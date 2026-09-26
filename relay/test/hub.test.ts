@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HubRegistry } from "../src/hub/registry.js";
-import type { ConnectionMeta, HubSocket } from "../src/hub/user-hub.js";
+import { WebSocket } from "ws";
+import { type ConnectionMeta, type HubSocket, TRY_AGAIN_LATER } from "../src/hub/user-hub.js";
 import { type CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, RelayErrorCode } from "../src/protocol/frames.js";
 import {
   call, connect, db, errorCode, hex, hubs, loginDevice, makeApp, registerAccount, type TestApp, TestSocket, upgradeStatus,
@@ -36,6 +37,7 @@ function registryRacingConnect(before: () => Promise<void>, after?: () => Promis
           await after?.();
         },
         receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
+        ping: (socket: HubSocket) => hub.ping(socket),
         disconnected: (socket: HubSocket) => hub.disconnected(socket),
         closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
       };
@@ -68,6 +70,7 @@ function registryBarrierForConnects(count: number, onArrival: (pending: number) 
           return hub.connect(socket, meta);
         },
         receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
+        ping: (socket: HubSocket) => hub.ping(socket),
         disconnected: (socket: HubSocket) => hub.disconnected(socket),
         closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
       };
@@ -279,6 +282,28 @@ describe("hub presence and routing over real sockets", () => {
     expect(hex(await m.nextBinary())).toBe(hex(encodeError(RelayErrorCode.frameTooLarge, agent.deviceId, CH)));
     await a.expectSilence();
   });
+
+  it("closes a receiver that stops reading with 1013 once its backlog passes 4 MiB; the sender stays connected", async () => {
+    const { app, agent, mobile } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    const m = await connect(app, mobile.token);
+    await m.nextBinary();
+    await a.nextBinary();
+    m.ws.pause(); // the phone stops reading: kernel buffers fill, then the relay's own buffer grows
+    const full = encodeData(mobile.deviceId, CH, new Uint8Array(MAX_FRAME_BYTES - 26));
+    // 400 × 64 KiB = 25 MiB: well past the cap plus what the kernel can buffer, within the 500-frame burst.
+    for (let i = 0; i < 400; i++) a.send(full);
+    const offline = hex(encodePresence(mobile.deviceId, false));
+    for (;;) {
+      const message = await a.nextBinary(10_000); // after the close, further frames get peer_offline
+      if (hex(message) === offline) break;
+    }
+    m.ws.resume();
+    expect(await m.closed).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    a.send("ping");
+    for (;;) if ((await a.next()) === "pong") break; // skip the peer_offline replies still queued
+    expect(a.ws.readyState).toBe(WebSocket.OPEN);
+  }, 30_000);
 
   it("closes a socket that sends a message over 1 MiB with 1009 (ws maxPayload)", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();

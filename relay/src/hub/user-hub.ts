@@ -13,6 +13,8 @@ import type { FrameBudgets } from "./frame-budgets.js";
  */
 export interface HubSocket {
   readonly readyState: number;
+  /** Bytes queued by `send` that have not been written to the network yet (`ws`'s own counter). */
+  readonly bufferedAmount: number;
   send(data: Uint8Array | string): void;
   close(code: number, reason: string): void;
   terminate(): void;
@@ -21,6 +23,18 @@ export interface HubSocket {
 export const SOCKET_OPEN = 1;
 /** Sent to every socket when the relay shuts down (spec §4.3); clients reconnect with backoff. */
 export const GOING_AWAY = 1001;
+/**
+ * Sent to a slow receiver (see MAX_BUFFERED_BYTES). shellx_core treats every close code other than
+ * 4001/4002 as "reconnect with backoff"; the agent's replay buffer catches the device up.
+ */
+export const TRY_AGAIN_LATER = 1013;
+/**
+ * Largest backlog of unsent bytes a socket may have before the hub sends it anything more. A peer
+ * that reads slower than its peers write would otherwise make the relay buffer without bound. Such
+ * a receiver is closed rather than skipped: dropping frames would break the end-to-end Noise stream,
+ * whose frames are authenticated in sequence.
+ */
+export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
 /** Identity of one connection, set by the ws route from the validated token. */
 export interface ConnectionMeta {
@@ -101,11 +115,11 @@ export class HubState {
       // The device's frame budget is deliberately NOT reset here (see FrameBudgets).
       this.sockets.set(socket, { device_id: meta.deviceId, kind: meta.kind, conn_id: meta.connId, closing: false });
       for (const other of this.liveDeviceIds()) {
-        if (other !== meta.deviceId) safeSend(socket, encodePresence(other, true));
+        if (other !== meta.deviceId) this.sendTo(socket, encodePresence(other, true));
       }
       this.broadcast(encodePresence(meta.deviceId, true), meta.deviceId);
       for (const row of tombstones) {
-        safeSend(socket, pairingRemovedEvent(meta.deviceId, row.mobile_id, row.pairing_id));
+        this.sendTo(socket, pairingRemovedEvent(meta.deviceId, row.mobile_id, row.pairing_id));
       }
     });
   }
@@ -113,6 +127,11 @@ export class HubState {
   /** A binary relay frame (or any text other than "ping", which the ws route answers itself). */
   receive(socket: HubSocket, data: ArrayBuffer | Uint8Array | string): void {
     void this.enqueue("frame", () => this.handleFrame(socket, data));
+  }
+
+  /** The ws route found `socket` over the backlog cap while answering a ping: close it (1013). */
+  slowReceiver(socket: HubSocket): void {
+    void this.enqueue("slow_receiver", () => this.dropSlowReceiver(socket));
   }
 
   /** The socket's close event: forget it and announce the device offline unless the hub closed it. */
@@ -165,8 +184,8 @@ export class HubState {
         pairingId,
       );
       const frame = pairingRemovedEvent(agentId, mobileId, pairingId);
-      for (const socket of this.socketsOf(agentId)) safeSend(socket, frame);
-      if (mobileId !== agentId) for (const socket of this.socketsOf(mobileId)) safeSend(socket, frame);
+      for (const socket of this.socketsOf(agentId)) this.sendTo(socket, frame);
+      if (mobileId !== agentId) for (const socket of this.socketsOf(mobileId)) this.sendTo(socket, frame);
     });
   }
 
@@ -299,27 +318,27 @@ export class HubState {
       return;
     }
     if (typeof data === "string") {
-      safeSend(socket, encodeError(RelayErrorCode.badFrame));
+      this.sendTo(socket, encodeError(RelayErrorCode.badFrame));
       return;
     }
     const frame = data instanceof Uint8Array ? data : new Uint8Array(data);
     const header = parseDataHeader(frame);
     if (frame.length > MAX_FRAME_BYTES) {
-      safeSend(socket, encodeError(RelayErrorCode.frameTooLarge, header?.peer, header?.channel));
+      this.sendTo(socket, encodeError(RelayErrorCode.frameTooLarge, header?.peer, header?.channel));
       logMeta("ws_frame_too_large", { device_id: me.device_id, size: frame.length });
       return;
     }
     if (header === null) {
-      safeSend(socket, encodeError(RelayErrorCode.badFrame));
+      this.sendTo(socket, encodeError(RelayErrorCode.badFrame));
       return;
     }
     const targets = this.socketsOf(header.peer);
     if (targets.length === 0) {
-      safeSend(socket, encodeError(RelayErrorCode.peerOffline, header.peer, header.channel));
+      this.sendTo(socket, encodeError(RelayErrorCode.peerOffline, header.peer, header.channel));
       return;
     }
     const routed = withPeer(frame, me.device_id);
-    for (const target of targets) safeSend(target, routed);
+    for (const target of targets) this.sendTo(target, routed);
   }
 
   private disconnectNow(deviceIds: string[], code: CloseCode): void {
@@ -377,13 +396,35 @@ export class HubState {
 
   private broadcast(frame: Uint8Array, exceptDeviceId: string): void {
     for (const [socket, me] of this.sockets) {
-      if (me.device_id !== exceptDeviceId && isLive(socket, me)) safeSend(socket, frame);
+      if (me.device_id !== exceptDeviceId && isLive(socket, me)) this.sendTo(socket, frame);
     }
+  }
+
+  /**
+   * Every frame the hub sends goes through here: it is dropped, and the socket closed with 1013 and
+   * announced offline, when the socket already has more than MAX_BUFFERED_BYTES waiting to go out.
+   */
+  private sendTo(socket: HubSocket, frame: Uint8Array): void {
+    if (isSlow(socket)) this.dropSlowReceiver(socket);
+    else safeSend(socket, frame);
+  }
+
+  private dropSlowReceiver(socket: HubSocket): void {
+    const me = this.sockets.get(socket);
+    if (me === undefined || !isLive(socket, me)) return;
+    me.closing = true;
+    safeClose(socket, TRY_AGAIN_LATER, "try again later");
+    logMeta("slow_receiver", { device_id: me.device_id });
+    this.markOffline(me.device_id);
   }
 }
 
 function isLive(socket: HubSocket, me: Attachment): boolean {
   return !me.closing && socket.readyState === SOCKET_OPEN;
+}
+
+function isSlow(socket: HubSocket): boolean {
+  return socket.bufferedAmount > MAX_BUFFERED_BYTES;
 }
 
 function safeSend(socket: HubSocket, data: Uint8Array | string): void {
@@ -425,6 +466,16 @@ export class UserHub {
 
   receive(socket: HubSocket, data: ArrayBuffer | Uint8Array | string): void {
     this.state.receive(socket, data);
+  }
+
+  /**
+   * The text heartbeat: "pong" goes out right away, outside the queue (spec §4.2) — except to a slow
+   * receiver, which is closed through the queue instead (pings are not budgeted, so a client that
+   * never reads could otherwise pile up pongs without bound).
+   */
+  ping(socket: HubSocket): void {
+    if (isSlow(socket)) this.state.slowReceiver(socket);
+    else safeSend(socket, "pong");
   }
 
   disconnected(socket: HubSocket): void {

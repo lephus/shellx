@@ -4,7 +4,7 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import { FRAMES_PER_SECOND } from "../src/hub/token-bucket.js";
-import { GOING_AWAY, type UserHub } from "../src/hub/user-hub.js";
+import { GOING_AWAY, MAX_BUFFERED_BYTES, TRY_AGAIN_LATER, type UserHub } from "../src/hub/user-hub.js";
 import {
   CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, RelayErrorCode,
 } from "../src/protocol/frames.js";
@@ -211,6 +211,110 @@ describe("frame budget (500 frames/s per device)", () => {
     await registry.forUser(userId).idle();
     // ...but the device still had only 50 frames left: the 51st trips the limit.
     expect(again.closedWith).toEqual({ code: 4003, reason: "rate_limited" });
+  });
+});
+
+describe("slow receivers (backpressure)", () => {
+  const NOW = 1_900_000_000_000;
+
+  function captureLogs(): string[] {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    return lines;
+  }
+
+  it("closes a DATA target whose unsent backlog is over 4 MiB with 1013 instead of relaying; the sender is unaffected", async () => {
+    expect(MAX_BUFFERED_BYTES).toBe(4 * 1024 * 1024);
+    const { hub, agentId, mobileId } = setup(() => NOW);
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, m, mobileId);
+    a.take();
+    m.take();
+    const lines = captureLogs();
+    m.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+    hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(0xde, 0xad)));
+    await hub.idle();
+
+    expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    expect(m.sent).toEqual([]); // the frame was not queued on top of the backlog
+    expect(a.closedWith).toBeNull();
+    expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]); // only told that the peer left
+    expect(await hub.online()).toEqual([agentId]);
+    expect(db().get("SELECT last_seen_at FROM devices WHERE id = ?", mobileId)).toEqual({ last_seen_at: NOW });
+    const logged = lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((e) => e.event === "slow_receiver");
+    expect(logged).toHaveLength(1);
+    expect(Object.keys(logged[0]!).sort()).toEqual(["device_id", "event", "ts"]); // metadata only
+    expect(logged[0]!.device_id).toBe(mobileId);
+
+    // The sender keeps working, and the slow socket's own close event later changes nothing.
+    clientCloses(hub, m);
+    hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(1)));
+    await hub.idle();
+    expect(a.take()).toEqual([hex(encodeError(RelayErrorCode.peerOffline, mobileId, CH))]);
+    expect(a.closedWith).toBeNull();
+  });
+
+  it("still relays to a target whose backlog is exactly at the cap", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, m, mobileId);
+    a.take();
+    m.take();
+    m.bufferedAmount = MAX_BUFFERED_BYTES;
+    hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(7)));
+    await hub.idle();
+    expect(m.take()).toEqual([hex(encodeData(agentId, CH, Uint8Array.of(7)))]);
+    expect(m.closedWith).toBeNull();
+  });
+
+  it("applies the same cap to ERROR replies: a sender that never reads them is closed with 1013", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    m.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+    hub.receive(m, encodeData(agentId, CH, Uint8Array.of(4))); // the agent is offline: an ERROR would be queued
+    await hub.idle();
+    expect(m.sent).toEqual([]);
+    expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    expect(await hub.online()).toEqual([]);
+  });
+
+  it("applies the same cap to PRESENCE: a slow peer is closed instead of being sent the newcomer's arrival", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    a.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    expect(a.sent).toEqual([]);
+    expect(a.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    // The newcomer saw the agent in its snapshot, then saw it leave.
+    expect(m.take()).toEqual([hex(encodePresence(agentId, true)), hex(encodePresence(agentId, false))]);
+  });
+
+  it("answers ping with pong outside the queue, but closes a slow receiver with 1013 instead", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    await joinHub(hub, m, mobileId);
+    a.take();
+    m.take();
+    hub.ping(m);
+    expect(m.take()).toEqual(["text:pong"]); // synchronously, not through the queue
+
+    m.bufferedAmount = MAX_BUFFERED_BYTES + 1;
+    hub.ping(m);
+    await hub.idle();
+    expect(m.sent).toEqual([]);
+    expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
   });
 });
 

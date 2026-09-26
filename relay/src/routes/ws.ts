@@ -34,9 +34,9 @@ export const webSocketAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /**
  * GET /v1/ws, step 2 — @hono/node-server completes the upgrade with `ws` and calls these handlers.
- * The socket joins the account's hub; `ping` is answered right here, outside the hub's queue
- * (spec §4.2). Only the validated token decides the device id and kind; nothing the client sends
- * in headers reaches the hub.
+ * The socket joins the account's hub; `ping` is answered at once, outside the hub's queue (spec
+ * §4.2), unless the socket is a slow receiver (see `UserHub.ping`). Only the validated token decides
+ * the device id and kind; nothing the client sends in headers reaches the hub.
  */
 export const webSocketUpgrade = upgradeWebSocket(
   (context) => {
@@ -85,10 +85,10 @@ export const webSocketUpgrade = upgradeWebSocket(
         socket = ws.raw as unknown as WebSocket;
         void admit(socket);
       },
-      onMessage(event, ws) {
+      onMessage(event) {
         if (socket === null) return;
         if (event.data === "ping") {
-          ws.send("pong");
+          hubs.forUser(auth.userId).ping(socket); // "pong" right away, outside the queue
           return;
         }
         const data = event.data;
