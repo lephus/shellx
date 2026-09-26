@@ -1,0 +1,7 @@
+# Build context of web/Dockerfile is the repository root: send only web/ and deploy/web/.
+*
+!web/
+!deploy/web/
+web/node_modules
+web/dist
+web/.astro
