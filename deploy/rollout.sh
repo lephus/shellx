@@ -15,11 +15,16 @@ case "$app_dir" in
 esac
 cd "$app_dir"
 
-mkdir -p data backups downloads/desktop nginx-proxy backup
+# Check data/ before creating anything: a missing or wrongly owned data/ must stop here, untouched.
+if [[ ! -d data ]]; then
+  echo "::error::$app_dir/data does not exist: create it and give it to uid $relay_uid first: mkdir -p $app_dir/data && sudo chown $relay_uid:$relay_uid $app_dir/data" >&2
+  exit 1
+fi
 if [[ "$(ls -nd data | awk '{print $3}')" != "$relay_uid" ]]; then
   echo "::error::$app_dir/data must belong to uid $relay_uid (the relay's node user): sudo chown $relay_uid:$relay_uid $app_dir/data" >&2
   exit 1
 fi
+mkdir -p backups downloads/desktop nginx-proxy backup
 touch .env
 if ! grep -q '^PROXY_NETWORK=.' .env; then
   echo "::error::PROXY_NETWORK is not set in $app_dir/.env (deploy/README.md, step 2)" >&2
@@ -57,8 +62,9 @@ wait_healthy() {
 # Pull first: if the images cannot be pulled, .env and the running stack stay as they were.
 IMAGE_TAG="$new_tag" docker compose pull
 set_tag "$new_tag"
-docker compose up -d --remove-orphans
-if wait_healthy; then
+# A `compose up -d` that fails outright (bad network, volume, daemon hiccup) is treated exactly
+# like an unhealthy relay: it falls straight into the rollback branch below.
+if docker compose up -d --remove-orphans && wait_healthy; then
   echo "relay is healthy on $new_tag"
   exit 0
 fi
@@ -67,7 +73,8 @@ echo "::error::relay not healthy within ${health_timeout}s on $new_tag; rolling 
 docker compose logs --no-color --tail 50 relay >&2 || true
 if [[ -n "$old_tag" ]]; then
   set_tag "$old_tag"
-  docker compose up -d --remove-orphans
-  if ! wait_healthy; then echo "::error::the previous release ($old_tag) is not healthy either" >&2; fi
+  if ! docker compose up -d --remove-orphans || ! wait_healthy; then
+    echo "::error::the previous release ($old_tag) is not healthy either" >&2
+  fi
 fi
 exit 1

@@ -10,11 +10,13 @@ import { fileURLToPath } from 'node:url';
 
 const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'rollout.sh');
 
-// Fake docker: logs every call; `compose pull` fails for tag "unpullable"; the relay container is
-// healthy unless .env's IMAGE_TAG is "broken".
+// Fake docker: logs every call; `compose pull` fails for tag "unpullable"; `compose up -d` itself
+// fails outright (exit 17, unrelated to health) whenever .env's IMAGE_TAG starts with "crash"; the
+// relay container is healthy unless .env's IMAGE_TAG is "broken".
 const FAKE_DOCKER = `#!/usr/bin/env bash
 echo "docker $* [IMAGE_TAG=\${IMAGE_TAG:-}]" >> "$CALLS"
 if [[ "$1 $2" == "compose pull" && "\${IMAGE_TAG:-}" == unpullable ]]; then exit 1; fi
+if [[ "$1 $2" == "compose up" ]] && grep -q '^IMAGE_TAG=crash' .env; then exit 17; fi
 if [[ "$1 $2" == "compose ps" ]]; then echo relay-container-id; exit 0; fi
 if [[ "$1" == inspect ]]; then
   if grep -q '^IMAGE_TAG=broken$' .env; then echo unhealthy; else echo healthy; fi
@@ -105,4 +107,33 @@ test('creates the folder layout and accepts an absolute app dir', () => {
   for (const dir of ['data', 'backups', 'downloads/desktop', 'nginx-proxy', 'backup']) {
     assert.ok(statSync(join(s.app, dir)).isDirectory(), dir);
   }
+});
+
+test('an outright failure of the first `compose up -d` rolls back to the previous tag and fails', () => {
+  const s = setup();
+  const result = s.run('crashnew');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not healthy within 3s on crashnew; rolling back to old/);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+  assert.equal(s.calls().match(/compose up -d --remove-orphans/g).length, 2);
+});
+
+test('when both `compose up -d` calls fail outright, the rollback diagnostic still prints and .env keeps the old tag', () => {
+  const s = setup({ env: 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=crashold\n' });
+  const result = s.run('crashnew');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not healthy within 3s on crashnew; rolling back to crashold/);
+  assert.match(result.stderr, /the previous release \(crashold\) is not healthy either/);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=crashold\n');
+  assert.equal(s.calls().match(/compose up -d --remove-orphans/g).length, 2);
+});
+
+test('refuses to deploy when data/ does not exist yet, and creates nothing', () => {
+  const s = setup({ ownData: false });
+  const result = s.run('abc123');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /phu\/shellx\/data does not exist/);
+  assert.throws(() => statSync(join(s.app, 'data')));
+  assert.throws(() => statSync(join(s.app, 'backups')));
+  assert.equal(s.calls(), '');
 });
