@@ -69,6 +69,12 @@ void main() {
     expect(out, ['\x1bOA']);
   });
 
+  test('textInput (IME/clipboard chip) strips ESC and C1, so it cannot inject sequences', () {
+    terminal.textInput('echo harmless\x1b[201~rm -rf ~/x\n');
+    terminal.textInput('a\u009b201~b');
+    expect(out, ['echo harmless[201~rm -rf ~/x\r', 'a201~b']);
+  });
+
   test('paste: bracketed when enabled, CR line breaks, never modified', () {
     keys.tapModifier(ExtraKey.ctrl);
     terminal.paste('echo 1\necho 2');

@@ -83,6 +83,35 @@ void main() {
     expect(normalizePastedText('a\r\nb\nc'), 'a\rb\rc');
   });
 
+  group('typed text (IME) is sanitised', () {
+    // Gboard's clipboard chip and IME commit text reach `normalizeTypedText` via
+    // `TerminalView._onInsert` -> `Terminal.textInput`, with no sanitising of their own.
+
+    test('ESC is stripped, so IME text cannot end bracketed paste on its own', () {
+      expect(normalizeTypedText('echo harmless\x1b[201~rm -rf ~/x\n'), 'echo harmless[201~rm -rf ~/x\r');
+    });
+
+    test('the 8-bit CSI (U+009B) is stripped as well', () {
+      expect(normalizeTypedText('a\u009b201~b'), 'a201~b');
+    });
+
+    test('C0 controls other than tab and line breaks are stripped, and so is DEL', () {
+      expect(normalizeTypedText('a\x00b\x03c\x07d\x08e\x7ff'), 'abcdef');
+    });
+
+    test('tabs and CR survive, LF still becomes CR', () {
+      expect(normalizeTypedText('a\tb\rc\nd'), 'a\tb\rc\rd');
+    });
+
+    test('Vietnamese and emoji text survive', () {
+      expect(normalizeTypedText('xin chào 😀 ¡ÿ'), 'xin chào 😀 ¡ÿ');
+    });
+
+    test('sticky Ctrl still maps the typed character after sanitising', () {
+      expect(applyModifiersToText(normalizeTypedText('c'), ctrl: true, alt: false), '\x03');
+    });
+  });
+
   group('pasted text is sanitised', () {
     test('ESC is stripped, so a paste cannot close bracketed paste itself', () {
       expect(normalizePastedText('echo harmless\x1b[201~rm -rf ~/x\n'), 'echo harmless[201~rm -rf ~/x\r');

@@ -53,13 +53,21 @@ String applyModifiersToText(String text, {required bool ctrl, required bool alt}
   return '$head$rest';
 }
 
-/// The Return key of a soft keyboard arrives as "\n"; terminals send CR.
-String normalizeTypedText(String text) => text.replaceAll('\n', '\r');
+/// Control characters typed or pasted text must never carry: ESC and every
+/// other C0 control except tab, LF and CR, DEL, and the C1 range
+/// (U+0080–U+009F, which includes the 8-bit CSI U+009B).
+final RegExp _unsafeControls = RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\u0080-\\u009F]');
 
-/// Control characters a paste must never carry: ESC and every other C0
-/// control except tab, LF and CR, DEL, and the C1 range (U+0080–U+009F,
-/// which includes the 8-bit CSI U+009B).
-final RegExp _pasteControls = RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\u0080-\\u009F]');
+/// The Return key of a soft keyboard arrives as "\n"; terminals send CR.
+///
+/// Also strips [_unsafeControls]: `TerminalView._onInsert` feeds IME commit
+/// text and the Gboard clipboard chip through `Terminal.textInput` with no
+/// sanitising of its own, so untrusted IME text could otherwise inject a
+/// bracketed-paste-end marker or other escape sequence the same way a
+/// malicious clipboard paste could (see [normalizePastedText]). Runs before
+/// [applyModifiersToText], so a sticky Ctrl still maps the character that
+/// follows.
+String normalizeTypedText(String text) => text.replaceAll(_unsafeControls, '').replaceAll('\n', '\r');
 
 /// Makes clipboard text safe to send as a paste: control characters are
 /// stripped and line breaks become CR, like xterm and iTerm2 do.
@@ -70,4 +78,4 @@ final RegExp _pasteControls = RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\u0
 /// would still let the paste inject key sequences, so this applies in both
 /// modes.
 String normalizePastedText(String text) =>
-    text.replaceAll(_pasteControls, '').replaceAll('\r\n', '\r').replaceAll('\n', '\r');
+    text.replaceAll(_unsafeControls, '').replaceAll('\r\n', '\r').replaceAll('\n', '\r');
