@@ -56,7 +56,7 @@ class RegisterController extends AuthController {
 
   /// "Từ 8 đến 128 ký tự. Còn thiếu 3 ký tự."
   String passwordHelp(S strings) {
-    final length = _password.value.length;
+    final length = AuthFormValidator.passwordLength(_password.value);
     if (length > 0 && length < AuthFormValidator.minPasswordLength) {
       return '${strings.passwordRule} ${strings.passwordMissing(AuthFormValidator.minPasswordLength - length)}';
     }

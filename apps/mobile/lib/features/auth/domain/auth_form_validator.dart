@@ -19,7 +19,13 @@ class AuthFormValidator {
 
   /// Registration: spec §5.2 "8–128 ký tự" and nothing else (no case or digit rules).
   String? validateNewPassword(String? value) {
-    final length = value?.length ?? 0;
+    final length = passwordLength(value ?? '');
     return length < minPasswordLength || length > maxPasswordLength ? S.current.errorWeakPassword : null;
   }
+
+  /// Characters as the relay counts them: Unicode code points, so an emoji is one character, not
+  /// two UTF-16 units. The relay counts after NFC normalisation, which Dart does not provide: an
+  /// accent typed as a separate combining mark counts twice here, and the relay's `weak_password`
+  /// then shows under the field.
+  static int passwordLength(String value) => value.runes.length;
 }

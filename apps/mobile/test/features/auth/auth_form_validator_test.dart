@@ -23,6 +23,14 @@ void main() {
     expect(validator.validateNewPassword(null), 'Mật khẩu phải có 8–128 ký tự.');
   });
 
+  test('new password: counted in Unicode code points, as the relay counts it', () {
+    const emoji = '😀'; // one code point, two UTF-16 units
+    expect(validator.validateNewPassword(emoji * 8), isNull);
+    expect(validator.validateNewPassword(emoji * 7), 'Mật khẩu phải có 8–128 ký tự.');
+    expect(validator.validateNewPassword(emoji * 128), isNull);
+    expect(validator.validateNewPassword(emoji * 129), 'Mật khẩu phải có 8–128 ký tự.');
+  });
+
   test('sign-in password: only required', () {
     expect(validator.validatePassword('x'), isNull);
     expect(validator.validatePassword(''), 'Cần nhập mật khẩu');

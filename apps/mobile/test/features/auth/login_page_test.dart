@@ -191,6 +191,21 @@ void main() {
       expect(popups.errors, isEmpty);
     });
 
+    testWidgets('the missing and extra characters are counted in code points (emoji)', (tester) async {
+      await openRegister(tester);
+      await fill(tester, 'me@example.com', '😀' * 5);
+      expect(find.text('Từ 8 đến 128 ký tự. Còn thiếu 3 ký tự.'), findsOneWidget);
+      expect(stateOf(tester, 'Tạo tài khoản'), ButtonState.disable);
+
+      await fill(tester, 'me@example.com', '😀' * 130);
+      expect(find.text('Từ 8 đến 128 ký tự. Thừa 2 ký tự.'), findsOneWidget);
+      expect(stateOf(tester, 'Tạo tài khoản'), ButtonState.disable);
+
+      await fill(tester, 'me@example.com', '😀' * 8);
+      expect(find.text('Từ 8 đến 128 ký tự.'), findsOneWidget);
+      expect(stateOf(tester, 'Tạo tài khoản'), ButtonState.available);
+    });
+
     testWidgets('R3: the keyboard submits only what the button would, once', (tester) async {
       await openRegister(tester);
       await fill(tester, 'me@example.com', 'short');
