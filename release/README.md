@@ -69,9 +69,11 @@ Settings → Environments → `release` → **Environment secrets** → **Add se
 | `AZURE_CERTIFICATE_PROFILE_NAME` | windows | Certificate profile name (Public Trust) |
 
 The `publish` job also reads the `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` secrets and
-the `VPS_APP_DIR` variable of this same `release` Environment, shared with the `production`
-Environment `deploy.yml` uses (see `deploy/README.md`) — **not** repository secrets or variables.
-Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
+the `VPS_APP_DIR` and (optional, digits only, default `22`) `VPS_SSH_PORT` variables of this same
+`release` Environment, shared with the `production` Environment `deploy.yml` uses (see
+`deploy/README.md`) — **not** repository secrets or variables. It uploads installers into a version
+folder created with mode 755, so nginx (uid 101, in the `web` image) can read it under a hardened
+umask. Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 
 The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinned in the workflow's
 `env:` block. The workflow expects the names fixed by `apps/desktop`: `ShellX.app` with bundle id

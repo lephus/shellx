@@ -28,8 +28,6 @@ concurrency:
 env:
   RELAY_IMAGE: ghcr.io/lephus/shellx-relay
   WEB_IMAGE: ghcr.io/lephus/shellx-web
-  # ShellX's one folder on the VPS, relative to the deploy user's home (decision V8).
-  APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
 
 jobs:
   deploy:
@@ -40,13 +38,30 @@ jobs:
     # and the VPS_APP_DIR variable with the release Environment used by release-desktop.yml's publish
     # job, since both write to the same VPS.
     environment: production
+    env:
+      # ShellX's one folder on the VPS, relative to the deploy user's home (decision V8). Declared at
+      # job level (not workflow level): `vars` only resolves an Environment-scoped variable inside a
+      # job that declares that `environment`, so this has to live here to ever see an override.
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      # Optional; only needed if sshd on the VPS does not listen on the default port 22.
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Resolve the commit and check VPS_APP_DIR
+      - name: Refuse a workflow_dispatch ref that is not merged to main (M2)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::the requested ref is not an ancestor of origin/main; merge it to main first, or pick an older commit that is already on main to roll back"
+            exit 1
+          fi
+
+      - name: Resolve the commit and check VPS_APP_DIR and VPS_SSH_PORT
         id: commit
         run: |
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -56,6 +71,10 @@ jobs:
           dotdot_re='(^|/)\.\.?(/|$)'
           if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
             echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
+            exit 1
+          fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
             exit 1
           fi
 
@@ -108,6 +127,7 @@ jobs:
             echo "  StrictHostKeyChecking yes"
             echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
             echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
           } > "$RUNNER_TEMP/ssh_config"
           echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
 
@@ -118,7 +138,7 @@ jobs:
           rsync -rt -e "ssh -F $SSH_CONFIG" --delete --chmod=D755,F644 deploy/nginx-proxy/ "vps:$APP_DIR/.incoming/nginx-proxy/"
           rsync -rt -e "ssh -F $SSH_CONFIG" --delete --chmod=D755,F644 deploy/backup/ "vps:$APP_DIR/.incoming/backup/"
 
-      - name: Roll out (swaps in the staged config; the previous config and IMAGE_TAG come back if the relay is not healthy within 60 s)
+      - name: Roll out (swaps in the staged config; the previous config and IMAGE_TAG come back if relay or web is not healthy within 60 s)
         env:
           SHA: ${{ steps.commit.outputs.sha }}
         run: ssh -F "$SSH_CONFIG" vps bash -s -- "$SHA" "$APP_DIR" < deploy/rollout.sh

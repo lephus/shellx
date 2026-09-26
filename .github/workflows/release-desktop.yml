@@ -26,8 +26,6 @@ env:
   FLUTTER_VERSION: 3.41.7
   NODE_VERSION: 22
   DOWNLOAD_BASE_URL: https://download.shellx.pro
-  # ShellX's one folder on the VPS, relative to the deploy user's home (VPS spec V8).
-  APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
 
 jobs:
   prepare:
@@ -236,6 +234,12 @@ jobs:
     environment: release
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      # ShellX's one folder on the VPS, relative to the deploy user's home (VPS spec V8). Declared at
+      # job level (not workflow level): `vars` only resolves an Environment-scoped variable inside a
+      # job that declares that `environment`, so this has to live here to ever see an override.
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      # Optional; only needed if sshd on the VPS does not listen on the default port 22.
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -269,6 +273,10 @@ jobs:
             echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
             exit 1
           fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
+            exit 1
+          fi
           umask 077
           printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
@@ -281,11 +289,14 @@ jobs:
             echo "  StrictHostKeyChecking yes"
             echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
             echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
           } > "$RUNNER_TEMP/ssh_config"
           echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
       - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
         run: |
-          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION'"
+          # mode 755 (not the runner's default umask): nginx (uid 101, in the web image) must be able
+          # to traverse this version folder to serve the files inside it (M6).
+          ssh -F "$SSH_CONFIG" vps "mkdir -m 755 -p '$APP_DIR/downloads/desktop/$VERSION'"
           rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
             "vps:$APP_DIR/downloads/desktop/$VERSION/"
       - name: Verify public download URLs
