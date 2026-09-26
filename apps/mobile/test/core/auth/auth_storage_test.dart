@@ -39,15 +39,17 @@ void main() {
     );
   });
 
-  test("forgetAccount removes the session, the device key and only this user's pins", () async {
+  test("forgetAccount removes the session, the device key and only this user's pins and pending unpairs", () async {
     await storage.save(session);
     await store.write(DeviceIdentity.storageKey, 'private-key');
     await store.write('pinned_machines_user-1', '[]');
     await store.write('pinned_machines_user-2', '[]');
+    await store.write('pending_unpairs_user-1', '[]');
+    await store.write('pending_unpairs_user-2', '[]');
 
     await storage.forgetAccount('user-1');
 
-    expect(store.values, {'pinned_machines_user-2': '[]'});
+    expect(store.values, {'pinned_machines_user-2': '[]', 'pending_unpairs_user-2': '[]'});
   });
 
   test('the session never prints its token', () {

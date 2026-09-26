@@ -299,6 +299,10 @@ class FakeBackend implements ShellxBackend {
   /// Thrown by [unpair] after the machine is shut down and its pin dropped, like a DELETE that
   /// failed three times in `shellx_client`.
   Object? unpairError;
+
+  /// [unpair] waits for this after dropping the machine, before it succeeds or throws
+  /// [unpairError] — a DELETE still retrying.
+  Completer<void>? unpairGate;
   final List<PairingUri> paired = [];
 
   /// Every [pair] call, failed ones included.
@@ -428,6 +432,8 @@ class FakeBackend implements ShellxBackend {
     machines[agentId]?.shutDown();
     _untrusted.remove(agentId)?.shutDown();
     _forget(agentId);
+    final gate = unpairGate;
+    if (gate != null) await gate.future;
     final error = unpairError;
     if (error != null) throw error;
   }

@@ -91,6 +91,7 @@ void main() {
       buildNumber: '1',
     );
     final events = AuthEventNotifier();
+    final pendingUnpairs = PendingUnpairs(store);
     session = SessionHolderImpl(
       api: api,
       storage: AuthStorageImpl(store),
@@ -99,6 +100,7 @@ void main() {
       packageInfo: packageInfo,
       backends: backends,
       events: events,
+      pendingUnpairs: pendingUnpairs,
     );
     final versionGate = VersionGate(api, packageInfo);
     // Loaded at launch, as dependency injection does before the first frame.
@@ -126,7 +128,7 @@ void main() {
       )
       ..registerFactory<QrScannerController>(() => QrScannerController(session))
       ..registerFactory<SettingsController>(
-        () => SettingsController(session, settings, lock, biometrics, registry, packageInfo),
+        () => SettingsController(session, settings, lock, biometrics, registry, packageInfo, pendingUnpairs),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));
     SessionEnforcerImpl(events, router).initialize();

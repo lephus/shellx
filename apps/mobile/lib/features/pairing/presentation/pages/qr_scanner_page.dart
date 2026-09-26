@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -424,11 +423,8 @@ class _CameraScannerState extends State<_CameraScanner> {
   /// denied); the error builder then keeps showing the notice.
   void _restartAfterPermission() {
     if (_scanner.value.error?.errorCode != MobileScannerErrorCode.permissionDenied) return;
-    unawaited(
-      _scanner.start().catchError((Object error) {
-        if (kDebugMode) debugPrint('Camera restart failed: ${error.runtimeType}');
-      }),
-    );
+    // Still denied (or the camera is busy): the error builder keeps showing why.
+    unawaited(_scanner.start().catchError((Object _) {}));
   }
 
   @override

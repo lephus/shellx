@@ -42,6 +42,7 @@ void main() {
     packageInfo: packageInfo('1.0.0'),
     backends: backends,
     events: notifier,
+    pendingUnpairs: PendingUnpairs(store),
   );
 
   setUp(() {
@@ -69,6 +70,40 @@ void main() {
     expect(api.token, 'saved');
     expect(backends.sessions.single.userId, testUserId);
     expect(events, isEmpty);
+  });
+
+  group('pending unpairs (spec §5.5)', () {
+    test('a backend start retries them once, in the background', () async {
+      await saveSession();
+      await PendingUnpairs(store).add(testUserId, agentA, 'MacBook-Pro');
+      await PendingUnpairs(store).add('other-user', agentB, 'Other');
+      final session = holder();
+      await session.restore();
+      await pumpEventQueue();
+
+      expect(backends.backends.single.unpaired, [agentA]);
+      expect(await PendingUnpairs(store).load(testUserId), isEmpty);
+      expect(await PendingUnpairs(store).load('other-user'), hasLength(1));
+    });
+
+    test('a retry that fails again never blocks or fails the sign-in and keeps the entry', () async {
+      await saveSession();
+      await PendingUnpairs(store).add(testUserId, agentA, 'MacBook-Pro');
+      final unpairGate = Completer<void>();
+      backends = FakeBackendFactory(
+        () => FakeBackend()
+          ..unpairGate = unpairGate
+          ..unpairError = const ApiException(status: 0, code: 'network', message: 'offline'),
+      );
+      final session = holder();
+      await session.restore();
+      expect(session.isAuthenticated.value, isTrue); // not waiting for the DELETE
+
+      unpairGate.complete();
+      await pumpEventQueue();
+      expect(backends.backends.single.unpaired, [agentA]);
+      expect(await PendingUnpairs(store).load(testUserId), [(agentId: agentA, name: 'MacBook-Pro')]);
+    });
   });
 
   test('nothing saved: stays signed out and remembers no email', () async {
@@ -457,6 +492,9 @@ void main() {
       await store.write('pinned_machines_other-user', '[]');
       final session = holder();
       await session.restore();
+      await pumpEventQueue(); // the retry at sign-in is done (nothing pending yet)
+      await PendingUnpairs(store).add(testUserId, agentA, 'MacBook-Pro');
+      await PendingUnpairs(store).add('other-user', agentB, 'Other');
 
       await session.deleteAccount('correct horse');
 
@@ -471,10 +509,12 @@ void main() {
         AuthStorage.emailKey,
         DeviceIdentity.storageKey,
         'pinned_machines_$testUserId',
+        'pending_unpairs_$testUserId',
       ]) {
         expect(await store.read(key), isNull, reason: key);
       }
       expect(await store.read('pinned_machines_other-user'), '[]');
+      expect(await PendingUnpairs(store).load('other-user'), hasLength(1));
       expect(api.token, isNull);
       expect(session.isAuthenticated.value, isFalse);
       expect(session.signOutReason.value, SignOutReason.accountDeleted);

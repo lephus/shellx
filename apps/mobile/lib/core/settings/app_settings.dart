@@ -44,13 +44,18 @@ class AppSettings {
     });
   }
 
+  /// Shows [value] without storing it (the Settings slider while it moves).
+  void previewFontSize(double value) => _fontSize.value = clampFontSize(value);
+
   Future<void> setFontSize(double value) async {
     _fontSize.value = clampFontSize(value);
     await _store.write(fontSizeKey, _fontSize.peek().toString());
   }
 
+  /// Stored first: the setting (and the lock that reads it) only changes once it is saved, so a
+  /// failed write leaves both as they were.
   Future<void> setBiometricLock(bool enabled) async {
-    _biometricLock.value = enabled;
     await _store.write(biometricLockKey, enabled.toString());
+    _biometricLock.value = enabled;
   }
 }

@@ -29,6 +29,7 @@ export 'auth/session_enforcer.dart';
 export 'auth/session_holder.dart';
 export 'backend/backend.dart';
 export 'backend/client_backend.dart';
+export 'backend/pending_unpairs.dart';
 export 'config/app_config.dart';
 export 'platform/device_description.dart';
 export 'platform/external_links.dart';

@@ -22,8 +22,9 @@ abstract class AuthStorage {
   Future<void> deleteToken();
 
   /// After `DELETE /v1/account`: forget everything tied to the deleted
-  /// account — the session, the device private key and the machines pinned
-  /// for [userId] (key `pinned_machines_<userId>`, overview §5.7).
+  /// account — the session, the device private key, the machines pinned
+  /// for [userId] (key `pinned_machines_<userId>`, overview §5.7) and its
+  /// pending unpairs ([PendingUnpairs]; the relay deleted every pairing).
   Future<void> forgetAccount(String userId);
 }
 
@@ -64,5 +65,6 @@ class AuthStorageImpl implements AuthStorage {
     }
     await _store.delete(DeviceIdentity.storageKey);
     await _store.delete('pinned_machines_$userId');
+    await _store.delete(PendingUnpairs.storageKey(userId));
   }
 }

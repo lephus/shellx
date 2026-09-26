@@ -41,6 +41,7 @@ import '../auth/session_enforcer.dart' as _i954;
 import '../auth/session_holder.dart' as _i56;
 import '../backend/backend.dart' as _i120;
 import '../backend/client_backend.dart' as _i139;
+import '../backend/pending_unpairs.dart' as _i727;
 import '../core.dart' as _i351;
 import '../handler/popup_handler.dart' as _i695;
 import '../platform/device_description.dart' as _i814;
@@ -99,6 +100,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i657.AuthStorage>(
       () => _i657.AuthStorageImpl(gh<_i145.KeyValueStore>()),
     );
+    gh.lazySingleton<_i727.PendingUnpairs>(
+      () => _i727.PendingUnpairs(gh<_i145.KeyValueStore>()),
+    );
     await gh.lazySingletonAsync<_i620.AppSettings>(() {
       final i = _i620.AppSettings(gh<_i145.KeyValueStore>());
       return i.load().then((_) => i);
@@ -112,6 +116,7 @@ extension GetItInjectableX on _i174.GetIt {
         packageInfo: gh<_i655.PackageInfo>(),
         backends: gh<_i351.BackendFactory>(),
         events: gh<_i351.AuthEventNotifier>(),
+        pendingUnpairs: gh<_i351.PendingUnpairs>(),
       ),
     );
     gh.lazySingleton<_i306.AppLockController>(
@@ -161,12 +166,6 @@ extension GetItInjectableX on _i174.GetIt {
       )..initialize(),
       dispose: (i) => i.dispose(),
     );
-    gh.factory<_i70.MachineListController>(
-      () => _i70.MachineListController.create(
-        gh<_i351.SessionHolder>(),
-        gh<_i667.WorkspaceRegistry>(),
-      ),
-    );
     gh.factory<_i1035.SettingsController>(
       () => _i1035.SettingsController(
         gh<_i351.SessionHolder>(),
@@ -175,6 +174,13 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i870.BiometricAuthenticator>(),
         gh<_i667.WorkspaceRegistry>(),
         gh<_i655.PackageInfo>(),
+        gh<_i351.PendingUnpairs>(),
+      ),
+    );
+    gh.factory<_i70.MachineListController>(
+      () => _i70.MachineListController.create(
+        gh<_i351.SessionHolder>(),
+        gh<_i667.WorkspaceRegistry>(),
       ),
     );
     gh.lazySingleton<_i695.PopupHandler>(

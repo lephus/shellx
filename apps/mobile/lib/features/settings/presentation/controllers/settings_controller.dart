@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -11,7 +12,15 @@ typedef PairedMachine = ({String agentId, String? name});
 /// Spec §9.2 #5: default font size, biometric lock, unpair per machine, sign out, version.
 @injectable
 class SettingsController extends Controller {
-  SettingsController(this._session, this.settings, this._lock, this._biometrics, this._registry, this._packageInfo);
+  SettingsController(
+    this._session,
+    this.settings,
+    this._lock,
+    this._biometrics,
+    this._registry,
+    this._packageInfo,
+    this._pendingUnpairs,
+  );
 
   final SessionHolder _session;
   final AppSettings settings;
@@ -19,13 +28,16 @@ class SettingsController extends Controller {
   final BiometricAuthenticator _biometrics;
   final WorkspaceRegistry _registry;
   final PackageInfo _packageInfo;
+  final PendingUnpairs _pendingUnpairs;
   final Signal<bool> _biometricsAvailable = signal(false);
   final Signal<List<PairedMachine>?> _paired = signal(null);
   final Signal<Set<String>> _failedUnpair = signal(const {});
   final Signal<bool> _loggingOut = signal(false);
 
   /// Spec §5.5: a machine whose DELETE failed after its pin was already dropped — kept here (with
-  /// the name last known for it) so it stays visible with a retry until the DELETE succeeds.
+  /// the name last known for it) so it stays visible with a retry until the DELETE succeeds. The
+  /// same entries are persisted in [PendingUnpairs], so they survive leaving Settings; this map
+  /// also keeps one whose record could not be written.
   final Map<String, String?> _failedNames = {};
   bool _disposed = false;
 
@@ -65,6 +77,8 @@ class SettingsController extends Controller {
   /// failure, [paired] falls back to whatever is already known to have failed to unpair, or an
   /// empty list — never null again once [load] has run once.
   Future<void> _loadPaired() async {
+    await _loadPending();
+    if (_disposed) return;
     await guard(() async {
       final backend = _session.requireBackend;
       final List<PinnedMachine> pins;
@@ -84,7 +98,12 @@ class SettingsController extends Controller {
       if (_disposed) return;
       final pinnedIds = pins.map((pin) => pin.agentId).toSet();
       // A machine that got paired again (fresh pin) is no longer a failed unpair.
-      _failedNames.removeWhere((agentId, _) => pinnedIds.contains(agentId));
+      final pairedAgain = _failedNames.keys.where(pinnedIds.contains).toList();
+      for (final agentId in pairedAgain) {
+        _failedNames.remove(agentId);
+        await _forgetPending(agentId);
+      }
+      if (_disposed) return;
       final combined = [
         for (final pin in pins) (agentId: pin.agentId, name: names[pin.agentId]),
         for (final entry in _failedNames.entries) (agentId: entry.key, name: entry.value),
@@ -94,6 +113,41 @@ class SettingsController extends Controller {
         _failedUnpair.value = Set.unmodifiable(_failedNames.keys);
       });
     });
+  }
+
+  /// The unpairs still pending from earlier visits (or another start) become failed rows too.
+  Future<void> _loadPending() async {
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      for (final entry in await _pendingUnpairs.load(userId)) {
+        _failedNames.update(entry.agentId, (name) => name ?? entry.name, ifAbsent: () => entry.name);
+      }
+    } catch (error) {
+      if (kDebugMode) debugPrint('SettingsController pending unpairs error: ${error.runtimeType}');
+    }
+  }
+
+  String? get _userId => _session.session.peek()?.userId;
+
+  /// Best effort: the row is shown from [_failedNames] even when the record cannot be written.
+  Future<void> _rememberPending(String? userId, String agentId, String? name) async {
+    if (userId == null) return;
+    try {
+      await _pendingUnpairs.add(userId, agentId, name);
+    } catch (error) {
+      if (kDebugMode) debugPrint('SettingsController pending unpairs error: ${error.runtimeType}');
+    }
+  }
+
+  Future<void> _forgetPending(String agentId, [String? userId]) async {
+    userId ??= _userId;
+    if (userId == null) return;
+    try {
+      await _pendingUnpairs.remove(userId, agentId);
+    } catch (error) {
+      if (kDebugMode) debugPrint('SettingsController pending unpairs error: ${error.runtimeType}');
+    }
   }
 
   void _showFailedOnly() => batch(() {
@@ -108,20 +162,27 @@ class SettingsController extends Controller {
     return null;
   }
 
-  Future<void> setFontSize(double size) => settings.setFontSize(size);
+  /// While the slider moves: the preview follows, nothing is written yet.
+  void previewFontSize(double size) => settings.previewFontSize(size);
 
-  Future<void> setBiometricLock(bool enabled) async {
+  /// When the slider is released: the size is stored; a failed write shows the toast.
+  Future<void> setFontSize(double size) => guard(() => settings.setFontSize(size));
+
+  /// The lock follows the setting only once it is stored; a failed write shows the toast and
+  /// leaves both as they were.
+  Future<void> setBiometricLock(bool enabled) => guard(() async {
     await settings.setBiometricLock(enabled);
     _lock.settingChanged();
-  }
+  });
 
   /// Spec §5.5: drop the pin and the pairing record, and the machine's open tabs. The real
   /// `unpair` shuts the machine down and forgets the pin before its DELETE, which can still throw
   /// (network, 5xx): the workspace is dropped either way (in a `finally`), but a machine whose
-  /// DELETE failed is kept — with the name known for it — so the row stays with a retry instead
-  /// of silently disappearing on the next load.
+  /// DELETE failed is kept — with the name known for it — in [PendingUnpairs] and on this page,
+  /// so its row stays with a retry, also after leaving Settings, and the next start retries it.
   Future<void> unpair(String agentId) async {
     final name = _nameOf(agentId);
+    final userId = _userId;
     var failed = false;
     await guard(() async {
       try {
@@ -133,12 +194,15 @@ class SettingsController extends Controller {
         _registry.remove(agentId);
       }
     });
-    if (_disposed) return;
+    // Recorded even when the page was left meanwhile: that is what the record is for.
     if (failed) {
       _failedNames[agentId] = name;
+      await _rememberPending(userId, agentId, name);
     } else {
       _failedNames.remove(agentId);
+      await _forgetPending(agentId, userId);
     }
+    if (_disposed) return;
     await _loadPaired();
   }
 

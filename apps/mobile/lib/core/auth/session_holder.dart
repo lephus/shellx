@@ -65,13 +65,15 @@ class SessionHolderImpl implements SessionHolder {
     required PackageInfo packageInfo,
     required BackendFactory backends,
     required AuthEventNotifier events,
+    required PendingUnpairs pendingUnpairs,
   }) : _api = api,
        _storage = storage,
        _store = store,
        _device = device,
        _appVersion = packageInfo.version,
        _backends = backends,
-       _events = events;
+       _events = events,
+       _pendingUnpairs = pendingUnpairs;
 
   final ShellxApi _api;
   final AuthStorage _storage;
@@ -80,6 +82,7 @@ class SessionHolderImpl implements SessionHolder {
   final String _appVersion;
   final BackendFactory _backends;
   final AuthEventNotifier _events;
+  final PendingUnpairs _pendingUnpairs;
   final Signal<AccountSession?> _session = signal(null);
   final Signal<ShellxBackend?> _backend = signal(null);
   final Signal<SignOutReason?> _signOutReason = signal(null);
@@ -170,6 +173,9 @@ class SessionHolderImpl implements SessionHolder {
       _backend.value = backend;
       _signOutReason.value = null;
     });
+    // Unpairs whose DELETE failed earlier (spec §5.5): retried once, in the background — sign-in
+    // never waits for them, and a failure keeps them for the next start or for Settings.
+    unawaited(_pendingUnpairs.retry(session.userId, backend));
   }
 
   /// Stops the backend at once: cancelling the relay subscription takes effect immediately, and

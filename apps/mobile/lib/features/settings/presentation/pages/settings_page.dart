@@ -87,7 +87,9 @@ class _SettingsPageState extends State<SettingsPage> {
                               divisions: (AppSettings.maxFontSize - AppSettings.minFontSize).round(),
                               value: fontSize,
                               label: fontSize.toStringAsFixed(0),
-                              onChanged: _controller.setFontSize,
+                              // The preview follows every step; the size is stored once, on release.
+                              onChanged: _controller.previewFontSize,
+                              onChangeEnd: _controller.setFontSize,
                             ),
                           ),
                           Text('A', style: context.typo.title.copyWith(color: colors.disable)),

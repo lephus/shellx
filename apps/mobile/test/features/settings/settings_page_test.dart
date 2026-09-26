@@ -23,9 +23,13 @@ void main() {
   late FakeSessionHolder session;
   late WorkspaceRegistry registry;
   late FakePopupHandler popups;
+  late InMemoryKeyValueStore store;
+  late PendingUnpairs pendingUnpairs;
 
   setUp(() async {
-    settings = AppSettings(InMemoryKeyValueStore());
+    store = InMemoryKeyValueStore();
+    pendingUnpairs = PendingUnpairs(store);
+    settings = AppSettings(store);
     await settings.load();
     biometrics = FakeBiometricAuthenticator();
     lock = AppLockController(authenticator: biometrics, isEnabled: () => settings.biometricLock.peek());
@@ -47,6 +51,7 @@ void main() {
           biometrics,
           registry,
           PackageInfo(appName: 'ShellX', packageName: 'com.shellx.prod', version: '1.0.0', buildNumber: '1'),
+          pendingUnpairs,
         ),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));
@@ -87,12 +92,41 @@ void main() {
     expect(find.textContaining('user@macbook', findRichText: true), findsOneWidget);
   });
 
-  testWidgets('font size slider persists the default size', (tester) async {
+  testWidgets('font size slider previews while it moves and stores the size on release', (tester) async {
     await openSettings(tester);
-    tester.widget<Slider>(find.byType(Slider)).onChanged!(20);
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(19);
+    slider.onChanged!(20);
     await tester.pump();
     expect(settings.fontSize.value, 20);
     expect(find.text('20'), findsWidgets);
+    expect(await store.read(AppSettings.fontSizeKey), isNull); // not on every step
+
+    slider.onChangeEnd!(20);
+    await tester.pumpAndSettle();
+    expect(await store.read(AppSettings.fontSizeKey), '20.0');
+  });
+
+  testWidgets('a font size that cannot be stored shows the toast', (tester) async {
+    settings = AppSettings(_UnwritableStore());
+    await openSettings(tester);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(20);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(popups.errors, isNotEmpty);
+  });
+
+  testWidgets('a biometric setting that cannot be stored shows the toast and changes nothing', (tester) async {
+    settings = AppSettings(_UnwritableStore());
+    lock.lockOnLaunch();
+    await openSettings(tester);
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(popups.errors, isNotEmpty);
+    expect(settings.biometricLock.value, isTrue);
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, isTrue);
+    expect(lock.isLocked.value, isTrue); // settingChanged() only runs after a stored change
   });
 
   testWidgets('biometric switch is on by default and can be turned off', (tester) async {
@@ -182,6 +216,71 @@ void main() {
     expect(find.text('Chưa bỏ ghép nối được.'), findsOneWidget);
     expect(find.text('MacBook-Pro'), findsNothing); // retried and gone
     expect(find.text('DESKTOP-42'), findsOneWidget); // the other one is left alone
+  });
+
+  group('a failed unpair survives leaving Settings', () {
+    Future<void> leaveAndReopen(WidgetTester tester) async {
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget);
+      await openPushed(tester);
+    }
+
+    testWidgets('the row and its retry come back on the next visit', (tester) async {
+      registry.forMachine(agentA);
+      backend.unpairError = const ApiException(status: 0, code: 'network', message: 'offline');
+      await openSettings(tester);
+      await tester.tap(find.text('Bỏ ghép nối'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').last);
+      await tester.pumpAndSettle();
+      expect(await pendingUnpairs.load('user-1'), [(agentId: agentA, name: 'MacBook-Pro')]);
+
+      await leaveAndReopen(tester);
+      expect(find.text('MacBook-Pro'), findsOneWidget);
+      expect(find.text('Chưa bỏ ghép nối được.'), findsOneWidget);
+
+      backend.unpairError = null;
+      await tester.tap(find.text('Thử lại'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chưa ghép nối máy nào.'), findsOneWidget);
+      expect(await pendingUnpairs.load('user-1'), isEmpty);
+
+      await leaveAndReopen(tester);
+      expect(find.text('Chưa bỏ ghép nối được.'), findsNothing);
+    });
+
+    testWidgets('leaving while the DELETE is still retrying records its failure all the same', (tester) async {
+      registry.forMachine(agentA);
+      final gate = backend.unpairGate = Completer<void>();
+      backend.unpairError = const ApiException(status: 0, code: 'network', message: 'offline');
+      await openSettings(tester);
+      await tester.tap(find.text('Bỏ ghép nối'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Bỏ ghép nối').last);
+      await tester.pump();
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(await pendingUnpairs.load('user-1'), [(agentId: agentA, name: 'MacBook-Pro')]);
+
+      backend.unpairGate = null;
+      await openPushed(tester);
+      expect(find.text('MacBook-Pro'), findsOneWidget);
+      expect(find.text('Chưa bỏ ghép nối được.'), findsOneWidget);
+    });
+
+    testWidgets('a machine paired again is listed as paired, and its old record is dropped', (tester) async {
+      await pendingUnpairs.add('user-1', agentA, 'MacBook-Pro');
+      await openSettings(tester);
+      expect(find.text('MacBook-Pro'), findsOneWidget);
+      expect(find.text('Chưa bỏ ghép nối được.'), findsNothing);
+      expect(find.text('Bỏ ghép nối'), findsOneWidget);
+      expect(await pendingUnpairs.load('user-1'), isEmpty);
+    });
   });
 
   testWidgets('a failed unpair whose name was never known shows the fallback, not blank', (tester) async {
@@ -305,4 +404,16 @@ void main() {
       expect(session.deletePasswords, ['correct horse']);
     });
   });
+}
+
+/// A Keychain/Keystore that reads fine but cannot be written.
+class _UnwritableStore implements KeyValueStore {
+  @override
+  Future<String?> read(String key) async => null;
+
+  @override
+  Future<void> write(String key, String value) => Future.error(StateError('keychain'));
+
+  @override
+  Future<void> delete(String key) async {}
 }
