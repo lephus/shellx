@@ -7,6 +7,7 @@ import type { AppDeps } from "../src/app.js";
 import type { Config } from "../src/config.js";
 import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
+import type { HubSocket } from "../src/hub/user-hub.js";
 import { startRelay, type RunningRelay } from "../src/relay.js";
 
 // ---- configuration used by every test relay ---------------------------------------------------
@@ -272,5 +273,34 @@ export async function waitFor<T>(probe: () => Promise<T | null | undefined>, tim
     if (value !== null && value !== undefined) return value;
     if (Date.now() > deadline) throw new Error("condition not met in time");
     await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+/** In-memory stand-in for a `ws` socket: records what the hub sends and how it closes it. */
+export class FakeSocket implements HubSocket {
+  readyState = 1;
+  readonly sent: (Uint8Array | string)[] = [];
+  closedWith: { code: number; reason: string } | null = null;
+  terminated = false;
+
+  send(data: Uint8Array | string): void {
+    if (this.readyState !== 1) throw new Error("socket is not open");
+    this.sent.push(data);
+  }
+
+  close(code: number, reason: string): void {
+    if (this.readyState !== 1) return;
+    this.closedWith = { code, reason };
+    this.readyState = 2;
+  }
+
+  terminate(): void {
+    this.terminated = true;
+    this.readyState = 3;
+  }
+
+  /** Hex of every binary frame received so far, then forgets them. */
+  take(): string[] {
+    return this.sent.splice(0).map((m) => (typeof m === "string" ? `text:${m}` : hex(m)));
   }
 }

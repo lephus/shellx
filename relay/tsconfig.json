@@ -17,7 +17,6 @@
   // Still Cloudflare code; removed from this list by the plan task that ports each file.
   "exclude": [
     "src/auth/session.ts",
-    "src/hub/user-hub.ts",
     "src/routes",
     "scripts/reset-password.ts",
     "test/account.test.ts",
