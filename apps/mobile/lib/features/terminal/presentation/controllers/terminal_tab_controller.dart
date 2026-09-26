@@ -40,7 +40,7 @@ class TerminalTabController extends Controller {
     _bind(handle);
   }
 
-  /// Review Focus 3: attaching failed with `session_not_found` (the agent
+  /// Attaching failed with `session_not_found` (the agent
   /// restarted). Shows "Phiên đã kết thúc" and can only be closed.
   TerminalTabController.ended({
     required MachineSession machine,
@@ -133,7 +133,8 @@ class TerminalTabController extends Controller {
     _resizeTimer = Timer(resizeDebounce, () => _sendResize(cols, rows));
   }
 
-  /// Review Focus 4: never send a size below 1×1, never repeat the last size.
+  /// Never sends a size below 1×1 (a zero-sized viewport while the keyboard slides or the phone
+  /// rotates), never repeats the last size.
   void _sendResize(int cols, int rows) {
     if (_disposed || !_isLive.peek() || cols < 1 || rows < 1) return;
     final size = (cols: cols, rows: rows);

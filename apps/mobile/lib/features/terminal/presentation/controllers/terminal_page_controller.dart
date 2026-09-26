@@ -33,7 +33,7 @@ class TerminalPageController extends Controller {
       _fontSize = signal(settings.fontSize.peek()) {
     _relayState = signal(backend.relayState);
     _relayStates = backend.relayStates.listen(_onRelayState);
-    // A sign-out (or another account) disposes every workspace of this backend (Task 13).
+    // A sign-out (or another account) disposes every workspace of this backend ([WorkspaceRegistry]).
     _stopSessionWatch = _session.backend.subscribe((current) {
       if (!identical(current, backend)) _startClosing();
     });
@@ -41,7 +41,7 @@ class TerminalPageController extends Controller {
     try {
       workspace = _registry.forMachine(agentId);
     } on StateError {
-      // R6: not pinned any more — forgotten by an `untrusted` handshake the client ran on its own
+      // Not pinned any more — forgotten by an `untrusted` handshake the client ran on its own
       // (relay back, app resumed) while no terminal page was open. Nothing to connect to: leave
       // as untrusted, so the machine list offers to pair again.
       _machineState = signal(const MachineFailed(MachineConnectionFailure.untrusted));
@@ -78,7 +78,7 @@ class TerminalPageController extends Controller {
   int _running = 0;
   bool _disposed = false;
 
-  /// R1: set by the first untrusted/proto_unsupported failure, however it was found.
+  /// Set by the first untrusted/proto_unsupported failure, however it was found.
   bool _machineFailureHandled = false;
 
   /// Leaving or disposed: no more signal writes, no more machine operations.
@@ -101,7 +101,7 @@ class TerminalPageController extends Controller {
   /// Set when the page must close (the machine list then shows the matching screen).
   ReadonlySignal<TerminalExit?> get exit => _exit;
 
-  /// R4: the page is leaving (untrusted, proto_unsupported, not pinned, signed out) and must not
+  /// The page is leaving (untrusted, proto_unsupported, not pinned, signed out) and must not
   /// read [workspace] any more: it may already be disposed.
   ReadonlySignal<bool> get closing => _closing;
 
@@ -121,7 +121,7 @@ class TerminalPageController extends Controller {
 
   Future<void> attach(SessionInfo session, TerminalGrid grid) => _run(() => workspace.attach(session, grid));
 
-  /// R2: "Gắn lại" on a taken-over tab. `reattach()` rethrows everything but `session_not_found`
+  /// "Gắn lại" on a taken-over tab. `reattach()` rethrows everything but `session_not_found`
   /// (e.g. `MachineConnectionException(agentOffline)`, thrown at once without a channel): those
   /// become the notice like any other request.
   Future<void> reattach(TerminalTabController tab) => _run(tab.reattach);
@@ -161,7 +161,7 @@ class TerminalPageController extends Controller {
     if (!_disposed) _relayState.value = state;
   }
 
-  /// R1: the client re-handshakes on its own (relay back, app resumed); an `untrusted` or
+  /// The client re-handshakes on its own (relay back, app resumed); an `untrusted` or
   /// `proto_unsupported` found that way arrives only here, never through [_run].
   void _onMachineState(MachineConnectionState state) {
     if (_disposed) return;
@@ -202,14 +202,14 @@ class TerminalPageController extends Controller {
 
   /// Spec §12: `untrusted` → the workspace is dropped, the machine unpaired, the page leaves with
   /// [TerminalExit.untrusted]; `proto_unsupported` → it leaves with [TerminalExit.updateRequired].
-  /// Handled once, whichever way it arrives first (R1: a request can meet the failure while the
+  /// Handled once, whichever way it arrives first (a request can meet the failure while the
   /// same failure also arrives on the machine's states). True when [failure] is one of these two.
   Future<bool> _onMachineFailure(MachineConnectionFailure failure) async {
     final untrusted = failure == MachineConnectionFailure.untrusted;
     if (!untrusted && failure != MachineConnectionFailure.protocolUnsupported) return false;
     if (_machineFailureHandled) return true;
     _machineFailureHandled = true;
-    // Before the workspace is disposed: from here on nothing on the page reads it (R4).
+    // Before the workspace is disposed: from here on nothing on the page reads it.
     _startClosing();
     if (!untrusted) {
       if (!_disposed) _exit.value = TerminalExit.updateRequired;

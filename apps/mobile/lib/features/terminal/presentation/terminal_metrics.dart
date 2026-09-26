@@ -4,7 +4,7 @@ import 'package:xterm/xterm.dart';
 
 typedef TerminalGrid = ({int cols, int rows});
 
-/// Used when the viewport cannot fit one cell yet (Review Focus 4): the real
+/// Used when the viewport cannot fit one cell yet (a size below 1×1 is never sent): the real
 /// size follows as a `resize` as soon as the terminal is laid out.
 const TerminalGrid fallbackGrid = (cols: 80, rows: 24);
 

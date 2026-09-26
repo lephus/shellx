@@ -55,10 +55,11 @@ class _TerminalPageState extends State<TerminalPage> {
   }
 
   /// Pops this page with [exit] after the current frame: the exit can already be known while the
-  /// page is first built (R6), and navigating during a build is not allowed. A sheet or dialog
-  /// still open on top (the session picker, a confirmation, the font size) is closed first, or the
-  /// router would pop it with [exit] as its result. A page that another navigation already took off
-  /// the stack (a sign-out replaces it with the login page) pops nothing: the top route is not its.
+  /// page is first built (a machine that is no longer pinned), and navigating during a build is
+  /// not allowed. A sheet or dialog still open on top (the session picker, a confirmation, the
+  /// font size) is closed first, or the router would pop it with [exit] as its result. A page that
+  /// another navigation already took off the stack (a sign-out replaces it with the login page)
+  /// pops nothing: the top route is not its.
   void _onExit(TerminalExit? exit) {
     if (exit == null || _leaving) return;
     _leaving = true;
@@ -105,14 +106,14 @@ class _TerminalPageState extends State<TerminalPage> {
     await _controller.close(tab);
   }
 
-  /// "Dán" and the hardware paste shortcut (R3): `ShellxTerminal.paste` normalises the line breaks
+  /// "Dán" and the hardware paste shortcut: `ShellxTerminal.paste` normalises the line breaks
   /// and adds the bracketed-paste markers when the program asked for them.
   Future<void> _paste() async {
     final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (text != null && mounted) _controller.paste(text);
   }
 
-  /// "Sao chép" and the hardware copy shortcut (R3).
+  /// "Sao chép" and the hardware copy shortcut.
   Future<void> _copy(TerminalTabController tab) async {
     final range = tab.selection.selection;
     if (range == null) return;
@@ -178,7 +179,7 @@ class _TerminalPageState extends State<TerminalPage> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: TerminalColors.chrome,
-        // R4: once the page is leaving, the workspace may already be disposed; nothing below
+        // Once the page is leaving, the workspace may already be disposed; nothing below
         // reads it again. Every Watch that does is inside [_body], replaced here in the next frame
         // (a parent rebuilds before its children), and the controller writes none of the signals
         // they read in the meantime.
@@ -267,7 +268,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   if (_controller.closing.value) return const SizedBox.expand();
                   final fontSize = _controller.fontSize.value;
                   // The size the terminal view gives its cells, so the session opens at the size
-                  // the view then reports (Review Focus 4: never below 1×1, else the fallback).
+                  // the view then reports (never below 1×1, else the fallback).
                   final cells = Size(
                     (constraints.maxWidth - _terminalPadding.horizontal).clamp(0, double.infinity),
                     (constraints.maxHeight - _terminalPadding.vertical).clamp(0, double.infinity),
@@ -631,7 +632,7 @@ class _TerminalPane extends StatelessWidget {
             child: PinchToZoom(
               fontSize: fontSize,
               onFontSize: onFontSize,
-              // R3: `terminalShortcuts` maps the hardware copy/paste chords to ShellX intents that
+              // `terminalShortcuts` maps the hardware copy/paste chords to ShellX intents that
               // xterm's own actions do not handle; they do what "Sao chép" and "Dán" do.
               child: Actions(
                 actions: <Type, Action<Intent>>{

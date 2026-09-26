@@ -75,7 +75,7 @@ class TerminalWorkspace extends Controller {
     );
   }
 
-  /// Attaches an existing session. Review Focus 3: when the session is gone
+  /// Attaches an existing session. When the session is gone
   /// (`session_not_found`), the tab still appears, showing "Phiên đã kết thúc".
   Future<TerminalTabController> attach(SessionInfo session, TerminalGrid grid) async {
     final tabs = _tabs.peek();
@@ -176,7 +176,7 @@ class WorkspaceRegistry {
   /// existed (the machine list's "N tab" pill).
   final Signal<int> _version = signal(0);
 
-  /// Asks [ShellxBackend.machine] every time (Task 10: it returns the same [MachineSession] while
+  /// Asks [ShellxBackend.machine] every time (it returns the same [MachineSession] while
   /// the underlying machine client stays the same, and a NEW one after an unpair and re-pair).
   /// Throws [StateError] when [agentId] is not pinned — never paired, unpaired, or forgotten after
   /// an `untrusted` handshake — and then sheds any cached workspace for that id (it is dead: its
