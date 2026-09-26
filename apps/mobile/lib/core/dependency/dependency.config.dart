@@ -19,6 +19,8 @@ import 'package:shellx_core/shellx_core.dart' as _i145;
 
 import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
+import '../../features/machines/presentation/controllers/machine_list_controller.dart'
+    as _i70;
 import '../../features/pairing/presentation/controllers/qr_scanner_controller.dart'
     as _i1044;
 import '../../features/settings/presentation/controllers/delete_account_controller.dart'
@@ -129,6 +131,12 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i667.WorkspaceRegistry>(),
         gh<_i351.SessionHolder>(),
         gh<_i351.AppSettings>(),
+      ),
+    );
+    gh.factory<_i70.MachineListController>(
+      () => _i70.MachineListController.create(
+        gh<_i351.SessionHolder>(),
+        gh<_i667.WorkspaceRegistry>(),
       ),
     );
     gh.factory<_i1035.SettingsController>(

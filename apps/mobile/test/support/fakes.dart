@@ -245,9 +245,11 @@ class FakeMachineSession implements MachineSession {
 
 /// Scriptable [ShellxBackend]. [unpair] (whether or not [unpairError] is set) and an `untrusted`
 /// handshake behave like `shellx_client`. Known divergences from the real client:
-/// - relay loss, [suspend] and [emitRelay] reach neither the machine states (real: a lost channel
-///   moves [MachineReady] to [MachineIdle]; script it with [FakeMachineSession.emitState]) nor
-///   presence (real: an offline frame for every online machine; use [emitPresence]);
+/// - [suspend] and [emitRelay] reach neither the machine states (real: a lost channel moves
+///   [MachineReady] to [MachineIdle]; script it with [FakeMachineSession.emitState]) nor presence
+///   on their own — use [emitRelayLoss] for the synthetic offline PRESENCE the real client raises
+///   for every online machine on relay loss or suspend, or [emitPresence] for one hub-reported
+///   change;
 /// - requests do not connect first, and `attach` of an unknown id succeeds (real:
 ///   `AppErrorException(sessionNotFound)`);
 /// - [resume] emits `connected` even when not suspended;
@@ -317,6 +319,20 @@ class FakeBackend implements ShellxBackend {
   void emitPresence(String deviceId, {required bool online}) {
     online ? onlineIds.add(deviceId) : onlineIds.remove(deviceId);
     _presence.add(PresenceFrame(deviceId: deviceId, online: online));
+  }
+
+  /// `ClientService._onState`, on relay loss or `suspend` (`stop()`): an offline frame for every
+  /// online machine, then it clears its own online set — and [relayState] itself has already
+  /// changed by the time any of those frames reaches a listener. Reproduces that same order, so a
+  /// listener reading [relayState] while handling one of these frames sees the new, non-connected
+  /// state rather than the old one.
+  void emitRelayLoss([RelayConnectionState to = RelayConnectionState.disconnected]) {
+    relayStateValue = to;
+    for (final deviceId in onlineIds.toList()) {
+      _presence.add(PresenceFrame(deviceId: deviceId, online: false));
+    }
+    onlineIds.clear();
+    _relay.add(to);
   }
 
   /// The machine's session; an `untrusted` handshake forgets it, as `shellx_client` forgets the
