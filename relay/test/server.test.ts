@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,7 +11,8 @@ import { GOING_AWAY } from "../src/hub/user-hub.js";
 import { pairingRemovedEvent } from "../src/protocol/frames.js";
 import type { RunningRelay } from "../src/relay.js";
 import {
-  call, connect, db, hex, loginDevice, makeApp, newPairingId, onCleanup, pair, registerAccount, tempDir, type TestApp,
+  call, connect, db, deviceBody, hex, loginDevice, makeApp, newPairingId, onCleanup, pair, PASSWORD, randomEmail,
+  registerAccount, tempDir, type TestApp, waitFor,
 } from "./helpers.js";
 
 const RELAY_DIR = join(import.meta.dirname, "..");
@@ -177,6 +179,54 @@ describe("graceful shutdown (spec §4.3)", () => {
       reopened.close();
     }
   }, 30_000);
+
+  it("ignores a second SIGTERM while it waits for an in-flight request, which still completes; exit 0", async () => {
+    const server = startServer({ ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false" });
+    onCleanup(() => server.child.kill("SIGKILL"));
+    const port = await waitForListening(server.output);
+    const body = Buffer.from(JSON.stringify({ email: randomEmail(), password: PASSWORD, device: deviceBody("agent") }), "utf8");
+
+    // A registration whose body is still arriving: the relay is inside the route, awaiting the rest.
+    // `Expect: 100-continue` makes the relay confirm it has dispatched the request before we go on.
+    let sendRest: () => void = () => {};
+    let dispatched: () => void = () => {};
+    const inRoute = new Promise<void>((resolve) => (dispatched = resolve));
+    const registered = new Promise<number>((resolve, reject) => {
+      const req = httpRequest(
+        {
+          host: "127.0.0.1", port, method: "POST", path: "/v1/auth/register", agent: false,
+          headers: { "Content-Type": "application/json", "Content-Length": String(body.length), Expect: "100-continue" },
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        },
+      );
+      req.on("error", reject);
+      req.on("continue", () => {
+        req.write(body.subarray(0, 10));
+        sendRest = () => req.end(body.subarray(10));
+        dispatched();
+      });
+      req.flushHeaders();
+    });
+    await inRoute;
+
+    server.child.kill("SIGTERM");
+    await waitFor(async () => (server.output().includes('"event":"relay_stopping"') ? true : null));
+    server.child.kill("SIGTERM"); // mid-shutdown: must change nothing
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(server.child.exitCode).toBeNull(); // still waiting for the request
+    expect(server.child.signalCode).toBeNull();
+
+    sendRest();
+    expect(await registered).toBe(201);
+    const result = await server.exit;
+    expect(result.code).toBe(0);
+    expect(result.stdout.match(/"event":"relay_stopping"/g)).toHaveLength(1);
+    expect(result.stdout.match(/"event":"relay_stopped"/g)).toHaveLength(1);
+    expect(result.stderr).toBe("");
+  });
 
   it("lets an in-flight REST call that touches the hub finish before the database closes", async () => {
     let releaseHash: () => void = () => {};

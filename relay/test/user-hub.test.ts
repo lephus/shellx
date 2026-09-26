@@ -354,6 +354,22 @@ describe("pairing_removed tombstones", () => {
     );
   });
 
+  it("never lets another account's hub overwrite a tombstone row that belongs to this account", async () => {
+    const registry = new HubRegistry({ db: db() });
+    const [alice, bob] = [seedUser(), seedUser()];
+    const agentId = alice.device("agent");
+    const mobileId = alice.device("mobile");
+    const [older, newer] = [newPairingId(), newPairingId()];
+    await registry.forUser(alice.userId).notifyPairingRemoved(agentId, mobileId, older);
+    await registry.forUser(bob.userId).notifyPairingRemoved(agentId, mobileId, newer); // Alice's device ids, Bob's hub
+    expect(db().all("SELECT user_id, pairing_id FROM pending_pairing_removed WHERE agent_id = ?", agentId)).toEqual([
+      { user_id: alice.userId, pairing_id: older },
+    ]);
+    const a = new FakeSocket();
+    await joinHub(registry.forUser(alice.userId), a, agentId, "agent");
+    expect(a.take()).toEqual([hex(pairingRemovedEvent(agentId, mobileId, older))]);
+  });
+
   it("admitPairing refuses ids not newer than the tombstone (keeping it) and clears it for a newer id", async () => {
     const { hub } = setup();
     const agentId = crypto.randomUUID();
@@ -426,25 +442,31 @@ describe("REST-side operations", () => {
     expect(a.take()).toEqual([]);
   });
 
-  it("disconnectAllExcept closes every other device, including one that joined after the caller started", async () => {
+  it("disconnectAllExcept closes every other device, including one whose join was queued in the same tick just before it", async () => {
     const { hub, agentId, mobileId, user } = setup();
     const secondAgent = user.device("agent");
     const [a, m, a2] = [new FakeSocket(), new FakeSocket(), new FakeSocket()];
     await joinHub(hub, a, agentId, "agent");
     await joinHub(hub, m, mobileId);
-    await joinHub(hub, a2, secondAgent, "agent");
-    await hub.disconnectAllExcept(agentId, CloseCode.revoked);
+    // Both queued before either runs: the hub uses its own live list when the disconnect runs.
+    const joining = joinHub(hub, a2, secondAgent, "agent");
+    const closing = hub.disconnectAllExcept(agentId, CloseCode.revoked);
+    expect(a2.closedWith).toBeNull(); // nothing has run yet
+    await Promise.all([joining, closing]);
     expect(m.closedWith?.code).toBe(4002);
     expect(a2.closedWith?.code).toBe(4002);
     expect(a.closedWith).toBeNull();
   });
 
-  it("closeAccount closes whatever is live now with 4002 and purges the tombstones", async () => {
+  it("closeAccount closes with 4002 a socket whose join was queued in the same tick just before it, and purges the tombstones", async () => {
     const { hub, agentId, mobileId } = setup();
     await hub.notifyPairingRemoved(agentId, mobileId, newPairingId());
     const late = new FakeSocket();
-    await joinHub(hub, late, mobileId); // lands after any device list a route could have read
-    await hub.closeAccount();
+    // Both queued before either runs: the join lands after any device list a route could have read.
+    const joining = joinHub(hub, late, mobileId);
+    const closing = hub.closeAccount();
+    expect(late.closedWith).toBeNull(); // nothing has run yet
+    await Promise.all([joining, closing]);
     expect(late.closedWith).toEqual({ code: 4002, reason: "revoked" });
     expect(await hub.purgeAll()).toBe(0);
   });
@@ -508,21 +530,26 @@ describe("serial queue and lifecycle", () => {
     await registry.whenEmpty();
     expect(registry.size).toBe(0);
 
-    registry.forUser(crypto.randomUUID()); // looked up, never used
-    await registry.whenEmpty();
+    registry.forUser(crypto.randomUUID()); // a handle alone creates no state
+    expect(registry.size).toBe(0);
+    registry.stateFor(crypto.randomUUID()); // state created, but nothing ever queued on it
+    expect(registry.size).toBe(1);
+    await registry.whenEmpty(); // released by the microtask queued at creation
     expect(registry.size).toBe(0);
   });
 
-  it("ignores a socket that closed before its turn to join came", async () => {
+  it("ignores a socket that closed after its join was queued but before its turn came", async () => {
     const { hub, agentId, mobileId } = setup();
     const a = new FakeSocket();
     await joinHub(hub, a, agentId, "agent");
     const gone = new FakeSocket();
-    gone.readyState = 3;
-    await joinHub(hub, gone, mobileId);
-    hub.disconnected(gone);
+    const joining = joinHub(hub, gone, mobileId);
+    clientCloses(hub, gone); // same tick: the close event is queued behind the join
+    await joining;
     await hub.idle();
-    expect(a.take()).toEqual([]);
+    expect(gone.sent).toEqual([]);
+    expect(gone.closedWith).toBeNull();
+    expect(a.take()).toEqual([]); // never announced online, so never offline either
     expect(await hub.online()).toEqual([agentId]);
   });
 
@@ -534,6 +561,22 @@ describe("serial queue and lifecycle", () => {
     const a = new FakeSocket();
     await expect(joinHub(hub, a, agentId, "agent")).rejects.toMatchObject({ code: "SQLITE_BUSY" });
     expect(await hub.online()).toEqual([]);
+    // Untouched: the ws route closes it with 1011, the hub neither sent to it nor closed it.
+    expect(a.sent).toEqual([]);
+    expect(a.closedWith).toBeNull();
+    expect(a.terminated).toBe(false);
+  });
+
+  it("accepts synchronous tasks only: an async task would let other operations run at its await", () => {
+    const { registry, userId } = setup();
+    const state = registry.stateFor(userId);
+    // Compile-time check (npm run typecheck): never called.
+    const _asyncTaskIsRejected = () =>
+      // @ts-expect-error — enqueue's task must not return a promise
+      state["enqueue"]("async", async () => undefined);
+    expect(typeof _asyncTaskIsRejected).toBe("function");
+    const _syncTaskIsAccepted = () => state["enqueue"]("sync", () => 1);
+    expect(typeof _syncTaskIsAccepted).toBe("function");
   });
 
   it("goAway closes every socket with 1001, refuses later joins the same way, and empties the registry", async () => {

@@ -67,6 +67,9 @@ export interface HubHost {
   release(state: HubState): void;
 }
 
+/** What a queued task may return: anything but a promise (see `HubState.enqueue`). */
+type SyncResult<T> = T extends PromiseLike<unknown> ? never : T;
+
 const CLOSE_REASONS: Record<CloseCode, string> = {
   [CloseCode.replaced]: "replaced",
   [CloseCode.revoked]: "revoked",
@@ -177,7 +180,8 @@ export class HubState {
       this.host.db.run(
         `INSERT INTO pending_pairing_removed (user_id, agent_id, mobile_id, pairing_id) VALUES (?, ?, ?, ?)
          ON CONFLICT (agent_id, mobile_id) DO UPDATE SET pairing_id = excluded.pairing_id
-         WHERE excluded.pairing_id > pending_pairing_removed.pairing_id`,
+         WHERE excluded.pairing_id > pending_pairing_removed.pairing_id
+           AND pending_pairing_removed.user_id = excluded.user_id`,
         this.userId,
         agentId,
         mobileId,
@@ -288,7 +292,13 @@ export class HubState {
 
   // ---- internals ------------------------------------------------------------------------------
 
-  private enqueue<T>(op: string, task: () => T): Promise<T> {
+  /**
+   * Runs `task` once every operation queued before it has run. The task MUST be synchronous: the
+   * queue serialises tasks only up to their first `await`, so an async task would let later
+   * operations run in the middle of it (the Durable Object's input gate had the same rule). The
+   * `SyncResult` type refuses a task that returns a promise.
+   */
+  private enqueue<T>(op: string, task: () => SyncResult<T>): Promise<T> {
     this.pending++;
     const result = this.tail.then(task);
     this.tail = result.then(
