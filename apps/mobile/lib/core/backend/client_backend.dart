@@ -46,8 +46,8 @@ final class ClientBackend implements ShellxBackend {
   bool _disposed = false;
 
   /// Builds the relay connection and client for a signed-in account and
-  /// starts the client (plan 03: `ClientService.start()` loads the pins,
-  /// subscribes and calls `relay.start()`; `stop()` calls `relay.stop()`).
+  /// starts the client (`ClientService.start()` loads the pins, subscribes
+  /// and calls `relay.start()`; `stop()` calls `relay.stop()`).
   static Future<ClientBackend> start({
     required Uri relayBaseUri,
     required ShellxApi api,

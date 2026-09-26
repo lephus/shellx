@@ -150,6 +150,18 @@ void main() {
     expect(find.descendant(of: card(agentB), matching: find.textContaining('tab')), findsNothing);
   });
 
+  testWidgets('an unpaired card shows no "N tab" pill, even with a workspace still holding tabs', (tester) async {
+    final workspace = registry.forMachine(agentA);
+    await workspace.openNew((cols: 80, rows: 24));
+    await workspace.openNew((cols: 80, rows: 24));
+    // The pin was forgotten (an untrusted handshake the client ran on its own) while no terminal
+    // page was open: the registry still holds the workspace.
+    backend.pinnedList = [pinned(agentB), pinned(vanphong)];
+    await openList(tester);
+    expect(find.descendant(of: card(agentA), matching: find.text('Chưa ghép nối')), findsOneWidget);
+    expect(find.descendant(of: card(agentA), matching: find.textContaining('tab')), findsNothing);
+  });
+
   testWidgets('while the relay reconnects: banner, dimmed "Đang chờ kết nối" cards, no taps', (tester) async {
     await openList(tester);
     backend.emitRelay(RelayConnectionState.disconnected);

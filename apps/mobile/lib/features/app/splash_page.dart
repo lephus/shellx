@@ -77,10 +77,13 @@ class _AppLaunchState extends State<AppLaunch> {
       failed = true;
     }
     if (!mounted) return;
+    // The session enforcer is what leaves the login page after signing in (and returns to it
+    // after a sign-out): without it the app would open but never navigate.
     final canRun =
         getIt.isRegistered<AppRouter>() &&
         getIt.isRegistered<AppLockController>() &&
-        getIt.isRegistered<SessionHolder>();
+        getIt.isRegistered<SessionHolder>() &&
+        getIt.isRegistered<SessionEnforcer>();
     // The launch may have stopped before it locked the app: fail closed.
     if (failed && canRun) getIt<AppLockController>().lockOnLaunch();
     setState(() => _state = canRun ? _LaunchState.ready : _LaunchState.failed);

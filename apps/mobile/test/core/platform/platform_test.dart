@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,6 +65,14 @@ void main() {
       expect(wipes, 2);
       expect(prefs.getBool(installMarkerKey), isTrue);
     });
+  });
+
+  test('describeThisDevice falls back to a generic name when the platform call fails', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    // No device_info_plus implementation answers in a unit test: the call fails like a
+    // PlatformException would on a phone.
+    final device = await describeThisDevice();
+    expect(device.name, Platform.isIOS ? 'iPhone' : 'Android');
   });
 
   group('formatAndroidModelName', () {

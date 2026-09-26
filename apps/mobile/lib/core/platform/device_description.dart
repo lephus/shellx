@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 /// What this phone reports as `device.name` / `device.platform` (spec §5.2:
@@ -20,15 +21,24 @@ String formatAndroidModelName(String manufacturer, String model) {
   return '${maker[0].toUpperCase()}${maker.substring(1)} $name';
 }
 
+/// Runs before the first frame (a pre-resolved dependency): a platform error or an empty model
+/// falls back to a generic name ("iPhone", "Android") instead of blocking the launch.
 Future<DeviceDescription> describeThisDevice([DeviceInfoPlugin? plugin]) async {
-  final info = plugin ?? DeviceInfoPlugin();
-  if (Platform.isIOS) {
-    final ios = await info.iosInfo;
-    return DeviceDescription(name: ios.modelName, platform: DevicePlatform.ios);
+  final ios = Platform.isIOS;
+  final platform = ios ? DevicePlatform.ios : DevicePlatform.android;
+  final fallback = ios ? 'iPhone' : 'Android';
+  String name;
+  try {
+    final info = plugin ?? DeviceInfoPlugin();
+    if (ios) {
+      name = (await info.iosInfo).modelName;
+    } else {
+      final android = await info.androidInfo;
+      name = formatAndroidModelName(android.manufacturer, android.model);
+    }
+  } catch (error) {
+    if (kDebugMode) debugPrint('describeThisDevice error: ${error.runtimeType}');
+    name = '';
   }
-  final android = await info.androidInfo;
-  return DeviceDescription(
-    name: formatAndroidModelName(android.manufacturer, android.model),
-    platform: DevicePlatform.android,
-  );
+  return DeviceDescription(name: name.trim().isEmpty ? fallback : name.trim(), platform: platform);
 }

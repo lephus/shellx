@@ -187,9 +187,9 @@ class TerminalTabController extends Controller {
   /// `MachineConnectionException` `MachineClient.attach()` throws at once
   /// when there is no channel (`agentOffline`, `timeout`, …) — leaves the
   /// controller exactly as it was (same banner, still not live, subscription
-  /// and screen unchanged, not disposed) and is rethrown, so the caller (Task
-  /// 14's "Gắn lại" button) can show it through the usual `ErrorText`
-  /// mapping. A later `reattach()` call still works.
+  /// and screen unchanged, not disposed) and is rethrown, so the caller (the
+  /// terminal page's "Gắn lại" button) can show it through the usual
+  /// `ErrorText` mapping. A later `reattach()` call still works.
   Future<void> reattach() async {
     if (_banner.peek()?.notice != TabNotice.takenOver) return;
     final current = _terminal.peek();

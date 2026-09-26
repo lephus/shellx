@@ -33,7 +33,7 @@ class UpdateRequiredPage extends StatelessWidget {
               AppButton(
                 title: ios ? strings.openAppStore : strings.openPlayStore,
                 width: double.infinity,
-                onTap: () => getIt<ExternalLinks>().open(ios ? AppConfig.appStorePage : AppConfig.playStorePage),
+                onTap: () => getIt<ExternalLinks>().openOrToast(ios ? AppConfig.appStorePage : AppConfig.playStorePage),
               ),
             ],
           ),

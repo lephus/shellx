@@ -131,7 +131,7 @@ void main() {
         () => SettingsController(session, settings, lock, biometrics, registry, packageInfo, pendingUnpairs),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));
-    SessionEnforcerImpl(events, router).initialize();
+    getIt.registerSingleton<SessionEnforcer>(SessionEnforcerImpl(events, router)..initialize());
   });
 
   tearDown(() async {

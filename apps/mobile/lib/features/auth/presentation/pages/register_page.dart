@@ -86,8 +86,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 HighlightedText(
                   strings.termsNotice(strings.termsLink, strings.privacyLink),
                   parts: {
-                    strings.termsLink: () => getIt<ExternalLinks>().open(AppConfig.termsPage),
-                    strings.privacyLink: () => getIt<ExternalLinks>().open(AppConfig.privacyPage),
+                    strings.termsLink: () => getIt<ExternalLinks>().openOrToast(AppConfig.termsPage),
+                    strings.privacyLink: () => getIt<ExternalLinks>().openOrToast(AppConfig.privacyPage),
                   },
                   textAlign: TextAlign.center,
                   style: fine,

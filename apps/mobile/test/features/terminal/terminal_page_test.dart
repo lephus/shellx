@@ -702,6 +702,38 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(results, [TerminalExit.untrusted]);
   });
+
+  testWidgets('a clipboard the platform cannot read or write shows the error toast', (tester) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method.startsWith('Clipboard.')) throw PlatformException(code: 'clipboard');
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    await open(tester);
+    final popups = getIt<PopupHandler>() as FakePopupHandler;
+
+    await tester.scrollUntilVisible(
+      find.text('Dán').hitTestable(),
+      100,
+      scrollable: find.descendant(of: find.byType(ExtraKeysBar), matching: find.byType(Scrollable)),
+    );
+    await tester.tap(find.text('Dán'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(machine.inputs, isEmpty);
+    expect(popups.errors, ['Đã có lỗi xảy ra (PlatformException).']);
+
+    machine.handles.single.emit(const TabOutput('hello world'));
+    final tab = registry.forMachine(agentA).activeTab.value!;
+    final buffer = tab.terminal.value.buffer;
+    tab.selection.setSelection(buffer.createAnchor(0, 0), buffer.createAnchor(5, 0));
+    await tester.pump();
+    await tester.tap(find.text('Sao chép'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(popups.errors, hasLength(2));
+    expect(popups.successes, isEmpty);
+  });
 }
 
 /// A registry whose [remove] fails, like a workspace whose disposal throws.

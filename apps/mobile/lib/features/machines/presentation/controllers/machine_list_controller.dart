@@ -77,8 +77,16 @@ class MachineListController extends Controller {
   }
 
   Future<MachineList> _load(int generation) async {
-    final devices = await _backend.devices();
-    final pinned = {for (final machine in await _backend.pinnedMachines()) machine.agentId};
+    final List<RemoteDevice> devices;
+    final Set<String> pinned;
+    try {
+      devices = await _backend.devices();
+      pinned = {for (final machine in await _backend.pinnedMachines()) machine.agentId};
+    } catch (_) {
+      // Stale as well: the later refresh's outcome, success or failure, is the one to show.
+      if (generation != _refreshGeneration) return state.peek();
+      rethrow;
+    }
     // A later refresh() may already have started (or finished) by the time this one's requests
     // come back: let it win rather than overwrite it with this now-stale snapshot.
     if (generation != _refreshGeneration) return state.peek();

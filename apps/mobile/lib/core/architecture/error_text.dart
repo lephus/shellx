@@ -9,7 +9,7 @@ import 'package:shellx_mobile/shared/shared.dart';
 /// `toString()` (an [ApiException] or relay failure can carry request
 /// details, overview §2).
 ///
-/// Machine-level vs. per-tab wording (context for Tasks 12/14): when a
+/// Machine-level vs. per-tab wording (the terminal's tabs and page): when a
 /// pinned machine's channel goes `untrusted`, `MachineClient` both moves to
 /// `MachineFailed(untrusted)` *and* ends every open tab on that machine with
 /// `TabError(AppErrorCode.sessionNotFound)`. The machine-level text from
@@ -33,7 +33,7 @@ final class ErrorText {
     _ => strings.errorUnknown(error.runtimeType.toString()),
   };
 
-  /// HTTP 429 is recognised by status, never by code (plan 02). Any other
+  /// HTTP 429 is recognised by status, never by code (the relay's contract). Any other
   /// code this app does not special-case (e.g. the relay's `413
   /// payload_too_large`, `410 pairing_removed`) falls through to the
   /// generic, localized "Đã có lỗi xảy ra (…)" text.

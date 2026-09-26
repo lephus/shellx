@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -174,6 +175,15 @@ void main() {
       await tester.tap(find.text('Điều khoản'));
       await tester.tap(find.text('Chính sách quyền riêng tư'));
       expect(links.opened, [Uri.parse('https://shellx.pro/terms'), Uri.parse('https://shellx.pro/privacy')]);
+    });
+
+    testWidgets('a link the phone cannot open shows the error toast instead of failing silently', (tester) async {
+      await openRegister(tester);
+      links.error = PlatformException(code: 'ACTIVITY_NOT_FOUND');
+      await tester.tap(find.text('Điều khoản'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(popups.errors, ['Đã có lỗi xảy ra (PlatformException).']);
     });
 
     testWidgets('too long: "Thừa N ký tự."; weak_password stays under the password', (tester) async {

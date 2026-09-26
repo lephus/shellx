@@ -123,7 +123,9 @@ class _MachineListPageState extends State<MachineListPage> {
                 MachineCard card(MachineEntry machine) => MachineCard(
                   machine: machine,
                   waiting: waiting,
-                  tabs: _controller.tabsOpen(machine.id),
+                  // Only a paired machine has tabs to count: an unpaired one's workspace (if the
+                  // registry still holds one) is dead.
+                  tabs: machine.paired ? _controller.tabsOpen(machine.id) : 0,
                   now: _controller.now(),
                   onTap: waiting || !machine.online
                       ? null
@@ -292,7 +294,7 @@ class MachineCard extends StatelessWidget {
                             ),
                           ),
                           Text(detail, style: context.typo.paragraph13.copyWith(color: colors.secondaryText)),
-                          if (tabs > 0 && !waiting)
+                          if (tabs > 0 && !waiting && machine.paired)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
@@ -386,7 +388,7 @@ class _EmptyState extends StatelessWidget {
                   1,
                   HighlightedText(
                     strings.emptyStep1(site),
-                    parts: {site: () => getIt<ExternalLinks>().open(AppConfig.downloadPage)},
+                    parts: {site: () => getIt<ExternalLinks>().openOrToast(AppConfig.downloadPage)},
                     style: text,
                     partStyle: text.bold.copyWith(color: colors.primary),
                   ),

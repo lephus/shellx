@@ -106,10 +106,17 @@ class _TerminalPageState extends State<TerminalPage> {
     await _controller.close(tab);
   }
 
-  /// "Dán" and the hardware paste shortcut: `ShellxTerminal.paste` normalises the line breaks
-  /// and adds the bracketed-paste markers when the program asked for them.
+  /// "Dán" and the hardware paste shortcut: `ShellxTerminal.paste` sanitises the text, turns
+  /// line breaks into CR and adds the bracketed-paste markers when the program asked for them. A
+  /// clipboard the platform cannot read shows the ErrorText toast.
   Future<void> _paste() async {
-    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    final String? text;
+    try {
+      text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    } catch (error) {
+      _clipboardFailed(error);
+      return;
+    }
     if (text != null && mounted) _controller.paste(text);
   }
 
@@ -120,8 +127,19 @@ class _TerminalPageState extends State<TerminalPage> {
     final copied = S.of(context).copied;
     final text = tab.terminal.peek().buffer.getText(range);
     tab.selection.clearSelection();
-    await Clipboard.setData(ClipboardData(text: text));
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+    } catch (error) {
+      _clipboardFailed(error);
+      return;
+    }
     if (mounted) _controller.popupHandler.showSuccess(title: copied);
+  }
+
+  /// Only the error's type is logged, never the clipboard's content.
+  void _clipboardFailed(Object error) {
+    if (kDebugMode) debugPrint('Clipboard error: ${error.runtimeType}');
+    if (mounted) _controller.popupHandler.showError(title: ErrorText(S.of(context)).describe(error));
   }
 
   void _toggleKeyboard() {

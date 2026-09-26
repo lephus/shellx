@@ -460,7 +460,10 @@ class _CameraScannerState extends State<_CameraScanner> {
                   ),
                   if (denied) ...[
                     16.sizedHeight,
-                    AppButton(title: strings.openSettings, onTap: () => getIt<ExternalLinks>().openAppSettings()),
+                    AppButton(
+                      title: strings.openSettings,
+                      onTap: () => getIt<ExternalLinks>().openAppSettingsOrToast(),
+                    ),
                   ],
                 ],
               ),
