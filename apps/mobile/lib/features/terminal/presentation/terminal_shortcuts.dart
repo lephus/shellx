@@ -3,9 +3,9 @@ import 'package:flutter/widgets.dart';
 
 /// Intent for pasting text to the terminal with normalization.
 ///
-/// The handler must normalize the pasted text with [normalizePastedText],
-/// then call `terminal.paste(text)` which adds bracketed-paste markers
-/// if the terminal enabled mode 2004.
+/// The handler reads the clipboard and calls `terminal.paste(text)`;
+/// `ShellxTerminal.paste` strips control characters, turns line breaks into
+/// CR and adds bracketed-paste markers if the terminal enabled mode 2004.
 ///
 /// This custom intent prevents xterm.dart's internal `TerminalActions` from
 /// intercepting the paste before normalization can occur.

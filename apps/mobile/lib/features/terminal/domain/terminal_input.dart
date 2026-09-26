@@ -56,5 +56,18 @@ String applyModifiersToText(String text, {required bool ctrl, required bool alt}
 /// The Return key of a soft keyboard arrives as "\n"; terminals send CR.
 String normalizeTypedText(String text) => text.replaceAll('\n', '\r');
 
-/// Pasted line breaks become CR, like xterm and iTerm2 do.
-String normalizePastedText(String text) => text.replaceAll('\r\n', '\r').replaceAll('\n', '\r');
+/// Control characters a paste must never carry: ESC and every other C0
+/// control except tab, LF and CR, DEL, and the C1 range (U+0080–U+009F,
+/// which includes the 8-bit CSI U+009B).
+final RegExp _pasteControls = RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\u0080-\\u009F]');
+
+/// Makes clipboard text safe to send as a paste: control characters are
+/// stripped and line breaks become CR, like xterm and iTerm2 do.
+///
+/// Stripping ESC is what keeps bracketed paste honest: a clipboard holding
+/// `ESC[201~` would otherwise end the paste early, and whatever follows it
+/// would run as typed input (pastejacking). Without bracketed paste, an ESC
+/// would still let the paste inject key sequences, so this applies in both
+/// modes.
+String normalizePastedText(String text) =>
+    text.replaceAll(_pasteControls, '').replaceAll('\r\n', '\r').replaceAll('\n', '\r');

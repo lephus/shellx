@@ -30,14 +30,22 @@ class LockGate extends StatefulWidget {
   State<LockGate> createState() => _LockGateState();
 }
 
-class _LockGateState extends State<LockGate> {
+class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
   late final AppLifecycleListener _lifecycle;
   late final void Function() _stopUnfocus;
+
+  /// True while the app is not in the foreground and the biometric lock is on:
+  /// the iOS app switcher and Android recents snapshot the screen then, and
+  /// must never show terminal output.
+  bool _covered = false;
 
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onPause: _onPause, onResume: _onResume);
+    // Registered before the router (this widget is the router's ancestor, so its
+    // initState runs first), so this observer is asked about a system back first.
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycle = AppLifecycleListener(onPause: _onPause, onResume: _onResume, onStateChange: _onStateChange);
     // Keep keystrokes (soft or hardware keyboard) away from the hidden terminal.
     _stopUnfocus = widget.lock.isLocked.subscribe((locked) {
       if (locked) FocusManager.instance.primaryFocus?.unfocus();
@@ -54,8 +62,23 @@ class _LockGateState extends State<LockGate> {
     widget.onForeground?.call();
   }
 
+  void _onStateChange(AppLifecycleState state) {
+    final covered = switch (state) {
+      AppLifecycleState.resumed => false,
+      AppLifecycleState.inactive || AppLifecycleState.hidden || AppLifecycleState.paused => widget.lock.isEnabled,
+      AppLifecycleState.detached => _covered,
+    };
+    if (covered != _covered && mounted) setState(() => _covered = covered);
+  }
+
+  /// Android system back while locked: consumed, so the routes hidden under the
+  /// lock screen never pop.
+  @override
+  Future<bool> didPopRoute() async => widget.lock.isLocked.peek();
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopUnfocus();
     _lifecycle.dispose();
     super.dispose();
@@ -67,16 +90,31 @@ class _LockGateState extends State<LockGate> {
       final locked = widget.lock.isLocked.value;
       return Stack(
         children: [
-          ExcludeFocus(excluding: locked, child: widget.child),
+          ExcludeFocus(excluding: locked || _covered, child: widget.child),
           // BlockSemantics drops the hidden terminal's accessibility nodes too, not only its
           // focus (a screen reader must not be able to swipe past the lock screen).
           if (locked)
             Positioned.fill(
               child: BlockSemantics(child: LockScreen(lock: widget.lock)),
             ),
+          if (_covered) const Positioned.fill(child: BlockSemantics(child: PrivacyCover())),
         ],
       );
     });
+  }
+}
+
+/// What the app switcher shows while the biometric lock is on: the app
+/// background with the ShellX logo, never the screen underneath.
+class PrivacyCover extends StatelessWidget {
+  const PrivacyCover({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: context.colors.background,
+      child: const Center(child: ShellxLogo()),
+    );
   }
 }
 

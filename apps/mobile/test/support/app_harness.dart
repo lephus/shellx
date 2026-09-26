@@ -21,12 +21,14 @@ Widget localized(Widget home, {Locale locale = vi, TransitionBuilder? builder}) 
 
 /// An auto_route app for page tests. Its start page has an "open" button that pushes [open] and
 /// adds what the pushed page pops with to [results]; [routes] holds the pages under test
-/// ([XRoute.page]) and stand-ins ([stubRoute]).
+/// ([XRoute.page]) and stand-ins ([stubRoute]). [builder] wraps the router like
+/// `MaterialApp.router(builder:)` does in the app (e.g. the lock gate).
 Widget routedApp({
   required PageRouteInfo Function() open,
   List<AutoRoute> routes = const [],
   List<Object?>? results,
   Locale locale = vi,
+  TransitionBuilder? builder,
 }) {
   final router = _TestRouter([
     AutoRoute(page: PageInfo('HostRoute', builder: (_) => _Host(open, results)), initial: true),
@@ -40,6 +42,7 @@ Widget routedApp({
       supportedLocales: S.delegate.supportedLocales,
       theme: ThemeDataFactory.create(Brightness.light),
       routerConfig: config,
+      builder: builder,
     ),
   );
 }

@@ -62,6 +62,10 @@ final class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
       // The passcode was removed after the lock was enabled: nothing can be
       // verified any more, so do not lock the user out of their own app.
       return error.code == LocalAuthExceptionCode.noCredentialsSet;
+    } catch (_) {
+      // Any other failure (PlatformException, no Activity yet, …) fails closed:
+      // the app stays locked and the lock screen's button retries.
+      return false;
     }
   }
 }

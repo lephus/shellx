@@ -81,10 +81,11 @@ const Map<TerminalKey, _TextKey> _textKeys = {
 /// hardware key, or the keystroke is silently dropped whenever a sticky
 /// modifier is armed.
 ///
-/// [paste] is the single place normalization (CR line breaks) and bracketed
-/// paste markers are applied: callers (e.g. the terminal page's
-/// `ShellxPasteIntent` handler) only need to read the clipboard and call
-/// `terminal.paste(text)`. Pasted text never picks up the sticky modifiers.
+/// [paste] is the single place sanitising (control characters stripped, CR
+/// line breaks) and bracketed paste markers are applied: callers (e.g. the
+/// terminal page's `ShellxPasteIntent` handler) only need to read the
+/// clipboard and call `terminal.paste(text)`. Pasted text never picks up the
+/// sticky modifiers.
 class ShellxTerminal extends Terminal {
   ShellxTerminal({required this.modifiers, super.maxLines = 2000}) : super(inputHandler: shellxInputHandler);
 
@@ -121,7 +122,8 @@ class ShellxTerminal extends Terminal {
   void textInput(String text) => super.textInput(modifiers.applyModifiers(normalizeTypedText(text)));
 
   /// Spec §9.4: bracketed paste when the application enabled it. Pasted text
-  /// never picks up sticky modifiers.
+  /// never picks up sticky modifiers, and its control characters are stripped
+  /// in both modes (see [normalizePastedText]).
   @override
   void paste(String text) {
     final normalized = normalizePastedText(text);

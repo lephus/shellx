@@ -97,4 +97,24 @@ void main() {
     expect(await first, isTrue);
     expect(lock.isLocked.value, isFalse);
   });
+
+  test('an authentication error keeps the app locked and a later retry still works', () async {
+    auth.authenticateError = StateError('prompt could not be shown');
+    final lock = controller()..lockOnLaunch();
+    expect(await lock.unlock('reason'), isFalse);
+    expect(lock.isLocked.value, isTrue);
+    expect(lock.isAuthenticating.value, isFalse);
+
+    auth.authenticateError = null;
+    auth.result = true;
+    expect(await lock.unlock('reason'), isTrue);
+    expect(lock.isLocked.value, isFalse);
+  });
+
+  test('isEnabled follows the setting', () {
+    final lock = controller();
+    expect(lock.isEnabled, isTrue);
+    enabled = false;
+    expect(lock.isEnabled, isFalse);
+  });
 }

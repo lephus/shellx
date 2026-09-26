@@ -78,6 +78,30 @@ void main() {
     expect(keys.ctrl.value, ModifierLatch.oneShot);
   });
 
+  test('paste: an embedded end marker cannot escape bracketed paste', () {
+    terminal.write('\x1b[?2004h');
+    terminal.paste('echo harmless\x1b[201~rm -rf ~/x\n');
+    final sent = out.join();
+    expect('\x1b[200~'.allMatches(sent), hasLength(1));
+    expect('\x1b[201~'.allMatches(sent), hasLength(1));
+    expect(sent, startsWith('\x1b[200~'));
+    expect(sent, endsWith('\x1b[201~'));
+    final inner = sent.substring('\x1b[200~'.length, sent.length - '\x1b[201~'.length);
+    expect(inner.contains('\x1b'), isFalse);
+    expect(inner, 'echo harmless[201~rm -rf ~/x\r');
+  });
+
+  test('paste: the 8-bit CSI (U+009B) is stripped as well', () {
+    terminal.write('\x1b[?2004h');
+    terminal.paste('a\u009b201~b');
+    expect(out, ['\x1b[200~a201~b\x1b[201~']);
+  });
+
+  test('paste without bracketed mode strips ESC too, so no key sequence is injected', () {
+    terminal.paste('ls\x1b[A\x1bOB\tx\r\n');
+    expect(out, ['ls[AOB\tx\r']);
+  });
+
   group('hardware keyboard (TerminalView.keyInput has no textInput fallback)', () {
     // TerminalView's raw KeyEvent path (`_handleKeyEvent`) calls only
     // Terminal.keyInput and never falls back to textInput() the way the soft

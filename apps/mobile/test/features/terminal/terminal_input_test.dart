@@ -83,6 +83,29 @@ void main() {
     expect(normalizePastedText('a\r\nb\nc'), 'a\rb\rc');
   });
 
+  group('pasted text is sanitised', () {
+    test('ESC is stripped, so a paste cannot close bracketed paste itself', () {
+      expect(normalizePastedText('echo harmless\x1b[201~rm -rf ~/x\n'), 'echo harmless[201~rm -rf ~/x\r');
+    });
+
+    test('C0 controls other than tab and line breaks are stripped, and so is DEL', () {
+      expect(normalizePastedText('a\x00b\x03c\x07d\x08e\x7ff'), 'abcdef');
+      expect(normalizePastedText('\x01\x02\x04\x05\x06\x0b\x0c\x0e\x0f\x10\x1a\x1c\x1d\x1e\x1f'), '');
+    });
+
+    test('C1 controls are stripped, CSI (U+009B) included', () {
+      expect(normalizePastedText('a\u009b201~b\u0080c\u0085d\u009fe'), 'a201~bcde');
+    });
+
+    test('tabs survive and CRLF/LF/CR all become CR', () {
+      expect(normalizePastedText('a\tb\r\nc\nd\re'), 'a\tb\rc\rd\re');
+    });
+
+    test('printable text outside ASCII is kept', () {
+      expect(normalizePastedText('xin chào 😀 ¡ÿ'), 'xin chào 😀 ¡ÿ');
+    });
+  });
+
   group('terminalShortcuts', () {
     Iterable<SingleActivator> activators(TargetPlatform platform) =>
         terminalShortcuts(platform).keys.cast<SingleActivator>();

@@ -108,4 +108,100 @@ void main() {
 
     expect(taps, 0);
   });
+
+  testWidgets('an error from the system prompt keeps the lock screen up and the button retries', (tester) async {
+    auth.authenticateError = StateError('no activity');
+    lock.lockOnLaunch();
+    await tester.pumpWidget(app());
+    await tester.pump();
+    expect(auth.prompts, 1);
+    expect(find.text('ShellX đang khóa'), findsOneWidget);
+
+    auth.authenticateError = null;
+    auth.result = true;
+    await tester.tap(find.text('Mở khóa bằng Face ID'));
+    await tester.pump();
+    expect(auth.prompts, 2);
+    expect(find.text('ShellX đang khóa'), findsNothing);
+  });
+
+  group('privacy cover in the app switcher', () {
+    testWidgets('shown while inactive or hidden, gone again on resume', (tester) async {
+      await tester.pumpWidget(app());
+      expect(find.byType(PrivacyCover), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsNothing);
+      expect(find.text('ShellX đang khóa'), findsNothing);
+    });
+
+    testWidgets('after a long background the lock screen replaces the cover', (tester) async {
+      await tester.pumpWidget(app());
+      await goToBackground(tester);
+      expect(find.byType(PrivacyCover), findsOneWidget);
+
+      now = now.add(const Duration(minutes: 6));
+      await comeBack(tester);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsNothing);
+      expect(find.text('ShellX đang khóa'), findsOneWidget);
+    });
+
+    testWidgets('not shown when the biometric lock is off', (tester) async {
+      lock = AppLockController(authenticator: auth, isEnabled: () => false, now: () => now);
+      await tester.pumpWidget(app());
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.byType(PrivacyCover), findsNothing);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    });
+  });
+
+  group('system back while locked', () {
+    Widget routed() => routedApp(
+      open: () => const PageRouteInfo('HiddenRoute'),
+      routes: [stubRoute('HiddenRoute')],
+      builder: (context, child) => LockGate(lock: lock, child: child!),
+    );
+
+    testWidgets('is consumed, so the routes hidden under the lock never pop', (tester) async {
+      await tester.pumpWidget(routed());
+      await tester.pumpAndSettle();
+      await openPushed(tester);
+      expect(find.text('HiddenRoute stub'), findsOneWidget);
+
+      lock.lockOnLaunch();
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('ShellX đang khóa'), findsOneWidget);
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('HiddenRoute stub'), findsOneWidget);
+      expect(find.text('ShellX đang khóa'), findsOneWidget);
+    });
+
+    testWidgets('pops normally while unlocked', (tester) async {
+      await tester.pumpWidget(routed());
+      await tester.pumpAndSettle();
+      await openPushed(tester);
+      expect(find.text('HiddenRoute stub'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('HiddenRoute stub'), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+  });
 }
