@@ -55,19 +55,36 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
 - **Hub:** one `HubState` per account with a serial queue for everything that touches it (sockets
   joining/closing, frames, REST calls). Routes reach it with `registry.forUser(userId).<method>()`.
   Text `ping` is answered with `pong` immediately, outside the queue.
+- **Slow receivers:** before sending anything (DATA, ERROR, PRESENCE, EVENT, `pong`) the hub checks
+  the socket's unsent backlog; over 4 MiB it sends nothing more and closes the socket with 1013
+  "try again later" (logged as `slow_receiver`). Clients reconnect with backoff and catch up from
+  the agent's replay buffer; frames are never skipped (that would break the Noise stream).
 - **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP. The
   IP is `X-Real-IP` when the TCP peer is a private or loopback address (nginx-proxy), otherwise the
-  peer address. IPs and e-mail addresses are never logged.
-- **argon2id:** m = 19456 KiB, t = 2, p = 1; at most 4 hashes run at once, the rest wait.
+  peer address; an IPv6 address counts as its /64. IPs and e-mail addresses are never logged.
+- **argon2id:** m = 19456 KiB, t = 2, p = 1; at most 4 hashes run at once and up to 32 wait; beyond
+  that register, login and password change answer 429 `rate_limited`. The image sets
+  `UV_THREADPOOL_SIZE=8` so the 4 hashes never take the whole libuv thread pool.
+- **Refused upgrades:** a WebSocket upgrade with a bad token (401) or any other `Upgrade` (400) is
+  answered and its socket destroyed after 5 s if the client does not close it; a client resetting
+  the connection never affects the relay.
 - **Limits:** JSON bodies over 16 KiB → 413 `payload_too_large`; a password over 128 code points is
   refused as `invalid_credentials` before hashing; WebSocket frames over 64 KiB → ERROR
   `frame_too_large`, messages over 1 MiB close the socket with 1009; 500 frames/s per device →
   ERROR `rate_limited`, close 4003.
 - **Shutdown:** on SIGTERM/SIGINT the relay stops accepting connections, closes every socket with
-  1001 "going away", waits at most 5 s for requests and hub queues, closes the database and exits 0.
-  Clients reconnect with their usual backoff.
+  1001 "going away" (recording `last_seen_at` of those devices), waits at most 5 s for requests and
+  hub queues, closes the database and exits 0 (1 if the shutdown failed; logged by kind). A second
+  signal is ignored. Clients reconnect with their usual backoff.
 - **Logs:** one JSON line per event with metadata only (time, `device_id`, error kind). Never
   payloads, tokens, passwords, e-mail or IP addresses.
+
+## Healthcheck
+
+Compose runs `node dist/scripts/healthcheck.js` in the container. It exits 0 and prints nothing
+when `GET http://127.0.0.1:$PORT/v1/version` answers 200 within 3 s and the database at `$DB_PATH`
+opens read-only (it is never created) and answers `SELECT 1`. Otherwise it prints one line such as
+`healthcheck: version ECONNREFUSED; database SQLITE_CANTOPEN` (error kinds only) and exits 1.
 
 ## Emergency password reset (spec §5.2)
 
