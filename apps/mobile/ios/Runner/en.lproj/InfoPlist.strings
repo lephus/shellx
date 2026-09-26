@@ -1,0 +1,3 @@
+/* The iOS permission prompts in English; keep them equal to Info.plist. */
+"NSCameraUsageDescription" = "ShellX uses the camera to scan the pairing QR code shown on your computer.";
+"NSFaceIDUsageDescription" = "ShellX uses Face ID to unlock the app.";

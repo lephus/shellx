@@ -31,6 +31,20 @@ void main() {
       expect(plist, contains('<key>CFBundleLocalizations</key>'));
       expect(plist, contains('<string>vi</string>'));
     });
+
+    test('the camera and Face ID prompts are localized in Vietnamese and English, and bundled', () {
+      for (final language in ['vi', 'en']) {
+        final strings = readFile('ios/Runner/$language.lproj/InfoPlist.strings');
+        expect(strings, contains('"NSCameraUsageDescription" = "'), reason: language);
+        expect(strings, contains('"NSFaceIDUsageDescription" = "'), reason: language);
+      }
+      expect(readFile('ios/Runner/vi.lproj/InfoPlist.strings'), contains('ShellX dùng camera'));
+      final project = readFile('ios/Runner.xcodeproj/project.pbxproj');
+      expect(project, contains('path = vi.lproj/InfoPlist.strings;'));
+      expect(project, contains('path = en.lproj/InfoPlist.strings;'));
+      expect(project, contains('/* InfoPlist.strings in Resources */,'));
+      expect(RegExp(r'knownRegions = \([^)]*\bvi,').hasMatch(project), isTrue);
+    });
   });
 
   group('Android', () {
@@ -48,6 +62,23 @@ void main() {
       }
       expect(manifest, contains('android:allowBackup="false"'));
       expect(manifest, contains('android:label="ShellX"'));
+    });
+
+    test('backup and device transfer exclude everything (defence in depth)', () {
+      final manifest = readFile('android/app/src/main/AndroidManifest.xml');
+      expect(manifest, contains('android:fullBackupContent="@xml/backup_rules"'));
+      expect(manifest, contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
+      final rules = readFile('android/app/src/main/res/xml/data_extraction_rules.xml');
+      expect(rules, contains('<cloud-backup>'));
+      expect(rules, contains('<device-transfer>'));
+      expect(rules, isNot(contains('<include')));
+      for (final domain in ['root', 'file', 'database', 'sharedpref', 'external']) {
+        expect('<exclude domain="$domain" path="." />'.allMatches(rules), hasLength(2), reason: domain);
+        expect(
+          readFile('android/app/src/main/res/xml/backup_rules.xml'),
+          contains('<exclude domain="$domain" path="." />'),
+        );
+      }
     });
 
     test('MainActivity (package com.shellx.prod) is a FlutterFragmentActivity with AppCompat themes', () {
@@ -83,6 +114,12 @@ void main() {
       expect(pubspec, isNot(contains('$package:')), reason: package);
     }
     expect(pubspec, contains('resolution: workspace'));
+  });
+
+  test('the runtime packages the app works around are pinned exactly (pubspec.lock is not committed)', () {
+    final pubspec = readFile('pubspec.yaml');
+    expect(pubspec, contains('\n  xterm: 4.0.0\n'));
+    expect(pubspec, contains('\n  signals_flutter: 6.3.1\n'));
   });
 
   test('JetBrains Mono and both OFL licenses are bundled', () {
