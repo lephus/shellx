@@ -8,5 +8,6 @@ workspace:
   - packages/shellx_client
   - packages/shellx_e2e
   - apps/desktop
+  - apps/mobile
 dev_dependencies:
   lints: ^6.0.0

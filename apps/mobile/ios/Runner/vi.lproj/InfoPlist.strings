@@ -1,0 +1,3 @@
+/* The iOS permission prompts in Vietnamese; the English ones are in Info.plist and en.lproj. */
+"NSCameraUsageDescription" = "ShellX dùng camera để quét mã QR ghép nối hiện trên máy tính của bạn.";
+"NSFaceIDUsageDescription" = "ShellX dùng Face ID để mở khóa app.";

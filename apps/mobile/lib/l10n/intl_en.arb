@@ -1,0 +1,376 @@
+{
+  "@@locale": "en",
+  "somethingWentWrong": "Something went wrong",
+  "loadMoreFailPleaseTryAgain": "Load more failed\nPlease try again",
+  "retry": "Retry",
+  "somethingWentWrongPleaseTryAgain": "Something went wrong, please try again",
+  "forbiddenTitle": "You don't have permission to access this feature",
+  "networkError": "Network Error",
+  "notFound": "Not Found",
+  "unauthorized": "Unauthorized",
+  "unknownError": "Unknown Error",
+  "validationEmailRequired": "Email is required",
+  "validationEmailInvalid": "Please enter a valid email address",
+  "validationPasswordRequired": "Password is required",
+  "validationPasswordMinLength": "Password must be at least {length} characters",
+  "@validationPasswordMinLength": {
+    "placeholders": {
+      "length": {
+        "type": "int"
+      }
+    }
+  },
+  "validationPasswordUppercase": "Password must contain at least one uppercase letter",
+  "validationPasswordLowercase": "Password must contain at least one lowercase letter",
+  "validationPasswordDigit": "Password must contain at least one number",
+  "validationPasswordSpecialChar": "Password must contain at least one special character",
+  "validationPasswordConfirmRequired": "Please confirm your password",
+  "validationPasswordNotMatch": "Passwords do not match",
+  "validationTextRequired": "This field is required",
+  "validationTextMinLength": "Must be at least {length} characters",
+  "@validationTextMinLength": {
+    "placeholders": {
+      "length": {
+        "type": "int"
+      }
+    }
+  },
+  "validationTextMaxLength": "Must be at most {length} characters",
+  "@validationTextMaxLength": {
+    "placeholders": {
+      "length": {
+        "type": "int"
+      }
+    }
+  },
+  "validationPhoneRequired": "Phone number is required",
+  "validationPhoneInvalid": "Please enter a valid phone number",
+  "appTitle": "ShellX",
+  "actionCancel": "Cancel",
+  "actionClose": "Close",
+  "actionLater": "Later",
+  "loginTitle": "Sign in",
+  "loginSubtitle": "Use the same account as ShellX on your computer.",
+  "emailLabel": "Email",
+  "emailHint": "email@example.com",
+  "passwordLabel": "Password",
+  "passwordHint": "Password",
+  "passwordShow": "Show password",
+  "passwordHide": "Hide password",
+  "loginButton": "Sign in",
+  "forgotPasswordHint": "Forgot your password? Change it in ShellX on a computer that is signed in.",
+  "noAccountPrompt": "No account yet?",
+  "createAccountLink": "Create one",
+  "signedOutExpired": "Your sign-in has expired. Please sign in again.",
+  "signedOutAccountDeleted": "Your account has been deleted.",
+  "registerTitle": "Create account",
+  "registerSubtitle": "One account for your phone and all your computers.",
+  "registerButton": "Create account",
+  "passwordRule": "8 to 128 characters.",
+  "passwordMissing": "{count, plural, =1{1 more character needed.} other{{count} more characters needed.}}",
+  "@passwordMissing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordTooLong": "{count, plural, =1{1 character too many.} other{{count} characters too many.}}",
+  "@passwordTooLong": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "termsNotice": "By creating an account you agree to the {terms} and the {privacy}.",
+  "@termsNotice": {
+    "placeholders": {
+      "terms": {
+        "type": "String"
+      },
+      "privacy": {
+        "type": "String"
+      }
+    }
+  },
+  "termsLink": "Terms",
+  "privacyLink": "Privacy Policy",
+  "errorInvalidEmail": "Invalid email address.",
+  "errorWeakPassword": "Password must be 8–128 characters.",
+  "errorDisposableEmail": "Disposable email addresses can't be used. Please use a real email.",
+  "errorEmailTaken": "This email is already registered.",
+  "errorInvalidCredentials": "Incorrect email or password.",
+  "errorWrongPassword": "Incorrect password.",
+  "errorRateLimited": "Try again in a few minutes.",
+  "errorNetwork": "Can't reach the server. Check your connection and try again.",
+  "errorUnknown": "Something went wrong ({code}).",
+  "@errorUnknown": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "errorNotInAccount": "This computer doesn't belong to your account. Sign in with the same account on the computer.",
+  "errorQrInvalid": "The QR code is invalid or has expired. Create a new code on your computer.",
+  "errorAgentOffline": "The computer is offline. Open ShellX on the computer and try again.",
+  "errorTimeout": "The computer didn't respond. Please try again.",
+  "errorUntrusted": "This computer no longer trusts this phone. Please pair again.",
+  "errorSessionLimit": "This computer already has the maximum of 10 sessions open. Close some sessions first.",
+  "errorSpawnFailed": "Couldn't start the shell: {reason}",
+  "@errorSpawnFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "updateRequiredTitle": "App update required",
+  "updateRequiredBody": "This version can no longer connect to your computers. Update to keep using ShellX.",
+  "openAppStore": "Open the App Store",
+  "openPlayStore": "Open Google Play",
+  "lockTitle": "ShellX is locked",
+  "lockSubtitle": "Unlock to see your computers and terminal sessions.",
+  "lockReason": "Unlock ShellX",
+  "lockUnlockWith": "Unlock with {method}",
+  "@lockUnlockWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "biometricFaceId": "Face ID",
+  "biometricTouchId": "Touch ID",
+  "biometricFingerprint": "fingerprint",
+  "biometricGeneric": "biometrics",
+  "biometricPasscode": "device passcode",
+  "bannerReconnecting": "Connection lost, retrying…",
+  "bannerReplaced": "Another instance of the app has connected.",
+  "bannerReconnectButton": "Reconnect",
+  "machinesTitle": "Your computers",
+  "settingsTooltip": "Settings",
+  "machineOnline": "Online",
+  "machinesOfflineHeader": "Offline",
+  "machineOffline": "This computer is offline.",
+  "machineWaiting": "Waiting for connection",
+  "machineLastOnline": "Last online: {when}",
+  "@machineLastOnline": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "machineNotPaired": "Not paired",
+  "machineTabs": "{count, plural, =1{1 tab} other{{count} tabs}}",
+  "@machineTabs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pairNewMachine": "Pair a new computer",
+  "emptyTitle": "No computers yet",
+  "emptyStep1": "Install ShellX on your computer (macOS or Windows) from {site}.",
+  "@emptyStep1": {
+    "placeholders": {
+      "site": {
+        "type": "String"
+      }
+    }
+  },
+  "emptyStep2": "Sign in with this same account.",
+  "emptyStep3": "Click the ShellX icon → {menu}, then scan the code.",
+  "@emptyStep3": {
+    "placeholders": {
+      "menu": {
+        "type": "String"
+      }
+    }
+  },
+  "pairPhoneMenuItem": "Pair phone…",
+  "scanQrButton": "Scan QR code",
+  "untrustedTitle": "Pair again",
+  "actionScanCode": "Scan code",
+  "lastSeenJustNow": "just now",
+  "lastSeenMinutes": "{count, plural, =1{1 minute ago} other{{count} minutes ago}}",
+  "@lastSeenMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSeenToday": "today, {time}",
+  "@lastSeenToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lastSeenYesterday": "yesterday, {time}",
+  "@lastSeenYesterday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lastSeenDate": "{month}/{day}, {time}",
+  "@lastSeenDate": {
+    "placeholders": {
+      "day": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lastSeenUnknown": "unknown",
+  "scannerTitle": "Scan pairing code",
+  "scannerCardTitle": "The code is on your computer",
+  "scannerCardBody": "macOS: click the ShellX icon in the menu bar. Windows: click the icon in the system tray. Choose {menu}",
+  "@scannerCardBody": {
+    "placeholders": {
+      "menu": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerPairing": "Pairing…",
+  "scannerCameraDenied": "Camera access is needed to scan the QR code. Allow it in your phone's Settings.",
+  "openSettings": "Open Settings",
+  "scannerCameraError": "Couldn't start the camera.",
+  "pairingSucceeded": "Paired",
+  "pairingSucceededBody": "{name} now trusts this phone. From now on, just tap the computer to open a terminal.",
+  "@pairingSucceededBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "openTerminal": "Open terminal",
+  "backToMachines": "Back to computers",
+  "pairingFailedTitle": "Couldn't pair",
+  "scanAgain": "Scan again",
+  "terminalConnected": "Connected · end-to-end encrypted",
+  "terminalConnecting": "Connecting…",
+  "fontSizeTooltip": "Font size",
+  "keyboardTooltip": "Keyboard",
+  "terminalOpenNew": "Open a new session",
+  "terminalCloseTab": "Close session",
+  "terminalCloseConfirm": "Close this session? Programs running in it will be stopped.",
+  "terminalNoTabs": "No open sessions.",
+  "terminalFailedTabTitle": "shell",
+  "sessionsLoading": "Getting the session list…",
+  "pickerTitle": "{count, plural, =1{This computer has 1 session} other{This computer has {count} sessions}}",
+  "@pickerTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pickerSubtitle": "Reopen a session to continue where you left off, or start a new one.",
+  "pickerOpen": "Open",
+  "pickerStarted": "opened {when}",
+  "@pickerStarted": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "pickerAttachedElsewhere": "open on another device",
+  "sessionEnded": "Session ended",
+  "sessionExitedBody": "The last command exited with code {code}. The output above can still be read and copied.",
+  "@sessionExitedBody": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionGoneBody": "The computer no longer has this session. The output above can still be read and copied.",
+  "tabTakenOver": "This session was opened on another device.",
+  "tabClosedByHost": "The session was closed on the computer.",
+  "tabReattach": "Reattach",
+  "closeTab": "Close tab",
+  "copyAction": "Copy",
+  "copied": "Copied",
+  "keyPaste": "Paste",
+  "keyArrowUp": "Up arrow",
+  "keyArrowDown": "Down arrow",
+  "keyArrowLeft": "Left arrow",
+  "keyArrowRight": "Right arrow",
+  "keyPipe": "Vertical bar",
+  "keyTilde": "Tilde",
+  "keySlash": "Slash",
+  "keyMinus": "Hyphen",
+  "settingsTitle": "Settings",
+  "settingsTerminalGroup": "Terminal",
+  "settingsFontSize": "Default font size",
+  "settingsSecurityGroup": "Security",
+  "settingsLockWith": "Lock with {method}",
+  "@settingsLockWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLockFootnote": "Asked when the app opens and when you come back after more than 5 minutes.",
+  "settingsBiometricUnavailable": "No passcode or biometrics are set up on this device",
+  "settingsPairedMachines": "Paired computers",
+  "settingsNoPairedMachines": "No paired computers.",
+  "settingsUnpair": "Unpair",
+  "settingsUnpairConfirm": "Unpair {name}? You'll need to scan a QR code again to use this computer.",
+  "@settingsUnpairConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUnpairFailed": "Couldn't unpair yet.",
+  "settingsAccountGroup": "Account",
+  "settingsEmail": "Email",
+  "settingsLogout": "Sign out",
+  "settingsLogoutConfirm": "Sign out of ShellX? Paired computers are kept for your next sign-in.",
+  "settingsDeleteAccount": "Delete account",
+  "settingsVersion": "ShellX {version} ({build})",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "unknownMachine": "Unknown computer",
+  "deleteAccountTitle": "Delete account",
+  "deleteAccountWarningTitle": "This can't be undone",
+  "deleteAccountLoseAccount": "Deletes the account {email} with all its devices and pairings.",
+  "@deleteAccountLoseAccount": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountLoseComputers": "Every computer signed in to it is signed out.",
+  "deleteAccountLoseSessions": "Open terminal sessions are closed.",
+  "deleteAccountPasswordLabel": "Enter your password to confirm",
+  "deleteAccountButton": "Delete permanently"
+}

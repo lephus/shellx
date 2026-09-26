@@ -215,6 +215,17 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - run: flutter pub get
+      - name: Generated code is up to date
+        run: |
+          dart run intl_utils:generate
+          dart run build_runner build
+          git diff --exit-code -- .
+          untracked="$(git ls-files --others --exclude-standard -- .)"
+          if [ -n "$untracked" ]; then
+            echo "::error::Generated files are not committed:"
+            echo "$untracked"
+            exit 1
+          fi
       - run: flutter test
 
   web:
