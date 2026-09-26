@@ -55,8 +55,9 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
 - **Hub:** one `HubState` per account with a serial queue for everything that touches it (sockets
   joining/closing, frames, REST calls). Routes reach it with `registry.forUser(userId).<method>()`.
   Text `ping` is answered with `pong` immediately, outside the queue — but it counts against the
-  device's 500 frames/s budget like any frame, and it goes unanswered while the socket still has
-  unsent bytes (so a client that stops reading cannot pile up pongs; its own heartbeat times out).
+  device's 500 frames/s budget like any frame, and it goes unanswered once more than 64 KiB wait to
+  be sent to that socket (a slow but healthy link keeps its heartbeat; a client that stops reading
+  cannot pile up pongs, and its own heartbeat times out).
 - **Slow receivers:** before sending anything (DATA, ERROR, PRESENCE, EVENT, `pong`) the hub checks
   the socket's unsent backlog; over 4 MiB it sends nothing more and closes the socket with 1013
   "try again later" (logged as `slow_receiver`). Its close frame waits behind that backlog, so the

@@ -5,7 +5,7 @@ import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import { FRAMES_PER_SECOND } from "../src/hub/token-bucket.js";
 import {
-  GOING_AWAY, MAX_BUFFERED_BYTES, SLOW_RECEIVER_CLOSE_MS, TRY_AGAIN_LATER, type UserHub,
+  GOING_AWAY, MAX_BUFFERED_BYTES, PONG_MAX_BUFFERED_BYTES, SLOW_RECEIVER_CLOSE_MS, TRY_AGAIN_LATER, type UserHub,
 } from "../src/hub/user-hub.js";
 import {
   CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, RelayErrorCode,
@@ -350,11 +350,24 @@ describe("slow receivers (backpressure)", () => {
     expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
   });
 
-  it("never answers a ping while the socket still has unsent bytes, and keeps the socket open (R1)", async () => {
+  it("still answers a ping on a slow but healthy link, up to 64 KiB of unsent bytes (R1 follow-up)", async () => {
+    expect(PONG_MAX_BUFFERED_BYTES).toBe(64 * 1024);
     const { hub, mobileId } = setup();
     const m = new FakeSocket();
     await joinHub(hub, m, mobileId);
-    m.bufferedAmount = 1; // a pong would queue behind it: bufferedAmount counts 4 bytes, the heap far more
+    m.bufferedAmount = 10 * 1024; // streaming output the phone is still reading
+    hub.ping(m, mobileId);
+    expect(m.take()).toEqual(["text:pong"]);
+    m.bufferedAmount = PONG_MAX_BUFFERED_BYTES; // exactly at the threshold
+    hub.ping(m, mobileId);
+    expect(m.take()).toEqual(["text:pong"]);
+  });
+
+  it("never answers a ping once more than 64 KiB is unsent, and keeps the socket open (R1)", async () => {
+    const { hub, mobileId } = setup();
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    m.bufferedAmount = PONG_MAX_BUFFERED_BYTES + 1; // a pong would pile up behind a stuck backlog
     hub.ping(m, mobileId);
     hub.ping(m, mobileId);
     await hub.idle();

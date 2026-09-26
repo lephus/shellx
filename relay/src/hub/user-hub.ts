@@ -41,6 +41,14 @@ export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
  * backlog for its own 30 s close timeout. shellx_core treats the resulting 1006 like 1013.
  */
 export const SLOW_RECEIVER_CLOSE_MS = 1000;
+/**
+ * A ping is still answered while the socket has at most this many unsent bytes: a phone reading
+ * heavy output over a slow but healthy link keeps its heartbeat. Above it (a stuck or badly lagging
+ * reader) the ping goes unanswered, so pongs can only ever pile up behind 64 KiB of backlog — with
+ * pings inside the 500/s frame budget, a few MB of heap at worst — and the client's own heartbeat
+ * times out instead.
+ */
+export const PONG_MAX_BUFFERED_BYTES = 64 * 1024;
 
 /** Identity of one connection, set by the ws route from the validated token. */
 export interface ConnectionMeta {
@@ -535,17 +543,18 @@ export class UserHub {
   /**
    * The text heartbeat of `deviceId` (the ws route's validated device): "pong" goes out right away,
    * outside the queue (spec §4.2). A ping spends one frame of the device's 500 frames/s budget like
-   * any frame; over it, the socket gets ERROR rate_limited and 4003 through the queue. No pong is
-   * ever queued behind unsent bytes: while `bufferedAmount` is above 0 the ping goes unanswered, so
-   * a client that stops reading cannot pile up pongs (each costs far more heap than the 4 bytes
-   * `bufferedAmount` counts for it) and its own heartbeat fails on the stuck socket instead. A socket
-   * over the 4 MiB cap is closed with 1013 through the queue.
+   * any frame; over it, the socket gets ERROR rate_limited and 4003 through the queue. A pong is
+   * sent while at most PONG_MAX_BUFFERED_BYTES (64 KiB) wait to go out, so a slow but healthy link
+   * keeps its heartbeat; above that the ping goes unanswered, so a client that stops reading cannot
+   * pile up pongs (each costs far more heap than the 4 bytes `bufferedAmount` counts for it) and its
+   * own heartbeat fails on the stuck socket instead. A socket over the 4 MiB cap is closed with 1013
+   * through the queue.
    */
   ping(socket: HubSocket, deviceId: string): void {
     if (socket.readyState !== SOCKET_OPEN) return; // being closed: nothing more to answer
     if (!this.host.budgets.take(deviceId)) this.state.rateLimited(socket);
     else if (isSlow(socket)) this.state.slowReceiver(socket);
-    else if (socket.bufferedAmount === 0) safeSend(socket, "pong");
+    else if (socket.bufferedAmount <= PONG_MAX_BUFFERED_BYTES) safeSend(socket, "pong");
   }
 
   disconnected(socket: HubSocket): void {

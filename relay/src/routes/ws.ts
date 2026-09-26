@@ -40,7 +40,7 @@ export const webSocketAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 /**
  * GET /v1/ws, step 2 — @hono/node-server completes the upgrade with `ws` and calls these handlers.
  * The socket joins the account's hub; `ping` is answered at once, outside the hub's queue (spec
- * §4.2), within the device's frame budget and only while nothing is waiting to be sent to it (see
+ * §4.2), within the device's frame budget and only while at most 64 KiB wait to be sent to it (see
  * `UserHub.ping`). Only the validated token decides the device id and kind; nothing the client sends
  * in headers reaches the hub.
  */

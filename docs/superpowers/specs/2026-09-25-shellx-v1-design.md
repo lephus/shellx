@@ -143,7 +143,7 @@ shellx/
 - **Mật khẩu:** 8–128 ký tự. Băm bằng **argon2id** (m = 19 456 KiB, t = 2, p = 1), lưu dạng chuỗi PHC.
 - **Đăng ký / đăng nhập** luôn kèm thông tin thiết bị `{kind, name, platform, public_key}`. Nếu khóa công khai đó đã có trong tài khoản thì dùng lại `device_id` cũ; nếu chưa thì tạo thiết bị mới. `name` là hostname (agent) hoặc tên model máy (mobile).
 - **Token thiết bị:** 32 byte ngẫu nhiên, mã hóa base64url, gửi qua header `Authorization: Bearer <token>`. Cơ sở dữ liệu chỉ lưu SHA-256 của token. Token hết hạn khi `last_used_at` cũ hơn 90 ngày; `last_used_at` cập nhật tối đa một lần mỗi giờ.
-- **Giới hạn tần suất** (bộ giới hạn cửa sổ trượt trong bộ nhớ của relay, cửa sổ 60 giây; IP lấy từ `X-Real-IP` của nginx-proxy): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP. Vượt giới hạn trả HTTP 429.
+- **Giới hạn tần suất** (bộ giới hạn cửa sổ trượt trong bộ nhớ của relay, cửa sổ 60 giây; IP lấy từ `X-Real-IP` của nginx-proxy): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP; nâng cấp WebSocket (`/v1/ws`) 60 lần/IP, tính mọi lần thử, trước khi kiểm tra token. Vượt giới hạn trả HTTP 429 (với nâng cấp WebSocket: từ chối nâng cấp bằng HTTP 429, client thử lại theo backoff).
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
 - **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong cơ sở dữ liệu, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị (một khóa chung cho điện thoại, vì lúc đăng nhập phải gửi khóa công khai trước khi biết `user_id`) và danh sách máy đã ghim (lưu theo `user_id`) được giữ lại, để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy danh sách máy đã ghim đó.
@@ -211,7 +211,8 @@ Byte 1 : type
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`.
 - Sự kiện: `{event: "pairing_removed", agent_id, mobile_id, pairing_id}`.
 - Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`.
-- Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
+- Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket, tính cả `ping`). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
+- Thiết bị nhận chậm: khi còn hơn 4 MiB chưa gửi được tới một socket, hub đóng socket đó với mã 1013 (`try again later`) và ngắt hẳn sau 1 giây nếu nó vẫn chưa đóng; client kết nối lại theo backoff như mọi mã đóng khác ngoài 4001/4002.
 - Khi một thiết bị kết nối, hub gửi cho nó PRESENCE của mọi thiết bị đang online trong tài khoản và báo thiết bị mới online cho các thiết bị còn lại. Khi ngắt, hub báo offline và ghi `last_seen_at` vào cơ sở dữ liệu.
 
 ### 6.3 Kênh mã hóa (payload của DATA)
