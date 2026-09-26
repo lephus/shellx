@@ -254,14 +254,19 @@ export class HubState {
     });
   }
 
-  /** Shutdown: closes every socket with 1001 "going away". */
+  /**
+   * Shutdown: closes every socket with 1001 "going away" and records last_seen_at for the devices
+   * that were still connected (their close events are ignored from now on, so markOffline never runs).
+   */
   goAway(): Promise<void> {
     return this.enqueue("go_away", () => {
+      const connected = this.liveDeviceIds();
       for (const [socket, me] of this.sockets) {
         if (me.closing) continue;
         me.closing = true;
         safeClose(socket, GOING_AWAY, "going away");
       }
+      for (const deviceId of connected) this.recordLastSeen(deviceId);
     });
   }
 
@@ -373,11 +378,15 @@ export class HubState {
   private markOffline(deviceId: string): void {
     if (this.socketsOf(deviceId).length > 0) return;
     this.broadcast(encodePresence(deviceId, false), deviceId);
+    this.recordLastSeen(deviceId);
+  }
+
+  /** Best-effort bookkeeping: a database error must not stop routing, presence or a shutdown. */
+  private recordLastSeen(deviceId: string): void {
     try {
       this.host.db.run("UPDATE devices SET last_seen_at = ? WHERE id = ?", this.host.now(), deviceId);
-    } catch {
-      // Best-effort bookkeeping: a database error must not stop routing/presence.
-      logMeta("last_seen_write_failed", { device_id: deviceId });
+    } catch (err) {
+      logMeta("last_seen_write_failed", { device_id: deviceId, error: errorKind(err) });
     }
   }
 

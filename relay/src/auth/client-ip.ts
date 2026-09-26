@@ -26,15 +26,42 @@ function isTrustedPeer(address: string): boolean {
 }
 
 /**
- * The client address used as the rate-limit key (spec §4.2): `X-Real-IP` set by nginx-proxy when
- * the TCP peer is a trusted proxy and the header holds a valid IP, otherwise the peer address
- * itself. Used only in memory by the limiters; never logged.
+ * The /64 network of an IPv6 address, e.g. `2001:db8:1:2::/64` for `2001:0DB8:1:2:a::1`. One
+ * subscriber is usually given a whole /64, so keying by the full address would let a single client
+ * rotate through 2^64 keys and never be limited (M12). `address` must be a valid IPv6 address.
+ */
+function ipv6Network64(address: string): string {
+  let text = address.split("%")[0]!.toLowerCase(); // drop a zone index (fe80::1%eth0)
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text); // trailing IPv4 (64:ff9b::198.51.100.7)
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number) as [number, number, number, number];
+    text = `${text.slice(0, dotted.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head = "", tail] = text.split("::");
+  const headGroups = head === "" ? [] : head.split(":");
+  const tailGroups = tail === undefined || tail === "" ? [] : tail.split(":");
+  const zeros = tail === undefined ? [] : Array<string>(8 - headGroups.length - tailGroups.length).fill("0");
+  const groups = [...headGroups, ...zeros, ...tailGroups].map((group) => parseInt(group, 16).toString(16));
+  return `${groups.slice(0, 4).join(":")}::/64`;
+}
+
+/** The rate-limit key of a valid address: IPv4 as is, IPv4-mapped IPv6 as IPv4, other IPv6 by its /64. */
+function limitKey(address: string): string {
+  const plain = unmapped(address);
+  return isIP(plain) === 6 ? ipv6Network64(plain) : plain;
+}
+
+/**
+ * The client key used by the rate limiters (spec §4.2): the address in `X-Real-IP` set by
+ * nginx-proxy when the TCP peer is a trusted proxy and the header holds a valid IP, otherwise the
+ * peer address itself; an IPv6 address is reduced to its /64. Used only in memory by the limiters;
+ * never logged.
  */
 export function clientIp(realIpHeader: string | undefined, remoteAddress: string | undefined): string {
   const peer = remoteAddress === undefined ? undefined : unmapped(remoteAddress);
   if (peer !== undefined && isTrustedPeer(peer)) {
     const forwarded = realIpHeader?.trim();
-    if (forwarded !== undefined && isIP(forwarded) !== 0) return unmapped(forwarded);
+    if (forwarded !== undefined && isIP(forwarded) !== 0) return limitKey(forwarded);
   }
-  return peer ?? "unknown";
+  return peer === undefined ? "unknown" : isIP(peer) === 0 ? peer : limitKey(peer);
 }

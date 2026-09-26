@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  type Argon2Backend, createPasswordHasher, hashPassword, MAX_CONCURRENT_HASHES, nodeArgon2, passwordBytes, Semaphore,
-  verifyPassword,
+  createPasswordHasher, HasherBusyError, hashPassword, MAX_CONCURRENT_HASHES, MAX_QUEUED_HASHES, nodeArgon2, passwordBytes,
+  Semaphore, verifyPassword,
 } from "../src/auth/password.js";
+import { gatedBackend } from "./helpers.js";
 
 // Known answers computed with the relay's former argon2 WASM build and cross-checked with Node's
 // crypto.argon2Sync and @noble/hashes: hashes stored by the Cloudflare relay still verify.
@@ -69,30 +70,6 @@ describe("argon2id (@node-rs/argon2)", () => {
   });
 });
 
-/** A backend whose operations finish only when the test says so, recording how many ran at once. */
-function gatedBackend() {
-  const gates: (() => void)[] = [];
-  let running = 0;
-  let peak = 0;
-  const run = async <T>(value: T): Promise<T> => {
-    running++;
-    peak = Math.max(peak, running);
-    await new Promise<void>((resolve) => gates.push(resolve));
-    running--;
-    return value;
-  };
-  const backend: Argon2Backend = {
-    hash: () => run("$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
-    verify: () => run(true),
-  };
-  return {
-    backend,
-    started: () => gates.length,
-    peak: () => peak,
-    releaseOne: () => gates.shift()?.(),
-  };
-}
-
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("concurrency cap (risk R-VPS4)", () => {
@@ -133,6 +110,49 @@ describe("concurrency cap (risk R-VPS4)", () => {
       await tick();
     }
     await Promise.all(work);
+    expect(gated.peak()).toBe(4);
+  });
+
+  it("hands a freed slot to the waiters in arrival order (FIFO)", async () => {
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend, 1);
+    const finished: string[] = [];
+    const work = ["first", "second", "third"].map((name) => hasher.hash(name).then(() => finished.push(name)));
+    await tick();
+    expect(gated.startedWith()).toEqual(["first"]); // two callers are waiting at the same time
+    gated.releaseOne();
+    await tick();
+    expect(gated.startedWith()).toEqual(["first", "second"]);
+    gated.releaseOne();
+    await tick();
+    expect(gated.startedWith()).toEqual(["first", "second", "third"]);
+    gated.releaseOne();
+    await Promise.all(work);
+    expect(finished).toEqual(["first", "second", "third"]);
+  });
+
+  it("refuses a new caller with HasherBusyError once 32 are waiting behind the 4 running; verify too", async () => {
+    expect(MAX_QUEUED_HASHES).toBe(32);
+    const gated = gatedBackend();
+    const hasher = createPasswordHasher(gated.backend);
+    const accepted = Array.from({ length: MAX_CONCURRENT_HASHES + MAX_QUEUED_HASHES }, (_, i) => hasher.hash(`password-${i}`));
+    await tick();
+    expect(gated.started()).toBe(4);
+    await expect(hasher.hash("one-too-many")).rejects.toBeInstanceOf(HasherBusyError);
+    // A full queue is not a wrong password: verify must not answer false.
+    await expect(hasher.verify("one-too-many", "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA")).rejects.toBeInstanceOf(
+      HasherBusyError,
+    );
+
+    gated.releaseOne(); // one finishes, a waiter takes its slot: one place in the queue is free again
+    await tick();
+    const next = hasher.hash("fits-again");
+    await expect(hasher.hash("full-again")).rejects.toBeInstanceOf(HasherBusyError);
+    while (gated.started() > 0) {
+      gated.releaseOne();
+      await tick();
+    }
+    await Promise.all([...accepted, next]);
     expect(gated.peak()).toBe(4);
   });
 

@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { Hono } from "hono";
 import type { PasswordHasher } from "./auth/password.js";
-import { passwords as defaultPasswords } from "./auth/password.js";
+import { HasherBusyError, passwords as defaultPasswords } from "./auth/password.js";
 import type { RateLimiters } from "./auth/rate-limit.js";
 import type { AuthContext } from "./auth/session.js";
 import type { Config } from "./config.js";
@@ -20,7 +20,7 @@ export interface AppDeps {
   db: Db;
   hubs: HubRegistry;
   limiters: RateLimiters;
-  /** Defaults to the process-wide argon2id hasher (at most 4 hashes at once). */
+  /** Defaults to the process-wide argon2id hasher (at most 4 hashes at once, 32 waiting). */
   passwords?: PasswordHasher;
   /** Unix milliseconds; injectable for token-expiry tests. */
   now?: () => number;
@@ -79,6 +79,11 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
 
   app.onError((err, c) => {
     if (err instanceof ApiError) return c.json(errorBody(err.code, err.message), err.status);
+    if (err instanceof HasherBusyError) {
+      // argon2 is saturated (M8): the same answer as the rate limiters, and nothing logged per request.
+      const e = Errors.rateLimited();
+      return c.json(errorBody(e.code, e.message), e.status);
+    }
     logMeta("unhandled_error", { method: c.req.method, path: new URL(c.req.url).pathname, error: errorKind(err) });
     return c.json(errorBody("internal_error", "Internal error"), 500);
   });

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, expect } from "vitest";
 import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
+import type { Argon2Backend } from "../src/auth/password.js";
 import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
 import type { Config } from "../src/config.js";
 import { Db } from "../src/db/db.js";
@@ -429,6 +430,37 @@ export async function waitFor<T>(probe: () => Promise<T | null | undefined>, tim
     if (Date.now() > deadline) throw new Error("condition not met in time");
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+}
+
+/**
+ * An argon2 backend whose operations finish only when the test says so (in start order), recording
+ * how many ran at once and which passwords started, in order.
+ */
+export function gatedBackend() {
+  const gates: (() => void)[] = [];
+  const startedWith: string[] = [];
+  let running = 0;
+  let peak = 0;
+  const run = async <T>(password: Uint8Array, value: T): Promise<T> => {
+    running++;
+    peak = Math.max(peak, running);
+    startedWith.push(Buffer.from(password).toString("utf8"));
+    await new Promise<void>((resolve) => gates.push(resolve));
+    running--;
+    return value;
+  };
+  const backend: Argon2Backend = {
+    hash: (password) => run(password, "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaA"),
+    verify: (_phc, password) => run(password, true),
+  };
+  return {
+    backend,
+    /** Operations running right now (started and not yet released). */
+    started: () => gates.length,
+    startedWith: () => [...startedWith],
+    peak: () => peak,
+    releaseOne: () => gates.shift()?.(),
+  };
 }
 
 /** In-memory stand-in for a `ws` socket: records what the hub sends and how it closes it. */

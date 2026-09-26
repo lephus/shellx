@@ -90,12 +90,12 @@ describe("clientIp", () => {
     for (const peer of ["172.18.0.3", "::ffff:172.18.0.3", "10.1.2.3", "192.168.1.9", "127.0.0.1", "::1", "fd00::5"]) {
       expect(clientIp("203.0.113.7", peer)).toBe("203.0.113.7");
     }
-    expect(clientIp(" 2001:db8::1 ", "172.18.0.3")).toBe("2001:db8::1");
+    expect(clientIp(" 2001:db8::1 ", "172.18.0.3")).toBe("2001:db8:0:0::/64"); // IPv6: keyed by its /64
   });
 
   it("ignores X-Real-IP from a public peer: a client that bypasses the proxy cannot pick its key", () => {
     expect(clientIp("198.51.100.99", "203.0.113.50")).toBe("203.0.113.50");
-    expect(clientIp("198.51.100.99", "2001:db8::77")).toBe("2001:db8::77");
+    expect(clientIp("198.51.100.99", "2001:db8::77")).toBe("2001:db8:0:0::/64");
   });
 
   it("falls back to the peer address when X-Real-IP is missing or not an IP address", () => {
@@ -104,5 +104,26 @@ describe("clientIp", () => {
     expect(clientIp("not-an-ip", "172.18.0.3")).toBe("172.18.0.3");
     expect(clientIp("203.0.113.7, 10.0.0.1", "172.18.0.3")).toBe("172.18.0.3");
     expect(clientIp(undefined, undefined)).toBe("unknown");
+  });
+
+  it("keys IPv6 clients by their /64, since one subscriber usually holds a whole /64 (M12)", () => {
+    const key = (address: string) => clientIp(address, "172.18.0.3");
+    // Every address of one /64, however it is written, shares one key...
+    const sameNetwork = ["2001:db8:1:2::1", "2001:db8:1:2:aaaa:bbbb:cccc:dddd", "2001:DB8:1:2::FFFF", "2001:0db8:0001:0002::9"];
+    expect(new Set(sameNetwork.map(key))).toEqual(new Set(["2001:db8:1:2::/64"]));
+    // ...and the neighbouring /64s do not.
+    expect(key("2001:db8:1:3::1")).toBe("2001:db8:1:3::/64");
+    expect(key("2001:db8:1::1")).toBe("2001:db8:1:0::/64");
+    expect(key("::1")).toBe("0:0:0:0::/64");
+    expect(key("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+    expect(key("64:ff9b::198.51.100.7")).toBe("64:ff9b:0:0::/64");
+    // The same applies to a public IPv6 peer that connected directly.
+    expect(clientIp(undefined, "2001:db8:1:2::7")).toBe("2001:db8:1:2::/64");
+  });
+
+  it("leaves IPv4 and IPv4-mapped IPv6 addresses as plain IPv4 keys", () => {
+    expect(clientIp("203.0.113.7", "172.18.0.3")).toBe("203.0.113.7");
+    expect(clientIp("::ffff:203.0.113.7", "172.18.0.3")).toBe("203.0.113.7");
+    expect(clientIp(undefined, "::ffff:198.51.100.4")).toBe("198.51.100.4");
   });
 });

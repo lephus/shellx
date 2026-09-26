@@ -165,13 +165,12 @@ describe("presence and routing", () => {
       lines.push(args.map(String).join(" "));
     });
     vi.spyOn(db(), "run").mockImplementation(() => {
-      throw new Error("disk I/O error at /data/relay.db");
+      throw Object.assign(new Error("disk I/O error at /data/relay.db"), { code: "SQLITE_IOERR" });
     });
     clientCloses(hub, m);
     await hub.idle();
     expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
-    expect(lines.join("\n")).toContain("last_seen_write_failed");
-    expect(lines.join("\n")).toContain(mobileId);
+    expect(lines.join("\n")).toContain(`"event":"last_seen_write_failed","device_id":"${mobileId}","error":"SQLITE_IOERR"`);
     expect(lines.join("\n")).not.toContain("disk I/O");
   });
 });
@@ -556,6 +555,53 @@ describe("serial queue and lifecycle", () => {
     clientCloses(registry.forUser(userId), m);
     await done;
     expect(registry.size).toBe(0);
+  });
+
+  it("goAway records last_seen_at for every device still connected (their close events are ignored)", async () => {
+    const now = 1_900_000_000_000;
+    const { registry, userId, agentId, mobileId, user } = setup(() => now);
+    const replacedEarlier = user.device("mobile");
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(registry.forUser(userId), a, agentId, "agent");
+    await joinHub(registry.forUser(userId), m, mobileId);
+    db().run("UPDATE devices SET last_seen_at = 5 WHERE id = ?", replacedEarlier); // not connected: untouched
+    const done = registry.goAway();
+    await registry.forUser(userId).idle();
+    const seen = (id: string) => db().get<{ last_seen_at: number | null }>("SELECT last_seen_at FROM devices WHERE id = ?", id)!.last_seen_at;
+    expect(seen(agentId)).toBe(now);
+    expect(seen(mobileId)).toBe(now);
+    expect(seen(replacedEarlier)).toBe(5);
+    clientCloses(registry.forUser(userId), a);
+    clientCloses(registry.forUser(userId), m);
+    await done;
+  });
+
+  it("goAway still closes every socket with 1001 when the last_seen_at write fails, logging the error kind only", async () => {
+    const { registry, userId, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    const m = new FakeSocket();
+    await joinHub(registry.forUser(userId), a, agentId, "agent");
+    await joinHub(registry.forUser(userId), m, mobileId);
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    vi.spyOn(db(), "run").mockImplementation(() => {
+      throw Object.assign(new Error("database is locked: UPDATE devices ..."), { code: "SQLITE_BUSY" });
+    });
+    const done = registry.goAway();
+    await registry.forUser(userId).idle();
+    expect(a.closedWith).toEqual({ code: GOING_AWAY, reason: "going away" });
+    expect(m.closedWith).toEqual({ code: GOING_AWAY, reason: "going away" });
+    const output = lines.join("\n");
+    expect(output).toContain(`"event":"last_seen_write_failed","device_id":"${agentId}","error":"SQLITE_BUSY"`);
+    expect(output).toContain(`"event":"last_seen_write_failed","device_id":"${mobileId}","error":"SQLITE_BUSY"`);
+    expect(output).not.toContain("UPDATE devices");
+    expect(output).not.toContain("hub_op_failed"); // best effort: the operation itself succeeded
+    clientCloses(registry.forUser(userId), a);
+    clientCloses(registry.forUser(userId), m);
+    await done;
   });
 
   it("terminateAll drops sockets that never answered the close handshake", async () => {

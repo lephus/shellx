@@ -3,7 +3,7 @@ import type { AppEnv } from "../app.js";
 import { clientIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
 import { checkEmail, normalizeEmail } from "../auth/email.js";
-import { hashPassword } from "../auth/password.js";
+import type { PasswordHasher } from "../auth/password.js";
 import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy.js";
 import { insertToken, insertTokenIfPasswordUnchanged, requireAuth } from "../auth/session.js";
 import { generateToken, hashToken, parseBearer } from "../auth/tokens.js";
@@ -20,9 +20,15 @@ function requestIp(c: Context<AppEnv>): string {
 }
 
 let dummyPhc: Promise<string> | undefined;
-/** Verifying against a throwaway hash keeps unknown-email logins as slow as wrong-password ones. */
-function dummyHash(): Promise<string> {
-  dummyPhc ??= hashPassword("shellx-dummy-password");
+/**
+ * Verifying against a throwaway hash keeps unknown-email logins as slow as wrong-password ones.
+ * Computed once; a failed attempt (e.g. HasherBusyError while argon2 is saturated) is not kept.
+ */
+function dummyHash(passwords: PasswordHasher): Promise<string> {
+  dummyPhc ??= passwords.hash("shellx-dummy-password").catch((err: unknown) => {
+    dummyPhc = undefined;
+    throw err;
+  });
   return dummyPhc;
 }
 
@@ -80,7 +86,8 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
 
   const db = c.get("db");
   const user = db.get<{ id: string; password_hash: string }>("SELECT id, password_hash FROM users WHERE email = ?", email);
-  const passwordOk = await c.get("passwords").verify(password, user?.password_hash ?? (await dummyHash()));
+  const passwords = c.get("passwords");
+  const passwordOk = await passwords.verify(password, user?.password_hash ?? (await dummyHash(passwords)));
   if (user === undefined || !passwordOk) {
     logMeta("login_failed");
     throw Errors.invalidCredentials();
