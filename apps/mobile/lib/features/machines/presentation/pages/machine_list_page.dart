@@ -227,10 +227,15 @@ class MachineCard extends StatelessWidget {
     final colors = context.colors;
     final online = machine.online && !waiting;
     final platform = machine.platform == DevicePlatform.windows ? 'Windows' : 'macOS';
+    // R3: a machine that was just paired and has never connected to the relay has no
+    // "Lần cuối online" to show; the design is silent on this case, so it reads plain "Offline"
+    // (the same word as the group header, not upper-cased).
     final detail = waiting
         ? strings.machineWaiting
         : machine.online
         ? '${strings.machineOnline} · $platform'
+        : machine.lastSeenAt == null
+        ? strings.machinesOfflineHeader
         : strings.machineLastOnline(formatLastSeen(strings, machine.lastSeenAt, now));
     return Padding(
       key: ValueKey('machine-${machine.id}'),

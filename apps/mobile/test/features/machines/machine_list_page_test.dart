@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shellx_mobile/features/machines/domain/machine_entry.dart';
 import 'package:shellx_mobile/features/machines/presentation/controllers/machine_list_controller.dart';
+import 'package:shellx_mobile/features/machines/presentation/pages/machine_list_page.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
@@ -214,5 +216,25 @@ void main() {
     await tester.fling(find.byType(CustomScrollView), const Offset(0, 300), 1000);
     await tester.pumpAndSettle();
     expect(find.text('Thử lại sau ít phút.'), findsOneWidget);
+  });
+
+  testWidgets('R3: an offline machine never seen (lastSeenAt null) shows "Offline"', (tester) async {
+    const neverSeen = MachineEntry(
+      id: 'never-seen',
+      name: 'PC-MOI',
+      platform: DevicePlatform.windows,
+      online: false,
+      lastSeenAt: null,
+      paired: true,
+    );
+    await tester.pumpWidget(
+      localized(
+        Scaffold(
+          body: MachineCard(machine: neverSeen, waiting: false, tabs: 0, now: now, onTap: null),
+        ),
+      ),
+    );
+    expect(find.text('Offline'), findsOneWidget);
+    expect(find.textContaining('Lần cuối online'), findsNothing);
   });
 }
