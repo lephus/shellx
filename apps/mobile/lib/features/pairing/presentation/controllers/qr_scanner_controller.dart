@@ -38,8 +38,17 @@ class QrScannerController extends Controller {
 
   ReadonlySignal<ScannerStep> get step => _step;
 
+  /// True once [dispose] has run; the page's own [onCode] call checks this to swallow the race
+  /// below instead of leaking an unhandled error (fix round 1, item 1).
+  bool get isDisposed => _disposed;
+
   /// Pairs with the scanned machine; codes seen while pairing or while a result is shown are
   /// ignored.
+  ///
+  /// Fix round 1 (Critical): every `await` below can outlive the page — closing the scanner while
+  /// pairing (or while the machine-name lookup that follows a success) is in flight disposes
+  /// [_step] out from under this call. So [_disposed] is (re-)checked immediately after *every*
+  /// await, right before the next signal write, never just once up front.
   Future<void> onCode(String raw, S strings) async {
     if (_step.peek() is! Scanning) return;
     _step.value = const Pairing();
@@ -48,7 +57,9 @@ class QrScannerController extends Controller {
     if (_disposed) return;
     switch (outcome) {
       case PairingSucceeded(:final agentId):
-        _step.value = Paired(agentId: agentId, machineName: await _nameOf(agentId, strings));
+        final machineName = await _nameOf(agentId, strings);
+        if (_disposed) return;
+        _step.value = Paired(agentId: agentId, machineName: machineName);
       case PairingRejected(:final message):
         _step.value = PairingFailed(message);
     }

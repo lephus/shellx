@@ -33,7 +33,15 @@ class _QrScannerPageState extends State<QrScannerPage> {
     super.dispose();
   }
 
-  void _onCode(String raw) => _controller.onCode(raw, S.of(context));
+  /// Fire-and-forget: [MobileScanner.onDetect] cannot await it. [QrScannerController.onCode] is
+  /// itself race-safe (fix round 1), but this is a second net — closing the scanner never lets a
+  /// stray error surface as an unhandled Future error.
+  void _onCode(String raw) {
+    final strings = S.of(context);
+    _controller.onCode(raw, strings).catchError((Object error, StackTrace stackTrace) {
+      if (!_controller.isDisposed) throw error;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -269,6 +269,10 @@ class FakeBackend implements ShellxBackend {
   List<RemoteDevice> deviceList;
   List<PinnedMachine> pinnedList;
   Object? devicesError;
+
+  /// [devices] completes only once this does — a `GET /v1/devices` still in flight when something
+  /// else runs (e.g. the caller is disposed).
+  Completer<void>? devicesGate;
   final Set<String> onlineIds = {};
   RelayConnectionState relayStateValue = RelayConnectionState.connected;
   final StreamController<RelayConnectionState> _relay = StreamController<RelayConnectionState>.broadcast(sync: true);
@@ -354,6 +358,8 @@ class FakeBackend implements ShellxBackend {
 
   @override
   Future<List<RemoteDevice>> devices() async {
+    final gate = devicesGate;
+    if (gate != null) await gate.future;
     final error = devicesError;
     if (error != null) throw error;
     return deviceList;

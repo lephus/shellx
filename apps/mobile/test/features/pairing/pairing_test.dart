@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/pairing/domain/pairing_flow.dart';
 import 'package:shellx_mobile/features/pairing/presentation/controllers/qr_scanner_controller.dart';
+import 'package:shellx_mobile/features/pairing/presentation/pages/qr_scanner_page.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
@@ -170,5 +172,45 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('open'), findsOneWidget);
     });
+
+    // ---- Fix round 1 (task-15-fix1-findings.md) ----
+
+    testWidgets(
+      '(Critical) the name lookup finishing after the page closes writes nothing (no crash)',
+      (tester) async {
+        final gate = Completer<void>();
+        backend.devicesGate = gate;
+        await openScanner(tester);
+
+        scan(validCode);
+        await tester.pump();
+        // Still resolving the machine name (`devices()` is gated): the pairing overlay is up.
+        expect(find.text('Đang ghép nối…'), findsOneWidget);
+
+        // Close the scanner (as "Đóng"/system back would) while that lookup is still in flight.
+        tester.element(find.byType(QrScannerPage)).router.maybePop();
+        await tester.pumpAndSettle();
+        expect(find.text('open'), findsOneWidget);
+
+        // The gated `devices()` call now resolves, after the controller (and its signal) is
+        // disposed: this must not throw (SignalsWriteAfterDisposeError) or leak an unhandled error.
+        gate.complete();
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'R2: devices() failing right after pairing still succeeds with "Máy không xác định"',
+      (tester) async {
+        backend.devicesError = const ApiException(status: 401, code: 'unauthorized', message: 'no token');
+        await openScanner(tester);
+        scan(validCode);
+        await tester.pumpAndSettle();
+        expect(find.text('Đã ghép nối'), findsOneWidget);
+        expect(find.textContaining('Máy không xác định đã tin cậy điện thoại này.'), findsOneWidget);
+        expect(find.text('Không ghép nối được'), findsNothing);
+      },
+    );
   });
 }
