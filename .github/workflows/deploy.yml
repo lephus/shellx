@@ -1,0 +1,130 @@
+name: Deploy
+
+# Continuous deployment to the VPS (VPS spec §6.1). There is no CI (decision V5): building the relay
+# image runs every relay test, so a failing test stops the deploy before anything is pushed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'relay/**'
+      - 'web/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit SHA, tag or branch to deploy (empty = the selected branch). Pick an older commit to roll back.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  RELAY_IMAGE: ghcr.io/lephus/shellx-relay
+  WEB_IMAGE: ghcr.io/lephus/shellx-web
+  # ShellX's one folder on the VPS, relative to the deploy user's home (decision V8).
+  APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+
+jobs:
+  deploy:
+    name: Build, push and roll out
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Resolve the commit and check VPS_APP_DIR
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /"
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build the relay image (runs the relay tests)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: docker build -t "$RELAY_IMAGE:$SHA" relay
+
+      - name: Build the web image (refuses the [quốc gia] placeholder, checks pages and links)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: docker build -f web/Dockerfile -t "$WEB_IMAGE:$SHA" .
+
+      - name: Push both images
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          docker push "$RELAY_IMAGE:$SHA"
+          docker push "$WEB_IMAGE:$SHA"
+
+      - name: Install the deploy SSH key (host key pinned by VPS_KNOWN_HOSTS)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  BatchMode yes"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Sync the deploy files into VPS_APP_DIR
+        run: |
+          ssh vps "mkdir -p '$APP_DIR/nginx-proxy' '$APP_DIR/backup'"
+          rsync -rt --chmod=D755,F644 deploy/docker-compose.yml deploy/relay.env "vps:$APP_DIR/"
+          rsync -rt --delete --chmod=D755,F644 deploy/nginx-proxy/ "vps:$APP_DIR/nginx-proxy/"
+          rsync -rt --delete --chmod=D755,F644 deploy/backup/ "vps:$APP_DIR/backup/"
+
+      - name: Roll out (the previous IMAGE_TAG comes back if the relay is not healthy within 60 s)
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: ssh vps bash -s -- "$SHA" "$APP_DIR" < deploy/rollout.sh
+
+      - name: Check the public endpoints (retries while a first certificate is issued)
+        run: |
+          check() {
+            for attempt in $(seq 1 10); do
+              if curl -fsS -o /dev/null "$1"; then
+                echo "$1 answers"
+                return 0
+              fi
+              echo "$1 not answering yet (attempt $attempt/10)"
+              sleep 15
+            done
+            echo "::error::$1 did not answer after 10 attempts"
+            return 1
+          }
+          check https://relay.shellx.pro/v1/version
+          check https://shellx.pro/
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/config

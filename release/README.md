@@ -9,7 +9,8 @@
 
 **Triggers**
 
-- Pushing a tag `desktop-vX.Y.Z` runs a real release: build, sign, notarize, upload to R2.
+- Pushing a tag `desktop-vX.Y.Z` runs a real release: build, sign, notarize, upload to
+  `download.shellx.pro` (rsync into the VPS folder `downloads/desktop/<version>/`).
 - **Actions → Release desktop → Run workflow** with `dry_run` checked (the default) builds and
   packages only: the macOS app gets an ad-hoc signature, the installer is unsigned, nothing is
   uploaded, and the files are attached to the run as artifacts `macos-dmg` and
@@ -32,15 +33,16 @@
 | `windows/build-installer.ps1` | Find (or install) Inno Setup 6.7.1 and compile `shellx.iss` |
 | `tests/*.test.mjs` | `node --test release/tests/*.test.mjs` (the macOS script tests run only on macOS) |
 
-**Why `wrangler r2 object put` for the upload:** it is the tool the relay already uses, it
-authenticates with one Cloudflare API token (no separate S3 access key pair, endpoint URL or AWS
-CLI configuration), and it sets `Content-Type`, `Content-Disposition` and `Cache-Control` in one
-command. Its 300 MiB single-upload limit is far above the installer sizes. `--remote` is
-mandatory: without it Wrangler 4 writes to a local simulated bucket and still reports success.
+**Upload:** the `publish` job rsyncs both files over SSH into
+`$VPS_APP_DIR/downloads/desktop/<version>/` on the VPS (default `~/phu/shellx`), with the same
+`VPS_*` secrets as `deploy.yml`. The `web` container serves that folder at `download.shellx.pro`
+with `Content-Disposition: attachment` and a one-year immutable `Cache-Control`
+(`deploy/web/nginx.conf`). rsync writes to a temporary name and renames it, so a half-uploaded file
+is never served under the real name.
 
 ## GitHub secrets
 
-All 13 secrets below must be created as **Environment secrets** of a GitHub Environment named
+All 11 secrets below must be created as **Environment secrets** of a GitHub Environment named
 `release`, allowing the tag pattern `desktop-v*` and branch `main` (Settings → Environments → **New environment**
 → name `release` → **Deployment branches and tags** → **Selected branches and tags** → add rules
 `desktop-v*` and `main`; main is protected by PR review, and dry-run steps never use these secrets;
@@ -65,12 +67,13 @@ Settings → Environments → `release` → **Environment secrets** → **Add se
 | `AZURE_SIGNING_ENDPOINT` | windows | Signing account endpoint for its region, e.g. `https://weu.codesigning.azure.net/` |
 | `AZURE_SIGNING_ACCOUNT_NAME` | windows | Artifact Signing account name |
 | `AZURE_CERTIFICATE_PROFILE_NAME` | windows | Certificate profile name (Public Trust) |
-| `CLOUDFLARE_API_TOKEN` | publish | API token with **Account → Workers R2 Storage → Edit** |
-| `CLOUDFLARE_ACCOUNT_ID` | publish | Cloudflare account ID that owns the R2 bucket and the `shellx.pro` zone |
+The `publish` job also reads the **repository** secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`,
+`VPS_KNOWN_HOSTS` and the variable `VPS_APP_DIR`, shared with `deploy.yml` (see `deploy/README.md`).
+Delete the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 
-The bucket name (`shellx-downloads`), the public base URL (`https://download.shellx.pro`), Flutter
-3.41.7 and Wrangler 4.139.0 are pinned in the workflow's `env:` block. The workflow expects the
-names fixed by `apps/desktop`: `ShellX.app` with bundle id `pro.shellx.desktop`, and `ShellX.exe`.
+The public base URL (`https://download.shellx.pro`) and Flutter 3.41.7 are pinned in the workflow's
+`env:` block. The workflow expects the names fixed by `apps/desktop`: `ShellX.app` with bundle id
+`pro.shellx.desktop`, and `ShellX.exe`.
 
 ## One-time setup
 
@@ -109,41 +112,37 @@ names fixed by `apps/desktop`: `ShellX.app` with bundle id `pro.shellx.desktop`,
    Profile Signer** (older portals: "Trusted Signing Certificate Profile Signer") → the app
    registration.
 
-### 3. Cloudflare R2 and `download.shellx.pro`
+### 3. `download.shellx.pro` on the VPS
 
-1. R2 → **Create bucket** → name `shellx-downloads`.
-2. Bucket → Settings → **Custom Domains** → Add → `download.shellx.pro` → Connect. Leave the
-   `r2.dev` public URL disabled.
-3. My Profile → API Tokens → **Create Token** → Custom token → Permissions: **Account → Workers R2
-   Storage → Edit**, Account resources: the ShellX account → `CLOUDFLARE_API_TOKEN`.
-4. Account ID (Workers & Pages overview, right column) → `CLOUDFLARE_ACCOUNT_ID`.
-5. Check: `curl -s -o /dev/null -w '%{http_code}\n' https://download.shellx.pro/desktop/0.0.0/none`
+1. Set up the VPS as described in `deploy/README.md`: the `web` container serves
+   `~/phu/shellx/downloads/` at `download.shellx.pro`, and the four `VPS_*` repository secrets let
+   the `publish` job upload into it.
+2. Check: `curl -s -o /dev/null -w '%{http_code}\n' https://download.shellx.pro/desktop/0.0.0/none`
    prints `404`.
 
 ### 4. GitHub
 
 1. Settings → Environments → **New environment** → name `release`, allow deployment for tags
    matching `desktop-v*` and branch `main` (main is protected by PR review; dry-run steps do not
-   access secrets; optionally add required reviewers), then add the 13 secrets above to it
+   access secrets; optionally add required reviewers), then add the 11 secrets above to it
    as Environment secrets (see "GitHub secrets" above).
 2. Recommended: Settings → Rules → Rulesets → **New tag ruleset** targeting `desktop-v*`,
    restricting creation and deletion to maintainers.
 3. Run one dry run (next section, step 2) to validate the toolchain before the first real release.
-4. After the first full CI run on `feat/shellx-v1` → `main` finishes, make the `CI result` check
-   required on `main`: Settings → Branches (or Rules → Rulesets) → add a rule for `main` →
-   **Require status checks to pass before merging** → select `CI result`.
+4. There is no CI (VPS spec, decision V5): run the Dart, desktop and mobile tests on your machine
+   before merging to `main` and before tagging.
 
 ## Releasing version X.Y.Z
 
 **First release only (v1.0.0):** `web/src/site.config.json` already ships with
 `"desktopVersion": "1.0.0"` (see `web/README.md`). If the website is deployed before this
-procedure has published `1.0.0` to R2, its download buttons 404. Run this whole procedure for
-`1.0.0` — through step 5 (Relay) at least — before the branch containing `web/` is merged to `main`
-and deployed by Cloudflare Pages; step 6 below then only has to confirm the version already
-matches.
+procedure has published `1.0.0` to `download.shellx.pro`, its download buttons 404. Run this whole
+procedure for `1.0.0` — through step 5 (Relay) at least — before the branch containing `web/` is
+merged to `main` and deployed by `deploy.yml`; step 6 below then only has to confirm the version
+already matches.
 
-1. Set `version: X.Y.Z+N` in `apps/desktop/pubspec.yaml` (increase `N` every release), merge to
-   `main`, wait for CI.
+1. Set `version: X.Y.Z+N` in `apps/desktop/pubspec.yaml` (increase `N` every release), run the
+   desktop tests locally, merge to `main`.
 2. **Dry run:** Actions → Release desktop → Run workflow → branch `main`, version `X.Y.Z`,
    `dry_run` checked. Download the `macos-dmg` and `windows-installer` artifacts and smoke-test them
    (macOS: right-click → Open, because the dry-run app is ad-hoc signed; Windows: SmartScreen →
@@ -158,22 +157,21 @@ matches.
    Mac, download the dmg in a browser, drag ShellX to Applications and open it: macOS must show only
    the standard "downloaded from the Internet" prompt. On Windows, the installer's signature must
    show the publisher.
-5. **Relay:** in `relay/wrangler.jsonc`, edit the `vars` of the production environment
-   (`env.production.vars`), which feed `GET /v1/version`:
+5. **Relay:** in `deploy/relay.env`, edit the values that feed `GET /v1/version`:
    - `LATEST_AGENT_VERSION` → `X.Y.Z`
    - `MAC_URL` → `https://download.shellx.pro/desktop/X.Y.Z/ShellX-X.Y.Z.dmg`
    - `WIN_URL` → `https://download.shellx.pro/desktop/X.Y.Z/ShellX-Setup-X.Y.Z.exe`
    - `MIN_AGENT` / `MIN_MOBILE` → raise only to force older agents / mobile apps to update.
 
-   Deploy the relay to production (see `relay/README.md`), then check that
+   Push to `main`: `deploy.yml` restarts the relay with the new values. Then check that
    `curl -s https://relay.shellx.pro/v1/version` shows `"version":"X.Y.Z"` and both URLs under
    `latest_agent`. Running agents show the update notice within 24 hours.
 6. **Website:** set `"desktopVersion": "X.Y.Z"` in `web/src/site.config.json`, run
    `npm ci && CHECK_DOWNLOADS=1 npm run build` in `web/` (the "installer URLs are live" check must
-   pass), merge to `main`. Cloudflare Pages deploys it.
+   pass), merge to `main`; `deploy.yml` deploys it.
 
 Order matters: installers first, then the relay (which tells running agents to update), then the
-website. The relay and the website must never link to files that are not on R2 yet.
+website. The relay and the website must never link to files that are not on `download.shellx.pro` yet.
 
 ## When something goes wrong
 
@@ -181,9 +179,8 @@ website. The relay and the website must never link to files that are not on R2 y
   platform jobs succeed). `notarize.sh` prints the notary log; the usual cause is nested code
   without hardened runtime or a secure timestamp. Fix it, then move the tag:
   `git push --delete origin desktop-vX.Y.Z && git tag -f desktop-vX.Y.Z && git push origin desktop-vX.Y.Z`.
-- **`publish` failed after uploading one file:** delete it with
-  `npx wrangler@4.139.0 r2 object delete shellx-downloads/desktop/X.Y.Z/<file> --remote`, then
-  **Re-run failed jobs**.
+- **`publish` failed after uploading one file:** delete it on the VPS
+  (`rm ~/phu/shellx/downloads/desktop/X.Y.Z/<file>`), then **Re-run failed jobs**.
 - **A broken installer was published:** do not overwrite it. Objects are served with
   `Cache-Control: immutable` for a year and `publish` refuses existing versions. Release
   `X.Y.(Z+1)`.
