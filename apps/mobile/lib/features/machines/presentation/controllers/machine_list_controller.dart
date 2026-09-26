@@ -44,6 +44,10 @@ class MachineListController extends Controller {
   late final StreamSubscription<RelayConnectionState> _relay;
   bool _disposed = false;
 
+  /// Bumped by every [refresh]; a call whose requests come back after a later one started
+  /// discards its own result instead of applying it (see [_load]).
+  int _refreshGeneration = 0;
+
   /// Online machines first, then offline, each sorted by name; agents only. A failed refresh
   /// keeps the last list and holds the spec §12 text in `state.error` — `ShellxBackend.devices()`
   /// and `pinnedMachines()` (a Keychain/Keystore read) can both throw, and neither is ever left
@@ -62,14 +66,22 @@ class MachineListController extends Controller {
   /// `WorkspaceRegistry.tabCount`, so a `computed`/`Watch` reading this follows it.
   int tabsOpen(String agentId) => _registry?.tabCount(agentId) ?? 0;
 
-  /// "Kết nối lại" after close code 4001 (spec §12).
-  void reconnectReplaced() => unawaited(_onReconnectReplaced?.call());
+  /// "Kết nối lại" after close code 4001 (spec §12). The real path (`resume()` →
+  /// `ClientService.start()` → loading the pinned machines) reads secure storage and can throw;
+  /// guarded so that failure shows the spec §12 text as a toast instead of going unhandled.
+  void reconnectReplaced() => unawaited(guard(() async => _onReconnectReplaced?.call()));
 
-  Future<void> refresh() => mainStateGuard(_load, state: state);
+  Future<void> refresh() {
+    final generation = ++_refreshGeneration;
+    return mainStateGuard(() => _load(generation), state: state);
+  }
 
-  Future<MachineList> _load() async {
+  Future<MachineList> _load(int generation) async {
     final devices = await _backend.devices();
     final pinned = {for (final machine in await _backend.pinnedMachines()) machine.agentId};
+    // A later refresh() may already have started (or finished) by the time this one's requests
+    // come back: let it win rather than overwrite it with this now-stale snapshot.
+    if (generation != _refreshGeneration) return state.peek();
     final live = _backend.relayState == RelayConnectionState.connected;
     return _sorted([
       for (final device in devices)

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
@@ -5,6 +7,7 @@ import 'package:shellx_mobile/features/machines/presentation/controllers/machine
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
+import '../../support/fake_popup_handler.dart';
 import '../../support/fakes.dart';
 
 void main() {
@@ -145,5 +148,43 @@ void main() {
 
     await workspace.openNew((cols: 80, rows: 24));
     expect(seen.last, 2);
+  });
+
+  test('reconnectReplaced: a failure to restart shows the popup error, never unhandled', () async {
+    final popups = FakePopupHandler();
+    getIt.registerSingleton<PopupHandler>(popups);
+    addTearDown(getIt.reset);
+
+    final failing = MachineListController(
+      backend: backend,
+      onReconnectReplaced: () async => throw StateError('boom'),
+      now: () => now,
+    );
+    addTearDown(failing.dispose);
+
+    failing.reconnectReplaced();
+    await pumpEventQueue();
+
+    expect(popups.errors, isNotEmpty);
+  });
+
+  test('two concurrent refreshes: the one that started later keeps its data, even though the '
+      'earlier one resolves last', () async {
+    backend.deviceList = [agentDevice(agentA, 'first-result')];
+    final gate = Completer<void>();
+    backend.devicesGate = gate;
+    final first = controller.refresh(); // generation 1, blocked inside devices()
+
+    backend.devicesGate = null;
+    backend.deviceList = [agentDevice(agentA, 'second-result')];
+    await controller.refresh(); // generation 2, resolves at once
+    expect(names(), ['second-result']);
+
+    // What the stale call would fetch once released; must not end up applied.
+    backend.deviceList = [agentDevice(agentA, 'stale-first-result')];
+    gate.complete();
+    await first;
+
+    expect(names(), ['second-result']);
   });
 }
