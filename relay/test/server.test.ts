@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { createConnection } from "node:net";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { passwords, type PasswordHasher } from "../src/auth/password.js";
@@ -9,7 +10,7 @@ import { GOING_AWAY } from "../src/hub/user-hub.js";
 import { pairingRemovedEvent } from "../src/protocol/frames.js";
 import type { RunningRelay } from "../src/relay.js";
 import {
-  call, connect, db, hex, loginDevice, makeApp, newPairingId, pair, registerAccount, tempDir, type TestApp,
+  call, connect, db, hex, loginDevice, makeApp, newPairingId, onCleanup, pair, registerAccount, tempDir, type TestApp,
 } from "./helpers.js";
 
 const RELAY_DIR = join(import.meta.dirname, "..");
@@ -56,6 +57,31 @@ function remote(port: number): TestApp {
   return { ready: Promise.resolve({ port, url: `http://127.0.0.1:${port}` } as RunningRelay) };
 }
 
+/** Sends `request` on a raw TCP connection, returns the status line of the answer and resets (RST) the connection. */
+function statusThenReset(port: number, request: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection(port, "127.0.0.1", () => socket.write(request));
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("no answer within 2s"));
+    }, 2000);
+    socket.once("data", (chunk: Buffer) => {
+      clearTimeout(timer);
+      socket.resetAndDestroy();
+      resolve(chunk.toString("latin1").split("\r\n")[0]!);
+    });
+    socket.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+const BAD_TOKEN_WEBSOCKET_UPGRADE =
+  "GET /v1/ws HTTP/1.1\r\nHost: relay.shellx.pro\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
+  "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nAuthorization: Bearer bogus\r\n\r\n";
+const H2C_UPGRADE = "GET /v1/version HTTP/1.1\r\nHost: relay.shellx.pro\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n";
+
 describe("startup failures exit 1 with a one-line error", () => {
   it("a missing required variable", async () => {
     const { MIN_AGENT: _missing, ...rest } = VERSION_ENV;
@@ -96,6 +122,28 @@ describe("startup failures exit 1 with a one-line error", () => {
     } finally {
       chmodSync(dir, 0o755);
     }
+  });
+});
+
+describe("hostile clients", () => {
+  it("survives a client that resets the connection right after a refused upgrade (401, then 400)", async () => {
+    const server = startServer({ ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db") });
+    onCleanup(() => server.child.kill("SIGKILL"));
+    const port = await waitForListening(server.output);
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // the RST reaches the relay
+
+    expect(await statusThenReset(port, BAD_TOKEN_WEBSOCKET_UPGRADE)).toBe("HTTP/1.1 401 Unauthorized");
+    await settle();
+    expect(server.child.exitCode).toBeNull();
+    expect(await statusThenReset(port, H2C_UPGRADE)).toBe("HTTP/1.1 400 Bad Request");
+    await settle();
+    expect(server.child.exitCode).toBeNull();
+    expect((await call(remote(port), "GET", "/v1/version")).status).toBe(200);
+
+    server.child.kill("SIGTERM");
+    const result = await server.exit;
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
   });
 });
 

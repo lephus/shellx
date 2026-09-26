@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
-import { call, db, makeApp, upgradeStatus } from "./helpers.js";
+import { call, db, makeApp, upgradeStatus, waitFor } from "./helpers.js";
 
 describe("app skeleton", () => {
   it("GET /v1/version returns the configured versions", async () => {
@@ -70,4 +70,31 @@ describe("app skeleton", () => {
 
     expect(await upgradeStatus(app, "not-a-real-token")).toBe(401);
   });
+
+  const refusedUpgrades = [
+    ["a non-WebSocket upgrade (400)", "GET /v1/version HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n", "HTTP/1.1 400"],
+    [
+      "a WebSocket upgrade with a bad token (401)",
+      "GET /v1/ws HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nAuthorization: Bearer bogus\r\n\r\n",
+      "HTTP/1.1 401",
+    ],
+  ] as const;
+  for (const [name, request, status] of refusedUpgrades) {
+    it(`destroys the socket of ${name} once the linger expires, even if the client keeps its end open`, async () => {
+      const relay = await makeApp({}, { refusedUpgradeLingerMs: 100 }).ready;
+      const socket = connect({ port: relay.port, host: "127.0.0.1", allowHalfOpen: true });
+      socket.on("error", () => {
+        // the relay may reset it; only the server-side connection count matters here
+      });
+      socket.write(request);
+      const answer = await new Promise<string>((resolve) => socket.once("data", (chunk: Buffer) => resolve(chunk.toString("latin1"))));
+      expect(answer.startsWith(status)).toBe(true);
+      const openConnections = () =>
+        new Promise<number>((resolve, reject) => relay.server.getConnections((err, count) => (err ? reject(err) : resolve(count))));
+      expect(await openConnections()).toBe(1); // our FIN is sent; the client never sends its own
+      await waitFor(async () => ((await openConnections()) === 0 ? true : null), 2000);
+      socket.destroy();
+    });
+  }
 });

@@ -1,8 +1,10 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Duplex } from "node:stream";
 import { createAdaptorServer } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { createApp, type AppDeps } from "./app.js";
+import { errorKind, logMeta } from "./log.js";
 
 /**
  * Largest WebSocket message `ws` will read (Cloudflare's limit was also 1 MiB). Frames above
@@ -14,10 +16,15 @@ export const MAX_WS_MESSAGE_BYTES = 1024 * 1024;
 /** Shutdown waits at most this long for sockets to close and requests to finish (spec §4.3). */
 export const SHUTDOWN_GRACE_MS = 5000;
 
+/** How long a refused upgrade's socket may stay open after our answer before it is destroyed. */
+export const REFUSED_UPGRADE_LINGER_MS = 5000;
+
 export interface ListenOptions {
   host: string;
   /** 0 picks a free port (tests). */
   port: number;
+  /** Defaults to REFUSED_UPGRADE_LINGER_MS; shorter in tests. */
+  refusedUpgradeLingerMs?: number;
 }
 
 export interface RunningRelay {
@@ -31,6 +38,17 @@ export interface RunningRelay {
    * caller closes the database afterwards.
    */
   shutdown(graceMs?: number): Promise<void>;
+}
+
+/**
+ * After we answered and ended our side of a refused upgrade, the server (allowHalfOpen) keeps the
+ * socket until the client closes its side. A client that never does would hold the file descriptor
+ * forever, so the socket is destroyed once `ms` has passed (M4); the delay lets a well-behaved
+ * client read the answer and close first, so it never sees a reset.
+ */
+function destroyAfterLinger(socket: Duplex, ms: number): void {
+  const timer = setTimeout(() => socket.destroy(), ms).unref();
+  socket.once("close", () => clearTimeout(timer));
 }
 
 /** Counts requests in flight so shutdown can wait for them. */
@@ -78,16 +96,33 @@ export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<
   // everything else to the adaptor's listener unchanged. The adaptor relies on exactly one
   // `upgrade` listener being registered (its reject path checks `listenerCount === 1`), so we
   // replace it in place rather than adding a second one.
+  const lingerMs = listen.refusedUpgradeLingerMs ?? REFUSED_UPGRADE_LINGER_MS;
   const [adaptorUpgrade] = server.listeners("upgrade");
   if (adaptorUpgrade) {
     server.removeListener("upgrade", adaptorUpgrade as (...args: unknown[]) => void);
-    server.on("upgrade", (req, socket, head) => {
+    server.on("upgrade", (req, socket: Duplex, head) => {
+      // Node removes the HTTP server's own `error` listener before emitting `upgrade`, and nothing
+      // else adds one until `ws` takes the socket over: a client that resets the connection (RST)
+      // after a refused upgrade, or while its token is being checked, would otherwise raise an
+      // unhandled `error` event and kill the process (C1).
+      socket.on("error", () => socket.destroy());
       const upgrade = req.headers.upgrade;
       if (typeof upgrade !== "string" || upgrade.toLowerCase() !== "websocket") {
         socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        destroyAfterLinger(socket, lingerMs);
         return;
       }
-      (adaptorUpgrade as (...args: unknown[]) => void).call(server, req, socket, head);
+      const handled = (adaptorUpgrade as (...args: unknown[]) => unknown).call(server, req, socket, head);
+      void Promise.resolve(handled).then(
+        () => {
+          // The adaptor refused the upgrade (401, 426, 500): it wrote the status and ended its side.
+          if (socket.writableEnded) destroyAfterLinger(socket, lingerMs);
+        },
+        (err: unknown) => {
+          logMeta("ws_upgrade_failed", { error: errorKind(err) });
+          socket.destroy();
+        },
+      );
     });
   }
 

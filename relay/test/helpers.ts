@@ -11,7 +11,7 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
-import { startRelay, type RunningRelay } from "../src/relay.js";
+import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
 // ---- configuration used by every test relay ---------------------------------------------------
 
@@ -117,12 +117,13 @@ export interface TestApp {
 
 /**
  * Starts a real relay (HTTP server + WebSocket upgrade) for this test, over the test's database and
- * hub registry, with rate limits off. `deps` overrides any dependency for this app only.
+ * hub registry, with rate limits off. `deps` overrides any dependency for this app only; `listen`
+ * overrides listen options other than the address.
  */
-export function makeApp(deps: Partial<AppDeps> = {}): TestApp {
+export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
   const ready = startRelay(
     { config: TEST_CONFIG, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
-    { host: "127.0.0.1", port: 0 },
+    { ...listen, host: "127.0.0.1", port: 0 },
   );
   onCleanup(async () => {
     const relay = await ready;
