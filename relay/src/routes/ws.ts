@@ -7,7 +7,7 @@ import { authenticate } from "../auth/session.js";
 import { parseBearer } from "../auth/tokens.js";
 import type { HubSocket } from "../hub/user-hub.js";
 import { Errors } from "../http/errors.js";
-import { logMeta } from "../log.js";
+import { errorKind, logMeta } from "../log.js";
 import { CloseCode } from "../protocol/frames.js";
 
 /** Close code for a connection the hub could not admit (its tombstones could not be read). */
@@ -70,8 +70,8 @@ export const webSocketUpgrade = upgradeWebSocket(
         if ((await authenticate(db, token, now())) === null) {
           await hubs.forUser(auth.userId).closeConnection(connId, CloseCode.revoked);
         }
-      } catch {
-        logMeta("ws_recheck_failed", { device_id: auth.deviceId });
+      } catch (err) {
+        logMeta("ws_recheck_failed", { device_id: auth.deviceId, error: errorKind(err) });
         try {
           await hubs.forUser(auth.userId).closeConnection(connId, CloseCode.revoked);
         } catch {
@@ -99,5 +99,5 @@ export const webSocketUpgrade = upgradeWebSocket(
       },
     };
   },
-  { onError: () => logMeta("ws_handler_error") },
+  { onError: (err) => logMeta("ws_handler_error", { error: errorKind(err) }) },
 );

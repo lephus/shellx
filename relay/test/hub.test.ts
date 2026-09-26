@@ -43,6 +43,38 @@ function registryRacingConnect(before: () => Promise<void>, after?: () => Promis
   } as unknown as HubRegistry;
 }
 
+/**
+ * A registry whose connect() holds every one of the first `count` callers at a barrier until all
+ * of them have arrived — proving they are genuinely pending at the same time, rather than the
+ * async token hash before this point coincidentally letting one finish before the next starts —
+ * then releases them all together into the real hub in the same tick (Review Focus 1).
+ */
+function registryBarrierForConnects(count: number, onArrival: (pending: number) => void): HubRegistry {
+  const real = hubs();
+  let pending = 0;
+  let release: (() => void) | undefined;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    forUser: (userId: string) => {
+      const hub = real.forUser(userId);
+      return {
+        connect: async (socket: HubSocket, meta: ConnectionMeta) => {
+          pending++;
+          onArrival(pending); // fires while every caller so far is still stuck below, not yet in the hub
+          if (pending >= count) release!();
+          await barrier;
+          return hub.connect(socket, meta);
+        },
+        receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
+        disconnected: (socket: HubSocket) => hub.disconnected(socket),
+        closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
+      };
+    },
+  } as unknown as HubRegistry;
+}
+
 describe("GET /v1/ws", () => {
   it("rejects a plain GET with 426 upgrade_required", async () => {
     const res = await call(makeApp(), "GET", "/v1/ws");
@@ -96,7 +128,18 @@ describe("GET /v1/ws", () => {
     });
     const socket = await connect(racing, mobile.token); // the upgrade itself still succeeds...
     expect(await socket.closed).toEqual({ code: 4002, reason: "revoked" }); // ...but is then closed
-    await call(app, "GET", "/v1/version"); // the normal app is unaffected
+    expect((await call(app, "GET", "/v1/version")).status).toBe(200); // the normal app is unaffected
+  });
+
+  it("closes the socket with 1011 internal_error if the hub rejects the join, e.g. a database error", async () => {
+    const { mobile } = await accountWithAgentAndMobile();
+    const racing = makeApp({
+      hubs: registryRacingConnect(async () => {
+        throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+      }),
+    });
+    const socket = await connect(racing, mobile.token); // the upgrade itself still succeeds...
+    expect(await socket.closed).toEqual({ code: 1011, reason: "internal_error" }); // ...but is then closed
   });
 
   it("fails closed if the post-join re-check itself errors, e.g. a database error", async () => {
@@ -144,7 +187,17 @@ describe("GET /v1/ws", () => {
   it("two sockets of the same device racing in one tick: exactly one survives, peers never see it offline", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();
     const a = await connect(app, agent.token);
-    const [first, second] = await Promise.all([connect(app, mobile.token), connect(app, mobile.token)]);
+    let maxPending = 0;
+    const racing = makeApp({
+      hubs: registryBarrierForConnects(2, (pending) => {
+        maxPending = Math.max(maxPending, pending);
+      }),
+    });
+    const [first, second] = await Promise.all([connect(racing, mobile.token), connect(racing, mobile.token)]);
+    // Proves the barrier really held both connects pending at once: this can only reach 2 if the
+    // second call arrived while the first was still stuck below, not after the first had already
+    // finished (which is what the async token hash alone let happen, undetected, before this fix).
+    expect(maxPending).toBe(2);
     const closed = await Promise.race([
       first.closed.then((info) => ({ loser: first, winner: second, info })),
       second.closed.then((info) => ({ loser: second, winner: first, info })),

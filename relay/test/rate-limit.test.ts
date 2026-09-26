@@ -105,7 +105,7 @@ describe("budget survives reconnects", () => {
     expect((await again.nextBinary())[3]).toBe(RelayErrorCode.peerOffline);
     again.send(encodeData(crypto.randomUUID(), CH, Uint8Array.of(4))); // the 501st: over budget
     expect(hex(await again.nextBinary())).toBe(hex(encodeError(RelayErrorCode.rateLimited)));
-    expect((await again.closed).code).toBe(4003);
+    expect(await again.closed).toEqual({ code: 4003, reason: "rate_limited" });
   });
 
   it("keeps routing, presence, replacement and heartbeat working after the hub is dropped and re-created", async () => {

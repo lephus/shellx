@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach } from "vitest";
+import { afterEach, expect } from "vitest";
 import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
 import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
@@ -180,11 +180,17 @@ export async function call(app: TestApp, method: string, path: string, options: 
 
 /** Like `call`, but the body is streamed in `chunks` with no Content-Length (chunked encoding). */
 export async function callStreamed(app: TestApp, method: string, path: string, chunks: Uint8Array[]): Promise<TestResponse> {
-  return request(app, method, path, { "Content-Type": "application/json", "X-Real-IP": "203.0.113.7" }, chunks);
+  return request(app, method, path, { "Content-Type": "application/json", "X-Real-IP": "203.0.113.7" }, chunks, (req) => {
+    // The old Workers fixture asserted this on the Request object before sending it: prove this
+    // harness genuinely exercises the no-Content-Length (counted-as-it-streams) code path too,
+    // rather than accidentally taking the same fast path as a request with a known length.
+    expect(req.getHeader("content-length")).toBeUndefined();
+  });
 }
 
 async function request(
   app: TestApp, method: string, path: string, headers: Record<string, string>, chunks: Uint8Array[],
+  onRequest?: (req: http.ClientRequest) => void,
 ): Promise<TestResponse> {
   const { port } = await app.ready;
   return new Promise((resolve, reject) => {
@@ -200,6 +206,7 @@ async function request(
       });
       res.on("error", reject);
     });
+    onRequest?.(req);
     req.on("error", reject);
     for (const chunk of chunks) req.write(chunk);
     req.end();

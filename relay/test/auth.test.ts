@@ -138,12 +138,15 @@ describe("production rate limits (createRateLimiters, keyed by X-Real-IP)", () =
       lines.push(args.map(String).join(" "));
     });
     const email = randomEmail();
+    const statuses: number[] = [];
     for (let i = 0; i < 12; i++) {
-      await call(app, "POST", "/v1/auth/login", {
+      const res = await call(app, "POST", "/v1/auth/login", {
         ip: "198.51.100.13",
         body: { email, password: "wrong password", device: deviceBody("mobile") },
       });
+      statuses.push(res.status);
     }
+    expect(statuses).toContain(429); // otherwise this proves nothing about a refused request
     const output = lines.join("\n");
     expect(output).not.toContain("198.51.100.13");
     expect(output).not.toContain(email);
