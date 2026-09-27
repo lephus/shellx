@@ -52,9 +52,12 @@ export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
  */
 export const MAX_PENDING_SENDS = 1024;
 /**
- * How long a slow receiver's 1013 close handshake may take before the socket is dropped outright.
- * Its close frame waits behind the very backlog that made it slow, so `ws` would otherwise hold that
- * backlog for its own 30 s close timeout. shellx_core treats the resulting 1006 like 1013.
+ * How long the close handshake of any socket the hub closes (1013 slow receiver, 4001 replaced,
+ * 4002 revoked, 4003 rate limited) may take before the socket is dropped outright. Its close frame
+ * waits behind whatever backlog the socket has, and a socket being closed no longer counts as live
+ * (nor against MAX_LIVE_DEVICES_PER_ACCOUNT), so `ws` would otherwise hold that backlog for its own
+ * close timeout. shellx_core treats the resulting 1006 like the code it replaces: 4001 was already
+ * replaced, 4002 reconnects into HTTP 401 (revoked), 1013 and 4003 reconnect with backoff.
  */
 export const SLOW_RECEIVER_CLOSE_MS = 1000;
 /**
@@ -124,7 +127,7 @@ const CLOSE_REASONS: Record<CloseCode, string> = {
  */
 export class HubState {
   private readonly sockets = new Map<HubSocket, Attachment>();
-  /** Slow receivers closed with 1013, dropped if their close event has not come in time. */
+  /** Sockets the hub closed (1013, 4001, 4002, 4003), dropped if their close event has not come in time. */
   private readonly dropTimers = new Map<HubSocket, NodeJS.Timeout>();
   private tail: Promise<unknown> = Promise.resolve();
   private pending = 0;
@@ -149,8 +152,11 @@ export class HubState {
    * 4003 or 1013 whose close event has not arrived) is terminated first, so a device reconnecting in
    * a loop never has more than one closing socket holding relay memory. The newcomer gets a PRESENCE
    * snapshot of the other online devices, then (for an agent) every pairing_removed tombstone; the
-   * others see it come online. Rejects (with the socket untouched) if the tombstones cannot be read,
-   * so the caller can close it.
+   * others see it come online. The newcomer's own snapshot skips the backlog check: the socket is
+   * brand new, and an agent with more than ~1000 tombstones would otherwise trip MAX_PENDING_SENDS
+   * on its own replay and be closed with 1013 on every connect. Anything sent to it later is
+   * checked. Rejects (with the socket untouched) if the tombstones cannot be read, so the caller can
+   * close it.
    */
   connect(socket: HubSocket, meta: ConnectionMeta): Promise<void> {
     return this.enqueue("connect", () => {
@@ -173,11 +179,11 @@ export class HubState {
       // The device's frame budget is deliberately NOT reset here (see FrameBudgets).
       this.sockets.set(socket, { device_id: meta.deviceId, kind: meta.kind, conn_id: meta.connId, closing: false });
       for (const other of this.liveDeviceIds()) {
-        if (other !== meta.deviceId) this.sendTo(socket, encodePresence(other, true));
+        if (other !== meta.deviceId) safeSend(socket, encodePresence(other, true));
       }
       this.broadcast(encodePresence(meta.deviceId, true), meta.deviceId);
       for (const row of tombstones) {
-        this.sendTo(socket, pairingRemovedEvent(meta.deviceId, row.mobile_id, row.pairing_id));
+        safeSend(socket, pairingRemovedEvent(meta.deviceId, row.mobile_id, row.pairing_id));
       }
     });
   }
@@ -429,12 +435,30 @@ export class HubState {
     );
   }
 
-  /** Marks the socket as closed by the hub, then closes it with `code`. */
+  /**
+   * Marks the socket as closed by the hub, then closes it with `code` (4001, 4002 or 4003); dropped
+   * outright if its close has not completed SLOW_RECEIVER_CLOSE_MS later (see `dropLater`).
+   */
   private closeSocket(socket: HubSocket, code: CloseCode): void {
     const me = this.sockets.get(socket);
     if (me === undefined || me.closing) return;
     me.closing = true;
     safeClose(socket, code, CLOSE_REASONS[code]);
+    this.dropLater(socket);
+  }
+
+  /**
+   * Terminates `socket` if its close event has not come SLOW_RECEIVER_CLOSE_MS from now. The timer
+   * is unref'd (it never keeps the process alive) and cleared by `disconnected`.
+   */
+  private dropLater(socket: HubSocket): void {
+    if (this.dropTimers.has(socket)) return;
+    const timer = setTimeout(() => {
+      this.dropTimers.delete(socket);
+      safeTerminate(socket);
+    }, SLOW_RECEIVER_CLOSE_MS);
+    timer.unref();
+    this.dropTimers.set(socket, timer);
   }
 
   /**
@@ -498,19 +522,14 @@ export class HubState {
   /**
    * Closes a slow receiver with 1013 and announces it offline. Its close frame waits behind the
    * backlog, so the socket is terminated if its close event has not come SLOW_RECEIVER_CLOSE_MS
-   * later (the timer is unref'd and cleared by `disconnected`).
+   * later (see `dropLater`).
    */
   private dropSlowReceiver(socket: HubSocket): void {
     const me = this.sockets.get(socket);
     if (me === undefined || !isLive(socket, me)) return;
     me.closing = true;
     safeClose(socket, TRY_AGAIN_LATER, "try again later");
-    const timer = setTimeout(() => {
-      this.dropTimers.delete(socket);
-      safeTerminate(socket);
-    }, SLOW_RECEIVER_CLOSE_MS);
-    timer.unref();
-    this.dropTimers.set(socket, timer);
+    this.dropLater(socket);
     logMeta("slow_receiver", { device_id: me.device_id });
     this.markOffline(me.device_id);
   }

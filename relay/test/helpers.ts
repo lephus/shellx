@@ -468,7 +468,11 @@ export class FakeSocket implements HubSocket {
   readyState = 1;
   /** Bytes queued but not yet written to the network (a slow receiver has a lot); set by tests. */
   bufferedAmount = 0;
-  /** Sends whose write has not completed yet (a stuck reader piles them up); set by tests. */
+  /**
+   * Sends whose write has not completed yet, like `WsHubSocket`'s count: every `send` adds one and
+   * nothing takes it back until the test calls `drain()` (the writes completed). Tests may also set
+   * it directly (a stuck reader piles them up).
+   */
   pendingSends = 0;
   readonly sent: (Uint8Array | string)[] = [];
   closedWith: { code: number; reason: string } | null = null;
@@ -477,6 +481,12 @@ export class FakeSocket implements HubSocket {
   send(data: Uint8Array | string): void {
     if (this.readyState !== 1) throw new Error("socket is not open");
     this.sent.push(data);
+    this.pendingSends++;
+  }
+
+  /** Every queued write completed (what `ws`'s send callbacks report for a socket that reads). */
+  drain(): void {
+    this.pendingSends = 0;
   }
 
   close(code: number, reason: string): void {

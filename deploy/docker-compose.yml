@@ -14,9 +14,11 @@ services:
     image: ghcr.io/lephus/shellx-relay:${IMAGE_TAG:?IMAGE_TAG is not set in .env}
     restart: unless-stopped
     # Hard memory ceiling (VPS spec §3, §4.3): past it the kernel kills the relay, not a neighbour on the
-    # shared VPS; `restart` brings it back and clients reconnect with backoff. Compose v2 syntax:
-    # `deploy.resources` is ignored without swarm.
+    # shared VPS; `restart` brings it back and clients reconnect with backoff. memswap_limit equal to
+    # mem_limit means no swap on top (otherwise a host with swap allows twice as much). Compose v2
+    # syntax: `deploy.resources` is ignored without swarm.
     mem_limit: 512m
+    memswap_limit: 512m
     env_file: relay.env
     environment:
       VIRTUAL_HOST: relay.shellx.pro

@@ -255,6 +255,20 @@ describe("hub presence and routing over real sockets", () => {
     expect(await a.next()).toBe("pong");
   });
 
+  it("never answers a WebSocket control PING: only the text heartbeat gets a pong (fix round 1, C1)", async () => {
+    const { app, agent } = await accountWithAgentAndMobile();
+    const a = await connect(app, agent.token);
+    let controlPongs = 0;
+    a.ws.on("pong", () => controlPongs++);
+    a.ws.ping(); // opcode 0x9: `ws` would answer it itself, outside the frame budget and every backlog check
+    await a.expectSilence(300);
+    expect(controlPongs).toBe(0);
+    a.send("ping");
+    expect(await a.next()).toBe("pong");
+    expect(controlPongs).toBe(0);
+    expect(a.ws.readyState).toBe(WebSocket.OPEN);
+  });
+
   it("routes DATA to the peer with the peer field rewritten to the sender", async () => {
     const { app, agent, mobile } = await accountWithAgentAndMobile();
     const a = await connect(app, agent.token);
@@ -447,5 +461,19 @@ describe("queued sends of a real ws socket", () => {
     await waitFor(async () => (server.pendingSends === 0 ? true : null));
     a.ws.resume(); // lets the client see the dropped connection
     expect((await a.closed).code).toBe(1006);
+  }, 30_000);
+
+  it("drops a socket whose close handshake never completes within seconds, not ws's default 30 s (fix round 1, I1 backstop)", async () => {
+    const { agent } = await accountWithAgentAndMobile();
+    const joined: HubSocket[] = [];
+    const app = makeApp({ hubs: registryCapturingSockets(joined) });
+    const a = await connect(app, agent.token);
+    const server = await waitFor(async () => joined[0]);
+    a.ws.pause(); // never reads the close frame, so never answers it
+    server.close(1000, "bye"); // a close the hub did not arm its own 1 s drop for
+    expect(server.readyState).toBe(WebSocket.CLOSING);
+    await waitFor(async () => (server.readyState === WebSocket.CLOSED ? true : null), 5000);
+    a.ws.resume();
+    await a.closed;
   }, 30_000);
 });
