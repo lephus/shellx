@@ -65,7 +65,7 @@ Chúng tôi chỉ dùng dữ liệu nêu ở mục 1 để: tạo và xác thự
 
 ## 6. Bên cung cấp hạ tầng và nơi xử lý dữ liệu
 
-Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **[quốc gia]**: máy chủ chuyển tiếp, cơ sở dữ liệu tài khoản cùng các bản sao lưu, trang web và bản cài đặt. Dữ liệu được lưu và xử lý tại **[quốc gia]**. Chúng tôi không dùng mạng phân phối nội dung (CDN) hay dịch vụ phân tích của bên thứ ba.
+Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **Việt Nam**: máy chủ chuyển tiếp, cơ sở dữ liệu tài khoản cùng các bản sao lưu, trang web và bản cài đặt. Dữ liệu được lưu và xử lý tại **Việt Nam**. Chúng tôi không dùng mạng phân phối nội dung (CDN) hay dịch vụ phân tích của bên thứ ba.
 
 Khi bạn tải ứng dụng từ App Store hoặc Google Play, Apple và Google xử lý dữ liệu theo chính sách riêng của họ.
 

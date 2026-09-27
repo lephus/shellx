@@ -65,7 +65,7 @@ We use the data listed in section 1 only to: create and authenticate your accoun
 
 ## 6. Infrastructure provider and where data is processed
 
-The Service runs on a private server rented by ShellX in **[quốc gia]**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **[quốc gia]**. We use no content delivery network (CDN) and no third-party analytics.
+The Service runs on a private server rented by ShellX in **Vietnam**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **Vietnam**. We use no content delivery network (CDN) and no third-party analytics.
 
 When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies.
 

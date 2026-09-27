@@ -61,7 +61,7 @@ Chúng tôi cấp cho bạn quyền cá nhân, không độc quyền, không chu
 
 ## 9. Dịch vụ của bên thứ ba
 
-Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **[quốc gia]**. Ứng dụng di động được phân phối qua App Store và Google Play và cũng chịu điều khoản của Apple và Google. Với ứng dụng tải từ App Store, Thỏa thuận cấp phép người dùng cuối tiêu chuẩn của Apple (Standard EULA) cũng được áp dụng.
+Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **Việt Nam**. Ứng dụng di động được phân phối qua App Store và Google Play và cũng chịu điều khoản của Apple và Google. Với ứng dụng tải từ App Store, Thỏa thuận cấp phép người dùng cuối tiêu chuẩn của Apple (Standard EULA) cũng được áp dụng.
 
 ## 10. Chấm dứt
 

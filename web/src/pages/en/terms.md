@@ -61,7 +61,7 @@ We grant you a personal, non-exclusive, non-transferable, revocable license to i
 
 ## 9. Third-party services
 
-The Service runs on a private server rented by ShellX in **[quốc gia]**. The mobile app is distributed through the App Store and Google Play and is also subject to Apple's and Google's terms. For apps downloaded from the App Store, Apple's Standard End User License Agreement (Standard EULA) also applies.
+The Service runs on a private server rented by ShellX in **Vietnam**. The mobile app is distributed through the App Store and Google Play and is also subject to Apple's and Google's terms. For apps downloaded from the App Store, Apple's Standard End User License Agreement (Standard EULA) also applies.
 
 ## 10. Termination
 
