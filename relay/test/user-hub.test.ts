@@ -5,7 +5,8 @@ import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import { FRAMES_PER_SECOND } from "../src/hub/token-bucket.js";
 import {
-  GOING_AWAY, MAX_BUFFERED_BYTES, PONG_MAX_BUFFERED_BYTES, SLOW_RECEIVER_CLOSE_MS, TRY_AGAIN_LATER, type UserHub,
+  GOING_AWAY, MAX_BUFFERED_BYTES, MAX_LIVE_DEVICES_PER_ACCOUNT, MAX_PENDING_SENDS, PONG_MAX_BUFFERED_BYTES,
+  PONG_MAX_PENDING_SENDS, SLOW_RECEIVER_CLOSE_MS, TRY_AGAIN_LATER, type UserHub,
 } from "../src/hub/user-hub.js";
 import {
   CloseCode, encodeData, encodeError, encodePresence, MAX_FRAME_BYTES, pairingRemovedEvent, RelayErrorCode,
@@ -428,6 +429,200 @@ describe("slow receivers (backpressure)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("closes a DATA target with more than 1024 sends still queued with 1013 and terminates it 1 s later, though far less than 4 MiB is unsent", async () => {
+    expect(MAX_PENDING_SENDS).toBe(1024);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { hub, agentId, mobileId } = setup(() => NOW);
+      const a = new FakeSocket();
+      const m = new FakeSocket();
+      await joinHub(hub, a, agentId, "agent");
+      await joinHub(hub, m, mobileId);
+      a.take();
+      m.take();
+      m.bufferedAmount = 40 * 1024; // tiny frames: each costs ~400 B of heap but only a few bytes here
+      m.pendingSends = MAX_PENDING_SENDS; // exactly at the limit: still relayed
+      hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(1)));
+      await hub.idle();
+      expect(m.take()).toEqual([hex(encodeData(agentId, CH, Uint8Array.of(1)))]);
+      expect(m.closedWith).toBeNull();
+
+      const lines = captureLogs();
+      m.pendingSends = MAX_PENDING_SENDS + 1; // stopped reading
+      hub.receive(a, encodeData(mobileId, CH, Uint8Array.of(2)));
+      await hub.idle();
+      expect(m.sent).toEqual([]); // not queued on top of the pile
+      expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+      expect(a.take()).toEqual([hex(encodePresence(mobileId, false))]);
+      expect(a.closedWith).toBeNull();
+      expect(await hub.online()).toEqual([agentId]);
+      expect(db().get("SELECT last_seen_at FROM devices WHERE id = ?", mobileId)).toEqual({ last_seen_at: NOW });
+      const logged = lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((e) => e.event === "slow_receiver");
+      expect(logged.map((e) => e.device_id)).toEqual([mobileId]);
+
+      vi.advanceTimersByTime(SLOW_RECEIVER_CLOSE_MS - 1);
+      expect(m.terminated).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(m.terminated).toBe(true);
+      expect(a.terminated).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("applies the queued-send limit to ERROR replies: a sender that never reads them is closed with 1013 (gate probe)", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    m.pendingSends = MAX_PENDING_SENDS + 1;
+    hub.receive(m, Uint8Array.of(1, 2, 3)); // bad_frame: an ERROR would be queued
+    hub.receive(m, encodeData(agentId, CH, Uint8Array.of(4))); // peer_offline: likewise
+    await hub.idle();
+    expect(m.sent).toEqual([]);
+    expect(m.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    expect(await hub.online()).toEqual([]);
+  });
+
+  it("applies the queued-send limit to PRESENCE and to pings", async () => {
+    const { hub, agentId, mobileId } = setup();
+    const a = new FakeSocket();
+    await joinHub(hub, a, agentId, "agent");
+    a.pendingSends = MAX_PENDING_SENDS + 1;
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    expect(a.sent).toEqual([]);
+    expect(a.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+
+    const again = new FakeSocket();
+    await joinHub(hub, again, agentId, "agent");
+    m.take();
+    again.take();
+    again.pendingSends = MAX_PENDING_SENDS + 1;
+    hub.ping(again, agentId);
+    await hub.idle();
+    expect(again.sent).toEqual([]);
+    expect(again.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "try again later" });
+    expect(m.take()).toEqual([hex(encodePresence(agentId, false))]);
+  });
+
+  it("answers a ping only while at most 64 sends are queued, and keeps the socket open above that", async () => {
+    expect(PONG_MAX_PENDING_SENDS).toBe(64);
+    const { hub, mobileId } = setup();
+    const m = new FakeSocket();
+    await joinHub(hub, m, mobileId);
+    m.bufferedAmount = 1024; // few bytes: only the count can stop the pong
+    m.pendingSends = PONG_MAX_PENDING_SENDS; // exactly at the threshold
+    hub.ping(m, mobileId);
+    expect(m.take()).toEqual(["text:pong"]);
+
+    m.pendingSends = PONG_MAX_PENDING_SENDS + 1; // each pong would add ~400 B of heap behind a stuck reader
+    hub.ping(m, mobileId);
+    hub.ping(m, mobileId);
+    await hub.idle();
+    expect(m.sent).toEqual([]);
+    expect(m.closedWith).toBeNull(); // the client's own heartbeat times out on a stuck socket
+
+    m.pendingSends = PONG_MAX_PENDING_SENDS; // both limits must hold: count at the threshold, bytes over
+    m.bufferedAmount = PONG_MAX_BUFFERED_BYTES + 1;
+    hub.ping(m, mobileId);
+    expect(m.sent).toEqual([]);
+
+    m.pendingSends = 0; // drained: heartbeats are answered again
+    m.bufferedAmount = 0;
+    hub.ping(m, mobileId);
+    expect(m.take()).toEqual(["text:pong"]);
+  });
+});
+
+describe("live devices per account", () => {
+  function captureLogs(): string[] {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    return lines;
+  }
+
+  /** An account with `count` devices live on the hub, each with its socket. */
+  async function accountAtCap(count = MAX_LIVE_DEVICES_PER_ACCOUNT) {
+    const { hub, user } = setup();
+    const live: { id: string; socket: FakeSocket }[] = [];
+    for (let i = 0; i < count; i++) {
+      const id = user.device(i === 0 ? "agent" : "mobile");
+      const socket = new FakeSocket();
+      await joinHub(hub, socket, id, i === 0 ? "agent" : "mobile");
+      live.push({ id, socket });
+    }
+    for (const { socket } of live) socket.take();
+    return { hub, user, live };
+  }
+
+  function untouched(live: { socket: FakeSocket }[]): void {
+    for (const { socket } of live) {
+      expect(socket.closedWith).toBeNull();
+      expect(socket.terminated).toBe(false);
+    }
+  }
+
+  it("refuses a 17th device with 1013 'too many devices online', leaving the 16 live ones untouched", async () => {
+    expect(MAX_LIVE_DEVICES_PER_ACCOUNT).toBe(16);
+    const { hub, user, live } = await accountAtCap();
+    const newcomer = user.device("mobile");
+    const lines = captureLogs();
+    const refused = new FakeSocket();
+    await joinHub(hub, refused, newcomer);
+
+    expect(refused.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "too many devices online" });
+    expect(refused.sent).toEqual([]); // no presence snapshot
+    untouched(live);
+    for (const { socket } of live) expect(socket.sent).toEqual([]); // nobody saw it come online
+    expect((await hub.online()).sort()).toEqual(live.map((d) => d.id).sort());
+    expect(hub.socketCount).toBe(MAX_LIVE_DEVICES_PER_ACCOUNT); // the refused socket is not held
+    const logged = lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((e) => e.event === "account_device_cap");
+    expect(logged).toHaveLength(1);
+    expect(Object.keys(logged[0]!).sort()).toEqual(["device_id", "event", "ts"]); // metadata only
+    expect(logged[0]!.device_id).toBe(newcomer);
+
+    // Its close event later changes nothing; frames it managed to send are ignored.
+    hub.receive(refused, encodeData(live[0]!.id, CH, Uint8Array.of(1)));
+    clientCloses(hub, refused);
+    await hub.idle();
+    untouched(live);
+    for (const { socket } of live) expect(socket.sent).toEqual([]);
+  });
+
+  it("accepts a reconnect of a live device at the cap: replacement does not count", async () => {
+    const { hub, live } = await accountAtCap();
+    const { id, socket: old } = live[5]!;
+    const again = new FakeSocket();
+    await joinHub(hub, again, id);
+
+    expect(again.closedWith).toBeNull();
+    expect(old.closedWith).toEqual({ code: 4001, reason: "replaced" });
+    untouched(live.filter((d) => d.id !== id));
+    expect(again.sent).toHaveLength(MAX_LIVE_DEVICES_PER_ACCOUNT - 1); // presence of every other device
+    expect(await hub.online()).toHaveLength(MAX_LIVE_DEVICES_PER_ACCOUNT);
+  });
+
+  it("accepts a new device again once one of the 16 has left", async () => {
+    const { hub, user, live } = await accountAtCap();
+    const refused = new FakeSocket();
+    await joinHub(hub, refused, user.device("mobile"));
+    expect(refused.closedWith).toEqual({ code: TRY_AGAIN_LATER, reason: "too many devices online" });
+
+    clientCloses(hub, live[3]!.socket);
+    const newcomer = user.device("mobile");
+    const accepted = new FakeSocket();
+    await joinHub(hub, accepted, newcomer);
+    expect(accepted.closedWith).toBeNull();
+    expect(await hub.online()).toHaveLength(MAX_LIVE_DEVICES_PER_ACCOUNT);
+    expect(await hub.online()).toContain(newcomer);
+    expect(live[0]!.socket.take()).toEqual([
+      hex(encodePresence(live[3]!.id, false)),
+      hex(encodePresence(newcomer, true)),
+    ]);
   });
 });
 

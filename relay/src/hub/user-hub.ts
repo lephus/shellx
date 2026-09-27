@@ -15,6 +15,12 @@ export interface HubSocket {
   readonly readyState: number;
   /** Bytes queued by `send` that have not been written to the network yet (`ws`'s own counter). */
   readonly bufferedAmount: number;
+  /**
+   * Sends whose write has not completed yet, successfully or not (counted by the ws route's adapter,
+   * `WsHubSocket`). Each costs a few hundred bytes of heap however small its frame, which
+   * `bufferedAmount` does not see.
+   */
+  readonly pendingSends: number;
   send(data: Uint8Array | string): void;
   close(code: number, reason: string): void;
   terminate(): void;
@@ -24,8 +30,9 @@ export const SOCKET_OPEN = 1;
 /** Sent to every socket when the relay shuts down (spec §4.3); clients reconnect with backoff. */
 export const GOING_AWAY = 1001;
 /**
- * Sent to a slow receiver (see MAX_BUFFERED_BYTES). shellx_core treats every close code other than
- * 4001/4002 as "reconnect with backoff"; the agent's replay buffer catches the device up.
+ * Sent to a slow receiver (see MAX_BUFFERED_BYTES and MAX_PENDING_SENDS), and to a new device over
+ * MAX_LIVE_DEVICES_PER_ACCOUNT. shellx_core treats every close code other than 4001/4002 as
+ * "reconnect with backoff"; the agent's replay buffer catches the device up.
  */
 export const TRY_AGAIN_LATER = 1013;
 /**
@@ -35,6 +42,15 @@ export const TRY_AGAIN_LATER = 1013;
  * whose frames are authenticated in sequence.
  */
 export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+/**
+ * Largest number of sends a socket may have queued before the hub sends it anything more; over
+ * it, the socket is a slow receiver like one over MAX_BUFFERED_BYTES. Every queued send also pins
+ * ~400 B of heap (buffers, write-queue entry, callback) that `bufferedAmount` does not count, so a
+ * client that stops reading while its tiny frames draw ERROR replies (or tiny DATA frames flow to
+ * it) would otherwise pin ~57 MB of heap before its backlog reached 4 MiB of payload. With this
+ * cap, a stuck socket pins at most ~1024 × 400 B on top of its payload.
+ */
+export const MAX_PENDING_SENDS = 1024;
 /**
  * How long a slow receiver's 1013 close handshake may take before the socket is dropped outright.
  * Its close frame waits behind the very backlog that made it slow, so `ws` would otherwise hold that
@@ -49,6 +65,15 @@ export const SLOW_RECEIVER_CLOSE_MS = 1000;
  * times out instead.
  */
 export const PONG_MAX_BUFFERED_BYTES = 64 * 1024;
+/** Like PONG_MAX_BUFFERED_BYTES, for the number of queued sends: a ping is answered only at or below it. */
+export const PONG_MAX_PENDING_SENDS = 64;
+/**
+ * Most devices one account may have connected at once. A new device beyond it is refused with 1013
+ * "too many devices online" (shellx_core reconnects with backoff); a device that is already live
+ * may always reconnect, since it replaces its own socket. Bounds what one account can pin in relay
+ * memory at 16 sockets' worth of the per-socket caps above.
+ */
+export const MAX_LIVE_DEVICES_PER_ACCOUNT = 16;
 
 /** Identity of one connection, set by the ws route from the validated token. */
 export interface ConnectionMeta {
@@ -118,7 +143,9 @@ export class HubState {
 
   /**
    * Adds a freshly upgraded socket. One connection per device: the newest wins, the old socket gets
-   * 4001 and no offline is announced. Any earlier socket of the device that is still closing (a 4001,
+   * 4001 and no offline is announced. A device that is not live yet is refused with 1013 "too many
+   * devices online" when the account already has MAX_LIVE_DEVICES_PER_ACCOUNT live devices; the
+   * others are left untouched. Any earlier socket of the device that is still closing (a 4001,
    * 4003 or 1013 whose close event has not arrived) is terminated first, so a device reconnecting in
    * a loop never has more than one closing socket holding relay memory. The newcomer gets a PRESENCE
    * snapshot of the other online devices, then (for an agent) every pairing_removed tombstone; the
@@ -130,6 +157,12 @@ export class HubState {
       if (socket.readyState !== SOCKET_OPEN) return; // the client left before its turn came
       if (this.host.shuttingDown) {
         safeClose(socket, GOING_AWAY, "going away");
+        return;
+      }
+      const live = this.liveDeviceIds();
+      if (!live.includes(meta.deviceId) && live.length >= MAX_LIVE_DEVICES_PER_ACCOUNT) {
+        safeClose(socket, TRY_AGAIN_LATER, "too many devices online");
+        logMeta("account_device_cap", { device_id: meta.deviceId });
         return;
       }
       const tombstones = this.tombstonesOf(meta.deviceId); // may throw: nothing has changed yet
@@ -154,7 +187,7 @@ export class HubState {
     void this.enqueue("frame", () => this.handleFrame(socket, data));
   }
 
-  /** The ws route found `socket` over the backlog cap while answering a ping: close it (1013). */
+  /** The ws route found `socket` over a backlog cap (bytes or sends) while answering a ping: close it (1013). */
   slowReceiver(socket: HubSocket): void {
     void this.enqueue("slow_receiver", () => this.dropSlowReceiver(socket));
   }
@@ -444,7 +477,8 @@ export class HubState {
 
   /**
    * Every frame the hub sends goes through here: it is dropped, and the socket closed with 1013 and
-   * announced offline, when the socket already has more than MAX_BUFFERED_BYTES waiting to go out.
+   * announced offline, when the socket already has more than MAX_BUFFERED_BYTES or more than
+   * MAX_PENDING_SENDS sends waiting to go out.
    */
   private sendTo(socket: HubSocket, frame: Uint8Array): void {
     if (isSlow(socket)) this.dropSlowReceiver(socket);
@@ -487,7 +521,12 @@ function isLive(socket: HubSocket, me: Attachment): boolean {
 }
 
 function isSlow(socket: HubSocket): boolean {
-  return socket.bufferedAmount > MAX_BUFFERED_BYTES;
+  return socket.bufferedAmount > MAX_BUFFERED_BYTES || socket.pendingSends > MAX_PENDING_SENDS;
+}
+
+/** May a ping be answered right now? Only while the socket's backlog is small in bytes and in sends. */
+function mayPong(socket: HubSocket): boolean {
+  return socket.bufferedAmount <= PONG_MAX_BUFFERED_BYTES && socket.pendingSends <= PONG_MAX_PENDING_SENDS;
 }
 
 function safeSend(socket: HubSocket, data: Uint8Array | string): void {
@@ -544,17 +583,17 @@ export class UserHub {
    * The text heartbeat of `deviceId` (the ws route's validated device): "pong" goes out right away,
    * outside the queue (spec §4.2). A ping spends one frame of the device's 500 frames/s budget like
    * any frame; over it, the socket gets ERROR rate_limited and 4003 through the queue. A pong is
-   * sent while at most PONG_MAX_BUFFERED_BYTES (64 KiB) wait to go out, so a slow but healthy link
-   * keeps its heartbeat; above that the ping goes unanswered, so a client that stops reading cannot
-   * pile up pongs (each costs far more heap than the 4 bytes `bufferedAmount` counts for it) and its
-   * own heartbeat fails on the stuck socket instead. A socket over the 4 MiB cap is closed with 1013
-   * through the queue.
+   * sent while at most PONG_MAX_BUFFERED_BYTES (64 KiB) and at most PONG_MAX_PENDING_SENDS (64)
+   * sends wait to go out, so a slow but healthy link keeps its heartbeat; above either, the ping
+   * goes unanswered, so a client that stops reading cannot pile up pongs (each costs far more heap
+   * than the 4 bytes `bufferedAmount` counts for it) and its own heartbeat fails on the stuck socket
+   * instead. A socket over the 4 MiB or 1024-send cap is closed with 1013 through the queue.
    */
   ping(socket: HubSocket, deviceId: string): void {
     if (socket.readyState !== SOCKET_OPEN) return; // being closed: nothing more to answer
     if (!this.host.budgets.take(deviceId)) this.state.rateLimited(socket);
     else if (isSlow(socket)) this.state.slowReceiver(socket);
-    else if (socket.bufferedAmount <= PONG_MAX_BUFFERED_BYTES) safeSend(socket, "pong");
+    else if (mayPong(socket)) safeSend(socket, "pong");
   }
 
   disconnected(socket: HubSocket): void {

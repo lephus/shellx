@@ -14,6 +14,52 @@ import { CloseCode } from "../protocol/frames.js";
 /** Close code for a connection the hub could not admit (its tombstones could not be read). */
 export const INTERNAL_ERROR_CLOSE = 1011;
 
+/**
+ * The hub's view of one `ws` socket: the socket itself, plus the number of sends whose write has
+ * not completed yet (`pendingSends`). The count goes up on every `send` and down in `ws`'s send
+ * callback, which runs once per send whether the write succeeded or failed (a dropped connection,
+ * a send after the close), never synchronously. It is what lets the hub bound the heap a reader
+ * that stopped reading can pin with many tiny frames (see `MAX_PENDING_SENDS`).
+ */
+export class WsHubSocket implements HubSocket {
+  private pending = 0;
+  private readonly sent = (): void => {
+    this.pending--;
+  };
+
+  constructor(private readonly ws: WebSocket) {}
+
+  get readyState(): number {
+    return this.ws.readyState;
+  }
+
+  get bufferedAmount(): number {
+    return this.ws.bufferedAmount;
+  }
+
+  get pendingSends(): number {
+    return this.pending;
+  }
+
+  send(data: Uint8Array | string): void {
+    this.pending++;
+    try {
+      this.ws.send(data, this.sent);
+    } catch (err) {
+      this.pending--; // refused outright: the callback will not run
+      throw err;
+    }
+  }
+
+  close(code: number, reason: string): void {
+    this.ws.close(code, reason);
+  }
+
+  terminate(): void {
+    this.ws.terminate();
+  }
+}
+
 function hasUpgradeToken(connection: string | undefined): boolean {
   return (connection ?? "").split(",").some((token) => token.trim().toLowerCase() === "upgrade");
 }
@@ -39,10 +85,11 @@ export const webSocketAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /**
  * GET /v1/ws, step 2 — @hono/node-server completes the upgrade with `ws` and calls these handlers.
- * The socket joins the account's hub; `ping` is answered at once, outside the hub's queue (spec
- * §4.2), within the device's frame budget and only while at most 64 KiB wait to be sent to it (see
- * `UserHub.ping`). Only the validated token decides the device id and kind; nothing the client sends
- * in headers reaches the hub.
+ * The socket joins the account's hub, wrapped in a `WsHubSocket` that counts its queued sends;
+ * `ping` is answered at once, outside the hub's queue (spec §4.2), within the device's frame budget
+ * and only while at most 64 KiB and 64 sends wait to go out to it (see `UserHub.ping`). Only the
+ * validated token decides the device id and kind; nothing the client sends in headers reaches the
+ * hub.
  */
 export const webSocketUpgrade = upgradeWebSocket(
   (context) => {
@@ -88,7 +135,7 @@ export const webSocketUpgrade = upgradeWebSocket(
 
     return {
       onOpen(_event, ws) {
-        socket = ws.raw as unknown as WebSocket;
+        socket = new WsHubSocket(ws.raw as unknown as WebSocket);
         void admit(socket);
       },
       onMessage(event) {

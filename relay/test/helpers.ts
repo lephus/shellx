@@ -468,6 +468,8 @@ export class FakeSocket implements HubSocket {
   readyState = 1;
   /** Bytes queued but not yet written to the network (a slow receiver has a lot); set by tests. */
   bufferedAmount = 0;
+  /** Sends whose write has not completed yet (a stuck reader piles them up); set by tests. */
+  pendingSends = 0;
   readonly sent: (Uint8Array | string)[] = [];
   closedWith: { code: number; reason: string } | null = null;
   terminated = false;

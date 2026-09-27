@@ -78,6 +78,26 @@ function registryBarrierForConnects(count: number, onArrival: (pending: number) 
   } as unknown as HubRegistry;
 }
 
+/** A registry like the test's real one that also records every socket the ws route hands the hub. */
+function registryCapturingSockets(joined: HubSocket[]): HubRegistry {
+  const real = hubs();
+  return {
+    forUser: (userId: string) => {
+      const hub = real.forUser(userId);
+      return {
+        connect: (socket: HubSocket, meta: ConnectionMeta) => {
+          joined.push(socket);
+          return hub.connect(socket, meta);
+        },
+        receive: (socket: HubSocket, data: ArrayBuffer | string) => hub.receive(socket, data),
+        ping: (socket: HubSocket, deviceId: string) => hub.ping(socket, deviceId),
+        disconnected: (socket: HubSocket) => hub.disconnected(socket),
+        closeConnection: (connId: string, code: CloseCode) => hub.closeConnection(connId, code),
+      };
+    },
+  } as unknown as HubRegistry;
+}
+
 describe("GET /v1/ws", () => {
   it("rejects a plain GET with 426 upgrade_required", async () => {
     const res = await call(makeApp(), "GET", "/v1/ws");
@@ -382,4 +402,50 @@ describe("hub presence and routing over real sockets", () => {
     expect(output).toContain("ws_frame_too_large");
     expect(output).not.toContain("SECRET-PAYLOAD-MARKER");
   });
+});
+
+describe("queued sends of a real ws socket", () => {
+  it("counts sends until their write completes: rises while the peer does not read, back to 0 once it drains", async () => {
+    const { agent } = await accountWithAgentAndMobile();
+    const joined: HubSocket[] = [];
+    const app = makeApp({ hubs: registryCapturingSockets(joined) });
+    const a = await connect(app, agent.token);
+    const server = await waitFor(async () => joined[0]);
+    expect(server.pendingSends).toBe(0);
+
+    a.ws.pause(); // stops reading: kernel buffers fill, then the relay's own write queue grows
+    const frame = new Uint8Array(64 * 1024);
+    // 400 × 64 KiB = 25 MiB: more than the kernel can buffer, so the writes stay queued in the relay.
+    for (let i = 0; i < 400; i++) server.send(frame);
+    expect(server.pendingSends).toBe(400); // a write never completes synchronously
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(server.pendingSends).toBeGreaterThan(0);
+    expect(server.bufferedAmount).toBeGreaterThan(0);
+
+    a.ws.resume();
+    await waitFor(async () => (server.pendingSends === 0 ? true : null), 10_000);
+    expect(server.bufferedAmount).toBe(0);
+  }, 30_000);
+
+  it("counts a send that fails as done too: the connection dropped with writes queued, or a send after the close", async () => {
+    const { agent } = await accountWithAgentAndMobile();
+    const joined: HubSocket[] = [];
+    const app = makeApp({ hubs: registryCapturingSockets(joined) });
+    const a = await connect(app, agent.token);
+    const server = await waitFor(async () => joined[0]);
+    a.ws.pause();
+    const frame = new Uint8Array(64 * 1024);
+    for (let i = 0; i < 400; i++) server.send(frame);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(server.pendingSends).toBeGreaterThan(0);
+
+    server.terminate(); // every queued write now fails
+    await waitFor(async () => (server.pendingSends === 0 ? true : null));
+    expect(server.readyState).toBe(WebSocket.CLOSED);
+    server.send(Uint8Array.of(1)); // too late: fails, without throwing
+    expect(server.pendingSends).toBe(1);
+    await waitFor(async () => (server.pendingSends === 0 ? true : null));
+    a.ws.resume(); // lets the client see the dropped connection
+    expect((await a.closed).code).toBe(1006);
+  }, 30_000);
 });
