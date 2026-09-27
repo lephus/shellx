@@ -2,7 +2,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 import { createAdaptorServer } from "@hono/node-server";
-import { WebSocketServer } from "ws";
+import { type ServerOptions, WebSocketServer } from "ws";
 import { createApp, type AppDeps } from "./app.js";
 import { errorKind, logMeta } from "./log.js";
 
@@ -12,6 +12,14 @@ import { errorKind, logMeta } from "./log.js";
  * anything larger closes the socket with 1009.
  */
 export const MAX_WS_MESSAGE_BYTES = 1024 * 1024;
+
+/**
+ * `ws`'s own wait for a close handshake before it destroys the socket (its default is 30 s). A
+ * backstop for closes the hub does not drop itself after 1 s (SLOW_RECEIVER_CLOSE_MS): 1001 on
+ * shutdown, 1011 from the ws route, 1013 for a device over the per-account cap. A close frame stuck
+ * behind a backlog would otherwise pin that backlog for 30 s.
+ */
+export const WS_CLOSE_TIMEOUT_MS = 2000;
 
 /** Shutdown waits at most this long for sockets to close and requests to finish (spec §4.3). */
 export const SHUTDOWN_GRACE_MS = 5000;
@@ -101,12 +109,19 @@ class Inflight {
 export async function startRelay(deps: AppDeps, listen: ListenOptions): Promise<RunningRelay> {
   const app = createApp(deps);
   const inflight = new Inflight();
-  const wss = new WebSocketServer({
+  const wsOptions: ServerOptions & { closeTimeout: number } = { // closeTimeout: ws 8.22, not in @types/ws 8.18
     noServer: true,
     maxPayload: MAX_WS_MESSAGE_BYTES,
     perMessageDeflate: false,
     clientTracking: false,
-  });
+    // A control PING would be answered by `ws` itself, outside the hub's frame budget and backlog
+    // checks: a client that stops reading could pile up pongs without bound. The heartbeat is the
+    // text "ping" (spec §6.1), which the hub answers within those bounds; shellx_core sends no
+    // control pings.
+    autoPong: false,
+    closeTimeout: WS_CLOSE_TIMEOUT_MS,
+  };
+  const wss = new WebSocketServer(wsOptions);
   const server = createAdaptorServer({
     fetch: (request, env) => inflight.track(async () => app.fetch(request, env)),
     websocket: { server: wss },

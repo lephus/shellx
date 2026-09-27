@@ -55,7 +55,7 @@ Compose project `shellx` gồm các service:
 
 | Service | Image | Vai trò |
 |---|---|---|
-| `relay` | `ghcr.io/lephus/shellx-relay:${IMAGE_TAG}` | Node 22, user không phải root, lắng nghe 8080 trong container, không publish cổng. Env `VIRTUAL_HOST=relay.shellx.pro`, `VIRTUAL_PORT=8080`, `LETSENCRYPT_HOST=relay.shellx.pro`, cộng thêm `relay.env`. Bind mount `./data:/data` (SQLite `/data/relay.db`). Healthcheck `GET /v1/version`. `restart: unless-stopped`. |
+| `relay` | `ghcr.io/lephus/shellx-relay:${IMAGE_TAG}` | Node 22, user không phải root, lắng nghe 8080 trong container, không publish cổng. Env `VIRTUAL_HOST=relay.shellx.pro`, `VIRTUAL_PORT=8080`, `LETSENCRYPT_HOST=relay.shellx.pro`, cộng thêm `relay.env`. Bind mount `./data:/data` (SQLite `/data/relay.db`). Healthcheck `GET /v1/version`. `restart: unless-stopped`. `mem_limit: 512m` và `memswap_limit: 512m`, tức không dùng thêm swap (cú pháp Compose v2; `deploy.resources` bị bỏ qua khi không dùng swarm): vượt trần thì kernel chỉ giết relay chứ không giết tiến trình khác trên VPS dùng chung, rồi `restart` bật lại và client tự kết nối lại. |
 | `web` | `ghcr.io/lephus/shellx-web:${IMAGE_TAG}` | nginx:alpine chứa bản build Astro. `VIRTUAL_HOST=shellx.pro,www.shellx.pro,download.shellx.pro`, `LETSENCRYPT_HOST` cùng danh sách. Mount `./downloads:/srv/downloads:ro`. |
 | `backup` | `alpine` + `sqlite` | Chạy mỗi ngày lúc 03:00 (giờ VPS): `sqlite3 /data/relay.db ".backup /backups/relay-<ngày>.db"`, giữ 14 bản gần nhất. Mount `./data` chỉ đọc và `./backups`. |
 
@@ -96,7 +96,7 @@ Toàn bộ quy tắc trong spec v1 §5, §6, §10.2 vẫn là chuẩn.
 | Migration D1 | Relay tự chạy migration khi khởi động từ `relay/migrations/*.sql`, theo thứ tự tên file, ghi vào bảng `schema_migrations(name, applied_at)`, mỗi file một transaction. `0001_init.sql` dùng lại nguyên văn. Không có rollback; sửa lỗi bằng migration mới. |
 | Durable Object `UserHub` | `HubRegistry` trong tiến trình: `Map<userId, UserHub>`. Hub được tạo khi có kết nối đầu tiên hoặc khi một route REST cần báo cho hub, và bị gỡ khi không còn socket. Chi tiết ở §4.3. |
 | Storage SQL của DO (tombstone `pending_pairing_removed`) | Bảng mới trong migration `0002_hub_state.sql`: cùng các cột như bảng của DO, thêm `user_id` và index `(user_id, agent_id)`. Tombstone giữ nguyên ngữ nghĩa: phát lại mỗi khi agent kết nối, cho tới khi có POST mới hơn, agent đăng xuất hoặc tài khoản bị xóa. |
-| `setWebSocketAutoResponse("ping","pong")` | Frame text `ping` được trả `pong` ngay trong handler `message`, không qua hàng đợi của hub. |
+| `setWebSocketAutoResponse("ping","pong")` | Frame text `ping` được trả `pong` ngay trong handler `message`, không qua hàng đợi của hub, chỉ khi socket còn tối đa 64 KiB và tối đa 64 lần gửi đang chờ (xem §4.3). Khung điều khiển PING không được trả lời: `WebSocketServer` đặt `autoPong: false` và `closeTimeout: 2000`. |
 | `serializeAttachment` | Metadata `{device_id, kind, conn_id, closing}` lưu trên đối tượng socket; không còn hibernation. |
 | Rate limiting binding | `SlidingWindowLimiter` trong bộ nhớ: khóa là IP hoặc email, cửa sổ 60 giây, cùng mức cũ (đăng nhập 10/IP và 5/email, đăng ký 3/IP), thêm nâng cấp WebSocket 60/IP (tính mọi lần thử, trước khi kiểm tra token; vượt thì từ chối nâng cấp bằng HTTP 429). Định kỳ dọn khóa hết hạn. `RATE_LIMITS_ENABLED=false` chỉ dùng khi chạy local hoặc e2e. |
 | argon2id WASM | `@node-rs/argon2`, cùng tham số (m = 19456 KiB, t = 2, p = 1). Tối đa 4 lần băm cùng lúc; lần thứ 5 phải xếp hàng, để giới hạn RAM (4 × 19 MiB). Hash lưu theo chuẩn PHC `$argon2id$…`. |
@@ -118,7 +118,14 @@ Toàn bộ quy tắc trong spec v1 §5, §6, §10.2 vẫn là chuẩn.
   - chuyển tiếp DATA giữa các thiết bị cùng tài khoản;
   - EVENT `pairing_removed`;
   - giới hạn 500 frame/giây (tính cả `ping`);
-  - thiết bị nhận chậm: còn hơn 4 MiB chưa gửi được thì socket bị đóng với mã 1013 và ngắt hẳn sau 1 giây nếu vẫn chưa đóng.
+  - thiết bị nhận chậm: còn hơn 4 MiB chưa gửi được, hoặc hơn 1024 lần gửi đang chờ, thì socket bị đóng với mã 1013 và ngắt hẳn sau 1 giây nếu vẫn chưa đóng.
+- Giới hạn bộ nhớ (thêm khi port, trước lần deploy đầu tiên):
+  - Route ws bọc mỗi socket `ws` trong `WsHubSocket`, đếm số lần gửi chưa xong: tăng khi gửi, giảm trong callback gửi của `ws`, cả khi thành công lẫn khi lỗi. Mỗi lần gửi đang chờ tốn khoảng 400 B heap mà `bufferedAmount` không tính. Vì vậy trước đây một socket bị kẹt, nhận nhiều frame ERROR hoặc DATA nhỏ, giữ được khoảng 57 MB heap trước khi chạm 4 MiB. Nay ngưỡng 1024 lần gửi giữ mức đó quanh 1 MB (probe: +56,5 MB xuống +0,9 MB).
+  - `pong` chỉ được gửi khi socket còn tối đa 64 KiB và tối đa 64 lần gửi đang chờ. Khung điều khiển PING không được trả lời (`autoPong: false`); trước đó `ws` tự trả lời, ngoài mọi giới hạn (probe: 300k PING từ một client không đọc giữ +58,9 MB và không bao giờ bị đóng; nay +0,3 MB).
+  - Snapshot lúc kết nối của chính thiết bị mới (PRESENCE các thiết bị khác, rồi tombstone `pairing_removed`) không qua kiểm tra hàng chờ, vì socket vừa mở. Nếu kiểm tra, một agent có hơn khoảng 1000 tombstone sẽ bị đóng 1013 mỗi lần kết nối.
+  - Mọi lần hub chủ động đóng (1013, 4001, 4002, 4003) đều hẹn ngắt hẳn sau 1 giây nếu chưa đóng xong. Các lần đóng khác (1001, 1011, 1013 của thiết bị bị từ chối) bị `ws` ngắt sau 2 giây (`closeTimeout`). Trước đó một socket bị đóng 4003 giữ backlog khoảng 30 giây (probe: +3,5 MB trong 30 giây; nay được giải phóng trước 1,5 giây).
+  - Mỗi tài khoản tối đa 16 thiết bị online cùng lúc. Thiết bị mới thứ 17 bị đóng với mã 1013 `too many devices online` ngay trong hàng đợi của hub, log `account_device_cap` chỉ với `device_id`. Thiết bị đang online kết nối lại thì không bị từ chối.
+  - Container relay có `mem_limit: 512m` và `memswap_limit: 512m` (§3).
 - Route REST gọi thẳng `registry.forUser(userId).<method>()`, thay cho `stub.fetch(...)`.
 - **Tắt an toàn:** khi nhận SIGTERM/SIGINT, relay:
   1. ngừng nhận kết nối HTTP và WebSocket mới;

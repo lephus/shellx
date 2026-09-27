@@ -55,16 +55,33 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
 - **Hub:** one `HubState` per account with a serial queue for everything that touches it (sockets
   joining/closing, frames, REST calls). Routes reach it with `registry.forUser(userId).<method>()`.
   Text `ping` is answered with `pong` immediately, outside the queue — but it counts against the
-  device's 500 frames/s budget like any frame, and it goes unanswered once more than 64 KiB wait to
-  be sent to that socket (a slow but healthy link keeps its heartbeat; a client that stops reading
-  cannot pile up pongs, and its own heartbeat times out).
+  device's 500 frames/s budget like any frame, and it goes unanswered once more than 64 KiB or more
+  than 64 sends wait to go out to that socket (a slow but healthy link keeps its heartbeat; a client
+  that stops reading cannot pile up pongs, and its own heartbeat times out). A skipped ping is
+  dropped, not answered later. WebSocket control PING frames are never answered (`autoPong: false`):
+  `ws` would answer them outside every bound; the heartbeat is the text `ping` only.
 - **Slow receivers:** before sending anything (DATA, ERROR, PRESENCE, EVENT, `pong`) the hub checks
-  the socket's unsent backlog; over 4 MiB it sends nothing more and closes the socket with 1013
-  "try again later" (logged as `slow_receiver`). Its close frame waits behind that backlog, so the
-  socket is dropped outright (the client sees 1006) if it has not closed 1 s later. Clients reconnect
-  with backoff on either code and catch up from the agent's replay buffer; frames are never skipped
-  (that would break the Noise stream). When a device connects, any earlier socket of it that is still
-  closing is dropped too, so a device reconnecting in a loop never piles up closing sockets.
+  the socket's backlog, in bytes and in sends (the ws route wraps each socket in `WsHubSocket`,
+  which counts sends until `ws` reports their write done or failed). Over 4 MiB unsent, or over 1024
+  sends queued, it sends nothing more and closes the socket with 1013 "try again later" (logged as
+  `slow_receiver`). The count matters for tiny frames: each queued send pins ~400 B of heap that
+  the byte count does not see, so a stuck socket fed tiny ERROR or DATA frames used to pin ~57 MB
+  before reaching 4 MiB; it now pins about 1 MB. Clients reconnect with backoff and catch up from
+  the agent's replay buffer; frames are never skipped (that would break the Noise stream). The one
+  exception to the check is a newcomer's own connect snapshot (PRESENCE of the others, then an
+  agent's `pairing_removed` tombstones): the socket is brand new, and an agent with over ~1000
+  tombstones would otherwise be closed by its own replay on every connect.
+- **Closing sockets:** every close the hub starts (1013, 4001 replaced, 4002 revoked, 4003 rate
+  limited) is followed by an outright drop (the client sees 1006) if the close has not completed 1 s
+  later: the close frame waits behind the socket's backlog, and a closing socket no longer counts as
+  live. Any other close (1001 on shutdown, 1011, the 1013 of a refused device) is dropped by `ws`
+  after 2 s (`closeTimeout`, instead of its default 30 s). When a device connects, any earlier socket
+  of it that is still closing is dropped too, so a device reconnecting in a loop never piles up
+  closing sockets.
+- **Devices online per account:** at most 16 devices of one account are connected at once. A
+  17th device is refused with 1013 "too many devices online" (logged as `account_device_cap` with its
+  `device_id`) and retries with backoff; the 16 connected ones are untouched. A device that is
+  already connected can always reconnect: its new socket replaces the old one.
 - **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP,
   WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
   upgrade is refused with HTTP 429 and clients retry with backoff). The IP is `X-Real-IP` when the
@@ -82,7 +99,11 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
 - **Limits:** JSON bodies over 16 KiB → 413 `payload_too_large`; a password over 128 code points is
   refused as `invalid_credentials` before hashing; WebSocket frames over 64 KiB → ERROR
   `frame_too_large`, messages over 1 MiB close the socket with 1009; 500 frames/s per device (text
-  `ping` included) → ERROR `rate_limited`, close 4003.
+  `ping` included) → ERROR `rate_limited`, close 4003; per socket, 4 MiB unsent or 1024 queued
+  sends → close 1013; 16 devices online per account → close 1013 for the next one. The container is
+  capped at 512 MB, swap included (`mem_limit` and `memswap_limit` in `deploy/docker-compose.yml`):
+  past it only the relay is killed,
+  and `restart: unless-stopped` brings it back.
 - **Shutdown:** on SIGTERM/SIGINT the relay stops accepting connections, closes every socket with
   1001 "going away" (recording `last_seen_at` of those devices), waits at most 5 s for requests and
   hub queues, closes the database and exits 0 (1 if the shutdown failed; logged by kind). A second

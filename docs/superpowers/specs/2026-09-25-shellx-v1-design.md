@@ -144,6 +144,7 @@ shellx/
 - **Đăng ký / đăng nhập** luôn kèm thông tin thiết bị `{kind, name, platform, public_key}`. Nếu khóa công khai đó đã có trong tài khoản thì dùng lại `device_id` cũ; nếu chưa thì tạo thiết bị mới. `name` là hostname (agent) hoặc tên model máy (mobile).
 - **Token thiết bị:** 32 byte ngẫu nhiên, mã hóa base64url, gửi qua header `Authorization: Bearer <token>`. Cơ sở dữ liệu chỉ lưu SHA-256 của token. Token hết hạn khi `last_used_at` cũ hơn 90 ngày; `last_used_at` cập nhật tối đa một lần mỗi giờ.
 - **Giới hạn tần suất** (bộ giới hạn cửa sổ trượt trong bộ nhớ của relay, cửa sổ 60 giây; IP lấy từ `X-Real-IP` của nginx-proxy): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP; nâng cấp WebSocket (`/v1/ws`) 60 lần/IP, tính mọi lần thử, trước khi kiểm tra token. Vượt giới hạn trả HTTP 429 (với nâng cấp WebSocket: từ chối nâng cấp bằng HTTP 429, client thử lại theo backoff).
+- **Số thiết bị online cùng lúc:** mỗi tài khoản tối đa 16 thiết bị kết nối WebSocket cùng lúc. Một thiết bị chưa kết nối mà tới khi tài khoản đã đủ 16 thì bị đóng với mã 1013 (`too many devices online`), client thử lại theo backoff; 16 kết nối đang có không bị động tới. Thiết bị đang kết nối thì luôn kết nối lại được, vì socket mới thay socket cũ. Số thiết bị đăng ký trong tài khoản không bị giới hạn.
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
 - **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong cơ sở dữ liệu, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị (một khóa chung cho điện thoại, vì lúc đăng nhập phải gửi khóa công khai trước khi biết `user_id`) và danh sách máy đã ghim (lưu theo `user_id`) được giữ lại, để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy danh sách máy đã ghim đó.
@@ -190,7 +191,7 @@ Face ID / vân tay / mã máy qua `local_auth`. Mặc định bật. Yêu cầu 
 ### 6.1 WebSocket
 
 - URL: `wss://relay.shellx.pro/v1/ws`, header `Authorization: Bearer <token>`.
-- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, relay trả `pong` ngay trong handler nhận tin, không qua hàng đợi của hub. Không nhận `pong` trong 10 giây thì client coi như mất kết nối.
+- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, relay trả `pong` ngay trong handler nhận tin, không qua hàng đợi của hub, nhưng chỉ khi socket đó còn tối đa 64 KiB và tối đa 64 lần gửi đang chờ; vượt một trong hai thì `ping` không được trả lời (và không được trả bù sau). Không nhận `pong` trong 10 giây thì client coi như mất kết nối. Khung điều khiển PING của WebSocket (opcode 0x9) không bao giờ được trả lời: relay tắt auto-pong của `ws`, vì nó trả lời ngoài mọi giới hạn của hub.
 - **Khung nhị phân** là khung relay (mục 6.2).
 
 ### 6.2 Khung relay
@@ -210,9 +211,9 @@ Byte 1 : type
 - DATA từ client lên hub: `peer` là thiết bị đích. Hub chuyển xuống thiết bị đích với `peer` được thay bằng thiết bị nguồn.
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`.
 - Sự kiện: `{event: "pairing_removed", agent_id, mobile_id, pairing_id}`.
-- Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`.
+- Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`. Mọi lần hub chủ động đóng (1013, 4001, 4002, 4003) mà sau 1 giây vẫn chưa đóng xong thì socket bị ngắt hẳn (client thấy 1006 và xử lý như mã gốc); các lần đóng khác bị `ws` ngắt sau 2 giây.
 - Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket, tính cả `ping`). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
-- Thiết bị nhận chậm: khi còn hơn 4 MiB chưa gửi được tới một socket, hub đóng socket đó với mã 1013 (`try again later`) và ngắt hẳn sau 1 giây nếu nó vẫn chưa đóng; client kết nối lại theo backoff như mọi mã đóng khác ngoài 4001/4002.
+- Thiết bị nhận chậm: khi còn hơn 4 MiB chưa gửi được, hoặc hơn 1024 lần gửi đang chờ, tới một socket, hub đóng socket đó với mã 1013 (`try again later`) và ngắt hẳn sau 1 giây nếu nó vẫn chưa đóng; client kết nối lại theo backoff như mọi mã đóng khác ngoài 4001/4002.
 - Khi một thiết bị kết nối, hub gửi cho nó PRESENCE của mọi thiết bị đang online trong tài khoản và báo thiết bị mới online cho các thiết bị còn lại. Khi ngắt, hub báo offline và ghi `last_seen_at` vào cơ sở dữ liệu.
 
 ### 6.3 Kênh mã hóa (payload của DATA)
