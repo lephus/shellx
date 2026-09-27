@@ -191,7 +191,7 @@ Face ID / vân tay / mã máy qua `local_auth`. Mặc định bật. Yêu cầu 
 ### 6.1 WebSocket
 
 - URL: `wss://relay.shellx.pro/v1/ws`, header `Authorization: Bearer <token>`.
-- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, relay trả `pong` ngay trong handler nhận tin, không qua hàng đợi của hub, nhưng chỉ khi socket đó còn tối đa 64 KiB và tối đa 64 lần gửi đang chờ; vượt một trong hai thì `ping` không được trả lời. Không nhận `pong` trong 10 giây thì client coi như mất kết nối.
+- **Khung văn bản** chỉ dùng cho nhịp tim: client gửi `ping` mỗi 30 giây, relay trả `pong` ngay trong handler nhận tin, không qua hàng đợi của hub, nhưng chỉ khi socket đó còn tối đa 64 KiB và tối đa 64 lần gửi đang chờ; vượt một trong hai thì `ping` không được trả lời (và không được trả bù sau). Không nhận `pong` trong 10 giây thì client coi như mất kết nối. Khung điều khiển PING của WebSocket (opcode 0x9) không bao giờ được trả lời: relay tắt auto-pong của `ws`, vì nó trả lời ngoài mọi giới hạn của hub.
 - **Khung nhị phân** là khung relay (mục 6.2).
 
 ### 6.2 Khung relay
@@ -211,7 +211,7 @@ Byte 1 : type
 - DATA từ client lên hub: `peer` là thiết bị đích. Hub chuyển xuống thiết bị đích với `peer` được thay bằng thiết bị nguồn.
 - Mã lỗi: `1 peer_offline`, `2 frame_too_large`, `3 rate_limited`, `4 bad_frame`.
 - Sự kiện: `{event: "pairing_removed", agent_id, mobile_id, pairing_id}`.
-- Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`.
+- Mã đóng WebSocket: `4001 replaced` (cùng thiết bị vừa kết nối lần nữa), `4002 revoked` (token bị thu hồi), `4003 rate_limited`. Mọi lần hub chủ động đóng (1013, 4001, 4002, 4003) mà sau 1 giây vẫn chưa đóng xong thì socket bị ngắt hẳn (client thấy 1006 và xử lý như mã gốc); các lần đóng khác bị `ws` ngắt sau 2 giây.
 - Giới hạn: khung tối đa 64 KiB; mỗi kết nối tối đa 500 khung/giây (token bucket, tính cả `ping`). Vượt giới hạn: hub gửi ERROR `rate_limited` rồi đóng với mã 4003.
 - Thiết bị nhận chậm: khi còn hơn 4 MiB chưa gửi được, hoặc hơn 1024 lần gửi đang chờ, tới một socket, hub đóng socket đó với mã 1013 (`try again later`) và ngắt hẳn sau 1 giây nếu nó vẫn chưa đóng; client kết nối lại theo backoff như mọi mã đóng khác ngoài 4001/4002.
 - Khi một thiết bị kết nối, hub gửi cho nó PRESENCE của mọi thiết bị đang online trong tài khoản và báo thiết bị mới online cho các thiết bị còn lại. Khi ngắt, hub báo offline và ghi `last_seen_at` vào cơ sở dữ liệu.
