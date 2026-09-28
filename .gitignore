@@ -1,3 +1,6 @@
 .dart_tool/
 build/
 pubspec.lock
+
+# Session worktrees
+.claude/worktrees/
