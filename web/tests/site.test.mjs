@@ -131,16 +131,26 @@ test('every internal link resolves to a built file', () => {
   }
 });
 
-test('no third-party scripts, stylesheets or frames (the privacy policy promises no trackers)', () => {
-  for (const file of allHtmlFiles()) {
-    const html = readFileSync(file, 'utf8');
-    const where = relative(dist, file);
-    assert.doesNotMatch(html, /<iframe/i, `${where} embeds an iframe`);
-    for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]*)"/gi)) {
-      assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `${where} loads external script ${m[1]}`);
-    }
-    for (const m of html.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/gi)) {
-      assert.doesNotMatch(m[0], /href="(https?:)?\/\//, `${where} loads external stylesheet`);
+test('no external scripts, styles, fonts or media on any page', () => {
+  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+  for (const p of allPages) {
+    const html = readPage(p);
+    for (const m of html.matchAll(/<(script|link|img|source|iframe)\b[^>]*\b(?:src|href)="(https?:)?\/\/(?!shellx\.pro)/g)) {
+      assert.fail(`${p}: external resource in ${m[0].slice(0, 120)}`);
     }
   }
+});
+
+test('every page has exactly one h1', () => {
+  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+  for (const p of allPages) {
+    const count = (readPage(p).match(/<h1[\s>]/g) ?? []).length;
+    assert.equal(count, 1, `${p} has ${count} h1`);
+  }
+});
+
+test('self-hosted font files exist and are preloaded', () => {
+  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Regular.woff2')));
+  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Bold.woff2')));
+  assert.match(readPage('/'), /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
 });
