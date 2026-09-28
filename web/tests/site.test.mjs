@@ -132,11 +132,52 @@ test('every internal link resolves to a built file', () => {
 });
 
 test('no external scripts, styles, fonts or media on any page', () => {
+  // Patterns for checking external resources
+  // Negative lookahead with boundary ensures shellx.pro is only allowed with path/quote boundary, not shellx.pro.evil.com, etc
+  const htmlOriginPattern = /<(?:script|link|img|source|iframe)\b[^>]*\b(?:src|href)="(?:https?:)?\/\/(?!shellx\.pro[/"])/gi;
+  const cssUrlPattern = /url\(\s*["']?(?:https?:)?\/\/(?!shellx\.pro[/"'])/gi;
+
+  // Validate that the patterns correctly identify evil domains but allow shellx.pro
+  const evilSample = '<script src="https://shellx.pro.evil.com/x.js">';
+  const goodSample = '<script src="https://shellx.pro/x.js">';
+
+  htmlOriginPattern.lastIndex = 0;
+  assert.ok(htmlOriginPattern.test(evilSample), 'Pattern should catch shellx.pro.evil.com domains');
+
+  htmlOriginPattern.lastIndex = 0;
+  assert.ok(!htmlOriginPattern.test(goodSample), 'Pattern should allow shellx.pro domains');
+
   const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+
+  // Check HTML tags for external resources on all pages
   for (const p of allPages) {
     const html = readPage(p);
-    for (const m of html.matchAll(/<(script|link|img|source|iframe)\b[^>]*\b(?:src|href)="(https?:)?\/\/(?!shellx\.pro)/g)) {
+    htmlOriginPattern.lastIndex = 0;
+    for (const m of html.matchAll(htmlOriginPattern)) {
       assert.fail(`${p}: external resource in ${m[0].slice(0, 120)}`);
+    }
+
+    // Check inline <style> contents for external URL references
+    for (const styleMatch of html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) {
+      const styleContent = styleMatch[1];
+      cssUrlPattern.lastIndex = 0;
+      for (const m of styleContent.matchAll(cssUrlPattern)) {
+        assert.fail(`${p}: external CSS url() in <style>: ${m[0].slice(0, 120)}`);
+      }
+    }
+  }
+
+  // Check all .css files in dist/_astro/ for external URL references
+  const astroDir = join(dist, '_astro');
+  if (existsSync(astroDir)) {
+    for (const file of readdirSync(astroDir)) {
+      if (file.endsWith('.css')) {
+        const css = readFileSync(join(astroDir, file), 'utf8');
+        cssUrlPattern.lastIndex = 0;
+        for (const m of css.matchAll(cssUrlPattern)) {
+          assert.fail(`dist/_astro/${file}: external CSS url(): ${m[0].slice(0, 120)}`);
+        }
+      }
     }
   }
 });
