@@ -1,0 +1,18 @@
+---
+interface Props { command: string; id?: string }
+const { command, id } = Astro.props;
+---
+<section class="tb" id={id} data-term-block>
+  <p class="tb-prompt"><span class="ps1" aria-hidden="true">$&nbsp;</span><span class="tb-cmd" data-cmd>{command}</span></p>
+  <div class="tb-out" data-out><slot /></div>
+</section>
+<style>
+  .tb { margin-top: 1.75rem; }
+  .tb-prompt { margin: 0; color: var(--accent); font-weight: 700; }
+  .ps1 { color: var(--muted); }
+  .tb-out { margin-top: 0.4rem; }
+  .tb-out :global(h1), .tb-out :global(h2) { font-size: 1.15rem; margin: 0.5rem 0; }
+  .tb :global(h1) { font-size: 1.5rem; }
+  .tb-out :global(ul), .tb-out :global(ol) { padding-left: 1.4rem; margin: 0.5rem 0; }
+  .tb-out :global(li) { margin: 0.3rem 0; }
+</style>

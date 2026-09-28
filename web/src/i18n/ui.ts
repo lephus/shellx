@@ -23,6 +23,7 @@ const vi = {
   intro:
     'Cài agent ShellX trên máy Mac hoặc PC, rồi mở và điều khiển các phiên terminal từ điện thoại ở bất kỳ đâu có Internet. Không cần mở port trên router, không cần mang laptop theo.',
   e2e: 'Kết nối được mã hóa đầu cuối: máy chủ trung gian không đọc được nội dung terminal của bạn.',
+  heroStatus: 'đã ghép nối · mã hóa đầu cuối',
   stepsHeading: 'Bắt đầu trong ba bước',
   step1: 'Cài agent trên máy tính và đăng ký tài khoản.',
   step2: 'Cài app trên điện thoại và đăng nhập cùng tài khoản.',
@@ -59,6 +60,7 @@ const en: Strings = {
   intro:
     'Install the ShellX agent on your Mac or PC, then open and control terminal sessions from your phone wherever you have an Internet connection. No router ports to open, no laptop to carry.',
   e2e: 'End-to-end encrypted: the relay server in the middle cannot read your terminal content.',
+  heroStatus: 'paired · end-to-end encrypted',
   stepsHeading: 'Get started in three steps',
   step1: 'Install the agent on your computer and create an account.',
   step2: 'Install the phone app and sign in with the same account.',

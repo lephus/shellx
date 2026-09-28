@@ -195,3 +195,12 @@ test('self-hosted font files exist and are preloaded', () => {
   assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Bold.woff2')));
   assert.match(readPage('/'), /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
 });
+
+test('home is a terminal session: window chrome + command blocks', () => {
+  for (const p of ['/', '/en/']) {
+    const html = readPage(p);
+    assert.match(html, /shellx@pro/);
+    assert.ok((html.match(/data-term-block/g) ?? []).length >= 3, `${p}: too few term blocks`);
+    assert.match(html, /data-cmd/);
+  }
+});

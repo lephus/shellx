@@ -1,42 +1,36 @@
 ---
 import Base from '../layouts/Base.astro';
+import Terminal from './Terminal.astro';
+import TermBlock from './TermBlock.astro';
 import Downloads from './Downloads.astro';
 import { ui, type Lang } from '../i18n/ui';
 
-interface Props {
-  lang: Lang;
-}
-
+interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = ui[lang];
 ---
-
 <Base lang={lang} page="home" title={t.homeTitle} description={t.homeDescription}>
-  <section class="hero">
-    <h1>{t.tagline}</h1>
-    <p>{t.intro}</p>
-    <p class="e2e">{t.e2e}</p>
-  </section>
-  <Downloads lang={lang} />
-  <section>
-    <h2>{t.stepsHeading}</h2>
-    <ol>
-      <li>{t.step1}</li>
-      <li>{t.step2}</li>
-      <li>{t.step3}</li>
-    </ol>
-  </section>
+  <Terminal>
+    <TermBlock command="shellx connect">
+      <p class="status"><span aria-hidden="true">✓ </span>{t.heroStatus}</p>
+      <h1>{t.tagline}</h1>
+      <p>{t.intro}</p>
+      <p class="e2e">{t.e2e}</p>
+    </TermBlock>
+    <TermBlock command="shellx pair --qr">
+      <h2>{t.stepsHeading}</h2>
+      <ol>
+        <li>{t.step1}</li>
+        <li>{t.step2}</li>
+        <li>{t.step3}</li>
+      </ol>
+    </TermBlock>
+    <TermBlock command="shellx download" id="download">
+      <Downloads lang={lang} />
+    </TermBlock>
+  </Terminal>
 </Base>
-
 <style>
-  .hero h1 {
-    font-size: 2rem;
-    line-height: 1.25;
-    margin-top: 2rem;
-  }
-  .e2e {
-    padding: 0.75rem 1rem;
-    border-left: 4px solid var(--accent);
-    background: var(--card);
-  }
+  .status { color: var(--ok); margin: 0.25rem 0 0; }
+  .e2e { padding: 0.6rem 0.9rem; border-left: 3px solid var(--accent); background: var(--bg); }
 </style>
