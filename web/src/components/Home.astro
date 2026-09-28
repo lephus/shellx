@@ -115,6 +115,14 @@ const ld = [
 <style>
   .status { color: var(--ok); margin: 0.25rem 0 0; }
   .e2e { padding: 0.6rem 0.9rem; border-left: 3px solid var(--accent); background: var(--bg); }
+  :global(#download) {
+    margin-top: 2rem;
+    padding: 0.4rem 1rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    background: rgba(34, 211, 238, 0.05);
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.12);
+  }
   .arrows { list-style: none; padding-left: 0; }
   .arrows :global(li)::before { content: '→ '; color: var(--accent); }
   details { border: 1px solid var(--border); border-radius: 0.4rem; padding: 0.5rem 0.9rem; margin: 0.5rem 0; }

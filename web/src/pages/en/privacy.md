@@ -83,7 +83,7 @@ We disclose data to authorities only when the law requires it. Because terminal 
 
 You can delete your account yourself in the mobile app: open **Settings → Delete account** and enter your password again to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, access tokens and pairing records; every connected device is signed out. The desktop agent cannot tell this apart from a password change, so it always deletes its access token, closes all terminal sessions and shows the sign-in screen again — it **keeps** its device key and its list of trusted phones. That list is cleared only when you sign in again with a different account, when you sign out of the agent from the tray, or when you uninstall the agent.
 
-If you can no longer use the mobile app, email [support@shellx.pro](mailto:support@shellx.pro) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
+If you can no longer use the mobile app, email [phule9225@gmail.com](mailto:phule9225@gmail.com) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
 
 Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Deleted data may also remain in the daily database backups for up to 14 days, and is removed together with those backups.
 
@@ -91,7 +91,7 @@ Data stored on your devices (section 3): on Windows, uninstalling the agent remo
 
 ## 9. Your rights
 
-You have the right to request access to, correction of, or deletion of your personal data, to withdraw consent and to object to processing, under the data protection laws where you live. Send requests to [support@shellx.pro](mailto:support@shellx.pro); we reply within 30 days.
+You have the right to request access to, correction of, or deletion of your personal data, to withdraw consent and to object to processing, under the data protection laws where you live. Send requests to [phule9225@gmail.com](mailto:phule9225@gmail.com); we reply within 30 days.
 
 In the apps you can view your devices, revoke or remove pairings, sign out, change your password (from a signed-in computer) and delete your account (from the mobile app).
 
@@ -109,4 +109,4 @@ When this policy changes, we update this page and the "Last updated" date at the
 
 ## 13. Contact
 
-Privacy questions: [support@shellx.pro](mailto:support@shellx.pro).
+Privacy questions: [phule9225@gmail.com](mailto:phule9225@gmail.com).

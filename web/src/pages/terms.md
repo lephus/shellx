@@ -4,7 +4,7 @@ lang: vi
 page: terms
 title: Điều khoản sử dụng
 description: Điều khoản áp dụng khi bạn sử dụng ShellX.
-updated: "2026-09-27"
+updated: "2026-09-28"
 ---
 
 Điều khoản này là thỏa thuận giữa bạn và ShellX ("chúng tôi") khi bạn sử dụng agent trên máy tính, ứng dụng di động, máy chủ chuyển tiếp và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Khi tạo tài khoản hoặc sử dụng Dịch vụ, bạn đồng ý với các điều khoản này và với [Chính sách quyền riêng tư](/privacy/).
@@ -24,7 +24,7 @@ ShellX cho phép bạn mở và điều khiển các phiên terminal trên máy 
 - Bạn chịu trách nhiệm giữ bí mật mật khẩu và bảo vệ các thiết bị đang đăng nhập.
 - Một điện thoại chỉ điều khiển được máy tính khi vừa đăng nhập cùng tài khoản, vừa được ghép nối bằng mã QR hiển thị trên chính máy tính đó. Chỉ quét mã QR khi bạn đang ở cạnh máy tính của mình.
 - Nếu mất điện thoại: trên máy tính, mở menu khay → "Thiết bị đã ghép" → "Thu hồi" điện thoại đó, rồi đổi mật khẩu (việc đổi mật khẩu đăng xuất mọi thiết bị khác).
-- Dịch vụ không có khôi phục mật khẩu qua email; mật khẩu chỉ đổi được từ một máy tính đang đăng nhập. Nếu bạn không còn truy cập được máy tính nào, hãy liên hệ [support@shellx.pro](mailto:support@shellx.pro); chúng tôi sẽ xác minh quyền sở hữu tài khoản trước khi đặt lại mật khẩu.
+- Dịch vụ không có khôi phục mật khẩu qua email; mật khẩu chỉ đổi được từ một máy tính đang đăng nhập. Nếu bạn không còn truy cập được máy tính nào, hãy liên hệ [phule9225@gmail.com](mailto:phule9225@gmail.com); chúng tôi sẽ xác minh quyền sở hữu tài khoản trước khi đặt lại mật khẩu.
 - Hãy báo ngay cho chúng tôi nếu bạn phát hiện tài khoản bị truy cập trái phép.
 
 ## 4. Trách nhiệm đối với lệnh được chạy
@@ -89,4 +89,4 @@ Khi điều khoản thay đổi, chúng tôi cập nhật trang này và ngày "
 
 ## 16. Liên hệ
 
-[support@shellx.pro](mailto:support@shellx.pro)
+[phule9225@gmail.com](mailto:phule9225@gmail.com)

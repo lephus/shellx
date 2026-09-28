@@ -34,7 +34,7 @@ function hrefs(html) {
 test('site config is valid', () => {
   assert.match(config.desktopVersion, /^\d+\.\d+\.\d+$/);
   assert.equal(config.downloadBaseUrl, 'https://download.shellx.pro/desktop');
-  assert.match(config.supportEmail, /^[^@\s]+@shellx\.pro$/);
+  assert.match(config.supportEmail, /^[^@\s]+@[^@\s]+\.[^@\s]+$/);
   assert.ok(config.appStoreUrl === null || config.appStoreUrl.startsWith('https://apps.apple.com/'));
   assert.ok(config.googlePlayUrl === null || config.googlePlayUrl.startsWith('https://play.google.com/'));
 });

@@ -58,6 +58,7 @@ const pageUrl = page ? new URL(pathFor(lang, page), site).href : site.href;
     </main>
     <footer class="wrap bottom">
       <nav>
+        <a class="dl" href={`${pathFor(lang, 'home')}#download`}>{t.download}</a>
         <a href={pathFor(lang, 'privacy')}>{t.privacy}</a>
         <a href={pathFor(lang, 'terms')}>{t.terms}</a>
         <a href={`mailto:${supportEmail}`}>{t.contact}: {supportEmail}</a>
@@ -101,5 +102,7 @@ const pageUrl = page ? new URL(pathFor(lang, page), site).href : site.href;
   .bottom { margin-top: 3rem; padding-top: 1rem; padding-bottom: 2rem;
             border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
   .bottom nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+  .bottom .dl { font-weight: 700; }
+  .bottom .dl::before { content: '↓ '; }
   code { font-family: var(--mono); font-size: 0.9em; }
 </style>

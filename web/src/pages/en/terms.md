@@ -4,7 +4,7 @@ lang: en
 page: terms
 title: Terms of Use
 description: The terms that apply when you use ShellX.
-updated: "2026-09-27"
+updated: "2026-09-28"
 ---
 
 These terms are an agreement between you and ShellX ("we") covering your use of the desktop agent, the mobile app, the relay server and the website `shellx.pro` (together, the "Service"). By creating an account or using the Service, you agree to these terms and to the [Privacy Policy](/en/privacy/).
@@ -24,7 +24,7 @@ ShellX lets you open and control terminal sessions on your own macOS or Windows 
 - You are responsible for keeping your password secret and for protecting the devices you are signed in on.
 - A phone can control a computer only when it is signed in to the same account and has been paired by scanning the QR code shown on that computer. Only scan a QR code when you are next to your own computer.
 - If you lose your phone: on your computer, open the tray menu, go to paired devices and revoke that phone, then change your password (which signs out every other device).
-- There is no password recovery by email; the password can only be changed from a signed-in computer. If you no longer have access to any computer, contact [support@shellx.pro](mailto:support@shellx.pro); we will verify that you own the account before resetting the password.
+- There is no password recovery by email; the password can only be changed from a signed-in computer. If you no longer have access to any computer, contact [phule9225@gmail.com](mailto:phule9225@gmail.com); we will verify that you own the account before resetting the password.
 - Tell us immediately if you notice unauthorized access to your account.
 
 ## 4. Responsibility for commands you run
@@ -89,4 +89,4 @@ These terms are available in Vietnamese and English. If the two versions differ,
 
 ## 16. Contact
 
-[support@shellx.pro](mailto:support@shellx.pro)
+[phule9225@gmail.com](mailto:phule9225@gmail.com)
