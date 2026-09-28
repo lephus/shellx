@@ -224,4 +224,5 @@ test('typing effect ships, is tiny, and respects reduced motion', () => {
     .map((m) => m[1]).join('');
   assert.ok(inline.length > 0, 'no inline script found');
   assert.ok(inline.length < 8192, `inline JS too big: ${inline.length} bytes`);
+  assert.ok(inline.includes('getBoundingClientRect'), 'typing effect must guard above-fold blocks');
 });

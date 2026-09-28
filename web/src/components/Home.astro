@@ -69,6 +69,7 @@ const t = ui[lang];
   if (!reduce && 'IntersectionObserver' in window) {
     const blocks = [...document.querySelectorAll('[data-term-block]')];
     for (const b of blocks) {
+      if (b.getBoundingClientRect().top < 0) continue;
       const cmd = b.querySelector('[data-cmd]');
       b.dataset.full = cmd.textContent;
       cmd.textContent = '';
