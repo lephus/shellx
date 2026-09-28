@@ -68,12 +68,14 @@ const t = ui[lang];
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduce && 'IntersectionObserver' in window) {
     const blocks = [...document.querySelectorAll('[data-term-block]')];
+    const pending = [];
     for (const b of blocks) {
       if (b.getBoundingClientRect().top < 0) continue;
       const cmd = b.querySelector('[data-cmd]');
       b.dataset.full = cmd.textContent;
       cmd.textContent = '';
       b.classList.add('tb-pending');
+      pending.push(b);
     }
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
@@ -82,7 +84,7 @@ const t = ui[lang];
         type(e.target);
       }
     }, { rootMargin: '0px 0px -10% 0px' });
-    blocks.forEach((b) => io.observe(b));
+    pending.forEach((b) => io.observe(b));
     function type(b) {
       const cmd = b.querySelector('[data-cmd]');
       const full = b.dataset.full;
