@@ -204,3 +204,15 @@ test('home is a terminal session: window chrome + command blocks', () => {
     assert.match(html, /data-cmd/);
   }
 });
+
+test('home carries the full marketing content statically (no JS needed)', () => {
+  const checks = [
+    ['/', ['Tính năng', 'Bảo mật', 'Câu hỏi thường gặp', 'argon2id', 'mã QR', 'miễn phí']],
+    ['/en/', ['Features', 'Security', 'FAQ', 'argon2id', 'QR code', 'free']],
+  ];
+  for (const [p, needles] of checks) {
+    const html = readPage(p);
+    for (const n of needles) assert.ok(html.includes(n), `${p} missing "${n}"`);
+    assert.ok((html.match(/<details[\s>]/g) ?? []).length >= 4, `${p}: FAQ needs >= 4 <details>`);
+  }
+});
