@@ -216,3 +216,12 @@ test('home carries the full marketing content statically (no JS needed)', () => 
     assert.ok((html.match(/<details[\s>]/g) ?? []).length >= 4, `${p}: FAQ needs >= 4 <details>`);
   }
 });
+
+test('typing effect ships, is tiny, and respects reduced motion', () => {
+  const html = readPage('/');
+  assert.match(html, /prefers-reduced-motion/);
+  const inline = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1]).join('');
+  assert.ok(inline.length > 0, 'no inline script found');
+  assert.ok(inline.length < 8192, `inline JS too big: ${inline.length} bytes`);
+});

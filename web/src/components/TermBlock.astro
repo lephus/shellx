@@ -15,4 +15,13 @@ const { command, id } = Astro.props;
   .tb :global(h1) { font-size: 1.5rem; }
   .tb-out :global(ul), .tb-out :global(ol) { padding-left: 1.4rem; margin: 0.5rem 0; }
   .tb-out :global(li) { margin: 0.3rem 0; }
+  .tb.tb-pending :global(.tb-out) { visibility: hidden; }
+  .tb-cmd.typing::after, .tb-prompt .tb-cmd:empty::after {
+    content: '█'; color: var(--accent);
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tb-cmd.typing::after { animation: none; }
+  }
 </style>
