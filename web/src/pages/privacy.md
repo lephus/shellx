@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu và quyền của bạn.
-updated: "2026-09-27"
+updated: "2026-09-28"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -34,7 +34,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 **Bản ghi ghép nối** — khi bạn ghép nối một điện thoại với một máy tính bằng mã QR, máy chủ lưu cặp (máy tính, điện thoại) và thời điểm ghép nối, chỉ để hiển thị trong ứng dụng. Việc tin cậy một điện thoại được quyết định và lưu trên chính máy tính của bạn, không phải trên máy chủ.
 
-**Địa chỉ IP** — địa chỉ IP của bạn được dùng tạm thời để giới hạn số lần đăng nhập và đăng ký trong mỗi khoảng 60 giây (chống dò mật khẩu và lạm dụng). Chúng tôi không lưu địa chỉ IP vào cơ sở dữ liệu tài khoản.
+**Địa chỉ IP** — địa chỉ IP của bạn được dùng tạm thời để giới hạn số lần đăng nhập và đăng ký trong mỗi khoảng 60 giây (chống dò mật khẩu và lạm dụng). Chúng tôi không lưu địa chỉ IP vào cơ sở dữ liệu tài khoản. Các yêu cầu `https://` tới Dịch vụ không bị ghi nhật ký truy cập; riêng nếu bạn truy cập bằng liên kết `http://` không bảo mật, máy chủ web dùng chung có thể ghi yêu cầu đó (kèm địa chỉ IP) vào nhật ký kỹ thuật trước khi chuyển hướng bạn sang `https://`.
 
 **Nhật ký vận hành** — máy chủ ghi nhật ký kỹ thuật tối thiểu để vận hành và xử lý sự cố: thời điểm, mã thiết bị, mã lỗi và kích thước gói dữ liệu. Nhật ký **không bao giờ** chứa nội dung terminal, mật khẩu hay mã truy cập.
 

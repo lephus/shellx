@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: What data ShellX collects, why, how long it is kept, and your rights.
-updated: "2026-09-27"
+updated: "2026-09-28"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -34,7 +34,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 
 **Pairing records** — when you pair a phone with a computer by scanning a QR code, the server stores the (computer, phone) pair and when it was paired, for display in the apps only. Whether a phone is trusted is decided and stored on your computer, not on the server.
 
-**IP addresses** — your IP address is used transiently to limit sign-in and registration attempts per 60-second window (to stop password guessing and abuse). We do not store IP addresses in the account database.
+**IP addresses** — your IP address is used transiently to limit sign-in and registration attempts per 60-second window (to stop password guessing and abuse). We do not store IP addresses in the account database. `https://` requests to the Service are not access-logged; however, if you visit over a plain `http://` link, the shared web server may record that request (including your IP address) in its technical log before redirecting you to `https://`.
 
 **Operational logs** — the server keeps minimal technical logs to run the Service and fix problems: timestamps, device IDs, error codes and frame sizes. Logs **never** contain terminal content, passwords or access tokens.
 
