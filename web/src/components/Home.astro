@@ -69,6 +69,48 @@ const ld = [
       ))}
     </TermBlock>
   </Terminal>
+
+  <script is:inline>
+    (() => {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduce && 'IntersectionObserver' in window) {
+        const blocks = [...document.querySelectorAll('[data-term-block]')];
+        const pending = [];
+        for (const b of blocks) {
+          if (b.getBoundingClientRect().top < 0) continue;
+          const cmd = b.querySelector('[data-cmd]');
+          if (!cmd) continue;
+          b.dataset.full = cmd.textContent;
+          cmd.textContent = '';
+          b.classList.add('tb-pending');
+          pending.push(b);
+        }
+        const io = new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            io.unobserve(e.target);
+            type(e.target);
+          }
+        }, { rootMargin: '0px 0px -10% 0px' });
+        pending.forEach((b) => io.observe(b));
+        function type(b) {
+          const cmd = b.querySelector('[data-cmd]');
+          const full = b.dataset.full;
+          let i = 0;
+          cmd.classList.add('typing');
+          const tick = () => {
+            cmd.textContent = full.slice(0, ++i);
+            if (i < full.length) setTimeout(tick, 24);
+            else {
+              cmd.classList.remove('typing');
+              b.classList.remove('tb-pending');
+            }
+          };
+          tick();
+        }
+      }
+    })();
+  </script>
 </Base>
 <style>
   .status { color: var(--ok); margin: 0.25rem 0 0; }
@@ -78,42 +120,3 @@ const ld = [
   details { border: 1px solid var(--border); border-radius: 0.4rem; padding: 0.5rem 0.9rem; margin: 0.5rem 0; }
   summary { cursor: pointer; font-weight: 700; }
 </style>
-
-<script is:inline>
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduce && 'IntersectionObserver' in window) {
-    const blocks = [...document.querySelectorAll('[data-term-block]')];
-    const pending = [];
-    for (const b of blocks) {
-      if (b.getBoundingClientRect().top < 0) continue;
-      const cmd = b.querySelector('[data-cmd]');
-      b.dataset.full = cmd.textContent;
-      cmd.textContent = '';
-      b.classList.add('tb-pending');
-      pending.push(b);
-    }
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        io.unobserve(e.target);
-        type(e.target);
-      }
-    }, { rootMargin: '0px 0px -10% 0px' });
-    pending.forEach((b) => io.observe(b));
-    function type(b) {
-      const cmd = b.querySelector('[data-cmd]');
-      const full = b.dataset.full;
-      let i = 0;
-      cmd.classList.add('typing');
-      const tick = () => {
-        cmd.textContent = full.slice(0, ++i);
-        if (i < full.length) setTimeout(tick, 24);
-        else {
-          cmd.classList.remove('typing');
-          b.classList.remove('tb-pending');
-        }
-      };
-      tick();
-    }
-  }
-</script>
