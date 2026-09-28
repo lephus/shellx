@@ -131,16 +131,130 @@ test('every internal link resolves to a built file', () => {
   }
 });
 
-test('no third-party scripts, stylesheets or frames (the privacy policy promises no trackers)', () => {
-  for (const file of allHtmlFiles()) {
-    const html = readFileSync(file, 'utf8');
-    const where = relative(dist, file);
-    assert.doesNotMatch(html, /<iframe/i, `${where} embeds an iframe`);
-    for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]*)"/gi)) {
-      assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `${where} loads external script ${m[1]}`);
+test('no external scripts, styles, fonts or media on any page', () => {
+  // Patterns for checking external resources
+  // Negative lookahead with boundary ensures shellx.pro is only allowed with path/quote boundary, not shellx.pro.evil.com, etc
+  const htmlOriginPattern = /<(?:script|link|img|source|iframe)\b[^>]*\b(?:src|href)="(?:https?:)?\/\/(?!shellx\.pro[/"])/gi;
+  const cssUrlPattern = /url\(\s*["']?(?:https?:)?\/\/(?!shellx\.pro[/"'])/gi;
+
+  // Validate that the patterns correctly identify evil domains but allow shellx.pro
+  const evilSample = '<script src="https://shellx.pro.evil.com/x.js">';
+  const goodSample = '<script src="https://shellx.pro/x.js">';
+
+  htmlOriginPattern.lastIndex = 0;
+  assert.ok(htmlOriginPattern.test(evilSample), 'Pattern should catch shellx.pro.evil.com domains');
+
+  htmlOriginPattern.lastIndex = 0;
+  assert.ok(!htmlOriginPattern.test(goodSample), 'Pattern should allow shellx.pro domains');
+
+  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+
+  // Check HTML tags for external resources on all pages
+  for (const p of allPages) {
+    const html = readPage(p);
+    htmlOriginPattern.lastIndex = 0;
+    for (const m of html.matchAll(htmlOriginPattern)) {
+      assert.fail(`${p}: external resource in ${m[0].slice(0, 120)}`);
     }
-    for (const m of html.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/gi)) {
-      assert.doesNotMatch(m[0], /href="(https?:)?\/\//, `${where} loads external stylesheet`);
+
+    // Check inline <style> contents for external URL references
+    for (const styleMatch of html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) {
+      const styleContent = styleMatch[1];
+      cssUrlPattern.lastIndex = 0;
+      for (const m of styleContent.matchAll(cssUrlPattern)) {
+        assert.fail(`${p}: external CSS url() in <style>: ${m[0].slice(0, 120)}`);
+      }
     }
+  }
+
+  // Check all .css files in dist/_astro/ for external URL references
+  const astroDir = join(dist, '_astro');
+  if (existsSync(astroDir)) {
+    for (const file of readdirSync(astroDir)) {
+      if (file.endsWith('.css')) {
+        const css = readFileSync(join(astroDir, file), 'utf8');
+        cssUrlPattern.lastIndex = 0;
+        for (const m of css.matchAll(cssUrlPattern)) {
+          assert.fail(`dist/_astro/${file}: external CSS url(): ${m[0].slice(0, 120)}`);
+        }
+      }
+    }
+  }
+});
+
+test('every page has exactly one h1', () => {
+  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+  for (const p of allPages) {
+    const count = (readPage(p).match(/<h1[\s>]/g) ?? []).length;
+    assert.equal(count, 1, `${p} has ${count} h1`);
+  }
+});
+
+test('self-hosted font files exist and are preloaded', () => {
+  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Regular.woff2')));
+  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Bold.woff2')));
+  assert.match(readPage('/'), /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
+});
+
+test('home is a terminal session: window chrome + command blocks', () => {
+  for (const p of ['/', '/en/']) {
+    const html = readPage(p);
+    assert.match(html, /shellx@pro/);
+    assert.ok((html.match(/data-term-block/g) ?? []).length >= 3, `${p}: too few term blocks`);
+    assert.match(html, /data-cmd/);
+  }
+});
+
+test('home carries the full marketing content statically (no JS needed)', () => {
+  const checks = [
+    ['/', ['Tính năng', 'Bảo mật', 'Câu hỏi thường gặp', 'argon2id', 'mã QR', 'miễn phí']],
+    ['/en/', ['Features', 'Security', 'FAQ', 'argon2id', 'QR code', 'free']],
+  ];
+  for (const [p, needles] of checks) {
+    const html = readPage(p);
+    for (const n of needles) assert.ok(html.includes(n), `${p} missing "${n}"`);
+    assert.ok((html.match(/<details[\s>]/g) ?? []).length >= 4, `${p}: FAQ needs >= 4 <details>`);
+  }
+});
+
+test('typing effect ships, is tiny, and respects reduced motion', () => {
+  const html = readPage('/');
+  assert.match(html, /prefers-reduced-motion/);
+  const inline = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1]).join('');
+  assert.ok(inline.length > 0, 'no inline script found');
+  assert.ok(inline.length < 8192, `inline JS too big: ${inline.length} bytes`);
+  assert.ok(inline.includes('getBoundingClientRect'), 'typing effect must guard above-fold blocks');
+});
+
+test('robots.txt and sitemap.xml exist; sitemap lists exactly the 6 pages', () => {
+  assert.match(readFileSync(join(dist, 'robots.txt'), 'utf8'), /Sitemap: https:\/\/shellx\.pro\/sitemap\.xml/);
+  const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+  assert.deepEqual(locs, [
+    'https://shellx.pro/', 'https://shellx.pro/en/', 'https://shellx.pro/en/privacy/',
+    'https://shellx.pro/en/terms/', 'https://shellx.pro/privacy/', 'https://shellx.pro/terms/',
+  ]);
+});
+
+test('OG/Twitter meta and per-language OG image on every page', () => {
+  for (const p of ['/', '/en/', '/privacy/', '/en/privacy/']) {
+    const html = readPage(p);
+    const og = p.startsWith('/en') ? '/og/og-en.png' : '/og/og-vi.png';
+    assert.match(html, /property="og:title"/);
+    assert.match(html, /name="twitter:card" content="summary_large_image"/);
+    assert.ok(html.includes(`https://shellx.pro${og}`), `${p} wrong og:image`);
+    assert.ok(existsSync(join(dist, og.slice(1))), `${og} missing from dist`);
+  }
+});
+
+test('home JSON-LD parses and declares the free app', () => {
+  for (const p of ['/', '/en/']) {
+    const scripts = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    assert.ok(scripts.length >= 1, `${p}: JSON-LD missing`);
+    const types = scripts.map((m) => JSON.parse(m[1])).map((d) => d['@type']);
+    assert.ok(types.includes('SoftwareApplication'));
+    const app = scripts.map((m) => JSON.parse(m[1])).find((d) => d['@type'] === 'SoftwareApplication');
+    assert.equal(app.offers.price, '0');
   }
 });

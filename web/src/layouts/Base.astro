@@ -16,6 +16,8 @@ const other = otherLang(lang);
 const switchHref = pathFor(other, page ?? 'home');
 const site = Astro.site ?? new URL('https://shellx.pro');
 const year = new Date().getFullYear();
+const ogImage = new URL(lang === 'en' ? '/og/og-en.png' : '/og/og-vi.png', site).href;
+const pageUrl = page ? new URL(pathFor(lang, page), site).href : site.href;
 ---
 
 <!doctype html>
@@ -30,11 +32,26 @@ const year = new Date().getFullYear();
     {page && <link rel="alternate" hreflang="vi" href={new URL(pathFor('vi', page), site).href} />}
     {page && <link rel="alternate" hreflang="en" href={new URL(pathFor('en', page), site).href} />}
     {page && <link rel="alternate" hreflang="x-default" href={new URL(pathFor('vi', page), site).href} />}
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/JetBrainsMono-Regular.woff2" crossorigin />
+    <meta name="theme-color" content="#0b1120" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ShellX" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content={lang === 'vi' ? 'vi_VN' : 'en_US'} />
+    <meta property="og:locale:alternate" content={lang === 'vi' ? 'en_US' : 'vi_VN'} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <slot name="head" />
   </head>
   <body>
     <header class="wrap top">
-      <a class="brand" href={pathFor(lang, 'home')}>ShellX</a>
-      <a class="lang-switch" href={switchHref} hreflang={other} lang={other}>{ui[other].languageName}</a>
+      <a class="brand" href={pathFor(lang, 'home')}><span aria-hidden="true">~/</span>shellx</a>
+      <a class="lang-switch" href={switchHref} hreflang={other} lang={other}
+        ><span aria-hidden="true">--lang=</span>{other}</a>
     </header>
     <main class="wrap">
       <slot />
@@ -51,71 +68,38 @@ const year = new Date().getFullYear();
 </html>
 
 <style is:global>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: swap;
+  }
   :root {
-    color-scheme: light dark;
-    --bg: #ffffff;
-    --fg: #0f172a;
-    --muted: #475569;
-    --accent: #0e7490;
-    --card: #f1f5f9;
-    --border: #cbd5e1;
+    color-scheme: dark;
+    --bg: #0b1120; --fg: #e2e8f0; --muted: #94a3b8;
+    --accent: #22d3ee; --ok: #4ade80; --card: #0f172a; --border: #1e293b;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0b1120;
-      --fg: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #22d3ee;
-      --card: #111827;
-      --border: #334155;
-    }
-  }
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    line-height: 1.6;
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--mono); line-height: 1.7; font-size: 0.95rem;
   }
-  a {
-    color: var(--accent);
-  }
-  .wrap {
-    max-width: 52rem;
-    margin: 0 auto;
-    padding: 0 1rem;
-  }
-  .top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-  }
-  .brand {
-    font-weight: 700;
-    font-size: 1.25rem;
-    color: var(--fg);
-    text-decoration: none;
-  }
-  .bottom {
-    margin-top: 3rem;
-    padding-top: 1rem;
-    padding-bottom: 2rem;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-  .bottom nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-  }
-  code {
-    font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
-    font-size: 0.9em;
-  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 0 1rem; }
+  .top { display: flex; justify-content: space-between; align-items: center;
+         padding-top: 1rem; padding-bottom: 1rem; }
+  .brand { font-weight: 700; font-size: 1.1rem; color: var(--fg); text-decoration: none; }
+  .brand span, .lang-switch span { color: var(--muted); }
+  .lang-switch { text-decoration: none; }
+  .bottom { margin-top: 3rem; padding-top: 1rem; padding-bottom: 2rem;
+            border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  .bottom nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+  code { font-family: var(--mono); font-size: 0.9em; }
 </style>

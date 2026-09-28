@@ -1,5 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import TermBlock from '../components/TermBlock.astro';
 import { ui } from '../i18n/ui';
 
 // nginx serves dist/404.html with status 404 for unknown paths (deploy/web/nginx.conf).
@@ -8,10 +10,16 @@ const en = ui.en;
 ---
 
 <Base lang="vi" page={null} title={`${vi.notFoundTitle} — ShellX`} description={vi.notFoundBody}>
-  <h1>{vi.notFoundTitle}</h1>
-  <p>{vi.notFoundBody} <a href="/">{vi.backHome}</a></p>
-  <div lang="en">
-    <h2>{en.notFoundTitle}</h2>
-    <p>{en.notFoundBody} <a href="/en/">{en.backHome}</a></p>
-  </div>
+  <Terminal title="shellx@pro — 404">
+    <TermBlock command="open …">
+      <p class="err" aria-hidden="true">zsh: command not found</p>
+      <h1>{vi.notFoundTitle}</h1>
+      <p>{vi.notFoundBody} <a href="/">{vi.backHome}</a></p>
+      <div lang="en">
+        <h2>{en.notFoundTitle}</h2>
+        <p>{en.notFoundBody} <a href="/en/">{en.backHome}</a></p>
+      </div>
+    </TermBlock>
+  </Terminal>
 </Base>
+<style> .err { color: #f87171; margin: 0.25rem 0 0; } </style>
