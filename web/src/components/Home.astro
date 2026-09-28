@@ -8,8 +8,23 @@ import { ui, type Lang, pathFor } from '../i18n/ui';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = ui[lang];
+const site = 'https://shellx.pro';
+const url = lang === 'vi' ? `${site}/` : `${site}/en/`;
+const ld = [
+  {
+    '@context': 'https://schema.org', '@type': 'SoftwareApplication',
+    name: 'ShellX', applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'macOS, Windows, iOS, Android',
+    description: t.homeDescription, url, inLanguage: lang,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  },
+  { '@context': 'https://schema.org', '@type': 'WebSite', name: 'ShellX', url: site, inLanguage: lang },
+];
 ---
 <Base lang={lang} page="home" title={t.homeTitle} description={t.homeDescription}>
+  <Fragment slot="head">
+    {ld.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+  </Fragment>
   <Terminal>
     <TermBlock command="shellx connect">
       <p class="status"><span aria-hidden="true">✓ </span>{t.heroStatus}</p>

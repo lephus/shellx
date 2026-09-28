@@ -226,3 +226,35 @@ test('typing effect ships, is tiny, and respects reduced motion', () => {
   assert.ok(inline.length < 8192, `inline JS too big: ${inline.length} bytes`);
   assert.ok(inline.includes('getBoundingClientRect'), 'typing effect must guard above-fold blocks');
 });
+
+test('robots.txt and sitemap.xml exist; sitemap lists exactly the 6 pages', () => {
+  assert.match(readFileSync(join(dist, 'robots.txt'), 'utf8'), /Sitemap: https:\/\/shellx\.pro\/sitemap\.xml/);
+  const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+  assert.deepEqual(locs, [
+    'https://shellx.pro/', 'https://shellx.pro/en/', 'https://shellx.pro/en/privacy/',
+    'https://shellx.pro/en/terms/', 'https://shellx.pro/privacy/', 'https://shellx.pro/terms/',
+  ]);
+});
+
+test('OG/Twitter meta and per-language OG image on every page', () => {
+  for (const p of ['/', '/en/', '/privacy/', '/en/privacy/']) {
+    const html = readPage(p);
+    const og = p.startsWith('/en') ? '/og/og-en.png' : '/og/og-vi.png';
+    assert.match(html, /property="og:title"/);
+    assert.match(html, /name="twitter:card" content="summary_large_image"/);
+    assert.ok(html.includes(`https://shellx.pro${og}`), `${p} wrong og:image`);
+    assert.ok(existsSync(join(dist, og.slice(1))), `${og} missing from dist`);
+  }
+});
+
+test('home JSON-LD parses and declares the free app', () => {
+  for (const p of ['/', '/en/']) {
+    const scripts = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    assert.ok(scripts.length >= 1, `${p}: JSON-LD missing`);
+    const types = scripts.map((m) => JSON.parse(m[1])).map((d) => d['@type']);
+    assert.ok(types.includes('SoftwareApplication'));
+    const app = scripts.map((m) => JSON.parse(m[1])).find((d) => d['@type'] === 'SoftwareApplication');
+    assert.equal(app.offers.price, '0');
+  }
+});
