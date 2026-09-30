@@ -109,14 +109,14 @@ shellx-term --version
 
 Khối nằm ở **đầu** file, chỉ gồm ký tự ASCII, có dấu `# >>> ShellX >>>` và `# <<< ShellX <<<`. Nó `exec` sang `shellx-term` khi **mọi** điều kiện sau đều đúng:
 
-- shell đang ở chế độ tương tác (`$-` chứa `i`);
+- shell đang tương tác **và không chạy chuỗi lệnh hay script**: zsh `[[ -o interactive ]]` và `$ZSH_EXECUTION_STRING` rỗng (không dùng `-o shinstdin`: zsh chỉ bật nó sau khi đọc xong các file khởi động); bash `$-` chứa `i` và `$BASH_EXECUTION_STRING` rỗng. VS Code/Cursor chạy `$SHELL -i -l -c '…'` để đọc biến môi trường khi khởi động; bọc shell đó sẽ làm editor treo;
 - stdin và stdout đều là terminal (`[ -t 0 ] && [ -t 1 ]`);
 - chưa ở trong `shellx-term` (`SHELLX_TERM` rỗng) và không phải phiên do ShellX mở từ điện thoại (`SHELLX` rỗng);
 - không ở trong tmux hoặc screen (`TMUX`, `STY` rỗng) — cửa sổ đang chạy tmux đã được bọc ở tầng ngoài;
-- ứng dụng terminal không nằm trong danh sách loại trừ (theo `TERM_PROGRAM`, lập từ kết quả kiểm tra ở §13; Warp là nghi vấn đầu tiên);
+- ứng dụng terminal không nằm trong danh sách loại trừ theo `TERM_PROGRAM`. Hiện có `WarpTerminal` (loại trừ trước vì Warp tự khởi tạo shell; chưa kiểm được vì máy phát triển chưa cài). Danh sách chốt sau kiểm tra ở §13;
 - file `~/Library/Application Support/ShellX/bin/shellx-term` tồn tại và chạy được.
 
-Khối truyền cho `shellx-term` đường dẫn tuyệt đối của **chính shell đang chạy** (bash: `$BASH`; zsh: `${${ZSH_ARGZERO#-}:c}`) và cờ `--login` nếu shell là login shell (bash: `shopt -q login_shell`; zsh: `[[ -o login ]]`). Nhờ `exec`, `shellx-term` giữ đúng PID của shell ban đầu.
+Khối truyền cho `shellx-term` đường dẫn tuyệt đối của **chính shell đang chạy**: bash dùng `$BASH`; zsh dùng `${ZSH_ARGZERO#-}` nếu đã tuyệt đối, nếu không thì `$SHELL` khi `$SHELL` là zsh (trường hợp Terminal.app/iTerm2 mở login shell `-zsh`), còn lại tìm theo `PATH`. Kèm cờ `--login` nếu shell là login shell (bash: `shopt -q login_shell`; zsh: `[[ -o login ]]`). Nhờ `exec`, `shellx-term` giữ đúng PID của shell ban đầu. Nội dung chuẩn của khối nằm ở `term/shell/block.zsh` và `term/shell/block.bash`; bộ cài (P4) chèn đúng nội dung đó.
 
 ### 5.3 Khối tích hợp trên Windows (PowerShell 7 và 5.1)
 
