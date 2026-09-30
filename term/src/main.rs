@@ -5,6 +5,9 @@
 mod cli;
 #[cfg(unix)]
 mod fallback;
+#[cfg(unix)]
+#[allow(dead_code)] // wired in by Task 3
+mod tty;
 
 #[cfg(unix)]
 fn main() {
