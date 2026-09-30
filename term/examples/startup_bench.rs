@@ -25,7 +25,20 @@ fn main() {
     assert!(bin.exists(), "build first: cargo build --release");
     let home = PathBuf::from(std::env::var_os("HOME").expect("HOME"));
     let root = std::env::temp_dir().join(format!("shellx-bench-{}", std::process::id()));
+    assert!(
+        BLOCK.contains(INSTALLED),
+        "block.zsh no longer contains the installed path"
+    );
     let wrapped = BLOCK.replace(INSTALLED, bin.to_str().unwrap());
+    assert!(
+        wrapped.contains("wrap --login --"),
+        "block.zsh has no login branch to measure"
+    );
+    let nologin = wrapped.replace("wrap --login --", "wrap --");
+    assert_ne!(
+        nologin, wrapped,
+        "the non-login variant must differ from the login one"
+    );
     let variants = [
         ("baseline", setup(&root.join("baseline"), &home, "")),
         (

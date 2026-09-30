@@ -78,3 +78,64 @@ fn a_symlinked_file_stays_a_symlink() {
         .is_symlink());
     assert_eq!(read(&real), "export B=2\n");
 }
+
+fn block_fails(args: &[&str]) -> String {
+    let out = Command::new("/bin/bash")
+        .arg(BLOCK_SCRIPT)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "{args:?} should have failed");
+    String::from_utf8_lossy(&out.stderr).to_string()
+}
+
+#[test]
+fn a_block_without_its_end_marker_is_refused_and_left_untouched() {
+    let dir = common::temp_dir("dev-block-broken");
+    let rc = dir.join(".zshrc");
+    let original = "keep1\n# >>> ShellX >>>\nkeep2\nkeep3\n";
+    std::fs::write(&rc, original).unwrap();
+    let rc_s = rc.to_str().unwrap();
+    assert!(block_fails(&["off", rc_s]).contains("damaged"));
+    assert_eq!(read(&rc), original);
+    assert!(block_fails(&["on", rc_s]).contains("damaged"));
+    assert_eq!(read(&rc), original);
+    assert_eq!(block(&["status", rc_s]), "broken");
+    assert!(!dir.join(".zshrc.shellx-backup").exists());
+}
+
+#[test]
+fn out_of_order_markers_are_refused() {
+    let dir = common::temp_dir("dev-block-order");
+    let rc = dir.join(".zshrc");
+    let original = "# <<< ShellX <<<\nx\n# >>> ShellX >>>\ny\n";
+    std::fs::write(&rc, original).unwrap();
+    assert!(block_fails(&["off", rc.to_str().unwrap()]).contains("damaged"));
+    assert_eq!(read(&rc), original);
+}
+
+fn round_trip(name: &str, original: &[u8]) {
+    let dir = common::temp_dir(name);
+    let rc = dir.join(".zshrc");
+    std::fs::write(&rc, original).unwrap();
+    let rc_s = rc.to_str().unwrap();
+    block(&["on", rc_s]);
+    assert_eq!(block(&["status", rc_s]), "on");
+    block(&["off", rc_s]);
+    assert_eq!(std::fs::read(&rc).unwrap(), original);
+}
+
+#[test]
+fn a_file_without_a_trailing_newline_round_trips_byte_exactly() {
+    round_trip("dev-block-nonl", b"a\nb");
+}
+
+#[test]
+fn a_crlf_file_round_trips_byte_exactly() {
+    round_trip("dev-block-crlf", b"export A=1\r\n# x\r\n");
+}
+
+#[test]
+fn an_empty_file_round_trips_byte_exactly() {
+    round_trip("dev-block-empty", b"");
+}
