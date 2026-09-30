@@ -1,0 +1,20 @@
+[package]
+name = "shellx-term"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Wraps an interactive shell in a PTY so ShellX can share the terminal with a paired phone."
+
+[dependencies]
+portable-pty = "0.9.0"
+signal-hook = "0.4.4"
+libc = "0.2.189"
+
+[features]
+# Fault injection for integration tests only: `cargo test --features test-hooks`.
+test-hooks = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
