@@ -6,8 +6,11 @@ mod cli;
 #[cfg(unix)]
 mod fallback;
 #[cfg(unix)]
-#[allow(dead_code)] // wired in by Task 3
+mod faults;
+#[cfg(unix)]
 mod tty;
+#[cfg(unix)]
+mod wrap;
 
 #[cfg(unix)]
 fn main() {
@@ -15,8 +18,16 @@ fn main() {
     let target = fallback::Target::for_command(&command);
     match command {
         cli::Command::Version => println!("shellx-term {}", env!("CARGO_PKG_VERSION")),
-        // Task 3 runs the wrapper for `Wrap`; until then it falls back too.
-        cli::Command::Wrap(_) | cli::Command::Invalid => fallback::exec_shell(&target),
+        cli::Command::Invalid => fallback::exec_shell(&target),
+        cli::Command::Wrap(args) => match wrap::run(&args) {
+            Ok(code) => std::process::exit(code),
+            Err(error) => {
+                if let Some(notice) = error.notice() {
+                    eprintln!("{notice}");
+                }
+                fallback::exec_shell(&target)
+            }
+        },
     }
 }
 

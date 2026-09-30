@@ -54,6 +54,7 @@ impl Drop for RawMode {
 
 /// Restores the modes saved by [`RawMode::enable`]. Never blocks: it runs
 /// from the panic hook and the SIGTERM path.
+#[allow(dead_code)] // first caller arrives in Task 4
 pub fn restore_saved() {
     if let Ok(mut saved) = SAVED.try_lock() {
         if let Some((fd, original)) = saved.take() {
@@ -112,10 +113,6 @@ mod tests {
         let mut modes: libc::termios = unsafe { std::mem::zeroed() };
         assert_eq!(unsafe { libc::tcgetattr(fd, &mut modes) }, 0);
         modes
-    }
-
-    fn local_flags(fd: RawFd) -> libc::tcflag_t {
-        get_termios(fd).c_lflag
     }
 
     #[test]
