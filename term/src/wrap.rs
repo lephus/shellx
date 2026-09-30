@@ -102,17 +102,12 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
 /// life.
 fn forward_signals(mut signals: Signals, master: Box<dyn MasterPty + Send>) {
     std::thread::spawn(move || {
+        // A resize between reading the initial size and registering the
+        // signals would otherwise be lost.
+        resize_to_window(&*master);
         for signal in signals.forever() {
             match signal {
-                SIGWINCH => {
-                    let (cols, rows) = current_size();
-                    let _ = master.resize(PtySize {
-                        rows,
-                        cols,
-                        pixel_width: 0,
-                        pixel_height: 0,
-                    });
-                }
+                SIGWINCH => resize_to_window(&*master),
                 SIGTERM => {
                     tty::restore_saved();
                     std::process::exit(128 + SIGTERM);
@@ -120,6 +115,16 @@ fn forward_signals(mut signals: Signals, master: Box<dyn MasterPty + Send>) {
                 _ => {}
             }
         }
+    });
+}
+
+fn resize_to_window(master: &dyn MasterPty) {
+    let (cols, rows) = current_size();
+    let _ = master.resize(PtySize {
+        rows,
+        cols,
+        pixel_width: 0,
+        pixel_height: 0,
     });
 }
 

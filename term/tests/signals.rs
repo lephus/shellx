@@ -5,16 +5,6 @@ use std::time::{Duration, Instant};
 
 const T: Duration = Duration::from_secs(5);
 
-/// Saves the window's modes to `before` and waits until that is done, so the
-/// later type-ahead cannot leave the kernel's transient PENDIN flag in the
-/// saved value.
-fn record_modes_first(h: &mut Harness, dir: &std::path::Path) {
-    let d = dir.display();
-    h.send(&format!("stty -g > {d}/before; echo rea''dy\r"));
-    h.expect("ready", T);
-    h.settle(Duration::from_millis(100));
-}
-
 #[test]
 fn resizing_the_window_resizes_the_shell() {
     let mut h = Harness::wrap_sh(&[]);
@@ -87,14 +77,17 @@ fn a_flood_of_output_can_be_interrupted() {
     h.wait_exit(T);
 }
 
+// The outer shell is non-interactive (`sh -c`): an interactive one restores
+// the window's modes itself when a job dies, which would hide a missing restore.
 #[test]
 fn the_window_modes_are_restored_after_the_shell_exits() {
     let dir = common::temp_dir("modes-exit");
     let d = dir.display();
-    let mut h = Harness::spawn("/bin/sh", &[], &[], 80, 24);
-    h.send(&format!(
-        "stty -g > {d}/before; {BIN} wrap -- /bin/sh; stty -g > {d}/after; echo sa''ved\r"
-    ));
+    let script = format!(
+        "stty -g > {d}/before; echo rea''dy; {BIN} wrap -- /bin/sh; stty -g > {d}/after; echo sa''ved"
+    );
+    let mut h = Harness::spawn("/bin/sh", &["-c", &script], &[], 80, 24);
+    h.expect("ready", T);
     h.send("echo in''side\r");
     h.expect("inside", T);
     h.send("exit 0\r");
@@ -106,11 +99,11 @@ fn the_window_modes_are_restored_after_the_shell_exits() {
 fn sigterm_restores_the_window_and_exits_143() {
     let dir = common::temp_dir("modes-term");
     let d = dir.display();
-    let mut h = Harness::spawn("/bin/sh", &[], &[], 80, 24);
-    record_modes_first(&mut h, &dir);
-    h.send(&format!(
-        "{BIN} wrap -- /bin/sh; echo code=$?; stty -g > {d}/after; echo sa''ved\r"
-    ));
+    let script = format!(
+        "stty -g > {d}/before; echo rea''dy; {BIN} wrap -- /bin/sh; echo code=$?; stty -g > {d}/after; echo sa''ved"
+    );
+    let mut h = Harness::spawn("/bin/sh", &["-c", &script], &[], 80, 24);
+    h.expect("ready", T);
     h.send("echo in''side\r");
     h.expect("inside", T);
     h.send("kill -TERM $PPID\r");
@@ -124,8 +117,9 @@ fn closing_the_window_hangs_up_the_running_command() {
     let mut h = Harness::wrap_sh(&[]);
     h.send("sh -c 'echo pid=$$; exec sleep 1000'\r");
     let sleeper = h.wait_number_after("pid=", T) as i32;
-    std::thread::sleep(Duration::from_millis(200)); // let `exec sleep` happen
-                                                    // What the kernel does to a window's process when the window closes.
+    // let `exec sleep` happen
+    std::thread::sleep(Duration::from_millis(200));
+    // What the kernel does to a window's process when the window closes.
     unsafe { libc::kill(h.pid(), libc::SIGHUP) };
     h.wait_exit(T);
     let until = Instant::now() + T;

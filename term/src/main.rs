@@ -23,7 +23,13 @@ fn main() {
     // replace this process with a plain shell.
     std::panic::set_hook(Box::new(|info| {
         tty::restore_saved();
-        eprint!("\r\nshellx-term: internal error ({info}); starting a plain shell\r\n");
+        use std::io::Write;
+        // Never `eprint!`: it panics if stderr is gone, and a panic inside
+        // the hook aborts without starting a shell.
+        let _ = write!(
+            std::io::stderr(),
+            "\r\nshellx-term: internal error ({info}); starting a plain shell\r\n"
+        );
         fallback::close_on_exec_above_stderr();
         match TARGET.get() {
             Some(target) => fallback::exec_shell(target),

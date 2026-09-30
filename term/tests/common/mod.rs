@@ -261,6 +261,7 @@ pub fn temp_dir(name: &str) -> PathBuf {
 /// `before` and `after` (saved with `stty -g`) must match. The kernel's
 /// transient PENDIN flag (0x20000000 in lflag; "input is being retyped")
 /// comes and goes with the shell's own prompt handling, so it is ignored.
+/// Relies on macOS `stty -g` output (an `lflag=<hex>` field).
 pub fn assert_same_modes(dir: &std::path::Path) {
     fn read(dir: &std::path::Path, name: &str) -> String {
         let text = std::fs::read_to_string(dir.join(name)).unwrap();
