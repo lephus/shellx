@@ -47,10 +47,7 @@ impl RawMode {
 
 impl Drop for RawMode {
     fn drop(&mut self) {
-        unsafe {
-            libc::tcsetattr(self.fd, libc::TCSANOW, &self.original);
-            libc::tcflush(self.fd, libc::TCIOFLUSH);
-        }
+        unsafe { libc::tcsetattr(self.fd, libc::TCSANOW, &self.original) };
         *SAVED.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }
@@ -60,10 +57,7 @@ impl Drop for RawMode {
 pub fn restore_saved() {
     if let Ok(mut saved) = SAVED.try_lock() {
         if let Some((fd, original)) = saved.take() {
-            unsafe {
-                libc::tcsetattr(fd, libc::TCSANOW, &original);
-                libc::tcflush(fd, libc::TCIOFLUSH);
-            }
+            unsafe { libc::tcsetattr(fd, libc::TCSANOW, &original) };
         }
     }
 }
@@ -114,10 +108,14 @@ mod tests {
         }
     }
 
-    fn local_flags(fd: RawFd) -> libc::tcflag_t {
+    fn get_termios(fd: RawFd) -> libc::termios {
         let mut modes: libc::termios = unsafe { std::mem::zeroed() };
         assert_eq!(unsafe { libc::tcgetattr(fd, &mut modes) }, 0);
-        modes.c_lflag
+        modes
+    }
+
+    fn local_flags(fd: RawFd) -> libc::tcflag_t {
+        get_termios(fd).c_lflag
     }
 
     #[test]
@@ -139,25 +137,48 @@ mod tests {
     fn raw_mode_turns_off_echo_line_editing_and_signals_then_restores() {
         let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let pty = Pty::open(80, 24);
-        let before = local_flags(pty.slave);
-        assert_ne!(before & (libc::ECHO | libc::ICANON | libc::ISIG), 0);
+        let before = get_termios(pty.slave);
+        assert_ne!(before.c_lflag & (libc::ECHO | libc::ICANON | libc::ISIG), 0);
         {
             let _raw = RawMode::enable(pty.slave).unwrap();
+            let raw_modes = get_termios(pty.slave);
+            // Verify key flags are off in raw mode
             assert_eq!(
-                local_flags(pty.slave) & (libc::ECHO | libc::ICANON | libc::ISIG),
+                raw_modes.c_lflag & (libc::ECHO | libc::ICANON | libc::ISIG),
                 0
             );
+            assert_eq!(raw_modes.c_oflag & libc::OPOST, 0);
         }
-        assert_eq!(local_flags(pty.slave), before);
+        // After drop, verify all termios fields are restored
+        let after = get_termios(pty.slave);
+        assert_eq!(after.c_iflag, before.c_iflag);
+        assert_eq!(after.c_oflag, before.c_oflag);
+        assert_eq!(after.c_cflag, before.c_cflag);
+        assert_eq!(after.c_cc, before.c_cc);
+        // PENDIN is a benign kernel flag set when returning to canonical mode; mask it out
+        assert_eq!(
+            after.c_lflag & !libc::PENDIN,
+            before.c_lflag & !libc::PENDIN
+        );
     }
 
     #[test]
     fn restore_saved_works_without_drop() {
         let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let pty = Pty::open(80, 24);
-        let before = local_flags(pty.slave);
+        let before = get_termios(pty.slave);
         std::mem::forget(RawMode::enable(pty.slave).unwrap());
         restore_saved();
-        assert_eq!(local_flags(pty.slave), before);
+        let after = get_termios(pty.slave);
+        // Verify all termios fields are restored
+        assert_eq!(after.c_iflag, before.c_iflag);
+        assert_eq!(after.c_oflag, before.c_oflag);
+        assert_eq!(after.c_cflag, before.c_cflag);
+        assert_eq!(after.c_cc, before.c_cc);
+        // PENDIN is a benign kernel flag set when returning to canonical mode; mask it out
+        assert_eq!(
+            after.c_lflag & !libc::PENDIN,
+            before.c_lflag & !libc::PENDIN
+        );
     }
 }
