@@ -76,6 +76,16 @@ pub fn exec_shell(target: &Target) -> ! {
     std::process::exit(127)
 }
 
+/// Marks every descriptor above stderr close-on-exec, so a shell started
+/// from the panic hook does not keep the old PTY open (the old inner shell
+/// then gets its hang-up).
+pub fn close_on_exec_above_stderr() {
+    let max = unsafe { libc::sysconf(libc::_SC_OPEN_MAX) }.clamp(0, 4096) as i32;
+    for fd in 3..max {
+        unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

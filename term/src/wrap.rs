@@ -3,7 +3,9 @@
 
 use crate::cli::WrapArgs;
 use crate::{faults, tty};
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use signal_hook::consts::{SIGTERM, SIGWINCH};
+use signal_hook::iterator::Signals;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::mem::ManuallyDrop;
@@ -69,6 +71,7 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
     // Raw mode before the shell starts; any early return below drops it,
     // which puts the window's modes back before the fallback shell runs.
     let raw = tty::RawMode::enable(STDIN).map_err(|e| WrapError::Pty(e.to_string()))?;
+    let signals = Signals::new([SIGWINCH, SIGTERM]).map_err(|e| WrapError::Pty(e.to_string()))?;
 
     if faults::hit("spawn") {
         return Err(WrapError::Spawn("injected fault".into()));
@@ -81,12 +84,43 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
 
     copy_window_to_pty(to_pty);
     let output_done = copy_pty_to_window(from_pty);
-    let _master = pair.master; // keeps the PTY open; Task 4 moves it to the signal thread
+    forward_signals(signals, pair.master);
+    if faults::hit("panic") {
+        panic!("injected fault");
+    }
 
     let code = wait_for_exit(&mut *child);
     let _ = output_done.recv_timeout(DRAIN_AFTER_EXIT);
     drop(raw);
     Ok(code)
+}
+
+/// Window resized → resize the PTY (the kernel then sends the shell
+/// SIGWINCH). SIGTERM → put the window's modes back and exit; the kernel
+/// closes the PTY, which hangs up the shell as closing a window does.
+/// The thread owns the PTY master, keeping the PTY open for the process's
+/// life.
+fn forward_signals(mut signals: Signals, master: Box<dyn MasterPty + Send>) {
+    std::thread::spawn(move || {
+        for signal in signals.forever() {
+            match signal {
+                SIGWINCH => {
+                    let (cols, rows) = current_size();
+                    let _ = master.resize(PtySize {
+                        rows,
+                        cols,
+                        pixel_width: 0,
+                        pixel_height: 0,
+                    });
+                }
+                SIGTERM => {
+                    tty::restore_saved();
+                    std::process::exit(128 + SIGTERM);
+                }
+                _ => {}
+            }
+        }
+    });
 }
 
 /// Size of the window, or 80x24 if it does not say.

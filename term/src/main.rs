@@ -14,18 +14,32 @@ mod wrap;
 
 #[cfg(unix)]
 fn main() {
+    use std::sync::OnceLock;
+    static TARGET: OnceLock<fallback::Target> = OnceLock::new();
+
     let command = cli::parse(std::env::args_os().skip(1));
-    let target = fallback::Target::for_command(&command);
+    let target = TARGET.get_or_init(|| fallback::Target::for_command(&command));
+    // A bug must never cost the user their terminal: restore the window and
+    // replace this process with a plain shell.
+    std::panic::set_hook(Box::new(|info| {
+        tty::restore_saved();
+        eprint!("\r\nshellx-term: internal error ({info}); starting a plain shell\r\n");
+        fallback::close_on_exec_above_stderr();
+        match TARGET.get() {
+            Some(target) => fallback::exec_shell(target),
+            None => fallback::exec_shell(&fallback::Target::default()),
+        }
+    }));
     match command {
         cli::Command::Version => println!("shellx-term {}", env!("CARGO_PKG_VERSION")),
-        cli::Command::Invalid => fallback::exec_shell(&target),
+        cli::Command::Invalid => fallback::exec_shell(target),
         cli::Command::Wrap(args) => match wrap::run(&args) {
             Ok(code) => std::process::exit(code),
             Err(error) => {
                 if let Some(notice) = error.notice() {
                     eprintln!("{notice}");
                 }
-                fallback::exec_shell(&target)
+                fallback::exec_shell(target)
             }
         },
     }

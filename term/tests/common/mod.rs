@@ -121,6 +121,13 @@ impl Harness {
         }
     }
 
+    /// Collects whatever the window shows for `duration` (`text()` only
+    /// sees output that was pumped).
+    pub fn settle(&mut self, duration: Duration) {
+        let until = Instant::now() + duration;
+        while self.pump(until) {}
+    }
+
     /// Waits until the output contains `needle`. Type commands so their
     /// echo does not contain the needle (`echo he''llo`, expect `hello`).
     /// Only newly arrived bytes are searched, so floods of output stay cheap.
@@ -249,4 +256,22 @@ pub fn temp_dir(name: &str) -> PathBuf {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create temp dir");
     dir
+}
+
+/// `before` and `after` (saved with `stty -g`) must match. The kernel's
+/// transient PENDIN flag (0x20000000 in lflag; "input is being retyped")
+/// comes and goes with the shell's own prompt handling, so it is ignored.
+pub fn assert_same_modes(dir: &std::path::Path) {
+    fn read(dir: &std::path::Path, name: &str) -> String {
+        let text = std::fs::read_to_string(dir.join(name)).unwrap();
+        let mut fields: Vec<String> = text.trim().split(':').map(String::from).collect();
+        for field in &mut fields {
+            if let Some(hex) = field.strip_prefix("lflag=") {
+                let bits = u64::from_str_radix(hex, 16).unwrap() & !0x2000_0000;
+                *field = format!("lflag={bits:x}");
+            }
+        }
+        fields.join(":")
+    }
+    assert_eq!(read(dir, "before"), read(dir, "after"));
 }

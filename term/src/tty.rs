@@ -54,7 +54,6 @@ impl Drop for RawMode {
 
 /// Restores the modes saved by [`RawMode::enable`]. Never blocks: it runs
 /// from the panic hook and the SIGTERM path.
-#[allow(dead_code)] // first caller arrives in Task 4
 pub fn restore_saved() {
     if let Ok(mut saved) = SAVED.try_lock() {
         if let Some((fd, original)) = saved.take() {
