@@ -16,5 +16,6 @@ pub mod session;
 pub mod size;
 #[cfg(unix)]
 pub mod tty;
+pub mod wincodec;
 #[cfg(unix)]
 pub mod wrap;
