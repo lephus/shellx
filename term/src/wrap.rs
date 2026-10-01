@@ -159,7 +159,12 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
     // Raw mode before the shell starts; any early return below drops it,
     // which puts the window's modes back before the fallback shell runs.
     let raw = tty::RawMode::enable(STDIN).map_err(|e| WrapError::Pty(e.to_string()))?;
-    let watched: &[i32] = if sigterm_ignored() {
+    // An interactive shell ignores SIGTERM, but its `exec` of the block hands
+    // us the default disposition: a block-started window keeps ignoring it.
+    if args.from_block {
+        unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) };
+    }
+    let watched: &[i32] = if args.from_block || sigterm_ignored() {
         &[SIGWINCH]
     } else {
         &[SIGWINCH, SIGTERM]

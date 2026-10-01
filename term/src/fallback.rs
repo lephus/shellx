@@ -137,6 +137,7 @@ mod tests {
             login: true,
             shell: "/bin/bash".into(),
             shell_args: vec!["-x".into()],
+            from_block: false,
         }));
         assert_eq!(target.shell, Some(OsString::from("/bin/bash")));
         assert!(target.login);

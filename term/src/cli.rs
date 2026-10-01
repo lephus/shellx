@@ -11,6 +11,10 @@ pub struct WrapArgs {
     pub shell: OsString,
     /// Extra arguments for the shell.
     pub shell_args: Vec<OsString>,
+    /// Started by a ShellX block (no arguments, shell named in the
+    /// environment): the window's shell has just been replaced by us, so we
+    /// behave like the interactive shell we replace (ignore SIGTERM).
+    pub from_block: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,6 +47,7 @@ pub fn parse_with_env<I: IntoIterator<Item = OsString>>(
                 login: get("SHELLX_TERM_WRAP_LOGIN").is_some_and(|v| v == "1"),
                 shell,
                 shell_args: Vec::new(),
+                from_block: true,
             }),
             _ => Command::Invalid,
         },
@@ -98,6 +103,7 @@ fn parse_wrap(mut args: impl Iterator<Item = OsString>) -> Command {
         login,
         shell,
         shell_args: args.collect(),
+        from_block: false,
     })
 }
 
@@ -114,7 +120,18 @@ mod tests {
             login,
             shell: shell.into(),
             shell_args: shell_args.iter().map(OsString::from).collect(),
+            from_block: false,
         })
+    }
+
+    fn from_block(command: Command) -> Command {
+        match command {
+            Command::Wrap(args) => Command::Wrap(WrapArgs {
+                from_block: true,
+                ..args
+            }),
+            other => other,
+        }
     }
 
     fn env_of(vars: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<OsString> {
@@ -135,12 +152,24 @@ mod tests {
                     ("SHELLX_TERM_WRAP_LOGIN", "1")
                 ])
             ),
-            wrap(true, "/bin/bash", &[])
+            from_block(wrap(true, "/bin/bash", &[]))
         );
         assert_eq!(
             parse_with_env(
                 Vec::<OsString>::new(),
                 env_of(&[("SHELLX_TERM_WRAP", "/bin/zsh")])
+            ),
+            from_block(wrap(false, "/bin/zsh", &[]))
+        );
+    }
+
+    #[test]
+    fn an_explicit_wrap_is_not_from_a_block() {
+        // Even with the block's variable set, arguments mean an explicit call.
+        assert_eq!(
+            parse_with_env(
+                ["wrap", "--", "/bin/zsh"].map(OsString::from),
+                env_of(&[("SHELLX_TERM_WRAP", "/bin/bash")])
             ),
             wrap(false, "/bin/zsh", &[])
         );

@@ -256,6 +256,31 @@ fn a_zsh_login_window_keeps_login_behaviour_inside() {
     assert_eq!(h.text().matches("ZLOGIN-RAN").count(), 1, "{:?}", h.text());
 }
 
+/// A plain interactive shell ignores SIGTERM; the wrapped window must too
+/// (`pkill zsh` must not close windows). The block's `exec` hands us a
+/// default disposition, so we ignore it ourselves.
+fn assert_sigterm_does_not_close_the_window(program: &str, args: &[&str], tag: &str) {
+    let home = real_home(tag);
+    let mut h = run_shell(program, args, &home, &[]);
+    assert_really_wrapped(&mut h);
+    h.send("kill -TERM $PPID; sleep 0.3; echo al''ive\r");
+    h.expect("alive", T);
+    h.send("echo al''ive-again\r");
+    h.expect("alive-again", T);
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn a_wrapped_zsh_window_ignores_sigterm_like_a_plain_interactive_shell() {
+    assert_sigterm_does_not_close_the_window("/bin/zsh", &["-il"], "term-zsh");
+}
+
+#[test]
+fn a_wrapped_bash_window_ignores_sigterm_like_a_plain_interactive_shell() {
+    assert_sigterm_does_not_close_the_window("/bin/bash", &["-il"], "term-bash");
+}
+
 #[test]
 fn a_nested_shell_inside_a_wrapped_window_is_not_wrapped_again() {
     let home = real_home("real-nested");
