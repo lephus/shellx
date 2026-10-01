@@ -2,7 +2,7 @@ mod common;
 
 use common::{Harness, BIN};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ const ZSH_BLOCK: &str = include_str!("../shell/block.zsh");
 const BASH_BLOCK: &str = include_str!("../shell/block.bash");
 
 /// A fake HOME whose "installed" shellx-term just reports how it was called.
-fn home(name: &str) -> PathBuf {
+fn home(name: &str) -> common::TempDir {
     let home = common::temp_dir(name);
     let bin = home.join("Library/Application Support/ShellX/bin");
     std::fs::create_dir_all(&bin).unwrap();
@@ -194,7 +194,10 @@ fn with_the_real_binary_the_rest_of_the_file_runs_once_inside() {
 /// Runs `/bin/zsh -i` in a fake HOME; `setup` may add files and returns the
 /// extra environment. Returns the window text after the shell exited or
 /// the block fell through (AFTER-BLOCK).
-fn zsh_with(tag: &str, env_of: impl FnOnce(&Path) -> Vec<(String, String)>) -> (PathBuf, Harness) {
+fn zsh_with(
+    tag: &str,
+    env_of: impl FnOnce(&Path) -> Vec<(String, String)>,
+) -> (common::TempDir, Harness) {
     let home = home(tag);
     let extra = env_of(&home);
     let extra: Vec<(&str, &str)> = extra
@@ -370,4 +373,31 @@ fn assert_wrapped_with(program: &str, extra: &[(&str, &str)], tag: &str) {
     let mut h = run_shell(program, &["-i"], &home, extra);
     h.expect("WRAPPED [wrap] [--] [/bin/zsh]", T);
     assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn sourcing_the_block_by_hand_does_not_replace_the_running_zsh() {
+    let home = home("zsh-source");
+    // The startup file has no block, so the window starts unwrapped.
+    std::fs::write(home.join(".zshrc"), "").unwrap();
+    std::fs::write(home.join("blk.zsh"), ZSH_BLOCK).unwrap();
+    let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
+    h.send("MYVAR=kept; source ~/blk.zsh\r");
+    h.send("echo still-$MYVAR-here\r");
+    h.expect("still-kept-here", T);
+    assert!(!h.text().contains("WRAPPED"), "{:?}", h.text());
+    h.send("exit\r");
+    h.wait_exit(T);
+}
+
+#[test]
+fn zsh_running_a_script_interactively_is_not_wrapped() {
+    let home = home("zsh-script");
+    let script = home.join("run.zsh");
+    std::fs::write(&script, "echo script-ran\n").unwrap();
+    let script = script.to_str().unwrap();
+    let mut h = run_shell("/bin/zsh", &["-i", script], &home, &[]);
+    h.expect("script-ran", T);
+    assert_eq!(h.wait_exit(T), 0);
+    assert!(!h.text().contains("WRAPPED"), "{:?}", h.text());
 }

@@ -82,7 +82,7 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
         .map_err(|e| WrapError::Spawn(e.to_string()))?;
     drop(pair.slave);
 
-    copy_window_to_pty(to_pty);
+    copy_window_to_pty(to_pty, child.process_id());
     let output_done = copy_pty_to_window(from_pty);
     forward_signals(signals, pair.master);
     if faults::hit("panic") {
@@ -148,22 +148,35 @@ fn shell_command(args: &WrapArgs) -> CommandBuilder {
     cmd
 }
 
-/// The window's keystrokes → the shell, until the window goes away.
-fn copy_window_to_pty(mut to_pty: Box<dyn Write + Send>) {
+/// The window's keystrokes → the shell, until the window goes away. When
+/// reading the window fails (its app was killed without a SIGHUP reaching
+/// us), hang the inner session up the way closing a window does; the main
+/// thread then sees the shell exit and takes the normal exit path.
+fn copy_window_to_pty(mut to_pty: Box<dyn Write + Send>, shell_pid: Option<u32>) {
     std::thread::spawn(move || {
         // fd 0 lives as long as the process; ManuallyDrop keeps it open.
         let mut window = ManuallyDrop::new(unsafe { File::from_raw_fd(STDIN) });
         let mut buf = [0u8; 8192];
-        loop {
+        let window_gone = loop {
             match window.read(&mut buf) {
-                Ok(0) => break,
+                Ok(0) => break true,
                 Ok(n) => {
                     if to_pty.write_all(&buf[..n]).is_err() {
-                        break;
+                        break false;
                     }
                 }
                 Err(e) if e.kind() == ErrorKind::Interrupted => continue,
-                Err(_) => break,
+                Err(_) => break true,
+            }
+        };
+        if window_gone {
+            if let Some(pid) = shell_pid {
+                // The shell is a session leader (its own process group): the
+                // group gets the hang-up, then the shell itself.
+                unsafe {
+                    libc::kill(-(pid as i32), libc::SIGHUP);
+                    libc::kill(pid as i32, libc::SIGHUP);
+                }
             }
         }
         // Dropping portable-pty's writer types "\n^D" into the shell.

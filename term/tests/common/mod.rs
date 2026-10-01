@@ -6,14 +6,19 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use std::io::{Read, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 pub const BIN: &str = env!("CARGO_BIN_EXE_shellx-term");
 
 pub struct Harness {
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    master: Option<Box<dyn MasterPty + Send>>,
+    writer: Option<Box<dyn Write + Send>>,
+    stop_reader: Arc<AtomicBool>,
+    reader_thread: Option<JoinHandle<()>>,
     rx: Receiver<Vec<u8>>,
     output: Vec<u8>,
     child: Box<dyn Child + Send + Sync>,
@@ -61,9 +66,23 @@ impl Harness {
         let mut reader = pair.master.try_clone_reader().expect("reader");
         let writer = pair.master.take_writer().expect("writer");
         let (tx, rx) = channel();
-        std::thread::spawn(move || {
+        let master_fd = pair.master.as_raw_fd().expect("master fd");
+        let stop_reader = Arc::new(AtomicBool::new(false));
+        let stop = stop_reader.clone();
+        let reader_thread = std::thread::spawn(move || {
             let mut buf = [0u8; 16384];
-            loop {
+            // Poll with a timeout instead of a blocking read, so
+            // `close_window` can make this thread let go of its descriptor.
+            while !stop.load(Ordering::SeqCst) {
+                let mut pfd = libc::pollfd {
+                    fd: master_fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                if unsafe { libc::poll(&mut pfd, 1, 50) } <= 0 || pfd.revents & libc::POLLNVAL != 0
+                {
+                    continue;
+                }
                 match reader.read(&mut buf) {
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
@@ -75,8 +94,10 @@ impl Harness {
             }
         });
         Harness {
-            master: pair.master,
-            writer,
+            master: Some(pair.master),
+            writer: Some(writer),
+            stop_reader,
+            reader_thread: Some(reader_thread),
             rx,
             output: Vec::new(),
             child,
@@ -93,8 +114,9 @@ impl Harness {
     }
 
     pub fn send_bytes(&mut self, bytes: &[u8]) {
-        self.writer.write_all(bytes).expect("write to window");
-        self.writer.flush().expect("flush window");
+        let writer = self.writer.as_mut().expect("window is open");
+        writer.write_all(bytes).expect("write to window");
+        writer.flush().expect("flush window");
     }
 
     /// Everything the window has shown so far (lossy UTF-8).
@@ -182,6 +204,8 @@ impl Harness {
 
     pub fn resize(&self, cols: u16, rows: u16) {
         self.master
+            .as_ref()
+            .expect("window is open")
             .resize(PtySize {
                 rows,
                 cols,
@@ -189,6 +213,19 @@ impl Harness {
                 pixel_height: 0,
             })
             .expect("resize");
+    }
+
+    /// The window goes away the way it does when its app is killed: every
+    /// descriptor on the master side is closed. The kernel then hangs up
+    /// the window's session (SIGHUP to its foreground group, which a program
+    /// may ignore) and reads on the slave side fail.
+    pub fn close_window(&mut self) {
+        self.stop_reader.store(true, Ordering::SeqCst);
+        drop(self.writer.take());
+        drop(self.master.take());
+        if let Some(thread) = self.reader_thread.take() {
+            thread.join().expect("reader thread");
+        }
     }
 
     /// PID of the program running in the window.
@@ -218,7 +255,9 @@ impl Harness {
                 "process did not exit; output so far: {:?}",
                 self.text()
             );
-            let _ = self.pump(Instant::now() + Duration::from_millis(50));
+            if !self.pump(Instant::now() + Duration::from_millis(50)) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
         }
     }
 }
@@ -250,12 +289,36 @@ pub fn wait_with_timeout(
     }
 }
 
-/// A fresh, empty directory for one test.
-pub fn temp_dir(name: &str) -> PathBuf {
+/// A fresh, empty directory for one test. It is removed when the guard
+/// drops, except when the test is panicking (kept for debugging).
+pub struct TempDir(PathBuf);
+
+impl std::ops::Deref for TempDir {
+    type Target = std::path::Path;
+    fn deref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for TempDir {
+    fn as_ref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+}
+
+pub fn temp_dir(name: &str) -> TempDir {
     let dir = std::env::temp_dir().join(format!("shellx-term-test-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+    TempDir(dir)
 }
 
 /// `before` and `after` (saved with `stty -g`) must match. The kernel's

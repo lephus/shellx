@@ -1,6 +1,7 @@
 # >>> ShellX >>>
 # Lets your paired phone see this terminal. Managed by ShellX: turn it off from the ShellX menu instead of editing it.
-if [[ -o interactive && -z "${ZSH_EXECUTION_STRING-}" && -t 0 && -t 1 \
+if [[ -o interactive && -z "${ZSH_EXECUTION_STRING-}" && -z "${ZSH_SCRIPT-}" \
+      && $ZSH_EVAL_CONTEXT != toplevel* && -t 0 && -t 1 \
       && -z "${SHELLX_TERM-}${SHELLX-}${TMUX-}${STY-}" \
       && "${TERM_PROGRAM-}" != WarpTerminal \
       && -f "$HOME/Library/Application Support/ShellX/bin/shellx-term" \

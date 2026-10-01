@@ -31,8 +31,10 @@ fn resizing_the_window_resizes_the_shell() {
 #[test]
 fn ctrl_c_interrupts_the_foreground_command() {
     let mut h = Harness::wrap_sh(&[]);
-    h.send("sleep 30\r");
-    std::thread::sleep(Duration::from_millis(300));
+    // The marker appears only once the command runs (its echo has a quote in it).
+    h.send("sh -c 'echo sle''eping; exec sleep 30'\r");
+    h.expect("sleeping", T);
+    std::thread::sleep(Duration::from_millis(100)); // let `exec sleep` happen
     h.send_bytes(b"\x03");
     h.send("echo after''int\r");
     h.expect("afterint", T);
@@ -43,8 +45,9 @@ fn ctrl_c_interrupts_the_foreground_command() {
 #[test]
 fn ctrl_z_stops_the_foreground_command() {
     let mut h = Harness::wrap_sh(&[]);
-    h.send("sleep 30\r");
-    std::thread::sleep(Duration::from_millis(300));
+    h.send("sh -c 'echo sle''eping; exec sleep 30'\r");
+    h.expect("sleeping", T);
+    std::thread::sleep(Duration::from_millis(100)); // let `exec sleep` happen
     h.send_bytes(b"\x1a");
     h.expect("Stopped", T);
     // SIGKILL ends a stopped job; the shell reports it before its next prompt.
@@ -127,6 +130,30 @@ fn closing_the_window_hangs_up_the_running_command() {
         assert!(
             Instant::now() < until,
             "sleep {sleeper} survived the window closing"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// The window's app is killed: no SIGHUP reaches shellx-term (the wrapper
+/// ignores it, and the setting survives `exec`), but the master side of the
+/// window is gone, so reading the window fails. shellx-term must hang up
+/// the inner session itself; neither it nor the inner command may survive.
+#[test]
+fn a_window_that_vanishes_without_sighup_leaves_no_orphans() {
+    let script = format!("trap '' HUP; exec '{BIN}' wrap -- /bin/sh");
+    let mut h = Harness::spawn("/bin/sh", &["-c", &script], &[], 80, 24);
+    h.send("sh -c 'echo pid=$$; exec sleep 1000'\r");
+    let sleeper = h.wait_number_after("pid=", T) as i32;
+    std::thread::sleep(Duration::from_millis(200)); // let `exec sleep` happen
+    let term = h.pid();
+    h.close_window();
+    h.wait_exit(T);
+    let until = Instant::now() + T;
+    while unsafe { libc::kill(sleeper, 0) } == 0 {
+        assert!(
+            Instant::now() < until,
+            "sleep {sleeper} survived the window vanishing (shellx-term {term} is gone)"
         );
         std::thread::sleep(Duration::from_millis(50));
     }
