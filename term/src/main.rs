@@ -2,15 +2,8 @@
 //! terminal with a paired phone.
 //! Spec: docs/superpowers/specs/2026-10-01-desktop-terminal-sharing-design.md
 
-mod cli;
 #[cfg(unix)]
-mod fallback;
-#[cfg(unix)]
-mod faults;
-#[cfg(unix)]
-mod tty;
-#[cfg(unix)]
-mod wrap;
+use shellx_term::{cli, fallback, tty, wrap};
 
 #[cfg(unix)]
 fn main() {
@@ -24,6 +17,11 @@ fn main() {
         // user their terminal: restore the window and replace this process
         // with a plain shell.
         std::panic::set_hook(Box::new(|info| {
+            // A bug in the link thread only stops the link: the terminal
+            // goes on. (Replacing the process here would close the PTY.)
+            if shellx_term::link::is_link_thread() {
+                return;
+            }
             tty::restore_saved();
             use std::io::Write;
             // Never `eprint!`: it panics if stderr is gone, and a panic inside
@@ -48,6 +46,15 @@ fn main() {
                 "shellx-term {}",
                 env!("CARGO_PKG_VERSION")
             );
+        }
+        cli::Command::Probe => {
+            use std::io::Write;
+            match cli::parent_executable() {
+                Some(path) => {
+                    let _ = writeln!(std::io::stdout(), "{}", path.display());
+                }
+                None => std::process::exit(1),
+            }
         }
         cli::Command::Invalid => {
             // The block may be calling an older or newer binary: still give

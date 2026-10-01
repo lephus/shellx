@@ -4,6 +4,11 @@
 //!
 //!     cargo build --release && cargo run --release --example startup_bench
 //!
+//! It uses the real HOME on purpose (your real startup files are what is being
+//! timed), so a running ShellX agent would see its wrapped windows register as
+//! sessions. Quit the agent first. (Tests never do this: their windows get a
+//! temporary HOME.)
+//!
 //! SHELLX_BENCH_RUNS (default 20) sets the samples per variant.
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
@@ -30,25 +35,11 @@ fn main() {
         "block.zsh no longer contains the installed path"
     );
     let shipped = BLOCK.replace(INSTALLED, bin.to_str().unwrap());
-    // The shipped block starts a non-login inner shell; build the login variant
-    // by adding --login to the exec line.
-    let login = shipped.replace(
-        "wrap -- \"$__shellx_shell\"",
-        "wrap --login -- \"$__shellx_shell\"",
-    );
-    assert_ne!(
-        login, shipped,
-        "block.zsh has no exec line to turn into the login variant"
-    );
     let variants = [
         ("baseline", setup(&root.join("baseline"), &home, "")),
         (
-            "wrapped (shipped block, non-login inner)",
-            setup(&root.join("nologin"), &home, &shipped),
-        ),
-        (
-            "wrapped, login inner",
-            setup(&root.join("login"), &home, &login),
+            "wrapped (shipped block)",
+            setup(&root.join("wrapped"), &home, &shipped),
         ),
     ];
 
@@ -65,7 +56,7 @@ fn main() {
     for (i, (name, _)) in variants.iter().enumerate() {
         let m = median(&samples[i]);
         println!(
-            "{name:<42} median {m:7.1} ms   p90 {:7.1} ms   overhead {:+7.1} ms",
+            "{name:<28} median {m:7.1} ms   p90 {:7.1} ms   overhead {:+7.1} ms",
             percentile(&samples[i], 0.9),
             m - baseline
         );
@@ -107,7 +98,14 @@ fn time_to_ready(zdotdir: &Path) -> f64 {
     let mut cmd = CommandBuilder::new("/bin/zsh");
     cmd.arg("-l");
     cmd.env("ZDOTDIR", zdotdir);
-    for name in ["SHELLX_TERM", "SHELLX", "TMUX", "STY"] {
+    for name in [
+        "SHELLX_TERM",
+        "SHELLX_TERM_WRAP",
+        "SHELLX_TERM_LOGIN",
+        "SHELLX",
+        "TMUX",
+        "STY",
+    ] {
         cmd.env_remove(name);
     }
     let start = Instant::now();

@@ -9,6 +9,9 @@ description = "Wraps an interactive shell in a PTY so ShellX can share the termi
 portable-pty = "0.9.0"
 signal-hook = "0.4.4"
 libc = "0.2.189"
+hmac = "0.13.0"
+sha2 = "0.11.0"
+getrandom = "0.4.3"
 
 [features]
 # Fault injection for integration tests only: `cargo test --features test-hooks`.

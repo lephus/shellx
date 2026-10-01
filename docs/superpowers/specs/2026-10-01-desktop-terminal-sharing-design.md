@@ -98,31 +98,42 @@ Build: `flutter build macos` và `flutter build windows` tự build `shellx-term
 ### 5.1 Cách gọi
 
 ```
+shellx-term                  # không đối số: shell lấy từ biến môi trường (cách các khối tích hợp gọi)
 shellx-term wrap [--login] -- <đường dẫn tuyệt đối của shell> [đối số…]
+shellx-term probe            # in đường dẫn file thực thi của tiến trình cha
 shellx-term uninstall        # gỡ khối tích hợp khỏi mọi file cấu hình, xóa thư mục bin
 shellx-term --version
 ```
 
-`wrap` mở một PTY cỡ bằng cửa sổ hiện tại, chạy shell trong đó với biến môi trường `SHELLX_TERM=1`, chuyển tiếp dữ liệu hai chiều, và thoát với **đúng mã thoát của shell**.
+- **Không đối số + `SHELLX_TERM_WRAP`:** đây là cách các khối gọi, để tiêu đề cửa sổ hiện tên shell chứ không hiện đối số của `shellx-term` (R2). `SHELLX_TERM_WRAP` là đường dẫn tuyệt đối của shell cần bọc; `SHELLX_TERM_WRAP_LOGIN=1` (chỉ bash đặt) nghĩa là shell bên trong chạy với `-l`. Thiếu `SHELLX_TERM_WRAP` hoặc đường dẫn không tuyệt đối thì coi như đối số không hợp lệ: in một dòng cảnh báo và mở shell thường (§5.4). Cả hai biến bị gỡ khỏi môi trường của shell bên trong, và cả của shell thường do đường dự phòng mở (§5.4 mục 2; `SHELLX_TERM_LOGIN` thì giữ lại vì khối zsh đọc nó). Khi `shellx-term` được gọi theo cách này (từ khối, trong shell tương tác vừa bị thay thế) thì nó **luôn bỏ qua SIGTERM** như shell tương tác đó (§5.4 mục 6).
+- **`wrap`:** mở một PTY cỡ bằng cửa sổ hiện tại, chạy shell trong đó, chuyển tiếp dữ liệu hai chiều, và thoát với **đúng mã thoát của shell**. Biến `SHELLX_TERM` của shell bên trong chứa **đường dẫn tty của PTY bên trong** (vd `/dev/ttys012`), không còn là `1`; khối so nó với tty của cửa sổ hiện tại để biết mình đang ở trong cửa sổ đã bọc hay chỉ thừa kế biến từ tiến trình cha (§5.2). Nếu không lấy được tên tty của PTY thì `wrap` coi như không mở được PTY (lỗi `no tty name for the PTY`) và đi đường dự phòng §5.4 mục 2: đặt `1` sẽ không chặn được việc bọc lại đệ quy, nên không có giá trị dự phòng đó.
+- **`probe`:** in đường dẫn file thực thi của tiến trình cha (trên macOS bằng `proc_pidpath`), thoát với mã 1 nếu không lấy được. Khối gọi trong `$(…)`; vì `$(…)` là một bản fork của chính shell đang chạy khối nên đây đúng là file shell cần bọc.
+- **Biến thử nghiệm:** `SHELLX_TERM_TIMING=fast` và `SHELLX_TERM_FAULT` chỉ có hiệu lực khi biên dịch với feature `test-hooks`; bản phát hành bỏ qua chúng.
 
 ### 5.2 Khối tích hợp trên macOS (zsh, bash)
 
-Khối nằm ở **đầu** file, chỉ gồm ký tự ASCII, có dấu `# >>> ShellX >>>` và `# <<< ShellX <<<`. Nó `exec` sang `shellx-term` khi **mọi** điều kiện sau đều đúng:
+Khối nằm ở **đầu** file, chỉ gồm ký tự ASCII, có dấu `# >>> ShellX >>>` và `# <<< ShellX <<<`. Nó `exec` sang `shellx-term` (không đối số, shell truyền qua `SHELLX_TERM_WRAP`, §5.1) khi **mọi** điều kiện sau đều đúng:
 
 - shell đang tương tác **và không chạy chuỗi lệnh hay script**: zsh `[[ -o interactive ]]`, `$ZSH_EXECUTION_STRING` rỗng và `$ZSH_SCRIPT` rỗng (`zsh -i script`; không dùng `-o shinstdin`: zsh chỉ bật nó sau khi đọc xong các file khởi động); bash `$-` chứa `i` và `$BASH_EXECUTION_STRING` rỗng. VS Code/Cursor chạy `$SHELL -i -l -c '…'` để đọc biến môi trường khi khởi động; bọc shell đó sẽ làm editor treo;
-- **zsh: khối đang chạy trong lúc zsh đọc file khởi động, không phải do người dùng `source` tay:** `$ZSH_EVAL_CONTEXT` không bắt đầu bằng `toplevel` (khi đọc file khởi động giá trị là `file`, hoặc `file:file` khi script của IDE `source` tiếp `.zshrc`; `source ~/.zshrc` gõ tay cho `toplevel:file`). Nếu thiếu điều kiện này, `source ~/.zshrc` trong cửa sổ chưa bọc sẽ `exec` thay shell đang chạy và mất job, hàm, biến. bash chưa có điều kiện tương đương (ghi cho P2);
+- **zsh: khối đang chạy trong lúc zsh đọc file khởi động, không phải do người dùng `source` tay:** `$ZSH_EVAL_CONTEXT` không bắt đầu bằng `toplevel` (khi đọc file khởi động giá trị là `file`, hoặc `file:file` khi script của IDE `source` tiếp `.zshrc`; `source ~/.zshrc` gõ tay cho `toplevel:file`). Nếu thiếu điều kiện này, `source ~/.zshrc` trong cửa sổ chưa bọc sẽ `exec` thay shell đang chạy và mất job, hàm, biến. **bash:** `BASH_LINENO[0]` bằng `0`: khi bash đọc file khởi động thì khối chạy ở mức trên cùng của file, còn `. ~/.bashrc` gõ tay thì `BASH_LINENO[0]` là số dòng của lệnh gọi (khác `0`), nên khối bỏ qua. Giới hạn của điều kiện này ở danh sách "Giới hạn đã biết" bên dưới;
 - stdin và stdout đều là terminal (`[ -t 0 ] && [ -t 1 ]`);
-- chưa ở trong `shellx-term` (`SHELLX_TERM` rỗng) và không phải phiên do ShellX mở từ điện thoại (`SHELLX` rỗng);
+- chưa ở trong đúng cửa sổ đã bọc này: biến `SHELLX_TERM` (tty của PTY bên trong, §5.1) **khác tty của cửa sổ hiện tại** (zsh so với `$TTY`; bash so với `$(tty)`, chỉ chạy khi mọi điều kiện rẻ hơn đã đạt, và `SHELLX_TERM` rỗng thì khỏi so). Một ứng dụng mở từ cửa sổ đã bọc (vd `code .`) thừa kế `SHELLX_TERM` nhưng có tty riêng, nên terminal của nó **vẫn được bọc**; shell bên trong thì có `SHELLX_TERM` bằng đúng tty của nó nên không bọc lại. Và không phải phiên do ShellX mở từ điện thoại (`SHELLX` rỗng);
 - không ở trong tmux hoặc screen (`TMUX`, `STY` rỗng) — cửa sổ đang chạy tmux đã được bọc ở tầng ngoài;
 - ứng dụng terminal không nằm trong danh sách loại trừ theo `TERM_PROGRAM`. Hiện có `WarpTerminal` (loại trừ trước vì Warp tự khởi tạo shell; chưa kiểm được vì máy phát triển chưa cài). Danh sách chốt sau kiểm tra ở §13;
 - ứng dụng terminal không phải VS Code/Cursor hay JetBrains **khi shell là bash** (`TERM_PROGRAM` khác `vscode`, `TERMINAL_EMULATOR` khác `JetBrains-JediTerm`): integration bash của các IDE này được chèn bằng `--init-file`/rcfile nên không chạy lại được. Với zsh, xem mục "Tích hợp IDE" bên dưới;
-- `~/Library/Application Support/ShellX/bin/shellx-term` là file thường (`-f`, vì `-x` đúng cả với thư mục), có quyền chạy (`-x`), và `shellx-term --version` chạy thành công (điều kiện cuối cùng, nên chỉ chạy khi mọi điều kiện khác đã cho phép bọc). Lý do: zsh **thoát** khi `exec` thất bại, nên một file hỏng hoặc sai kiến trúc sẽ đóng mọi cửa sổ mới; kiểm tra trước tốn khoảng 2–3 ms.
+- `~/Library/Application Support/ShellX/bin/shellx-term` là file thường (`-f`, vì `-x` đúng cả với thư mục), có quyền chạy (`-x`), và `shellx-term probe` chạy thành công **và in ra một đường dẫn tuyệt đối** (điều kiện cuối cùng, nên chỉ chạy khi mọi điều kiện khác đã cho phép bọc). Lý do: zsh **thoát** khi `exec` thất bại, nên một file hỏng hoặc sai kiến trúc sẽ đóng mọi cửa sổ mới; chạy thử trước loại trường hợp đó. Một lần chạy `probe` làm hai việc: chứng minh file chạy được **và** cho biết file thực thi của chính shell đang chạy khối.
 
-Khối truyền cho `shellx-term` đường dẫn tuyệt đối của **chính shell đang chạy**: bash dùng `$BASH`; zsh dùng `${ZSH_ARGZERO#-}` nếu đã tuyệt đối, nếu không thì `$SHELL` khi `$SHELL` là zsh (trường hợp Terminal.app/iTerm2 mở login shell `-zsh`), còn lại tìm theo `PATH`. Nhờ `exec`, `shellx-term` giữ đúng PID của shell ban đầu. Nội dung chuẩn của khối nằm ở `term/shell/block.zsh` và `term/shell/block.bash`; bộ cài (P4) chèn đúng nội dung đó.
+Đường dẫn của shell cần bọc lấy từ `shellx-term probe` (file thực thi của tiến trình cha), không đoán từ `$SHELL`, `$0` hay `PATH`: cách đó đúng cả khi zsh được chạy bằng tên trần, bằng đường dẫn tương đối, hay do ứng dụng chạy zsh không phải login (lệnh tùy chỉnh của iTerm2). Khối `exec -a` với `argv[0]` **y nguyên của shell ban đầu** (zsh: `$ZSH_ARGZERO`, kể cả dạng `-zsh`; bash: `$0`), nên Terminal.app lấy tên từ argv vẫn thấy `-zsh`, và tiêu đề cửa sổ gần như y cũ (giải quyết hướng sửa R2). Nhờ `exec`, `shellx-term` giữ đúng PID của shell ban đầu. Nội dung chuẩn của khối nằm ở `term/shell/block.zsh` và `term/shell/block.bash`; bộ cài (P4) chèn đúng nội dung đó và **phải cài binary vào `bin` trước khi ghi khối** (khối cần một binary có lệnh `probe`).
 
-- **Đối số `--login`:** zsh **luôn** chạy shell bên trong ở chế độ không phải login, kể cả khi shell ngoài là login. Lý do: zsh login ngoài đã đọc `.zshenv` và `.zprofile` trước `.zshrc` (nơi đặt khối); shell login bên trong sẽ chạy lại `/etc/zprofile` (`path_helper`) và `~/.zprofile`, làm **đảo thứ tự `PATH`** (đo trong P1), và chậm hơn (+35,9 ms so với +13,2 ms). Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường đặt trong `~/.zprofile` không được áp dụng trong cửa sổ đã bọc; `logout` báo lỗi "not login shell" trong cửa sổ zsh đã bọc; và `[[ -o login ]]` là sai đối với logic trong rc của người dùng. Ý tưởng cho P2: export một biến đánh dấu để shell bên trong chạy `setopt login` (chưa kiểm xem `.zlogin` có được đọc khi đó không). bash giữ `--login` cho login shell (khối nằm đầu `.bash_profile`, trước phần còn lại của file).
-- **Tích hợp IDE:** VS Code/Cursor và JetBrains khởi động zsh với `ZDOTDIR` trỏ vào thư mục của họ. Ngay trước `exec`, khối zsh đặt lại `ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR` nếu không có) để shell bên trong chạy lại integration của IDE. Chỉ đổi `ZDOTDIR` sau khi mọi điều kiện (kể cả kiểm tra `--version`) đã đạt, nên khi không bọc thì `ZDOTDIR` và các biến của người dùng không bị đụng tới; khối không để lại biến phụ `__shellx_*` nào khi không bọc. bash loại trừ hai IDE này như trên.
-- **Chỗ hở đã biết:** `bash -i script` vẫn bị bọc (zsh đã xử lý bằng `$ZSH_SCRIPT`); `. ~/.bashrc` gõ tay trong bash vẫn `exec` thay shell (ghi cho P2).
+- **Login shell:**
+  - **zsh:** shell bên trong **luôn khởi động không phải login**, kể cả khi shell ngoài là login: login bên trong sẽ chạy lại `/etc/zprofile` (`path_helper`) và `~/.zprofile`, làm **đảo thứ tự `PATH`** và chậm hơn (đo trong P1: +35,9 ms so với +13,2 ms). Thay vào đó, nếu shell ngoài là login (`[[ -o login ]]`) khối `export SHELLX_TERM_LOGIN=1`. Trong shell bên trong, nhánh `elif` của khối (đang ở đúng cửa sổ đã bọc, `SHELLX_TERM` bằng `$TTY`, và có `SHELLX_TERM_LOGIN`) gỡ biến rồi chạy `setopt login`; zsh đọc `~/.zlogin` sau `.zshrc` và `logout` chạy được. Vì vậy PATH vẫn giống hệt cửa sổ thường, `[[ -o login ]]` đúng, `~/.zlogin` chạy đúng một lần và `logout` thoát bình thường (có test PTY). Không còn "cái giá login" đã ghi ở P1. Nhánh `elif` cũng áp dụng cho **shell thường do fallback mở** (§5.4), vì fallback cũng đặt `SHELLX_TERM` bằng tty của cửa sổ; đó là chủ ý (cùng hành vi `.zlogin`/`logout`).
+  - **bash:** `SHELLX_TERM_WRAP_LOGIN=1` khi `shopt -q login_shell`; shell bên trong chạy với `-l` (khối nằm đầu `.bash_profile`, trước phần còn lại của file). Hai biến `SHELLX_TERM_WRAP*` được `shellx-term` gỡ trước khi chạy shell bên trong; nếu `exec` thất bại thì khối gỡ chúng khỏi shell hiện tại.
+- **Tích hợp IDE:** VS Code/Cursor và JetBrains khởi động zsh với `ZDOTDIR` trỏ vào thư mục của họ. Ngay trước `exec`, khối zsh đặt lại `ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR` nếu không có) để shell bên trong chạy lại integration của IDE. Chỉ đổi `ZDOTDIR` sau khi mọi điều kiện (kể cả kiểm tra `probe`) đã đạt, nên khi không bọc thì `ZDOTDIR` và các biến của người dùng không bị đụng tới; khối không để lại biến phụ `__shellx_*` nào khi không bọc. bash loại trừ hai IDE này như trên.
+- **Giới hạn đã biết:**
+  - `bash -i script` vẫn bị bọc (zsh xử lý bằng `$ZSH_SCRIPT`); đây vẫn là chỗ hở. `source ~/.zshrc` / `. ~/.bashrc` gõ tay thì **đã xử lý cho cả hai shell**.
+  - Điều kiện `BASH_LINENO[0] == 0` của bash có hai giới hạn: (1) hàm bọc một dòng, vd `reload() { . ~/.bashrc; }`, vẫn làm `BASH_LINENO[0]` bằng `0`, nên vẫn thay shell đang chạy; (2) file rc được `source` từ một file khởi động khác thì **không được bọc** (`BASH_LINENO[0]` khác `0`). Hệ quả: người dùng chỉ có `.profile` + `.bashrc` sẽ có cửa sổ login không được bọc; bộ cài P4 vì vậy đặt khối vào **cả `.bash_profile` và `.bashrc`**.
+  - **Mọi PTY khởi động từ một cửa sổ đã bọc** (`script`, `asciinema rec`, `:terminal` của nvim, một ứng dụng terminal mở bằng `code .`) cho shell của nó một tty mới, khác `SHELLX_TERM`, nên shell đó **được bọc riêng và hiện thành một terminal chia sẻ thêm**. Đây là chủ ý của dấu theo tty.
+  - Khối cần một binary có lệnh `probe`. Bản `shellx-term` cũ hơn (chỉ có `--version`) gặp khối mới thì `probe` rơi vào nhánh đối số lạ và mở shell thường bên trong `$(…)`, trông như treo; vì vậy bộ cài (P4) cài binary trước rồi mới ghi khối.
 
 ### 5.3 Khối tích hợp trên Windows (PowerShell 7 và 5.1)
 
@@ -146,11 +157,11 @@ Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài c
 ### 5.4 Cam kết an toàn
 
 1. **Terminal không bao giờ chờ ShellX.** Luồng chính chỉ chuyển dữ liệu giữa cửa sổ và PTY. Bản sao gửi agent đi qua hàng chờ giới hạn **1 MiB**. Hàng chờ đầy thì cắt kết nối với agent, kết nối lại sau và gửi lại bộ đệm (§6.5). Ghi input từ điện thoại vào PTY chạy trên luồng riêng.
-2. **Không mở được PTY hay không chạy được shell trong PTY:** macOS `exec` thẳng shell gốc với đối số gốc; Windows thoát với mã 222 (§5.3). Người dùng vẫn có shell, chỉ không chia sẻ.
-3. **Agent không chạy:** `shellx-term` chạy bình thường và thử kết nối lại theo lịch 1, 2, 4, 8, tối đa 10 giây. Mỗi lần thử chỉ đọc file `endpoint` rồi kết nối tới localhost.
+2. **Không mở được PTY hay không chạy được shell trong PTY** (và cả khi đối số không hợp lệ, hoặc panic): macOS `exec` thẳng một shell thường, thử lần lượt shell được yêu cầu, `$SHELL`, `/bin/zsh`, `/bin/sh` (chỉ đường dẫn tuyệt đối), với `argv[0]` như login(1) (`-zsh` nếu là login); Windows thoát với mã 222 (§5.3). Shell thường này nhận `SHELLX_TERM` = **tty của chính cửa sổ** (`0` nếu không có tty), để khối trong file khởi động của nó thấy mình đã ở đúng cửa sổ và không gửi ngược về `shellx-term`. Người dùng vẫn có shell, chỉ không chia sẻ.
+3. **Agent không chạy:** `shellx-term` chạy bình thường và thử kết nối lại theo lịch 1, 2, 4, 8, rồi mỗi 10 giây (§6.5). Mỗi lần thử chỉ đọc file `endpoint` rồi kết nối tới localhost.
 4. **`shellx-term` bị xóa:** khối tích hợp kiểm tra file tồn tại trước khi dùng.
 5. **Shell thoát:** `shellx-term` khôi phục chế độ cửa sổ rồi thoát với mã thoát của shell. **Cửa sổ biến mất** (đọc cửa sổ gặp EOF hoặc lỗi, vd ứng dụng terminal bị kill mà SIGHUP không tới `shellx-term`): `shellx-term` gửi SIGHUP cho nhóm tiến trình của shell bên trong rồi cho chính shell, sau đó đi theo đường thoát bình thường; không để lại tiến trình mồ côi.
-6. **Chế độ cửa sổ luôn được khôi phục** (termios / console mode ban đầu) khi thoát bình thường, khi nhận tín hiệu kết thúc, và khi panic (panic hook).
+6. **Chế độ cửa sổ luôn được khôi phục** (termios / console mode ban đầu) khi thoát bình thường, khi nhận tín hiệu kết thúc, và khi panic (panic hook, chỉ cài cho chế độ `wrap`). **SIGTERM:** shell tương tác thường bỏ qua SIGTERM, nhưng zsh/bash đặt lại SIGTERM về mặc định trước khi `exec` (đã đo trên macOS), nên `shellx-term` do khối gọi sẽ thấy SIGTERM ở trạng thái mặc định. Vì vậy: khi `shellx-term` được gọi theo cách của khối (không đối số + `SHELLX_TERM_WRAP`, §5.1) thì nó **luôn bỏ qua SIGTERM**, giống shell tương tác mà nó thay; nhờ đó `pkill -f zsh` không đóng cửa sổ đã bọc (có test PTY với `kill -TERM` từ shell bên trong, cho cả zsh và bash). Khi gọi tường minh bằng `wrap …` thì **giữ nguyên trạng thái lúc khởi động**: đang bị bỏ qua thì tiếp tục bỏ qua; ngược lại SIGTERM khôi phục cửa sổ rồi thoát với mã `128+SIGTERM`.
 7. **Bàn phím và kích thước:** Ctrl+C, Ctrl+Z, Ctrl+D đi thẳng vào shell bên trong. Đổi kích thước cửa sổ được chuyển tiếp: macOS qua `SIGWINCH`, Windows qua `WINDOW_BUFFER_SIZE_EVENT`. Tiêu đề do shell hoặc chương trình đặt (OSC 0/2) đi qua nguyên vẹn ra cửa sổ.
 8. **Bộ đệm 256 KiB** output gần nhất, giữ từ lúc mở cửa sổ.
 
@@ -171,33 +182,65 @@ Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài c
 
 - Agent mở `ServerSocket` trên `127.0.0.1`, cổng do hệ điều hành chọn, **chỉ khi tính năng đang bật**.
 - Mỗi lần agent khởi động (và mỗi lần bật tính năng), agent sinh **khóa bí mật 32 byte mới** và ghi file `endpoint` (ghi file tạm rồi đổi tên) gồm phiên bản, số cổng và khóa:
-  - macOS: `~/Library/Application Support/ShellX/term/endpoint`; thư mục 0700, file 0600.
+  - macOS: `$HOME/Library/Application Support/ShellX/term/endpoint`; thư mục 0700, file 0600.
   - Windows: `%LOCALAPPDATA%\ShellX\term\endpoint` (quyền thừa kế của `%LOCALAPPDATA%`: chỉ người dùng, SYSTEM, Administrators).
 - Tắt tính năng hoặc thoát agent: đóng cổng và xóa file `endpoint`.
+- **Định dạng file:** văn bản UTF-8, đúng ba dòng, cho phép một dấu xuống dòng ở cuối:
+  ```
+  v=1
+  port=<số thập phân 1..65535>
+  secret=<64 ký tự hex thường>
+  ```
+  `port` viết thập phân thuần, không số 0 đứng đầu. Dòng đầu `v=` khác `v=1` là phiên bản không hỗ trợ; dòng sai, thừa hoặc thiếu, `port` ngoài khoảng, `secret` không phải 64 hex thường, hay file không phải UTF-8 là sai định dạng. Cả ba trường hợp (và file không tồn tại) đều làm lần kết nối đó thất bại và `shellx-term` thử lại theo lịch §6.5.
 - `shellx-term` đọc lại file ở mỗi lần kết nối.
 
 ### 6.2 Khung
 
-Mỗi khung là độ dài 4 byte big-endian + một map CBOR có khóa `t` (cùng quy ước với tin nhắn ứng dụng hiện có). Khung tối đa 64 KiB; output lớn được chia nhỏ. Nhận khung sai định dạng hoặc quá lớn thì đóng kết nối.
+Mỗi khung là độ dài 4 byte big-endian + một map CBOR có khóa `t` (cùng quy ước với tin nhắn ứng dụng hiện có). Khung tối đa 64 KiB (`65536` byte payload); `snapshot` và `out` được chia thành các phần `data` **tối đa 60 KiB** (`61440` byte) mỗi khung. Nhận khung sai định dạng hoặc quá lớn thì đóng kết nối.
+
+- **Thứ tự khóa CBOR:** `shellx-term` ghi khóa map theo **thứ tự byte tăng dần** (bên Rust dùng `BTreeMap`). Đây **không phải** thứ tự chuẩn "độ dài trước" của RFC 8949 §4.2.1: vd `hello` ghi `nonce`, `t`, `v` (theo byte), trong khi thứ tự chuẩn sẽ là `t`, `v`, `nonce`. Bộ giải mã **chấp nhận mọi thứ tự khóa**; chỉ khi muốn khớp **từng byte** với `term/protocol/vectors.txt` thì bên ghi (agent, P3) mới phải dùng đúng thứ tự khóa này. Số nguyên và độ dài được ghi ở dạng ngắn nhất; bộ giải mã không bắt buộc dạng ngắn nhất.
 
 ### 6.3 Xác thực hai chiều
 
 1. `shellx-term` → agent: `{t: "hello", v: 1, nonce: 32 byte}`.
-2. agent → `shellx-term`: `{t: "challenge", nonce: 32 byte, mac: HMAC-SHA256(khóa, "shellx-term/agent" ‖ nonce_term ‖ nonce_agent)}`.
+2. agent → `shellx-term`: `{t: "challenge", nonce: 32 byte, mac: HMAC-SHA256(khóa, "shellx-term/agent" ‖ nonce_term ‖ nonce_agent)}`. **Agent có thể trả `{t: "reject", reason}` thay cho `challenge`** (vd khi quá giới hạn hoặc không biết phiên bản); xem lưu ý về độ tin cậy bên dưới.
 3. `shellx-term` kiểm `mac` (so sánh thời gian hằng). Sai thì đóng và **chưa gửi byte terminal nào**.
 4. `shellx-term` → agent: `{t: "auth", mac: HMAC-SHA256(khóa, "shellx-term/term" ‖ nonce_agent ‖ nonce_term), term_id: 16 byte, app, shell, pid, cols, rows, started_at}`.
 5. Agent kiểm `mac`, rồi trả `{t: "ready"}`, hoặc `{t: "reject", reason: "limit" | "version"}` và đóng.
 
-- `v` là phiên bản giao thức nội bộ. Agent chấp nhận mọi phiên bản nó biết, để terminal mở từ trước khi cập nhật ShellX vẫn nối được. Bị `reject` với `version` thì `shellx-term` ngừng thử cho tới khi file `endpoint` đổi. Bị `limit` thì thử lại sau 30 giây.
-- Xác thực không qua trong 5 giây thì đóng.
-- `app`: tên ứng dụng terminal lấy từ biến môi trường (`TERM_PROGRAM` trên macOS; `WT_SESSION` có mặt thì là Windows Terminal; `TERM_PROGRAM=vscode` cho VS Code/Cursor), rỗng nếu không biết.
+- Byte chuẩn của từng tin nhắn và hai `mac` (với khóa và nonce cố định) nằm ở `term/protocol/vectors.txt`. **Plan P3 phải khớp từng byte** các vector này (thứ tự khóa: §6.2).
+- `v` là phiên bản giao thức nội bộ. Agent chấp nhận mọi phiên bản nó biết, để terminal mở từ trước khi cập nhật ShellX vẫn nối được. Bị `reject` với `version` thì `shellx-term` ngừng thử cho tới khi **nội dung** file `endpoint` đổi (đọc lại mỗi 10 giây, §6.5). Bị `limit` thì thử lại sau 30 giây. Lý do khác (không biết) thì thử lại theo lịch 1, 2, 4, 8, 10 giây.
+- **Hạn 5 giây** cho cả bắt tay tính trên **từng byte đọc hoặc ghi**, không chỉ từng lời gọi hệ thống: một bên nhỏ giọt từng byte cũng không giữ được quá 5 giây. Quá hạn thì đóng.
+- **`reject` trước khi agent chứng minh khóa là chưa xác thực nhưng vẫn được chấp nhận:** kẻ chiếm cổng chỉ làm chậm việc chia sẻ (chiếm cổng vốn đã làm được vậy) và **không bao giờ nhận byte terminal nào**, vì lúc đó mới chỉ có `hello` rời đi.
+- **Các trường của `auth`:**
+  - `term_id`: 16 byte ngẫu nhiên, sinh một lần cho mỗi cửa sổ và giữ nguyên qua các lần nối lại.
+  - `pid`: PID của **shell bên trong** (không phải của `shellx-term`).
+  - `started_at`: Unix mili giây lúc `shellx-term` bắt đầu.
+  - `shell`: tên shell (vd `zsh`); `cols`, `rows`: kích thước cửa sổ lúc đó.
+  - `app`: tên ứng dụng terminal, rỗng nếu không biết. macOS lấy theo thứ tự: (1) `__CFBundleIdentifier` tra bảng dưới; (2) `TERM_PROGRAM`: `Apple_Terminal` → Terminal, `iTerm.app` → iTerm2, `vscode` → VS Code, `WarpTerminal` → Warp, `ghostty` → Ghostty, `WezTerm` → WezTerm, giá trị lạ khác được dùng nguyên văn; (3) `TERMINAL_EMULATOR=JetBrains-JediTerm` → JetBrains. Windows: `WT_SESSION` có mặt thì là Windows Terminal (làm ở P2b).
+
+| `__CFBundleIdentifier` | `app` |
+|---|---|
+| `com.apple.Terminal` | Terminal |
+| `com.googlecode.iterm2` | iTerm2 |
+| `com.microsoft.VSCode` | VS Code |
+| `com.microsoft.VSCodeInsiders` | VS Code Insiders |
+| `com.todesktop.230313mzl4w4u92` | Cursor |
+| `com.google.android.studio` | Android Studio |
+| `com.jetbrains.intellij` | IntelliJ IDEA |
+| `com.jetbrains.intellij.ce` | IntelliJ IDEA CE |
+| `dev.warp.Warp-Stable` | Warp |
+| `com.mitchellh.ghostty` | Ghostty |
+| `net.kovidgoyal.kitty` | kitty |
+| `org.alacritty` | Alacritty |
+| `com.github.wez.wezterm` | WezTerm |
 
 ### 6.4 Tin nhắn sau `ready`
 
 | Hướng | `t` | Trường | Ý nghĩa |
 |---|---|---|---|
-| term → agent | `snapshot` | `data` | Toàn bộ bộ đệm 256 KiB. Luôn là khung đầu tiên sau `ready` |
-| term → agent | `out` | `data` | Output mới |
+| term → agent | `snapshot` | `data`, `last` | Bộ đệm 256 KiB (hoặc ít hơn), gửi thành các phần `data` ≤ 60 KiB; `last: true` ở phần cuối. Luôn là khung đầu tiên sau `ready`. Chưa có output thì gửi **một** khung `data` rỗng với `last: true` |
+| term → agent | `out` | `data` | Output mới, cũng chia thành các phần ≤ 60 KiB |
 | term → agent | `size` | `cols`, `rows` | Kích thước cửa sổ đổi |
 | term → agent | `local` | — | Bên điều khiển chuyển về `desktop` (§5.5) |
 | term → agent | `exit` | `code` | Shell đã thoát |
@@ -207,7 +250,14 @@ Mỗi khung là độ dài 4 byte big-endian + một map CBOR có khóa `t` (cù
 
 ### 6.5 Mất kết nối và nối lại
 
-- `shellx-term` nối lại với **cùng `term_id`**, gửi `snapshot` mới.
+- `shellx-term` nối lại với **cùng `term_id`**, gửi `snapshot` mới (luôn đứng đầu sau `ready`; phần output chưa gửi của phiên cũ bị bỏ, vì snapshot đã chứa nó).
+- **Lịch thử lại:** sau mỗi lần thất bại (không đọc được `endpoint`, không nối được, bắt tay lỗi hoặc hết hạn 5 giây) chờ 1, 2, 4, 8 rồi 10 giây cho các lần sau; thành công thì lịch quay về đầu. Sau một phiên bị ngắt, chờ 1 giây trước lần nối kế tiếp. `reject limit`: thử lại sau **30 giây**. `reject version`: **không** thử cho tới khi nội dung `endpoint` đổi; đọc lại file **mỗi 10 giây**.
+- **Không bao giờ làm chậm terminal:**
+  - ghi vào socket có hạn **1 giây**;
+  - hàng chờ gửi giới hạn **1 MiB** byte đã mã hóa;
+  - agent treo (nhận kết nối nhưng ngừng đọc) làm phiên bị cắt khi một lần ghi quá hạn 1 giây **hoặc** hàng chờ tràn 1 MiB; phiên sau đó được nối lại và đồng bộ bằng `snapshot`;
+  - đường cửa sổ ↔ PTY không bao giờ chờ socket.
+- **Khi shell thoát:** gửi `exit` rồi chờ đẩy xong tối đa **200 ms** (cộng 500 ms xả output như trước); agent treo hoặc không có thì cửa sổ vẫn đóng ngay sau đó.
 - Agent giữ phiên `desktop` **30 giây** sau khi mất kết nối. Nối lại kịp thì dùng lại đúng phiên (cùng `id` phiên): agent đặt bộ đệm của phiên theo `snapshot` (số thứ tự tiếp tục tăng) và gửi `session.reset` rồi dữ liệu cho điện thoại đang gắn.
 - Quá 30 giây: phiên bị xóa; điện thoại đang gắn nhận `session.detached {reason: "terminal_gone"}`.
 
@@ -490,11 +540,11 @@ Bước đầu tiên của kế hoạch triển khai là một **bản thử `sh
   - Còn chờ người thử trên giao diện thật.
 - **R2 — một phần.**
   - Bọc chạy đúng trên Terminal.app thật, với cả khối đầu lẫn khối cuối. Với khối cuối: PATH giống hệt, `source` bằng tay không thay shell, file `shellx-term` hỏng thì cửa sổ vẫn mở bình thường.
-  - Tiêu đề thành `shellx-term wrap -- … ▸ <lệnh>`. Hướng sửa ở P2: tham số qua biến môi trường và `argv[0]` giống shell gốc.
+  - Tiêu đề thành `shellx-term wrap -- … ▸ <lệnh>`. Đã cài ở P2a: tham số qua biến môi trường và `exec -a` với `argv[0]` y nguyên của shell gốc (§5.1, §5.2), nhưng **vẫn cần kiểm tra tay trong cửa sổ Terminal.app/iTerm2 thật** xem tiêu đề đã đúng chưa.
   - **Mất cảnh báo "terminate running processes?" khi đóng cửa sổ đang chạy lệnh.** Đây là giới hạn của hướng A: Terminal chỉ xét tiến trình trên tty của cửa sổ. **Người dùng chọn (a): chấp nhận và ghi rõ trong cửa sổ xác nhận (§10.1).**
   - Không có chuyện hỏi thừa khi shell đang rảnh.
-- **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự (số đo từ bản bench đầu, trước bước kiểm tra `--version`). Bước kiểm tra `--version` thêm khoảng 2,4 ms. Cái giá của shell bên trong không phải login: `~/.zlogin` và thiết lập không phải biến môi trường trong `~/.zprofile` không áp dụng; `logout` báo "not login shell"; `[[ -o login ]]` là sai cho logic rc của người dùng (P2: biến đánh dấu để chạy `setopt login`, chưa kiểm `.zlogin`).
-- **Phát hiện thêm:** zsh thoát khi `exec` thất bại, nên khối kiểm tra `shellx-term --version` trước khi `exec` (§5.2).
+- **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự (số đo từ bản bench đầu, trước bước kiểm tra `--version`). Bước kiểm tra `--version` thêm khoảng 2,4 ms. Cái giá của shell bên trong không phải login: `~/.zlogin` và thiết lập không phải biến môi trường trong `~/.zprofile` không áp dụng; `logout` báo "not login shell"; `[[ -o login ]]` là sai cho logic rc của người dùng. **Đã xử lý ở P2a:** biến `SHELLX_TERM_LOGIN` + `setopt login` trong shell bên trong, nên các cái giá này không còn (§5.2). Số đo cuối của P2a: xem ledger.
+- **Phát hiện thêm:** zsh thoát khi `exec` thất bại, nên khối chạy `shellx-term probe` trước khi `exec` (§5.2).
 
 ---
 
@@ -505,7 +555,8 @@ Khối lượng lớn, chia thành các kế hoạch nối tiếp; mỗi kế ho
 | # | Kế hoạch | Phụ thuộc | Kết quả kiểm được |
 |---|---|---|---|
 | P1 | Bản thử `shellx-term` trên macOS (chỉ bọc shell) + kiểm R1–R3 | — | Báo cáo tương thích, danh sách loại trừ, số đo thời gian mở; quyết định tiếp tục hoặc điều chỉnh thiết kế |
-| P2 | `shellx-term` đầy đủ (macOS + Windows): §5, §6 phía term, test §11.1, workflow `windows-check.yml` | P1 | `cargo test` xanh trên macOS và `windows-latest` |
-| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §8, test §11.2, e2e §11.4 | P2 | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
+| P2a | `shellx-term` nối agent trên macOS: §5, §6 phía term, test §11.1 (**xong**, ledger `terminal-sharing.md`) | P1 | `cargo test --features test-hooks` xanh trên macOS |
+| P2b | `shellx-term` trên Windows (§5.3) + workflow `windows-check.yml` | P2a | `cargo test` xanh trên `windows-latest` |
+| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §8, test §11.2, e2e §11.4 | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
 | P4 | Desktop: bật/tắt, bộ sửa file cấu hình, chính sách PowerShell, cập nhật/gỡ, menu và thông báo (§7.6, §10), tích hợp build và ký (§4, §10.7), test §11.3 | P3 | Bật trên macOS từ menu, mở cửa sổ mới thấy trên điện thoại giả lập |
 | P5 | Mobile: §9, cập nhật file thiết kế giao diện, test §11.5 | P3 (chạy song song với P4 được) | Pixel 3 xem và gõ vào terminal Terminal.app qua `relay.shellx.pro`; danh sách §11.6 phần macOS |

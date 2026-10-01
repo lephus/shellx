@@ -55,9 +55,10 @@ pub fn arg0(shell: &OsStr, login: bool) -> OsString {
     }
 }
 
-/// Replaces this process with the first shell that starts. `SHELLX_TERM=0`
-/// stops the ShellX block in that shell's startup file from sending it back
-/// here (the block only acts when `SHELLX_TERM` is empty).
+/// Replaces this process with the first shell that starts. `SHELLX_TERM` is
+/// set to the window's own tty (`0` without one): the ShellX block in that
+/// shell's startup file sees it is already in its window and does not send
+/// it back here.
 pub fn exec_shell(target: &Target) -> ! {
     let shell_env = std::env::var_os("SHELL");
     for shell in candidates(target.shell.as_deref(), shell_env.as_deref()) {
@@ -70,10 +71,27 @@ pub fn exec_shell(target: &Target) -> ! {
         let _error = std::process::Command::new(&shell)
             .arg0(arg0(&shell, target.login))
             .args(args)
-            .env("SHELLX_TERM", "0")
+            .env("SHELLX_TERM", own_tty())
+            // The block's hand-over variables: the new shell must not see
+            // them (SHELLX_TERM_LOGIN stays, the zsh block reads it).
+            .env_remove("SHELLX_TERM_WRAP")
+            .env_remove("SHELLX_TERM_WRAP_LOGIN")
             .exec();
     }
     std::process::exit(127)
+}
+
+/// The window's tty, so the ShellX block in the new shell sees it is
+/// already in its own window and does not wrap again; "0" without a tty.
+fn own_tty() -> OsString {
+    use std::os::unix::ffi::OsStrExt;
+    let mut buf = [0 as libc::c_char; 256];
+    let ok = unsafe { libc::ttyname_r(0, buf.as_mut_ptr(), buf.len()) } == 0;
+    if !ok {
+        return OsString::from("0");
+    }
+    let name = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) };
+    OsStr::from_bytes(name.to_bytes()).to_os_string()
 }
 
 /// Marks every descriptor above stderr close-on-exec, so a shell started
@@ -123,6 +141,7 @@ mod tests {
             login: true,
             shell: "/bin/bash".into(),
             shell_args: vec!["-x".into()],
+            from_block: false,
         }));
         assert_eq!(target.shell, Some(OsString::from("/bin/bash")));
         assert!(target.login);

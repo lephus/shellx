@@ -20,8 +20,8 @@ fn version_prints_the_crate_version() {
 fn bad_arguments_still_give_the_user_a_shell() {
     let mut h = Harness::spawn(BIN, &["bogus"], &[("SHELL", "/bin/sh")], 80, 24);
     h.expect("shellx-term: unknown arguments; starting a plain shell", T);
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=0", T);
+    h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo m=own''-tty\r");
+    h.expect("m=own-tty", T);
     h.send("exit 4\r");
     assert_eq!(h.wait_exit(T), 4);
 }
@@ -35,8 +35,8 @@ fn a_missing_shell_falls_back_to_the_shell_variable() {
         80,
         24,
     );
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=0", T);
+    h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo m=own''-tty\r");
+    h.expect("m=own-tty", T);
     h.send("exit 6\r");
     assert_eq!(h.wait_exit(T), 6);
 }
@@ -75,4 +75,23 @@ fn version_with_a_failing_stdout_does_not_start_a_shell() {
         !stderr.contains("plain shell"),
         "--version fell back to a shell: {stderr:?}"
     );
+}
+
+#[test]
+fn the_fallback_shell_does_not_inherit_the_block_s_wrap_variables() {
+    let mut h = Harness::spawn(
+        BIN,
+        &["bogus"],
+        &[
+            ("SHELL", "/bin/sh"),
+            ("SHELLX_TERM_WRAP", "/bin/sh"),
+            ("SHELLX_TERM_WRAP_LOGIN", "1"),
+        ],
+        80,
+        24,
+    );
+    h.send("echo v=[${SHELLX_TERM_WRAP-}][${SHELLX_TERM_WRAP_LOGIN-}]\r");
+    h.expect("v=[][]", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
 }

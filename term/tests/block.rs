@@ -6,7 +6,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-const T: Duration = Duration::from_secs(5);
+// Generous: a loaded machine can take seconds to start a dozen zsh at once.
+const T: Duration = Duration::from_secs(15);
 const ZSH_BLOCK: &str = include_str!("../shell/block.zsh");
 const BASH_BLOCK: &str = include_str!("../shell/block.bash");
 
@@ -16,7 +17,17 @@ fn home(name: &str) -> common::TempDir {
     let bin = home.join("Library/Application Support/ShellX/bin");
     std::fs::create_dir_all(&bin).unwrap();
     let fake = bin.join("shellx-term");
-    std::fs::write(&fake, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/calls.log\"\n[ \"$1\" = --version ] && exit 0\nprintf 'WRAPPED'\nfor a in \"$@\"; do printf ' [%s]' \"$a\"; done\nprintf '\\n'\nprintf 'ZDOTDIR=[%s]\\n' \"${ZDOTDIR-unset}\"\nexit 0\n").unwrap();
+    std::fs::write(
+        &fake,
+        "#!/bin/sh\n\
+         printf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/calls.log\"\n\
+         if [ \"$1\" = probe ]; then printf '%s\\n' \"${SHELLX_FAKE_PROBE:-/bin/zsh}\"; exit 0; fi\n\
+         printf 'WRAPPED'; for a in \"$@\"; do printf ' [%s]' \"$a\"; done\n\
+         printf ' wrap=[%s] login=[%s] marker=[%s]\\n' \"${SHELLX_TERM_WRAP-}\" \"${SHELLX_TERM_WRAP_LOGIN-}\" \"${SHELLX_TERM_LOGIN-}\"\n\
+         printf 'ZDOTDIR=[%s]\\n' \"${ZDOTDIR-unset}\"\n\
+         exit 0\n",
+    )
+    .unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
     std::fs::write(
         home.join(".zshrc"),
@@ -48,6 +59,10 @@ fn env_for(home: &Path) -> Vec<(&'static str, String)> {
 fn run_shell(program: &str, args: &[&str], home: &Path, extra: &[(&str, &str)]) -> Harness {
     let base = env_for(home);
     let mut env: Vec<(&str, &str)> = base.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    if program.ends_with("bash") {
+        // What `probe` reports: the shell binary that runs the block.
+        env.push(("SHELLX_FAKE_PROBE", "/bin/bash"));
+    }
     env.extend_from_slice(extra);
     Harness::spawn(program, args, &env, 80, 24)
 }
@@ -94,32 +109,37 @@ fn blocks_are_ascii_with_exact_markers() {
 
 #[test]
 fn zsh_interactive_is_wrapped() {
-    assert_wrapped("/bin/zsh", &["-i"], "WRAPPED [wrap] [--] [/bin/zsh]");
+    assert_wrapped(
+        "/bin/zsh",
+        &["-i"],
+        "WRAPPED wrap=[/bin/zsh] login=[] marker=[]",
+    );
 }
 
 #[test]
-fn zsh_login_is_wrapped_as_non_login() {
-    assert_wrapped("/bin/zsh", &["-il"], "WRAPPED [wrap] [--] [/bin/zsh]");
+fn zsh_login_is_wrapped_as_non_login_with_the_login_marker() {
+    assert_wrapped(
+        "/bin/zsh",
+        &["-il"],
+        "WRAPPED wrap=[/bin/zsh] login=[] marker=[1]",
+    );
 }
 
 #[test]
-fn zsh_started_by_bare_name_resolves_to_the_login_shell() {
-    // argv[0] is "zsh" (not absolute): the block uses $SHELL.
-    assert_wrapped("zsh", &["-i"], "WRAPPED [wrap] [--] [/bin/zsh]");
+fn zsh_started_by_bare_name_is_wrapped_as_the_probed_binary() {
+    // argv[0] is "zsh" (not absolute): the block wraps what `probe` reports
+    // (the running shell's own binary), not $SHELL.
+    assert_wrapped("zsh", &["-i"], "WRAPPED wrap=[/bin/zsh] login=[] marker=[]");
 }
 
 #[test]
 fn bash_interactive_is_wrapped() {
-    assert_wrapped("/bin/bash", &["-i"], "WRAPPED [wrap] [--] [/bin/bash]");
+    assert_wrapped("/bin/bash", &["-i"], "WRAPPED wrap=[/bin/bash] login=[] ");
 }
 
 #[test]
 fn bash_login_is_wrapped_as_login() {
-    assert_wrapped(
-        "/bin/bash",
-        &["-il"],
-        "WRAPPED [wrap] [--login] [--] [/bin/bash]",
-    );
+    assert_wrapped("/bin/bash", &["-il"], "WRAPPED wrap=[/bin/bash] login=[1] ");
 }
 
 #[test]
@@ -136,8 +156,6 @@ fn editor_environment_probes_are_not_wrapped() {
 #[test]
 fn nested_and_excluded_shells_are_not_wrapped() {
     let cases = [
-        ("SHELLX_TERM", "1"),
-        ("SHELLX_TERM", "0"),
         ("SHELLX", "1"),
         ("TMUX", "/tmp/tmux-1/default,1,0"),
         ("STY", "1.pts"),
@@ -175,20 +193,140 @@ fn no_terminal_means_no_wrapping() {
     assert!(!stdout.contains("WRAPPED"), "{stdout:?}");
 }
 
-#[test]
-fn with_the_real_binary_the_rest_of_the_file_runs_once_inside() {
-    let home = home("real");
+/// A fake HOME with the real binary "installed".
+fn real_home(tag: &str) -> common::TempDir {
+    let home = home(tag);
     std::fs::copy(
         BIN,
         home.join("Library/Application Support/ShellX/bin/shellx-term"),
     )
     .unwrap();
+    home
+}
+
+/// Prints `expr` inside the shell as `name=[value]` and returns the value.
+/// (The typed command has `name""=[`, so only the output matches.)
+fn shell_value(h: &mut Harness, name: &str, expr: &str) -> String {
+    h.send(&format!("echo \"{name}\"\"=[{expr}]\"\r"));
+    let prefix = format!("{name}=[");
+    h.expect(&prefix, T);
+    h.settle(Duration::from_millis(300));
+    let text = h.text();
+    let start = text.rfind(&prefix).unwrap() + prefix.len();
+    let end = text[start..].find(']').expect("closing bracket");
+    text[start..start + end].trim().to_string()
+}
+
+/// Inside a really wrapped window the shell's parent is `shellx-term`. (`ucomm`
+/// is the executable's name; `comm` shows the argv0 the block kept, `zsh`.)
+fn assert_really_wrapped(h: &mut Harness) {
+    let comm = shell_value(h, "PCOMM", "$(ps -o ucomm= -p $PPID)");
+    assert!(
+        comm.contains("shellx-term"),
+        "not wrapped: parent is {comm:?}"
+    );
+}
+
+#[test]
+fn with_the_real_binary_the_rest_of_the_file_runs_once_inside() {
+    let home = real_home("real");
     let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=1", T);
+    h.send("[[ $SHELLX_TERM == $TTY ]] && echo SAME''-TTY\r");
+    h.expect("SAME-TTY", T);
+    assert_really_wrapped(&mut h);
+    let args = shell_value(&mut h, "PARGS", "$(ps -o args= -p $PPID)");
+    assert!(
+        !args.contains("wrap"),
+        "shellx-term got arguments: {args:?}"
+    );
     assert_eq!(h.text().matches("AFTER-BLOCK").count(), 1, "{:?}", h.text());
     h.send("exit 3\r");
     assert_eq!(h.wait_exit(T), 3);
+}
+
+#[test]
+fn a_zsh_login_window_keeps_login_behaviour_inside() {
+    let home = real_home("real-login");
+    std::fs::write(home.join(".zlogin"), "echo ZLOGIN-RAN\n").unwrap();
+    let mut h = run_shell("/bin/zsh", &["-il"], &home, &[]);
+    h.expect("ZLOGIN-RAN", T);
+    h.send("[[ -o login ]] && echo LOGIN''-ON\r");
+    h.expect("LOGIN-ON", T);
+    assert_really_wrapped(&mut h);
+    h.send("logout\r");
+    assert_eq!(h.wait_exit(T), 0);
+    assert_eq!(h.text().matches("ZLOGIN-RAN").count(), 1, "{:?}", h.text());
+}
+
+/// A plain interactive shell ignores SIGTERM; the wrapped window must too
+/// (`pkill zsh` must not close windows). The block's `exec` hands us a
+/// default disposition, so we ignore it ourselves.
+fn assert_sigterm_does_not_close_the_window(program: &str, args: &[&str], tag: &str) {
+    let home = real_home(tag);
+    let mut h = run_shell(program, args, &home, &[]);
+    assert_really_wrapped(&mut h);
+    h.send("kill -TERM $PPID; sleep 0.3; echo al''ive\r");
+    h.expect("alive", T);
+    h.send("echo al''ive-again\r");
+    h.expect("alive-again", T);
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn a_wrapped_zsh_window_ignores_sigterm_like_a_plain_interactive_shell() {
+    assert_sigterm_does_not_close_the_window("/bin/zsh", &["-il"], "term-zsh");
+}
+
+#[test]
+fn a_wrapped_bash_window_ignores_sigterm_like_a_plain_interactive_shell() {
+    assert_sigterm_does_not_close_the_window("/bin/bash", &["-il"], "term-bash");
+}
+
+#[test]
+fn a_nested_shell_inside_a_wrapped_window_is_not_wrapped_again() {
+    let home = real_home("real-nested");
+    let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
+    assert_really_wrapped(&mut h);
+    h.send("zsh -i\r");
+    let comm = shell_value(&mut h, "NCOMM", "$(ps -o ucomm= -p $PPID)");
+    assert!(
+        comm == "zsh" && !comm.contains("shellx-term"),
+        "nested shell was wrapped: parent is {comm:?}"
+    );
+    assert_eq!(h.text().matches("AFTER-BLOCK").count(), 2, "{:?}", h.text());
+    h.send("exit\r");
+    h.send("exit\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn a_terminal_app_launched_from_a_wrapped_window_wraps_its_own_terminals() {
+    // Its tty differs from the one in SHELLX_TERM.
+    for (program, tag) in [
+        ("/bin/zsh", "other-tty-zsh"),
+        ("/bin/bash", "other-tty-bash"),
+    ] {
+        let home = home(tag);
+        let mut h = run_shell(program, &["-i"], &home, &[("SHELLX_TERM", "/dev/ttys999")]);
+        h.expect("WRAPPED wrap=[/bin/", T);
+        assert_eq!(h.wait_exit(T), 0);
+    }
+}
+
+#[test]
+fn bash_manual_source_does_not_replace_the_running_bash() {
+    let home = home("bash-source");
+    // The startup file has no block, so the window starts unwrapped.
+    std::fs::write(home.join(".bashrc"), "echo AFTER-BLOCK\n").unwrap();
+    std::fs::write(home.join("blk.sh"), BASH_BLOCK).unwrap();
+    let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
+    h.expect("AFTER-BLOCK", T);
+    h.send(". ~/blk.sh; echo after''-src\r");
+    h.expect("after-src", T);
+    assert!(!h.text().contains("WRAPPED"), "{:?}", h.text());
+    h.send("exit\r");
+    h.wait_exit(T);
 }
 
 /// Runs `/bin/zsh -i` in a fake HOME; `setup` may add files and returns the
@@ -238,7 +376,10 @@ fn vscode_style_injection_repoints_zdotdir() {
         ]
     });
     let text = finish_wrapped(&mut h);
-    assert!(text.contains("WRAPPED [wrap] [--] [/bin/zsh]"), "{text:?}");
+    assert!(
+        text.contains("WRAPPED wrap=[/bin/zsh] login=[]"),
+        "{text:?}"
+    );
     assert!(text.contains(&format!("ZDOTDIR=[{inj_s}]")), "{text:?}");
 }
 
@@ -265,7 +406,10 @@ fn jetbrains_style_injection_repoints_zdotdir() {
         24,
     );
     let text = finish_wrapped(&mut h);
-    assert!(text.contains("WRAPPED [wrap] [--] [/bin/zsh]"), "{text:?}");
+    assert!(
+        text.contains("WRAPPED wrap=[/bin/zsh] login=[]"),
+        "{text:?}"
+    );
     assert!(text.contains(&format!("ZDOTDIR=[{inj_s}]")), "{text:?}");
 }
 
@@ -324,7 +468,7 @@ fn an_unrunnable_binary_leaves_the_shell_and_its_variables_alone() {
 }
 
 #[test]
-fn the_binary_is_probed_with_version_before_wrapping() {
+fn the_binary_is_probed_before_wrapping() {
     let home = home("probe-order");
     let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
     assert_eq!(h.wait_exit(T), 0);
@@ -332,7 +476,7 @@ fn the_binary_is_probed_with_version_before_wrapping() {
         std::fs::read_to_string(home.join("Library/Application Support/ShellX/bin/calls.log"))
             .unwrap();
     let lines: Vec<&str> = log.lines().collect();
-    assert_eq!(lines, ["--version", "wrap -- /bin/zsh"], "{log:?}");
+    assert_eq!(lines, ["probe", ""], "{log:?}");
 }
 
 #[test]
@@ -371,7 +515,7 @@ fn ide_exclusions_for_bash_and_zsh() {
 fn assert_wrapped_with(program: &str, extra: &[(&str, &str)], tag: &str) {
     let home = home(tag);
     let mut h = run_shell(program, &["-i"], &home, extra);
-    h.expect("WRAPPED [wrap] [--] [/bin/zsh]", T);
+    h.expect("WRAPPED wrap=[/bin/zsh] login=[]", T);
     assert_eq!(h.wait_exit(T), 0);
 }
 
