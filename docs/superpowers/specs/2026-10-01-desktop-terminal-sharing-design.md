@@ -141,18 +141,33 @@ Khối nằm ở đầu profile `CurrentUserAllHosts` của từng bản PowerSh
 
 - `$Host.Name -eq 'ConsoleHost'` (loại trừ ISE và PowerShell Extension của VS Code);
 - stdin và stdout không bị chuyển hướng (`[Console]::IsInputRedirected`, `IsOutputRedirected`);
-- PowerShell không được gọi với `-Command`, `-File`, `-EncodedCommand`, `-NonInteractive` (kể cả dạng viết tắt, không phân biệt hoa thường);
+- mọi đối số của PowerShell nằm trong **danh sách cho phép** `-NoLogo`, `-NoProfile`, `-NoProfileLoadTime`, `-NoExit`, `-Login`, `-l` (không phân biệt hoa thường); đối số nào khác (`-Command`, `-File`, `-EncodedCommand`, `-NonInteractive`, tên script, kể cả dạng viết tắt…) thì không bọc. Danh sách cho phép thay cho danh sách cấm ban đầu: không cần đoán hết các dạng viết tắt;
+- `Get-History -Count 1` rỗng: khối chỉ bọc ở lần khởi động đầu của phiên. `. $PROFILE` gõ tay sau đó (đã có lịch sử lệnh) không bọc, nên không lồng thêm một lớp `shellx-term`;
 - `SHELLX_TERM` và `SHELLX` rỗng;
 - file `%LOCALAPPDATA%\ShellX\bin\shellx-term.exe` tồn tại.
 
-Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài chạy `shellx-term wrap -- <(Get-Process -Id $PID).Path> -NoLogo`, chờ, rồi `exit` với mã thoát của nó. **Ngoại lệ:** mã **222** nghĩa là "không bọc được"; khi đó profile chạy tiếp như bình thường và người dùng dùng PowerShell ngoài. (Nếu chính shell bên trong thoát với mã 222, người dùng rơi về PowerShell ngoài thay vì cửa sổ đóng. Trường hợp hiếm và vô hại, ghi nhận.)
+`SHELLX_TERM` của shell bên trong là `conpty:<pid>` (pid của `shellx-term`). **Giới hạn:** Windows không có kiểm tra theo tty như macOS (§5.2); biến này được thừa kế, nên một ứng dụng terminal mở từ cửa sổ PowerShell đã bọc (vd `code .`) không bọc terminal của chính nó.
+
+Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài đặt `$global:LASTEXITCODE = 222` trước, chạy `shellx-term wrap -- <(Get-Process -Id $PID).Path> -NoLogo` (`catch` rỗng), chờ, rồi gọi `[Environment]::Exit($LASTEXITCODE)` **chỉ khi mã khác 222 và không âm**. Mã **222** nghĩa là "không bọc được". Mã **âm** (tiến trình sập, hoặc trình nạp lỗi như thiếu `VCRUNTIME140.dll`) được coi như 222: profile chạy tiếp như bình thường và người dùng dùng PowerShell ngoài. Cuối cùng khối gỡ `LASTEXITCODE`. (Nếu chính shell bên trong thoát với mã 222 hoặc mã âm, người dùng rơi về PowerShell ngoài thay vì cửa sổ đóng. Hiếm và vô hại, ghi nhận.)
 
 **Cái giá trên Windows:** mỗi cửa sổ PowerShell có thêm một tiến trình PowerShell đứng chờ (mở chậm hơn khoảng 0,3–1 giây, tốn thêm khoảng 60–80 MB RAM). Con số thật đo trong lần kiểm tra Windows.
 
-`shellx-term` trên Windows:
-- đưa console ngoài vào chế độ VT thô (`ENABLE_VIRTUAL_TERMINAL_INPUT`, tắt `ENABLE_PROCESSED_INPUT`/`LINE_INPUT`/`ECHO_INPUT` ở stdin; `ENABLE_VIRTUAL_TERMINAL_PROCESSING` ở stdout), để Ctrl+C đi vào shell bên trong như một ký tự thay vì tín hiệu;
-- đọc input bằng `ReadConsoleInputW` để nhận cả phím (kể cả ký tự tiếng Việt từ IME, gồm cặp surrogate UTF-16) lẫn sự kiện đổi kích thước;
-- tạo ConPTY bên trong qua `portable-pty`.
+`shellx-term` trên Windows (`term/src/wincon.rs`, `term/src/winwrap.rs`):
+- **Chế độ console VT thô.** Stdin: tắt `ENABLE_PROCESSED_INPUT`/`LINE_INPUT`/`ECHO_INPUT`/`MOUSE_INPUT`, bật `ENABLE_VIRTUAL_TERMINAL_INPUT` và `ENABLE_WINDOW_INPUT`; Ctrl+C đi vào shell bên trong như một ký tự thay vì tín hiệu. Stdout: bật `ENABLE_PROCESSED_OUTPUT`, `ENABLE_VIRTUAL_TERMINAL_PROCESSING` và `DISABLE_NEWLINE_AUTO_RETURN`.
+- **Input** đọc bằng `ReadConsoleInputW` (phím, kể cả ký tự tiếng Việt từ IME, lẫn sự kiện đổi kích thước). Cặp surrogate UTF-16 được ghép lại qua nhiều sự kiện. Nhả phím Alt mang theo một ký tự được tính là một lần gõ, vì ký tự gõ bằng Alt+bàn phím số đến theo cách đó.
+- **Output** ghi bằng `WriteConsoleW` (UTF-16); UTF-8 bị cắt giữa hai lần đọc được xử lý.
+- **Kích thước cửa sổ** lấy từ `WINDOW_BUFFER_SIZE_EVENT` **và** kiểm lại mỗi 250 ms: conhost cổ điển chỉ báo đổi cỡ buffer, nên đổi chiều cao khi scrollback dài không có sự kiện.
+- **Bộ xử lý đóng** (close handler) khôi phục console. **Mất console** thì giết shell bên trong. **Panic** ngoài luồng link khôi phục console và thoát với mã 222.
+- **Khi thoát**, bước xả output chờ đủ **500 ms**, vì ống ConPTY chỉ đóng cùng pseudoconsole (mỗi lần thoát trên Windows thêm khoảng 0,5 s).
+- Tạo ConPTY bên trong qua `portable-pty`.
+
+**Giới hạn đã biết (P2b):**
+- Không có kiểm tra theo tty (xem trên).
+- Shell bên trong thoát với 222 hoặc mã âm thì rơi về shell ngoài.
+- Tích hợp PowerShell của VS Code (`-NoExit -Command …`) không được bọc.
+- Ctrl+Space / Ctrl+@ (NUL) chưa tới shell bên trong, nên `MenuComplete` của PSReadLine chưa dùng được.
+- Mỗi lần thoát chậm thêm khoảng 0,5 s (bước xả).
+- Việc cho P4: dựng `shellx-term.exe` với `+crt-static` để không phụ thuộc VCRUNTIME.
 
 ### 5.4 Cam kết an toàn
 
@@ -161,8 +176,8 @@ Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài c
 3. **Agent không chạy:** `shellx-term` chạy bình thường và thử kết nối lại theo lịch 1, 2, 4, 8, rồi mỗi 10 giây (§6.5). Mỗi lần thử chỉ đọc file `endpoint` rồi kết nối tới localhost.
 4. **`shellx-term` bị xóa:** khối tích hợp kiểm tra file tồn tại trước khi dùng.
 5. **Shell thoát:** `shellx-term` khôi phục chế độ cửa sổ rồi thoát với mã thoát của shell. **Cửa sổ biến mất** (đọc cửa sổ gặp EOF hoặc lỗi, vd ứng dụng terminal bị kill mà SIGHUP không tới `shellx-term`): `shellx-term` gửi SIGHUP cho nhóm tiến trình của shell bên trong rồi cho chính shell, sau đó đi theo đường thoát bình thường; không để lại tiến trình mồ côi.
-6. **Chế độ cửa sổ luôn được khôi phục** (termios / console mode ban đầu) khi thoát bình thường, khi nhận tín hiệu kết thúc, và khi panic (panic hook, chỉ cài cho chế độ `wrap`). **SIGTERM:** shell tương tác thường bỏ qua SIGTERM, nhưng zsh/bash đặt lại SIGTERM về mặc định trước khi `exec` (đã đo trên macOS), nên `shellx-term` do khối gọi sẽ thấy SIGTERM ở trạng thái mặc định. Vì vậy: khi `shellx-term` được gọi theo cách của khối (không đối số + `SHELLX_TERM_WRAP`, §5.1) thì nó **luôn bỏ qua SIGTERM**, giống shell tương tác mà nó thay; nhờ đó `pkill -f zsh` không đóng cửa sổ đã bọc (có test PTY với `kill -TERM` từ shell bên trong, cho cả zsh và bash). Khi gọi tường minh bằng `wrap …` thì **giữ nguyên trạng thái lúc khởi động**: đang bị bỏ qua thì tiếp tục bỏ qua; ngược lại SIGTERM khôi phục cửa sổ rồi thoát với mã `128+SIGTERM`.
-7. **Bàn phím và kích thước:** Ctrl+C, Ctrl+Z, Ctrl+D đi thẳng vào shell bên trong. Đổi kích thước cửa sổ được chuyển tiếp: macOS qua `SIGWINCH`, Windows qua `WINDOW_BUFFER_SIZE_EVENT`. Tiêu đề do shell hoặc chương trình đặt (OSC 0/2) đi qua nguyên vẹn ra cửa sổ.
+6. **Chế độ cửa sổ luôn được khôi phục** (termios / console mode ban đầu) khi thoát bình thường, khi nhận tín hiệu kết thúc, và khi panic (panic hook, chỉ cài cho chế độ `wrap`; trên Windows panic ngoài luồng link cũng khôi phục console rồi thoát 222, §5.3). **SIGTERM:** shell tương tác thường bỏ qua SIGTERM, nhưng zsh/bash đặt lại SIGTERM về mặc định trước khi `exec` (đã đo trên macOS), nên `shellx-term` do khối gọi sẽ thấy SIGTERM ở trạng thái mặc định. Vì vậy: khi `shellx-term` được gọi theo cách của khối (không đối số + `SHELLX_TERM_WRAP`, §5.1) thì nó **luôn bỏ qua SIGTERM**, giống shell tương tác mà nó thay; nhờ đó `pkill -f zsh` không đóng cửa sổ đã bọc (có test PTY với `kill -TERM` từ shell bên trong, cho cả zsh và bash). Khi gọi tường minh bằng `wrap …` thì **giữ nguyên trạng thái lúc khởi động**: đang bị bỏ qua thì tiếp tục bỏ qua; ngược lại SIGTERM khôi phục cửa sổ rồi thoát với mã `128+SIGTERM`. **Trước khi `exec` shell dự phòng**, SIGTERM được trả về đúng trạng thái lúc tiến trình khởi động (P2b Task 1), để shell dự phòng và các tiến trình con không thừa hưởng SIGTERM đang bị bỏ qua.
+7. **Bàn phím và kích thước:** Ctrl+C, Ctrl+Z, Ctrl+D đi thẳng vào shell bên trong. Đổi kích thước cửa sổ được chuyển tiếp: macOS qua `SIGWINCH`, Windows qua `WINDOW_BUFFER_SIZE_EVENT` và kiểm lại mỗi 250 ms (§5.3). Tiêu đề do shell hoặc chương trình đặt (OSC 0/2) đi qua nguyên vẹn ra cửa sổ.
 8. **Bộ đệm 256 KiB** output gần nhất, giữ từ lúc mở cửa sổ.
 
 ### 5.5 Kích thước khi cả hai cùng dùng
@@ -506,12 +521,12 @@ Mỗi ứng dụng kiểm tra:
 
 - **macOS:** kiểm chứng đầy đủ trên máy phát triển: test tự động, danh sách §11.6, và điện thoại thật (Pixel 3) qua `relay.shellx.pro`.
 - **Windows:**
-  - Workflow mới `.github/workflows/windows-check.yml`, **chỉ `workflow_dispatch`**, chạy trên `windows-latest`:
-    - `cargo test` cho `term/` (gồm ConPTY thật);
+  - Workflow `.github/workflows/windows-check.yml`, kích hoạt bằng `workflow_dispatch` **và** push lên nhánh `windows-check/**`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
+  - **Phạm vi trong P2b:** chỉ `term/` (`cargo fmt --check`, `clippy`, `test`, gồm ConPTY thật), trên `windows-latest` và `macos-latest`. P3 và P4 thêm các bước còn lại:
     - `dart test` cho `packages/shellx_agent` và `packages/shellx_core`;
     - `flutter build windows` để xác nhận `shellx-term.exe` nằm trong bản build.
-  - Không chạy theo push; giữ quyết định "không CI".
-  - Kiểm tra tương tác (§11.6, phần Windows) là **việc chờ**, ghi vào HANDOFF §4.
+  - Không chạy theo push thường; giữ quyết định "không CI".
+  - Kiểm tra tương tác (§11.6, phần Windows) vẫn là **việc chờ**, ghi vào HANDOFF §4.
   - Cho tới khi kiểm xong: công tắc không hiện trên Windows trừ khi có `SHELLX_EXPERIMENTAL=terminal-sharing`. Bản Windows vẫn chứa `shellx-term.exe` và mọi code, chỉ ẩn công tắc.
 - **Mobile:** tính năng hiện khi agent hỗ trợ (§8), không cần cờ.
 
@@ -556,7 +571,7 @@ Khối lượng lớn, chia thành các kế hoạch nối tiếp; mỗi kế ho
 |---|---|---|---|
 | P1 | Bản thử `shellx-term` trên macOS (chỉ bọc shell) + kiểm R1–R3 | — | Báo cáo tương thích, danh sách loại trừ, số đo thời gian mở; quyết định tiếp tục hoặc điều chỉnh thiết kế |
 | P2a | `shellx-term` nối agent trên macOS: §5, §6 phía term, test §11.1 (**xong**, ledger `terminal-sharing.md`) | P1 | `cargo test --features test-hooks` xanh trên macOS |
-| P2b | `shellx-term` trên Windows (§5.3) + workflow `windows-check.yml` | P2a | `cargo test` xanh trên `windows-latest` |
+| P2b | `shellx-term` trên Windows (§5.3) + workflow `windows-check.yml` (code xong, chờ CI Windows) | P2a | `cargo test` xanh trên `windows-latest` |
 | P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §8, test §11.2, e2e §11.4 | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
 | P4 | Desktop: bật/tắt, bộ sửa file cấu hình, chính sách PowerShell, cập nhật/gỡ, menu và thông báo (§7.6, §10), tích hợp build và ký (§4, §10.7), test §11.3 | P3 | Bật trên macOS từ menu, mở cửa sổ mới thấy trên điện thoại giả lập |
 | P5 | Mobile: §9, cập nhật file thiết kế giao diện, test §11.5 | P3 (chạy song song với P4 được) | Pixel 3 xem và gõ vào terminal Terminal.app qua `relay.shellx.pro`; danh sách §11.6 phần macOS |

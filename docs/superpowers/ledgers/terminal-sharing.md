@@ -3,6 +3,7 @@
 Spec: `docs/superpowers/specs/2026-10-01-desktop-terminal-sharing-design.md`
 Plan P1: `docs/superpowers/plans/2026-10-01-terminal-sharing-p1-shellx-term-spike.md`
 Plan P2a: `docs/superpowers/plans/2026-10-01-terminal-sharing-p2a-agent-link.md`
+Plan P2b: `docs/superpowers/plans/2026-10-01-terminal-sharing-p2b-windows.md`
 
 ## P1 — bản thử shellx-term trên macOS (2026-10-01)
 
@@ -169,3 +170,59 @@ Từ review từng task. **Các mục đã gạch ở dưới được sửa tro
 - **Panic trong `WrapEvents::input` hoặc `MasterResizer` làm khóa writer/master bị "poison".** Khi đó luồng cửa sổ lặng lẽ thôi nhận phím và đổi kích thước. Chỉ xảy ra nếu chính portable-pty panic khi ghi hoặc đổi kích thước, nên rất hiếm. Cách sửa: khóa tự phục hồi (`unwrap_or_else(|e| e.into_inner())`). — **đã sửa ở P2b Task 1.**
 - **Luồng đọc của liên kết panic thì bỏ qua bước `shutdown` (M4).** Hệ quả: output vẫn chạy nhưng input từ điện thoại mất lặng lẽ cho tới hết phiên. Cách sửa: một drop guard tự gọi `shutdown`. — **đã sửa ở P2b Task 1.**
 - Lặt vặt: một câu "test finish treo" trong mục **Test** ở trên đã lỗi thời (M5 đã thêm test này); chú thích của test M5 trong `tests/link.rs` bị thụt lề lạ. — **đã sửa ở P2b Task 1.**
+
+## P2b — `shellx-term` trên Windows (2026-10-01)
+
+Nhánh `feat/terminal-sharing-p2b`. Cổng Windows của `shellx-term` (spec §5.3) và workflow `windows-check`. Chưa chạy trên máy Windows thật.
+
+**Test (macOS):** `cd term && cargo test --features test-hooks`: **157 chạy xanh, 2 `#[ignore]`**. `cargo fmt --check` và `cargo clippy --all-targets --features test-hooks -- -D warnings` sạch. Test Windows (`term/tests/windows.rs`) và mã `cfg(windows)` chưa biên dịch được trên macOS. **CI Windows: chờ Task 8 (lần chạy CI Windows đầu tiên).**
+
+### Commit trong nhánh
+
+- `996ccdf` SIGTERM trả về trạng thái ban đầu trước shell dự phòng; khóa chống poison; luồng đọc link tắt phiên cả khi panic.
+- `803ea17` lõi phiên dùng chung; đường dẫn endpoint và tên ứng dụng theo nền tảng; test và harness sẵn cho Windows.
+- `15b08cc` bộ mã hóa thuần UTF-16 (phím) và UTF-8 (luồng) cho console Windows.
+- `c0bd03b` lớp console Windows: chế độ VT thô, kích thước, phím, đổi cỡ, output UTF-16, close handler.
+- `e1337d1` wrapper Windows: shell ConPTY, relay console, đường nối agent, thoát 222 khi không bọc được.
+- `8a67f9d` khối tích hợp PowerShell; test tích hợp Windows; kiểm tra văn bản khối trên mọi nền tảng.
+- `7ae6b3b` test Windows chờ đường nối agent và ping trước khi gõ; khối chạy tiếp sau khi sập hoặc lỗi trình nạp.
+- `b01d1a0` cửa sổ test Windows giữ lịch sử PSReadLine trong thư mục tạm của chính nó.
+- Commit của Task 7: workflow `windows-check`, spec, ledger, HANDOFF.
+
+### Khối PowerShell (`term/shell/block.ps1`)
+
+- Danh sách cho phép đối số: `-NoLogo`, `-NoProfile`, `-NoProfileLoadTime`, `-NoExit`, `-Login`, `-l` (không phân biệt hoa thường); đối số khác thì không bọc. Thay cho danh sách cấm ở bản spec đầu.
+- Điều kiện `Get-History -Count 1`: `. $PROFILE` gõ tay sau đó không bọc.
+- `$global:LASTEXITCODE = 222` đặt trước lệnh gọi, `catch` rỗng. Thoát bằng `[Environment]::Exit($LASTEXITCODE)` chỉ khi mã khác 222 **và** không âm; mã âm (sập, thiếu `VCRUNTIME140.dll`) coi như 222. Sau đó `Remove-Variable LASTEXITCODE`.
+
+### `shellx-term` trên Windows
+
+- Chế độ console: stdin tắt PROCESSED/LINE/ECHO/MOUSE, bật VIRTUAL_TERMINAL_INPUT và WINDOW_INPUT; stdout bật PROCESSED_OUTPUT, VIRTUAL_TERMINAL_PROCESSING, DISABLE_NEWLINE_AUTO_RETURN.
+- Input qua `ReadConsoleInputW`, ghép surrogate giữa các sự kiện; nhả phím Alt mang ký tự tính là một lần gõ (Alt+số).
+- Output qua `WriteConsoleW` (UTF-16), xử lý UTF-8 bị cắt giữa hai lần đọc.
+- Kích thước: `WINDOW_BUFFER_SIZE_EVENT` **và** kiểm mỗi 250 ms (conhost cổ điển chỉ báo đổi buffer).
+- Close handler khôi phục console; mất console giết shell bên trong; panic ngoài luồng link khôi phục console và thoát 222.
+- Thoát: bước xả output chờ đủ 500 ms (ống ConPTY chỉ đóng cùng pseudoconsole).
+- Dấu shell bên trong `SHELLX_TERM=conpty:<pid>`; endpoint `%LOCALAPPDATA%\ShellX\term\endpoint`.
+
+### Giới hạn đã biết
+
+- Không có kiểm tra theo tty trên Windows: ứng dụng terminal mở từ cửa sổ đã bọc không bọc terminal của chính nó.
+- Shell bên trong thoát với 222 hoặc mã âm thì rơi về shell ngoài.
+- Tích hợp PowerShell của VS Code (`-NoExit -Command …`) không được bọc.
+- Ctrl+Space / Ctrl+@ (NUL) chưa tới shell bên trong, nên `MenuComplete` của PSReadLine không dùng được.
+- Mỗi lần thoát trên Windows chậm thêm khoảng 0,5 s.
+- **Việc cho P4:** dựng `shellx-term.exe` với `+crt-static` để không phụ thuộc VCRUNTIME.
+
+### Workflow `windows-check`
+
+`.github/workflows/windows-check.yml`: `workflow_dispatch` và push lên `windows-check/**`; chạy `cargo fmt --check`, `clippy` và `test` (`--locked`) trên `windows-latest` và `macos-latest`. Bước đầu đặt `core.autocrlf=false` vì runner Windows mặc định là `true`. Phạm vi chỉ `term/`; P3/P4 thêm `dart test` và `flutter build windows`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
+
+### Kiểm tay Windows còn thiếu
+
+- Windows Terminal thật (không chỉ conhost).
+- Bộ gõ (IME): Telex/VNI qua Unikey hoặc IME của Windows.
+- Đóng tab khi lệnh đang chạy.
+- Mã hóa profile của PowerShell 5.1 (khối chỉ ASCII; kiểm profile có tiếng Việt và không BOM).
+- Ctrl+Space (xem giới hạn).
+- Đổi cỡ cửa sổ conhost cổ điển (đặc biệt chiều cao khi scrollback dài).

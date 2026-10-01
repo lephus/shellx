@@ -1,0 +1,39 @@
+# Runs the shellx-term suite on real Windows (and macOS for parity).
+# Never on ordinary pushes: only by hand, or by pushing a branch named
+# windows-check/** (workflow_dispatch needs this file on the default branch).
+name: windows-check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['windows-check/**']
+
+permissions:
+  contents: read
+
+jobs:
+  term:
+    name: shellx-term (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: term
+    steps:
+      # GitHub's Windows runners default to core.autocrlf=true; the tests compare exact LF text.
+      - name: Keep LF line endings
+        working-directory: ${{ github.workspace }}
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup component add clippy rustfmt
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --features test-hooks -- -D warnings
+      - name: Test
+        run: cargo test --locked --features test-hooks -- --test-threads=4
