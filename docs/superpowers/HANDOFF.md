@@ -39,6 +39,9 @@ Việc còn lại — tất cả cần người dùng quyết/cung cấp:
 ## 4. Việc chờ người dùng (không chặn code)
 
 - **VPS** (runbook `deploy/README.md`): quốc gia đặt VPS đã điền là Việt Nam (2026-09-27; bộ chặn `[quốc gia]` vẫn giữ cho lần sửa sau); user deploy trong nhóm `docker`, `~/phu/shellx/data` thuộc uid 1000; tên network của nginx-proxy vào `~/phu/shellx/.env`; 4 secret `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` và biến `VPS_APP_DIR` (mặc định `phu/shellx`), `VPS_SSH_PORT` (tuỳ chọn, chỉ số, mặc định `22`) — tất cả là Environment secret/variable của hai GitHub Environment `production` (dùng bởi `deploy.yml`) và `release` (dùng bởi `publish`), không phải repository secret; sau lần deploy đầu: công khai 2 package GHCR `shellx-relay`, `shellx-web` và chép (không symlink) 4 file `~/phu/shellx/nginx-proxy/*` vào `vhost.d` của nginx-proxy rồi tạo lại container ShellX — **tất cả đã xong 2026-09-28**: deploy đầu tiên (b157539) live, relay/web healthy, cert đã cấp, 4 check của README bước 6 pass. Lưu ý VPS này: container nginx-proxy tên `proxy`, network tên `nginx-proxy`, vhost.d nằm ở volume `nginx_nginx_vhosts`. Mọi lệnh trên VPS do người dùng chạy hoặc cho phép rõ ràng.
+- **Chia sẻ terminal (P1) — R2:** Terminal.app không còn hỏi "terminate running processes?" khi đóng cửa sổ đang chạy lệnh (lệnh chạy trên PTY bên trong, Terminal chỉ xét tiến trình trên tty của cửa sổ). Người dùng chọn: (a) chấp nhận và ghi rõ khi bật tính năng; (b) đề nghị đặt "Ask before closing: Always"; (c) cả hai. Xem §9.
+- **Chia sẻ terminal (P1) — kiểm tay còn thiếu:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện thật của Cursor và Android Studio, iTerm2, VS Code, Warp, và một lần kiểm ngắn trên cửa sổ Terminal.app thật với khối cuối cùng (cần người dùng đồng ý chèn khối vào `~/.zshrc`).
+- **Chia sẻ terminal — Windows:** kiểm tra tương tác trên máy Windows thật chưa làm (spec §12).
 - **Dọn Cloudflare** (khi nameserver đã về nhà đăng ký): xóa zone `shellx.pro` trên Cloudflare, `npx wrangler logout`, xóa secret `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 - **GitHub Environment `release`** (tag `desktop-v*` + nhánh `main`) với 11 secret ký — xem `release/README.md`.
 - **Pháp lý**: tên pháp nhân/địa chỉ cho privacy/terms; nhờ người có chuyên môn xem lại (hiện ghi "ShellX", luật Việt Nam, 16 tuổi, log ≤ 30 ngày).
@@ -79,3 +82,27 @@ Người dùng: "Mobile bạn hãy lấy /Users/lehuuphu/Documents/workspace/Dig
 - V1–V7 (2026-09-26): bỏ Cloudflare; relay, trang web và nơi tải bản cài chạy trên VPS của người dùng (Ubuntu, Docker, `jwilder/nginx-proxy` + letsencrypt-companion); relay chuyển sang Node.js giữ nguyên giao thức; không CI, chỉ CD (`deploy.yml` khi push `main`, `release-desktop.yml` khi tag `desktop-v*`); build image relay chạy toàn bộ test relay.
 - V8 (2026-09-27): mọi thứ của ShellX trên VPS nằm trong **một thư mục `~/phu/shellx`** (biến GitHub `VPS_APP_DIR`), kể cả database (`./data`, bind mount). Ngoại lệ duy nhất: các file vhost của nginx-proxy trong `vhost.d` (bản gốc ở `~/phu/shellx/nginx-proxy/`, chép — không symlink — vào đó).
 - Việc còn mở: tên network của nginx-proxy. (Quốc gia đặt VPS: Việt Nam, đã điền 2026-09-27.)
+
+## 9. Chia sẻ terminal máy tính (2026-10-01)
+
+Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn trên máy tính (mọi ứng dụng terminal, macOS và Windows).
+- Spec: `specs/2026-10-01-desktop-terminal-sharing-design.md`.
+- Kế hoạch P1: `plans/2026-10-01-terminal-sharing-p1-shellx-term-spike.md`.
+- Kết quả và phát quyết: `ledgers/terminal-sharing.md`.
+
+- **P1 xong:** crate Rust `term/` (`shellx-term wrap`) cho macOS, cùng khối tích hợp zsh/bash (`term/shell/`).
+  - Test: 64 test trong 7 bộ (sau lượt sửa review cuối).
+  - Đo khởi động: +13,2 ms, cộng khoảng 2,4 ms cho bước kiểm tra `--version`.
+  - Đã kiểm trên Terminal.app thật nhưng bằng **khối đầu tiên** (shell bên trong `--login`, chưa có kiểm tra `--version`, chưa có xử lý `ZDOTDIR`). Khối cuối cùng mới chỉ chạy trong test PTY và giả lập; một lần kiểm ngắn trên cửa sổ thật với khối cuối cùng đang chờ (cần người dùng đồng ý). Cursor và Android Studio kiểm bằng giả lập. Kết quả R1–R3 nằm ở spec §13.
+- **Chờ người dùng quyết trước P2:** cách xử lý việc Terminal.app không còn hỏi "terminate running processes?" khi đóng cửa sổ đang chạy lệnh:
+  - (a) chấp nhận và ghi rõ;
+  - (b) đề nghị đặt "Ask before closing: Always";
+  - (c) cả hai.
+- **Còn lại:**
+  - P2: `shellx-term` đầy đủ, nối agent, Windows.
+  - P3: agent và giao thức.
+  - P4: phần desktop (bật/tắt, bộ cài, ký).
+  - P5: mobile.
+  - Thứ tự ở spec §14.
+- **Kiểm tay còn thiếu** (thêm vào danh sách spec §11.6): gõ bằng bộ gõ tiếng Việt (IME), Cmd+W, giao diện thật của Cursor và Android Studio, iTerm2, VS Code, Warp.
+- **Windows:** kiểm tra tương tác trên máy Windows thật là việc chờ (spec §12). Trước khi kiểm xong, công tắc chỉ hiện khi đặt `SHELLX_EXPERIMENTAL=terminal-sharing`.
