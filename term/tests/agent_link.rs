@@ -1,4 +1,4 @@
-#![cfg(feature = "test-hooks")]
+#![cfg(all(unix, feature = "test-hooks"))]
 
 mod common;
 

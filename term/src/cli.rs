@@ -111,6 +111,16 @@ fn parse_wrap(mut args: impl Iterator<Item = OsString>) -> Command {
 mod tests {
     use super::*;
 
+    /// Absolute paths on the platform running the tests.
+    #[cfg(unix)]
+    const ZSH: &str = "/bin/zsh";
+    #[cfg(unix)]
+    const BASH: &str = "/bin/bash";
+    #[cfg(windows)]
+    const ZSH: &str = r"C:\shells\zsh.exe";
+    #[cfg(windows)]
+    const BASH: &str = r"C:\shells\bash.exe";
+
     fn parse_strs(args: &[&str]) -> Command {
         parse(args.iter().map(OsString::from))
     }
@@ -147,19 +157,13 @@ mod tests {
         assert_eq!(
             parse_with_env(
                 Vec::<OsString>::new(),
-                env_of(&[
-                    ("SHELLX_TERM_WRAP", "/bin/bash"),
-                    ("SHELLX_TERM_WRAP_LOGIN", "1")
-                ])
+                env_of(&[("SHELLX_TERM_WRAP", BASH), ("SHELLX_TERM_WRAP_LOGIN", "1")])
             ),
-            from_block(wrap(true, "/bin/bash", &[]))
+            from_block(wrap(true, BASH, &[]))
         );
         assert_eq!(
-            parse_with_env(
-                Vec::<OsString>::new(),
-                env_of(&[("SHELLX_TERM_WRAP", "/bin/zsh")])
-            ),
-            from_block(wrap(false, "/bin/zsh", &[]))
+            parse_with_env(Vec::<OsString>::new(), env_of(&[("SHELLX_TERM_WRAP", ZSH)])),
+            from_block(wrap(false, ZSH, &[]))
         );
     }
 
@@ -168,10 +172,10 @@ mod tests {
         // Even with the block's variable set, arguments mean an explicit call.
         assert_eq!(
             parse_with_env(
-                ["wrap", "--", "/bin/zsh"].map(OsString::from),
-                env_of(&[("SHELLX_TERM_WRAP", "/bin/bash")])
+                ["wrap", "--", ZSH].map(OsString::from),
+                env_of(&[("SHELLX_TERM_WRAP", BASH)])
             ),
-            wrap(false, "/bin/zsh", &[])
+            wrap(false, ZSH, &[])
         );
     }
 
@@ -196,6 +200,7 @@ mod tests {
         assert_eq!(parse_strs(&["probe", "x"]), Command::Invalid);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_parent_executable_is_this_test_runner_s_parent() {
         let parent = parent_executable().expect("parent path");
@@ -204,17 +209,14 @@ mod tests {
 
     #[test]
     fn wrap_with_a_shell() {
-        assert_eq!(
-            parse_strs(&["wrap", "--", "/bin/zsh"]),
-            wrap(false, "/bin/zsh", &[])
-        );
+        assert_eq!(parse_strs(&["wrap", "--", ZSH]), wrap(false, ZSH, &[]));
     }
 
     #[test]
     fn wrap_login_with_shell_arguments() {
         assert_eq!(
-            parse_strs(&["wrap", "--login", "--", "/bin/bash", "-x"]),
-            wrap(true, "/bin/bash", &["-x"])
+            parse_strs(&["wrap", "--login", "--", BASH, "-x"]),
+            wrap(true, BASH, &["-x"])
         );
     }
 
@@ -233,11 +235,11 @@ mod tests {
         for args in [
             &["bogus"][..],
             &["wrap"][..],
-            &["wrap", "/bin/zsh"][..],
+            &["wrap", ZSH][..],
             &["wrap", "--"][..],
             &["wrap", "--", "zsh"][..],
-            &["wrap", "--nope", "--", "/bin/zsh"][..],
-            &["wrap", "--login", "--login", "--", "/bin/zsh"][..],
+            &["wrap", "--nope", "--", ZSH][..],
+            &["wrap", "--login", "--login", "--", ZSH][..],
         ] {
             assert_eq!(parse_strs(args), Command::Invalid, "{args:?}");
         }

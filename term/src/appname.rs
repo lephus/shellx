@@ -1,7 +1,7 @@
 //! Which terminal app hosts this window, for the phone's session list
 //! (spec §6.3 `app`). macOS hands every app's processes its bundle id in
-//! `__CFBundleIdentifier`; `TERM_PROGRAM` and JetBrains' variable are
-//! fallbacks.
+//! `__CFBundleIdentifier`; Windows Terminal sets `WT_SESSION`. `TERM_PROGRAM`
+//! and JetBrains' variable are fallbacks.
 
 const BY_BUNDLE: &[(&str, &str)] = &[
     ("com.apple.Terminal", "Terminal"),
@@ -46,6 +46,9 @@ fn lookup(get: impl Fn(&str) -> Option<String>) -> String {
         if let Some((_, name)) = BY_BUNDLE.iter().find(|(bundle, _)| *bundle == id) {
             return name.to_string();
         }
+    }
+    if get("WT_SESSION").is_some_and(|v| !v.is_empty()) {
+        return "Windows Terminal".to_string();
     }
     if let Some(program) = get("TERM_PROGRAM").filter(|p| !p.is_empty()) {
         return BY_TERM_PROGRAM
@@ -111,5 +114,18 @@ mod tests {
             "JetBrains"
         );
         assert_eq!(app(&[]), "");
+    }
+
+    #[test]
+    fn windows_terminal_is_recognised_by_its_session_variable() {
+        assert_eq!(
+            app(&[("WT_SESSION", "8e5e2f1c-0000-0000-0000-000000000000")]),
+            "Windows Terminal"
+        );
+        assert_eq!(
+            app(&[("WT_SESSION", "x"), ("TERM_PROGRAM", "vscode")]),
+            "Windows Terminal"
+        );
+        assert_eq!(app(&[("WT_SESSION", "")]), "");
     }
 }
