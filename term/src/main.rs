@@ -2,15 +2,8 @@
 //! terminal with a paired phone.
 //! Spec: docs/superpowers/specs/2026-10-01-desktop-terminal-sharing-design.md
 
-mod cli;
 #[cfg(unix)]
-mod fallback;
-#[cfg(unix)]
-mod faults;
-#[cfg(unix)]
-mod tty;
-#[cfg(unix)]
-mod wrap;
+use shellx_term::{cli, fallback, tty, wrap};
 
 #[cfg(unix)]
 fn main() {
