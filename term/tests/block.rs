@@ -16,7 +16,7 @@ fn home(name: &str) -> PathBuf {
     let bin = home.join("Library/Application Support/ShellX/bin");
     std::fs::create_dir_all(&bin).unwrap();
     let fake = bin.join("shellx-term");
-    std::fs::write(&fake, "#!/bin/sh\nprintf 'WRAPPED'\nfor a in \"$@\"; do printf ' [%s]' \"$a\"; done\nprintf '\\n'\nexit 0\n").unwrap();
+    std::fs::write(&fake, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/calls.log\"\n[ \"$1\" = --version ] && exit 0\nprintf 'WRAPPED'\nfor a in \"$@\"; do printf ' [%s]' \"$a\"; done\nprintf '\\n'\nprintf 'ZDOTDIR=[%s]\\n' \"${ZDOTDIR-unset}\"\nexit 0\n").unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
     std::fs::write(
         home.join(".zshrc"),
@@ -98,12 +98,8 @@ fn zsh_interactive_is_wrapped() {
 }
 
 #[test]
-fn zsh_login_is_wrapped_as_login() {
-    assert_wrapped(
-        "/bin/zsh",
-        &["-il"],
-        "WRAPPED [wrap] [--login] [--] [/bin/zsh]",
-    );
+fn zsh_login_is_wrapped_as_non_login() {
+    assert_wrapped("/bin/zsh", &["-il"], "WRAPPED [wrap] [--] [/bin/zsh]");
 }
 
 #[test]
@@ -193,4 +189,185 @@ fn with_the_real_binary_the_rest_of_the_file_runs_once_inside() {
     assert_eq!(h.text().matches("AFTER-BLOCK").count(), 1, "{:?}", h.text());
     h.send("exit 3\r");
     assert_eq!(h.wait_exit(T), 3);
+}
+
+/// Runs `/bin/zsh -i` in a fake HOME; `setup` may add files and returns the
+/// extra environment. Returns the window text after the shell exited or
+/// the block fell through (AFTER-BLOCK).
+fn zsh_with(tag: &str, env_of: impl FnOnce(&Path) -> Vec<(String, String)>) -> (PathBuf, Harness) {
+    let home = home(tag);
+    let extra = env_of(&home);
+    let extra: Vec<(&str, &str)> = extra
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
+    let h = run_shell("/bin/zsh", &["-i"], &home, &extra);
+    (home, h)
+}
+
+fn finish_wrapped(h: &mut Harness) -> String {
+    assert_eq!(h.wait_exit(T), 0);
+    assert!(!h.text().contains("AFTER-BLOCK"), "{:?}", h.text());
+    h.text()
+}
+
+#[test]
+fn no_injector_leaves_zdotdir_as_passed() {
+    let (home, mut h) = zsh_with("zd-none", |_| vec![]);
+    let text = finish_wrapped(&mut h);
+    let line = format!("ZDOTDIR=[{}]", home.display());
+    assert!(text.contains(&line), "{text:?}");
+}
+
+#[test]
+fn vscode_style_injection_repoints_zdotdir() {
+    let inj = common::temp_dir("zd-vscode-inj");
+    std::fs::write(
+        inj.join(".zshrc"),
+        "VSCODE_ZDOTDIR=$ZDOTDIR; ZDOTDIR=$USER_ZDOTDIR; . $USER_ZDOTDIR/.zshrc\n",
+    )
+    .unwrap();
+    let inj_s = inj.to_str().unwrap().to_string();
+    let (_home, mut h) = zsh_with("zd-vscode", |home| {
+        vec![
+            ("ZDOTDIR".into(), inj_s.clone()),
+            ("USER_ZDOTDIR".into(), home.to_str().unwrap().into()),
+        ]
+    });
+    let text = finish_wrapped(&mut h);
+    assert!(text.contains("WRAPPED [wrap] [--] [/bin/zsh]"), "{text:?}");
+    assert!(text.contains(&format!("ZDOTDIR=[{inj_s}]")), "{text:?}");
+}
+
+#[test]
+fn jetbrains_style_injection_repoints_zdotdir() {
+    let inj = common::temp_dir("zd-jb-inj");
+    std::fs::write(
+        inj.join(".zshenv"),
+        "_INTELLIJ_ZDOTDIR=$ZDOTDIR; unset ZDOTDIR\n",
+    )
+    .unwrap();
+    let inj_s = inj.to_str().unwrap().to_string();
+    // Without ZDOTDIR the user's files are found through HOME.
+    let home = home("zd-jb");
+    let mut h = Harness::spawn(
+        "/bin/zsh",
+        &["-i"],
+        &[
+            ("HOME", home.to_str().unwrap()),
+            ("ZDOTDIR", &inj_s),
+            ("SHELL", "/bin/zsh"),
+        ],
+        80,
+        24,
+    );
+    let text = finish_wrapped(&mut h);
+    assert!(text.contains("WRAPPED [wrap] [--] [/bin/zsh]"), "{text:?}");
+    assert!(text.contains(&format!("ZDOTDIR=[{inj_s}]")), "{text:?}");
+}
+
+/// An "installed" shellx-term the kernel cannot run (NULs, mode 0755).
+fn break_binary(home: &Path) {
+    let bin = home.join("Library/Application Support/ShellX/bin/shellx-term");
+    std::fs::write(&bin, [0u8; 64]).unwrap();
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+#[test]
+fn an_unrunnable_binary_leaves_the_shell_and_its_variables_alone() {
+    let inj = common::temp_dir("broken-inj");
+    std::fs::write(
+        inj.join(".zshrc"),
+        "VSCODE_ZDOTDIR=$ZDOTDIR; ZDOTDIR=$USER_ZDOTDIR; . $USER_ZDOTDIR/.zshrc\n",
+    )
+    .unwrap();
+    let inj_s = inj.to_str().unwrap().to_string();
+    // (program, extra env, shell-specific probe of leftover helper variables)
+    for (program, with_injector) in [
+        ("/bin/zsh", false),
+        ("/bin/zsh", true),
+        ("/bin/bash", false),
+    ] {
+        let tag = format!(
+            "broken-{}-{with_injector}",
+            program.rsplit('/').next().unwrap()
+        );
+        let home = home(&tag);
+        break_binary(&home);
+        let home_s = home.to_str().unwrap().to_string();
+        let mut extra: Vec<(&str, &str)> = vec![];
+        if with_injector {
+            extra.push(("ZDOTDIR", &inj_s));
+            extra.push(("USER_ZDOTDIR", &home_s));
+        }
+        let mut h = run_shell(program, &["-i"], &home, &extra);
+        h.expect("AFTER-BLOCK", T);
+        let probe = if program == "/bin/zsh" {
+            "print -r -- \"zd=[${ZDOTDIR-unset}] n=[${(k)parameters[(I)__shellx_*]}] end\""
+        } else {
+            "echo zd=[${ZDOTDIR-unset}] n=[$(set | grep -c __shellx_)] end"
+        };
+        h.send(&format!("{probe}\r"));
+        h.expect(&format!("zd=[{home_s}]"), T);
+        h.settle(Duration::from_millis(300));
+        let text = h.text();
+        h.send("exit\r");
+        h.wait_exit(T);
+        assert!(!text.contains("WRAPPED"), "{tag}: {text:?}");
+        let n = if program == "/bin/zsh" { "" } else { "0" };
+        let want = format!("zd=[{home_s}] n=[{n}] end");
+        assert!(text.contains(&want), "{tag}: {text:?}");
+    }
+}
+
+#[test]
+fn the_binary_is_probed_with_version_before_wrapping() {
+    let home = home("probe-order");
+    let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
+    assert_eq!(h.wait_exit(T), 0);
+    let log =
+        std::fs::read_to_string(home.join("Library/Application Support/ShellX/bin/calls.log"))
+            .unwrap();
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines, ["--version", "wrap -- /bin/zsh"], "{log:?}");
+}
+
+#[test]
+fn a_directory_at_the_installed_path_is_not_exec_d() {
+    for (program, tag) in [("/bin/zsh", "dir-zsh"), ("/bin/bash", "dir-bash")] {
+        let home = home(tag);
+        let bin = home.join("Library/Application Support/ShellX/bin/shellx-term");
+        std::fs::remove_file(&bin).unwrap();
+        std::fs::create_dir(&bin).unwrap();
+        let mut h = run_shell(program, &["-i"], &home, &[]);
+        h.expect("AFTER-BLOCK", T);
+        h.send("exit\r");
+        h.wait_exit(T);
+        assert!(!h.text().contains("WRAPPED"), "{tag}: {:?}", h.text());
+    }
+}
+
+#[test]
+fn ide_exclusions_for_bash_and_zsh() {
+    assert_not_wrapped(
+        "/bin/bash",
+        &["-i"],
+        &[("TERM_PROGRAM", "vscode")],
+        "bash-vscode",
+    );
+    assert_not_wrapped(
+        "/bin/bash",
+        &["-i"],
+        &[("TERMINAL_EMULATOR", "JetBrains-JediTerm")],
+        "bash-jetbrains",
+    );
+    // zsh is handled through ZDOTDIR, not excluded.
+    assert_wrapped_with("/bin/zsh", &[("TERM_PROGRAM", "vscode")], "zsh-vscode");
+}
+
+fn assert_wrapped_with(program: &str, extra: &[(&str, &str)], tag: &str) {
+    let home = home(tag);
+    let mut h = run_shell(program, &["-i"], &home, extra);
+    h.expect("WRAPPED [wrap] [--] [/bin/zsh]", T);
+    assert_eq!(h.wait_exit(T), 0);
 }

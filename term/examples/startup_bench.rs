@@ -29,29 +29,26 @@ fn main() {
         BLOCK.contains(INSTALLED),
         "block.zsh no longer contains the installed path"
     );
-    let wrapped = BLOCK.replace(INSTALLED, bin.to_str().unwrap());
-    assert!(
-        wrapped.contains("wrap --login --"),
-        "block.zsh has no login branch to measure"
+    let shipped = BLOCK.replace(INSTALLED, bin.to_str().unwrap());
+    // The shipped block starts a non-login inner shell; build the login variant
+    // by adding --login to the exec line.
+    let login = shipped.replace(
+        "wrap -- \"$__shellx_shell\"",
+        "wrap --login -- \"$__shellx_shell\"",
     );
-    let nologin = wrapped.replace("wrap --login --", "wrap --");
     assert_ne!(
-        nologin, wrapped,
-        "the non-login variant must differ from the login one"
+        login, shipped,
+        "block.zsh has no exec line to turn into the login variant"
     );
     let variants = [
         ("baseline", setup(&root.join("baseline"), &home, "")),
         (
-            "wrapped, login inner",
-            setup(&root.join("login"), &home, &wrapped),
+            "wrapped (shipped block, non-login inner)",
+            setup(&root.join("nologin"), &home, &shipped),
         ),
         (
-            "wrapped, non-login inner",
-            setup(
-                &root.join("nologin"),
-                &home,
-                &wrapped.replace("wrap --login --", "wrap --"),
-            ),
+            "wrapped, login inner",
+            setup(&root.join("login"), &home, &login),
         ),
     ];
 
@@ -68,7 +65,7 @@ fn main() {
     for (i, (name, _)) in variants.iter().enumerate() {
         let m = median(&samples[i]);
         println!(
-            "{name:<26} median {m:7.1} ms   p90 {:7.1} ms   overhead {:+7.1} ms",
+            "{name:<42} median {m:7.1} ms   p90 {:7.1} ms   overhead {:+7.1} ms",
             percentile(&samples[i], 0.9),
             m - baseline
         );
