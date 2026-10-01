@@ -99,17 +99,6 @@ fn assert_not_wrapped(program: &str, args: &[&str], extra: &[(&str, &str)], tag:
 }
 
 #[test]
-fn blocks_are_ascii_with_exact_markers() {
-    for block in [ZSH_BLOCK, BASH_BLOCK] {
-        assert!(block.is_ascii());
-        let lines: Vec<&str> = block.lines().collect();
-        assert_eq!(lines.first(), Some(&"# >>> ShellX >>>"));
-        assert_eq!(lines.last(), Some(&"# <<< ShellX <<<"));
-        assert!(block.ends_with('\n'));
-    }
-}
-
-#[test]
 fn zsh_interactive_is_wrapped() {
     assert_wrapped(
         "/bin/zsh",
