@@ -11,3 +11,16 @@ pub fn hit(point: &str) -> bool {
 pub fn hit(_point: &str) -> bool {
     false
 }
+
+/// Short link timers for integration tests (`SHELLX_TERM_TIMING=fast`).
+/// Short link timers for integration tests (`SHELLX_TERM_TIMING=fast`).
+#[cfg(feature = "test-hooks")]
+pub fn fast_timing() -> bool {
+    std::env::var("SHELLX_TERM_TIMING").is_ok_and(|v| v == "fast")
+}
+
+#[cfg(not(feature = "test-hooks"))]
+#[inline(always)]
+pub fn fast_timing() -> bool {
+    false
+}

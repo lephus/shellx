@@ -8,6 +8,8 @@ pub mod cli;
 pub mod fallback;
 #[cfg(unix)]
 pub mod faults;
+#[cfg(unix)]
+pub mod link;
 pub mod outbox;
 pub mod proto;
 pub mod ring;
