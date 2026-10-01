@@ -11,6 +11,7 @@ pub mod faults;
 pub mod outbox;
 pub mod proto;
 pub mod ring;
+pub mod size;
 #[cfg(unix)]
 pub mod tty;
 #[cfg(unix)]
