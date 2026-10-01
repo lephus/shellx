@@ -475,6 +475,20 @@ Bước đầu tiên của kế hoạch triển khai là một **bản thử `sh
 | R1 | **Shell integration của ứng dụng terminal** bị hỏng khi shell chạy lại bên trong `shellx-term`: VS Code/Cursor chèn integration cho zsh qua `ZDOTDIR`; iTerm2 shell integration; Warp tự khởi tạo shell theo cách riêng | Kiểm trong bản thử. Không sửa được thì đưa vào danh sách loại trừ theo `TERM_PROGRAM` |
 | R2 | **Tên tiến trình trên tiêu đề và hỏi xác nhận khi đóng:** Terminal.app và iTerm2 xem tiến trình đang chạy trên TTY của cửa sổ, nay là `shellx-term`. Có thể tiêu đề hiện "shellx-term" và mỗi lần đóng cửa sổ đều bị hỏi "terminate running processes?" | Kiểm trong bản thử (`exec` giữ nguyên PID của login shell có thể giúp). Nếu bị hỏi: khi bật tính năng, đề nghị người dùng thêm `shellx-term` vào danh sách tiến trình bỏ qua của Terminal.app/iTerm2 (chỉ khi người dùng đồng ý), hoặc tìm cách khác trước khi làm tiếp |
 | R3 | **Thời gian mở cửa sổ** vượt 50 ms | Đo trong bản thử; tối ưu khối tích hợp (không gọi tiến trình con) |
+
+**Kết quả P1 (2026-10-01; chi tiết và số đo trong `docs/superpowers/ledgers/terminal-sharing.md`):**
+
+- **R1 — đã xử lý.**
+  - Cursor/VS Code và Android Studio mất integration khi bị bọc (giả lập bằng chính script của hai IDE).
+  - Cách sửa: khối zsh trỏ `ZDOTDIR` về `$VSCODE_ZDOTDIR` hoặc `$_INTELLIJ_ZDOTDIR` trước khi `exec`; khối bash loại trừ hai IDE này (§5.2).
+  - Còn chờ người thử trên giao diện thật.
+- **R2 — một phần.**
+  - Bọc vẫn chạy đúng trên Terminal.app.
+  - Tiêu đề thành `shellx-term wrap -- … ▸ <lệnh>`. Hướng sửa ở P2: tham số qua biến môi trường và `argv[0]` giống shell gốc.
+  - **Mất cảnh báo "terminate running processes?" khi đóng cửa sổ đang chạy lệnh.** Đây là giới hạn của hướng A: Terminal chỉ xét tiến trình trên tty của cửa sổ. Cách xử lý chờ người dùng chọn.
+  - Không có chuyện hỏi thừa khi shell đang rảnh.
+- **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự. Bước kiểm tra `--version` thêm khoảng 2,4 ms.
+- **Phát hiện thêm:** zsh thoát khi `exec` thất bại, nên khối kiểm tra `shellx-term --version` trước khi `exec` (§5.2).
 | R4 | **ConPTY lồng nhau trên Windows:** input VT, IME tiếng Việt qua `ReadConsoleInputW`, Ctrl+C, sự kiện đổi kích thước, chương trình toàn màn hình | Test tự động trên `windows-latest` + kiểm tra tay (việc chờ); công tắc ẩn tới khi xong |
 | R5 | **Chi phí PowerShell đứng chờ** trên Windows (thời gian mở, RAM) | Đo khi kiểm tra Windows; ghi rõ trong cửa sổ xác nhận |
 | R6 | Khối tích hợp tương tác với cấu hình sẵn có của người dùng (oh-my-zsh, powerlevel10k instant prompt, file có `exec tmux`) | Khối đứng đầu file nên `exec` trước mọi thứ; shell bên trong chạy cấu hình của người dùng như một cửa sổ mới. Kiểm với oh-my-zsh + powerlevel10k |

@@ -38,3 +38,32 @@ Các kiểm tra trên Terminal.app được làm tự động: AppleScript `do s
 | Warp | chưa kiểm (chưa cài; đang loại trừ trước) | | | | | |
 
 Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W trên Terminal.app; giao diện thật của Cursor và Android Studio (dấu lệnh, phím tắt, mở lại Cursor từ Dock).
+
+## Quyết định sau P1 (2026-10-01)
+
+- **R1 — integration của IDE: sửa được, không cần loại trừ.**
+  - Cursor/VS Code chèn integration bằng `ZDOTDIR`; Android Studio/JetBrains cũng vậy. Khối `exec` trước khi IDE kịp cài hook, nên shell bên trong mất integration (giả lập bằng chính script của hai IDE đã xác nhận).
+  - Cách sửa: trước khi `exec`, khối zsh đặt `export ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR`). Shell bên trong khi đó chạy lại integration. Nếu `exec` thất bại, `ZDOTDIR` được trả về như cũ.
+  - Khối bash loại trừ `TERM_PROGRAM=vscode` và `TERMINAL_EMULATOR=JetBrains-JediTerm`, vì integration bash của hai IDE nạp qua `--init-file`, không chạy lại được.
+  - Còn phải người thử trên giao diện thật của Cursor và Android Studio.
+  - Warp vẫn loại trừ trước (chưa cài để kiểm).
+- **Kiểm tra trước khi `exec` (thêm trong P1).** zsh 5.9 thoát hẳn khi `exec` thất bại (đã kiểm: "exec format error" rồi shell thoát).
+  - Nếu không có bước này, một `shellx-term` hỏng hoặc sai kiến trúc CPU sẽ làm **mọi cửa sổ zsh mới đóng ngay khi mở**.
+  - Khối nay chạy `shellx-term --version` trước, khoảng 2,4 ms. Chỉ khi lệnh này thành công thì khối mới đổi `ZDOTDIR` và `exec`; nếu không, cửa sổ chạy như terminal thường.
+  - Chỉ còn một rủi ro rất nhỏ: file bị thay đổi đúng vào khoảng giữa bước kiểm tra và `exec`.
+- **Khoảng trống đã biết (JetBrains):** nếu người dùng tự đặt `ZDOTDIR` riêng và mở terminal trong IDE JetBrains, shell bên trong rơi về `$HOME`, vì `.zshenv` của IDE đã xoá `_INTELLIJ_ORIGINAL_ZDOTDIR`. Hiếm gặp; ghi cho P2.
+- **R2 — Terminal.app: chạy đúng, nhưng có hai khác biệt.**
+  1. **Tiêu đề cửa sổ** thành `shellx-term wrap -- /bin/zsh ▸ …` thay vì `-zsh`. Terminal lấy tên từ argv (thử `exec -a -zsh` thì tiêu đề thành `-zsh wrap -- /bin/zsh ▸ zsh`). Hướng sửa cho P2: truyền tham số qua biến môi trường và đặt `argv[0]` giống shell gốc, khi đó tiêu đề gần như y cũ.
+  2. **Mất cảnh báo khi đóng cửa sổ đang chạy lệnh.** Cửa sổ thường hỏi "Do you want to terminate running processes in this window?"; cửa sổ có `shellx-term` thì đóng luôn và lệnh bị dừng. Lý do: Terminal chỉ xét tiến trình trên tty của cửa sổ, còn lệnh chạy trên PTY bên trong. `shellx-term` không chặn được thao tác đóng (Terminal gửi SIGHUP). Đây là giới hạn của hướng A; iTerm2 nhiều khả năng cũng vậy (chưa kiểm).
+     - **Cần người dùng chọn:**
+       - (a) chấp nhận và ghi rõ trong cửa sổ xác nhận khi bật tính năng;
+       - (b) khi bật, đề nghị đổi Terminal.app → Settings → Profiles → Shell → "Ask before closing" thành **Always** (lúc nào cũng hỏi, kể cả khi shell rảnh);
+       - (c) cả hai.
+- **R3 — shell zsh bên trong chạy không phải login.**
+  - +13,2 ms so với +35,9 ms (ngưỡng 50 ms). PATH giống hệt cửa sổ thường; dạng login làm đổi thứ tự PATH.
+  - Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường (alias, hàm, option) trong `~/.zprofile` không áp dụng cho cửa sổ được bọc.
+  - bash giữ `--login`. Khối bash nằm đầu `.bash_profile` nên có thể bị cùng vấn đề đổi thứ tự PATH (chưa đo; bash hiếm trên macOS). Ghi cho P2.
+- **Cho P4:** file cấu hình có thể là symlink (dotfile manager), nên bộ cài thật phải ghi xuyên qua link như `dev-block.sh`. Phải từ chối sửa khi khối hỏng (chỉ có dấu mở, hoặc dấu sai thứ tự), và gỡ khối phải trả file về đúng từng byte (file không có xuống dòng cuối, CRLF).
+- **Khoảng trống đã biết:** `zsh -i script` và `bash -i script` vẫn bị bọc (script không chạy). Hiếm gặp; ghi trong spec §5.2.
+- **Đã kiểm bằng tự động:** Ctrl+C, Ctrl+Z, đổi cỡ, dán 200 dòng, UTF-8, mã thoát, vim/less/top. **Chưa có người thử:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện Cursor và Android Studio. Cả bốn thuộc danh sách §11.6 khi làm P5.
+- **Đề xuất: GO cho P2**, sau khi người dùng chọn cách xử lý R2.
