@@ -45,6 +45,10 @@ pub fn handshake(
     )?;
     let (nonce_agent, proof) = match recv(stream, deadline)? {
         AgentMsg::Challenge { nonce, mac } => (nonce, mac),
+        // This Reject arrives before the agent has proven the secret, so it is
+        // unauthenticated. Honoring it is safe: a squatter on the port can only
+        // delay sharing (holding the port already allows that) and never
+        // receives terminal bytes.
         AgentMsg::Reject { reason } => return Ok(HandshakeOutcome::Rejected(reason)),
         other => {
             return Err(HandshakeError::Protocol(format!(
