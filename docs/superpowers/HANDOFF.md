@@ -94,9 +94,14 @@ Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn 
   - Đo khởi động: +13,2 ms, cộng khoảng 2,4 ms cho bước kiểm tra `--version`.
   - Đã kiểm trên Terminal.app thật với cả khối đầu lẫn khối cuối. Với khối cuối: PATH giống hệt, `source` bằng tay không thay shell, file `shellx-term` hỏng thì cửa sổ vẫn mở bình thường. Cursor và Android Studio kiểm bằng giả lập. Kết quả R1–R3 nằm ở spec §13.
 - **Người dùng đã quyết (2026-10-01):** R2 chọn (a): chấp nhận việc Terminal.app không còn hỏi "terminate running processes?", và ghi rõ trong cửa sổ xác nhận khi bật (spec §10.1). **GO cho P2.**
+- **P2a xong (2026-10-01):** `shellx-term` nối agent trên macOS (nhánh `feat/terminal-sharing-p2a`).
+  - Giao thức nội bộ phía term: bắt tay HMAC hai chiều, snapshot rồi output trực tiếp, input và kích thước từ điện thoại, nối lại; không bao giờ làm chậm terminal (hàng chờ 1 MiB, ghi 1 giây, `exit` xả ≤ 200 ms).
+  - Khối zsh/bash mới: gọi bằng biến môi trường với `argv[0]` của shell gốc, `probe`, dấu theo tty, `setopt login` cho zsh login, bỏ qua `source` tay (bash: giới hạn ở spec §5.2).
+  - Test: 135 chạy xanh, 2 `#[ignore]`. Đo khởi động: baseline 687,4 ms, bọc 713,8 ms, **+26,4 ms** (< 50 ms).
+  - Spec §5.1, §5.2, §5.4, §6.1–§6.5 đã cập nhật theo code; byte chuẩn: `term/protocol/vectors.txt` (P3 phải khớp từng byte, thứ tự khóa theo byte). Chi tiết, việc còn mở và các mục "Ghi cho P2": `ledgers/terminal-sharing.md`, mục P2a.
 - **Còn lại:**
-  - P2: `shellx-term` đầy đủ, nối agent, Windows.
-  - P3: agent và giao thức.
+  - **P2b:** `shellx-term` trên Windows (spec §5.3) + `windows-check.yml`.
+  - **P3:** agent và giao thức (phải khớp `vectors.txt`).
   - P4: phần desktop (bật/tắt, bộ cài, ký).
   - P5: mobile.
   - Thứ tự ở spec §14.

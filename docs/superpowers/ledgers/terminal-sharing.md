@@ -2,6 +2,7 @@
 
 Spec: `docs/superpowers/specs/2026-10-01-desktop-terminal-sharing-design.md`
 Plan P1: `docs/superpowers/plans/2026-10-01-terminal-sharing-p1-shellx-term-spike.md`
+Plan P2a: `docs/superpowers/plans/2026-10-01-terminal-sharing-p2a-agent-link.md`
 
 ## P1 — bản thử shellx-term trên macOS (2026-10-01)
 
@@ -92,3 +93,70 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
   - Terminal.app khôi phục phiên (`SHELL_SESSION_DID_INIT` không được export): kiểm tay.
 - **Đã kiểm bằng tự động:** Ctrl+C, Ctrl+Z, đổi cỡ, dán 200 dòng, UTF-8, mã thoát, vim/less/top. **Chưa có người thử:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện Cursor và Android Studio. Cả bốn thuộc danh sách §11.6 khi làm P5.
 - **Người dùng quyết GO cho P2 (2026-10-01).**
+
+## P2a — `shellx-term` nối agent, macOS (2026-10-01)
+
+Nhánh `feat/terminal-sharing-p2a`. Phần phía `shellx-term` của kết nối nội bộ (spec §6) và khối tích hợp mới (§5.2). Agent (P3) và Windows (P2b) chưa làm.
+
+**Test:** `cd term && cargo test --features test-hooks`: **135 test chạy, 2 bị `#[ignore]`** (bộ test đơn vị 56 + 9 bộ tích hợp; xanh 3 lần liên tiếp trước mỗi commit). `cargo fmt --check` và `cargo clippy --all-targets --features test-hooks -- -D warnings` sạch. Byte chuẩn của giao thức: `term/protocol/vectors.txt` (`vectors_match`, `proof_vectors_match`).
+
+### Đo thời gian mở cửa sổ (sau Task 7)
+
+`cargo run --release --example startup_bench`, khối zsh cuối cùng (có `probe`, `exec -a`, `SHELLX_TERM_LOGIN`):
+
+```
+baseline                   median   687.4 ms
+wrapped (shipped block)    median   713.8 ms   overhead   +26.4 ms
+```
+
+**+26,4 ms, dưới ngưỡng 50 ms.** Số này thay cho số của P1 (+13,2 ms và +35,9 ms): shell bên trong nay chạy `setopt login` (đúng hành vi login) nên PATH vẫn giống hệt mà `.zlogin` và `logout` hoạt động.
+
+### Những gì P2a làm (commit trong nhánh)
+
+- `e17f4fa` thư viện + bộ mã CBOR, khung, tin nhắn, byte chuẩn.
+- `51ec090`, `8d90168`, `b3cf57e` bắt tay HMAC hai chiều, file `endpoint`; hạn 5 giây tính trên từng byte; `reject` trước bằng chứng được chấp nhận (không lộ byte terminal).
+- `15f8a4b` bộ đệm vòng 256 KiB và hàng chờ không bao giờ chặn 1 MiB; `dca127a` kích thước (bên cuối cùng thao tác điều khiển).
+- `3aa211e` đường nối: snapshot rồi output trực tiếp, input/kích thước từ điện thoại, nối lại, không bao giờ chặn terminal.
+- `070d92d` nối vào `wrap`, dấu theo tty, tên ứng dụng, giữ SIGTERM đang bị bỏ qua.
+- `2af91d2` gọi bằng biến môi trường với `argv[0]` của shell gốc, `probe`, dấu theo tty trong khối, biến đánh dấu login của zsh, điều kiện `source` tay của bash.
+
+### Các mục "Ghi cho P2" (P1)
+
+| Mục | Trạng thái |
+|---|---|
+| bash: `. ~/.bashrc` gõ tay vẫn `exec` thay shell | **Xong** (`2af91d2`, `BASH_LINENO[0] == 0`), còn hai giới hạn đã ghi ở spec §5.2 |
+| bash: `bash -i script` vẫn bị bọc | **Còn mở** (zsh đã xử lý, bash chưa) |
+| zsh login: biến đánh dấu + `setopt login` (R3) | **Xong** (`2af91d2`; có test PTY: `.zlogin` chạy một lần, `logout` thoát 0) |
+| Tiêu đề cửa sổ: tham số qua biến môi trường, `argv[0]` giống shell gốc (R2) | **Xong** (`2af91d2`, `exec -a`) |
+| SIGTERM đang bị bỏ qua thì giữ nguyên | **Xong** (`070d92d`) |
+| `SHELLX_TERM=1` bị thừa kế (`code .`): ghi tty bên trong, so với `$TTY` | **Xong** (`070d92d` đặt tty, `2af91d2` so trong khối); hệ quả: mọi PTY mở từ cửa sổ đã bọc cũng được bọc (spec §5.2) |
+| Sai zsh khi `ZSH_ARGZERO` tương đối / zsh không login | **Xong** (`2af91d2`, `probe` thay cho đoán từ `$SHELL`/`--version`) |
+| JetBrains với `ZDOTDIR` tùy chỉnh: shell bên trong rơi về `$HOME` | **Còn mở** (hiếm; chưa có cách sửa) |
+| Terminal.app khôi phục phiên (`SHELL_SESSION_DID_INIT` không export) | **Còn mở**, chỉ kiểm tay được |
+
+### Cần biết khi dùng
+
+- Khối cần binary có `probe`: bộ cài (P4) cài binary vào `bin` **trước** khi ghi khối. Binary cũ gặp khối mới sẽ mở shell thường trong `$(…)` và trông như treo.
+- Điều kiện bash `BASH_LINENO[0] == 0` không bắt được hàm bọc một dòng (`reload() { . ~/.bashrc; }`) và bỏ qua rc được `source` từ file khác: người dùng chỉ có `.profile` + `.bashrc` có cửa sổ login không bọc. P4 đặt khối vào cả `.bash_profile` và `.bashrc`.
+- Mọi PTY mở từ cửa sổ đã bọc (`script`, `asciinema rec`, `:terminal` của nvim, `code .`) được bọc riêng và hiện là một terminal chia sẻ thêm (chủ ý của dấu theo tty).
+- Nhánh `elif` (`setopt login`) cũng áp dụng cho shell thường do fallback mở: chủ ý.
+- Thứ tự khóa CBOR là thứ tự byte (Rust `BTreeMap`), không phải thứ tự chuẩn "độ dài trước" của RFC 8949. P3 phải ghi cùng thứ tự để khớp từng byte `vectors.txt`.
+
+### Việc nhỏ còn mở tại thời điểm viết
+
+Từ review từng task (chưa sửa khi viết mục này; bản review cuối của nhánh có thể sửa một phần, nên cần kiểm lại trước khi nhận):
+
+- **Cho P3 (agent):** bộ giải mã nhận số nguyên không ở dạng ngắn nhất (chỉ bộ mã hóa ghi dạng ngắn nhất); không có test quét ngẫu nhiên "không panic" (cắt cụt/đổi byte) trên các vector.
+- **Cho P2b/tiếp theo (độ bền của đường nối):**
+  - `output()`/`send()` chạy trong lúc `finish` đang xả có thể đẩy khung sau `exit`; một phiên có thể bắt đầu sau `finish`; mất đánh thức trong `nap`.
+  - Luồng đọc của agent chết mà output vẫn chảy thì không bị phát hiện (chỉ kiểm khi hết thời gian chờ pop) → input từ điện thoại mất âm thầm.
+  - Thay đổi kích thước trong lúc bắt tay bị mất tới lần đổi sau (cần đẩy lại `Size` khi vào `live`).
+  - Callback `LinkEvents` chạy trên luồng đọc và teardown join luồng này: `input()` bị chặn sẽ làm kẹt nối lại (cần ghi tài liệu hoặc tách).
+  - `Timing::backoff` panic nếu vector rỗng; `output()` vẫn mã hóa sau khi hàng chờ tràn.
+- **Cho `wrap`/`fallback`:**
+  - HOME không đặt → `Link::start(None)` bỏ `writer` → portable-pty gõ `\n^D` khi luồng cửa sổ thoát (một dòng `std::mem::forget(writer)`).
+  - Panic của luồng link nằm trong tầm panic hook: panic ở link làm exec shell thường và treo phiên; cân nhắc để panic của luồng link chỉ giết link.
+  - Fallback `exec_shell` không gỡ `SHELLX_TERM_WRAP`/`SHELLX_TERM_WRAP_LOGIN` (cửa sổ bash login rơi về fallback → ứng dụng khởi chạy sau đó bị bọc kiểu login).
+  - `wrap.rs` còn đặt `SHELLX_TERM="1"` khi không lấy được tên tty (không còn là tín hiệu bỏ qua → rủi ro bọc đệ quy, lý thuyết); nên coi `None` là thất bại.
+  - Khối nên gọi `probe </dev/null` để binary cũ không đọc terminal.
+- **Test:** vài khoảng trống (kích thước ở mức bằng nhau, bash cùng tty, zsh sai bản với binary thật, test thoát/"finish treo" hiện làm tràn thay vì thử đúng `finish`, test khởi động lại để lại agent cũ đang nghe); `read_endpoint` gộp mọi lỗi IO thành `Missing`.
