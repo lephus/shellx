@@ -174,9 +174,15 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
     if faults::hit("spawn") {
         return Err(WrapError::Spawn("injected fault".into()));
     }
+    // The marker must be this PTY's path: "1" would not stop the inner
+    // shell's block from wrapping again.
+    let tty_name = pair
+        .master
+        .tty_name()
+        .ok_or_else(|| WrapError::Pty("no tty name for the PTY".into()))?;
     let mut child = pair
         .slave
-        .spawn_command(shell_command(args, pair.master.tty_name()))
+        .spawn_command(shell_command(args, tty_name))
         .map_err(|e| WrapError::Spawn(e.to_string()))?;
     drop(pair.slave);
 
@@ -267,17 +273,13 @@ fn current_size() -> (u16, u16) {
         .unwrap_or((80, 24))
 }
 
-fn shell_command(args: &WrapArgs, tty: Option<std::path::PathBuf>) -> CommandBuilder {
+fn shell_command(args: &WrapArgs, tty: std::path::PathBuf) -> CommandBuilder {
     let mut cmd = CommandBuilder::new(&args.shell);
     if args.login {
         cmd.arg("-l");
     }
     cmd.args(&args.shell_args);
-    cmd.env(
-        "SHELLX_TERM",
-        tty.map(|p| p.into_os_string())
-            .unwrap_or_else(|| "1".into()),
-    );
+    cmd.env("SHELLX_TERM", tty.into_os_string());
     cmd.env_remove("SHELLX_TERM_WRAP");
     cmd.env_remove("SHELLX_TERM_WRAP_LOGIN");
     if let Ok(dir) = std::env::current_dir() {

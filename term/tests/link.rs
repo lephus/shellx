@@ -250,3 +250,88 @@ fn no_endpoint_means_idle_until_one_appears() {
     let mut s = agent.next_session(T);
     assert_eq!(s.snapshot(T), b"early\r\n");
 }
+
+#[test]
+fn no_frame_follows_exit() {
+    let home = common::temp_dir("link-exit-last");
+    let (link, _events) = start(&home);
+    let link = Arc::new(link);
+    let agent = FakeAgent::start(&home, Behavior::Normal);
+    let mut s = agent.next_session(T);
+    s.snapshot(T);
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let producer = {
+        let (link, stop) = (link.clone(), stop.clone());
+        std::thread::spawn(move || {
+            while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                link.output(b"noise\r\n");
+                link.send(TermMsg::Local);
+            }
+        })
+    };
+    std::thread::sleep(Duration::from_millis(50));
+    link.finish(5);
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    producer.join().unwrap();
+    let mut last = None;
+    while let Some(msg) = s.recv(Duration::from_millis(500)) {
+        last = Some(msg);
+    }
+    assert_eq!(last, Some(TermMsg::Exit { code: 5 }));
+}
+
+#[test]
+fn a_malformed_agent_frame_ends_the_session_even_while_output_flows() {
+    let home = common::temp_dir("link-malformed");
+    let (link, _events) = start(&home);
+    let link = Arc::new(link);
+    let agent = FakeAgent::start(&home, Behavior::Normal);
+    let mut s = agent.next_session(T);
+    s.snapshot(T);
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let producer = {
+        let (link, stop) = (link.clone(), stop.clone());
+        std::thread::spawn(move || {
+            while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                link.output(b"flow\r\n");
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        })
+    };
+    s.send_garbage();
+    // The agent keeps reading, so only the terminal can end the session.
+    let reader = std::thread::spawn(
+        move || {
+            while s.recv(Duration::from_millis(200)).is_some() {}
+        },
+    );
+    let mut second = agent.next_session(Duration::from_secs(3));
+    assert!(!second.snapshot(T).is_empty());
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    producer.join().unwrap();
+    reader.join().unwrap();
+}
+
+#[test]
+fn finish_waits_at_most_the_flush_time_for_a_frame_a_hung_agent_never_reads() {
+    let home = common::temp_dir("link-exit-pinned");
+    let (link, _events) = start(&home);
+    let agent = FakeAgent::start(&home, Behavior::Normal);
+    let mut hung = agent.next_session(T);
+    hung.snapshot(T); // then never reads again
+                      // About 950 KiB: under the outbox limit (1 MiB), so the session is not
+                      // dropped for overflow, and more than the socket buffers take: live
+                      // frames sit in the outbox, unwritable.
+    for _ in 0..62 {
+        link.output(&[b'z'; 15 * 1024]);
+    }
+    std::thread::sleep(Duration::from_millis(100));
+    let began = Instant::now();
+    link.finish(0);
+    assert!(
+        began.elapsed() < Duration::from_millis(400),
+        "finish took {:?}",
+        began.elapsed()
+    );
+    drop(hung);
+}

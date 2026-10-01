@@ -197,6 +197,11 @@ impl AgentSession {
         write_frame(&mut self.stream, &msg.encode()).expect("send to terminal");
     }
 
+    /// Sends a frame whose payload is not valid protocol data.
+    pub fn send_garbage(&mut self) {
+        write_frame(&mut self.stream, &[0xff, 0xff, 0xff]).expect("send to terminal");
+    }
+
     /// The snapshot pieces that must open every session.
     pub fn snapshot(&mut self, timeout: Duration) -> Vec<u8> {
         let mut data = Vec::new();

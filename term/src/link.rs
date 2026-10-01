@@ -171,9 +171,12 @@ impl Link {
     pub fn finish(&self, code: u32) {
         self.shared.finishing.store(true, Ordering::SeqCst);
         {
-            let state = lock(&self.shared.output);
+            // `live` ends in the same locked block as `exit` is queued, so
+            // no `out` or notice frame can follow it.
+            let mut state = lock(&self.shared.output);
             if state.live {
                 self.shared.outbox.push(TermMsg::Exit { code }.encode());
+                state.live = false;
             }
         }
         self.shared.outbox.wait_drained(self.timing.exit_flush);
@@ -334,7 +337,10 @@ fn read_agent(mut stream: TcpStream, events: Arc<dyn LinkEvents>) {
             Ok(Some(AgentMsg::LocalSize)) => events.phone_left(),
             // Handshake-only or unknown messages are ignored.
             Ok(_) => {}
-            Err(_) => return,
+            Err(_) => break,
         }
     }
+    // The session is over (EOF, error or a frame we cannot decode): fail
+    // the writer's next write at once instead of waiting for its poll.
+    let _ = stream.shutdown(Shutdown::Both);
 }

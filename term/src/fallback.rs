@@ -72,6 +72,10 @@ pub fn exec_shell(target: &Target) -> ! {
             .arg0(arg0(&shell, target.login))
             .args(args)
             .env("SHELLX_TERM", own_tty())
+            // The block's hand-over variables: the new shell must not see
+            // them (SHELLX_TERM_LOGIN stays, the zsh block reads it).
+            .env_remove("SHELLX_TERM_WRAP")
+            .env_remove("SHELLX_TERM_WRAP_LOGIN")
             .exec();
     }
     std::process::exit(127)

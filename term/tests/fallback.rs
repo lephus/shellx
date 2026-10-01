@@ -76,3 +76,22 @@ fn version_with_a_failing_stdout_does_not_start_a_shell() {
         "--version fell back to a shell: {stderr:?}"
     );
 }
+
+#[test]
+fn the_fallback_shell_does_not_inherit_the_block_s_wrap_variables() {
+    let mut h = Harness::spawn(
+        BIN,
+        &["bogus"],
+        &[
+            ("SHELL", "/bin/sh"),
+            ("SHELLX_TERM_WRAP", "/bin/sh"),
+            ("SHELLX_TERM_WRAP_LOGIN", "1"),
+        ],
+        80,
+        24,
+    );
+    h.send("echo v=[${SHELLX_TERM_WRAP-}][${SHELLX_TERM_WRAP_LOGIN-}]\r");
+    h.expect("v=[][]", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
+}
