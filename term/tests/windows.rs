@@ -14,11 +14,13 @@ const CMD: &str = r"C:\Windows\System32\cmd.exe";
 const PWSH: &str = r"C:\Program Files\PowerShell\7\pwsh.exe";
 const POWERSHELL: &str = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
 
-/// A window whose LOCALAPPDATA is `dir` (endpoint and installed binary live there).
+/// A window whose LOCALAPPDATA and APPDATA are `dir` (endpoint and installed
+/// binary live there; APPDATA keeps PSReadLine history off the real profile).
 fn spawn(program: &str, args: &[&str], dir: &Path, extra: &[(&str, &str)]) -> Harness {
     let base = dir.to_str().unwrap().to_string();
     let mut env: Vec<(&str, &str)> = vec![
         ("LOCALAPPDATA", base.as_str()),
+        ("APPDATA", base.as_str()),
         ("SHELLX_TERM_TIMING", "fast"),
     ];
     env.extend_from_slice(extra);
