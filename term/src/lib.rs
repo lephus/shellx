@@ -3,6 +3,8 @@
 //! agent's side of the local link.
 //! Spec: docs/superpowers/specs/2026-10-01-desktop-terminal-sharing-design.md
 
+#[cfg(unix)]
+pub mod appname;
 pub mod cli;
 #[cfg(unix)]
 pub mod fallback;

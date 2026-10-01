@@ -185,7 +185,7 @@ fn with_the_real_binary_the_rest_of_the_file_runs_once_inside() {
     .unwrap();
     let mut h = run_shell("/bin/zsh", &["-i"], &home, &[]);
     h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=1", T);
+    h.expect("m=/dev/tty", T);
     assert_eq!(h.text().matches("AFTER-BLOCK").count(), 1, "{:?}", h.text());
     h.send("exit 3\r");
     assert_eq!(h.wait_exit(T), 3);

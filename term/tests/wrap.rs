@@ -17,8 +17,8 @@ fn typed_commands_run_in_the_wrapped_shell() {
 #[test]
 fn the_wrapped_shell_is_marked() {
     let mut h = Harness::wrap_sh(&[]);
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=1", T);
+    h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo m=tty\r");
+    h.expect("m=tty", T);
     h.send("exit\r");
     h.wait_exit(T);
 }
