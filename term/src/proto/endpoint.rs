@@ -3,12 +3,23 @@
 
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Endpoint {
     pub port: u16,
     pub secret: [u8; 32],
     /// The file's exact bytes (to notice when the agent rewrites it).
     pub raw: Vec<u8>,
+}
+
+/// Never prints the secret or the raw file.
+impl std::fmt::Debug for Endpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Endpoint")
+            .field("port", &self.port)
+            .field("secret", &"<redacted>")
+            .field("raw", &format_args!("<{} bytes>", self.raw.len()))
+            .finish()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -45,8 +56,8 @@ pub fn parse_endpoint(raw: &[u8]) -> Result<Endpoint, EndpointError> {
     let port = lines
         .next()
         .and_then(|l| l.strip_prefix("port="))
+        .filter(|p| p.bytes().all(|b| b.is_ascii_digit()) && !p.starts_with('0'))
         .and_then(|p| p.parse::<u16>().ok())
-        .filter(|p| *p > 0)
         .ok_or(EndpointError::Malformed("port"))?;
     let hex = lines
         .next()
@@ -108,6 +119,18 @@ mod tests {
                 EndpointError::Malformed("port"),
             ),
             (
+                format!("v=1\nport=+5\nsecret={ok_secret}\n"),
+                EndpointError::Malformed("port"),
+            ),
+            (
+                format!("v=1\nport=0005\nsecret={ok_secret}\n"),
+                EndpointError::Malformed("port"),
+            ),
+            (
+                format!("v=1\nport=5 \nsecret={ok_secret}\n"),
+                EndpointError::Malformed("port"),
+            ),
+            (
                 format!("v=1\nport=70000\nsecret={ok_secret}\n"),
                 EndpointError::Malformed("port"),
             ),
@@ -133,6 +156,21 @@ mod tests {
         assert_eq!(
             read_endpoint(Path::new("/nonexistent/endpoint")).unwrap_err(),
             EndpointError::Missing
+        );
+    }
+
+    #[test]
+    fn debug_output_hides_the_secret() {
+        let secret = [0xab; 32];
+        let ep = parse_endpoint(format_endpoint(5, &secret).as_bytes()).unwrap();
+        let shown = format!("{ep:?}");
+        assert!(
+            !shown.contains(&"ab".repeat(32)) && !shown.contains("secret=ab"),
+            "{shown}"
+        );
+        assert!(
+            shown.contains("redacted") && shown.contains("port: 5"),
+            "{shown}"
         );
     }
 

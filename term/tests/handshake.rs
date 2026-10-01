@@ -84,3 +84,42 @@ fn rejections_are_reported() {
         }
     }
 }
+
+#[test]
+fn a_dripping_peer_cannot_outlast_the_deadline() {
+    use shellx_term::proto::messages::AgentMsg;
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = std::thread::spawn(move || {
+        let (mut s, _) = listener.accept().unwrap();
+        let mut hello = [0u8; 4];
+        s.read_exact(&mut hello).unwrap();
+        let mut rest = vec![0u8; u32::from_be_bytes(hello) as usize];
+        s.read_exact(&mut rest).unwrap();
+        let payload = AgentMsg::Challenge {
+            nonce: [1; 32],
+            mac: [2; 32],
+        }
+        .encode();
+        let mut frame = (payload.len() as u32).to_be_bytes().to_vec();
+        frame.extend_from_slice(&payload);
+        for b in frame {
+            if s.write_all(&[b]).is_err() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    });
+    let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    let start = Instant::now();
+    let result = handshake(&mut s, &[9; 32], &info(), Duration::from_millis(500));
+    assert!(matches!(result, Err(HandshakeError::Timeout)), "{result:?}");
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "took {:?}",
+        start.elapsed()
+    );
+    drop(s);
+    let _ = server.join();
+}
