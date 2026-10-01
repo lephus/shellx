@@ -19,6 +19,8 @@ wrapped, login inner       median   739.6 ms   p90   758.0 ms   overhead   +35.9
 wrapped, non-login inner   median   716.9 ms   p90   742.3 ms   overhead   +13.2 ms
 ```
 
+Ba dòng số đo trên lấy từ **bản bench đầu tiên** (nhãn và thứ tự biến thể như trên; chạy trước khi khối có bước kiểm tra `--version`). Bước kiểm tra này thêm khoảng 2,4 ms, đo riêng; chưa chạy lại bench với khối cuối cùng.
+
 So PATH với cùng cấu hình thật, qua ZDOTDIR tạm:
 - **Shell bên trong là login:** đủ 45 mục nhưng **đổi thứ tự**. `/opt/local/bin`, `/opt/homebrew/bin`… nhảy lên trước vì `/etc/zprofile` (path_helper) và `.zprofile` chạy lại. Thứ tự đổi thì lệnh trùng tên có thể chạy bản khác.
 - **Shell bên trong không phải login:** PATH **giống hệt** cửa sổ thường.
@@ -26,7 +28,11 @@ So PATH với cùng cấu hình thật, qua ZDOTDIR tạm:
 
 ### Kiểm tra theo ứng dụng
 
+**Khối đã dùng khi thử trên Terminal.app thật là bản ĐẦU TIÊN**: shell bên trong chạy với `--login`, chưa có bước kiểm tra `--version`, chưa có xử lý `ZDOTDIR`. Khối cuối cùng (shell bên trong không phải login, kiểm tra `--version`, `ZDOTDIR`, điều kiện `ZSH_SCRIPT`/`ZSH_EVAL_CONTEXT`) mới chỉ chạy trong test PTY và giả lập, **chưa** thử trên cửa sổ Terminal.app thật. Cần một lần kiểm ngắn trên cửa sổ thật với khối cuối cùng (cần người dùng đồng ý, vì phải chèn khối vào `~/.zshrc` thật).
+
 Các kiểm tra trên Terminal.app được làm tự động: AppleScript `do script` gõ lệnh vào đúng tab thử theo tty; nút đóng được bấm bằng System Events trên đúng cửa sổ thử. Không gửi phím nào vào cửa sổ khác của người dùng.
+
+Cột Terminal.app trong bảng dưới là kết quả của khối đầu tiên (xem trên).
 
 | Ứng dụng | Tiêu đề (R2) | Hỏi khi đóng (R2) | Integration (R1) | PATH giống trước | Checklist 1–8 | Ghi chú |
 |---|---|---|---|---|---|---|
@@ -43,7 +49,7 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
 
 - **R1 — integration của IDE: sửa được, không cần loại trừ.**
   - Cursor/VS Code chèn integration bằng `ZDOTDIR`; Android Studio/JetBrains cũng vậy. Khối `exec` trước khi IDE kịp cài hook, nên shell bên trong mất integration (giả lập bằng chính script của hai IDE đã xác nhận).
-  - Cách sửa: trước khi `exec`, khối zsh đặt `export ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR`). Shell bên trong khi đó chạy lại integration. Nếu `exec` thất bại, `ZDOTDIR` được trả về như cũ.
+  - Cách sửa: trước khi `exec`, khối zsh đặt `export ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR`). Shell bên trong khi đó chạy lại integration. Khối không có đoạn "trả `ZDOTDIR` về như cũ" khi `exec` thất bại (đã bỏ): zsh thoát hẳn nếu `exec` thất bại, nên thay vào đó khối chạy `shellx-term --version` trước, và chỉ đổi `ZDOTDIR` rồi `exec` khi lệnh này thành công (xem mục kế tiếp).
   - Khối bash loại trừ `TERM_PROGRAM=vscode` và `TERMINAL_EMULATOR=JetBrains-JediTerm`, vì integration bash của hai IDE nạp qua `--init-file`, không chạy lại được.
   - Còn phải người thử trên giao diện thật của Cursor và Android Studio.
   - Warp vẫn loại trừ trước (chưa cài để kiểm).
@@ -61,9 +67,21 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
        - (c) cả hai.
 - **R3 — shell zsh bên trong chạy không phải login.**
   - +13,2 ms so với +35,9 ms (ngưỡng 50 ms). PATH giống hệt cửa sổ thường; dạng login làm đổi thứ tự PATH.
-  - Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường (alias, hàm, option) trong `~/.zprofile` không áp dụng cho cửa sổ được bọc.
+  - Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường (alias, hàm, option) trong `~/.zprofile` không áp dụng cho cửa sổ được bọc. Ngoài ra `logout` báo lỗi ("not login shell") trong cửa sổ zsh được bọc, và `[[ -o login ]]` là sai đối với logic trong rc của người dùng.
+  - Ý tưởng cho P2: export một biến đánh dấu để shell bên trong chạy `setopt login` (chưa kiểm xem khi đó `.zlogin` có được đọc không).
   - bash giữ `--login`. Khối bash nằm đầu `.bash_profile` nên có thể bị cùng vấn đề đổi thứ tự PATH (chưa đo; bash hiếm trên macOS). Ghi cho P2.
 - **Cho P4:** file cấu hình có thể là symlink (dotfile manager), nên bộ cài thật phải ghi xuyên qua link như `dev-block.sh`. Phải từ chối sửa khi khối hỏng (chỉ có dấu mở, hoặc dấu sai thứ tự), và gỡ khối phải trả file về đúng từng byte (file không có xuống dòng cuối, CRLF).
-- **Khoảng trống đã biết:** `zsh -i script` và `bash -i script` vẫn bị bọc (script không chạy). Hiếm gặp; ghi trong spec §5.2.
+- **Sửa sau review cuối P1 (zsh):**
+  - `source ~/.zshrc` gõ tay trong cửa sổ chưa bọc không còn `exec` thay shell đang chạy (mất job, hàm, biến). Khối zsh thêm điều kiện `$ZSH_EVAL_CONTEXT != toplevel*`: khi zsh đọc file khởi động, ngữ cảnh là `file` (hoặc `file:file` khi script của IDE `source` tiếp `.zshrc`), còn `source` gõ tay cho `toplevel:file`. Không dùng `== file` như đề xuất ban đầu vì sẽ làm hỏng tích hợp IDE (VS Code/JetBrains `source` file của người dùng, ngữ cảnh `file:file`; test `vscode_style_injection_repoints_zdotdir` bắt được).
+  - `zsh -i /đường/dẫn/script` không còn bị bọc (điều kiện `-z "${ZSH_SCRIPT-}"`). `bash -i script` vẫn bị bọc (xem danh sách P2).
+  - `shellx-term` nay tự treo (SIGHUP) phiên bên trong khi đọc cửa sổ gặp EOF/lỗi, kể cả khi ứng dụng terminal bị kill mà SIGHUP không tới `shellx-term`; trước đó cả `shellx-term` lẫn shell bên trong có thể sống mồ côi.
+  - Chỉ cài panic hook cho lệnh `wrap`; đối số lạ in một dòng `shellx-term: unknown arguments; starting a plain shell` rồi vẫn mở shell thường.
+- **Ghi cho P2 (không làm trong P1):**
+  - bash: `. ~/.bashrc` / `. ~/.bash_profile` gõ tay vẫn `exec` thay shell (chưa có cách phát hiện sạch; ý tưởng `BASH_LINENO`/`BASH_SOURCE`); `bash -i script` vẫn bị bọc.
+  - Biến đánh dấu để shell zsh bên trong chạy `setopt login` (xem R3).
+  - SIGTERM: nếu `shellx-term` khởi động khi SIGTERM đang bị bỏ qua thì giữ nguyên việc bỏ qua (zsh tương tác bỏ qua SIGTERM; `pkill -f zsh` hiện đóng được cửa sổ đã bọc).
+  - `SHELLX_TERM=1` được thừa kế bởi ứng dụng mở từ cửa sổ đã bọc (vd `code .`) nên terminal của chúng không bao giờ được bọc; ghi tty bên trong vào biến và so với `$TTY`.
+  - Sai zsh khi `ZSH_ARGZERO` là đường dẫn tương đối và ứng dụng chạy zsh không phải login (lệnh tùy chỉnh của iTerm2): bước thăm dò `--version` có thể lấy đường dẫn file thực thi của tiến trình cha.
+  - Terminal.app khôi phục phiên (`SHELL_SESSION_DID_INIT` không được export): kiểm tay.
 - **Đã kiểm bằng tự động:** Ctrl+C, Ctrl+Z, đổi cỡ, dán 200 dòng, UTF-8, mã thoát, vim/less/top. **Chưa có người thử:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện Cursor và Android Studio. Cả bốn thuộc danh sách §11.6 khi làm P5.
 - **Đề xuất: GO cho P2**, sau khi người dùng chọn cách xử lý R2.

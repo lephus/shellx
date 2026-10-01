@@ -109,7 +109,8 @@ shellx-term --version
 
 Khối nằm ở **đầu** file, chỉ gồm ký tự ASCII, có dấu `# >>> ShellX >>>` và `# <<< ShellX <<<`. Nó `exec` sang `shellx-term` khi **mọi** điều kiện sau đều đúng:
 
-- shell đang tương tác **và không chạy chuỗi lệnh hay script**: zsh `[[ -o interactive ]]` và `$ZSH_EXECUTION_STRING` rỗng (không dùng `-o shinstdin`: zsh chỉ bật nó sau khi đọc xong các file khởi động); bash `$-` chứa `i` và `$BASH_EXECUTION_STRING` rỗng. VS Code/Cursor chạy `$SHELL -i -l -c '…'` để đọc biến môi trường khi khởi động; bọc shell đó sẽ làm editor treo;
+- shell đang tương tác **và không chạy chuỗi lệnh hay script**: zsh `[[ -o interactive ]]`, `$ZSH_EXECUTION_STRING` rỗng và `$ZSH_SCRIPT` rỗng (`zsh -i script`; không dùng `-o shinstdin`: zsh chỉ bật nó sau khi đọc xong các file khởi động); bash `$-` chứa `i` và `$BASH_EXECUTION_STRING` rỗng. VS Code/Cursor chạy `$SHELL -i -l -c '…'` để đọc biến môi trường khi khởi động; bọc shell đó sẽ làm editor treo;
+- **zsh: khối đang chạy trong lúc zsh đọc file khởi động, không phải do người dùng `source` tay:** `$ZSH_EVAL_CONTEXT` không bắt đầu bằng `toplevel` (khi đọc file khởi động giá trị là `file`, hoặc `file:file` khi script của IDE `source` tiếp `.zshrc`; `source ~/.zshrc` gõ tay cho `toplevel:file`). Nếu thiếu điều kiện này, `source ~/.zshrc` trong cửa sổ chưa bọc sẽ `exec` thay shell đang chạy và mất job, hàm, biến. bash chưa có điều kiện tương đương (ghi cho P2);
 - stdin và stdout đều là terminal (`[ -t 0 ] && [ -t 1 ]`);
 - chưa ở trong `shellx-term` (`SHELLX_TERM` rỗng) và không phải phiên do ShellX mở từ điện thoại (`SHELLX` rỗng);
 - không ở trong tmux hoặc screen (`TMUX`, `STY` rỗng) — cửa sổ đang chạy tmux đã được bọc ở tầng ngoài;
@@ -119,9 +120,9 @@ Khối nằm ở **đầu** file, chỉ gồm ký tự ASCII, có dấu `# >>> S
 
 Khối truyền cho `shellx-term` đường dẫn tuyệt đối của **chính shell đang chạy**: bash dùng `$BASH`; zsh dùng `${ZSH_ARGZERO#-}` nếu đã tuyệt đối, nếu không thì `$SHELL` khi `$SHELL` là zsh (trường hợp Terminal.app/iTerm2 mở login shell `-zsh`), còn lại tìm theo `PATH`. Nhờ `exec`, `shellx-term` giữ đúng PID của shell ban đầu. Nội dung chuẩn của khối nằm ở `term/shell/block.zsh` và `term/shell/block.bash`; bộ cài (P4) chèn đúng nội dung đó.
 
-- **Đối số `--login`:** zsh **luôn** chạy shell bên trong ở chế độ không phải login, kể cả khi shell ngoài là login. Lý do: zsh login ngoài đã đọc `.zshenv` và `.zprofile` trước `.zshrc` (nơi đặt khối); shell login bên trong sẽ chạy lại `/etc/zprofile` (`path_helper`) và `~/.zprofile`, làm **đảo thứ tự `PATH`** (đo trong P1), và chậm hơn (+35,9 ms so với +13,2 ms). Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường đặt trong `~/.zprofile` không được áp dụng trong cửa sổ đã bọc. bash giữ `--login` cho login shell (khối nằm đầu `.bash_profile`, trước phần còn lại của file).
+- **Đối số `--login`:** zsh **luôn** chạy shell bên trong ở chế độ không phải login, kể cả khi shell ngoài là login. Lý do: zsh login ngoài đã đọc `.zshenv` và `.zprofile` trước `.zshrc` (nơi đặt khối); shell login bên trong sẽ chạy lại `/etc/zprofile` (`path_helper`) và `~/.zprofile`, làm **đảo thứ tự `PATH`** (đo trong P1), và chậm hơn (+35,9 ms so với +13,2 ms). Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường đặt trong `~/.zprofile` không được áp dụng trong cửa sổ đã bọc; `logout` báo lỗi "not login shell" trong cửa sổ zsh đã bọc; và `[[ -o login ]]` là sai đối với logic trong rc của người dùng. Ý tưởng cho P2: export một biến đánh dấu để shell bên trong chạy `setopt login` (chưa kiểm xem `.zlogin` có được đọc khi đó không). bash giữ `--login` cho login shell (khối nằm đầu `.bash_profile`, trước phần còn lại của file).
 - **Tích hợp IDE:** VS Code/Cursor và JetBrains khởi động zsh với `ZDOTDIR` trỏ vào thư mục của họ. Ngay trước `exec`, khối zsh đặt lại `ZDOTDIR=$VSCODE_ZDOTDIR` (hoặc `$_INTELLIJ_ZDOTDIR` nếu không có) để shell bên trong chạy lại integration của IDE. Chỉ đổi `ZDOTDIR` sau khi mọi điều kiện (kể cả kiểm tra `--version`) đã đạt, nên khi không bọc thì `ZDOTDIR` và các biến của người dùng không bị đụng tới; khối không để lại biến phụ `__shellx_*` nào khi không bọc. bash loại trừ hai IDE này như trên.
-- **Chỗ hở đã biết:** `zsh -i script` và `bash -i script` vẫn bị bọc.
+- **Chỗ hở đã biết:** `bash -i script` vẫn bị bọc (zsh đã xử lý bằng `$ZSH_SCRIPT`); `. ~/.bashrc` gõ tay trong bash vẫn `exec` thay shell (ghi cho P2).
 
 ### 5.3 Khối tích hợp trên Windows (PowerShell 7 và 5.1)
 
@@ -148,7 +149,7 @@ Windows không thay tiến trình tại chỗ được, nên PowerShell ngoài c
 2. **Không mở được PTY hay không chạy được shell trong PTY:** macOS `exec` thẳng shell gốc với đối số gốc; Windows thoát với mã 222 (§5.3). Người dùng vẫn có shell, chỉ không chia sẻ.
 3. **Agent không chạy:** `shellx-term` chạy bình thường và thử kết nối lại theo lịch 1, 2, 4, 8, tối đa 10 giây. Mỗi lần thử chỉ đọc file `endpoint` rồi kết nối tới localhost.
 4. **`shellx-term` bị xóa:** khối tích hợp kiểm tra file tồn tại trước khi dùng.
-5. **Shell thoát:** `shellx-term` khôi phục chế độ cửa sổ rồi thoát với mã thoát của shell.
+5. **Shell thoát:** `shellx-term` khôi phục chế độ cửa sổ rồi thoát với mã thoát của shell. **Cửa sổ biến mất** (đọc cửa sổ gặp EOF hoặc lỗi, vd ứng dụng terminal bị kill mà SIGHUP không tới `shellx-term`): `shellx-term` gửi SIGHUP cho nhóm tiến trình của shell bên trong rồi cho chính shell, sau đó đi theo đường thoát bình thường; không để lại tiến trình mồ côi.
 6. **Chế độ cửa sổ luôn được khôi phục** (termios / console mode ban đầu) khi thoát bình thường, khi nhận tín hiệu kết thúc, và khi panic (panic hook).
 7. **Bàn phím và kích thước:** Ctrl+C, Ctrl+Z, Ctrl+D đi thẳng vào shell bên trong. Đổi kích thước cửa sổ được chuyển tiếp: macOS qua `SIGWINCH`, Windows qua `WINDOW_BUFFER_SIZE_EVENT`. Tiêu đề do shell hoặc chương trình đặt (OSC 0/2) đi qua nguyên vẹn ra cửa sổ.
 8. **Bộ đệm 256 KiB** output gần nhất, giữ từ lúc mở cửa sổ.
@@ -475,6 +476,11 @@ Bước đầu tiên của kế hoạch triển khai là một **bản thử `sh
 | R1 | **Shell integration của ứng dụng terminal** bị hỏng khi shell chạy lại bên trong `shellx-term`: VS Code/Cursor chèn integration cho zsh qua `ZDOTDIR`; iTerm2 shell integration; Warp tự khởi tạo shell theo cách riêng | Kiểm trong bản thử. Không sửa được thì đưa vào danh sách loại trừ theo `TERM_PROGRAM` |
 | R2 | **Tên tiến trình trên tiêu đề và hỏi xác nhận khi đóng:** Terminal.app và iTerm2 xem tiến trình đang chạy trên TTY của cửa sổ, nay là `shellx-term`. Có thể tiêu đề hiện "shellx-term" và mỗi lần đóng cửa sổ đều bị hỏi "terminate running processes?" | Kiểm trong bản thử (`exec` giữ nguyên PID của login shell có thể giúp). Nếu bị hỏi: khi bật tính năng, đề nghị người dùng thêm `shellx-term` vào danh sách tiến trình bỏ qua của Terminal.app/iTerm2 (chỉ khi người dùng đồng ý), hoặc tìm cách khác trước khi làm tiếp |
 | R3 | **Thời gian mở cửa sổ** vượt 50 ms | Đo trong bản thử; tối ưu khối tích hợp (không gọi tiến trình con) |
+| R4 | **ConPTY lồng nhau trên Windows:** input VT, IME tiếng Việt qua `ReadConsoleInputW`, Ctrl+C, sự kiện đổi kích thước, chương trình toàn màn hình | Test tự động trên `windows-latest` + kiểm tra tay (việc chờ); công tắc ẩn tới khi xong |
+| R5 | **Chi phí PowerShell đứng chờ** trên Windows (thời gian mở, RAM) | Đo khi kiểm tra Windows; ghi rõ trong cửa sổ xác nhận |
+| R6 | Khối tích hợp tương tác với cấu hình sẵn có của người dùng (oh-my-zsh, powerlevel10k instant prompt, file có `exec tmux`) | Khối đứng đầu file nên `exec` trước mọi thứ; shell bên trong chạy cấu hình của người dùng như một cửa sổ mới. Kiểm với oh-my-zsh + powerlevel10k |
+| R7 | `SHLVL` tăng thêm 1 trong shell bên trong | Chấp nhận (chỉ là biểu hiện) |
+| R8 | Khối còn sót sau khi kéo ShellX.app vào Thùng rác | Vô hại theo §5.4; có `shellx-term uninstall` và mục FAQ |
 
 **Kết quả P1 (2026-10-01; chi tiết và số đo trong `docs/superpowers/ledgers/terminal-sharing.md`):**
 
@@ -483,17 +489,12 @@ Bước đầu tiên của kế hoạch triển khai là một **bản thử `sh
   - Cách sửa: khối zsh trỏ `ZDOTDIR` về `$VSCODE_ZDOTDIR` hoặc `$_INTELLIJ_ZDOTDIR` trước khi `exec`; khối bash loại trừ hai IDE này (§5.2).
   - Còn chờ người thử trên giao diện thật.
 - **R2 — một phần.**
-  - Bọc vẫn chạy đúng trên Terminal.app.
+  - Bọc vẫn chạy đúng trên Terminal.app thật, nhưng lần thử thật đó dùng **khối đầu tiên** (shell bên trong `--login`, chưa có kiểm tra `--version`, chưa có xử lý `ZDOTDIR`). Khối cuối cùng mới chỉ chạy trong test PTY và giả lập; cần một lần kiểm ngắn trên cửa sổ thật (cần người dùng đồng ý).
   - Tiêu đề thành `shellx-term wrap -- … ▸ <lệnh>`. Hướng sửa ở P2: tham số qua biến môi trường và `argv[0]` giống shell gốc.
   - **Mất cảnh báo "terminate running processes?" khi đóng cửa sổ đang chạy lệnh.** Đây là giới hạn của hướng A: Terminal chỉ xét tiến trình trên tty của cửa sổ. Cách xử lý chờ người dùng chọn.
   - Không có chuyện hỏi thừa khi shell đang rảnh.
-- **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự. Bước kiểm tra `--version` thêm khoảng 2,4 ms.
+- **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự (số đo từ bản bench đầu, trước bước kiểm tra `--version`). Bước kiểm tra `--version` thêm khoảng 2,4 ms. Cái giá của shell bên trong không phải login: `~/.zlogin` và thiết lập không phải biến môi trường trong `~/.zprofile` không áp dụng; `logout` báo "not login shell"; `[[ -o login ]]` là sai cho logic rc của người dùng (P2: biến đánh dấu để chạy `setopt login`, chưa kiểm `.zlogin`).
 - **Phát hiện thêm:** zsh thoát khi `exec` thất bại, nên khối kiểm tra `shellx-term --version` trước khi `exec` (§5.2).
-| R4 | **ConPTY lồng nhau trên Windows:** input VT, IME tiếng Việt qua `ReadConsoleInputW`, Ctrl+C, sự kiện đổi kích thước, chương trình toàn màn hình | Test tự động trên `windows-latest` + kiểm tra tay (việc chờ); công tắc ẩn tới khi xong |
-| R5 | **Chi phí PowerShell đứng chờ** trên Windows (thời gian mở, RAM) | Đo khi kiểm tra Windows; ghi rõ trong cửa sổ xác nhận |
-| R6 | Khối tích hợp tương tác với cấu hình sẵn có của người dùng (oh-my-zsh, powerlevel10k instant prompt, file có `exec tmux`) | Khối đứng đầu file nên `exec` trước mọi thứ; shell bên trong chạy cấu hình của người dùng như một cửa sổ mới. Kiểm với oh-my-zsh + powerlevel10k |
-| R7 | `SHLVL` tăng thêm 1 trong shell bên trong | Chấp nhận (chỉ là biểu hiện) |
-| R8 | Khối còn sót sau khi kéo ShellX.app vào Thùng rác | Vô hại theo §5.4; có `shellx-term uninstall` và mục FAQ |
 
 ---
 
