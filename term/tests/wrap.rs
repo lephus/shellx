@@ -81,3 +81,31 @@ fn output_written_just_before_exit_is_not_lost() {
     let count = h.output_bytes().iter().filter(|&&b| b == b'b').count();
     assert!(count >= 300_000, "only {count} bytes arrived");
 }
+
+#[test]
+fn test_windows_get_a_temporary_home_unless_the_caller_sets_one() {
+    let mut h = Harness::wrap_sh(&[]);
+    h.send("echo ho''me=$HOME;\r");
+    let text = {
+        h.expect("home=/", T);
+        h.settle(Duration::from_millis(200));
+        h.text()
+    };
+    let at = text.rfind("home=").unwrap() + 5;
+    let home: String = text[at..]
+        .chars()
+        .take_while(|c| !c.is_whitespace() && *c != ';')
+        .collect();
+    let temp = std::env::temp_dir();
+    assert!(
+        std::path::Path::new(&home).starts_with(&temp),
+        "HOME is {home:?}, not under {temp:?}"
+    );
+    h.send("exit 0\r");
+    h.wait_exit(T);
+    let mut h = Harness::wrap_sh(&[("HOME", "/nonexistent-home")]);
+    h.send("echo ho''me=$HOME;\r");
+    h.expect("home=/nonexistent-home", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
+}

@@ -4,6 +4,11 @@
 //!
 //!     cargo build --release && cargo run --release --example startup_bench
 //!
+//! It uses the real HOME on purpose (your real startup files are what is being
+//! timed), so a running ShellX agent would see its wrapped windows register as
+//! sessions. Quit the agent first. (Tests never do this: their windows get a
+//! temporary HOME.)
+//!
 //! SHELLX_BENCH_RUNS (default 20) sets the samples per variant.
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};

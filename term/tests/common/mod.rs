@@ -6,7 +6,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use std::io::{Read, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -22,11 +22,16 @@ pub struct Harness {
     rx: Receiver<Vec<u8>>,
     output: Vec<u8>,
     child: Box<dyn Child + Send + Sync>,
+    /// The window's own temporary HOME (when the caller did not pass one),
+    /// kept until the window is dropped.
+    _home: Option<TempDir>,
 }
 
 impl Harness {
     /// Runs `program args` in a fresh `cols`x`rows` PTY ("the window").
     /// `PS1` is `$ ` and ShellX variables are cleared unless `env` sets them.
+    /// `HOME` is a fresh temporary directory unless `env` sets it, so no test
+    /// window ever reaches the real HOME or a running agent.
     pub fn spawn(
         program: &str,
         args: &[&str],
@@ -61,6 +66,15 @@ impl Harness {
         for (key, value) in env {
             cmd.env(key, value);
         }
+        let home = if env.iter().any(|(key, _)| *key == "HOME") {
+            None
+        } else {
+            static NEXT: AtomicUsize = AtomicUsize::new(0);
+            let n = NEXT.fetch_add(1, Ordering::SeqCst);
+            let dir = temp_dir(&format!("window-home-{n}"));
+            cmd.env("HOME", &*dir);
+            Some(dir)
+        };
         let child = pair.slave.spawn_command(cmd).expect("spawn");
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().expect("reader");
@@ -101,6 +115,7 @@ impl Harness {
             rx,
             output: Vec::new(),
             child,
+            _home: home,
         }
     }
 
