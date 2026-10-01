@@ -323,7 +323,7 @@ Thanh phím phụ, chụm đổi cỡ chữ, copy/paste, khóa app và danh sác
 
 ### 10.1 Bật
 
-1. Người dùng bật công tắc → cửa sổ xác nhận liệt kê **chính xác các file sẽ sửa hoặc tạo**, giới hạn (chỉ terminal mở sau khi bật), và trên Windows là trạng thái chính sách script (§10.3).
+1. Người dùng bật công tắc → cửa sổ xác nhận liệt kê **chính xác các file sẽ sửa hoặc tạo**, giới hạn (chỉ terminal mở sau khi bật), và trên Windows là trạng thái chính sách script (§10.3). Trên macOS, cửa sổ xác nhận còn nói rõ: **đóng một cửa sổ terminal đang chạy lệnh sẽ không còn được Terminal.app (và có thể iTerm2) hỏi xác nhận**, vì lệnh chạy bên trong `shellx-term` (§13 R2, người dùng chọn phương án (a) ngày 2026-10-01).
 2. Người dùng đồng ý → ShellX:
    1. chép `shellx-term` vào thư mục `bin` (§10.4);
    2. sao lưu từng file cấu hình **một lần** thành `<tên file>.shellx-backup`, không ghi đè bản sao lưu đã có;
@@ -489,9 +489,9 @@ Bước đầu tiên của kế hoạch triển khai là một **bản thử `sh
   - Cách sửa: khối zsh trỏ `ZDOTDIR` về `$VSCODE_ZDOTDIR` hoặc `$_INTELLIJ_ZDOTDIR` trước khi `exec`; khối bash loại trừ hai IDE này (§5.2).
   - Còn chờ người thử trên giao diện thật.
 - **R2 — một phần.**
-  - Bọc vẫn chạy đúng trên Terminal.app thật, nhưng lần thử thật đó dùng **khối đầu tiên** (shell bên trong `--login`, chưa có kiểm tra `--version`, chưa có xử lý `ZDOTDIR`). Khối cuối cùng mới chỉ chạy trong test PTY và giả lập; cần một lần kiểm ngắn trên cửa sổ thật (cần người dùng đồng ý).
+  - Bọc chạy đúng trên Terminal.app thật, với cả khối đầu lẫn khối cuối. Với khối cuối: PATH giống hệt, `source` bằng tay không thay shell, file `shellx-term` hỏng thì cửa sổ vẫn mở bình thường.
   - Tiêu đề thành `shellx-term wrap -- … ▸ <lệnh>`. Hướng sửa ở P2: tham số qua biến môi trường và `argv[0]` giống shell gốc.
-  - **Mất cảnh báo "terminate running processes?" khi đóng cửa sổ đang chạy lệnh.** Đây là giới hạn của hướng A: Terminal chỉ xét tiến trình trên tty của cửa sổ. Cách xử lý chờ người dùng chọn.
+  - **Mất cảnh báo "terminate running processes?" khi đóng cửa sổ đang chạy lệnh.** Đây là giới hạn của hướng A: Terminal chỉ xét tiến trình trên tty của cửa sổ. **Người dùng chọn (a): chấp nhận và ghi rõ trong cửa sổ xác nhận (§10.1).**
   - Không có chuyện hỏi thừa khi shell đang rảnh.
 - **R3 — đạt.** Shell bên trong không phải login: +13,2 ms và PATH giống hệt cửa sổ thường; dạng login: +35,9 ms và PATH đổi thứ tự (số đo từ bản bench đầu, trước bước kiểm tra `--version`). Bước kiểm tra `--version` thêm khoảng 2,4 ms. Cái giá của shell bên trong không phải login: `~/.zlogin` và thiết lập không phải biến môi trường trong `~/.zprofile` không áp dụng; `logout` báo "not login shell"; `[[ -o login ]]` là sai cho logic rc của người dùng (P2: biến đánh dấu để chạy `setopt login`, chưa kiểm `.zlogin`).
 - **Phát hiện thêm:** zsh thoát khi `exec` thất bại, nên khối kiểm tra `shellx-term --version` trước khi `exec` (§5.2).

@@ -28,7 +28,17 @@ So PATH với cùng cấu hình thật, qua ZDOTDIR tạm:
 
 ### Kiểm tra theo ứng dụng
 
-**Khối đã dùng khi thử trên Terminal.app thật là bản ĐẦU TIÊN**: shell bên trong chạy với `--login`, chưa có bước kiểm tra `--version`, chưa có xử lý `ZDOTDIR`. Khối cuối cùng (shell bên trong không phải login, kiểm tra `--version`, `ZDOTDIR`, điều kiện `ZSH_SCRIPT`/`ZSH_EVAL_CONTEXT`) mới chỉ chạy trong test PTY và giả lập, **chưa** thử trên cửa sổ Terminal.app thật. Cần một lần kiểm ngắn trên cửa sổ thật với khối cuối cùng (cần người dùng đồng ý, vì phải chèn khối vào `~/.zshrc` thật).
+**Khối đã dùng khi thử trên Terminal.app thật là bản ĐẦU TIÊN**: shell bên trong chạy với `--login`, chưa có bước kiểm tra `--version`, chưa có xử lý `ZDOTDIR`. Khối cuối cùng (shell bên trong không phải login, kiểm tra `--version`, `ZDOTDIR`, điều kiện `ZSH_SCRIPT`/`ZSH_EVAL_CONTEXT`) mới chỉ chạy trong test PTY và giả lập, **chưa** thử trên cửa sổ Terminal.app thật. Lần kiểm trên cửa sổ thật với khối cuối đã làm sau đó; xem mục ngay dưới.
+
+**Thử lại trên cửa sổ thật với khối cuối (2026-10-01, người dùng đồng ý lần hai):**
+- Cửa sổ mới được bọc (`SHELLX_TERM=1`). Tiêu đề là `shellx-term wrap -- /bin/zsh ▸ zsh`, và `▸ vim` khi chạy vim.
+- **PATH giống hệt cửa sổ thường** (31 mục).
+- `[[ -o login ]]` sai và `logout` báo "not login shell", đúng như cái giá đã ghi.
+- vim và Ctrl+C chạy đúng.
+- `source ~/.zshrc` bằng tay trong một zsh không được bọc **không thay shell**: biến vẫn còn.
+- Đóng cửa sổ đang chạy `sleep` thì không hỏi; đây là R2, người dùng đã chấp nhận.
+- **Thay `shellx-term` đã cài bằng file hỏng thì cửa sổ mới vẫn mở bình thường:** tiêu đề `-zsh`, không bị bọc, không có thông báo lỗi.
+- Sau đó `~/.zshrc` được gỡ khối và so `cmp` giống hệt hai bản sao; `shellx-term` và thư mục `ShellX` đã xóa.
 
 Các kiểm tra trên Terminal.app được làm tự động: AppleScript `do script` gõ lệnh vào đúng tab thử theo tty; nút đóng được bấm bằng System Events trên đúng cửa sổ thử. Không gửi phím nào vào cửa sổ khác của người dùng.
 
@@ -61,10 +71,7 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
 - **R2 — Terminal.app: chạy đúng, nhưng có hai khác biệt.**
   1. **Tiêu đề cửa sổ** thành `shellx-term wrap -- /bin/zsh ▸ …` thay vì `-zsh`. Terminal lấy tên từ argv (thử `exec -a -zsh` thì tiêu đề thành `-zsh wrap -- /bin/zsh ▸ zsh`). Hướng sửa cho P2: truyền tham số qua biến môi trường và đặt `argv[0]` giống shell gốc, khi đó tiêu đề gần như y cũ.
   2. **Mất cảnh báo khi đóng cửa sổ đang chạy lệnh.** Cửa sổ thường hỏi "Do you want to terminate running processes in this window?"; cửa sổ có `shellx-term` thì đóng luôn và lệnh bị dừng. Lý do: Terminal chỉ xét tiến trình trên tty của cửa sổ, còn lệnh chạy trên PTY bên trong. `shellx-term` không chặn được thao tác đóng (Terminal gửi SIGHUP). Đây là giới hạn của hướng A; iTerm2 nhiều khả năng cũng vậy (chưa kiểm).
-     - **Cần người dùng chọn:**
-       - (a) chấp nhận và ghi rõ trong cửa sổ xác nhận khi bật tính năng;
-       - (b) khi bật, đề nghị đổi Terminal.app → Settings → Profiles → Shell → "Ask before closing" thành **Always** (lúc nào cũng hỏi, kể cả khi shell rảnh);
-       - (c) cả hai.
+     - **Người dùng chọn (a) (2026-10-01):** chấp nhận, và cửa sổ xác nhận khi bật tính năng phải nói rõ điều này (spec §10.1). Không đề nghị đổi cài đặt "Ask before closing".
 - **R3 — shell zsh bên trong chạy không phải login.**
   - +13,2 ms so với +35,9 ms (ngưỡng 50 ms). PATH giống hệt cửa sổ thường; dạng login làm đổi thứ tự PATH.
   - Cái giá: `~/.zlogin` và các thiết lập không phải biến môi trường (alias, hàm, option) trong `~/.zprofile` không áp dụng cho cửa sổ được bọc. Ngoài ra `logout` báo lỗi ("not login shell") trong cửa sổ zsh được bọc, và `[[ -o login ]]` là sai đối với logic trong rc của người dùng.
@@ -84,4 +91,4 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
   - Sai zsh khi `ZSH_ARGZERO` là đường dẫn tương đối và ứng dụng chạy zsh không phải login (lệnh tùy chỉnh của iTerm2): bước thăm dò `--version` có thể lấy đường dẫn file thực thi của tiến trình cha.
   - Terminal.app khôi phục phiên (`SHELL_SESSION_DID_INIT` không được export): kiểm tay.
 - **Đã kiểm bằng tự động:** Ctrl+C, Ctrl+Z, đổi cỡ, dán 200 dòng, UTF-8, mã thoát, vim/less/top. **Chưa có người thử:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện Cursor và Android Studio. Cả bốn thuộc danh sách §11.6 khi làm P5.
-- **Đề xuất: GO cho P2**, sau khi người dùng chọn cách xử lý R2.
+- **Người dùng quyết GO cho P2 (2026-10-01).**
