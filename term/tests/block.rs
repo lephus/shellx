@@ -283,6 +283,33 @@ fn a_wrapped_bash_window_ignores_sigterm_like_a_plain_interactive_shell() {
     assert_sigterm_does_not_close_the_window("/bin/bash", &["-il"], "term-bash");
 }
 
+/// When wrapping fails in a block-started bash window, the plain bash that
+/// takes over, and what it runs, get SIGTERM as the window had it: bash
+/// passes an ignored SIGTERM on to every command.
+#[cfg(feature = "test-hooks")]
+#[test]
+fn a_failed_wrap_leaves_sigterm_as_it_was_for_the_fallback_shell() {
+    let home = real_home("fallback-sigterm");
+    let mut h = run_shell(
+        "/bin/bash",
+        &["-il"],
+        &home,
+        &[("SHELLX_TERM_FAULT", "spawn")],
+    );
+    h.expect("could not share this terminal", T);
+    h.send("/bin/sh -c 'kill -TERM $$; echo SUR''VIVED'; echo co''de=$?\r");
+    let code = h.wait_number_after("code=", T);
+    assert_eq!(
+        code,
+        143,
+        "the command kept an ignored SIGTERM: {:?}",
+        h.text()
+    );
+    assert!(!h.text().contains("SURVIVED"), "{:?}", h.text());
+    h.send("exit\r");
+    h.wait_exit(T);
+}
+
 #[test]
 fn a_nested_shell_inside_a_wrapped_window_is_not_wrapped_again() {
     let home = real_home("real-nested");

@@ -318,10 +318,11 @@ fn finish_waits_at_most_the_flush_time_for_a_frame_a_hung_agent_never_reads() {
     let (link, _events) = start(&home);
     let agent = FakeAgent::start(&home, Behavior::Normal);
     let mut hung = agent.next_session(T);
-    hung.snapshot(T); // then never reads again
-                      // About 950 KiB: under the outbox limit (1 MiB), so the session is not
-                      // dropped for overflow, and more than the socket buffers take: live
-                      // frames sit in the outbox, unwritable.
+    // Then it never reads again.
+    hung.snapshot(T);
+    // About 950 KiB: under the outbox limit (1 MiB), so the session is not
+    // dropped for overflow, and more than the socket buffers take: live
+    // frames sit in the outbox, unwritable.
     for _ in 0..62 {
         link.output(&[b'z'; 15 * 1024]);
     }

@@ -20,6 +20,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// A panic on another thread must not stop keystrokes or resizes: take the
+/// lock even if it was poisoned.
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 type SharedWriter = Arc<Mutex<Box<dyn Write + Send>>>;
 type SharedMaster = Arc<Mutex<Box<dyn MasterPty + Send>>>;
 
@@ -28,14 +34,12 @@ struct MasterResizer(SharedMaster);
 
 impl Resizer for MasterResizer {
     fn resize(&self, cols: u16, rows: u16) {
-        if let Ok(master) = self.0.lock() {
-            let _ = master.resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            });
-        }
+        let _ = lock(&self.0).resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        });
     }
 }
 
@@ -59,21 +63,15 @@ impl LinkEvents for WrapEvents {
     }
 
     fn input(&self, data: &[u8]) {
-        if let Ok(mut w) = self.writer.lock() {
-            let _ = w.write_all(data);
-        }
+        let _ = lock(&self.writer).write_all(data);
     }
 
     fn phone_resize(&self, cols: u16, rows: u16) {
-        if let Ok(mut size) = self.size.lock() {
-            size.phone_resize((cols, rows));
-        }
+        lock(&self.size).phone_resize((cols, rows));
     }
 
     fn phone_left(&self) {
-        if let Ok(mut size) = self.size.lock() {
-            size.phone_left();
-        }
+        lock(&self.size).phone_left();
     }
 }
 
@@ -257,10 +255,7 @@ fn forward_signals(mut signals: Signals, master: SharedMaster, size: Size, link:
 }
 
 fn on_window_resize(size: &Size, link: &Link) {
-    let notices = match size.lock() {
-        Ok(mut s) => s.window_resized(current_size()),
-        Err(_) => return,
-    };
+    let notices = lock(size).window_resized(current_size());
     for notice in notices {
         link.send(notice.to_msg());
     }
@@ -302,17 +297,18 @@ fn copy_window_to_pty(writer: SharedWriter, size: Size, link: Arc<Link>, shell_p
                 Ok(0) => break true,
                 Ok(n) => {
                     // A desktop keystroke takes the size back from the phone.
-                    let notices = match size.lock() {
-                        Ok(mut s) if s.driver() == Driver::Phone => s.local_input(),
-                        _ => Vec::new(),
+                    let notices = {
+                        let mut s = lock(&size);
+                        if s.driver() == Driver::Phone {
+                            s.local_input()
+                        } else {
+                            Vec::new()
+                        }
                     };
                     for notice in notices {
                         link.send(notice.to_msg());
                     }
-                    let ok = match writer.lock() {
-                        Ok(mut w) => w.write_all(&buf[..n]).is_ok(),
-                        Err(_) => false,
-                    };
+                    let ok = lock(&writer).write_all(&buf[..n]).is_ok();
                     if !ok {
                         break false;
                     }

@@ -7,6 +7,7 @@ use shellx_term::{cli, fallback, tty, wrap};
 
 #[cfg(unix)]
 fn main() {
+    fallback::remember_sigterm();
     use std::sync::OnceLock;
     static TARGET: OnceLock<fallback::Target> = OnceLock::new();
 
