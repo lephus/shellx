@@ -339,3 +339,4 @@ pub fn assert_same_modes(dir: &std::path::Path) {
     }
     assert_eq!(read(dir, "before"), read(dir, "after"));
 }
+pub mod fake_agent;
