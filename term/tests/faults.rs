@@ -10,8 +10,8 @@ const T: Duration = Duration::from_secs(5);
 fn plain_shell_after_fault(fault: &str) {
     let mut h = Harness::wrap_sh(&[("SHELLX_TERM_FAULT", fault), ("SHELL", "/bin/sh")]);
     h.expect("could not share this terminal", T);
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=0", T);
+    h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo m=own''-tty\r");
+    h.expect("m=own-tty", T);
     h.send("exit 5\r");
     assert_eq!(h.wait_exit(T), 5);
 }
@@ -41,8 +41,8 @@ fn a_crash_restores_the_window_and_leaves_a_plain_shell() {
     // The notice is printed just before the exec; keystrokes sent in that gap
     // can still be read by the dying process's input thread.
     std::thread::sleep(Duration::from_millis(300));
-    h.send("echo m=$SHELLX_TERM\r");
-    h.expect("m=0", T);
+    h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo m=own''-tty\r");
+    h.expect("m=own-tty", T);
     h.send("exit\r");
     h.expect("saved", T);
     common::assert_same_modes(&dir);

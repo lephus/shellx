@@ -42,6 +42,15 @@ fn main() {
                 env!("CARGO_PKG_VERSION")
             );
         }
+        cli::Command::Probe => {
+            use std::io::Write;
+            match cli::parent_executable() {
+                Some(path) => {
+                    let _ = writeln!(std::io::stdout(), "{}", path.display());
+                }
+                None => std::process::exit(1),
+            }
+        }
         cli::Command::Invalid => {
             // The block may be calling an older or newer binary: still give
             // the user a shell, and say why it is a plain one.
