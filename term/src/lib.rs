@@ -19,5 +19,7 @@ pub mod tty;
 pub mod wincodec;
 #[cfg(windows)]
 pub mod wincon;
+#[cfg(windows)]
+pub mod winwrap;
 #[cfg(unix)]
 pub mod wrap;

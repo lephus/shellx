@@ -79,9 +79,56 @@ fn main() {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn main() {
-    // Windows arrives in plan P2 (spec §5.3). 222 tells the PowerShell block
-    // "could not wrap, carry on".
+    use shellx_term::{cli, link, wincon, winwrap};
+    use std::io::Write;
+
+    let command = cli::parse(std::env::args_os().skip(1));
+    if matches!(command, cli::Command::Wrap(_)) {
+        // A bug must never cost the user their window: put the console back
+        // and exit 222 so the PowerShell profile carries on in the outer shell.
+        std::panic::set_hook(Box::new(|info| {
+            if link::is_link_thread() {
+                return; // only the link dies; the terminal keeps running
+            }
+            wincon::restore_saved();
+            let _ = write!(
+                std::io::stderr(),
+                "\r\nshellx-term: internal error ({info}); carrying on without sharing\r\n"
+            );
+            std::process::exit(winwrap::COULD_NOT_WRAP);
+        }));
+    }
+    match command {
+        cli::Command::Version => {
+            let _ = writeln!(
+                std::io::stdout(),
+                "shellx-term {}",
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+        cli::Command::Wrap(args) => match winwrap::run(&args) {
+            Ok(code) => std::process::exit(code),
+            Err(error) => {
+                if let Some(notice) = error.notice() {
+                    let _ = writeln!(std::io::stderr(), "{notice}");
+                }
+                std::process::exit(winwrap::COULD_NOT_WRAP);
+            }
+        },
+        // `probe` serves the Unix blocks only.
+        cli::Command::Probe | cli::Command::Invalid => {
+            let _ = writeln!(
+                std::io::stderr(),
+                "shellx-term: unknown arguments; carrying on without sharing"
+            );
+            std::process::exit(winwrap::COULD_NOT_WRAP);
+        }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+fn main() {
     std::process::exit(222);
 }
