@@ -22,6 +22,6 @@ fn the_powershell_block_uses_the_installed_path_and_222() {
     let ps1 = BLOCKS[2].1;
     assert!(ps1.contains(r"Join-Path $env:LOCALAPPDATA 'ShellX\bin\shellx-term.exe'"));
     assert!(ps1.contains("$global:LASTEXITCODE = 222"));
-    assert!(ps1.contains("if ($LASTEXITCODE -ne 222) { [Environment]::Exit($LASTEXITCODE) }"));
+    assert!(ps1.contains("if ($LASTEXITCODE -ne 222 -and $LASTEXITCODE -ge 0) { [Environment]::Exit($LASTEXITCODE) }"));
     assert!(ps1.contains("$null -eq (Get-History -Count 1)"));
 }

@@ -8,10 +8,10 @@ if (-not $env:SHELLX_TERM -and -not $env:SHELLX -and $env:LOCALAPPDATA -and $Hos
       Where-Object { $_ -notmatch '^-(nologo|noprofile|noprofileloadtime|noexit|login|l)$' })
   $__shellxExe = Join-Path $env:LOCALAPPDATA 'ShellX\bin\shellx-term.exe'
   if ($__shellxPlain -and (Test-Path -LiteralPath $__shellxExe -PathType Leaf)) {
-    # 222 = could not wrap: carry on here. A binary that cannot start leaves it at 222 too.
+    # 222, or a negative code (a crash, a loader failure), means carry on here. A binary that cannot start leaves 222.
     $global:LASTEXITCODE = 222
-    try { & $__shellxExe wrap -- (Get-Process -Id $PID).Path -NoLogo } catch { $global:LASTEXITCODE = 222 }
-    if ($LASTEXITCODE -ne 222) { [Environment]::Exit($LASTEXITCODE) }
+    try { & $__shellxExe wrap -- (Get-Process -Id $PID).Path -NoLogo } catch { }
+    if ($LASTEXITCODE -ne 222 -and $LASTEXITCODE -ge 0) { [Environment]::Exit($LASTEXITCODE) }
     Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
   }
   Remove-Variable -Name __shellxPlain, __shellxExe -ErrorAction SilentlyContinue

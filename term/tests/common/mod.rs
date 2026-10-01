@@ -204,7 +204,8 @@ impl Harness {
 
     /// Waits until the output contains `needle`. Type commands so their
     /// echo does not contain the needle (`echo he''llo`, expect `hello`).
-    /// Only newly arrived bytes are searched, so floods of output stay cheap.
+    /// The whole output so far is searched (not just what arrived since the
+    /// last call), so an expected token must be unique in the session.
     pub fn expect(&mut self, needle: &str, timeout: Duration) {
         let until = Instant::now() + timeout;
         let needle = needle.as_bytes();

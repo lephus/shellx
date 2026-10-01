@@ -41,6 +41,10 @@ impl LastSize {
 /// Runs the shell until it exits and returns its exit code. `Err` is only
 /// returned before the shell started.
 pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
+    // Tests only: a binary that dies at start, as a loader failure does. On Windows, abort exits with a negative NTSTATUS-style code.
+    if faults::hit("abort") {
+        std::process::abort();
+    }
     if !wincon::is_console() {
         return Err(WrapError::NotATerminal);
     }

@@ -64,8 +64,8 @@ fn arrow_keys_reach_the_inner_shell() {
     let mut h = wrapped_cmd(&dir);
     h.send("set /a 6*7+1000\r");
     h.expect("1042", T);
-    h.send("\x1b[A\r"); // Up: cmd recalls the last command
-    h.expect("1042", T); // `expect` only searches output that arrived since
+    h.send("\x1b[A+1\r"); // Up recalls the line; +1 makes the result 1043
+    h.expect("1043", T);
     h.send("exit 0\r");
     h.wait_exit(T);
 }
@@ -75,8 +75,9 @@ fn ctrl_c_stops_the_running_command() {
     let dir = common::temp_dir("win-ctrlc");
     let mut h = wrapped_cmd(&dir);
     h.send("ping -n 60 127.0.0.1\r");
-    std::thread::sleep(Duration::from_millis(1500));
+    h.expect("TTL=", T);
     h.send_bytes(b"\x03");
+    h.settle(Duration::from_millis(1000));
     h.send("set /a 5*5+1000\r");
     h.expect("1025", T);
     h.send("exit 0\r");
@@ -90,9 +91,16 @@ fn resizing_the_window_resizes_the_shell() {
     h.send("$Host.UI.RawUI.WindowSize.Width + 1000\r");
     h.expect("1100", T);
     h.resize(120, 40);
-    std::thread::sleep(Duration::from_millis(500));
-    h.send("$Host.UI.RawUI.WindowSize.Width + 1000\r");
-    h.expect("1120", T);
+    let until = Instant::now() + T;
+    while !h.text().contains("1120") {
+        assert!(
+            Instant::now() < until,
+            "no 1120 after the resize: {:?}",
+            h.text()
+        );
+        h.send("$Host.UI.RawUI.WindowSize.Width + 1000\r");
+        h.settle(Duration::from_millis(500));
+    }
     h.send("exit 0\r");
     h.wait_exit(T);
 }
@@ -117,18 +125,41 @@ fn typed_vietnamese_reaches_the_shell() {
     h.wait_exit(T);
 }
 
+fn assert_fault_exits_222(fault: &str) {
+    let dir = common::temp_dir(&format!("win-222-{fault}"));
+    let mut h = spawn(
+        BIN,
+        &["wrap", "--", CMD, "/d"],
+        &dir,
+        &[("SHELLX_TERM_FAULT", fault)],
+    );
+    assert_eq!(h.wait_exit(T), 222, "{fault}: {:?}", h.text());
+}
+
 #[test]
-fn a_fault_or_a_crash_exits_222() {
-    for fault in ["openpty", "spawn", "panic"] {
-        let dir = common::temp_dir(&format!("win-222-{fault}"));
-        let mut h = spawn(
-            BIN,
-            &["wrap", "--", CMD, "/d"],
-            &dir,
-            &[("SHELLX_TERM_FAULT", fault)],
-        );
-        assert_eq!(h.wait_exit(T), 222, "{fault}: {:?}", h.text());
-    }
+fn typed_emoji_reaches_the_shell() {
+    let dir = common::temp_dir("win-emoji-in");
+    let mut h = wrapped_pwsh(&dir);
+    // UTF-16 code units: V i ệ t (4) + the emoji (2).
+    h.send("'E=' + 'Việt😀'.Length\r");
+    h.expect("E=6", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
+}
+
+#[test]
+fn an_openpty_fault_exits_222() {
+    assert_fault_exits_222("openpty");
+}
+
+#[test]
+fn a_spawn_fault_exits_222() {
+    assert_fault_exits_222("spawn");
+}
+
+#[test]
+fn a_crash_exits_222() {
+    assert_fault_exits_222("panic");
 }
 
 #[test]
@@ -162,7 +193,7 @@ fn killing_shellx_term_ends_the_inner_shell() {
     h.send("'PID=' + $PID\r");
     let inner = h.wait_number_after("PID=", T);
     h.send("ping -n 300 127.0.0.1\r");
-    std::thread::sleep(Duration::from_millis(1500));
+    h.expect("TTL=", T);
     // Only shellx-term.exe, as when its window is torn down; not the tree.
     let status = std::process::Command::new("taskkill")
         .args(["/PID", &h.pid().to_string(), "/F"])
@@ -176,8 +207,14 @@ fn killing_shellx_term_ends_the_inner_shell() {
             .args(["/FI", &format!("PID eq {inner}"), "/NH"])
             .output()
             .unwrap();
-        if !String::from_utf8_lossy(&out.stdout).contains(&inner.to_string()) {
+        assert!(out.status.success(), "tasklist failed: {out:?}");
+        let listing = String::from_utf8_lossy(&out.stdout);
+        if listing.contains(&inner.to_string()) {
+            // still running
+        } else if listing.contains("INFO:") {
             break;
+        } else {
+            panic!("unexpected tasklist output: {listing:?}");
         }
         assert!(
             Instant::now() < until,
@@ -210,24 +247,58 @@ fn shell_with_block(program: &str, dir: &Path, extra: &[(&str, &str)]) -> Harnes
     h
 }
 
+/// The block wraps the window: the inner shell reports itself to the agent
+/// link, and the inner exit code closes the window. The probe is typed only
+/// after the session appears, so the outer PSReadLine cannot swallow it.
+fn block_wraps_and_the_inner_exit_code_closes_the_window(program: &str, shell: &str, name: &str) {
+    let dir = common::temp_dir(name);
+    install(&dir, None);
+    let agent = FakeAgent::start(&dir, Behavior::Normal);
+    let mut h = shell_with_block(program, &dir, &[]);
+    let s = agent.next_session(T);
+    assert_eq!(s.info.shell, shell);
+    h.send("'[' + $env:SHELLX_TERM + ']'\r");
+    h.expect("[conpty:", T);
+    h.send("exit 5\r");
+    assert_eq!(h.wait_exit(T), 5, "{program}: {:?}", h.text());
+}
+
 #[test]
-fn the_block_wraps_and_the_inner_exit_code_closes_the_window() {
-    for program in [PWSH, POWERSHELL] {
-        let dir = common::temp_dir("win-block");
-        install(&dir, None);
-        let mut h = shell_with_block(program, &dir, &[]);
-        h.send("'[' + $env:SHELLX_TERM + ']'\r");
-        h.expect("[conpty:", T);
-        h.send("exit 5\r");
-        assert_eq!(h.wait_exit(T), 5, "{program}: {:?}", h.text());
-    }
+fn the_block_wraps_pwsh_and_the_inner_exit_code_closes_the_window() {
+    block_wraps_and_the_inner_exit_code_closes_the_window(PWSH, "pwsh", "win-block-7");
+}
+
+#[test]
+fn the_block_wraps_powershell_5_and_the_inner_exit_code_closes_the_window() {
+    block_wraps_and_the_inner_exit_code_closes_the_window(POWERSHELL, "powershell", "win-block-5");
+}
+
+fn corrupt_binary_leaves_the_window_working(program: &str, name: &str) {
+    let dir = common::temp_dir(name);
+    install(&dir, Some(b"MZ this is not a real executable"));
+    let mut h = shell_with_block(program, &dir, &[]);
+    h.expect("AFTER-BLOCK", T);
+    h.send("6*7+1000\r");
+    h.expect("1042", T);
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0);
 }
 
 #[test]
 fn a_corrupt_binary_leaves_the_window_working() {
-    let dir = common::temp_dir("win-corrupt");
-    install(&dir, Some(b"MZ this is not a real executable"));
-    let mut h = shell_with_block(PWSH, &dir, &[]);
+    corrupt_binary_leaves_the_window_working(PWSH, "win-corrupt");
+}
+
+#[test]
+fn a_corrupt_binary_leaves_the_window_working_in_powershell_5() {
+    corrupt_binary_leaves_the_window_working(POWERSHELL, "win-corrupt-5");
+}
+
+#[test]
+fn a_binary_that_dies_at_start_leaves_the_window_working() {
+    let dir = common::temp_dir("win-abort");
+    install(&dir, None);
+    let mut h = shell_with_block(PWSH, &dir, &[("SHELLX_TERM_FAULT", "abort")]);
     h.expect("AFTER-BLOCK", T);
     h.send("6*7+1000\r");
     h.expect("1042", T);
