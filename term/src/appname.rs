@@ -28,8 +28,20 @@ const BY_TERM_PROGRAM: &[(&str, &str)] = &[
     ("WezTerm", "WezTerm"),
 ];
 
-/// A display name, or "" when unknown. `get` reads an environment variable.
+/// Longest app name sent to the agent, in characters.
+const MAX_NAME: usize = 64;
+
+/// A display name (at most 64 characters), or "" when unknown. `get` reads an
+/// environment variable.
 pub fn terminal_app(get: impl Fn(&str) -> Option<String>) -> String {
+    let name = lookup(get);
+    match name.char_indices().nth(MAX_NAME) {
+        Some((end, _)) => name[..end].to_string(),
+        None => name,
+    }
+}
+
+fn lookup(get: impl Fn(&str) -> Option<String>) -> String {
     if let Some(id) = get("__CFBundleIdentifier") {
         if let Some((_, name)) = BY_BUNDLE.iter().find(|(bundle, _)| *bundle == id) {
             return name.to_string();
@@ -73,6 +85,15 @@ mod tests {
             app(&[("__CFBundleIdentifier", "com.apple.Terminal")]),
             "Terminal"
         );
+    }
+
+    #[test]
+    fn a_huge_term_program_is_cut_to_64_characters() {
+        let long = "é".repeat(10_000);
+        let name = app(&[("TERM_PROGRAM", &long)]);
+        assert_eq!(name.chars().count(), 64);
+        assert!(long.starts_with(&name));
+        assert_eq!(app(&[("TERM_PROGRAM", "Hyper")]), "Hyper");
     }
 
     #[test]

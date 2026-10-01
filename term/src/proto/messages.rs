@@ -469,6 +469,8 @@ pub(crate) mod tests {
     /// Writes term/protocol/vectors.txt from the samples. Run once after a
     /// deliberate protocol change, review the diff, commit it:
     /// `cargo test --features test-hooks write_vectors -- --ignored`
+    /// It rewrites the whole file WITHOUT the `auth.*` lines: run
+    /// `write_proof_vectors` afterwards to put them back.
     #[test]
     #[ignore]
     fn write_vectors() {

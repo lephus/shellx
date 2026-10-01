@@ -4,6 +4,10 @@
 
 use crate::proto::messages::TermMsg;
 
+/// Bounds for a phone's columns and rows.
+const PHONE_MIN: u16 = 1;
+const PHONE_MAX: u16 = 1000;
+
 pub trait Resizer {
     fn resize(&self, cols: u16, rows: u16);
 }
@@ -83,7 +87,13 @@ impl<R: Resizer> SizeControl<R> {
     }
 
     /// The phone attached, typed or resized (agent `resize`).
+    /// The size is clamped like the agent clamps it (1..=1000): a phone must
+    /// not be able to ask for a 0x0 or 65535-wide PTY.
     pub fn phone_resize(&mut self, size: (u16, u16)) {
+        let size = (
+            size.0.clamp(PHONE_MIN, PHONE_MAX),
+            size.1.clamp(PHONE_MIN, PHONE_MAX),
+        );
         let was_desktop = self.driver == Driver::Desktop;
         self.driver = Driver::Phone;
         self.apply(size, was_desktop);
@@ -202,6 +212,17 @@ mod tests {
         let mut s = SizeControl::new(&log, (80, 1));
         s.phone_resize((80, 1));
         assert_eq!(*log.0.borrow(), vec![(80, 2), (80, 1)]);
+    }
+
+    #[test]
+    fn phone_sizes_are_clamped_to_a_sane_range() {
+        let log = Log::default();
+        let mut s = SizeControl::new(&log, (80, 24));
+        s.phone_resize((0, 60000));
+        assert_eq!(s.applied(), (1, 1000));
+        s.phone_resize((65535, 0));
+        assert_eq!(s.applied(), (1000, 1));
+        assert_eq!(*log.0.borrow(), vec![(1, 1000), (1000, 1)]);
     }
 
     #[test]

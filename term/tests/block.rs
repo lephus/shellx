@@ -125,8 +125,9 @@ fn zsh_login_is_wrapped_as_non_login_with_the_login_marker() {
 }
 
 #[test]
-fn zsh_started_by_bare_name_resolves_to_the_login_shell() {
-    // argv[0] is "zsh" (not absolute): the block uses $SHELL.
+fn zsh_started_by_bare_name_is_wrapped_as_the_probed_binary() {
+    // argv[0] is "zsh" (not absolute): the block wraps what `probe` reports
+    // (the running shell's own binary), not $SHELL.
     assert_wrapped("zsh", &["-i"], "WRAPPED wrap=[/bin/zsh] login=[] marker=[]");
 }
 

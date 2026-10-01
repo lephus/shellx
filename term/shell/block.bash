@@ -8,7 +8,7 @@ if [[ $- == *i* && -z "${BASH_EXECUTION_STRING-}" && "${BASH_LINENO[0]-0}" == 0 
       && -f "$HOME/Library/Application Support/ShellX/bin/shellx-term" \
       && -x "$HOME/Library/Application Support/ShellX/bin/shellx-term" ]] \
    && { [[ -z "${SHELLX_TERM-}" ]] || [[ "$SHELLX_TERM" != "$(tty)" ]]; }; then
-  __shellx_shell=$("$HOME/Library/Application Support/ShellX/bin/shellx-term" probe 2>/dev/null)
+  __shellx_shell=$("$HOME/Library/Application Support/ShellX/bin/shellx-term" probe </dev/null 2>/dev/null)
   if [[ $__shellx_shell == /* ]]; then
     export SHELLX_TERM_WRAP=$__shellx_shell
     if shopt -q login_shell; then export SHELLX_TERM_WRAP_LOGIN=1; fi

@@ -1,6 +1,7 @@
 //! The small CBOR subset the local link uses (spec §6.2): one map with text
 //! keys whose values are unsigned integers, byte strings, text strings or
-//! booleans. Definite lengths only; integers in their shortest form.
+//! booleans. Definite lengths only. The encoder writes integers and lengths
+//! in their shortest form; the decoder accepts any valid length form.
 
 use std::collections::BTreeMap;
 

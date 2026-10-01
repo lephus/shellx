@@ -7,7 +7,7 @@ if [[ -o interactive && -z "${ZSH_EXECUTION_STRING-}" && -z "${ZSH_SCRIPT-}" \
       && -f "$HOME/Library/Application Support/ShellX/bin/shellx-term" \
       && -x "$HOME/Library/Application Support/ShellX/bin/shellx-term" ]]; then
   # One run: proves the binary works (zsh exits if exec fails) and names this exact shell binary.
-  __shellx_shell=$("$HOME/Library/Application Support/ShellX/bin/shellx-term" probe 2>/dev/null)
+  __shellx_shell=$("$HOME/Library/Application Support/ShellX/bin/shellx-term" probe </dev/null 2>/dev/null)
   if [[ $__shellx_shell == /* ]]; then
     # VS Code/Cursor and JetBrains start zsh with ZDOTDIR pointing at their own dir; point it back
     # there so the inner shell re-runs their integration.

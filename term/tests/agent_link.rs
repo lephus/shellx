@@ -166,12 +166,24 @@ fn exit_reaches_the_agent_and_a_hung_agent_does_not_hold_the_window() {
 
 #[test]
 fn the_inner_shell_is_marked_with_its_own_tty() {
+    // The way a block calls us: no arguments, the shell in the environment.
     let home = common::temp_dir("e2e-marker");
-    let mut h = wrapped_sh(&home);
+    let mut h = Harness::spawn(
+        BIN,
+        &[],
+        &[
+            ("HOME", home.to_str().unwrap()),
+            ("SHELLX_TERM_TIMING", "fast"),
+            ("SHELLX_TERM_WRAP", "/bin/sh"),
+            ("SHELLX_TERM_WRAP_LOGIN", "1"),
+        ],
+        80,
+        24,
+    );
     h.send("[ \"$SHELLX_TERM\" = \"$(tty)\" ] && echo same''-tty\r");
     h.expect("same-tty", T);
-    h.send("echo wrap=[${SHELLX_TERM_WRAP-}]\r");
-    h.expect("wrap=[]", T);
+    h.send("echo wrap=[${SHELLX_TERM_WRAP-}][${SHELLX_TERM_WRAP_LOGIN-}]\r");
+    h.expect("wrap=[][]", T);
     h.send("exit\r");
     h.wait_exit(T);
 }

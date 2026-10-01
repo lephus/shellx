@@ -294,6 +294,7 @@ fn shell_command(args: &WrapArgs, tty: std::path::PathBuf) -> CommandBuilder {
 /// thread then sees the shell exit and takes the normal exit path.
 fn copy_window_to_pty(writer: SharedWriter, size: Size, link: Arc<Link>, shell_pid: Option<u32>) {
     std::thread::spawn(move || {
+        // fd 0 lives as long as the process; ManuallyDrop keeps it open.
         let mut window = ManuallyDrop::new(unsafe { File::from_raw_fd(STDIN) });
         let mut buf = [0u8; 8192];
         let window_gone = loop {
@@ -322,14 +323,18 @@ fn copy_window_to_pty(writer: SharedWriter, size: Size, link: Arc<Link>, shell_p
         };
         if window_gone {
             if let Some(pid) = shell_pid {
+                // The shell is a session leader (its own process group): the
+                // group gets the hang-up, then the shell itself.
                 unsafe {
                     libc::kill(-(pid as i32), libc::SIGHUP);
                     libc::kill(pid as i32, libc::SIGHUP);
                 }
             }
         }
-        // The writer stays alive in the shared Arc: dropping portable-pty's
-        // writer would type "\n^D" into the shell.
+        // Never drop portable-pty's writer: it types "\n^D" into the shell.
+        // Other owners (the link's events) may already be gone, e.g. without
+        // HOME, so this reference is leaked on purpose.
+        std::mem::forget(writer);
     });
 }
 
