@@ -17,6 +17,11 @@ fn main() {
         // user their terminal: restore the window and replace this process
         // with a plain shell.
         std::panic::set_hook(Box::new(|info| {
+            // A bug in the link thread only stops the link: the terminal
+            // goes on. (Replacing the process here would close the PTY.)
+            if shellx_term::link::is_link_thread() {
+                return;
+            }
             tty::restore_saved();
             use std::io::Write;
             // Never `eprint!`: it panics if stderr is gone, and a panic inside

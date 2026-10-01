@@ -17,6 +17,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
+/// Name prefix of every thread of the link; see `is_link_thread`.
+pub const LINK_THREAD: &str = "shellx-link";
+
+/// True on a thread that belongs to the link. A panic there must not take
+/// the terminal down (the panic hook ignores it).
+pub fn is_link_thread() -> bool {
+    std::thread::current()
+        .name()
+        .is_some_and(|name| name.starts_with(LINK_THREAD))
+}
+
 /// Largest `snapshot`/`out` data piece: a frame stays under 64 KiB.
 pub const SNAPSHOT_PIECE: usize = 60 * 1024;
 
@@ -121,7 +132,12 @@ impl Link {
         if let Some(path) = endpoint {
             let shared = shared.clone();
             let timing = timing.clone();
-            std::thread::spawn(move || connection_loop(path, timing, shared, events));
+            // Named so the panic hook can tell a link bug (the link stops, the
+            // terminal carries on) from a bug on the window path. If the
+            // thread cannot start there is simply no session this time.
+            let _ = std::thread::Builder::new()
+                .name(LINK_THREAD.into())
+                .spawn(move || connection_loop(path, timing, shared, events));
         }
         Link { shared, timing }
     }
@@ -192,6 +208,9 @@ fn connection_loop(
                 continue;
             }
         };
+        if faults::hit("link-panic") {
+            panic!("injected link fault");
+        }
         if blocked.as_deref() == Some(endpoint.raw.as_slice()) {
             nap(&shared, timing.version_poll);
             continue;
@@ -240,7 +259,10 @@ fn run_session(stream: TcpStream, shared: &Shared, events: &Arc<dyn LinkEvents>,
     let reader = match writer.try_clone() {
         Ok(r) if send_snapshot(&mut writer, &snapshot) => {
             let events = events.clone();
-            Some(std::thread::spawn(move || read_agent(r, events)))
+            std::thread::Builder::new()
+                .name(format!("{LINK_THREAD}-reader"))
+                .spawn(move || read_agent(r, events))
+                .ok()
         }
         _ => None,
     };

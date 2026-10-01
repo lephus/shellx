@@ -192,3 +192,36 @@ fn an_ignored_sigterm_stays_ignored() {
     h.send("exit 0\r");
     assert_eq!(h.wait_exit(T), 0);
 }
+
+#[test]
+fn a_panic_in_the_link_thread_does_not_cost_the_terminal_session() {
+    let home = common::temp_dir("e2e-link-panic");
+    let h = home.to_str().unwrap();
+    let mut w = Harness::spawn(
+        BIN,
+        &["wrap", "--", "/bin/sh"],
+        &[
+            ("HOME", h),
+            ("SHELLX_TERM_TIMING", "fast"),
+            ("SHELLX_TERM_FAULT", "link-panic"),
+        ],
+        80,
+        24,
+    );
+    let _agent = FakeAgent::start(&home, Behavior::Normal);
+    std::thread::sleep(Duration::from_millis(500)); // the link thread panics
+    w.send("echo st''ill-here\r");
+    w.expect("still-here", T);
+    w.send("echo pid=$PPID\r");
+    w.settle(Duration::from_millis(300));
+    assert!(
+        !w.text().contains("starting a plain shell"),
+        "{:?}",
+        w.text()
+    );
+    // The window process is still shellx-term, not a replacement shell.
+    w.send("ps -o ucomm= -p $PPID\r");
+    w.expect("shellx-term", T);
+    w.send("exit 0\r");
+    assert_eq!(w.wait_exit(T), 0);
+}
