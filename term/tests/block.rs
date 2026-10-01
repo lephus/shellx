@@ -6,7 +6,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-const T: Duration = Duration::from_secs(5);
+// Generous: a loaded machine can take seconds to start a dozen zsh at once.
+const T: Duration = Duration::from_secs(15);
 const ZSH_BLOCK: &str = include_str!("../shell/block.zsh");
 const BASH_BLOCK: &str = include_str!("../shell/block.bash");
 

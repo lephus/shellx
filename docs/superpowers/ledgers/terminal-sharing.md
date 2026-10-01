@@ -98,7 +98,7 @@ Còn cần người thử tay: gõ bằng bộ gõ tiếng Việt (IME); Cmd+W t
 
 Nhánh `feat/terminal-sharing-p2a`. Phần phía `shellx-term` của kết nối nội bộ (spec §6) và khối tích hợp mới (§5.2). Agent (P3) và Windows (P2b) chưa làm.
 
-**Test:** `cd term && cargo test --features test-hooks`: **135 test chạy, 2 bị `#[ignore]`** (bộ test đơn vị 56 + 9 bộ tích hợp; xanh 3 lần liên tiếp trước mỗi commit). `cargo fmt --check` và `cargo clippy --all-targets --features test-hooks -- -D warnings` sạch. Byte chuẩn của giao thức: `term/protocol/vectors.txt` (`vectors_match`, `proof_vectors_match`).
+**Test:** `cd term && cargo test --features test-hooks`: **146 test chạy, 2 bị `#[ignore]`** (bộ test đơn vị 59 + 9 bộ tích hợp; số này tính sau đợt sửa của review cuối; xanh 3 lần liên tiếp trước mỗi commit). `cargo fmt --check` và `cargo clippy --all-targets --features test-hooks -- -D warnings` sạch. Byte chuẩn của giao thức: `term/protocol/vectors.txt` (`vectors_match`, `proof_vectors_match`).
 
 ### Đo thời gian mở cửa sổ (sau Task 7)
 
@@ -128,7 +128,7 @@ wrapped (shipped block)    median   713.8 ms   overhead   +26.4 ms
 | bash: `bash -i script` vẫn bị bọc | **Còn mở** (zsh đã xử lý, bash chưa) |
 | zsh login: biến đánh dấu + `setopt login` (R3) | **Xong** (`2af91d2`; có test PTY: `.zlogin` chạy một lần, `logout` thoát 0) |
 | Tiêu đề cửa sổ: tham số qua biến môi trường, `argv[0]` giống shell gốc (R2) | **Xong** (`2af91d2`, `exec -a`) |
-| SIGTERM đang bị bỏ qua thì giữ nguyên | **Xong** (`070d92d`) |
+| SIGTERM đang bị bỏ qua thì giữ nguyên | **Xong, sửa ở review cuối:** `070d92d` chỉ giữ trạng thái "bỏ qua" có sẵn, nhưng zsh/bash đặt lại SIGTERM về mặc định trước `exec` nên đường khối không bao giờ thấy trạng thái đó. Nay `shellx-term` do khối gọi (không đối số + `SHELLX_TERM_WRAP`) luôn bỏ qua SIGTERM; `wrap …` tường minh vẫn giữ nguyên trạng thái lúc khởi động. Test PTY với bản thật cho zsh và bash (`kill -TERM $PPID`), spec §5.4 mục 6 |
 | `SHELLX_TERM=1` bị thừa kế (`code .`): ghi tty bên trong, so với `$TTY` | **Xong** (`070d92d` đặt tty, `2af91d2` so trong khối); hệ quả: mọi PTY mở từ cửa sổ đã bọc cũng được bọc (spec §5.2) |
 | Sai zsh khi `ZSH_ARGZERO` tương đối / zsh không login | **Xong** (`2af91d2`, `probe` thay cho đoán từ `$SHELL`/`--version`) |
 | JetBrains với `ZDOTDIR` tùy chỉnh: shell bên trong rơi về `$HOME` | **Còn mở** (hiếm; chưa có cách sửa) |
@@ -144,19 +144,21 @@ wrapped (shipped block)    median   713.8 ms   overhead   +26.4 ms
 
 ### Việc nhỏ còn mở tại thời điểm viết
 
-Từ review từng task (chưa sửa khi viết mục này; bản review cuối của nhánh có thể sửa một phần, nên cần kiểm lại trước khi nhận):
+Từ review từng task. **Các mục đã gạch ở dưới được sửa trong đợt sửa của review cuối** (cùng nhánh); phần còn lại vẫn mở tại thời điểm viết:
 
 - **Cho P3 (agent):** bộ giải mã nhận số nguyên không ở dạng ngắn nhất (chỉ bộ mã hóa ghi dạng ngắn nhất); không có test quét ngẫu nhiên "không panic" (cắt cụt/đổi byte) trên các vector.
 - **Cho P2b/tiếp theo (độ bền của đường nối):**
-  - `output()`/`send()` chạy trong lúc `finish` đang xả có thể đẩy khung sau `exit`; một phiên có thể bắt đầu sau `finish`; mất đánh thức trong `nap`.
-  - Luồng đọc của agent chết mà output vẫn chảy thì không bị phát hiện (chỉ kiểm khi hết thời gian chờ pop) → input từ điện thoại mất âm thầm.
+  - ~~`output()`/`send()` chạy trong lúc `finish` đang xả có thể đẩy khung sau `exit`~~ **Xong** (`live` tắt cùng khối khóa với việc đẩy `exit`; test `no_frame_follows_exit`). Còn mở: một phiên có thể bắt đầu sau `finish`; mất đánh thức trong `nap`.
+  - ~~Luồng đọc của agent chết mà output vẫn chảy thì không bị phát hiện~~ **Xong** (`read_agent` đóng socket khi kết thúc nên luồng ghi lỗi ngay; test `a_malformed_agent_frame_ends_the_session_even_while_output_flows`).
   - Thay đổi kích thước trong lúc bắt tay bị mất tới lần đổi sau (cần đẩy lại `Size` khi vào `live`).
   - Callback `LinkEvents` chạy trên luồng đọc và teardown join luồng này: `input()` bị chặn sẽ làm kẹt nối lại (cần ghi tài liệu hoặc tách).
   - `Timing::backoff` panic nếu vector rỗng; `output()` vẫn mã hóa sau khi hàng chờ tràn.
 - **Cho `wrap`/`fallback`:**
-  - HOME không đặt → `Link::start(None)` bỏ `writer` → portable-pty gõ `\n^D` khi luồng cửa sổ thoát (một dòng `std::mem::forget(writer)`).
-  - Panic của luồng link nằm trong tầm panic hook: panic ở link làm exec shell thường và treo phiên; cân nhắc để panic của luồng link chỉ giết link.
-  - Fallback `exec_shell` không gỡ `SHELLX_TERM_WRAP`/`SHELLX_TERM_WRAP_LOGIN` (cửa sổ bash login rơi về fallback → ứng dụng khởi chạy sau đó bị bọc kiểu login).
-  - `wrap.rs` còn đặt `SHELLX_TERM="1"` khi không lấy được tên tty (không còn là tín hiệu bỏ qua → rủi ro bọc đệ quy, lý thuyết); nên coi `None` là thất bại.
-  - Khối nên gọi `probe </dev/null` để binary cũ không đọc terminal.
+  - ~~HOME không đặt → portable-pty gõ `\n^D`~~ **Xong** (luồng cửa sổ kết thúc bằng `std::mem::forget(writer)`; chưa có test riêng cho trường hợp HOME không đặt).
+  - ~~Panic của luồng link làm exec shell thường~~ **Xong** (mọi luồng link tên `shellx-link…`, panic hook bỏ qua chúng, link dừng còn terminal tiếp tục; lỗi tạo luồng nghĩa là "không có phiên lần này"; test `a_panic_in_the_link_thread_does_not_cost_the_terminal_session` với `SHELLX_TERM_FAULT=link-panic`).
+  - ~~Fallback `exec_shell` không gỡ `SHELLX_TERM_WRAP`/`SHELLX_TERM_WRAP_LOGIN`~~ **Xong** (test `the_fallback_shell_does_not_inherit_the_block_s_wrap_variables`).
+  - ~~`SHELLX_TERM="1"` khi không lấy được tên tty~~ **Xong** (trả `WrapError::Pty`, đi đường fallback; không có test vì không giả lập được `tty_name() == None`).
+  - ~~Khối nên gọi `probe </dev/null`~~ **Xong** (cả `block.zsh` lẫn `block.bash`).
+  - Còn mở từ review cuối (ghi nhận, chưa sửa): `SIGTERM` thoát mà không gửi `exit` cho agent; một `sleep` 200 ms trong test kích thước; `Fields` clone; `start(None)` chưa có test; test bash cùng tty với bản thật; kiểm tra chỉ-tiền-tố ở `block.rs`; vài chi tiết nhỏ ở §5.4.2/§6.3.
+  - Đã sửa thêm ở review cuối: cửa sổ test nay có HOME tạm riêng (`Harness::spawn`; trước đó luồng link của test có thể nối vào agent thật ở HOME thật; `startup_bench` cố ý dùng HOME thật, đã ghi trong tài liệu của nó); kích thước từ điện thoại bị kẹp trong 1..=1000; tên ứng dụng cắt ở 64 ký tự; test `finish` với khung không ghi được ngay mà chưa tràn hàng chờ (~950 KiB, vì 600 KiB lọt hết vào bộ đệm socket của macOS nên không thử được đường cần thử).
 - **Test:** vài khoảng trống (kích thước ở mức bằng nhau, bash cùng tty, zsh sai bản với binary thật, test thoát/"finish treo" hiện làm tràn thay vì thử đúng `finish`, test khởi động lại để lại agent cũ đang nghe); `read_endpoint` gộp mọi lỗi IO thành `Missing`.
