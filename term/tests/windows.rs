@@ -61,6 +61,22 @@ fn the_inner_shell_carries_the_conpty_marker() {
 }
 
 #[test]
+fn the_inner_shell_keeps_the_window_s_environment() {
+    // OS comes from the machine registry; the window's own value must win.
+    let dir = common::temp_dir("win-env");
+    let mut h = spawn(
+        BIN,
+        &["wrap", "--", CMD, "/d"],
+        &dir,
+        &[("OS", "shellx-env-marker")],
+    );
+    h.send("echo [%OS%]\r");
+    h.expect("[shellx-env-marker]", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
+}
+
+#[test]
 fn arrow_keys_reach_the_inner_shell() {
     let dir = common::temp_dir("win-arrows");
     let mut h = wrapped_cmd(&dir);

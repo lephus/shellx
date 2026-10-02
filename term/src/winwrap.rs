@@ -78,6 +78,13 @@ pub fn run(args: &WrapArgs) -> Result<i32, WrapError> {
         return Err(WrapError::Spawn("injected fault".into()));
     }
     let mut cmd = CommandBuilder::new(&args.shell);
+    // On Windows the builder lays the registry environment over ours (PATH,
+    // TEMP, PSModulePath…); the inner shell must get the window's own, as it
+    // would without ShellX (a venv, `conda activate`, VS Code's env settings).
+    cmd.env_clear();
+    for (key, value) in std::env::vars_os() {
+        cmd.env(key, value);
+    }
     cmd.args(&args.shell_args);
     // The PowerShell block skips any shell that carries a marker.
     cmd.env("SHELLX_TERM", format!("conpty:{}", std::process::id()));

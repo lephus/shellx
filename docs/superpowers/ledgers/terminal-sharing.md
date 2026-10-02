@@ -216,7 +216,7 @@ Nhánh `feat/terminal-sharing-p2b`. Cổng Windows của `shellx-term` (spec §5
 
 ### Workflow `windows-check`
 
-`.github/workflows/windows-check.yml`: `workflow_dispatch` và push lên `windows-check/**`; chạy `cargo fmt --check`, `clippy` và `test` (`--locked`) trên `windows-latest` và `macos-latest`. Bước đầu đặt `core.autocrlf=false` vì runner Windows mặc định là `true`. Phạm vi chỉ `term/`; P3/P4 thêm `dart test` và `flutter build windows`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
+`.github/workflows/windows-check.yml`: `workflow_dispatch` và push lên `windows-check/**`; chạy `cargo fmt --check`, `clippy` và `test` (`--locked`) trên `windows-latest` và `macos-latest`. Bước đầu đặt `core.autocrlf=false` vì runner Windows mặc định là `true`. Rust ghim ở 1.95.0 (bản trên máy Mac) để lint/định dạng của bản stable mới hơn không làm đỏ CI. Phạm vi chỉ `term/`; P3/P4 thêm `dart test` và `flutter build windows`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
 
 ### Kiểm tay Windows còn thiếu
 
@@ -226,3 +226,14 @@ Nhánh `feat/terminal-sharing-p2b`. Cổng Windows của `shellx-term` (spec §5
 - Mã hóa profile của PowerShell 5.1 (khối chỉ ASCII; kiểm profile có tiếng Việt và không BOM).
 - Ctrl+Space (xem giới hạn).
 - Đổi cỡ cửa sổ conhost cổ điển (đặc biệt chiều cao khi scrollback dài).
+- Lối tắt PowerShell 7 ở Start menu có thể truyền `-WorkingDirectory ~`, đối số này không nằm trong danh sách cho phép nên cửa sổ đó sẽ không được bọc (chưa xác minh).
+- Ctrl+Break cũng tới PowerShell bên ngoài trong lúc nó chờ.
+
+### Review cuối P2b (2026-10-02)
+
+Chạy sớm, song song với lần CI Windows đầu, để lỗi CI và lỗi review sửa chung một vòng đẩy. Kết luận: cần sửa 1 lỗi Important, không có Critical; 5 mục Review Focus đều đúng khi lần theo code; tên/chữ ký winapi 0.3.9 và lời gọi portable-pty 0.9.0 đã đối chiếu với source; `Cargo.lock` đủ cho Windows.
+
+- **I1 — Xong:** trên Windows, `CommandBuilder::new` của portable-pty đè môi trường của tiến trình bằng giá trị registry (PATH, TEMP, PSModulePath…), nên shell bên trong mất PATH của venv/`conda activate`/`terminal.integrated.env` của VS Code. Nay `winwrap` xóa môi trường gốc của builder rồi chép nguyên môi trường của cửa sổ; test Windows `the_inner_shell_keeps_the_window_s_environment` (`OS` đặt khác registry).
+- **M1 — Xong:** workflow ghim Rust 1.95.0.
+- **M2 — Còn mở:** chưa có test Windows kiểm console được trả về chế độ cũ sau khi thoát hoặc panic (spec §11.1); hướng: thử phím Up sau khi carry-on và một test khối với lỗi `panic`.
+- **M3 — Còn mở:** `appname.rs` xét `WT_SESSION` trước `TERM_PROGRAM`, mà `WT_SESSION` được thừa kế, nên VS Code mở bằng `code .` từ một tab Windows Terminal sẽ hiện là "Windows Terminal". Hẹp, spec không quy định thứ tự.
