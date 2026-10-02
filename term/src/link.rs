@@ -329,10 +329,27 @@ fn send_snapshot(writer: &mut TcpStream, snapshot: &[u8]) -> bool {
     true
 }
 
-fn read_agent(mut stream: TcpStream, events: Arc<dyn LinkEvents>) {
-    while let Ok(frame) = read_frame(&mut stream) {
+/// Shuts the socket down however the reader ends, including a panic (the
+/// panic hook lets link threads die): the session writer then fails at once
+/// and the link reconnects, instead of silently dropping phone input.
+struct ShutdownOnDrop(TcpStream);
+
+impl Drop for ShutdownOnDrop {
+    fn drop(&mut self) {
+        let _ = self.0.shutdown(Shutdown::Both);
+    }
+}
+
+fn read_agent(stream: TcpStream, events: Arc<dyn LinkEvents>) {
+    let mut guard = ShutdownOnDrop(stream);
+    while let Ok(frame) = read_frame(&mut guard.0) {
         match AgentMsg::decode(&frame) {
-            Ok(Some(AgentMsg::In { data })) => events.input(&data),
+            Ok(Some(AgentMsg::In { data })) => {
+                if faults::hit("reader-panic") {
+                    panic!("injected reader fault");
+                }
+                events.input(&data)
+            }
             Ok(Some(AgentMsg::Resize { cols, rows })) => events.phone_resize(cols, rows),
             Ok(Some(AgentMsg::LocalSize)) => events.phone_left(),
             // Handshake-only or unknown messages are ignored.
@@ -340,7 +357,4 @@ fn read_agent(mut stream: TcpStream, events: Arc<dyn LinkEvents>) {
             Err(_) => break,
         }
     }
-    // The session is over (EOF, error or a frame we cannot decode): fail
-    // the writer's next write at once instead of waiting for its poll.
-    let _ = stream.shutdown(Shutdown::Both);
 }

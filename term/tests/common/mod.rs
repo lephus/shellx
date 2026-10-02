@@ -3,12 +3,15 @@
 #![allow(dead_code)]
 
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use shellx_term::proto::endpoint::ENDPOINT_BASE_VAR;
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -16,22 +19,24 @@ pub const BIN: &str = env!("CARGO_BIN_EXE_shellx-term");
 
 pub struct Harness {
     master: Option<Box<dyn MasterPty + Send>>,
-    writer: Option<Box<dyn Write + Send>>,
+    /// Shared with the Windows reader, which answers ConPTY's cursor query.
+    writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     stop_reader: Arc<AtomicBool>,
     reader_thread: Option<JoinHandle<()>>,
     rx: Receiver<Vec<u8>>,
     output: Vec<u8>,
     child: Box<dyn Child + Send + Sync>,
-    /// The window's own temporary HOME (when the caller did not pass one),
-    /// kept until the window is dropped.
-    _home: Option<TempDir>,
+    /// The window's own temporary per-user base directory (when the caller
+    /// did not pass one), kept until the window is dropped.
+    _base: Option<TempDir>,
 }
 
 impl Harness {
     /// Runs `program args` in a fresh `cols`x`rows` PTY ("the window").
     /// `PS1` is `$ ` and ShellX variables are cleared unless `env` sets them.
-    /// `HOME` is a fresh temporary directory unless `env` sets it, so no test
-    /// window ever reaches the real HOME or a running agent.
+    /// The per-user base directory (`HOME` on Unix, `LOCALAPPDATA` on
+    /// Windows) is a fresh temporary directory unless `env` sets it, so no
+    /// test window ever reaches the real one or a running agent.
     pub fn spawn(
         program: &str,
         args: &[&str],
@@ -57,6 +62,7 @@ impl Harness {
             "STY",
             "SHELLX_TERM_FAULT",
             "TERM_PROGRAM",
+            "WT_SESSION",
         ] {
             cmd.env_remove(name);
         }
@@ -66,23 +72,25 @@ impl Harness {
         for (key, value) in env {
             cmd.env(key, value);
         }
-        let home = if env.iter().any(|(key, _)| *key == "HOME") {
+        let base = if env.iter().any(|(key, _)| *key == ENDPOINT_BASE_VAR) {
             None
         } else {
             static NEXT: AtomicUsize = AtomicUsize::new(0);
             let n = NEXT.fetch_add(1, Ordering::SeqCst);
             let dir = temp_dir(&format!("window-home-{n}"));
-            cmd.env("HOME", &*dir);
+            cmd.env(ENDPOINT_BASE_VAR, &*dir);
             Some(dir)
         };
         let child = pair.slave.spawn_command(cmd).expect("spawn");
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().expect("reader");
-        let writer = pair.master.take_writer().expect("writer");
+        let writer = Arc::new(Mutex::new(pair.master.take_writer().expect("writer")));
         let (tx, rx) = channel();
-        let master_fd = pair.master.as_raw_fd().expect("master fd");
         let stop_reader = Arc::new(AtomicBool::new(false));
         let stop = stop_reader.clone();
+        #[cfg(unix)]
+        let master_fd = pair.master.as_raw_fd().expect("master fd");
+        #[cfg(unix)]
         let reader_thread = std::thread::spawn(move || {
             let mut buf = [0u8; 16384];
             // Poll with a timeout instead of a blocking read, so
@@ -107,6 +115,30 @@ impl Harness {
                 }
             }
         });
+        #[cfg(windows)]
+        let reader_thread = {
+            let answer = writer.clone();
+            std::thread::spawn(move || {
+                let _ = stop; // Windows reads block; the thread ends with the pipe.
+                let mut buf = [0u8; 16384];
+                loop {
+                    match reader.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            // A ConPTY made with PSEUDOCONSOLE_INHERIT_CURSOR (as
+                            // portable-pty makes them) asks where the cursor is
+                            // and waits for the answer.
+                            if find(&buf[..n], b"\x1b[6n").is_some() {
+                                let _ = answer.lock().unwrap().write_all(b"\x1b[1;1R");
+                            }
+                            if tx.send(buf[..n].to_vec()).is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            })
+        };
         Harness {
             master: Some(pair.master),
             writer: Some(writer),
@@ -115,7 +147,7 @@ impl Harness {
             rx,
             output: Vec::new(),
             child,
-            _home: home,
+            _base: base,
         }
     }
 
@@ -129,7 +161,12 @@ impl Harness {
     }
 
     pub fn send_bytes(&mut self, bytes: &[u8]) {
-        let writer = self.writer.as_mut().expect("window is open");
+        let mut writer = self
+            .writer
+            .as_ref()
+            .expect("window is open")
+            .lock()
+            .unwrap();
         writer.write_all(bytes).expect("write to window");
         writer.flush().expect("flush window");
     }
@@ -167,7 +204,8 @@ impl Harness {
 
     /// Waits until the output contains `needle`. Type commands so their
     /// echo does not contain the needle (`echo he''llo`, expect `hello`).
-    /// Only newly arrived bytes are searched, so floods of output stay cheap.
+    /// The whole output so far is searched (not just what arrived since the
+    /// last call), so an expected token must be unique in the session.
     pub fn expect(&mut self, needle: &str, timeout: Duration) {
         let until = Instant::now() + timeout;
         let needle = needle.as_bytes();
@@ -248,22 +286,15 @@ impl Harness {
         self.child.process_id().expect("pid") as i32
     }
 
-    /// Waits for the program to exit; returns its code (128 + n for signal n).
+    /// Waits for the program to exit; returns its code (128 + n for signal n
+    /// on Unix).
     pub fn wait_exit(&mut self, timeout: Duration) -> i32 {
         let until = Instant::now() + timeout;
         loop {
-            // Not `use`-ing `Downcast`: the call must resolve on the trait object.
-            let child = self
-                .child
-                .as_any_mut()
-                .downcast_mut::<std::process::Child>()
-                .expect("portable-pty spawns std::process::Child on Unix");
-            if let Some(status) = child.try_wait().expect("try_wait") {
+            if let Some(code) = self.exited() {
                 let drain_until = Instant::now() + Duration::from_millis(300);
                 while self.pump(drain_until) {}
-                return status
-                    .code()
-                    .unwrap_or_else(|| 128 + status.signal().unwrap_or(0));
+                return code;
             }
             assert!(
                 Instant::now() < until,
@@ -274,6 +305,30 @@ impl Harness {
                 std::thread::sleep(Duration::from_millis(10));
             }
         }
+    }
+
+    /// The exit code if the program has exited (128 + n for signal n on Unix).
+    #[cfg(unix)]
+    fn exited(&mut self) -> Option<i32> {
+        // Not `use`-ing `Downcast`: the call must resolve on the trait object.
+        let child = self
+            .child
+            .as_any_mut()
+            .downcast_mut::<std::process::Child>()
+            .expect("portable-pty spawns std::process::Child on Unix");
+        child.try_wait().expect("try_wait").map(|status| {
+            status
+                .code()
+                .unwrap_or_else(|| 128 + status.signal().unwrap_or(0))
+        })
+    }
+
+    #[cfg(windows)]
+    fn exited(&mut self) -> Option<i32> {
+        self.child
+            .try_wait()
+            .expect("try_wait")
+            .map(|status| status.exit_code() as i32)
     }
 }
 

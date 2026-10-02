@@ -40,7 +40,7 @@ Việc còn lại — tất cả cần người dùng quyết/cung cấp:
 
 - **VPS** (runbook `deploy/README.md`): quốc gia đặt VPS đã điền là Việt Nam (2026-09-27; bộ chặn `[quốc gia]` vẫn giữ cho lần sửa sau); user deploy trong nhóm `docker`, `~/phu/shellx/data` thuộc uid 1000; tên network của nginx-proxy vào `~/phu/shellx/.env`; 4 secret `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` và biến `VPS_APP_DIR` (mặc định `phu/shellx`), `VPS_SSH_PORT` (tuỳ chọn, chỉ số, mặc định `22`) — tất cả là Environment secret/variable của hai GitHub Environment `production` (dùng bởi `deploy.yml`) và `release` (dùng bởi `publish`), không phải repository secret; sau lần deploy đầu: công khai 2 package GHCR `shellx-relay`, `shellx-web` và chép (không symlink) 4 file `~/phu/shellx/nginx-proxy/*` vào `vhost.d` của nginx-proxy rồi tạo lại container ShellX — **tất cả đã xong 2026-09-28**: deploy đầu tiên (b157539) live, relay/web healthy, cert đã cấp, 4 check của README bước 6 pass. Lưu ý VPS này: container nginx-proxy tên `proxy`, network tên `nginx-proxy`, vhost.d nằm ở volume `nginx_nginx_vhosts`. Mọi lệnh trên VPS do người dùng chạy hoặc cho phép rõ ràng.
 - **Chia sẻ terminal (P1) — kiểm tay còn thiếu:** bộ gõ tiếng Việt (IME), Cmd+W, giao diện thật của Cursor và Android Studio, iTerm2, VS Code, Warp.
-- **Chia sẻ terminal — Windows:** kiểm tra tương tác trên máy Windows thật chưa làm (spec §12).
+- **Chia sẻ terminal — Windows:** kiểm tra tương tác trên máy Windows thật chưa làm (spec §12). Phải gồm: Windows Terminal thật, bộ gõ IME (Telex/VNI), đóng tab khi lệnh đang chạy, mã hóa profile PowerShell 5.1, Ctrl+Space, đổi cỡ cửa sổ conhost cổ điển. Chi tiết: `ledgers/terminal-sharing.md`, mục P2b.
 - **Dọn Cloudflare** (khi nameserver đã về nhà đăng ký): xóa zone `shellx.pro` trên Cloudflare, `npx wrangler logout`, xóa secret `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 - **GitHub Environment `release`** (tag `desktop-v*` + nhánh `main`) với 11 secret ký — xem `release/README.md`.
 - **Pháp lý**: tên pháp nhân/địa chỉ cho privacy/terms; nhờ người có chuyên môn xem lại (hiện ghi "ShellX", luật Việt Nam, 16 tuổi, log ≤ 30 ngày).
@@ -99,8 +99,10 @@ Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn 
   - Khối zsh/bash mới: gọi bằng biến môi trường với `argv[0]` của shell gốc, `probe`, dấu theo tty, `setopt login` cho zsh login, bỏ qua `source` tay (bash: giới hạn ở spec §5.2).
   - Test: 135 chạy xanh, 2 `#[ignore]`. Đo khởi động: baseline 687,4 ms, bọc 713,8 ms, **+26,4 ms** (< 50 ms).
   - Spec §5.1, §5.2, §5.4, §6.1–§6.5 đã cập nhật theo code; byte chuẩn: `term/protocol/vectors.txt` (P3 phải khớp từng byte, thứ tự khóa theo byte). Chi tiết, việc còn mở và các mục "Ghi cho P2": `ledgers/terminal-sharing.md`, mục P2a.
+- **P2b (code xong, chờ CI Windows):** `shellx-term` trên Windows (ConPTY, console VT thô, khối PowerShell với danh sách đối số cho phép) và workflow `windows-check.yml` (`workflow_dispatch` hoặc push `windows-check/**`; chỉ `term/`). macOS: 157 test xanh, 2 `#[ignore]`.
+  - Giới hạn: không có kiểm tra theo tty; shell bên trong thoát 222/mã âm thì rơi về shell ngoài; tích hợp PowerShell của VS Code không bọc; Ctrl+Space chưa tới shell bên trong; mỗi lần thoát chậm ~0,5 s. Việc cho P4: `+crt-static`. Chi tiết: ledger, mục P2b.
 - **Còn lại:**
-  - **P2b:** `shellx-term` trên Windows (spec §5.3) + `windows-check.yml`.
+  - **P2b:** chờ lần chạy CI Windows đầu tiên (Task 8) rồi mới đóng.
   - **P3:** agent và giao thức (phải khớp `vectors.txt`).
   - P4: phần desktop (bật/tắt, bộ cài, ký).
   - P5: mobile.

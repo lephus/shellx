@@ -8,6 +8,34 @@ use crate::cli::Command;
 use std::ffi::{OsStr, OsString};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
+use std::sync::OnceLock;
+
+/// SIGTERM's disposition when this process started. A block-started window
+/// ignores SIGTERM for itself (spec §5.4 item 6); the fallback shell must not
+/// inherit that, or bash passes the ignore on to every command it runs.
+static START_SIGTERM: OnceLock<libc::sighandler_t> = OnceLock::new();
+
+/// Call first thing in `main`.
+pub fn remember_sigterm() {
+    let mut old: libc::sigaction = unsafe { std::mem::zeroed() };
+    let handler = if unsafe { libc::sigaction(libc::SIGTERM, std::ptr::null(), &mut old) } == 0 {
+        old.sa_sigaction
+    } else {
+        libc::SIG_DFL
+    };
+    let _ = START_SIGTERM.set(handler);
+}
+
+/// Ignored stays ignored; anything else becomes the default.
+fn restore_sigterm() {
+    let ignored = START_SIGTERM.get() == Some(&libc::SIG_IGN);
+    let disposition = if ignored {
+        libc::SIG_IGN
+    } else {
+        libc::SIG_DFL
+    };
+    unsafe { libc::signal(libc::SIGTERM, disposition) };
+}
 
 /// What to start when wrapping is impossible.
 #[derive(Debug, Clone, Default)]
@@ -58,8 +86,10 @@ pub fn arg0(shell: &OsStr, login: bool) -> OsString {
 /// Replaces this process with the first shell that starts. `SHELLX_TERM` is
 /// set to the window's own tty (`0` without one): the ShellX block in that
 /// shell's startup file sees it is already in its window and does not send
-/// it back here.
+/// it back here. SIGTERM goes back to the disposition the process started
+/// with before every `exec`.
 pub fn exec_shell(target: &Target) -> ! {
+    restore_sigterm();
     let shell_env = std::env::var_os("SHELL");
     for shell in candidates(target.shell.as_deref(), shell_env.as_deref()) {
         let args: &[OsString] = if target.shell.as_ref() == Some(&shell) {

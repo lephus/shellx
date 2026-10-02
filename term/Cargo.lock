@@ -271,6 +271,7 @@ dependencies = [
  "portable-pty",
  "sha2",
  "signal-hook",
+ "winapi",
 ]
 
 [[package]]

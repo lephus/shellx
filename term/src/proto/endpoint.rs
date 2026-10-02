@@ -29,15 +29,29 @@ pub enum EndpointError {
     UnsupportedVersion,
 }
 
-pub fn endpoint_path_in(home: &Path) -> PathBuf {
-    home.join("Library/Application Support/ShellX/term/endpoint")
+/// The environment variable naming the per-user base directory (spec §6.1).
+#[cfg(unix)]
+pub const ENDPOINT_BASE_VAR: &str = "HOME";
+#[cfg(windows)]
+pub const ENDPOINT_BASE_VAR: &str = "LOCALAPPDATA";
+
+#[cfg(unix)]
+pub fn endpoint_path_in(base: &Path) -> PathBuf {
+    base.join("Library/Application Support/ShellX/term/endpoint")
 }
 
-/// `$HOME/Library/Application Support/ShellX/term/endpoint`, if HOME is set.
+#[cfg(windows)]
+pub fn endpoint_path_in(base: &Path) -> PathBuf {
+    base.join("ShellX").join("term").join("endpoint")
+}
+
+/// The agent's endpoint file for this user: `$HOME/Library/Application
+/// Support/ShellX/term/endpoint` on macOS, `%LOCALAPPDATA%\ShellX\term\endpoint`
+/// on Windows. None when the base variable is unset or empty.
 pub fn default_endpoint_path() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .filter(|h| !h.is_empty())
-        .map(|h| endpoint_path_in(Path::new(&h)))
+    std::env::var_os(ENDPOINT_BASE_VAR)
+        .filter(|b| !b.is_empty())
+        .map(|b| endpoint_path_in(Path::new(&b)))
 }
 
 pub fn read_endpoint(path: &Path) -> Result<Endpoint, EndpointError> {
@@ -174,11 +188,23 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
-    fn the_path_is_under_application_support() {
+    fn the_unix_base_is_home() {
+        assert_eq!(ENDPOINT_BASE_VAR, "HOME");
         assert_eq!(
             endpoint_path_in(Path::new("/Users/u")),
             PathBuf::from("/Users/u/Library/Application Support/ShellX/term/endpoint")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_windows_base_is_localappdata() {
+        assert_eq!(ENDPOINT_BASE_VAR, "LOCALAPPDATA");
+        assert_eq!(
+            endpoint_path_in(Path::new(r"C:\Users\u\AppData\Local")),
+            PathBuf::from(r"C:\Users\u\AppData\Local\ShellX\term\endpoint")
         );
     }
 }

@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 mod common;
 
 use common::{Harness, BIN};
@@ -94,17 +96,6 @@ fn assert_not_wrapped(program: &str, args: &[&str], extra: &[(&str, &str)], tag:
     );
     h.send("exit\r");
     h.wait_exit(T);
-}
-
-#[test]
-fn blocks_are_ascii_with_exact_markers() {
-    for block in [ZSH_BLOCK, BASH_BLOCK] {
-        assert!(block.is_ascii());
-        let lines: Vec<&str> = block.lines().collect();
-        assert_eq!(lines.first(), Some(&"# >>> ShellX >>>"));
-        assert_eq!(lines.last(), Some(&"# <<< ShellX <<<"));
-        assert!(block.ends_with('\n'));
-    }
 }
 
 #[test]
@@ -281,6 +272,33 @@ fn a_wrapped_zsh_window_ignores_sigterm_like_a_plain_interactive_shell() {
 #[test]
 fn a_wrapped_bash_window_ignores_sigterm_like_a_plain_interactive_shell() {
     assert_sigterm_does_not_close_the_window("/bin/bash", &["-il"], "term-bash");
+}
+
+/// When wrapping fails in a block-started bash window, the plain bash that
+/// takes over, and what it runs, get SIGTERM as the window had it: bash
+/// passes an ignored SIGTERM on to every command.
+#[cfg(feature = "test-hooks")]
+#[test]
+fn a_failed_wrap_leaves_sigterm_as_it_was_for_the_fallback_shell() {
+    let home = real_home("fallback-sigterm");
+    let mut h = run_shell(
+        "/bin/bash",
+        &["-il"],
+        &home,
+        &[("SHELLX_TERM_FAULT", "spawn")],
+    );
+    h.expect("could not share this terminal", T);
+    h.send("/bin/sh -c 'kill -TERM $$; echo SUR''VIVED'; echo co''de=$?\r");
+    let code = h.wait_number_after("code=", T);
+    assert_eq!(
+        code,
+        143,
+        "the command kept an ignored SIGTERM: {:?}",
+        h.text()
+    );
+    assert!(!h.text().contains("SURVIVED"), "{:?}", h.text());
+    h.send("exit\r");
+    h.wait_exit(T);
 }
 
 #[test]
