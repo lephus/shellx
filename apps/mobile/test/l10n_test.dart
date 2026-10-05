@@ -57,6 +57,7 @@ void main() {
     expect(vi.desktopWindowClosed, 'Cửa sổ terminal trên máy tính đã đóng.');
     expect(vi.desktopTerminalGone, 'Mất kết nối với terminal này trên máy tính.');
     expect(vi.desktopClosedByHost, 'Máy tính đã ngắt điện thoại khỏi terminal này.');
+    expect(vi.desktopTerminalLabel, 'Terminal trên máy tính');
     final en = await S.load(const Locale('en'));
     expect(en.pickerDesktopGroup, 'Terminals on the computer');
     expect(en.pickerShellxGroup, 'ShellX sessions');
@@ -77,7 +78,6 @@ void main() {
     expect(en.desktopWindowClosed, 'The terminal window on the computer was closed.');
     expect(en.desktopTerminalGone, 'Lost the connection to this terminal on the computer.');
     expect(en.desktopClosedByHost, 'The computer disconnected this phone from this terminal.');
-    expect(vi.desktopTerminalLabel, 'Terminal trên máy tính');
   });
 
   testWidgets('S.of(context) resolves Vietnamese inside the design system', (tester) async {
