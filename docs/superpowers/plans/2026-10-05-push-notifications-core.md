@@ -48,3 +48,23 @@
 
 ## Gates
 `npm run typecheck`, `npm test` (relay); `dart analyze` + `dart test` (shellx_core, shellx_agent, shellx_e2e); `cargo fmt --check`, `cargo clippy`, `cargo test --features test-hooks` (term).
+
+## Rulings (decided during implementation)
+
+- Ruling: the zsh shim holds only `.zshenv`, which restores the user's `ZDOTDIR` at once and installs the hooks through a one-shot `precmd` at the first prompt (spec §4.4 named four shim files) — macOS `/etc/zshrc` derives `HISTFILE` from `ZDOTDIR`, so a shim kept until `.zshrc` would put history in the agent's directory; a `ZDOTDIR` the user sets in `.zshenv` is honoured; the hooks run first in `precmd_functions` — cost if wrong: a `.zshrc` that empties `precmd_functions` loses the hook (no command notifications, nothing else).
+- Ruling: bash `--rcfile` reads the login files (`/etc/profile`, first of `~/.bash_profile`/`~/.bash_login`/`~/.profile`) when the resolved command was a login shell (`-l`, what macOS starts), else `~/.bashrc` — `--rcfile` only applies to non-login shells — cost: `shopt login_shell` is off in ShellX bash sessions.
+- Ruling: bash is not hooked when a `DEBUG` trap already exists (bash-preexec etc.); `PROMPT_COMMAND` is joined with newlines and re-wrapped by the trap if the startup files replace it — cost: those users get no command notifications.
+- Ruling: PowerShell does not dot-source the profile (PowerShell loads it before `-Command`), and E/C come from wrapping `PSConsoleHostReadLine` (VS Code's method) instead of `AddToHistoryHandler`/`CommandValidationHandler`; a `prompt` the profile sets after the hook is wrapped again at the next line read — cost: without PSReadLine no command notifications.
+- Ruling: the relay sets `data.agent_id` from the agent's token; a client-supplied `agent_id` and FCM-reserved keys (`from`, `notification`, `message_type`, `collapse_key`, `google*`, `gcm*`) are refused with 400 — FCM would answer INVALID_ARGUMENT and the relay would then delete the phone's token — cost: none known.
+- Ruling: recipients also need a live sign-in (a token used within 90 days), not only a push token — a phone signed out by a password change keeps its push token row — cost: none.
+- Ruling: order of checks `agent_only` → `503 push_unavailable` → `429` → `400` — an agent on a relay without push does not spend its budget — cost: invalid bodies count against the 120/h.
+- Ruling: `FCM_ENDPOINT`/`FCM_TOKEN_ENDPOINT` are honoured only for loopback URLs — a stray value in production can never send the access token elsewhere — cost: none.
+- Ruling: push configuration is loaded by `src/push/config.ts`, separate from `Config` (whose tests compare the whole object) — cost: none.
+- Ruling: the `notifyAgent` limiter follows `RATE_LIMITS_ENABLED=false` like the others (dev relay, e2e) — cost: none.
+- Ruling: titles `<machine> · <session>` (session: `Phiên n`/`Session n`, desktop `<app> — <window title>`); durations leave out zero parts (`3 phút`, `1 giờ`); English `exit`, `s`, `min`, `h`; control characters in a command line become one space — cost: wording only.
+- Ruling: the sender clips the title to 200 and the body to 1000 characters (with `…`) before sending — cost: none.
+- Ruling: shared terminals reset the OSC parser on every new link (a sequence cut by a reconnection is dropped) but keep the command tracker (a command started before still ends after) — cost: none.
+- Ruling: the zsh block's inner branch is now `SHELLX_TERM` non-empty and equal to `$TTY` (login handling nested inside, unchanged); hooks are therefore also defined in nested shells and in `shellx-term`'s fallback shell — cost: a fallback (unwrapped) window sends OSC 133 to the terminal app (ignored, or command marks in iTerm2).
+- Ruling: `ShellIntegration` hooks only plain starts (`-i`, `-l`, `--login`, PowerShell `-NoLogo`/`-Login`/`-NoExit`); anything else starts unchanged; hook files are rewritten before each start when missing or stale (temporary directories get cleaned) — cost: none.
+- Ruling: hook tests run real `zsh -i`/`bash -i` through `Process` without a tty (interactive shells run preexec/precmd/DEBUG/PROMPT_COMMAND without one — verified), the blocks through the term crate's real-PTY harness; PowerShell was verified by hand with a portable pwsh 7.4.6 in a pty (not in the automated suite; Windows PowerShell 5.1 not run) — cost: a PowerShell regression is only caught by hand or by the Windows CI's existing block tests.
+- Ruling: the e2e fake FCM listens on a fixed port (8788, `SHELLX_E2E_FAKE_FCM_PORT`); the relay is started by hand with `FCM_SERVICE_ACCOUNT` from `npm run fake-fcm-account` and the two loopback overrides — cost: one more manual step for that test (it is skipped without `SHELLX_E2E_RELAY`).
