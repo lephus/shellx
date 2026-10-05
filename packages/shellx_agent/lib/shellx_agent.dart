@@ -11,6 +11,7 @@ export 'src/pairing/pairing_id.dart';
 export 'src/pty/process_pty.dart';
 export 'src/pty/pty.dart';
 export 'src/pty/session_environment.dart';
+export 'src/pty/shell_integration.dart';
 export 'src/pty/shell_resolver.dart';
 export 'src/service/agent_events.dart';
 export 'src/service/agent_service.dart';
