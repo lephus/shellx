@@ -129,6 +129,45 @@ void main() {
       'message': 'no shell',
       'id': 2,
     },
+    const SessionList(desktop: true): {'t': 'session.list', 'desktop': true},
+    const SessionListResult([
+      SessionInfo(
+        id: 9,
+        index: 1,
+        shell: 'zsh',
+        createdAt: 1790000000002,
+        attached: false,
+        kind: SessionKind.desktop,
+        app: 'Terminal',
+        title: 'npm run dev',
+      ),
+    ], desktopSharing: true): {
+      't': 'session.list.result',
+      'sessions': [
+        {
+          'id': 9,
+          'index': 1,
+          'shell': 'zsh',
+          'created_at': 1790000000002,
+          'attached': false,
+          'kind': 'desktop',
+          'app': 'Terminal',
+          'title': 'npm run dev',
+        },
+      ],
+      'desktop_sharing': true,
+    },
+    const SessionDetach(id: 9): {'t': 'session.detach', 'id': 9},
+    const SessionDriver(id: 9, by: DriverSide.desktop): {
+      't': 'session.driver',
+      'id': 9,
+      'by': 'desktop',
+    },
+    const SessionDetached(id: 9, reason: DetachReason.terminalGone): {
+      't': 'session.detached',
+      'id': 9,
+      'reason': 'terminal_gone',
+    },
   };
 
   group('toMap uses the wire keys', () {
@@ -205,6 +244,91 @@ void main() {
     expect(decodeBatch(bytes), [const AckMessage(id: 1, seq: 2)]);
   });
 
+  group('terminal sharing compatibility (spec §8)', () {
+    test('session.list without desktop is byte-identical to before', () {
+      expect(
+        encodeBatch([const SessionList()]),
+        encodeCbor([
+          {'t': 'session.list'},
+        ]),
+      );
+    });
+
+    test('a shell SessionInfo and a result without desktop_sharing keep '
+        'the old keys only', () {
+      const result = SessionListResult([
+        SessionInfo(
+          id: 1,
+          index: 1,
+          shell: 'zsh',
+          createdAt: 1,
+          attached: false,
+        ),
+      ]);
+      expect(result.toMap(), {
+        't': 'session.list.result',
+        'sessions': [
+          {
+            'id': 1,
+            'index': 1,
+            'shell': 'zsh',
+            'created_at': 1,
+            'attached': false,
+          },
+        ],
+      });
+    });
+
+    test('missing desktop and desktop_sharing decode as false / null', () {
+      final decoded = decodeBatch(
+        encodeCbor([
+          {'t': 'session.list'},
+          {'t': 'session.list.result', 'sessions': <Object?>[]},
+        ]),
+      );
+      expect((decoded[0] as SessionList).desktop, isFalse);
+      expect((decoded[1] as SessionListResult).desktopSharing, isNull);
+    });
+
+    test('a session entry with an unknown kind is skipped, not an error', () {
+      final decoded = decodeBatch(
+        encodeCbor([
+          {
+            't': 'session.list.result',
+            'sessions': [
+              {
+                'id': 1,
+                'index': 1,
+                'shell': 'zsh',
+                'created_at': 1,
+                'attached': false,
+                'kind': 'hologram',
+              },
+              {
+                'id': 2,
+                'index': 1,
+                'shell': 'zsh',
+                'created_at': 1,
+                'attached': false,
+                'kind': 'desktop',
+              },
+            ],
+          },
+        ]),
+      );
+      final sessions = (decoded.single as SessionListResult).sessions;
+      expect(sessions.map((s) => s.id), [2]);
+      expect(sessions.single.kind, SessionKind.desktop);
+      expect(sessions.single.app, '');
+      expect(sessions.single.title, '');
+    });
+
+    test('DriverSide.fromWire rejects an unknown side', () {
+      expect(DriverSide.fromWire('phone'), DriverSide.phone);
+      expect(() => DriverSide.fromWire('tablet'), throwsFormatException);
+    });
+  });
+
   group('malformed input throws FormatException', () {
     final cases = <String, Object?>{
       'not an array': {'t': 'ack'},
@@ -241,6 +365,29 @@ void main() {
           'sessions': [1],
         },
       ],
+      'session.driver with an unknown side': {
+        't': 'session.driver',
+        'id': 1,
+        'by': 'tablet',
+      },
+      'session.detach without id': {'t': 'session.detach'},
+      'session.list with a non-bool desktop': {
+        't': 'session.list',
+        'desktop': 1,
+      },
+      'session entry with a non-string kind': {
+        't': 'session.list.result',
+        'sessions': [
+          {
+            'id': 1,
+            'index': 1,
+            'shell': 'zsh',
+            'created_at': 1,
+            'attached': false,
+            'kind': 7,
+          },
+        ],
+      },
     };
     cases.forEach((name, value) {
       test(name, () {

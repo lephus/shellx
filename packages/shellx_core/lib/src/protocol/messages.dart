@@ -23,10 +23,17 @@ sealed class AppMessage {
     final f = _Fields(map, t);
     return switch (t) {
       'pair.confirm' => const PairConfirm(),
-      'session.list' => const SessionList(),
-      'session.list.result' => SessionListResult([
-        for (final item in f.list('sessions')) SessionInfo._fromMap(item, t),
-      ]),
+      'session.list' => SessionList(
+        desktop: f.optionalBoolean('desktop') ?? false,
+      ),
+      'session.list.result' => SessionListResult(
+        [
+          for (final item in f.list('sessions'))
+            // ignore: use_null_aware_elements
+            if (SessionInfo._fromMap(item, t) case final info?) info,
+        ],
+        desktopSharing: f.optionalBoolean('desktop_sharing'),
+      ),
       'session.open' => SessionOpen(
         cols: f.integer('cols'),
         rows: f.integer('rows'),
@@ -57,6 +64,11 @@ sealed class AppMessage {
         rows: f.integer('rows'),
       ),
       'session.close' => SessionClose(id: f.integer('id')),
+      'session.detach' => SessionDetach(id: f.integer('id')),
+      'session.driver' => SessionDriver(
+        id: f.integer('id'),
+        by: DriverSide.fromWire(f.string('by')),
+      ),
       'session.exited' => SessionExited(
         id: f.integer('id'),
         exitCode: f.integer('exit_code'),
@@ -97,12 +109,20 @@ final class PairConfirm extends AppMessage {
 }
 
 final class SessionList extends AppMessage {
-  const SessionList();
+  const SessionList({this.desktop = false});
+
+  /// Also list desktop terminals and report `desktop_sharing` (spec §8).
+  /// Only written when true, so the old wire form is unchanged.
+  final bool desktop;
   @override
   String get type => 'session.list';
   @override
-  Map<String, Object?> toMap() => {'t': type};
+  Map<String, Object?> toMap() => {'t': type, if (desktop) 'desktop': true};
 }
+
+/// Where a session's terminal lives (spec §7.1). Absent on the wire means
+/// [shellx].
+enum SessionKind { shellx, desktop }
 
 final class SessionInfo {
   const SessionInfo({
@@ -111,6 +131,9 @@ final class SessionInfo {
     required this.shell,
     required this.createdAt,
     required this.attached,
+    this.kind = SessionKind.shellx,
+    this.app = '',
+    this.title = '',
   });
 
   final int id;
@@ -120,6 +143,13 @@ final class SessionInfo {
   /// Unix milliseconds.
   final int createdAt;
   final bool attached;
+  final SessionKind kind;
+
+  /// Terminal application (desktop sessions only; may be empty).
+  final String app;
+
+  /// Latest window title (desktop sessions only; may be empty).
+  final String title;
 
   Map<String, Object?> toMap() => {
     'id': id,
@@ -127,19 +157,35 @@ final class SessionInfo {
     'shell': shell,
     'created_at': createdAt,
     'attached': attached,
+    if (kind == SessionKind.desktop) ...{
+      'kind': 'desktop',
+      'app': app,
+      'title': title,
+    },
   };
 
-  static SessionInfo _fromMap(Object? value, String type) {
+  /// Null for a `kind` this version does not know: the entry is skipped so
+  /// a newer agent's new session kinds never break the list (spec §7.9).
+  static SessionInfo? _fromMap(Object? value, String type) {
     if (value is! Map<Object?, Object?>) {
       throw FormatException('$type: session entry must be a map');
     }
     final f = _Fields(value, type);
+    final kind = switch (f.optionalString('kind')) {
+      null => SessionKind.shellx,
+      'desktop' => SessionKind.desktop,
+      _ => null,
+    };
+    if (kind == null) return null;
     return SessionInfo(
       id: f.integer('id'),
       index: f.integer('index'),
       shell: f.string('shell'),
       createdAt: f.integer('created_at'),
       attached: f.boolean('attached'),
+      kind: kind,
+      app: f.optionalString('app') ?? '',
+      title: f.optionalString('title') ?? '',
     );
   }
 
@@ -155,14 +201,20 @@ final class SessionInfo {
 }
 
 final class SessionListResult extends AppMessage {
-  const SessionListResult(this.sessions);
+  const SessionListResult(this.sessions, {this.desktopSharing});
   final List<SessionInfo> sessions;
+
+  /// Whether terminal sharing is on (spec §8); only in answers to
+  /// `session.list {desktop: true}`. Null means an agent without terminal
+  /// sharing, or a list that did not ask.
+  final bool? desktopSharing;
   @override
   String get type => 'session.list.result';
   @override
   Map<String, Object?> toMap() => {
     't': type,
     'sessions': [for (final session in sessions) session.toMap()],
+    if (desktopSharing != null) 'desktop_sharing': desktopSharing,
   };
 }
 
@@ -297,6 +349,44 @@ final class SessionClose extends AppMessage {
   Map<String, Object?> toMap() => {'t': type, 'id': id};
 }
 
+/// The phone leaves a desktop session; the terminal keeps running (spec §8).
+/// Never answered.
+final class SessionDetach extends AppMessage {
+  const SessionDetach({required this.id});
+  final int id;
+  @override
+  String get type => 'session.detach';
+  @override
+  Map<String, Object?> toMap() => {'t': type, 'id': id};
+}
+
+/// Who sets a desktop terminal's size now (spec §5.5, §7.3).
+enum DriverSide {
+  desktop('desktop'),
+  phone('phone');
+
+  const DriverSide(this.wire);
+  final String wire;
+
+  /// Throws [FormatException] for an unknown value.
+  static DriverSide fromWire(String wire) {
+    for (final side in values) {
+      if (side.wire == wire) return side;
+    }
+    throw FormatException('Unknown driver side', wire);
+  }
+}
+
+final class SessionDriver extends AppMessage {
+  const SessionDriver({required this.id, required this.by});
+  final int id;
+  final DriverSide by;
+  @override
+  String get type => 'session.driver';
+  @override
+  Map<String, Object?> toMap() => {'t': type, 'id': id, 'by': by.wire};
+}
+
 final class SessionExited extends AppMessage {
   const SessionExited({required this.id, required this.exitCode});
   final int id, exitCode;
@@ -308,7 +398,8 @@ final class SessionExited extends AppMessage {
 
 enum DetachReason {
   takenOver('taken_over'),
-  closedByHost('closed_by_host');
+  closedByHost('closed_by_host'),
+  terminalGone('terminal_gone');
 
   const DetachReason(this.wire);
   final String wire;
@@ -413,6 +504,18 @@ final class _Fields {
       return value as int?;
     }
     throw FormatException('$_type: "$key" must be an integer');
+  }
+
+  bool? optionalBoolean(String key) {
+    final value = _map[key];
+    if (value == null || value is bool) return value as bool?;
+    throw FormatException('$_type: "$key" must be a boolean');
+  }
+
+  String? optionalString(String key) {
+    final value = _map[key];
+    if (value == null || value is String) return value as String?;
+    throw FormatException('$_type: "$key" must be a string');
   }
 
   T _get<T>(String key) {
