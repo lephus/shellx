@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
-import 'package:shellx_core/src/util/cbor_values.dart';
 import 'package:test/test.dart';
 
 Uint8List _bytes(List<int> values) => Uint8List.fromList(values);

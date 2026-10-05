@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
-import 'package:shellx_core/src/util/cbor_values.dart';
 import 'package:test/test.dart';
 
 const _peer = '0f8fad5b-d9cb-469f-a165-70867728950e';
