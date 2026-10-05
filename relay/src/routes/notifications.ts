@@ -9,6 +9,23 @@ import { logMeta } from "../log.js";
 export const NOTIFICATION_TITLE_MAX_CHARS = 200;
 export const NOTIFICATION_BODY_MAX_CHARS = 1000;
 export const NOTIFICATION_DATA_MAX_KEYS = 10;
+export const NOTIFICATION_DATA_VALUE_MAX_CHARS = 256;
+/**
+ * FCM refuses messages over 4096 bytes of payload; title + body + data keys and values (UTF-8)
+ * stay under this, leaving room for `agent_id` and the rest of the message.
+ */
+export const NOTIFICATION_MAX_PAYLOAD_BYTES = 3584;
+const DATA_KEY = /^[a-z0-9_]{1,64}$/;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+/** False for a string with a lone UTF-16 surrogate (it has no UTF-8 form; FCM would refuse it). */
+function isWellFormed(text: string): boolean {
+  return !LONE_SURROGATE.test(text);
+}
+
+function utf8Bytes(text: string): number {
+  return Buffer.byteLength(text, "utf8");
+}
 
 /**
  * Keys FCM refuses in `data` with INVALID_ARGUMENT — which would make the relay delete the phone's
@@ -29,7 +46,8 @@ function parseData(value: unknown): Record<string, string> | null {
   if (entries.length > NOTIFICATION_DATA_MAX_KEYS) return null;
   const data: Record<string, string> = {};
   for (const [key, item] of entries) {
-    if (key === "" || isReservedDataKey(key) || typeof item !== "string") return null;
+    if (!DATA_KEY.test(key) || isReservedDataKey(key) || typeof item !== "string") return null;
+    if (!isWellFormed(item) || codePoints(item) > NOTIFICATION_DATA_VALUE_MAX_CHARS) return null;
     data[key] = item;
   }
   return data;
@@ -45,10 +63,12 @@ export const notificationRoutes = new Hono<AppEnv>();
 /**
  * POST /v1/notifications {title, body, data?} — agents only (push spec §5). Sends one push to every
  * phone of the account that has a pairing record with this agent, a push token and a live sign-in.
- * `data` (string → string, at most 10 keys) is passed through with `agent_id` added by the relay.
+ * `data` (at most 10 keys `[a-z0-9_]{1,64}`, string values ≤ 256 characters) is passed through with `agent_id` added by the relay.
  * Answers `202 {sent}` once FCM has answered for every phone; tokens FCM reports as gone are deleted.
  * 503 `push_unavailable` when the relay has no Firebase configuration; 429 past 120 per agent per
- * hour (N10). Neither the content nor the tokens are ever logged.
+ * hour (N10). 400 for anything FCM would refuse as a payload error (too large — title, body and
+ * data over 3.5 KB of UTF-8 —, lone surrogates), so such a request never reaches FCM and never costs
+ * a phone its token. Neither the content nor the tokens are ever logged.
  */
 notificationRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
@@ -60,8 +80,12 @@ notificationRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
   const { title, body: text } = body;
   if (typeof title !== "string" || title.trim() === "" || codePoints(title) > NOTIFICATION_TITLE_MAX_CHARS) throw Errors.badRequest();
   if (typeof text !== "string" || text.trim() === "" || codePoints(text) > NOTIFICATION_BODY_MAX_CHARS) throw Errors.badRequest();
+  if (!isWellFormed(title) || !isWellFormed(text)) throw Errors.badRequest();
   const data = parseData(body.data);
   if (data === null) throw Errors.badRequest();
+  const payloadBytes =
+    utf8Bytes(title) + utf8Bytes(text) + Object.entries(data).reduce((n, [k, v]) => n + utf8Bytes(k) + utf8Bytes(v), 0);
+  if (payloadBytes > NOTIFICATION_MAX_PAYLOAD_BYTES) throw Errors.badRequest();
 
   const db = c.get("db");
   const recipients = db.all<Recipient>(

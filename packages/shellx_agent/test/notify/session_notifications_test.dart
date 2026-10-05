@@ -168,6 +168,46 @@ void main() {
       });
     });
 
+    test('a snapshot whose last command event is an end forgets the running '
+        'command; one that ends with a start keeps it', () {
+      fakeAsync((async) {
+        final push = _Push();
+        var next = 100;
+        final manager = DesktopSessionManager(
+          nextId: () => next++,
+          notifications: push.notifications,
+        );
+        manager.outbound.listen((_) {});
+        FakeTermLink reconnect(String snapshot) {
+          final link = FakeTermLink(desk.windowInfo(1));
+          manager.addLink(link);
+          link.snapshot(snapshot);
+          async.flushMicrotasks();
+          return link;
+        }
+
+        var link = reconnect('');
+        link.out('$esc]133;C$bel');
+        async.flushMicrotasks();
+        link.drop();
+        async.flushMicrotasks();
+        // The command ended (and a prompt came back) while the link was down.
+        link = reconnect('$esc]133;C${bel}x$esc]133;D;0$bel\$ ');
+        link.out('$esc]133;D;0$bel');
+        async.flushMicrotasks();
+        expect(push.bodies, isEmpty);
+
+        link.out('$esc]133;C$bel');
+        async.flushMicrotasks();
+        link.drop();
+        async.flushMicrotasks();
+        link = reconnect('$esc]133;D;0$bel$esc]133;C${bel}still running');
+        link.out('$esc]133;D;4$bel');
+        async.flushMicrotasks();
+        expect(push.bodies.map((b) => b['body']), ['✗ Command · exit 4 · 0 s']);
+      });
+    });
+
     test('a sequence cut by a reconnection is dropped; a command started '
         'before it still ends after it', () {
       fakeAsync((async) {

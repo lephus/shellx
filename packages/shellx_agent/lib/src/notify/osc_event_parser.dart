@@ -7,7 +7,8 @@ sealed class OscEvent {
   const OscEvent();
 }
 
-/// `OSC 133 ; C`: the command line just entered starts running.
+/// `OSC 133 ; C` (or VS Code's `633 ; C`): the command line just entered
+/// starts running.
 final class CommandStarted extends OscEvent {
   const CommandStarted();
   @override
@@ -186,17 +187,27 @@ final class OscEventParser {
     }
   }
 
+  /// VS Code's own shell integration reports start and end as `633;C` and
+  /// `633;D[;<code>]` (no 133): accepted like 133, so commands in VS Code
+  /// terminals notify too.
   static OscEvent? _vscode(String text) {
     final parts = text.split(';');
-    if (parts.first != 'E' || parts.length < 2) return null;
-    return CommandLineSeen(_clip(unescapeVsCode(parts[1])));
+    switch (parts.first) {
+      case 'E':
+        if (parts.length < 2) return null;
+        return CommandLineSeen(_clip(unescapeVsCode(parts[1])));
+      case 'C' || 'D':
+        return _semanticPrompt(text);
+      default:
+        return null;
+    }
   }
 
   static final _progress = RegExp(r'^[0-9]+;');
 
   static OscEvent? _osc9(String text) {
     // OSC 9;4;… is ConEmu / Windows Terminal progress, not a notification.
-    if (text.isEmpty || _progress.hasMatch(text)) return null;
+    if (text.trim().isEmpty || _progress.hasMatch(text)) return null;
     return NotifyRequested(title: null, body: _clip(text));
   }
 
@@ -207,9 +218,9 @@ final class OscEventParser {
     final second = rest.indexOf(';');
     final title = second < 0 ? '' : rest.substring(0, second);
     final body = second < 0 ? rest : rest.substring(second + 1);
-    if (body.isEmpty) return null;
+    if (body.trim().isEmpty) return null;
     return NotifyRequested(
-      title: title.isEmpty ? null : _clip(title),
+      title: title.trim().isEmpty ? null : _clip(title),
       body: _clip(body),
     );
   }

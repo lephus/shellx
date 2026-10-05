@@ -95,6 +95,23 @@ final class SessionNotifier {
   /// A command that started before keeps running.
   void resetParser() => _parser.reset();
 
+  /// A replayed snapshot (never notifies, N11). When the last command event
+  /// in it is an end (`133;D`), the command that was running ended while
+  /// the link was down: it is forgotten, so a later live `D` does not merge
+  /// two commands. A snapshot that ends with a start (or has none) keeps
+  /// the running command.
+  void snapshot(Uint8List data) {
+    try {
+      OscEvent? last;
+      for (final event in OscEventParser().feed(data)) {
+        if (event is CommandStarted || event is CommandFinished) last = event;
+      }
+      if (last is CommandFinished) _tracker.abandon();
+    } catch (_) {
+      // Never break the session.
+    }
+  }
+
   void _handle(OscEvent event) {
     if (event is NotifyRequested) {
       final text = _text();

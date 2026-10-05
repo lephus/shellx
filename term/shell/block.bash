@@ -16,15 +16,21 @@ if [[ $- == *i* && -z "${BASH_EXECUTION_STRING-}" && "${BASH_LINENO[0]-0}" == 0 
     unset SHELLX_TERM_WRAP SHELLX_TERM_WRAP_LOGIN
   fi
   unset __shellx_shell
-elif [[ $- == *i* && -n "${SHELLX_TERM-}" ]] && [[ "$SHELLX_TERM" == "$(tty 2>/dev/null)" ]]; then
+elif [[ $- == *i* && -n "${SHELLX_TERM-}" ]] && [[ "$SHELLX_TERM" == "$(tty 2>/dev/null)" ]] \
+     && [[ "${TERM_PROGRAM-}" != vscode || -z "${VSCODE_INJECTION-}${VSCODE_SHELL_INTEGRATION-}" ]]; then
   # Inside the wrapped shell: command notifications for the paired phone (each command line, its start
-  # and its exit code as OSC 633;E, 133;C, 133;D).
+  # and its exit code as OSC 633;E, 133;C, 133;D). Not inside VS Code with its own shell integration.
   if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]]; then
     __shellx_hooked=1
     __shellx_wrap_prompt() {
-      case "${PROMPT_COMMAND-}" in
+      case "${PROMPT_COMMAND[*]-}" in
         *__shellx_prompt_end*) ;;
-        *) PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end" ;;
+        *)
+          if [[ "$(builtin declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+            PROMPT_COMMAND=(__shellx_prompt_start "${PROMPT_COMMAND[@]}" __shellx_prompt_end)
+          else
+            PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end"
+          fi ;;
       esac
     }
     __shellx_prompt_start() {
@@ -42,9 +48,9 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" ]] && [[ "$SHELLX_TERM" == "$(tty 2>/d
       return $ret
     }
     __shellx_debug() {
+      case "${PROMPT_COMMAND[*]-}" in *__shellx_prompt_end*) ;; *) __shellx_wrap_prompt ;; esac
       if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then
         __shellx_at_prompt=
-        __shellx_wrap_prompt
         return
       fi
       [ -n "${COMP_LINE-}" ] && return

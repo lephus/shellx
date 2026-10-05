@@ -37,6 +37,14 @@ final class CommandTracker {
   String? _runningLine;
   DateTime? _startedAt;
 
+  /// Forgets a command that started: its end was missed (e.g. it ended
+  /// while a shared terminal was reconnecting), so a later `D` must not be
+  /// taken as its end.
+  void abandon() {
+    _startedAt = null;
+    _runningLine = null;
+  }
+
   /// Returns a [CompletedCommand] when [event] ends a command that ran at
   /// least the threshold, else null.
   CompletedCommand? handle(OscEvent event) {

@@ -188,9 +188,11 @@ account key; without one it runs normally and push is simply off (`docker compos
    by deploys:
 
    ```bash
-   mkdir -p ~/phu/shellx/secrets
-   # from your machine: scp fcm.json <deploy-user>@<vps>:phu/shellx/secrets/fcm.json
-   sudo chown 1000:1000 ~/phu/shellx/secrets/fcm.json && sudo chmod 400 ~/phu/shellx/secrets/fcm.json
+   # Docker creates ./secrets as root if the relay started before it existed: take it back first.
+   sudo mkdir -p ~/phu/shellx/secrets
+   sudo chown <deploy-user>:<deploy-user> ~/phu/shellx/secrets && sudo chmod 755 ~/phu/shellx/secrets
+   # from your machine: scp fcm.json <deploy-user>@<vps>:/tmp/fcm.json
+   sudo install -o 1000 -g 1000 -m 400 /tmp/fcm.json ~/phu/shellx/secrets/fcm.json && rm /tmp/fcm.json
    echo "FCM_SERVICE_ACCOUNT=/secrets/fcm.json" >> ~/phu/shellx/.env
    cd ~/phu/shellx && docker compose up -d --force-recreate relay
    docker compose logs relay | grep push_   # push_enabled {"project":"shellxpro"}
@@ -198,7 +200,11 @@ account key; without one it runs normally and push is simply off (`docker compos
 
    `docker-compose.yml` mounts `./secrets` read-only at `/secrets` and passes `FCM_SERVICE_ACCOUNT`
    from `.env` (rollout.sh keeps every `.env` line except `IMAGE_TAG`). To turn push off, remove the
-   line and recreate the relay. Rotating the key: replace the file, recreate the relay.
+   line and recreate the relay. **Rotating the key:** create a new key in the Firebase console, copy it
+   to `/tmp/fcm.json` on the VPS, then `sudo install -o 1000 -g 1000 -m 400 /tmp/fcm.json
+   ~/phu/shellx/secrets/fcm.json && rm /tmp/fcm.json` (the file is read-only and owned by uid 1000,
+   so a plain `cp` over it fails), `docker compose up -d --force-recreate relay`, and delete the old
+   key in the console.
 
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
 `web/src/pages/privacy.md`, `web/src/pages/en/privacy.md`, `web/src/pages/terms.md` and

@@ -105,8 +105,6 @@ interface CachedToken {
   expiresAt: number;
 }
 
-/** FCM error codes that mean "this token will never work again": the token is deleted. */
-const INVALID_TOKEN_CODES = new Set(["UNREGISTERED", "INVALID_ARGUMENT"]);
 
 /**
  * FCM HTTP v1 client (push spec §5): an OAuth access token from a JWT signed with the service
@@ -161,9 +159,12 @@ export class FcmClient implements PushGateway {
       await res.body?.cancel();
       return "ok";
     }
-    const code = await fcmErrorCode(res);
+    const { code, tokenField } = await fcmError(res);
     if (res.status === 401) this.cached = null; // a revoked or expired access token: fetch a new one next time
-    if (code !== null && INVALID_TOKEN_CODES.has(code)) return "invalid_token";
+    // Only a token FCM says is gone or malformed is deleted: UNREGISTERED, or INVALID_ARGUMENT whose
+    // field violation names `message.token`. Any other INVALID_ARGUMENT is about our payload, and
+    // deleting every recipient's token for it would silently sign phones out of push.
+    if (code === "UNREGISTERED" || (code === "INVALID_ARGUMENT" && tokenField)) return "invalid_token";
     logMeta("fcm_send_failed", { status: res.status, error: code ?? "unknown" });
     return "error";
   }
@@ -202,23 +203,32 @@ export class FcmClient implements PushGateway {
 }
 
 /**
- * The FCM error code of a failed send: `details[].errorCode` of the FcmError detail when present
- * (e.g. UNREGISTERED), else `error.status` (e.g. INVALID_ARGUMENT); null when the body says neither.
+ * The FCM error code of a failed send — `details[].errorCode` of the FcmError detail when present
+ * (e.g. UNREGISTERED), else `error.status` (e.g. INVALID_ARGUMENT); null when the body says neither —
+ * and whether a `google.rpc.BadRequest` field violation names the token (`message.token`).
  */
-async function fcmErrorCode(res: Response): Promise<string | null> {
+async function fcmError(res: Response): Promise<{ code: string | null; tokenField: boolean }> {
   let json: unknown;
   try {
     json = await res.json();
   } catch {
-    return null;
+    return { code: null, tokenField: false };
   }
   const error = (json as { error?: { status?: unknown; details?: unknown } } | null)?.error;
-  if (typeof error !== "object" || error === null) return null;
+  if (typeof error !== "object" || error === null) return { code: null, tokenField: false };
+  let code: string | null = null;
+  let tokenField = false;
   if (Array.isArray(error.details)) {
     for (const detail of error.details) {
-      const code = (detail as { errorCode?: unknown } | null)?.errorCode;
-      if (typeof code === "string" && /^[A-Z_]+$/.test(code)) return code;
+      const d = detail as { errorCode?: unknown; fieldViolations?: unknown } | null;
+      if (code === null && typeof d?.errorCode === "string" && /^[A-Z_]+$/.test(d.errorCode)) code = d.errorCode;
+      if (Array.isArray(d?.fieldViolations)) {
+        for (const v of d.fieldViolations) {
+          if ((v as { field?: unknown } | null)?.field === "message.token") tokenField = true;
+        }
+      }
     }
   }
-  return typeof error.status === "string" && /^[A-Z_]+$/.test(error.status) ? error.status : null;
+  if (code === null && typeof error.status === "string" && /^[A-Z_]+$/.test(error.status)) code = error.status;
+  return { code, tokenField };
 }

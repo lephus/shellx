@@ -300,6 +300,29 @@ void main() {
       expect(']133;C'.allMatches(out), hasLength(4));
     }, skip: hasBash ? null : 'no /bin/bash');
 
+    test('bash: an array PROMPT_COMMAND (bash 5.1+) gets start and end as its '
+        'first and last elements, once (this machine has bash 3.2 only: the '
+        'generated array is checked, not bash 5.1 running it)', () async {
+      File('${home.path}/.bashrc').writeAsStringSync(
+        'PROMPT_COMMAND=(user_one user_two)\n'
+        'user_one() { :; }; user_two() { :; }\n',
+      );
+      final out = await run(
+        const ShellCommand(
+          executable: '/bin/bash',
+          arguments: [],
+          name: 'bash',
+        ),
+        ['true', 'true', r'echo "PC=[${PROMPT_COMMAND[*]}]"'],
+      );
+      expect(
+        out,
+        contains(
+          'PC=[__shellx_prompt_start user_one user_two __shellx_prompt_end]',
+        ),
+      );
+    }, skip: hasBash ? null : 'no /bin/bash');
+
     test(
       'bash -l: the login files load instead of ~/.bashrc',
       () async {

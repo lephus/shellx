@@ -332,6 +332,7 @@ final class DesktopSessionManager {
         s.live = true;
         s.stream.restartWith(bytes);
         s.titles.reset();
+        s.notifier?.snapshot(bytes);
         final title = s.titles.feed(bytes);
         if (title != null) s.title = title;
         _pump(s);

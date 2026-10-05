@@ -155,14 +155,46 @@ describe("FcmClient", () => {
     expect(f.tokenCalls()).toHaveLength(1);
   });
 
-  it("maps UNREGISTERED and INVALID_ARGUMENT to invalid_token", async () => {
-    for (const reply of [
-      () => fcmError(404, "NOT_FOUND", "UNREGISTERED"),
-      () => fcmError(400, "INVALID_ARGUMENT", "INVALID_ARGUMENT"),
-      () => fcmError(400, "INVALID_ARGUMENT"),
-    ]) {
+  it("maps UNREGISTERED, and INVALID_ARGUMENT about message.token, to invalid_token", async () => {
+    const tokenViolation = () =>
+      Response.json(
+        {
+          error: {
+            code: 400,
+            status: "INVALID_ARGUMENT",
+            details: [
+              { "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", errorCode: "INVALID_ARGUMENT" },
+              { "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [{ field: "message.token", description: "Invalid registration token" }] },
+            ],
+          },
+        },
+        { status: 400 },
+      );
+    for (const reply of [() => fcmError(404, "NOT_FOUND", "UNREGISTERED"), tokenViolation]) {
       const client = new FcmClient({ account: ACCOUNT, fetch: fakeFetch({ sendReply: reply }).fn });
       expect(await client.send(MESSAGE)).toBe("invalid_token");
+    }
+  });
+
+  it("an INVALID_ARGUMENT about the payload is an error, never invalid_token (the token is kept)", async () => {
+    const payloadViolation = () =>
+      Response.json(
+        {
+          error: {
+            code: 400,
+            status: "INVALID_ARGUMENT",
+            details: [{ "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [{ field: "message.data", description: "too big" }] }],
+          },
+        },
+        { status: 400 },
+      );
+    for (const reply of [
+      () => fcmError(400, "INVALID_ARGUMENT", "INVALID_ARGUMENT"),
+      () => fcmError(400, "INVALID_ARGUMENT"),
+      payloadViolation,
+    ]) {
+      const client = new FcmClient({ account: ACCOUNT, fetch: fakeFetch({ sendReply: reply }).fn });
+      expect(await client.send(MESSAGE)).toBe("error");
     }
   });
 

@@ -625,3 +625,43 @@ fn an_unwrapped_shell_gets_no_command_hooks() {
         h.wait_exit(T);
     }
 }
+
+#[test]
+fn a_later_prompt_command_in_bashrc_keeps_command_notifications() {
+    // The block sits at the top; the rest of ~/.bashrc replaces PROMPT_COMMAND.
+    let home = real_home("notify-bash-pc");
+    std::fs::write(
+        home.join(".bashrc"),
+        format!("{BASH_BLOCK}PROMPT_COMMAND=\"true\"\necho AFTER-BLOCK\n"),
+    )
+    .unwrap();
+    let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
+    assert_really_wrapped(&mut h);
+    h.send("sleep 0.2; false\r");
+    h.expect("\x1b]133;D;1\x07", T);
+    let text = h.text();
+    assert!(
+        text.contains("\x1b]633;E;sleep 0.2\\x3b false\x07\x1b]133;C\x07"),
+        "{text:?}"
+    );
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn the_inner_zsh_leaves_command_reporting_to_vscode_shell_integration() {
+    let home = real_home("notify-zsh-vscode");
+    let mut h = run_shell(
+        "/bin/zsh",
+        &["-i"],
+        &home,
+        &[("TERM_PROGRAM", "vscode"), ("VSCODE_INJECTION", "1")],
+    );
+    assert_really_wrapped(&mut h);
+    h.send("false; whence -w __shellx_precmd || echo no''-hooks\r");
+    h.expect("no-hooks", T);
+    h.settle(Duration::from_millis(300));
+    assert!(!h.text().contains("]133;"), "{:?}", h.text());
+    h.send("exit\r");
+    h.wait_exit(T);
+}

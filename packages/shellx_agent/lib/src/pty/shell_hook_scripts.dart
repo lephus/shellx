@@ -101,16 +101,23 @@ fi
 /// `DEBUG` trap emits E and C once per command line (gated by
 /// `__shellx_at_prompt`, which `PROMPT_COMMAND` sets last); the first part
 /// of `PROMPT_COMMAND` emits D with `$?`. If the user's startup files later
-/// replace `PROMPT_COMMAND`, the trap wraps it again. Not installed when a
+/// replace `PROMPT_COMMAND`, the trap wraps it again (a fork-free check
+/// before every command). An array `PROMPT_COMMAND` (bash 5.1+) gets start
+/// and end as its first and last elements. Not installed when a
 /// `DEBUG` trap already exists (bash-preexec and friends): no command
 /// notifications then, nothing else changes.
 const bashHookBody = r'''
 if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]]; then
   __shellx_hooked=1
   __shellx_wrap_prompt() {
-    case "${PROMPT_COMMAND-}" in
+    case "${PROMPT_COMMAND[*]-}" in
       *__shellx_prompt_end*) ;;
-      *) PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end" ;;
+      *)
+        if [[ "$(builtin declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+          PROMPT_COMMAND=(__shellx_prompt_start "${PROMPT_COMMAND[@]}" __shellx_prompt_end)
+        else
+          PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end"
+        fi ;;
     esac
   }
   __shellx_prompt_start() {
@@ -128,9 +135,9 @@ if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]];
     return $ret
   }
   __shellx_debug() {
+    case "${PROMPT_COMMAND[*]-}" in *__shellx_prompt_end*) ;; *) __shellx_wrap_prompt ;; esac
     if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then
       __shellx_at_prompt=
-      __shellx_wrap_prompt
       return
     fi
     [ -n "${COMP_LINE-}" ] && return
@@ -184,18 +191,33 @@ if (-not $global:__ShellxHooked) {
   $global:__ShellxHooked = $true
   $global:__ShellxRunning = $false
   $global:__ShellxUserPrompt = $function:prompt
+  $global:__ShellxFirstPrompt = $function:prompt
+  $global:__ShellxPromptDepth = 0
   $global:__ShellxPrompt = {
     $ok = $global:?
     $code = $global:LASTEXITCODE
-    $mark = ''
-    if ($global:__ShellxRunning) {
-      $global:__ShellxRunning = $false
-      $n = if ($ok) { 0 } elseif ($code -is [int] -and $code -ne 0) { $code } else { 1 }
-      $mark = "$([char]27)]133;D;$n$([char]7)"
+    if ($global:__ShellxPromptDepth -gt 0) {
+      # Called again from inside (a prompt wrapped after ours that calls ours): no recursion.
+      if ($global:__ShellxPromptDepth -eq 1 -and $global:__ShellxFirstPrompt) {
+        $global:__ShellxPromptDepth = 2
+        try { return & $global:__ShellxFirstPrompt } finally { $global:__ShellxPromptDepth = 1 }
+      }
+      return 'PS> '
     }
-    $text = if ($global:__ShellxUserPrompt) { & $global:__ShellxUserPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
-    $global:LASTEXITCODE = $code
-    "$mark$text"
+    $global:__ShellxPromptDepth = 1
+    try {
+      $mark = ''
+      if ($global:__ShellxRunning) {
+        $global:__ShellxRunning = $false
+        $n = if ($ok) { 0 } elseif ($code -is [int] -and $code -ne 0) { $code } else { 1 }
+        $mark = "$([char]27)]133;D;$n$([char]7)"
+      }
+      $text = if ($global:__ShellxUserPrompt) { & $global:__ShellxUserPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
+      $global:LASTEXITCODE = $code
+      "$mark$text"
+    } finally {
+      $global:__ShellxPromptDepth = 0
+    }
   }
   Set-Item -Path function:global:prompt -Value $global:__ShellxPrompt
   if (Get-Command PSConsoleHostReadLine -CommandType Function -ErrorAction SilentlyContinue) {

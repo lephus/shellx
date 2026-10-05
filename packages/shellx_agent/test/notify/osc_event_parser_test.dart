@@ -34,8 +34,16 @@ void main() {
     test('133;A/B, a non-numeric D code and other 633 kinds are ignored', () {
       expect(_parse('$esc]133;A$bel$esc]133;B$bel'), isEmpty);
       expect(_parse('$esc]133;D;x$bel'), isEmpty);
-      expect(_parse('$esc]633;A$bel$esc]633;C$bel$esc]633;D;1$bel'), isEmpty);
+      expect(_parse('$esc]633;A$bel$esc]633;B$bel'), isEmpty);
       expect(_parse('$esc]633;P;Cwd=/tmp$bel'), isEmpty);
+    });
+
+    test("VS Code's own 633;C / 633;D[;code] start and end a command", () {
+      expect(_parse('$esc]633;C$bel$esc]633;D;1$bel$esc]633;D$bel'), [
+        const CommandStarted(),
+        const CommandFinished(1),
+        const CommandFinished(0),
+      ]);
     });
 
     test('633;E carries the command line, VS Code escaping undone', () {
@@ -86,6 +94,15 @@ void main() {
       expect(_parse('$esc]777;notify;only-body$bel'), [
         const NotifyRequested(title: null, body: 'only-body'),
       ]);
+    });
+
+    test('a blank title is null; a blank body drops the notification', () {
+      expect(_parse('$esc]777;notify;   ;body$bel'), [
+        const NotifyRequested(title: null, body: 'body'),
+      ]);
+      expect(_parse('$esc]777;notify;t;   $bel'), isEmpty);
+      expect(_parse('$esc]777;notify;;\t $bel'), isEmpty);
+      expect(_parse('$esc]9;   $bel'), isEmpty);
     });
 
     test('other 777 commands and an empty body are ignored', () {

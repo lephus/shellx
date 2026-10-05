@@ -155,6 +155,10 @@ describe("POST /v1/notifications", () => {
       { title: "t", body: "b", data: { gcm_x: "x" } },
       { title: "t", body: "b", data: { agent_id: "spoofed" } },
       { title: "t", body: "b", data: { "": "x" } },
+      { title: "t", body: "b", data: { Session: "x" } },
+      { title: "t", body: "b", data: { "with-dash": "x" } },
+      { title: "t", body: "b", data: { ["k".repeat(65)]: "x" } },
+      { title: "t", body: "b", data: { k: "v".repeat(257) } },
     ];
     for (const body of bad) {
       const res = await notify(app, account.agent.token, body);
@@ -169,6 +173,32 @@ describe("POST /v1/notifications", () => {
     ]) {
       expect((await notify(app, account.agent.token, body)).status).toBe(202);
     }
+  });
+
+  it("refuses what FCM would refuse as a payload error (size over 3.5 KB of UTF-8, lone surrogates) and never deletes a token for it", async () => {
+    const push = new FakeGateway({ t: "invalid_token" });
+    const app = makeApp({ push });
+    const account = await registerAccount(app);
+    const phone = await loginDevice(app, account, "mobile");
+    await pair(app, account.agent.token, phone.deviceId);
+    await setToken(app, phone, "t");
+    const tenBig = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`k${i}`, "é".repeat(256)])); // 5 KB of UTF-8
+    for (const body of [
+      { title: "t", body: "b", data: tenBig },
+      { title: "💥".repeat(200), body: "€".repeat(1000), data: {} }, // 800 + 3000 bytes
+      { title: "bad \ud800 title", body: "b" },
+      { title: "t", body: "lone \udc00" },
+      { title: "t", body: "b", data: { k: "x\ud83d" } },
+    ]) {
+      const raw = JSON.stringify(body).replaceAll("\\\\u", "\\u");
+      const res = await call(app, "POST", "/v1/notifications", { token: account.agent.token, body: raw });
+      expect(res.status, raw.slice(0, 60)).toBe(400);
+    }
+    expect(push.sent).toEqual([]);
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM push_tokens")!.n).toBe(1);
+    // Just under the limit is fine.
+    const ok = await notify(app, account.agent.token, { title: "t".repeat(200), body: "é".repeat(1000), data: { k: "v".repeat(256) } });
+    expect(ok.status).toBe(202);
   });
 
   it("limits each agent (429 rate_limited from the notifyAgent limiter, keyed by device id)", async () => {

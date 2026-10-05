@@ -142,6 +142,30 @@ void main() {
     });
   });
 
+  test('the body is shortened so title + body + data stay under 3584 '
+      'UTF-8 bytes', () {
+    fakeAsync((async) {
+      final (api, bodies) = _api(_ok);
+      NotificationSender(api: api).send(
+        AgentNotification(
+          title: '💥' * 200,
+          body: '€' * 1000,
+          data: const {'session_id': '1', 'kind': 'message'},
+        ),
+      );
+      async.flushMicrotasks();
+      final title = bodies.single['title'] as String;
+      final body = bodies.single['body'] as String;
+      expect(title.runes.length, 200);
+      expect(body, endsWith('…'));
+      final total =
+          utf8.encode(title).length +
+          utf8.encode(body).length +
+          utf8.encode('session_id1kindmessage').length;
+      expect(total, lessThanOrEqualTo(NotificationSender.maxPayloadBytes));
+    });
+  });
+
   test('title and body are cut to the relay limits (200 / 1000)', () {
     fakeAsync((async) {
       final (api, bodies) = _api(_ok);

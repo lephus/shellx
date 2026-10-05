@@ -26,46 +26,49 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
   fi
   # Command notifications for the paired phone: report each command line, its start and its exit code
   # (OSC 633;E, 133;C, 133;D), installed at the first prompt, after the rest of the startup files.
-  if (( ! ${+functions[__shellx_precmd]} )); then
-    __shellx_preexec() {
-      local s=$1
-      s=${s//\\/\\\\}; s=${s//;/\\x3b}; s=${s//$'\n'/\\x0a}
-      s=${s//$'\r'/\\x0d}; s=${s//$'\a'/\\x07}; s=${s//$'\e'/\\x1b}
-      builtin printf '\e]633;E;%s\a\e]133;C\a' "$s"
-      __shellx_running=1
-    }
-    __shellx_precmd() {
-      local ret=$?
-      if [[ -n ${__shellx_running-} ]]; then
-        builtin printf '\e]133;D;%s\a' "$ret"
-        builtin unset __shellx_running
-      fi
-      return ret
-    }
-    __shellx_install() {
-      precmd_functions=(${precmd_functions:#__shellx_install})
-      if (( ! ${precmd_functions[(Ie)__shellx_precmd]} )); then
-        precmd_functions=(__shellx_precmd $precmd_functions)
-      fi
-      if (( ! ${preexec_functions[(Ie)__shellx_preexec]} )); then
-        preexec_functions+=(__shellx_preexec)
-      fi
-      if ! builtin whence -w shellx >/dev/null 2>&1; then
-        shellx() {
-          if [[ ${1-} == notify && $# -gt 1 ]]; then
-            builtin shift
-            local t="$*"
-            t=${t//$'\e'/}; t=${t//$'\a'/}
-            builtin printf '\e]777;notify;;%s\a' "$t"
-          else
-            builtin print -u2 'usage: shellx notify <text>'
-            return 2
-          fi
-        }
-      fi
-    }
-    typeset -ga precmd_functions preexec_functions
-    precmd_functions+=(__shellx_install)
+  # Not inside VS Code with its own shell integration (it already reports commands, as OSC 633).
+  if [[ "${TERM_PROGRAM-}" != vscode || -z "${VSCODE_INJECTION-}${VSCODE_SHELL_INTEGRATION-}" ]]; then
+    if (( ! ${+functions[__shellx_precmd]} )); then
+      __shellx_preexec() {
+        local s=$1
+        s=${s//\\/\\\\}; s=${s//;/\\x3b}; s=${s//$'\n'/\\x0a}
+        s=${s//$'\r'/\\x0d}; s=${s//$'\a'/\\x07}; s=${s//$'\e'/\\x1b}
+        builtin printf '\e]633;E;%s\a\e]133;C\a' "$s"
+        __shellx_running=1
+      }
+      __shellx_precmd() {
+        local ret=$?
+        if [[ -n ${__shellx_running-} ]]; then
+          builtin printf '\e]133;D;%s\a' "$ret"
+          builtin unset __shellx_running
+        fi
+        return ret
+      }
+      __shellx_install() {
+        precmd_functions=(${precmd_functions:#__shellx_install})
+        if (( ! ${precmd_functions[(Ie)__shellx_precmd]} )); then
+          precmd_functions=(__shellx_precmd $precmd_functions)
+        fi
+        if (( ! ${preexec_functions[(Ie)__shellx_preexec]} )); then
+          preexec_functions+=(__shellx_preexec)
+        fi
+        if ! builtin whence -w shellx >/dev/null 2>&1; then
+          shellx() {
+            if [[ ${1-} == notify && $# -gt 1 ]]; then
+              builtin shift
+              local t="$*"
+              t=${t//$'\e'/}; t=${t//$'\a'/}
+              builtin printf '\e]777;notify;;%s\a' "$t"
+            else
+              builtin print -u2 'usage: shellx notify <text>'
+              return 2
+            fi
+          }
+        fi
+      }
+      typeset -ga precmd_functions preexec_functions
+      precmd_functions+=(__shellx_install)
+    fi
   fi
 fi
 # <<< ShellX <<<

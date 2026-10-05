@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:shellx_core/shellx_core.dart';
 
@@ -40,6 +41,10 @@ final class NotificationSender {
   /// Relay limits (push spec §5).
   static const int maxTitleLength = 200;
   static const int maxBodyLength = 1000;
+
+  /// The relay refuses title + body + data over 3584 bytes of UTF-8; the
+  /// body is shortened to stay under this.
+  static const int maxPayloadBytes = 3584;
 
   final ShellxApi _api;
   final int maxPerWindow;
@@ -87,11 +92,17 @@ final class NotificationSender {
 
   Future<void> _deliver(AgentNotification n) async {
     try {
-      await _api.sendNotification(
-        _clip(n.title, maxTitleLength),
-        _clip(n.body, maxBodyLength),
-        data: n.data,
-      );
+      final title = _clip(n.title, maxTitleLength);
+      var dataBytes = 0;
+      n.data.forEach((k, v) => dataBytes += _bytes(k) + _bytes(v));
+      var body = _clip(n.body, maxBodyLength);
+      var max = body.runes.length;
+      while (max > 1 &&
+          _bytes(title) + _bytes(body) + dataBytes > maxPayloadBytes) {
+        max = max * 3 ~/ 4;
+        body = _clip(n.body, max);
+      }
+      await _api.sendNotification(title, body, data: n.data);
     } catch (error) {
       _failed++;
       final code = error is ApiException ? error.code : error.runtimeType;
@@ -104,6 +115,8 @@ final class NotificationSender {
       }
     }
   }
+
+  static int _bytes(String text) => utf8.encode(text).length;
 
   static String _clip(String text, int max) {
     final runes = text.runes;
