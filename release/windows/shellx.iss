@@ -73,6 +73,10 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags
 [UninstallRun]
 ; Stop the tray agent so its files can be deleted.
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
+; Terminal sharing (spec 10.6): remove the ShellX block from the PowerShell profiles and delete
+; %LOCALAPPDATA%\ShellX\bin and \term. Works whether or not the agent still runs (it takes no lock
+; and opens no window), so the order against the taskkill above does not matter.
+Filename: "{app}\{#AppExeName}"; Parameters: "--terminal-sharing-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "TerminalSharingCleanup"
 
 [UninstallDelete]
 ; The agent's per-user data folder: flutter_secure_storage's DPAPI-encrypted file (device key,
@@ -80,6 +84,10 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#AppExeName}"""; Flags
 ; ProductName "ShellX" (Runner.rc, plan 04); path_provider's application-support directory
 ; resolves to %APPDATA%\pro.shellx\ShellX (confirmed in plan 04's Task 1).
 Type: filesandordirs; Name: "{userappdata}\pro.shellx\ShellX"
+; Terminal sharing's folders, in case --terminal-sharing-cleanup could not delete them (a
+; shellx-term.exe that was still running then has exited by now).
+Type: filesandordirs; Name: "{localappdata}\ShellX\bin"
+Type: filesandordirs; Name: "{localappdata}\ShellX\term"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
