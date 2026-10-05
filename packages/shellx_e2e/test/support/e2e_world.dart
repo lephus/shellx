@@ -198,6 +198,10 @@ final class E2eWorld {
   late final NoiseKeyPair agentKey;
   late final TrustedStore trusted;
   late final SessionManager sessions;
+  late final DesktopSessionManager desktop;
+  late final SessionRouter router;
+  late final TerminalSharing sharing;
+  late final Directory home;
   late final AgentService agent;
   late final RelayConnection agentRelay;
   late final DroppableConnector agentConnector;
@@ -251,11 +255,27 @@ final class E2eWorld {
     );
     agentId = auth.deviceId;
     trusted = TrustedStore(storage);
+    home = await Directory.systemTemp.createTemp('shellx-e2e-home-');
+    final ids = sessionIdAllocator();
     sessions = SessionManager(
       ptyFactory: const ProcessPtyFactory(),
       shellResolver: const _PlainShell(),
       homeDirectory: Directory.systemTemp.path,
       baseEnvironment: Platform.environment,
+      nextId: ids,
+    );
+    desktop = DesktopSessionManager(nextId: ids);
+    sharing = TerminalSharing(
+      endpointPath: termEndpointPath(
+        environment: {'HOME': home.path},
+        windows: false,
+      ),
+      sessions: desktop,
+    );
+    router = SessionRouter(
+      shells: sessions,
+      desktop: desktop,
+      desktopSharing: () => sharing.enabled,
     );
     _sessionsCreated = true;
     agentConnector = DroppableConnector();
@@ -270,7 +290,7 @@ final class E2eWorld {
       deviceId: auth.deviceId,
       identity: agentKey,
       trusted: trusted,
-      sessions: sessions,
+      sessions: router,
       pairing: PairingCodeManager(now: () => DateTime.now().add(clockSkew)),
       appVersion: '1.0.0',
     );
@@ -334,7 +354,11 @@ final class E2eWorld {
     if (_disposed) return;
     _disposed = true;
     agentHttp.release();
-    if (_sessionsCreated) sessions.closeAll();
+    if (_sessionsCreated) {
+      router.closeAll();
+      await _quietly(sharing.stop);
+      await _quietly(() => home.delete(recursive: true));
+    }
     for (final phone in _phones) {
       await _quietly(phone._dispose);
     }
