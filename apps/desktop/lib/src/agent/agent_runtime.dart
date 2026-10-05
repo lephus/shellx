@@ -101,11 +101,20 @@ final class CoreAgentRuntime implements AgentRuntime {
       token: () => token,
       connector: connector,
     );
+    final ids = sessionIdAllocator();
     _sessions = SessionManager(
       ptyFactory: ptyFactory,
       shellResolver: shellResolver,
       homeDirectory: homeDirectory,
       baseEnvironment: baseEnvironment,
+      nextId: ids,
+    );
+    _desktopSessions = DesktopSessionManager(nextId: ids);
+    // P4 replaces `() => false` with the TerminalSharing switch.
+    _router = SessionRouter(
+      shells: _sessions,
+      desktop: _desktopSessions,
+      desktopSharing: () => false,
     );
     _pairing = PairingCodeManager(now: _now);
     _service = AgentService(
@@ -114,7 +123,7 @@ final class CoreAgentRuntime implements AgentRuntime {
       deviceId: params.credentials.deviceId,
       identity: params.identity,
       trusted: params.trusted,
-      sessions: _sessions,
+      sessions: _router,
       pairing: _pairing,
       appVersion: appVersion,
       clock: _now,
@@ -124,6 +133,8 @@ final class CoreAgentRuntime implements AgentRuntime {
   final DateTime Function() _now;
   late final RelayConnection _relay;
   late final SessionManager _sessions;
+  late final DesktopSessionManager _desktopSessions;
+  late final SessionRouter _router;
   late final PairingCodeManager _pairing;
   late final AgentService _service;
 
@@ -146,7 +157,7 @@ final class CoreAgentRuntime implements AgentRuntime {
   @override
   Future<void> stop() async {
     _running = false;
-    _sessions.closeAll();
+    _router.closeAll();
     await _service.stop();
   }
 
@@ -172,9 +183,9 @@ final class CoreAgentRuntime implements AgentRuntime {
   @override
   Future<void> revoke(String mobileId) => _service.revoke(mobileId);
   @override
-  void closeSession(int id) => _sessions.closeSession(id);
+  void closeSession(int id) => _router.closeSession(id);
   @override
-  void closeAllSessions() => _sessions.closeAll();
+  void closeAllSessions() => _router.closeAll();
 
   /// RelayConnection.reconnectNow() acts only while disconnected; after a
   /// 4001 close `relay.start()` is what connects again (AgentService is
