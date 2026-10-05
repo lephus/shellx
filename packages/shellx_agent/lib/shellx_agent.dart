@@ -14,4 +14,7 @@ export 'src/session/ring_buffer.dart';
 export 'src/session/session_ids.dart';
 export 'src/session/session_manager.dart';
 export 'src/session/session_stream.dart';
+export 'src/term/term_auth.dart';
+export 'src/term/term_frames.dart';
+export 'src/term/term_messages.dart';
 export 'src/trust/trusted_store.dart';
