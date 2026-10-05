@@ -111,3 +111,18 @@ Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn 
   - Thứ tự ở spec §14.
 - **Kiểm tay còn thiếu** (thêm vào danh sách spec §11.6): gõ bằng bộ gõ tiếng Việt (IME), Cmd+W, giao diện thật của Cursor và Android Studio, iTerm2, VS Code, Warp.
 - **Windows:** kiểm tra tương tác trên máy Windows thật là việc chờ (spec §12). Trước khi kiểm xong, công tắc chỉ hiện khi đặt `SHELLX_EXPERIMENTAL=terminal-sharing`.
+
+## 10. Thông báo đẩy (2026-10-05) — User checklist for push
+
+Spec: `specs/2026-10-05-push-notifications-design.md`. Plan: `plans/2026-10-05-push-notifications-core.md` (N-a: relay, agent, hook) và `plans/2026-10-05-push-notifications-apps.md` (N-b: mobile, desktop, chính sách). Firebase: dự án **`shellxpro`**, tài khoản Google **phulealali@gmail.com**; app Android và iOS `com.shellx.prod` đã đăng ký, file cấu hình client đã commit (`apps/mobile/lib/firebase_options.dart`, `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`).
+
+Việc chỉ người dùng làm được, theo thứ tự:
+
+1. **APNs key → Firebase.** Apple Developer → Keys → tạo key có "Apple Push Notifications service (APNs)" (file `.p8`, ghi Key ID và Team ID). Firebase console `shellxpro` → Project settings → Cloud Messaging → Apple app `com.shellx.prod` → upload `.p8`. Không có bước này iPhone không nhận được gì.
+2. **Service account FCM → VPS.** Firebase console → Project settings → Service accounts → Generate new private key (JSON, giữ bí mật). Đặt lên VPS đúng theo `deploy/README.md` mục "Push notifications": `~/phu/shellx/secrets/fcm.json` (chủ uid 1000, quyền 400) và dòng `FCM_SERVICE_ACCOUNT=/secrets/fcm.json` trong `~/phu/shellx/.env`, rồi recreate relay; `docker compose logs relay | grep push_` phải thấy `push_enabled`.
+3. **App ID `com.shellx.prod`:** Apple Developer → Identifiers → bật capability **Push Notifications**; tạo lại provisioning profile (development và App Store) rồi tải về Xcode. Project đã có `Runner/Runner.entitlements` và capability Push + Background Modes (remote-notification).
+4. **Bản phát hành iOS:** `Runner.entitlements` đang để `aps-environment` = `development` (để chạy từ Xcode). Bản build App Store/TestFlight phải mang `production`: Xcode tự đổi theo distribution profile khi Archive → Distribute; nếu ký tay, kiểm tra `codesign -d --entitlements - ShellX.app` cho thấy `production`.
+5. **Deploy relay:** push `main` (workflow `deploy.yml`) để relay có `push_tokens`, `PUT/DELETE /v1/devices/me/push-token`, `POST /v1/notifications`. Chính sách quyền riêng tư mới (mục "Thông báo đẩy") đi cùng lần deploy này — phải lên **trước** khi phát hành app mobile có push.
+6. **Kiểm tay trên máy thật** (spec §10, §11): iPhone và Android đăng nhập, ghép nối một máy → app hỏi quyền thông báo một lần; trên máy tính chọn ngưỡng trong tray "Thông báo khi lệnh chạy lâu xong"; trong một phiên ShellX chạy `sleep 40; false` → điện thoại nhận "✗ sleep 40; false · mã 1 · 40 giây" khi app ở foreground (banner), nền và **đã đóng hẳn**; chạm vào → mở đúng máy (và tab nếu còn); `shellx notify "Build xong"` và `printf '\e]9;Xin chào\a'` → thông báo ngay; terminal máy tính được chia sẻ (sau khi bật lại chia sẻ để cài khối mới) cũng báo; Cài đặt app hiện "Đang bật"; tắt thông báo trong cài đặt điện thoại → Cài đặt app hiện "Đang tắt — Mở Cài đặt hệ thống"; đăng xuất → không còn nhận.
+
+Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã bật "Chia sẻ terminal" sẽ thấy "cần thiết lập lại" một lần sau khi cập nhật app desktop.
