@@ -58,8 +58,26 @@ void main() {
     expect(vi.desktopTerminalGone, 'Mất kết nối với terminal này trên máy tính.');
     expect(vi.desktopClosedByHost, 'Máy tính đã ngắt điện thoại khỏi terminal này.');
     final en = await S.load(const Locale('en'));
+    expect(en.pickerDesktopGroup, 'Terminals on the computer');
+    expect(en.pickerShellxGroup, 'ShellX sessions');
+    expect(en.pickerNewSession, 'New session');
+    expect(
+      en.pickerHintSharingOff,
+      "Turn on 'Share terminal' in the ShellX menu on the computer to see its open terminals here.",
+    );
+    expect(en.pickerHintUpdateDesktop, 'Update ShellX on the computer to see its open terminals.');
+    expect(
+      en.pickerHintOpenNewWindow,
+      'Only terminal windows opened after sharing was turned on show up here. '
+      'Open a new terminal window on the computer.',
+    );
+    expect(en.desktopTerminalLabel, 'Terminal on the computer');
     expect(en.desktopStillRunning, 'The terminal is still running on the computer.');
     expect(en.desktopDriverBanner, 'The computer is using this terminal');
+    expect(en.desktopWindowClosed, 'The terminal window on the computer was closed.');
+    expect(en.desktopTerminalGone, 'Lost the connection to this terminal on the computer.');
+    expect(en.desktopClosedByHost, 'The computer disconnected this phone from this terminal.');
+    expect(vi.desktopTerminalLabel, 'Terminal trên máy tính');
   });
 
   testWidgets('S.of(context) resolves Vietnamese inside the design system', (tester) async {

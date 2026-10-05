@@ -854,11 +854,15 @@ void main() {
       await openDesktop(tester);
       const banner = 'Máy tính đang dùng terminal này';
       expect(find.text(banner), findsNothing);
+      await tester.pump(const Duration(milliseconds: 200)); // any resize of the first layout is out
+      final sent = machine.resizes.length;
 
       machine.handle(40).emit(const TabDriver(DriverSide.desktop));
       await tester.pump();
       expect(find.text(banner), findsOneWidget);
-      final sent = machine.resizes.length;
+      // Showing the banner (laid over the cells) changes no size: nothing is sent on its own.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(machine.resizes, hasLength(sent));
 
       await tester.tap(find.byType(TerminalView));
       await tester.pump();
@@ -878,6 +882,66 @@ void main() {
       await tester.tap(find.byType(TerminalView));
       await tester.pump();
       expect(machine.resizes, hasLength(sent + 2));
+    });
+
+    testWidgets('scrolling, a long press and a two-finger pinch on the terminal do not take the size back', (
+      tester,
+    ) async {
+      await openDesktop(tester);
+      machine.handle(40).emit(const TabDriver(DriverSide.desktop));
+      await tester.pump(const Duration(milliseconds: 200));
+      final sent = machine.resizes.length;
+      final terminal = find.byType(TerminalView);
+      final center = tester.getCenter(terminal);
+
+      // Scroll through the history.
+      await tester.drag(terminal, const Offset(0, 200));
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent));
+
+      // Long press (selection) without moving.
+      final press = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 800));
+      await press.up();
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent));
+      registry.forMachine(agentA).activeTab.value!.selection.clearSelection();
+
+      // Pinch: a second finger joins before the first lifts, neither moving far.
+      final first = await tester.startGesture(center - const Offset(30, 0));
+      final second = await tester.startGesture(center + const Offset(30, 0), pointer: 7);
+      await tester.pump();
+      await first.up();
+      await second.up();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(machine.resizes, hasLength(sent));
+      expect(find.text('Máy tính đang dùng terminal này'), findsOneWidget);
+
+      // A plain tap still does.
+      await tester.tap(terminal);
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent + 1));
+    });
+
+    testWidgets('after closing the last desktop tab, "Mở phiên mới" offers the computer\'s terminals again', (
+      tester,
+    ) async {
+      await openDesktop(tester);
+      await tester.tap(
+        find.descendant(of: find.byKey(const ValueKey('tab-40')), matching: find.byTooltip('Đóng tab')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Chưa có phiên nào đang mở.'), findsOneWidget);
+
+      await tester.tap(find.text('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      expect(machine.listCalls, 2);
+      expect(find.text('Terminal — ~/projects/api'), findsOneWidget);
+      expect(machine.opened, isEmpty);
+
+      await tester.tap(find.text('Terminal — ~/projects/api'));
+      await tester.pumpAndSettle();
+      expect(machine.attached.map((a) => a.id), [40, 40]);
     });
 
     testWidgets('typing while the computer drives sends the phone size before the keys', (tester) async {

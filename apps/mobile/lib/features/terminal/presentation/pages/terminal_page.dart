@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kLongPressTimeout, kTouchSlop;
 import 'package:flutter/services.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -320,7 +323,7 @@ class _TerminalPageState extends State<TerminalPage> {
                     children: [
                       Positioned.fill(
                         child: active == null
-                            ? _NoTab(busy: _controller.busy.value, onOpen: () => _controller.openNew(_grid))
+                            ? _NoTab(busy: _controller.busy.value, onOpen: _onAdd)
                             : _TerminalPane(
                                 key: ValueKey(active.id),
                                 tab: active,
@@ -688,11 +691,10 @@ class _TerminalPane extends StatelessWidget {
       return Stack(
         children: [
           Positioned.fill(
-            // Terminal sharing §9.2: touching the terminal takes the size back from the computer. A
-            // Listener does not join the gesture arena, so selection, scrolling and pinch still work.
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => tab.claimSize(),
+            // Terminal sharing §9.2: a tap on the terminal takes the size back from the computer;
+            // scrolling, long-press selection and pinch do not.
+            child: _TapListener(
+              onTap: tab.claimSize,
               child: PinchToZoom(
                 fontSize: fontSize,
                 onFontSize: onFontSize,
@@ -863,6 +865,81 @@ class _EndedCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Calls [onTap] for a real tap only: one pointer, released within [kLongPressTimeout], having moved
+/// less than [kTouchSlop]. Built on a [Listener], so it never joins the gesture arena and the
+/// terminal's own gestures (scroll, selection, pinch) work as before.
+class _TapListener extends StatefulWidget {
+  const _TapListener({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_TapListener> createState() => _TapListenerState();
+}
+
+class _TapListenerState extends State<_TapListener> {
+  /// Pointers currently down.
+  final Set<int> _down = {};
+
+  /// The candidate tap: its pointer, where and when it went down. Cleared as soon as the gesture
+  /// stops being a tap (a second pointer, too much movement).
+  ({int pointer, Offset position})? _candidate;
+
+  /// Held down this long it is a long press (selection), not a tap. A timer rather than the events'
+  /// time stamps, which synthesized events may leave at zero.
+  Timer? _longPress;
+
+  void _onDown(PointerDownEvent event) {
+    _down.add(event.pointer);
+    _longPress?.cancel();
+    if (_down.length == 1) {
+      _candidate = (pointer: event.pointer, position: event.position);
+      _longPress = Timer(kLongPressTimeout, () => _candidate = null);
+    } else {
+      _candidate = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _longPress?.cancel();
+    super.dispose();
+  }
+
+  void _onMove(PointerMoveEvent event) {
+    final candidate = _candidate;
+    if (candidate == null || candidate.pointer != event.pointer) return;
+    if ((event.position - candidate.position).distance >= kTouchSlop) _candidate = null;
+  }
+
+  void _onUp(PointerUpEvent event) {
+    _down.remove(event.pointer);
+    final candidate = _candidate;
+    if (candidate == null || candidate.pointer != event.pointer) return;
+    _candidate = null;
+    _longPress?.cancel();
+    if ((event.position - candidate.position).distance < kTouchSlop) widget.onTap();
+  }
+
+  void _onCancel(PointerCancelEvent event) {
+    _down.remove(event.pointer);
+    if (_candidate?.pointer == event.pointer) _candidate = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onDown,
+      onPointerMove: _onMove,
+      onPointerUp: _onUp,
+      onPointerCancel: _onCancel,
+      child: widget.child,
     );
   }
 }
