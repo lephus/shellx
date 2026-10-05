@@ -150,6 +150,7 @@ void main() {
       ShellCommand shell,
       List<String> lines, {
       Map<String, String> extraEnv = const {},
+      bool pty = false,
     }) async {
       final launch = integration.apply(shell, {
         'HOME': home.path,
@@ -158,9 +159,14 @@ void main() {
         'BASH_SILENCE_DEPRECATION_WARNING': '1',
         ...extraEnv,
       });
+      // With [pty], macOS `script` gives the shell a real terminal (bash-preexec
+      // needs one); lines are then typed one by one.
       final process = await Process.start(
-        launch.command.executable,
-        launch.command.arguments,
+        pty ? '/usr/bin/script' : launch.command.executable,
+        [
+          if (pty) ...['-q', '/dev/null', launch.command.executable],
+          ...launch.command.arguments,
+        ],
         environment: launch.environment,
         includeParentEnvironment: false,
         workingDirectory: home.path,
@@ -170,8 +176,17 @@ void main() {
         process.stdout.transform(utf8.decoder).forEach(out.write),
         process.stderr.transform(utf8.decoder).forEach(out.write),
       ]);
-      process.stdin.write('${lines.join('\n')}\nexit\n');
-      await process.stdin.close();
+      if (pty) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        for (final line in [...lines, 'exit']) {
+          process.stdin.write('$line\r');
+          await process.stdin.flush();
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        }
+      } else {
+        process.stdin.write('${lines.join('\n')}\nexit\n');
+        await process.stdin.close();
+      }
       await process.exitCode.timeout(const Duration(seconds: 20));
       await done;
       return out.toString();
@@ -361,6 +376,78 @@ void main() {
           '__shellx_prompt_end]',
         ),
       );
+    }, skip: hasBash ? null : 'no /bin/bash');
+
+    final bashPreexec =
+        '${Directory.current.path}/../../term/tests/fixtures/bash-preexec.sh';
+
+    test(
+      'bash with bash-preexec in ~/.bashrc: ShellX uses preexec/precmd '
+      'functions; both ShellX and the user hooks see every command',
+      () async {
+        File('${home.path}/.bashrc').writeAsStringSync(
+          "source '$bashPreexec'\n"
+          'preexec() { echo "PRE""EXEC[\$1]"; }\n'
+          'precmd() { echo "PRE""CMD"; }\n',
+        );
+        final out = await run(
+          const ShellCommand(
+            executable: '/bin/bash',
+            arguments: [],
+            name: 'bash',
+          ),
+          ['echo one', 'false', 'echo three', 'echo three'],
+          pty: true,
+        );
+        for (final line in ['echo one', 'false', 'echo three']) {
+          expect(out, contains('$esc]633;E;$line$bel$esc]133;C$bel'));
+          expect(out, contains('PREEXEC[$line]'));
+        }
+        expect(out, contains('$esc]133;D;1$bel'));
+        // echo one, false, echo three twice, exit.
+        expect(']633;E;'.allMatches(out), hasLength(5));
+        expect('PREEXEC['.allMatches(out), hasLength(5));
+        expect(out, isNot(contains(']633;E;__bp')));
+      },
+      skip: hasBash && File('/usr/bin/script').existsSync() && Platform.isMacOS
+          ? null
+          : 'needs /bin/bash and macOS script(1) for a pty',
+    );
+
+    test('bash with set -u or extdebug in ~/.bashrc: no errors, every command '
+        'runs and is reported, nothing inside functions', () async {
+      for (final rc in [
+        'set -u\n',
+        'shopt -s extdebug\nf() { local x=1; echo in'
+            '-f; return 3; }\n',
+      ]) {
+        File('${home.path}/.bashrc').writeAsStringSync(rc);
+        final out = await run(
+          const ShellCommand(
+            executable: '/bin/bash',
+            arguments: [],
+            name: 'bash',
+          ),
+          [
+            'echo one',
+            if (rc.contains('extdebug')) 'f' else 'false',
+            r'PROMPT_COMMAND="$PROMPT_COMMAND; true"',
+            'echo after',
+          ],
+        );
+        expect(out, isNot(contains('unbound variable')), reason: rc);
+        expect(out, contains('after\n'), reason: rc);
+        expect(out, contains(']633;E;echo after'), reason: rc);
+        expect(
+          out,
+          contains(rc.contains('extdebug') ? ']133;D;3' : ']133;D;1'),
+          reason: rc,
+        );
+        if (rc.contains('extdebug')) expect(out, contains('in-f'));
+        for (final inner in [']633;E;local', ']633;E;return', ']633;E;true']) {
+          expect(out, isNot(contains(inner)), reason: rc);
+        }
+      }
     }, skip: hasBash ? null : 'no /bin/bash');
 
     test(

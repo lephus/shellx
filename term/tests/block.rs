@@ -716,3 +716,118 @@ fn vscode_injection_alone_does_not_turn_the_inner_hooks_off() {
     h.send("exit 0\r");
     h.wait_exit(T);
 }
+
+// ---- bash-preexec, set -u, extdebug (round 3) --------------------------------------------------
+
+const BASH_PREEXEC: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/bash-preexec.sh"
+);
+
+/// Starts a really wrapped bash whose ~/.bashrc is `before` + block + `after`,
+/// types `cmds` one by one (each waits for its own `done-<n>` marker) and
+/// returns the window text.
+fn bash_session(tag: &str, before: &str, after: &str, cmds: &[&str]) -> String {
+    let home = real_home(tag);
+    std::fs::write(
+        home.join(".bashrc"),
+        format!("{before}\n{BASH_BLOCK}{after}\n"),
+    )
+    .unwrap();
+    let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
+    assert_really_wrapped(&mut h);
+    for (i, cmd) in cmds.iter().enumerate() {
+        h.send(&format!("{cmd}\r"));
+        h.send(&format!("echo do''ne-{i}\r"));
+        h.expect(&format!("done-{i}\r"), T);
+    }
+    h.settle(Duration::from_millis(300));
+    let text = h.text();
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0, "{tag}: {text:?}");
+    text
+}
+
+const USER_HOOKS: &str =
+    "preexec() { echo \"PRE\"\"EXEC[$1]\"; }\nprecmd() { echo \"PRE\"\"CMD\"; }";
+
+fn assert_reported_with_bash_preexec(text: &str, tag: &str) {
+    for line in ["echo one", "false", "echo three"] {
+        let e = format!("\x1b]633;E;{line}\x07\x1b]133;C\x07");
+        assert!(text.contains(&e), "{tag}: no E/C for {line:?}: {text:?}");
+        assert!(
+            text.contains(&format!("PREEXEC[{line}]")),
+            "{tag}: the user's preexec skipped {line:?}: {text:?}"
+        );
+    }
+    assert!(text.contains("\x1b]133;D;1\x07"), "{tag}: {text:?}");
+    // The user's preexec ran for every typed line (3 commands, 3 markers, the
+    // ps probe), and ShellX reported each of them exactly once.
+    let e_count = text.matches("]633;E;").count();
+    let pre_count = text.matches("PREEXEC[").count();
+    assert_eq!(e_count, pre_count, "{tag}: {text:?}");
+    assert!(!text.contains("]633;E;__bp"), "{tag}: {text:?}");
+}
+
+#[test]
+fn bash_preexec_sourced_after_the_block_shares_the_hooks() {
+    let text = bash_session(
+        "bp-after",
+        "",
+        &format!("source '{BASH_PREEXEC}'\n{USER_HOOKS}"),
+        &["echo one", "false", "echo three", "echo three"],
+    );
+    assert_reported_with_bash_preexec(&text, "bp-after");
+}
+
+#[test]
+fn bash_preexec_sourced_before_the_block_shares_the_hooks() {
+    let text = bash_session(
+        "bp-before",
+        &format!("source '{BASH_PREEXEC}'\n{USER_HOOKS}"),
+        "",
+        &["echo one", "false", "echo three", "echo three"],
+    );
+    assert_reported_with_bash_preexec(&text, "bp-before");
+}
+
+#[test]
+fn set_u_in_bashrc_raises_no_errors_and_commands_are_reported() {
+    for (tag, before, after) in [
+        ("nounset-before", "set -u", ""),
+        (
+            "nounset-after",
+            "",
+            "set -u\nPROMPT_COMMAND=\"$PROMPT_COMMAND; history -a\"",
+        ),
+    ] {
+        let text = bash_session(tag, before, after, &["echo one", "false", "echo three"]);
+        assert!(!text.contains("unbound variable"), "{tag}: {text:?}");
+        assert!(text.contains("\x1b]633;E;false\x07"), "{tag}: {text:?}");
+        assert!(text.contains("\x1b]133;D;1\x07"), "{tag}: {text:?}");
+        assert!(!text.contains("]633;E;history"), "{tag}: {text:?}");
+    }
+}
+
+#[test]
+fn extdebug_runs_every_command_and_reports_only_typed_lines() {
+    let text = bash_session(
+        "extdebug",
+        "",
+        "shopt -s extdebug\nf() { local x=1; echo in''-f; return 3; }\nPROMPT_COMMAND=\"$PROMPT_COMMAND; true\"\necho RC''-LAST",
+        &["echo one", "f", "echo after"],
+    );
+    for needle in ["RC-LAST", "one\r", "in-f", "after\r"] {
+        assert!(text.contains(needle), "skipped {needle:?}: {text:?}");
+    }
+    assert!(text.contains("\x1b]633;E;f\x07"), "{text:?}");
+    assert!(text.contains("\x1b]133;D;3\x07"), "{text:?}");
+    for inner in [
+        "]633;E;local",
+        "]633;E;return",
+        "]633;E;true",
+        "]633;E;__shellx",
+    ] {
+        assert!(!text.contains(inner), "{inner}: {text:?}");
+    }
+}
