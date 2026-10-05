@@ -139,6 +139,12 @@ final class ClientBackend implements ShellxBackend {
   }
 
   @override
+  Future<void> registerPushToken(String token, PushPlatform platform) async {
+    _checkNotDisposed();
+    return _api.registerPushToken(token, platform);
+  }
+
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;

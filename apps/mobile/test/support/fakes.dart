@@ -464,6 +464,19 @@ class FakeBackend implements ShellxBackend {
     if (error != null) throw error;
   }
 
+  /// Every [registerPushToken] call, failed ones included.
+  final List<(String, PushPlatform)> pushTokens = [];
+
+  /// Thrown by [registerPushToken] (e.g. offline, or a relay without push support: 404).
+  Object? pushTokenError;
+
+  @override
+  Future<void> registerPushToken(String token, PushPlatform platform) async {
+    pushTokens.add((token, platform));
+    final error = pushTokenError;
+    if (error != null) throw error;
+  }
+
   @override
   Future<void> dispose() async {
     disposeCalls++;

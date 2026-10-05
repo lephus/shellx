@@ -76,6 +76,11 @@ class FakeRelayHttp {
       if (accountResponseLost) throw http.ClientException('connection reset');
       return http.Response('', 204);
     }
+    if (path == '/v1/devices/me/push-token') {
+      if (logoutOffline) throw http.ClientException('offline');
+      await logoutGate?.future;
+      return http.Response('', 204);
+    }
     if (path == '/v1/auth/logout') {
       if (logoutOffline) throw http.ClientException('offline');
       await logoutGate?.future;

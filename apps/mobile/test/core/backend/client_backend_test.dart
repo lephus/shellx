@@ -36,6 +36,7 @@ void main() {
               ? http.Response('', 204)
               : http.Response('{"error":{"code":"forbidden","message":"no"}}', deleteStatus);
         }
+        if (request.method == 'PUT') return http.Response('', 204);
         return http.Response('[]', 200);
       }),
     )..token = 'token-1';
@@ -107,6 +108,21 @@ void main() {
     expect(backend.devices, throwsStateError);
     expect(() => backend.unpair(agentA), throwsStateError);
     expect(requests, isEmpty);
+  });
+
+  test('registerPushToken PUTs the token and platform with the account token; refused after dispose', () async {
+    final backend = await start();
+    await backend.registerPushToken('fcm-token-1', PushPlatform.ios);
+    final put = requests.single;
+    expect(put.method, 'PUT');
+    expect(put.url.path, '/v1/devices/me/push-token');
+    expect(put.headers['authorization'], 'Bearer token-1');
+    expect(put.body, '{"token":"fcm-token-1","platform":"ios"}');
+
+    await backend.dispose();
+    api.token = 'token-2';
+    expect(() => backend.registerPushToken('fcm-token-1', PushPlatform.ios), throwsStateError);
+    expect(requests, hasLength(1));
   });
 
   test('one session per pinned machine; with the relay down connect fails at once', () async {

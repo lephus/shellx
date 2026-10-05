@@ -34,7 +34,7 @@ abstract class SessionHolder {
   Future<void> register(String email, String password);
 
   /// Signs out even offline. The backend is stopped and the saved token deleted first; then
-  /// `POST /v1/auth/logout` is tried for at most 10 s while the old relay connection settles (at
+  /// `POST /v1/auth/logout` (with `DELETE /v1/devices/me/push-token` beside it) is tried for at most 10 s while the old relay connection settles (at
   /// most 15 s, a dial in flight), and the sign-out is announced after both. Network, storage and
   /// teardown errors are swallowed. A call while a sign-out runs (a 4002 included) returns that
   /// sign-out.
@@ -226,10 +226,15 @@ class SessionHolderImpl implements SessionHolder {
       _logError(deleted ? 'forgetAccount' : 'deleteToken', error);
     }
     if (reason == SignOutReason.loggedOut) {
+      // The push token goes too (push spec §6; the relay's logout also drops it). Both requests
+      // run side by side under the one bound, each failure swallowed on its own.
       try {
-        await _api.logout().timeout(_logoutTimeout);
+        await Future.wait([
+          _quietly('deletePushToken', _api.deletePushToken),
+          _quietly('logout', _api.logout),
+        ]).timeout(_logoutTimeout);
       } catch (error) {
-        // Offline, timed out or a platform error: the token is already deleted locally.
+        // Timed out: the token is already deleted locally.
         _logError('logout', error);
       }
     }
@@ -246,6 +251,15 @@ class SessionHolderImpl implements SessionHolder {
       _signOutReason.value = reason;
     });
     _events.notifyAll(SignedOutEvent(reason));
+  }
+
+  /// Offline, a relay without the endpoint or a platform error: logged by type, never thrown.
+  static Future<void> _quietly(String step, Future<void> Function() request) async {
+    try {
+      await request();
+    } catch (error) {
+      _logError(step, error);
+    }
   }
 
   /// Only the type: an error may carry request details (overview §2).

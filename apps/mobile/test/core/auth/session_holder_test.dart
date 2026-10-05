@@ -178,6 +178,31 @@ void main() {
     expect((events.single as SignedOutEvent).reason, SignOutReason.loggedOut);
   });
 
+  test('logout also removes the push token on the relay (push spec §6), as the signed-out device', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+
+    await session.logout();
+
+    final delete = relay.lastTo('/v1/devices/me/push-token');
+    expect(delete.method, 'DELETE');
+    expect(delete.headers['authorization'], 'Bearer saved');
+    expect(logoutRequests(), hasLength(1));
+    expect(session.isAuthenticated.value, isFalse);
+  });
+
+  test('a revocation (4002) sends neither the push-token delete nor the logout', () async {
+    await saveSession();
+    final session = holder();
+    await session.restore();
+    backends.backends.single.emitRelay(RelayConnectionState.revoked);
+    await pumpEventQueue();
+    expect(session.isAuthenticated.value, isFalse);
+    expect(relay.requests.where((r) => r.url.path == '/v1/devices/me/push-token'), isEmpty);
+    expect(logoutRequests(), isEmpty);
+  });
+
   test('logout still signs out locally when the relay is unreachable', () async {
     await saveSession();
     relay.logoutOffline = true;

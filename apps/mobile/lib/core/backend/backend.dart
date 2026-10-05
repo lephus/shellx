@@ -171,9 +171,14 @@ abstract interface class ShellxBackend {
   /// only an `untrusted` handshake forgets a pin.
   Future<void> unpair(String agentId);
 
+  /// `PUT /v1/devices/me/push-token` (push spec §5, §6): this phone's FCM token, so the relay
+  /// can push the agents' notifications to it. Throws [ApiException] (a relay without push
+  /// support answers 404), and [StateError] after [dispose].
+  Future<void> registerPushToken(String token, PushPlatform platform);
+
   /// Stops the client and the relay connection for good (sign-out). After
   /// it, [suspend], [resume] and [reconnectNow] do nothing — the relay never
-  /// dials again — and [devices], [pair] and [unpair] throw [StateError]:
+  /// dials again — and [devices], [pair], [unpair] and [registerPushToken] throw [StateError]:
   /// the shared [ShellxApi] may already hold the next account's token.
   Future<void> dispose();
 }
