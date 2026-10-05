@@ -101,6 +101,31 @@ final class RuntimeParams {
 
 typedef AgentRuntimeFactory = AgentRuntime Function(RuntimeParams params);
 
+/// What push notifications need from the app (push spec §7). Every getter is
+/// read when a notification is built.
+final class PushNotificationsSetup {
+  const PushNotificationsSetup({
+    required this.threshold,
+    required this.machineName,
+    required this.locale,
+    this.hooksDirectory,
+  });
+
+  /// "Thông báo khi lệnh chạy lâu xong", read live from the settings; null =
+  /// off.
+  final Duration? Function() threshold;
+
+  /// The agent's device name (the first part of every title).
+  final String Function() machineName;
+
+  /// The computer's language (`Platform.localeName`).
+  final String Function() locale;
+
+  /// Where the shell hooks of ShellX sessions are written (spec §4.4); null
+  /// starts shells without them (no command notifications in sessions).
+  final String? hooksDirectory;
+}
+
 /// Production [AgentRuntime] wiring shellx_core + shellx_agent.
 final class CoreAgentRuntime implements AgentRuntime {
   CoreAgentRuntime(
@@ -112,6 +137,7 @@ final class CoreAgentRuntime implements AgentRuntime {
     required String homeDirectory,
     required Map<String, String> baseEnvironment,
     String? termEndpointPath,
+    PushNotificationsSetup? notifications,
     RelaySocketConnector connector = ioRelaySocketConnector,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now {
@@ -122,14 +148,36 @@ final class CoreAgentRuntime implements AgentRuntime {
       connector: connector,
     );
     final ids = sessionIdAllocator();
+    // One AgentNotifications for both kinds of session: the 6-per-minute
+    // limit is per machine (push spec N10). It sends with the signed-in
+    // agent's token (params.api).
+    _notifications = notifications == null
+        ? null
+        : AgentNotifications(
+            NotificationsConfig(
+              api: params.api,
+              threshold: notifications.threshold,
+              machineName: notifications.machineName,
+              locale: notifications.locale,
+            ),
+            now: now,
+          );
+    final hooks = notifications?.hooksDirectory;
     _sessions = SessionManager(
       ptyFactory: ptyFactory,
       shellResolver: shellResolver,
       homeDirectory: homeDirectory,
       baseEnvironment: baseEnvironment,
       nextId: ids,
+      notifications: _notifications,
+      shellIntegration: hooks == null
+          ? null
+          : ShellIntegration(directory: hooks),
     );
-    _desktopSessions = DesktopSessionManager(nextId: ids);
+    _desktopSessions = DesktopSessionManager(
+      nextId: ids,
+      notifications: _notifications,
+    );
     _sharing = termEndpointPath == null
         ? null
         : TerminalSharing(
@@ -156,6 +204,7 @@ final class CoreAgentRuntime implements AgentRuntime {
   }
 
   final DateTime Function() _now;
+  late final AgentNotifications? _notifications;
   late final RelayConnection _relay;
   late final SessionManager _sessions;
   late final DesktopSessionManager _desktopSessions;
@@ -171,6 +220,12 @@ final class CoreAgentRuntime implements AgentRuntime {
 
   /// Exposed for tests.
   PairingCodeManager get pairingCodes => _pairing;
+
+  /// Exposed for tests: null without [PushNotificationsSetup].
+  AgentNotifications? get notifications => _notifications;
+
+  /// Exposed for tests: the ShellX sessions.
+  SessionManager get shellSessions => _sessions;
 
   @override
   Future<void> start() {

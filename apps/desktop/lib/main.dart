@@ -16,6 +16,7 @@ import 'src/agent/agent_controller.dart';
 import 'src/agent/agent_runtime.dart';
 import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
+import 'src/agent/notify_threshold.dart';
 import 'src/config.dart';
 import 'src/l10n/locale.dart';
 import 'src/platform/app_reopen.dart';
@@ -89,7 +90,8 @@ Future<void> _start(
   AppLocalizations l10n,
 ) async {
   // Spec §8.2: only one agent at a time.
-  final lock = SingleInstanceLock(await getApplicationSupportDirectory());
+  final supportDirectory = await getApplicationSupportDirectory();
+  final lock = SingleInstanceLock(supportDirectory);
   if (!await lock.acquire()) {
     await lock.signalRunningInstance();
     exit(0);
@@ -135,6 +137,17 @@ Future<void> _start(
     ),
   );
 
+  final deviceName = deviceNameFromHostname(Platform.localHostname);
+  // Push spec §7: the threshold is read from the settings whenever a command
+  // ends, so the tray choice applies at once; titles start with the name the
+  // relay knows this computer by.
+  final pushNotifications = PushNotificationsSetup(
+    threshold: () => notifyThreshold(settings),
+    machineName: () => deviceName,
+    locale: () => Platform.localeName,
+    hooksDirectory: '${supportDirectory.path}${Platform.pathSeparator}hooks',
+  );
+
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
@@ -159,6 +172,7 @@ Future<void> _start(
               environment: environment,
               windows: Platform.isWindows,
             ),
+      notifications: pushNotifications,
     ),
     keepAwake: Platform.isWindows ? WindowsKeepAwake() : CaffeinateKeepAwake(),
     launchAtLogin: PackageLaunchAtLogin(),
@@ -169,7 +183,7 @@ Future<void> _start(
     platform: Platform.isWindows
         ? DevicePlatform.windows
         : DevicePlatform.macos,
-    deviceName: deviceNameFromHostname(Platform.localHostname),
+    deviceName: deviceName,
     // Sign-out and quit wait (at most 3 s) for PTY tree kills in flight.
     awaitPtyKills: ptyFactory.killsSettled,
     terminalSharing: sharingSetup,
