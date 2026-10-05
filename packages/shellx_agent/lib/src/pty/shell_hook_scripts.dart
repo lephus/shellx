@@ -97,30 +97,73 @@ fi
 ''' +
     bashHookBody;
 
-/// The bash hooks (shared with `term/shell/block.bash`; bash 3.2+). A
-/// `DEBUG` trap emits E and C once per command line (gated by
-/// `__shellx_at_prompt`, which `PROMPT_COMMAND` sets last); the first part
-/// of `PROMPT_COMMAND` emits D with `$?`. If the user's startup files later
-/// replace `PROMPT_COMMAND`, the trap wraps it again (a fork-free check
-/// before every command). An array `PROMPT_COMMAND` (bash 5.1+) gets start
-/// and end as its first and last elements. Not installed when a
-/// `DEBUG` trap already exists (bash-preexec and friends): no command
-/// notifications then, nothing else changes.
+/// The bash hooks (shared with `term/shell/block.bash`; bash 3.2+, safe
+/// under `set -u` and `shopt -s extdebug`).
+///
+/// - Without bash-preexec: a `DEBUG` trap emits E and C once per command
+///   line (gated by `__shellx_at_prompt`, which `PROMPT_COMMAND` sets last);
+///   the first part of `PROMPT_COMMAND` emits D with `$?`. If the startup
+///   files later replace or append to `PROMPT_COMMAND`, the trap wraps it
+///   again (a fork-free check before every command: our start first, our
+///   end last); the next command line after such a re-wrap is still
+///   reported. An array `PROMPT_COMMAND` (bash 5.1+) gets start and end as
+///   its first and last elements. The trap always returns 0 (under
+///   `extdebug` a non-zero return would skip the user's command) and does
+///   nothing when it fires inside a function.
+/// - With bash-preexec (atuin, iTerm2's integration, ...; loaded before the
+///   hook, or detected later by the trap or the prompt functions): our
+///   functions go into `preexec_functions` (E and C from the command line in
+///   `$1`) and first into `precmd_functions` (D with `$?`), our entries leave
+///   `PROMPT_COMMAND` and our trap does nothing more. bash-preexec's trap is
+///   never touched.
+/// - Not installed when some other `DEBUG` trap already exists: no command
+///   notifications then, nothing else changes.
 const bashHookBody = r'''
-if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]]; then
+if [[ $- == *i* && -z "${__shellx_hooked-}" ]] \
+   && { [[ -n "${__bp_imported-}${bash_preexec_imported-}" ]] || [[ -z "$(builtin trap -p DEBUG)" ]]; }; then
   __shellx_hooked=1
-  __shellx_wrap_prompt() {
-    case "${PROMPT_COMMAND[*]-}" in
-      *__shellx_prompt_end*) ;;
-      *)
-        if [[ "$(builtin declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-          PROMPT_COMMAND=(__shellx_prompt_start "${PROMPT_COMMAND[@]}" __shellx_prompt_end)
-        else
-          PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end"
-        fi ;;
-    esac
+  __shellx_unwrap() {
+    local nl=$'\n' ws=$' \t\n;'
+    __shellx_s=${1//"__shellx_prompt_start${nl}"/}
+    __shellx_s=${__shellx_s//"${nl}__shellx_prompt_end"/}
+    __shellx_s=${__shellx_s//__shellx_prompt_start/:}
+    __shellx_s=${__shellx_s//__shellx_prompt_end/:}
+    while :; do case "$__shellx_s" in [$ws]*) __shellx_s=${__shellx_s#?} ;; *) break ;; esac; done
   }
-  __shellx_prompt_start() {
+  __shellx_wrap_prompt() {
+    local e first= last= __shellx_s
+    if [ -n "${PROMPT_COMMAND[1]+x}" ]; then
+      for e in "${PROMPT_COMMAND[@]}"; do [ -n "$first" ] || first=$e; last=$e; done
+      if [ "$first" = __shellx_prompt_start ] && [ "$last" = __shellx_prompt_end ]; then return 1; fi
+      local -a a=()
+      for e in "${PROMPT_COMMAND[@]}"; do
+        case "$e" in
+          __shellx_prompt_start|__shellx_prompt_end) ;;
+          *) __shellx_unwrap "$e"; a+=("$__shellx_s") ;;
+        esac
+      done
+      PROMPT_COMMAND=(__shellx_prompt_start ${a[@]+"${a[@]}"} __shellx_prompt_end)
+    else
+      case "${PROMPT_COMMAND-}" in __shellx_prompt_start*__shellx_prompt_end) return 1 ;; esac
+      __shellx_unwrap "${PROMPT_COMMAND-}"
+      PROMPT_COMMAND="__shellx_prompt_start"$'\n'"$__shellx_s"$'\n'"__shellx_prompt_end"
+    fi
+    return 0
+  }
+  __shellx_esc() {
+    local nl=$'\n' cr=$'\r' bel=$'\a' esc=$'\e'
+    __shellx_s=$1
+    __shellx_s=${__shellx_s//\\/\\\\}; __shellx_s=${__shellx_s//;/\\x3b}; __shellx_s=${__shellx_s//$nl/\\x0a}
+    __shellx_s=${__shellx_s//$cr/\\x0d}; __shellx_s=${__shellx_s//$bel/\\x07}; __shellx_s=${__shellx_s//$esc/\\x1b}
+  }
+  __shellx_bp_preexec() {
+    local __shellx_s
+    __shellx_esc "${1-}"
+    builtin printf '\033]633;E;%s\007\033]133;C\007' "$__shellx_s"
+    __shellx_running=1
+    return 0
+  }
+  __shellx_bp_precmd() {
     local ret=$?
     if [ -n "${__shellx_running-}" ]; then
       builtin printf '\033]133;D;%s\007' "$ret"
@@ -128,33 +171,94 @@ if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]];
     fi
     return $ret
   }
+  __shellx_use_bash_preexec() {
+    local e __shellx_s
+    __shellx_bp=1
+    if [ -n "${PROMPT_COMMAND[1]+x}" ]; then
+      local -a a=()
+      for e in "${PROMPT_COMMAND[@]}"; do
+        case "$e" in
+          __shellx_prompt_start|__shellx_prompt_end) ;;
+          *) __shellx_unwrap "$e"; a+=("$__shellx_s") ;;
+        esac
+      done
+      PROMPT_COMMAND=(${a[@]+"${a[@]}"})
+    else
+      __shellx_unwrap "${PROMPT_COMMAND-}"
+      PROMPT_COMMAND=$__shellx_s
+    fi
+    for e in ${precmd_functions[@]+"${precmd_functions[@]}"}; do [ "$e" = __shellx_bp_precmd ] && return 0; done
+    precmd_functions=(__shellx_bp_precmd ${precmd_functions[@]+"${precmd_functions[@]}"})
+    preexec_functions+=(__shellx_bp_preexec)
+    return 0
+  }
+  __shellx_prompt_start() {
+    local ret=$?
+    if [ -n "${__shellx_running-}" ]; then
+      builtin printf '\033]133;D;%s\007' "$ret"
+      __shellx_running=
+    fi
+    if [ -z "${__shellx_bp-}" ] && [ -n "${__bp_imported-}${bash_preexec_imported-}" ]; then __shellx_use_bash_preexec; fi
+    return $ret
+  }
   __shellx_prompt_end() {
     local ret=$? re='^ *([0-9]+)'
+    if [ -n "${__shellx_skip_end-}" ]; then
+      # This run of PROMPT_COMMAND began before the re-wrap: our end was not last in it.
+      __shellx_skip_end=
+      return $ret
+    fi
     if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]]; then __shellx_hist=${BASH_REMATCH[1]}; fi
     __shellx_at_prompt=1
     return $ret
   }
   __shellx_debug() {
-    case "${PROMPT_COMMAND[*]-}" in *__shellx_prompt_end*) ;; *) __shellx_wrap_prompt ;; esac
+    [ -z "${__shellx_bp-}" ] || return 0
+    if [ -n "${__bp_imported-}${bash_preexec_imported-}" ]; then
+      __shellx_use_bash_preexec
+      return 0
+    fi
+    # Under extdebug the trap also fires inside functions (ours included): only top-level commands count.
+    [ -z "${FUNCNAME[1]-}" ] || return 0
+    local re='^ *([0-9]+)[* ] *(.*)$' __shellx_s
+    if __shellx_wrap_prompt; then
+      # Our start/end were missing, or no longer first/last: the next command line typed is still a
+      # command even if this prompt never reaches __shellx_prompt_end (the first line that adds a
+      # history entry).
+      if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]]; then __shellx_hist=${BASH_REMATCH[1]}; fi
+      __shellx_pending=1
+      __shellx_at_prompt=
+      if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then __shellx_skip_end=1; fi
+      return 0
+    fi
     if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then
       __shellx_at_prompt=
-      return
+      __shellx_pending=
+      return 0
     fi
-    [ -n "${COMP_LINE-}" ] && return
-    [ -z "${__shellx_at_prompt-}" ] && return
+    if [ -n "${COMP_LINE-}" ]; then return 0; fi
+    if [ -z "${__shellx_at_prompt-}" ]; then
+      if [ -z "${__shellx_pending-}" ]; then return 0; fi
+      if ! [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]]; then return 0; fi
+      if [ "${BASH_REMATCH[1]}" = "${__shellx_hist-}" ]; then return 0; fi
+      __shellx_pending=
+    fi
     __shellx_at_prompt=
-    local s re='^ *([0-9]+)[* ] *(.*)$' nl=$'\n' cr=$'\r' bel=$'\a' esc=$'\e'
     if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]] && [ "${BASH_REMATCH[1]}" != "${__shellx_hist-}" ]; then
-      s=${BASH_REMATCH[2]}
+      __shellx_esc "${BASH_REMATCH[2]}"
     else
-      s=$BASH_COMMAND
+      __shellx_esc "$BASH_COMMAND"
     fi
-    s=${s//\\/\\\\}; s=${s//;/\\x3b}; s=${s//$nl/\\x0a}; s=${s//$cr/\\x0d}; s=${s//$bel/\\x07}; s=${s//$esc/\\x1b}
-    builtin printf '\033]633;E;%s\007\033]133;C\007' "$s"
+    builtin printf '\033]633;E;%s\007\033]133;C\007' "$__shellx_s"
     __shellx_running=1
+    return 0
   }
-  __shellx_wrap_prompt
-  builtin trap '__shellx_debug' DEBUG
+  if [ -n "${__bp_imported-}${bash_preexec_imported-}" ]; then
+    __shellx_use_bash_preexec
+  else
+    __shellx_wrap_prompt
+    builtin trap '__shellx_debug' DEBUG
+  fi
   if ! builtin type shellx >/dev/null 2>&1; then
     shellx() {
       if [ "${1-}" = notify ] && [ $# -gt 1 ]; then

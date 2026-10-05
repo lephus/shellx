@@ -26,8 +26,8 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
   fi
   # Command notifications for the paired phone: report each command line, its start and its exit code
   # (OSC 633;E, 133;C, 133;D), installed at the first prompt, after the rest of the startup files.
-  # Not inside VS Code with its own shell integration (it already reports commands, as OSC 633).
-  if [[ "${TERM_PROGRAM-}" != vscode || -z "${VSCODE_INJECTION-}${VSCODE_SHELL_INTEGRATION-}" ]]; then
+  # Not where VS Code's own shell integration runs (it already reports commands, as OSC 633).
+  if [[ -z "${VSCODE_SHELL_INTEGRATION-}" ]]; then
     if (( ! ${+functions[__shellx_precmd]} )); then
       __shellx_preexec() {
         local s=$1

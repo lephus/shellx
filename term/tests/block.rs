@@ -626,26 +626,56 @@ fn an_unwrapped_shell_gets_no_command_hooks() {
     }
 }
 
-#[test]
-fn a_later_prompt_command_in_bashrc_keeps_command_notifications() {
-    // The block sits at the top; the rest of ~/.bashrc replaces PROMPT_COMMAND.
-    let home = real_home("notify-bash-pc");
-    std::fs::write(
-        home.join(".bashrc"),
-        format!("{BASH_BLOCK}PROMPT_COMMAND=\"true\"\necho AFTER-BLOCK\n"),
-    )
-    .unwrap();
+/// A really wrapped bash window whose ~/.bashrc is the block followed by
+/// `rest`; the first command typed after startup is `sleep 0.2; false`,
+/// which must be reported with its own line (633;E, 133;C, 133;D;1).
+fn bash_with_rest_reports_the_first_command(rest: &str, tag: &str) -> String {
+    let home = real_home(tag);
+    std::fs::write(home.join(".bashrc"), format!("{BASH_BLOCK}{rest}")).unwrap();
     let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
-    assert_really_wrapped(&mut h);
+    // Typed first, before anything else (the probe below comes after).
     h.send("sleep 0.2; false\r");
     h.expect("\x1b]133;D;1\x07", T);
+    h.send("echo sec''ond\r");
+    h.expect("second", T);
+    assert_really_wrapped(&mut h);
+    h.settle(Duration::from_millis(300));
     let text = h.text();
     assert!(
         text.contains("\x1b]633;E;sleep 0.2\\x3b false\x07\x1b]133;C\x07"),
-        "{text:?}"
+        "{tag}: {text:?}"
+    );
+    assert!(
+        text.contains("\x1b]633;E;echo sec''ond\x07"),
+        "{tag}: {text:?}"
     );
     h.send("exit 0\r");
     assert_eq!(h.wait_exit(T), 0);
+    text
+}
+
+#[test]
+fn a_prompt_command_set_on_the_last_line_of_bashrc_keeps_the_first_command() {
+    bash_with_rest_reports_the_first_command("PROMPT_COMMAND=\"true\"\n", "notify-bash-pc-last");
+}
+
+#[test]
+fn a_prompt_command_set_later_in_bashrc_keeps_command_notifications() {
+    bash_with_rest_reports_the_first_command(
+        "PROMPT_COMMAND=\"true\"\necho AFTER-BLOCK\n",
+        "notify-bash-pc",
+    );
+}
+
+#[test]
+fn a_prompt_command_appended_later_in_bashrc_is_not_reported_as_a_command() {
+    let text = bash_with_rest_reports_the_first_command(
+        "PROMPT_COMMAND=\"$PROMPT_COMMAND; history -a\"\necho AFTER-BLOCK\n",
+        "notify-bash-pc-append",
+    );
+    assert!(!text.contains("]633;E;history"), "{text:?}");
+    // Exactly the commands typed: sleep/false, echo, ps (assert_really_wrapped).
+    assert_eq!(text.matches("]133;C").count(), 3, "{text:?}");
 }
 
 #[test]
@@ -655,7 +685,10 @@ fn the_inner_zsh_leaves_command_reporting_to_vscode_shell_integration() {
         "/bin/zsh",
         &["-i"],
         &home,
-        &[("TERM_PROGRAM", "vscode"), ("VSCODE_INJECTION", "1")],
+        &[
+            ("TERM_PROGRAM", "vscode"),
+            ("VSCODE_SHELL_INTEGRATION", "1"),
+        ],
     );
     assert_really_wrapped(&mut h);
     h.send("false; whence -w __shellx_precmd || echo no''-hooks\r");
@@ -664,4 +697,137 @@ fn the_inner_zsh_leaves_command_reporting_to_vscode_shell_integration() {
     assert!(!h.text().contains("]133;"), "{:?}", h.text());
     h.send("exit\r");
     h.wait_exit(T);
+}
+
+#[test]
+fn vscode_injection_alone_does_not_turn_the_inner_hooks_off() {
+    // VSCODE_INJECTION stays exported for the whole VS Code terminal, also in
+    // nested shells and with shell integration turned off.
+    let home = real_home("notify-zsh-vscode-injection");
+    let mut h = run_shell(
+        "/bin/zsh",
+        &["-i"],
+        &home,
+        &[("TERM_PROGRAM", "vscode"), ("VSCODE_INJECTION", "1")],
+    );
+    assert_really_wrapped(&mut h);
+    h.send("false\r");
+    h.expect("\x1b]133;D;1\x07", T);
+    h.send("exit 0\r");
+    h.wait_exit(T);
+}
+
+// ---- bash-preexec, set -u, extdebug (round 3) --------------------------------------------------
+
+const BASH_PREEXEC: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/bash-preexec.sh"
+);
+
+/// Starts a really wrapped bash whose ~/.bashrc is `before` + block + `after`,
+/// types `cmds` one by one (each waits for its own `done-<n>` marker) and
+/// returns the window text.
+fn bash_session(tag: &str, before: &str, after: &str, cmds: &[&str]) -> String {
+    let home = real_home(tag);
+    std::fs::write(
+        home.join(".bashrc"),
+        format!("{before}\n{BASH_BLOCK}{after}\n"),
+    )
+    .unwrap();
+    let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
+    assert_really_wrapped(&mut h);
+    for (i, cmd) in cmds.iter().enumerate() {
+        h.send(&format!("{cmd}\r"));
+        h.send(&format!("echo do''ne-{i}\r"));
+        h.expect(&format!("done-{i}\r"), T);
+    }
+    h.settle(Duration::from_millis(300));
+    let text = h.text();
+    h.send("exit 0\r");
+    assert_eq!(h.wait_exit(T), 0, "{tag}: {text:?}");
+    text
+}
+
+const USER_HOOKS: &str =
+    "preexec() { echo \"PRE\"\"EXEC[$1]\"; }\nprecmd() { echo \"PRE\"\"CMD\"; }";
+
+fn assert_reported_with_bash_preexec(text: &str, tag: &str) {
+    for line in ["echo one", "false", "echo three"] {
+        let e = format!("\x1b]633;E;{line}\x07\x1b]133;C\x07");
+        assert!(text.contains(&e), "{tag}: no E/C for {line:?}: {text:?}");
+        assert!(
+            text.contains(&format!("PREEXEC[{line}]")),
+            "{tag}: the user's preexec skipped {line:?}: {text:?}"
+        );
+    }
+    assert!(text.contains("\x1b]133;D;1\x07"), "{tag}: {text:?}");
+    // The user's preexec ran for every typed line (3 commands, 3 markers, the
+    // ps probe), and ShellX reported each of them exactly once.
+    let e_count = text.matches("]633;E;").count();
+    let pre_count = text.matches("PREEXEC[").count();
+    assert_eq!(e_count, pre_count, "{tag}: {text:?}");
+    assert!(!text.contains("]633;E;__bp"), "{tag}: {text:?}");
+}
+
+#[test]
+fn bash_preexec_sourced_after_the_block_shares_the_hooks() {
+    let text = bash_session(
+        "bp-after",
+        "",
+        &format!("source '{BASH_PREEXEC}'\n{USER_HOOKS}"),
+        &["echo one", "false", "echo three", "echo three"],
+    );
+    assert_reported_with_bash_preexec(&text, "bp-after");
+}
+
+#[test]
+fn bash_preexec_sourced_before_the_block_shares_the_hooks() {
+    let text = bash_session(
+        "bp-before",
+        &format!("source '{BASH_PREEXEC}'\n{USER_HOOKS}"),
+        "",
+        &["echo one", "false", "echo three", "echo three"],
+    );
+    assert_reported_with_bash_preexec(&text, "bp-before");
+}
+
+#[test]
+fn set_u_in_bashrc_raises_no_errors_and_commands_are_reported() {
+    for (tag, before, after) in [
+        ("nounset-before", "set -u", ""),
+        (
+            "nounset-after",
+            "",
+            "set -u\nPROMPT_COMMAND=\"$PROMPT_COMMAND; history -a\"",
+        ),
+    ] {
+        let text = bash_session(tag, before, after, &["echo one", "false", "echo three"]);
+        assert!(!text.contains("unbound variable"), "{tag}: {text:?}");
+        assert!(text.contains("\x1b]633;E;false\x07"), "{tag}: {text:?}");
+        assert!(text.contains("\x1b]133;D;1\x07"), "{tag}: {text:?}");
+        assert!(!text.contains("]633;E;history"), "{tag}: {text:?}");
+    }
+}
+
+#[test]
+fn extdebug_runs_every_command_and_reports_only_typed_lines() {
+    let text = bash_session(
+        "extdebug",
+        "",
+        "shopt -s extdebug\nf() { local x=1; echo in''-f; return 3; }\nPROMPT_COMMAND=\"$PROMPT_COMMAND; true\"\necho RC''-LAST",
+        &["echo one", "f", "echo after"],
+    );
+    for needle in ["RC-LAST", "one\r", "in-f", "after\r"] {
+        assert!(text.contains(needle), "skipped {needle:?}: {text:?}");
+    }
+    assert!(text.contains("\x1b]633;E;f\x07"), "{text:?}");
+    assert!(text.contains("\x1b]133;D;3\x07"), "{text:?}");
+    for inner in [
+        "]633;E;local",
+        "]633;E;return",
+        "]633;E;true",
+        "]633;E;__shellx",
+    ] {
+        assert!(!text.contains(inner), "{inner}: {text:?}");
+    }
 }

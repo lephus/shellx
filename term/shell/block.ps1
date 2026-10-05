@@ -16,9 +16,9 @@ if (-not $env:SHELLX_TERM -and -not $env:SHELLX -and $env:LOCALAPPDATA -and $Hos
   }
   Remove-Variable -Name __shellxPlain, __shellxExe -ErrorAction SilentlyContinue
 } elseif ($env:SHELLX_TERM -and -not $env:SHELLX -and $Host.Name -eq 'ConsoleHost' `
-    -and $env:TERM_PROGRAM -ne 'vscode' -and -not $Global:__VSCodeOriginalPrompt) {
+    -and -not $env:VSCODE_SHELL_INTEGRATION -and -not $Global:__VSCodeOriginalPrompt) {
   # Inside the wrapped shell: command notifications for the paired phone (each command line, its start
-  # and its exit code as OSC 633;E, 133;C, 133;D). Not inside VS Code (its own integration reports commands).
+  # and its exit code as OSC 633;E, 133;C, 133;D). Not where VS Code's own shell integration runs.
   if (-not $global:__ShellxHooked) {
     $global:__ShellxHooked = $true
     $global:__ShellxRunning = $false
