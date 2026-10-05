@@ -125,6 +125,24 @@ class MessageLookup extends MessageLookupByLibrary {
     "deleteAccountWarningTitle": MessageLookupByLibrary.simpleMessage(
       "Không hoàn tác được",
     ),
+    "desktopClosedByHost": MessageLookupByLibrary.simpleMessage(
+      "Máy tính đã ngắt điện thoại khỏi terminal này.",
+    ),
+    "desktopDriverBanner": MessageLookupByLibrary.simpleMessage(
+      "Máy tính đang dùng terminal này",
+    ),
+    "desktopStillRunning": MessageLookupByLibrary.simpleMessage(
+      "Terminal vẫn chạy trên máy tính.",
+    ),
+    "desktopTerminalGone": MessageLookupByLibrary.simpleMessage(
+      "Mất kết nối với terminal này trên máy tính.",
+    ),
+    "desktopTerminalLabel": MessageLookupByLibrary.simpleMessage(
+      "Terminal trên máy tính",
+    ),
+    "desktopWindowClosed": MessageLookupByLibrary.simpleMessage(
+      "Cửa sổ terminal trên máy tính đã đóng.",
+    ),
     "emailHint": MessageLookupByLibrary.simpleMessage("email@example.com"),
     "emailLabel": MessageLookupByLibrary.simpleMessage("Email"),
     "emptyStep1": m1,
@@ -250,7 +268,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "đang mở trên thiết bị khác",
     ),
+    "pickerDesktopGroup": MessageLookupByLibrary.simpleMessage(
+      "Terminal trên máy tính",
+    ),
+    "pickerHintOpenNewWindow": MessageLookupByLibrary.simpleMessage(
+      "Chỉ các cửa sổ terminal mở sau khi bật chia sẻ mới hiện ở đây. Mở một cửa sổ terminal mới trên máy tính.",
+    ),
+    "pickerHintSharingOff": MessageLookupByLibrary.simpleMessage(
+      "Bật \'Chia sẻ terminal\' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.",
+    ),
+    "pickerHintUpdateDesktop": MessageLookupByLibrary.simpleMessage(
+      "Cập nhật ShellX trên máy tính để xem các terminal đang mở.",
+    ),
+    "pickerNewSession": MessageLookupByLibrary.simpleMessage("Phiên mới"),
     "pickerOpen": MessageLookupByLibrary.simpleMessage("Mở"),
+    "pickerShellxGroup": MessageLookupByLibrary.simpleMessage("Phiên ShellX"),
     "pickerStarted": m15,
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Mở lại phiên cũ để xem tiếp đúng chỗ đã dừng, hoặc tạo phiên mới.",

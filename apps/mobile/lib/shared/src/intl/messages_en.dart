@@ -130,6 +130,24 @@ class MessageLookup extends MessageLookupByLibrary {
     "deleteAccountWarningTitle": MessageLookupByLibrary.simpleMessage(
       "This can\'t be undone",
     ),
+    "desktopClosedByHost": MessageLookupByLibrary.simpleMessage(
+      "The computer disconnected this phone from this terminal.",
+    ),
+    "desktopDriverBanner": MessageLookupByLibrary.simpleMessage(
+      "The computer is using this terminal",
+    ),
+    "desktopStillRunning": MessageLookupByLibrary.simpleMessage(
+      "The terminal is still running on the computer.",
+    ),
+    "desktopTerminalGone": MessageLookupByLibrary.simpleMessage(
+      "Lost the connection to this terminal on the computer.",
+    ),
+    "desktopTerminalLabel": MessageLookupByLibrary.simpleMessage(
+      "Terminal on the computer",
+    ),
+    "desktopWindowClosed": MessageLookupByLibrary.simpleMessage(
+      "The terminal window on the computer was closed.",
+    ),
     "emailHint": MessageLookupByLibrary.simpleMessage("email@example.com"),
     "emailLabel": MessageLookupByLibrary.simpleMessage("Email"),
     "emptyStep1": m1,
@@ -259,7 +277,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "open on another device",
     ),
+    "pickerDesktopGroup": MessageLookupByLibrary.simpleMessage(
+      "Terminals on the computer",
+    ),
+    "pickerHintOpenNewWindow": MessageLookupByLibrary.simpleMessage(
+      "Only terminal windows opened after sharing was turned on show up here. Open a new terminal window on the computer.",
+    ),
+    "pickerHintSharingOff": MessageLookupByLibrary.simpleMessage(
+      "Turn on \'Share terminal\' in the ShellX menu on the computer to see its open terminals here.",
+    ),
+    "pickerHintUpdateDesktop": MessageLookupByLibrary.simpleMessage(
+      "Update ShellX on the computer to see its open terminals.",
+    ),
+    "pickerNewSession": MessageLookupByLibrary.simpleMessage("New session"),
     "pickerOpen": MessageLookupByLibrary.simpleMessage("Open"),
+    "pickerShellxGroup": MessageLookupByLibrary.simpleMessage(
+      "ShellX sessions",
+    ),
     "pickerStarted": m15,
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Reopen a session to continue where you left off, or start a new one.",

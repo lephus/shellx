@@ -1379,6 +1379,126 @@ class S {
     return Intl.message('Close tab', name: 'closeTab', desc: '', args: []);
   }
 
+  /// `Terminals on the computer`
+  String get pickerDesktopGroup {
+    return Intl.message(
+      'Terminals on the computer',
+      name: 'pickerDesktopGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `ShellX sessions`
+  String get pickerShellxGroup {
+    return Intl.message(
+      'ShellX sessions',
+      name: 'pickerShellxGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `New session`
+  String get pickerNewSession {
+    return Intl.message(
+      'New session',
+      name: 'pickerNewSession',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Turn on 'Share terminal' in the ShellX menu on the computer to see its open terminals here.`
+  String get pickerHintSharingOff {
+    return Intl.message(
+      'Turn on \'Share terminal\' in the ShellX menu on the computer to see its open terminals here.',
+      name: 'pickerHintSharingOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Update ShellX on the computer to see its open terminals.`
+  String get pickerHintUpdateDesktop {
+    return Intl.message(
+      'Update ShellX on the computer to see its open terminals.',
+      name: 'pickerHintUpdateDesktop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only terminal windows opened after sharing was turned on show up here. Open a new terminal window on the computer.`
+  String get pickerHintOpenNewWindow {
+    return Intl.message(
+      'Only terminal windows opened after sharing was turned on show up here. Open a new terminal window on the computer.',
+      name: 'pickerHintOpenNewWindow',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Terminal on the computer`
+  String get desktopTerminalLabel {
+    return Intl.message(
+      'Terminal on the computer',
+      name: 'desktopTerminalLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The terminal is still running on the computer.`
+  String get desktopStillRunning {
+    return Intl.message(
+      'The terminal is still running on the computer.',
+      name: 'desktopStillRunning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The computer is using this terminal`
+  String get desktopDriverBanner {
+    return Intl.message(
+      'The computer is using this terminal',
+      name: 'desktopDriverBanner',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The terminal window on the computer was closed.`
+  String get desktopWindowClosed {
+    return Intl.message(
+      'The terminal window on the computer was closed.',
+      name: 'desktopWindowClosed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Lost the connection to this terminal on the computer.`
+  String get desktopTerminalGone {
+    return Intl.message(
+      'Lost the connection to this terminal on the computer.',
+      name: 'desktopTerminalGone',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The computer disconnected this phone from this terminal.`
+  String get desktopClosedByHost {
+    return Intl.message(
+      'The computer disconnected this phone from this terminal.',
+      name: 'desktopClosedByHost',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Copy`
   String get copyAction {
     return Intl.message('Copy', name: 'copyAction', desc: '', args: []);

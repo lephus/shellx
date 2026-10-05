@@ -247,4 +247,156 @@ void main() {
     ended.terminal.value.textInput('x');
     expect(machine.inputs, isEmpty);
   });
+
+  group('desktop terminal (terminal sharing §9.2)', () {
+    const window = SessionInfo(
+      id: 40,
+      index: 1,
+      shell: 'zsh',
+      createdAt: 0,
+      attached: false,
+      kind: SessionKind.desktop,
+      app: 'Terminal',
+      title: '~/projects/api',
+    );
+    late FakeTabHandle desktopHandle;
+    late TerminalTabController desktop;
+
+    setUp(() async {
+      machine.sessions = [window];
+      desktopHandle = await machine.attach(window.id, cols: 80, rows: 24) as FakeTabHandle;
+      machine.attached.clear();
+      desktop = TerminalTabController(machine: machine, handle: desktopHandle, modifiers: keys, cols: 80, rows: 24);
+    });
+
+    tearDown(() => desktop.dispose());
+
+    test('is a desktop tab labelled with the window title, else the app, else "<shell> <index>"', () async {
+      expect(desktop.isDesktop, isTrue);
+      expect(tab.isDesktop, isFalse);
+      expect(desktop.title.value, '~/projects/api');
+
+      machine.sessions = [
+        const SessionInfo(id: 41, index: 2, shell: 'zsh', createdAt: 0, attached: false, kind: SessionKind.desktop, app: 'iTerm2'),
+        const SessionInfo(id: 42, index: 3, shell: 'bash', createdAt: 0, attached: false, kind: SessionKind.desktop),
+      ];
+      final appOnly = TerminalTabController(
+        machine: machine,
+        handle: await machine.attach(41, cols: 80, rows: 24),
+        modifiers: keys,
+        cols: 80,
+        rows: 24,
+      );
+      final bare = TerminalTabController(
+        machine: machine,
+        handle: await machine.attach(42, cols: 80, rows: 24),
+        modifiers: keys,
+        cols: 80,
+        rows: 24,
+      );
+      addTearDown(appOnly.dispose);
+      addTearDown(bare.dispose);
+      expect(appOnly.title.value, 'iTerm2');
+      expect(bare.title.value, 'bash 3');
+
+      // A title the program sets later still wins, as on a ShellX tab.
+      desktopHandle.emit(const TabOutput('\x1b]2;vim notes.md\x07'));
+      expect(desktop.title.value, 'vim notes.md');
+    });
+
+    test('the phone drives after attaching; session.driver moves the banner both ways', () {
+      // Ledger "Ghi cho P5": a phone that takes over at the same size gets no session.driver.
+      expect(desktop.driver.value, DriverSide.phone);
+      expect(desktop.showDriverBanner.value, isFalse);
+
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      expect(desktop.showDriverBanner.value, isTrue);
+
+      desktopHandle.emit(const TabDriver(DriverSide.phone));
+      expect(desktop.showDriverBanner.value, isFalse);
+    });
+
+    test('a ShellX tab never shows the banner', () {
+      handle.emit(const TabDriver(DriverSide.desktop));
+      expect(tab.showDriverBanner.value, isFalse);
+    });
+
+    test('claimSize sends the phone size, even unchanged, only while the computer drives', () {
+      desktop.claimSize();
+      expect(machine.resizes, isEmpty);
+
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      desktop.claimSize();
+      expect(machine.resizes, [(id: 40, cols: 80, rows: 24)]);
+      // The banner stays until the agent confirms.
+      expect(desktop.showDriverBanner.value, isTrue);
+    });
+
+    test('typing while the computer drives sends the size once, then the keys', () {
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      desktop.terminal.value.textInput('l');
+      desktop.terminal.value.textInput('s');
+      expect(machine.resizes, [(id: 40, cols: 80, rows: 24)]);
+      expect(machine.inputs.map((i) => utf8.decode(i.data)), ['l', 's']);
+
+      // The computer takes it back again: the next keystroke claims again.
+      desktopHandle.emit(const TabDriver(DriverSide.phone));
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      desktop.terminal.value.textInput('x');
+      expect(machine.resizes, hasLength(2));
+    });
+
+    test('typing while the phone drives sends no resize', () {
+      desktop.terminal.value.textInput('ls');
+      expect(machine.resizes, isEmpty);
+    });
+
+    test('session.exited: the window was closed; nothing to reattach', () {
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      desktopHandle.emit(const TabExited(0));
+      expect(desktop.banner.value?.notice, TabNotice.desktopClosed);
+      expect(desktop.canReattach, isFalse);
+      expect(desktop.showDriverBanner.value, isFalse);
+    });
+
+    test('terminal_gone: lost the terminal; nothing to reattach (not "closed by the host")', () {
+      desktopHandle.emit(const TabDetached(DetachReason.terminalGone));
+      expect(desktop.banner.value?.notice, TabNotice.terminalGone);
+      expect(desktop.canReattach, isFalse);
+    });
+
+    test('session_not_found on a desktop tab is the lost-terminal card too', () {
+      desktopHandle.emit(const TabError(AppErrorCode.sessionNotFound, 'gone'));
+      expect(desktop.banner.value?.notice, TabNotice.terminalGone);
+    });
+
+    test('closed_by_host: the terminal keeps running; "Gắn lại" attaches again and the phone drives', () async {
+      machine.reuseHandles = true;
+      desktopHandle.emit(const TabDriver(DriverSide.desktop));
+      desktopHandle.emit(const TabDetached(DetachReason.closedByHost));
+      expect(desktop.banner.value?.notice, TabNotice.closedByHost);
+      expect(desktop.canReattach, isTrue);
+
+      await desktop.reattach();
+
+      expect(machine.attached.single.id, 40);
+      expect(desktop.banner.value, isNull);
+      expect(desktop.driver.value, DriverSide.phone);
+    });
+
+    test('a ShellX tab closed by the host cannot be reattached', () async {
+      handle.emit(const TabDetached(DetachReason.closedByHost));
+      expect(tab.canReattach, isFalse);
+      await tab.reattach();
+      expect(machine.attached, isEmpty);
+    });
+
+    test('an ended placeholder of a vanished desktop terminal shows the lost-terminal card', () {
+      final ended = TerminalTabController.ended(machine: machine, session: window, modifiers: keys);
+      addTearDown(ended.dispose);
+      expect(ended.isDesktop, isTrue);
+      expect(ended.banner.value?.notice, TabNotice.terminalGone);
+      expect(ended.title.value, '~/projects/api');
+    });
+  });
 }

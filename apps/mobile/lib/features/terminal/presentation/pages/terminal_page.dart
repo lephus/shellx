@@ -713,7 +713,14 @@ class _TerminalPane extends StatelessWidget {
               left: 12,
               right: 12,
               bottom: 12,
-              child: _EndedCard(banner: banner, onCloseTab: onCloseTab, onOpenNew: onOpenNew, onReattach: onReattach),
+              child: _EndedCard(
+                banner: banner,
+                isDesktop: tab.isDesktop,
+                canReattach: tab.canReattach,
+                onCloseTab: onCloseTab,
+                onOpenNew: onOpenNew,
+                onReattach: onReattach,
+              ),
             ),
         ],
       );
@@ -722,11 +729,22 @@ class _TerminalPane extends StatelessWidget {
 }
 
 /// Design "Phiên đã kết thúc": the tab keeps its content; the card offers the next step. A
-/// `spawn_failed` shows its reason in the same card (spec §12).
+/// `spawn_failed` shows its reason in the same card (spec §12). A desktop terminal that is gone
+/// offers only "Đóng tab" (terminal sharing §9.2: it cannot be reattached, and a new session would
+/// not be that window); one the computer disconnected offers "Gắn lại".
 class _EndedCard extends StatelessWidget {
-  const _EndedCard({required this.banner, required this.onCloseTab, required this.onOpenNew, required this.onReattach});
+  const _EndedCard({
+    required this.banner,
+    required this.isDesktop,
+    required this.canReattach,
+    required this.onCloseTab,
+    required this.onOpenNew,
+    required this.onReattach,
+  });
 
   final TabBanner banner;
+  final bool isDesktop;
+  final bool canReattach;
   final VoidCallback onCloseTab;
   final VoidCallback onOpenNew;
   final VoidCallback onReattach;
@@ -738,10 +756,13 @@ class _EndedCard extends StatelessWidget {
       TabNotice.exited => (strings.sessionEnded, strings.sessionExitedBody(banner.exitCode ?? 0)),
       TabNotice.sessionEnded => (strings.sessionEnded, strings.sessionGoneBody),
       TabNotice.takenOver => (strings.tabTakenOver, null),
-      TabNotice.closedByHost => (strings.tabClosedByHost, null),
+      TabNotice.closedByHost => (isDesktop ? strings.desktopClosedByHost : strings.tabClosedByHost, null),
       TabNotice.failed => (ErrorText(strings).appError(banner.errorCode!, banner.detail ?? ''), null),
+      TabNotice.desktopClosed => (strings.desktopWindowClosed, null),
+      TabNotice.terminalGone => (strings.desktopTerminalGone, null),
     };
-    final takenOver = banner.notice == TabNotice.takenOver;
+    // The second button: "Gắn lại", "Mở phiên mới" on a ShellX tab, none on a desktop terminal that is gone.
+    final String? secondLabel = canReattach ? strings.tabReattach : (isDesktop ? null : strings.terminalOpenNew);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -771,17 +792,19 @@ class _EndedCard extends StatelessWidget {
                   onTap: onCloseTab,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
-                  title: takenOver ? strings.tabReattach : strings.terminalOpenNew,
-                  height: 44,
-                  radius: 11,
-                  backgroundColor: TerminalColors.cyan,
-                  textColor: TerminalColors.onCyan,
-                  onTap: takenOver ? onReattach : onOpenNew,
+              if (secondLabel != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppButton(
+                    title: secondLabel,
+                    height: 44,
+                    radius: 11,
+                    backgroundColor: TerminalColors.cyan,
+                    textColor: TerminalColors.onCyan,
+                    onTap: canReattach ? onReattach : onOpenNew,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
