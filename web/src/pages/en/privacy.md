@@ -13,7 +13,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 
 - Terminal content (the commands you type and the output you see) is **end-to-end encrypted** between your phone and your computer. The relay only forwards encrypted data and **cannot read** it, except for the content of push notifications (section 3).
 - We store only what is needed to run your account: your email, a hash of your password, device information and pairing records.
-- Push notifications are optional: when you turn them on, their content passes through our server, Google Firebase Cloud Messaging and Apple Push Notification service without end-to-end encryption (section 3).
+- Push notifications: while the computer's "Notify when long commands finish" setting is on (the default), or when a program sends a notification, the agent sends the notification text through our server, Google Firebase Cloud Messaging and Apple Push Notification service, without end-to-end encryption, to paired phones that allowed notifications (section 3).
 - No ads, no analytics or tracking tools, and we never sell data.
 
 ## 1. Data stored on our servers
@@ -49,12 +49,14 @@ To replay output produced while your phone is briefly disconnected, the agent ke
 
 ## 3. Push notifications
 
-When you allow notifications in the mobile app, the agent on your paired computers can tell your phone when a long-running command finishes, or when a program sends a notification — even when the app is closed. To do this:
+The agent on your computer can tell your paired phones when a long-running command finishes, or when a program sends a notification — even when the mobile app is closed.
 
-- The mobile app receives a **push token** (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, or Firebase reports that the token is no longer valid.
-- When notifications are on, the **title and text of each notification** — the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text a program sent — are sent by the agent through the ShellX relay to **Google Firebase Cloud Messaging** and, for iPhones, to **Apple Push Notification service**, to be shown on your phone. This content is **not end-to-end encrypted**: our server, Google and Apple can read it. Our server only forwards it; it does not store it or write it to its logs. Google and Apple process it under their own policies.
+- **What the agent sends, and when.** While the computer's "Notify when long commands finish" setting is on (default: 30 seconds) — and whenever a program in the terminal emits a notification sequence (for example `shellx notify`, OSC 9, OSC 777) — the agent sends the **notification text** to the ShellX relay: the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text the program sent. This text is **not end-to-end encrypted**.
+- **What the relay does with it.** The relay only forwards it through **Google Firebase Cloud Messaging** and, for iPhones, **Apple Push Notification service**, and only to phones that are paired with that computer and have allowed notifications. The relay does not store it or write it to its logs; Google and Apple process it under their own policies.
+- **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for 15 minutes before trying again.
+- **Push tokens.** When you allow notifications, the mobile app receives a push token (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Firebase reports the token is no longer valid.
 - This is the only exception to section 2: only the content of notifications, not the rest of your terminal.
-- You can turn them off at any time: choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), or turn off ShellX notifications in your phone's settings — the next time the app opens, its push token is invalidated and no more notifications are sent to that phone. Signing out on the phone also deletes the token.
+- **How to turn it off:** choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), turn off ShellX notifications in your phone's settings, or sign out on the phone.
 
 ## 4. Data that stays on your devices
 

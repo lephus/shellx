@@ -97,6 +97,7 @@ Payload tối đa 4 KiB mỗi chuỗi (dài hơn thì bỏ qua); tiêu đề/n�
 
 - `NotificationSender` gọi `POST /v1/notifications` bằng token của agent (như các lệnh REST hiện có). Không có mạng hay relay trả lỗi → bỏ thông báo đó (không xếp hàng: thông báo trễ vài phút thường vô nghĩa). `401` → không làm gì thêm (luồng `AgentRevoked` hiện có lo).
 - Chống spam N10: cửa sổ trượt 60 giây, tối đa 6; vượt thì bỏ.
+- Relay trả `202 {sent: 0}` (không điện thoại nào nhận được) → agent ngừng gửi 15 phút (theo từng runtime); `sent > 0` hoặc runtime mới thì hết ngừng.
 - Ngưỡng đổi trong Cài đặt có hiệu lực ngay cho lệnh kết thúc sau đó.
 
 ### 4.4 Hook cho phiên ShellX (agent mở shell)
@@ -155,7 +156,7 @@ Nhánh "đang ở đúng cửa sổ đã bọc" của khối tích hợp (`term/
 
 ## 9. Quyền riêng tư
 
-`web/src/pages/privacy.md` và `web/src/pages/en/privacy.md` thêm mục "Thông báo đẩy": khi bật, tiêu đề và nội dung thông báo (tên máy, tên phiên/cửa sổ, dòng lệnh, mã thoát, thời gian, hoặc chữ do chương trình gửi) được gửi qua relay ShellX tới Google Firebase Cloud Messaging và Apple Push Notification service để hiện trên điện thoại; relay không lưu nội dung này; FCM token của điện thoại được lưu tới khi đăng xuất. Câu "relay không đọc được nội dung terminal" được sửa thành "… ngoại trừ nội dung thông báo đẩy".
+`web/src/pages/privacy.md` và `web/src/pages/en/privacy.md` thêm mục "Thông báo đẩy" (sửa 2026-10-05 sau review N-b): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định 30 giây) — và bất cứ khi nào một chương trình phát chuỗi thông báo — agent gửi nội dung thông báo (tên máy, tên phiên/cửa sổ, dòng lệnh, mã thoát, thời gian, hoặc chữ do chương trình gửi) tới relay ShellX; relay chỉ chuyển tiếp qua Google Firebase Cloud Messaging / Apple Push Notification service tới các điện thoại đã ghép nối với máy đó và đã cho phép thông báo, không lưu nội dung; khi không điện thoại nào nhận được (`202 {sent: 0}`), agent ngừng gửi 15 phút; FCM token của điện thoại được lưu tới khi đăng xuất (hoặc tắt thông báo trong cài đặt điện thoại). Câu hỏi đáp "máy chủ lưu gì" thêm mã thông báo đẩy. Câu "relay không đọc được nội dung terminal" được sửa thành "… ngoại trừ nội dung thông báo đẩy".
 
 ---
 

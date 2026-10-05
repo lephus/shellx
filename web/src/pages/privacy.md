@@ -13,7 +13,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 - Nội dung terminal (lệnh bạn gõ và kết quả hiển thị) được **mã hóa đầu cuối** giữa điện thoại và máy tính của bạn. Máy chủ chuyển tiếp chỉ chuyển dữ liệu đã mã hóa và **không thể đọc** nội dung đó, ngoại trừ nội dung thông báo đẩy (mục 3).
 - Chúng tôi chỉ lưu những gì cần để vận hành tài khoản: email, mật khẩu ở dạng băm, thông tin thiết bị và bản ghi ghép nối.
-- Thông báo đẩy (push notification) là tùy chọn: khi bạn bật, nội dung thông báo đi qua máy chủ của chúng tôi, Google Firebase Cloud Messaging và Apple Push Notification service ở dạng không mã hóa đầu cuối (mục 3).
+- Thông báo đẩy (push notification): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định) hoặc khi một chương trình gửi thông báo, agent gửi nội dung thông báo qua máy chủ của chúng tôi, Google Firebase Cloud Messaging và Apple Push Notification service, ở dạng không mã hóa đầu cuối, tới điện thoại đã ghép nối và cho phép thông báo (mục 3).
 - Không quảng cáo, không công cụ phân tích hay theo dõi, không bán dữ liệu.
 
 ## 1. Dữ liệu lưu trên máy chủ của chúng tôi
@@ -49,12 +49,14 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 ## 3. Thông báo đẩy
 
-Khi bạn cho phép thông báo trên ứng dụng di động, agent trên các máy tính đã ghép nối có thể báo cho điện thoại khi một lệnh chạy lâu kết thúc, hoặc khi một chương trình gửi thông báo — kể cả khi ứng dụng đã đóng. Để làm được việc đó:
+Agent trên máy tính có thể báo cho điện thoại đã ghép nối khi một lệnh chạy lâu kết thúc, hoặc khi một chương trình gửi thông báo — kể cả khi ứng dụng di động đã đóng.
 
-- Ứng dụng di động nhận một **mã thông báo đẩy** (FCM token) từ Google Firebase Cloud Messaging và gửi lên máy chủ của chúng tôi. Máy chủ lưu mã này tới khi bạn đăng xuất trên điện thoại đó, xóa tài khoản, hoặc Firebase báo mã không còn hiệu lực.
-- Khi bạn bật thông báo, **tiêu đề và nội dung thông báo** — tên máy tính, tên phiên hoặc cửa sổ terminal, dòng lệnh, mã thoát và thời gian chạy, hoặc chữ do chương trình gửi — được agent gửi qua máy chủ chuyển tiếp ShellX tới **Google Firebase Cloud Messaging** và, với iPhone, tới **Apple Push Notification service**, để hiện trên điện thoại. Nội dung này **không được mã hóa đầu cuối**: máy chủ của chúng tôi, Google và Apple có thể đọc được. Máy chủ của chúng tôi chỉ chuyển tiếp, không lưu nội dung này và không ghi nó vào nhật ký; Google và Apple xử lý nó theo chính sách riêng của họ.
+- **Agent gửi gì, khi nào.** Trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định: 30 giây) — và bất cứ khi nào một chương trình trong terminal phát chuỗi thông báo (ví dụ `shellx notify`, OSC 9, OSC 777) — agent gửi **nội dung thông báo** tới máy chủ chuyển tiếp ShellX: tên máy tính, tên phiên hoặc cửa sổ terminal, dòng lệnh, mã thoát và thời gian chạy, hoặc chữ do chương trình gửi. Nội dung này **không được mã hóa đầu cuối**.
+- **Máy chủ làm gì với nó.** Máy chủ chỉ chuyển tiếp nội dung đó qua **Google Firebase Cloud Messaging** và, với iPhone, **Apple Push Notification service**, và chỉ tới những điện thoại đã ghép nối với chính máy tính đó và đã cho phép thông báo. Máy chủ không lưu nội dung này và không ghi nó vào nhật ký; Google và Apple xử lý nó theo chính sách riêng của họ.
+- **Khi không điện thoại nào nhận được** (chưa điện thoại nào cho phép thông báo, hoặc đều đã đăng xuất), agent ngừng gửi trong 15 phút rồi mới thử lại.
+- **Mã thông báo đẩy.** Ứng dụng di động nhận một mã thông báo đẩy (FCM token) từ Google Firebase Cloud Messaging và gửi lên máy chủ khi bạn cho phép thông báo. Máy chủ lưu mã này tới khi bạn đăng xuất trên điện thoại đó, xóa tài khoản, tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc Firebase báo mã không còn hiệu lực.
 - Đây là ngoại lệ duy nhất đối với mục 2: chỉ nội dung thông báo, không phải phần còn lại của terminal.
-- Bạn có thể tắt bất cứ lúc nào: chọn "Tắt" ở "Thông báo khi lệnh chạy lâu xong" trong menu ShellX trên máy tính (thông báo khi lệnh kết thúc), hoặc tắt thông báo của ShellX trong cài đặt của điện thoại — lần mở ứng dụng tiếp theo, mã thông báo đẩy bị vô hiệu và không còn thông báo nào được gửi tới điện thoại đó. Đăng xuất trên điện thoại cũng xóa mã này.
+- **Cách tắt:** chọn "Tắt" ở "Thông báo khi lệnh chạy lâu xong" trong menu ShellX trên máy tính (thông báo khi lệnh kết thúc), hoặc tắt thông báo của ShellX trong cài đặt điện thoại, hoặc đăng xuất trên điện thoại.
 
 ## 4. Dữ liệu chỉ nằm trên thiết bị của bạn
 
