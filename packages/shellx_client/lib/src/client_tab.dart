@@ -187,6 +187,7 @@ final class ClientTab {
   @internal
   void handleDriver(DriverSide by) => _emit(TabDriver(by));
 
+  @internal
   void handleDetached(DetachReason reason) {
     _end();
     _emit(TabDetached(reason));

@@ -178,8 +178,9 @@ final class MachineClient {
     if (tab == null) {
       final info =
           _known[id] ??
-          (await listSessions(includeDesktop: _listedDesktop))
-              .where((s) => s.id == id).firstOrNull;
+          (await listSessions(
+            includeDesktop: _listedDesktop,
+          )).where((s) => s.id == id).firstOrNull;
       if (info == null) {
         throw AppErrorException(
           AppErrorCode.sessionNotFound,

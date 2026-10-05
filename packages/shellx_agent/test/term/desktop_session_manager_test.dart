@@ -291,6 +291,31 @@ void main() {
       });
     });
 
+    test('disconnectPhone while draining after exit is ignored; the drain '
+        'still ends with session.exited', () {
+      fakeAsync((async) {
+        final manager = DesktopSessionManager(nextId: () => 100, sendWindow: 4);
+        final sent = <OutboundMessage>[];
+        manager.outbound.listen(sent.add);
+        final link = FakeTermLink(windowInfo(1));
+        manager.addLink(link);
+        link.snapshot('');
+        async.flushMicrotasks();
+        manager.attach(phone, 100, 80, 24, 0);
+        link
+          ..out('abcdefgh')
+          ..emit(const TermExit(code: 7));
+        async.flushMicrotasks();
+        final before = sent.length;
+        manager.disconnectPhone(100);
+        expect(sent, hasLength(before));
+        manager.ack(phone, 100, 4);
+        final messages = sent.map((o) => o.message).toList();
+        expect(messages.whereType<SessionDetached>(), isEmpty);
+        expect(messages.last, const SessionExited(id: 100, exitCode: 7));
+      });
+    });
+
     test('attach to an unknown or exited session is session_not_found', () {
       fakeAsync((async) {
         final rig = DesktopRig();

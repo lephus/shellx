@@ -20,6 +20,9 @@ import 'term_messages.dart';
 /// (counted over the whole handshake, so a byte-by-byte trickle cannot hold
 /// it open). `admit` decides `reject limit` once `auth` is verified (spec
 /// §7.8 step 3: a reconnecting window must never be turned away).
+///
+/// [start] and [stop] must not overlap: the caller serializes them
+/// (`TerminalSharing` queues both).
 final class TermServer {
   TermServer({
     required String endpointPath,

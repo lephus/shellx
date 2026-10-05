@@ -26,14 +26,11 @@ sealed class AppMessage {
       'session.list' => SessionList(
         desktop: f.optionalBoolean('desktop') ?? false,
       ),
-      'session.list.result' => SessionListResult(
-        [
-          for (final item in f.list('sessions'))
-            // ignore: use_null_aware_elements
-            if (SessionInfo._fromMap(item, t) case final info?) info,
-        ],
-        desktopSharing: f.optionalBoolean('desktop_sharing'),
-      ),
+      'session.list.result' => SessionListResult([
+        for (final item in f.list('sessions'))
+          // ignore: use_null_aware_elements
+          if (SessionInfo._fromMap(item, t) case final info?) info,
+      ], desktopSharing: f.optionalBoolean('desktop_sharing')),
       'session.open' => SessionOpen(
         cols: f.integer('cols'),
         rows: f.integer('rows'),

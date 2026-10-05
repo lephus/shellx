@@ -222,6 +222,13 @@ void main() {
         rig.router.closeSession(desktopId);
         expectTerminalAlive();
         expect(rig.ptys.ptys.single.killed, isFalse);
+        expect(
+          rig.to(phone),
+          contains(
+            SessionDetached(id: desktopId, reason: DetachReason.closedByHost),
+          ),
+        );
+        expect(rig.desktop.sessions.single.attachedMobileId, isNull);
       });
     });
 
@@ -232,6 +239,13 @@ void main() {
         async.flushMicrotasks();
         expect(rig.ptys.ptys.single.killed, isTrue);
         expectTerminalAlive();
+        expect(
+          rig.to(phone),
+          contains(
+            SessionDetached(id: desktopId, reason: DetachReason.closedByHost),
+          ),
+        );
+        expect(rig.desktop.sessions.single.attachedMobileId, isNull);
       });
     });
 

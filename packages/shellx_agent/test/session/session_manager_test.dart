@@ -445,9 +445,6 @@ void main() {
     expect(rig.manager.sessionInfos.single.kind, SessionKind.shellx);
     rig.clear();
     await rig.manager.handle(phone, const SessionList());
-    expect(
-      rig.to(phone).single,
-      SessionListResult(rig.manager.sessionInfos),
-    );
+    expect(rig.to(phone).single, SessionListResult(rig.manager.sessionInfos));
   });
 }

@@ -116,7 +116,11 @@ final class DesktopSessionManager {
   final _sessions = <int, _Session>{};
   final _byTerm = <String, _Session>{};
 
-  /// Messages to deliver, in order. Synchronous, like `SessionManager`'s.
+  /// Messages to deliver, in order. A synchronous broadcast stream, like
+  /// `SessionManager`'s and `SessionRouter`'s: a listener must not call
+  /// back into this manager synchronously from its callback (adding to the
+  /// stream while one of its listeners runs throws "Cannot fire new
+  /// event").
   Stream<OutboundMessage> get outbound => _outbound.stream;
   Stream<void> get changes => _changes.stream;
   Stream<DesktopPhoneAttached> get phoneAttached => _attached.stream;
@@ -256,10 +260,13 @@ final class DesktopSessionManager {
 
   /// Tray "Disconnect phone", or the phone's access going away: the phone
   /// gets `session.detached {closed_by_host}`; the terminal keeps running.
+  /// A session draining after its terminal exited is left alone (like
+  /// `SessionManager.closeSession`): the drain finishes and the phone gets
+  /// `session.exited`.
   void disconnectPhone(int id) {
     final s = _sessions[id];
     final mobileId = s?.attachedMobileId;
-    if (s == null || mobileId == null) return;
+    if (s == null || s.closing || mobileId == null) return;
     _send(mobileId, SessionDetached(id: id, reason: DetachReason.closedByHost));
     _phoneLeft(s);
     _changes.add(null);

@@ -20,7 +20,12 @@ Uint8List hmacSha256(List<int> key, List<int> data) {
     inner[i] = k ^ 0x36;
     outer[i] = k ^ 0x5c;
   }
-  return _hash(concatBytes([outer, _hash(concatBytes([inner, data]))]));
+  return _hash(
+    concatBytes([
+      outer,
+      _hash(concatBytes([inner, data])),
+    ]),
+  );
 }
 
 final _agentLabel = utf8.encode('shellx-term/agent');

@@ -77,6 +77,9 @@ final class TermWindow {
         'PATH': Platform.environment['PATH'] ?? '/usr/bin:/bin',
         'PS1': r'$ ',
         'ENV': '',
+        // No history file: /bin/sh (bash) would write .bash_history into
+        // the temp HOME on SIGHUP, racing the test's tearDown.
+        'HISTFILE': '',
         'TERM': 'xterm-256color',
         'SHELLX_TERM_TIMING': 'fast',
       },

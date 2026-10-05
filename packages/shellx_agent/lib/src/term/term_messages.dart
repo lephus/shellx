@@ -18,7 +18,9 @@ Uint8List _encode(Map<String, Object?> fields) {
     throw const FormatException('local-link message must be a CBOR map');
   }
   final t = value['t'];
-  if (t is! String) throw const FormatException('local-link message without "t"');
+  if (t is! String) {
+    throw const FormatException('local-link message without "t"');
+  }
   return (value, t);
 }
 
@@ -98,7 +100,8 @@ final class TermInfo {
   String get key => bytesToHex(termId);
 
   @override
-  String toString() => 'TermInfo(app: $app, shell: $shell, pid: $pid, '
+  String toString() =>
+      'TermInfo(app: $app, shell: $shell, pid: $pid, '
       '${cols}x$rows)';
 }
 
@@ -275,11 +278,7 @@ final class AgentResize extends AgentToTerm {
   const AgentResize({required this.cols, required this.rows});
   final int cols, rows;
   @override
-  Map<String, Object?> _fields() => {
-    't': 'resize',
-    'cols': cols,
-    'rows': rows,
-  };
+  Map<String, Object?> _fields() => {'t': 'resize', 'cols': cols, 'rows': rows};
   @override
   String toString() => 'AgentResize(${cols}x$rows)';
 }

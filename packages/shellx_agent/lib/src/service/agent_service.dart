@@ -16,8 +16,9 @@ import 'handshake_responder.dart';
 /// and completes pairing.
 ///
 /// [start] subscribes and calls `relay.start()`. [stop] drops every channel
-/// and calls `relay.stop()`; it does not close sessions (call
-/// `SessionManager.closeAll()` for that).
+/// and calls `relay.stop()`; it does not close sessions (the owner of the
+/// [AgentSessions] calls its `closeAll` for that — `SessionRouter.closeAll`
+/// in the desktop app).
 ///
 /// Frames, relay state changes, channel failures and [revoke] all run one
 /// at a time through a single inbox, so trust decisions and the channel

@@ -84,6 +84,26 @@ void main() {
     term.destroy();
   });
 
+  test('a link outlives the handshake deadline', () async {
+    final (port, secret) = readEndpoint(path);
+    final term = await FakeTerm.connect(port);
+    expect(await term.handshake(secret), isA<AgentReady>());
+    await pumpEventQueue();
+    // Twice the 300 ms handshake deadline: the deadline must not touch a
+    // link that finished its handshake.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    var closed = false;
+    unawaited(term.closed.then((_) => closed = true));
+    await pumpEventQueue();
+    expect(closed, isFalse);
+    links.single.send(AgentIn(data: Uint8List.fromList([67])));
+    final message = await term.next();
+    expect(message, isA<AgentIn>());
+    expect((message! as AgentIn).data, [67]);
+    expect(closed, isFalse);
+    term.destroy();
+  });
+
   test('a wrong term proof is closed without ready or reject', () async {
     final (port, secret) = readEndpoint(path);
     final term = await FakeTerm.connect(port);
