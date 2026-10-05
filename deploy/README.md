@@ -8,7 +8,9 @@ The only exception is four small files copied once into nginx-proxy's `vhost.d` 
 ~/phu/shellx/
   docker-compose.yml     # from deploy/docker-compose.yml (compose project "shellx")
   relay.env              # from deploy/relay.env (versions, download links; no secrets)
-  .env                   # IMAGE_TAG (written by deploy.yml) and PROXY_NETWORK (written by you, once)
+  .env                   # IMAGE_TAG (written by deploy.yml), PROXY_NETWORK and, for push,
+                         # FCM_SERVICE_ACCOUNT (written by you, once)
+  secrets/fcm.json       # Firebase service account key (push; by hand, never synced — see below)
   data/relay.db          # the SQLite database (bind mount ./data:/data, owned by uid 1000)
   backups/relay-<YYYY-MM-DD>.db   # daily at 03:00, the 14 newest are kept
   downloads/desktop/<version>/    # installers, uploaded by release-desktop.yml
@@ -172,6 +174,40 @@ the VPS as the deploy user unless a step says otherwise.
      `~/phu/shellx`) instead of turning logging off.
    This is tracked as an open item for you in `docs/superpowers/HANDOFF.md` §4; the privacy policy
    text is not changed until you pick one.
+
+## Push notifications (once, by hand)
+
+The relay sends push notifications through Firebase Cloud Messaging only when it has a service
+account key; without one it runs normally and push is simply off (`docker compose logs relay` shows
+`push_disabled` once at startup).
+
+1. In the Firebase console of project `shellxpro`: Project settings → Service accounts → **Generate
+   new private key** (a JSON file). Keep it secret: anyone holding it can send notifications to
+   your phones. (APNs for iOS: Project settings → Cloud Messaging → Apple app → upload the `.p8` key.)
+2. Put it on the VPS, readable by the relay's uid 1000 only, in the folder that is **never** synced
+   by deploys:
+
+   ```bash
+   # Docker creates ./secrets as root if the relay started before it existed: take it back first.
+   sudo mkdir -p ~/phu/shellx/secrets
+   sudo chown <deploy-user>:<deploy-user> ~/phu/shellx/secrets && sudo chmod 755 ~/phu/shellx/secrets
+   # A private upload folder in your home (never /tmp: world-listable, default file mode)
+   mkdir -m 700 -p ~/fcm-upload
+   # from your machine: scp fcm.json <deploy-user>@<vps>:fcm-upload/fcm.json
+   sudo install -o 1000 -g 1000 -m 400 ~/fcm-upload/fcm.json ~/phu/shellx/secrets/fcm.json
+   rm -rf ~/fcm-upload
+   echo "FCM_SERVICE_ACCOUNT=/secrets/fcm.json" >> ~/phu/shellx/.env
+   cd ~/phu/shellx && docker compose up -d --force-recreate relay
+   docker compose logs relay | grep push_   # push_enabled {"project":"shellxpro"}
+   ```
+
+   `docker-compose.yml` mounts `./secrets` read-only at `/secrets` and passes `FCM_SERVICE_ACCOUNT`
+   from `.env` (rollout.sh keeps every `.env` line except `IMAGE_TAG`). To turn push off, remove the
+   line and recreate the relay. **Rotating the key:** create a new key in the Firebase console, copy it
+   into `~/fcm-upload/` on the VPS as above (`mkdir -m 700 -p ~/fcm-upload` first), then `sudo install -o
+   1000 -g 1000 -m 400 ~/fcm-upload/fcm.json ~/phu/shellx/secrets/fcm.json && rm -rf ~/fcm-upload` (the file is read-only and owned by uid 1000,
+   so a plain `cp` over it fails), `docker compose up -d --force-recreate relay`, and delete the old
+   key in the console.
 
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
 `web/src/pages/privacy.md`, `web/src/pages/en/privacy.md`, `web/src/pages/terms.md` and

@@ -4,8 +4,10 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../notify/agent_notifications.dart';
 import '../pty/pty.dart';
 import '../pty/session_environment.dart';
+import '../pty/shell_integration.dart';
 import '../pty/shell_resolver.dart';
 import 'agent_sessions.dart';
 import 'session_ids.dart';
@@ -85,6 +87,9 @@ final class _Session {
 
   StreamSubscription<Uint8List>? output;
 
+  /// Push notifications from this session's output (null when off).
+  SessionNotifier? notifier;
+
   void write(Uint8List data) {
     if (!exited) pty.write(data);
   }
@@ -115,7 +120,11 @@ final class SessionManager implements AgentSessions {
     int sendWindow = 256 * 1024,
     Random? random,
     int Function()? nextId,
+    AgentNotifications? notifications,
+    ShellIntegration? shellIntegration,
   }) : _ptyFactory = ptyFactory,
+       _notifications = notifications,
+       _shellIntegration = shellIntegration,
        _shellResolver = shellResolver,
        _homeDirectory = homeDirectory,
        _baseEnvironment = baseEnvironment,
@@ -131,6 +140,11 @@ final class SessionManager implements AgentSessions {
   final int _maxSessions;
   final int _bufferCapacity;
   final int _sendWindow;
+  final AgentNotifications? _notifications;
+
+  /// Starts zsh/bash/PowerShell with the push-notification hook (spec
+  /// §4.4); null starts the resolved shell unchanged.
+  final ShellIntegration? _shellIntegration;
 
   final _outbound = StreamController<OutboundMessage>.broadcast(sync: true);
   final _changes = StreamController<void>.broadcast();
@@ -299,10 +313,11 @@ final class SessionManager implements AgentSessions {
     final Pty pty;
     try {
       command = await _shellResolver.resolve();
+      final launch = _launch(command);
       pty = _ptyFactory.spawn(
-        command,
+        launch.command,
         workingDirectory: _homeDirectory,
-        environment: buildSessionEnvironment(_baseEnvironment),
+        environment: launch.environment,
         cols: c,
         rows: r,
       );
@@ -340,6 +355,10 @@ final class SessionManager implements AgentSessions {
       rows: r,
     );
     session.attachedMobileId = mobileId;
+    session.notifier = _notifications?.forShell(
+      sessionId: session.id,
+      index: session.index,
+    );
     _sessions[session.id] = session;
     _send(
       mobileId,
@@ -348,6 +367,17 @@ final class SessionManager implements AgentSessions {
     _watch(session);
     _opened.add(SessionOpenedEvent(mobileId, session.id));
     _changes.add(null);
+  }
+
+  ShellLaunch _launch(ShellCommand command) {
+    final environment = buildSessionEnvironment(_baseEnvironment);
+    final integration = _shellIntegration;
+    if (integration == null) return ShellLaunch(command, environment);
+    try {
+      return integration.apply(command, environment);
+    } catch (_) {
+      return ShellLaunch(command, environment);
+    }
   }
 
   void _attach(String mobileId, int id, int cols, int rows, int lastSeq) {
@@ -392,6 +422,7 @@ final class SessionManager implements AgentSessions {
       (data) {
         session.stream.append(data);
         _pump(session);
+        session.notifier?.feed(data);
       },
       onDone: outputDone.complete,
       onError: (Object _) {},

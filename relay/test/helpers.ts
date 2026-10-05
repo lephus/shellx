@@ -29,7 +29,9 @@ export const TEST_CONFIG: Config = {
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
-export const unlimited: RateLimiters = { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll };
+export const unlimited: RateLimiters = {
+  loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+};
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
 export class CountingLimiter implements RateLimiter {

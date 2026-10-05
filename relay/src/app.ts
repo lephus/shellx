@@ -12,7 +12,9 @@ import { errorKind, logMeta } from "./log.js";
 import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { deviceRoutes } from "./routes/devices.js";
+import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
+import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 
 export interface AppDeps {
@@ -24,6 +26,8 @@ export interface AppDeps {
   passwords?: PasswordHasher;
   /** Unix milliseconds; injectable for token-expiry tests. */
   now?: () => number;
+  /** FCM gateway; null or absent when push is not configured (503 `push_unavailable`). */
+  push?: PushGateway | null;
 }
 
 export interface AppVariables {
@@ -33,6 +37,7 @@ export interface AppVariables {
   limiters: RateLimiters;
   passwords: PasswordHasher;
   now: () => number;
+  push: PushGateway | null;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -54,6 +59,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("limiters", deps.limiters);
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
+    c.set("push", deps.push ?? null);
     await next();
   });
 
@@ -70,6 +76,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/account", accountRoutes);
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
+  app.route("/v1/notifications", notificationRoutes);
   app.get("/v1/ws", webSocketAuth, webSocketUpgrade);
 
   app.notFound((c) => {

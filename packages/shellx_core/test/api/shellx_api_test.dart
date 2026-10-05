@@ -399,6 +399,131 @@ void main() {
     });
   });
 
+  group('push notifications', () {
+    test(
+      'registerPushToken puts {token, platform} with the bearer token',
+      () async {
+        final recorder = _Recorder((_) => http.Response('', 204));
+        final api = recorder.api(token: 'tok');
+        await api.registerPushToken('fcm-token', PushPlatform.ios);
+        expect(recorder.last.method, 'PUT');
+        expect(
+          recorder.last.url.toString(),
+          'https://relay.shellx.pro/v1/devices/me/push-token',
+        );
+        expect(recorder.last.headers['authorization'], 'Bearer tok');
+        expect(recorder.lastJson, {'token': 'fcm-token', 'platform': 'ios'});
+        await api.registerPushToken('t2', PushPlatform.android);
+        expect(jsonDecode(recorder.requests.last.body), {
+          'token': 't2',
+          'platform': 'android',
+        });
+      },
+    );
+
+    test('registerPushToken maps mobile_only and an old relay (404)', () async {
+      final mobileOnly = _Recorder(
+        (_) => _error(403, 'mobile_only', 'Only a phone may do this'),
+      ).api(token: 'tok');
+      await expectLater(
+        mobileOnly.registerPushToken('t', PushPlatform.android),
+        throwsA(_apiError(403, 'mobile_only')),
+      );
+      final oldRelay = _Recorder(
+        (_) => _error(404, 'not_found', 'Not found'),
+      ).api(token: 'tok');
+      await expectLater(
+        oldRelay.registerPushToken('t', PushPlatform.android),
+        throwsA(_apiError(404, 'not_found')),
+      );
+    });
+
+    test('deletePushToken deletes with the bearer token', () async {
+      final recorder = _Recorder((_) => http.Response('', 204));
+      await recorder.api(token: 'tok').deletePushToken();
+      expect(recorder.last.method, 'DELETE');
+      expect(recorder.last.url.path, '/v1/devices/me/push-token');
+      expect(recorder.last.headers['authorization'], 'Bearer tok');
+    });
+
+    test(
+      'sendNotification posts {title, body, data} and returns sent',
+      () async {
+        final recorder = _Recorder((_) => _json({'sent': 2}, 202));
+        final sent = await recorder
+            .api(token: 'agent-tok')
+            .sendNotification(
+              'MacBook · Session 1',
+              '✓ make · 45 s',
+              data: {'session_id': '7', 'kind': 'command'},
+            );
+        expect(sent, 2);
+        expect(recorder.last.method, 'POST');
+        expect(recorder.last.url.path, '/v1/notifications');
+        expect(recorder.last.headers['authorization'], 'Bearer agent-tok');
+        expect(recorder.lastJson, {
+          'title': 'MacBook · Session 1',
+          'body': '✓ make · 45 s',
+          'data': {'session_id': '7', 'kind': 'command'},
+        });
+      },
+    );
+
+    test('sendNotification without data sends no data key', () async {
+      final recorder = _Recorder((_) => _json({'sent': 0}, 202));
+      expect(await recorder.api(token: 't').sendNotification('a', 'b'), 0);
+      expect(recorder.lastJson, {'title': 'a', 'body': 'b'});
+    });
+
+    test('sendNotification maps 503 push_unavailable and 429', () async {
+      final unavailable = _Recorder(
+        (_) => _error(503, 'push_unavailable', 'not configured'),
+      ).api(token: 't');
+      await expectLater(
+        unavailable.sendNotification('a', 'b'),
+        throwsA(_apiError(503, 'push_unavailable')),
+      );
+      final limited = _Recorder(
+        (_) => _error(429, 'rate_limited', 'slow down'),
+      ).api(token: 't');
+      await expectLater(
+        limited.sendNotification('a', 'b'),
+        throwsA(_apiError(429, 'rate_limited')),
+      );
+    });
+
+    test('sendNotification: a malformed 202 body is bad_response', () async {
+      final api = _Recorder((_) => _json({'nope': 1}, 202)).api(token: 't');
+      await expectLater(
+        api.sendNotification('a', 'b'),
+        throwsA(_apiError(202, 'bad_response')),
+      );
+    });
+
+    test('all three fail locally with 401 without a token', () async {
+      final recorder = _Recorder((_) => http.Response('', 204));
+      final api = recorder.api();
+      await expectLater(
+        api.registerPushToken('t', PushPlatform.ios),
+        throwsA(_apiError(401, 'unauthorized')),
+      );
+      await expectLater(
+        api.deletePushToken(),
+        throwsA(_apiError(401, 'unauthorized')),
+      );
+      await expectLater(
+        api.sendNotification('a', 'b'),
+        throwsA(_apiError(401, 'unauthorized')),
+      );
+      expect(recorder.requests, isEmpty);
+    });
+
+    test('PushPlatform wire names', () {
+      expect(PushPlatform.android.wire, 'android');
+      expect(PushPlatform.ios.wire, 'ios');
+    });
+  });
+
   group('version', () {
     test('is unauthenticated and parses latest_agent', () async {
       final recorder = _Recorder(
