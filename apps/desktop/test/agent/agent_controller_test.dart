@@ -971,6 +971,29 @@ void main() {
       expect(h.keepAwake.last, isFalse);
     });
 
+    test('the long-command threshold (push spec §7): 30 s by default, '
+        'stored, remembered, unknown values refused', () async {
+      boot();
+      await h.seedSignedIn();
+      await controller().bootstrap(watchForWake: false);
+      expect(state().notifyThresholdSeconds, 30);
+      await controller().setNotifyThreshold(300);
+      expect(state().notifyThresholdSeconds, 300);
+      expect(h.settings.ints[SettingKeys.notifyThreshold], 300);
+      await controller().setNotifyThreshold(0);
+      expect(state().notifyThresholdSeconds, 0);
+      await controller().setNotifyThreshold(45);
+      expect(state().notifyThresholdSeconds, 0);
+      expect(h.settings.ints[SettingKeys.notifyThreshold], 0);
+
+      final again = TestHarness();
+      again.settings.ints[SettingKeys.notifyThreshold] = 60;
+      boot(again);
+      await h.seedSignedIn();
+      await controller().bootstrap(watchForWake: false);
+      expect(state().notifyThresholdSeconds, 60);
+    });
+
     test('keep awake off is remembered across restarts', () async {
       boot(TestHarness(settings: {SettingKeys.keepAwake: false}));
       await h.seedSignedIn();

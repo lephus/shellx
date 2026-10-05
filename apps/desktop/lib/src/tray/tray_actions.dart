@@ -71,6 +71,8 @@ final class TrayActions {
         await _agent.revoke(mobileId);
       case ToggleKeepAwake():
         await _agent.setKeepAwake(!state.keepAwake);
+      case SetNotifyThreshold(:final seconds):
+        await _agent.setNotifyThreshold(seconds);
       case ToggleLaunchAtStartup():
         await _agent.setLaunchAtStartup(!state.launchAtStartup);
       case OpenChangePassword():

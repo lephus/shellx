@@ -686,6 +686,30 @@ abstract class AppLocalizations {
   /// **'Share terminals with phone (experimental)'**
   String get trayTerminalSharing;
 
+  /// No description provided for @trayNotifyThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify when long commands finish'**
+  String get trayNotifyThreshold;
+
+  /// No description provided for @trayNotifyOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get trayNotifyOff;
+
+  /// No description provided for @trayNotifySeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 second} other{{count} seconds}}'**
+  String trayNotifySeconds(int count);
+
+  /// No description provided for @trayNotifyMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String trayNotifyMinutes(int count);
+
   /// No description provided for @trayDesktopTerminals.
   ///
   /// In en, this message translates to:

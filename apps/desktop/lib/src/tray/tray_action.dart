@@ -1,3 +1,5 @@
+import '../agent/notify_threshold.dart';
+
 /// Everything the tray menu can ask for.
 sealed class TrayAction {
   const TrayAction();
@@ -70,6 +72,13 @@ final class SetUpTerminalSharing extends TrayAction {
   const SetUpTerminalSharing();
 }
 
+/// "Thông báo khi lệnh chạy lâu xong" (push spec §7): one of the choices,
+/// in seconds (0 = off).
+final class SetNotifyThreshold extends TrayAction {
+  const SetNotifyThreshold(this.seconds);
+  final int seconds;
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -96,6 +105,7 @@ abstract final class TrayKeys {
   static const String terminalSharing = 'terminal_sharing';
   static const String terminalSharingSetup = 'terminal_sharing_setup';
   static const String desktopTerminals = 'desktop_terminals';
+  static const String notifyThreshold = 'notify_threshold';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -103,6 +113,8 @@ abstract final class TrayKeys {
   static String revoke(String mobileId) => 'revoke:$mobileId';
   static String desktopTerminal(int id) => 'desktop_terminal:$id';
   static String disconnectPhone(int id) => 'desktop_disconnect:$id';
+  static String notifyThresholdChoice(int seconds) =>
+      'notify_threshold:$seconds';
 }
 
 TrayAction? trayActionForKey(String? key) {
@@ -110,6 +122,13 @@ TrayAction? trayActionForKey(String? key) {
   const closePrefix = 'session_close:';
   const revokePrefix = 'revoke:';
   const disconnectPrefix = 'desktop_disconnect:';
+  const thresholdPrefix = 'notify_threshold:';
+  if (key.startsWith(thresholdPrefix)) {
+    final seconds = int.tryParse(key.substring(thresholdPrefix.length));
+    return seconds == null || !kNotifyThresholdChoices.contains(seconds)
+        ? null
+        : SetNotifyThreshold(seconds);
+  }
   if (key.startsWith(disconnectPrefix)) {
     final id = int.tryParse(key.substring(disconnectPrefix.length));
     return id == null ? null : DisconnectDesktopPhone(id);

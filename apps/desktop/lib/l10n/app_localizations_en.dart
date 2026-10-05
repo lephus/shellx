@@ -388,6 +388,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trayTerminalSharing => 'Share terminals with phone (experimental)';
 
   @override
+  String get trayNotifyThreshold => 'Notify when long commands finish';
+
+  @override
+  String get trayNotifyOff => 'Off';
+
+  @override
+  String trayNotifySeconds(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count seconds',
+      one: '1 second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trayNotifyMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String trayDesktopTerminals(int count) {
     return 'Computer terminals ($count)';
   }

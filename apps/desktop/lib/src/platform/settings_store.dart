@@ -12,6 +12,10 @@ abstract final class SettingKeys {
   /// them even when PowerShell no longer reports a profile.
   static const String terminalSharingFiles = 'terminal_sharing_files';
 
+  /// Push spec §7: "Thông báo khi lệnh chạy lâu xong", in seconds (0 = off;
+  /// missing = the default, see `notify_threshold.dart`).
+  static const String notifyThreshold = 'command_notify_threshold_seconds';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -19,6 +23,7 @@ abstract final class SettingKeys {
     onboardingDone,
     terminalSharing,
     terminalSharingFiles,
+    notifyThreshold,
   };
 }
 
@@ -27,6 +32,8 @@ abstract interface class SettingsStore {
   Future<void> setBool(String key, bool value);
   List<String> getStrings(String key);
   Future<void> setStrings(String key, List<String> values);
+  int? getInt(String key);
+  Future<void> setInt(String key, int value);
 }
 
 final class SharedPrefsSettingsStore implements SettingsStore {
@@ -56,6 +63,12 @@ final class SharedPrefsSettingsStore implements SettingsStore {
   @override
   Future<void> setStrings(String key, List<String> values) =>
       _prefs.setStringList(key, values);
+
+  @override
+  int? getInt(String key) => _prefs.getInt(key);
+
+  @override
+  Future<void> setInt(String key, int value) => _prefs.setInt(key, value);
 }
 
 final class InMemorySettingsStore implements SettingsStore {
@@ -85,5 +98,16 @@ final class InMemorySettingsStore implements SettingsStore {
   Future<void> setStrings(String key, List<String> values) async {
     if (fail) throw StateError('settings write failed');
     strings[key] = List.of(values);
+  }
+
+  final Map<String, int> ints = {};
+
+  @override
+  int? getInt(String key) => ints[key];
+
+  @override
+  Future<void> setInt(String key, int value) async {
+    if (fail) throw StateError('settings write failed');
+    ints[key] = value;
   }
 }

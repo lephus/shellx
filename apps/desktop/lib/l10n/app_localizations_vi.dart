@@ -384,6 +384,32 @@ class AppLocalizationsVi extends AppLocalizations {
       'Chia sẻ terminal với điện thoại (thử nghiệm)';
 
   @override
+  String get trayNotifyThreshold => 'Thông báo khi lệnh chạy lâu xong';
+
+  @override
+  String get trayNotifyOff => 'Tắt';
+
+  @override
+  String trayNotifySeconds(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count giây',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trayNotifyMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count phút',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String trayDesktopTerminals(int count) {
     return 'Terminal trên máy tính ($count)';
   }

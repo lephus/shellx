@@ -3,6 +3,7 @@ import 'package:tray_manager/tray_manager.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../agent/agent_state.dart';
+import '../agent/notify_threshold.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import 'tray_action.dart';
 
@@ -39,6 +40,13 @@ final class TrayMenuIds {
   }
 
   void startBuild() => _separators = 0;
+}
+
+/// "Tắt", "10 giây", "1 phút"… (push spec §7).
+String notifyThresholdLabel(int seconds, AppLocalizations l10n) {
+  if (seconds == 0) return l10n.trayNotifyOff;
+  if (seconds % 60 == 0) return l10n.trayNotifyMinutes(seconds ~/ 60);
+  return l10n.trayNotifySeconds(seconds);
 }
 
 String _statusLine(AgentViewState state, AppLocalizations l10n) {
@@ -191,6 +199,15 @@ Menu buildTrayMenu(
           '⚠ ${l10n.trayTerminalSharingNeedsSetup}',
           disabled: sharing.busy,
         ),
+      // Push spec §7.
+      sub(TrayKeys.notifyThreshold, l10n.trayNotifyThreshold, [
+        for (final seconds in kNotifyThresholdChoices)
+          check(
+            TrayKeys.notifyThresholdChoice(seconds),
+            notifyThresholdLabel(seconds, l10n),
+            seconds == state.notifyThresholdSeconds,
+          ),
+      ]),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
       item(TrayKeys.quit, l10n.trayQuit),

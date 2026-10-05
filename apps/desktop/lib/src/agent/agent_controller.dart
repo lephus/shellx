@@ -12,6 +12,7 @@ import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_runtime.dart';
 import 'agent_state.dart';
 import 'desktop_services.dart';
+import 'notify_threshold.dart';
 import 'storage_keys.dart';
 import 'update_check.dart';
 
@@ -111,6 +112,7 @@ class AgentController extends Notifier<AgentViewState> {
         SettingKeys.onboardingDone,
         defaultValue: false,
       ),
+      notifyThresholdSeconds: notifyThresholdSeconds(settings),
     );
     final sharingSetup = _s.terminalSharing;
     if (sharingSetup != null) {
@@ -320,6 +322,15 @@ class AgentController extends Notifier<AgentViewState> {
       await _stopRuntime();
     }
     await _applyKeepAwake();
+  }
+
+  /// Push spec §7: stored, and read by the agent when the next command
+  /// ends (no restart). Only [kNotifyThresholdChoices] are accepted.
+  Future<void> setNotifyThreshold(int seconds) async {
+    if (!kNotifyThresholdChoices.contains(seconds)) return;
+    await _s.settings.setInt(SettingKeys.notifyThreshold, seconds);
+    if (!ref.mounted) return;
+    state = state.copyWith(notifyThresholdSeconds: seconds);
   }
 
   Future<void> setKeepAwake(bool enabled) async {

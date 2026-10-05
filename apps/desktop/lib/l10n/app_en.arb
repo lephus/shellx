@@ -192,6 +192,20 @@
   "notifyStorageUnreadableTitle": "ShellX could not read your saved sign-in",
   "notifySignOutIncompleteTitle": "Signed out, but some saved sign-in data could not be deleted",
   "trayTerminalSharing": "Share terminals with phone (experimental)",
+  "trayNotifyThreshold": "Notify when long commands finish",
+  "trayNotifyOff": "Off",
+  "trayNotifySeconds": "{count, plural, =1{1 second} other{{count} seconds}}",
+  "@trayNotifySeconds": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "trayNotifyMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@trayNotifyMinutes": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "trayDesktopTerminals": "Computer terminals ({count})",
   "@trayDesktopTerminals": {
     "placeholders": {

@@ -2,6 +2,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import 'agent_runtime.dart';
+import 'notify_threshold.dart';
 import 'update_check.dart';
 
 enum AuthPhase { loading, signedOut, signedIn }
@@ -65,6 +66,7 @@ final class AgentViewState {
     this.pairing,
     this.update,
     this.terminalSharing = const TerminalSharingView(),
+    this.notifyThresholdSeconds = kDefaultNotifyThresholdSeconds,
   });
 
   final AuthPhase phase;
@@ -86,6 +88,10 @@ final class AgentViewState {
   final UpdateNotice? update;
   final TerminalSharingView terminalSharing;
 
+  /// "Thông báo khi lệnh chạy lâu xong" (push spec §7): one of
+  /// [kNotifyThresholdChoices]; 0 = off.
+  final int notifyThresholdSeconds;
+
   bool get signedIn => phase == AuthPhase.signedIn;
 
   AgentViewState copyWith({
@@ -103,6 +109,7 @@ final class AgentViewState {
     Object? pairing = _unset,
     Object? update = _unset,
     TerminalSharingView? terminalSharing,
+    int? notifyThresholdSeconds,
   }) {
     return AgentViewState(
       phase: phase ?? this.phase,
@@ -121,6 +128,8 @@ final class AgentViewState {
           : pairing as PairingView?,
       update: identical(update, _unset) ? this.update : update as UpdateNotice?,
       terminalSharing: terminalSharing ?? this.terminalSharing,
+      notifyThresholdSeconds:
+          notifyThresholdSeconds ?? this.notifyThresholdSeconds,
     );
   }
 }

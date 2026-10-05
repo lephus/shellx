@@ -61,6 +61,7 @@ void main() {
       '---',
       'Giữ máy không ngủ',
       'Khởi động cùng hệ thống',
+      'Thông báo khi lệnh chạy lâu xong',
       'Đổi mật khẩu…',
       'Đăng xuất',
       'Thoát',
@@ -78,6 +79,46 @@ void main() {
     final device = menu.getMenuItem(TrayKeys.device('m1'))!;
     expect(device.submenu!.items!.single.key, TrayKeys.revoke('m1'));
     expect(device.submenu!.items!.single.label, 'Thu hồi');
+  });
+
+  test('long-command notifications submenu (push spec §7): the five choices, '
+      'the current one checked', () {
+    final menu = buildTrayMenu(_signedIn(), vi, TrayMenuIds());
+    final sub = menu.getMenuItem(TrayKeys.notifyThreshold)!;
+    expect(sub.label, 'Thông báo khi lệnh chạy lâu xong');
+    expect(_labels(sub.submenu!), [
+      'Tắt',
+      '10 giây',
+      '30 giây',
+      '1 phút',
+      '5 phút',
+    ]);
+    expect(
+      [for (final item in sub.submenu!.items!) item.checked],
+      [false, false, true, false, false],
+    );
+    expect([
+      for (final item in sub.submenu!.items!) item.key,
+    ], [0, 10, 30, 60, 300].map(TrayKeys.notifyThresholdChoice).toList());
+
+    final off = buildTrayMenu(
+      AgentViewState(
+        phase: AuthPhase.signedIn,
+        email: 'user@email.com',
+        notifyThresholdSeconds: 0,
+      ),
+      lookupAppLocalizations(const Locale('en')),
+      TrayMenuIds(),
+    ).getMenuItem(TrayKeys.notifyThreshold)!;
+    expect(off.label, 'Notify when long commands finish');
+    expect(_labels(off.submenu!), [
+      'Off',
+      '10 seconds',
+      '30 seconds',
+      '1 minute',
+      '5 minutes',
+    ]);
+    expect(off.submenu!.items!.first.checked, isTrue);
   });
 
   test('empty lists: sessions disabled, devices show a placeholder', () {
@@ -197,6 +238,12 @@ void main() {
     expect(trayActionForKey(TrayKeys.remoteAccess), isA<ToggleRemoteAccess>());
     expect(trayActionForKey(TrayKeys.quit), isA<Quit>());
     expect(trayActionForKey(TrayKeys.status), isNull);
+    expect(
+      trayActionForKey(TrayKeys.notifyThresholdChoice(60)),
+      isA<SetNotifyThreshold>().having((a) => a.seconds, 'seconds', 60),
+    );
+    expect(trayActionForKey('notify_threshold:45'), isNull);
+    expect(trayActionForKey('notify_threshold:x'), isNull);
     expect(trayActionForKey('session_close:abc'), isNull);
     expect(trayActionForKey(null), isNull);
   });
