@@ -169,6 +169,26 @@ void main() {
       expect(backend.pushTokens, hasLength(1));
     });
 
+    test('turned off in the system settings after a registration: the install token is deleted '
+        'once', () async {
+      messaging.current = PushPermission.granted;
+      controller.start();
+      await pumpEventQueue();
+      expect(prefs.getBool(PushController.registeredKey), isTrue);
+
+      messaging.current = PushPermission.denied;
+      await controller.refreshPermission();
+      expect(messaging.deletes, 1);
+      expect(prefs.getBool(PushController.registeredKey), isFalse);
+      await controller.refreshPermission();
+      expect(messaging.deletes, 1);
+
+      // Turned on again: a new registration.
+      messaging.current = PushPermission.granted;
+      await controller.refreshPermission();
+      expect(backend.pushTokens, hasLength(2));
+    });
+
     test('Firebase missing: nothing is asked, registered or listened to', () async {
       messaging = FakePushMessaging(available: false);
       controller = build()..start();

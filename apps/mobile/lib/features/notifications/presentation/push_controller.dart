@@ -13,7 +13,8 @@ import 'package:toastification/toastification.dart';
 ///   `onTokenRefresh`; a failure waits for the next launch);
 /// - the first time the machine list shows a paired machine → the system prompt, once per
 ///   install: a refusal is never asked again automatically (Settings offers the way back);
-/// - sign-out → this install's token is deleted (the relay drops its copy too);
+/// - sign-out, or notifications turned off in the system settings → this install's token is
+///   deleted (the relay drops its copy too);
 /// - in the foreground → an in-app banner; a tap (banner, notification, or the one that launched
 ///   the app) → [NotificationOpener].
 ///
@@ -53,6 +54,9 @@ class PushController {
 
   /// Set once the automatic prompt was shown on this install.
   static const String askedKey = 'push_permission_asked';
+
+  /// Set while a relay holds this install's token; cleared when the token is deleted.
+  static const String registeredKey = 'push_token_registered';
 
   final PushMessaging _messaging;
   final SessionHolder _session;
@@ -111,8 +115,13 @@ class PushController {
     }
     _permission.value = permission;
     final backend = _session.backend.peek();
-    if (permission == PushPermission.granted && backend != null && !identical(_registeredFor, backend)) {
-      await _register(backend);
+    if (permission == PushPermission.granted) {
+      if (backend != null && !identical(_registeredFor, backend)) await _register(backend);
+    } else if (_prefs.getBool(registeredKey) ?? false) {
+      // Turned off in the system settings: the token is invalidated, so the relay stops sending
+      // notification text to it (FCM answers UNREGISTERED and the relay drops it).
+      _registeredFor = null;
+      await _deleteToken();
     }
     return permission;
   }
@@ -142,7 +151,7 @@ class PushController {
       unawaited(refreshPermission());
     } else if (previous != null) {
       // Signed out: pushes to this install stop even if the relay did not hear the logout.
-      unawaited(Future.sync(_messaging.deleteToken).catchError((Object error) => _log('deleteToken', error)));
+      unawaited(_deleteToken());
     }
   }
 
@@ -158,9 +167,19 @@ class PushController {
       final value = token ?? await _messaging.token();
       if (value == null || !identical(_session.backend.peek(), backend)) return;
       await backend.registerPushToken(value, _platform);
+      await _prefs.setBool(registeredKey, true);
       if (identical(_session.backend.peek(), backend)) _registeredFor = backend;
     } catch (error) {
       _log('registerPushToken', error);
+    }
+  }
+
+  Future<void> _deleteToken() async {
+    try {
+      await _messaging.deleteToken();
+      await _prefs.setBool(registeredKey, false);
+    } catch (error) {
+      _log('deleteToken', error);
     }
   }
 
