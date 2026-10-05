@@ -50,7 +50,7 @@ final class ConfigEdit {
 /// Inserts and removes ShellX blocks, keeping each file's content, encoding
 /// and line endings (spec §10.2). A symlinked file (dotfiles repos) is
 /// edited in place through the link, so the link stays a link.
-final class ConfigFileEditor {
+class ConfigFileEditor {
   const ConfigFileEditor();
 
   static String backupPath(String path) => '$path.shellx-backup';

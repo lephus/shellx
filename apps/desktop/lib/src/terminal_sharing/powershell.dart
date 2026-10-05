@@ -50,7 +50,7 @@ final class PowerShellInstall {
 }
 
 /// Asks each installed PowerShell for its profile path and script policy.
-final class PowerShellProbe {
+class PowerShellProbe {
   PowerShellProbe({
     required Map<String, String> environment,
     ProcessRunner run = runProcessUtf8,
