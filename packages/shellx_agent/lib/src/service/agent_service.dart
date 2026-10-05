@@ -5,14 +5,14 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../pairing/pairing_code_manager.dart';
 import '../pairing/pairing_id.dart';
-import '../session/session_manager.dart';
+import '../session/agent_sessions.dart';
 import '../trust/trusted_store.dart';
 import 'agent_channel.dart';
 import 'agent_events.dart';
 import 'handshake_responder.dart';
 
 /// The agent side of the relay protocol: answers handshakes, keeps at most
-/// one encrypted channel per phone, routes app messages to [SessionManager]
+/// one encrypted channel per phone, routes app messages to [AgentSessions]
 /// and completes pairing.
 ///
 /// [start] subscribes and calls `relay.start()`. [stop] drops every channel
@@ -40,7 +40,7 @@ final class AgentService {
     required String deviceId,
     required NoiseKeyPair identity,
     required TrustedStore trusted,
-    required SessionManager sessions,
+    required AgentSessions sessions,
     required PairingCodeManager pairing,
     required String appVersion,
     Duration flushInterval = const Duration(milliseconds: 16),
@@ -80,7 +80,7 @@ final class AgentService {
   final String _deviceId;
   final NoiseKeyPair _identity;
   final TrustedStore _trusted;
-  final SessionManager _sessions;
+  final AgentSessions _sessions;
   final PairingCodeManager _pairing;
   final Duration _flushInterval;
   final HandshakeResponder _responder;

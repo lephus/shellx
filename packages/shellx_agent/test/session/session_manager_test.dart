@@ -417,4 +417,37 @@ void main() {
     expect([for (final e in opened) (e.mobileId, e.sessionId)], [(phone, id)]);
     expect(changes, 2);
   });
+
+  test('nextId: ids come from the given allocator', () async {
+    var next = 500;
+    final rig = SessionRig();
+    final manager = SessionManager(
+      ptyFactory: rig.factory,
+      shellResolver: const FixedShellResolver(),
+      homeDirectory: '/Users/test',
+      baseEnvironment: const {},
+      nextId: () => next++,
+    );
+    final sent = <OutboundMessage>[];
+    manager.outbound.listen(sent.add);
+    await manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+    await manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
+    expect(
+      sent.map((o) => o.message).whereType<SessionOpened>().map((m) => m.id),
+      [500, 501],
+    );
+  });
+
+  test('sessionInfos lists what session.list.result lists', () async {
+    final rig = SessionRig();
+    final id = await rig.open(phone);
+    expect(rig.manager.sessionInfos.single.id, id);
+    expect(rig.manager.sessionInfos.single.kind, SessionKind.shellx);
+    rig.clear();
+    await rig.manager.handle(phone, const SessionList());
+    expect(
+      rig.to(phone).single,
+      SessionListResult(rig.manager.sessionInfos),
+    );
+  });
 }
