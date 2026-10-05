@@ -20,8 +20,14 @@ class ConfirmPage extends StatelessWidget {
           Text(request.title, style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
           Expanded(
-            child: Text(request.body, style: theme.textTheme.bodyMedium),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                request.body,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
           ),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -33,10 +39,12 @@ class ConfirmPage extends StatelessWidget {
               const SizedBox(width: 8),
               FilledButton(
                 key: const Key('confirm.ok'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
-                ),
+                style: request.destructive
+                    ? FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
+                      )
+                    : null,
                 onPressed: () => request.complete(true),
                 child: Text(request.confirmLabel),
               ),

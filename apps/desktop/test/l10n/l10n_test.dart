@@ -56,6 +56,25 @@ void main() {
     expect(vi.notifyPaired('iPhone'), 'Đã ghép nối với iPhone');
     expect(vi.errorRateLimited, 'Thử lại sau ít phút.');
     expect(vi.notifyUpdateRequiredTitle, 'Cần cập nhật app');
+    // Terminal sharing, spec §7.6 and §10.3.
+    expect(
+      vi.trayTerminalSharing,
+      'Chia sẻ terminal với điện thoại (thử nghiệm)',
+    );
+    expect(vi.trayDesktopTerminals(3), 'Terminal trên máy tính (3)');
+    expect(vi.trayDisconnectPhone, 'Ngắt điện thoại');
+    expect(
+      vi.trayTerminalSharingNeedsSetup,
+      'Chia sẻ terminal cần thiết lập lại…',
+    );
+    expect(
+      vi.notifyDesktopTerminalWatched('Pixel', 'Terminal — vim'),
+      'Pixel đang xem terminal Terminal — vim',
+    );
+    expect(
+      vi.confirmAllowScriptsAction,
+      'Cho phép script cục bộ cho tài khoản của tôi',
+    );
   });
 
   test('plural and select messages render in both languages', () {

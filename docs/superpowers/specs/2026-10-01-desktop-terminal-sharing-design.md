@@ -463,7 +463,7 @@ Thanh phím phụ, chụm đổi cỡ chữ, copy/paste, khóa app và danh sác
 |---|---|
 | `~/.zshrc` | Tạo nếu chưa có |
 | `~/.bashrc`, `~/.bash_profile` | **Chỉ sửa file đã có.** Không bao giờ tạo `~/.bash_profile`: nếu có nó, bash login thôi đọc `~/.profile`. Không có file bash nào thì bỏ qua bash và nói rõ trong cửa sổ xác nhận |
-| Profile PowerShell 7 và 5.1 | Đường dẫn lấy bằng cách hỏi chính từng bản PowerShell đã cài (`-NoProfile -Command $PROFILE.CurrentUserAllHosts`), vì Documents có thể nằm trong OneDrive. Tạo nếu chưa có |
+| Profile PowerShell 7 và 5.1 | Đường dẫn lấy bằng cách hỏi chính từng bản PowerShell đã cài (`-NoProfile -Command $PROFILE.CurrentUserAllHosts`), vì Documents có thể nằm trong OneDrive. Tạo nếu chưa có. Khối đặt ngay sau phần mở đầu `using namespace/module/assembly` hoặc khối `param(…)` nếu có (các câu lệnh đó phải đứng đầu file), không thì ở đầu file |
 
 - **Chèn và gỡ đều không lặp:** chèn lại vẫn chỉ có một khối; gỡ chỉ xóa phần giữa hai dấu.
 - **Giữ nguyên** nội dung, bảng mã (UTF-8, UTF-8 BOM, UTF-16 LE/BE) và kiểu xuống dòng (LF/CRLF) sẵn có của file.

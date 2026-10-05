@@ -385,6 +385,113 @@ class AppLocalizationsEn extends AppLocalizations {
       'Signed out, but some saved sign-in data could not be deleted';
 
   @override
+  String get trayTerminalSharing => 'Share terminals with phone (experimental)';
+
+  @override
+  String trayDesktopTerminals(int count) {
+    return 'Computer terminals ($count)';
+  }
+
+  @override
+  String get trayDisconnectPhone => 'Disconnect phone';
+
+  @override
+  String get trayTerminalSharingNeedsSetup =>
+      'Terminal sharing needs to be set up again…';
+
+  @override
+  String notifyDesktopTerminalWatched(String device, String terminal) {
+    return '$device is viewing terminal $terminal';
+  }
+
+  @override
+  String get notifyTerminalSharingFailedTitle =>
+      'Could not turn on terminal sharing';
+
+  @override
+  String get notifyTerminalSharingFailedBody =>
+      'Nothing was changed. Try again.';
+
+  @override
+  String get notifyTerminalSharingStartFailedTitle =>
+      'Terminal sharing could not start';
+
+  @override
+  String get notifyTerminalSharingDisableIncompleteTitle =>
+      'Terminal sharing is off, but the ShellX block could not be removed from some files';
+
+  @override
+  String get confirmSharingTitle => 'Share terminals with your phone?';
+
+  @override
+  String get confirmSharingIntro =>
+      'Every terminal window you open from now on can be viewed and typed into from your paired phones. Windows that are already open are not shared.';
+
+  @override
+  String get confirmSharingFiles =>
+      'ShellX will change these files (each existing file is backed up once as <name>.shellx-backup):';
+
+  @override
+  String confirmSharingFileCreated(String path) {
+    return '$path (new file)';
+  }
+
+  @override
+  String confirmSharingBinary(String path) {
+    return 'and copy shellx-term to $path.';
+  }
+
+  @override
+  String get confirmSharingBashSkipped =>
+      'There is no ~/.bashrc or ~/.bash_profile, so bash windows are not shared.';
+
+  @override
+  String get confirmSharingMacNote =>
+      'Note: Terminal.app (and possibly iTerm2) will no longer ask for confirmation when you close a window that is running a command.';
+
+  @override
+  String get confirmSharingWindowsNote =>
+      'Each PowerShell window will open a little slower and use some extra memory.';
+
+  @override
+  String confirmSharingPowerShellBlocked(String name) {
+    return '$name: running scripts is not allowed, so its profile will not run until local scripts are allowed.';
+  }
+
+  @override
+  String confirmSharingPowerShellGroupPolicy(String name) {
+    return '$name: the script policy is set by your organization (Group Policy), so this PowerShell will not be shared.';
+  }
+
+  @override
+  String get confirmSharingNoPowerShell =>
+      'No PowerShell was found on this computer.';
+
+  @override
+  String get confirmSharingAction => 'Turn on';
+
+  @override
+  String get confirmAllowScriptsTitle => 'Allow local scripts?';
+
+  @override
+  String confirmAllowScriptsBody(String names) {
+    return '$names: running scripts is not allowed, so the ShellX block in the profile cannot run. This sets the policy to RemoteSigned for your account only (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned).';
+  }
+
+  @override
+  String get confirmAllowScriptsAction => 'Allow local scripts for my account';
+
+  @override
+  String notifyTerminalSharingFailedFile(String path) {
+    return 'ShellX could not change $path. Nothing was changed.';
+  }
+
+  @override
+  String notifyAllowScriptsFailedTitle(String name) {
+    return 'Could not allow local scripts for $name';
+  }
+
+  @override
   String get startupFailed =>
       'ShellX could not start. Open it again; if this keeps happening, restart your computer.';
 

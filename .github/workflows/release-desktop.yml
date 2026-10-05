@@ -64,6 +64,13 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      # flutter build macos builds shellx-term (term/) as a universal binary through an Xcode
+      # Run Script phase (apps/desktop/macos/scripts/build_shellx_term.sh), spec §4.
+      # Pinned like windows-check.yml, so a release builds with the toolchain the tests ran on.
+      - name: Rust 1.95.0 with the shellx-term targets (arm64 + x86_64)
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default 1.95.0
       - name: flutter build macos --release
         working-directory: apps/desktop
         run: flutter build macos --release
@@ -77,6 +84,16 @@ jobs:
           bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
           if [[ "$bundle_id" != "pro.shellx.desktop" ]]; then
             echo "::error::$app has bundle id '$bundle_id', expected pro.shellx.desktop"
+            exit 1
+          fi
+          helper="$app/Contents/Helpers/shellx-term"
+          if [[ ! -x "$helper" ]]; then
+            echo "::error::$helper not found (the Xcode phase must build shellx-term)"
+            exit 1
+          fi
+          archs="$(lipo -archs "$helper")"
+          if [[ " $archs " != *" arm64 "* || " $archs " != *" x86_64 "* ]]; then
+            echo "::error::$helper has architectures '$archs', expected arm64 and x86_64"
             exit 1
           fi
           echo "APP=$app" >> "$GITHUB_ENV"
@@ -145,6 +162,11 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      # Pinned like windows-check.yml; CMake builds shellx-term.exe with it.
+      - name: Rust 1.95.0 for shellx-term
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
       - name: flutter build windows --release
         working-directory: apps/desktop
         run: flutter build windows --release
@@ -152,6 +174,8 @@ jobs:
         run: |
           $release = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\build\windows\x64\runner\Release'
           if (-not (Test-Path (Join-Path $release 'ShellX.exe'))) { throw "ShellX.exe not found in $release (apps/desktop must build ShellX.exe)" }
+          # Spec §4: CMake builds shellx-term.exe with cargo and installs it next to ShellX.exe.
+          if (-not (Test-Path (Join-Path $release 'shellx-term.exe'))) { throw "shellx-term.exe not found in $release (apps/desktop/windows/CMakeLists.txt must build it)" }
           "RELEASE_DIR=$release" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Sign app binaries (Azure Artifact Signing)
         if: env.DRY_RUN == 'false'
@@ -208,7 +232,7 @@ jobs:
       - name: Verify Authenticode signatures
         if: env.DRY_RUN == 'false'
         run: |
-          foreach ($file in @($env:SETUP_EXE, (Join-Path $env:RELEASE_DIR 'ShellX.exe'))) {
+          foreach ($file in @($env:SETUP_EXE, (Join-Path $env:RELEASE_DIR 'ShellX.exe'), (Join-Path $env:RELEASE_DIR 'shellx-term.exe'))) {
             $signature = Get-AuthenticodeSignature -FilePath $file
             if ($signature.Status -ne 'Valid') { throw "$file signature status: $($signature.Status)" }
             Write-Host "$file signed by $($signature.SignerCertificate.Subject)"

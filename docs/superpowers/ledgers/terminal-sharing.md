@@ -353,6 +353,70 @@ Các việc nhỏ khác đã hoãn (không đánh dấu) nằm trong `.superpowe
 - Thẻ `TabDetached(terminalGone)`: hiện `terminal_tab_controller.dart:142` vẫn ánh xạ `terminal_gone` sang banner "đóng bởi máy chủ".
 - Điện thoại giành phiên (`taken_over`) khi phiên đang do điện thoại lái và cùng kích thước thì **không** nhận `session.driver` (`desktop_session_manager.dart:439`, `_drive` thoát sớm khi `!changed && driver == phone`): banner của P5 phải coi bên lái là "phone" ngay sau khi gắn.
 
+## P4 — phần desktop (2026-10-05)
+
+Nhánh `feat/p4-desktop` (cắt từ `main` đã có P1–P3). Plan: `docs/superpowers/plans/2026-10-05-terminal-sharing-p4-desktop.md`. Spec §4, §7.6, §10, §11.3, §12. Chỉ đổi `apps/desktop`, `release/`, `.github/workflows/`, `docs/`; `packages/*`, `term/`, `relay/`, `apps/mobile` không đổi.
+
+### Những gì P4 làm
+
+- `apps/desktop/lib/src/terminal_sharing/`: bộ sửa file cấu hình (UTF-8, UTF-8 BOM, UTF-16 LE/BE, bảng mã 8-bit giữ nguyên từng byte; LF/CRLF; chèn/gỡ không lặp; sao lưu một lần `<file>.shellx-backup`; sửa xuyên symlink; hoàn tác), đường dẫn `bin`/`term`/helper, chép và cập nhật `shellx-term` (Windows: đổi tên bản đang chạy thành `.old-<n>.exe`), dò PowerShell (profile `CurrentUserAllHosts` và chính sách script, Group Policy), bộ điều phối bật/tắt/kiểm tra/khởi động/gỡ, giới hạn thông báo 10 phút.
+- `CoreAgentRuntime`: một `TerminalSharing` trên `DesktopSessionManager` của nó; `SessionRouter(desktopSharing: () => sharing.enabled)`; `stop()` dừng chia sẻ sau `closeAll`.
+- `AgentController`: công tắc (setting `terminal_sharing_enabled`), bật có hoàn tác (lỗi ở cổng nội bộ → gỡ file, công tắc tắt), tắt, "cần thiết lập lại" lúc khởi động, cập nhật binary lúc khởi động, thông báo khi điện thoại gắn vào.
+- Menu: công tắc, "Terminal trên máy tính (N)" với "Ngắt điện thoại", dòng "⚠ Chia sẻ terminal cần thiết lập lại…"; cửa sổ xác nhận liệt kê đúng file, giới hạn, ghi chú R2 (macOS) hoặc chính sách script (Windows, thêm bước "Cho phép script cục bộ cho tài khoản của tôi").
+- `ShellX.exe --terminal-sharing-cleanup` (bộ gỡ Inno Setup gọi), build: Xcode Run Script `apps/desktop/macos/scripts/build_shellx_term.sh` (Debug: kiến trúc máy; Release: universal), CMake `shellx_term` (`+crt-static`); ký: `sign-app.sh` ký `Contents/Helpers/*` trước app; `release-desktop.yml` kiểm helper và Authenticode của `shellx-term.exe`; job `desktop` mới trong `windows-check.yml`.
+
+### Test (cổng cuối)
+
+| Gói | Kết quả |
+|---|---|
+| `apps/desktop` | 372 xanh (đường cơ sở 269), `flutter analyze` sạch |
+| `release/tests` (`node --test`) | 28 xanh |
+
+Gồm một e2e macOS thật trong HOME tạm (`test/terminal_sharing/end_to_end_macos_test.dart`): bộ cài chép `shellx-term` thật và ghi khối zsh, một `zsh -il` thật trong PTY (`script(1)`) chạy khối, `exec` `shellx-term`, hiện thành phiên `desktop` trong `CoreAgentRuntime` thật (app "Terminal", shell "zsh"), `.zshrc` của người dùng vẫn chạy bên trong, `closeAllSessions`/`closeSession` không đụng terminal, `exit 3` truyền đúng mã, tắt thì `.zshrc` trở về như cũ. `flutter build macos --debug` chạy được: `ShellX.app/Contents/Helpers/shellx-term` (arm64, ký ad hoc + runtime, `codesign --verify --deep --strict` qua).
+
+### Rulings
+
+- Ruling: máy chủ nội bộ chạy theo vòng đời runtime (đăng nhập + "Cho phép truy cập từ xa" bật); tắt truy cập từ xa hoặc đăng xuất thì đóng cổng, xóa `endpoint`, các `shellx-term` tự thử lại — `DesktopSessionManager` và `SessionRouter` thuộc runtime, không có điện thoại nào dùng được phiên khi không có runtime — cái giá nếu sai: menu không liệt kê terminal khi truy cập từ xa tắt; muốn liệt kê thì phải đưa `DesktopSessionManager` ra ngoài runtime.
+- Ruling: công tắc chỉ nằm trong menu khi đã đăng nhập (nhóm cài đặt, sau "Khởi động cùng hệ thống") — menu lúc chưa đăng nhập chỉ có Đăng nhập/Thoát — cái giá nếu sai: thêm một dòng vào menu chưa đăng nhập.
+- Ruling: cập nhật binary lúc khởi động so theo **nội dung file** (cùng nội dung ⇔ cùng `--version` và cùng hash), không chạy `--version` — gọn hơn và không chạy binary trong `bin` — cái giá nếu sai: không có (so byte chặt hơn so hash).
+- Ruling: "cần thiết lập lại" cũng bật khi khối trong file **khác** khối hiện tại (bản ShellX mới đổi khối) hoặc khi có thêm `~/.bashrc`/`~/.bash_profile` sau khi bật — cả hai đều làm cửa sổ mới không được bọc đúng; bấm dòng cảnh báo là chạy lại luồng bật — cái giá nếu sai: cảnh báo hơi nhiều với người hay tạo file bash.
+- Ruling: file cấu hình là symlink (dotfiles) thì sửa tại chỗ file đích, giữ symlink; ghi thẳng vào file (không ghi file tạm rồi đổi tên) để giữ inode, quyền và symlink; bản sao lưu đặt cạnh tên file người dùng thấy — đổi tên đè sẽ biến symlink thành file thường — cái giá nếu sai: ghi bị ngắt giữa chừng có thể để file dở (đã có bản sao lưu).
+- Ruling: file không phải UTF-8/UTF-16 có BOM được giữ **từng byte** (đọc như latin1; khối chỉ gồm ASCII) — Windows PowerShell 5.1 đọc file không BOM theo bảng mã hệ thống — cái giá nếu sai: UTF-16 không BOM không nhận ra (hiếm).
+- Ruling: nút "Cho phép script cục bộ cho tài khoản của tôi" là cửa sổ xác nhận thứ hai ngay sau cửa sổ bật (chỉ khi có PowerShell bị chặn mà sửa được); từ chối thì vẫn bật — `ConfirmRequest` chỉ có hai nút, thêm nút thứ ba phải viết lại trang — cái giá nếu sai: thêm một bước bấm.
+- Ruling: profile của bản PowerShell bị Group Policy chặn không bị sửa (cửa sổ xác nhận nói bản đó không được chia sẻ); profile bị chặn nhưng sửa được thì vẫn được chèn khối — sẽ chạy ngay khi chính sách đổi — cái giá nếu sai: một profile có khối không bao giờ chạy.
+- Ruling: tắt không hỏi xác nhận — tắt không phá gì (terminal vẫn chạy), spec §10.5 không yêu cầu — cái giá nếu sai: điện thoại đang xem bị ngắt khi bấm nhầm.
+- Ruling: `shellx-term uninstall` (spec §5.1, §10.6 macOS) **chưa làm**: nằm trong `term/src`, ngoài phạm vi được phép của P4; mục FAQ shellx.pro (§10.6) là thay đổi `web/`, cũng ngoài phạm vi — cái giá nếu sai: trên macOS người dùng xóa ShellX.app mà không tắt trước thì phải tự xóa khối (vô hại, §5.4).
+- Ruling: Release build macOS cần cả hai target Rust; máy dev chỉ có `aarch64-apple-darwin` nên chỉ kiểm được Debug; `release-desktop.yml` thêm `rustup target add …` — không được cài thêm gì toàn cục — cái giá nếu sai: lần phát hành đầu lỗi ở bước build nếu runner thiếu `lipo`/target (đã có bước kiểm).
+- Ruling: e2e macOS của P4 là test của `apps/desktop` (HOME tạm, `script(1)` thay cửa sổ Terminal.app); bỏ qua kèm lý do khi chưa build `shellx-term` — chạy thật trên máy dev, không đụng file của người dùng — cái giá nếu sai: máy không có binary build sẵn thì test này không chạy.
+
+### Việc chờ người dùng
+
+- Bật thử từ menu trên máy thật (sửa `~/.zshrc` thật), mở cửa sổ Terminal.app mới, xem trên điện thoại (cần P5), kiểm §11.6 phần macOS.
+- `flutter build macos --release` trên máy có cả hai target Rust (hoặc chạy `release-desktop.yml` dry run) để thấy helper universal và `sign-app.sh` ký helper.
+- Windows: đẩy `windows-check/p4` để chạy job `desktop` (test bộ cài + `flutter build windows` có `shellx-term.exe`); kiểm tương tác vẫn là việc chờ (§12), công tắc vẫn ẩn trừ khi có `SHELLX_EXPERIMENTAL=terminal-sharing`.
+- `shellx-term uninstall` và mục FAQ (§10.6): giao cho một lượt `term/` + `web/`.
+
+### Lượt sửa sau review P4 (2026-10-05)
+
+Review "with fixes", không có Critical. Tất cả 14 mục đã sửa trong một lượt; `apps/desktop` 398 xanh (372 trước lượt sửa), `release/tests` 28 xanh, `flutter analyze` sạch.
+
+- Bản sao lưu mang quyền của file gốc (file 0600 → bản sao lưu 0600), quyền đặt trước khi ghi byte nào.
+- `install()` tự dọn khi ghi lỗi: trả lại nội dung cũ nếu đã bắt đầu ghi, xóa bản sao lưu do chính lần gọi đó tạo, xóa file mới ghi dở (test: file 0444).
+- PowerShell: khối đặt ngay sau phần mở đầu `using …` / `param(…)` (spec §10.2 đã thêm một dòng); gỡ vẫn theo dấu.
+- Windows: công tắc hiện khi có cờ **hoặc** setting đang bật (khởi động cùng hệ thống không có cờ vẫn tắt được, vẫn cập nhật `bin`).
+- Bật/tắt chờ lượt kiểm tra lúc khởi động xong mới chạy.
+- Ghi nhớ các file đã sửa (setting `terminal_sharing_files`); tắt và `--terminal-sharing-cleanup` gỡ ở hợp của file đã nhớ và file dò được; file còn khối thì `complete` là false và được nhớ lại.
+- Symlink hỏng: `.bashrc`/`.bash_profile` coi như không có; `.zshrc` bị từ chối, thông báo nêu tên file. Thông báo lỗi khi bật nêu file hỏng (`SharingSetupException.path`).
+- Chép binary lỗi sau khi đã tạo `bin` thì xóa `bin`; provider bị hủy giữa lúc bật thì hoàn tác; đổi chính sách script thất bại thì báo; bộ giới hạn thông báo xóa khi đổi runtime; dò PowerShell có hạn 10 giây và giết tiến trình; `release-desktop.yml` ghim Rust 1.95.0.
+- Ruling: chèn sau `using` chỉ áp cho file `.ps1`, và đặt ngay sau dòng `using`/khối `param` cuối cùng (không sau các dòng chú thích theo sau) — không có phần mở đầu thì khối vẫn ở byte 0 như trước — cái giá nếu sai: một file kết thúc bằng dòng `using` không có xuống dòng được thêm một dấu xuống dòng mà lúc gỡ không lấy lại.
+- Ruling: bản sao lưu lấy đúng quyền của file gốc (không ép 0600) — file 0644 thì bản sao lưu lộ đúng bằng file gốc — cái giá nếu sai: không có.
+
+**Ghi lại, không sửa (theo review):**
+- Bước CMake giả định thư mục target mặc định `term/target`; ai đặt `CARGO_TARGET_DIR` thì bước `install(FILES …)` không thấy `shellx-term.exe`. Tương tự script Xcode.
+- Người dùng đặt `ZDOTDIR` trong `~/.zshenv`: zsh đọc `$ZDOTDIR/.zshrc`, không phải `~/.zshrc`, nên khối không chạy và "cần thiết lập lại" không phát hiện. Cần một mục FAQ (cùng lượt với mục FAQ §10.6).
+- File chỉ dùng CR (Mac cổ) không được nhận ra kiểu xuống dòng; khối ghi bằng LF.
+- Hoàn tác một profile PowerShell vừa tạo chỉ xóa file, để lại thư mục `Documents\PowerShell` vừa tạo.
+
 ## P5 — mobile (2026-10-05)
 
 Nhánh `feat/p5-mobile` (cắt từ `main`, đã có P1–P3). Plan: `docs/superpowers/plans/2026-10-05-terminal-sharing-p5-mobile.md`. Phần mobile của spec §9 và test §11.5. Chỉ đổi `apps/mobile` và file thiết kế. `packages/shellx_client` không đổi vì không thiếu gì.

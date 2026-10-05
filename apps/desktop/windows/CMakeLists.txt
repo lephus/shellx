@@ -52,6 +52,26 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# shellx-term (terminal sharing, spec sections 4 and 10.4): cargo builds it from term/ (statically linked
+# CRT, so it needs no VCRUNTIME next to it) and the install step puts it next to ShellX.exe.
+set(SHELLX_TERM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../term")
+set(SHELLX_TERM_RUST_TARGET "x86_64-pc-windows-msvc")
+set(SHELLX_TERM_EXE "${SHELLX_TERM_DIR}/target/${SHELLX_TERM_RUST_TARGET}/release/shellx-term.exe")
+find_program(SHELLX_CARGO cargo HINTS "$ENV{CARGO_HOME}/bin" "$ENV{USERPROFILE}/.cargo/bin")
+if(NOT SHELLX_CARGO)
+  message(FATAL_ERROR "cargo not found: install Rust (https://rustup.rs) to build shellx-term")
+endif()
+add_custom_target(shellx_term ALL
+  COMMAND ${CMAKE_COMMAND} -E env "RUSTFLAGS=-C target-feature=+crt-static"
+    "${SHELLX_CARGO}" build --release --locked
+    --manifest-path "${SHELLX_TERM_DIR}/Cargo.toml"
+    --target ${SHELLX_TERM_RUST_TARGET}
+  WORKING_DIRECTORY "${SHELLX_TERM_DIR}"
+  COMMENT "Building shellx-term with cargo"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} shellx_term)
+
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
@@ -79,6 +99,9 @@ install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}
   COMPONENT Runtime)
 
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
+install(FILES "${SHELLX_TERM_EXE}" DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
 if(PLUGIN_BUNDLED_LIBRARIES)

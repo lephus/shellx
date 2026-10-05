@@ -10,7 +10,10 @@ abstract interface class WindowHost {
 }
 
 Size windowSizeFor(WindowState state) {
-  if (state.confirm != null) return const Size(440, 260);
+  final confirm = state.confirm;
+  if (confirm != null) {
+    return confirm.long ? const Size(560, 560) : const Size(440, 260);
+  }
   return switch (state.route) {
     LoginRoute() => const Size(440, 620),
     OnboardingRoute() => const Size(520, 660),

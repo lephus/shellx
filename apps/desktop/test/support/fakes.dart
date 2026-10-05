@@ -16,6 +16,10 @@ import 'package:shellx_desktop/src/platform/launch_at_login.dart';
 import 'package:shellx_desktop/src/platform/notifier.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/platform/url_opener.dart';
+import 'package:shellx_desktop/src/terminal_sharing/config_file_editor.dart';
+import 'package:shellx_desktop/src/terminal_sharing/powershell.dart';
+import 'package:shellx_desktop/src/terminal_sharing/sharing_paths.dart';
+import 'package:shellx_desktop/src/terminal_sharing/terminal_sharing_setup.dart';
 
 /// In-process stand-in for the relay REST API (spec §10.2 wire format).
 final class FakeRelayApi {
@@ -175,6 +179,140 @@ final class FakeAgentRuntime implements AgentRuntime {
   void closeAllSessions() => closedAll = true;
   @override
   void reconnectNow() => reconnects++;
+
+  final StreamController<DesktopPhoneAttached> attachedController =
+      StreamController<DesktopPhoneAttached>.broadcast(sync: true);
+  List<DesktopSessionSummary> currentDesktopSessions = [];
+  bool sharing = false;
+
+  /// Calls of [setTerminalSharing], in order.
+  final List<bool> sharingCalls = [];
+
+  /// Makes `setTerminalSharing(true)` throw (the port cannot be opened).
+  bool failSharingStart = false;
+  final List<int> disconnectedPhones = [];
+
+  @override
+  List<DesktopSessionSummary> get desktopSessions => currentDesktopSessions;
+  @override
+  Stream<DesktopPhoneAttached> get desktopPhoneAttached =>
+      attachedController.stream;
+  @override
+  bool get terminalSharing => sharing;
+  @override
+  Future<void> setTerminalSharing(bool enabled) async {
+    sharingCalls.add(enabled);
+    if (enabled && failSharingStart) {
+      throw const SocketException('bind failed');
+    }
+    sharing = enabled;
+  }
+
+  @override
+  void disconnectDesktopPhone(int id) => disconnectedPhones.add(id);
+}
+
+/// Records what the controller asks of the installer; touches no file.
+final class FakeSharingSetup extends TerminalSharingSetup {
+  FakeSharingSetup({bool windows = false})
+    : super(
+        paths: SharingPaths(
+          windows: windows,
+          home: '/Users/phu',
+          binDir: '/Users/phu/Library/Application Support/ShellX/bin',
+          binary:
+              '/Users/phu/Library/Application Support/ShellX/bin/shellx-term',
+          termDir: '/Users/phu/Library/Application Support/ShellX/term',
+          bundledBinary:
+              '/Applications/ShellX.app/Contents/Helpers/shellx-term',
+        ),
+      );
+
+  final List<String> calls = [];
+  bool failEnable = false;
+  bool needsSetupResult = false;
+  List<String> failedFiles = [];
+  SharingPlan plan = const SharingPlan(
+    files: [
+      PlannedFile(
+        ConfigTarget(
+          path: '/Users/phu/.zshrc',
+          block: 'block',
+          create: true,
+          newFileEol: '\n',
+        ),
+        exists: true,
+      ),
+    ],
+    bashSkipped: true,
+    powerShells: [],
+  );
+
+  @override
+  Future<SharingPlan> prepare() async {
+    calls.add('prepare');
+    return plan;
+  }
+
+  @override
+  Future<SharingInstall> enable(SharingPlan plan) async {
+    calls.add('enable');
+    await enableGate?.future;
+    if (failEnable) {
+      throw const SharingSetupException(
+        '/Users/phu/.zshrc',
+        FileSystemException('denied'),
+      );
+    }
+    return SharingInstall(
+      () async => calls.add('undo'),
+      editedFiles: [for (final f in plan.files) f.path],
+    );
+  }
+
+  /// The knownFiles of the last disable.
+  List<String> disableKnownFiles = [];
+
+  @override
+  Future<DisableResult> disable({
+    Future<void> Function()? stopServer,
+    List<String> knownFiles = const [],
+  }) async {
+    calls.add('disable');
+    disableKnownFiles = knownFiles;
+    await stopServer?.call();
+    calls.add('disabled');
+    return DisableResult(failedFiles: failedFiles, binRemoved: true);
+  }
+
+  @override
+  Future<bool> needsSetup() async {
+    calls.add('needsSetup');
+    return needsSetupResult;
+  }
+
+  /// While set and not completed, [enable] waits for it.
+  Completer<void>? enableGate;
+
+  /// While set and not completed, [maintain] waits for it.
+  Completer<void>? maintainGate;
+
+  @override
+  Future<void> maintain({required bool enabled}) async {
+    calls.add('maintain:$enabled');
+    await maintainGate?.future;
+    calls.add('maintained');
+  }
+
+  final List<PowerShellInstall> allowedScripts = [];
+
+  bool allowScriptsResult = true;
+
+  @override
+  Future<bool> allowLocalScripts(PowerShellInstall install) async {
+    allowedScripts.add(install);
+    return allowScriptsResult;
+  }
 }
 
 final class RecordingKeepAwake implements KeepAwake {
@@ -303,6 +441,7 @@ final class TestHarness {
     Locale locale = const Locale('en'),
     this.appVersion = '1.0.0',
     this.platform = DevicePlatform.macos,
+    this.sharingSetup,
   }) : settings = InMemorySettingsStore(settings),
        l10n = lookupAppLocalizations(locale);
 
@@ -317,6 +456,15 @@ final class TestHarness {
   final String appVersion;
   final DevicePlatform platform;
   final List<FakeAgentRuntime> runtimes = [];
+
+  /// Null: the terminal-sharing switch is not offered.
+  final FakeSharingSetup? sharingSetup;
+
+  /// New runtimes fail to open the terminal-sharing port.
+  bool sharingStartFails = false;
+
+  /// The clock DesktopServices.now reads.
+  DateTime now = DateTime(2026, 10, 5, 12);
   int quits = 0;
 
   /// Calls of DesktopServices.awaitPtyKills.
@@ -359,7 +507,8 @@ final class TestHarness {
       return created;
     },
     runtimeFactory: (params) {
-      final runtime = FakeAgentRuntime(params);
+      final runtime = FakeAgentRuntime(params)
+        ..failSharingStart = sharingStartFails;
       runtimes.add(runtime);
       return runtime;
     },
@@ -378,6 +527,8 @@ final class TestHarness {
       return ptyKills();
     },
     ptyKillTimeout: ptyKillTimeout,
+    terminalSharing: sharingSetup,
+    now: () => now,
   );
 
   /// Stores credentials as a previous successful login would have.

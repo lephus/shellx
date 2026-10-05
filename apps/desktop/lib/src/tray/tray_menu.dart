@@ -3,6 +3,7 @@ import 'package:tray_manager/tray_manager.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../agent/agent_state.dart';
+import '../terminal_sharing/attach_throttle.dart';
 import 'tray_action.dart';
 
 enum TrayIconState { normal, offline, active }
@@ -124,6 +125,24 @@ Menu buildTrayMenu(
               item(TrayKeys.revoke(d.mobileId), l10n.trayRevoke),
             ]),
         ];
+  final sharing = state.terminalSharing;
+  final terminalItems = [
+    for (final t in sharing.sessions)
+      sub(
+        TrayKeys.desktopTerminal(t.id),
+        t.attachedMobileId == null
+            ? desktopTerminalLabel(t)
+            : '${desktopTerminalLabel(t)} 📱',
+        [
+          // Spec §7.6: no item ends the terminal.
+          item(
+            TrayKeys.disconnectPhone(t.id),
+            l10n.trayDisconnectPhone,
+            disabled: t.attachedMobileId == null,
+          ),
+        ],
+      ),
+  ];
   final update = state.update;
   // Binding ruling (Task 8): spec §12 forbids automatic reconnect after a
   // 4001 (`replaced`) close, so the tray offers this explicit way back.
@@ -143,6 +162,13 @@ Menu buildTrayMenu(
         sessionItems,
         disabled: state.sessions.isEmpty,
       ),
+      if (sharing.available && sharing.enabled)
+        sub(
+          TrayKeys.desktopTerminals,
+          l10n.trayDesktopTerminals(sharing.sessions.length),
+          terminalItems,
+          disabled: sharing.sessions.isEmpty,
+        ),
       item(TrayKeys.pair, l10n.trayPairPhone, disabled: !state.remoteAccess),
       sub(TrayKeys.devices, l10n.trayPairedDevices, deviceItems),
       sep(),
@@ -152,6 +178,19 @@ Menu buildTrayMenu(
         l10n.trayLaunchAtStartup,
         state.launchAtStartup,
       ),
+      if (sharing.available)
+        check(
+          TrayKeys.terminalSharing,
+          l10n.trayTerminalSharing,
+          sharing.enabled,
+          disabled: sharing.busy,
+        ),
+      if (sharing.available && sharing.enabled && sharing.needsSetup)
+        item(
+          TrayKeys.terminalSharingSetup,
+          '⚠ ${l10n.trayTerminalSharingNeedsSetup}',
+          disabled: sharing.busy,
+        ),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
       item(TrayKeys.quit, l10n.trayQuit),

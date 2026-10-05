@@ -28,6 +28,14 @@ while IFS= read -r -d '' item; do
   sign "$item"
 done < <(find "$app/Contents" -depth -type d \( -name '*.framework' -o -name '*.app' -o -name '*.xpc' \) -print0)
 
-# 3. The app itself, with its entitlements.
+# 3. Helper executables in Contents/Helpers (spec §10.7: shellx-term, which terminal sharing copies
+#    out of the app and runs in every shared terminal window). Before the app, which seals them.
+if [[ -d "$app/Contents/Helpers" ]]; then
+  while IFS= read -r -d '' item; do
+    sign "$item"
+  done < <(find "$app/Contents/Helpers" -type f -perm -u+x -print0)
+fi
+
+# 4. The app itself, with its entitlements.
 sign --entitlements "$entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"

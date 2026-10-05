@@ -6,6 +6,46 @@ import 'update_check.dart';
 
 enum AuthPhase { loading, signedOut, signedIn }
 
+/// The terminal-sharing part of the tray (spec §7.6).
+final class TerminalSharingView {
+  const TerminalSharingView({
+    this.available = false,
+    this.enabled = false,
+    this.busy = false,
+    this.needsSetup = false,
+    this.sessions = const <DesktopSessionSummary>[],
+  });
+
+  /// The switch is shown (macOS; Windows only with the experimental flag).
+  final bool available;
+
+  /// The switch (remembered across restarts).
+  final bool enabled;
+
+  /// Turning on or off is in progress.
+  final bool busy;
+
+  /// On, but a block or `shellx-term` is missing ("set up again").
+  final bool needsSetup;
+
+  /// Shared terminals; empty without a runtime.
+  final List<DesktopSessionSummary> sessions;
+
+  TerminalSharingView copyWith({
+    bool? available,
+    bool? enabled,
+    bool? busy,
+    bool? needsSetup,
+    List<DesktopSessionSummary>? sessions,
+  }) => TerminalSharingView(
+    available: available ?? this.available,
+    enabled: enabled ?? this.enabled,
+    busy: busy ?? this.busy,
+    needsSetup: needsSetup ?? this.needsSetup,
+    sessions: sessions ?? this.sessions,
+  );
+}
+
 const Object _unset = Object();
 
 /// Everything the tray and the windows render. Immutable.
@@ -24,6 +64,7 @@ final class AgentViewState {
     this.trusted = const <TrustedDevice>[],
     this.pairing,
     this.update,
+    this.terminalSharing = const TerminalSharingView(),
   });
 
   final AuthPhase phase;
@@ -43,6 +84,7 @@ final class AgentViewState {
   final List<TrustedDevice> trusted;
   final PairingView? pairing;
   final UpdateNotice? update;
+  final TerminalSharingView terminalSharing;
 
   bool get signedIn => phase == AuthPhase.signedIn;
 
@@ -60,6 +102,7 @@ final class AgentViewState {
     List<TrustedDevice>? trusted,
     Object? pairing = _unset,
     Object? update = _unset,
+    TerminalSharingView? terminalSharing,
   }) {
     return AgentViewState(
       phase: phase ?? this.phase,
@@ -77,6 +120,7 @@ final class AgentViewState {
           ? this.pairing
           : pairing as PairingView?,
       update: identical(update, _unset) ? this.update : update as UpdateNotice?,
+      terminalSharing: terminalSharing ?? this.terminalSharing,
     );
   }
 }

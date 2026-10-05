@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../platform/settings_store.dart';
 import '../platform/wake_detector.dart';
+import '../terminal_sharing/attach_throttle.dart';
+import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_runtime.dart';
 import 'agent_state.dart';
 import 'desktop_services.dart';
@@ -48,6 +50,11 @@ class AgentController extends Notifier<AgentViewState> {
   /// The one [bootstrap] run.
   Future<void>? _bootstrap;
 
+  /// The startup check of terminal sharing (binary update, "set up again").
+  Future<void>? _sharingCheck;
+  late final AttachNotificationThrottle _attachThrottle =
+      AttachNotificationThrottle(now: () => _s.now());
+
   /// The signed-in account, set with the stored copy by [bootstrap] and
   /// [signIn] and dropped as soon as a sign-out starts. A runtime starts
   /// only from these, synchronously, so there is never a second runtime and
@@ -71,6 +78,10 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Visible for tests.
   AgentRuntime? get runtime => _runtime;
+
+  /// The startup check of terminal sharing [bootstrap] started, if any.
+  @visibleForTesting
+  Future<void>? get terminalSharingCheck => _sharingCheck;
 
   /// Loads settings and stored credentials; starts the agent when signed in
   /// and remote access is on; schedules update checks (startup + every 24 h).
@@ -101,6 +112,19 @@ class AgentController extends Notifier<AgentViewState> {
         defaultValue: false,
       ),
     );
+    final sharingSetup = _s.terminalSharing;
+    if (sharingSetup != null) {
+      state = state.copyWith(
+        terminalSharing: state.terminalSharing.copyWith(
+          available: true,
+          enabled: settings.getBool(
+            SettingKeys.terminalSharing,
+            defaultValue: false,
+          ),
+        ),
+      );
+      _sharingCheck = _checkTerminalSharing(sharingSetup);
+    }
     if (state.onboardingDone) {
       try {
         final enabled = await _s.launchAtLogin.isEnabled();
@@ -371,6 +395,107 @@ class AgentController extends Notifier<AgentViewState> {
 
   void closeSession(int id) => _runtime?.closeSession(id);
 
+  /// What turning terminal sharing on would change (the confirmation);
+  /// null where the switch is not offered.
+  Future<SharingPlan?> prepareTerminalSharing() async =>
+      _s.terminalSharing?.prepare();
+
+  /// Spec §10.1 step 2: installs `shellx-term` and the blocks, then starts
+  /// the local server when a runtime runs. Any failure undoes what was done,
+  /// leaves the switch off and notifies. Never throws; false when it did
+  /// not turn on.
+  Future<bool> enableTerminalSharing(SharingPlan plan) async {
+    final setup = _s.terminalSharing;
+    if (setup == null || state.terminalSharing.busy) return false;
+    _updateSharing((v) => v.copyWith(busy: true));
+    try {
+      await _settleSharingCheck();
+      final SharingInstall install;
+      try {
+        install = await setup.enable(plan);
+      } catch (error) {
+        debugPrint(
+          'ShellX: enabling terminal sharing failed: '
+          '${error.runtimeType}',
+        );
+        await _notifySharingFailed(
+          error is SharingSetupException ? error.path : null,
+        );
+        return false;
+      }
+      if (!ref.mounted) {
+        await install.undo();
+        return false;
+      }
+      // On before the server starts, so a runtime starting meanwhile also
+      // starts sharing.
+      _updateSharing((v) => v.copyWith(enabled: true, needsSetup: false));
+      try {
+        await _runtime?.setTerminalSharing(true);
+        await _s.settings.setStrings(
+          SettingKeys.terminalSharingFiles,
+          {
+            ..._s.settings.getStrings(SettingKeys.terminalSharingFiles),
+            ...install.editedFiles,
+          }.toList(),
+        );
+        await _s.settings.setBool(SettingKeys.terminalSharing, true);
+      } catch (error) {
+        debugPrint(
+          'ShellX: starting terminal sharing failed: '
+          '${error.runtimeType}',
+        );
+        _updateSharing((v) => v.copyWith(enabled: false));
+        await _bestEffort(() async => _runtime?.setTerminalSharing(false));
+        await install.undo();
+        await _notifySharingFailed();
+        return false;
+      }
+      _refreshSessions();
+      return true;
+    } finally {
+      _updateSharing((v) => v.copyWith(busy: false));
+    }
+  }
+
+  /// Spec §10.5: removes the blocks, stops the local server (phones on
+  /// desktop terminals get `closed_by_host`; the windows keep running),
+  /// deletes `bin`. Never throws; a file it could not clean is notified.
+  Future<void> disableTerminalSharing() async {
+    final setup = _s.terminalSharing;
+    if (setup == null || state.terminalSharing.busy) return;
+    _updateSharing(
+      (v) => v.copyWith(busy: true, enabled: false, needsSetup: false),
+    );
+    try {
+      await _settleSharingCheck();
+      final result = await setup.disable(
+        stopServer: () async => _runtime?.setTerminalSharing(false),
+        knownFiles: _s.settings.getStrings(SettingKeys.terminalSharingFiles),
+      );
+      await _saveSetting(SettingKeys.terminalSharing, false);
+      // Remember only what still has a block, for the next disable.
+      await _bestEffort(
+        () => _s.settings.setStrings(
+          SettingKeys.terminalSharingFiles,
+          result.failedFiles,
+        ),
+      );
+      _refreshSessions();
+      if (result.failedFiles.isNotEmpty) {
+        await _notify(
+          title: _s.l10n.notifyTerminalSharingDisableIncompleteTitle,
+          body: result.failedFiles.join('\n'),
+        );
+      }
+    } finally {
+      _updateSharing((v) => v.copyWith(busy: false));
+    }
+  }
+
+  /// Tray "Disconnect phone" on a desktop terminal (spec §7.6).
+  void disconnectDesktopPhone(int id) => _runtime?.disconnectDesktopPhone(id);
+
   void closeAllSessions() => _runtime?.closeAllSessions();
 
   /// Called by [WakeDetector] after the computer slept: retry now instead of
@@ -479,17 +604,41 @@ class AgentController extends Notifier<AgentViewState> {
       ),
     );
     _runtime = runtime;
+    _attachThrottle.clear();
     _runtimeSubscriptions.addAll([
       runtime.relayStates.listen(_onRelayState),
       runtime.events.listen(_onAgentEvent),
       runtime.sessionChanges.listen((_) => _refreshSessions()),
+      runtime.desktopPhoneAttached.listen(_onDesktopPhoneAttached),
     ]);
     state = state.copyWith(
       relay: runtime.relayState,
       sessions: runtime.sessions,
       activeChannels: 0,
+      terminalSharing: state.terminalSharing.copyWith(
+        sessions: runtime.desktopSessions,
+      ),
     );
     await runtime.start();
+    if (state.terminalSharing.enabled && _s.terminalSharing != null) {
+      await _startSharing(runtime);
+    }
+  }
+
+  /// The switch is on and a runtime started: open the local server. A
+  /// failure (port refused) is notified; the switch stays on and the next
+  /// runtime tries again.
+  Future<void> _startSharing(AgentRuntime runtime) async {
+    try {
+      await runtime.setTerminalSharing(true);
+    } catch (error) {
+      debugPrint(
+        'ShellX: terminal sharing did not start: '
+        '${error.runtimeType}',
+      );
+      if (!identical(_runtime, runtime)) return;
+      await _notify(title: _s.l10n.notifyTerminalSharingStartFailedTitle);
+    }
   }
 
   /// Closes every session and disconnects. The runtime is detached and
@@ -512,6 +661,9 @@ class AgentController extends Notifier<AgentViewState> {
         sessions: const <SessionSummary>[],
         activeChannels: 0,
         pairing: null,
+        terminalSharing: state.terminalSharing.copyWith(
+          sessions: const <DesktopSessionSummary>[],
+        ),
       );
     }
     final stopping = _bestEffort(runtime.stop);
@@ -684,7 +836,66 @@ class AgentController extends Notifier<AgentViewState> {
   void _refreshSessions() {
     final runtime = _runtime;
     if (runtime == null || !ref.mounted) return;
-    state = state.copyWith(sessions: runtime.sessions);
+    state = state.copyWith(
+      sessions: runtime.sessions,
+      terminalSharing: state.terminalSharing.copyWith(
+        sessions: runtime.desktopSessions,
+      ),
+    );
+  }
+
+  void _updateSharing(
+    TerminalSharingView Function(TerminalSharingView view) change,
+  ) {
+    if (!ref.mounted) return;
+    state = state.copyWith(terminalSharing: change(state.terminalSharing));
+  }
+
+  /// At startup (spec §10.4, §7.6): keeps `shellx-term` in `bin` current
+  /// (or finishes removing it), then checks whether the blocks and the
+  /// binary are still in place. Never touches startup files. Never throws.
+  Future<void> _checkTerminalSharing(TerminalSharingSetup setup) async {
+    final enabled = state.terminalSharing.enabled;
+    await setup.maintain(enabled: enabled);
+    if (!enabled) return;
+    final needsSetup = await setup.needsSetup();
+    if (!ref.mounted || !state.terminalSharing.enabled) return;
+    _updateSharing((v) => v.copyWith(needsSetup: needsSetup));
+  }
+
+  /// Names the file that could not be changed, when known.
+  Future<void> _notifySharingFailed([String? path]) => _notify(
+    title: _s.l10n.notifyTerminalSharingFailedTitle,
+    body: path == null
+        ? _s.l10n.notifyTerminalSharingFailedBody
+        : _s.l10n.notifyTerminalSharingFailedFile(path),
+  );
+
+  /// Turning on or off waits for the startup check (binary update, health)
+  /// so the two never work on `bin` at the same time.
+  Future<void> _settleSharingCheck() async {
+    try {
+      await _sharingCheck;
+    } catch (_) {
+      // The check never throws; nothing to wait for otherwise.
+    }
+  }
+
+  /// Spec §7.6: "{phone} is viewing terminal {app — title}", at most once
+  /// per (phone, terminal) in 10 minutes.
+  void _onDesktopPhoneAttached(DesktopPhoneAttached event) {
+    if (!ref.mounted) return;
+    if (!_attachThrottle.allow(event.mobileId, event.sessionId)) return;
+    final sessions = _runtime?.desktopSessions ?? const [];
+    final session = sessions.where((s) => s.id == event.sessionId);
+    final label = session.isEmpty
+        ? 'Terminal'
+        : desktopTerminalLabel(session.first);
+    final phones = state.trusted.where((d) => d.mobileId == event.mobileId);
+    final name = phones.isEmpty ? event.mobileId : phones.first.name;
+    unawaited(
+      _notify(title: _s.l10n.notifyDesktopTerminalWatched(name, label)),
+    );
   }
 
   /// Never throws: an unreadable store keeps the last list on screen.

@@ -191,6 +191,78 @@
   },
   "notifyStorageUnreadableTitle": "ShellX could not read your saved sign-in",
   "notifySignOutIncompleteTitle": "Signed out, but some saved sign-in data could not be deleted",
+  "trayTerminalSharing": "Share terminals with phone (experimental)",
+  "trayDesktopTerminals": "Computer terminals ({count})",
+  "@trayDesktopTerminals": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "trayDisconnectPhone": "Disconnect phone",
+  "trayTerminalSharingNeedsSetup": "Terminal sharing needs to be set up again…",
+  "notifyDesktopTerminalWatched": "{device} is viewing terminal {terminal}",
+  "@notifyDesktopTerminalWatched": {
+    "placeholders": {
+      "device": {"type": "String"},
+      "terminal": {"type": "String"}
+    }
+  },
+  "notifyTerminalSharingFailedTitle": "Could not turn on terminal sharing",
+  "notifyTerminalSharingFailedBody": "Nothing was changed. Try again.",
+  "notifyTerminalSharingStartFailedTitle": "Terminal sharing could not start",
+  "notifyTerminalSharingDisableIncompleteTitle": "Terminal sharing is off, but the ShellX block could not be removed from some files",
+  "confirmSharingTitle": "Share terminals with your phone?",
+  "confirmSharingIntro": "Every terminal window you open from now on can be viewed and typed into from your paired phones. Windows that are already open are not shared.",
+  "confirmSharingFiles": "ShellX will change these files (each existing file is backed up once as <name>.shellx-backup):",
+  "confirmSharingFileCreated": "{path} (new file)",
+  "@confirmSharingFileCreated": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "confirmSharingBinary": "and copy shellx-term to {path}.",
+  "@confirmSharingBinary": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "confirmSharingBashSkipped": "There is no ~/.bashrc or ~/.bash_profile, so bash windows are not shared.",
+  "confirmSharingMacNote": "Note: Terminal.app (and possibly iTerm2) will no longer ask for confirmation when you close a window that is running a command.",
+  "confirmSharingWindowsNote": "Each PowerShell window will open a little slower and use some extra memory.",
+  "confirmSharingPowerShellBlocked": "{name}: running scripts is not allowed, so its profile will not run until local scripts are allowed.",
+  "@confirmSharingPowerShellBlocked": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "confirmSharingPowerShellGroupPolicy": "{name}: the script policy is set by your organization (Group Policy), so this PowerShell will not be shared.",
+  "@confirmSharingPowerShellGroupPolicy": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "confirmSharingNoPowerShell": "No PowerShell was found on this computer.",
+  "confirmSharingAction": "Turn on",
+  "confirmAllowScriptsTitle": "Allow local scripts?",
+  "confirmAllowScriptsBody": "{names}: running scripts is not allowed, so the ShellX block in the profile cannot run. This sets the policy to RemoteSigned for your account only (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned).",
+  "@confirmAllowScriptsBody": {
+    "placeholders": {
+      "names": {"type": "String"}
+    }
+  },
+  "confirmAllowScriptsAction": "Allow local scripts for my account",
+  "notifyTerminalSharingFailedFile": "ShellX could not change {path}. Nothing was changed.",
+  "@notifyTerminalSharingFailedFile": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "notifyAllowScriptsFailedTitle": "Could not allow local scripts for {name}",
+  "@notifyAllowScriptsFailedTitle": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
   "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
 }

@@ -60,6 +60,22 @@ final class Quit extends TrayAction {
   const Quit();
 }
 
+/// The terminal-sharing switch (spec §7.6, §10.1, §10.5).
+final class ToggleTerminalSharing extends TrayAction {
+  const ToggleTerminalSharing();
+}
+
+/// The "needs to be set up again" warning: the enable flow once more.
+final class SetUpTerminalSharing extends TrayAction {
+  const SetUpTerminalSharing();
+}
+
+/// "Disconnect phone" on a desktop terminal; never ends the terminal.
+final class DisconnectDesktopPhone extends TrayAction {
+  const DisconnectDesktopPhone(this.id);
+  final int id;
+}
+
 /// Menu item keys. Dynamic keys embed the session id / mobile device id.
 abstract final class TrayKeys {
   static const String status = 'status';
@@ -77,17 +93,27 @@ abstract final class TrayKeys {
   static const String signOut = 'sign_out';
   static const String signIn = 'sign_in';
   static const String quit = 'quit';
+  static const String terminalSharing = 'terminal_sharing';
+  static const String terminalSharingSetup = 'terminal_sharing_setup';
+  static const String desktopTerminals = 'desktop_terminals';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
   static String device(String mobileId) => 'device:$mobileId';
   static String revoke(String mobileId) => 'revoke:$mobileId';
+  static String desktopTerminal(int id) => 'desktop_terminal:$id';
+  static String disconnectPhone(int id) => 'desktop_disconnect:$id';
 }
 
 TrayAction? trayActionForKey(String? key) {
   if (key == null) return null;
   const closePrefix = 'session_close:';
   const revokePrefix = 'revoke:';
+  const disconnectPrefix = 'desktop_disconnect:';
+  if (key.startsWith(disconnectPrefix)) {
+    final id = int.tryParse(key.substring(disconnectPrefix.length));
+    return id == null ? null : DisconnectDesktopPhone(id);
+  }
   if (key.startsWith(closePrefix)) {
     final id = int.tryParse(key.substring(closePrefix.length));
     return id == null ? null : CloseSession(id);
@@ -108,6 +134,8 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.downloadUpdate => const DownloadUpdate(),
     TrayKeys.reconnect => const Reconnect(),
     TrayKeys.quit => const Quit(),
+    TrayKeys.terminalSharing => const ToggleTerminalSharing(),
+    TrayKeys.terminalSharingSetup => const SetUpTerminalSharing(),
     _ => null,
   };
 }

@@ -46,6 +46,15 @@ test('uninstall removes the agent\'s per-user data folder (device key, trusted-p
   assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{userappdata\}\\pro\.shellx\\ShellX"/);
 });
 
+test('uninstall cleans up terminal sharing (spec 10.6): blocks via ShellX.exe, then bin and term', () => {
+  assert.match(
+    iss,
+    /\[UninstallRun\][^[]*Filename: "\{app\}\\\{#AppExeName\}"; Parameters: "--terminal-sharing-cleanup"; Flags: runhidden waituntilterminated/,
+  );
+  assert.match(iss, /\[UninstallDelete\][^[]*Name: "\{localappdata\}\\ShellX\\bin"/);
+  assert.match(iss, /\[UninstallDelete\][^[]*Name: "\{localappdata\}\\ShellX\\term"/);
+});
+
 test('uninstall removes the launch-at-login registry value', () => {
   assert.ok(
     iss.includes("RegDeleteValue(HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Run', 'ShellX')"),

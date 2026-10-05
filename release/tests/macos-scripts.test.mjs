@@ -29,6 +29,9 @@ function fakeApp(dir) {
   copyFileSync('/usr/bin/true', join(app, 'Contents/MacOS/ShellX'));
   // Any Mach-O file works for codesign; this stands in for a plugin dylib.
   copyFileSync('/usr/bin/true', join(app, 'Contents/Frameworks/libplugin.dylib'));
+  // Stands in for shellx-term (spec §10.7), built into Contents/Helpers by the Xcode phase.
+  mkdirSync(join(app, 'Contents/Helpers'), { recursive: true });
+  copyFileSync('/usr/bin/true', join(app, 'Contents/Helpers/shellx-term'));
   return app;
 }
 
@@ -44,7 +47,7 @@ test('sign-app.sh signs nested code and the app with hardened runtime', { skip }
     writeFileSync(entitlements, plist({ 'com.apple.security.network.client': true }));
     const result = run(join(scripts, 'sign-app.sh'), [app, entitlements], { MACOS_SIGNING_IDENTITY: '-' });
     assert.equal(result.status, 0, result.stderr);
-    for (const target of [app, join(app, 'Contents/Frameworks/libplugin.dylib')]) {
+    for (const target of [app, join(app, 'Contents/Frameworks/libplugin.dylib'), join(app, 'Contents/Helpers/shellx-term')]) {
       const info = run('codesign', ['-dv', '--verbose=4', target]);
       assert.match(info.stderr, /flags=0x\w+\([^)]*runtime[^)]*\)/, `${target} lacks hardened runtime`);
     }
