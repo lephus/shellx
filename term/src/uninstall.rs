@@ -7,83 +7,123 @@
 //! without anything installed, changes nothing.
 
 use std::fmt;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub const BEGIN: &str = "# >>> ShellX >>>";
 pub const END: &str = "# <<< ShellX <<<";
 
-#[derive(Clone, Copy)]
-enum Encoding {
-    Utf8,
-    Utf8Bom,
-    Utf16Le,
-    Utf16Be,
+/// What `remove_block` found.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Removal {
+    /// No marker at all.
+    NoBlock,
+    /// The file without its block(s).
+    Removed(Vec<u8>),
+    /// A begin marker without an end marker; nothing to remove safely.
+    Unterminated,
+    /// UTF-16 with an odd number of bytes: not text we can scan.
+    BadEncoding,
 }
 
-fn decode(bytes: &[u8]) -> Option<(Encoding, String)> {
-    let utf16 = |body: &[u8], from: fn([u8; 2]) -> u16| -> Option<String> {
-        if !body.len().is_multiple_of(2) {
-            return None;
-        }
-        let units: Vec<u16> = body.chunks_exact(2).map(|c| from([c[0], c[1]])).collect();
-        String::from_utf16(&units).ok()
+/// Removes begin..end lines in a sequence of code units (bytes or UTF-16
+/// units). A marker is a whole line (after dropping one trailing `\r`),
+/// exactly as the app's editor matches. Every other unit is kept as is.
+fn strip<T: Copy + PartialEq>(
+    units: &[T],
+    nl: T,
+    cr: T,
+    begin: &[T],
+    end: &[T],
+) -> Option<Result<Vec<T>, ()>> {
+    let is = |line: &[T], marker: &[T]| {
+        let line = line.strip_suffix(&[nl]).unwrap_or(line);
+        let line = line.strip_suffix(&[cr]).unwrap_or(line);
+        line == marker
     };
-    if let Some(body) = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
-        return Some((Encoding::Utf8Bom, String::from_utf8(body.to_vec()).ok()?));
-    }
-    if let Some(body) = bytes.strip_prefix(&[0xFF, 0xFE]) {
-        return Some((Encoding::Utf16Le, utf16(body, u16::from_le_bytes)?));
-    }
-    if let Some(body) = bytes.strip_prefix(&[0xFE, 0xFF]) {
-        return Some((Encoding::Utf16Be, utf16(body, u16::from_be_bytes)?));
-    }
-    Some((Encoding::Utf8, String::from_utf8(bytes.to_vec()).ok()?))
-}
-
-fn encode(encoding: Encoding, text: &str) -> Vec<u8> {
-    match encoding {
-        Encoding::Utf8 => text.as_bytes().to_vec(),
-        Encoding::Utf8Bom => [&[0xEF, 0xBB, 0xBF][..], text.as_bytes()].concat(),
-        Encoding::Utf16Le => [0xFF, 0xFE]
-            .into_iter()
-            .chain(text.encode_utf16().flat_map(u16::to_le_bytes))
-            .collect(),
-        Encoding::Utf16Be => [0xFE, 0xFF]
-            .into_iter()
-            .chain(text.encode_utf16().flat_map(u16::to_be_bytes))
-            .collect(),
-    }
-}
-
-/// Removes every complete ShellX block (begin line through end line, with its
-/// line break) from `bytes`. `None` when there is nothing to remove: no block,
-/// a begin marker without its end marker (left alone rather than guessing), or
-/// content that is not text in a supported encoding.
-pub fn remove_block(bytes: &[u8]) -> Option<Vec<u8>> {
-    let (encoding, text) = decode(bytes)?;
-    let marker = |line: &str, which: &str| line.trim_matches(['\r', '\n', ' ', '\t']) == which;
-    let mut out = String::with_capacity(text.len());
-    let mut pending = String::new();
+    let mut out = Vec::with_capacity(units.len());
+    let mut pending: Vec<T> = Vec::new();
     let mut inside = false;
     let mut removed = false;
-    for line in text.split_inclusive('\n') {
+    let mut saw_begin = false;
+    for line in units.split_inclusive(|u| *u == nl) {
         if inside {
-            pending.push_str(line);
-            if marker(line, END) {
+            pending.extend_from_slice(line);
+            if is(line, end) {
                 inside = false;
                 pending.clear();
                 removed = true;
             }
-        } else if marker(line, BEGIN) {
+        } else if is(line, begin) {
             inside = true;
-            pending.push_str(line);
+            saw_begin = true;
+            pending.extend_from_slice(line);
         } else {
-            out.push_str(line);
+            out.extend_from_slice(line);
         }
     }
-    // An unterminated block stays exactly as it was.
-    out.push_str(&pending);
-    removed.then(|| encode(encoding, &out))
+    out.extend_from_slice(&pending);
+    if removed {
+        Some(Ok(out))
+    } else if saw_begin {
+        Some(Err(()))
+    } else {
+        None
+    }
+}
+
+/// Removes every complete ShellX block from `bytes`, whatever the encoding
+/// (UTF-8, UTF-8 BOM, UTF-16 LE/BE, or 8-bit code pages: the markers are
+/// ASCII, so the other bytes never need decoding).
+pub fn remove_block(bytes: &[u8]) -> Removal {
+    fn finish(r: Option<Result<Vec<u8>, ()>>) -> Removal {
+        match r {
+            None => Removal::NoBlock,
+            Some(Ok(out)) => Removal::Removed(out),
+            Some(Err(())) => Removal::Unterminated,
+        }
+    }
+    let utf16 = |body: &[u8], le: bool| -> Removal {
+        if !body.len().is_multiple_of(2) {
+            return Removal::BadEncoding;
+        }
+        let from = |c: &[u8]| {
+            if le {
+                u16::from_le_bytes([c[0], c[1]])
+            } else {
+                u16::from_be_bytes([c[0], c[1]])
+            }
+        };
+        let units: Vec<u16> = body.chunks_exact(2).map(from).collect();
+        let b: Vec<u16> = BEGIN.encode_utf16().collect();
+        let e: Vec<u16> = END.encode_utf16().collect();
+        match strip(&units, 0x0A, 0x0D, &b, &e) {
+            None => Removal::NoBlock,
+            Some(Err(())) => Removal::Unterminated,
+            Some(Ok(out)) => {
+                let bom: [u8; 2] = if le { [0xFF, 0xFE] } else { [0xFE, 0xFF] };
+                let mut v = bom.to_vec();
+                for u in out {
+                    v.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+                }
+                Removal::Removed(v)
+            }
+        }
+    };
+    if let Some(body) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        return utf16(body, true);
+    }
+    if let Some(body) = bytes.strip_prefix(&[0xFE, 0xFF]) {
+        return utf16(body, false);
+    }
+    let (prefix, body) = match bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
+        Some(body) => (&bytes[..3], body),
+        None => (&bytes[..0], bytes),
+    };
+    match finish(strip(body, b'\n', b'\r', BEGIN.as_bytes(), END.as_bytes())) {
+        Removal::Removed(out) => Removal::Removed([prefix, &out[..]].concat()),
+        other => other,
+    }
 }
 
 /// Config files that may hold the block, in a fixed order.
@@ -107,17 +147,21 @@ pub fn config_files(home: &Path, windows: bool) -> Vec<PathBuf> {
     }
 }
 
-/// The directory the blocks point at.
-pub fn bin_dir(home: &Path, local_app_data: Option<&Path>, windows: bool) -> PathBuf {
+/// `<...>/ShellX`: the folder holding `bin` and `term`.
+pub fn shellx_dir(home: &Path, local_app_data: Option<&Path>, windows: bool) -> PathBuf {
     if windows {
         local_app_data
             .map(Path::to_path_buf)
             .unwrap_or_else(|| home.join("AppData").join("Local"))
             .join("ShellX")
-            .join("bin")
     } else {
-        home.join("Library/Application Support/ShellX/bin")
+        home.join("Library/Application Support/ShellX")
     }
+}
+
+/// The directory the blocks point at.
+pub fn bin_dir(home: &Path, local_app_data: Option<&Path>, windows: bool) -> PathBuf {
+    shellx_dir(home, local_app_data, windows).join("bin")
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -125,13 +169,17 @@ pub enum FileOutcome {
     Removed,
     NoBlock,
     Missing,
+    /// Found something we will not touch (reason).
+    Skipped(String),
     Failed(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum BinOutcome {
+pub enum DirOutcome {
     Removed,
     Missing,
+    /// Not deleted on purpose (reason).
+    Kept(String),
     /// Windows: the running executable cannot be deleted; the rest is gone.
     LeftRunning(PathBuf),
     Failed(String),
@@ -140,22 +188,50 @@ pub enum BinOutcome {
 #[derive(Debug)]
 pub struct Report {
     pub files: Vec<(PathBuf, FileOutcome)>,
-    pub bin: (PathBuf, BinOutcome),
+    /// Windows without a user profile folder: PowerShell profiles unknown.
+    pub profiles_unknown: bool,
+    pub bin: (PathBuf, DirOutcome),
+    pub term: (PathBuf, DirOutcome),
 }
 
 impl Report {
+    /// Something failed or was skipped: the exit code is non-zero.
     pub fn has_errors(&self) -> bool {
+        self.profiles_unknown
+            || self.file_problem()
+            || matches!(self.bin.1, DirOutcome::Failed(_))
+            || matches!(self.term.1, DirOutcome::Failed(_))
+    }
+
+    fn file_problem(&self) -> bool {
         self.files
             .iter()
-            .any(|(_, o)| matches!(o, FileOutcome::Failed(_)))
-            || matches!(self.bin.1, BinOutcome::Failed(_))
+            .any(|(_, o)| matches!(o, FileOutcome::Failed(_) | FileOutcome::Skipped(_)))
     }
 
     fn nothing_found(&self) -> bool {
-        self.files
-            .iter()
-            .all(|(_, o)| matches!(o, FileOutcome::NoBlock | FileOutcome::Missing))
-            && self.bin.1 == BinOutcome::Missing
+        !self.profiles_unknown
+            && self
+                .files
+                .iter()
+                .all(|(_, o)| matches!(o, FileOutcome::NoBlock | FileOutcome::Missing))
+            && self.bin.1 == DirOutcome::Missing
+            && self.term.1 == DirOutcome::Missing
+    }
+}
+
+fn describe(f: &mut fmt::Formatter<'_>, dir: &Path, outcome: &DirOutcome) -> fmt::Result {
+    match outcome {
+        DirOutcome::Removed => writeln!(f, "Deleted {}", dir.display()),
+        DirOutcome::Missing => Ok(()),
+        DirOutcome::Kept(why) => writeln!(f, "Kept {}: {why}", dir.display()),
+        DirOutcome::LeftRunning(exe) => writeln!(
+            f,
+            "Deleted the contents of {} except {} (in use); delete it after closing ShellX terminals",
+            dir.display(),
+            exe.display()
+        ),
+        DirOutcome::Failed(why) => writeln!(f, "Could not delete {}: {why}", dir.display()),
     }
 }
 
@@ -167,28 +243,84 @@ impl fmt::Display for Report {
                 "ShellX terminal sharing is not installed; nothing to remove."
             );
         }
+        if self.profiles_unknown {
+            writeln!(
+                f,
+                "Skipped the PowerShell profiles: the user profile folder is not known"
+            )?;
+        }
         for (path, outcome) in &self.files {
             match outcome {
                 FileOutcome::Removed => {
                     writeln!(f, "Removed the ShellX block from {}", path.display())?
                 }
+                FileOutcome::Skipped(why) => writeln!(f, "Skipped {}: {why}", path.display())?,
                 FileOutcome::Failed(why) => {
                     writeln!(f, "Could not update {}: {why}", path.display())?
                 }
                 FileOutcome::NoBlock | FileOutcome::Missing => {}
             }
         }
-        let (dir, outcome) = &self.bin;
-        match outcome {
-            BinOutcome::Removed => write!(f, "Deleted {}", dir.display()),
-            BinOutcome::Missing => write!(f, "No bin directory at {}", dir.display()),
-            BinOutcome::LeftRunning(exe) => write!(
-                f,
-                "Deleted the contents of {} except {} (in use); delete it after closing ShellX terminals",
-                dir.display(),
-                exe.display()
-            ),
-            BinOutcome::Failed(why) => write!(f, "Could not delete {}: {why}", dir.display()),
+        describe(f, &self.bin.0, &self.bin.1)?;
+        describe(f, &self.term.0, &self.term.1)
+    }
+}
+
+/// Replaces `path`'s content crash-safely: temp file beside the real target
+/// (symlinks resolved), same mode, fsync, rename over it. Falls back to
+/// writing in place where a rename would change the file (hard links, other
+/// owner), where no temp file can be made, and, on Windows, when the rename
+/// is refused (a sync client holding the file).
+fn write_file(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    let target = std::fs::canonicalize(path)?;
+    let meta = std::fs::metadata(&target)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if meta.nlink() > 1 || meta.uid() != unsafe { libc::geteuid() } {
+            return std::fs::write(&target, data);
+        }
+    }
+    let Some(dir) = target.parent() else {
+        return std::fs::write(&target, data);
+    };
+    let name = target.file_name().unwrap_or_default().to_string_lossy();
+    let tmp = dir.join(format!(".{name}.shellx-tmp-{}", std::process::id()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::PermissionsExt;
+        options.mode(meta.permissions().mode() & 0o7777);
+    }
+    let Ok(mut file) = options.open(&tmp) else {
+        return std::fs::write(&target, data);
+    };
+    let written = file
+        .write_all(data)
+        .and_then(|()| file.set_permissions(meta.permissions()))
+        .and_then(|()| file.sync_all());
+    drop(file);
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    match std::fs::rename(&tmp, &target) {
+        Ok(()) => {
+            #[cfg(unix)]
+            if let Ok(d) = std::fs::File::open(dir) {
+                let _ = d.sync_all();
+            }
+            Ok(())
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp);
+            if cfg!(windows) {
+                std::fs::write(&target, data)
+            } else {
+                Err(e)
+            }
         }
     }
 }
@@ -200,20 +332,25 @@ fn clean_file(path: &Path) -> FileOutcome {
         Err(e) => return FileOutcome::Failed(e.to_string()),
     };
     match remove_block(&bytes) {
-        None => FileOutcome::NoBlock,
-        // In place (not rename): keeps permissions and symlinked dotfiles.
-        Some(cleaned) => match std::fs::write(path, cleaned) {
+        Removal::NoBlock => FileOutcome::NoBlock,
+        Removal::Unterminated => FileOutcome::Skipped(format!(
+            "has `{BEGIN}` without `{END}`; left unchanged, remove it by hand"
+        )),
+        Removal::BadEncoding => {
+            FileOutcome::Skipped("unreadable UTF-16 (odd length); left unchanged".into())
+        }
+        Removal::Removed(cleaned) => match write_file(path, &cleaned) {
             Ok(()) => FileOutcome::Removed,
             Err(e) => FileOutcome::Failed(e.to_string()),
         },
     }
 }
 
-fn delete_bin(dir: &Path, windows: bool, running: Option<&Path>) -> BinOutcome {
+fn delete_dir(dir: &Path, windows: bool, running: Option<&Path>) -> DirOutcome {
     let meta = match std::fs::symlink_metadata(dir) {
         Ok(meta) => meta,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return BinOutcome::Missing,
-        Err(e) => return BinOutcome::Failed(e.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return DirOutcome::Missing,
+        Err(e) => return DirOutcome::Failed(e.to_string()),
     };
     let result = if meta.file_type().is_symlink() || meta.is_file() {
         std::fs::remove_file(dir)
@@ -221,7 +358,7 @@ fn delete_bin(dir: &Path, windows: bool, running: Option<&Path>) -> BinOutcome {
         std::fs::remove_dir_all(dir)
     };
     match result {
-        Ok(()) => BinOutcome::Removed,
+        Ok(()) => DirOutcome::Removed,
         Err(e) if windows => match running.filter(|exe| exe.starts_with(dir)) {
             Some(exe) => {
                 // The running .exe is locked; take everything else.
@@ -232,43 +369,80 @@ fn delete_bin(dir: &Path, windows: bool, running: Option<&Path>) -> BinOutcome {
                         }
                     }
                 }
-                BinOutcome::LeftRunning(exe.to_path_buf())
+                DirOutcome::LeftRunning(exe.to_path_buf())
             }
-            None => BinOutcome::Failed(e.to_string()),
+            None => DirOutcome::Failed(e.to_string()),
         },
-        Err(e) => BinOutcome::Failed(e.to_string()),
+        Err(e) => DirOutcome::Failed(e.to_string()),
     }
 }
 
-/// Does the whole uninstall for `home` (`local_app_data` on Windows).
-pub fn run(home: &Path, local_app_data: Option<&Path>) -> Report {
-    let windows = cfg!(windows);
-    let files = config_files(home, windows)
+/// Does the whole uninstall. `home` is `None` on Windows when the user
+/// profile folder is unknown (the PowerShell profiles are then skipped).
+pub fn run_with(
+    home: Option<&Path>,
+    local_app_data: Option<&Path>,
+    windows: bool,
+    running: Option<&Path>,
+) -> Report {
+    let files: Vec<(PathBuf, FileOutcome)> = home
+        .map(|home| config_files(home, windows))
+        .unwrap_or_default()
         .into_iter()
         .map(|path| {
             let outcome = clean_file(&path);
             (path, outcome)
         })
         .collect();
-    let dir = bin_dir(home, local_app_data, windows);
-    let running = std::env::current_exe().ok();
-    let outcome = delete_bin(&dir, windows, running.as_deref());
+    let base = shellx_dir(home.unwrap_or(Path::new("")), local_app_data, windows);
+    let (bin, term) = (base.join("bin"), base.join("term"));
+    let problem = files
+        .iter()
+        .any(|(_, o)| matches!(o, FileOutcome::Failed(_) | FileOutcome::Skipped(_)));
+    let (bin_outcome, term_outcome) = if problem {
+        // Keep the binary: the user fixes the file and runs this again.
+        let keep = |dir: &Path| match std::fs::symlink_metadata(dir) {
+            Ok(_) => {
+                DirOutcome::Kept("so you can run this again after fixing the problem above".into())
+            }
+            Err(_) => DirOutcome::Missing,
+        };
+        (keep(&bin), keep(&term))
+    } else {
+        (
+            delete_dir(&bin, windows, running),
+            delete_dir(&term, windows, running),
+        )
+    };
     Report {
         files,
-        bin: (dir, outcome),
+        profiles_unknown: home.is_none(),
+        bin: (bin, bin_outcome),
+        term: (term, term_outcome),
     }
+}
+
+pub fn run(home: Option<&Path>, local_app_data: Option<&Path>) -> Report {
+    let running = std::env::current_exe().ok();
+    run_with(home, local_app_data, cfg!(windows), running.as_deref())
 }
 
 /// Entry point of the subcommand: prints the summary, returns the exit code.
 pub fn main() -> i32 {
-    use std::io::Write;
-    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    let Some(home) = std::env::var_os(var).filter(|h| !h.is_empty()) else {
+    let windows = cfg!(windows);
+    let var = if windows { "USERPROFILE" } else { "HOME" };
+    let home = std::env::var_os(var)
+        .filter(|h| !h.is_empty())
+        .map(PathBuf::from);
+    let local = std::env::var_os("LOCALAPPDATA")
+        .filter(|h| !h.is_empty())
+        .map(PathBuf::from);
+    // Windows needs only LOCALAPPDATA for `bin` and `term`; Unix needs HOME.
+    if home.is_none() && (!windows || local.is_none()) {
         let _ = writeln!(std::io::stderr(), "shellx-term: {var} is not set");
         return 1;
-    };
-    let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    let report = run(Path::new(&home), local.as_deref());
+    }
+    let report = run(home.as_deref(), local.as_deref());
     if report.has_errors() {
         let _ = writeln!(
             std::io::stderr(),
@@ -289,24 +463,31 @@ mod tests {
         format!("{BEGIN}{eol}if true; then{eol}  :{eol}fi{eol}{END}{eol}")
     }
 
+    fn removed(bytes: &[u8]) -> Vec<u8> {
+        match remove_block(bytes) {
+            Removal::Removed(out) => out,
+            other => panic!("expected Removed, got {other:?}"),
+        }
+    }
+
     fn utf16(text: &str, le: bool) -> Vec<u8> {
-        encode(
-            if le {
-                Encoding::Utf16Le
-            } else {
-                Encoding::Utf16Be
-            },
-            text,
-        )
+        let mut v = if le {
+            vec![0xFF, 0xFE]
+        } else {
+            vec![0xFE, 0xFF]
+        };
+        for u in text.encode_utf16() {
+            v.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+        }
+        v
     }
 
     #[test]
     fn removes_the_block_and_keeps_the_rest_for_lf_and_crlf() {
         for eol in ["\n", "\r\n"] {
             let input = format!("export A=1{eol}{}export B=2 # é{eol}", block(eol));
-            let out = remove_block(input.as_bytes()).unwrap();
             assert_eq!(
-                out,
+                removed(input.as_bytes()),
                 format!("export A=1{eol}export B=2 # é{eol}").as_bytes()
             );
         }
@@ -315,11 +496,10 @@ mod tests {
     #[test]
     fn block_at_the_top_or_end_and_without_a_final_newline() {
         let top = format!("{}rest\n", block("\n"));
-        assert_eq!(remove_block(top.as_bytes()).unwrap(), b"rest\n");
+        assert_eq!(removed(top.as_bytes()), b"rest\n");
         let end = format!("rest\n{BEGIN}\nx\n{END}");
-        assert_eq!(remove_block(end.as_bytes()).unwrap(), b"rest\n");
-        // A file holding only the block becomes empty.
-        assert_eq!(remove_block(block("\n").as_bytes()).unwrap(), b"");
+        assert_eq!(removed(end.as_bytes()), b"rest\n");
+        assert_eq!(removed(block("\n").as_bytes()), b"");
     }
 
     #[test]
@@ -328,36 +508,77 @@ mod tests {
         let want = "a\r\nb é\r\n";
         let utf8_bom = [&[0xEF, 0xBB, 0xBF][..], text.as_bytes()].concat();
         assert_eq!(
-            remove_block(&utf8_bom).unwrap(),
+            removed(&utf8_bom),
             [&[0xEF, 0xBB, 0xBF][..], want.as_bytes()].concat()
         );
         for le in [true, false] {
-            assert_eq!(remove_block(&utf16(&text, le)).unwrap(), utf16(want, le));
+            assert_eq!(removed(&utf16(&text, le)), utf16(want, le));
         }
     }
 
     #[test]
-    fn nothing_to_remove_returns_none() {
-        assert_eq!(remove_block(b""), None);
-        assert_eq!(remove_block(b"export A=1\n"), None);
-        // Idempotent: a second pass finds nothing.
-        let once = remove_block(format!("x\n{}", block("\n")).as_bytes()).unwrap();
-        assert_eq!(remove_block(&once), None);
+    fn non_utf8_bytes_are_kept_exactly() {
+        // Latin-1 / cp1258 profile: 0xE9, 0xFF and a lone 0xC3 survive.
+        let mut input = b"# caf\xe9 \xff\n".to_vec();
+        input.extend_from_slice(block("\n").as_bytes());
+        input.extend_from_slice(b"tail \xc3\n");
+        assert_eq!(removed(&input), b"# caf\xe9 \xff\ntail \xc3\n");
+        // Same with a UTF-8 BOM that is followed by invalid UTF-8.
+        let bom = [&[0xEF, 0xBB, 0xBF][..], &input].concat();
+        assert_eq!(
+            removed(&bom),
+            [&[0xEF, 0xBB, 0xBF][..], b"# caf\xe9 \xff\ntail \xc3\n"].concat()
+        );
     }
 
     #[test]
-    fn an_unterminated_block_and_foreign_bytes_are_left_alone() {
-        assert_eq!(remove_block(format!("a\n{BEGIN}\nb\n").as_bytes()), None);
-        assert_eq!(remove_block(&[0xFF, 0x00, 0xC3, 0x28]), None);
-        // Odd length UTF-16.
-        assert_eq!(remove_block(&[0xFF, 0xFE, 0x41]), None);
+    fn utf16_with_a_lone_surrogate_is_handled() {
+        for le in [true, false] {
+            let mut input = utf16(&format!("a\n{}b\n", block("\n")), le);
+            // Splice a lone surrogate (0xD800) before the final "b\n".
+            let at = input.len() - 4;
+            let lone = if le { [0x00, 0xD8] } else { [0xD8, 0x00] };
+            input.splice(at..at, lone);
+            let mut want = utf16("a\n", le);
+            want.extend_from_slice(&lone);
+            for u in "b\n".encode_utf16() {
+                want.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+            }
+            assert_eq!(removed(&input), want);
+        }
+    }
+
+    #[test]
+    fn nothing_to_remove() {
+        assert_eq!(remove_block(b""), Removal::NoBlock);
+        assert_eq!(remove_block(b"export A=1\n"), Removal::NoBlock);
+        let once = removed(format!("x\n{}", block("\n")).as_bytes());
+        assert_eq!(remove_block(&once), Removal::NoBlock);
+    }
+
+    #[test]
+    fn unterminated_and_odd_length_are_reported_not_hidden() {
+        assert_eq!(
+            remove_block(format!("a\n{BEGIN}\nb\n").as_bytes()),
+            Removal::Unterminated
+        );
+        assert_eq!(remove_block(&[0xFF, 0xFE, 0x41]), Removal::BadEncoding);
+    }
+
+    #[test]
+    fn markers_must_be_the_whole_line() {
+        // Indented (inside a function) or with other text: left alone.
+        let indented = format!("f() {{\n  {BEGIN}\n  echo hi\n  {END}\n}}\n");
+        assert_eq!(remove_block(indented.as_bytes()), Removal::NoBlock);
+        let trailing = format!("{BEGIN} \nx\n{END}\n");
+        assert_eq!(remove_block(trailing.as_bytes()), Removal::NoBlock);
     }
 
     #[test]
     fn removes_several_blocks_but_not_a_marker_inside_a_line() {
         let input = format!("{}mid\necho '{BEGIN}'\n{}", block("\n"), block("\n"));
         assert_eq!(
-            remove_block(input.as_bytes()).unwrap(),
+            removed(input.as_bytes()),
             format!("mid\necho '{BEGIN}'\n").as_bytes()
         );
     }
@@ -376,40 +597,135 @@ mod tests {
         );
     }
 
+    #[test]
+    fn windows_without_a_profile_folder_still_cleans_bin_and_term() {
+        let root = temp("winhome");
+        let shellx = root.join("ShellX");
+        std::fs::create_dir_all(shellx.join("bin")).unwrap();
+        std::fs::create_dir_all(shellx.join("term")).unwrap();
+        let report = run_with(None, Some(&root), true, None);
+        assert!(report.profiles_unknown && report.has_errors());
+        assert_eq!(report.bin.1, DirOutcome::Removed);
+        assert_eq!(report.term.1, DirOutcome::Removed);
+        assert!(report
+            .to_string()
+            .contains("Skipped the PowerShell profiles"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn temp(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("shellx-uninstall-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[cfg(unix)]
     mod fs {
         use super::*;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
-        fn temp(name: &str) -> PathBuf {
-            let dir = std::env::temp_dir()
-                .join(format!("shellx-uninstall-{}-{name}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&dir);
-            std::fs::create_dir_all(&dir).unwrap();
-            dir
+        fn run_home(home: &Path) -> Report {
+            run_with(Some(home), None, false, None)
         }
 
         #[test]
-        fn cleans_files_deletes_bin_and_is_idempotent() {
+        fn cleans_files_deletes_bin_and_term_and_is_idempotent() {
             let home = temp("run");
             std::fs::write(home.join(".zshrc"), format!("a\n{}", block("\n"))).unwrap();
             std::fs::write(home.join(".bashrc"), "plain\n").unwrap();
-            let bin = bin_dir(&home, None, false);
-            std::fs::create_dir_all(&bin).unwrap();
-            std::fs::write(bin.join("shellx-term"), "x").unwrap();
+            let shellx = shellx_dir(&home, None, false);
+            for d in ["bin", "term"] {
+                std::fs::create_dir_all(shellx.join(d)).unwrap();
+                std::fs::write(shellx.join(d).join("f"), "x").unwrap();
+            }
 
-            let first = run(&home, None);
+            let first = run_home(&home);
             assert!(!first.has_errors());
             assert_eq!(first.files[0].1, FileOutcome::Removed);
             assert_eq!(first.files[1].1, FileOutcome::NoBlock);
             assert_eq!(first.files[2].1, FileOutcome::Missing);
-            assert_eq!(first.bin.1, BinOutcome::Removed);
+            assert_eq!(first.bin.1, DirOutcome::Removed);
+            assert_eq!(first.term.1, DirOutcome::Removed);
             assert_eq!(std::fs::read(home.join(".zshrc")).unwrap(), b"a\n");
             assert!(!home.join(".bash_profile").exists(), "never created");
             assert!(first.to_string().contains("Removed the ShellX block"));
 
-            let second = run(&home, None);
-            assert!(second.nothing_found());
+            let second = run_home(&home);
+            assert!(!second.has_errors());
             assert!(second.to_string().contains("nothing to remove"));
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn a_symlinked_file_stays_a_link_and_the_target_keeps_mode_and_content() {
+            let home = temp("symlink");
+            let real = home.join("dotfiles-zshrc");
+            std::fs::write(&real, format!("keep\n{}", block("\n"))).unwrap();
+            std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o600)).unwrap();
+            std::os::unix::fs::symlink(&real, home.join(".zshrc")).unwrap();
+            let report = run_home(&home);
+            assert_eq!(report.files[0].1, FileOutcome::Removed);
+            assert!(std::fs::symlink_metadata(home.join(".zshrc"))
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert_eq!(std::fs::read(&real).unwrap(), b"keep\n");
+            assert_eq!(std::fs::metadata(&real).unwrap().mode() & 0o7777, 0o600);
+            // No temp file left behind.
+            let leftovers: Vec<_> = std::fs::read_dir(&home)
+                .unwrap()
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().contains("shellx-tmp"))
+                .collect();
+            assert!(leftovers.is_empty());
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn permissions_are_kept_and_hard_links_are_written_in_place() {
+            let home = temp("perm");
+            let file = home.join(".bashrc");
+            std::fs::write(&file, format!("x\n{}", block("\n"))).unwrap();
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o640)).unwrap();
+            assert_eq!(run_home(&home).files[1].1, FileOutcome::Removed);
+            assert_eq!(std::fs::metadata(&file).unwrap().mode() & 0o7777, 0o640);
+
+            let other = home.join(".zshrc");
+            std::fs::write(&other, format!("y\n{}", block("\n"))).unwrap();
+            let linked = home.join("linked");
+            std::fs::hard_link(&other, &linked).unwrap();
+            assert_eq!(run_home(&home).files[0].1, FileOutcome::Removed);
+            // Both names still see the same (edited) file.
+            assert_eq!(std::fs::read(&linked).unwrap(), b"y\n");
+            assert_eq!(std::fs::read(&other).unwrap(), b"y\n");
+            assert_eq!(std::fs::metadata(&other).unwrap().nlink(), 2);
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn skipped_files_are_printed_fail_the_run_and_keep_bin() {
+            let home = temp("skipped");
+            let content = format!("a\n{BEGIN}\nunfinished\n");
+            std::fs::write(home.join(".bashrc"), &content).unwrap();
+            let bin = bin_dir(&home, None, false);
+            std::fs::create_dir_all(&bin).unwrap();
+            let report = run_home(&home);
+            assert!(matches!(report.files[1].1, FileOutcome::Skipped(_)));
+            assert!(report.has_errors());
+            let text = report.to_string();
+            assert!(
+                text.contains("Skipped") && text.contains(".bashrc"),
+                "{text}"
+            );
+            assert!(!text.contains("nothing to remove"));
+            assert!(matches!(report.bin.1, DirOutcome::Kept(_)));
+            assert!(bin.exists());
+            assert_eq!(
+                std::fs::read(home.join(".bashrc")).unwrap(),
+                content.as_bytes()
+            );
             let _ = std::fs::remove_dir_all(&home);
         }
 
@@ -422,7 +738,7 @@ mod tests {
             let bin = bin_dir(&home, None, false);
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
             std::os::unix::fs::symlink(&target, &bin).unwrap();
-            assert_eq!(run(&home, None).bin.1, BinOutcome::Removed);
+            assert_eq!(run_home(&home).bin.1, DirOutcome::Removed);
             assert!(target.join("keep").exists());
             let _ = std::fs::remove_dir_all(&home);
         }
