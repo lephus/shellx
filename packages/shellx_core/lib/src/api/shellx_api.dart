@@ -153,6 +153,49 @@ final class ShellxApi {
     );
   }
 
+  /// Registers this phone's FCM registration [token]
+  /// (`PUT /v1/devices/me/push-token`, phone token only: an agent gets
+  /// `403 mobile_only`). Registering a token held by another device moves
+  /// it here. A relay without push support answers `404`.
+  Future<void> registerPushToken(String token, PushPlatform platform) async {
+    await _send(
+      'PUT',
+      '/v1/devices/me/push-token',
+      authenticated: true,
+      body: {'token': token, 'platform': platform.wire},
+    );
+  }
+
+  /// Removes this device's push token (`DELETE /v1/devices/me/push-token`).
+  /// Idempotent. Logout removes it on the relay as well.
+  Future<void> deletePushToken() async {
+    await _send('DELETE', '/v1/devices/me/push-token', authenticated: true);
+  }
+
+  /// Sends a push notification to every phone paired with this agent that
+  /// registered a token (`POST /v1/notifications`, agent token only).
+  /// Returns how many phones FCM accepted it for. The relay limits [title]
+  /// to 200 and [body] to 1000 characters, and [data] to 10 entries.
+  /// Fails with `503 push_unavailable` when the relay has no Firebase
+  /// configuration, `429 rate_limited` past 120 per hour, `404` on a relay
+  /// without push support.
+  Future<int> sendNotification(
+    String title,
+    String body, {
+    Map<String, String>? data,
+  }) async {
+    final response = await _send(
+      'POST',
+      '/v1/notifications',
+      authenticated: true,
+      body: {'title': title, 'body': body, 'data': ?data},
+    );
+    return _parse(
+      response,
+      (json) => (json as Map<String, dynamic>)['sent'] as int,
+    );
+  }
+
   /// Closes the underlying [http.Client], but only if this [ShellxApi]
   /// created it itself: a client passed to the constructor is left open,
   /// since its lifecycle belongs to whoever created and passed it in.
