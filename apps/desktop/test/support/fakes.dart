@@ -17,6 +17,7 @@ import 'package:shellx_desktop/src/platform/notifier.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/platform/url_opener.dart';
 import 'package:shellx_desktop/src/terminal_sharing/config_file_editor.dart';
+import 'package:shellx_desktop/src/terminal_sharing/powershell.dart';
 import 'package:shellx_desktop/src/terminal_sharing/sharing_paths.dart';
 import 'package:shellx_desktop/src/terminal_sharing/terminal_sharing_setup.dart';
 
@@ -277,6 +278,14 @@ final class FakeSharingSetup extends TerminalSharingSetup {
   @override
   Future<void> maintain({required bool enabled}) async =>
       calls.add('maintain:$enabled');
+
+  final List<PowerShellInstall> allowedScripts = [];
+
+  @override
+  Future<bool> allowLocalScripts(PowerShellInstall install) async {
+    allowedScripts.add(install);
+    return true;
+  }
 }
 
 final class RecordingKeepAwake implements KeepAwake {

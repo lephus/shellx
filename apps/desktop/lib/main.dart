@@ -30,6 +30,10 @@ import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
+import 'src/terminal_sharing/attach_throttle.dart';
+import 'src/terminal_sharing/powershell.dart';
+import 'src/terminal_sharing/sharing_paths.dart';
+import 'src/terminal_sharing/terminal_sharing_setup.dart';
 import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/activation.dart';
@@ -38,7 +42,14 @@ import 'src/ui/window_coordinator.dart';
 import 'src/ui/window_host.dart';
 import 'src/ui/window_router.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // Spec §10.6: the Windows uninstaller runs `ShellX.exe
+  // --terminal-sharing-cleanup` before deleting the files. No window, no
+  // tray, no single-instance lock: remove the blocks, `bin` and `term`,
+  // then exit.
+  if (args.contains('--terminal-sharing-cleanup')) {
+    exit(await _terminalSharingCleanup());
+  }
   WidgetsFlutterBinding.ensureInitialized();
   final locale = resolveAppLocale(PlatformDispatcher.instance.locales);
   final l10n = lookupAppLocalizations(locale);
@@ -115,6 +126,7 @@ Future<void> _start(
     onProblem: terminalProblems.report,
   );
   late final TrayManagerHost trayHost;
+  final sharingSetup = _terminalSharingSetup(environment);
 
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
@@ -134,6 +146,12 @@ Future<void> _start(
       ),
       homeDirectory: home,
       baseEnvironment: environment,
+      termEndpointPath: sharingSetup == null
+          ? null
+          : termEndpointPath(
+              environment: environment,
+              windows: Platform.isWindows,
+            ),
     ),
     keepAwake: Platform.isWindows ? WindowsKeepAwake() : CaffeinateKeepAwake(),
     launchAtLogin: PackageLaunchAtLogin(),
@@ -147,6 +165,7 @@ Future<void> _start(
     deviceName: deviceNameFromHostname(Platform.localHostname),
     // Sign-out and quit wait (at most 3 s) for PTY tree kills in flight.
     awaitPtyKills: ptyFactory.killsSettled,
+    terminalSharing: sharingSetup,
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
     quitApp: () async {
@@ -218,6 +237,52 @@ Future<void> _start(
   // The only bootstrap() call. An unreadable keychain does not throw: the
   // controller starts signed out and notifies.
   await container.read(agentControllerProvider.notifier).bootstrap();
+}
+
+/// Spec §7.6, §12: the switch is offered on macOS, and on Windows only with
+/// `SHELLX_EXPERIMENTAL=terminal-sharing`. Null otherwise (or without the
+/// environment variables the paths need).
+TerminalSharingSetup? _terminalSharingSetup(Map<String, String> environment) {
+  final available = terminalSharingAvailable(
+    macos: Platform.isMacOS,
+    windows: Platform.isWindows,
+    environment: environment,
+  );
+  if (!available) return null;
+  return _anyTerminalSharingSetup(environment);
+}
+
+/// Regardless of the experimental flag (the uninstaller must always clean
+/// up).
+TerminalSharingSetup? _anyTerminalSharingSetup(
+  Map<String, String> environment,
+) {
+  final paths = SharingPaths.forPlatform(
+    windows: Platform.isWindows,
+    environment: environment,
+    executable: Platform.resolvedExecutable,
+  );
+  if (paths == null) return null;
+  return TerminalSharingSetup(
+    paths: paths,
+    powerShell: Platform.isWindows
+        ? PowerShellProbe(environment: environment)
+        : null,
+  );
+}
+
+/// Exit code of `--terminal-sharing-cleanup`: 0, or 1 when something was
+/// left behind (the uninstaller goes on either way).
+Future<int> _terminalSharingCleanup() async {
+  try {
+    final setup = _anyTerminalSharingSetup(Platform.environment);
+    if (setup == null) return 1;
+    final result = await setup.cleanup();
+    return result.complete ? 0 : 1;
+  } catch (error) {
+    debugPrint('ShellX: terminal sharing cleanup failed: ${error.runtimeType}');
+    return 1;
+  }
 }
 
 /// The app failed to start, so there may be no window or tray icon to show

@@ -31,11 +31,20 @@ final class ConfirmRequest {
     required this.title,
     required this.body,
     required this.confirmLabel,
+    this.long = false,
+    this.destructive = true,
   });
 
   final String title;
   final String body;
   final String confirmLabel;
+
+  /// A body of several paragraphs (a list of files): a taller window.
+  final bool long;
+
+  /// The confirm button is styled as dangerous (closing sessions, signing
+  /// out); false for "Turn on".
+  final bool destructive;
   final Completer<bool> _completer = Completer<bool>();
 
   Future<bool> get result => _completer.future;
