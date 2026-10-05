@@ -425,7 +425,7 @@ Mọi thay đổi nằm trong tin nhắn ứng dụng (spec v1 §6.4), đi trong
 - Hai nhóm: **"Terminal trên máy tính"** (biểu tượng máy tính; dòng chính "ứng dụng — tiêu đề", nếu thiếu thì dùng tên ứng dụng hoặc tên shell; dòng phụ "mở {khi nào}" và "đang mở trên thiết bị khác" nếu có) và **"Phiên ShellX"** (như hiện nay), cuối bảng là nút **"Phiên mới"**.
 - **Khi hiện:** lần đầu vào một máy (như hiện nay), và **khi bấm `+`** nếu có phiên `desktop` hoặc phiên `shellx` chưa mở thành tab. Không có gì để chọn thì `+` mở phiên mới ngay như bây giờ.
 - **Không có phiên `desktop`**, một dòng gợi ý:
-  - `desktop_sharing: false`: "Bật 'Chia sẻ terminal' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây."
+  - `desktop_sharing: false`: "Bật 'Chia sẻ terminal với điện thoại' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây."
   - Thiếu `desktop_sharing`: "Cập nhật ShellX trên máy tính để xem các terminal đang mở."
   - `desktop_sharing: true`: "Chỉ các cửa sổ terminal mở sau khi bật chia sẻ mới hiện ở đây. Mở một cửa sổ terminal mới trên máy tính."
 

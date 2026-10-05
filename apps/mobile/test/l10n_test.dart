@@ -45,7 +45,7 @@ void main() {
     expect(vi.pickerNewSession, 'Phiên mới');
     expect(
       vi.pickerHintSharingOff,
-      "Bật 'Chia sẻ terminal' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.",
+      "Bật 'Chia sẻ terminal với điện thoại' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.",
     );
     expect(vi.pickerHintUpdateDesktop, 'Cập nhật ShellX trên máy tính để xem các terminal đang mở.');
     expect(
@@ -64,7 +64,7 @@ void main() {
     expect(en.pickerNewSession, 'New session');
     expect(
       en.pickerHintSharingOff,
-      "Turn on 'Share terminal' in the ShellX menu on the computer to see its open terminals here.",
+      "Turn on 'Share terminals with phone' in the ShellX menu on the computer to see its open terminals here.",
     );
     expect(en.pickerHintUpdateDesktop, 'Update ShellX on the computer to see its open terminals.');
     expect(
@@ -78,6 +78,24 @@ void main() {
     expect(en.desktopWindowClosed, 'The terminal window on the computer was closed.');
     expect(en.desktopTerminalGone, 'Lost the connection to this terminal on the computer.');
     expect(en.desktopClosedByHost, 'The computer disconnected this phone from this terminal.');
+  });
+
+  test('the picker hint names the desktop switch as its tray item does (P4)', () async {
+    final vi = await S.load(const Locale('vi'));
+    expect(vi.pickerHintSharingOff, contains("'Chia sẻ terminal với điện thoại'"));
+    final en = await S.load(const Locale('en'));
+    expect(en.pickerHintSharingOff, contains("'Share terminals with phone'"));
+  });
+
+  test('push notification texts (push spec §6) in both languages', () async {
+    final vi = await S.load(const Locale('vi'));
+    expect(vi.settingsNotificationsGroup, 'Thông báo');
+    expect(vi.settingsNotificationsOff, 'Đang tắt');
+    expect(vi.settingsNotificationsOpenSystem, 'Mở Cài đặt hệ thống');
+    final en = await S.load(const Locale('en'));
+    expect(en.settingsNotificationsGroup, 'Notifications');
+    expect(en.settingsNotificationsOff, 'Off');
+    expect(en.settingsNotificationsOpenSystem, 'Open system settings');
   });
 
   testWidgets('S.of(context) resolves Vietnamese inside the design system', (tester) async {

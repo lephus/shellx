@@ -8,6 +8,8 @@ import 'package:shellx_mobile/core/platform/device_description.dart';
 import 'package:shellx_mobile/core/platform/fresh_install.dart';
 import 'package:shellx_mobile/core/platform/secure_key_value_store.dart';
 import 'package:shellx_mobile/core/router/app_router.dart';
+import 'package:shellx_mobile/features/notifications/data/firebase_push_messaging.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 
 @module
 abstract class Module {
@@ -32,6 +34,12 @@ abstract class Module {
   @lazySingleton
   @preResolve
   Future<PackageInfo> get packageInfo => PackageInfo.fromPlatform();
+
+  /// Push notifications (push spec §6): Firebase starts here, bounded; without it the app runs
+  /// without push.
+  @lazySingleton
+  @preResolve
+  Future<PushMessaging> get pushMessaging => startPushMessaging();
 
   /// REST goes only through `shellx_core` (`package:http`), never through a second HTTP stack.
   @lazySingleton

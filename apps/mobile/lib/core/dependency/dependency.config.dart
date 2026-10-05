@@ -25,6 +25,11 @@ import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
 import '../../features/machines/presentation/controllers/machine_list_controller.dart'
     as _i70;
+import '../../features/notifications/domain/push_messaging.dart' as _i623;
+import '../../features/notifications/presentation/notification_opener.dart'
+    as _i539;
+import '../../features/notifications/presentation/push_controller.dart'
+    as _i737;
 import '../../features/pairing/presentation/controllers/qr_scanner_controller.dart'
     as _i1044;
 import '../../features/settings/presentation/controllers/delete_account_controller.dart'
@@ -72,6 +77,10 @@ extension GetItInjectableX on _i174.GetIt {
     );
     await gh.lazySingletonAsync<_i655.PackageInfo>(
       () => module.packageInfo,
+      preResolve: true,
+    );
+    await gh.lazySingletonAsync<_i623.PushMessaging>(
+      () => module.pushMessaging,
       preResolve: true,
     );
     gh.lazySingleton<_i145.ShellxApi>(() => module.api);
@@ -166,6 +175,36 @@ extension GetItInjectableX on _i174.GetIt {
       )..initialize(),
       dispose: (i) => i.dispose(),
     );
+    gh.lazySingleton<_i539.MachineNavigator>(
+      () => _i539.RouterMachineNavigator(gh<_i351.AppRouter>()),
+    );
+    gh.lazySingleton<_i539.NotificationOpener>(
+      () => _i539.NotificationOpener(
+        gh<_i351.SessionHolder>(),
+        gh<_i667.WorkspaceRegistry>(),
+        gh<_i539.MachineNavigator>(),
+      ),
+    );
+    gh.lazySingleton<_i695.PopupHandler>(
+      () => _i695.PopupHandler(gh<_i351.BuildContext>()),
+    );
+    gh.lazySingleton<_i737.PushController>(
+      () => _i737.PushController.create(
+        gh<_i623.PushMessaging>(),
+        gh<_i351.SessionHolder>(),
+        gh<_i460.SharedPreferences>(),
+        gh<_i539.NotificationOpener>(),
+        gh<_i351.DeviceDescription>(),
+      ),
+      dispose: (i) => i.dispose(),
+    );
+    gh.factory<_i70.MachineListController>(
+      () => _i70.MachineListController.create(
+        gh<_i351.SessionHolder>(),
+        gh<_i667.WorkspaceRegistry>(),
+        gh<_i737.PushController>(),
+      ),
+    );
     gh.factory<_i1035.SettingsController>(
       () => _i1035.SettingsController(
         gh<_i351.SessionHolder>(),
@@ -175,16 +214,9 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i667.WorkspaceRegistry>(),
         gh<_i655.PackageInfo>(),
         gh<_i351.PendingUnpairs>(),
+        gh<_i737.PushController>(),
+        gh<_i351.ExternalLinks>(),
       ),
-    );
-    gh.factory<_i70.MachineListController>(
-      () => _i70.MachineListController.create(
-        gh<_i351.SessionHolder>(),
-        gh<_i667.WorkspaceRegistry>(),
-      ),
-    );
-    gh.lazySingleton<_i695.PopupHandler>(
-      () => _i695.PopupHandler(gh<_i351.BuildContext>()),
     );
     return this;
   }

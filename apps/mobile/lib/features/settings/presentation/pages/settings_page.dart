@@ -1,10 +1,11 @@
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/presentation/biometric_method.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// Spec §9.2 #5 and the design's "Cài đặt": grouped cards — Terminal (font size with a live
-/// preview), Security (biometric lock), paired computers, account — and the version footer
+/// preview), Security (biometric lock), Notifications (push spec §6), paired computers, account — and the version footer
 /// (it opens the open-source licences, incl. both fonts' OFL).
 @RoutePage()
 class SettingsPage extends StatefulWidget {
@@ -127,6 +128,45 @@ class _SettingsPageState extends State<SettingsPage> {
               }),
             ],
           ),
+          if (_controller.notificationsAvailable)
+            Watch((context) {
+              final on = _controller.notificationPermission.value == PushPermission.granted;
+              return _Group(
+                header: strings.settingsNotificationsGroup,
+                footer: Text(
+                  on ? strings.settingsNotificationsFootnote : strings.settingsNotificationsOffFootnote,
+                  style: context.typo.metadata12.copyWith(color: colors.disable),
+                ),
+                children: [
+                  _Row(
+                    title: strings.settingsNotifications,
+                    leading: Icon(
+                      on ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                      color: colors.secondaryText,
+                    ),
+                    trailing: Text(
+                      on ? strings.settingsNotificationsOn : strings.settingsNotificationsOff,
+                      style: context.typo.paragraph.copyWith(color: colors.secondaryText),
+                    ),
+                  ),
+                  if (!on) ...[
+                    Divider(height: 1, color: colors.divider),
+                    _controller.canAskForNotifications
+                        ? _Row(
+                            title: strings.settingsNotificationsTurnOn,
+                            action: true,
+                            onTap: _controller.turnOnNotifications,
+                          )
+                        : _Row(
+                            title: strings.settingsNotificationsOpenSystem,
+                            action: true,
+                            trailing: Icon(Icons.open_in_new, size: 18, color: colors.primary),
+                            onTap: _controller.openNotificationSettings,
+                          ),
+                  ],
+                ],
+              );
+            }),
           _Group(
             header: strings.settingsPairedMachines,
             children: [
@@ -254,7 +294,15 @@ class _Group extends StatelessWidget {
 
 /// `.ri`: one 50 pt row of a settings card.
 class _Row extends StatelessWidget {
-  const _Row({required this.title, this.leading, this.trailing, this.onTap, this.danger = false, this.muted = false});
+  const _Row({
+    required this.title,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.danger = false,
+    this.muted = false,
+    this.action = false,
+  });
 
   final String title;
   final Widget? leading;
@@ -263,11 +311,16 @@ class _Row extends StatelessWidget {
   final bool danger;
   final bool muted;
 
+  /// A link-like row (accent colour).
+  final bool action;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final style = danger
         ? context.typo.subHeader15.bold.copyWith(color: colors.error)
+        : action
+        ? context.typo.subHeader15.bold.copyWith(color: colors.primary)
         : context.typo.subHeader15.copyWith(color: muted ? colors.secondaryText : colors.primaryText);
     return InkWell(
       onTap: onTap,

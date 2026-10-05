@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/delete_account_controller.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
@@ -12,7 +15,9 @@ import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
 import '../../support/fake_biometrics.dart';
+import '../../support/fake_links.dart';
 import '../../support/fake_popup_handler.dart';
+import '../../support/fake_push.dart';
 import '../../support/fakes.dart';
 
 void main() {
@@ -25,8 +30,16 @@ void main() {
   late FakePopupHandler popups;
   late InMemoryKeyValueStore store;
   late PendingUnpairs pendingUnpairs;
+  late FakePushMessaging messaging;
+  late SharedPreferences prefs;
+  late FakeExternalLinks links;
+  PushController? push;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+    messaging = FakePushMessaging();
+    links = FakeExternalLinks();
     store = InMemoryKeyValueStore();
     pendingUnpairs = PendingUnpairs(store);
     settings = AppSettings(store);
@@ -52,12 +65,22 @@ void main() {
           registry,
           PackageInfo(appName: 'ShellX', packageName: 'com.shellx.prod', version: '1.0.0', buildNumber: '1'),
           pendingUnpairs,
+          push = PushController(
+            messaging: messaging,
+            session: session,
+            prefs: prefs,
+            opener: RecordingOpener(),
+            device: const DeviceDescription(name: 'iPhone 15', platform: DevicePlatform.ios),
+            popup: () => popups,
+          ),
+          links,
         ),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));
   });
 
   tearDown(() async {
+    push?.dispose();
     registry.dispose();
     await getIt.reset();
   });
@@ -78,6 +101,47 @@ void main() {
     await tester.pumpAndSettle();
     await openPushed(tester);
   }
+
+  group('notifications (push spec §6)', () {
+    testWidgets('granted: "On" with the footnote, no action', (tester) async {
+      messaging.current = PushPermission.granted;
+      await openSettings(tester);
+      expect(find.text('THÔNG BÁO'), findsOneWidget);
+      expect(find.text('Thông báo đẩy'), findsOneWidget);
+      expect(find.text('Đang bật'), findsOneWidget);
+      expect(find.textContaining('Chọn ngưỡng thời gian trong menu ShellX'), findsOneWidget);
+      expect(find.text('Mở Cài đặt hệ thống'), findsNothing);
+      expect(find.text('Bật thông báo'), findsNothing);
+    });
+
+    testWidgets('never asked: "Bật thông báo" shows the system prompt', (tester) async {
+      await openSettings(tester);
+      expect(find.text('Đang tắt'), findsOneWidget);
+      await tester.tap(find.text('Bật thông báo'));
+      await tester.pumpAndSettle();
+      expect(messaging.requests, 1);
+      expect(find.text('Đang bật'), findsOneWidget);
+      expect(backend.pushTokens, hasLength(1));
+    });
+
+    testWidgets('refused before: "Mở Cài đặt hệ thống" opens the phone\'s notification settings', (tester) async {
+      await prefs.setBool(PushController.askedKey, true);
+      messaging.current = PushPermission.denied;
+      await openSettings(tester);
+      expect(find.text('Đang tắt'), findsOneWidget);
+      expect(find.text('Thông báo đang tắt — mở Cài đặt hệ thống để bật.'), findsOneWidget);
+      await tester.tap(find.text('Mở Cài đặt hệ thống'));
+      await tester.pumpAndSettle();
+      expect(links.notificationSettingsOpened, 1);
+      expect(messaging.requests, 0);
+    });
+
+    testWidgets('Firebase missing: no notifications group', (tester) async {
+      messaging = FakePushMessaging(available: false);
+      await openSettings(tester);
+      expect(find.text('THÔNG BÁO'), findsNothing);
+    });
+  });
 
   testWidgets('design: grouped cards, account email, version footer, paired machines by name', (tester) async {
     await openSettings(tester);

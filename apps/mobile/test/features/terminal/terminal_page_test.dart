@@ -748,7 +748,8 @@ void main() {
     );
     const shellxSession = SessionInfo(id: 7, index: 1, shell: 'zsh', createdAt: 1790000000000, attached: false);
     const stillRunning = 'Terminal vẫn chạy trên máy tính.';
-    const hintOff = "Bật 'Chia sẻ terminal' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.";
+    const hintOff =
+        "Bật 'Chia sẻ terminal với điện thoại' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.";
     const hintUpdate = 'Cập nhật ShellX trên máy tính để xem các terminal đang mở.';
     const hintOn =
         'Chỉ các cửa sổ terminal mở sau khi bật chia sẻ mới hiện ở đây. Mở một cửa sổ terminal mới trên máy tính.';

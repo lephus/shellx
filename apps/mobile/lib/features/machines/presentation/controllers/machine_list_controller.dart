@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/machines/domain/machine_entry.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
 /// Spec §9.2 #2: agents from `GET /v1/devices`, kept live with PRESENCE.
@@ -13,10 +14,12 @@ class MachineListController extends Controller {
     required ShellxBackend backend,
     WorkspaceRegistry? registry,
     Future<void> Function()? onReconnectReplaced,
+    void Function(int paired)? onPairedMachines,
     DateTime Function()? now,
   }) : _backend = backend,
        _registry = registry,
        _onReconnectReplaced = onReconnectReplaced,
+       _onPairedMachines = onPairedMachines,
        _now = now ?? DateTime.now {
     _relayState = signal(backend.relayState);
     _presence = backend.presence.listen(_onPresence);
@@ -29,15 +32,20 @@ class MachineListController extends Controller {
   }
 
   @factoryMethod
-  static MachineListController create(SessionHolder session, WorkspaceRegistry registry) => MachineListController(
-    backend: session.requireBackend,
-    registry: registry,
-    onReconnectReplaced: session.reconnectReplaced,
-  );
+  static MachineListController create(SessionHolder session, WorkspaceRegistry registry, PushController push) =>
+      MachineListController(
+        backend: session.requireBackend,
+        registry: registry,
+        onReconnectReplaced: session.reconnectReplaced,
+        onPairedMachines: push.onPairedMachines,
+      );
 
   final ShellxBackend _backend;
   final WorkspaceRegistry? _registry;
   final Future<void> Function()? _onReconnectReplaced;
+
+  /// Push spec §6: the notification permission is asked once a paired machine is listed.
+  final void Function(int paired)? _onPairedMachines;
   final DateTime Function() _now;
   late final Signal<RelayConnectionState> _relayState;
   late final Computed<bool> _waiting = computed(() => _relayState.value != RelayConnectionState.connected);
@@ -83,7 +91,9 @@ class MachineListController extends Controller {
     state.loading();
     try {
       final result = await _load();
-      if (generation == _refreshGeneration) state.complete(result);
+      if (generation != _refreshGeneration) return;
+      state.complete(result);
+      _onPairedMachines?.call(result.machines.where((machine) => machine.paired).length);
     } catch (e, stackTrace) {
       if (generation != _refreshGeneration) return;
       final error = e is AppError ? e : errorFactory.fromException(e, stackTrace: stackTrace);

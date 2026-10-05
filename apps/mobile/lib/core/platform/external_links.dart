@@ -10,6 +10,10 @@ abstract interface class ExternalLinks {
   Future<bool> open(Uri url);
 
   Future<void> openAppSettings();
+
+  /// The phone's notification settings for ShellX (push spec §6, Settings when notifications are
+  /// off).
+  Future<void> openNotificationSettings();
 }
 
 @LazySingleton(as: ExternalLinks)
@@ -19,6 +23,10 @@ final class UrlLauncherLinks implements ExternalLinks {
 
   @override
   Future<void> openAppSettings() => system.AppSettings.openAppSettings();
+
+  @override
+  Future<void> openNotificationSettings() =>
+      system.AppSettings.openAppSettings(type: system.AppSettingsType.notification);
 }
 
 /// For a tap on a link or a button: a platform that cannot open it (a `PlatformException`, no app
@@ -36,6 +44,14 @@ extension TappedExternalLinks on ExternalLinks {
   Future<void> openAppSettingsOrToast() async {
     try {
       await openAppSettings();
+    } catch (error) {
+      _toast(error);
+    }
+  }
+
+  Future<void> openNotificationSettingsOrToast() async {
+    try {
+      await openNotificationSettings();
     } catch (error) {
       _toast(error);
     }

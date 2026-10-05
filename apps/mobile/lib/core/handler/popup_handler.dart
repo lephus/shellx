@@ -127,6 +127,7 @@ class PopupHandler {
     IconData? icon,
   }) {
     showMessage(
+      callbacks: callbacks,
       title: title,
       description: description,
       icon: Assets.icons.icTick.svg(width: 24, height: 24),
@@ -142,6 +143,7 @@ class PopupHandler {
     IconData? icon,
   }) {
     showMessage(
+      callbacks: callbacks,
       title: title,
       description: description,
       icon: Assets.icons.icClose.svg(width: 24, height: 24),
@@ -157,6 +159,7 @@ class PopupHandler {
     IconData? icon,
   }) {
     showMessage(
+      callbacks: callbacks,
       title: title,
       description: description,
       icon: const Icon(

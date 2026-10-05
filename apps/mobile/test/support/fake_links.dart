@@ -4,6 +4,7 @@ import 'package:shellx_mobile/core/core.dart' hide test;
 class FakeExternalLinks implements ExternalLinks {
   final List<Uri> opened = [];
   int settingsOpened = 0;
+  int notificationSettingsOpened = 0;
 
   /// Thrown by [open] and [openAppSettings] after recording the call (e.g. a PlatformException).
   Object? error;
@@ -17,6 +18,13 @@ class FakeExternalLinks implements ExternalLinks {
     final failure = error;
     if (failure != null) throw failure;
     return openResult;
+  }
+
+  @override
+  Future<void> openNotificationSettings() async {
+    notificationSettingsOpened++;
+    final failure = error;
+    if (failure != null) throw failure;
   }
 
   @override

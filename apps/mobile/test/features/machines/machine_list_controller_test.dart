@@ -50,6 +50,18 @@ void main() {
     expect(machines.last.lastSeenAt, now.subtract(const Duration(hours: 2)));
   });
 
+  test('reports how many machines are paired after each refresh (push permission, push spec §6)', () async {
+    final reported = <int>[];
+    final reporting = MachineListController(backend: backend, onPairedMachines: reported.add, now: () => now);
+    addTearDown(reporting.dispose);
+    await reporting.refresh();
+    backend.pinnedList = [];
+    await reporting.refresh();
+    backend.devicesError = Exception('offline');
+    await reporting.refresh();
+    expect(reported, [1, 0]);
+  });
+
   test('uses PRESENCE while connected and the REST snapshot otherwise', () async {
     await controller.refresh();
     expect(controller.state.value.machines.first.online, isFalse); // hub says nothing is online

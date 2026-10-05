@@ -65,7 +65,10 @@ void main() {
       final plist = readFile('ios/Runner/GoogleService-Info.plist');
       expect(plist, contains('<string>shellxpro</string>'));
       expect(plist, contains('<string>com.shellx.prod</string>'));
-      expect(readFile('ios/Runner.xcodeproj/project.pbxproj'), contains('/* GoogleService-Info.plist in Resources */,'));
+      expect(
+        readFile('ios/Runner.xcodeproj/project.pbxproj'),
+        contains('/* GoogleService-Info.plist in Resources */,'),
+      );
     });
   });
 

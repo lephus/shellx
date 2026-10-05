@@ -7,6 +7,8 @@ class FakePopupHandler implements PopupHandler {
   final List<String> errors = [];
   final List<String> successes = [];
   final List<String> infos = [];
+  final List<String?> infoDescriptions = [];
+  final List<ToastificationCallbacks> infoCallbacks = [];
 
   @override
   void showError({
@@ -33,7 +35,11 @@ class FakePopupHandler implements PopupHandler {
     required String title,
     String? description,
     IconData? icon,
-  }) => infos.add(title);
+  }) {
+    infos.add(title);
+    infoDescriptions.add(description);
+    infoCallbacks.add(callbacks);
+  }
 
   @override
   void hide() {}

@@ -553,6 +553,18 @@ class FakeSessionHolder implements SessionHolder {
     _signOutReason.value = reason;
   });
 
+  /// A new sign-in around [backend] (the old backend, if any, is replaced in the same batch).
+  void signIn(ShellxBackend backend) => batch(() {
+    _session.value = const AccountSession(
+      userId: 'user-1',
+      deviceId: 'device-1',
+      token: 'token-1',
+      email: 'me@example.com',
+    );
+    _backend.value = backend;
+    _signOutReason.value = null;
+  });
+
   @override
   ReadonlySignal<ShellxBackend?> get backend => _backend;
 

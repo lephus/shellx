@@ -284,7 +284,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Only terminal windows opened after sharing was turned on show up here. Open a new terminal window on the computer.",
     ),
     "pickerHintSharingOff": MessageLookupByLibrary.simpleMessage(
-      "Turn on \'Share terminal\' in the ShellX menu on the computer to see its open terminals here.",
+      "Turn on \'Share terminals with phone\' in the ShellX menu on the computer to see its open terminals here.",
     ),
     "pickerHintUpdateDesktop": MessageLookupByLibrary.simpleMessage(
       "Update ShellX on the computer to see its open terminals.",
@@ -349,6 +349,26 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "settingsNoPairedMachines": MessageLookupByLibrary.simpleMessage(
       "No paired computers.",
+    ),
+    "settingsNotifications": MessageLookupByLibrary.simpleMessage(
+      "Push notifications",
+    ),
+    "settingsNotificationsFootnote": MessageLookupByLibrary.simpleMessage(
+      "Tells you when a long-running command finishes on a computer, or when a program sends a notification. Choose the time threshold in the ShellX menu on the computer.",
+    ),
+    "settingsNotificationsGroup": MessageLookupByLibrary.simpleMessage(
+      "Notifications",
+    ),
+    "settingsNotificationsOff": MessageLookupByLibrary.simpleMessage("Off"),
+    "settingsNotificationsOffFootnote": MessageLookupByLibrary.simpleMessage(
+      "Notifications are off — open the system settings to turn them on.",
+    ),
+    "settingsNotificationsOn": MessageLookupByLibrary.simpleMessage("On"),
+    "settingsNotificationsOpenSystem": MessageLookupByLibrary.simpleMessage(
+      "Open system settings",
+    ),
+    "settingsNotificationsTurnOn": MessageLookupByLibrary.simpleMessage(
+      "Turn on notifications",
     ),
     "settingsPairedMachines": MessageLookupByLibrary.simpleMessage(
       "Paired computers",

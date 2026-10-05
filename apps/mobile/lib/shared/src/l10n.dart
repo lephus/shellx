@@ -1409,10 +1409,10 @@ class S {
     );
   }
 
-  /// `Turn on 'Share terminal' in the ShellX menu on the computer to see its open terminals here.`
+  /// `Turn on 'Share terminals with phone' in the ShellX menu on the computer to see its open terminals here.`
   String get pickerHintSharingOff {
     return Intl.message(
-      'Turn on \'Share terminal\' in the ShellX menu on the computer to see its open terminals here.',
+      'Turn on \'Share terminals with phone\' in the ShellX menu on the computer to see its open terminals here.',
       name: 'pickerHintSharingOff',
       desc: '',
       args: [],
@@ -1619,6 +1619,86 @@ class S {
     return Intl.message(
       'No passcode or biometrics are set up on this device',
       name: 'settingsBiometricUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Notifications`
+  String get settingsNotificationsGroup {
+    return Intl.message(
+      'Notifications',
+      name: 'settingsNotificationsGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Push notifications`
+  String get settingsNotifications {
+    return Intl.message(
+      'Push notifications',
+      name: 'settingsNotifications',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `On`
+  String get settingsNotificationsOn {
+    return Intl.message(
+      'On',
+      name: 'settingsNotificationsOn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Off`
+  String get settingsNotificationsOff {
+    return Intl.message(
+      'Off',
+      name: 'settingsNotificationsOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Turn on notifications`
+  String get settingsNotificationsTurnOn {
+    return Intl.message(
+      'Turn on notifications',
+      name: 'settingsNotificationsTurnOn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open system settings`
+  String get settingsNotificationsOpenSystem {
+    return Intl.message(
+      'Open system settings',
+      name: 'settingsNotificationsOpenSystem',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Tells you when a long-running command finishes on a computer, or when a program sends a notification. Choose the time threshold in the ShellX menu on the computer.`
+  String get settingsNotificationsFootnote {
+    return Intl.message(
+      'Tells you when a long-running command finishes on a computer, or when a program sends a notification. Choose the time threshold in the ShellX menu on the computer.',
+      name: 'settingsNotificationsFootnote',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Notifications are off — open the system settings to turn them on.`
+  String get settingsNotificationsOffFootnote {
+    return Intl.message(
+      'Notifications are off — open the system settings to turn them on.',
+      name: 'settingsNotificationsOffFootnote',
       desc: '',
       args: [],
     );

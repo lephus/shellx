@@ -1,15 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/domain/biometric_authenticator.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
 /// A computer pinned on this phone; [name] is null while `GET /v1/devices` is unreachable.
 typedef PairedMachine = ({String agentId, String? name});
 
-/// Spec §9.2 #5: default font size, biometric lock, unpair per machine, sign out, version.
+/// Spec §9.2 #5: default font size, biometric lock, unpair per machine, sign out, version; push
+/// spec §6: whether notifications are on, with the way to turn them on.
 @injectable
 class SettingsController extends Controller {
   SettingsController(
@@ -20,6 +25,8 @@ class SettingsController extends Controller {
     this._registry,
     this._packageInfo,
     this._pendingUnpairs,
+    this._push,
+    this._links,
   );
 
   final SessionHolder _session;
@@ -29,6 +36,8 @@ class SettingsController extends Controller {
   final WorkspaceRegistry _registry;
   final PackageInfo _packageInfo;
   final PendingUnpairs _pendingUnpairs;
+  final PushController _push;
+  final ExternalLinks _links;
   final Signal<bool> _biometricsAvailable = signal(false);
   final Signal<List<PairedMachine>?> _paired = signal(null);
   final Signal<Set<String>> _failedUnpair = signal(const {});
@@ -62,7 +71,22 @@ class SettingsController extends Controller {
   /// another sign-out.
   ReadonlySignal<bool> get loggingOut => _loggingOut;
 
+  /// The "Thông báo" group is shown (Firebase works on this install).
+  bool get notificationsAvailable => _push.available;
+
+  /// Null until read.
+  ReadonlySignal<PushPermission?> get notificationPermission => _push.permission;
+
+  /// Not granted yet and never asked: "Bật thông báo" shows the system prompt. Once asked, a
+  /// refusal can only be undone in the system settings.
+  bool get canAskForNotifications => !_push.asked;
+
+  Future<void> turnOnNotifications() => _push.requestFromSettings();
+
+  Future<void> openNotificationSettings() => _links.openNotificationSettingsOrToast();
+
   Future<void> load() async {
+    unawaited(_push.refreshPermission());
     await guard(() async {
       final available = await _biometrics.isAvailable();
       if (_disposed) return;

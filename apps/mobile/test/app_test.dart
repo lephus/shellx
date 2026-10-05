@@ -21,6 +21,9 @@ import 'package:shellx_mobile/features/auth/presentation/controllers/login_contr
 import 'package:shellx_mobile/features/auth/presentation/controllers/register_controller.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 import 'package:shellx_mobile/features/machines/presentation/controllers/machine_list_controller.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
+import 'package:shellx_mobile/features/notifications/presentation/notification_opener.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
 import 'package:shellx_mobile/features/pairing/presentation/controllers/qr_scanner_controller.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/delete_account_controller.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
@@ -31,6 +34,7 @@ import 'package:shellx_mobile/shared/shared.dart';
 import 'support/fake_biometrics.dart';
 import 'support/fake_links.dart';
 import 'support/fake_popup_handler.dart';
+import 'support/fake_push.dart';
 import 'support/fake_relay_http.dart';
 import 'support/fakes.dart';
 
@@ -67,6 +71,8 @@ void main() {
   late WorkspaceRegistry registry;
   late AppLockController lock;
   late AppRouter router;
+  late FakePushMessaging messaging;
+  late PushController push;
   late DateTime clock;
 
   setUp(() async {
@@ -113,6 +119,15 @@ void main() {
     );
     registry = WorkspaceRegistry(session.backend);
     router = AppRouter(authGuard: AuthGuard(session), updateGuard: UpdateGuard(versionGate));
+    messaging = FakePushMessaging()..answer = PushPermission.denied;
+    push = PushController(
+      messaging: messaging,
+      session: session,
+      prefs: await SharedPreferences.getInstance(),
+      opener: NotificationOpener(session, registry, RouterMachineNavigator(router)),
+      device: const DeviceDescription(name: 'Pixel 8', platform: DevicePlatform.android),
+      popup: () => popups,
+    );
     getIt
       ..registerSingleton<PopupHandler>(popups)
       ..registerSingleton<ExternalLinks>(links)
@@ -120,21 +135,33 @@ void main() {
       ..registerSingleton<SessionHolder>(session)
       ..registerSingleton<AppLockController>(lock)
       ..registerSingleton<AppRouter>(router)
+      ..registerSingleton<PushController>(push)
       ..registerFactory<LoginController>(() => LoginController(session))
       ..registerFactory<RegisterController>(() => RegisterController(session))
-      ..registerFactory<MachineListController>(() => MachineListController.create(session, registry))
+      ..registerFactory<MachineListController>(() => MachineListController.create(session, registry, push))
       ..registerFactoryParam<TerminalPageController, String, void>(
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       )
       ..registerFactory<QrScannerController>(() => QrScannerController(session))
       ..registerFactory<SettingsController>(
-        () => SettingsController(session, settings, lock, biometrics, registry, packageInfo, pendingUnpairs),
+        () => SettingsController(
+          session,
+          settings,
+          lock,
+          biometrics,
+          registry,
+          packageInfo,
+          pendingUnpairs,
+          push,
+          links,
+        ),
       )
       ..registerFactory<DeleteAccountController>(() => DeleteAccountController(session));
     getIt.registerSingleton<SessionEnforcer>(SessionEnforcerImpl(events, router)..initialize());
   });
 
   tearDown(() async {
+    push.dispose();
     registry.dispose();
     await getIt.reset();
   });
@@ -194,6 +221,45 @@ void main() {
     await launch(tester);
     expect(find.text('Your computers'), findsOneWidget);
     expect(find.text('MacBook-Pro'), findsOneWidget);
+  });
+
+  testWidgets('push: the permission is asked once a paired machine is listed (spec §6)', (tester) async {
+    await launch(tester);
+    await signIn(tester);
+    expect(find.text('Your computers'), findsOneWidget);
+    expect(messaging.requests, 1);
+  });
+
+  testWidgets('push: tapping a notification opens that machine\'s terminal (spec §6)', (tester) async {
+    await launch(tester);
+    await signIn(tester);
+    messaging.opened.add(
+      const PushMessage(title: 'MacBook-Pro · Phiên 1', body: 'Build xong', data: {'agent_id': agentA}),
+    );
+    await tester.pumpAndSettle();
+    expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+    expect(find.text('zsh 1'), findsOneWidget);
+
+    // Already on that machine: nothing more is pushed.
+    messaging.opened.add(const PushMessage(data: {'agent_id': agentA}));
+    await tester.pumpAndSettle();
+    expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+  });
+
+  testWidgets('push: the notification that launched the app opens its machine (spec §6)', (tester) async {
+    await AuthStorageImpl(store).save(
+      const AccountSession(userId: testUserId, deviceId: testDeviceId, token: 'saved', email: 'me@example.com'),
+    );
+    messaging.initial = const PushMessage(data: {'agent_id': agentA, 'session_id': '5'});
+    await launch(tester);
+    expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+  });
+
+  testWidgets('push: a message in the foreground shows the in-app banner (spec §6)', (tester) async {
+    await launch(tester);
+    await signIn(tester);
+    messaging.foreground.add(const PushMessage(title: 'MacBook-Pro · Phiên 1', body: '✓ make · 45 giây'));
+    expect(popups.infos, ['MacBook-Pro · Phiên 1']);
   });
 
   testWidgets('sign in → machine list → settings → sign out returns to login', (tester) async {
@@ -276,6 +342,8 @@ void main() {
     await launch(tester);
     await signIn(tester);
     await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Delete account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();

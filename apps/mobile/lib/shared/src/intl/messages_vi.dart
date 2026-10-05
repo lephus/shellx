@@ -275,7 +275,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Chỉ các cửa sổ terminal mở sau khi bật chia sẻ mới hiện ở đây. Mở một cửa sổ terminal mới trên máy tính.",
     ),
     "pickerHintSharingOff": MessageLookupByLibrary.simpleMessage(
-      "Bật \'Chia sẻ terminal\' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.",
+      "Bật \'Chia sẻ terminal với điện thoại\' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.",
     ),
     "pickerHintUpdateDesktop": MessageLookupByLibrary.simpleMessage(
       "Cập nhật ShellX trên máy tính để xem các terminal đang mở.",
@@ -338,6 +338,28 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "settingsNoPairedMachines": MessageLookupByLibrary.simpleMessage(
       "Chưa ghép nối máy nào.",
+    ),
+    "settingsNotifications": MessageLookupByLibrary.simpleMessage(
+      "Thông báo đẩy",
+    ),
+    "settingsNotificationsFootnote": MessageLookupByLibrary.simpleMessage(
+      "Báo khi một lệnh chạy lâu trên máy tính xong hoặc khi chương trình gửi thông báo. Chọn ngưỡng thời gian trong menu ShellX trên máy tính.",
+    ),
+    "settingsNotificationsGroup": MessageLookupByLibrary.simpleMessage(
+      "Thông báo",
+    ),
+    "settingsNotificationsOff": MessageLookupByLibrary.simpleMessage(
+      "Đang tắt",
+    ),
+    "settingsNotificationsOffFootnote": MessageLookupByLibrary.simpleMessage(
+      "Thông báo đang tắt — mở Cài đặt hệ thống để bật.",
+    ),
+    "settingsNotificationsOn": MessageLookupByLibrary.simpleMessage("Đang bật"),
+    "settingsNotificationsOpenSystem": MessageLookupByLibrary.simpleMessage(
+      "Mở Cài đặt hệ thống",
+    ),
+    "settingsNotificationsTurnOn": MessageLookupByLibrary.simpleMessage(
+      "Bật thông báo",
     ),
     "settingsPairedMachines": MessageLookupByLibrary.simpleMessage(
       "Máy đã ghép nối",
