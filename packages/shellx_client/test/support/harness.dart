@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import 'drive.dart';
 import 'fake_pty.dart';
+import 'fake_term_link.dart';
 import 'fake_relay.dart';
 
 const userId = 'user-1';
@@ -119,6 +121,9 @@ final class Harness {
   late final ClientService tablet;
   late FakePtyFactory ptys;
   late SessionManager sessions;
+  late DesktopSessionManager desktop;
+  late SessionRouter router;
+  bool desktopSharing = true;
   late AgentService agent;
   int _agentStarts = 0;
 
@@ -138,12 +143,19 @@ final class Harness {
   /// first session id), same identity and trust list.
   void startAgent() {
     ptys = FakePtyFactory();
+    final ids = sessionIdAllocator(Random(1000 + _agentStarts++));
     sessions = SessionManager(
       ptyFactory: ptys,
       shellResolver: shellResolver,
       homeDirectory: '/Users/test',
       baseEnvironment: const {},
-      random: Random(1000 + _agentStarts++),
+      nextId: ids,
+    );
+    desktop = DesktopSessionManager(nextId: ids);
+    router = SessionRouter(
+      shells: sessions,
+      desktop: desktop,
+      desktopSharing: () => desktopSharing,
     );
     agent = AgentService(
       relay: RelayConnection(
@@ -157,7 +169,7 @@ final class Harness {
       deviceId: agentId,
       identity: keys.agent,
       trusted: trusted,
-      sessions: sessions,
+      sessions: router,
       pairing: PairingCodeManager(now: () => now),
       appVersion: '1.0.0',
     );
@@ -170,6 +182,7 @@ final class Harness {
   void restartAgent() {
     agent.stop();
     sessions.closeAll();
+    desktop.clear();
     settle(async);
     startAgent();
   }
@@ -179,6 +192,25 @@ final class Harness {
     relay.setReachable(phoneId, false);
     relay.dropConnection(phoneId);
     settle(async);
+  }
+
+  /// A desktop terminal window [n] connecting to the agent, snapshot sent.
+  FakeTermLink shareWindow(int n, {String snapshot = ''}) {
+    final link = FakeTermLink(
+      TermInfo(
+        termId: Uint8List.fromList(List.filled(16, n)),
+        app: 'Terminal',
+        shell: 'zsh',
+        pid: 1000 + n,
+        cols: 80,
+        rows: 24,
+        startedAt: 1759276800000,
+      ),
+    );
+    desktop.addLink(link);
+    link.snapshot(snapshot);
+    settle(async);
+    return link;
   }
 
   /// Lets the phone reconnect (backoff ≤ 1 s) and finish re-attaching.

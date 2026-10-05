@@ -6,6 +6,8 @@ import 'package:test/test.dart';
 Uint8List bytes(int from, int count) =>
     Uint8List.fromList(List.generate(count, (i) => (from + i) % 256));
 
+Uint8List _bytes(String s) => Uint8List.fromList(s.codeUnits);
+
 void main() {
   test('starts empty', () {
     final ring = RingBuffer(8);
@@ -54,5 +56,38 @@ void main() {
 
   test('rejects a non-positive capacity', () {
     expect(() => RingBuffer(0), throwsArgumentError);
+  });
+
+  test('restartWith drops what was held and keeps positions increasing', () {
+    final ring = RingBuffer(8)..append(_bytes('abcdef'));
+    ring.restartWith(_bytes('XYZ'));
+    expect(ring.start, 6);
+    expect(ring.end, 9);
+    expect(String.fromCharCodes(ring.read(6, 10)), 'XYZ');
+    expect(() => ring.read(5, 1), throwsRangeError);
+  });
+
+  test('restartWith larger than the capacity keeps the newest bytes', () {
+    final ring = RingBuffer(4)..append(_bytes('ab'));
+    ring.restartWith(_bytes('0123456789'));
+    expect(ring.start, 8);
+    expect(ring.end, 12);
+    expect(String.fromCharCodes(ring.read(8, 4)), '6789');
+  });
+
+  test('restartWith on an empty buffer is an append', () {
+    final ring = RingBuffer(8)..restartWith(_bytes('hi'));
+    expect(ring.start, 0);
+    expect(ring.end, 2);
+  });
+
+  test('after restartWith, appends wrap around as usual', () {
+    final ring = RingBuffer(4)
+      ..append(_bytes('abc'))
+      ..restartWith(_bytes('de'))
+      ..append(_bytes('fgh'));
+    expect(ring.start, 4);
+    expect(ring.end, 8);
+    expect(String.fromCharCodes(ring.read(4, 4)), 'efgh');
   });
 }

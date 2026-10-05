@@ -117,6 +117,12 @@ final class MachineClient {
 
   Stream<MachineConnectionState> get states => _states.stream;
 
+  bool? _desktopSharing;
+  bool _listedDesktop = false;
+
+  /// The last `desktop_sharing` the agent reported, or null if never told.
+  bool? get desktopSharing => _desktopSharing;
+
   List<ClientTab> get tabs => List.unmodifiable(_tabs.values);
 
   /// IK handshake with the pinned key. Throws [MachineConnectionException]
@@ -128,13 +134,17 @@ final class MachineClient {
     );
   }
 
-  Future<List<SessionInfo>> listSessions() async {
+  /// [includeDesktop] also asks for desktop terminals (spec §8); until the
+  /// app shows them (P5) it stays false by default, so today's screens see
+  /// today's list.
+  Future<List<SessionInfo>> listSessions({bool includeDesktop = false}) async {
     await connect();
+    if (includeDesktop) _listedDesktop = true;
     final pending = _PendingList();
     _pendingLists.add(pending);
     return _request(
       pending.completer,
-      const SessionList(),
+      SessionList(desktop: includeDesktop),
       () => _pendingLists.remove(pending),
       abandon: () => pending.abandoned = true,
     );
@@ -168,7 +178,9 @@ final class MachineClient {
     if (tab == null) {
       final info =
           _known[id] ??
-          (await listSessions()).where((s) => s.id == id).firstOrNull;
+          (await listSessions(
+            includeDesktop: _listedDesktop,
+          )).where((s) => s.id == id).firstOrNull;
       if (info == null) {
         throw AppErrorException(
           AppErrorCode.sessionNotFound,
@@ -186,6 +198,9 @@ final class MachineClient {
           cols: cols,
           rows: rows,
           sendAck: _sendAck,
+          kind: info.kind,
+          app: info.app,
+          title: info.title,
         );
         _tabs[id] = tab;
       }
@@ -249,6 +264,12 @@ final class MachineClient {
     final wasAttached = tab.isAttached;
     tab.dispose();
     if (!wasAttached) return;
+    if (tab.kind == SessionKind.desktop) {
+      // Leaving a desktop terminal never ends it; with no channel the agent
+      // already detached this phone when the channel dropped.
+      if (_send([SessionDetach(id: id)])) await _outbox;
+      return;
+    }
     if (_send([SessionClose(id: id)])) {
       await _outbox;
       return;
@@ -503,8 +524,9 @@ final class MachineClient {
 
   void _dispatch(AppMessage message) {
     switch (message) {
-      case SessionListResult(:final sessions):
+      case SessionListResult(:final sessions, :final desktopSharing):
         _known = {for (final s in sessions) s.id: s};
+        if (desktopSharing != null) _desktopSharing = desktopSharing;
         if (_pendingLists.isEmpty) return;
         final pending = _pendingLists.removeAt(0);
         pending.retires.forEach(_pendingOpens.remove);
@@ -531,6 +553,8 @@ final class MachineClient {
         _tabs[id] = tab;
         _attachedHere.add(tab);
         pending.completer.complete(tab);
+      case SessionDriver(:final id, :final by):
+        _tabs[id]?.handleDriver(by);
       case SessionAttached(:final id):
         _takeAttach(id)?.complete();
         // The agent takes this tab's input again: send what was held.

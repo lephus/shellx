@@ -216,7 +216,7 @@ Nhánh `feat/terminal-sharing-p2b`. Cổng Windows của `shellx-term` (spec §5
 
 ### Workflow `windows-check`
 
-`.github/workflows/windows-check.yml`: `workflow_dispatch` và push lên `windows-check/**`; chạy `cargo fmt --check`, `clippy` và `test` (`--locked`) trên `windows-latest` và `macos-latest`. Bước đầu đặt `core.autocrlf=false` vì runner Windows mặc định là `true`. Phạm vi chỉ `term/`; P3/P4 thêm `dart test` và `flutter build windows`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
+`.github/workflows/windows-check.yml`: `workflow_dispatch` và push lên `windows-check/**`; chạy `cargo fmt --check`, `clippy` và `test` (`--locked`) trên `windows-latest` và `macos-latest`. Bước đầu đặt `core.autocrlf=false` vì runner Windows mặc định là `true`. Rust ghim ở 1.95.0 (bản trên máy Mac) để lint/định dạng của bản stable mới hơn không làm đỏ CI. Phạm vi chỉ `term/`; P3/P4 thêm `dart test` và `flutter build windows`. `workflow_dispatch` chỉ dùng được khi file đã nằm trên nhánh mặc định.
 
 ### Kiểm tay Windows còn thiếu
 
@@ -226,3 +226,129 @@ Nhánh `feat/terminal-sharing-p2b`. Cổng Windows của `shellx-term` (spec §5
 - Mã hóa profile của PowerShell 5.1 (khối chỉ ASCII; kiểm profile có tiếng Việt và không BOM).
 - Ctrl+Space (xem giới hạn).
 - Đổi cỡ cửa sổ conhost cổ điển (đặc biệt chiều cao khi scrollback dài).
+- Lối tắt PowerShell 7 ở Start menu có thể truyền `-WorkingDirectory ~`, đối số này không nằm trong danh sách cho phép nên cửa sổ đó sẽ không được bọc (chưa xác minh).
+- Ctrl+Break cũng tới PowerShell bên ngoài trong lúc nó chờ.
+
+### Review cuối P2b (2026-10-02)
+
+Chạy sớm, song song với lần CI Windows đầu, để lỗi CI và lỗi review sửa chung một vòng đẩy. Kết luận: cần sửa 1 lỗi Important, không có Critical; 5 mục Review Focus đều đúng khi lần theo code; tên/chữ ký winapi 0.3.9 và lời gọi portable-pty 0.9.0 đã đối chiếu với source; `Cargo.lock` đủ cho Windows.
+
+- **I1 — Xong:** trên Windows, `CommandBuilder::new` của portable-pty đè môi trường của tiến trình bằng giá trị registry (PATH, TEMP, PSModulePath…), nên shell bên trong mất PATH của venv/`conda activate`/`terminal.integrated.env` của VS Code. Nay `winwrap` xóa môi trường gốc của builder rồi chép nguyên môi trường của cửa sổ; test Windows `the_inner_shell_keeps_the_window_s_environment` (`OS` đặt khác registry).
+- **M1 — Xong:** workflow ghim Rust 1.95.0.
+- **M2 — Còn mở:** chưa có test Windows kiểm console được trả về chế độ cũ sau khi thoát hoặc panic (spec §11.1); hướng: thử phím Up sau khi carry-on và một test khối với lỗi `panic`.
+- **M3 — Còn mở:** `appname.rs` xét `WT_SESSION` trước `TERM_PROGRAM`, mà `WT_SESSION` được thừa kế, nên VS Code mở bằng `code .` từ một tab Windows Terminal sẽ hiện là "Windows Terminal". Hẹp, spec không quy định thứ tự.
+
+## P3 — agent + giao thức (2026-10-05)
+
+Nhánh `feat/terminal-sharing-p3` (cắt từ `origin/windows-check/p2b` = `main` + `d6f778f`). Plan: `docs/superpowers/plans/2026-10-05-terminal-sharing-p3-agent-protocol.md`. Phía agent của đường nối nội bộ (spec §6), phiên `desktop` (§7.1–7.5, §7.7–7.9), giao thức điện thoại (§8), e2e (§11.4). Relay, web, `term/src/**` và giao diện mobile/desktop không đổi; thay đổi duy nhất ở `term/` là ví dụ chỉ dành cho test `term/examples/fake_window.rs`.
+
+### Môi trường
+
+- Flutter 3.41.7 cài qua `fvm install 3.41.7` (gọi bằng `PATH="$HOME/fvm/versions/3.41.7/bin:$PATH"`); fvm toàn cục vẫn là 3.38.2.
+- Rust 1.95.0 cài qua rustup (`--no-modify-path`), gọi bằng `PATH="$HOME/.cargo/bin:$PATH"`, không đổi PATH của máy.
+- e2e chạy với relay cục bộ (`npm run dev`, `SHELLX_E2E_RELAY=http://127.0.0.1:8787`). Không kết nối `relay.shellx.pro`.
+
+### Test (lần chạy cổng cuối, 2026-10-05)
+
+| Gói | Kết quả |
+|---|---|
+| `packages/shellx_core` | 280 xanh |
+| `packages/shellx_agent` | 275 xanh (271 trước vòng sửa sau review cuối) |
+| `packages/shellx_client` | 103 xanh |
+| `packages/shellx_e2e` `test/term_link_test.dart` | 3 xanh (`shellx-term` thật) |
+| `apps/desktop` | 269 xanh |
+| `apps/mobile` | 501 xanh |
+| `term/` (`cargo test --features test-hooks`) | 157 xanh, 2 `#[ignore]` (không đổi) |
+
+`dart analyze` / `flutter analyze` sạch ở mọi gói; `cargo fmt --check` và `cargo clippy --all-targets --features test-hooks -- -D warnings` sạch. Đường cơ sở trước P3: core 261, agent 167, client 98, desktop 269.
+
+e2e trên relay cục bộ (Task 12): toàn bộ `packages/shellx_e2e` **11 xanh** (7 e2e cũ + 3 `term_link` + 1 `desktop_terminal_e2e_test.dart`); file mới chạy thêm 3 lần liên tiếp đều xanh. Không chạy lại ở Task 13 (cổng cuối không khởi động relay).
+
+### Commit trong nhánh (`git log --oneline main..HEAD`)
+
+```
+ecea0eb test(e2e): desktop terminal over the relay — list, earlier output, typing, detach, re-attach, exit code (spec §11.4)
+ec4bdb6 feat(agent): TerminalSharing; test(e2e): real shellx-term through the agent — earlier output, phone typing and size, window takes the size back, exit code, agent restart (spec §11.4)
+f6e9373 feat(client): desktop sessions — listSessions(includeDesktop), desktopSharing, tab kind/app/title, TabDriver, closeTab detaches desktop tabs
+1456af4 feat(agent): SessionRouter — shared ids, merged session.list, desktop attach only for phones that listed with desktop: true, every close path spares desktop terminals (spec §7.2, §7.9)
+8d9464a feat(agent): DesktopSessionManager — desktop sessions over TermLink: snapshot, 30 s reconnect, driver/size, titles, exit; no way to end a terminal (spec §7, T13)
+38d28b2 feat(agent): OSC 0/2 window-title parser that survives chunk splits (spec §7.4)
+baf969a feat(agent): TermServer — loopback port, endpoint, HMAC handshake with 5 s deadline, reject limit/version, links that close past 1 MiB queued
+40abace feat(agent): endpoint file — per-platform path, 0700/0600 before the secret, atomic write, delete only our own (spec §6.1)
+18203ff test(core): drop imports made redundant by the cbor_values export
+3ac3991 feat(agent): local-link codec — messages, frames and HMAC proofs, byte-exact with term/protocol/vectors.txt
+65a257e refactor(agent): SessionManager uses SessionStream and an injectable id allocator; AgentService takes AgentSessions (existing tests unchanged)
+b6bd6ed feat(agent): SessionStream (phone-facing half of a session), RingBuffer.restartWith, shared session id allocator, AgentSessions interface
+a5205de feat(core): terminal sharing messages — session.list desktop, desktop_sharing, desktop SessionInfo, session.detach, session.driver, terminal_gone (spec §8)
+9f4a023 docs: implementation plan P3 — agent + protocol (terminal sharing)
+fe7ea0a docs: P3 spec — the desktop-capable flag is kept per phone across channel losses (tabs re-attach without listing)
+3688f0b docs: terminal sharing P3 design — agent structure (T13), data flow, errors and compatibility, tests; real-relay e2e run by the user (T14)
+d6f778f fix(term): the Windows inner shell keeps the window's environment, not the registry's; ci: pin Rust 1.95.0; docs: P2b final review
+```
+
+Commit của Task 13: workflow `windows-check` (job `dart`), ledger này, HANDOFF, trạng thái spec.
+
+### Quyết định của người điều phối (rulings)
+
+- Ruling: dùng Flutter 3.41.7 cài bằng `fvm install 3.41.7` (người dùng đã duyệt), fvm toàn cục giữ 3.38.2 — workspace cần Dart ^3.11, 3.38.2 chỉ có Dart 3.10 (đã kiểm: `pub get` lỗi) — cái giá nếu sai: không có cho các dự án khác.
+- Ruling: lúc đầu Rust chưa cài và người dùng chưa duyệt, nên Task 11–12 viết đúng như plan và mọi bước cần cargo/`shellx-term` ghi "chờ: cần Rust" — người dùng chưa cho cài thêm toolchain ngoài Flutter — cái giá nếu sai: `fake_window.rs` và test dùng binary thật hạ cánh chưa kiểm. **Đã thay thế** bằng ruling kế tiếp.
+- Ruling: người dùng yêu cầu cài Rust 1.95.0 (2026-10-05): cài qua rustup `--no-modify-path --profile minimal` kèm clippy, rustfmt, gọi bằng `PATH="$HOME/.cargo/bin:$PATH"`; nền `cargo test` của `term/` 157 xanh / 2 `#[ignore]`; Task 11–13 chạy đủ cargo và test binary thật — lệnh của người dùng — cái giá nếu sai: không có.
+- Ruling: `hello`/`auth` đến sau `ready` vẫn được chuyển ra `TermLink.messages` (plan quy định, review Task 6 Minor 2), giữ nguyên; `DesktopSessionManager` coi `TermHello() || TermAuth()` là lỗi giao thức và bỏ link — giữ hành vi đã định trong plan — cái giá nếu sai: người tiêu thụ `TermLink` sau này cũng phải tự xử lý hai tin nhắn này.
+- Ruling: T13 — phiên `desktop` có bộ quản lý riêng (`DesktopSessionManager`) **không có hàm tắt**, phần chung rút ra `SessionStream`; không giả làm `Pty` có `kill()` rỗng, không dùng một `SessionManager` chung có cờ `kind` — an toàn của terminal không được phụ thuộc vào việc không quên một nhánh — cái giá nếu sai: thêm một lớp và `AgentSessions` để ghép, trùng một ít mã.
+- Ruling: cờ "điện thoại đã `session.list {desktop: true}`" được giữ theo từng điện thoại qua các lần mất kênh (sửa spec §7.9, commit `fe7ea0a`) và chỉ xóa khi thu hồi — tab mở sẵn phải nối lại được mà không liệt kê lại — cái giá nếu sai: một điện thoại bị thu hồi rồi ghép lại phải liệt kê lại; nếu cờ bị xóa sớm, tab desktop không nối lại được sau khi mất kênh.
+- Ruling: `listSessions(includeDesktop: false)` là mặc định cho đến P5 — `session.list` không có `desktop: true` và câu trả lời phải giống từng byte như hiện nay, app mobile hiện tại chưa biết phiên `desktop` — cái giá nếu sai: P5 phải nhớ bật `includeDesktop: true`, nếu quên người dùng không thấy phiên desktop.
+- Ruling: `TermSize` từ `shellx-term` bị bỏ qua (kích thước do `driver` quyết định, bên cuối cùng thao tác điều khiển) — tránh hai nguồn kích thước giằng co — cái giá nếu sai: khi cửa sổ đổi cỡ mà điện thoại đang lái, kích thước phía điện thoại không theo cửa sổ.
+- Ruling: `driver(phone)` được gửi cho `shellx-term` trên **mọi** lần điện thoại đổi cỡ (không chỉ lần đầu) — để cửa sổ biết điện thoại đang lái và lấy lại cỡ khi nó gõ — cái giá nếu sai: thêm một tin nhắn nhỏ mỗi lần đổi cỡ.
+- Ruling: dùng ví dụ `term/examples/fake_window.rs` thay cho `script(1)` để giả cửa sổ terminal trong test — `script(1)` khác nhau giữa macOS/Linux/Windows và không điều khiển được cỡ/thoát — cái giá nếu sai: một chương trình test thêm cần biên dịch và (trên Windows) clippy qua `windows-check`.
+- Ruling (lệch plan đã chấp nhận, Task 8): `_dropLink` đặt thêm `live=false` vì mã trong brief sập khi `input`/`resize` đến lúc `exit` đang xả; thêm test hồi quy — cái giá nếu sai: không có.
+- Ruling (lệch plan đã chấp nhận, Task 11): `buildTermBinaries` đưa `$HOME/.cargo/bin` lên đầu PATH; `tearDown` chờ cửa sổ thoát rồi thử xóa HOME tạm (tối đa 5 giây) — cái giá nếu sai: thử lại có thể che việc bash ghi `.bash_history` (xem "Việc nhỏ còn mở").
+
+### Việc nhỏ còn mở (đánh dấu "FLAG FOR FINAL REVIEW")
+
+Các mục đã sửa hoặc đã gỡ ở vòng sửa sau review cuối nằm trong mục kế tiếp. Còn mở:
+
+- `input()` dùng `s.link!` sau khi `_drive` đã phát (nên lấy `link` trước) (`desktop_session_manager.dart`).
+- `tearDown` của `term_link_test.dart` vẫn giữ vòng thử xóa HOME tạm có giới hạn (nay chỉ là lưới an toàn: `HISTFILE=''` đã chặn `.bash_history`); chưa cho cửa sổ của test 3 tự thoát.
+- "Cửa sổ lấy lại cỡ" mới chỉ được chứng minh bằng tin nhắn `driver`; thêm `stty size` → `24 80` (`term_link_test.dart:110`).
+
+### Sửa sau review cuối (2026-10-05)
+
+Review cuối toàn nhánh: một mục Important và các mục nhỏ, sửa trong một lượt (báo cáo cục bộ `.superpowers/sdd/2026-10-05-terminal-sharing-p3-agent-protocol/final-fix-report.md`).
+
+1. **Important — `TerminalSharing.start/stop` chạy đua:** `stop()` gọi lúc `start()` đang chờ bind/ghi `endpoint` trả về ngay và chia sẻ vẫn BẬT; hai `start()` cùng lúc bind hai server, rò server thứ nhất. Nay `TerminalSharing` xếp `start`/`stop` thành một hàng đợi theo thứ tự gọi (`start` lỗi chỉ ném cho người gọi, không chặn hàng); `TermServer` ghi rõ người gọi phải tuần tự hóa. Test: "stop while start is in flight leaves sharing off and no endpoint file", "two concurrent starts bind one server" (`terminal_sharing_test.dart`).
+2. `@internal` đặt lại trên cả `handleDriver` lẫn `handleDetached` (`client_tab.dart`).
+3. `dart format` cho `term_auth.dart`, `term_messages.dart`, `machine_client.dart`, `messages.dart` (và lint `curly_braces_in_flow_control_structures` lộ ra ở `term_messages.dart`).
+4. Test mới: một `TermLink` sống quá 2× hạn bắt tay vẫn gửi được và không bị đóng (`term_server_test.dart`).
+5. Test router `closeSession(desktopId)` và `closeAll` nay khẳng định điện thoại nhận `session.detached {closed_by_host}` và phiên không còn điện thoại gắn (`session_router_test.dart`).
+6. `DesktopSessionManager.disconnectPhone` bỏ qua phiên đang xả sau `exit` (như `SessionManager.closeSession`): việc xả kết thúc và điện thoại nhận `session.exited` thay vì `closed_by_host` mà không có `session.exited`. Có test.
+7. Chú thích cũ: `AgentService` (đóng phiên là việc của chủ `AgentSessions`, tức `SessionRouter.closeAll`); `DesktopSessionManager.outbound` mang cảnh báo gọi ngược đồng bộ như `SessionRouter`/`SessionManager`.
+8. `TermWindow` đặt `HISTFILE=''` (bash không ghi `.bash_history` vào HOME tạm khi SIGHUP); giữ vòng thử lại có giới hạn trong `tearDown`.
+
+Mục đánh dấu của Task 5 (`deleteIfOwned` để lọt `FormatException`) là **báo nhầm**: `File.readAsString` bọc lỗi giải mã thành `FileSystemException`, đã được bắt.
+
+**Lệch §11.4 (đã chấp nhận):** spec muốn e2e qua relay chạy với relay trong bộ nhớ; thực tế `desktop_terminal_e2e_test.dart` chạy với relay Node cục bộ (`npm run dev`) và bị bỏ qua khi không có `SHELLX_E2E_RELAY`. Cổng mặc định phủ luồng này theo từng phần: `term_link_test.dart` (`shellx-term` thật qua agent) và harness của `shellx_client` với relay trong bộ nhớ.
+
+Các việc nhỏ khác đã hoãn (không đánh dấu) nằm trong `.superpowers/sdd/2026-10-05-terminal-sharing-p3-agent-protocol/progress.md` (cục bộ, không vào git).
+
+### Việc chờ người dùng
+
+- **T14 — chạy e2e trên relay thật** (không chạy trong P3): `cd packages/shellx_e2e && SHELLX_E2E_RELAY=https://relay.shellx.pro dart test test/desktop_terminal_e2e_test.dart`
+- **CI Windows của job `dart` mới** (`shellx_core` + `shellx_agent` trên `windows-latest` và `macos-latest`): chỉ đẩy nhánh `windows-check/p3` khi người dùng bảo. Các test `term_endpoint`/`term_server`/`terminal_sharing` là `@TestOn('mac-os || linux')`; bộ mã, tên cửa sổ, luồng, router và bộ quản lý phiên desktop chạy cả trên Windows. Lần chạy này cũng kiểm clippy cho `fake_window.rs` trên Windows.
+- Spec §7.7–§7.9, T13–T14 đang "chờ người dùng đọc lại".
+
+### Ghi cho P4
+
+- `TerminalSharing` bật/tắt từ công tắc (start/stop theo `enabled`).
+- `agent_runtime.dart`: `desktopSharing: () => sharing.enabled`.
+- Menu khay liệt kê `DesktopSessionManager.sessions`.
+- Thông báo từ `phoneAttached` (giới hạn 10 phút cho mỗi cặp (điện thoại, terminal)).
+- Đường dẫn endpoint lấy từ `termEndpointPath(environment: Platform.environment, windows: Platform.isWindows)`.
+- Chưa có test của `apps/desktop` cho việc phiên desktop sống sót qua `runtime.stop`/`closeSession`/`closeAllSessions`.
+
+### Ghi cho P5
+
+- Gọi `listSessions(includeDesktop: true)`.
+- Gợi ý `desktopSharing` có ba giá trị null/false/true (agent cũ / tắt / bật).
+- Banner của `TabDriver` (ai đang lái).
+- Thẻ `TabDetached(terminalGone)`: hiện `terminal_tab_controller.dart:142` vẫn ánh xạ `terminal_gone` sang banner "đóng bởi máy chủ".
+- Điện thoại giành phiên (`taken_over`) khi phiên đang do điện thoại lái và cùng kích thước thì **không** nhận `session.driver` (`desktop_session_manager.dart:439`, `_drive` thoát sớm khi `!changed && driver == phone`): banner của P5 phải coi bên lái là "phone" ngay sau khi gắn.

@@ -101,9 +101,11 @@ Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn 
   - Spec §5.1, §5.2, §5.4, §6.1–§6.5 đã cập nhật theo code; byte chuẩn: `term/protocol/vectors.txt` (P3 phải khớp từng byte, thứ tự khóa theo byte). Chi tiết, việc còn mở và các mục "Ghi cho P2": `ledgers/terminal-sharing.md`, mục P2a.
 - **P2b (code xong, chờ CI Windows):** `shellx-term` trên Windows (ConPTY, console VT thô, khối PowerShell với danh sách đối số cho phép) và workflow `windows-check.yml` (`workflow_dispatch` hoặc push `windows-check/**`; chỉ `term/`). macOS: 157 test xanh, 2 `#[ignore]`.
   - Giới hạn: không có kiểm tra theo tty; shell bên trong thoát 222/mã âm thì rơi về shell ngoài; tích hợp PowerShell của VS Code không bọc; Ctrl+Space chưa tới shell bên trong; mỗi lần thoát chậm ~0,5 s. Việc cho P4: `+crt-static`. Chi tiết: ledger, mục P2b.
+- **P3 xong (2026-10-05):** agent và giao thức, nhánh `feat/terminal-sharing-p3` (chưa gộp, chưa đẩy). Phiên `desktop` qua `DesktopSessionManager` (không có hàm tắt), `TermServer`/`TermLink`/`TerminalSharing`, `SessionRouter`, client có `listSessions(includeDesktop)`.
+  - Test: core 280, agent 271, client 103, desktop 269, mobile 501, `term_link` 3, term 157 (2 `#[ignore]`); e2e trên relay cục bộ 11 xanh.
+  - Còn lại cho người dùng: chạy e2e trên relay thật (`cd packages/shellx_e2e && SHELLX_E2E_RELAY=https://relay.shellx.pro dart test test/desktop_terminal_e2e_test.dart`); chạy CI Windows của job `dart` mới (đẩy `windows-check/p3` khi sẵn sàng); đọc lại spec §7.7–§7.9. Chi tiết, rulings, việc nhỏ còn mở, ghi cho P4/P5: ledger, mục P3.
 - **Còn lại:**
   - **P2b:** chờ lần chạy CI Windows đầu tiên (Task 8) rồi mới đóng.
-  - **P3:** agent và giao thức (phải khớp `vectors.txt`).
   - P4: phần desktop (bật/tắt, bộ cài, ký).
   - P5: mobile.
   - Thứ tự ở spec §14.

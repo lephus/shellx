@@ -138,6 +138,8 @@ class TerminalTabController extends Controller {
         if (_banner.peek()?.notice != TabNotice.closedByHost) {
           _banner.value = TabBanner(TabNotice.exited, exitCode: exitCode);
         }
+      case TabDriver():
+        break; // The "computer is using this terminal" banner comes in P5.
       case TabDetached(:final reason):
         _banner.value = TabBanner(reason == DetachReason.takenOver ? TabNotice.takenOver : TabNotice.closedByHost);
       case TabError(:final code, :final message):
