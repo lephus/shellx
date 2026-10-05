@@ -16,6 +16,7 @@ pub mod session;
 pub mod size;
 #[cfg(unix)]
 pub mod tty;
+pub mod uninstall;
 pub mod wincodec;
 #[cfg(windows)]
 pub mod wincon;

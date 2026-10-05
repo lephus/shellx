@@ -23,6 +23,8 @@ pub enum Command {
     Version,
     /// Print the parent process's executable path (used by the shell blocks).
     Probe,
+    /// Remove the ShellX block from the shell config files and delete `bin`.
+    Uninstall,
     /// Anything else. `main` never refuses the user a shell: it falls back
     /// to a plain one for this.
     Invalid,
@@ -57,6 +59,10 @@ pub fn parse_with_env<I: IntoIterator<Item = OsString>>(
         },
         Some(first) if first == "probe" => match args.next() {
             None => Command::Probe,
+            Some(_) => Command::Invalid,
+        },
+        Some(first) if first == "uninstall" => match args.next() {
+            None => Command::Uninstall,
             Some(_) => Command::Invalid,
         },
         Some(first) if first == "wrap" => parse_wrap(args),
@@ -192,6 +198,12 @@ mod tests {
             ),
             Command::Invalid
         );
+    }
+
+    #[test]
+    fn uninstall() {
+        assert_eq!(parse_strs(&["uninstall"]), Command::Uninstall);
+        assert_eq!(parse_strs(&["uninstall", "x"]), Command::Invalid);
     }
 
     #[test]

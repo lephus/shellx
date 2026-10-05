@@ -48,6 +48,7 @@ fn main() {
                 env!("CARGO_PKG_VERSION")
             );
         }
+        cli::Command::Uninstall => std::process::exit(shellx_term::uninstall::main()),
         cli::Command::Probe => {
             use std::io::Write;
             match cli::parent_executable() {
@@ -108,6 +109,7 @@ fn main() {
                 env!("CARGO_PKG_VERSION")
             );
         }
+        cli::Command::Uninstall => std::process::exit(shellx_term::uninstall::main()),
         cli::Command::Wrap(args) => match winwrap::run(&args) {
             Ok(code) => std::process::exit(code),
             Err(error) => {
