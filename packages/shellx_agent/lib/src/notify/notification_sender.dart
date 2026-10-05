@@ -27,11 +27,16 @@ final class AgentNotification {
 ///   `429`, `401` — the relay connection's own `AgentRevoked` flow handles
 ///   a revoked agent) drops that notification: no queue, no retry, since a
 ///   notification minutes late is usually meaningless.
+/// - A `202 {sent: 0}` (no paired phone can receive it) pauses sending for
+///   [pauseWhenUnheard] (15 min): no notification text leaves the computer
+///   while nobody would see it. Any `sent > 0` lifts the pause; a new
+///   sender (a new runtime) starts unpaused.
 final class NotificationSender {
   NotificationSender({
     required ShellxApi api,
     this.maxPerWindow = 6,
     this.window = const Duration(seconds: 60),
+    this.pauseWhenUnheard = const Duration(minutes: 15),
     DateTime Function()? now,
     void Function(String message)? log,
   }) : _api = api,
@@ -49,17 +54,23 @@ final class NotificationSender {
   final ShellxApi _api;
   final int maxPerWindow;
   final Duration window;
+  final Duration pauseWhenUnheard;
   final DateTime Function() _now;
   final void Function(String message)? _log;
   final _recent = <DateTime>[];
 
   int _droppedByLimit = 0;
+  int _droppedWhilePaused = 0;
+  DateTime? _pausedUntil;
   int _failed = 0;
   int _inFlight = 0;
   Completer<void>? _idle;
 
   /// Notifications refused by the per-minute limit so far.
   int get droppedByLimit => _droppedByLimit;
+
+  /// Notifications not sent because the last one reached no phone.
+  int get droppedWhilePaused => _droppedWhilePaused;
 
   /// Notifications whose request failed so far.
   int get failed => _failed;
@@ -72,6 +83,14 @@ final class NotificationSender {
   bool send(AgentNotification notification) {
     try {
       final now = _now();
+      final pausedUntil = _pausedUntil;
+      if (pausedUntil != null) {
+        if (now.isBefore(pausedUntil)) {
+          _droppedWhilePaused++;
+          return false;
+        }
+        _pausedUntil = null;
+      }
       _recent.removeWhere((t) => now.difference(t) >= window);
       if (_recent.length >= maxPerWindow) {
         _droppedByLimit++;
@@ -102,7 +121,16 @@ final class NotificationSender {
         max = max * 3 ~/ 4;
         body = _clip(n.body, max);
       }
-      await _api.sendNotification(title, body, data: n.data);
+      final sent = await _api.sendNotification(title, body, data: n.data);
+      if (sent == 0) {
+        _pausedUntil = _now().add(pauseWhenUnheard);
+        _log?.call(
+          'no phone received the notification: paused for '
+          '${pauseWhenUnheard.inMinutes} min',
+        );
+      } else {
+        _pausedUntil = null;
+      }
     } catch (error) {
       _failed++;
       final code = error is ApiException ? error.code : error.runtimeType;

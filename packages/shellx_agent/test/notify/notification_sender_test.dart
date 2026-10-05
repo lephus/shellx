@@ -40,6 +40,83 @@ const _n = AgentNotification(
 );
 
 void main() {
+  test('after 202 {sent: 0} (no phone can receive) nothing is sent for 15 min; '
+      'sent > 0 lifts the pause', () {
+    fakeAsync((async) {
+      final clock = _Clock();
+      var sent = 0;
+      final logs = <String>[];
+      final (api, bodies) = _api(
+        () async => http.Response(
+          '{"sent":$sent}',
+          202,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      final sender = NotificationSender(
+        api: api,
+        now: () => clock.now,
+        log: logs.add,
+      );
+      expect(sender.send(_n), isTrue);
+      async.flushMicrotasks();
+      expect(bodies, hasLength(1));
+
+      clock.advance(const Duration(minutes: 14, seconds: 59));
+      expect(sender.send(_n), isFalse);
+      expect(sender.droppedWhilePaused, 1);
+      async.flushMicrotasks();
+      expect(bodies, hasLength(1));
+
+      clock.advance(const Duration(seconds: 1));
+      sent = 2;
+      expect(sender.send(_n), isTrue);
+      async.flushMicrotasks();
+      expect(bodies, hasLength(2));
+      // A phone received it: no pause.
+      expect(sender.send(_n), isTrue);
+      async.flushMicrotasks();
+      expect(bodies, hasLength(3));
+      expect(logs, contains(contains('paused')));
+    });
+  });
+
+  test(
+    'a failed request does not pause; a new sender (new runtime) is not paused',
+    () {
+      fakeAsync((async) {
+        final clock = _Clock();
+        var status = 503;
+        final (api, bodies) = _api(
+          () async => status == 503
+              ? http.Response(
+                  '{"error":{"code":"push_unavailable","message":"x"}}',
+                  503,
+                  headers: {'content-type': 'application/json'},
+                )
+              : http.Response(
+                  '{"sent":0}',
+                  202,
+                  headers: {'content-type': 'application/json'},
+                ),
+        );
+        final sender = NotificationSender(api: api, now: () => clock.now);
+        sender.send(_n);
+        async.flushMicrotasks();
+        expect(sender.send(_n), isTrue);
+        async.flushMicrotasks();
+        status = 202;
+        sender.send(_n);
+        async.flushMicrotasks();
+        expect(sender.send(_n), isFalse);
+        final fresh = NotificationSender(api: api, now: () => clock.now);
+        expect(fresh.send(_n), isTrue);
+        async.flushMicrotasks();
+        expect(bodies, hasLength(4));
+      });
+    },
+  );
+
   test('sends title, body and data through POST /v1/notifications', () {
     fakeAsync((async) {
       final (api, bodies) = _api(_ok);
