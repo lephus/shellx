@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../notify/agent_notifications.dart';
 import '../session/agent_sessions.dart';
 import '../session/session_stream.dart';
 import 'osc_title.dart';
@@ -72,6 +73,9 @@ final class _Session {
   String title = '';
   _Driver driver = _Driver.desktop;
 
+  /// Push notifications from live `out` (never the snapshot, N11).
+  SessionNotifier? notifier;
+
   /// The attached phone's size; 0 before any phone attached.
   int cols = 0, rows = 0;
 
@@ -96,7 +100,9 @@ final class DesktopSessionManager {
     int sendWindow = 256 * 1024,
     Duration reconnectGrace = const Duration(seconds: 30),
     Duration drainTimeout = const Duration(seconds: 30),
+    AgentNotifications? notifications,
   }) : _nextId = nextId,
+       _notifications = notifications,
        _maxSessions = maxSessions,
        _bufferCapacity = bufferCapacity,
        _sendWindow = sendWindow,
@@ -109,6 +115,7 @@ final class DesktopSessionManager {
   final int _sendWindow;
   final Duration _grace;
   final Duration _drainTimeout;
+  final AgentNotifications? _notifications;
 
   final _outbound = StreamController<OutboundMessage>.broadcast(sync: true);
   final _changes = StreamController<void>.broadcast();
@@ -181,6 +188,12 @@ final class DesktopSessionManager {
           send: _send,
         ),
       );
+      final created = session;
+      created.notifier = _notifications?.forDesktop(
+        sessionId: id,
+        app: () => created.info.app,
+        title: () => created.title,
+      );
       _sessions[id] = session;
       _byTerm[link.info.key] = session;
     } else {
@@ -190,6 +203,7 @@ final class DesktopSessionManager {
       session.info = link.info;
     }
     final s = session;
+    s.notifier?.resetParser();
     s.link = link;
     s.live = false;
     s.snapshot = BytesBuilder(copy: false);
@@ -335,6 +349,7 @@ final class DesktopSessionManager {
           _changes.add(null);
         }
         _pump(s);
+        s.notifier?.feed(data);
       case TermLocal():
         if (!s.live) return _protocolError(s);
         s.driver = _Driver.desktop;

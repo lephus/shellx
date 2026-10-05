@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../notify/agent_notifications.dart';
 import '../pty/pty.dart';
 import '../pty/session_environment.dart';
 import '../pty/shell_resolver.dart';
@@ -85,6 +86,9 @@ final class _Session {
 
   StreamSubscription<Uint8List>? output;
 
+  /// Push notifications from this session's output (null when off).
+  SessionNotifier? notifier;
+
   void write(Uint8List data) {
     if (!exited) pty.write(data);
   }
@@ -115,7 +119,9 @@ final class SessionManager implements AgentSessions {
     int sendWindow = 256 * 1024,
     Random? random,
     int Function()? nextId,
+    AgentNotifications? notifications,
   }) : _ptyFactory = ptyFactory,
+       _notifications = notifications,
        _shellResolver = shellResolver,
        _homeDirectory = homeDirectory,
        _baseEnvironment = baseEnvironment,
@@ -131,6 +137,7 @@ final class SessionManager implements AgentSessions {
   final int _maxSessions;
   final int _bufferCapacity;
   final int _sendWindow;
+  final AgentNotifications? _notifications;
 
   final _outbound = StreamController<OutboundMessage>.broadcast(sync: true);
   final _changes = StreamController<void>.broadcast();
@@ -340,6 +347,10 @@ final class SessionManager implements AgentSessions {
       rows: r,
     );
     session.attachedMobileId = mobileId;
+    session.notifier = _notifications?.forShell(
+      sessionId: session.id,
+      index: session.index,
+    );
     _sessions[session.id] = session;
     _send(
       mobileId,
@@ -392,6 +403,7 @@ final class SessionManager implements AgentSessions {
       (data) {
         session.stream.append(data);
         _pump(session);
+        session.notifier?.feed(data);
       },
       onDone: outputDone.complete,
       onError: (Object _) {},
