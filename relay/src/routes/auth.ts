@@ -121,7 +121,8 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
 });
 
 /**
- * POST /v1/auth/logout — deletes this token; for an agent also every pairing it owns (spec §5.2).
+ * POST /v1/auth/logout — deletes this token and the device's push token; for an agent also every
+ * pairing it owns (spec §5.2).
  *
  * Notify-before-delete (same safe order as `DELETE /v1/pairings`): every pairing is reported to the
  * hub — which durably records the tombstone for the agent before doing anything live — before any
@@ -142,6 +143,7 @@ authRoutes.post("/logout", requireAuth, async (c) => {
     db.transaction(() => {
       db.run("DELETE FROM tokens WHERE token_hash = ?", tokenHash);
       db.run("DELETE FROM pairings WHERE agent_id = ?", auth.deviceId);
+      db.run("DELETE FROM push_tokens WHERE device_id = ?", auth.deviceId);
     });
     // The token and pairings are already gone: a hub failure from here on must not turn a
     // successful logout into a 500. The agent has no trust list left to reconcile against rows
@@ -152,7 +154,11 @@ authRoutes.post("/logout", requireAuth, async (c) => {
       logMeta("agent_purge_failed", { device_id: auth.deviceId });
     }
   } else {
-    db.run("DELETE FROM tokens WHERE token_hash = ?", tokenHash);
+    // A signed-out phone must stop getting notifications (push spec §5).
+    db.transaction(() => {
+      db.run("DELETE FROM tokens WHERE token_hash = ?", tokenHash);
+      db.run("DELETE FROM push_tokens WHERE device_id = ?", auth.deviceId);
+    });
   }
   logMeta("logout", { device_id: auth.deviceId });
   return c.body(null, 204);
