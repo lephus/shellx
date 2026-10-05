@@ -65,6 +65,7 @@ class PushController {
   final PushPlatform _platform;
   final PopupHandler Function() _popup;
   final Signal<PushPermission?> _permission = signal(null);
+  late final Signal<bool> _asked = signal(_prefs.getBool(askedKey) ?? false);
   final List<StreamSubscription<Object?>> _subscriptions = [];
   void Function()? _stopWatching;
   ShellxBackend? _owner;
@@ -79,8 +80,9 @@ class PushController {
   /// Null until read; Settings shows it.
   ReadonlySignal<PushPermission?> get permission => _permission;
 
-  /// The automatic prompt was already shown on this install.
-  bool get asked => _prefs.getBool(askedKey) ?? false;
+  /// The automatic prompt was already shown on this install. Reactive (Settings swaps "Bật thông
+  /// báo" for "Mở Cài đặt hệ thống" once it was).
+  bool get asked => _asked.value;
 
   /// Once, when the app's router is up (after the first frame). Never throws.
   void start() {
@@ -130,6 +132,7 @@ class PushController {
     if (!available || _asking) return;
     _asking = true;
     try {
+      _asked.value = true;
       await _prefs.setBool(askedKey, true);
       final permission = await _messaging.requestPermission();
       _permission.value = permission;
@@ -225,5 +228,6 @@ class PushController {
     }
     _subscriptions.clear();
     _permission.dispose();
+    _asked.dispose();
   }
 }
