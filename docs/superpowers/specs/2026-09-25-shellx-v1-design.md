@@ -18,7 +18,7 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 1. Người dùng mới cài agent, đăng ký tài khoản và ghép nối điện thoại trong dưới 3 phút.
 2. Từ điện thoại mở được phiên terminal và dùng được các chương trình toàn màn hình (`vim`, `htop`); Ctrl, Esc, Tab, phím mũi tên hoạt động đúng.
 3. Điện thoại mất mạng vài phút rồi quay lại: phiên vẫn còn chạy, output phát sinh trong lúc mất kết nối được bù lại (trong giới hạn bộ đệm 256 KiB mỗi phiên).
-4. Relay, hoặc bất kỳ ai có mật khẩu tài khoản nhưng chưa quét QR tại máy, không đọc được và không điều khiển được terminal.
+4. Relay, hoặc bất kỳ ai có mật khẩu tài khoản nhưng chưa quét QR tại máy, không đọc được và không điều khiển được terminal. **Ngoại lệ (2026-10-05):** nội dung thông báo đẩy (tên máy, tên phiên/cửa sổ, dòng lệnh, mã thoát, thời gian, hoặc chữ do chương trình gửi) đi qua relay ở dạng rõ khi người dùng bật thông báo — quyết định N3 của `2026-10-05-push-notifications-design.md`.
 5. Độ trễ gõ phím mục tiêu dưới 150 ms (trung vị) khi điện thoại và máy tính ở cùng khu vực địa lý.
 
 ---
@@ -51,7 +51,7 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 ### 3.2 Ngoài phạm vi v1.0
 
 - Hiển thị/mirror terminal trên desktop.
-- Push notification.
+- ~~Push notification.~~ Nay trong phạm vi (2026-10-05): `2026-10-05-push-notifications-design.md`.
 - Truyền file.
 - Kết nối P2P (WebRTC).
 - Lệnh cần quyền admin/UAC trên Windows.
