@@ -45,6 +45,28 @@ void main() {
       expect(project, contains('/* InfoPlist.strings in Resources */,'));
       expect(RegExp(r'knownRegions = \([^)]*\bvi,').hasMatch(project), isTrue);
     });
+
+    test('push notifications: entitlements (aps-environment), capabilities and background mode', () {
+      final entitlements = readFile('ios/Runner/Runner.entitlements');
+      expect(entitlements, contains('<key>aps-environment</key>\n\t<string>development</string>'));
+      final project = readFile('ios/Runner.xcodeproj/project.pbxproj');
+      // Debug, Release and Profile of the Runner target.
+      expect('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;'.allMatches(project), hasLength(3));
+      expect(project, contains('path = Runner.entitlements;'));
+      expect(project, contains('com.apple.Push = {\n\t\t\t\t\t\t\t\tenabled = 1;'));
+      expect(project, contains('com.apple.BackgroundModes = {\n\t\t\t\t\t\t\t\tenabled = 1;'));
+      expect(
+        readFile('ios/Runner/Info.plist'),
+        contains('<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>remote-notification</string>'),
+      );
+    });
+
+    test('Firebase: GoogleService-Info.plist of project shellxpro for com.shellx.prod, bundled', () {
+      final plist = readFile('ios/Runner/GoogleService-Info.plist');
+      expect(plist, contains('<string>shellxpro</string>'));
+      expect(plist, contains('<string>com.shellx.prod</string>'));
+      expect(readFile('ios/Runner.xcodeproj/project.pbxproj'), contains('/* GoogleService-Info.plist in Resources */,'));
+    });
   });
 
   group('Android', () {
@@ -81,15 +103,47 @@ void main() {
       }
     });
 
+    test('push notifications: permission, default channel, icon and colour', () {
+      final manifest = readFile('android/app/src/main/AndroidManifest.xml');
+      expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
+      expect(manifest, contains('com.google.firebase.messaging.default_notification_channel_id'));
+      expect(manifest, contains('android:value="@string/notification_channel_id"'));
+      expect(manifest, contains('android:resource="@drawable/ic_notification"'));
+      expect(manifest, contains('android:resource="@color/notification_color"'));
+      expect(readFile('android/app/src/main/res/values/strings.xml'), contains('>shellx_notifications<'));
+      expect(readFile('android/app/src/main/res/values-vi/strings.xml'), contains('Thông báo từ máy tính'));
+      for (final density in ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+        expect(File('android/app/src/main/res/drawable-$density/ic_notification.png').existsSync(), isTrue);
+      }
+      final activity = readFile('android/app/src/main/kotlin/com/shellx/prod/MainActivity.kt');
+      expect(activity, contains('createNotificationChannel(channel)'));
+      expect(activity, contains('R.string.notification_channel_id'));
+    });
+
+    test('Firebase: google-services.json of project shellxpro for com.shellx.prod, plugin applied', () {
+      final json = readFile('android/app/google-services.json');
+      expect(json, contains('"project_id": "shellxpro"'));
+      expect(json, contains('"package_name": "com.shellx.prod"'));
+      expect(readFile('android/app/build.gradle.kts'), contains('id("com.google.gms.google-services")'));
+      expect(readFile('android/settings.gradle.kts'), contains('id("com.google.gms.google-services") version'));
+    });
+
     test('MainActivity (package com.shellx.prod) is a FlutterFragmentActivity with AppCompat themes', () {
       final activity = readFile('android/app/src/main/kotlin/com/shellx/prod/MainActivity.kt');
       expect(activity, contains('package com.shellx.prod\n'));
-      expect(activity, contains('class MainActivity : FlutterFragmentActivity()'));
+      expect(activity, contains('class MainActivity : FlutterFragmentActivity() {'));
       expect(Directory('android/app/src/main/kotlin/com/example').existsSync(), isFalse);
       expect(Directory('android/app/src/main/kotlin/pro').existsSync(), isFalse);
       expect(readFile('android/app/src/main/res/values/styles.xml'), contains('Theme.AppCompat'));
       expect(readFile('android/app/src/main/res/values-night/styles.xml'), contains('Theme.AppCompat'));
     });
+  });
+
+  test('Firebase options name project shellxpro for both platforms (flutterfire configure)', () {
+    final options = readFile('lib/firebase_options.dart');
+    expect("projectId: 'shellxpro'".allMatches(options), hasLength(2));
+    expect(options, contains("iosBundleId: 'com.shellx.prod'"));
+    expect(readFile('firebase.json'), contains('"projectId":"shellxpro"'));
   });
 
   test('the base package name is gone from sources and platform files', () {

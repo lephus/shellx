@@ -39,6 +39,10 @@
 	<string>ShellX uses the camera to scan the pairing QR code shown on your computer.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>ShellX uses Face ID to unlock the app.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

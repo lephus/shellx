@@ -40,6 +40,10 @@ dependencies:
   # ShellX
   app_settings: 7.0.0
   device_info_plus: ^12.3.0
+  # Push notifications (push spec §6). Configuration: lib/firebase_options.dart, written by
+  # `flutterfire configure --project=shellxpro`.
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
   local_auth: ^3.0.2
   mobile_scanner: ^7.4.2
   package_info_plus: ^9.0.1

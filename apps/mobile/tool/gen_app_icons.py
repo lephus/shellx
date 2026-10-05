@@ -26,6 +26,8 @@ Outputs written by this script:
   - android/app/src/main/res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher_foreground.png
   - android/app/src/main/res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher_monochrome.png
   - android/app/src/main/res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png (legacy)
+  - android/app/src/main/res/drawable-{m,h,xh,xxh,xxxh}dpi/ic_notification.png
+    (the status-bar icon of push notifications: the monochrome glyph, 24dp)
   - assets/images/logo.png (512x512, used by `ShellxLogo`)
 """
 
@@ -64,6 +66,9 @@ DENSITIES = {
     "xxxhdpi": 4.0,
 }
 LEGACY_DP = 48
+
+# Android status-bar (notification) icons are 24dp, white on transparent.
+NOTIFICATION_DP = 24
 
 
 def measure_corner_radius(im: Image.Image) -> float:
@@ -215,8 +220,8 @@ def gen_android_adaptive_icon_xml() -> None:
     )
 
 
-def gen_android_foreground_and_monochrome() -> None:
-    square = load_square_source().convert("RGBA")
+def build_monochrome(square: Image.Image) -> Image.Image:
+    """The white glyph on transparent, full size (see gen_android_foreground_and_monochrome)."""
     bg = np.array(BACKGROUND_COLOR, dtype=float)
 
     # Monochrome: white glyph, alpha by each pixel's distance from the flat
@@ -236,7 +241,12 @@ def gen_android_foreground_and_monochrome() -> None:
     reference = float(solid_dist.min())
     alpha = np.clip(np.round(dist / reference * 255.0), 0, 255).astype(np.uint8)
     mono_rgba = np.dstack([np.full_like(alpha, 255), np.full_like(alpha, 255), np.full_like(alpha, 255), alpha])
-    monochrome_full = Image.fromarray(mono_rgba, mode="RGBA")
+    return Image.fromarray(mono_rgba, mode="RGBA")
+
+
+def gen_android_foreground_and_monochrome() -> None:
+    square = load_square_source().convert("RGBA")
+    monochrome_full = build_monochrome(square)
 
     for density, scale in DENSITIES.items():
         viewport = round(ADAPTIVE_VIEWPORT_DP * scale)
@@ -253,6 +263,17 @@ def gen_android_foreground_and_monochrome() -> None:
         mono_canvas = Image.new("RGBA", (viewport, viewport), (0, 0, 0, 0))
         mono_canvas.paste(monochrome_full.resize((inner, inner), Image.LANCZOS), (offset, offset))
         mono_canvas.save(density_dir / "ic_launcher_monochrome.png", "PNG")
+
+
+def gen_android_notification_icon() -> None:
+    """The push notification's small icon: the whole tile's glyph scaled to 24dp (the tile's own
+    margin keeps it off the edges), white on transparent as Android requires."""
+    monochrome_full = build_monochrome(load_square_source().convert("RGBA"))
+    for density, scale in DENSITIES.items():
+        size = round(NOTIFICATION_DP * scale)
+        density_dir = ANDROID_RES_DIR / f"drawable-{density}"
+        density_dir.mkdir(parents=True, exist_ok=True)
+        monochrome_full.resize((size, size), Image.LANCZOS).save(density_dir / "ic_notification.png", "PNG")
 
 
 def gen_android_legacy_icon(logo_512: Image.Image) -> None:
@@ -275,6 +296,7 @@ def main() -> None:
     gen_ios_appicon()
     gen_android_adaptive_icon_xml()
     gen_android_foreground_and_monochrome()
+    gen_android_notification_icon()
     gen_android_legacy_icon(logo_512)
     gen_in_app_logo(logo_512)
 
