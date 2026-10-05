@@ -824,6 +824,18 @@ abstract class AppLocalizations {
   /// **'Allow local scripts for my account'**
   String get confirmAllowScriptsAction;
 
+  /// No description provided for @notifyTerminalSharingFailedFile.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX could not change {path}. Nothing was changed.'**
+  String notifyTerminalSharingFailedFile(String path);
+
+  /// No description provided for @notifyAllowScriptsFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not allow local scripts for {name}'**
+  String notifyAllowScriptsFailedTitle(String name);
+
   /// No description provided for @startupFailed.
   ///
   /// In en, this message translates to:

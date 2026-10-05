@@ -409,6 +409,7 @@ class AgentController extends Notifier<AgentViewState> {
     if (setup == null || state.terminalSharing.busy) return false;
     _updateSharing((v) => v.copyWith(busy: true));
     try {
+      await _settleSharingCheck();
       final SharingInstall install;
       try {
         install = await setup.enable(plan);
@@ -417,15 +418,27 @@ class AgentController extends Notifier<AgentViewState> {
           'ShellX: enabling terminal sharing failed: '
           '${error.runtimeType}',
         );
-        await _notifySharingFailed();
+        await _notifySharingFailed(
+          error is SharingSetupException ? error.path : null,
+        );
         return false;
       }
-      if (!ref.mounted) return false;
+      if (!ref.mounted) {
+        await install.undo();
+        return false;
+      }
       // On before the server starts, so a runtime starting meanwhile also
       // starts sharing.
       _updateSharing((v) => v.copyWith(enabled: true, needsSetup: false));
       try {
         await _runtime?.setTerminalSharing(true);
+        await _s.settings.setStrings(
+          SettingKeys.terminalSharingFiles,
+          {
+            ..._s.settings.getStrings(SettingKeys.terminalSharingFiles),
+            ...install.editedFiles,
+          }.toList(),
+        );
         await _s.settings.setBool(SettingKeys.terminalSharing, true);
       } catch (error) {
         debugPrint(
@@ -455,10 +468,19 @@ class AgentController extends Notifier<AgentViewState> {
       (v) => v.copyWith(busy: true, enabled: false, needsSetup: false),
     );
     try {
+      await _settleSharingCheck();
       final result = await setup.disable(
         stopServer: () async => _runtime?.setTerminalSharing(false),
+        knownFiles: _s.settings.getStrings(SettingKeys.terminalSharingFiles),
       );
       await _saveSetting(SettingKeys.terminalSharing, false);
+      // Remember only what still has a block, for the next disable.
+      await _bestEffort(
+        () => _s.settings.setStrings(
+          SettingKeys.terminalSharingFiles,
+          result.failedFiles,
+        ),
+      );
       _refreshSessions();
       if (result.failedFiles.isNotEmpty) {
         await _notify(
@@ -582,6 +604,7 @@ class AgentController extends Notifier<AgentViewState> {
       ),
     );
     _runtime = runtime;
+    _attachThrottle.clear();
     _runtimeSubscriptions.addAll([
       runtime.relayStates.listen(_onRelayState),
       runtime.events.listen(_onAgentEvent),
@@ -840,10 +863,23 @@ class AgentController extends Notifier<AgentViewState> {
     _updateSharing((v) => v.copyWith(needsSetup: needsSetup));
   }
 
-  Future<void> _notifySharingFailed() => _notify(
+  /// Names the file that could not be changed, when known.
+  Future<void> _notifySharingFailed([String? path]) => _notify(
     title: _s.l10n.notifyTerminalSharingFailedTitle,
-    body: _s.l10n.notifyTerminalSharingFailedBody,
+    body: path == null
+        ? _s.l10n.notifyTerminalSharingFailedBody
+        : _s.l10n.notifyTerminalSharingFailedFile(path),
   );
+
+  /// Turning on or off waits for the startup check (binary update, health)
+  /// so the two never work on `bin` at the same time.
+  Future<void> _settleSharingCheck() async {
+    try {
+      await _sharingCheck;
+    } catch (_) {
+      // The check never throws; nothing to wait for otherwise.
+    }
+  }
 
   /// Spec §7.6: "{phone} is viewing terminal {app — title}", at most once
   /// per (phone, terminal) in 10 minutes.

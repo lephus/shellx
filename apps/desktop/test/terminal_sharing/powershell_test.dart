@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +142,51 @@ void main() {
           'Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force',
         );
       },
+    );
+  });
+
+  group('timeout (fix wave)', () {
+    test('a PowerShell that hangs is left out', () async {
+      final probe = PowerShellProbe(
+        environment: const {},
+        run: (exe, args) async => throw TimeoutException('hung'),
+      );
+      expect(await probe.find(), isEmpty);
+    });
+
+    test(
+      'runProcessUtf8 kills a process past its timeout',
+      () async {
+        final started = DateTime.now();
+        await expectLater(
+          runProcessUtf8('/bin/sleep', [
+            '30',
+          ], timeout: const Duration(milliseconds: 200)),
+          throwsA(isA<TimeoutException>()),
+        );
+        expect(
+          DateTime.now().difference(started),
+          lessThan(const Duration(seconds: 5)),
+        );
+        final ps = await Process.run('/bin/ps', ['-axo', 'command']);
+        expect(
+          (ps.stdout as String)
+              .split('\n')
+              .where((l) => l.trim() == '/bin/sleep 30'),
+          isEmpty,
+        );
+      },
+      skip: Platform.isWindows ? 'POSIX sleep' : false,
+    );
+
+    test(
+      'runProcessUtf8 returns UTF-8 output',
+      () async {
+        final result = await runProcessUtf8('/bin/echo', ['Phú']);
+        expect(result.exitCode, 0);
+        expect((result.stdout as String).trim(), 'Phú');
+      },
+      skip: Platform.isWindows ? 'POSIX echo' : false,
     );
   });
 }

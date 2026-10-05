@@ -36,6 +36,13 @@ void main() {
     });
   });
 
+  test('clear forgets every pair (a new runtime)', () {
+    final throttle = AttachNotificationThrottle(now: () => DateTime(2026));
+    expect(throttle.allow('m1', 1), isTrue);
+    throttle.clear();
+    expect(throttle.allow('m1', 1), isTrue);
+  });
+
   group('desktopTerminalLabel', () {
     test('app — title, falling back to the shell and to "Terminal"', () {
       expect(desktopTerminalLabel(summary()), 'Terminal — build');
@@ -85,6 +92,17 @@ void main() {
       expect(
         terminalSharingAvailable(macos: false, windows: false, environment: {}),
         isFalse,
+      );
+      // Turned on with the flag, started without it (launch at login): the
+      // switch stays so the user can turn it off.
+      expect(
+        terminalSharingAvailable(
+          macos: false,
+          windows: true,
+          environment: {},
+          storedEnabled: true,
+        ),
+        isTrue,
       );
     });
   });

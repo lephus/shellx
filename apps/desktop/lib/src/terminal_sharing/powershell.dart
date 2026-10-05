@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,15 +7,29 @@ import 'dart:io';
 typedef ProcessRunner =
     Future<ProcessResult> Function(String executable, List<String> arguments);
 
+/// How long one PowerShell may take to answer before it is killed.
+const Duration powerShellTimeout = Duration(seconds: 10);
+
+/// Runs [executable] and collects its UTF-8 output. Past [timeout] the
+/// process is killed and a [TimeoutException] thrown (a PowerShell stuck on
+/// a slow profile store or an antivirus scan must not hang ShellX).
 Future<ProcessResult> runProcessUtf8(
   String executable,
-  List<String> arguments,
-) => Process.run(
-  executable,
-  arguments,
-  stdoutEncoding: utf8,
-  stderrEncoding: utf8,
-);
+  List<String> arguments, {
+  Duration timeout = powerShellTimeout,
+}) async {
+  final process = await Process.start(executable, arguments);
+  final stdout = process.stdout.transform(utf8.decoder).join();
+  final stderr = process.stderr.transform(utf8.decoder).join();
+  await process.stdin.close();
+  try {
+    final code = await process.exitCode.timeout(timeout);
+    return ProcessResult(process.pid, code, await stdout, await stderr);
+  } on TimeoutException {
+    process.kill(ProcessSignal.sigkill);
+    rethrow;
+  }
+}
 
 /// Whether a PowerShell will run its profile (spec §10.3).
 enum ScriptPolicy {
@@ -97,6 +112,8 @@ class PowerShellProbe {
         ]);
       } on ProcessException {
         continue; // Not installed.
+      } on TimeoutException {
+        continue; // Hung: killed; this PowerShell is left out.
       }
       if (result.exitCode != 0) continue;
       final install = parse(name, executable, result.stdout as String);
@@ -118,6 +135,8 @@ class PowerShellProbe {
       ]);
       return result.exitCode == 0;
     } on ProcessException {
+      return false;
+    } on TimeoutException {
       return false;
     }
   }

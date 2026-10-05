@@ -12,6 +12,9 @@ final class AttachNotificationThrottle {
   final Duration window;
   final Map<(String, int), DateTime> _last = {};
 
+  /// Forgets every pair (a new runtime numbers its sessions afresh).
+  void clear() => _last.clear();
+
   /// True (and remembered) when a notification may be shown now.
   bool allow(String mobileId, int sessionId) {
     final now = _now();
@@ -33,14 +36,19 @@ String desktopTerminalLabel(DesktopSessionSummary session) {
 
 /// Spec §7.6, §12: the switch always shows on macOS; on Windows only when
 /// ShellX starts with `SHELLX_EXPERIMENTAL=terminal-sharing` (a
-/// comma-separated list is accepted) until Windows is checked by hand.
+/// comma-separated list is accepted) until Windows is checked by hand — or
+/// when sharing is already on ([storedEnabled]): a start without the flag
+/// (launch at login) must still let the user turn it off and keep `bin`
+/// current.
 bool terminalSharingAvailable({
   required bool macos,
   required bool windows,
   required Map<String, String> environment,
+  bool storedEnabled = false,
 }) {
   if (macos) return true;
   if (!windows) return false;
+  if (storedEnabled) return true;
   final flags = (environment['SHELLX_EXPERIMENTAL'] ?? '')
       .split(',')
       .map((f) => f.trim().toLowerCase());

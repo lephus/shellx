@@ -395,3 +395,24 @@ Gồm một e2e macOS thật trong HOME tạm (`test/terminal_sharing/end_to_end
 - `flutter build macos --release` trên máy có cả hai target Rust (hoặc chạy `release-desktop.yml` dry run) để thấy helper universal và `sign-app.sh` ký helper.
 - Windows: đẩy `windows-check/p4` để chạy job `desktop` (test bộ cài + `flutter build windows` có `shellx-term.exe`); kiểm tương tác vẫn là việc chờ (§12), công tắc vẫn ẩn trừ khi có `SHELLX_EXPERIMENTAL=terminal-sharing`.
 - `shellx-term uninstall` và mục FAQ (§10.6): giao cho một lượt `term/` + `web/`.
+
+### Lượt sửa sau review P4 (2026-10-05)
+
+Review "with fixes", không có Critical. Tất cả 14 mục đã sửa trong một lượt; `apps/desktop` 398 xanh (372 trước lượt sửa), `release/tests` 28 xanh, `flutter analyze` sạch.
+
+- Bản sao lưu mang quyền của file gốc (file 0600 → bản sao lưu 0600), quyền đặt trước khi ghi byte nào.
+- `install()` tự dọn khi ghi lỗi: trả lại nội dung cũ nếu đã bắt đầu ghi, xóa bản sao lưu do chính lần gọi đó tạo, xóa file mới ghi dở (test: file 0444).
+- PowerShell: khối đặt ngay sau phần mở đầu `using …` / `param(…)` (spec §10.2 đã thêm một dòng); gỡ vẫn theo dấu.
+- Windows: công tắc hiện khi có cờ **hoặc** setting đang bật (khởi động cùng hệ thống không có cờ vẫn tắt được, vẫn cập nhật `bin`).
+- Bật/tắt chờ lượt kiểm tra lúc khởi động xong mới chạy.
+- Ghi nhớ các file đã sửa (setting `terminal_sharing_files`); tắt và `--terminal-sharing-cleanup` gỡ ở hợp của file đã nhớ và file dò được; file còn khối thì `complete` là false và được nhớ lại.
+- Symlink hỏng: `.bashrc`/`.bash_profile` coi như không có; `.zshrc` bị từ chối, thông báo nêu tên file. Thông báo lỗi khi bật nêu file hỏng (`SharingSetupException.path`).
+- Chép binary lỗi sau khi đã tạo `bin` thì xóa `bin`; provider bị hủy giữa lúc bật thì hoàn tác; đổi chính sách script thất bại thì báo; bộ giới hạn thông báo xóa khi đổi runtime; dò PowerShell có hạn 10 giây và giết tiến trình; `release-desktop.yml` ghim Rust 1.95.0.
+- Ruling: chèn sau `using` chỉ áp cho file `.ps1`, và đặt ngay sau dòng `using`/khối `param` cuối cùng (không sau các dòng chú thích theo sau) — không có phần mở đầu thì khối vẫn ở byte 0 như trước — cái giá nếu sai: một file kết thúc bằng dòng `using` không có xuống dòng được thêm một dấu xuống dòng mà lúc gỡ không lấy lại.
+- Ruling: bản sao lưu lấy đúng quyền của file gốc (không ép 0600) — file 0644 thì bản sao lưu lộ đúng bằng file gốc — cái giá nếu sai: không có.
+
+**Ghi lại, không sửa (theo review):**
+- Bước CMake giả định thư mục target mặc định `term/target`; ai đặt `CARGO_TARGET_DIR` thì bước `install(FILES …)` không thấy `shellx-term.exe`. Tương tự script Xcode.
+- Người dùng đặt `ZDOTDIR` trong `~/.zshenv`: zsh đọc `$ZDOTDIR/.zshrc`, không phải `~/.zshrc`, nên khối không chạy và "cần thiết lập lại" không phát hiện. Cần một mục FAQ (cùng lượt với mục FAQ §10.6).
+- File chỉ dùng CR (Mac cổ) không được nhận ra kiểu xuống dòng; khối ghi bằng LF.
+- Hoàn tác một profile PowerShell vừa tạo chỉ xóa file, để lại thư mục `Documents\PowerShell` vừa tạo.

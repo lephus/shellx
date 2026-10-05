@@ -251,6 +251,18 @@
     }
   },
   "confirmAllowScriptsAction": "Allow local scripts for my account",
+  "notifyTerminalSharingFailedFile": "ShellX could not change {path}. Nothing was changed.",
+  "@notifyTerminalSharingFailedFile": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "notifyAllowScriptsFailedTitle": "Could not allow local scripts for {name}",
+  "@notifyAllowScriptsFailedTitle": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
   "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
 }

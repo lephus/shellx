@@ -159,7 +159,7 @@ void main() {
       final s = setup(); // No bundled binary.
       await expectLater(
         s.enable(await s.prepare()),
-        throwsA(isA<FileSystemException>()),
+        throwsA(isA<SharingSetupException>()),
       );
       expect(File(inHome('.zshrc')).readAsStringSync(), 'x\n');
     });
@@ -171,7 +171,7 @@ void main() {
       final s = setup(editor: FailingEditor(2));
       await expectLater(
         s.enable(await s.prepare()),
-        throwsA(isA<FileSystemException>()),
+        throwsA(isA<SharingSetupException>()),
       );
       expect(File(inHome('.zshrc')).readAsStringSync(), 'x\n');
       expect(File(inHome('.zshrc.shellx-backup')).existsSync(), isFalse);
@@ -351,5 +351,117 @@ void main() {
       expect(await s.allowLocalScripts(blocked), isTrue);
       expect(probe.allowed, [blocked]);
     });
+  });
+
+  group('fix wave', () {
+    test(
+      'binary install failing after bin was created leaves no bin',
+      () async {
+        bundle();
+        final ps = paths();
+        final s = TerminalSharingSetup(
+          paths: ps,
+          binary: TermBinaryInstaller(
+            ps,
+            chmod: (_, _) async => throw const FileSystemException('chmod'),
+          ),
+        );
+        await expectLater(
+          s.enable(await s.prepare()),
+          throwsA(
+            isA<SharingSetupException>().having(
+              (e) => e.path,
+              'path',
+              ps.binary,
+            ),
+          ),
+        );
+        expect(Directory(ps.binDir).existsSync(), isFalse);
+        expect(File(inHome('.zshrc')).existsSync(), isFalse);
+      },
+    );
+
+    test('a failing file is named in the error', () async {
+      bundle();
+      File(inHome('.bash_profile')).writeAsStringSync('y\n');
+      final s = setup(editor: FailingEditor(2));
+      await expectLater(
+        s.enable(await s.prepare()),
+        throwsA(
+          isA<SharingSetupException>().having(
+            (e) => e.path,
+            'path',
+            inHome('.bash_profile'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'a dangling bash symlink counts as missing; a dangling .zshrc is refused by name',
+      () async {
+        bundle();
+        Link(inHome('.bashrc')).createSync(p.join(dir.path, 'nowhere'));
+        final s = setup();
+        final plan = await s.prepare();
+        expect(plan.files.map((f) => f.path), [inHome('.zshrc')]);
+        expect(plan.bashSkipped, isTrue);
+        await s.enable(plan);
+        await s.disable();
+        File(
+          inHome('.zshrc'),
+        ).deleteSync(); // Created by enable, kept by disable.
+
+        Link(
+          inHome('.zshrc'),
+        ).createSync(p.join(dir.path, 'dotfiles', 'zshrc'));
+        await expectLater(
+          s.enable(await s.prepare()),
+          throwsA(
+            isA<SharingSetupException>().having(
+              (e) => e.path,
+              'path',
+              inHome('.zshrc'),
+            ),
+          ),
+        );
+        expect(Directory(paths().binDir).existsSync(), isFalse);
+      },
+      skip: Platform.isWindows ? 'symlinks need privileges on Windows' : false,
+    );
+
+    test('enable reports the files it changed', () async {
+      bundle();
+      File(inHome('.bashrc')).writeAsStringSync('');
+      final s = setup();
+      final install = await s.enable(await s.prepare());
+      expect(install.editedFiles, [inHome('.zshrc'), inHome('.bashrc')]);
+    });
+
+    test(
+      'Windows disable also cleans remembered profiles PowerShell no longer reports',
+      () async {
+        final profile = inHome('profile.ps1');
+        File(profile).writeAsStringSync('${powerShellBlock}Set-Alias x y\n');
+        final s = setup(windows: true, powerShell: FakePowerShellProbe([]));
+        final result = await s.disable(knownFiles: [profile]);
+        expect(result.complete, isTrue);
+        expect(File(profile).readAsStringSync(), 'Set-Alias x y\n');
+        final cleaned = await s.cleanup(knownFiles: [profile]);
+        expect(cleaned.complete, isTrue);
+      },
+    );
+
+    test(
+      'a block that could not be removed is reported, so complete is false',
+      () async {
+        File(inHome('.zshrc')).writeAsStringSync('${zshBlock}x\n');
+        await Process.run('/bin/chmod', ['444', inHome('.zshrc')]);
+        final result = await setup().disable();
+        expect(result.complete, isFalse);
+        expect(result.failedFiles, [inHome('.zshrc')]);
+      },
+      skip: Platform.isWindows ? 'POSIX modes' : false,
+    );
   });
 }

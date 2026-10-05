@@ -73,9 +73,86 @@ Uint8List encodeConfig(ConfigText config) {
 /// [block] (LF, ending with a newline) at the top of [text], written with
 /// [eol]. Any ShellX block already in [text] is removed first, so inserting
 /// again never makes a second block.
-String insertBlock(String text, String block, {required String eol}) {
+///
+/// [powerShell]: `using namespace|module|assembly` statements and a script
+/// `param(…)` block must come before any other statement, so the block goes
+/// right after such a prelude (comments and blank lines may sit in it);
+/// without one it stays at the very top.
+String insertBlock(
+  String text,
+  String block, {
+  required String eol,
+  bool powerShell = false,
+}) {
   final converted = eol == '\n' ? block : block.replaceAll('\n', eol);
-  return converted + removeBlock(text);
+  final rest = removeBlock(text);
+  final at = powerShell ? powerShellPreludeEnd(rest) : 0;
+  if (at == 0) return converted + rest;
+  final head = rest.substring(0, at);
+  final separator = head.endsWith('\n') ? '' : eol;
+  return head + separator + converted + rest.substring(at);
+}
+
+final RegExp _using = RegExp(
+  r'^\s*using\s+(namespace|module|assembly)\b',
+  caseSensitive: false,
+);
+final RegExp _attribute = RegExp(r'^\s*\[[^\]]*\]\s*$');
+final RegExp _param = RegExp(r'^\s*param\s*\(', caseSensitive: false);
+
+/// Visible for tests: the offset just after the last `using` line or the
+/// `param(…)` block of a PowerShell prelude, or 0 when there is none.
+int powerShellPreludeEnd(String text) {
+  var end = 0;
+  var pos = 0;
+  var inBlockComment = false;
+  while (pos < text.length) {
+    final newline = text.indexOf('\n', pos);
+    final lineEnd = newline < 0 ? text.length : newline + 1;
+    final line = text.substring(pos, newline < 0 ? text.length : newline);
+    final trimmed = line.trim();
+    if (inBlockComment) {
+      if (trimmed.contains('#>')) inBlockComment = false;
+    } else if (trimmed.isEmpty || trimmed.startsWith('#')) {
+      // Blank line or comment (#requires included).
+    } else if (trimmed.startsWith('<#')) {
+      if (!trimmed.contains('#>')) inBlockComment = true;
+    } else if (_using.hasMatch(line)) {
+      end = lineEnd;
+    } else if (_attribute.hasMatch(line) || _param.hasMatch(line)) {
+      // [CmdletBinding()] lines, then param( … ): find the closing paren.
+      final paramAt = text.indexOf(
+        RegExp(r'param\s*\(', caseSensitive: false),
+        pos,
+      );
+      if (paramAt < 0) return end;
+      final between = text.substring(pos, paramAt);
+      if (!between
+          .split('\n')
+          .every(
+            (l) =>
+                l.trim().isEmpty ||
+                _attribute.hasMatch(l) ||
+                l.trim().startsWith('#'),
+          )) {
+        return end;
+      }
+      var depth = 0;
+      for (var i = text.indexOf('(', paramAt); i < text.length; i++) {
+        final c = text[i];
+        if (c == '(') depth++;
+        if (c == ')' && --depth == 0) {
+          final nl = text.indexOf('\n', i);
+          return nl < 0 ? text.length : nl + 1;
+        }
+      }
+      return end; // Unbalanced: leave the top alone.
+    } else {
+      return end;
+    }
+    pos = lineEnd;
+  }
+  return end;
 }
 
 /// [text] without its ShellX blocks: each runs from a start-marker line

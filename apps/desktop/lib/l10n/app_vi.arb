@@ -121,6 +121,8 @@
   "confirmAllowScriptsTitle": "Cho phép script cục bộ?",
   "confirmAllowScriptsBody": "{names}: chưa cho phép chạy script, nên khối ShellX trong profile không chạy được. Thao tác này đặt chính sách RemoteSigned chỉ cho tài khoản của bạn (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned).",
   "confirmAllowScriptsAction": "Cho phép script cục bộ cho tài khoản của tôi",
+  "notifyTerminalSharingFailedFile": "ShellX không sửa được {path}. Không có gì bị thay đổi.",
+  "notifyAllowScriptsFailedTitle": "Không cho phép được script cục bộ cho {name}",
   "startupFailed": "ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.",
   "windowsVersionUnsupported": "ShellX cần Windows 10 bản 1809 trở lên."
 }

@@ -155,4 +155,74 @@ void main() {
     },
     skip: Platform.isWindows ? 'symlinks need privileges on Windows' : false,
   );
+
+  group('fix wave', () {
+    String mode(String p) =>
+        (FileStat.statSync(p).mode & 0x1FF).toRadixString(8);
+
+    test(
+      'the backup keeps a 0600 original private',
+      () async {
+        File(path('.zshrc')).writeAsStringSync('export TOKEN=secret\n');
+        await Process.run('/bin/chmod', ['600', path('.zshrc')]);
+        await editor.install(target('.zshrc'));
+        expect(mode(path('.zshrc.shellx-backup')), '600');
+        expect(mode(path('.zshrc')), '600');
+      },
+      skip: Platform.isWindows ? 'POSIX modes' : false,
+    );
+
+    test(
+      'a read-only file: install fails, file unchanged, no backup left',
+      () async {
+        File(path('.zshrc')).writeAsStringSync('x\n');
+        await Process.run('/bin/chmod', ['444', path('.zshrc')]);
+        await expectLater(
+          editor.install(target('.zshrc')),
+          throwsA(isA<FileSystemException>()),
+        );
+        expect(File(path('.zshrc')).readAsStringSync(), 'x\n');
+        expect(File(path('.zshrc.shellx-backup')).existsSync(), isFalse);
+        expect(dir.listSync().map((e) => e.path), [path('.zshrc')]);
+      },
+      skip: Platform.isWindows ? 'POSIX modes' : false,
+    );
+
+    test(
+      'a dangling symlink is refused, naming the file; remove ignores it',
+      () async {
+        Link(path('.zshrc')).createSync(path('gone'));
+        await expectLater(
+          editor.install(target('.zshrc', create: true)),
+          throwsA(
+            isA<ConfigFileException>().having(
+              (e) => e.path,
+              'path',
+              path('.zshrc'),
+            ),
+          ),
+        );
+        expect(File(path('gone')).existsSync(), isFalse);
+        expect(await editor.remove(path('.zshrc')), isFalse);
+        expect(await editor.installedBlock(path('.zshrc')), isNull);
+      },
+      skip: Platform.isWindows ? 'symlinks need privileges on Windows' : false,
+    );
+
+    test('a PowerShell profile keeps its using prelude first', () async {
+      File(path('profile.ps1')).writeAsStringSync(
+        'using namespace System.Management.Automation\nusing namespace System.Management.Automation.Language\n\nSet-PSReadLineOption -EditMode Emacs\n',
+      );
+      await editor.install(target('profile.ps1'));
+      expect(
+        File(path('profile.ps1')).readAsStringSync(),
+        'using namespace System.Management.Automation\nusing namespace System.Management.Automation.Language\n$block\nSet-PSReadLineOption -EditMode Emacs\n',
+      );
+      expect(await editor.remove(path('profile.ps1')), isTrue);
+      expect(
+        File(path('profile.ps1')).readAsStringSync(),
+        'using namespace System.Management.Automation\nusing namespace System.Management.Automation.Language\n\nSet-PSReadLineOption -EditMode Emacs\n',
+      );
+    });
+  });
 }

@@ -126,13 +126,20 @@ Future<void> _start(
     onProblem: terminalProblems.report,
   );
   late final TrayManagerHost trayHost;
-  final sharingSetup = _terminalSharingSetup(environment);
+  final settings = await SharedPrefsSettingsStore.open();
+  final sharingSetup = _terminalSharingSetup(
+    environment,
+    storedEnabled: settings.getBool(
+      SettingKeys.terminalSharing,
+      defaultValue: false,
+    ),
+  );
 
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
     secureStore: SecureKeyValueStore(),
-    settings: await SharedPrefsSettingsStore.open(),
+    settings: settings,
     api: ShellxApi(baseUri: relayBase),
     createApi: () => ShellxApi(baseUri: relayBase),
     runtimeFactory: (params) => CoreAgentRuntime(
@@ -242,11 +249,15 @@ Future<void> _start(
 /// Spec §7.6, §12: the switch is offered on macOS, and on Windows only with
 /// `SHELLX_EXPERIMENTAL=terminal-sharing`. Null otherwise (or without the
 /// environment variables the paths need).
-TerminalSharingSetup? _terminalSharingSetup(Map<String, String> environment) {
+TerminalSharingSetup? _terminalSharingSetup(
+  Map<String, String> environment, {
+  required bool storedEnabled,
+}) {
   final available = terminalSharingAvailable(
     macos: Platform.isMacOS,
     windows: Platform.isWindows,
     environment: environment,
+    storedEnabled: storedEnabled,
   );
   if (!available) return null;
   return _anyTerminalSharingSetup(environment);
@@ -277,7 +288,18 @@ Future<int> _terminalSharingCleanup() async {
   try {
     final setup = _anyTerminalSharingSetup(Platform.environment);
     if (setup == null) return 1;
-    final result = await setup.cleanup();
+    // The profiles an enable remembered, in case PowerShell no longer
+    // reports one (best effort: the settings need the plugin channel).
+    var known = const <String>[];
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+      known = (await SharedPrefsSettingsStore.open()).getStrings(
+        SettingKeys.terminalSharingFiles,
+      );
+    } catch (error) {
+      debugPrint('ShellX: reading settings failed: ${error.runtimeType}');
+    }
+    final result = await setup.cleanup(knownFiles: known);
     return result.complete ? 0 : 1;
   } catch (error) {
     debugPrint('ShellX: terminal sharing cleanup failed: ${error.runtimeType}');

@@ -347,8 +347,12 @@ void main() {
         policy: ScriptPolicy.blocked,
       );
 
+      var setupFailing = false;
+      setUp(() => setupFailing = false);
+
       Future<void> run({required bool allow}) async {
         await boot(windows: true);
+        setup.allowScriptsResult = !setupFailing;
         setup.plan = SharingPlan(
           files: [planned(blocked.profilePath)],
           bashSkipped: false,
@@ -371,6 +375,16 @@ void main() {
       test('the policy changes only when the button is pressed', () async {
         await run(allow: true);
         expect(setup.allowedScripts, [blocked]);
+        expect(setup.calls, contains('enable'));
+      });
+
+      test('a policy change that fails is reported', () async {
+        setupFailing = true;
+        await run(allow: true);
+        expect(
+          h.notifier.shown.map((n) => n.title),
+          contains(h.l10n.notifyAllowScriptsFailedTitle('Windows PowerShell')),
+        );
         expect(setup.calls, contains('enable'));
       });
 

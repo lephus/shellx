@@ -257,13 +257,29 @@ final class FakeSharingSetup extends TerminalSharingSetup {
   @override
   Future<SharingInstall> enable(SharingPlan plan) async {
     calls.add('enable');
-    if (failEnable) throw const FileSystemException('denied');
-    return SharingInstall(() async => calls.add('undo'));
+    await enableGate?.future;
+    if (failEnable) {
+      throw const SharingSetupException(
+        '/Users/phu/.zshrc',
+        FileSystemException('denied'),
+      );
+    }
+    return SharingInstall(
+      () async => calls.add('undo'),
+      editedFiles: [for (final f in plan.files) f.path],
+    );
   }
 
+  /// The knownFiles of the last disable.
+  List<String> disableKnownFiles = [];
+
   @override
-  Future<DisableResult> disable({Future<void> Function()? stopServer}) async {
+  Future<DisableResult> disable({
+    Future<void> Function()? stopServer,
+    List<String> knownFiles = const [],
+  }) async {
     calls.add('disable');
+    disableKnownFiles = knownFiles;
     await stopServer?.call();
     calls.add('disabled');
     return DisableResult(failedFiles: failedFiles, binRemoved: true);
@@ -275,16 +291,27 @@ final class FakeSharingSetup extends TerminalSharingSetup {
     return needsSetupResult;
   }
 
+  /// While set and not completed, [enable] waits for it.
+  Completer<void>? enableGate;
+
+  /// While set and not completed, [maintain] waits for it.
+  Completer<void>? maintainGate;
+
   @override
-  Future<void> maintain({required bool enabled}) async =>
-      calls.add('maintain:$enabled');
+  Future<void> maintain({required bool enabled}) async {
+    calls.add('maintain:$enabled');
+    await maintainGate?.future;
+    calls.add('maintained');
+  }
 
   final List<PowerShellInstall> allowedScripts = [];
+
+  bool allowScriptsResult = true;
 
   @override
   Future<bool> allowLocalScripts(PowerShellInstall install) async {
     allowedScripts.add(install);
-    return true;
+    return allowScriptsResult;
   }
 }
 

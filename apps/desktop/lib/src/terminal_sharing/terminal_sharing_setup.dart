@@ -39,11 +39,25 @@ final class PlannedFile {
   String get path => target.path;
 }
 
+/// Turning sharing on failed at [path] (the `bin` copy or a startup file);
+/// everything done before was undone.
+final class SharingSetupException implements Exception {
+  const SharingSetupException(this.path, this.cause);
+  final String path;
+  final Object cause;
+  @override
+  String toString() => 'SharingSetupException($path): ${cause.runtimeType}';
+}
+
 /// An enable that worked, and how to take it back (the server failed to
 /// start afterwards, spec §10.1 step 3).
 final class SharingInstall {
-  SharingInstall(this._undo);
+  SharingInstall(this._undo, {this.editedFiles = const []});
   final Future<void> Function() _undo;
+
+  /// Startup files this enable changed or created (remembered so disable
+  /// cleans them even if PowerShell no longer reports them).
+  final List<String> editedFiles;
   Future<void> undo() => _undo();
 }
 
@@ -122,7 +136,8 @@ class TerminalSharingSetup {
     // `.bashrc` alone misses login windows); never create either.
     for (final name in ['.bash_profile', '.bashrc']) {
       final path = _home(name);
-      if (await File(path).exists() || await Link(path).exists()) {
+      // File.exists follows links: a dangling symlink counts as missing.
+      if (await File(path).exists()) {
         files.add(
           PlannedFile(
             ConfigTarget(
@@ -147,9 +162,15 @@ class TerminalSharingSetup {
   /// block: a block needs a binary with `probe`), backs each file up once,
   /// inserts the blocks. A failure undoes the steps done so far and
   /// rethrows.
+  /// Failures are a [SharingSetupException] naming the file.
   Future<SharingInstall> enable(SharingPlan plan) async {
     final binExisted = await Directory(paths.binDir).exists();
-    await binary.install();
+    try {
+      await binary.install();
+    } catch (error) {
+      if (!binExisted) await _quietly(binary.remove, 'removing bin');
+      throw SharingSetupException(paths.binary, error);
+    }
     final edits = <ConfigEdit>[];
     Future<void> undo() async {
       for (final edit in edits.reversed) {
@@ -158,25 +179,40 @@ class TerminalSharingSetup {
       if (!binExisted) await _quietly(binary.remove, 'removing bin');
     }
 
-    try {
-      for (final file in plan.files) {
+    for (final file in plan.files) {
+      try {
         edits.add(await _editor.install(file.target));
+      } catch (error) {
+        await undo();
+        throw SharingSetupException(file.path, error);
       }
-    } catch (_) {
-      await undo();
-      rethrow;
     }
-    return SharingInstall(undo);
+    return SharingInstall(
+      undo,
+      editedFiles: [
+        for (final edit in edits)
+          if (edit.changed) edit.path,
+      ],
+    );
   }
 
   /// Spec §10.5: removes the block from every startup file that may have
   /// one, calls [stopServer] (closes the port, deletes `endpoint`), then
   /// deletes `bin`. Never throws; reports what it could not do.
-  Future<DisableResult> disable({Future<void> Function()? stopServer}) async {
+  ///
+  /// [knownFiles]: files an earlier enable edited (stored by the caller);
+  /// cleaned together with the ones found now. A file that still has a
+  /// block afterwards is reported in [DisableResult.failedFiles].
+  Future<DisableResult> disable({
+    Future<void> Function()? stopServer,
+    List<String> knownFiles = const [],
+  }) async {
     final failed = <String>[];
-    for (final path in await _allStartupFiles()) {
+    final files = {...knownFiles, ...await _allStartupFiles()};
+    for (final path in files) {
       try {
         await _editor.remove(path);
+        if (await _editor.installedBlock(path) != null) failed.add(path);
       } catch (error) {
         debugPrint('ShellX: removing a block failed: ${error.runtimeType}');
         failed.add(path);
@@ -237,8 +273,8 @@ class TerminalSharingSetup {
 
   /// `ShellX.exe --terminal-sharing-cleanup` (Windows uninstaller, spec
   /// §10.6): blocks, `bin` and `term` go.
-  Future<DisableResult> cleanup() async {
-    final result = await disable();
+  Future<DisableResult> cleanup({List<String> knownFiles = const []}) async {
+    final result = await disable(knownFiles: knownFiles);
     await _quietly(() async {
       final term = Directory(paths.termDir);
       if (await term.exists()) await term.delete(recursive: true);

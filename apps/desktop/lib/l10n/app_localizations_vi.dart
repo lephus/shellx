@@ -479,6 +479,16 @@ class AppLocalizationsVi extends AppLocalizations {
       'Cho phép script cục bộ cho tài khoản của tôi';
 
   @override
+  String notifyTerminalSharingFailedFile(String path) {
+    return 'ShellX không sửa được $path. Không có gì bị thay đổi.';
+  }
+
+  @override
+  String notifyAllowScriptsFailedTitle(String name) {
+    return 'Không cho phép được script cục bộ cho $name';
+  }
+
+  @override
   String get startupFailed =>
       'ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.';
 

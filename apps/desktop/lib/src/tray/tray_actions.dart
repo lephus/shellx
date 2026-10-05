@@ -166,7 +166,11 @@ final class TrayActions {
       );
       if (allow) {
         for (final shell in fixable) {
-          await setup.allowLocalScripts(shell);
+          if (!await setup.allowLocalScripts(shell)) {
+            await _services.notifier.show(
+              title: l10n.notifyAllowScriptsFailedTitle(shell.name),
+            );
+          }
         }
       }
     }

@@ -482,6 +482,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmAllowScriptsAction => 'Allow local scripts for my account';
 
   @override
+  String notifyTerminalSharingFailedFile(String path) {
+    return 'ShellX could not change $path. Nothing was changed.';
+  }
+
+  @override
+  String notifyAllowScriptsFailedTitle(String name) {
+    return 'Could not allow local scripts for $name';
+  }
+
+  @override
   String get startupFailed =>
       'ShellX could not start. Open it again; if this keeps happening, restart your computer.';
 

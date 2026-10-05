@@ -66,8 +66,11 @@ jobs:
           cache: true
       # flutter build macos builds shellx-term (term/) as a universal binary through an Xcode
       # Run Script phase (apps/desktop/macos/scripts/build_shellx_term.sh), spec §4.
-      - name: Rust targets for shellx-term (arm64 + x86_64)
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      # Pinned like windows-check.yml, so a release builds with the toolchain the tests ran on.
+      - name: Rust 1.95.0 with the shellx-term targets (arm64 + x86_64)
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default 1.95.0
       - name: flutter build macos --release
         working-directory: apps/desktop
         run: flutter build macos --release
@@ -159,6 +162,11 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      # Pinned like windows-check.yml; CMake builds shellx-term.exe with it.
+      - name: Rust 1.95.0 for shellx-term
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
       - name: flutter build windows --release
         working-directory: apps/desktop
         run: flutter build windows --release

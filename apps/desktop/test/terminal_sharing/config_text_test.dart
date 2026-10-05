@@ -199,4 +199,61 @@ void main() {
       expect(decodeConfig(Uint8List(0)).eol, isNull);
     });
   });
+
+  group('PowerShell prelude (spec §10.2)', () {
+    String ps(String text) =>
+        insertBlock(text, block, eol: '\n', powerShell: true);
+
+    test('no prelude: block at the very top, as before', () {
+      expect(ps('Set-Alias x y\n'), '${block}Set-Alias x y\n');
+      expect(
+        ps('# my profile\nSet-Alias x y\n'),
+        '$block# my profile\nSet-Alias x y\n',
+      );
+      expect(ps(''), block);
+    });
+
+    test('after using lines, comments and blanks inside the prelude', () {
+      const text =
+          '#requires -Version 7\n# header\nusing namespace System\n\nUSING module PSReadLine\n# aliases\nSet-Alias x y\n';
+      expect(
+        ps(text),
+        '#requires -Version 7\n# header\nusing namespace System\n\nUSING module PSReadLine\n$block# aliases\nSet-Alias x y\n',
+      );
+      expect(removeBlock(ps(text)), text);
+      expect(ps(ps(text)), ps(text));
+    });
+
+    test('after a param block, attributes included, across lines', () {
+      const text =
+          '<# .SYNOPSIS\n  profile #>\n[CmdletBinding()]\nparam(\n  [string]\$Name = (Get-Date)\n)\nWrite-Host hi\n';
+      expect(
+        ps(text),
+        '<# .SYNOPSIS\n  profile #>\n[CmdletBinding()]\nparam(\n  [string]\$Name = (Get-Date)\n)\n${block}Write-Host hi\n',
+      );
+    });
+
+    test('a using line without a final newline gets one before the block', () {
+      expect(ps('using namespace System'), 'using namespace System\n$block');
+    });
+
+    test('CRLF prelude', () {
+      expect(
+        insertBlock(
+          'using namespace System\r\nx\r\n',
+          block,
+          eol: '\r\n',
+          powerShell: true,
+        ),
+        'using namespace System\r\n${block.replaceAll('\n', '\r\n')}x\r\n',
+      );
+    });
+
+    test('shell files ignore the PowerShell rule', () {
+      expect(
+        insertBlock('using namespace X\n', block, eol: '\n'),
+        '${block}using namespace X\n',
+      );
+    });
+  });
 }

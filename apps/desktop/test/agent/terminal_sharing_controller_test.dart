@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -60,7 +62,7 @@ void main() {
         await start();
         expect(sharing().available, isTrue);
         expect(sharing().enabled, isFalse);
-        expect(setup.calls, ['maintain:false']);
+        expect(setup.calls, ['maintain:false', 'maintained']);
         expect(h.runtime.sharingCalls, isEmpty);
       },
     );
@@ -74,7 +76,7 @@ void main() {
         await start();
         expect(sharing().enabled, isTrue);
         expect(sharing().needsSetup, isTrue);
-        expect(setup.calls, ['maintain:true', 'needsSetup']);
+        expect(setup.calls, ['maintain:true', 'maintained', 'needsSetup']);
         expect(h.runtime.sharingCalls, [true]);
         // Startup never edits startup files (spec §10.2).
         expect(setup.calls, isNot(contains('enable')));
@@ -242,5 +244,88 @@ void main() {
         expect(h.notifier.shown, hasLength(2));
       },
     );
+  });
+
+  group('fix wave', () {
+    test(
+      'a toggle during the startup check waits for it (no race on bin)',
+      () async {
+        boot(settings: {SettingKeys.terminalSharing: true});
+        setup.maintainGate = Completer<void>();
+        await h.seedSignedIn();
+        await controller().bootstrap(watchForWake: false);
+        final disabling = controller().disableTerminalSharing();
+        await pumpEventQueue();
+        expect(setup.calls, ['maintain:true']);
+        setup.maintainGate!.complete();
+        await disabling;
+        expect(
+          setup.calls.indexOf('disable'),
+          greaterThan(setup.calls.indexOf('maintained')),
+        );
+      },
+    );
+
+    test(
+      'enable remembers the files it edited; disable passes them back and keeps only leftovers',
+      () async {
+        boot();
+        await h.seedSignedIn();
+        await start();
+        expect(await controller().enableTerminalSharing(setup.plan), isTrue);
+        expect(h.settings.strings[SettingKeys.terminalSharingFiles], [
+          '/Users/phu/.zshrc',
+        ]);
+
+        setup.failedFiles = ['/Users/phu/.zshrc'];
+        await controller().disableTerminalSharing();
+        expect(setup.disableKnownFiles, ['/Users/phu/.zshrc']);
+        expect(h.settings.strings[SettingKeys.terminalSharingFiles], [
+          '/Users/phu/.zshrc',
+        ]);
+
+        setup.failedFiles = [];
+        // Turning off again retries what was left behind.
+        await controller().disableTerminalSharing();
+        expect(h.settings.strings[SettingKeys.terminalSharingFiles], isEmpty);
+      },
+    );
+
+    test('the failure notification names the file', () async {
+      boot();
+      await h.seedSignedIn();
+      await start();
+      setup.failEnable = true;
+      await controller().enableTerminalSharing(setup.plan);
+      expect(
+        h.notifier.shown.single.body,
+        h.l10n.notifyTerminalSharingFailedFile('/Users/phu/.zshrc'),
+      );
+    });
+
+    test('disposed while enabling: the install is undone', () async {
+      boot();
+      await h.seedSignedIn();
+      await start();
+      setup.enableGate = Completer<void>();
+      final enabling = controller().enableTerminalSharing(setup.plan);
+      await pumpEventQueue();
+      container.dispose();
+      setup.enableGate!.complete();
+      expect(await enabling, isFalse);
+      expect(setup.calls, contains('undo'));
+    });
+
+    test('a new runtime notifies the same (phone, terminal) again', () async {
+      boot(settings: {SettingKeys.terminalSharing: true});
+      await h.seedSignedIn();
+      await start();
+      h.runtime.attachedController.add(const DesktopPhoneAttached('m1', 7));
+      await controller().setRemoteAccess(false);
+      await controller().setRemoteAccess(true);
+      h.runtime.attachedController.add(const DesktopPhoneAttached('m1', 7));
+      await pumpEventQueue();
+      expect(h.notifier.shown, hasLength(2));
+    });
   });
 }
