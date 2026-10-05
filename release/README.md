@@ -25,13 +25,19 @@
 |---|---|
 | `scripts/version.mjs`, `scripts/resolve-version.mjs` | Pick the version and the dry-run flag from the GitHub context |
 | `macos/import-certificate.sh` | Import the Developer ID certificate into a temporary keychain |
-| `macos/sign-app.sh` | Sign nested code, then the app, with hardened runtime; refuse App Sandbox entitlements |
+| `macos/sign-app.sh` | Sign nested code (dylibs, bundles, `Contents/Helpers/shellx-term`), then the app, with hardened runtime; refuse App Sandbox entitlements |
 | `macos/notarize.sh` | `notarytool submit --wait`, staple, `spctl` check |
 | `macos/make-dmg.sh` | Compressed dmg with `ShellX.app` and an `/Applications` link |
-| `windows/shellx.iss` | Inno Setup script (per-user install, Windows 10 1809+, stops a running agent) |
+| `windows/shellx.iss` | Inno Setup script (per-user install, Windows 10 1809+, stops a running agent; uninstall runs `ShellX.exe --terminal-sharing-cleanup`) |
 | `windows/Vietnamese.isl` | Unofficial Vietnamese messages, copied unchanged from `jrsoftware/issrc` tag `is-6_7_1` (`Files/Languages/Unofficial/Vietnamese.isl`); SHA-256 pinned in `tests/inno.test.mjs` |
 | `windows/build-installer.ps1` | Find (or install) Inno Setup 6.7.1 and compile `shellx.iss` |
 | `tests/*.test.mjs` | `node --test release/tests/*.test.mjs` (the macOS script tests run only on macOS) |
+
+**shellx-term (terminal sharing):** `flutter build macos` builds it with cargo into
+`ShellX.app/Contents/Helpers/shellx-term` (universal in Release: the macOS job adds the
+`aarch64-apple-darwin` and `x86_64-apple-darwin` Rust targets); `flutter build windows` puts
+`shellx-term.exe` (static CRT) next to `ShellX.exe`, where the Azure step signs it with the other
+`exe` files. Both jobs fail if the helper is missing.
 
 **Upload:** the `publish` job rsyncs both files over SSH into
 `$VPS_APP_DIR/downloads/desktop/<version>/` on the VPS (default `~/phu/shellx`), with the same

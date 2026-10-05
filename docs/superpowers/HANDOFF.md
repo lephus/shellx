@@ -106,7 +106,7 @@ Từ điện thoại xem và gõ vào các cửa sổ terminal đang mở sẵn 
   - Còn lại cho người dùng: chạy e2e trên relay thật (`cd packages/shellx_e2e && SHELLX_E2E_RELAY=https://relay.shellx.pro dart test test/desktop_terminal_e2e_test.dart`); chạy CI Windows của job `dart` mới (đẩy `windows-check/p3` khi sẵn sàng); đọc lại spec §7.7–§7.9. Chi tiết, rulings, việc nhỏ còn mở, ghi cho P4/P5: ledger, mục P3.
 - **Còn lại:**
   - **P2b:** chờ lần chạy CI Windows đầu tiên (Task 8) rồi mới đóng.
-  - P4: phần desktop (bật/tắt, bộ cài, ký).
+  - P4: code xong (2026-10-05), nhánh `feat/p4-desktop`: công tắc, bộ cài file cấu hình, menu và thông báo, build bundle `shellx-term`, ký. Desktop 372 test xanh, e2e macOS trong HOME tạm. Rulings, việc chờ (bật thử trên máy thật, CI Windows job `desktop`, `shellx-term uninstall` + FAQ chưa làm): ledger, mục P4.
   - P5: mobile.
   - Thứ tự ở spec §14.
 - **Kiểm tay còn thiếu** (thêm vào danh sách spec §11.6): gõ bằng bộ gõ tiếng Việt (IME), Cmd+W, giao diện thật của Cursor và Android Studio, iTerm2, VS Code, Warp.
