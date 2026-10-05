@@ -19,5 +19,6 @@ export 'src/term/term_endpoint.dart';
 export 'src/term/term_frames.dart';
 export 'src/term/term_link.dart';
 export 'src/term/term_messages.dart';
+export 'src/term/osc_title.dart';
 export 'src/term/term_server.dart';
 export 'src/trust/trusted_store.dart';
