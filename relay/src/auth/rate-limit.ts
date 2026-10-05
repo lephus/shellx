@@ -11,6 +11,8 @@ export interface RateLimiters {
   registerIp: RateLimiter;
   /** Every WebSocket upgrade attempt on /v1/ws, counted before its token is checked. */
   upgradeIp: RateLimiter;
+  /** `POST /v1/notifications`, keyed by the agent's device id (push spec N10). */
+  notifyAgent: RateLimiter;
 }
 
 /** Spec §5.2: 60-second window; login 10/IP and 5/email, register 3/IP. */
@@ -23,6 +25,9 @@ export const REGISTER_PER_IP = 3;
  * clients with backoff need, low enough that one address cannot churn upgrades against the relay.
  */
 export const UPGRADES_PER_IP = 60;
+/** Push spec N10: at most 120 `POST /v1/notifications` per agent per hour. */
+export const NOTIFICATIONS_PER_AGENT = 120;
+export const NOTIFICATIONS_WINDOW_MS = 60 * 60_000;
 
 export interface SlidingWindowOptions {
   /** Allowed calls per key within any window of `windowMs`. */
@@ -81,13 +86,16 @@ export class SlidingWindowLimiter implements RateLimiter {
 
 const allowAll: RateLimiter = { limit: async () => true };
 
-/** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all four off. */
+/** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all five off. */
 export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, now: () => number = Date.now): RateLimiters {
-  if (!config.rateLimitsEnabled) return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll };
+  if (!config.rateLimitsEnabled) {
+    return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll };
+  }
   return {
     loginIp: new SlidingWindowLimiter({ limit: LOGIN_PER_IP, now }),
     loginEmail: new SlidingWindowLimiter({ limit: LOGIN_PER_EMAIL, now }),
     registerIp: new SlidingWindowLimiter({ limit: REGISTER_PER_IP, now }),
     upgradeIp: new SlidingWindowLimiter({ limit: UPGRADES_PER_IP, now }),
+    notifyAgent: new SlidingWindowLimiter({ limit: NOTIFICATIONS_PER_AGENT, windowMs: NOTIFICATIONS_WINDOW_MS, now }),
   };
 }

@@ -20,6 +20,7 @@ export const Errors = {
   unauthorized: () => new ApiError(401, "unauthorized", "Missing, invalid or expired token"),
   invalidCredentials: () => new ApiError(401, "invalid_credentials", "Email or password is incorrect"),
   agentOnly: () => new ApiError(403, "agent_only", "Only a desktop agent may do this"),
+  mobileOnly: () => new ApiError(403, "mobile_only", "Only a phone may do this"),
   forbidden: () => new ApiError(403, "forbidden", "Not allowed"),
   deviceNotFound: () => new ApiError(404, "device_not_found", "Device not found"),
   notFound: () => new ApiError(404, "not_found", "Not found"),
@@ -28,6 +29,7 @@ export const Errors = {
   payloadTooLarge: () => new ApiError(413, "payload_too_large", "Request body is too large"),
   upgradeRequired: () => new ApiError(426, "upgrade_required", "Expected a WebSocket upgrade"),
   rateLimited: () => new ApiError(429, "rate_limited", "Too many requests, try again later"),
+  pushUnavailable: () => new ApiError(503, "push_unavailable", "Push notifications are not configured on this relay"),
 } as const;
 
 export function errorBody(code: string, message: string): { error: { code: string; message: string } } {

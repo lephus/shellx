@@ -23,7 +23,7 @@ describe("app skeleton", () => {
     expect(await res.json()).toEqual({ error: { code: "not_found", message: "Not found" } });
   });
 
-  it("migrations created the four tables of 0001 and the tombstone table of 0002", () => {
+  it("migrations created the four tables of 0001 and the tombstone table of 0002 (push_tokens: push-tokens.test.ts)", () => {
     const names = db()
       .all<{ name: string }>(
         `SELECT name FROM sqlite_master WHERE type = 'table'

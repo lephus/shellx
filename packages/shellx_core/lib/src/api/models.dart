@@ -99,3 +99,11 @@ final class ApiException implements Exception {
   @override
   String toString() => 'ApiException($status, $code): $message';
 }
+
+/// Push service of a phone's FCM registration token (`android` or `ios`).
+enum PushPlatform {
+  android,
+  ios;
+
+  String get wire => name;
+}

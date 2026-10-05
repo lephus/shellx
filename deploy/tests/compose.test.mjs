@@ -28,3 +28,11 @@ test('the relay has a hard memory ceiling of 512 MB, swap included (mem_limit + 
   // deploy.resources.limits is ignored by `docker compose up` without swarm: it would look like a limit and be none.
   assert.doesNotMatch(compose, /^\s+deploy:/m);
 });
+
+test('push: the relay gets FCM_SERVICE_ACCOUNT from .env (empty by default) and ./secrets read-only', () => {
+  const relay = service('relay');
+  assert.match(relay, /^ {6}FCM_SERVICE_ACCOUNT: \$\{FCM_SERVICE_ACCOUNT:-\}$/m);
+  assert.match(relay, /^ {6}- \.\/secrets:\/secrets:ro$/m);
+  // The secret itself never goes through relay.env (synced from the repository on every deploy).
+  assert.doesNotMatch(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'relay.env'), 'utf8'), /FCM/);
+});

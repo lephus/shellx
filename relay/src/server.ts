@@ -5,6 +5,7 @@ import { Db } from "./db/db.js";
 import { migrate } from "./db/migrate.js";
 import { HubRegistry } from "./hub/registry.js";
 import { errorKind, logMeta } from "./log.js";
+import { loadPush } from "./push/config.js";
 import { startRelay } from "./relay.js";
 import { createStopHandler } from "./stop.js";
 
@@ -31,9 +32,14 @@ try {
   fail(`cannot open database at ${config.dbPath} (${errorKind(err)})`);
 }
 
+// Push is optional (push spec §5): without a usable FCM_SERVICE_ACCOUNT the relay runs as before.
+const push = loadPush(process.env);
+if (push.gateway === null) logMeta("push_disabled", { reason: push.reason });
+else logMeta("push_enabled", { project: push.projectId });
+
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config) },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

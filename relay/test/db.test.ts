@@ -101,9 +101,9 @@ describe("migrate", () => {
   it("applies every migration once, in file-name order, and records them", () => {
     const db = openFresh();
     try {
-      expect(migrate(db)).toEqual(["0001_init.sql", "0002_hub_state.sql"]);
+      expect(migrate(db)).toEqual(["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql"]);
       const rows = db.all<{ name: string; applied_at: number }>("SELECT name, applied_at FROM schema_migrations ORDER BY name");
-      expect(rows.map((r) => r.name)).toEqual(["0001_init.sql", "0002_hub_state.sql"]);
+      expect(rows.map((r) => r.name)).toEqual(["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql"]);
       for (const row of rows) expect(row.applied_at).toBeGreaterThan(1_700_000_000_000);
     } finally {
       db.close();

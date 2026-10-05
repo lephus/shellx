@@ -221,10 +221,26 @@ final class E2eWorld {
   bool _disposed = false;
 
   /// Everything is torn down again (account included) if a step fails.
-  static Future<E2eWorld> create(Uri baseUri) async {
+  ///
+  /// By default sessions run `/bin/sh` without hooks or notifications;
+  /// [shell], [shellEnvironment], [shellIntegration] and [notifications]
+  /// (built from the agent's signed-in API) change that.
+  static Future<E2eWorld> create(
+    Uri baseUri, {
+    ShellResolver? shell,
+    Map<String, String>? shellEnvironment,
+    ShellIntegration? shellIntegration,
+    AgentNotifications Function(ShellxApi agentApi)? notifications,
+  }) async {
     final world = E2eWorld._();
     try {
-      await world._build(baseUri);
+      await world._build(
+        baseUri,
+        shell: shell,
+        shellEnvironment: shellEnvironment,
+        shellIntegration: shellIntegration,
+        notifications: notifications,
+      );
     } catch (_) {
       await world.dispose();
       rethrow;
@@ -232,7 +248,13 @@ final class E2eWorld {
     return world;
   }
 
-  Future<void> _build(Uri baseUri) async {
+  Future<void> _build(
+    Uri baseUri, {
+    ShellResolver? shell,
+    Map<String, String>? shellEnvironment,
+    ShellIntegration? shellIntegration,
+    AgentNotifications Function(ShellxApi agentApi)? notifications,
+  }) async {
     final random = Random.secure();
     final tag = List.generate(
       16,
@@ -259,10 +281,12 @@ final class E2eWorld {
     final ids = sessionIdAllocator();
     sessions = SessionManager(
       ptyFactory: const ProcessPtyFactory(),
-      shellResolver: const _PlainShell(),
+      shellResolver: shell ?? const _PlainShell(),
       homeDirectory: Directory.systemTemp.path,
-      baseEnvironment: Platform.environment,
+      baseEnvironment: shellEnvironment ?? Platform.environment,
       nextId: ids,
+      shellIntegration: shellIntegration,
+      notifications: notifications?.call(api),
     );
     desktop = DesktopSessionManager(nextId: ids);
     sharing = TerminalSharing(

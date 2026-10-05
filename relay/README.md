@@ -27,7 +27,7 @@ npm run build       # tsc → dist/ (what the image runs: node dist/server.js)
 
   ```bash
   flutter pub get                 # from the repository root, once
-  cd packages/shellx_e2e && SHELLX_E2E_RELAY=http://127.0.0.1:8787 dart test   # 7 tests
+  cd packages/shellx_e2e && SHELLX_E2E_RELAY=http://127.0.0.1:8787 dart test
   ```
 - `relay/.npmrc` sets `ignore-scripts=true`: `better-sqlite3` and `@node-rs/argon2` ship prebuilt
   binaries, and npm 10 (bundled with Node 22) would otherwise try to compile `better-sqlite3`.
@@ -43,12 +43,14 @@ stops the relay with one line on stderr and exit status 1.
 | `PORT` | `8080` | Listening port (`0` = any free port) |
 | `HOST` | `0.0.0.0` | Listening address (`npm run dev` uses `127.0.0.1`) |
 | `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
-| `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade limits off |
+| `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade/notification limits off |
+| `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push notifications). Unset, unreadable or invalid → push is off, the relay runs normally, logs `push_disabled` with the reason once, and `POST /v1/notifications` answers 503 `push_unavailable` |
+| `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
 
 On startup the relay applies every `migrations/*.sql` not yet listed in `schema_migrations`, in
 file-name order, one transaction per file. There are no down-migrations: fix a mistake with a new
 file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub's
-`pairing_removed` tombstones.
+`pairing_removed` tombstones; `0003_push_tokens.sql` holds the phones' FCM tokens.
 
 ## Behaviour worth knowing
 
@@ -110,6 +112,29 @@ file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub
   signal is ignored. Clients reconnect with their usual backoff.
 - **Logs:** one JSON line per event with metadata only (time, `device_id`, error kind). Never
   payloads, tokens, passwords, e-mail or IP addresses.
+
+## Push notifications
+
+Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
+
+- `PUT /v1/devices/me/push-token {token, platform}` (phones only, `403 mobile_only` otherwise; token
+  1..4096 characters, platform `android` or `ios`) stores the phone's FCM token; a token registered
+  again by another device moves to it. `DELETE /v1/devices/me/push-token` removes it. Logout removes
+  it too, and deleting the account removes it with the device.
+- `POST /v1/notifications {title, body, data?}` (agents only): title 1..200, body 1..1000
+  characters, `data` at most 10 string values (FCM-reserved keys such as `from`, `google…`, `gcm…`
+  are refused with 400; the relay adds `agent_id`). Recipients are the phones with a pairing record
+  to this agent, a push token and a live sign-in. Answers `202 {sent}` after FCM answered for each;
+  tokens FCM reports `UNREGISTERED`/`INVALID_ARGUMENT` are deleted; other FCM errors are logged by
+  kind and not retried. 120 per agent per hour (`429 rate_limited`). 503 `push_unavailable` without
+  configuration.
+- `src/push/fcm.ts` talks to FCM HTTP v1 with an OAuth token from a JWT (RS256, `node:crypto`)
+  signed with the service account key; the token is cached until a minute before it expires.
+- Logs never contain titles, bodies or tokens (only counts and the agent's `device_id`).
+- **Local test against a fake FCM server:** `npm run fake-fcm-account -- .data/fake-fcm.json`, then
+  `FCM_SERVICE_ACCOUNT=.data/fake-fcm.json FCM_ENDPOINT=http://127.0.0.1:8788
+  FCM_TOKEN_ENDPOINT=http://127.0.0.1:8788/token npm run dev` (environment variables win over
+  `dev.env`). `packages/shellx_e2e/test/push_e2e_test.dart` runs that fake server on port 8788.
 
 ## Healthcheck
 

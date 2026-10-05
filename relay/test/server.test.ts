@@ -1,6 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { generateKeyPairSync } from "node:crypto";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { request as httpRequest } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
+import type { AddressInfo } from "node:net";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -300,5 +302,78 @@ describe("restart", () => {
     await a.closed;
     await (await after.ready).shutdown(1000);
     reopened.close();
+  });
+});
+
+describe("push configuration (FCM_SERVICE_ACCOUNT, push spec §5)", () => {
+  it("a missing or broken key file leaves push off: the relay still runs and answers 503 push_unavailable", async () => {
+    const keyFile = join(tempDir(), "fcm.json");
+    writeFileSync(keyFile, "{ not json");
+    for (const [extra, reason] of [
+      [{}, "not_configured"],
+      [{ FCM_SERVICE_ACCOUNT: join(tempDir(), "missing.json") }, "unreadable"],
+      [{ FCM_SERVICE_ACCOUNT: keyFile }, "invalid"],
+    ] as const) {
+      const server = startServer({
+        ...VERSION_ENV, ...extra, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false",
+      });
+      const port = await waitForListening(server.output);
+      expect(server.output()).toContain(`"event":"push_disabled","reason":"${reason}"`);
+      const account = await registerAccount(remote(port));
+      const res = await call(remote(port), "POST", "/v1/notifications", { token: account.agent.token, body: { title: "t", body: "b" } });
+      expect(res.status).toBe(503);
+      server.child.kill("SIGTERM");
+      expect((await server.exit).code).toBe(0);
+    }
+  });
+
+  it("with a key and loopback FCM overrides, a notification reaches the (fake) FCM server with the phone's token", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    const keyFile = join(tempDir(), "fcm.json");
+    writeFileSync(keyFile, JSON.stringify({ project_id: "shellx-test", client_email: "t@shellx-test.iam", private_key: privateKey }));
+    const seen: { path: string; body: string }[] = [];
+    const fake = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
+      req.on("end", () => {
+        seen.push({ path: req.url ?? "", body });
+        res.setHeader("Content-Type", "application/json");
+        res.end(req.url === "/token" ? JSON.stringify({ access_token: "fake", expires_in: 3600 }) : JSON.stringify({ name: "m/1" }));
+      });
+    });
+    await new Promise<void>((resolve) => fake.listen(0, "127.0.0.1", resolve));
+    onCleanup(() => new Promise<void>((resolve) => fake.close(() => resolve())));
+    const fakeUrl = `http://127.0.0.1:${(fake.address() as AddressInfo).port}`;
+
+    const server = startServer({
+      ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false",
+      FCM_SERVICE_ACCOUNT: keyFile, FCM_ENDPOINT: fakeUrl, FCM_TOKEN_ENDPOINT: `${fakeUrl}/token`,
+    });
+    const port = await waitForListening(server.output);
+    expect(server.output()).toContain('"event":"push_enabled","project":"shellx-test"');
+    const app = remote(port);
+    const account = await registerAccount(app);
+    const phone = await loginDevice(app, account, "mobile");
+    expect((await pair(app, account.agent.token, phone.deviceId)).status).toBe(201);
+    await call(app, "PUT", "/v1/devices/me/push-token", { token: phone.token, body: { token: "phone-fcm-token", platform: "android" } });
+    const res = await call(app, "POST", "/v1/notifications", { token: account.agent.token, body: { title: "Mac", body: "Build xong" } });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ sent: 1 });
+    expect(seen.map((s) => s.path)).toEqual(["/token", "/v1/projects/shellx-test/messages:send"]);
+    expect(JSON.parse(seen[1]!.body).message).toMatchObject({
+      token: "phone-fcm-token",
+      notification: { title: "Mac", body: "Build xong" },
+      data: { agent_id: account.agent.deviceId },
+    });
+    server.child.kill("SIGTERM");
+    const result = await server.exit;
+    expect(result.code).toBe(0);
+    // Neither the content nor the token is ever logged.
+    expect(result.stdout).not.toContain("Build xong");
+    expect(result.stdout).not.toContain("phone-fcm-token");
   });
 });
