@@ -101,24 +101,42 @@ fi
 /// `DEBUG` trap emits E and C once per command line (gated by
 /// `__shellx_at_prompt`, which `PROMPT_COMMAND` sets last); the first part
 /// of `PROMPT_COMMAND` emits D with `$?`. If the user's startup files later
-/// replace `PROMPT_COMMAND`, the trap wraps it again (a fork-free check
-/// before every command). An array `PROMPT_COMMAND` (bash 5.1+) gets start
-/// and end as its first and last elements. Not installed when a
+/// replace or append to `PROMPT_COMMAND`, the trap wraps it again (a
+/// fork-free check before every command: start must come first and end
+/// last); the next command line after such a re-wrap is still reported. An
+/// array `PROMPT_COMMAND` (bash 5.1+) gets start and end as its first and
+/// last elements. Not installed when a
 /// `DEBUG` trap already exists (bash-preexec and friends): no command
 /// notifications then, nothing else changes.
 const bashHookBody = r'''
 if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]]; then
   __shellx_hooked=1
+  __shellx_unwrap() {
+    local nl=$'\n' ws=$' \t\n;'
+    __shellx_s=${1//"__shellx_prompt_start${nl}"/}
+    __shellx_s=${__shellx_s//"${nl}__shellx_prompt_end"/}
+    __shellx_s=${__shellx_s//__shellx_prompt_start/:}
+    __shellx_s=${__shellx_s//__shellx_prompt_end/:}
+    while :; do case "$__shellx_s" in [$ws]*) __shellx_s=${__shellx_s#?} ;; *) break ;; esac; done
+  }
   __shellx_wrap_prompt() {
-    case "${PROMPT_COMMAND[*]-}" in
-      *__shellx_prompt_end*) ;;
-      *)
-        if [[ "$(builtin declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-          PROMPT_COMMAND=(__shellx_prompt_start "${PROMPT_COMMAND[@]}" __shellx_prompt_end)
-        else
-          PROMPT_COMMAND="__shellx_prompt_start"$'\n'"${PROMPT_COMMAND-}"$'\n'"__shellx_prompt_end"
-        fi ;;
-    esac
+    local e n=${#PROMPT_COMMAND[@]}
+    if [ "$n" -gt 1 ]; then
+      if [ "${PROMPT_COMMAND[0]}" = __shellx_prompt_start ] && [ "${PROMPT_COMMAND[$n-1]}" = __shellx_prompt_end ]; then return 1; fi
+      local -a a=()
+      for e in "${PROMPT_COMMAND[@]}"; do
+        case "$e" in
+          __shellx_prompt_start|__shellx_prompt_end) ;;
+          *) __shellx_unwrap "$e"; a+=("$__shellx_s") ;;
+        esac
+      done
+      PROMPT_COMMAND=(__shellx_prompt_start "${a[@]}" __shellx_prompt_end)
+    else
+      case "${PROMPT_COMMAND-}" in __shellx_prompt_start*__shellx_prompt_end) return 1 ;; esac
+      __shellx_unwrap "${PROMPT_COMMAND-}"
+      PROMPT_COMMAND="__shellx_prompt_start"$'\n'"$__shellx_s"$'\n'"__shellx_prompt_end"
+    fi
+    return 0
   }
   __shellx_prompt_start() {
     local ret=$?
@@ -130,20 +148,40 @@ if [[ $- == *i* && -z "${__shellx_hooked-}" && -z "$(builtin trap -p DEBUG)" ]];
   }
   __shellx_prompt_end() {
     local ret=$? re='^ *([0-9]+)'
+    if [ -n "${__shellx_skip_end-}" ]; then
+      # This run of PROMPT_COMMAND began before the re-wrap: our end was not last in it.
+      __shellx_skip_end=
+      return $ret
+    fi
     if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]]; then __shellx_hist=${BASH_REMATCH[1]}; fi
     __shellx_at_prompt=1
     return $ret
   }
   __shellx_debug() {
-    case "${PROMPT_COMMAND[*]-}" in *__shellx_prompt_end*) ;; *) __shellx_wrap_prompt ;; esac
+    local s re='^ *([0-9]+)[* ] *(.*)$' nl=$'\n' cr=$'\r' bel=$'\a' esc=$'\e'
+    if __shellx_wrap_prompt; then
+      # Our start/end were missing, or no longer first/last: the next command line typed is still a
+      # command even if this prompt never reaches __shellx_prompt_end (the first line that adds a
+      # history entry).
+      if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]]; then __shellx_hist=${BASH_REMATCH[1]}; fi
+      __shellx_pending=1
+      __shellx_at_prompt=
+      if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then __shellx_skip_end=1; fi
+      return
+    fi
     if [ "$BASH_COMMAND" = __shellx_prompt_start ]; then
       __shellx_at_prompt=
+      __shellx_pending=
       return
     fi
     [ -n "${COMP_LINE-}" ] && return
-    [ -z "${__shellx_at_prompt-}" ] && return
+    if [ -z "${__shellx_at_prompt-}" ]; then
+      [ -z "${__shellx_pending-}" ] && return
+      [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]] || return
+      [ "${BASH_REMATCH[1]}" != "${__shellx_hist-}" ] || return
+      __shellx_pending=
+    fi
     __shellx_at_prompt=
-    local s re='^ *([0-9]+)[* ] *(.*)$' nl=$'\n' cr=$'\r' bel=$'\a' esc=$'\e'
     if [[ "$(HISTTIMEFORMAT= builtin history 1)" =~ $re ]] && [ "${BASH_REMATCH[1]}" != "${__shellx_hist-}" ]; then
       s=${BASH_REMATCH[2]}
     else

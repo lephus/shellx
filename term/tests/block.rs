@@ -626,26 +626,56 @@ fn an_unwrapped_shell_gets_no_command_hooks() {
     }
 }
 
-#[test]
-fn a_later_prompt_command_in_bashrc_keeps_command_notifications() {
-    // The block sits at the top; the rest of ~/.bashrc replaces PROMPT_COMMAND.
-    let home = real_home("notify-bash-pc");
-    std::fs::write(
-        home.join(".bashrc"),
-        format!("{BASH_BLOCK}PROMPT_COMMAND=\"true\"\necho AFTER-BLOCK\n"),
-    )
-    .unwrap();
+/// A really wrapped bash window whose ~/.bashrc is the block followed by
+/// `rest`; the first command typed after startup is `sleep 0.2; false`,
+/// which must be reported with its own line (633;E, 133;C, 133;D;1).
+fn bash_with_rest_reports_the_first_command(rest: &str, tag: &str) -> String {
+    let home = real_home(tag);
+    std::fs::write(home.join(".bashrc"), format!("{BASH_BLOCK}{rest}")).unwrap();
     let mut h = run_shell("/bin/bash", &["-i"], &home, &[]);
-    assert_really_wrapped(&mut h);
+    // Typed first, before anything else (the probe below comes after).
     h.send("sleep 0.2; false\r");
     h.expect("\x1b]133;D;1\x07", T);
+    h.send("echo sec''ond\r");
+    h.expect("second", T);
+    assert_really_wrapped(&mut h);
+    h.settle(Duration::from_millis(300));
     let text = h.text();
     assert!(
         text.contains("\x1b]633;E;sleep 0.2\\x3b false\x07\x1b]133;C\x07"),
-        "{text:?}"
+        "{tag}: {text:?}"
+    );
+    assert!(
+        text.contains("\x1b]633;E;echo sec''ond\x07"),
+        "{tag}: {text:?}"
     );
     h.send("exit 0\r");
     assert_eq!(h.wait_exit(T), 0);
+    text
+}
+
+#[test]
+fn a_prompt_command_set_on_the_last_line_of_bashrc_keeps_the_first_command() {
+    bash_with_rest_reports_the_first_command("PROMPT_COMMAND=\"true\"\n", "notify-bash-pc-last");
+}
+
+#[test]
+fn a_prompt_command_set_later_in_bashrc_keeps_command_notifications() {
+    bash_with_rest_reports_the_first_command(
+        "PROMPT_COMMAND=\"true\"\necho AFTER-BLOCK\n",
+        "notify-bash-pc",
+    );
+}
+
+#[test]
+fn a_prompt_command_appended_later_in_bashrc_is_not_reported_as_a_command() {
+    let text = bash_with_rest_reports_the_first_command(
+        "PROMPT_COMMAND=\"$PROMPT_COMMAND; history -a\"\necho AFTER-BLOCK\n",
+        "notify-bash-pc-append",
+    );
+    assert!(!text.contains("]633;E;history"), "{text:?}");
+    // Exactly the commands typed: sleep/false, echo, ps (assert_really_wrapped).
+    assert_eq!(text.matches("]133;C").count(), 3, "{text:?}");
 }
 
 #[test]
@@ -655,7 +685,10 @@ fn the_inner_zsh_leaves_command_reporting_to_vscode_shell_integration() {
         "/bin/zsh",
         &["-i"],
         &home,
-        &[("TERM_PROGRAM", "vscode"), ("VSCODE_INJECTION", "1")],
+        &[
+            ("TERM_PROGRAM", "vscode"),
+            ("VSCODE_SHELL_INTEGRATION", "1"),
+        ],
     );
     assert_really_wrapped(&mut h);
     h.send("false; whence -w __shellx_precmd || echo no''-hooks\r");
@@ -663,5 +696,23 @@ fn the_inner_zsh_leaves_command_reporting_to_vscode_shell_integration() {
     h.settle(Duration::from_millis(300));
     assert!(!h.text().contains("]133;"), "{:?}", h.text());
     h.send("exit\r");
+    h.wait_exit(T);
+}
+
+#[test]
+fn vscode_injection_alone_does_not_turn_the_inner_hooks_off() {
+    // VSCODE_INJECTION stays exported for the whole VS Code terminal, also in
+    // nested shells and with shell integration turned off.
+    let home = real_home("notify-zsh-vscode-injection");
+    let mut h = run_shell(
+        "/bin/zsh",
+        &["-i"],
+        &home,
+        &[("TERM_PROGRAM", "vscode"), ("VSCODE_INJECTION", "1")],
+    );
+    assert_really_wrapped(&mut h);
+    h.send("false\r");
+    h.expect("\x1b]133;D;1\x07", T);
+    h.send("exit 0\r");
     h.wait_exit(T);
 }

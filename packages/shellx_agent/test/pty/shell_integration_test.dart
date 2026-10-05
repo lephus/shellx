@@ -323,6 +323,46 @@ void main() {
       );
     }, skip: hasBash ? null : 'no /bin/bash');
 
+    test('bash: a PROMPT_COMMAND appended to later (scalar, then array) is '
+        'wrapped again: real commands keep their own line, the appended '
+        'prompt command is never reported', () async {
+      File('${home.path}/.bashrc').writeAsStringSync(
+        'PROMPT_COMMAND=user_one\n'
+        'user_one() { :; }; user_two() { :; }; user_three() { :; }\n',
+      );
+      final out = await run(
+        const ShellCommand(
+          executable: '/bin/bash',
+          arguments: [],
+          name: 'bash',
+        ),
+        [
+          r'PROMPT_COMMAND="$PROMPT_COMMAND; user_two"',
+          'sleep 0.1; false',
+          'echo after'
+              '-scalar',
+          'PROMPT_COMMAND+=(user_three)',
+          'true',
+          r'echo "PC=[${PROMPT_COMMAND[*]}]"',
+        ],
+      );
+      expect(out, isNot(contains(']633;E;user_')));
+      expect(
+        out,
+        contains('$esc]633;E;sleep 0.1\\x3b false$bel$esc]133;C$bel'),
+      );
+      expect(out, contains('$esc]133;D;1$bel'));
+      expect(out, contains(']633;E;echo after-scalar'));
+      // bash 3.2 here: the rebuilt array is checked, bash 5.1 does not run it.
+      expect(
+        out,
+        contains(
+          'PC=[__shellx_prompt_start user_one; user_two user_three '
+          '__shellx_prompt_end]',
+        ),
+      );
+    }, skip: hasBash ? null : 'no /bin/bash');
+
     test(
       'bash -l: the login files load instead of ~/.bashrc',
       () async {

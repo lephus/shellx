@@ -45,7 +45,7 @@ fn every_block_installs_command_hooks_only_in_its_inner_shell_branch() {
     assert!(
         bash.find("__shellx_debug").unwrap()
             > bash
-                .find("elif [[ $- == *i* && -n \"${SHELLX_TERM-}\" ]]")
+                .find("elif [[ $- == *i* && -n \"${SHELLX_TERM-}\"")
                 .unwrap()
     );
     let ps1 = BLOCKS[2].1;
