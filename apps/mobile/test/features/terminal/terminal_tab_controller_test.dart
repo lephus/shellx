@@ -277,7 +277,15 @@ void main() {
       expect(desktop.title.value, '~/projects/api');
 
       machine.sessions = [
-        const SessionInfo(id: 41, index: 2, shell: 'zsh', createdAt: 0, attached: false, kind: SessionKind.desktop, app: 'iTerm2'),
+        const SessionInfo(
+          id: 41,
+          index: 2,
+          shell: 'zsh',
+          createdAt: 0,
+          attached: false,
+          kind: SessionKind.desktop,
+          app: 'iTerm2',
+        ),
         const SessionInfo(id: 42, index: 3, shell: 'bash', createdAt: 0, attached: false, kind: SessionKind.desktop),
       ];
       final appOnly = TerminalTabController(

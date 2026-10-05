@@ -28,6 +28,10 @@ abstract final class TerminalColors {
   static const Color noticeText = Color(0xFFFFD9DB);
   static const Color noticeBorder = Color(0xFF5A2A2E);
 
+  /// "Máy tính đang dùng terminal này" banner over a desktop terminal (text: [yellow]).
+  static const Color driverBannerBackground = Color(0xFF2A2412);
+  static const Color driverBannerBorder = Color(0xFF4A3F1C);
+
   /// ANSI palette for xterm.
   static const TerminalTheme theme = TerminalTheme(
     cursor: foreground,

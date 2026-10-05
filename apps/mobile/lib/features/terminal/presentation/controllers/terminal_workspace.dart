@@ -7,6 +7,32 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_k
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
 
+/// What the session picker offers (terminal sharing §9.1): the sessions not open as tabs yet, and
+/// the agent's `desktop_sharing` for the hint shown when there is no desktop terminal.
+final class SessionListing {
+  const SessionListing(this.sessions, {required this.desktopSharing});
+
+  final List<SessionInfo> sessions;
+
+  /// Null: an agent older than terminal sharing ("Cập nhật ShellX trên máy tính…").
+  final bool? desktopSharing;
+
+  /// "Terminal trên máy tính".
+  List<SessionInfo> get desktop => [
+    for (final session in sessions)
+      if (session.kind == SessionKind.desktop) session,
+  ];
+
+  /// "Phiên ShellX".
+  List<SessionInfo> get shellx => [
+    for (final session in sessions)
+      if (session.kind != SessionKind.desktop) session,
+  ];
+
+  /// Nothing to pick: `+` opens a new session at once.
+  bool get isEmpty => sessions.isEmpty;
+}
+
 /// The tabs of one machine. Outlives its page so terminals keep receiving
 /// output while the user is elsewhere in the app (spec §9.4).
 class TerminalWorkspace extends Controller {
@@ -55,15 +81,23 @@ class TerminalWorkspace extends Controller {
   /// Spec §9.2 #4: the first time the machine page opens, send
   /// `session.list`. Returns the sessions not shown as tabs yet, or null on
   /// later visits.
-  Future<List<SessionInfo>?> prepare() async {
+  Future<SessionListing?> prepare() async {
     await ensureConnected();
     if (_listedSessions) return null;
+    return pickable();
+  }
+
+  /// Terminal sharing §9.1, for `+`: lists the machine's sessions (desktop terminals included)
+  /// again, leaving out those already open as tabs.
+  Future<SessionListing> pickable() async {
+    await ensureConnected();
     final sessions = await machine.listSessions();
     _listedSessions = true;
-    return [
+    final open = {for (final tab in _tabs.peek()) tab.id};
+    return SessionListing([
       for (final session in sessions)
-        if (!_tabs.peek().any((tab) => tab.id == session.id)) session,
-    ];
+        if (!open.contains(session.id)) session,
+    ], desktopSharing: machine.desktopSharing);
   }
 
   /// Spec §12: `spawn_failed` shows its reason inside a tab, so it becomes a
@@ -134,7 +168,8 @@ class TerminalWorkspace extends Controller {
     return tab;
   }
 
-  /// `×`: sends `session.close` (spec §6.4) and drops the tab. Errors from an
+  /// `×`: sends `session.close` (spec §6.4) — `session.detach` for a desktop terminal, which keeps
+  /// running on the computer — and drops the tab. Errors from an
   /// already-ended session are ignored — the tab must always be closable.
   ///
   /// The active tab is tracked by identity, not by index: removing a tab shifts every later

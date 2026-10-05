@@ -734,6 +734,216 @@ void main() {
     expect(popups.errors, hasLength(2));
     expect(popups.successes, isEmpty);
   });
+
+  group('terminal sharing (§9, tests §11.5)', () {
+    const window = SessionInfo(
+      id: 40,
+      index: 1,
+      shell: 'zsh',
+      createdAt: 1790000000000,
+      attached: false,
+      kind: SessionKind.desktop,
+      app: 'Terminal',
+      title: '~/projects/api',
+    );
+    const shellxSession = SessionInfo(id: 7, index: 1, shell: 'zsh', createdAt: 1790000000000, attached: false);
+    const stillRunning = 'Terminal vẫn chạy trên máy tính.';
+    const hintOff = "Bật 'Chia sẻ terminal' trong menu ShellX trên máy tính để xem các terminal đang mở ở đây.";
+    const hintUpdate = 'Cập nhật ShellX trên máy tính để xem các terminal đang mở.';
+    const hintOn =
+        'Chỉ các cửa sổ terminal mở sau khi bật chia sẻ mới hiện ở đây. Mở một cửa sổ terminal mới trên máy tính.';
+
+    FakePopupHandler popups() => getIt<PopupHandler>() as FakePopupHandler;
+
+    /// Opens the page and attaches the desktop terminal from the picker.
+    Future<void> openDesktop(WidgetTester tester) async {
+      machine
+        ..sessions = [window]
+        ..desktopSharingValue = true;
+      await open(tester);
+      await tester.tap(find.byKey(const ValueKey('picker-session-40')));
+      await tester.pumpAndSettle();
+      expect(machine.attached.single.id, 40);
+    }
+
+    testWidgets('the picker shows two groups and "Phiên mới"; a desktop row attaches with its label', (tester) async {
+      machine
+        ..sessions = [shellxSession, window]
+        ..desktopSharingValue = true;
+      await open(tester);
+
+      expect(find.text('Máy này đang có 2 phiên'), findsOneWidget);
+      expect(find.text('TERMINAL TRÊN MÁY TÍNH'), findsOneWidget);
+      expect(find.text('PHIÊN SHELLX'), findsOneWidget);
+      expect(find.text('Terminal — ~/projects/api'), findsOneWidget);
+      expect(find.text('zsh 1'), findsOneWidget);
+      expect(find.text('Phiên mới'), findsOneWidget);
+      expect(find.byKey(const ValueKey('picker-desktop-hint')), findsNothing);
+
+      await tester.tap(find.text('Terminal — ~/projects/api'));
+      await tester.pumpAndSettle();
+      expect(machine.attached.single.id, 40);
+      // The tab is labelled with the window title, with a small computer icon.
+      final chip = find.byKey(const ValueKey('tab-40'));
+      expect(find.descendant(of: chip, matching: find.text('~/projects/api')), findsOneWidget);
+      expect(find.descendant(of: chip, matching: find.byIcon(Icons.desktop_windows_outlined)), findsOneWidget);
+    });
+
+    for (final (sharing, hint) in [(false, hintOff), (null, hintUpdate), (true, hintOn)]) {
+      testWidgets('without a desktop terminal the picker hints by desktop_sharing: $sharing', (tester) async {
+        machine
+          ..sessions = [shellxSession]
+          ..desktopSharingValue = sharing;
+        await open(tester);
+        expect(find.text('TERMINAL TRÊN MÁY TÍNH'), findsOneWidget);
+        expect(find.text(hint), findsOneWidget);
+        for (final other in [hintOff, hintUpdate, hintOn].where((h) => h != hint)) {
+          expect(find.text(other), findsNothing);
+        }
+      });
+    }
+
+    testWidgets('"Phiên mới" in the picker opens a new session', (tester) async {
+      machine.sessions = [window];
+      await open(tester);
+      await tester.tap(find.text('Phiên mới'));
+      await tester.pumpAndSettle();
+      expect(machine.opened, hasLength(1));
+    });
+
+    testWidgets('+ opens the picker while a session is not a tab yet, else a new session at once', (tester) async {
+      await open(tester); // nothing listed: the first tab opens on its own
+      expect(machine.opened, hasLength(1));
+
+      machine
+        ..sessions = [window]
+        ..desktopSharingValue = true;
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      expect(machine.listCalls, 2);
+      expect(find.text('Terminal — ~/projects/api'), findsOneWidget);
+      await tester.tap(find.text('Terminal — ~/projects/api'));
+      await tester.pumpAndSettle();
+      expect(machine.attached.single.id, 40);
+      expect(machine.opened, hasLength(1));
+
+      // Everything listed is a tab now: + opens a new session without asking.
+      await tester.dragUntilVisible(find.byTooltip('Mở phiên mới'), find.byType(ListView).first, const Offset(-200, 0));
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      expect(machine.listCalls, 3);
+      expect(find.text('Phiên mới'), findsNothing);
+      expect(machine.opened, hasLength(2));
+    });
+
+    testWidgets('× on a desktop tab detaches without asking and says the terminal keeps running', (tester) async {
+      await openDesktop(tester);
+      await tester.tap(
+        find.descendant(of: find.byKey(const ValueKey('tab-40')), matching: find.byTooltip('Đóng tab')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Đóng phiên này? Mọi chương trình đang chạy trong phiên sẽ bị dừng.'), findsNothing);
+      expect(machine.closed, [40]);
+      expect(find.byKey(const ValueKey('tab-40')), findsNothing);
+      expect(popups().infos, [stillRunning]);
+    });
+
+    testWidgets('"Máy tính đang dùng terminal này": tapping the terminal or the banner sends the phone size', (
+      tester,
+    ) async {
+      await openDesktop(tester);
+      const banner = 'Máy tính đang dùng terminal này';
+      expect(find.text(banner), findsNothing);
+
+      machine.handle(40).emit(const TabDriver(DriverSide.desktop));
+      await tester.pump();
+      expect(find.text(banner), findsOneWidget);
+      final sent = machine.resizes.length;
+
+      await tester.tap(find.byType(TerminalView));
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent + 1));
+      expect(machine.resizes.last.id, 40);
+      expect(find.text(banner), findsOneWidget); // until the agent confirms
+
+      await tester.tap(find.text(banner));
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent + 2));
+
+      machine.handle(40).emit(const TabDriver(DriverSide.phone));
+      await tester.pump();
+      expect(find.text(banner), findsNothing);
+
+      // While the phone drives, a tap sends nothing.
+      await tester.tap(find.byType(TerminalView));
+      await tester.pump();
+      expect(machine.resizes, hasLength(sent + 2));
+    });
+
+    testWidgets('typing while the computer drives sends the phone size before the keys', (tester) async {
+      await openDesktop(tester);
+      machine.handle(40).emit(const TabDriver(DriverSide.desktop));
+      await tester.pump();
+      final sent = machine.resizes.length;
+      registry.forMachine(agentA).activeTab.value!.terminal.value.textInput('ls');
+      expect(machine.resizes, hasLength(sent + 1));
+      expect(lastInput(), 'ls');
+    });
+
+    testWidgets('session.exited: "Cửa sổ terminal trên máy tính đã đóng." with only "Đóng tab"', (tester) async {
+      await openDesktop(tester);
+      machine.handle(40).emit(const TabOutput('git pull'));
+      machine.handle(40).emit(const TabExited(0));
+      await tester.pump();
+      expect(find.text('Cửa sổ terminal trên máy tính đã đóng.'), findsOneWidget);
+      expect(find.text('Mở phiên mới'), findsNothing);
+      expect(find.text('Gắn lại'), findsNothing);
+      expect(screen(), contains('git pull'));
+
+      await tester.tap(find.text('Đóng tab'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('tab-40')), findsNothing);
+      // The window is gone: no "still running" toast.
+      expect(popups().infos, isEmpty);
+    });
+
+    testWidgets('terminal_gone: "Mất kết nối với terminal này trên máy tính." with only "Đóng tab"', (tester) async {
+      await openDesktop(tester);
+      machine.handle(40).emit(const TabDetached(DetachReason.terminalGone));
+      await tester.pump();
+      expect(find.text('Mất kết nối với terminal này trên máy tính.'), findsOneWidget);
+      expect(find.text('Phiên đã bị đóng trên máy tính.'), findsNothing);
+      expect(find.text('Mở phiên mới'), findsNothing);
+      expect(find.text('Gắn lại'), findsNothing);
+      expect(find.text('Đóng tab'), findsWidgets);
+    });
+
+    testWidgets('closed_by_host: "Máy tính đã ngắt điện thoại khỏi terminal này." with "Gắn lại" and "Đóng tab"', (
+      tester,
+    ) async {
+      await openDesktop(tester);
+      machine.reuseHandles = true;
+      machine.handle(40).emit(const TabDetached(DetachReason.closedByHost));
+      await tester.pump();
+      expect(find.text('Máy tính đã ngắt điện thoại khỏi terminal này.'), findsOneWidget);
+      expect(find.text('Mở phiên mới'), findsNothing);
+
+      await tester.tap(find.text('Gắn lại'));
+      await tester.pumpAndSettle();
+      expect(machine.attached.map((a) => a.id), [40, 40]);
+      expect(find.text('Máy tính đã ngắt điện thoại khỏi terminal này.'), findsNothing);
+    });
+
+    testWidgets('"Đóng tab" after closed_by_host says the terminal keeps running', (tester) async {
+      await openDesktop(tester);
+      machine.handle(40).emit(const TabDetached(DetachReason.closedByHost));
+      await tester.pump();
+      await tester.tap(find.text('Đóng tab'));
+      await tester.pumpAndSettle();
+      expect(machine.closed, [40]);
+      expect(popups().infos, [stillRunning]);
+    });
+  });
 }
 
 /// A registry whose [remove] fails, like a workspace whose disposal throws.

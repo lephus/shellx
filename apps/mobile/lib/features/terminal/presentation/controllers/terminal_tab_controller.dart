@@ -124,6 +124,7 @@ class TerminalTabController extends Controller {
   final Signal<TabBanner?> _banner = signal(null);
   final Signal<bool> _bound = signal(false);
   final Signal<String?> _oscTitle = signal(null);
+
   /// The phone drives right after any attach: taking over at an unchanged size brings no
   /// `session.driver` (ledger "Ghi cho P5").
   final Signal<DriverSide> _driver = signal(DriverSide.phone);
@@ -163,6 +164,11 @@ class TerminalTabController extends Controller {
     TabNotice.closedByHost => isDesktop,
     _ => false,
   };
+
+  /// Closing this tab leaves a terminal running on the computer ("Terminal vẫn chạy trên máy tính."):
+  /// a desktop tab whose terminal was not closed or lost.
+  bool get leavesTerminalRunning =>
+      isDesktop && !const {TabNotice.desktopClosed, TabNotice.terminalGone}.contains(_banner.peek()?.notice);
 
   /// Desktop: the window title, else the app, else "`<shell> <index>`".
   String get _fallbackTitle {

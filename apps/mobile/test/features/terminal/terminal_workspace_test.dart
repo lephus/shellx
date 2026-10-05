@@ -33,10 +33,77 @@ void main() {
 
   test('prepare connects and lists sessions only on the first visit', () async {
     machine.sessions = [running];
-    expect(await workspace.prepare(), [running]);
+    expect((await workspace.prepare())?.sessions, [running]);
     expect(await workspace.prepare(), isNull);
     expect(machine.connectCalls, 1);
     expect(machine.listCalls, 1);
+  });
+
+  group('terminal sharing (§9.1)', () {
+    const window = SessionInfo(
+      id: 40,
+      index: 1,
+      shell: 'zsh',
+      createdAt: 0,
+      attached: false,
+      kind: SessionKind.desktop,
+      app: 'Terminal',
+    );
+
+    test('the listing splits desktop terminals from ShellX sessions and carries desktop_sharing', () async {
+      machine
+        ..sessions = [running, window]
+        ..desktopSharingValue = true;
+      final listing = (await workspace.prepare())!;
+      expect(listing.desktop, [window]);
+      expect(listing.shellx, [running]);
+      expect(listing.desktopSharing, isTrue);
+      expect(listing.isEmpty, isFalse);
+    });
+
+    test('pickable lists again every time, leaving out what is already a tab', () async {
+      machine
+        ..sessions = [running, window]
+        ..desktopSharingValue = false;
+      await workspace.prepare();
+      await workspace.attach(window, grid);
+
+      final listing = await workspace.pickable();
+      expect(machine.listCalls, 2);
+      expect(listing.sessions, [running]);
+      expect(listing.desktopSharing, isFalse);
+
+      await workspace.attach(running, grid);
+      expect((await workspace.pickable()).isEmpty, isTrue);
+    });
+
+    test('an old agent reports no desktop_sharing', () async {
+      machine.sessions = [running];
+      expect((await workspace.pickable()).desktopSharing, isNull);
+    });
+
+    test('closing a desktop tab detaches through closeTab and keeps the terminal running', () async {
+      machine.sessions = [window];
+      final tab = await workspace.attach(window, grid);
+      expect(tab.leavesTerminalRunning, isTrue);
+      await workspace.close(tab);
+      expect(machine.closed, [40]);
+    });
+
+    test('a desktop tab whose terminal is gone, or a ShellX tab, leaves nothing running', () async {
+      machine.sessions = [window];
+      final tab = await workspace.attach(window, grid);
+      machine.handle(40).emit(const TabDetached(DetachReason.terminalGone));
+      expect(tab.leavesTerminalRunning, isFalse);
+      expect((await workspace.openNew(grid)).leavesTerminalRunning, isFalse);
+    });
+
+    test('closed_by_host still leaves the terminal running', () async {
+      machine.sessions = [window];
+      final tab = await workspace.attach(window, grid);
+      machine.handle(40).emit(const TabDetached(DetachReason.closedByHost));
+      expect(tab.leavesTerminalRunning, isTrue);
+    });
   });
 
   test('prepare throws the MachineFailed state for an untrusted machine', () async {

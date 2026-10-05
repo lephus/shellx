@@ -132,7 +132,10 @@ class TerminalPageController extends Controller {
   }
 
   /// First visit: connect and `session.list`; null on later visits or on error.
-  Future<List<SessionInfo>?> prepare() => _run<List<SessionInfo>?>(() => workspace.prepare());
+  Future<SessionListing?> prepare() => _run<SessionListing?>(() => workspace.prepare());
+
+  /// `+` (terminal sharing §9.1): what the picker would offer; null on error (shown as the notice).
+  Future<SessionListing?> pickable() => _run(() => workspace.pickable());
 
   Future<void> openNew(TerminalGrid grid) => _run(() => workspace.openNew(grid));
 

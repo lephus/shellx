@@ -75,13 +75,29 @@ class _TerminalPageState extends State<TerminalPage> {
 
   Future<void> _prepare() async {
     if (!mounted || _controller.closing.peek()) return;
-    final sessions = await _controller.prepare();
-    if (sessions == null || !mounted || _controller.closing.peek()) return;
-    if (sessions.isEmpty) {
+    final listing = await _controller.prepare();
+    if (listing == null || !mounted || _controller.closing.peek()) return;
+    if (listing.isEmpty) {
       if (_controller.workspace.tabs.peek().isEmpty) await _controller.openNew(_grid);
       return;
     }
-    final choice = await showSessionPicker(context, sessions);
+    await _pick(listing);
+  }
+
+  /// `+` (terminal sharing §9.1): the picker when a desktop terminal or a ShellX session is not open
+  /// as a tab yet, else a new session at once.
+  Future<void> _onAdd() async {
+    final listing = await _controller.pickable();
+    if (listing == null || !mounted || _controller.closing.peek()) return;
+    if (listing.isEmpty) {
+      await _controller.openNew(_grid);
+      return;
+    }
+    await _pick(listing);
+  }
+
+  Future<void> _pick(SessionListing listing) async {
+    final choice = await showSessionPicker(context, listing);
     if (!mounted || _controller.closing.peek()) return;
     switch (choice) {
       case AttachSession(:final session):
@@ -93,9 +109,11 @@ class _TerminalPageState extends State<TerminalPage> {
     }
   }
 
+  /// A live ShellX session asks first (closing it stops its programs). A desktop terminal never asks:
+  /// `×` only detaches, and a toast says the terminal keeps running (terminal sharing §9.2).
   Future<void> _close(TerminalTabController tab) async {
-    if (tab.isLive.peek()) {
-      final strings = S.of(context);
+    final strings = S.of(context);
+    if (tab.isLive.peek() && !tab.isDesktop) {
       final confirmed = await showConfirmDialog(
         context,
         message: strings.terminalCloseConfirm,
@@ -103,7 +121,9 @@ class _TerminalPageState extends State<TerminalPage> {
       );
       if (!confirmed || !mounted) return;
     }
+    final stillRunning = tab.leavesTerminalRunning;
     await _controller.close(tab);
+    if (stillRunning && mounted) _controller.popupHandler.showInfo(title: strings.desktopStillRunning);
   }
 
   /// "Dán" and the hardware paste shortcut: `ShellxTerminal.paste` sanitises the text, turns
@@ -231,7 +251,7 @@ class _TerminalPageState extends State<TerminalPage> {
                     workspace: workspace,
                     closing: _controller.closing,
                     canOpen: _controller.canOpen,
-                    onOpen: () => _controller.openNew(_grid),
+                    onOpen: _onAdd,
                     onClose: _close,
                     inline: true,
                   ),
@@ -259,7 +279,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       workspace: workspace,
                       closing: _controller.closing,
                       canOpen: _controller.canOpen,
-                      onOpen: () => _controller.openNew(_grid),
+                      onOpen: _onAdd,
                       onClose: _close,
                     ),
                   ],
@@ -311,7 +331,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                 onFontSize: _controller.setFontSize,
                                 onCopy: () => _copy(active),
                                 onPaste: _paste,
-                                onCloseTab: () => _controller.close(active),
+                                onCloseTab: () => _close(active),
                                 onOpenNew: () => _controller.replaceWithNew(active, _grid),
                                 onReattach: () => _controller.reattach(active),
                               ),
@@ -483,7 +503,8 @@ class _TabStrip extends StatelessWidget {
                 selected: index == activeIndex,
                 onSelect: () => workspace.select(index),
                 onClose: () => onClose(tab),
-                closeTooltip: strings.terminalCloseTab,
+                // A desktop terminal keeps running: `×` closes the tab, not the session.
+                closeTooltip: tab.isDesktop ? strings.closeTab : strings.terminalCloseTab,
               ),
             IconButton(
               tooltip: strings.terminalOpenNew,
@@ -507,6 +528,8 @@ class _TabChip extends StatelessWidget {
     required this.onClose,
     required this.closeTooltip,
   });
+
+  static const double _maxLabelWidth = 180;
 
   final TerminalTabController tab;
 
@@ -543,14 +566,29 @@ class _TabChip extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    // A tab whose session never started has no shell name or index to show.
-                    tab.hasSession ? tab.title.value : S.of(context).terminalFailedTabTitle,
-                    style: TextStyle(
-                      fontFamily: FontFamily.jetBrainsMono,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  if (tab.isDesktop) ...[
+                    Icon(
+                      Icons.desktop_windows_outlined,
+                      size: 13,
                       color: selected ? const Color(0xFFEAF3F5) : TerminalColors.dim,
+                      semanticLabel: S.of(context).desktopTerminalLabel,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  // Window titles of desktop terminals run long ("user@host: ~/path — zsh — 80×24").
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: _maxLabelWidth),
+                    child: Text(
+                      // A tab whose session never started has no shell name or index to show.
+                      tab.hasSession ? tab.title.value : S.of(context).terminalFailedTabTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: FontFamily.jetBrainsMono,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? const Color(0xFFEAF3F5) : TerminalColors.dim,
+                      ),
                     ),
                   ),
                   Tooltip(
@@ -646,53 +684,69 @@ class _TerminalPane extends StatelessWidget {
     return Watch((context) {
       if (closing.value) return const SizedBox.expand();
       final banner = tab.banner.value;
+      final computerDrives = tab.showDriverBanner.value;
       return Stack(
         children: [
           Positioned.fill(
-            child: PinchToZoom(
-              fontSize: fontSize,
-              onFontSize: onFontSize,
-              // `terminalShortcuts` maps the hardware copy/paste chords to ShellX intents that
-              // xterm's own actions do not handle; they do what "Sao chép" and "Dán" do.
-              child: Actions(
-                actions: <Type, Action<Intent>>{
-                  ShellxPasteIntent: CallbackAction<ShellxPasteIntent>(
-                    onInvoke: (_) {
-                      onPaste();
-                      return null;
-                    },
-                  ),
-                  ShellxCopyIntent: CallbackAction<ShellxCopyIntent>(
-                    onInvoke: (_) {
-                      onCopy();
-                      return null;
-                    },
-                  ),
-                },
-                // xterm adds the MediaQuery padding (status bar, home indicator) inside the view;
-                // the bars around the terminal already keep clear of them.
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeLeft: true,
-                  removeTop: true,
-                  removeRight: true,
-                  removeBottom: true,
-                  child: TerminalView(
-                    tab.terminal.value,
-                    controller: tab.selection,
-                    focusNode: focusNode,
-                    theme: TerminalColors.theme,
-                    textStyle: shellxTerminalStyle(fontSize),
-                    padding: padding,
-                    autofocus: true,
-                    deleteDetection: true,
-                    readOnly: !tab.isLive.value,
-                    shortcuts: terminalShortcuts(defaultTargetPlatform),
+            // Terminal sharing §9.2: touching the terminal takes the size back from the computer. A
+            // Listener does not join the gesture arena, so selection, scrolling and pinch still work.
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => tab.claimSize(),
+              child: PinchToZoom(
+                fontSize: fontSize,
+                onFontSize: onFontSize,
+                // `terminalShortcuts` maps the hardware copy/paste chords to ShellX intents that
+                // xterm's own actions do not handle; they do what "Sao chép" and "Dán" do.
+                child: Actions(
+                  actions: <Type, Action<Intent>>{
+                    ShellxPasteIntent: CallbackAction<ShellxPasteIntent>(
+                      onInvoke: (_) {
+                        onPaste();
+                        return null;
+                      },
+                    ),
+                    ShellxCopyIntent: CallbackAction<ShellxCopyIntent>(
+                      onInvoke: (_) {
+                        onCopy();
+                        return null;
+                      },
+                    ),
+                  },
+                  // xterm adds the MediaQuery padding (status bar, home indicator) inside the view;
+                  // the bars around the terminal already keep clear of them.
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeLeft: true,
+                    removeTop: true,
+                    removeRight: true,
+                    removeBottom: true,
+                    child: TerminalView(
+                      tab.terminal.value,
+                      controller: tab.selection,
+                      focusNode: focusNode,
+                      theme: TerminalColors.theme,
+                      textStyle: shellxTerminalStyle(fontSize),
+                      padding: padding,
+                      autofocus: true,
+                      deleteDetection: true,
+                      readOnly: !tab.isLive.value,
+                      shortcuts: terminalShortcuts(defaultTargetPlatform),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          // Over the cells, never above them: pushing the terminal down would change its size and
+          // send a resize that takes the size back on its own.
+          if (computerDrives)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _DriverBanner(onTap: tab.claimSize),
+            ),
           // Every child is positioned, so the stack fills the pane.
           Positioned(
             top: 8,
@@ -808,6 +862,43 @@ class _EndedCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Design "Terminal trên máy tính": the computer has taken this desktop terminal's size (someone typed
+/// or resized the window there). Tapping it, the terminal, or typing hands the size back.
+class _DriverBanner extends StatelessWidget {
+  const _DriverBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const ValueKey('desktop-driver-banner'),
+      color: TerminalColors.driverBannerBackground,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: TerminalColors.driverBannerBorder)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.desktop_windows_outlined, size: 18, color: TerminalColors.yellow),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  S.of(context).desktopDriverBanner,
+                  style: context.typo.paragraph13.bold.copyWith(color: TerminalColors.yellow),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
