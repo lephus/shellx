@@ -389,7 +389,7 @@ Phiên `desktop` **không** đi qua `SessionManager` hiện có. Phần chung đ
 - **Agent khởi động lại** → khóa mới, `shellx-term` nối lại với khóa mới; agent không còn nhớ `term_id` nên tạo phiên mới (`id` mới). Điện thoại gắn lại `id` cũ nhận `session_not_found` như phiên `shellx` hiện nay. Chấp nhận.
 
 **Tin nhắn từ điện thoại.**
-- Agent ghi nhớ theo từng kênh việc điện thoại đã gửi `session.list {desktop: true}`. Điện thoại chưa gửi thì **không được gắn vào phiên `desktop`** (`session_not_found`), nên không bao giờ nhận `session.driver` hay `terminal_gone` mà bộ giải mã cũ từ chối. Cờ mất cùng kênh.
+- Agent ghi nhớ **theo từng điện thoại** việc điện thoại đã gửi `session.list {desktop: true}`. Điện thoại chưa gửi thì **không được gắn vào phiên `desktop`** (`session_not_found`), nên không bao giờ nhận `session.driver` hay `terminal_gone` mà bộ giải mã cũ từ chối. Cờ **giữ qua các lần mất kênh** (app gắn lại tab sau khi rớt mạng mà không liệt kê lại: `MachineClient._resumeOnce`), mất khi agent khởi động lại hoặc điện thoại bị thu hồi.
 - `session.detach` cho `id` không tồn tại hoặc là phiên `shellx` → bỏ qua (tin nhắn này không có trả lời).
 - `input`/`resize` cho phiên `desktop` đang mất kết nối → bỏ.
 
