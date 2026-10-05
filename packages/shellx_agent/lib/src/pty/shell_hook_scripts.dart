@@ -176,16 +176,15 @@ const powerShellHook =
 ''' +
     powerShellHookBody;
 
-/// The PowerShell hooks (shared with `term/shell/block.ps1`).
+/// The PowerShell hooks (shared with `term/shell/block.ps1`). A profile
+/// that sets its own `prompt` after the hook (the block sits at the top of
+/// the profile) is wrapped again at the next line read.
 const powerShellHookBody = r'''
 if (-not $global:__ShellxHooked) {
   $global:__ShellxHooked = $true
   $global:__ShellxRunning = $false
-  $global:__ShellxPrompt = $function:prompt
-  function global:__ShellxEscape([string]$s) {
-    $s.Replace('\', '\\').Replace(';', '\x3b').Replace("`n", '\x0a').Replace("`r", '\x0d').Replace([string][char]7, '\x07').Replace([string][char]27, '\x1b')
-  }
-  function global:prompt {
+  $global:__ShellxUserPrompt = $function:prompt
+  $global:__ShellxPrompt = {
     $ok = $global:?
     $code = $global:LASTEXITCODE
     $mark = ''
@@ -194,17 +193,23 @@ if (-not $global:__ShellxHooked) {
       $n = if ($ok) { 0 } elseif ($code -is [int] -and $code -ne 0) { $code } else { 1 }
       $mark = "$([char]27)]133;D;$n$([char]7)"
     }
-    $text = if ($global:__ShellxPrompt) { & $global:__ShellxPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
+    $text = if ($global:__ShellxUserPrompt) { & $global:__ShellxUserPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
     $global:LASTEXITCODE = $code
     "$mark$text"
   }
+  Set-Item -Path function:global:prompt -Value $global:__ShellxPrompt
   if (Get-Command PSConsoleHostReadLine -CommandType Function -ErrorAction SilentlyContinue) {
     $global:__ShellxReadLine = $function:PSConsoleHostReadLine
     function global:PSConsoleHostReadLine {
+      if ("$function:prompt" -ne "$global:__ShellxPrompt") {
+        $global:__ShellxUserPrompt = $function:prompt
+        Set-Item -Path function:global:prompt -Value $global:__ShellxPrompt
+      }
       $line = & $global:__ShellxReadLine
       if ($line -and $line.Trim()) {
         $global:__ShellxRunning = $true
-        [Console]::Write("$([char]27)]633;E;$(__ShellxEscape $line)$([char]7)$([char]27)]133;C$([char]7)")
+        $s = $line.Replace('\', '\\').Replace(';', '\x3b').Replace("`n", '\x0a').Replace("`r", '\x0d').Replace([string][char]7, '\x07').Replace([string][char]27, '\x1b')
+        [Console]::Write("$([char]27)]633;E;$s$([char]7)$([char]27)]133;C$([char]7)")
       }
       $line
     }

@@ -563,3 +563,65 @@ fn zsh_running_a_script_interactively_is_not_wrapped() {
     assert_eq!(h.wait_exit(T), 0);
     assert!(!h.text().contains("WRAPPED"), "{:?}", h.text());
 }
+
+// ---- command notifications in the inner shell (push spec §4.5) --------------------------------
+
+/// Runs `sleep 0.2; false` and `shellx notify` in the inner shell of a really
+/// wrapped window and checks the OSC 633;E, 133;C, 133;D;1 and 777 it emits.
+fn assert_inner_shell_reports_commands(program: &str, tag: &str) {
+    let home = real_home(tag);
+    let mut h = run_shell(program, &["-i"], &home, &[]);
+    assert_really_wrapped(&mut h);
+    h.send("sleep 0.2; false\r");
+    h.expect("\x1b]133;D;1\x07", T);
+    h.send("shellx notify he''llo\r");
+    h.expect("\x1b]777;notify;;hello\x07", T);
+    let text = h.text();
+    assert!(
+        text.contains("\x1b]633;E;sleep 0.2\\x3b false\x07\x1b]133;C\x07"),
+        "{tag}: {text:?}"
+    );
+    h.send("exit\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn the_inner_zsh_reports_commands_with_osc_133_and_633() {
+    assert_inner_shell_reports_commands("/bin/zsh", "notify-zsh");
+}
+
+#[test]
+fn the_inner_bash_reports_commands_with_osc_133_and_633() {
+    assert_inner_shell_reports_commands("/bin/bash", "notify-bash");
+}
+
+#[test]
+fn the_inner_zsh_login_window_still_reads_zlogin_and_reports_commands() {
+    let home = real_home("notify-zsh-login");
+    std::fs::write(home.join(".zlogin"), "echo ZLOGIN-RAN\n").unwrap();
+    let mut h = run_shell("/bin/zsh", &["-il"], &home, &[]);
+    h.expect("ZLOGIN-RAN", T);
+    h.send("true\r");
+    h.expect("\x1b]133;D;0\x07", T);
+    h.send("logout\r");
+    assert_eq!(h.wait_exit(T), 0);
+}
+
+#[test]
+fn an_unwrapped_shell_gets_no_command_hooks() {
+    // No binary installed: the block does nothing, so no OSC 133 and no
+    // `shellx` function; the existing variable checks cover leftovers.
+    for (program, tag) in [("/bin/zsh", "nohook-zsh"), ("/bin/bash", "nohook-bash")] {
+        let home = home(tag);
+        std::fs::remove_file(home.join("Library/Application Support/ShellX/bin/shellx-term"))
+            .unwrap();
+        let mut h = run_shell(program, &["-i"], &home, &[]);
+        h.expect("AFTER-BLOCK", T);
+        h.send("false; type shellx >/dev/null 2>&1 || echo no''-shellx\r");
+        h.expect("no-shellx", T);
+        h.settle(Duration::from_millis(300));
+        assert!(!h.text().contains("]133;"), "{tag}: {:?}", h.text());
+        h.send("exit\r");
+        h.wait_exit(T);
+    }
+}
