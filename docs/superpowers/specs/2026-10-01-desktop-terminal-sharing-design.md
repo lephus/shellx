@@ -1,7 +1,7 @@
 # Chia sẻ terminal máy tính với điện thoại — Đặc tả thiết kế
 
 - **Ngày:** 2026-10-01
-- **Trạng thái:** Đã duyệt qua brainstorming từng phần (6/6); chờ người dùng đọc lại spec trước khi lập kế hoạch
+- **Trạng thái:** Đã duyệt qua brainstorming từng phần (6/6). P1, P2a xong; P2b code xong. **Bổ sung P3 (2026-10-05): §7.7–§7.9, T13–T14, §11.2, §11.4, §14 — chờ người dùng đọc lại**
 - **Phạm vi:** chương trình mới `shellx-term` (Rust), agent desktop (macOS/Windows), giao thức điện thoại ↔ agent, app mobile, bộ cài và quy trình phát hành desktop. Relay **không đổi**.
 - **Sửa đổi spec v1 (`2026-09-25-shellx-v1-design.md`):** D2 nói "Mọi phiên terminal do điện thoại mở". Tính năng này bổ sung một loại phiên thứ hai: terminal do người dùng tự mở trên máy tính, được chia sẻ sang điện thoại. Mục §3.2 "Hiển thị/mirror terminal trên desktop" (chiều ngược lại: xem phiên của điện thoại trên máy tính) vẫn ngoài phạm vi.
 
@@ -39,6 +39,8 @@ Khi rời máy tính, người dùng mở điện thoại và **xem tiếp, gõ 
 | T10 | Quyền của điện thoại | Không bao giờ tắt terminal máy tính. "Đóng" từ điện thoại chỉ là rời |
 | T11 | Windows PowerShell 5.1 bị chặn script | ShellX phát hiện, giải thích, có nút đổi chính sách `CurrentUser` sang `RemoteSigned`; chỉ đổi khi người dùng bấm xác nhận |
 | T12 | Kiểm chứng Windows | Workflow GitHub Actions chạy khi bấm tay trên `windows-latest` (không chạy theo push). Kiểm tra tương tác là việc chờ. Công tắc trên Windows chỉ hiện qua cờ ẩn |
+| T13 | Phiên `desktop` trong agent (2026-10-05) | Rút lõi chung `SessionStream`; phiên `desktop` có bộ quản lý riêng **không có hàm tắt** (§7.7). Loại bỏ: giả làm `Pty` có `kill()` rỗng, và một `SessionManager` chung có cờ `kind` — cả hai để an toàn của terminal phụ thuộc vào việc không quên một nhánh |
+| T14 | e2e qua relay thật (2026-10-05) | Là bước cuối của P3, **người dùng tự chạy** theo lệnh ghi trong plan; agent không tự kết nối `relay.shellx.pro` |
 
 ---
 
@@ -334,6 +336,65 @@ Giữ quy tắc hiện có: chỉ điện thoại đã ghép nối, qua kênh m�
 - Dòng cảnh báo **"Chia sẻ terminal cần thiết lập lại…"** khi công tắc bật mà khối tích hợp không còn trong file cấu hình, hoặc `shellx-term` trong thư mục `bin` bị thiếu.
 - **Thông báo trên máy tính** khi một điện thoại gắn vào phiên `desktop`: "{thiết bị} đang xem terminal {ứng dụng — tiêu đề}". Tối đa một thông báo cho mỗi cặp (điện thoại, terminal) trong 10 phút, để việc gắn lại sau khi rớt mạng không làm phiền.
 
+### 7.7 Cấu trúc trong agent (P3, chốt 2026-10-05)
+
+Phiên `desktop` **không** đi qua `SessionManager` hiện có. Phần chung được rút ra một lớp riêng; mỗi loại phiên có bộ quản lý của mình (quyết định T13). Mọi thành phần nằm trong `packages/shellx_agent`.
+
+| Thành phần | Việc | Phụ thuộc |
+|---|---|---|
+| `SessionStream` (rút từ `SessionManager`) | Bộ đệm vòng, `sent`/`acked`, đẩy dữ liệu theo cửa sổ gửi, gắn, gắn lại, phát lại, `session.reset`, `taken_over`. Không biết shell hay `shellx-term` | `RingBuffer` |
+| `SessionManager` | Phiên `shellx`, hành vi **không đổi**: mở shell, tắt, giới hạn 10 | `SessionStream`, `PtyFactory` |
+| `DesktopSessionManager` (mới) | Phiên `desktop`: nhận `TermLink` đã xác thực, giữ 30 giây chờ nối lại, bên điều khiển, tiêu đề, giới hạn 32. **Không có hàm tắt terminal nào** | `SessionStream` |
+| `TermServer` (mới) | `ServerSocket` trên `127.0.0.1`, ghi/xóa `endpoint`, bắt tay §6.3, `reject`. Đưa ra `TermLink` đã xác thực. `start()` / `stop()`; `running` là giá trị `desktop_sharing` | codec, `cryptography` |
+| Codec kết nối nội bộ (mới) | Khung §6.2, tin nhắn §6.3–§6.4; ghi khóa map theo thứ tự byte; khớp từng byte `term/protocol/vectors.txt` | CBOR của `shellx_core` |
+| `SessionRouter` (mới) | Thay `SessionManager` trong `AgentService`: chuyển tin nhắn theo `id` phiên, gộp `session.list`, một bộ cấp `id` chung cho hai bộ quản lý (không bao giờ trùng `id`), gộp `outbound`/`changes` | hai bộ quản lý |
+
+- `shellx_core`: trường và tin nhắn §8. `shellx_client`: API giao thức tương ứng (liệt kê có `desktop: true`, `session.detach`, `session.driver`, `terminal_gone`) để e2e đóng vai điện thoại; giao diện để P5.
+- `apps/desktop`: chỉ đổi chỗ nối `AgentService` ↔ `SessionRouter`. Công tắc, menu, thông báo §7.6 thuộc P4; P3 đưa ra API cho chúng (danh sách phiên `desktop` kèm `app`/`title`/điện thoại đang gắn, "ngắt điện thoại" theo `id`, `TermServer.start/stop`).
+- **Các đường "tắt" (§7.2) qua `SessionRouter`:** thu hồi điện thoại, `closeAll`, thoát app → phiên `shellx` bị tắt như cũ; phiên `desktop` chỉ bị ngắt điện thoại (`session.detached {closed_by_host}` nếu kênh còn). `session.close` gửi tới `id` của phiên `desktop` = `session.detach`.
+
+### 7.8 Luồng dữ liệu phía agent (P3)
+
+**Kết nối mới.**
+1. `hello` có `v` lạ → `reject version` ngay (trước khi tính HMAC). Ngược lại → `challenge`.
+2. `auth` → kiểm `mac` (so sánh thời gian hằng). Hạn 5 giây cho cả bắt tay, tính trên từng byte đọc/ghi (§6.3).
+3. Giới hạn 32 được kiểm **ở bước `auth`**, khi đã biết `term_id`: terminal đang nối lại (cùng `term_id` với phiên đang chờ 30 giây) **không bao giờ bị `reject limit`**. Phiên đang chờ vẫn tính vào giới hạn.
+4. `ready`, rồi giao `TermLink` cho `DesktopSessionManager`.
+
+**Gắn kết nối vào phiên.** `term_id` mới → phiên mới (`id` từ bộ cấp chung, `index` theo dãy riêng). `term_id` trùng phiên đang chờ → dùng lại phiên (giữ `id`), hủy hẹn giờ. `term_id` trùng phiên **còn kết nối** (kết nối cũ treo nửa vời) → kết nối mới thắng, đóng kết nối cũ.
+
+**Snapshot.** Agent gom các phần tới `last: true` rồi mới áp vào phiên, nên điện thoại không bao giờ thấy snapshot dở dang; tổng vượt 256 KiB là vi phạm giao thức (đóng kết nối). Lần đầu: bộ đệm bắt đầu từ 0 với nội dung snapshot. Nối lại: bộ đệm **thay bằng snapshot, số thứ tự đi tiếp** (`RingBuffer.restartWith(bytes)`: vùng hợp lệ thành `[end cũ, end cũ + độ dài snapshot)`); điện thoại đang gắn nhận `session.reset` rồi dữ liệu từ đầu vùng mới. Sau đó, nếu bên điều khiển là `phone`, agent **gửi lại `resize`**: `shellx-term` tự về kích thước cửa sổ khi mất kết nối (`term/src/size.rs`).
+
+**Trong lúc chạy.**
+- `out` → bộ đệm → điện thoại theo cửa sổ gửi/ack như phiên `shellx`. Agent luôn đọc socket; điện thoại chậm thì nhận `session.reset`.
+- Điện thoại `session.attach` / `input` / `resize`: bên điều khiển là `desktop` hoặc kích thước khác → `resize` cho `shellx-term`, bên điều khiển = `phone`, `session.driver {phone}` cho điện thoại. Mẹo "giảm một dòng" do `shellx-term` làm (§5.5), agent không làm lại.
+- `local` → bên điều khiển = `desktop`, `session.driver {desktop}` cho điện thoại đang gắn.
+- Điện thoại rời, bị ngắt hoặc mất kênh → `local_size`, bên điều khiển = `desktop`.
+- Ghi sang `shellx-term` (`in`, `resize`, `local_size`) không bao giờ chặn agent; hàng chờ ghi vượt 1 MiB → đóng kết nối (`shellx-term` tự nối lại và gửi snapshot).
+
+**Tiêu đề.** Bộ đọc OSC 0/2 chạy liên tục trên `snapshot` và `out`, chịu chuỗi bị cắt giữa hai khung, giữ tiêu đề mới nhất ≤ 200 ký tự. Nối lại mà snapshot không có tiêu đề nào thì giữ tiêu đề cũ.
+
+**Kết thúc.**
+- `exit {code}` → phiên đang đóng, xả bộ đệm cho điện thoại rồi `session.exited` (logic drain hiện có của `SessionStream`).
+- Mất kết nối không có `exit` → phiên vẫn hiện trong danh sách, điện thoại vẫn gắn, **input bị bỏ (không xếp hàng)**; hẹn giờ 30 giây. Hết giờ → xóa phiên, `session.detached {terminal_gone}` cho điện thoại đang gắn.
+
+### 7.9 Lỗi và tương thích phía agent (P3)
+
+**Máy chủ nội bộ.**
+- `start()` không mở được cổng → ném lỗi, không ghi `endpoint` (P4 báo lỗi và để công tắc tắt).
+- **`endpoint` (macOS):** tạo thư mục với quyền 0700; ghi file tạm, đặt quyền 0600 **trước khi ghi khóa** vào, rồi đổi tên. Windows: quyền thừa kế (§6.1).
+- `stop()`: đóng cổng và mọi kết nối, xóa `endpoint` **chỉ khi nội dung vẫn là của lần `start()` này**. Mọi phiên `desktop` bị xóa ngay (không chờ 30 giây); điện thoại đang gắn nhận `session.detached {closed_by_host}`. Terminal không bị đụng tới; `shellx-term` tiếp tục thử nối lại theo §6.5.
+- Khung sai định dạng hoặc quá lớn, sai `mac`, hết hạn bắt tay, khung sai thứ tự sau `ready` (vd `out` trước khi snapshot xong, hai snapshot) → đóng kết nối đó. Trước `ready` thì không có phiên nào; sau `ready` thì phiên vào trạng thái chờ 30 giây.
+- Log của agent không bao giờ ghi khóa, `mac`, nonce hay byte terminal.
+- **Agent khởi động lại** → khóa mới, `shellx-term` nối lại với khóa mới; agent không còn nhớ `term_id` nên tạo phiên mới (`id` mới). Điện thoại gắn lại `id` cũ nhận `session_not_found` như phiên `shellx` hiện nay. Chấp nhận.
+
+**Tin nhắn từ điện thoại.**
+- Agent ghi nhớ theo từng kênh việc điện thoại đã gửi `session.list {desktop: true}`. Điện thoại chưa gửi thì **không được gắn vào phiên `desktop`** (`session_not_found`), nên không bao giờ nhận `session.driver` hay `terminal_gone` mà bộ giải mã cũ từ chối. Cờ mất cùng kênh.
+- `session.detach` cho `id` không tồn tại hoặc là phiên `shellx` → bỏ qua (tin nhắn này không có trả lời).
+- `input`/`resize` cho phiên `desktop` đang mất kết nối → bỏ.
+
+**Bộ giải mã mới (`shellx_core`).** `SessionInfo` có `kind` lạ (không phải `desktop`) thì **bỏ qua mục đó** thay vì ném lỗi cả danh sách, để agent sau này thêm loại phiên mà không làm hỏng app mobile mới. Mọi trường mới là tùy chọn.
+
 ---
 
 ## 8. Giao thức điện thoại ↔ agent
@@ -472,7 +533,13 @@ ShellX gỡ khối khỏi mọi file cấu hình, đóng cổng nội bộ, xóa
 - **Danh sách phiên:** giới hạn 32; chỉ liệt kê phiên `desktop` khi có `desktop: true`; `desktop_sharing`.
 - **Máy chủ nội bộ:** xác thực (đúng, sai, chậm, giả lập kẻ chiếm cổng không có khóa), `reject` theo `limit`/`version`, nhiều phiên bản `v`.
 - **Tiêu đề:** đọc OSC tiêu đề.
-- **Thông báo:** thông báo gắn vào bị giới hạn tần suất.
+- **Thông báo:** thông báo gắn vào bị giới hạn tần suất (P4, cùng phần giao diện §7.6).
+- **Bổ sung P3 (§7.7–§7.9):**
+  - Refactor `SessionStream`: **mọi test agent hiện có chạy xanh mà không sửa nội dung test** (chỉ được đổi chỗ khởi tạo); đó là bằng chứng hành vi phiên `shellx` không đổi.
+  - Codec: mã hóa từng tin nhắn khớp **từng byte** mỗi dòng `term.*`/`agent.*` của `vectors.txt`, giải mã ngược lại; hai `mac` khớp `auth.*_proof`.
+  - `TermServer` với socket thật: quyền file `endpoint` (macOS), `stop()` không xóa `endpoint` của lần `start()` khác, nối lại không bị `reject limit`, kết nối cũ treo bị kết nối mới cùng `term_id` thay.
+  - `DesktopSessionManager` với `TermLink` giả và `fake_async`: snapshot nhiều phần, `restartWith` + `session.reset`, gửi lại `resize` sau khi nối lại, input bị bỏ khi mất kết nối, `terminal_gone` đúng 30 giây, điện thoại chưa gửi `desktop: true` không gắn được.
+  - `SessionRouter`: `id` không bao giờ trùng giữa hai bộ quản lý; `session.list` có/không có `desktop: true`.
 
 ### 11.3 Bộ sửa file cấu hình (Dart)
 
@@ -486,7 +553,8 @@ ShellX gỡ khối khỏi mọi file cấu hình, đóng cổng nội bộ, xóa
 ### 11.4 End-to-end (`packages/shellx_e2e`)
 
 - **Qua relay trong bộ nhớ:** điện thoại giả lập ↔ agent ↔ `shellx-term` thật đi trọn luồng: liệt kê, gắn, xem output có từ trước, gõ lệnh, rời, gắn lại, shell thoát.
-- **Qua relay thật:** chạy một lần trỏ vào `relay.shellx.pro` (như lần kiểm tra 2026-09-30).
+- **Qua relay thật:** chạy một lần trỏ vào `relay.shellx.pro` (như lần kiểm tra 2026-09-30). **Người dùng tự chạy** bằng lệnh ghi trong plan P3 (T14).
+- `shellx-term` thật được build bằng `cargo build` (feature `test-hooks`) ở đầu bộ test e2e; thiếu `cargo` thì bộ test **báo lỗi rõ**, không âm thầm bỏ qua. `HOME` tạm cho cả agent lẫn `shellx-term`, nên `endpoint` không đụng thư mục thật của người dùng.
 
 ### 11.5 Mobile
 
@@ -572,6 +640,6 @@ Khối lượng lớn, chia thành các kế hoạch nối tiếp; mỗi kế ho
 | P1 | Bản thử `shellx-term` trên macOS (chỉ bọc shell) + kiểm R1–R3 | — | Báo cáo tương thích, danh sách loại trừ, số đo thời gian mở; quyết định tiếp tục hoặc điều chỉnh thiết kế |
 | P2a | `shellx-term` nối agent trên macOS: §5, §6 phía term, test §11.1 (**xong**, ledger `terminal-sharing.md`) | P1 | `cargo test --features test-hooks` xanh trên macOS |
 | P2b | `shellx-term` trên Windows (§5.3) + workflow `windows-check.yml` (code xong, chờ CI Windows) | P2a | `cargo test` xanh trên `windows-latest` |
-| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §8, test §11.2, e2e §11.4 | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
+| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §7.7–7.9, §8, test §11.2, e2e §11.4; thêm `dart test` của `shellx_agent` và `shellx_core` vào `windows-check.yml` (§12). Nhánh `feat/terminal-sharing-p3`, tách từ `origin/windows-check/p2b` | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
 | P4 | Desktop: bật/tắt, bộ sửa file cấu hình, chính sách PowerShell, cập nhật/gỡ, menu và thông báo (§7.6, §10), tích hợp build và ký (§4, §10.7), test §11.3 | P3 | Bật trên macOS từ menu, mở cửa sổ mới thấy trên điện thoại giả lập |
 | P5 | Mobile: §9, cập nhật file thiết kế giao diện, test §11.5 | P3 (chạy song song với P4 được) | Pixel 3 xem và gõ vào terminal Terminal.app qua `relay.shellx.pro`; danh sách §11.6 phần macOS |
