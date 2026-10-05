@@ -27,6 +27,12 @@ final class TabExited extends TabEvent {
   final int exitCode;
 }
 
+/// Who sets the desktop terminal's size now (spec §9.2 banner).
+final class TabDriver extends TabEvent {
+  const TabDriver(this.by);
+  final DriverSide by;
+}
+
 final class TabDetached extends TabEvent {
   const TabDetached(this.reason);
   final DetachReason reason;
@@ -64,6 +70,9 @@ final class ClientTab {
     required int cols,
     required int rows,
     required void Function(AckMessage ack) sendAck,
+    this.kind = SessionKind.shellx,
+    this.app = '',
+    this.title = '',
   }) : _cols = cols,
        _rows = rows,
        _sendAck = sendAck {
@@ -73,6 +82,9 @@ final class ClientTab {
   final int id;
   final int index;
   final String shell;
+  final SessionKind kind;
+  final String app;
+  final String title;
   final void Function(AckMessage ack) _sendAck;
 
   late final StreamController<TabEvent> _events =
@@ -173,6 +185,8 @@ final class ClientTab {
   }
 
   @internal
+  void handleDriver(DriverSide by) => _emit(TabDriver(by));
+
   void handleDetached(DetachReason reason) {
     _end();
     _emit(TabDetached(reason));
