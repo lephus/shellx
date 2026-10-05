@@ -352,3 +352,69 @@ Các việc nhỏ khác đã hoãn (không đánh dấu) nằm trong `.superpowe
 - Banner của `TabDriver` (ai đang lái).
 - Thẻ `TabDetached(terminalGone)`: hiện `terminal_tab_controller.dart:142` vẫn ánh xạ `terminal_gone` sang banner "đóng bởi máy chủ".
 - Điện thoại giành phiên (`taken_over`) khi phiên đang do điện thoại lái và cùng kích thước thì **không** nhận `session.driver` (`desktop_session_manager.dart:439`, `_drive` thoát sớm khi `!changed && driver == phone`): banner của P5 phải coi bên lái là "phone" ngay sau khi gắn.
+
+## P5 — mobile (2026-10-05)
+
+Nhánh `feat/p5-mobile` (cắt từ `main`, đã có P1–P3). Plan: `docs/superpowers/plans/2026-10-05-terminal-sharing-p5-mobile.md`. Phần mobile của spec §9 và test §11.5. Chỉ đổi `apps/mobile` và file thiết kế. `packages/shellx_client` không đổi vì không thiếu gì.
+
+### Commit trong nhánh (`git log --oneline main..HEAD`)
+
+- `c830139` docs: plan P5.
+- `ad8a5ef` docs(design): thêm mục "Terminal trên máy tính" (`#s4b`) vào `docs/superpowers/design/2026-09-25-shellx-mobile-ui.html`, làm trước khi code giao diện.
+- `45cb9bc` feat(mobile): port.
+  - `listSessions()` luôn gửi `desktop: true`.
+  - Thêm `MachineSession.desktopSharing`.
+  - Thêm `TabHandle.kind/app/title`.
+- `70bec47` feat(mobile): `TerminalTabController`.
+  - Bên lái và `claimSize()`.
+  - Thẻ `desktopClosed`/`terminalGone`.
+  - Gắn lại sau `closed_by_host`.
+  - Câu chữ vi + en.
+- `91d35f7` feat(mobile): giao diện.
+  - Bảng chọn hai nhóm và ba gợi ý.
+  - `+` liệt kê lại.
+  - Tab có biểu tượng máy tính.
+  - `×` rời phiên kèm thông báo nhỏ.
+  - Băng bên lái và các thẻ kết thúc.
+- `ce33c19` fix(mobile): đợt sửa theo review.
+  - Chỉ một cú chạm thật mới lấy lại kích thước.
+  - Nút của màn không có tab đi qua cùng luồng với `+`.
+  - Thêm test.
+- `fd896ac` test(mobile): sửa thứ tự trong test l10n.
+
+### Test (lần chạy cổng cuối, 2026-10-05)
+
+- `apps/mobile`: `flutter analyze` báo "No issues found!". `flutter test` có 535 test xanh (P3 là 501).
+- Code sinh ra vẫn khớp: chạy lại `dart run intl_utils:generate` và `dart run build_runner build` không tạo khác biệt.
+
+### Quyết định (rulings)
+
+- Ruling: `MachineSession` giữ `Future<List<SessionInfo>> listSessions()` và thêm `bool? desktopSharing`, cùng dạng với `MachineClient` — đổi port ít nhất, client đã giữ sẵn giá trị — cái giá nếu sai: một lần refactor nhỏ sang kiểu record.
+- Ruling: không đổi `packages/shellx_client` — giao diện không thiếu accessor nào — không có.
+- Ruling: lần đầu vào máy mà không có phiên nào thì mở phiên mới ngay, không hiện bảng chọn (đọc theo chữ §9.1) — cái giá nếu sai: người dùng đang tắt chia sẻ và chưa có phiên nào sẽ không bao giờ thấy gợi ý trên điện thoại.
+- Ruling: tiêu đề nhóm "Terminal trên máy tính" luôn hiện; khi nhóm trống thì hiện gợi ý bên dưới. Nhóm "Phiên ShellX" chỉ hiện khi có phiên. Tiêu đề "Máy này đang có N phiên" đếm cả hai nhóm — cái giá nếu sai: sửa câu chữ và bố cục.
+- Ruling: nút cuối bảng chọn là "Phiên mới" / "New session" (§9.1). Tooltip `+` và nút trên thẻ kết thúc vẫn là "Mở phiên mới" — cái giá nếu sai: một chuỗi.
+- Ruling: dòng desktop trong bảng chọn là "ứng dụng — tiêu đề"; thiếu một phần thì dùng phần còn lại, thiếu cả hai thì dùng tên shell. Nhãn tab desktop theo thứ tự: tiêu đề OSC đang chạy, rồi tiêu đề trong danh sách (chốt lúc gắn), rồi tên ứng dụng, rồi `shell index` — cái giá nếu sai: nhãn khác menu khay sau khi tiêu đề đổi.
+- Ruling: "snackbar" là toast sẵn có của app (`popupHandler.showInfo`, cùng kênh với "Đã sao chép") — cái giá nếu sai: chuyển sang `ScaffoldMessenger`.
+- Ruling: bấm "Đóng tab" trên thẻ `closed_by_host` cũng hiện "Terminal vẫn chạy trên máy tính." vì terminal còn chạy. Cửa sổ đã đóng hoặc đã mất thì không hiện — cái giá nếu sai: một điều kiện.
+- Ruling: băng "Máy tính đang dùng terminal này" phủ lên đầu terminal, không đẩy terminal xuống. Nếu đẩy xuống, lưới đổi cỡ sẽ tự gửi `resize`, giành lại kích thước và làm băng biến mất ngay — cái giá nếu sai: băng che dòng đầu khi đang hiện.
+- Ruling: khi máy tính đang lái, mỗi cú chạm đều gửi `resize`; gõ phím chỉ gửi một lần cho mỗi lần nhận `driver{desktop}`. Băng chỉ ẩn khi agent xác nhận `driver{phone}` — cái giá nếu sai: vài `resize` thừa.
+- Ruling (đợt sửa): chỉ cú chạm thật mới lấy lại kích thước, tức là một ngón, nhấc trước `kLongPressTimeout` và di chuyển dưới `kTouchSlop`. Cuộn lịch sử, nhấn giữ để chọn và chụm hai ngón không lấy lại. Vẫn dùng `Listener`, không tham gia gesture arena — cái giá nếu sai: một cú chạm rất chậm không lấy lại kích thước.
+- Ruling: `session_not_found` trên tab desktop, và tab giữ chỗ `.ended` của phiên desktop, hiện thẻ "Mất kết nối với terminal này trên máy tính." chỉ với nút "Đóng tab" — một phiên ShellX mới không phải là cửa sổ đó, và nguyên nhân có thể là agent khởi động lại — cái giá nếu sai: lựa chọn câu chữ.
+- Ruling: nhãn mọi tab tối đa 180 pt, dài hơn thì thêm dấu "…". Tiêu đề cửa sổ của Terminal.app rất dài và sẽ đẩy `+` ra khỏi hàng tab — cái giá nếu sai: tiêu đề OSC dài của phiên ShellX cũng bị cắt.
+- Ruling: gợi ý tiếng Anh gọi công tắc là 'Share terminal' — cái giá nếu sai: một chuỗi (xem ghi chú bên dưới).
+- Ruling: test mobile không kiểm adapter thật sự gửi `desktop: true` từ đầu đến cuối, vì cần một agent giả lập bắt tay. Đây là một dòng chuyển tiếp sang `listSessions(includeDesktop: true)`, đã có test riêng trong shellx_client — cái giá nếu sai: lỗi ở dòng chuyển tiếp chỉ lộ ra khi chạy e2e hoặc thử tay.
+- Ruling (đợt sửa): nút "Mở phiên mới" của màn không có tab đi qua cùng luồng với `+`. Sau khi đóng tab desktop cuối cùng, người dùng lại được chọn các terminal trên máy tính — không có.
+
+### Ghi chú
+
+- Khi máy tính đang lái, việc bật bàn phím hoặc xoay điện thoại cũng giành lại kích thước, vì mọi `resize` của điện thoại đều có nghĩa là điện thoại lái. Cách này nhất quán với agent (§7.3).
+- Lần đầu vào máy không có phiên nào thì bỏ qua bảng chọn, nên không có gợi ý nào hiện ra.
+- Chữ 'Share terminal' trong gợi ý tiếng Anh phải khớp nhãn tiếng Anh của menu desktop. Việc này chờ P4 đặt nhãn.
+- Các bước kiểm tay §11.6 với điện thoại thật và máy tính thật còn chờ:
+  - bảng chọn hai nhóm với agent thật;
+  - băng bên lái khi gõ trên máy tính;
+  - chạm để lấy lại kích thước;
+  - "Ngắt điện thoại" rồi "Gắn lại";
+  - đóng cửa sổ thì hiện thẻ kết thúc.
+- Artifact thiết kế (HANDOFF §6) chưa được đăng lại theo file HTML mới.
