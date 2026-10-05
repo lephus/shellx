@@ -31,7 +31,14 @@ PinnedMachine pinned(String agentId) =>
 /// longer attached after [TabExited], [TabDetached] or [TabError], and closing it ends the stream.
 /// Unlike it, events are delivered synchronously.
 class FakeTabHandle implements TabHandle {
-  FakeTabHandle({required this.id, required this.index, this.shell = 'zsh'});
+  FakeTabHandle({
+    required this.id,
+    required this.index,
+    this.shell = 'zsh',
+    this.kind = SessionKind.shellx,
+    this.app = '',
+    this.title = '',
+  });
 
   @override
   final int id;
@@ -39,6 +46,12 @@ class FakeTabHandle implements TabHandle {
   final int index;
   @override
   final String shell;
+  @override
+  final SessionKind kind;
+  @override
+  final String app;
+  @override
+  final String title;
   bool attached = true;
   late final StreamController<TabEvent> _events = StreamController<TabEvent>.broadcast(
     sync: true,
@@ -102,6 +115,9 @@ class FakeMachineSession implements MachineSession {
   int connectCalls = 0;
   List<SessionInfo> sessions = [];
   int listCalls = 0;
+
+  /// What [desktopSharing] reports (null: an agent older than terminal sharing).
+  bool? desktopSharingValue;
   Object? openError;
 
   /// [openSession] completes only once this does — an open still in flight when something else
@@ -191,6 +207,9 @@ class FakeMachineSession implements MachineSession {
   }
 
   @override
+  bool? get desktopSharing => desktopSharingValue;
+
+  @override
   Future<TabHandle> openSession({required int cols, required int rows}) async {
     opened.add((cols: cols, rows: rows));
     final gate = openGate;
@@ -219,7 +238,14 @@ class FakeMachineSession implements MachineSession {
       handle = existing..attached = true;
     } else {
       final info = sessions.where((s) => s.id == id).firstOrNull;
-      handle = FakeTabHandle(id: id, index: info?.index ?? id, shell: info?.shell ?? 'zsh');
+      handle = FakeTabHandle(
+        id: id,
+        index: info?.index ?? id,
+        shell: info?.shell ?? 'zsh',
+        kind: info?.kind ?? SessionKind.shellx,
+        app: info?.app ?? '',
+        title: info?.title ?? '',
+      );
       handles
         ..removeWhere((h) => h.id == id)
         ..add(handle);

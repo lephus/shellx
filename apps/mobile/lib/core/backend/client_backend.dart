@@ -172,7 +172,10 @@ final class _MachineSessionAdapter implements MachineSession {
   Future<void> connect() => _client.connect();
 
   @override
-  Future<List<SessionInfo>> listSessions() => _client.listSessions();
+  Future<List<SessionInfo>> listSessions() => _client.listSessions(includeDesktop: true);
+
+  @override
+  bool? get desktopSharing => _client.desktopSharing;
 
   @override
   Future<TabHandle> openSession({required int cols, required int rows}) async =>
@@ -214,6 +217,15 @@ final class _TabAdapter implements TabHandle {
 
   @override
   String get shell => _tab.shell;
+
+  @override
+  SessionKind get kind => _tab.kind;
+
+  @override
+  String get app => _tab.app;
+
+  @override
+  String get title => _tab.title;
 
   @override
   bool get isAttached => _tab.isAttached;

@@ -13,6 +13,14 @@ abstract interface class TabHandle {
   int get index;
   String get shell;
 
+  /// [SessionKind.desktop] for a terminal window open on the computer (spec "chia sẻ terminal" §9.2).
+  SessionKind get kind;
+
+  /// Desktop terminals only: the terminal application and the window title when the tab was
+  /// attached; may be empty.
+  String get app;
+  String get title;
+
   /// False after [TabDetached], [TabExited] or [TabError], and once the tab
   /// is closed.
   bool get isAttached;
@@ -63,8 +71,15 @@ abstract interface class MachineSession {
   /// Like every request: connects first (throwing as [connect] does), then
   /// throws `MachineConnectionException(agentOffline)` at once when there is
   /// no channel or it is lost before the answer, `timeout` when the machine
-  /// does not answer in time.
+  /// does not answer in time. Always asks for the computer's terminal windows
+  /// too (`desktop: true`, spec "chia sẻ terminal" §8): they come back with
+  /// [SessionKind.desktop].
   Future<List<SessionInfo>> listSessions();
+
+  /// The `desktop_sharing` of the last [listSessions] answer: null when the
+  /// agent never reported it (an agent older than terminal sharing), else
+  /// whether "Chia sẻ terminal" is on (spec §9.1 hints).
+  bool? get desktopSharing;
 
   /// Throws [AppErrorException] (`session_limit`, `spawn_failed`) or
   /// [MachineConnectionException].
@@ -91,8 +106,9 @@ abstract interface class MachineSession {
 
   /// Removes the tab and ends its [TabHandle.events]. An attached tab also
   /// closes its session on the machine: at once, or — without a channel —
-  /// right after the next channel is installed. An ended tab is only removed
-  /// here.
+  /// right after the next channel is installed. A desktop tab
+  /// ([SessionKind.desktop]) only leaves the terminal (`session.detach`): the
+  /// window keeps running on the computer. An ended tab is only removed here.
   Future<void> closeTab(int id);
 }
 

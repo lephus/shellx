@@ -119,6 +119,8 @@ void main() {
     expect(machine.agentId, agentA);
     expect(machine.state, isA<MachineIdle>());
     expect(machine.tabs, isEmpty);
+    // Never told by the agent yet: the picker treats it as an agent older than terminal sharing.
+    expect(machine.desktopSharing, isNull);
 
     // Never the MachineFailed state object: MachineConnectionException after moving to MachineFailed.
     await expectLater(
