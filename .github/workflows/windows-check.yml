@@ -41,3 +41,30 @@ jobs:
         run: cargo clippy --locked --all-targets --features test-hooks -- -D warnings
       - name: Test
         run: cargo test --locked --features test-hooks -- --test-threads=4
+
+  dart:
+    name: shellx_core + shellx_agent (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      # The workspace includes the Flutter apps, so resolving it needs the
+      # Flutter SDK (pinned to the dev machine's version).
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+      - name: Resolve the workspace
+        run: flutter pub get
+      - name: shellx_core
+        working-directory: packages/shellx_core
+        run: dart test
+      - name: shellx_agent
+        working-directory: packages/shellx_agent
+        run: dart test

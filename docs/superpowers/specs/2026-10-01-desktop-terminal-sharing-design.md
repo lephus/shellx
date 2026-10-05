@@ -1,7 +1,7 @@
 # Chia sẻ terminal máy tính với điện thoại — Đặc tả thiết kế
 
 - **Ngày:** 2026-10-01
-- **Trạng thái:** Đã duyệt qua brainstorming từng phần (6/6). P1, P2a xong; P2b code xong. **Bổ sung P3 (2026-10-05): §7.7–§7.9, T13–T14, §11.2, §11.4, §14 — chờ người dùng đọc lại**
+- **Trạng thái:** Đã duyệt qua brainstorming từng phần (6/6). P1, P2a, P3 xong; P2b code xong. **Bổ sung P3 (2026-10-05): §7.7–§7.9, T13–T14, §11.2, §11.4, §14 — chờ người dùng đọc lại**
 - **Phạm vi:** chương trình mới `shellx-term` (Rust), agent desktop (macOS/Windows), giao thức điện thoại ↔ agent, app mobile, bộ cài và quy trình phát hành desktop. Relay **không đổi**.
 - **Sửa đổi spec v1 (`2026-09-25-shellx-v1-design.md`):** D2 nói "Mọi phiên terminal do điện thoại mở". Tính năng này bổ sung một loại phiên thứ hai: terminal do người dùng tự mở trên máy tính, được chia sẻ sang điện thoại. Mục §3.2 "Hiển thị/mirror terminal trên desktop" (chiều ngược lại: xem phiên của điện thoại trên máy tính) vẫn ngoài phạm vi.
 
@@ -640,6 +640,6 @@ Khối lượng lớn, chia thành các kế hoạch nối tiếp; mỗi kế ho
 | P1 | Bản thử `shellx-term` trên macOS (chỉ bọc shell) + kiểm R1–R3 | — | Báo cáo tương thích, danh sách loại trừ, số đo thời gian mở; quyết định tiếp tục hoặc điều chỉnh thiết kế |
 | P2a | `shellx-term` nối agent trên macOS: §5, §6 phía term, test §11.1 (**xong**, ledger `terminal-sharing.md`) | P1 | `cargo test --features test-hooks` xanh trên macOS |
 | P2b | `shellx-term` trên Windows (§5.3) + workflow `windows-check.yml` (code xong, chờ CI Windows) | P2a | `cargo test` xanh trên `windows-latest` |
-| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §7.7–7.9, §8, test §11.2, e2e §11.4; thêm `dart test` của `shellx_agent` và `shellx_core` vào `windows-check.yml` (§12). Nhánh `feat/terminal-sharing-p3`, tách từ `origin/windows-check/p2b` | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
+| P3 | Agent + giao thức: §6 phía agent, §7.1–7.5, §7.7–7.9, §8, test §11.2, e2e §11.4 (**xong**, ledger `terminal-sharing.md`); thêm `dart test` của `shellx_agent` và `shellx_core` vào `windows-check.yml` (§12). Nhánh `feat/terminal-sharing-p3`, tách từ `origin/windows-check/p2b` | P2a | e2e điện thoại giả lập ↔ agent ↔ `shellx-term` thật |
 | P4 | Desktop: bật/tắt, bộ sửa file cấu hình, chính sách PowerShell, cập nhật/gỡ, menu và thông báo (§7.6, §10), tích hợp build và ký (§4, §10.7), test §11.3 | P3 | Bật trên macOS từ menu, mở cửa sổ mới thấy trên điện thoại giả lập |
 | P5 | Mobile: §9, cập nhật file thiết kế giao diện, test §11.5 | P3 (chạy song song với P4 được) | Pixel 3 xem và gõ vào terminal Terminal.app qua `relay.shellx.pro`; danh sách §11.6 phần macOS |
