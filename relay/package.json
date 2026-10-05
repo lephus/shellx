@@ -11,6 +11,7 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "domains:update": "tsx scripts/update-disposable-domains.ts",
+    "fake-fcm-account": "tsx scripts/fake-fcm-service-account.ts",
     "reset-password": "node --env-file=dev.env --import tsx src/scripts/reset-password.ts",
     "build": "tsc -p tsconfig.build.json"
   },
