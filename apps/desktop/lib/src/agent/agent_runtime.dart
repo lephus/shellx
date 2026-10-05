@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
@@ -224,12 +227,33 @@ final class CoreAgentRuntime implements AgentRuntime {
   /// Exposed for tests: null without [PushNotificationsSetup].
   AgentNotifications? get notifications => _notifications;
 
+  /// A phone opening a channel (the count goes up) or pairing may just have
+  /// allowed notifications: the sender's pause after an unheard one ends.
+  @visibleForTesting
+  void onAgentEvent(AgentEvent event) {
+    switch (event) {
+      case ActiveChannelsChanged(:final count):
+        if (count > _channels) _notifications?.phoneConnected();
+        _channels = count;
+      case MobilePaired():
+        _notifications?.phoneConnected();
+      case SessionOpenedByMobile() || AgentRevoked():
+        break;
+    }
+  }
+
+  int _channels = 0;
+  StreamSubscription<AgentEvent>? _eventWatch;
+
   /// Exposed for tests: the ShellX sessions.
   SessionManager get shellSessions => _sessions;
 
   @override
   Future<void> start() {
     _running = true;
+    if (_notifications != null) {
+      _eventWatch ??= _service.events.listen(onAgentEvent);
+    }
     return _service.start();
   }
 
@@ -240,6 +264,8 @@ final class CoreAgentRuntime implements AgentRuntime {
   @override
   Future<void> stop() async {
     _running = false;
+    unawaited(_eventWatch?.cancel());
+    _eventWatch = null;
     _router.closeAll();
     final stopping = _service.stop();
     try {

@@ -31,7 +31,7 @@ void main() {
     // buffered behind its output) is checked on the bytes: C comes before the
     // output of an external program that runs first.
     test('${shell.name}: `/bin/echo before; sleep 3; false` over a zero '
-        'threshold sends "✗ … · exit 1 · <n> s" with n >= 1; C precedes the '
+        'threshold sends "✗ … · exit 1 · <n> s" with n >= 2; C precedes the '
         'command\'s output', () async {
       final temp = Directory.systemTemp.createTempSync('shellx-hook-e2e-');
       addTearDown(() => temp.deleteSync(recursive: true));
@@ -93,7 +93,7 @@ void main() {
         r'^✗ /bin/echo before; sleep 3; false · exit 1 · (\d+) s$',
       ).firstMatch(body);
       expect(match, isNotNull, reason: body);
-      expect(int.parse(match!.group(1)!), inInclusiveRange(1, 10));
+      expect(int.parse(match!.group(1)!), inInclusiveRange(2, 10));
       final output = outputText(sent, id);
       final start = output.indexOf('\x1b]133;C\x07');
       final before = output.indexOf('before', start < 0 ? 0 : start);

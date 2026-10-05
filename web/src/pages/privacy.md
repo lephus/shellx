@@ -53,7 +53,7 @@ Agent trên máy tính có thể báo cho điện thoại đã ghép nối khi m
 
 - **Agent gửi gì, khi nào.** Trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định: 30 giây) — và bất cứ khi nào một chương trình trong terminal phát chuỗi thông báo (ví dụ `shellx notify`, OSC 9, OSC 777) — agent gửi **nội dung thông báo** tới máy chủ chuyển tiếp ShellX: tên máy tính, tên phiên hoặc cửa sổ terminal, dòng lệnh, mã thoát và thời gian chạy, hoặc chữ do chương trình gửi. Nội dung này **không được mã hóa đầu cuối**.
 - **Máy chủ làm gì với nó.** Máy chủ chỉ chuyển tiếp nội dung đó qua **Google Firebase Cloud Messaging** và, với iPhone, **Apple Push Notification service**, và chỉ tới những điện thoại đã ghép nối với chính máy tính đó và đã cho phép thông báo. Máy chủ không lưu nội dung này và không ghi nó vào nhật ký; Google và Apple xử lý nó theo chính sách riêng của họ.
-- **Khi không điện thoại nào nhận được** (chưa điện thoại nào cho phép thông báo, hoặc đều đã đăng xuất), agent ngừng gửi trong 15 phút rồi mới thử lại.
+- **Khi không điện thoại nào nhận được** (chưa điện thoại nào cho phép thông báo, hoặc đều đã đăng xuất), agent ngừng gửi tối đa 15 phút — sớm hơn nếu trong lúc đó có điện thoại kết nối tới máy tính.
 - **Mã thông báo đẩy.** Ứng dụng di động nhận một mã thông báo đẩy (FCM token) từ Google Firebase Cloud Messaging và gửi lên máy chủ khi bạn cho phép thông báo. Máy chủ lưu mã này tới khi bạn đăng xuất trên điện thoại đó, xóa tài khoản, tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc Firebase báo mã không còn hiệu lực.
 - Đây là ngoại lệ duy nhất đối với mục 2: chỉ nội dung thông báo, không phải phần còn lại của terminal.
 - **Cách tắt:** chọn "Tắt" ở "Thông báo khi lệnh chạy lâu xong" trong menu ShellX trên máy tính (thông báo khi lệnh kết thúc), hoặc tắt thông báo của ShellX trong cài đặt điện thoại, hoặc đăng xuất trên điện thoại.
@@ -89,7 +89,7 @@ Chúng tôi chỉ cung cấp dữ liệu cho cơ quan nhà nước khi pháp lu�
 
 - **Tài khoản và thiết bị:** cho tới khi tài khoản bị xóa.
 - **Mã truy cập:** bị xóa khi bạn đăng xuất trên thiết bị đó hoặc khi bị thu hồi (đổi mật khẩu thu hồi mã của mọi thiết bị khác); mã hết hiệu lực sau 90 ngày không dùng.
-- **Mã thông báo đẩy:** bị xóa khi bạn đăng xuất trên điện thoại đó, khi xóa tài khoản, hoặc khi Firebase báo mã không còn hiệu lực.
+- **Mã thông báo đẩy:** bị xóa khi bạn đăng xuất trên điện thoại đó, khi xóa tài khoản, khi bạn tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc khi Firebase báo mã không còn hiệu lực.
 - **Bản ghi ghép nối:** bị xóa khi bạn thu hồi hoặc bỏ ghép nối, hoặc khi bạn đăng xuất khỏi agent trên máy tính đó.
 - **Nhật ký vận hành:** không quá 30 ngày.
 - **Bản sao lưu cơ sở dữ liệu:** mỗi ngày một bản, giữ 14 bản gần nhất.

@@ -47,6 +47,10 @@ final class AgentNotifications {
   final NotificationSender sender;
   final DateTime Function()? _now;
 
+  /// A phone opened a channel to this agent or paired: lifts the sender's
+  /// pause after an unheard notification ([NotificationSender.resume]).
+  void phoneConnected() => sender.resume();
+
   /// A ShellX session (title `<machine> · Phiên <index>`).
   SessionNotifier forShell({required int sessionId, required int index}) =>
       SessionNotifier._(this, sessionId, (text) => text.shellSession(index));

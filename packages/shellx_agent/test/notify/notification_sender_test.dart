@@ -81,6 +81,29 @@ void main() {
     });
   });
 
+  test('paused after {sent: 0}, a phone connecting (resume) lets the next '
+      'one through at once', () {
+    fakeAsync((async) {
+      final clock = _Clock();
+      final (api, bodies) = _api(
+        () async => http.Response(
+          '{"sent":0}',
+          202,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      final sender = NotificationSender(api: api, now: () => clock.now);
+      sender.send(_n);
+      async.flushMicrotasks();
+      clock.advance(const Duration(minutes: 1));
+      expect(sender.send(_n), isFalse);
+      sender.resume();
+      expect(sender.send(_n), isTrue);
+      async.flushMicrotasks();
+      expect(bodies, hasLength(2));
+    });
+  });
+
   test(
     'a failed request does not pause; a new sender (new runtime) is not paused',
     () {

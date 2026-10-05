@@ -12,6 +12,8 @@ import 'package:shellx_desktop/src/agent/agent_runtime.dart';
 import 'package:shellx_desktop/src/agent/notify_threshold.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 
+import '../support/fakes.dart' as fakes show phone;
+
 final class _Pty implements Pty {
   final _output = StreamController<Uint8List>.broadcast(sync: true);
   final _exit = Completer<int>();
@@ -71,6 +73,7 @@ void main() {
   late InMemorySettingsStore settings;
   late _PtyFactory ptys;
   late DateTime now;
+  var sentValue = 1;
 
   setUp(() {
     hooks = Directory.systemTemp.createTempSync('shellx-hooks-');
@@ -78,6 +81,7 @@ void main() {
     settings = InMemorySettingsStore();
     ptys = _PtyFactory();
     now = DateTime.utc(2026, 10, 5, 12);
+    sentValue = 1;
   });
 
   tearDown(() => hooks.deleteSync(recursive: true));
@@ -87,7 +91,7 @@ void main() {
       baseUri: Uri.parse('https://relay.test'),
       httpClient: MockClient((request) async {
         posts.add(request);
-        return http.Response('{"sent":1}', 202);
+        return http.Response('{"sent":$sentValue}', 202);
       }),
     )..token = 'agent-token';
     return CoreAgentRuntime(
@@ -186,6 +190,39 @@ void main() {
       runtime.closeAllSessions();
     },
   );
+
+  test('paused after an unheard notification ({sent: 0}), a phone connecting '
+      'lets the next one through', () async {
+    sentValue = 0;
+    final runtime = await build();
+    final pty = await openSession(runtime);
+    pty.emit('$esc]9;one$bel');
+    await runtime.notifications!.sender.idle;
+    pty.emit('$esc]9;two$bel');
+    await runtime.notifications!.sender.idle;
+    expect(posts, hasLength(1));
+
+    sentValue = 1;
+    runtime.onAgentEvent(const ActiveChannelsChanged(1));
+    pty.emit('$esc]9;three$bel');
+    await runtime.notifications!.sender.idle;
+    expect(posts, hasLength(2));
+    expect(body(posts.last)['body'], 'three');
+
+    // A channel closing does not lift a new pause; a pairing does.
+    sentValue = 0;
+    pty.emit('$esc]9;four$bel');
+    await runtime.notifications!.sender.idle;
+    runtime.onAgentEvent(const ActiveChannelsChanged(0));
+    pty.emit('$esc]9;five$bel');
+    await runtime.notifications!.sender.idle;
+    expect(posts, hasLength(3));
+    runtime.onAgentEvent(MobilePaired(fakes.phone('m1', 'iPhone')));
+    pty.emit('$esc]9;six$bel');
+    await runtime.notifications!.sender.idle;
+    expect(posts, hasLength(4));
+    runtime.closeAllSessions();
+  });
 
   test(
     'without the setup nothing is wired (the shell starts unchanged)',

@@ -97,7 +97,7 @@ Payload tối đa 4 KiB mỗi chuỗi (dài hơn thì bỏ qua); tiêu đề/n�
 
 - `NotificationSender` gọi `POST /v1/notifications` bằng token của agent (như các lệnh REST hiện có). Không có mạng hay relay trả lỗi → bỏ thông báo đó (không xếp hàng: thông báo trễ vài phút thường vô nghĩa). `401` → không làm gì thêm (luồng `AgentRevoked` hiện có lo).
 - Chống spam N10: cửa sổ trượt 60 giây, tối đa 6; vượt thì bỏ.
-- Relay trả `202 {sent: 0}` (không điện thoại nào nhận được) → agent ngừng gửi 15 phút (theo từng runtime); `sent > 0` hoặc runtime mới thì hết ngừng.
+- Relay trả `202 {sent: 0}` (không điện thoại nào nhận được) → agent ngừng gửi (theo từng runtime). Hết ngừng khi: đủ 15 phút, runtime mới, hoặc một điện thoại kết nối tới agent (mở kênh mã hóa hoặc ghép nối — có thể nó vừa cho phép thông báo).
 - Ngưỡng đổi trong Cài đặt có hiệu lực ngay cho lệnh kết thúc sau đó.
 
 ### 4.4 Hook cho phiên ShellX (agent mở shell)
@@ -132,7 +132,7 @@ Nhánh "đang ở đúng cửa sổ đã bọc" của khối tích hợp (`term/
 - Thêm `firebase_core`, `firebase_messaging`; cấu hình sinh bởi `flutterfire configure --project=shellxpro` (`firebase_options.dart`, `google-services.json`, `GoogleService-Info.plist`). iOS: capability Push Notifications + Background Modes (remote-notification) trong entitlements.
 - **Xin quyền thông báo** sau khi đăng nhập và có ít nhất một máy đã ghép nối (Android 13+: `POST_NOTIFICATIONS`). Từ chối → không hỏi lại tự động; Cài đặt có dòng "Thông báo: đang tắt — mở Cài đặt hệ thống".
 - **Token:** lấy sau khi có quyền; `PUT` lên relay; nghe `onTokenRefresh` để gửi lại; đăng xuất → `DELETE`. Lỗi mạng → thử lại ở lần mở app sau.
-- **Foreground:** FCM không tự hiện → app hiện banner trong app (toastification sẵn có) với tiêu đề + nội dung.
+- **Foreground:** FCM không tự hiện → app hiện banner trong app (toastification sẵn có) với tiêu đề + nội dung. Khi app đang khóa (màn khóa sinh trắc học) thì không hiện banner.
 - **Chạm thông báo** (`getInitialMessage`, `onMessageOpenedApp`): mở máy `agent_id`; nếu `session_id` là một tab đang có thì chuyển tới tab đó.
 - Firebase chưa cấu hình (thiếu file) → app chạy bình thường, không có push (khởi tạo Firebase trong `try`).
 
@@ -156,7 +156,7 @@ Nhánh "đang ở đúng cửa sổ đã bọc" của khối tích hợp (`term/
 
 ## 9. Quyền riêng tư
 
-`web/src/pages/privacy.md` và `web/src/pages/en/privacy.md` thêm mục "Thông báo đẩy" (sửa 2026-10-05 sau review N-b): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định 30 giây) — và bất cứ khi nào một chương trình phát chuỗi thông báo — agent gửi nội dung thông báo (tên máy, tên phiên/cửa sổ, dòng lệnh, mã thoát, thời gian, hoặc chữ do chương trình gửi) tới relay ShellX; relay chỉ chuyển tiếp qua Google Firebase Cloud Messaging / Apple Push Notification service tới các điện thoại đã ghép nối với máy đó và đã cho phép thông báo, không lưu nội dung; khi không điện thoại nào nhận được (`202 {sent: 0}`), agent ngừng gửi 15 phút; FCM token của điện thoại được lưu tới khi đăng xuất (hoặc tắt thông báo trong cài đặt điện thoại). Câu hỏi đáp "máy chủ lưu gì" thêm mã thông báo đẩy. Câu "relay không đọc được nội dung terminal" được sửa thành "… ngoại trừ nội dung thông báo đẩy".
+`web/src/pages/privacy.md` và `web/src/pages/en/privacy.md` thêm mục "Thông báo đẩy" (sửa 2026-10-05 sau review N-b): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định 30 giây) — và bất cứ khi nào một chương trình phát chuỗi thông báo — agent gửi nội dung thông báo (tên máy, tên phiên/cửa sổ, dòng lệnh, mã thoát, thời gian, hoặc chữ do chương trình gửi) tới relay ShellX; relay chỉ chuyển tiếp qua Google Firebase Cloud Messaging / Apple Push Notification service tới các điện thoại đã ghép nối với máy đó và đã cho phép thông báo, không lưu nội dung; khi không điện thoại nào nhận được (`202 {sent: 0}`), agent ngừng gửi tới 15 phút (hết sớm khi một điện thoại kết nối tới máy); FCM token của điện thoại được lưu tới khi đăng xuất (hoặc tắt thông báo trong cài đặt điện thoại). Câu hỏi đáp "máy chủ lưu gì" thêm mã thông báo đẩy. Câu "relay không đọc được nội dung terminal" được sửa thành "… ngoại trừ nội dung thông báo đẩy".
 
 ---
 

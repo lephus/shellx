@@ -29,8 +29,9 @@ final class AgentNotification {
 ///   notification minutes late is usually meaningless.
 /// - A `202 {sent: 0}` (no paired phone can receive it) pauses sending for
 ///   [pauseWhenUnheard] (15 min): no notification text leaves the computer
-///   while nobody would see it. Any `sent > 0` lifts the pause; a new
-///   sender (a new runtime) starts unpaused.
+///   while nobody would see it. The pause ends after that time, when a phone
+///   connects to the agent ([resume]: it may just have allowed push), or with
+///   a new sender (a new runtime); a later `sent > 0` also clears it.
 final class NotificationSender {
   NotificationSender({
     required ShellxApi api,
@@ -78,6 +79,10 @@ final class NotificationSender {
   /// Completes when no request is in flight (tests).
   Future<void> get idle =>
       _inFlight == 0 ? Future.value() : (_idle ??= Completer<void>()).future;
+
+  /// A phone connected to the agent: it may have just allowed notifications,
+  /// so the pause after an unheard notification ends now.
+  void resume() => _pausedUntil = null;
 
   /// Returns false when [notification] was dropped by the limit.
   bool send(AgentNotification notification) {

@@ -53,7 +53,7 @@ The agent on your computer can tell your paired phones when a long-running comma
 
 - **What the agent sends, and when.** While the computer's "Notify when long commands finish" setting is on (default: 30 seconds) — and whenever a program in the terminal emits a notification sequence (for example `shellx notify`, OSC 9, OSC 777) — the agent sends the **notification text** to the ShellX relay: the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text the program sent. This text is **not end-to-end encrypted**.
 - **What the relay does with it.** The relay only forwards it through **Google Firebase Cloud Messaging** and, for iPhones, **Apple Push Notification service**, and only to phones that are paired with that computer and have allowed notifications. The relay does not store it or write it to its logs; Google and Apple process it under their own policies.
-- **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for 15 minutes before trying again.
+- **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for up to 15 minutes — less if a phone connects to the computer in the meantime.
 - **Push tokens.** When you allow notifications, the mobile app receives a push token (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Firebase reports the token is no longer valid.
 - This is the only exception to section 2: only the content of notifications, not the rest of your terminal.
 - **How to turn it off:** choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), turn off ShellX notifications in your phone's settings, or sign out on the phone.
@@ -89,7 +89,7 @@ We disclose data to authorities only when the law requires it. Because terminal 
 
 - **Account and devices:** until the account is deleted.
 - **Access tokens:** deleted when you sign out on that device or when revoked (changing your password revokes the tokens of all other devices); a token expires after 90 days without use.
-- **Push tokens:** deleted when you sign out on that phone, when the account is deleted, or when Firebase reports the token is no longer valid.
+- **Push tokens:** deleted when you sign out on that phone, when the account is deleted, when you turn off ShellX notifications in the phone's settings (the next time the app opens), or when Firebase reports the token is no longer valid.
 - **Pairing records:** deleted when you revoke or unpair, or when you sign out of the agent on that computer.
 - **Operational logs:** no longer than 30 days.
 - **Database backups:** one per day; the 14 most recent are kept.
