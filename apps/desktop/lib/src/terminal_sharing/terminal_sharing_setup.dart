@@ -42,7 +42,7 @@ final class PlannedFile {
 /// An enable that worked, and how to take it back (the server failed to
 /// start afterwards, spec §10.1 step 3).
 final class SharingInstall {
-  SharingInstall._(this._undo);
+  SharingInstall(this._undo);
   final Future<void> Function() _undo;
   Future<void> undo() => _undo();
 }
@@ -166,7 +166,7 @@ class TerminalSharingSetup {
       await undo();
       rethrow;
     }
-    return SharingInstall._(undo);
+    return SharingInstall(undo);
   }
 
   /// Spec §10.5: removes the block from every startup file that may have

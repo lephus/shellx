@@ -380,6 +380,105 @@ class AppLocalizationsVi extends AppLocalizations {
       'Đã đăng xuất, nhưng không xóa được một phần thông tin đăng nhập đã lưu';
 
   @override
+  String get trayTerminalSharing =>
+      'Chia sẻ terminal với điện thoại (thử nghiệm)';
+
+  @override
+  String trayDesktopTerminals(int count) {
+    return 'Terminal trên máy tính ($count)';
+  }
+
+  @override
+  String get trayDisconnectPhone => 'Ngắt điện thoại';
+
+  @override
+  String get trayTerminalSharingNeedsSetup =>
+      'Chia sẻ terminal cần thiết lập lại…';
+
+  @override
+  String notifyDesktopTerminalWatched(String device, String terminal) {
+    return '$device đang xem terminal $terminal';
+  }
+
+  @override
+  String get notifyTerminalSharingFailedTitle =>
+      'Không bật được chia sẻ terminal';
+
+  @override
+  String get notifyTerminalSharingFailedBody =>
+      'Không có gì bị thay đổi. Hãy thử lại.';
+
+  @override
+  String get notifyTerminalSharingStartFailedTitle =>
+      'Chia sẻ terminal không khởi động được';
+
+  @override
+  String get notifyTerminalSharingDisableIncompleteTitle =>
+      'Đã tắt chia sẻ terminal, nhưng chưa gỡ được khối ShellX khỏi một số file';
+
+  @override
+  String get confirmSharingTitle => 'Chia sẻ terminal với điện thoại?';
+
+  @override
+  String get confirmSharingIntro =>
+      'Mọi cửa sổ terminal mở từ giờ trở đi sẽ xem và gõ được từ điện thoại đã ghép nối. Các cửa sổ đang mở không được chia sẻ.';
+
+  @override
+  String get confirmSharingFiles =>
+      'ShellX sẽ sửa các file sau (mỗi file đã có được sao lưu một lần thành <tên>.shellx-backup):';
+
+  @override
+  String confirmSharingFileCreated(String path) {
+    return '$path (file mới)';
+  }
+
+  @override
+  String confirmSharingBinary(String path) {
+    return 'và chép shellx-term vào $path.';
+  }
+
+  @override
+  String get confirmSharingBashSkipped =>
+      'Không có ~/.bashrc hay ~/.bash_profile nên cửa sổ bash không được chia sẻ.';
+
+  @override
+  String get confirmSharingMacNote =>
+      'Lưu ý: đóng một cửa sổ terminal đang chạy lệnh sẽ không còn được Terminal.app (và có thể cả iTerm2) hỏi xác nhận.';
+
+  @override
+  String get confirmSharingWindowsNote =>
+      'Mỗi cửa sổ PowerShell sẽ mở chậm hơn một chút và tốn thêm một ít bộ nhớ.';
+
+  @override
+  String confirmSharingPowerShellBlocked(String name) {
+    return '$name: chưa cho phép chạy script, nên profile của nó sẽ không chạy cho tới khi cho phép script cục bộ.';
+  }
+
+  @override
+  String confirmSharingPowerShellGroupPolicy(String name) {
+    return '$name: chính sách script do tổ chức của bạn đặt (Group Policy), nên bản PowerShell này sẽ không được chia sẻ.';
+  }
+
+  @override
+  String get confirmSharingNoPowerShell =>
+      'Không tìm thấy PowerShell nào trên máy này.';
+
+  @override
+  String get confirmSharingAction => 'Bật';
+
+  @override
+  String get confirmAllowScriptsTitle => 'Cho phép script cục bộ?';
+
+  @override
+  String confirmAllowScriptsBody(String names) {
+    return '$names: chưa cho phép chạy script, nên khối ShellX trong profile không chạy được. Thao tác này đặt chính sách RemoteSigned chỉ cho tài khoản của bạn (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned).';
+  }
+
+  @override
+  String get confirmAllowScriptsAction =>
+      'Cho phép script cục bộ cho tài khoản của tôi';
+
+  @override
   String get startupFailed =>
       'ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.';
 

@@ -680,6 +680,150 @@ abstract class AppLocalizations {
   /// **'Signed out, but some saved sign-in data could not be deleted'**
   String get notifySignOutIncompleteTitle;
 
+  /// No description provided for @trayTerminalSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Share terminals with phone (experimental)'**
+  String get trayTerminalSharing;
+
+  /// No description provided for @trayDesktopTerminals.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer terminals ({count})'**
+  String trayDesktopTerminals(int count);
+
+  /// No description provided for @trayDisconnectPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect phone'**
+  String get trayDisconnectPhone;
+
+  /// No description provided for @trayTerminalSharingNeedsSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal sharing needs to be set up again…'**
+  String get trayTerminalSharingNeedsSetup;
+
+  /// No description provided for @notifyDesktopTerminalWatched.
+  ///
+  /// In en, this message translates to:
+  /// **'{device} is viewing terminal {terminal}'**
+  String notifyDesktopTerminalWatched(String device, String terminal);
+
+  /// No description provided for @notifyTerminalSharingFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not turn on terminal sharing'**
+  String get notifyTerminalSharingFailedTitle;
+
+  /// No description provided for @notifyTerminalSharingFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was changed. Try again.'**
+  String get notifyTerminalSharingFailedBody;
+
+  /// No description provided for @notifyTerminalSharingStartFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal sharing could not start'**
+  String get notifyTerminalSharingStartFailedTitle;
+
+  /// No description provided for @notifyTerminalSharingDisableIncompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal sharing is off, but the ShellX block could not be removed from some files'**
+  String get notifyTerminalSharingDisableIncompleteTitle;
+
+  /// No description provided for @confirmSharingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share terminals with your phone?'**
+  String get confirmSharingTitle;
+
+  /// No description provided for @confirmSharingIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Every terminal window you open from now on can be viewed and typed into from your paired phones. Windows that are already open are not shared.'**
+  String get confirmSharingIntro;
+
+  /// No description provided for @confirmSharingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX will change these files (each existing file is backed up once as <name>.shellx-backup):'**
+  String get confirmSharingFiles;
+
+  /// No description provided for @confirmSharingFileCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'{path} (new file)'**
+  String confirmSharingFileCreated(String path);
+
+  /// No description provided for @confirmSharingBinary.
+  ///
+  /// In en, this message translates to:
+  /// **'and copy shellx-term to {path}.'**
+  String confirmSharingBinary(String path);
+
+  /// No description provided for @confirmSharingBashSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no ~/.bashrc or ~/.bash_profile, so bash windows are not shared.'**
+  String get confirmSharingBashSkipped;
+
+  /// No description provided for @confirmSharingMacNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: Terminal.app (and possibly iTerm2) will no longer ask for confirmation when you close a window that is running a command.'**
+  String get confirmSharingMacNote;
+
+  /// No description provided for @confirmSharingWindowsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Each PowerShell window will open a little slower and use some extra memory.'**
+  String get confirmSharingWindowsNote;
+
+  /// No description provided for @confirmSharingPowerShellBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: running scripts is not allowed, so its profile will not run until local scripts are allowed.'**
+  String confirmSharingPowerShellBlocked(String name);
+
+  /// No description provided for @confirmSharingPowerShellGroupPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: the script policy is set by your organization (Group Policy), so this PowerShell will not be shared.'**
+  String confirmSharingPowerShellGroupPolicy(String name);
+
+  /// No description provided for @confirmSharingNoPowerShell.
+  ///
+  /// In en, this message translates to:
+  /// **'No PowerShell was found on this computer.'**
+  String get confirmSharingNoPowerShell;
+
+  /// No description provided for @confirmSharingAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get confirmSharingAction;
+
+  /// No description provided for @confirmAllowScriptsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow local scripts?'**
+  String get confirmAllowScriptsTitle;
+
+  /// No description provided for @confirmAllowScriptsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{names}: running scripts is not allowed, so the ShellX block in the profile cannot run. This sets the policy to RemoteSigned for your account only (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned).'**
+  String confirmAllowScriptsBody(String names);
+
+  /// No description provided for @confirmAllowScriptsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow local scripts for my account'**
+  String get confirmAllowScriptsAction;
+
   /// No description provided for @startupFailed.
   ///
   /// In en, this message translates to:

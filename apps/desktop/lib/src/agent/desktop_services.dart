@@ -8,6 +8,7 @@ import '../platform/launch_at_login.dart';
 import '../platform/notifier.dart';
 import '../platform/settings_store.dart';
 import '../platform/url_opener.dart';
+import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_runtime.dart';
 
 final RegExp _releaseVersion = RegExp(r'^\d+\.\d+\.\d+$');
@@ -38,6 +39,8 @@ final class DesktopServices {
     this.shutdownTimeout = const Duration(seconds: 10),
     this.awaitPtyKills,
     this.ptyKillTimeout = const Duration(seconds: 3),
+    this.terminalSharing,
+    this.now = DateTime.now,
   }) : assert(
          _releaseVersion.hasMatch(appVersion),
          'appVersion must be PackageInfo.version: x.y.z, no +build suffix',
@@ -89,6 +92,13 @@ final class DesktopServices {
   /// stay stopped).
   final Future<void> Function()? awaitPtyKills;
   final Duration ptyKillTimeout;
+
+  /// Terminal sharing's installer (spec §10); null where the switch is not
+  /// offered (Windows without `SHELLX_EXPERIMENTAL=terminal-sharing`).
+  final TerminalSharingSetup? terminalSharing;
+
+  /// Wall clock (the attach-notification limit).
+  final DateTime Function() now;
 }
 
 final desktopServicesProvider = Provider<DesktopServices>(

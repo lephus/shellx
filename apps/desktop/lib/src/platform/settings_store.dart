@@ -6,12 +6,14 @@ abstract final class SettingKeys {
   static const String keepAwake = 'keep_awake_enabled';
   static const String launchAtStartup = 'launch_at_startup_enabled';
   static const String onboardingDone = 'onboarding_done';
+  static const String terminalSharing = 'terminal_sharing_enabled';
 
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
     launchAtStartup,
     onboardingDone,
+    terminalSharing,
   };
 }
 

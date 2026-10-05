@@ -56,6 +56,25 @@ abstract interface class AgentRuntime {
   void closeSession(int id);
   void closeAllSessions();
 
+  /// Terminals shared through `shellx-term` (spec §7.6); empty while
+  /// terminal sharing is off. [sessionChanges] also fires for them.
+  List<DesktopSessionSummary> get desktopSessions;
+
+  /// A phone attached to a desktop terminal (for the notification).
+  Stream<DesktopPhoneAttached> get desktopPhoneAttached;
+
+  /// Whether the local server for `shellx-term` runs.
+  bool get terminalSharing;
+
+  /// Starts or stops the local server (writes / deletes `endpoint`).
+  /// Starting throws when the port cannot be opened (spec §7.9) or this
+  /// runtime was built without an endpoint path. Stopping drops every
+  /// desktop session at once; the windows keep running.
+  Future<void> setTerminalSharing(bool enabled);
+
+  /// Tray "Disconnect phone": the phone leaves; the terminal keeps running.
+  void disconnectDesktopPhone(int id);
+
   /// While `disconnected`: retries now instead of after the backoff (the
   /// computer woke up). While `replaced` (4001: another instance of this
   /// agent connected): connects again — the relay never does that on its
@@ -92,6 +111,7 @@ final class CoreAgentRuntime implements AgentRuntime {
     required ShellResolver shellResolver,
     required String homeDirectory,
     required Map<String, String> baseEnvironment,
+    String? termEndpointPath,
     RelaySocketConnector connector = ioRelaySocketConnector,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now {
@@ -110,11 +130,16 @@ final class CoreAgentRuntime implements AgentRuntime {
       nextId: ids,
     );
     _desktopSessions = DesktopSessionManager(nextId: ids);
-    // P4 replaces `() => false` with the TerminalSharing switch.
+    _sharing = termEndpointPath == null
+        ? null
+        : TerminalSharing(
+            endpointPath: termEndpointPath,
+            sessions: _desktopSessions,
+          );
     _router = SessionRouter(
       shells: _sessions,
       desktop: _desktopSessions,
-      desktopSharing: () => false,
+      desktopSharing: () => _sharing?.enabled ?? false,
     );
     _pairing = PairingCodeManager(now: _now);
     _service = AgentService(
@@ -134,6 +159,7 @@ final class CoreAgentRuntime implements AgentRuntime {
   late final RelayConnection _relay;
   late final SessionManager _sessions;
   late final DesktopSessionManager _desktopSessions;
+  late final TerminalSharing? _sharing;
   late final SessionRouter _router;
   late final PairingCodeManager _pairing;
   late final AgentService _service;
@@ -154,11 +180,19 @@ final class CoreAgentRuntime implements AgentRuntime {
 
   /// AgentService.stop() drops the channels and stops the relay but leaves
   /// sessions alone, so they are closed here first (plan 03 contract).
+  /// Desktop terminals only lose their phones (spec §7.2); the local server
+  /// closes and `endpoint` goes, the windows keep running and retrying.
   @override
   Future<void> stop() async {
     _running = false;
     _router.closeAll();
-    await _service.stop();
+    final stopping = _service.stop();
+    try {
+      await _sharing?.stop();
+    } catch (_) {
+      // Best effort: the windows keep running either way.
+    }
+    await stopping;
   }
 
   @override
@@ -170,7 +204,27 @@ final class CoreAgentRuntime implements AgentRuntime {
   @override
   List<SessionSummary> get sessions => _sessions.sessions;
   @override
-  Stream<void> get sessionChanges => _sessions.changes;
+  Stream<void> get sessionChanges => _router.changes;
+  @override
+  List<DesktopSessionSummary> get desktopSessions => _desktopSessions.sessions;
+  @override
+  Stream<DesktopPhoneAttached> get desktopPhoneAttached =>
+      _desktopSessions.phoneAttached;
+  @override
+  bool get terminalSharing => _sharing?.enabled ?? false;
+
+  @override
+  Future<void> setTerminalSharing(bool enabled) async {
+    final sharing = _sharing;
+    if (sharing == null) {
+      if (enabled) throw StateError('terminal sharing is not available');
+      return;
+    }
+    await (enabled ? sharing.start() : sharing.stop());
+  }
+
+  @override
+  void disconnectDesktopPhone(int id) => _desktopSessions.disconnectPhone(id);
 
   @override
   PairingView startPairing() {
