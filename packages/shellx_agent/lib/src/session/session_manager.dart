@@ -7,14 +7,8 @@ import 'package:shellx_core/shellx_core.dart';
 import '../pty/pty.dart';
 import '../pty/session_environment.dart';
 import '../pty/shell_resolver.dart';
+import 'agent_sessions.dart';
 import 'ring_buffer.dart';
-
-/// An application message the agent must deliver to one phone.
-final class OutboundMessage {
-  const OutboundMessage(this.mobileId, this.message);
-  final String mobileId;
-  final AppMessage message;
-}
 
 /// Read-only view of a session for the tray menu.
 final class SessionSummary {
@@ -29,13 +23,6 @@ final class SessionSummary {
   final String shell;
   final DateTime createdAt;
   final String? attachedMobileId;
-}
-
-/// Emitted when a phone opens a new session (desktop notification).
-final class SessionOpenedEvent {
-  const SessionOpenedEvent(this.mobileId, this.sessionId);
-  final String mobileId;
-  final int sessionId;
 }
 
 const int _minDimension = 1;

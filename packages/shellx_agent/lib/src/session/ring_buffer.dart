@@ -15,7 +15,10 @@ final class RingBuffer {
   final Uint8List _bytes;
   int _end = 0;
 
-  int get start => max(0, _end - _capacity);
+  /// Positions below this were dropped by [restartWith].
+  int _floor = 0;
+
+  int get start => max(_floor, _end - _capacity);
   int get end => _end;
 
   void append(Uint8List data) {
@@ -34,6 +37,14 @@ final class RingBuffer {
       position = (position + count) % _capacity;
     }
     _end += data.length;
+  }
+
+  /// Drops every byte held and continues the stream with [data]: positions
+  /// keep increasing, and [start] becomes the old [end] (spec §7.8: a desktop
+  /// terminal's snapshot after a reconnect replaces the buffer).
+  void restartWith(Uint8List data) {
+    _floor = _end;
+    append(data);
   }
 
   /// Returns up to [maxBytes] bytes starting at stream position [from].
