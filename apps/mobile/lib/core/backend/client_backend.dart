@@ -145,6 +145,12 @@ final class ClientBackend implements ShellxBackend {
   }
 
   @override
+  Future<void> deletePushToken() async {
+    _checkNotDisposed();
+    return _api.deletePushToken();
+  }
+
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;

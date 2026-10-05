@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/notification_opener.dart';
 import 'package:toastification/toastification.dart';
@@ -27,9 +28,11 @@ class PushController {
     required SharedPreferences prefs,
     required NotificationOpener opener,
     required DeviceDescription device,
+    required AppLockController lock,
     required PopupHandler Function() popup,
   }) : _messaging = messaging,
        _session = session,
+       _lock = lock,
        _prefs = prefs,
        _opener = opener,
        _platform = device.platform == DevicePlatform.ios ? PushPlatform.ios : PushPlatform.android,
@@ -42,12 +45,14 @@ class PushController {
     SharedPreferences prefs,
     NotificationOpener opener,
     DeviceDescription device,
+    AppLockController lock,
   ) => PushController(
     messaging: messaging,
     session: session,
     prefs: prefs,
     opener: opener,
     device: device,
+    lock: lock,
     // Resolved when a banner shows: the popup handler needs the router's context.
     popup: () => getIt<PopupHandler>(),
   );
@@ -60,6 +65,7 @@ class PushController {
 
   final PushMessaging _messaging;
   final SessionHolder _session;
+  final AppLockController _lock;
   final SharedPreferences _prefs;
   final NotificationOpener _opener;
   final PushPlatform _platform;
@@ -73,6 +79,13 @@ class PushController {
   /// The backend whose relay has this install's token.
   ShellxBackend? _registeredFor;
   bool _asking = false;
+
+  /// The token deletion in flight; a registration waits for it, so it never fetches the token
+  /// that is about to be invalidated.
+  Future<void>? _deleting;
+
+  /// Stops waiting for the app to be unlocked (a prompt deferred by the lock).
+  void Function()? _stopWaitingForUnlock;
 
   /// Push works on this install (Firebase configured and started).
   bool get available => _messaging.available;
@@ -92,13 +105,31 @@ class PushController {
       ..add(_messaging.openedMessages.listen(_open, onError: _logStreamError))
       ..add(_messaging.tokenRefreshes.listen(_onTokenRefresh, onError: _logStreamError));
     _stopWatching = _session.backend.subscribe(_onBackend);
+    // A sign-out whose token deletion failed (offline, killed): retried now.
+    if (_session.backend.peek() == null && (_prefs.getBool(registeredKey) ?? false)) {
+      _deleting = _deleteToken();
+    }
     unawaited(_openInitial());
   }
 
-  /// The machine list loaded [paired] paired machines.
+  /// The machine list loaded [paired] paired machines. The prompt waits while the app is locked
+  /// or the lock is authenticating: on Android a system dialog cancels the BiometricPrompt.
   void onPairedMachines(int paired) {
-    if (paired < 1 || !available || asked) return;
-    unawaited(_ask());
+    if (paired < 1 || !available || asked || _stopWaitingForUnlock != null) return;
+    var done = false;
+    void Function()? stop;
+    stop = effect(() {
+      final busy = _lock.isLocked.value || _lock.isAuthenticating.value;
+      if (busy || done) return;
+      done = true;
+      // Not from inside the effect: the prompt writes signals.
+      scheduleMicrotask(() {
+        stop?.call();
+        _stopWaitingForUnlock = null;
+        unawaited(_ask());
+      });
+    });
+    _stopWaitingForUnlock = stop;
   }
 
   /// "Bật" in Settings, before the automatic prompt ran.
@@ -120,10 +151,17 @@ class PushController {
     if (permission == PushPermission.granted) {
       if (backend != null && !identical(_registeredFor, backend)) await _register(backend);
     } else if (_prefs.getBool(registeredKey) ?? false) {
-      // Turned off in the system settings: the token is invalidated, so the relay stops sending
-      // notification text to it (FCM answers UNREGISTERED and the relay drops it).
+      // Turned off in the system settings: the relay forgets the token and the token itself is
+      // invalidated, so no notification text is sent towards this phone any more.
       _registeredFor = null;
-      await _deleteToken();
+      if (backend != null) {
+        try {
+          await backend.deletePushToken();
+        } catch (error) {
+          _log('deletePushToken', error);
+        }
+      }
+      await (_deleting = _deleteToken());
     }
     return permission;
   }
@@ -150,12 +188,10 @@ class PushController {
     final previous = _owner;
     _owner = backend;
     _registeredFor = null;
-    if (backend != null) {
-      unawaited(refreshPermission());
-    } else if (previous != null) {
-      // Signed out: pushes to this install stop even if the relay did not hear the logout.
-      unawaited(_deleteToken());
-    }
+    // Signed out (or another account signed in): pushes to this install stop even if the relay did
+    // not hear the logout. The next account registers a fresh token once this is done.
+    if (previous != null) _deleting = _deleteToken();
+    if (backend != null) unawaited(refreshPermission());
   }
 
   void _onTokenRefresh(String token) {
@@ -167,11 +203,13 @@ class PushController {
   /// Never throws: offline or a relay without push support (404) waits for the next launch.
   Future<void> _register(ShellxBackend backend, {String? token}) async {
     try {
+      await _deleting;
       final value = token ?? await _messaging.token();
       if (value == null || !identical(_session.backend.peek(), backend)) return;
       await backend.registerPushToken(value, _platform);
+      if (!identical(_session.backend.peek(), backend)) return;
       await _prefs.setBool(registeredKey, true);
-      if (identical(_session.backend.peek(), backend)) _registeredFor = backend;
+      _registeredFor = backend;
     } catch (error) {
       _log('registerPushToken', error);
     }
@@ -199,6 +237,8 @@ class PushController {
 
   /// The system shows nothing while the app is open: the banner does (push spec §6).
   void _showBanner(PushMessage message) {
+    // Nothing of a notification shows over the lock screen of the app.
+    if (_lock.isLocked.peek()) return;
     final title = message.title ?? '';
     final body = message.body;
     if (title.isEmpty && (body == null || body.isEmpty)) return;
@@ -223,6 +263,7 @@ class PushController {
   @disposeMethod
   void dispose() {
     _stopWatching?.call();
+    _stopWaitingForUnlock?.call();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

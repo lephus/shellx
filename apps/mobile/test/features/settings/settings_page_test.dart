@@ -71,6 +71,7 @@ void main() {
             prefs: prefs,
             opener: RecordingOpener(),
             device: const DeviceDescription(name: 'iPhone 15', platform: DevicePlatform.ios),
+            lock: lock,
             popup: () => popups,
           ),
           links,

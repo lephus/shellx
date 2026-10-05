@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
 import 'package:toastification/toastification.dart';
 
+import '../../support/fake_biometrics.dart';
 import '../../support/fake_popup_handler.dart';
 import '../../support/fake_push.dart';
 import '../../support/fakes.dart';
@@ -23,6 +27,9 @@ void main() {
   late SharedPreferences prefs;
   late RecordingOpener opener;
   late FakePopupHandler popup;
+  late FakeBiometricAuthenticator biometrics;
+  late bool lockEnabled;
+  late AppLockController lock;
   late PushController controller;
 
   PushController build({DevicePlatform platform = DevicePlatform.ios}) => PushController(
@@ -31,6 +38,7 @@ void main() {
     prefs: prefs,
     opener: opener,
     device: DeviceDescription(name: 'iPhone 15', platform: platform),
+    lock: lock,
     popup: () => popup,
   );
 
@@ -42,6 +50,9 @@ void main() {
     session = FakeSessionHolder(backend);
     opener = RecordingOpener();
     popup = FakePopupHandler();
+    biometrics = FakeBiometricAuthenticator();
+    lockEnabled = false;
+    lock = AppLockController(authenticator: biometrics, isEnabled: () => lockEnabled);
     controller = build();
   });
 
@@ -68,6 +79,21 @@ void main() {
       controller.onPairedMachines(2);
       await pumpEventQueue();
       expect(messaging.requests, 1);
+    });
+
+    test('locked (first launch after an update): the prompt waits until the app is unlocked', () async {
+      lockEnabled = true;
+      lock.lockOnLaunch();
+      controller.start();
+      controller.onPairedMachines(1);
+      controller.onPairedMachines(1);
+      await pumpEventQueue();
+      expect(messaging.requests, 0);
+
+      expect(await lock.unlock('Mở khóa ShellX'), isTrue);
+      await pumpEventQueue();
+      expect(messaging.requests, 1);
+      expect(backend.pushTokens, hasLength(1));
     });
 
     test('a refusal is never asked again automatically, also after a restart', () async {
@@ -189,6 +215,57 @@ void main() {
       expect(backend.pushTokens, hasLength(2));
     });
 
+    test('turned off in the system settings: the relay also forgets the token', () async {
+      messaging.current = PushPermission.granted;
+      controller.start();
+      await pumpEventQueue();
+      messaging.current = PushPermission.denied;
+      await controller.refreshPermission();
+      expect(backend.pushTokenDeletes, 1);
+      expect(messaging.deletes, 1);
+    });
+
+    test('a sign-out whose token deletion did not happen is retried at the next start', () async {
+      await prefs.setBool(PushController.registeredKey, true);
+      session.signOut(SignOutReason.loggedOut);
+      controller.start();
+      await pumpEventQueue();
+      expect(messaging.deletes, 1);
+      expect(prefs.getBool(PushController.registeredKey), isFalse);
+    });
+
+    test('account A → account B: A\'s token is deleted first, then B registers a fresh one', () async {
+      messaging.current = PushPermission.granted;
+      controller.start();
+      await pumpEventQueue();
+      expect(backend.pushTokens, [('fcm-1', PushPlatform.ios)]);
+
+      final order = <String>[];
+      final next = FakeBackend();
+      messaging.onDelete = () {
+        order.add('delete');
+        messaging.tokenValue = 'fcm-2';
+      };
+      session.signIn(next);
+      await pumpEventQueue();
+      order.add('register ${next.pushTokens.single.$1}');
+      expect(order, ['delete', 'register fcm-2']);
+      expect(backend.pushTokens, hasLength(1));
+    });
+
+    test('a registration that completes after a sign-out does not mark the token registered', () async {
+      messaging.current = PushPermission.granted;
+      final gate = Completer<void>();
+      backend.pushTokenGate = gate;
+      controller.start();
+      await pumpEventQueue();
+      session.signOut(SignOutReason.loggedOut);
+      await pumpEventQueue();
+      gate.complete();
+      await pumpEventQueue();
+      expect(prefs.getBool(PushController.registeredKey), isNot(isTrue));
+    });
+
     test('Firebase missing: nothing is asked, registered or listened to', () async {
       messaging = FakePushMessaging(available: false);
       controller = build()..start();
@@ -213,6 +290,14 @@ void main() {
         ToastificationItem(builder: (_, _) => const SizedBox(), alignment: Alignment.topCenter),
       );
       expect(opener.opened, [message]);
+    });
+
+    test('no banner over the app lock', () async {
+      lockEnabled = true;
+      lock.lockOnLaunch();
+      controller.start();
+      messaging.foreground.add(message);
+      expect(popup.infos, isEmpty);
     });
 
     test('a tapped notification, and the one that launched the app, are opened', () async {

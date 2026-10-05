@@ -126,6 +126,7 @@ void main() {
       prefs: await SharedPreferences.getInstance(),
       opener: NotificationOpener(session, registry, RouterMachineNavigator(router)),
       device: const DeviceDescription(name: 'Pixel 8', platform: DevicePlatform.android),
+      lock: lock,
       popup: () => popups,
     );
     getIt

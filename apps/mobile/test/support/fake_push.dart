@@ -54,8 +54,14 @@ class FakePushMessaging implements PushMessaging {
   @override
   Future<PushMessage?> initialMessage() async => initial;
 
+  /// Runs inside [deleteToken].
+  void Function()? onDelete;
+
   @override
-  Future<void> deleteToken() async => deletes++;
+  Future<void> deleteToken() async {
+    deletes++;
+    onDelete?.call();
+  }
 }
 
 /// Records what the opener asked the router for.

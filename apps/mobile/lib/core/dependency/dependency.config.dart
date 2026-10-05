@@ -195,6 +195,7 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i460.SharedPreferences>(),
         gh<_i539.NotificationOpener>(),
         gh<_i351.DeviceDescription>(),
+        gh<_i306.AppLockController>(),
       ),
       dispose: (i) => i.dispose(),
     );

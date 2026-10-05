@@ -176,6 +176,10 @@ abstract interface class ShellxBackend {
   /// support answers 404), and [StateError] after [dispose].
   Future<void> registerPushToken(String token, PushPlatform platform);
 
+  /// `DELETE /v1/devices/me/push-token`: notifications were turned off on this phone. Throws
+  /// [ApiException], and [StateError] after [dispose].
+  Future<void> deletePushToken();
+
   /// Stops the client and the relay connection for good (sign-out). After
   /// it, [suspend], [resume] and [reconnectNow] do nothing — the relay never
   /// dials again — and [devices], [pair], [unpair] and [registerPushToken] throw [StateError]:

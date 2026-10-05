@@ -470,12 +470,21 @@ class FakeBackend implements ShellxBackend {
   /// Thrown by [registerPushToken] (e.g. offline, or a relay without push support: 404).
   Object? pushTokenError;
 
+  /// [registerPushToken] completes only once this does.
+  Completer<void>? pushTokenGate;
+
   @override
   Future<void> registerPushToken(String token, PushPlatform platform) async {
     pushTokens.add((token, platform));
+    await pushTokenGate?.future;
     final error = pushTokenError;
     if (error != null) throw error;
   }
+
+  int pushTokenDeletes = 0;
+
+  @override
+  Future<void> deletePushToken() async => pushTokenDeletes++;
 
   @override
   Future<void> dispose() async {
