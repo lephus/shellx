@@ -253,7 +253,7 @@ Nhánh `feat/terminal-sharing-p3` (cắt từ `origin/windows-check/p2b` = `main
 | Gói | Kết quả |
 |---|---|
 | `packages/shellx_core` | 280 xanh |
-| `packages/shellx_agent` | 271 xanh |
+| `packages/shellx_agent` | 275 xanh (271 trước vòng sửa sau review cuối) |
 | `packages/shellx_client` | 103 xanh |
 | `packages/shellx_e2e` `test/term_link_test.dart` | 3 xanh (`shellx-term` thật) |
 | `apps/desktop` | 269 xanh |
@@ -303,15 +303,30 @@ Commit của Task 13: workflow `windows-check` (job `dart`), ledger này, HANDOF
 - Ruling (lệch plan đã chấp nhận, Task 8): `_dropLink` đặt thêm `live=false` vì mã trong brief sập khi `input`/`resize` đến lúc `exit` đang xả; thêm test hồi quy — cái giá nếu sai: không có.
 - Ruling (lệch plan đã chấp nhận, Task 11): `buildTermBinaries` đưa `$HOME/.cargo/bin` lên đầu PATH; `tearDown` chờ cửa sổ thoát rồi thử xóa HOME tạm (tối đa 5 giây) — cái giá nếu sai: thử lại có thể che việc bash ghi `.bash_history` (xem "Việc nhỏ còn mở").
 
-### Việc nhỏ còn mở (đánh dấu "FLAG FOR FINAL REVIEW"; review cuối có thể sửa ngay)
+### Việc nhỏ còn mở (đánh dấu "FLAG FOR FINAL REVIEW")
 
-- `deleteIfOwned` chỉ bắt `FileSystemException`; file `endpoint` không phải UTF-8 làm `readAsString` ném `FormatException` ra khỏi `TermServer.stop()` (`term_endpoint.dart:69`).
-- Không test nào chứng minh một link sống lâu hơn hạn bắt tay 5 giây (xóa `_deadline.cancel()` lúc `ready` vẫn qua hết test) (`term_server_test.dart`).
-- `outbound` (broadcast đồng bộ) ném "Cannot fire new event" nếu người nghe gọi ngược vào bộ quản lý đồng bộ; lời chú thích ở `desktop_session_manager.dart:119` cần mang cảnh báo của `SessionManager`; `input()` dùng `s.link!` sau khi `_drive` đã phát (nên lấy `link` trước).
-- Test các đường đóng của router cho `closeSession(desktopId)` và `closeAll` chỉ khẳng định terminal còn sống, chưa khẳng định điện thoại nhận `closed_by_host`/bị tách (`session_router_test.dart:219-236`).
-- `@internal` bị dời: nay nằm trên `handleDriver`, `handleDetached` mất (`client_tab.dart:~186`).
-- `tearDown` thử lại che việc bash ghi `.bash_history` khi SIGHUP: đặt `HISTFILE=''` trong môi trường `TermWindow` và/hoặc cho cửa sổ của test 3 thoát, rồi bỏ vòng thử lại (`term_window.dart:76`, `term_link_test.dart:50`).
+Các mục đã sửa hoặc đã gỡ ở vòng sửa sau review cuối nằm trong mục kế tiếp. Còn mở:
+
+- `input()` dùng `s.link!` sau khi `_drive` đã phát (nên lấy `link` trước) (`desktop_session_manager.dart`).
+- `tearDown` của `term_link_test.dart` vẫn giữ vòng thử xóa HOME tạm có giới hạn (nay chỉ là lưới an toàn: `HISTFILE=''` đã chặn `.bash_history`); chưa cho cửa sổ của test 3 tự thoát.
 - "Cửa sổ lấy lại cỡ" mới chỉ được chứng minh bằng tin nhắn `driver`; thêm `stty size` → `24 80` (`term_link_test.dart:110`).
+
+### Sửa sau review cuối (2026-10-05)
+
+Review cuối toàn nhánh: một mục Important và các mục nhỏ, sửa trong một lượt (báo cáo cục bộ `.superpowers/sdd/2026-10-05-terminal-sharing-p3-agent-protocol/final-fix-report.md`).
+
+1. **Important — `TerminalSharing.start/stop` chạy đua:** `stop()` gọi lúc `start()` đang chờ bind/ghi `endpoint` trả về ngay và chia sẻ vẫn BẬT; hai `start()` cùng lúc bind hai server, rò server thứ nhất. Nay `TerminalSharing` xếp `start`/`stop` thành một hàng đợi theo thứ tự gọi (`start` lỗi chỉ ném cho người gọi, không chặn hàng); `TermServer` ghi rõ người gọi phải tuần tự hóa. Test: "stop while start is in flight leaves sharing off and no endpoint file", "two concurrent starts bind one server" (`terminal_sharing_test.dart`).
+2. `@internal` đặt lại trên cả `handleDriver` lẫn `handleDetached` (`client_tab.dart`).
+3. `dart format` cho `term_auth.dart`, `term_messages.dart`, `machine_client.dart`, `messages.dart` (và lint `curly_braces_in_flow_control_structures` lộ ra ở `term_messages.dart`).
+4. Test mới: một `TermLink` sống quá 2× hạn bắt tay vẫn gửi được và không bị đóng (`term_server_test.dart`).
+5. Test router `closeSession(desktopId)` và `closeAll` nay khẳng định điện thoại nhận `session.detached {closed_by_host}` và phiên không còn điện thoại gắn (`session_router_test.dart`).
+6. `DesktopSessionManager.disconnectPhone` bỏ qua phiên đang xả sau `exit` (như `SessionManager.closeSession`): việc xả kết thúc và điện thoại nhận `session.exited` thay vì `closed_by_host` mà không có `session.exited`. Có test.
+7. Chú thích cũ: `AgentService` (đóng phiên là việc của chủ `AgentSessions`, tức `SessionRouter.closeAll`); `DesktopSessionManager.outbound` mang cảnh báo gọi ngược đồng bộ như `SessionRouter`/`SessionManager`.
+8. `TermWindow` đặt `HISTFILE=''` (bash không ghi `.bash_history` vào HOME tạm khi SIGHUP); giữ vòng thử lại có giới hạn trong `tearDown`.
+
+Mục đánh dấu của Task 5 (`deleteIfOwned` để lọt `FormatException`) là **báo nhầm**: `File.readAsString` bọc lỗi giải mã thành `FileSystemException`, đã được bắt.
+
+**Lệch §11.4 (đã chấp nhận):** spec muốn e2e qua relay chạy với relay trong bộ nhớ; thực tế `desktop_terminal_e2e_test.dart` chạy với relay Node cục bộ (`npm run dev`) và bị bỏ qua khi không có `SHELLX_E2E_RELAY`. Cổng mặc định phủ luồng này theo từng phần: `term_link_test.dart` (`shellx-term` thật qua agent) và harness của `shellx_client` với relay trong bộ nhớ.
 
 Các việc nhỏ khác đã hoãn (không đánh dấu) nằm trong `.superpowers/sdd/2026-10-05-terminal-sharing-p3-agent-protocol/progress.md` (cục bộ, không vào git).
 
@@ -336,3 +351,4 @@ Các việc nhỏ khác đã hoãn (không đánh dấu) nằm trong `.superpowe
 - Gợi ý `desktopSharing` có ba giá trị null/false/true (agent cũ / tắt / bật).
 - Banner của `TabDriver` (ai đang lái).
 - Thẻ `TabDetached(terminalGone)`: hiện `terminal_tab_controller.dart:142` vẫn ánh xạ `terminal_gone` sang banner "đóng bởi máy chủ".
+- Điện thoại giành phiên (`taken_over`) khi phiên đang do điện thoại lái và cùng kích thước thì **không** nhận `session.driver` (`desktop_session_manager.dart:439`, `_drive` thoát sớm khi `!changed && driver == phone`): banner của P5 phải coi bên lái là "phone" ngay sau khi gắn.

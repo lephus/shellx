@@ -290,7 +290,7 @@ Mỗi khung là độ dài 4 byte big-endian + một map CBOR có khóa `t` (cù
 
 ### 7.1 Phiên `desktop`
 
-Mỗi `shellx-term` đã xác thực trở thành một phiên loại `desktop` trong `SessionManager`, dùng chung:
+Mỗi `shellx-term` đã xác thực trở thành một phiên loại `desktop` trong `DesktopSessionManager` (§7.7), dùng chung với phiên `shellx` qua `SessionStream`:
 - bộ đệm vòng theo `seq`;
 - gắn lại và phát lại;
 - quy tắc một điện thoại mỗi phiên (`taken_over`);
@@ -310,7 +310,7 @@ Agent **luôn đọc** socket của `shellx-term` vào bộ đệm (bộ đệm 
 
 ### 7.2 Không bao giờ tắt terminal máy tính
 
-Mọi đường code hiện có dẫn tới `kill()` (`closeSessionsAttachedTo`, `closeSession`, `closeAll`, `SessionClose`) phải bỏ qua phiên `desktop` và chỉ ngắt điện thoại. **Mỗi đường có một test riêng.** Phiên `desktop` không có `kill`; `Pty` của nó (adapter trên kết nối nội bộ) cài `kill()` là no-op.
+Mọi đường "tắt" (`closeSessionsAttachedTo`, `closeSession`, `closeAll`, `SessionClose`) đi qua `SessionRouter` (§7.7): phiên `shellx` bị tắt như cũ, phiên `desktop` chỉ bị ngắt điện thoại. **Mỗi đường có một test riêng.** Phiên `desktop` nằm trong `DesktopSessionManager`, không có `Pty`; `DesktopSessionManager` và `TermLink` không có hàm tắt terminal nào (đóng kết nối nội bộ chỉ dừng chia sẻ).
 
 ### 7.3 Kích thước
 
