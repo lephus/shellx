@@ -69,6 +69,19 @@ void main() {
         jsonDecode(sample().encode()) as Map<String, Object?>;
     Map<String, Object?> firstWorkspace(Map<String, Object?> m) =>
         (m['workspaces']! as List).first as Map<String, Object?>;
+    Map<String, Object?> firstLeaf(Map<String, Object?> m) =>
+        (((m['tabs']! as List).first as Map)['layout'] as Map)['first']
+            as Map<String, Object?>;
+    String withCwd(Map<String, Object?> m, String cwd) {
+      firstLeaf(m)['cwd'] = cwd;
+      return jsonEncode(m);
+    }
+
+    String withSession(Map<String, Object?> m, Object session) {
+      firstLeaf(m)['session'] = session;
+      return jsonEncode(m);
+    }
+
     final cases = <String, String Function()>{
       'not JSON': () => '{"v":1,',
       'not a map': () => '[]',
@@ -129,6 +142,46 @@ void main() {
         firstWorkspace(m)['id'] = 'w' * 65;
         return jsonEncode(m);
       },
+      'duplicate workspace id': () {
+        final m = base();
+        (m['workspaces']! as List).add({'id': 'default', 'tabs': <String>[]});
+        return jsonEncode(m);
+      },
+      'tab key in two workspaces': () {
+        final m = base();
+        (m['workspaces']! as List).add({
+          'id': 'w2',
+          'tabs': [k1],
+        });
+        return jsonEncode(m);
+      },
+      'tab key twice in one workspace': () {
+        final m = base();
+        firstWorkspace(m)['tabs'] = [k1, k1];
+        return jsonEncode(m);
+      },
+      'tab key is a pane of another tab': () {
+        final m = base();
+        final other = 'd' * 32;
+        (m['tabs'] as List).add({
+          'key': k2, // a leaf of the first tab
+          'focused': other,
+          'layout': {'pane': other},
+        });
+        return jsonEncode(m);
+      },
+      'cwd empty': () => withCwd(base(), ''),
+      'cwd relative': () => withCwd(base(), 'work/shellx'),
+      'cwd drive-relative': () => withCwd(base(), r'C:work'),
+      'cwd with NUL': () => withCwd(base(), '/tmp/a\u0000b'),
+      'cwd with a newline': () => withCwd(base(), '/tmp/a\nb'),
+      'cwd with ESC': () => withCwd(base(), '/tmp/\u001b[31m'),
+      'cwd with DEL': () => withCwd(base(), '/tmp/\u007f'),
+      'cwd with a C1 control': () => withCwd(base(), '/tmp/\u009b31m'),
+      'session zero': () => withSession(base(), 0),
+      'session negative': () => withSession(base(), -4),
+      'session not an int': () => withSession(base(), 1.5),
+      'session a string': () => withSession(base(), '12'),
       'more than 32 panes': () {
         final m = base();
         final tabs = m['tabs'] as List;
@@ -194,6 +247,38 @@ void main() {
     final back = RestoreSnapshot.tryParse(jsonEncode(m))!;
     expect(back.workspaces.single.tabs, [k1]);
     expect(back.selectedTab, isNull);
+  });
+
+  test('absolute cwds of POSIX and Windows forms are accepted', () {
+    for (final cwd in [
+      '/',
+      '/Users/a/w',
+      r'C:\Users\a',
+      r'd:\',
+      r'\\srv\share\x',
+    ]) {
+      final m = jsonDecode(sample().encode()) as Map<String, Object?>;
+      ((((m['tabs']! as List).first as Map)['layout'] as Map)['first']
+              as Map)['cwd'] =
+          cwd;
+      final back = RestoreSnapshot.tryParse(jsonEncode(m));
+      expect(back, isNotNull, reason: cwd);
+      expect(savedLeaves(back!.tabs.single.layout).first.cwd, cwd);
+    }
+  });
+
+  test('a tab keeps its creating pane key whether or not that pane is a '
+      'leaf of its own tree', () {
+    // Own leaf (the usual case) is in sample(); here the creating pane has
+    // closed, so the key is not a leaf anywhere.
+    final m = jsonDecode(sample().encode()) as Map<String, Object?>;
+    final other = 'd' * 32;
+    (m['tabs']! as List).add({
+      'key': 'e' * 32,
+      'focused': other,
+      'layout': {'pane': other, 'session': null},
+    });
+    expect(RestoreSnapshot.tryParse(jsonEncode(m)), isNotNull);
   });
 
   test('sameLayoutAs ignores savedAt and cleanExit', () {

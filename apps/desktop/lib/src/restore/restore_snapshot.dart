@@ -17,6 +17,20 @@ const int _maxCwd = 4096;
 const int _maxWorkspaceId = 64;
 final RegExp _keyPattern = RegExp(r'^[0-9a-f]{32}$');
 
+/// POSIX `/…`, Windows `C:\…` or UNC `\\…`.
+final RegExp _absolutePath = RegExp(r'^(/|[A-Za-z]:\\|\\\\)');
+
+/// C0, DEL and C1 controls (NUL included).
+final RegExp _control = RegExp(r'[\x00-\x1f\x7f-\x9f]');
+
+/// Whether [cwd] passes the load check (D11): absolute, ≤ 4096 characters,
+/// no control characters. Capture writes null for anything else so its
+/// own output always loads.
+bool isRestorableCwd(String cwd) =>
+    cwd.length <= _maxCwd &&
+    _absolutePath.hasMatch(cwd) &&
+    !_control.hasMatch(cwd);
+
 /// D14: a pane's restore key, never derived from user data.
 String newPaneKey([Random? random]) {
   final r = random ?? Random.secure();
@@ -193,22 +207,32 @@ final class RestoreSnapshot {
         );
       }
       if (seen.length > _maxPanes) return null;
+      // A tab key is its creating pane's key: a leaf of its own tree, or
+      // of none once that pane closed, never a pane of another tab.
+      for (final t in tabs) {
+        if (seen.contains(t.key) &&
+            !savedLeaves(t.layout).any((p) => p.key == t.key)) {
+          return null;
+        }
+      }
       final workspaces = <SavedWorkspace>[];
+      final workspaceIds = <String>{};
+      final listed = <String>{};
       for (final raw in root['workspaces']! as List<Object?>) {
         final w = raw! as Map<String, Object?>;
         final id = w['id'];
         if (id is! String || id.isEmpty || id.length > _maxWorkspaceId) {
           return null;
         }
-        workspaces.add(
-          SavedWorkspace(
-            id: id,
-            tabs: [
-              for (final k in w['tabs']! as List<Object?>)
-                if (tabKeys.contains(k)) k! as String,
-            ],
-          ),
-        );
+        if (!workspaceIds.add(id)) return null;
+        final members = <String>[];
+        for (final k in w['tabs']! as List<Object?>) {
+          // A tab sits in one place: once across all workspaces.
+          final key = k! as String;
+          if (!listed.add(key)) return null;
+          if (tabKeys.contains(key)) members.add(key);
+        }
+        workspaces.add(SavedWorkspace(id: id, tabs: members));
       }
       final selected = root['selectedTab'] as String?;
       return RestoreSnapshot(
@@ -250,10 +274,14 @@ SavedPaneNode _nodeFromJson(Object? raw, Set<String> seen, int depth) {
     if (!isPaneKey(key) || !seen.add(key)) {
       throw const FormatException('pane key');
     }
-    if (cwd != null && cwd.length > _maxCwd) {
+    if (cwd != null && !isRestorableCwd(cwd)) {
       throw const FormatException('cwd');
     }
-    return SavedPane(key: key, cwd: cwd, session: m['session'] as int?);
+    final session = m['session'] as int?;
+    if (session != null && session <= 0) {
+      throw const FormatException('session');
+    }
+    return SavedPane(key: key, cwd: cwd, session: session);
   }
   final axis = SplitAxis.values.byName(m['split']! as String);
   final ratio = (m['ratio']! as num).toDouble();

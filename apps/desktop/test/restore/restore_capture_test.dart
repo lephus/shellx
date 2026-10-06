@@ -104,6 +104,25 @@ void main() {
     expect(after.layout, isA<SavedSplit>());
     expect((after.layout as SavedSplit).axis, SplitAxis.column);
     expect(after.focused, k2);
+    // Capture's output always loads back, including a tab key that is no
+    // longer a leaf (preflight T2 row).
+    expect(RestoreSnapshot.tryParse(whole.encode()), isNotNull);
+    expect(RestoreSnapshot.tryParse(capture(keys).encode()), isNotNull);
+  });
+
+  test('captureSnapshot: a cwd that would not load is saved as null', () async {
+    local
+      ..add(local.summary(1, cwd: 'relative/dir'))
+      ..add(local.summary(2, cwd: '/tmp/a\u0007b'))
+      ..add(local.summary(3, cwd: '/ok'));
+    boot();
+    final s = capture({1: k1, 2: k2, 3: k3});
+    expect(s.tabs.map((t) => savedLeaves(t.layout).single.cwd), [
+      null,
+      null,
+      '/ok',
+    ]);
+    expect(RestoreSnapshot.tryParse(s.encode()), isNotNull);
   });
 
   test('captureSnapshot: focus on an exited pane falls back to the first '

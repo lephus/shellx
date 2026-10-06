@@ -66,7 +66,10 @@ SavedPaneNode? _save(
   PaneLeaf(:final sessionId) => switch (tab.panes[sessionId]) {
     final pane? when !pane.exited => SavedPane(
       key: keyOf(sessionId),
-      cwd: pane.cwd,
+      cwd: switch (pane.cwd) {
+        final cwd? when isRestorableCwd(cwd) => cwd,
+        _ => null,
+      },
       session: sessionId,
     ),
     _ => null,
