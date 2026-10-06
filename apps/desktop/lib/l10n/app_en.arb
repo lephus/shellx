@@ -374,6 +374,8 @@
   "workspaceHeaderSemantics": "Workspace {name}, {count, plural, =1{1 tab} other{{count} tabs}}",
   "@workspaceHeaderSemantics": {"placeholders": {"name": {"type": "String"}, "count": {"type": "int"}}},
   "workspaceContainsSelected": "contains the selected tab",
+  "workspaceCollapsedState": "collapsed",
+  "workspaceExpandedState": "expanded",
   "tabRename": "Rename tab",
   "tabNameField": "Tab name",
   "tabUseAutomaticName": "Use automatic name",

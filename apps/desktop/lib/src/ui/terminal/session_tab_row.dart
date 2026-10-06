@@ -310,6 +310,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                   initial: tab.label,
                   style: ShellxText.body,
                   label: l10n.tabNameField,
+                  identity: ('tab', tab.id),
                   onCommit: (text) => widget.onRename?.call(text),
                   onCancel: () => widget.onCancelRename?.call(),
                 )
@@ -408,80 +409,87 @@ class SessionTabRowState extends State<SessionTabRow> {
                 color: background,
                 borderRadius: BorderRadius.circular(ShellxRadius.r6),
               ),
-              foregroundDecoration: widget.focused
-                  ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(ShellxRadius.r6),
-                      border: Border.all(
-                        color: ShellxDesktopColors.accent,
-                        width: ShellxSizes.focusRing,
-                      ),
-                    )
-                  // Never null: a decoration that comes and goes would
-                  // change the subtree and rebuild an open name field.
-                  : const BoxDecoration(),
-              child: Stack(
-                children: [
-                  if (widget.selected)
-                    Positioned(
-                      // With the keyboard ring on the row's edge, the bar
-                      // moves inside it so both stay visible (UI §3.1).
-                      // UI-A2 §2.1: centred on the whole row, 46 included.
-                      left: widget.focused
-                          ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
-                          : 0,
-                      top: (height - ShellxSizes.selectedBarHeight) / 2,
-                      child: Container(
-                        key: const Key('row.selectedBar'),
-                        width: ShellxSizes.selectedBarWidth,
-                        height: ShellxSizes.selectedBarHeight,
-                        decoration: BoxDecoration(
+              child: DecoratedBox(
+                // The keyboard ring switches at once (UI §1.5, §3): in
+                // front, outside the hover fade. Never null: a decoration
+                // that comes and goes would change the subtree and
+                // rebuild an open name field.
+                position: DecorationPosition.foreground,
+                decoration: widget.focused
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                        border: Border.all(
                           color: ShellxDesktopColors.accent,
-                          borderRadius: BorderRadius.circular(ShellxRadius.r4),
+                          width: ShellxSizes.focusRing,
                         ),
-                      ),
-                    ),
-                  if (!withContext)
-                    Padding(
-                      padding: rowPadding,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [titleRow],
-                      ),
-                    )
-                  else ...[
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      // The title line's centre stays 6 + line/2 from the
-                      // top; the box is as tall as the 24 px close button.
-                      top: titleTop,
-                      height: titleBox,
-                      child: Padding(padding: rowPadding, child: titleRow),
-                    ),
-                    Positioned(
-                      left: ShellxSizes.contextInset,
-                      right: ShellxSpace.s8,
-                      // The 14 px line sits 2 below the title line; the
-                      // box grows to the 24 px port hit area around it.
-                      top: contextTop,
-                      height: contextBox,
-                      child: _HitBand(
-                        // The ×'s column, measured from the line's right
-                        // edge: the line ends 8 px in, the × hit area 6.
-                        cornerWidth: showClose
-                            ? ShellxSizes.rowCloseHit -
-                                  (ShellxSpace.s8 - rowPadding.right)
+                      )
+                    : const BoxDecoration(),
+                child: Stack(
+                  children: [
+                    if (widget.selected)
+                      Positioned(
+                        // With the keyboard ring on the row's edge, the bar
+                        // moves inside it so both stay visible (UI §3.1).
+                        // UI-A2 §2.1: centred on the whole row, 46 included.
+                        left: widget.focused
+                            ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
                             : 0,
-                        cornerHeight: overlap,
-                        child: _ContextLine(
-                          tab: tab,
-                          home: widget.home,
-                          onOpenPort: widget.onOpenPort,
+                        top: (height - ShellxSizes.selectedBarHeight) / 2,
+                        child: Container(
+                          key: const Key('row.selectedBar'),
+                          width: ShellxSizes.selectedBarWidth,
+                          height: ShellxSizes.selectedBarHeight,
+                          decoration: BoxDecoration(
+                            color: ShellxDesktopColors.accent,
+                            borderRadius: BorderRadius.circular(
+                              ShellxRadius.r4,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    if (!withContext)
+                      Padding(
+                        padding: rowPadding,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [titleRow],
+                        ),
+                      )
+                    else ...[
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        // The title line's centre stays 6 + line/2 from the
+                        // top; the box is as tall as the 24 px close button.
+                        top: titleTop,
+                        height: titleBox,
+                        child: Padding(padding: rowPadding, child: titleRow),
+                      ),
+                      Positioned(
+                        left: ShellxSizes.contextInset,
+                        right: ShellxSpace.s8,
+                        // The 14 px line sits 2 below the title line; the
+                        // box grows to the 24 px port hit area around it.
+                        top: contextTop,
+                        height: contextBox,
+                        child: _HitBand(
+                          // The ×'s column, measured from the line's right
+                          // edge: the line ends 8 px in, the × hit area 6.
+                          cornerWidth: showClose
+                              ? ShellxSizes.rowCloseHit -
+                                    (ShellxSpace.s8 - rowPadding.right)
+                              : 0,
+                          cornerHeight: overlap,
+                          child: _ContextLine(
+                            tab: tab,
+                            home: widget.home,
+                            onOpenPort: widget.onOpenPort,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

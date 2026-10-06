@@ -2,11 +2,13 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/terminal/inline_name_field.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/terminal/workspace_header.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
@@ -273,6 +275,33 @@ void main() {
       find.bySemanticsLabel(RegExp(r'tab 1 of 2 in Default$')),
       findsOneWidget,
     );
+    // Review: the expanded state, and the custom actions (no Delete on
+    // Default).
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Workspace Default, 2 tabs')),
+      isSemantics(
+        isHeader: true,
+        isButton: true,
+        hasExpandedState: true,
+        isExpanded: true,
+        customActions: [
+          const CustomSemanticsAction(label: 'Rename workspace'),
+          const CustomSemanticsAction(label: 'New tab in this workspace'),
+        ],
+      ),
+    );
+    expect(
+      tester.getSemantics(
+        find.bySemanticsLabel('Workspace Workspace 2, 1 tab'),
+      ),
+      isSemantics(
+        customActions: [
+          const CustomSemanticsAction(label: 'Rename workspace'),
+          const CustomSemanticsAction(label: 'New tab in this workspace'),
+          const CustomSemanticsAction(label: 'Delete workspace'),
+        ],
+      ),
+    );
     handle.dispose();
   });
 
@@ -469,5 +498,305 @@ void main() {
     await tester.tapAt(Offset(port2.center.dx, port2.top + 1));
     await tester.pumpAndSettle();
     expect(h.urlOpener.ports, [4000]);
+  });
+
+  // ---- review fix round 1 ------------------------------------------------
+
+  Finder grabbing() => find.byWidgetPredicate(
+    (w) => w is MouseRegion && w.cursor == SystemMouseCursors.grabbing,
+  );
+
+  testSidebar('a drag held in the bottom zone until its source row scrolled '
+      'away still ends on release: no grabbing cursor, no more scrolling', (
+    tester,
+  ) async {
+    for (var id = 1; id <= 40; id++) {
+      local.add(local.summary(id, origin: SessionOrigin.desktop));
+    }
+    await pumpSidebar(tester);
+    final controller = page(tester).sidebarScroll;
+    final list = find.byType(ListView);
+    final g = await startDrag(tester, row(1));
+    expect(grabbing(), findsOneWidget);
+    await hover(tester, g, tester.getBottomLeft(list) + const Offset(30, -8));
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(row(1), findsNothing); // the source scrolled out of the list
+    // Released over the terminal: no target takes it.
+    await g.moveTo(const Offset(700, 300));
+    await tester.pump();
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(grabbing(), findsNothing);
+    final at = controller.offset;
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(controller.offset, at);
+    expect(sidebar().tabsOf(kDefaultWorkspaceId).first, 1); // not moved
+  });
+
+  testSidebar('the tree cursor reaches screen readers: a header under the '
+      'cursor is focused in semantics, and landing on it or toggling it is '
+      'announced (D14, UI-A2 §8)', (tester) async {
+    final handle = tester.ensureSemantics();
+    final ws = await twoWorkspaces(tester);
+    await sendChord(tester, [
+      LogicalKeyboardKey.controlLeft,
+    ], LogicalKeyboardKey.f6);
+    tester.takeAnnouncements();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(
+      tester.getSemantics(
+        find.bySemanticsLabel('Workspace Workspace 2, 1 tab'),
+      ),
+      isSemantics(isFocused: true),
+    );
+    expect(tester.takeAnnouncements().map((a) => a.message), [
+      'Workspace Workspace 2, 1 tab, expanded',
+    ]);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(sidebar().workspace(ws)!.collapsed, isTrue);
+    expect(tester.takeAnnouncements().map((a) => a.message), [
+      'Workspace Workspace 2, 1 tab, contains the selected tab, '
+          'collapsed',
+    ]);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(tester.takeAnnouncements().map((a) => a.message), [
+      'Workspace Workspace 2, 1 tab, expanded',
+    ]);
+    handle.dispose();
+  });
+
+  testSidebar("a drop is announced with the tab's new place", (tester) async {
+    final ws = await twoWorkspaces(tester);
+    tester.takeAnnouncements();
+    final g = await startDrag(tester, row(1));
+    await hover(tester, g, tester.getCenter(header(ws)));
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(sidebar().tabsOf(ws), [100, 1]); // an open header: its end
+    expect(
+      tester.takeAnnouncements().single.message,
+      endsWith('tab 2 of 2 in Workspace 2'),
+    );
+  });
+
+  testSidebar('a click on the chevron toggles at once; the header looks '
+      'pressed while the button is down', (tester) async {
+    final ws = await twoWorkspaces(tester);
+    final chevron = find.descendant(
+      of: header(ws),
+      matching: find.byIcon(Icons.chevron_right),
+    );
+    final g = await tester.startGesture(
+      tester.getCenter(chevron),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+    final box = tester.widget<AnimatedContainer>(
+      find
+          .descendant(of: header(ws), matching: find.byType(AnimatedContainer))
+          .first,
+    );
+    expect(
+      (box.decoration! as BoxDecoration).color,
+      ShellxDesktopColors.rowPressed,
+    );
+    await g.up();
+    await tester.pump(); // no double-tap wait on the chevron
+    expect(sidebar().workspace(ws)!.collapsed, isTrue);
+  });
+
+  testSidebar('drop target look adds no layout shift; the 8 px above a '
+      'header drops into it; no drop line where the tab already is', (
+    tester,
+  ) async {
+    final ws = await twoWorkspaces(tester);
+    final name = find.descendant(
+      of: header(ws),
+      matching: find.text('Workspace 2'),
+    );
+    final before = tester.getTopLeft(name);
+    var g = await startDrag(tester, row(1)); // row 1's lower half: no-op
+    expect(find.byKey(const Key('drop.line')), findsNothing);
+    await hover(tester, g, tester.getTopLeft(row(2)) + const Offset(30, 4));
+    expect(find.byKey(const Key('drop.line')), findsNothing); // still no-op
+    await hover(tester, g, tester.getCenter(header(ws)));
+    expect(
+      tester
+          .widget<WorkspaceHeader>(find.byType(WorkspaceHeader).last)
+          .dropTarget,
+      isTrue,
+    );
+    expect(tester.getTopLeft(name), before);
+    await hover(
+      tester,
+      g,
+      tester.getTopLeft(header(ws)) + const Offset(30, -4),
+    );
+    expect(
+      tester
+          .widget<WorkspaceHeader>(find.byType(WorkspaceHeader).last)
+          .dropTarget,
+      isTrue,
+    );
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(sidebar().tabsOf(ws), [100, 1]);
+    g = await startDrag(tester, row(2));
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(sidebar().tabsOf(kDefaultWorkspaceId), [2]);
+  });
+
+  testSidebar('End reaches the last row; ⌥↑ on a header moves nothing', (
+    tester,
+  ) async {
+    final ws = await twoWorkspaces(tester);
+    tabs();
+    container.read(terminalTabsProvider.notifier).select(1);
+    await tester.pump();
+    await sendChord(tester, [
+      LogicalKeyboardKey.controlLeft,
+    ], LogicalKeyboardKey.f6);
+    await tester.sendKeyEvent(LogicalKeyboardKey.end);
+    await tester.pump();
+    expect(tabs().selectedId, 100);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp); // ws's header
+    await tester.pump();
+    await sendChord(tester, [
+      LogicalKeyboardKey.altLeft,
+    ], LogicalKeyboardKey.arrowUp);
+    expect(sidebar().tabsOf(ws), [100]);
+    expect(sidebar().tabsOf(kDefaultWorkspaceId), [1, 2]);
+    expect(
+      tester
+          .widget<WorkspaceHeader>(
+            find.descendant(
+              of: header(ws),
+              matching: find.byType(WorkspaceHeader),
+            ),
+          )
+          .focused,
+      isTrue,
+    );
+  });
+
+  testSidebar('scrolling under a held drag drops the stale slot', (
+    tester,
+  ) async {
+    for (var id = 1; id <= 40; id++) {
+      local.add(local.summary(id, origin: SessionOrigin.desktop));
+    }
+    await pumpSidebar(tester);
+    final list = find.byType(ListView);
+    final g = await startDrag(tester, row(1));
+    await hover(tester, g, tester.getBottomLeft(list) + const Offset(30, -8));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('drop.line')), findsNothing);
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(sidebar().tabsOf(kDefaultWorkspaceId).first, 1); // not moved
+  });
+
+  testSidebar('a tab name field survives a row closing above it: the typed '
+      'text stays and Enter keeps it', (tester) async {
+    for (var id = 1; id <= 3; id++) {
+      local.add(local.summary(id, origin: SessionOrigin.desktop));
+    }
+    await pumpSidebar(tester);
+    container.read(terminalTabsProvider.notifier).select(3);
+    await tester.pump();
+    workspaces().startRename(const RenameTab(3));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('row.renameField'));
+    await tester.enterText(field, 'ap');
+    local.close(1);
+    await tester.pumpAndSettle();
+    expect(row(1), findsNothing);
+    expect(
+      find.descendant(of: row(3), matching: find.text('ap')),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(tabs().tabs.firstWhere((t) => t.id == 3).label, 'ap');
+    await tester.pump(const Duration(seconds: 1));
+    expect(tabs().tabs.firstWhere((t) => t.id == 3).label, 'ap');
+  });
+
+  testSidebar('a workspace name field survives a row closing above it', (
+    tester,
+  ) async {
+    final ws = await twoWorkspaces(tester);
+    workspaces().startRename(RenameWorkspace(ws));
+    await tester.pumpAndSettle();
+    final field = find.descendant(
+      of: header(ws),
+      matching: find.byKey(const Key('row.renameField')),
+    );
+    await tester.enterText(field, 'Bac');
+    local.close(1);
+    await tester.pumpAndSettle();
+    expect(row(1), findsNothing);
+    expect(
+      find.descendant(of: field, matching: find.text('Bac')),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(sidebar().workspace(ws)!.name, 'Bac');
+  });
+
+  testSidebar('the keyboard ring appears at once, without a fade', (
+    tester,
+  ) async {
+    final ws = await twoWorkspaces(tester); // tab 100 selected
+    bool ringShown(Finder of) => tester
+        .widgetList<DecoratedBox>(
+          find.descendant(of: of, matching: find.byType(DecoratedBox)),
+        )
+        .any((d) {
+          final border = (d.decoration as BoxDecoration).border;
+          return border is Border &&
+              border.top.color == ShellxDesktopColors.accent &&
+              border.top.width == ShellxSizes.focusRing;
+        });
+    await sendChord(tester, [
+      LogicalKeyboardKey.controlLeft,
+    ], LogicalKeyboardKey.f6);
+    expect(ringShown(row(100)), isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(ringShown(header(ws)), isTrue);
+  });
+
+  testWidgets('a name field rebuilt elsewhere for the same item does not '
+      'commit late over the open one', (tester) async {
+    final commits = <String>[];
+    Widget field(Key key) => MaterialApp(
+      home: Material(
+        child: InlineNameField(
+          key: key,
+          identity: const ('tab', 3),
+          initial: 'zsh 3',
+          style: ShellxText.body,
+          label: 'Tab name',
+          onCommit: commits.add,
+          onCancel: () {},
+        ),
+      ),
+    );
+    await tester.pumpWidget(field(const ValueKey(1)));
+    await tester.enterText(find.byType(TextField), 'ap');
+    await tester.pumpWidget(field(const ValueKey(2))); // a fresh field
+    await tester.pump();
+    expect(commits, isEmpty);
+    await tester.pumpWidget(const SizedBox()); // the open one goes away
+    await tester.pump();
+    expect(commits, ['zsh 3']);
   });
 }

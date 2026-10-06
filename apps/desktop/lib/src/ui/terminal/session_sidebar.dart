@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +16,7 @@ import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
+import 'sidebar_drag.dart';
 import 'terminal_overlays.dart';
 import 'workspace_header.dart';
 
@@ -75,6 +75,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// dragged tab.
   String? _dropTarget;
   bool _dragging = false;
+
+  /// The tab being dragged: no drop line where it already is.
+  int? _draggedId;
 
   /// Where the pointer holds the dragged row (the feedback keeps it
   /// there; drop details report the feedback's corner).
@@ -148,6 +151,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     }
     return items;
   }
+
+  /// The list item's identity, independent of its index.
+  static Key _itemKey(_Item item) => switch (item) {
+    _HeaderItem(:final workspace) => ValueKey(('header', workspace.id)),
+    _RowItem(:final tab) => ValueKey(('row', tab.id)),
+    _EmptyItem(:final workspaceId) => ValueKey(('empty', workspaceId)),
+  };
 
   /// Space above item [i]: 8 above a header (the first item has the
   /// list's top padding only), else the A1 row gap (UI-A2 §3.1).
@@ -324,6 +334,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       final target = nav[i.clamp(0, nav.length - 1)];
       if (target is String) {
         setState(() => _headerCursor = target);
+        _announceHeader(target);
       } else {
         setState(() => _headerCursor = null);
         ref.read(terminalTabsProvider.notifier).select(target as int);
@@ -346,19 +357,27 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           final ws = s.workspaceOf(state.selectedId ?? -1);
           if (ws == null) return KeyEventResult.ignored;
           setState(() => _headerCursor = ws);
+          _announceHeader(ws);
           WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(ws));
         } else {
           setState(() => _headerCursor = header.id);
-          workspaces.setCollapsed(header.id, true);
+          if (!header.collapsed) {
+            workspaces.setCollapsed(header.id, true);
+            _announceHeader(header.id);
+          }
         }
       case LogicalKeyboardKey.arrowRight:
         if (header == null) return KeyEventResult.ignored;
         setState(() => _headerCursor = header.id);
         if (header.collapsed) {
           workspaces.setCollapsed(header.id, false);
+          _announceHeader(header.id);
         } else {
-          final first = s.tabsOf(header.id).firstOrNull;
-          if (first != null) go(nav.indexOf(first));
+          // Its first row (a member without a tab yet has no row).
+          final first = nav.indexWhere(
+            (t) => t is int && s.workspaceOf(t) == header.id,
+          );
+          if (first >= 0) go(first);
         }
       case LogicalKeyboardKey.enter ||
           LogicalKeyboardKey.numpadEnter ||
@@ -366,6 +385,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         if (header != null) {
           setState(() => _headerCursor = header.id);
           workspaces.toggleCollapsed(header.id);
+          _announceHeader(header.id);
         } else {
           final id = state.selectedId;
           if (id == null) return KeyEventResult.ignored;
@@ -564,6 +584,35 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       SemanticsService.sendAnnouncement(
         View.of(context),
         '${tab.label}, $where',
+        Directionality.of(context),
+      ),
+    );
+  }
+
+  /// D14 / UI-A2 §8: the list's focus stays on the list node, so a screen
+  /// reader hears where the tree cursor landed, and a header's new state
+  /// after a toggle: "Workspace Backend, 2 tabs, collapsed".
+  void _announceHeader(String id) {
+    final l10n = AppLocalizations.of(context);
+    final s = ref.read(sidebarWorkspacesProvider);
+    final w = s.workspace(id);
+    if (w == null) return;
+    final tabsState = ref.read(terminalTabsProvider);
+    final present = {for (final t in tabsState.tabs) t.id};
+    final members = [
+      for (final t in s.tabsOf(id))
+        if (present.contains(t)) t,
+    ];
+    final message = [
+      l10n.workspaceHeaderSemantics(w.displayName(l10n), members.length),
+      if (w.collapsed && members.contains(tabsState.selectedId))
+        l10n.workspaceContainsSelected,
+      w.collapsed ? l10n.workspaceCollapsedState : l10n.workspaceExpandedState,
+    ].join(', ');
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
         Directionality.of(context),
       ),
     );
@@ -804,6 +853,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     if (!mounted) return;
     setState(() {
       _dragging = false;
+      _draggedId = null;
       _drop = null;
       _dropTarget = null;
     });
@@ -841,7 +891,18 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                       tick.inMicroseconds /
                       Duration.microsecondsPerSecond)
               .clamp(p.minScrollExtent, p.maxScrollExtent);
-      if (next != p.pixels) controller.jumpTo(next);
+      if (next == p.pixels) return;
+      controller.jumpTo(next);
+      // The content moved under a still pointer: the slot it showed is
+      // stale until the pointer moves again (no drop meanwhile).
+      _expandTimer?.cancel();
+      _expandTimer = null;
+      if (_drop != null || _dropTarget != null) {
+        setState(() {
+          _drop = null;
+          _dropTarget = null;
+        });
+      }
     });
   }
 
@@ -894,12 +955,51 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     setState(() => _dropTarget = null);
   }
 
-  /// A tab closed mid-drag is simply not moved (moveTab ignores it).
+  /// A drop at [slot] would leave the dragged tab where it is.
+  bool _isNoOp((String, int) slot) {
+    final id = _draggedId;
+    if (id == null) return false;
+    final s = ref.read(sidebarWorkspacesProvider);
+    if (s.workspaceOf(id) != slot.$1) return false;
+    final at = s.tabsOf(slot.$1).indexOf(id);
+    return slot.$2 == at || slot.$2 == at + 1;
+  }
+
+  /// A tab closed mid-drag is simply not moved (moveTab ignores it). A
+  /// real move is announced like ⌥↑/⌥↓ (UI-A2 §8).
   void _dropAt(int tabId, String workspaceId, [int? index]) {
+    final s = ref.read(sidebarWorkspacesProvider);
+    final from = s.workspaceOf(tabId);
+    final list = s.tabsOf(workspaceId);
+    final noOp =
+        from == workspaceId &&
+        (index == null
+            ? list.lastOrNull == tabId
+            : _isNoOp((workspaceId, index)));
     ref
         .read(sidebarWorkspacesProvider.notifier)
         .moveTab(tabId, workspaceId, index);
     _stopDrag();
+    if (from != null && !noOp) _announceMove(tabId);
+  }
+
+  void _endDragLater() {
+    if (!_dragging) return;
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted && _dragging) _stopDrag();
+      })
+      ..ensureVisualUpdate();
+  }
+
+  /// A header or empty hint takes the drop only while it shows as the
+  /// target (not after the list scrolled under the pointer).
+  void _dropOnTarget(String target, int tabId, String workspaceId, [int? i]) {
+    if (_dropTarget == target) {
+      _dropAt(tabId, workspaceId, i);
+    } else {
+      _stopDrag();
+    }
   }
 
   Widget _draggable(
@@ -907,16 +1007,19 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     String home,
     Widget row, {
     required bool enabled,
-  }) => _RowDraggable(
+  }) => SidebarRowDraggable(
     data: tab.id,
     maxSimultaneousDrags: enabled ? null : 0,
     dragAnchorStrategy: _anchor,
-    feedback: _DragFeedback(tab: tab, home: home),
+    feedback: SidebarDragFeedback(tab: tab, home: home),
     childWhenDragging: Opacity(
       opacity: ShellxDesktopColors.disabledOpacity,
       child: row,
     ),
-    onDragStarted: () => setState(() => _dragging = true),
+    onDragStarted: () => setState(() {
+      _dragging = true;
+      _draggedId = tab.id;
+    }),
     onDragEnd: (_) => _stopDrag(),
     onDraggableCanceled: (_, _) => _stopDrag(),
     child: row,
@@ -936,7 +1039,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       }
     },
     builder: (context, _, _) {
-      final drop = _drop;
+      final slot = _drop;
+      final drop = slot == null || _isNoOp(slot) ? null : slot;
       final here = drop != null && drop.$1 == item.workspace.id;
       final before = here && drop.$2 == item.index;
       final after =
@@ -953,14 +1057,14 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                 left: 0,
                 right: 0,
                 top: -ShellxSizes.dropLine,
-                child: _DropLine(),
+                child: SidebarDropLine(),
               ),
             if (after)
               const Positioned(
                 left: 0,
                 right: 0,
                 bottom: -ShellxSizes.dropLine,
-                child: _DropLine(),
+                child: SidebarDropLine(),
               ),
           ],
         ),
@@ -1032,31 +1136,36 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _headerKeys.removeWhere((id, _) => sidebar.workspace(id) == null);
     final cursor = _cursorHeader();
 
-    Widget header(_HeaderItem item) {
+    /// The 8 px above a header drops into it too (no dead band).
+    Widget header(_HeaderItem item, double gap) {
       final w = item.workspace;
-      return KeyedSubtree(
-        key: ValueKey('ws.${w.id}'),
-        child: DragTarget<int>(
-          onMove: (_) => _hoverTarget(w.id, header: w.id),
-          onLeave: (_) => _leaveTarget(w.id),
-          onAcceptWithDetails: (d) => _dropAt(d.data, w.id),
-          builder: (context, _, _) => WorkspaceHeader(
-            key: _headerKeys.putIfAbsent(w.id, GlobalKey.new),
-            name: w.displayName(l10n),
-            count: item.count,
-            collapsed: w.collapsed,
-            containsSelected: item.containsSelected,
-            focused: _showFocus && cursor == w.id,
-            renaming: sidebar.renaming == RenameWorkspace(w.id),
-            dropTarget: _dropTarget == w.id,
-            deletable: !w.isDefault,
-            onToggle: () => workspaces.toggleCollapsed(w.id),
-            onStartRename: () => _startWorkspaceRename(w.id, fromList: false),
-            onRename: (text) => _commitWorkspaceName(w.id, text),
-            onCancelRename: () => _endRename(RenameWorkspace(w.id)),
-            onNewTab: () => unawaited(workspaces.openTabIn(w.id)),
-            onMenu: (at) => unawaited(_headerMenu(w, at)),
-            onDelete: () => workspaces.delete(w.id),
+      return DragTarget<int>(
+        onMove: (_) => _hoverTarget(w.id, header: w.id),
+        onLeave: (_) => _leaveTarget(w.id),
+        onAcceptWithDetails: (d) => _dropOnTarget(w.id, d.data, w.id),
+        builder: (context, _, _) => Padding(
+          padding: EdgeInsets.only(top: gap),
+          child: KeyedSubtree(
+            key: ValueKey('ws.${w.id}'),
+            child: WorkspaceHeader(
+              key: _headerKeys.putIfAbsent(w.id, GlobalKey.new),
+              workspaceId: w.id,
+              name: w.displayName(l10n),
+              count: item.count,
+              collapsed: w.collapsed,
+              containsSelected: item.containsSelected,
+              focused: _showFocus && cursor == w.id,
+              renaming: sidebar.renaming == RenameWorkspace(w.id),
+              dropTarget: _dropTarget == w.id,
+              deletable: !w.isDefault,
+              onToggle: () => workspaces.toggleCollapsed(w.id),
+              onStartRename: () => _startWorkspaceRename(w.id, fromList: false),
+              onRename: (text) => _commitWorkspaceName(w.id, text),
+              onCancelRename: () => _endRename(RenameWorkspace(w.id)),
+              onNewTab: () => unawaited(workspaces.openTabIn(w.id)),
+              onMenu: (at) => unawaited(_headerMenu(w, at)),
+              onDelete: () => workspaces.delete(w.id),
+            ),
           ),
         ),
       );
@@ -1067,7 +1176,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       return DragTarget<int>(
         onMove: (_) => _hoverTarget(target),
         onLeave: (_) => _leaveTarget(target),
-        onAcceptWithDetails: (d) => _dropAt(d.data, item.workspaceId, 0),
+        onAcceptWithDetails: (d) =>
+            _dropOnTarget(target, d.data, item.workspaceId, 0),
         builder: (context, _, _) => Container(
           key: ValueKey(target),
           height: _extent(item, scaler),
@@ -1076,6 +1186,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           decoration: _dropTarget == target
               ? BoxDecoration(
                   color: ShellxDesktopColors.primarySoft,
+                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                )
+              : null,
+          // The border in front: it never moves the text by 1 px.
+          foregroundDecoration: _dropTarget == target
+              ? BoxDecoration(
                   border: Border.all(color: ShellxDesktopColors.accent),
                   borderRadius: BorderRadius.circular(ShellxRadius.r6),
                 )
@@ -1143,6 +1259,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       );
     }
 
+    final itemIndex = {
+      for (final (i, item) in items.indexed) _itemKey(item): i,
+    };
     final list = ListView.builder(
       key: _listKey,
       controller: widget.scrollController,
@@ -1153,16 +1272,22 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         ShellxSizes.listBottom,
       ),
       itemCount: items.length,
+      // Items keep their elements when others are inserted or removed
+      // above them: an open name field is never rebuilt elsewhere (it
+      // would commit what was typed and reopen with the old name).
+      findChildIndexCallback: (key) => itemIndex[key],
       itemBuilder: (context, i) {
         final item = items[i];
         final gap = _gapBefore(items, i);
-        if (item is _RowItem) return tabRow(item, gap);
-        return Padding(
-          padding: EdgeInsets.only(top: gap),
+        return KeyedSubtree(
+          key: _itemKey(item),
           child: switch (item) {
-            _HeaderItem() => header(item),
-            _EmptyItem() => empty(item),
-            _RowItem() => const SizedBox.shrink(), // handled above
+            _RowItem() => tabRow(item, gap),
+            _HeaderItem() => header(item, gap),
+            _EmptyItem() => Padding(
+              padding: EdgeInsets.only(top: gap),
+              child: empty(item),
+            ),
           },
         );
       },
@@ -1190,6 +1315,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                   onPointerMove: (e) {
                     if (_dragging) _autoScroll(e.position);
                   },
+                  // A safety net: whatever ends the drag (or fails to, if
+                  // its source row is gone), the drag state never
+                  // outlives the button. After the frame, so a drop is
+                  // handled first.
+                  onPointerUp: (_) => _endDragLater(),
+                  onPointerCancel: (_) => _endDragLater(),
                   child: Stack(
                     children: [
                       Positioned.fill(
@@ -1253,116 +1384,4 @@ final class _RowItem extends _Item {
 final class _EmptyItem extends _Item {
   const _EmptyItem(this.workspaceId);
   final String workspaceId;
-}
-
-/// UI-A2 §6 drop line: 2 px `accent`, radius 1, as wide as the row.
-class _DropLine extends StatelessWidget {
-  const _DropLine();
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: Container(
-      key: const Key('drop.line'),
-      height: ShellxSizes.dropLine,
-      decoration: BoxDecoration(
-        color: ShellxDesktopColors.accent,
-        borderRadius: BorderRadius.circular(ShellxSizes.dropLine / 2),
-      ),
-    ),
-  );
-}
-
-/// UI-A2 §6: a row starts dragging once the pointer moved more than 4 px
-/// with the left button held, so a click with a slight jitter still
-/// selects (Flutter's mouse slop is 1 px).
-class _RowDraggable extends Draggable<int> {
-  const _RowDraggable({
-    required super.data,
-    required super.feedback,
-    required super.child,
-    super.childWhenDragging,
-    super.dragAnchorStrategy,
-    super.onDragStarted,
-    super.onDragEnd,
-    super.onDraggableCanceled,
-    super.maxSimultaneousDrags,
-  });
-
-  @override
-  MultiDragGestureRecognizer createRecognizer(
-    GestureMultiDragStartCallback onStart,
-  ) => _RowDragRecognizer()..onStart = onStart;
-}
-
-class _RowDragRecognizer extends MultiDragGestureRecognizer {
-  _RowDragRecognizer() : super(debugOwner: null);
-
-  @override
-  MultiDragPointerState createNewPointerState(PointerDownEvent event) =>
-      _RowDragPointerState(event.position, event.kind, gestureSettings);
-
-  @override
-  String get debugDescription => 'sidebar row drag';
-}
-
-class _RowDragPointerState extends MultiDragPointerState {
-  _RowDragPointerState(
-    super.initialPosition,
-    super.kind,
-    super.gestureSettings,
-  );
-
-  static const double _slop = 4;
-
-  @override
-  void checkForResolutionAfterMove() {
-    if (pendingDelta!.distance > _slop) {
-      resolve(GestureDisposition.accepted);
-    }
-  }
-
-  @override
-  void accepted(GestureMultiDragStartCallback starter) =>
-      starter(initialPosition);
-}
-
-/// UI-A2 §6 drag feedback: a copy of the row, 208 wide, on `rowSelected`
-/// with a 1 px `border`, `r6` and `e1`, at 92 %.
-class _DragFeedback extends StatelessWidget {
-  const _DragFeedback({required this.tab, required this.home});
-  final TerminalTab tab;
-  final String home;
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: IgnorePointer(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Opacity(
-          opacity: 0.92,
-          child: Container(
-            width: ShellxSizes.sidebarWidth - 2 * ShellxSizes.listMarginH,
-            decoration: BoxDecoration(
-              color: ShellxDesktopColors.rowSelected,
-              borderRadius: BorderRadius.circular(ShellxRadius.r6),
-              boxShadow: ShellxShadows.e1,
-            ),
-            foregroundDecoration: BoxDecoration(
-              border: Border.all(color: ShellxDesktopColors.border),
-              borderRadius: BorderRadius.circular(ShellxRadius.r6),
-            ),
-            child: SessionTabRow(
-              tab: tab,
-              selected: false,
-              position: 1,
-              count: 1,
-              home: home,
-              onSelect: () {},
-              onClose: () {},
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }

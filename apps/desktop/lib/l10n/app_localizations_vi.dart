@@ -704,6 +704,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get workspaceContainsSelected => 'có tab đang chọn';
 
   @override
+  String get workspaceCollapsedState => 'đã thu gọn';
+
+  @override
+  String get workspaceExpandedState => 'đã mở rộng';
+
+  @override
   String get tabRename => 'Đổi tên tab';
 
   @override

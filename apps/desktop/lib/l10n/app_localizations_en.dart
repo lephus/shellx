@@ -715,6 +715,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceContainsSelected => 'contains the selected tab';
 
   @override
+  String get workspaceCollapsedState => 'collapsed';
+
+  @override
+  String get workspaceExpandedState => 'expanded';
+
+  @override
   String get tabRename => 'Rename tab';
 
   @override

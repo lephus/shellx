@@ -179,6 +179,8 @@
   "workspaceDeleted": "Đã xóa workspace “{name}”. Các tab đã chuyển về {defaultName}.",
   "workspaceHeaderSemantics": "Workspace {name}, {count} tab",
   "workspaceContainsSelected": "có tab đang chọn",
+  "workspaceCollapsedState": "đã thu gọn",
+  "workspaceExpandedState": "đã mở rộng",
   "tabRename": "Đổi tên tab",
   "tabNameField": "Tên tab",
   "tabUseAutomaticName": "Dùng tên tự động",

@@ -20,6 +20,7 @@ class InlineNameField extends StatefulWidget {
     required this.label,
     required this.onCommit,
     required this.onCancel,
+    this.identity,
   });
 
   final String initial;
@@ -29,6 +30,14 @@ class InlineNameField extends StatefulWidget {
   final String label;
   final void Function(String text) onCommit;
   final VoidCallback onCancel;
+
+  /// What is being renamed (a tab, a workspace). A field disposed while a
+  /// newer field for the same item is open does not commit: the open one
+  /// has the user's text and commits itself.
+  final Object? identity;
+
+  /// The newest field per [identity].
+  static final _open = <Object, Object>{};
 
   /// Matches `kTabNameMaxLength` and `kWorkspaceNameMaxLength`.
   static const int maxLength = 64;
@@ -49,6 +58,7 @@ class _InlineNameFieldState extends State<InlineNameField> {
   @override
   void initState() {
     super.initState();
+    if (widget.identity case final id?) InlineNameField._open[id] = this;
     _focus.addListener(_onFocus);
     // After the frame that builds the field, so it wins over a focus
     // request made in the same frame (the selection's terminal focus).
@@ -79,7 +89,13 @@ class _InlineNameFieldState extends State<InlineNameField> {
   @override
   void dispose() {
     _focus.removeListener(_onFocus);
-    if (!_done) {
+    final id = widget.identity;
+    var superseded = false;
+    if (id != null) {
+      superseded = !identical(InlineNameField._open[id], this);
+      if (!superseded) InlineNameField._open.remove(id);
+    }
+    if (!_done && !superseded) {
       _done = true;
       final text = _controller.text;
       final commit = widget.onCommit;

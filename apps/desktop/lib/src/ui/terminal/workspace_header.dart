@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
@@ -28,6 +29,7 @@ class WorkspaceHeader extends StatefulWidget {
     required this.onNewTab,
     required this.onMenu,
     required this.onDelete,
+    this.workspaceId,
   });
 
   final String name;
@@ -51,6 +53,9 @@ class WorkspaceHeader extends StatefulWidget {
   final VoidCallback onNewTab;
   final void Function(Offset at) onMenu;
   final VoidCallback onDelete;
+
+  /// Identifies the name field (see [InlineNameField.identity]).
+  final String? workspaceId;
 
   /// UI-A2 §1.3: max(28, 16·s + 12).
   static double heightFor(TextScaler scaler) => max(
@@ -128,14 +133,26 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                   initial: widget.name,
                   style: nameStyle,
                   label: l10n.workspaceNameField,
+                  identity: widget.workspaceId == null
+                      ? null
+                      : ('ws', widget.workspaceId),
                   onCommit: widget.onRename,
                   onCancel: widget.onCancelRename,
                 )
-              : Text(
-                  widget.name,
-                  style: nameStyle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              // Double-click on the name renames (UI-A2 §3.3). Only the
+              // name waits for a second click; the chevron and the rest
+              // of the header toggle on the first.
+              : Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: GestureDetector(
+                    onDoubleTap: widget.onStartRename,
+                    child: Text(
+                      widget.name,
+                      style: nameStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ),
         ),
         const SizedBox(width: ShellxSpace.s4),
@@ -170,6 +187,9 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
       button: !renaming,
       expanded: !widget.collapsed,
       label: label,
+      // The list's tree cursor (D14): the list node holds the keyboard,
+      // the header is where screen readers place it.
+      focused: widget.focused,
       onTap: renaming ? null : widget.onToggle,
       customSemanticsActions: {
         CustomSemanticsAction(label: l10n.workspaceRename):
@@ -187,18 +207,13 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
           _hover = false;
           _pressed = false;
         }),
-        child: AnimatedContainer(
-          duration: ShellxMotion.of(context, ShellxMotion.fast),
-          curve: ShellxMotion.fastCurve,
-          height: height,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(ShellxRadius.r6),
-            border: widget.dropTarget
-                ? Border.all(color: ShellxDesktopColors.accent)
-                : null,
-          ),
-          foregroundDecoration: widget.focused
+        // The ring and the drop border are drawn in front, outside the
+        // animation: the keyboard ring switches at once (UI §1.5, §3) and
+        // a border never shifts the content. Never null, so the subtree
+        // (and an open name field) stays put.
+        child: DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: widget.focused
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(ShellxRadius.r6),
                   border: Border.all(
@@ -206,65 +221,82 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                     width: ShellxSizes.focusRing,
                   ),
                 )
-              // Never null: see SessionTabRow (keeps an open name field).
+              : widget.dropTarget
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                  border: Border.all(color: ShellxDesktopColors.accent),
+                )
               : const BoxDecoration(),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  // onDoubleTap holds a single click for the double-tap
-                  // timeout: accepted here (UI-A2 §3.3) — collapsing is
-                  // not as time-critical as switching tabs, and the first
-                  // click of a double-click must not collapse. While
-                  // renaming, clicks belong to the field.
-                  onTap: renaming ? null : widget.onToggle,
-                  onDoubleTap: renaming ? null : widget.onStartRename,
-                  onTapDown: renaming ? null : (_) => _setPressed(true),
-                  onTapUp: renaming ? null : (_) => _setPressed(false),
-                  onTapCancel: renaming ? null : () => _setPressed(false),
-                  onSecondaryTapUp: renaming
-                      ? null
-                      : (d) => widget.onMenu(d.globalPosition),
-                  child: row,
+          child: AnimatedContainer(
+            duration: ShellxMotion.of(context, ShellxMotion.fast),
+            curve: ShellxMotion.fastCurve,
+            height: height,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(ShellxRadius.r6),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  // Pressed shows on the button going down, not when the
+                  // gesture is decided.
+                  child: Listener(
+                    onPointerDown: (e) => _setPressed(
+                      !renaming && e.buttons & kPrimaryButton != 0,
+                    ),
+                    onPointerUp: (_) => _setPressed(false),
+                    onPointerCancel: (_) => _setPressed(false),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      // A click toggles; on the name it waits for the
+                      // double-tap timeout first (UI-A2 §3.3: the first
+                      // click of a double-click must not collapse). While
+                      // renaming, clicks belong to the field.
+                      onTap: renaming ? null : widget.onToggle,
+                      onSecondaryTapUp: renaming
+                          ? null
+                          : (d) => widget.onMenu(d.globalPosition),
+                      child: row,
+                    ),
+                  ),
                 ),
-              ),
-              if (widget.collapsed && widget.containsSelected)
+                if (widget.collapsed && widget.containsSelected)
+                  Positioned(
+                    left: 0,
+                    top: (height - ShellxSizes.collapsedMarkHeight) / 2,
+                    child: IgnorePointer(
+                      child: Container(
+                        key: const Key('header.collapsedMark'),
+                        width: ShellxSizes.selectedBarWidth,
+                        height: ShellxSizes.collapsedMarkHeight,
+                        decoration: BoxDecoration(
+                          color: ShellxDesktopColors.accent,
+                          borderRadius: BorderRadius.circular(ShellxRadius.r4),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Above the header's own gestures, so a click on `+` is the
+                // button's at once (not held by the header's double-tap).
                 Positioned(
-                  left: 0,
-                  top: (height - ShellxSizes.collapsedMarkHeight) / 2,
-                  child: IgnorePointer(
-                    child: Container(
-                      key: const Key('header.collapsedMark'),
-                      width: ShellxSizes.selectedBarWidth,
-                      height: ShellxSizes.collapsedMarkHeight,
-                      decoration: BoxDecoration(
-                        color: ShellxDesktopColors.accent,
-                        borderRadius: BorderRadius.circular(ShellxRadius.r4),
+                  top: 0,
+                  bottom: 0,
+                  right: ShellxSpace.s4,
+                  child: Center(
+                    child: Visibility(
+                      visible: showAdd,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: _HeaderAdd(
+                        tooltip: l10n.workspaceNewTab,
+                        onPressed: widget.onNewTab,
                       ),
                     ),
                   ),
                 ),
-              // Above the header's own gestures, so a click on `+` is the
-              // button's at once (not held by the header's double-tap).
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: ShellxSpace.s4,
-                child: Center(
-                  child: Visibility(
-                    visible: showAdd,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: _HeaderAdd(
-                      tooltip: l10n.workspaceNewTab,
-                      onPressed: widget.onNewTab,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

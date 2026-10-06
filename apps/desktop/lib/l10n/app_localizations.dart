@@ -1172,6 +1172,18 @@ abstract class AppLocalizations {
   /// **'contains the selected tab'**
   String get workspaceContainsSelected;
 
+  /// No description provided for @workspaceCollapsedState.
+  ///
+  /// In en, this message translates to:
+  /// **'collapsed'**
+  String get workspaceCollapsedState;
+
+  /// No description provided for @workspaceExpandedState.
+  ///
+  /// In en, this message translates to:
+  /// **'expanded'**
+  String get workspaceExpandedState;
+
   /// No description provided for @tabRename.
   ///
   /// In en, this message translates to:
