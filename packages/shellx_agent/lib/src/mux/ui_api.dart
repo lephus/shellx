@@ -16,10 +16,11 @@ final class CliFailure implements Exception {
 abstract interface class UiApi {
   /// One `ui.*` request → result fields. Throws [CliFailure].
   /// [cancelled] completes when the asking client went away (D21: a
-  /// `wait` stops then).
+  /// `wait` stops then); [isGone] tells the same at once, synchronously.
   Future<Map<String, Object?>> handle(
     MuxMessage request, {
     Future<void>? cancelled,
+    bool Function()? isGone,
   });
 
   /// D24 events (already filtered to what the UI emits).

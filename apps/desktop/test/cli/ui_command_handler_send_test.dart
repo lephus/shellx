@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/agent_marks.dart';
+import 'package:shellx_desktop/src/cli/pane_text.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
@@ -114,6 +115,87 @@ void main() {
         call('ui.pane.send', {'pane': 100, 'text': 'x'}),
         fails('exited'),
       );
+    });
+  });
+
+  group('A7 Task 7 review', () {
+    test('I1: a pane output event fires once its text is in the terminal; '
+        'a match on the second of two quick chunks succeeds', () async {
+      final terminal = c
+          .read(terminalTabsProvider)
+          .tabOfSession(100)!
+          .panes[100]!
+          .terminal;
+      final seen = <String>[];
+      final sub = c
+          .read(terminalTabsProvider.notifier)
+          .paneOutputs
+          .listen((_) => seen.add(screenText(terminal)));
+      addTearDown(sub.cancel);
+      final r = call('ui.pane.wait', {
+        'pane': 100,
+        'mode': 'match',
+        'pattern': 'two',
+        'fromNow': true,
+      });
+      await pumpFeed();
+      local.views[100]!
+        ..emit('one\r\n')
+        ..emit('two\r\n');
+      expect(await r.timeout(const Duration(seconds: 2)), {
+        'match': 'two',
+        'line': 'two',
+      });
+      expect(seen.last, contains('two'));
+    });
+
+    test('I2: send exit, the shell ends with 0, then wait --exit still '
+        'answers', () async {
+      await call('ui.pane.send', {'pane': 100, 'text': 'exit', 'enter': true});
+      local.views[100]!.end(0);
+      await pumpFeed();
+      expect(c.read(terminalTabsProvider).tabOfSession(100), isNull);
+      expect(await call('ui.pane.wait', {'pane': 100, 'mode': 'exit'}), {
+        'exitCode': 0,
+      });
+      await expectLater(
+        call('ui.pane.wait', {'pane': 100, 'mode': 'idle'}),
+        fails('not_found'),
+      );
+      await expectLater(
+        call('ui.pane.wait', {'pane': 999, 'mode': 'exit'}),
+        fails('not_found'),
+      );
+    });
+
+    test('M6: an unknown key is not echoed back', () async {
+      await expectLater(
+        call('ui.pane.send', {
+          'pane': 100,
+          'keys': ['hyper-\x1b]0;x\x07'],
+        }),
+        throwsA(
+          isA<CliFailure>().having(
+            (e) => e.message,
+            'message',
+            isNot(contains('hyper')),
+          ),
+        ),
+      );
+    });
+
+    test('M3: a client that leaves ends its wait with cancelled', () async {
+      final left = Completer<void>();
+      final r = h.handle(
+        const MuxMessage(
+          'ui.pane.wait',
+          q: 1,
+          fields: {'pane': 100, 'mode': 'idle'},
+        ),
+        cancelled: left.future,
+      );
+      left.complete();
+      await expectLater(r, fails(CliError.cancelled));
     });
   });
 

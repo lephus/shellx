@@ -715,7 +715,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       return null; // Ended between the listing and now.
     }
     final terminal = DesktopTerminal(platform: _platform());
-    final feed = TerminalFeed(terminal.write);
+    // A pane output event (A5a D4, A7 waits) fires once the text is in the
+    // terminal; what [_attach] writes itself (saved text, backlog) is not
+    // output.
+    var live = false;
+    final feed = TerminalFeed((text) {
+      terminal.write(text);
+      if (live && !_paneOutputs.isClosed) _paneOutputs.add(s.id);
+    });
     final link = _Link(view, terminal, feed);
     _links[s.id] = link;
     // Size first, without telling the session: the backlog is laid out at
@@ -728,6 +735,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (restored != null) feed.add(utf8.encode(restored));
     feed.add(view.backlog);
     feed.drain();
+    live = true;
     // A5a D8: [onReply] is set only after the drain above — load-bearing.
     // Saved text holding a query (`ESC[6n`, `ESC[c`) is answered into
     // nothing; a reply must never reach the new shell.
@@ -746,12 +754,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       view.resize(cols, rows);
     };
     link.subscriptions
-      ..add(
-        view.output.listen((bytes) {
-          feed.add(bytes);
-          if (!_paneOutputs.isClosed) _paneOutputs.add(s.id);
-        }),
-      )
+      ..add(view.output.listen(feed.add))
       ..add(
         view.driver.listen(
           (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),

@@ -23,9 +23,6 @@ abstract interface class PaneProbe {
   Terminal get terminal;
 }
 
-/// The client that asked went away (D21); nobody reads this answer.
-const kWaitCancelled = 'cancelled';
-
 const _unhookedQuiet = Duration(seconds: 2);
 const _matchThrottle = Duration(milliseconds: 100);
 const _matchMaxLines = 2000;
@@ -47,7 +44,7 @@ Future<Map<String, Object?>> _race(
   void cancel() {
     if (!done.isCompleted) {
       done.completeError(
-        const CliFailure(kWaitCancelled, 'the client went away'),
+        const CliFailure(CliError.cancelled, 'the client went away'),
       );
     }
   }

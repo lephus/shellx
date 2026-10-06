@@ -42,6 +42,10 @@ abstract final class CliError {
   static const runningCommand = 'running_command';
   static const noRoom = 'no_room';
   static const ambiguous = 'ambiguous';
+
+  /// The asking client went away (a `wait`, an open waiting its turn):
+  /// nobody reads this answer.
+  static const cancelled = 'cancelled';
 }
 
 /// D4: what this host serves (the CLI checks before sending). No

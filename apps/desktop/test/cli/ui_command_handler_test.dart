@@ -376,8 +376,8 @@ void main() {
       left.complete();
       // At once, not after the 10 s D33 wait.
       const soon = Duration(milliseconds: 500);
-      await expectLater(cli.timeout(soon), throwsA(isA<CliFailure>()));
-      await expectLater(ws.timeout(soon), throwsA(isA<CliFailure>()));
+      await expectLater(cli.timeout(soon), fails('cancelled'));
+      await expectLater(ws.timeout(soon), fails('cancelled'));
       expect(side().workspaces, hasLength(1));
       local.openGate!.complete();
       await user;
@@ -385,18 +385,16 @@ void main() {
       expect(local.opens, hasLength(2));
     });
 
-    test('a client that already left opens nothing', () async {
-      final left = Completer<void>()..complete();
+    test('a client that already left opens nothing (Task 7 review M3, '
+        'M5)', () async {
+      bool gone() => true;
       await expectLater(
-        h.handle(const MuxMessage('ui.tab.new', q: 1), cancelled: left.future),
-        fails('busy'),
+        h.handle(const MuxMessage('ui.tab.new', q: 1), isGone: gone),
+        fails('cancelled'),
       );
       await expectLater(
-        h.handle(
-          const MuxMessage('ui.workspace.new', q: 2),
-          cancelled: left.future,
-        ),
-        fails('busy'),
+        h.handle(const MuxMessage('ui.workspace.new', q: 2), isGone: gone),
+        fails('cancelled'),
       );
       expect(local.opens, hasLength(1)); // setUp's
       expect(side().workspaces, hasLength(1));

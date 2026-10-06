@@ -13,12 +13,17 @@ final class FakeUiApi implements UiApi {
   /// Replaces the `ui.*` answer (to test oversized results).
   Map<String, Object?>? answer;
 
+  /// The `isGone` of the last [handle] call.
+  bool Function()? isGone;
+
   @override
   Future<Map<String, Object?>> handle(
     MuxMessage request, {
     Future<void>? cancelled,
+    bool Function()? isGone,
   }) async {
     requests.add(request);
+    this.isGone = isGone;
     await gate?.future;
     if (request.type == 'ui.fail') {
       throw const CliFailure('not_found', 'no pane p1');

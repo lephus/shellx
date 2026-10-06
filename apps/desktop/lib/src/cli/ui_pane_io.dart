@@ -130,7 +130,8 @@ final class PaneIoCommands {
       final ch = ctrl.group(1)!.codeUnitAt(0);
       return (t) => t.charInput(ch, ctrl: true);
     }
-    throw badRequest(name.length <= 32 ? 'unknown key "$name"' : 'unknown key');
+    // Never echoed: the client's text could hold anything.
+    throw badRequest('unknown key name; see shellx send --help');
   }
 
   Future<Map<String, Object?>> read(MuxMessage r) async {
@@ -158,11 +159,20 @@ final class PaneIoCommands {
     MuxMessage r,
     Future<void>? cancelled,
   ) async {
-    final pane = _paneArg(r);
     final ms = r.fields['timeoutMs'] ?? 30000;
     if (ms is! int || ms < 1 || ms > 3600000) {
       throw badRequest('timeout is 1 ms–3600 s');
     }
+    // A shell that already ended with 0 left no pane (A3 D7): `send exit`
+    // then `wait --exit` still gets its code.
+    final raw = r.fields['pane'];
+    if (r.fields['mode'] == 'exit' &&
+        raw is int &&
+        _tabsState.tabOfSession(raw) == null) {
+      final code = _ref.read(terminalTabsProvider.notifier).lastExitCode(raw);
+      if (code != null) return {'exitCode': code};
+    }
+    final pane = _paneArg(r);
     final timeout = Duration(milliseconds: ms);
     final Future<Map<String, Object?>> Function(PaneProbe) start;
     switch (r.fields['mode']) {

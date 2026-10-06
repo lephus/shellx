@@ -277,6 +277,25 @@ void main() {
     await h.close();
   });
 
+  test('the UI can tell at once that the asking client left (A7 Task 7 '
+      'review M5)', () async {
+    final ui = FakeUiApi()..gate = Completer<void>();
+    final h = await InUiHost.start(ui, () => true, dir);
+    final c = await h.connect(token: h.token);
+    c.send(const MuxMessage('ui.ls', q: 1));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(ui.isGone!(), isFalse);
+    await c.close();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(ui.isGone!(), isTrue);
+    ui.gate!.complete();
+    await h.close();
+  });
+
+  test('cancelled is a wire code (A7 Task 7 review M3)', () {
+    expect(CliError.cancelled, 'cancelled');
+  });
+
   test('requests sent right behind auth are answered, in order', () async {
     final h = await InUiHost.start(FakeUiApi(), () => true, dir);
     final c = await h._transport.connect('mem');

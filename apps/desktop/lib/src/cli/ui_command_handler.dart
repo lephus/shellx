@@ -13,6 +13,10 @@ import 'cli_fields.dart';
 import 'cli_targets.dart';
 import 'ui_pane_io.dart';
 
+/// How a request learns its client left: [Future] completes then; the
+/// function tells at once (A7 D21, D33).
+typedef _Leaving = (Future<void>?, bool Function()?);
+
 final uiCommandHandlerProvider = Provider<UiCommandHandler>(
   (ref) => UiCommandHandler(ref),
 );
@@ -58,16 +62,17 @@ final class UiCommandHandler implements UiApi {
   Future<Map<String, Object?>> handle(
     MuxMessage request, {
     Future<void>? cancelled,
+    bool Function()? isGone,
   }) async {
     final t = request.type;
     return switch (t) {
       CliType.uiLs => _ls(),
-      CliType.uiTabNew => _tabNew(request, cancelled),
+      CliType.uiTabNew => _tabNew(request, (cancelled, isGone)),
       CliType.uiTabRename => _tabRename(request),
-      CliType.uiPaneSplit => _split(request, cancelled),
+      CliType.uiPaneSplit => _split(request, (cancelled, isGone)),
       CliType.uiFocus => _focus(request),
       CliType.uiClose => _close(request),
-      CliType.uiWorkspaceNew => _workspaceNew(request, cancelled),
+      CliType.uiWorkspaceNew => _workspaceNew(request, (cancelled, isGone)),
       CliType.uiWorkspaceRename => _workspaceRename(request),
       CliType.uiWorkspaceMove => _workspaceMove(request),
       CliType.uiPaneSend => _io.send(request),
@@ -81,23 +86,21 @@ final class UiCommandHandler implements UiApi {
 
   /// D33: retries while another open is in flight (every 50 ms, up to
   /// [openWait]); maps the tab list's failures to wire codes. Once the
-  /// client is gone ([cancelled]) it stops waiting and never opens.
-  /// [open] runs afresh on every try (what it resolves may have changed).
-  Future<T> _opening<T>(
-    Future<T> Function() open,
-    Future<void>? cancelled,
-  ) async {
+  /// client is gone ([leaving]) it stops waiting and never opens
+  /// (`cancelled`). [open] runs afresh on every try (what it resolves may
+  /// have changed).
+  Future<T> _opening<T>(Future<T> Function() open, _Leaving leaving) async {
+    final (cancelled, isGone) = leaving;
     var gone = false;
     final left = cancelled?.then<void>(
       (_) => gone = true,
       onError: (Object _) => gone = true,
     );
-    // A client already gone: its [left] callback is queued before this
-    // turn and runs first, so nothing opens for it.
-    if (left != null) await Future<void>.value();
     final waited = Stopwatch()..start();
     while (true) {
-      if (gone) throw const CliFailure(MuxError.busy, 'the client left');
+      if (gone || (isGone?.call() ?? false)) {
+        throw const CliFailure(CliError.cancelled, 'the client left');
+      }
       try {
         return await open();
       } on OpenBusyException {
@@ -199,10 +202,7 @@ final class UiCommandHandler implements UiApi {
   /// `focus`.
   /// The workspace is resolved on every try: one deleted during the D33
   /// wait is `not_found`, and nothing opens.
-  Future<Map<String, Object?>> _tabNew(
-    MuxMessage r,
-    Future<void>? cancelled,
-  ) async {
+  Future<Map<String, Object?>> _tabNew(MuxMessage r, _Leaving leaving) async {
     final wsKey = stringField(r, 'workspace');
     final cwd = stringField(r, 'cwd');
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
@@ -215,7 +215,7 @@ final class UiCommandHandler implements UiApi {
             ? null
             : resolveWorkspace(_sideState, wsKey, _side.displayName),
       ),
-      cancelled,
+      leaving,
     );
     if (select) _side.reveal(tab);
     _marks.touch(tab: tab, pane: tab);
@@ -225,10 +225,7 @@ final class UiCommandHandler implements UiApi {
 
   /// D15: any pane of any tab; focus and selection stay unless `focus`,
   /// which then focuses the new pane and selects its tab (as `ui.focus`).
-  Future<Map<String, Object?>> _split(
-    MuxMessage r,
-    Future<void>? cancelled,
-  ) async {
+  Future<Map<String, Object?>> _split(MuxMessage r, _Leaving leaving) async {
     final target = resolvePane(_tabsState, parseTarget(r.fields['pane'], null));
     final axis = switch (r.fields['direction'] ?? 'right') {
       'right' => SplitAxis.row,
@@ -240,7 +237,7 @@ final class UiCommandHandler implements UiApi {
     final focus = flagField(r, 'focus');
     final pane = await _opening(
       () => _tabs.splitPaneFor(target, axis, cwd: cwd, focus: focus),
-      cancelled,
+      leaving,
     );
     final tab = _tabsState.tabOfSession(pane)!.id;
     if (focus) {
@@ -305,7 +302,7 @@ final class UiCommandHandler implements UiApi {
   /// selection stay unless `focus`; no name field opens.
   Future<Map<String, Object?>> _workspaceNew(
     MuxMessage r,
-    Future<void>? cancelled,
+    _Leaving leaving,
   ) async {
     final name = stringField(r, 'name', max: 1024);
     final focus = flagField(r, 'focus');
@@ -314,7 +311,7 @@ final class UiCommandHandler implements UiApi {
     try {
       tab = await _opening(
         () => _tabs.openTabFor(select: focus, workspace: ws),
-        cancelled,
+        leaving,
       );
     } on Object {
       _side.discard(ws); // a workspace always has a tab (A2)

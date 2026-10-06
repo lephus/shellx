@@ -287,7 +287,11 @@ final class CliHost {
         if (!_enabled()) return _disabled(q);
         return cliResult(
           q,
-          await _ui.handle(m, cancelled: client.connection.done),
+          await _ui.handle(
+            m,
+            cancelled: client.connection.done,
+            isGone: () => client._closed,
+          ),
         );
       }
       return cliErrorMessage(q, MuxError.unknownType);
