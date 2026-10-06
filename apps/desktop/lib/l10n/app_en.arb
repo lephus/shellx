@@ -507,5 +507,7 @@
   "agentChip": "Agent",
   "agentChipTooltip": "A program is controlling this tab through the ShellX command line",
   "cliAnnounceAgent": "An agent is controlling {tab}",
-  "@cliAnnounceAgent": {"placeholders": {"tab": {"type": "String"}}}
+  "@cliAnnounceAgent": {"placeholders": {"tab": {"type": "String"}}},
+  "cliPathNotOnPath": "Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to {file}: {line}",
+  "@cliPathNotOnPath": {"description": "A7 ruling M10: after a macOS install, /usr/local/bin is missing from the login shell's PATH", "placeholders": {"file": {"type": "String"}, "line": {"type": "String"}}}
 }

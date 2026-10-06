@@ -331,6 +331,8 @@ Spec `specs/2026-10-07-desktop-cli-a7-design.md`, plan `plans/2026-10-07-desktop
 - [ ] Tray → "Dòng lệnh" có bốn mục; bỏ chọn "Cho phép điều khiển…" → `shellx ls` trong tab ShellX thoát 6 ngay (không cần mở lại kết nối)
 - [ ] Terminal.app (không phải shell ShellX), sau khi cài lệnh cho mọi terminal: `shellx ls` → thoát 6 với gợi ý "Allow other terminals"; tick "Cho phép terminal khác" → chạy được; bỏ tick → bị từ chối ngay (cả `shellx events --follow` đang chạy bị đóng)
 - [ ] "Cài lệnh shellx cho mọi terminal…": `/usr/local/bin` ghi được → không hỏi; không ghi được → hộp mật khẩu hệ thống, Huỷ → không đổi gì, không có thông báo; thành công → toast nhắc bật "Cho phép terminal khác"; "Gỡ…" chỉ gỡ link của ShellX (một `shellx` khác ở đó → toast lỗi kèm đường dẫn, không đụng vào)
+- [ ] Shell đăng nhập không có `/usr/local/bin` trong PATH (thử: `SHELL=/bin/bash` với `~/.bash_profile` đặt `PATH=/usr/bin:/bin`): cài xong → toast ghi đúng dòng `export PATH="/usr/local/bin:$PATH"` và tệp cần thêm
+- [ ] Bấm "Cài…" hai lần khi hộp mật khẩu đang mở → chỉ một hộp
 - [ ] `shellx-term uninstall` xoá `ShellX/cli` và link `/usr/local/bin/shellx` nếu nó trỏ vào đó (cần quyền root → in lệnh `sudo rm …`)
 - [ ] Chip "Agent" trên dòng tab và đầu pane đích 10 s sau mỗi lệnh; VoiceOver đọc "An agent is controlling …" tối đa một lần mỗi phút
 

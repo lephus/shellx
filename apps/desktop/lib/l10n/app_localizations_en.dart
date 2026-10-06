@@ -1154,4 +1154,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String cliAnnounceAgent(String tab) {
     return 'An agent is controlling $tab';
   }
+
+  @override
+  String cliPathNotOnPath(String file, String line) {
+    return 'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to $file: $line';
+  }
 }

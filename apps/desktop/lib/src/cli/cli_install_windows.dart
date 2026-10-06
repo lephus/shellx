@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:win32/win32.dart';
 
 import 'cli_install.dart';
@@ -84,16 +87,26 @@ final class WindowsUserEnvironment implements RegistryAccess {
 }
 
 /// Tells Explorer (and the terminals it starts next) that the user's
-/// environment changed: `WM_SETTINGCHANGE` with "Environment", at most 5 s
-/// per hung window.
-void broadcastEnvironmentChange() => using((arena) {
+/// environment changed: `WM_SETTINGCHANGE` with "Environment". A broadcast
+/// waits on every top-level window (up to 1 s each, skipping hung ones),
+/// so it runs on its own isolate, never on the UI's; failures are logged
+/// by type.
+void broadcastEnvironmentChange() {
+  unawaited(
+    Isolate.run(_broadcast).catchError(
+      (Object e) => debugPrint('ShellX: broadcast failed: ${e.runtimeType}'),
+    ),
+  );
+}
+
+void _broadcast() => using((arena) {
   SendMessageTimeout(
     HWND_BROADCAST,
     WM_SETTINGCHANGE,
     0,
     'Environment'.toNativeUtf16(allocator: arena).address,
     SMTO_ABORTIFHUNG,
-    5000,
+    1000,
     arena<IntPtr>(),
   );
 });

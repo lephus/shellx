@@ -24,6 +24,30 @@ final cliPathsProvider = Provider<CliPaths?>((_) => null);
 /// D8: "Install the shellx command for all terminals…"; set in `main.dart`.
 final cliPathInstallerProvider = Provider<PathInstaller?>((_) => null);
 
+/// Ruling M10 (macOS): after an install, whether `/usr/local/bin` is
+/// missing from the login shell's `PATH`, and what to add; set in
+/// `main.dart`.
+final cliLoginPathCheckProvider = Provider<Future<LoginPathHint?> Function()?>(
+  (_) => null,
+);
+
+/// Ruling M6: lets Quit stop the host first, before the sessions close.
+final cliHostControlProvider = Provider<CliHostControl>(
+  (_) => CliHostControl(),
+);
+
+final class CliHostControl {
+  /// Set by a running [CliService].
+  Future<void> Function()? stop;
+
+  /// Stops the host once; nothing when none runs.
+  Future<void> stopNow() async {
+    final s = stop;
+    stop = null;
+    await s?.call();
+  }
+}
+
 /// D26 "Copy the agent skill install command".
 final cliClipboardProvider = Provider<Future<void> Function(String text)>(
   (_) =>
@@ -36,6 +60,8 @@ final cliClipboardProvider = Provider<Future<void> Function(String text)>(
 /// so two hosts never serve one address.
 final class CliService {
   CliService._(this._host, this._lock, this._settings, this.address);
+
+  bool _stopped = false;
 
   final CliHost _host;
   final _MuxLock _lock;
@@ -90,11 +116,15 @@ final class CliService {
     }
     final cliSettings = c.read(cliSettingsProvider.notifier)
       ..onChanged = host.recheck;
-    return CliService._(host, lock, cliSettings, paths.address);
+    final service = CliService._(host, lock, cliSettings, paths.address);
+    c.read(cliHostControlProvider).stop = service.stop;
+    return service;
   }
 
-  /// Closes every connection and removes the endpoint file.
+  /// Closes every connection and removes the endpoint file. Once.
   Future<void> stop() async {
+    if (_stopped) return;
+    _stopped = true;
     if (_settings.onChanged == _host.recheck) _settings.onChanged = null;
     try {
       await _host.stop();

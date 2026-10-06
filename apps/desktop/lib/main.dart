@@ -234,7 +234,6 @@ Future<void> _start(
     portProbe: Platform.isWindows ? WindowsPortProbe() : MacPortProbe(),
   );
 
-  CliService? cliService;
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
@@ -271,15 +270,6 @@ Future<void> _start(
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
     quitApp: () async {
-      // A7: closes the command-line connections, removes the endpoint.
-      final service = cliService;
-      if (service != null) {
-        await runBounded(
-          service.stop,
-          timeout: _quitStepTimeout,
-          label: 'stopping the command-line host',
-        );
-      }
       await runBounded(
         trayHost.destroy,
         timeout: _quitStepTimeout,
@@ -311,6 +301,13 @@ Future<void> _start(
                 )
               : MacPathInstaller(cli.paths),
         ),
+        if (!Platform.isWindows)
+          cliLoginPathCheckProvider.overrideWithValue(
+            () => LoginPathCheck(
+              shell: environment['SHELL'] ?? '/bin/zsh',
+              linkDir: File(cli.paths.systemLink).parent.path,
+            ).missing(),
+          ),
       ],
     ],
   );
@@ -519,7 +516,9 @@ Future<void> _start(
   // single-instance lock is held; the host also takes `mux/mux.lock`.
   if (cli != null) {
     try {
-      cliService = await CliService.start(
+      // Quit stops it first, before the shells close (tray Quit, ruling
+      // M6: it registers itself in cliHostControlProvider).
+      await CliService.start(
         container,
         appVersion: info.version,
         token: cli.token,

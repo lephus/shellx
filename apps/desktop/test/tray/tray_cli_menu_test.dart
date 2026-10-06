@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:shellx_desktop/src/cli/cli_install.dart';
 import 'package:shellx_desktop/src/cli/cli_service.dart';
 import 'package:shellx_desktop/src/cli/cli_settings.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/restore/restore_persistence.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
@@ -17,6 +19,7 @@ import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import '../support/fakes.dart';
+import '../support/restore_fakes.dart';
 
 final vi = lookupAppLocalizations(const Locale('vi'));
 final en = lookupAppLocalizations(const Locale('en'));
@@ -38,12 +41,16 @@ final class FakePathInstaller implements PathInstaller {
   PathInstallResult next = PathInstallResult.installed;
   final calls = <String>[];
 
+  /// While set, install/uninstall wait for it (a password prompt open).
+  Completer<void>? gate;
+
   @override
   Future<bool> get installed async => isInstalled;
 
   @override
   Future<PathInstallResult> install() async {
     calls.add('install');
+    await gate?.future;
     if (next == PathInstallResult.installed) isInstalled = true;
     return next;
   }
@@ -51,6 +58,7 @@ final class FakePathInstaller implements PathInstaller {
   @override
   Future<PathInstallResult> uninstall() async {
     calls.add('uninstall');
+    await gate?.future;
     if (next == PathInstallResult.installed) isInstalled = false;
     return next;
   }
@@ -145,6 +153,8 @@ void main() {
     late FakePathInstaller installer;
     late List<String> copied;
     late int rechecks;
+    LoginPathHint? missingHint;
+    late int pathChecks;
     final paths = CliPaths.forTest(
       dir: '/Users/me/Library/Application Support/ShellX/cli',
       binary: '/Users/me/Library/Application Support/ShellX/cli/shellx',
@@ -156,8 +166,15 @@ void main() {
       installer = FakePathInstaller();
       copied = [];
       rechecks = 0;
+      missingHint = null;
+      pathChecks = 0;
       c = ProviderContainer.test(
         overrides: [
+          restoreStoreProvider.overrideWithValue(RecordingFiles()),
+          cliLoginPathCheckProvider.overrideWithValue(() async {
+            pathChecks++;
+            return missingHint;
+          }),
           desktopServicesProvider.overrideWithValue(h.services()),
           cliPathsProvider.overrideWithValue(paths),
           cliPathInstallerProvider.overrideWithValue(installer),
@@ -231,6 +248,64 @@ void main() {
       expect(installer.calls, ['install', 'uninstall']);
       expect(h.settings.values[SettingKeys.cliPathInstalled], isFalse);
       expect(local().cliPathInstalled, isFalse);
+    });
+
+    test('M3: a second click while the prompt is open does nothing', () async {
+      installer.gate = Completer<void>();
+      final first = tap(const ToggleCliPath());
+      await pumpEventQueue();
+      await tap(const ToggleCliPath());
+      expect(installer.calls, ['install']);
+      installer.gate!.complete();
+      await first;
+      expect(local().cliPathInstalled, isTrue);
+      // Free again afterwards.
+      installer.gate = null;
+      await tap(const ToggleCliPath());
+      expect(installer.calls, ['install', 'uninstall']);
+    });
+
+    test('M10: installed but /usr/local/bin is not on the login PATH: the '
+        'notice gives the exact line to add', () async {
+      missingHint = const LoginPathHint(
+        file: '~/.zprofile',
+        line: 'export PATH="/usr/local/bin:\$PATH"',
+      );
+      await tap(const ToggleCliPath());
+      expect(pathChecks, 1);
+      final n = notice();
+      expect(n, isA<CliPathNotOnPathNotice>());
+      expect((n! as CliPathNotOnPathNotice).hint, missingHint);
+      expect(
+        en.cliPathNotOnPath(
+          '~/.zprofile',
+          'export PATH="/usr/local/bin:\$PATH"',
+        ),
+        contains('export PATH="/usr/local/bin:\$PATH"'),
+      );
+      expect(vi.cliPathNotOnPath('~/.zprofile', 'x'), contains('~/.zprofile'));
+    });
+
+    test('M10: on the PATH: the usual installed notice; no check on '
+        'removal or failure', () async {
+      await tap(const ToggleCliPath());
+      expect(pathChecks, 1);
+      expect(notice(), isA<CliPathInstalledNotice>());
+      await tap(const ToggleCliPath()); // remove
+      installer.next = PathInstallResult.failed;
+      await tap(const ToggleCliPath());
+      expect(pathChecks, 1);
+    });
+
+    test('M6: Quit stops the command-line host first, before the shutdown '
+        'closes the sessions', () async {
+      final order = <String>[];
+      c.read(cliHostControlProvider).stop = () async => order.add('cli');
+      h.ptyKills = () async => order.add('shutdown');
+      await tap(const Quit(confirm: false));
+      expect(order, ['cli', 'shutdown']);
+      expect(h.quits, 1);
+      expect(c.read(cliHostControlProvider).stop, isNull);
     });
 
     test(

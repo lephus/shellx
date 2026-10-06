@@ -270,5 +270,6 @@
   "cliPathRemoveFailed": "Không gỡ được lệnh shellx. Hãy tự gỡ {path}.",
   "agentChip": "Agent",
   "agentChipTooltip": "Một chương trình đang điều khiển tab này qua dòng lệnh ShellX",
-  "cliAnnounceAgent": "Agent đang điều khiển {tab}"
+  "cliAnnounceAgent": "Agent đang điều khiển {tab}",
+  "cliPathNotOnPath": "Đã cài lệnh shellx vào /usr/local/bin nhưng shell của bạn không tìm ở đó. Hãy thêm dòng này vào {file}: {line}"
 }

@@ -189,7 +189,9 @@ void main() {
       final script = calls.single.last;
       expect(script, startsWith('do shell script "'));
       expect(script, endsWith('" with administrator privileges'));
-      expect(script, contains("ln -sf '/c/shellx' '$link'"));
+      // I1: never -f: a file that appeared meanwhile makes ln fail.
+      expect(script, contains("ln -sh '/c/shellx' '$link'"));
+      expect(script, isNot(contains('ln -sf')));
       expect(script, contains("mkdir -p '${dir.path}/bin'"));
 
       outcome = const ProcessOutcome(exitCode: 1, stderr: 'boom');
@@ -217,7 +219,7 @@ void main() {
       );
       await prompt.install();
       // Shell: '/U/o'\''b "x"\y/shellx'; then AppleScript escapes \ and ".
-      expect(script, contains(r"""ln -sf '/U/o'\\''b \"x\"\\y/shellx'"""));
+      expect(script, contains(r"""ln -sh '/U/o'\\''b \"x\"\\y/shellx'"""));
     });
 
     test('never replaces someone else\'s shellx', () async {
@@ -256,7 +258,19 @@ void main() {
         writable: (_) async => false,
       );
       expect(await installer.uninstall(), PathInstallResult.cancelled);
-      expect(calls.single, contains("rm -f '$link'"));
+      // M2: ownership checked again as root, right before the removal
+      // (AppleScript escapes the quotes).
+      expect(
+        calls.single,
+        contains(
+          r'[ \"$(readlink '
+          "'$link'"
+          r')\" = '
+          "'/c/shellx'"
+          " ] && "
+          "rm -f '$link'",
+        ),
+      );
       expect(calls.single, endsWith('with administrator privileges'));
     });
   });
@@ -295,9 +309,99 @@ void main() {
     await w.uninstall();
     expect(reg.values['Path'], r'C:\Tools');
 
+    // M4: everything else stays byte for byte, empty segments included.
+    reg.values['Path'] = r';C:\Tools;;C:\L\ShellX\cli;%X%;';
+    await w.uninstall();
+    expect(reg.values['Path'], r';C:\Tools;;%X%;');
+    // Always a separator of our own, so removing it restores the value.
+    await w.install();
+    expect(reg.values['Path'], r';C:\Tools;;%X%;;C:\L\ShellX\cli');
+    await w.uninstall();
+    expect(reg.values['Path'], r';C:\Tools;;%X%;');
+    reg.values['Path'] = r'C:\A;;C:\B';
+    await w.install();
+    expect(reg.values['Path'], r'C:\A;;C:\B;C:\L\ShellX\cli');
+
     // No Path value yet.
     final empty = MemoryRegistry({});
     await WindowsPathInstaller(paths, reg: empty, broadcast: () {}).install();
     expect(empty.values['Path'], r'C:\L\ShellX\cli');
+  });
+
+  group('M10: is /usr/local/bin on the login shell\'s PATH?', () {
+    LoginPathCheck check(
+      String shell,
+      ProcessOutcome outcome, {
+      List<List<String>>? calls,
+    }) => LoginPathCheck(
+      shell: shell,
+      linkDir: '/usr/local/bin',
+      run: (exe, args) async {
+        calls?.add([exe, ...args]);
+        return outcome;
+      },
+    );
+
+    test('on the PATH: no hint; runs the shell as a login shell', () async {
+      final calls = <List<String>>[];
+      final hint = await check(
+        '/bin/zsh',
+        const ProcessOutcome(
+          exitCode: 0,
+          stdout: '/opt/x:/usr/local/bin:/usr/bin',
+        ),
+        calls: calls,
+      ).missing();
+      expect(hint, isNull);
+      expect(calls.single, ['/bin/zsh', '-lc', r'printf %s "$PATH"']);
+    });
+
+    test(
+      'missing: the exact line and the file for zsh / bash / other',
+      () async {
+        const out = ProcessOutcome(exitCode: 0, stdout: '/usr/bin:/bin');
+        final zsh = (await check('/bin/zsh', out).missing())!;
+        expect(zsh.file, '~/.zprofile');
+        expect(zsh.line, 'export PATH="/usr/local/bin:\$PATH"');
+        expect(
+          (await check('/opt/homebrew/bin/bash', out).missing())!.file,
+          '~/.bash_profile',
+        );
+        // An unknown shell (fish…) is not run: zsh is asked instead.
+        final calls = <List<String>>[];
+        final other = (await check(
+          '/usr/local/bin/fish',
+          out,
+          calls: calls,
+        ).missing())!;
+        expect(calls.single.first, '/bin/zsh');
+        expect(other.file, '~/.zprofile');
+      },
+    );
+
+    test('the shell failed or timed out: unknown, no hint', () async {
+      expect(
+        await check('/bin/zsh', const ProcessOutcome(exitCode: 1)).missing(),
+        isNull,
+      );
+      final slow = LoginPathCheck(
+        shell: '/bin/zsh',
+        linkDir: '/usr/local/bin',
+        run: (exe, args) => throw const ProcessTimeout(),
+      );
+      expect(await slow.missing(), isNull);
+    });
+
+    test('the real runner is bounded: a hung shell is killed', () async {
+      final run = boundedProcessRunner(const Duration(milliseconds: 200));
+      final watch = Stopwatch()..start();
+      await expectLater(
+        run('/bin/sleep', ['5']),
+        throwsA(isA<ProcessTimeout>()),
+      );
+      expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+      final ok = await run('/bin/echo', ['hi']);
+      expect(ok.stdout.trim(), 'hi');
+    });
   });
 }

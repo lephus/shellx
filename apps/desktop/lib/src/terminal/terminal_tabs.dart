@@ -10,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../cli/cli_install.dart' show LoginPathHint;
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
@@ -96,6 +97,13 @@ final class CliPathInstalledNotice extends TabNotice {
 final class CliPathFailedNotice extends TabNotice {
   const CliPathFailedNotice(this.path);
   final String path;
+}
+
+/// A7 ruling M10: installed, but the login shell's `PATH` lacks
+/// `/usr/local/bin`: the exact line to add, and where.
+final class CliPathNotOnPathNotice extends TabNotice {
+  const CliPathNotOnPathNotice(this.hint);
+  final LoginPathHint hint;
 }
 
 /// A7 D8: the removal failed: what to remove by hand.

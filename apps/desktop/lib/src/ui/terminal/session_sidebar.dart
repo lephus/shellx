@@ -1294,10 +1294,6 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     // Only the unread map: history alone (a notice the user saw) does not
     // rebuild the sidebar.
     final unread = ref.watch(tabAttentionProvider.select((s) => s.unread));
-    // A7 D27: the marks prune themselves at expiry, so watching them is
-    // enough to drop a chip on time.
-    final agentMarks = ref.watch(agentMarksProvider);
-    final now = ref.read(agentMarksClockProvider)();
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final scaler = MediaQuery.textScalerOf(context);
     final items = _items();
@@ -1487,38 +1483,48 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
     Widget tabRow(_RowItem item, double gap) {
       final tab = item.tab;
-      final row = SessionTabRow(
-        key: _rows.putIfAbsent(tab.id, GlobalKey.new),
-        tab: tab,
-        selected: tab.id == state.selectedId,
-        focused: tab.id == state.selectedId && _showFocus && cursor == null,
-        position: positions[tab.id]!,
-        count: rows.length,
-        positionLabel: sidebar.showHeaders
-            ? l10n.sidebarPositionInWorkspace(
-                item.index + 1,
-                item.count,
-                item.workspace.displayName(l10n),
-              )
-            : null,
-        home: home,
-        renaming: sidebar.renaming == RenameTab(tab.id),
-        onSelect: () {
-          setState(() => _headerCursor = null);
-          widget.onSelected(tab.id);
-        },
-        onClose: () => widget.onClose(tab),
-        onStartRename: () => _startTabRename(tab.id, fromList: false),
-        onRename: (text) => _commitTabName(tab.id, text),
-        onCancelRename: () => _endRename(RenameTab(tab.id)),
-        onOpenPort: (port) => unawaited(_openPort(port)),
-        onMenu: (at) => unawaited(_rowMenu(tab, at)),
-        extraActions: _rowActions(l10n, tab),
-        menuOpen: _menuFor == ('row', tab.id),
-        unread: unread[tab.id],
-        onMarkRead: () =>
-            ref.read(tabAttentionProvider.notifier).markRead(tab.id),
-        agent: agentMarks.tabActive(tab.id, now),
+      // A7 D27, ruling M7: each row watches only its own mark, so a
+      // command rebuilds that row, not the sidebar. The marks prune
+      // themselves at expiry, so the chip goes on time.
+      final row = Consumer(
+        builder: (context, rowRef, _) => SessionTabRow(
+          key: _rows.putIfAbsent(tab.id, GlobalKey.new),
+          tab: tab,
+          selected: tab.id == state.selectedId,
+          focused: tab.id == state.selectedId && _showFocus && cursor == null,
+          position: positions[tab.id]!,
+          count: rows.length,
+          positionLabel: sidebar.showHeaders
+              ? l10n.sidebarPositionInWorkspace(
+                  item.index + 1,
+                  item.count,
+                  item.workspace.displayName(l10n),
+                )
+              : null,
+          home: home,
+          renaming: sidebar.renaming == RenameTab(tab.id),
+          onSelect: () {
+            setState(() => _headerCursor = null);
+            widget.onSelected(tab.id);
+          },
+          onClose: () => widget.onClose(tab),
+          onStartRename: () => _startTabRename(tab.id, fromList: false),
+          onRename: (text) => _commitTabName(tab.id, text),
+          onCancelRename: () => _endRename(RenameTab(tab.id)),
+          onOpenPort: (port) => unawaited(_openPort(port)),
+          onMenu: (at) => unawaited(_rowMenu(tab, at)),
+          extraActions: _rowActions(l10n, tab),
+          menuOpen: _menuFor == ('row', tab.id),
+          unread: unread[tab.id],
+          onMarkRead: () =>
+              ref.read(tabAttentionProvider.notifier).markRead(tab.id),
+          agent: rowRef.watch(
+            agentMarksProvider.select(
+              (m) =>
+                  m.tabActive(tab.id, rowRef.read(agentMarksClockProvider)()),
+            ),
+          ),
+        ),
       );
       // V9: under a header, rows sit 8 px in. The padding is always
       // there (0 without headers): the row's subtree never changes shape.

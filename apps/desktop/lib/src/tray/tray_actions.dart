@@ -50,6 +50,9 @@ final class TrayActions {
   /// must not ask again (A1 D10: exactly one confirmation).
   bool _quitting = false;
 
+  /// Ruling M3: an install or removal (maybe a password prompt) in flight.
+  bool _cliPathBusy = false;
+
   AgentController get _agent => _ref.read(agentControllerProvider.notifier);
   AgentViewState get _state => _ref.read(agentControllerProvider);
   WindowRouter get _router => _ref.read(windowRouterProvider.notifier);
@@ -205,6 +208,13 @@ final class TrayActions {
           if (!ok || _quitting) return;
         }
         _quitting = true;
+        // Ruling M6: no command-line request may act while the shells
+        // close: the host stops first.
+        await runBounded(
+          _ref.read(cliHostControlProvider).stopNow,
+          timeout: const Duration(seconds: 2),
+          label: 'stopping the command-line host',
+        );
         // A5a D12: the last save is clean, contents included, and final:
         // the sessions the shutdown closes, or a late "power-off
         // cancelled", must not change it.
@@ -251,7 +261,16 @@ final class TrayActions {
   Future<void> _toggleCliPath() async {
     final installer = _ref.read(cliPathInstallerProvider);
     final paths = _ref.read(cliPathsProvider);
-    if (installer == null || paths == null) return;
+    if (installer == null || paths == null || _cliPathBusy) return;
+    _cliPathBusy = true;
+    try {
+      await _runCliPath(installer, paths);
+    } finally {
+      _cliPathBusy = false;
+    }
+  }
+
+  Future<void> _runCliPath(PathInstaller installer, CliPaths paths) async {
     final cli = _ref.read(cliSettingsProvider.notifier);
     final removing = _ref.read(cliSettingsProvider).pathInstalled;
     PathInstallResult result;
@@ -267,7 +286,13 @@ final class TrayActions {
     if (result == PathInstallResult.installed) {
       await cli.setPathInstalled(!removing);
     }
+    // Ruling M10: installed where the login shell does not look.
+    final hint = result == PathInstallResult.installed && !removing
+        ? await _loginPathHint()
+        : null;
     final notice = switch ((result, removing)) {
+      (PathInstallResult.installed, false) when hint != null =>
+        CliPathNotOnPathNotice(hint),
       (PathInstallResult.installed, false) => const CliPathInstalledNotice(),
       (PathInstallResult.installed, true) => null,
       (_, false) => CliPathFailedNotice(paths.dir),
@@ -278,6 +303,17 @@ final class TrayActions {
     if (notice == null) return;
     _router.showTerminal();
     _ref.read(terminalTabsProvider.notifier).showNotice(notice);
+  }
+
+  Future<LoginPathHint?> _loginPathHint() async {
+    final check = _ref.read(cliLoginPathCheckProvider);
+    if (check == null) return null;
+    try {
+      return await check();
+    } on Object catch (e) {
+      debugPrint('ShellX: login PATH check failed: ${e.runtimeType}');
+      return null;
+    }
   }
 
   /// Spec §10.1: confirm with the exact files, then (Windows, a PowerShell

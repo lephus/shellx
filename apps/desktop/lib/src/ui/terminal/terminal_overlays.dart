@@ -623,6 +623,10 @@ class _NoticeToastState extends State<NoticeToast> {
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
     CliPathInstalledNotice() => l10n.cliPathInstalled,
     CliPathFailedNotice(:final path) => l10n.cliPathFailed(path),
+    CliPathNotOnPathNotice(:final hint) => l10n.cliPathNotOnPath(
+      hint.file,
+      hint.line,
+    ),
     CliPathRemoveFailedNotice(:final path) => l10n.cliPathRemoveFailed(path),
   };
 

@@ -57,12 +57,14 @@ void main() {
       FakeLocalSessions(),
       overrides: [cliMuxPathsProvider.overrideWithValue(paths)],
     );
+    addTearDown(c.dispose);
     final svc = await CliService.start(
       c,
       appVersion: '1.7.0',
       token: token,
       installBinary: false,
     );
+    addTearDown(svc.stop);
     expect(svc.address, paths.address);
     // D30: the directory is the user's alone.
     final mode = (await Process.run('/usr/bin/stat', [

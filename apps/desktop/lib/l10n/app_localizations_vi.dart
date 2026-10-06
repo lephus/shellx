@@ -1112,4 +1112,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String cliAnnounceAgent(String tab) {
     return 'Agent đang điều khiển $tab';
   }
+
+  @override
+  String cliPathNotOnPath(String file, String line) {
+    return 'Đã cài lệnh shellx vào /usr/local/bin nhưng shell của bạn không tìm ở đó. Hãy thêm dòng này vào $file: $line';
+  }
 }

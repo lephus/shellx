@@ -111,10 +111,13 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     ),
   };
 
-  /// A7 D27: the command line acted on this pane in the last 10 s.
-  bool _agent(int id) => ref
-      .watch(agentMarksProvider)
-      .paneActive(id, ref.read(agentMarksClockProvider)());
+  /// A7 D27: the command line acted on this pane in the last 10 s. Only
+  /// this pane's mark is watched (ruling M7).
+  bool _agent(int id) => ref.watch(
+    agentMarksProvider.select(
+      (m) => m.paneActive(id, ref.read(agentMarksClockProvider)()),
+    ),
+  );
 
   Widget _pane(int id) {
     final l10n = AppLocalizations.of(context);

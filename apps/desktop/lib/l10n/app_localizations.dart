@@ -1728,6 +1728,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An agent is controlling {tab}'**
   String cliAnnounceAgent(String tab);
+
+  /// A7 ruling M10: after a macOS install, /usr/local/bin is missing from the login shell's PATH
+  ///
+  /// In en, this message translates to:
+  /// **'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to {file}: {line}'**
+  String cliPathNotOnPath(String file, String line);
 }
 
 class _AppLocalizationsDelegate

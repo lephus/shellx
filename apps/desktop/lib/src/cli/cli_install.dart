@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show immutable, listEquals, visibleForTesting;
 import 'package:path/path.dart' as p;
 
 import '../terminal_sharing/sharing_paths.dart';
@@ -186,9 +188,19 @@ abstract interface class PathInstaller {
 }
 
 final class ProcessOutcome {
-  const ProcessOutcome({required this.exitCode, this.stderr = ''});
+  const ProcessOutcome({
+    required this.exitCode,
+    this.stdout = '',
+    this.stderr = '',
+  });
   final int exitCode;
+  final String stdout;
   final String stderr;
+}
+
+/// A [boundedProcessRunner] process ran too long and was killed.
+final class ProcessTimeout implements Exception {
+  const ProcessTimeout();
 }
 
 typedef ProcessRunner =
@@ -199,8 +211,33 @@ Future<ProcessOutcome> systemProcessRunner(
   List<String> args,
 ) async {
   final r = await Process.run(exe, args);
-  return ProcessOutcome(exitCode: r.exitCode, stderr: '${r.stderr}');
+  return ProcessOutcome(
+    exitCode: r.exitCode,
+    stdout: '${r.stdout}',
+    stderr: '${r.stderr}',
+  );
 }
+
+/// Like [systemProcessRunner], but a process still running after [limit]
+/// is killed and [ProcessTimeout] thrown.
+ProcessRunner boundedProcessRunner(Duration limit) => (exe, args) async {
+  final process = await Process.start(exe, args);
+  final out = process.stdout.transform(systemEncoding.decoder).join();
+  final err = process.stderr.transform(systemEncoding.decoder).join();
+  final code = await process.exitCode.timeout(
+    limit,
+    onTimeout: () {
+      process.kill(ProcessSignal.sigkill);
+      return -1;
+    },
+  );
+  if (code == -1) {
+    unawaited(out.then<void>((_) {}, onError: (Object _) {}));
+    unawaited(err.then<void>((_) {}, onError: (Object _) {}));
+    throw const ProcessTimeout();
+  }
+  return ProcessOutcome(exitCode: code, stdout: await out, stderr: await err);
+};
 
 /// `/bin/test -w`: the user may create files in [dir].
 Future<bool> posixWritable(String dir) async =>
@@ -259,8 +296,10 @@ final class MacPathInstaller implements PathInstaller {
       }
     }
     return _asAdmin(
+      // No -f: whatever appeared at the path meanwhile is never replaced
+      // (ln fails, the item reports `failed`); -h never follows a link.
       'mkdir -p ${_sh(_linkDir)} && '
-      'ln -sf ${_sh(paths.binary)} ${_sh(paths.systemLink)}',
+      'ln -sh ${_sh(paths.binary)} ${_sh(paths.systemLink)}',
     );
   }
 
@@ -276,7 +315,11 @@ final class MacPathInstaller implements PathInstaller {
         return PathInstallResult.failed;
       }
     }
-    return _asAdmin('rm -f ${_sh(paths.systemLink)}');
+    // Ownership is checked again as root, right before the removal.
+    final link = _sh(paths.systemLink);
+    return _asAdmin(
+      '[ "\$(readlink $link)" = ${_sh(paths.binary)} ] && rm -f $link',
+    );
   }
 
   Future<PathInstallResult> _asAdmin(String script) async {
@@ -324,33 +367,98 @@ final class WindowsPathInstaller implements PathInstaller {
   final RegistryAccess reg;
   final void Function() broadcast;
 
-  List<String> _parts() =>
-      (reg.read('Path') ?? '').split(';').where((s) => s.isNotEmpty).toList();
+  /// The raw segments, empty ones included, so a rewrite keeps every
+  /// other byte.
+  List<String> _segments() => (reg.read('Path') ?? '').split(';');
 
   bool _ours(String entry) =>
       entry.replaceAll(RegExp(r'\\+$'), '').toLowerCase() ==
       paths.dir.toLowerCase();
 
   @override
-  Future<bool> get installed async => _parts().any(_ours);
+  Future<bool> get installed async => _segments().any(_ours);
 
+  /// Appends `;<dir>` (just `<dir>` to an empty value); the existing value
+  /// is kept as is, so [uninstall] gives it back byte for byte.
   @override
   Future<PathInstallResult> install() async {
-    final parts = _parts();
-    if (!parts.any(_ours)) {
-      reg.write('Path', [...parts, paths.dir].join(';'));
+    final old = reg.read('Path') ?? '';
+    if (!old.split(';').any(_ours)) {
+      final separator = old.isEmpty ? '' : ';';
+      reg.write('Path', '$old$separator${paths.dir}');
       broadcast();
     }
     return PathInstallResult.installed;
   }
 
+  /// Drops only our segments (each with one separator).
   @override
   Future<PathInstallResult> uninstall() async {
-    final parts = _parts();
-    if (parts.any(_ours)) {
-      reg.write('Path', parts.where((s) => !_ours(s)).join(';'));
+    final segments = _segments();
+    if (segments.any(_ours)) {
+      reg.write('Path', segments.where((s) => !_ours(s)).join(';'));
       broadcast();
     }
     return PathInstallResult.installed;
+  }
+}
+
+/// A7 ruling M10: what to add when `/usr/local/bin` is not on the login
+/// shell's `PATH` (rare on macOS).
+@immutable
+final class LoginPathHint {
+  const LoginPathHint({required this.file, required this.line});
+
+  /// `~/.zprofile`, `~/.bash_profile` or `~/.profile`.
+  final String file;
+
+  /// `export PATH="/usr/local/bin:$PATH"`.
+  final String line;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LoginPathHint && other.file == file && other.line == line;
+
+  @override
+  int get hashCode => Object.hash(file, line);
+}
+
+/// A7 ruling M10: after a macOS install, asks the user's login shell
+/// (`$SHELL -lc`, zsh / bash / sh only; anything else → `/bin/zsh`)
+/// for its `PATH`. Unknown (the shell failed or ran over its time) → no
+/// hint.
+final class LoginPathCheck {
+  LoginPathCheck({
+    required String shell,
+    required this.linkDir,
+    ProcessRunner? run,
+  }) : shell = _known.contains(p.posix.basename(shell)) && shell.startsWith('/')
+           ? shell
+           : '/bin/zsh',
+       _run = run ?? boundedProcessRunner(const Duration(seconds: 2));
+
+  static const _known = {'zsh', 'bash', 'sh'};
+
+  final String shell;
+  final String linkDir;
+  final ProcessRunner _run;
+
+  Future<LoginPathHint?> missing() async {
+    final ProcessOutcome r;
+    try {
+      r = await _run(shell, ['-lc', r'printf %s "$PATH"']);
+    } on Object {
+      return null;
+    }
+    if (r.exitCode != 0) return null;
+    if (r.stdout.trim().split(':').contains(linkDir)) return null;
+    return LoginPathHint(
+      file: switch (p.posix.basename(shell)) {
+        'zsh' => '~/.zprofile',
+        'bash' => '~/.bash_profile',
+        _ => '~/.profile',
+      },
+      line: 'export PATH="$linkDir:\$PATH"',
+    );
   }
 }

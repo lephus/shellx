@@ -5,6 +5,7 @@ import 'package:shellx_desktop/src/cli/agent_marks.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/agent_chip.dart';
+import 'package:shellx_desktop/src/ui/terminal/session_tab_row.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -104,5 +105,24 @@ void main() {
       findsOneWidget,
     );
     semantics.dispose();
+  });
+
+  testSidebar('M7: a mark rebuilds only its own row, not the sidebar', (
+    t,
+  ) async {
+    local.add(local.summary(2, origin: SessionOrigin.desktop));
+    await pump(t);
+    SessionTabRow rowWidget(int id) => t.widget<SessionTabRow>(
+      find.byWidgetPredicate((w) => w is SessionTabRow && w.tab.id == id),
+    );
+    final other = rowWidget(2);
+    final target = rowWidget(1);
+    marks().touch(tab: 1);
+    await t.pump();
+    expect(chipIn(row(1)), findsOneWidget);
+    expect(rowWidget(1).agent, isTrue);
+    expect(identical(rowWidget(1), target), isFalse);
+    // Row 2 was not rebuilt: the same widget object.
+    expect(identical(rowWidget(2), other), isTrue);
   });
 }
