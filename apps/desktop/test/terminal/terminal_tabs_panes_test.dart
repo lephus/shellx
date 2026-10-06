@@ -307,14 +307,19 @@ void main() {
         tabs().setRatio(1, '', 0.05);
         expect((only().layout as PaneSplit).ratio, closeTo(0.176, 1e-9));
         tabs().setRatio(1, '', 0.99); // second side holds two panes
+        // Inner split at 0.55: its second pane (101) needs 176 px of
+        // (0.45·X − 1), so the side needs X = 177 / 0.45, plus the divider.
         expect(
           (only().layout as PaneSplit).ratio,
-          closeTo(1 - (2 * 176 + 1 + 1) / 1000, 1e-9),
+          closeTo(1 - (177 / 0.45 + 1) / 1000, 1e-9),
         );
         tabs().equalizeAt(1, '1');
         expect(((only().layout as PaneSplit).second as PaneSplit).ratio, 0.5);
+        final layout = only().layout;
         tabs().setRatio(1, '0', 0.3); // a leaf: ignored
+        tabs().setRatio(1, '11', 0.3); // no node there: ignored
         tabs().setRatio(99, '', 0.3); // no such tab: ignored
+        expect(only().layout, layout);
       },
     );
 
@@ -378,6 +383,70 @@ void main() {
       );
       await tabs().split(SplitAxis.row);
       expect(seen, everyElement([1]));
+    });
+
+    test('the pixel clamp keeps every nested pane at its minimum, with the '
+        "nested ratios as they are (D4)", () async {
+      boot();
+      await tabs().split(SplitAxis.row);
+      await tabs().split(SplitAxis.row); // 1 | (100 | 101), root 0.5
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(1400, 600),
+          minPane: Size(176, 100),
+          divider: 1,
+        ),
+      );
+      PaneSplit root() => only().layout as PaneSplit;
+      PaneSplit inner() => root().second as PaneSplit;
+      // The inner split is 0.5·1400 − 1 = 699 px wide.
+      tabs().setRatio(1, '1', 0.9);
+      expect(inner().ratio, closeTo(1 - 177 / 699, 1e-9));
+      tabs().setRatio(1, '1', 0.7);
+      expect(inner().ratio, 0.7);
+      // 101 gets 0.3·X − 1 of the right side's X: X ≥ 177 / 0.3, and the
+      // root's divider comes on top. (The old span rule allowed 101 to
+      // shrink to 0.3·(2·176 + 1) − 1 ≈ 105 px.)
+      tabs().setRatio(1, '', 0.99);
+      const side = 177 / 0.3;
+      expect(root().ratio, closeTo(1 - (side + 1) / 1400, 1e-9));
+      final secondPx = (1 - root().ratio) * 1400 - 1;
+      expect((1 - inner().ratio) * secondPx - 1, closeTo(176, 1e-6));
+      expect(inner().ratio * secondPx, greaterThanOrEqualTo(176 - 1e-6));
+      // Keys go through the same clamp.
+      tabs().resizeFocused(PaneDirection.left); // 101: inner '1' → 0.65
+      expect(inner().ratio, closeTo(0.65, 1e-9));
+    });
+
+    test('too small for both sides: a drag may only relieve the more '
+        'squeezed side (D4)', () async {
+      boot();
+      await tabs().split(SplitAxis.row); // 1 | 100 at 0.5
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(300, 400),
+          minPane: Size(176, 100),
+          divider: 1,
+        ),
+      );
+      // lo = 176/300, hi = 1 − 177/300: equal shortfall at their middle.
+      const fair = (176 / 300 + 1 - 177 / 300) / 2;
+      PaneSplit root() => only().layout as PaneSplit;
+      tabs().setRatio(1, '', 0.9); // squeezes 100 further: refused
+      expect(root().ratio, 0.5);
+      tabs().setRatio(1, '', 0.1); // relieves 100, stops at the fair point
+      expect(root().ratio, closeTo(fair, 1e-9));
+    });
+
+    test('an exited pane never resizes its session', () async {
+      boot();
+      await tabs().split(SplitAxis.row);
+      local.views[100]!.end(2);
+      await pumpEventQueue();
+      final r = local.views[100]!.resizes;
+      final before = r.length;
+      only().panes[100]!.terminal.resize(30, 10);
+      expect(r.length, before);
     });
   });
 }

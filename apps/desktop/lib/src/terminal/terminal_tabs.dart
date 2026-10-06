@@ -936,34 +936,82 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         : h >= 2 * m.minPane.height + m.divider && w >= m.minPane.width;
   }
 
-  /// D4: each side keeps its panes at their minimum along the axis.
+  /// D4: no pane of either side may end up below [PaneMetrics.minPane].
+  ///
+  /// Divider contract (Task 6 lays panes out the same way): a split of
+  /// extent E at ratio r gives its first child `r·E` pixels and its second
+  /// child `(1 − r)·E − divider`; the divider is taken from the second side.
+  ///
+  /// When the split cannot hold both sides at all (lo > hi), the ratio may
+  /// only move toward the point where both sides fall short by the same
+  /// number of pixels — a drag that relieves the more squeezed side works,
+  /// one that squeezes it further does not.
   double _clampForPixels(TerminalTab tab, PanePath path, double ratio) {
     final m = _metrics;
     final node = nodeAt(tab.layout, path);
-    final rect = splitRect(tab.layout, path);
-    if (m == null || node is! PaneSplit || rect == null) {
+    final size = _splitSize(tab.layout, path);
+    if (m == null || node is! PaneSplit || size == null) {
       return clampRatio(ratio);
     }
     final row = node.axis == SplitAxis.row;
-    final extent = row
-        ? rect.width * m.area.width
-        : rect.height * m.area.height;
-    final minPane = row ? m.minPane.width : m.minPane.height;
-    double need(PaneNode side) {
-      final n = paneSpan(side, node.axis);
-      return n * minPane + (n - 1) * m.divider;
-    }
-
-    final lo = need(node.first) / extent;
-    final hi = 1 - (need(node.second) + m.divider) / extent;
-    if (lo > hi) return node.ratio; // no room to move at all
-    return clampRatio(ratio.clamp(lo, hi).toDouble());
+    final extent = row ? size.width : size.height;
+    if (extent <= 0) return node.ratio;
+    final lo = _minExtent(node.first, node.axis) / extent;
+    final hi = 1 - (_minExtent(node.second, node.axis) + m.divider) / extent;
+    if (lo <= hi) return clampRatio(ratio.clamp(lo, hi).toDouble());
+    final fair = (lo + hi) / 2;
+    final towards = node.ratio < fair
+        ? ratio.clamp(node.ratio, fair)
+        : ratio.clamp(fair, node.ratio);
+    return clampRatio(towards.toDouble());
   }
 
-  /// D13: the selected tab's panes, minus those a zoom hides.
+  /// The pixel size of the split at [path], under the divider contract of
+  /// [_clampForPixels]; null when [path] is not a split.
+  Size? _splitSize(PaneNode root, PanePath path) {
+    final m = _metrics;
+    if (m == null) return null;
+    var node = root;
+    var w = m.area.width;
+    var h = m.area.height;
+    for (final step in path.split('')) {
+      if (node is! PaneSplit) return null;
+      final first = step == '0';
+      if (node.axis == SplitAxis.row) {
+        w = first ? node.ratio * w : (1 - node.ratio) * w - m.divider;
+      } else {
+        h = first ? node.ratio * h : (1 - node.ratio) * h - m.divider;
+      }
+      node = first ? node.first : node.second;
+    }
+    return node is PaneSplit ? Size(w, h) : null;
+  }
+
+  /// The smallest extent along [axis] that keeps every pane of [node] at
+  /// its minimum, with [node]'s own ratios kept as they are.
+  double _minExtent(PaneNode node, SplitAxis axis) {
+    final m = _metrics!;
+    switch (node) {
+      case PaneLeaf():
+        return axis == SplitAxis.row ? m.minPane.width : m.minPane.height;
+      case PaneSplit(axis: final a, :final ratio, :final first, :final second)
+          when a == axis:
+        // r·X ≥ min(first); (1 − r)·X − divider ≥ min(second).
+        return max(
+          _minExtent(first, axis) / ratio,
+          (_minExtent(second, axis) + m.divider) / (1 - ratio),
+        );
+      case PaneSplit(:final first, :final second):
+        return max(_minExtent(first, axis), _minExtent(second, axis));
+    }
+  }
+
+  /// D13: the selected tab's live panes, minus those a zoom hides.
   bool _reportsSize(int sessionId) {
     final tab = state.tabOfSession(sessionId);
     if (tab == null || tab.id != state.selectedId) return false;
+    // An exited pane's session is gone: nothing to tell it.
+    if (tab.panes[sessionId]?.exited ?? true) return false;
     final zoomed = tab.zoomedPaneId;
     return zoomed == null || zoomed == sessionId;
   }
