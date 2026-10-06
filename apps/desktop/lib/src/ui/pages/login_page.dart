@@ -104,6 +104,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             const SizedBox(height: 24),
             TextField(
               key: const Key('login.email'),
+              autofocus: true, // UI §3.7: forms start on the first field.
               controller: _email,
               enabled: !_busy,
               autofillHints: const [AutofillHints.email],

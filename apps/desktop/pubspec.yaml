@@ -27,6 +27,9 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
+  # Already in the lock file (window_manager uses it): the display list, so
+  # a window saved on a monitor that is gone opens centred (A1 D9).
+  screen_retriever: ^0.2.2
   shared_preferences: ^2.5.5
   shellx_agent: any
   shellx_core: any

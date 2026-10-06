@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/ui/app.dart';
+import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/fakes.dart';
@@ -14,7 +15,10 @@ void main() {
   late TestHarness h;
   late ProviderContainer container;
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Size size = const Size(1100, 720),
+  }) async {
     h = TestHarness(settings: {'onboarding_done': true});
     container = ProviderContainer(
       overrides: [desktopServicesProvider.overrideWithValue(h.services())],
@@ -22,7 +26,7 @@ void main() {
     await container
         .read(agentControllerProvider.notifier)
         .bootstrap(watchForWake: false);
-    tester.view.physicalSize = const Size(1100, 720);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -152,4 +156,139 @@ void main() {
       TargetPlatform.windows,
     }),
   );
+
+  group('the smallest window (640×400): every dialog fits or scrolls', () {
+    final cases = <String, (WindowRoute, String)>{
+      'login': (const LoginRoute(), 'login.submit'),
+      'onboarding': (const OnboardingRoute(), 'onboarding.finish'),
+      'pairing': (const PairingRoute(), 'pairing.new'),
+      'change password': (const ChangePasswordRoute(), 'password.submit'),
+    };
+    for (final MapEntry(key: name, value: (route, action)) in cases.entries) {
+      testApp('$name: no overflow, the primary action is reachable', (
+        tester,
+      ) async {
+        await pump(tester, size: ShellxSizes.minWindow);
+        container.read(windowRouterProvider.notifier).open(route);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final button = find.byKey(Key(action));
+        await tester.ensureVisible(button);
+        await tester.pumpAndSettle();
+        expect(button.hitTestable(), findsOneWidget);
+      });
+    }
+
+    testApp('a long confirm: no overflow, the action is reachable', (
+      tester,
+    ) async {
+      await pump(tester, size: ShellxSizes.minWindow);
+      final answer = container
+          .read(windowRouterProvider.notifier)
+          .confirm(
+            ConfirmRequest(
+              title: 't',
+              body: List.filled(80, 'a line of the file list').join('\n'),
+              confirmLabel: 'ok',
+              long: true,
+              destructive: false,
+            ),
+          );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('confirm.ok')));
+      expect(await answer, isTrue);
+    });
+  });
+
+  testApp('the login dialog is a named route and starts on the email field '
+      '(UI §3.7)', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pump(tester);
+    container.read(windowRouterProvider.notifier).open(const LoginRoute());
+    await tester.pumpAndSettle();
+    final focused = FocusManager.instance.primaryFocus?.context;
+    expect(
+      focused?.findAncestorWidgetOfExactType<TextField>()?.key,
+      const Key('login.email'),
+    );
+    final node = tester.getSemantics(find.byKey(const Key('dialog')));
+    expect(node.label, 'Sign in to ShellX');
+    expect(node.flagsCollection.scopesRoute, isTrue);
+    expect(node.flagsCollection.namesRoute, isTrue);
+    semantics.dispose();
+  });
+
+  testApp('the change-password dialog starts on the new password field', (
+    tester,
+  ) async {
+    await pump(tester);
+    container
+        .read(windowRouterProvider.notifier)
+        .open(const ChangePasswordRoute());
+    await tester.pumpAndSettle();
+    final focused = FocusManager.instance.primaryFocus?.context;
+    expect(
+      focused?.findAncestorWidgetOfExactType<TextField>()?.key,
+      const Key('password.new'),
+    );
+  });
+
+  testApp('a scrim click closes change-password only once it says "done"', (
+    tester,
+  ) async {
+    await pump(tester);
+    await container
+        .read(agentControllerProvider.notifier)
+        .signIn(email: 'a@b.co', password: '12345678', register: false);
+    final router = container.read(windowRouterProvider.notifier)
+      ..open(const ChangePasswordRoute());
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(router.current, isA<ChangePasswordRoute>());
+    await tester.enterText(
+      find.byKey(const Key('password.new')),
+      'long enough 1',
+    );
+    await tester.enterText(
+      find.byKey(const Key('password.confirm')),
+      'long enough 1',
+    );
+    await tester.tap(find.byKey(const Key('password.submit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('password.done')), findsOneWidget);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(router.current, isNull);
+  });
+
+  testApp('a closed dialog leaves with the 120 ms exit fade (UI §1.5)', (
+    tester,
+  ) async {
+    await pump(tester);
+    final router = container.read(windowRouterProvider.notifier)
+      ..open(const LoginRoute());
+    await tester.pumpAndSettle();
+    router.close();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(find.byKey(const Key('dialog')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 70));
+    expect(find.byKey(const Key('dialog')), findsNothing);
+  });
+
+  testApp('with reduced motion the dialog goes at once', (tester) async {
+    await pump(tester);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final router = container.read(windowRouterProvider.notifier)
+      ..open(const LoginRoute());
+    await tester.pumpAndSettle();
+    router.close();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('dialog')), findsNothing);
+  });
 }

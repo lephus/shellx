@@ -62,8 +62,26 @@ class _WindowContentState extends ConsumerState<WindowContent> {
               child: TerminalWorkspacePage(key: _workspace),
             ),
           ),
-          if (window.dialogOpen)
-            Positioned.fill(child: RouteDialogHost(state: window)),
+          // UI §1.5: the dialog (with its scrim) fades in with `base` and
+          // out with `exit`; one dialog replacing another switches at once.
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: ShellxMotion.of(context, ShellxMotion.base),
+              reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
+              switchInCurve: ShellxMotion.baseCurve,
+              switchOutCurve: ShellxMotion.exitCurve,
+              layoutBuilder: (current, previous) => Stack(
+                fit: StackFit.expand,
+                children: [...previous, ?current],
+              ),
+              child: window.dialogOpen
+                  ? RouteDialogHost(
+                      key: const ValueKey('dialogHost'),
+                      state: window,
+                    )
+                  : const SizedBox.shrink(key: ValueKey('none')),
+            ),
+          ),
         ],
       ),
     );

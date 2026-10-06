@@ -41,4 +41,33 @@ void main() {
       ]),
     );
   });
+
+  group('saved bounds must still be on a display (a monitor unplugged)', () {
+    const main = Rect.fromLTWH(0, 0, 1440, 900);
+    const right = Rect.fromLTWH(1440, 0, 1920, 1080);
+    const saved = Rect.fromLTWH(1600, 100, 1100, 720);
+
+    test('on a connected display: restored', () {
+      expect(restorableBounds(saved, [main, right]), saved);
+    });
+
+    test('its display is gone: null (the host centres the default)', () {
+      expect(restorableBounds(saved, [main]), isNull);
+    });
+
+    test('only an edge on a display (centre off every display): null', () {
+      expect(
+        restorableBounds(const Rect.fromLTWH(1000, 100, 1100, 720), [main]),
+        isNull,
+      );
+    });
+
+    test('no display list (the query failed): kept as saved', () {
+      expect(restorableBounds(saved, const []), saved);
+    });
+
+    test('nothing saved: null', () {
+      expect(restorableBounds(null, [main]), isNull);
+    });
+  });
 }

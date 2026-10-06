@@ -3,8 +3,11 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
-  /// macOS is logging out, restarting or shutting down: never hold it up.
+  /// Fallback for a quit without a readable reason: macOS announced a log
+  /// out, restart or shut down a moment ago. Reset after a while, because a
+  /// log out that another app cancels never tells us.
   private var poweringOff = false
+  private var poweringOffReset: DispatchWorkItem?
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     NSWorkspace.shared.notificationCenter.addObserver(
@@ -15,6 +18,25 @@ class AppDelegate: FlutterAppDelegate {
 
   @objc private func willPowerOff(_ notification: Notification) {
     poweringOff = true
+    poweringOffReset?.cancel()
+    let reset = DispatchWorkItem { [weak self] in self?.poweringOff = false }
+    poweringOffReset = reset
+    DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: reset)
+  }
+
+  /// The `quit` Apple Event that asks us to terminate says why: log out,
+  /// restart or shut down (never held up), or nothing for ⌘Q / menu Quit.
+  private var quitIsForPowerOff: Bool {
+    let reasons: [OSType] = [
+      OSType(kAELogOut), OSType(kAEReallyLogOut),
+      OSType(kAEShowRestartDialog), OSType(kAERestart),
+      OSType(kAEShowShutdownDialog), OSType(kAEShutDown),
+    ]
+    guard
+      let reason = NSAppleEventManager.shared().currentAppleEvent?
+        .attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
+    else { return false }
+    return reasons.contains(reason)
   }
 
   // ShellX lives in the menu bar; closing or hiding its window must not quit it.
@@ -40,7 +62,7 @@ class AppDelegate: FlutterAppDelegate {
   // through Dart's quit flow: confirm, close every shell tree, then exit(0),
   // which never comes back here. Log out / shut down is never blocked.
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if poweringOff || !AppChannel.isReady {
+    if quitIsForPowerOff || poweringOff || !AppChannel.isReady {
       return .terminateNow
     }
     AppChannel.quitRequested()

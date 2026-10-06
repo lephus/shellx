@@ -5,6 +5,7 @@ import 'package:shellx_core/shellx_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../form_rules.dart';
+import '../dialogs/route_dialog.dart';
 import '../window_router.dart';
 
 /// "Đổi mật khẩu…" (spec §8.3): new password twice, no old password (§5.2).
@@ -47,7 +48,11 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
       await ref
           .read(agentControllerProvider.notifier)
           .changePassword(_password.text);
-      if (mounted) setState(() => _done = true);
+      if (mounted) {
+        setState(() => _done = true);
+        // Only a message and Close are left: a scrim click may close it.
+        const DialogInformationalNotification().dispatch(context);
+      }
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = apiErrorText(error, l10n));
     } finally {
@@ -80,6 +85,7 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
           ] else ...[
             TextField(
               key: const Key('password.new'),
+              autofocus: true, // UI §3.7: forms start on the first field.
               controller: _password,
               enabled: !_busy,
               obscureText: true,

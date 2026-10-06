@@ -45,3 +45,13 @@ final class WindowBoundsStore {
     }
   }
 }
+
+/// [saved] if the window would still be on one of [displays] (its centre is
+/// on a display's visible area), else null so the host centres the default
+/// size: a window saved on a monitor that is gone must not open off screen.
+/// An empty [displays] (the query failed) keeps [saved].
+Rect? restorableBounds(Rect? saved, List<Rect> displays) {
+  if (saved == null) return null;
+  if (displays.isEmpty) return saved;
+  return displays.any((d) => d.contains(saved.center)) ? saved : null;
+}

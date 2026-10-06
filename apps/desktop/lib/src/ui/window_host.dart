@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../platform/app_reopen.dart';
@@ -17,17 +18,23 @@ abstract interface class WindowHost {
 }
 
 /// Shows/hides the single window to follow the router. Dialogs never
-/// resize it (UI §4).
+/// resize it (UI §4). Host calls run one after another, so a quick hide →
+/// show always ends shown (with the Dock icon), never interleaved.
 final class WindowPresenter {
   WindowPresenter(this._host);
 
   final WindowHost _host;
   bool _visible = false;
+  Future<void> _last = Future<void>.value();
 
-  Future<void> apply(WindowState state) async {
-    if (state.visible == _visible) return;
+  Future<void> apply(WindowState state) {
+    if (state.visible == _visible) return Future<void>.value();
     _visible = state.visible;
-    await (state.visible ? _host.show() : _host.hide());
+    final call = state.visible ? _host.show : _host.hide;
+    final done = _last.then((_) => call());
+    // A failed call is reported to this caller; the next one still runs.
+    _last = done.catchError((Object _) {});
+    return done;
   }
 }
 
@@ -43,10 +50,15 @@ final class WindowPresenter {
 /// `DestroyWindow`/`WM_DESTROY` (and therefore `PostQuitMessage`) is never
 /// reached. `windows/runner/main.cpp` is left unchanged.
 final class WindowManagerHost with WindowListener implements WindowHost {
-  WindowManagerHost({required this.onCloseRequested, required this.bounds});
+  WindowManagerHost({
+    required this.onCloseRequested,
+    required this.bounds,
+    Future<List<Rect>> Function()? displays,
+  }) : _displays = displays ?? _visibleDisplays;
 
   final void Function() onCloseRequested;
   final WindowBoundsStore bounds;
+  final Future<List<Rect>> Function() _displays;
   bool _placed = false;
   Timer? _save;
 
@@ -75,7 +87,7 @@ final class WindowManagerHost with WindowListener implements WindowHost {
     if (!_placed) {
       // First show: the remembered bounds, else 1100×720 centred (UI §2).
       _placed = true;
-      final saved = bounds.read();
+      final saved = restorableBounds(bounds.read(), await _safeDisplays());
       if (saved != null) {
         await windowManager.setBounds(saved);
       } else {
@@ -108,6 +120,22 @@ final class WindowManagerHost with WindowListener implements WindowHost {
 
   @override
   void onWindowMoved() => _remember();
+
+  /// Empty when the displays cannot be read (the saved bounds are kept).
+  Future<List<Rect>> _safeDisplays() async {
+    try {
+      return await _displays();
+    } catch (error) {
+      debugPrint('ShellX: reading the displays failed: ${error.runtimeType}');
+      return const [];
+    }
+  }
+
+  static Future<List<Rect>> _visibleDisplays() async => [
+    for (final display in await screenRetriever.getAllDisplays())
+      (display.visiblePosition ?? Offset.zero) &
+          (display.visibleSize ?? display.size),
+  ];
 
   /// Debounced: a drag fires many move/resize events.
   void _remember() {

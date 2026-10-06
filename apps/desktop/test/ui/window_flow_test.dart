@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/agent_state.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
 import 'package:shellx_desktop/src/ui/activation.dart';
@@ -18,6 +19,24 @@ import 'package:shellx_desktop/src/ui/window_host.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/fakes.dart';
+
+/// A host whose calls take a while: each call waits for [gate].
+final class _SlowWindowHost implements WindowHost {
+  final List<String> calls = [];
+  Completer<void> gate = Completer<void>();
+  Future<void> _call(String name) async {
+    calls.add('$name start');
+    await gate.future;
+    calls.add('$name end');
+  }
+
+  @override
+  Future<void> show() => _call('show');
+  @override
+  Future<void> hide() => _call('hide');
+  @override
+  Future<void> setTitle(String title) async {}
+}
 
 final class _FakeWindowHost implements WindowHost {
   final List<String> calls = [];
@@ -436,9 +455,39 @@ void main() {
     expect(host.calls, ['show', 'hide', 'show']);
   });
 
-  test('window title: "<tab> — ShellX", or "ShellX" without tabs', () {
+  test('WindowPresenter runs host calls one after another: a quick '
+      'hide → show cannot end with the Dock icon hidden', () async {
+    final host = _SlowWindowHost();
+    final presenter = WindowPresenter(host);
+    final shown = presenter.apply(const WindowState(terminal: true));
+    host.gate.complete();
+    await shown;
+    host.gate = Completer<void>();
+    final hidden = presenter.apply(const WindowState());
+    final again = presenter.apply(const WindowState(terminal: true));
+    await pumpEventQueue();
+    expect(host.calls.last, 'hide start');
+    host.gate.complete();
+    await hidden;
+    await again;
+    expect(host.calls, [
+      'show start',
+      'show end',
+      'hide start',
+      'hide end',
+      'show start',
+      'show end',
+    ]);
+  });
+
+  test('window title: "<tab> — ShellX", or "ShellX" without tabs', () async {
     final l10n = lookupAppLocalizations(const Locale('vi'));
     expect(windowTitleFor(null, l10n), 'ShellX');
+    await signedIn(settings: {'onboarding_done': true});
+    await handleActivation(container);
+    final tab = container.read(terminalTabsProvider).selected!;
+    expect(windowTitleFor(tab, l10n), '${tab.label} — ShellX');
+    expect(tab.label, isNotEmpty);
   });
 
   test('dialog sizes follow UI §4 widths', () {
