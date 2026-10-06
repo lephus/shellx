@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
@@ -67,8 +68,16 @@ String screen(TerminalTab tab) => [
     tab.terminal.mainBuffer.lines[i].getText().trimRight(),
 ].join('\n');
 
+/// What restore logged in this test (kept out of the test output; never
+/// more than an error type, D-N9).
+late List<String> restoreLog;
+
 void main() {
   setUp(() {
+    restoreLog = [];
+    final print = debugPrint;
+    debugPrint = (message, {wrapWidth}) => restoreLog.add(message ?? '');
+    addTearDown(() => debugPrint = print);
     local = FakeLocalSessions();
     files = RecordingFiles();
     settings = InMemorySettingsStore();

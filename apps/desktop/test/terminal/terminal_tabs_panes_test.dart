@@ -605,6 +605,24 @@ void main() {
     });
   });
 
+  test('A7 D21: the exit codes of the last 64 sessions that ended are kept '
+      '(Task 7 review M8)', () async {
+    for (var id = 1; id <= 66; id++) {
+      local.add(local.summary(id));
+    }
+    boot();
+    for (var id = 1; id <= 66; id++) {
+      local.views[id]!.end(id % 2 == 0 ? 0 : id);
+    }
+    await pumpEventQueue();
+    expect(tabs().lastExitCode(1), isNull);
+    expect(tabs().lastExitCode(2), isNull);
+    expect(tabs().lastExitCode(3), 3);
+    expect(tabs().lastExitCode(4), 0);
+    expect(tabs().lastExitCode(66), 0);
+    expect(tabs().lastExitCode(65), 65);
+  });
+
   test('A7 D29: a split opens with the tab id; a new tab with none', () async {
     boot();
     await tabs().openTab();
