@@ -113,9 +113,13 @@ fn refusal(m: &Message) -> ApiError {
     }
 }
 
-/// Constant time.
-fn same(a: &[u8; 32], b: &[u8]) -> bool {
-    b.len() == 32 && a.iter().zip(b).fold(0u8, |d, (x, y)| d | (x ^ y)) == 0
+/// The host's proof, checked in constant time (`verify_slice`).
+fn daemon_proof_ok(secret: &[u8; 32], nc: &[u8; 32], nd: &[u8; 32], got: &[u8]) -> bool {
+    let mut m = <HmacSha256 as KeyInit>::new_from_slice(secret).expect("HMAC takes any key length");
+    m.update(b"shellx-mux/daemon");
+    m.update(nc);
+    m.update(nd);
+    m.verify_slice(got).is_ok()
 }
 
 pub trait Session {
@@ -160,7 +164,7 @@ fn handshake(
         .and_then(|b| b.try_into().ok())
         .ok_or_else(|| not_running("handshake"))?;
     let got = theirs.get("proof").and_then(Value::as_bytes).unwrap_or(&[]);
-    if !same(&daemon_proof(secret, &nc, &nd), got) {
+    if !daemon_proof_ok(secret, &nc, &nd, got) {
         return Err(not_running("proof"));
     }
     if theirs.get("protocol").and_then(Value::as_i64) != Some(MUX_PROTOCOL) {
@@ -203,10 +207,11 @@ impl Deadline<'_> {
 /// block then (reads drain the buffer, then EOF), so that error is ignored.
 #[cfg(unix)]
 fn tolerate_closed_peer(r: std::io::Result<()>) -> std::io::Result<()> {
-    match r {
-        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
-        r => r,
+    #[cfg(target_os = "macos")]
+    if matches!(&r, Err(e) if e.raw_os_error() == Some(libc::EINVAL)) {
+        return Ok(());
     }
+    r
 }
 
 #[cfg(unix)]
@@ -320,7 +325,14 @@ impl Session for Conn {
         self.next_q += 1;
         let mut m = Message::new(t, fields);
         m.q = Some(q);
-        send(&mut self.stream, &m).map_err(|e| ApiError::Io(e.to_string()))?;
+        if send(&mut self.stream, &m).is_err() {
+            // The host may have refused and hung up: its message is still
+            // buffered. Anything else is a dead link.
+            return match recv(&mut self.stream) {
+                Ok(r) if r.t == "error" && r.q.is_none() => Err(refusal(&r)),
+                _ => Err(closed()),
+            };
+        }
         loop {
             let r = recv(&mut self.stream).map_err(|_| closed())?;
             if r.q != Some(q) {

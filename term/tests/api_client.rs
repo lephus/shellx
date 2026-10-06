@@ -254,6 +254,29 @@ fn a_refusal_after_ready_carries_the_hosts_message() {
     h.join().unwrap();
 }
 
+/// The host refuses and hangs up before the client's request: the send
+/// fails, yet the buffered refusal is what the CLI reports.
+#[test]
+fn a_buffered_refusal_survives_a_failed_send() {
+    let p = temp_sock("hangup");
+    let h = host(&p, honest(), |s| {
+        ready(s);
+        send(s, &forbidden()).unwrap();
+        s.shutdown(std::net::Shutdown::Both).unwrap();
+    });
+    let mut c = dial(&p, Duration::from_secs(2), None).unwrap();
+    h.join().unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    let e = c.request("ui.ls", vec![]).unwrap_err();
+    assert_eq!(
+        e,
+        ApiError::Remote {
+            code: "forbidden".into(),
+            message: HINT.into()
+        }
+    );
+}
+
 #[test]
 fn a_refusal_in_place_of_ready_carries_the_hosts_message() {
     let p = temp_sock("noready");
