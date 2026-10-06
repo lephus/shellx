@@ -423,16 +423,53 @@ class SignedOutStrip extends StatelessWidget {
 /// bar read as a phone at 14 px, where `smartphone` is a plain rectangle.
 const IconData kPhoneIcon = Icons.phone_iphone_outlined;
 
-/// UI §2.5: never interactive (clicks reach the terminal), never resizes
-/// the terminal. Announced once when it appears. [compact] (a narrow pane)
+/// UI §2.5: clicks reach the terminal, except on the [iconOnly] pill, which
+/// takes the pointer so its tooltip can show; never resizes the terminal. Announced once when it appears. [compact] (a narrow pane)
 /// uses the short copy, so the instruction is never the part cut off.
 class DriverPill extends StatelessWidget {
-  const DriverPill({super.key, this.compact = false});
+  const DriverPill({super.key, this.compact = false, this.iconOnly = false});
   final bool compact;
+
+  /// Final ruling S-4: a pane too narrow for the instruction shows the
+  /// phone mark alone; the words move to its tooltip and its label, so
+  /// the instruction is never the part cut off.
+  final bool iconOnly;
+
+  static final _decoration = BoxDecoration(
+    color: ShellxDesktopColors.warnBg,
+    borderRadius: BorderRadius.circular(ShellxRadius.pill),
+    border: Border.all(color: ShellxDesktopColors.warnBorder),
+    boxShadow: ShellxShadows.e1,
+  );
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    if (iconOnly) {
+      // Hit-testable (unlike the pill with words) for its tooltip; 28 px
+      // of the corner is all it takes from the terminal.
+      return Tooltip(
+        message: l10n.terminalDriverPhone,
+        excludeFromSemantics: true,
+        child: Semantics(
+          liveRegion: true,
+          label: l10n.terminalDriverPhone,
+          child: Container(
+            key: const Key('pane.driverPill'),
+            width: ShellxSizes.driverPill,
+            height: ShellxSizes.driverPill,
+            decoration: _decoration,
+            child: const Center(
+              child: Icon(
+                kPhoneIcon,
+                size: ShellxSizes.mark,
+                color: ShellxDesktopColors.warn,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return IgnorePointer(
       child: Semantics(
         liveRegion: true,
@@ -448,12 +485,7 @@ class DriverPill extends StatelessWidget {
             horizontal: ShellxSpace.s12,
             vertical: (ShellxSizes.driverPill - ShellxSizes.rowTextLine) / 2,
           ),
-          decoration: BoxDecoration(
-            color: ShellxDesktopColors.warnBg,
-            borderRadius: BorderRadius.circular(ShellxRadius.pill),
-            border: Border.all(color: ShellxDesktopColors.warnBorder),
-            boxShadow: ShellxShadows.e1,
-          ),
+          decoration: _decoration,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -532,7 +564,8 @@ class _NoticeToastState extends State<NoticeToast> {
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
   bool get _neutral =>
       widget.notice is WorkspaceDeletedNotice ||
-      widget.notice is NoUnreadNotice;
+      widget.notice is NoUnreadNotice ||
+      widget.notice is PaneNoRoomNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -577,6 +610,7 @@ class _NoticeToastState extends State<NoticeToast> {
       l10n.workspaceDeleted(name, movedTo),
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
+    PaneNoRoomNotice() => l10n.paneSplitNoRoom,
   };
 
   @override

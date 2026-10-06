@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show FileSystemException;
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:test/test.dart';
@@ -273,5 +275,94 @@ void main() {
     view.resize(120, 40);
     expect(rig.pty(0).writes, isEmpty);
     expect(rig.pty(0).resizes, isEmpty);
+  });
+
+  group('open(cwd:) (A3 D17)', () {
+    test('an existing absolute directory is the working directory', () async {
+      final probed = <String>[];
+      final rig = SessionRig(
+        directoryExists: (path) async {
+          probed.add(path);
+          return path == '/Users/test/work/shellx';
+        },
+      );
+      await rig.manager.open(
+        cols: 80,
+        rows: 24,
+        cwd: '/Users/test/work/shellx',
+      );
+      expect(rig.pty(0).workingDirectory, '/Users/test/work/shellx');
+      expect(probed, ['/Users/test/work/shellx']);
+    });
+
+    test(
+      'null, empty, relative or missing → home, relative never probed',
+      () async {
+        final probed = <String>[];
+        final rig = SessionRig(
+          directoryExists: (path) async {
+            probed.add(path);
+            return false;
+          },
+        );
+        for (final cwd in [null, '', 'work/shellx', '/Users/test/gone']) {
+          await rig.manager.open(cols: 80, rows: 24, cwd: cwd);
+        }
+        expect([
+          for (final p in rig.factory.ptys) p.workingDirectory,
+        ], List.filled(4, '/Users/test'));
+        expect(probed, ['/Users/test/gone']);
+      },
+    );
+
+    test('a probe that throws → home', () async {
+      final rig = SessionRig(
+        directoryExists: (_) async => throw const FileSystemException('denied'),
+      );
+      await rig.manager.open(cols: 80, rows: 24, cwd: '/private');
+      expect(rig.pty(0).workingDirectory, '/Users/test');
+    });
+
+    test('a probe that hangs → home after 300 ms', () {
+      fakeAsync((async) {
+        final rig = SessionRig(
+          directoryExists: (_) => Completer<bool>().future, // never completes
+        );
+        int? id;
+        unawaited(
+          rig.manager
+              .open(cols: 80, rows: 24, cwd: '/Volumes/nas')
+              .then((value) => id = value),
+        );
+        async.elapse(const Duration(milliseconds: 299));
+        expect(id, isNull);
+        async.elapse(const Duration(milliseconds: 2));
+        async.flushMicrotasks();
+        expect(id, isNotNull);
+        expect(rig.pty(0).workingDirectory, '/Users/test');
+      });
+    });
+
+    test('Windows: a drive path is used; UNC is never probed', () async {
+      final probed = <String>[];
+      final rig = SessionRig(
+        windowsPaths: true,
+        directoryExists: (path) async {
+          probed.add(path);
+          return true;
+        },
+      );
+      await rig.manager.open(cols: 80, rows: 24, cwd: r'C:\work\shellx');
+      await rig.manager.open(cols: 80, rows: 24, cwd: r'\\server\share\x');
+      expect(rig.pty(0).workingDirectory, r'C:\work\shellx');
+      expect(rig.pty(1).workingDirectory, '/Users/test');
+      expect(probed, [r'C:\work\shellx']);
+    });
+
+    test('phone opens still start at home', () async {
+      final rig = SessionRig(directoryExists: (_) async => true);
+      await rig.open(phone);
+      expect(rig.pty(0).workingDirectory, '/Users/test');
+    });
   });
 }

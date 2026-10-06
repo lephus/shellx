@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart';
 import '../../terminal/local_sessions_provider.dart';
+import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
@@ -19,6 +20,7 @@ import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'sidebar_drag.dart';
 import 'terminal_overlays.dart';
+import 'terminal_shortcuts.dart';
 import 'workspace_header.dart';
 
 /// (hit − visual) / 2: where the 24 px visual of a 28 px icon button starts.
@@ -729,6 +731,27 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               value: _RowAction.automaticName,
               label: l10n.tabUseAutomaticName,
             ),
+          // UI-A3 §4.2.
+          ShellxMenuEntry(
+            key: const Key('menu.row.splitRight'),
+            value: _RowAction.splitRight,
+            label: l10n.paneSplitRight,
+            shortcut: splitRightShortcutLabel(),
+            dividerBefore: true,
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.row.splitDown'),
+            value: _RowAction.splitDown,
+            label: l10n.paneSplitDown,
+            shortcut: splitDownShortcutLabel(),
+          ),
+          if (tab.isSplit)
+            ShellxMenuEntry(
+              key: const Key('menu.row.equalize'),
+              value: _RowAction.equalize,
+              label: l10n.paneEqualize,
+              shortcut: equalizePanesShortcutLabel(),
+            ),
           ShellxMenuEntry(
             key: const Key('menu.moveTo'),
             value: _RowAction.moveTo,
@@ -767,8 +790,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ShellxMenuEntry(
             key: const Key('menu.closeTab'),
             value: _RowAction.close,
-            label: l10n.terminalCloseTab,
-            shortcut: closeTabShortcutLabel(),
+            // Final N-2: a split tab says every pane goes.
+            label: tab.isSplit
+                ? l10n.terminalCloseTabAllPanes
+                : l10n.terminalCloseTab,
+            // D6: ⌘W closes a pane of a split tab.
+            shortcut: tab.isSplit ? null : closeTabShortcutLabel(),
             dividerBefore: true,
           ),
         ],
@@ -783,6 +810,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           _startTabRename(tab.id, fromList: fromList);
         case _RowAction.automaticName:
           ref.read(terminalTabsProvider.notifier).rename(tab.id, null);
+        case _RowAction.splitRight:
+          _splitFromRow(tab, SplitAxis.row);
+        case _RowAction.splitDown:
+          _splitFromRow(tab, SplitAxis.column);
+        case _RowAction.equalize:
+          widget.onSelected(tab.id);
+          Actions.maybeInvoke(context, const EqualizePanesIntent());
         case _RowAction.moveTo:
           await _moveToMenu(tab, at, fromList: fromList);
         case _RowAction.ports:
@@ -881,6 +915,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     return box.localToGlobal(Offset(ShellxSpace.s8, box.size.height));
   }
 
+  /// D21/D30: the row's tab is selected first, then the window's split
+  /// action runs (announcement and focus included).
+  void _splitFromRow(TerminalTab tab, SplitAxis axis) {
+    widget.onSelected(tab.id);
+    Actions.maybeInvoke(context, SplitPaneIntent(axis));
+  }
+
   /// UI-A2 §8 + UI-A4 §8, in the row menu's order (the row adds "Mark
   /// as read" before and "Close tab" after): mark all as read (when
   /// anything is unread), rename, move (only what can be done), one per
@@ -897,6 +938,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             ref.read(tabAttentionProvider.notifier).markAllRead(),
       CustomSemanticsAction(label: l10n.tabRename): () =>
           _startTabRename(tab.id, fromList: widget.focusNode.hasFocus),
+      // UI-A3 §8.
+      CustomSemanticsAction(label: l10n.paneSplitRight): () =>
+          _splitFromRow(tab, SplitAxis.row),
+      CustomSemanticsAction(label: l10n.paneSplitDown): () =>
+          _splitFromRow(tab, SplitAxis.column),
       CustomSemanticsAction(label: l10n.tabMoveTo): () => unawaited(
         _moveToMenu(
           tab,
@@ -1687,6 +1733,9 @@ enum _RowAction {
   markAllRead,
   rename,
   automaticName,
+  splitRight,
+  splitDown,
+  equalize,
   moveTo,
   moveUp,
   moveDown,

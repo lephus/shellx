@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
@@ -134,6 +135,94 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     tab: tab,
   );
 
+  /// ⌘W on a split tab, the pane ×, middle click on a pane header, "Close
+  /// pane" (UI-A3 §2.1, §4.1); the keyboard then goes to the tab's new
+  /// focused pane (UI-A3 §6), or back to the same pane when the dialog is
+  /// cancelled. A pane that closed is announced (D22).
+  Future<void> closePane(TerminalTab tab, int paneId) async {
+    final l10n = AppLocalizations.of(context);
+    await closePaneWithConfirm(
+      tabs: ref.read(terminalTabsProvider.notifier),
+      router: ref.read(windowRouterProvider.notifier),
+      l10n: l10n,
+      tab: tab,
+      paneId: paneId,
+    );
+    if (!mounted) return;
+    final after = ref
+        .read(terminalTabsProvider)
+        .tabs
+        .where((t) => t.id == tab.id)
+        .firstOrNull;
+    // Only this pane going away is news: a cancelled dialog says nothing,
+    // even when another pane exited meanwhile.
+    if (tab.isSplit && after != null && !after.panes.containsKey(paneId)) {
+      _announce(l10n.paneAnnounceClosed(after.paneCount));
+    }
+    focusTerminal();
+  }
+
+  /// D20 / A1: on Windows AltGr arrives as Ctrl+Alt; with the right Alt
+  /// held, a chord stays the shell's (AltGr+digit, AltGr+Shift+D and
+  /// AltGr+arrows type characters on German or Polish layouts).
+  static bool _leftAltOnly(Intent _) =>
+      defaultTargetPlatform != TargetPlatform.windows ||
+      !HardwareKeyboard.instance.logicalKeysPressed.contains(
+        LogicalKeyboardKey.altRight,
+      );
+
+  bool _split(Intent intent) =>
+      _leftAltOnly(intent) && ref.read(terminalTabsProvider).selected != null;
+
+  /// The pane chords apply only to a split tab; otherwise the key reaches
+  /// the shell, like ⌘C without a selection.
+  bool _isSplit(Intent intent) =>
+      _leftAltOnly(intent) &&
+      (ref.read(terminalTabsProvider).selected?.isSplit ?? false);
+
+  /// D22: polite, once.
+  void _announce(String message) => unawaited(
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      message,
+      Directionality.of(context),
+    ),
+  );
+
+  /// A focus change from the keyboard (UI-A3 §8); a click is not read.
+  void _announceFocusedPane() {
+    final tab = ref.read(terminalTabsProvider).selected;
+    if (tab == null || !tab.isSplit) return;
+    _announce(
+      AppLocalizations.of(context).paneRegionLabel(
+        tab.paneNumber(tab.focusedPaneId),
+        tab.paneCount,
+        tab.focused.automaticLabel,
+      ),
+    );
+  }
+
+  /// ⌘D / ⌘⇧D, the menus: the new pane is announced and gets the keyboard.
+  /// Announced only while the split tab is still the one shown: a tab
+  /// switch during a pending open must not speak for another tab.
+  Future<void> _splitPane(SplitAxis axis) async {
+    final origin = ref.read(terminalTabsProvider).selected;
+    if (origin == null) return;
+    await ref.read(terminalTabsProvider.notifier).split(axis);
+    if (!mounted) return;
+    final tab = ref.read(terminalTabsProvider).selected;
+    if (tab != null &&
+        tab.id == origin.id &&
+        tab.paneCount > origin.paneCount) {
+      _announce(
+        AppLocalizations.of(
+          context,
+        ).paneAnnounceSplit(tab.paneNumber(tab.focusedPaneId), tab.paneCount),
+      );
+    }
+    focusTerminal();
+  }
+
   /// UI §3.6 regions: terminal (or "Open new tab" with no tab), sidebar,
   /// signed-out strip (when shown).
   void _cycleRegion(int step) {
@@ -182,6 +271,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         if (selected == null) {
           // UI §2.7 (accepted): ⌘W on the empty state hides the window.
           ref.read(windowRouterProvider.notifier).hideWindow();
+        } else if (selected.isSplit) {
+          unawaited(closePane(selected, selected.focusedPaneId)); // A3 D6
         } else {
           unawaited(closeTab(selected));
         }
@@ -192,15 +283,40 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           workspaces.selectVisible(intent.position);
           focusTerminal();
         },
-        // On Windows AltGr arrives as Ctrl+Alt, and AltGr+digit types
-        // `{ [ ] }` on many layouts (German, Polish…): with the right Alt
-        // held the key stays the shell's.
-        enabled: (_) =>
-            defaultTargetPlatform != TargetPlatform.windows ||
-            !HardwareKeyboard.instance.logicalKeysPressed.contains(
-              LogicalKeyboardKey.altRight,
-            ),
+        // AltGr+digit types `{ [ ] }` on many layouts (German, Polish…).
+        enabled: _leftAltOnly,
       ),
+      // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell; like the
+      // other window shortcuts they close the panel first (UI-A4 §5.3).
+      SplitPaneIntent: run<SplitPaneIntent>((intent) {
+        closePanel();
+        unawaited(_splitPane(intent.axis));
+      }, enabled: _split),
+      FocusPaneIntent: run<FocusPaneIntent>((intent) {
+        closePanel();
+        if (tabs.focusDirection(intent.direction)) {
+          focusTerminal();
+          _announceFocusedPane();
+        }
+      }, enabled: _isSplit),
+      TogglePaneZoomIntent: run<TogglePaneZoomIntent>((_) {
+        closePanel();
+        final l10n = AppLocalizations.of(context);
+        _announce(
+          tabs.toggleZoom()
+              ? l10n.paneAnnounceZoomed
+              : l10n.paneAnnounceUnzoomed,
+        );
+        focusTerminal();
+      }, enabled: _isSplit),
+      EqualizePanesIntent: run<EqualizePanesIntent>((_) {
+        closePanel();
+        tabs.equalize();
+      }, enabled: _isSplit),
+      ResizePaneIntent: run<ResizePaneIntent>((intent) {
+        closePanel();
+        tabs.resizeFocused(intent.direction);
+      }, enabled: _isSplit),
       NextTabIntent: run<NextTabIntent>((_) {
         closePanel();
         workspaces.step(1);
@@ -324,13 +440,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     // A new selection gets the keyboard (UI §3.6), except while the
     // sidebar has it: its arrow keys (Task 8) move the selection and must
     // keep the focus in the list. An open name field keeps it too (D15).
-    ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
-      if (id != null &&
-          !sidebarFocus.hasFocus &&
-          ref.read(sidebarWorkspacesProvider).renaming == null) {
-        focusTerminal();
-      }
-    });
+    // A3 (UI-A3 §6): so does a new focused pane of the selected tab.
+    ref.listen(
+      terminalTabsProvider.select(
+        (s) => (s.selectedId, s.selected?.focusedPaneId),
+      ),
+      (_, next) {
+        if (next.$1 != null &&
+            !sidebarFocus.hasFocus &&
+            ref.read(sidebarWorkspacesProvider).renaming == null) {
+          focusTerminal();
+        }
+      },
+    );
     // The last tab closed: the keyboard goes to "Open new tab" instead of
     // vanishing with the terminal (after the frame that builds the button).
     ref.listen(terminalTabsProvider.select((s) => s.tabs.isEmpty), (
@@ -445,6 +567,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           emptyFocus: emptyFocus,
           stripFocus: stripFocus,
           shortcuts: terminalShortcuts,
+          onClosePane: (id) {
+            final tab = ref.read(terminalTabsProvider).tabOfSession(id);
+            if (tab != null) unawaited(closePane(tab, id));
+          },
         ),
       ),
     ],

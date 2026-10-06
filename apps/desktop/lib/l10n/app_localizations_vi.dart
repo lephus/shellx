@@ -933,4 +933,84 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get trayDesktopNotificationsUnfocused =>
       'Chỉ khi cửa sổ không ở phía trước';
+
+  @override
+  String get paneSplitRight => 'Chia sang phải';
+
+  @override
+  String get paneSplitDown => 'Chia xuống dưới';
+
+  @override
+  String get paneZoom => 'Phóng to pane';
+
+  @override
+  String get paneUnzoom => 'Bỏ phóng to';
+
+  @override
+  String get paneEqualize => 'Cân bằng pane';
+
+  @override
+  String get paneClose => 'Đóng pane';
+
+  @override
+  String paneCloseTooltip(String shortcut) {
+    return 'Đóng pane  $shortcut';
+  }
+
+  @override
+  String paneZoomedIndicator(int index, int count) {
+    return 'Phóng to · $index/$count';
+  }
+
+  @override
+  String paneRegionLabel(int index, int count, String title) {
+    return 'Pane $index trên $count — $title';
+  }
+
+  @override
+  String paneRegionUnreadLabel(int index, int count, String title) {
+    return 'Pane $index trên $count — $title, có thông báo chưa đọc';
+  }
+
+  @override
+  String get paneDividerLabel => 'Đường chia pane';
+
+  @override
+  String get paneSplitNoRoom => 'Không đủ chỗ để chia pane này';
+
+  @override
+  String paneAnnounceSplit(int index, int count) {
+    return 'Đã chia, pane $index trên $count';
+  }
+
+  @override
+  String paneAnnounceClosed(int count) {
+    return 'Đã đóng pane, còn $count';
+  }
+
+  @override
+  String get paneAnnounceZoomed => 'Đã phóng to pane';
+
+  @override
+  String get paneAnnounceUnzoomed => 'Đã bỏ phóng to';
+
+  @override
+  String sidebarPaneCount(int count) {
+    return '$count pane';
+  }
+
+  @override
+  String get terminalCloseTabAllPanes => 'Đóng tab (mọi pane)';
+
+  @override
+  String get confirmCloseRunningPaneBody =>
+      'Lệnh đang chạy trong pane này sẽ bị dừng.';
+
+  @override
+  String get confirmCloseRunningPaneAction => 'Đóng pane';
+
+  @override
+  String confirmCloseRunningPanesBody(int count) {
+    return '$count pane đang chạy lệnh sẽ bị dừng.';
+  }
 }

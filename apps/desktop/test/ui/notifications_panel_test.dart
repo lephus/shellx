@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations_en.dart';
 import 'package:shellx_desktop/l10n/app_localizations_vi.dart';
+import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/notifications_panel.dart';
@@ -45,6 +46,8 @@ TerminalWorkspacePageState page(WidgetTester tester) => tester
     .state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage));
 
 final panel = find.byKey(const Key('panel'));
+
+TerminalTabs tabs1() => container.read(terminalTabsProvider.notifier);
 
 List<String?> panelTexts(WidgetTester tester) => tester
     .widgetList<Text>(find.descendant(of: panel, matching: find.byType(Text)))
@@ -168,6 +171,21 @@ void main() {
     expect(tabs().selectedId, 3);
     expect(container.read(tabAttentionProvider).totalUnread, 0);
     expect(panel, findsNothing);
+  });
+
+  testSidebar('an entry from a split tab names the pane that sent it '
+      '(final m-6)', (tester) async {
+    await pumpSidebar(tester);
+    await tabs1().split(SplitAxis.row); // 1 | 100, 100 focused ("zsh 4")
+    await tester.pump();
+    await tester.pump();
+    expect(tabs().selected!.label, 'zsh 4');
+    local.notice(1, SessionNoticeKind.message, body: 'from pane 1');
+    await deliver(tester);
+    await openPanel(tester);
+    final texts = panelTexts(tester);
+    expect(texts, contains('zsh'));
+    expect(texts, isNot(contains('zsh 4')));
   });
 
   testSidebar('a closed tab entry says so and does not jump', (tester) async {

@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../terminal/pane_layout.dart';
+
 class NewTabIntent extends Intent {
   const NewTabIntent();
 }
@@ -13,6 +15,42 @@ class CloseTabIntent extends Intent {
 class NewWorkspaceIntent extends Intent {
   const NewWorkspaceIntent();
 }
+
+/// ⌘D / ⌘⇧D (A3 P3): split the focused pane of the selected tab.
+class SplitPaneIntent extends Intent {
+  const SplitPaneIntent(this.axis);
+  final SplitAxis axis;
+}
+
+/// ⌘⌥arrows / Ctrl+Alt+arrows (D9).
+class FocusPaneIntent extends Intent {
+  const FocusPaneIntent(this.direction);
+  final PaneDirection direction;
+}
+
+/// ⌘⇧↩ / Ctrl+Shift+Enter (D10).
+class TogglePaneZoomIntent extends Intent {
+  const TogglePaneZoomIntent();
+}
+
+/// ⌘⌃= / Ctrl+Shift+Alt+= (D11).
+class EqualizePanesIntent extends Intent {
+  const EqualizePanesIntent();
+}
+
+/// ⌘⌃arrows / Ctrl+Shift+Alt+arrows (D12).
+class ResizePaneIntent extends Intent {
+  const ResizePaneIntent(this.direction);
+  final PaneDirection direction;
+}
+
+// Not const: LogicalKeyboardKey overrides ==, so it cannot key a const map.
+final _arrows = {
+  LogicalKeyboardKey.arrowLeft: PaneDirection.left,
+  LogicalKeyboardKey.arrowRight: PaneDirection.right,
+  LogicalKeyboardKey.arrowUp: PaneDirection.up,
+  LogicalKeyboardKey.arrowDown: PaneDirection.down,
+};
 
 /// ⌘⇧I / Ctrl+Shift+I: open or close the notifications panel (A4 N5).
 class ToggleNotificationsPanelIntent extends Intent {
@@ -169,6 +207,52 @@ Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
         const NextTabIntent(),
     const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
         const PreviousTabIntent(),
+    // A3 P3 / D20. Windows chords with Alt are guarded against AltGr in
+    // the actions (Task 7), like Ctrl+Alt+digit.
+    SingleActivator(
+      LogicalKeyboardKey.keyD,
+      meta: mac,
+      control: !mac,
+      shift: !mac,
+      includeRepeats: false,
+    ): const SplitPaneIntent(
+      SplitAxis.row,
+    ),
+    SingleActivator(
+      LogicalKeyboardKey.keyD,
+      meta: mac,
+      control: !mac,
+      shift: true,
+      alt: !mac,
+      includeRepeats: false,
+    ): const SplitPaneIntent(
+      SplitAxis.column,
+    ),
+    for (final MapEntry(key: key, value: direction) in _arrows.entries) ...{
+      SingleActivator(key, meta: mac, control: !mac, alt: true):
+          FocusPaneIntent(direction),
+      SingleActivator(key, meta: mac, control: true, shift: !mac, alt: !mac):
+          ResizePaneIntent(direction),
+    },
+    for (final enter in [
+      LogicalKeyboardKey.enter,
+      LogicalKeyboardKey.numpadEnter,
+    ])
+      SingleActivator(
+        enter,
+        meta: mac,
+        control: !mac,
+        shift: true,
+        includeRepeats: false,
+      ): const TogglePaneZoomIntent(),
+    SingleActivator(
+      LogicalKeyboardKey.equal,
+      meta: mac,
+      control: true,
+      shift: !mac,
+      alt: !mac,
+      includeRepeats: false,
+    ): const EqualizePanesIntent(),
     font(LogicalKeyboardKey.equal): const FontBiggerIntent(),
     // ⌘+ is ⌘⇧= on a US layout; `add` is the "+" key of layouts that have
     // one (German…), and the keypad.

@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/agent_state.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
@@ -465,6 +466,60 @@ void main() {
       await answer(true);
       await done;
       expect(h.ptys.ptys.single.killed, isTrue);
+    });
+
+    test('the tray closes one pane of a split tab, not the tab (final '
+        'I-1)', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      final first = await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      final tabs = container.read(terminalTabsProvider.notifier);
+      TerminalTabsState tabState() => container.read(terminalTabsProvider);
+      await tabs.split(SplitAxis.row);
+      await pumpEventQueue();
+      final second = tabState().tabs.single.paneOrder.last;
+      expect(tabState().tabs.single.paneOrder, [first, second]);
+
+      // The tab's own id is its first pane's session (D1): only that pane.
+      await tray().handle(CloseSession(first));
+      await pumpEventQueue();
+      expect(window().confirm, isNull); // idle
+      expect(h.ptys.ptys[0].killed, isTrue);
+      expect(h.ptys.ptys[1].killed, isFalse);
+      expect(tabState().tabs.single.id, first);
+      expect(tabState().tabs.single.paneOrder, [second]);
+    });
+
+    test('the tray closes the second pane of a split tab, asking while it '
+        'runs a command (final I-1)', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      final first = await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      final tabs = container.read(terminalTabsProvider.notifier);
+      TerminalTabsState tabState() => container.read(terminalTabsProvider);
+      await tabs.split(SplitAxis.row);
+      await pumpEventQueue();
+      final second = tabState().tabs.single.paneOrder.last;
+      h.ptys.ptys[1].emit('\x1b]133;C\x07');
+      await pumpEventQueue();
+
+      final cancelled = tray().handle(CloseSession(second));
+      await pumpEventQueue();
+      final confirm = window().confirm!;
+      expect(confirm.body, 'The command running in this pane will be stopped.');
+      expect(confirm.confirmLabel, 'Close pane');
+      await answer(false);
+      await cancelled;
+      expect(h.ptys.ptys[1].killed, isFalse);
+      expect(tabState().tabs.single.paneOrder, [first, second]);
+
+      final done = tray().handle(CloseSession(second));
+      await answer(true);
+      await done;
+      await pumpEventQueue();
+      expect(h.ptys.ptys[1].killed, isTrue);
+      expect(h.ptys.ptys[0].killed, isFalse);
+      expect(tabState().tabs.single.paneOrder, [first]);
     });
 
     test(

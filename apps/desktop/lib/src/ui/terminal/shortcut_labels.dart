@@ -16,3 +16,10 @@ String moveDownShortcutLabel() => isMacDesktop ? '⌥↓' : 'Alt+↓';
 String newWorkspaceShortcutLabel() => isMacDesktop ? '⌘⇧N' : 'Ctrl+Shift+N';
 String notificationsShortcutLabel() => isMacDesktop ? '⌘⇧I' : 'Ctrl+Shift+I';
 String nextUnreadShortcutLabel() => isMacDesktop ? '⌘⇧U' : 'Ctrl+Shift+U';
+
+String splitRightShortcutLabel() => isMacDesktop ? '⌘D' : 'Ctrl+Shift+D';
+String splitDownShortcutLabel() => isMacDesktop ? '⌘⇧D' : 'Ctrl+Shift+Alt+D';
+String zoomPaneShortcutLabel() => isMacDesktop ? '⌘⇧↩' : 'Ctrl+Shift+Enter';
+String equalizePanesShortcutLabel() =>
+    isMacDesktop ? '⌘⌃=' : 'Ctrl+Shift+Alt+=';
+String closePaneShortcutLabel() => closeTabShortcutLabel();

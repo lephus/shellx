@@ -9,6 +9,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/context_line.dart';
+import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -188,6 +189,7 @@ class SessionTabRowState extends State<SessionTabRow> {
     final windows = defaultTargetPlatform == TargetPlatform.windows;
     final parts = <String>[
       tab.label,
+      if (tab.isSplit) l10n.sidebarPaneCount(tab.paneCount),
       if (tab.exited)
         l10n.sidebarStatusExited(tab.exitCode!)
       else if (tab.runningCommand)
@@ -380,6 +382,38 @@ class SessionTabRowState extends State<SessionTabRow> {
                       const SizedBox(width: ShellxSizes.badgeGap),
                       UnreadBadge(count: unread.count),
                     ],
+                    // UI-A3 §3: badge → pane count → phone; never cut.
+                    if (tab.isSplit) ...[
+                      const SizedBox(width: ShellxSpace.s4),
+                      Tooltip(
+                        message: l10n.sidebarPaneCount(tab.paneCount),
+                        excludeFromSemantics: true,
+                        child: Row(
+                          key: Key('row.paneCount.${tab.id}'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Final N-3: the icon follows the root split
+                            // (side by side: columns; stacked: rows).
+                            Icon(
+                              switch (tab.layout) {
+                                PaneSplit(axis: SplitAxis.column) =>
+                                  Icons.view_agenda_outlined,
+                                _ => Icons.view_column_outlined,
+                              },
+                              size: ShellxSizes.paneCountIcon,
+                              color: ShellxDesktopColors.textSecondary,
+                            ),
+                            const SizedBox(width: ShellxSizes.paneCountGap),
+                            Text(
+                              '${tab.paneCount}',
+                              style: ShellxText.caption.copyWith(
+                                color: ShellxDesktopColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
         ),
@@ -418,10 +452,13 @@ class SessionTabRowState extends State<SessionTabRow> {
           maintainAnimation: true,
           maintainState: true,
           child: _RowCloseButton(
-            tooltip: shortcutTooltip(
-              l10n.terminalCloseTabTooltip(shortcut),
-              shortcut,
-            ),
+            // D6: ⌘W closes a pane of a split tab, so no hint there.
+            tooltip: tab.isSplit
+                ? TextSpan(text: l10n.terminalCloseTabAllPanes)
+                : shortcutTooltip(
+                    l10n.terminalCloseTabTooltip(shortcut),
+                    shortcut,
+                  ),
             onPressed: widget.onClose,
           ),
         ),
@@ -747,6 +784,8 @@ void registerRowActionOrder(AppLocalizations l10n) {
     l10n.attentionMarkRead,
     l10n.attentionMarkAllRead,
     l10n.tabRename,
+    l10n.paneSplitRight, // UI-A3 §8
+    l10n.paneSplitDown,
     l10n.tabMoveTo,
     l10n.tabMoveUp,
     l10n.tabMoveDown,
