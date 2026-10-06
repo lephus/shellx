@@ -17,11 +17,43 @@ fn have(sh: &str) -> bool {
     Command::new(sh).arg("-c").arg("true").status().is_ok()
 }
 
+/// A temp dir removed when dropped (also when the test fails).
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new(name: &str) -> TempDir {
+        let d = std::env::temp_dir().join(format!("shellx-compl-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        TempDir(d)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+impl std::ops::Deref for TempDir {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+#[test]
+fn temp_dirs_are_removed() {
+    let d = TempDir::new("cleanup");
+    let path = d.to_path_buf();
+    std::fs::write(d.join("f"), "x").unwrap();
+    drop(d);
+    assert!(!path.exists());
+}
+
 /// A temp dir with a fake `shellx` whose `ls --ids` prints a hostile id.
-fn fake(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("shellx-compl-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&d);
-    std::fs::create_dir_all(&d).unwrap();
+fn fake(name: &str) -> TempDir {
+    let d = TempDir::new(name);
     let bin = d.join("shellx");
     let evil = format!("$(touch {}/PWNED)", d.display());
     std::fs::write(
@@ -124,10 +156,8 @@ fn zsh_completion_keeps_path_and_never_evaluates_ids() {
 }
 
 /// A temp dir with a fake `shellx` that prints [ids] verbatim.
-fn fake_ids(name: &str, ids: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("shellx-compl-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&d);
-    std::fs::create_dir_all(&d).unwrap();
+fn fake_ids(name: &str, ids: &str) -> TempDir {
+    let d = TempDir::new(name);
     let bin = d.join("shellx");
     std::fs::write(&bin, format!("#!/bin/sh\nprintf '{ids}'\n")).unwrap();
     use std::os::unix::fs::PermissionsExt;
