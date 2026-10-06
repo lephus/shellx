@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -41,6 +42,7 @@ final class MuxPeerInfo {
     this.sessions,
     this.caps = const [],
     this.token,
+    this.early = const [],
   });
   final int protocol;
   final String app;
@@ -53,6 +55,11 @@ final class MuxPeerInfo {
   /// A7 amendment (A5b D7 additive): the client's optional `auth.token`,
   /// as the host received it. Never logged.
   final String? token;
+
+  /// Messages that arrived in the same read as `ready` (client) or `auth`
+  /// (host), after it: the session layer handles them first, before its
+  /// own listener's. Not part of the wire.
+  final List<MuxMessage> early;
 }
 
 Uint8List _nonce() {
@@ -81,7 +88,7 @@ Future<MuxPeerInfo> clientHandshake(
   String? token,
 }) async {
   final nonceClient = _nonce();
-  final incoming = StreamIterator(c.messages);
+  final incoming = _HandshakeReader(c, timeout);
   try {
     c.send(
       MuxMessage(
@@ -94,13 +101,15 @@ Future<MuxPeerInfo> clientHandshake(
         },
       ),
     );
-    final hello = await _next(incoming, MuxType.hello, timeout);
+    final hello = await incoming.next(MuxType.hello);
     final nonceDaemon = hello.get<Uint8List>('nonce');
-    if (nonceDaemon == null ||
-        !_same(
-          daemonProof(secret, nonceClient, nonceDaemon),
-          hello.get<Uint8List>('proof'),
-        )) {
+    if (nonceDaemon == null || nonceDaemon.length != 32) {
+      throw const MuxHandshakeException('daemon nonce');
+    }
+    if (!_same(
+      daemonProof(secret, nonceClient, nonceDaemon),
+      hello.get<Uint8List>('proof'),
+    )) {
       throw const MuxHandshakeException('daemon proof');
     }
     c.send(
@@ -113,7 +122,7 @@ Future<MuxPeerInfo> clientHandshake(
         },
       ),
     );
-    await _next(incoming, MuxType.ready, timeout);
+    await incoming.next(MuxType.ready);
     return MuxPeerInfo(
       protocol: hello.get<int>('protocol') ?? -1,
       app: hello.get<String>('app') ?? '',
@@ -123,15 +132,14 @@ Future<MuxPeerInfo> clientHandshake(
       caps: [
         for (final c in hello.get<List<Object?>>('caps') ?? const []) '$c',
       ],
+      early: await incoming.drain(),
     );
   } on MuxHandshakeException {
     await c.close();
     rethrow;
   } finally {
     // Hands the stream back: later messages go to the caller's listener.
-    // Not awaited: the cancel takes effect at once, and its future may
-    // belong to the root zone (it would escape a fake clock).
-    unawaited(incoming.cancel());
+    incoming.finish();
   }
 }
 
@@ -143,9 +151,9 @@ Future<MuxPeerInfo> serverHandshake(
   required MuxPeerInfo self,
   Duration timeout = const Duration(seconds: 2),
 }) async {
-  final incoming = StreamIterator(c.messages);
+  final incoming = _HandshakeReader(c, timeout);
   try {
-    final hello = await _next(incoming, MuxType.hello, timeout);
+    final hello = await incoming.next(MuxType.hello);
     final nonceClient = hello.get<Uint8List>('nonce');
     if (nonceClient == null || nonceClient.length != 32) {
       throw const MuxHandshakeException('client nonce');
@@ -166,7 +174,7 @@ Future<MuxPeerInfo> serverHandshake(
         },
       ),
     );
-    final auth = await _next(incoming, MuxType.auth, timeout);
+    final auth = await incoming.next(MuxType.auth);
     if (!_same(
       clientProof(secret, nonceDaemon, nonceClient),
       auth.get<Uint8List>('proof'),
@@ -179,28 +187,84 @@ Future<MuxPeerInfo> serverHandshake(
       app: hello.get<String>('app') ?? '',
       role: hello.get<String>('role'),
       token: auth.get<String>('token'),
+      early: await incoming.drain(),
     );
   } on MuxHandshakeException {
     await c.close();
     rethrow;
   } finally {
-    unawaited(incoming.cancel());
+    incoming.finish();
   }
 }
 
-Future<MuxMessage> _next(
-  StreamIterator<MuxMessage> it,
-  String type,
-  Duration timeout,
-) async {
-  final bool more;
-  try {
-    more = await it.moveNext().timeout(timeout);
-  } on TimeoutException {
-    throw const MuxHandshakeException('timeout');
+/// Reads the handshake's messages under one deadline for the whole
+/// exchange (D6). Never pauses its subscription, so messages that arrive in
+/// the same read after the last handshake step are kept ([finish]).
+final class _HandshakeReader {
+  _HandshakeReader(MuxConnection c, Duration timeout) {
+    _sub = c.messages.listen(
+      (m) {
+        final waiter = _waiter;
+        if (waiter != null) {
+          _waiter = null;
+          waiter.complete(m);
+        } else {
+          _queue.add(m);
+        }
+      },
+      onDone: () => _end(const MuxHandshakeException('closed')),
+      onError: (Object _) => _end(const MuxHandshakeException('closed')),
+    );
+    _deadline = Timer(
+      timeout,
+      () => _end(const MuxHandshakeException('timeout')),
+    );
   }
-  if (!more || it.current.type != type) {
-    throw MuxHandshakeException('expected $type');
+
+  late final StreamSubscription<MuxMessage> _sub;
+  late final Timer _deadline;
+  final _queue = Queue<MuxMessage>();
+  Completer<MuxMessage>? _waiter;
+  MuxHandshakeException? _ended;
+  bool _finished = false;
+
+  void _end(MuxHandshakeException reason) {
+    _ended ??= reason;
+    final waiter = _waiter;
+    _waiter = null;
+    waiter?.completeError(reason);
   }
-  return it.current;
+
+  Future<MuxMessage> next(String type) async {
+    final MuxMessage m;
+    if (_queue.isNotEmpty) {
+      m = _queue.removeFirst();
+    } else if (_ended case final reason?) {
+      throw reason;
+    } else {
+      m = await (_waiter = Completer<MuxMessage>()).future;
+    }
+    if (m.type != type) throw MuxHandshakeException('expected $type');
+    return m;
+  }
+
+  /// Lets the messages of the current read reach the queue (their
+  /// delivery is scheduled after this continuation), then [finish]es.
+  Future<List<MuxMessage>> drain() async {
+    await Future<void>.delayed(Duration.zero);
+    return finish();
+  }
+
+  /// Stops reading; returns what is left. Safe to call twice.
+  List<MuxMessage> finish() {
+    if (_finished) return const [];
+    _finished = true;
+    _deadline.cancel();
+    // Not awaited: the cancel takes effect at once, and its future may
+    // belong to the root zone (it would escape a fake clock).
+    unawaited(_sub.cancel());
+    final left = List<MuxMessage>.of(_queue);
+    _queue.clear();
+    return left;
+  }
 }
