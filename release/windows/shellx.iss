@@ -88,6 +88,8 @@ Type: filesandordirs; Name: "{userappdata}\pro.shellx\ShellX"
 ; shellx-term.exe that was still running then has exited by now).
 Type: filesandordirs; Name: "{localappdata}\ShellX\bin"
 Type: filesandordirs; Name: "{localappdata}\ShellX\term"
+; A5a D22: saved session layout and terminal contents.
+Type: filesandordirs; Name: "{localappdata}\ShellX\restore"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;

@@ -282,3 +282,40 @@ Thử tay trên **macOS và Windows thật** (CI không có; spec §6):
 - [ ] VoiceOver / Narrator: đọc "Pane 2 trên 3 — vim" khi chuyển focus bằng phím; đọc khi chia/đóng/phóng to; đường chia là thanh trượt tăng/giảm được.
 - [ ] Windows, màn hình 125 % (và 150 %): đường chia 1 px sắc nét, không nhoè hay lệch nửa điểm ảnh. Đã biết: gốc vùng terminal x = 221 không nằm trên lưới điểm ảnh vật lý ở 1,25×; các cạnh chia đã làm tròn theo điểm ảnh thiết bị, nhưng cần nhìn bằng mắt ở 1,25× và ghi lại nếu đường chia mờ.
 - [ ] Tab một pane trông giống hệt trước A3 (so ảnh chụp với bản A4); test tự động: `apps/desktop/test/ui/one_pane_parity_test.dart`.
+
+## 15. Khôi phục phiên — A5a (2026-10-07)
+
+Spec `specs/2026-10-07-desktop-restore-a5a-design.md`, UI `design/2026-10-07-shellx-desktop-ui-a5.md`, plan `plans/2026-10-07-desktop-restore-a5a.md`. Shell **không** sống qua thoát (A5b mới làm); A5a mở shell mới ở thư mục cũ và vẽ lại nội dung cũ trên vạch "— Phiên được khôi phục · … —".
+
+Riêng tư: `restore/` (macOS `~/Library/Application Support/pro.shellx.desktop/restore`, Windows `%LOCALAPPDATA%\ShellX\restore`) chứa nội dung terminal (có thể có bí mật): 0700/0600, loại khỏi Time Machine, không bao giờ rời máy; tắt/xoá ở tray → Terminal; gỡ cài đặt Windows xoá thư mục. Trang chính sách §4 đã cập nhật (vi/en).
+
+Đo (spec tiêu chí 10, đo không chặn): từ `apps/desktop`, `flutter test --run-skipped --tags benchmark test/restore/restore_benchmark_test.dart` (phải có `--run-skipped`: `dart_test.yaml` bỏ qua thẻ `benchmark`). Apple M4, 2026-10-07: mã hoá 32 pane × 2.000 dòng ~85 ms + ghi ~37 ms = **~120 ms** (≤ 500 ms); ghi bố cục 32 tab ~6 ms (≤ 20 ms).
+
+### Thử tay — macOS
+- [ ] ⌘Q / mở lại: workspace, tab, tên, cây pane, tỉ lệ, phóng to, pane focus, tab chọn; không có tab thừa
+- [ ] `seq 1 5000` → 3001…5000 + vạch + prompt mới; `ls --color` giữ màu; `history` không có rác
+- [ ] vim mở lúc thoát → nội dung trước vim được lưu, không có màn hình vim
+- [ ] `kill -9` → dải "đóng bất thường"; Esc/Đóng; F6 tới được; Tab từ dải → terminal, Shift+Tab → sidebar
+- [ ] VoiceOver: dải được đọc **một lần** khi hiện (lịch sự, không ngắt lời); nút Đóng đọc "Đóng thông báo khôi phục"
+- [ ] Khởi động lại máy không thoát app (menu Apple → Restart) → khôi phục đủ, không có dải
+- [ ] Đăng xuất (Log Out) khi ShellX mở → mở lại: khôi phục đủ, không có dải
+- [ ] Đăng xuất bị huỷ (một app khác từ chối thoát): nhiều khả năng ShellX đã thoát (đã trả lời đồng ý). Nếu ShellX vẫn chạy: sau ~10 s việc lưu chạy lại; `kill -9` lúc đó → lần mở sau có dải
+- [ ] Ẩn cửa sổ (đóng cửa sổ, app vẫn ở tray) → `restore/layout.json` đổi giờ sửa ngay (`ls -l`), không đợi 60 s
+- [ ] cwd bị xoá / ổ mạng ngắt / thư mục SMB → home, không chờ
+- [ ] Tray → Terminal → bỏ chọn → `restore/scrollback` rỗng ngay; "Xóa nội dung đã lưu" mờ
+- [ ] `ls -l` quyền 700/600; `tmutil isexcluded` → Excluded
+- [ ] Điện thoại: phiên được khôi phục **không** có nội dung cũ
+- [ ] Đo: chạy lệnh benchmark ở trên trên máy thật, ghi số (mốc: ~120 ms trên M4; tiêu chí < 500 ms)
+
+### Thử tay — Windows
+- [ ] `flutter build windows` thành công (`/W4 /WX`). C++ của A5a **chưa từng được biên dịch**: kênh `pro.shellx.desktop/app`, `flutter::MethodResultFunctions`, `MsgWaitForMultipleObjects`/`GetTickCount64`, `ENDSESSION_CLOSEAPP` trong `windows/runner/flutter_window.cpp`
+- [ ] Như macOS (trừ Time Machine, VoiceOver, Log Out): Thoát ở tray, `seq`/màu, vim, `End task` trong Task Manager → dải, cwd mất/UNC → home, công tắc tray, điện thoại
+- [ ] Start → Restart khi ShellX mở → mở lại: khôi phục đủ, nội dung có (cũ nhất 60 s), không có dải
+- [ ] Huỷ tắt máy (Notepad có chữ chưa lưu → Cancel): việc lưu chạy lại (`exitCancelled`); `End task` sau đó → lần mở sau có dải. Rồi tắt máy lại (hỏi → huỷ → hỏi lại) → lần mở sau **không** có dải
+- [ ] Restart Manager (một trình cài đặt/công cụ gọi `RmShutdown` lên ShellX.exe): ShellX lưu rồi tự thoát, **không** hỏi xác nhận; lần mở sau không có dải. Lưu ý: bản cài ShellX dùng `CloseApplications=no` + `taskkill /F`, nên cập nhật bằng bản cài của chính ShellX **sẽ** hiện dải ở lần mở sau (nội dung cũ nhất 60 s)
+- [ ] `icacls "%LOCALAPPDATA%\ShellX\restore"` → chỉ tài khoản của bạn (cùng SYSTEM/Administrators thừa hưởng), không có Users/Everyone
+- [ ] Không có LOCALAPPDATA (`set LOCALAPPDATA=` trong cmd rồi chạy ShellX.exe từ đó): app khởi động bình thường, không lưu/không khôi phục gì, không lỗi
+- [ ] Ẩn cửa sổ → `layout.json` đổi giờ sửa ngay
+- [ ] Narrator: dải có thể bị đọc **hai lần** (vùng live + `sendAnnouncement`). Ghi lại; nếu đọc hai lần thì bỏ một trong hai
+- [ ] Màn hình 125 % (mang từ A3 §14): đường chia 1 px sắc nét; gốc vùng terminal x = 221 không nằm trên lưới điểm ảnh vật lý ở 1,25× — nhìn bằng mắt, cả khi dải khôi phục đang hiện
+- [ ] Gỡ cài đặt xoá `%LOCALAPPDATA%\ShellX\restore`

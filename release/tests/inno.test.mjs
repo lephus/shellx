@@ -61,3 +61,7 @@ test('uninstall removes the launch-at-login registry value', () => {
     'missing RegDeleteValue for HKCU Run\\ShellX',
   );
 });
+
+test('uninstall deletes the restore folder (A5a D22)', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\restore"/);
+});
