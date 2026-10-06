@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
 
 /// A Keychain/Keystore that cannot be read (locked, corrupted, or a platform error).
 class _UnreadableStore implements KeyValueStore {
@@ -59,5 +60,30 @@ void main() {
 
     expect(settings.fontSize.value, AppSettings.defaultFontSize);
     expect(settings.biometricLock.value, isTrue);
+  });
+
+  group('voice language', () {
+    test('is null until chosen, then stored and loaded back', () async {
+      final store = InMemoryKeyValueStore();
+      final settings = AppSettings(store);
+      await settings.load();
+      expect(settings.voiceLocale.value, isNull);
+
+      await settings.setVoiceLocale(VoiceLocale.en);
+      expect(settings.voiceLocale.value, VoiceLocale.en);
+      expect(await store.read(AppSettings.voiceLocaleKey), 'en');
+
+      final reloaded = AppSettings(store);
+      await reloaded.load();
+      expect(reloaded.voiceLocale.value, VoiceLocale.en);
+    });
+
+    test('an unknown stored value counts as never chosen', () async {
+      final store = InMemoryKeyValueStore();
+      await store.write(AppSettings.voiceLocaleKey, 'fr');
+      final settings = AppSettings(store);
+      await settings.load();
+      expect(settings.voiceLocale.value, isNull);
+    });
   });
 }
