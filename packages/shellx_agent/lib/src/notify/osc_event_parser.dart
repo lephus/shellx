@@ -106,9 +106,16 @@ final class BellRung extends OscEvent {
   String toString() => 'BellRung()';
 }
 
+/// The bytes of one OSC 99 notification so far. Kept as bytes so a
+/// base64 (`e=1`) chunk may end inside a UTF-8 character: the text is
+/// decoded once, when the last chunk arrives.
 final class _KittyDraft {
-  final title = StringBuffer();
-  final body = StringBuffer();
+  final title = BytesBuilder();
+  final body = BytesBuilder();
+
+  /// Grew past [OscEventParser.maxPayload]: its later chunks are ignored
+  /// until `d=1`, so no truncated tail becomes a notification.
+  bool dropped = false;
   int get length => title.length + body.length;
 }
 
@@ -299,17 +306,27 @@ final class OscEventParser {
       }
     }
     if (part != 'title' && part != 'body') return null;
-    var payload = text.substring(split + 1);
+    final payload = text.substring(split + 1);
+    final List<int> bytes;
     if (encoded) {
       try {
-        payload = utf8.decode(base64.decode(base64.normalize(payload)));
+        bytes = base64.decode(base64.normalize(payload));
       } on FormatException {
         return null;
       }
+    } else {
+      bytes = utf8.encode(payload);
     }
     final draft = _kittyDrafts.remove(id) ?? _KittyDraft();
-    (part == 'title' ? draft.title : draft.body).write(payload);
-    if (draft.length > maxPayload) return null; // dropped with its chunks
+    if (!draft.dropped) {
+      (part == 'title' ? draft.title : draft.body).add(bytes);
+      if (draft.length > maxPayload) {
+        draft
+          ..dropped = true
+          ..title.clear()
+          ..body.clear();
+      }
+    }
     if (!done) {
       if (_kittyDrafts.length >= maxKittyDrafts) {
         _kittyDrafts.remove(_kittyDrafts.keys.first);
@@ -317,8 +334,15 @@ final class OscEventParser {
       _kittyDrafts[id] = draft;
       return null;
     }
-    final title = draft.title.toString().trim();
-    final body = draft.body.toString().trim();
+    if (draft.dropped) return null;
+    final String title;
+    final String body;
+    try {
+      title = utf8.decode(draft.title.takeBytes()).trim();
+      body = utf8.decode(draft.body.takeBytes()).trim();
+    } on FormatException {
+      return null; // broken UTF-8 inside base64: dropped
+    }
     if (body.isEmpty) {
       return title.isEmpty
           ? null

@@ -88,6 +88,34 @@ void main() {
       expect((events.single as KittyNotifyRequested).body.runes.length, 200);
     });
 
+    test('e=1 chunks are decoded once: a character split across chunks', () {
+      final bytes = utf8.encode('Xin chào ✓');
+      // Cut inside the 3-byte '✓' so neither half is valid UTF-8 alone.
+      final cut = bytes.length - 2;
+      final p = OscEventParser();
+      final first = base64.encode(bytes.sublist(0, cut));
+      final rest = base64.encode(bytes.sublist(cut));
+      expect(p.feed(_b('$esc]99;i=u:d=0:e=1:p=body;$first$st')), isEmpty);
+      expect(p.feed(_b('$esc]99;i=u:e=1:p=body;$rest$st')), [
+        const KittyNotifyRequested(title: null, body: 'Xin chào ✓'),
+      ]);
+    });
+
+    test('a draft dropped at the 4 KiB cap stays dropped until d=1', () {
+      final p = OscEventParser();
+      final chunk = 'x' * 3000;
+      p.feed(_b('$esc]99;i=big:d=0:p=body;$chunk$st'));
+      // This chunk pushes the draft over 4 KiB: it is dropped.
+      expect(p.feed(_b('$esc]99;i=big:d=0:p=body;$chunk$st')), isEmpty);
+      // Later chunks of the same id are not a new (truncated) notification.
+      expect(p.feed(_b('$esc]99;i=big:d=0:p=body;tail$st')), isEmpty);
+      expect(p.feed(_b('$esc]99;i=big:p=body;end$st')), isEmpty);
+      // After d=1 the id is free again.
+      expect(p.feed(_b('$esc]99;i=big;fresh$st')), [
+        const KittyNotifyRequested(title: null, body: 'fresh'),
+      ]);
+    });
+
     test('reset() forgets drafts', () {
       final p = OscEventParser();
       p.feed(_b('$esc]99;i=1:d=0;T$st'));
