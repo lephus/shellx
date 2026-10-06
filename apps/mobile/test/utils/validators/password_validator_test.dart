@@ -12,38 +12,38 @@ void main() {
   group('validatePassword', () {
     group('with standard requirements', () {
       test('returns error when password is null', () {
-        expect(validatePassword(null), equals('Password is required'));
+        expect(validatePassword(null), equals('Password is required.'));
       });
 
       test('returns error when password is empty', () {
-        expect(validatePassword(''), equals('Password is required'));
+        expect(validatePassword(''), equals('Password is required.'));
       });
 
       test('returns error when password is too short', () {
         expect(
           validatePassword('Abc1'),
-          equals('Password must be at least 8 characters'),
+          equals('Password must be at least 8 characters.'),
         );
       });
 
       test('returns error when missing uppercase', () {
         expect(
           validatePassword('abcdefgh1'),
-          equals('Password must contain at least one uppercase letter'),
+          equals('Password must contain at least one uppercase letter.'),
         );
       });
 
       test('returns error when missing lowercase', () {
         expect(
           validatePassword('ABCDEFGH1'),
-          equals('Password must contain at least one lowercase letter'),
+          equals('Password must contain at least one lowercase letter.'),
         );
       });
 
       test('returns error when missing digit', () {
         expect(
           validatePassword('Abcdefgh'),
-          equals('Password must contain at least one number'),
+          equals('Password must contain at least one number.'),
         );
       });
 
@@ -76,7 +76,7 @@ void main() {
       test('requires minimum 12 characters', () {
         expect(
           validatePassword('Test123!', requirements: PasswordRequirements.strong),
-          equals('Password must be at least 12 characters'),
+          equals('Password must be at least 12 characters.'),
         );
       });
 
@@ -86,7 +86,7 @@ void main() {
             'SecurePass123',
             requirements: PasswordRequirements.strong,
           ),
-          equals('Password must contain at least one special character'),
+          equals('Password must contain at least one special character.'),
         );
       });
 
@@ -132,21 +132,21 @@ void main() {
     test('returns error when confirmation is null', () {
       expect(
         validatePasswordConfirmation(null, 'password'),
-        equals('Please confirm your password'),
+        equals('Please confirm your password.'),
       );
     });
 
     test('returns error when confirmation is empty', () {
       expect(
         validatePasswordConfirmation('', 'password'),
-        equals('Please confirm your password'),
+        equals('Please confirm your password.'),
       );
     });
 
     test('returns error when passwords do not match', () {
       expect(
         validatePasswordConfirmation('password1', 'password2'),
-        equals('Passwords do not match'),
+        equals('Passwords do not match.'),
       );
     });
 
@@ -160,7 +160,7 @@ void main() {
     test('is case sensitive', () {
       expect(
         validatePasswordConfirmation('Password', 'password'),
-        equals('Passwords do not match'),
+        equals('Passwords do not match.'),
       );
     });
   });

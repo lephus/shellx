@@ -132,150 +132,150 @@ class S {
     );
   }
 
-  /// `Email is required`
+  /// `Email is required.`
   String get validationEmailRequired {
     return Intl.message(
-      'Email is required',
+      'Email is required.',
       name: 'validationEmailRequired',
       desc: '',
       args: [],
     );
   }
 
-  /// `Please enter a valid email address`
+  /// `Please enter a valid email address.`
   String get validationEmailInvalid {
     return Intl.message(
-      'Please enter a valid email address',
+      'Please enter a valid email address.',
       name: 'validationEmailInvalid',
       desc: '',
       args: [],
     );
   }
 
-  /// `Password is required`
+  /// `Password is required.`
   String get validationPasswordRequired {
     return Intl.message(
-      'Password is required',
+      'Password is required.',
       name: 'validationPasswordRequired',
       desc: '',
       args: [],
     );
   }
 
-  /// `Password must be at least {length} characters`
+  /// `Password must be at least {length} characters.`
   String validationPasswordMinLength(int length) {
     return Intl.message(
-      'Password must be at least $length characters',
+      'Password must be at least $length characters.',
       name: 'validationPasswordMinLength',
       desc: '',
       args: [length],
     );
   }
 
-  /// `Password must contain at least one uppercase letter`
+  /// `Password must contain at least one uppercase letter.`
   String get validationPasswordUppercase {
     return Intl.message(
-      'Password must contain at least one uppercase letter',
+      'Password must contain at least one uppercase letter.',
       name: 'validationPasswordUppercase',
       desc: '',
       args: [],
     );
   }
 
-  /// `Password must contain at least one lowercase letter`
+  /// `Password must contain at least one lowercase letter.`
   String get validationPasswordLowercase {
     return Intl.message(
-      'Password must contain at least one lowercase letter',
+      'Password must contain at least one lowercase letter.',
       name: 'validationPasswordLowercase',
       desc: '',
       args: [],
     );
   }
 
-  /// `Password must contain at least one number`
+  /// `Password must contain at least one number.`
   String get validationPasswordDigit {
     return Intl.message(
-      'Password must contain at least one number',
+      'Password must contain at least one number.',
       name: 'validationPasswordDigit',
       desc: '',
       args: [],
     );
   }
 
-  /// `Password must contain at least one special character`
+  /// `Password must contain at least one special character.`
   String get validationPasswordSpecialChar {
     return Intl.message(
-      'Password must contain at least one special character',
+      'Password must contain at least one special character.',
       name: 'validationPasswordSpecialChar',
       desc: '',
       args: [],
     );
   }
 
-  /// `Please confirm your password`
+  /// `Please confirm your password.`
   String get validationPasswordConfirmRequired {
     return Intl.message(
-      'Please confirm your password',
+      'Please confirm your password.',
       name: 'validationPasswordConfirmRequired',
       desc: '',
       args: [],
     );
   }
 
-  /// `Passwords do not match`
+  /// `Passwords do not match.`
   String get validationPasswordNotMatch {
     return Intl.message(
-      'Passwords do not match',
+      'Passwords do not match.',
       name: 'validationPasswordNotMatch',
       desc: '',
       args: [],
     );
   }
 
-  /// `This field is required`
+  /// `This field is required.`
   String get validationTextRequired {
     return Intl.message(
-      'This field is required',
+      'This field is required.',
       name: 'validationTextRequired',
       desc: '',
       args: [],
     );
   }
 
-  /// `Must be at least {length} characters`
+  /// `Must be at least {length} characters.`
   String validationTextMinLength(int length) {
     return Intl.message(
-      'Must be at least $length characters',
+      'Must be at least $length characters.',
       name: 'validationTextMinLength',
       desc: '',
       args: [length],
     );
   }
 
-  /// `Must be at most {length} characters`
+  /// `Must be at most {length} characters.`
   String validationTextMaxLength(int length) {
     return Intl.message(
-      'Must be at most $length characters',
+      'Must be at most $length characters.',
       name: 'validationTextMaxLength',
       desc: '',
       args: [length],
     );
   }
 
-  /// `Phone number is required`
+  /// `Phone number is required.`
   String get validationPhoneRequired {
     return Intl.message(
-      'Phone number is required',
+      'Phone number is required.',
       name: 'validationPhoneRequired',
       desc: '',
       args: [],
     );
   }
 
-  /// `Please enter a valid phone number`
+  /// `Please enter a valid phone number.`
   String get validationPhoneInvalid {
     return Intl.message(
-      'Please enter a valid phone number',
+      'Please enter a valid phone number.',
       name: 'validationPhoneInvalid',
       desc: '',
       args: [],
@@ -948,10 +948,10 @@ class S {
     );
   }
 
-  /// `Click the ShellX icon → {menu}, then scan the code.`
+  /// `Click the ShellX icon, choose {menu}, then scan the code.`
   String emptyStep3(String menu) {
     return Intl.message(
-      'Click the ShellX icon → $menu, then scan the code.',
+      'Click the ShellX icon, choose $menu, then scan the code.',
       name: 'emptyStep3',
       desc: '',
       args: [menu],
@@ -2087,6 +2087,76 @@ class S {
     return Intl.message(
       'Tap to take over',
       name: 'desktopDriverTakeOver',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App`
+  String get settingsAppGroup {
+    return Intl.message('App', name: 'settingsAppGroup', desc: '', args: []);
+  }
+
+  /// `Appearance`
+  String get settingsTheme {
+    return Intl.message(
+      'Appearance',
+      name: 'settingsTheme',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `System`
+  String get settingsThemeSystem {
+    return Intl.message(
+      'System',
+      name: 'settingsThemeSystem',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Light`
+  String get settingsThemeLight {
+    return Intl.message(
+      'Light',
+      name: 'settingsThemeLight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Dark`
+  String get settingsThemeDark {
+    return Intl.message('Dark', name: 'settingsThemeDark', desc: '', args: []);
+  }
+
+  /// `Terms of use`
+  String get settingsTerms {
+    return Intl.message(
+      'Terms of use',
+      name: 'settingsTerms',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Privacy policy`
+  String get settingsPrivacy {
+    return Intl.message(
+      'Privacy policy',
+      name: 'settingsPrivacy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open-source licences`
+  String get settingsLicenses {
+    return Intl.message(
+      'Open-source licences',
+      name: 'settingsLicenses',
       desc: '',
       args: [],
     );

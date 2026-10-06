@@ -85,6 +85,11 @@ class SettingsController extends Controller {
 
   Future<void> openNotificationSettings() => _links.openNotificationSettingsOrToast();
 
+  /// "Điều khoản sử dụng" and "Chính sách quyền riêng tư" (the pages Register links to).
+  Future<void> openTerms() => _links.openOrToast(AppConfig.termsPage);
+
+  Future<void> openPrivacy() => _links.openOrToast(AppConfig.privacyPage);
+
   Future<void> load() async {
     unawaited(_push.refreshPermission());
     await guard(() async {

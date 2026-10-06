@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
@@ -155,6 +158,66 @@ void main() {
     expect(find.text('DESKTOP-42'), findsNothing); // not paired
     expect(find.text('user@macbook'), findsNothing); // the preview is one rich text
     expect(find.textContaining('user@macbook', findRichText: true), findsOneWidget);
+  });
+
+  group('app group (theme, terms, privacy, licences)', () {
+    testWidgets('terms and privacy open the web pages; licences open the licence page', (tester) async {
+      await openSettings(tester);
+      expect(find.text('ỨNG DỤNG'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Điều khoản sử dụng'), 200);
+      await tester.tap(find.text('Điều khoản sử dụng'));
+      await tester.pump();
+      await tester.tap(find.text('Chính sách quyền riêng tư'));
+      await tester.pump();
+      expect(links.opened, [AppConfig.termsPage, AppConfig.privacyPage]);
+      await tester.tap(find.text('Giấy phép mã nguồn mở'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LicensePage), findsOneWidget);
+    });
+
+    testWidgets('no theme choice outside an AdaptiveTheme', (tester) async {
+      await openSettings(tester);
+      expect(find.text('Giao diện'), findsNothing);
+    });
+
+    testWidgets('Giao diện: Theo máy / Sáng / Tối switches and remembers the theme', (tester) async {
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      // One router for every rebuild of the theme.
+      final app = routedApp(
+        open: () => const SettingsRoute(),
+        routes: [AutoRoute(page: SettingsRoute.page)],
+      );
+      await tester.pumpWidget(
+        AdaptiveTheme(
+          light: ThemeDataFactory.create(Brightness.light),
+          dark: ThemeDataFactory.create(Brightness.dark),
+          initial: AdaptiveThemeMode.system,
+          builder: (_, _) => app,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openPushed(tester);
+      final control = find.byType(SegmentedButton<AdaptiveThemeMode>);
+      expect(control, findsOneWidget);
+      expect(tester.widget<SegmentedButton<AdaptiveThemeMode>>(control).selected, {AdaptiveThemeMode.system});
+      await tester.tap(find.text('Tối'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SegmentedButton<AdaptiveThemeMode>>(control).selected, {AdaptiveThemeMode.dark});
+      expect(await AdaptiveTheme.getThemeMode(), AdaptiveThemeMode.dark);
+      expect(
+        tester.getSize(find.ancestor(of: find.text('Sáng'), matching: find.byType(TextButton))).height,
+        greaterThanOrEqualTo(44),
+      );
+    });
+  });
+
+  testWidgets('footnotes and the version line use secondaryText (AA), not the disabled grey', (tester) async {
+    await openSettings(tester);
+    final colors = Brightness.light.appColors;
+    expect(tester.widget<Text>(find.text('ShellX 1.0.0 (1)')).style!.color, colors.secondaryText);
   });
 
   testWidgets('font size slider previews while it moves and stores the size on release', (tester) async {

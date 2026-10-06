@@ -12,15 +12,15 @@ void main() {
 
   group('validateRequired', () {
     test('returns error when value is null', () {
-      expect(validateRequired(null), equals('This field is required'));
+      expect(validateRequired(null), equals('This field is required.'));
     });
 
     test('returns error when value is empty', () {
-      expect(validateRequired(''), equals('This field is required'));
+      expect(validateRequired(''), equals('This field is required.'));
     });
 
     test('returns error when value is only whitespace', () {
-      expect(validateRequired('   '), equals('This field is required'));
+      expect(validateRequired('   '), equals('This field is required.'));
     });
 
     test('returns null for valid value', () {
@@ -36,7 +36,7 @@ void main() {
     test('returns error when value is too short', () {
       expect(
         validateMinLength('abc', 5),
-        equals('Must be at least 5 characters'),
+        equals('Must be at least 5 characters.'),
       );
     });
 
@@ -57,7 +57,7 @@ void main() {
     test('returns error when value exceeds maximum', () {
       expect(
         validateMaxLength('12345678901', 10),
-        equals('Must be at most 10 characters'),
+        equals('Must be at most 10 characters.'),
       );
     });
 
@@ -78,14 +78,14 @@ void main() {
     test('returns error when value is too short', () {
       expect(
         validateLengthRange('abc', 5, 10),
-        equals('Must be at least 5 characters'),
+        equals('Must be at least 5 characters.'),
       );
     });
 
     test('returns error when value is too long', () {
       expect(
         validateLengthRange('12345678901', 5, 10),
-        equals('Must be at most 10 characters'),
+        equals('Must be at most 10 characters.'),
       );
     });
 
@@ -104,32 +104,32 @@ void main() {
 
   group('validateName', () {
     test('returns error when value is null', () {
-      expect(validateName(null), equals('This field is required'));
+      expect(validateName(null), equals('This field is required.'));
     });
 
     test('returns error when value is empty', () {
-      expect(validateName(''), equals('This field is required'));
+      expect(validateName(''), equals('This field is required.'));
     });
 
     test('returns error when value is whitespace', () {
-      expect(validateName('   '), equals('This field is required'));
+      expect(validateName('   '), equals('This field is required.'));
     });
 
     test('returns error when name is too short', () {
-      expect(validateName('A'), equals('Must be at least 2 characters'));
+      expect(validateName('A'), equals('Must be at least 2 characters.'));
     });
 
     test('returns error when name contains numbers', () {
       expect(
         validateName('John123'),
-        equals('This field is required'), // Generic message for invalid format
+        equals('This field is required.'), // Generic message for invalid format
       );
     });
 
     test('returns error when name contains special chars', () {
       expect(
         validateName('John@Doe'),
-        equals('This field is required'), // Generic message for invalid format
+        equals('This field is required.'), // Generic message for invalid format
       );
     });
 
@@ -170,14 +170,14 @@ void main() {
     test('returns error when value contains spaces', () {
       expect(
         validateAlphanumeric('abc 123'),
-        equals('This field is required'), // Generic message
+        equals('This field is required.'), // Generic message
       );
     });
 
     test('returns error when value contains special chars', () {
       expect(
         validateAlphanumeric('abc-123'),
-        equals('This field is required'), // Generic message
+        equals('This field is required.'), // Generic message
       );
     });
 
@@ -218,14 +218,14 @@ void main() {
     test('returns error for code with special chars', () {
       expect(
         validateOptionalCode('ABC-123'),
-        equals('This field is required'), // Generic message
+        equals('This field is required.'), // Generic message
       );
     });
 
     test('returns error for code with spaces', () {
       expect(
         validateOptionalCode('ABC 123'),
-        equals('This field is required'), // Generic message
+        equals('This field is required.'), // Generic message
       );
     });
   });
@@ -245,7 +245,7 @@ void main() {
         (v) => validateRequired(v),
         (v) => validateMinLength(v, 2),
       ]);
-      expect(result, equals('This field is required'));
+      expect(result, equals('This field is required.'));
     });
 
     test('stops at first error', () {

@@ -1,3 +1,4 @@
+import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/presentation/biometric_method.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
@@ -5,8 +6,8 @@ import 'package:shellx_mobile/features/settings/presentation/controllers/setting
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// Spec §9.2 #5 and the design's "Cài đặt": grouped cards — Terminal (font size with a live
-/// preview), Security (biometric lock), Notifications (push spec §6), paired computers, account — and the version footer
-/// (it opens the open-source licences, incl. both fonts' OFL).
+/// preview), Security (biometric lock), Notifications (push spec §6), paired computers, App (theme,
+/// terms, privacy, open-source licences incl. both fonts' OFL), account — and the version footer.
 @RoutePage()
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -38,6 +39,15 @@ class _SettingsPageState extends State<SettingsPage> {
       confirmLabel: strings.settingsUnpair,
     );
     if (confirmed) await _controller.unpair(machine.agentId);
+  }
+
+  void _showLicenses() {
+    final strings = S.of(context);
+    showLicensePage(
+      context: context,
+      applicationName: strings.appTitle,
+      applicationVersion: '${_controller.version} (${_controller.buildNumber})',
+    );
   }
 
   Future<void> _logout() async {
@@ -204,14 +214,37 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           _Group(
+            header: strings.settingsAppGroup,
+            children: [
+              // Only under the app's AdaptiveTheme (page tests may build Settings without one).
+              if (AdaptiveTheme.maybeOf(context) case final theme?) ...[
+                _ThemeRow(theme: theme),
+                Divider(height: 1, color: colors.divider),
+              ],
+              _Row(
+                title: strings.settingsTerms,
+                trailing: Icon(Icons.open_in_new, size: 18, color: colors.secondaryText),
+                onTap: _controller.openTerms,
+              ),
+              Divider(height: 1, color: colors.divider),
+              _Row(
+                title: strings.settingsPrivacy,
+                trailing: Icon(Icons.open_in_new, size: 18, color: colors.secondaryText),
+                onTap: _controller.openPrivacy,
+              ),
+              Divider(height: 1, color: colors.divider),
+              _Row(
+                title: strings.settingsLicenses,
+                trailing: Icon(Icons.chevron_right, color: colors.secondaryText),
+                onTap: _showLicenses,
+              ),
+            ],
+          ),
+          _Group(
             header: strings.settingsAccountGroup,
             footer: Center(
               child: GestureDetector(
-                onTap: () => showLicensePage(
-                  context: context,
-                  applicationName: strings.appTitle,
-                  applicationVersion: '${_controller.version} (${_controller.buildNumber})',
-                ),
+                onTap: _showLicenses,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(version, style: context.typo.metadata12.copyWith(color: colors.secondaryText)),
@@ -245,6 +278,46 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Giao diện": follow the phone, or always light or dark (stored by AdaptiveTheme).
+class _ThemeRow extends StatelessWidget {
+  const _ThemeRow({required this.theme});
+
+  final AdaptiveThemeManager<ThemeData> theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = S.of(context);
+    return ValueListenableBuilder<AdaptiveThemeMode>(
+      valueListenable: theme.modeChangeNotifier,
+      builder: (context, mode, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(15, 10, 15, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(strings.settingsTheme, style: context.typo.subHeader15.copyWith(color: context.colors.primaryText)),
+            8.sizedHeight,
+            SegmentedButton<AdaptiveThemeMode>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(value: AdaptiveThemeMode.system, label: Text(strings.settingsThemeSystem)),
+                ButtonSegment(value: AdaptiveThemeMode.light, label: Text(strings.settingsThemeLight)),
+                ButtonSegment(value: AdaptiveThemeMode.dark, label: Text(strings.settingsThemeDark)),
+              ],
+              selected: {mode},
+              onSelectionChanged: (selection) => theme.setThemeMode(selection.single),
+              style: ButtonStyle(
+                minimumSize: const WidgetStatePropertyAll(Size(44, 44)),
+                tapTargetSize: MaterialTapTargetSize.padded,
+                textStyle: WidgetStatePropertyAll(context.typo.paragraph.bold),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

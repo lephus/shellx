@@ -12,42 +12,42 @@ void main() {
   group('validatePhone', () {
     group('without formatting (default)', () {
       test('returns error when phone is null', () {
-        expect(validatePhone(null), equals('Phone number is required'));
+        expect(validatePhone(null), equals('Phone number is required.'));
       });
 
       test('returns error when phone is empty', () {
-        expect(validatePhone(''), equals('Phone number is required'));
+        expect(validatePhone(''), equals('Phone number is required.'));
       });
 
       test('returns error when phone is only whitespace', () {
-        expect(validatePhone('   '), equals('Phone number is required'));
+        expect(validatePhone('   '), equals('Phone number is required.'));
       });
 
       test('returns error when phone is too short', () {
         expect(
           validatePhone('123456'),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
       test('returns error when phone is too long', () {
         expect(
           validatePhone('1234567890123456'),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
       test('returns error when phone contains letters', () {
         expect(
           validatePhone('12345abcde'),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
       test('returns error when phone contains special characters', () {
         expect(
           validatePhone('123-456-7890'),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
@@ -70,7 +70,7 @@ void main() {
       test('returns error for phone with + (requires allowFormatting)', () {
         expect(
           validatePhone('+84386412929'),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
     });
@@ -99,14 +99,14 @@ void main() {
       test('returns error for invalid format', () {
         expect(
           validatePhone('abc-def-ghij', allowFormatting: true),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
       test('returns error when too short even with formatting', () {
         expect(
           validatePhone('123', allowFormatting: true),
-          equals('Please enter a valid phone number'),
+          equals('Please enter a valid phone number.'),
         );
       });
 
@@ -148,7 +148,7 @@ void main() {
     test('uses default messages when custom not provided', () {
       expect(
         validatePhoneWithMessages(value: null),
-        equals('Phone number is required'),
+        equals('Phone number is required.'),
       );
     });
   });

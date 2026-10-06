@@ -24,7 +24,7 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m1(site) => "Install ShellX on your computer (macOS or Windows) from ${site}.";
 
-  static String m2(menu) => "Click the ShellX icon → ${menu}, then scan the code.";
+  static String m2(menu) => "Click the ShellX icon, choose ${menu}, then scan the code.";
 
   static String m3(reason) => "Couldn\'t start the shell: ${reason}";
 
@@ -71,11 +71,11 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m22(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m23(length) => "Password must be at least ${length} characters";
+  static String m23(length) => "Password must be at least ${length} characters.";
 
-  static String m24(length) => "Must be at most ${length} characters";
+  static String m24(length) => "Must be at most ${length} characters.";
 
-  static String m25(length) => "Must be at least ${length} characters";
+  static String m25(length) => "Must be at least ${length} characters.";
 
   static String m26(target) => "To: ${target}";
 
@@ -326,6 +326,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Getting the session list…",
     ),
     "settingsAccountGroup": MessageLookupByLibrary.simpleMessage("Account"),
+    "settingsAppGroup": MessageLookupByLibrary.simpleMessage("App"),
     "settingsBiometricUnavailable": MessageLookupByLibrary.simpleMessage(
       "No passcode or biometrics are set up on this device",
     ),
@@ -335,6 +336,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsEmail": MessageLookupByLibrary.simpleMessage("Email"),
     "settingsFontSize": MessageLookupByLibrary.simpleMessage(
       "Default font size",
+    ),
+    "settingsLicenses": MessageLookupByLibrary.simpleMessage(
+      "Open-source licences",
     ),
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Asked when the app opens and when you come back after more than 5 minutes.",
@@ -370,8 +374,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsPairedMachines": MessageLookupByLibrary.simpleMessage(
       "Paired computers",
     ),
+    "settingsPrivacy": MessageLookupByLibrary.simpleMessage("Privacy policy"),
     "settingsSecurityGroup": MessageLookupByLibrary.simpleMessage("Security"),
     "settingsTerminalGroup": MessageLookupByLibrary.simpleMessage("Terminal"),
+    "settingsTerms": MessageLookupByLibrary.simpleMessage("Terms of use"),
+    "settingsTheme": MessageLookupByLibrary.simpleMessage("Appearance"),
+    "settingsThemeDark": MessageLookupByLibrary.simpleMessage("Dark"),
+    "settingsThemeLight": MessageLookupByLibrary.simpleMessage("Light"),
+    "settingsThemeSystem": MessageLookupByLibrary.simpleMessage("System"),
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Unpair"),
@@ -425,43 +435,43 @@ class MessageLookup extends MessageLookupByLibrary {
       "App update required",
     ),
     "validationEmailInvalid": MessageLookupByLibrary.simpleMessage(
-      "Please enter a valid email address",
+      "Please enter a valid email address.",
     ),
     "validationEmailRequired": MessageLookupByLibrary.simpleMessage(
-      "Email is required",
+      "Email is required.",
     ),
     "validationPasswordConfirmRequired": MessageLookupByLibrary.simpleMessage(
-      "Please confirm your password",
+      "Please confirm your password.",
     ),
     "validationPasswordDigit": MessageLookupByLibrary.simpleMessage(
-      "Password must contain at least one number",
+      "Password must contain at least one number.",
     ),
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
-      "Password must contain at least one lowercase letter",
+      "Password must contain at least one lowercase letter.",
     ),
     "validationPasswordMinLength": m23,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
-      "Passwords do not match",
+      "Passwords do not match.",
     ),
     "validationPasswordRequired": MessageLookupByLibrary.simpleMessage(
-      "Password is required",
+      "Password is required.",
     ),
     "validationPasswordSpecialChar": MessageLookupByLibrary.simpleMessage(
-      "Password must contain at least one special character",
+      "Password must contain at least one special character.",
     ),
     "validationPasswordUppercase": MessageLookupByLibrary.simpleMessage(
-      "Password must contain at least one uppercase letter",
+      "Password must contain at least one uppercase letter.",
     ),
     "validationPhoneInvalid": MessageLookupByLibrary.simpleMessage(
-      "Please enter a valid phone number",
+      "Please enter a valid phone number.",
     ),
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
-      "Phone number is required",
+      "Phone number is required.",
     ),
     "validationTextMaxLength": m24,
     "validationTextMinLength": m25,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
-      "This field is required",
+      "This field is required.",
     ),
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(

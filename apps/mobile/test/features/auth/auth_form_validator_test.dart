@@ -33,6 +33,6 @@ void main() {
 
   test('sign-in password: only required', () {
     expect(validator.validatePassword('x'), isNull);
-    expect(validator.validatePassword(''), 'Cần nhập mật khẩu');
+    expect(validator.validatePassword(''), 'Cần nhập mật khẩu.');
   });
 }

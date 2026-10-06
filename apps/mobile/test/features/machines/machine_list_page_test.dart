@@ -122,6 +122,20 @@ void main() {
     expect(find.text('Ghép nối máy mới'), findsOneWidget);
   });
 
+  testWidgets('a long name keeps the full width, at most 2 lines; "Chưa ghép nối" sits under it', (tester) async {
+    const long = 'PC-KETOAN-PHONG-TAI-CHINH-TANG-3-TOA-NHA-B-CHI-NHANH-HA-NOI';
+    backend.deviceList = [agentDevice(ketoan, long, platform: DevicePlatform.windows)];
+    await openList(tester);
+    final name = tester.widget<Text>(find.text(long));
+    expect(name.maxLines, 2);
+    expect(name.overflow, TextOverflow.ellipsis);
+    final badge = tester.getRect(find.text('Chưa ghép nối'));
+    expect(badge.top, greaterThanOrEqualTo(tester.getRect(find.text(long)).bottom));
+    expect(badge.top, greaterThanOrEqualTo(tester.getRect(find.text('Online · Windows')).top));
+    final colors = Brightness.light.appColors;
+    expect(tester.widget<Text>(find.text('Chưa ghép nối')).style!.color, colors.link);
+  });
+
   testWidgets('online paired opens the terminal; unpaired opens the scanner; offline is not tappable', (tester) async {
     await openList(tester);
     await tester.tap(card(agentA));

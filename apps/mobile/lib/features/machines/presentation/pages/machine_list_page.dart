@@ -272,8 +272,11 @@ class MachineCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Long Windows names ("PC-KETOAN-PHONG-…") wrap at the hyphens: two lines at most.
                       Text(
                         machine.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: context.typo.subHeader.bold.copyWith(
                           color: machine.online ? colors.primaryText : colors.secondaryText,
                         ),
@@ -294,6 +297,19 @@ class MachineCard extends StatelessWidget {
                             ),
                           ),
                           Text(detail, style: context.typo.paragraph13.copyWith(color: colors.secondaryText)),
+                          // Under the name, not beside it: the name keeps the card's width.
+                          if (!machine.paired)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.primarySoft,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                strings.machineNotPaired,
+                                style: context.typo.metadata12.bold.copyWith(color: colors.link),
+                              ),
+                            ),
                           if (tabs > 0 && !waiting && machine.paired)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -311,17 +327,7 @@ class MachineCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (!machine.paired)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(color: colors.primarySoft, borderRadius: BorderRadius.circular(999)),
-                    child: Text(
-                      strings.machineNotPaired,
-                      style: context.typo.metadata12.bold.copyWith(color: colors.link),
-                    ),
-                  )
-                else if (onTap != null)
-                  Icon(Icons.chevron_right, color: colors.disable),
+                if (onTap != null) ...[6.sizedWidth, Icon(Icons.chevron_right, color: colors.secondaryText)],
               ],
             ),
           ),

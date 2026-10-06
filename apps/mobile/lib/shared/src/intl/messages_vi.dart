@@ -24,7 +24,7 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m1(site) => "Cài ShellX trên máy tính (macOS hoặc Windows) từ ${site}.";
 
-  static String m2(menu) => "Bấm biểu tượng ShellX → ${menu}, rồi quét mã.";
+  static String m2(menu) => "Bấm biểu tượng ShellX, chọn ${menu}, rồi quét mã.";
 
   static String m3(reason) => "Không mở được shell: ${reason}";
 
@@ -67,11 +67,11 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m22(terms, privacy) => "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
 
-  static String m23(length) => "Mật khẩu phải có ít nhất ${length} ký tự";
+  static String m23(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
 
-  static String m24(length) => "Tối đa ${length} ký tự";
+  static String m24(length) => "Tối đa ${length} ký tự.";
 
-  static String m25(length) => "Phải có ít nhất ${length} ký tự";
+  static String m25(length) => "Phải có ít nhất ${length} ký tự.";
 
   static String m26(target) => "Gửi tới: ${target}";
 
@@ -316,6 +316,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Đang lấy danh sách phiên…",
     ),
     "settingsAccountGroup": MessageLookupByLibrary.simpleMessage("Tài khoản"),
+    "settingsAppGroup": MessageLookupByLibrary.simpleMessage("Ứng dụng"),
     "settingsBiometricUnavailable": MessageLookupByLibrary.simpleMessage(
       "Thiết bị chưa đặt mã khóa hoặc sinh trắc học",
     ),
@@ -324,6 +325,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "settingsEmail": MessageLookupByLibrary.simpleMessage("Email"),
     "settingsFontSize": MessageLookupByLibrary.simpleMessage("Cỡ chữ mặc định"),
+    "settingsLicenses": MessageLookupByLibrary.simpleMessage(
+      "Giấy phép mã nguồn mở",
+    ),
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Hỏi khi mở app và khi quay lại sau hơn 5 phút.",
     ),
@@ -360,8 +364,16 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsPairedMachines": MessageLookupByLibrary.simpleMessage(
       "Máy đã ghép nối",
     ),
+    "settingsPrivacy": MessageLookupByLibrary.simpleMessage(
+      "Chính sách quyền riêng tư",
+    ),
     "settingsSecurityGroup": MessageLookupByLibrary.simpleMessage("Bảo mật"),
     "settingsTerminalGroup": MessageLookupByLibrary.simpleMessage("Terminal"),
+    "settingsTerms": MessageLookupByLibrary.simpleMessage("Điều khoản sử dụng"),
+    "settingsTheme": MessageLookupByLibrary.simpleMessage("Giao diện"),
+    "settingsThemeDark": MessageLookupByLibrary.simpleMessage("Tối"),
+    "settingsThemeLight": MessageLookupByLibrary.simpleMessage("Sáng"),
+    "settingsThemeSystem": MessageLookupByLibrary.simpleMessage("Theo máy"),
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Cài đặt"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Cài đặt"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Bỏ ghép nối"),
@@ -417,43 +429,43 @@ class MessageLookup extends MessageLookupByLibrary {
       "Cần cập nhật app",
     ),
     "validationEmailInvalid": MessageLookupByLibrary.simpleMessage(
-      "Hãy nhập địa chỉ email hợp lệ",
+      "Hãy nhập địa chỉ email hợp lệ.",
     ),
     "validationEmailRequired": MessageLookupByLibrary.simpleMessage(
-      "Cần nhập email",
+      "Cần nhập email.",
     ),
     "validationPasswordConfirmRequired": MessageLookupByLibrary.simpleMessage(
-      "Hãy xác nhận mật khẩu",
+      "Hãy xác nhận mật khẩu.",
     ),
     "validationPasswordDigit": MessageLookupByLibrary.simpleMessage(
-      "Mật khẩu phải có ít nhất một chữ số",
+      "Mật khẩu phải có ít nhất một chữ số.",
     ),
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
-      "Mật khẩu phải có ít nhất một chữ thường",
+      "Mật khẩu phải có ít nhất một chữ thường.",
     ),
     "validationPasswordMinLength": m23,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
-      "Mật khẩu không khớp",
+      "Mật khẩu không khớp.",
     ),
     "validationPasswordRequired": MessageLookupByLibrary.simpleMessage(
-      "Cần nhập mật khẩu",
+      "Cần nhập mật khẩu.",
     ),
     "validationPasswordSpecialChar": MessageLookupByLibrary.simpleMessage(
-      "Mật khẩu phải có ít nhất một ký tự đặc biệt",
+      "Mật khẩu phải có ít nhất một ký tự đặc biệt.",
     ),
     "validationPasswordUppercase": MessageLookupByLibrary.simpleMessage(
-      "Mật khẩu phải có ít nhất một chữ hoa",
+      "Mật khẩu phải có ít nhất một chữ hoa.",
     ),
     "validationPhoneInvalid": MessageLookupByLibrary.simpleMessage(
-      "Hãy nhập số điện thoại hợp lệ",
+      "Hãy nhập số điện thoại hợp lệ.",
     ),
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
-      "Cần nhập số điện thoại",
+      "Cần nhập số điện thoại.",
     ),
     "validationTextMaxLength": m24,
     "validationTextMinLength": m25,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
-      "Trường này là bắt buộc",
+      "Trường này là bắt buộc.",
     ),
     "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(

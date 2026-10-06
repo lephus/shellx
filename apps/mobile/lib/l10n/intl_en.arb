@@ -9,10 +9,10 @@
   "notFound": "Not Found",
   "unauthorized": "Unauthorized",
   "unknownError": "Unknown Error",
-  "validationEmailRequired": "Email is required",
-  "validationEmailInvalid": "Please enter a valid email address",
-  "validationPasswordRequired": "Password is required",
-  "validationPasswordMinLength": "Password must be at least {length} characters",
+  "validationEmailRequired": "Email is required.",
+  "validationEmailInvalid": "Please enter a valid email address.",
+  "validationPasswordRequired": "Password is required.",
+  "validationPasswordMinLength": "Password must be at least {length} characters.",
   "@validationPasswordMinLength": {
     "placeholders": {
       "length": {
@@ -20,14 +20,14 @@
       }
     }
   },
-  "validationPasswordUppercase": "Password must contain at least one uppercase letter",
-  "validationPasswordLowercase": "Password must contain at least one lowercase letter",
-  "validationPasswordDigit": "Password must contain at least one number",
-  "validationPasswordSpecialChar": "Password must contain at least one special character",
-  "validationPasswordConfirmRequired": "Please confirm your password",
-  "validationPasswordNotMatch": "Passwords do not match",
-  "validationTextRequired": "This field is required",
-  "validationTextMinLength": "Must be at least {length} characters",
+  "validationPasswordUppercase": "Password must contain at least one uppercase letter.",
+  "validationPasswordLowercase": "Password must contain at least one lowercase letter.",
+  "validationPasswordDigit": "Password must contain at least one number.",
+  "validationPasswordSpecialChar": "Password must contain at least one special character.",
+  "validationPasswordConfirmRequired": "Please confirm your password.",
+  "validationPasswordNotMatch": "Passwords do not match.",
+  "validationTextRequired": "This field is required.",
+  "validationTextMinLength": "Must be at least {length} characters.",
   "@validationTextMinLength": {
     "placeholders": {
       "length": {
@@ -35,7 +35,7 @@
       }
     }
   },
-  "validationTextMaxLength": "Must be at most {length} characters",
+  "validationTextMaxLength": "Must be at most {length} characters.",
   "@validationTextMaxLength": {
     "placeholders": {
       "length": {
@@ -43,8 +43,8 @@
       }
     }
   },
-  "validationPhoneRequired": "Phone number is required",
-  "validationPhoneInvalid": "Please enter a valid phone number",
+  "validationPhoneRequired": "Phone number is required.",
+  "validationPhoneInvalid": "Please enter a valid phone number.",
   "appTitle": "ShellX",
   "actionCancel": "Cancel",
   "actionClose": "Close",
@@ -183,7 +183,7 @@
     }
   },
   "emptyStep2": "Sign in with this same account.",
-  "emptyStep3": "Click the ShellX icon → {menu}, then scan the code.",
+  "emptyStep3": "Click the ShellX icon, choose {menu}, then scan the code.",
   "@emptyStep3": {
     "placeholders": {
       "menu": {
@@ -422,5 +422,13 @@
   "voiceEnded": "Session ended — open a new session to send",
   "voiceDetached": "This session was disconnected from the phone — reattach to send",
   "voiceSendEnter": "Send Enter",
-  "desktopDriverTakeOver": "Tap to take over"
+  "desktopDriverTakeOver": "Tap to take over",
+  "settingsAppGroup": "App",
+  "settingsTheme": "Appearance",
+  "settingsThemeSystem": "System",
+  "settingsThemeLight": "Light",
+  "settingsThemeDark": "Dark",
+  "settingsTerms": "Terms of use",
+  "settingsPrivacy": "Privacy policy",
+  "settingsLicenses": "Open-source licences"
 }
