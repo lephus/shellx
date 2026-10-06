@@ -92,9 +92,9 @@ Thang khoảng cách, bo góc, độ nổi, chuyển động: A1 §1.2–§1.5 (
 
 Bề rộng W = bề rộng dòng − 32 − 8 (168 px ở 220).
 
-1. **Cổng:** đo cụm `:p1 :p2 :p3` (tối đa 3 cổng nhỏ nhất, cách nhau `portGap` 4 + đệm 2×2 mỗi cổng) và `+N` nếu còn. Trần của cụm = `min(0.6 W, W − dấu ngăn − chỗ tối thiểu của thư mục − chỗ tối thiểu của nhánh)`; chỗ tối thiểu của thư mục = `min(cả thư mục, max(40, đo("…/" + thành phần cuối)))`, của nhánh = biểu tượng + `min(nhánh, 48)` + dấu ngăn. Quá trần thì bớt cổng (giữ cổng nhỏ nhất) và tăng N, tới khi vừa hoặc còn 1 cổng. Nghĩa là: **bỏ cổng thứ hai trước khi cắt mất thành phần cuối của thư mục** (V2) — thư mục là thứ nhận ra tab nhất. Cổng **không bao giờ bị cắt chữ**.
+1. **Cổng:** đo cụm `:p1 :p2 :p3` (tối đa 3 cổng nhỏ nhất, cách nhau `portGap` 4 + đệm 2×2 mỗi cổng) và `+N` nếu còn. Trần của cụm = `min(0.6 W, W − dấu ngăn − chỗ tối thiểu của thư mục − chỗ tối thiểu của nhánh)`; chỗ tối thiểu của thư mục = `min(cả thư mục, max(40, đo("…/" + thành phần cuối)))`, của nhánh = biểu tượng + `min(nhánh, 48)` + dấu ngăn (48 px **chữ** sau biểu tượng, khoảng 6 ký tự: bỏ cổng thứ hai trước khi nhánh thành `featu…`). Quá trần thì bớt cổng (giữ cổng nhỏ nhất) và tăng N, tới khi vừa hoặc còn 1 cổng. Nghĩa là: **bỏ cổng thứ hai trước khi cắt mất thành phần cuối của thư mục** (V2) — thư mục là thứ nhận ra tab nhất. Cổng **không bao giờ bị cắt chữ**.
 2. Phần còn lại R = W − cụm cổng − dấu ngăn.
-3. **Nhánh:** biểu tượng + bề rộng tự nhiên, tối đa `max(48, 0.45 × R)` (nếu R < 48 thì tối đa R), và không lấn chỗ tối thiểu của thư mục (nhưng không dưới 48); quá thì **cắt cuối** (`feat/mobile-ui-p…`).
+3. **Nhánh:** biểu tượng + bề rộng tự nhiên, tối đa `max(48, 0.45 × R)` (nếu R < 48 thì tối đa R), và không lấn chỗ tối thiểu của thư mục (nhưng không dưới biểu tượng + 48); quá thì **cắt cuối** (`feat/mobile-ui-p…`).
 4. **Thư mục:** phần còn lại. Vừa nguyên → giữ nguyên (kể cả khi chỗ < 40). Không vừa → (a) giữ thành phần đầu (`~`, gốc `/` hoặc ổ `C:`), thay các thành phần giữa bằng `…`, giữ **nhiều thành phần cuối nhất** còn vừa: `~/…/apps/desktop`; (b) chỉ thành phần cuối: `…/desktop` (Windows `…\desktop`); (c) thành phần cuối nguyên: `desktop`; (d) thành phần cuối cắt cuối, **giữ ít nhất 3 ký tự** trước `…`: `deskt…`. Không bao giờ cắt ký tự giữa cả đường dẫn (bỏ kiểu `~/w…llx`, `~/…x` — không chỉ ra thư mục nào). Không còn cách nào, hoặc chỗ < 40 px → bỏ thư mục (tooltip bước 5 vẫn có chuỗi đầy đủ).
 5. Toàn bộ dòng ngữ cảnh có tooltip (chờ 500 ms, đặt **bên phải sidebar** như tooltip tiêu đề A1 §3.1, max-width 360) với chuỗi đầy đủ không cắt: `main · ~/work/shellx/apps/desktop · :3000 :5173 :8080 :9229` — chỉ hiện khi có phần bị cắt hoặc bị bỏ.
 
@@ -167,7 +167,7 @@ Chỉ hiện khi có **từ hai workspace** (D10). Một workspace = sidebar A1 
 ### 3.3 Tương tác
 
 - Bấm một lần (chevron hoặc tên) → bật/tắt thu gọn. **Double-click tên** → đổi tên (lần bấm đầu của double-click không thu gọn: dùng `onDoubleTap` + `onTap` của cùng `GestureDetector`, Flutter chỉ gọi `onTap` khi không có lần bấm thứ hai trong `kDoubleTapTimeout`).
-- Chuột phải / Shift+F10 / phím Menu → menu tiêu đề (§5.2).
+- Chuột phải / Shift+F10 / phím Menu → menu tiêu đề (§5.2), mở **bên phải sidebar** ngang tiêu đề (x = 220 + 6), như tooltip sidebar — không che tên đang bị tác động.
 - Thu gọn nhóm chứa tab đang chọn: terminal **không đổi**; ⌘1–9, Ctrl+Tab bỏ qua các tab bị ẩn.
 - Workspace "hiện tại" = workspace của tab đang chọn; nếu không có tab nào: workspace vừa tạo, hoặc Mặc định. Tab mới (⌘T, `+` trên đầu sidebar) mở vào workspace hiện tại; `+` trên tiêu đề mở vào nhóm đó.
 
@@ -177,14 +177,14 @@ Một dòng gợi ý 30 cao dưới tiêu đề, lề trái 32 (thụt thêm 8 n
 
 ### 3.5 Tiêu đề dính (V7)
 
-Khi cuộn, tiêu đề của nhóm đang ở đầu danh sách **dính ở trên cùng** vùng danh sách (một bản sao, nền `bgSidebar`, vạch 1 px `line` bên dưới), cho tới khi tiêu đề nhóm kế tiếp đẩy nó lên. Bản sao hoạt động như tiêu đề thật (bấm thu gọn, menu, `+`, đích thả khi kéo), không có ô đổi tên, không có vòng focus, `ExcludeSemantics` (tiêu đề thật vẫn trong cây trợ năng). Không có tiêu đề (một workspace) hoặc chưa tới tiêu đề nào: khi danh sách đã cuộn (`offset > 0`), một vạch 1 px `line` ở mép trên danh sách cho biết nội dung đang trượt dưới dải `+`. Cuộn tới dòng bằng bàn phím trừ chiều cao tiêu đề dính để dòng không bị che.
+Khi cuộn, tiêu đề của nhóm đang ở đầu danh sách **dính ở trên cùng** vùng danh sách (một bản sao, nền `bgSidebar`, vạch 1 px `line` bên dưới; dải dừng trước lề phải 6 px để không che thanh cuộn), cho tới khi tiêu đề nhóm kế tiếp đẩy nó lên. Bản sao hoạt động như tiêu đề thật (bấm thu gọn, menu, `+`, đích thả khi kéo), không có ô đổi tên, không có vòng focus, `ExcludeSemantics` (tiêu đề thật vẫn trong cây trợ năng). Không có tiêu đề (một workspace) hoặc chưa tới tiêu đề nào: khi danh sách đã cuộn (`offset > 0`), một vạch 1 px `line` ở mép trên danh sách cho biết nội dung đang trượt dưới dải `+`. Cuộn tới dòng bằng bàn phím trừ chiều cao tiêu đề dính để dòng không bị che.
 
 ---
 
 ## 4. Ô đổi tên tại chỗ (tab và workspace)
 
 - Mở bằng: double-click dòng tab / tên workspace; F2 khi danh sách có focus (trên dòng hoặc tiêu đề); menu "Đổi tên tab" / "Đổi tên workspace"; ⌘⇧N (ô tên của workspace mới).
-- Hình: cao 22 (khung viền là cả hộp 22, kể cả khi theme nền tảng dùng mật độ `compact` — ô dùng `VisualDensity.standard` và `constraints` cao 22; V5), nền `surfaceInset`, viền 1 px `accent`, `r4`, padding 2/4 (chữ canh giữa dọc), con trỏ `accent`. Ô được vẽ lệch trái 8 px (lề trong của khung viền + đệm 4, đo bằng test) để **chữ đứng đúng chỗ tiêu đề/tên cũ**, không nhảy ngang khi mở (V5). Tab: chữ `body` `textTitle`; workspace: `small` w600 `textTitle`. Rộng = chỗ của tên (dòng tab: từ sau ô chấm tới trước các dấu điện thoại; tiêu đề: từ sau chevron tới trước số tab).
+- Hình: cao 22 (khung viền là cả hộp 22, kể cả khi theme nền tảng dùng mật độ `compact` — ô dùng `VisualDensity.standard` và `constraints` cao 22; V5), nền `surfaceInset`, viền 1 px `accent`, `r4`, padding 2/4 (chữ canh giữa dọc), con trỏ `accent`. Ở dòng tab, ô được vẽ lệch trái 8 px (lề trong của khung viền + đệm 4, đo bằng test) để **chữ đứng đúng chỗ tiêu đề cũ**, không nhảy ngang khi mở (V5) — dùng 8 px trống sau chấm. Ở tiêu đề workspace không lệch: chevron chỉ cách 4 px, ô không được đè lên nó. Tab: chữ `body` `textTitle`; workspace: `small` w600 `textTitle`. Rộng = chỗ của tên (dòng tab: từ sau ô chấm tới trước các dấu điện thoại; tiêu đề: từ sau chevron tới trước số tab).
 - Mở ra: chữ hiện tại được **chọn hết** (tab: tên đang hiển thị, kể cả tên tự động).
 - Enter / Numpad Enter → lưu; **mất focus → lưu**; Esc → huỷ. Sau đó bàn phím về chỗ cũ (danh sách nếu mở từ danh sách, terminal nếu mở từ chuột hoặc ⌘⇧N).
 - Tối đa 64 ký tự (`maxLength`, không hiện bộ đếm). Cắt khoảng trắng hai đầu.
@@ -235,7 +235,7 @@ Mở tại cùng vị trí menu trước. Dòng đầu là tiêu đề không ch
 ## 6. Kéo thả
 
 - **Bắt đầu:** nhấn giữ chuột trái trên dòng tab và di > 4 px (`Draggable` với `affinity: null`, nút trái). Bấm thường vẫn là chọn tab (A1). Không kéo được tiêu đề workspace trong A2 (sắp xếp workspace: dùng thứ tự tạo; follow-up).
-- **Bóng kéo (feedback, V1):** một **chip gọn**: chấm trạng thái + tiêu đề trên một dòng 30 cao, rộng theo tiêu đề tối đa 208, nền `rowSelected` **đục 100 %** (không lộ chữ bên dưới), viền 1 px `border`, `r6`, `e1`. Góc trên-trái chip ở **con trỏ + (12, 10)**; bị kẹp trong danh sách theo chiều ngang (lề 6); nếu chip sẽ che vạch thả hoặc đích thả (tiêu đề, nhóm trống) thì dời xuống dưới đích 4 px (hoặc lên trên nếu dưới hết chỗ). Phép tính chỗ thả dùng **vị trí con trỏ**, không dùng góc chip. Nguồn ở chỗ cũ 38 %. Con trỏ `grabbing`.
+- **Bóng kéo (feedback, V1):** một **chip gọn**: chấm trạng thái + tiêu đề trên một dòng 30 cao, rộng theo tiêu đề tối đa 208, nền `rowSelected` **đục 100 %** (không lộ chữ bên dưới), viền 1 px `border`, `r6`, `e1`. Góc trên-trái chip ở **con trỏ + (12, 10)**; bị kẹp trong danh sách theo cả hai chiều (ngang: lề 6; dọc: trong khung danh sách); nếu chip sẽ che vạch thả hoặc đích thả (tiêu đề, nhóm trống) thì dời xuống dưới đích 4 px (hoặc lên trên nếu dưới hết chỗ). Phép tính chỗ thả dùng **vị trí con trỏ**, không dùng góc chip. Nguồn ở chỗ cũ 38 %. Con trỏ `grabbing`.
 - **Vạch chỗ thả:** 2 px `accent`, bo 1, rộng bằng dòng (lề 6), nằm **giữa khe 2 px** giữa hai dòng (trên dòng đầu: sát dưới tiêu đề; dưới dòng cuối: sát dưới dòng cuối). Nửa trên dòng → thả trước dòng; nửa dưới → thả sau.
 - **Rê trên tiêu đề:** tiêu đề thành đích thả (§3.2); thả → vào cuối nhóm. Nhóm thu gọn: rê 600 ms → tự mở rộng (giảm chuyển động: vẫn mở, không hoạt ảnh).
 - **Nhóm trống:** dòng gợi ý là đích thả.

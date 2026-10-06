@@ -1033,6 +1033,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   }
 
   void _leaveRow() {
+    _placeGhost(avoid: null); // no stale rect to jump around
     if (_drop != null) setState(() => _drop = null);
   }
 
@@ -1062,6 +1063,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   void _leaveTarget(String target) {
     if (_dropTarget != target) return;
+    _placeGhost(avoid: null);
     _expandTimer?.cancel();
     _expandTimer = null;
     setState(() => _dropTarget = null);
@@ -1246,6 +1248,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final positions = {for (final (i, row) in rows.indexed) row.tab.id: i + 1};
     _rows.removeWhere((id, _) => !positions.containsKey(id));
     _headerKeys.removeWhere((id, _) => sidebar.workspace(id) == null);
+    _emptyKeys.removeWhere((id, _) => sidebar.workspace(id) == null);
     final cursor = _cursorHeader();
     final indent = sidebar.showHeaders ? ShellxSizes.workspaceRowIndent : 0.0;
 
@@ -1442,9 +1445,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           Positioned(
             top: y,
             left: 0,
-            right: 0,
+            // The 6 px right gutter stays the scrollbar thumb's.
+            right: ShellxSizes.listMarginH,
             child: ExcludeSemantics(
               child: DecoratedBox(
+                key: const Key('sidebar.stickyBand'),
                 decoration: const BoxDecoration(
                   color: ShellxDesktopColors.bgSidebar,
                   border: Border(
@@ -1452,9 +1457,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ShellxSizes.listMarginH,
-                  ),
+                  padding: const EdgeInsets.only(left: ShellxSizes.listMarginH),
                   child: header(items[at] as _HeaderItem, 0, sticky: true),
                 ),
               ),

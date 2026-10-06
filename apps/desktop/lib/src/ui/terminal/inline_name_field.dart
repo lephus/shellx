@@ -21,6 +21,7 @@ class InlineNameField extends StatefulWidget {
     required this.onCommit,
     required this.onCancel,
     this.identity,
+    this.keepTextInPlace = false,
   });
 
   final String initial;
@@ -30,6 +31,11 @@ class InlineNameField extends StatefulWidget {
   final String label;
   final void Function(String text) onCommit;
   final VoidCallback onCancel;
+
+  /// V5: draw the field [textInset] left so its text sits where the title
+  /// was. Only where that much room is free left of the field (a tab row:
+  /// the 8 px after the dot); a workspace header has its chevron 4 px away.
+  final bool keepTextInPlace;
 
   /// What is being renamed (a tab, a workspace). A field disposed while a
   /// newer field for the same item is open does not commit: the open one
@@ -212,10 +218,12 @@ class _InlineNameFieldState extends State<InlineNameField> {
     // and the 4 px padding sit left of them).
     return Theme(
       data: Theme.of(context).copyWith(visualDensity: VisualDensity.standard),
-      child: Transform.translate(
-        offset: const Offset(-InlineNameField.textInset, 0),
-        child: field,
-      ),
+      child: widget.keepTextInPlace
+          ? Transform.translate(
+              offset: const Offset(-InlineNameField.textInset, 0),
+              child: field,
+            )
+          : field,
     );
   }
 }

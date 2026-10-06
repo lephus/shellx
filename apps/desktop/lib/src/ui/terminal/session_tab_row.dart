@@ -316,6 +316,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                   style: ShellxText.body,
                   label: l10n.tabNameField,
                   identity: ('tab', tab.id),
+                  keepTextInPlace: true,
                   onCommit: (text) => widget.onRename?.call(text),
                   onCancel: () => widget.onCancelRename?.call(),
                 )

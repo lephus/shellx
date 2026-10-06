@@ -83,10 +83,15 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
   bool _pressed = false;
 
   /// Shift+F10 from the sidebar: the menu under the header's left edge.
-  void openMenu() {
+  void openMenu() => _openMenuBeside();
+
+  /// Polish 7: right of the sidebar, level with the header (as the
+  /// sidebar's tooltips), so the menu never hides the name it acts on.
+  void _openMenuBeside() {
     final box = context.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
-    widget.onMenu(box.localToGlobal(Offset(ShellxSpace.s8, box.size.height)));
+    final top = box.localToGlobal(Offset.zero).dy;
+    widget.onMenu(Offset(ShellxSizes.sidebarWidth + ShellxSpace.s6, top));
   }
 
   void _setPressed(bool value) {
@@ -276,7 +281,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                       onTap: renaming ? null : widget.onToggle,
                       onSecondaryTapUp: renaming
                           ? null
-                          : (d) => widget.onMenu(d.globalPosition),
+                          : (_) => _openMenuBeside(),
                       child: row,
                     ),
                   ),

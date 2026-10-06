@@ -98,8 +98,8 @@ final class DragGhostPlacement {
 }
 
 /// V1: the chip's top-left: [ShellxSizes.dragGhostOffsetX]/`Y` right of and
-/// below the pointer, kept inside the list horizontally; moved below what
-/// it would cover (or above it when below leaves the list).
+/// below the pointer, kept inside the list; moved below what it would
+/// cover (or above it when below leaves the list).
 Offset dragGhostTopLeft(DragGhostPlacement p, Size chip) {
   final margin = ShellxSizes.listMarginH;
   final minX = p.bounds.left + margin;
@@ -113,7 +113,9 @@ Offset dragGhostTopLeft(DragGhostPlacement p, Size chip) {
       y = avoid.top - ShellxSizes.dragGhostClearance - chip.height;
     }
   }
-  return Offset(x, y);
+  // Never outside the list, vertically either.
+  final maxY = max(p.bounds.top, p.bounds.bottom - chip.height);
+  return Offset(x, y.clamp(p.bounds.top, maxY));
 }
 
 /// UI-A2 §6 (V1) drag feedback: a compact chip — the status dot and the

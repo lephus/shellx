@@ -181,9 +181,12 @@ ContextLineLayout layoutContextLine({
   double branchWidth(String b) => branchGlyph + measure(b);
 
   final pathNeed = path == null ? 0.0 : _pathNeed(path, measure, windows);
-  final branchNeed = branch == null
+  // A branch keeps at least 48 px of text after its glyph (about six
+  // characters) before a second port may stay (polish 6).
+  final branchFloor = branch == null
       ? 0.0
-      : branchGlyph + min(measure(branch), _branchMin) + sepWidth;
+      : branchGlyph + min(measure(branch), _branchMin);
+  final branchNeed = branch == null ? 0.0 : branchFloor + sepWidth;
   final portsCap = path == null
       ? width * _portsMaxShare
       : min(width * _portsMaxShare, width - sepWidth - pathNeed - branchNeed);
@@ -203,11 +206,11 @@ ContextLineLayout layoutContextLine({
 
   String? b = branch;
   if (b != null) {
-    var cap = remaining < _branchMin
+    var cap = remaining < branchFloor
         ? remaining
-        : max(_branchMin, remaining * _branchMaxShare);
+        : max(branchFloor, remaining * _branchMaxShare);
     if (path != null) {
-      cap = min(cap, max(_branchMin, remaining - sepWidth - pathNeed));
+      cap = min(cap, max(branchFloor, remaining - sepWidth - pathNeed));
     }
     if (branchWidth(b) > cap) {
       b = ellipsizeEnd(b, cap - branchGlyph, measure);

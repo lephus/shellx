@@ -117,6 +117,78 @@ void main() {
     });
   });
 
+  test('kept inside the list vertically too (polish 1)', () {
+    const bounds = Rect.fromLTWH(0, 40, 220, 400);
+    const chip = Size(120, 30);
+    expect(
+      dragGhostTopLeft(
+        const DragGhostPlacement(pointer: Offset(40, 430), bounds: bounds),
+        chip,
+      ).dy,
+      440 - 30,
+    );
+    expect(
+      dragGhostTopLeft(
+        const DragGhostPlacement(pointer: Offset(40, 0), bounds: bounds),
+        chip,
+      ).dy,
+      40,
+    );
+  });
+
+  testSidebar('the header menu opens beside the sidebar, not over the name '
+      '(polish 7)', (tester) async {
+    final ws = await twoWorkspaces(tester);
+    await tester.tap(header(ws), buttons: kSecondaryButton);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.byKey(const Key('menu.ws.newTab'))).dx,
+      greaterThanOrEqualTo(ShellxSizes.sidebarWidth),
+    );
+  });
+
+  testSidebar('the workspace name field keeps clear of the chevron '
+      '(polish 4)', (tester) async {
+    final ws = await twoWorkspaces(tester);
+    workspaces().startRename(RenameWorkspace(ws));
+    await tester.pumpAndSettle();
+    final field = inHeader(ws, const Key('row.renameField'));
+    final chevron = find.descendant(
+      of: header(ws),
+      matching: find.byIcon(Icons.chevron_right),
+    );
+    expect(
+      tester
+          .getTopLeft(
+            find.descendant(of: field, matching: find.byType(InputDecorator)),
+          )
+          .dx,
+      greaterThanOrEqualTo(tester.getTopRight(chevron).dx),
+    );
+  });
+
+  testSidebar('the pinned header leaves the scrollbar gutter free '
+      '(polish 3)', (tester) async {
+    for (var id = 1; id <= 12; id++) {
+      local.add(local.summary(id, origin: SessionOrigin.desktop));
+    }
+    await pumpSidebar(tester);
+    await workspaces().create();
+    workspaces().endRename();
+    tester.view.physicalSize = const Size(640, 400);
+    await tester.pumpAndSettle();
+    tester
+        .state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage))
+        .sidebarScroll
+        .jumpTo(120);
+    await tester.pump();
+    final band = find.byKey(const Key('sidebar.stickyBand'));
+    expect(
+      tester.getTopRight(band).dx,
+      ShellxSizes.sidebarWidth - ShellxSizes.listMarginH,
+    );
+  });
+
   testSidebar('the drag chip is compact, opaque, beside the pointer, and '
       'never over the drop line (V1)', (tester) async {
     final ws = await twoWorkspaces(tester);

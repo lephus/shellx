@@ -205,6 +205,22 @@ void main() {
       expect(l.path, isNot('~/w'));
     });
 
+    test('a long branch keeps 48 px of text (after its glyph) before a '
+        'second port does (polish 6)', () {
+      final l = layoutContextLine(
+        branch: 'feature-very-long-name',
+        path: '~/w',
+        ports: [3000, 5173],
+        width: 168,
+        measure: _m,
+        windows: false,
+        branchGlyph: 12,
+      );
+      expect((l.branch, l.path), ('feature…', '~/w'));
+      expect(l.ports, [3000]);
+      expect(l.morePorts, 1);
+    });
+
     test('nothing known → empty', () {
       final l = layoutContextLine(
         branch: null,
