@@ -84,4 +84,65 @@ void main() {
       expect(error, isA<MuxHandshakeException>());
     });
   });
+
+  group('optional auth.token (A7 amendment, A5b D7 additive)', () {
+    test('travels in auth only; the host returns it', () async {
+      final (a, b) = MemoryMuxTransport.pair();
+      final seen = <MuxMessage>[];
+      b.messages.listen(seen.add);
+      final server = serverHandshake(b, secret: secret, self: self);
+      await clientHandshake(
+        a,
+        secret: secret,
+        app: '1',
+        role: 'cli',
+        token: 'tok-1',
+      );
+      final peer = await server;
+      expect(peer.token, 'tok-1');
+      expect(peer.role, 'cli');
+      final hello = seen.firstWhere((m) => m.type == MuxType.hello);
+      final auth = seen.firstWhere((m) => m.type == MuxType.auth);
+      expect(hello.fields.containsKey('token'), isFalse);
+      expect(auth.get<String>('token'), 'tok-1');
+    });
+
+    test('absent → null, and no key on the wire', () async {
+      final (a, b) = MemoryMuxTransport.pair();
+      final seen = <MuxMessage>[];
+      b.messages.listen(seen.add);
+      final server = serverHandshake(b, secret: secret, self: self);
+      await clientHandshake(a, secret: secret, app: '1', role: 'cli');
+      expect((await server).token, isNull);
+      final auth = seen.firstWhere((m) => m.type == MuxType.auth);
+      expect(auth.fields.containsKey('token'), isFalse);
+    });
+
+    test('a squatter never sees the token', () async {
+      final (a, b) = MemoryMuxTransport.pair();
+      final sent = <MuxMessage>[];
+      b.messages.listen((m) {
+        sent.add(m);
+        if (m.type == MuxType.hello) {
+          b.send(
+            MuxMessage(
+              MuxType.hello,
+              fields: {
+                'protocol': 1,
+                'app': 'evil',
+                'nonce': Uint8List(32),
+                'proof': Uint8List(32),
+              },
+            ),
+          );
+        }
+      });
+      await expectLater(
+        clientHandshake(a, secret: secret, app: '1', role: 'cli', token: 't'),
+        throwsA(isA<MuxHandshakeException>()),
+      );
+      expect(sent.map((m) => m.type), [MuxType.hello]);
+      expect(sent.any((m) => m.fields.containsKey('token')), isFalse);
+    });
+  });
 }

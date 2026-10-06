@@ -40,6 +40,7 @@ final class MuxPeerInfo {
     this.pid,
     this.sessions,
     this.caps = const [],
+    this.token,
   });
   final int protocol;
   final String app;
@@ -48,6 +49,10 @@ final class MuxPeerInfo {
   final int? pid;
   final int? sessions;
   final List<String> caps;
+
+  /// A7 amendment (A5b D7 additive): the client's optional `auth.token`,
+  /// as the host received it. Never logged.
+  final String? token;
 }
 
 Uint8List _nonce() {
@@ -65,12 +70,15 @@ bool _same(Uint8List a, Uint8List? b) {
 }
 
 /// D6, client side: hello → verify the daemon's proof → auth → ready.
+/// [token] (A7 amendment) goes in `auth`, so only a host that proved the
+/// secret ever sees it.
 Future<MuxPeerInfo> clientHandshake(
   MuxConnection c, {
   required Uint8List secret,
   required String app,
   required String role,
   Duration timeout = const Duration(seconds: 2),
+  String? token,
 }) async {
   final nonceClient = _nonce();
   final incoming = StreamIterator(c.messages);
@@ -98,7 +106,11 @@ Future<MuxPeerInfo> clientHandshake(
     c.send(
       MuxMessage(
         MuxType.auth,
-        fields: {'proof': clientProof(secret, nonceDaemon, nonceClient)},
+        fields: {
+          'proof': clientProof(secret, nonceDaemon, nonceClient),
+          // A7: only now, after the host proved the secret.
+          'token': ?token,
+        },
       ),
     );
     await _next(incoming, MuxType.ready, timeout);
@@ -166,6 +178,7 @@ Future<MuxPeerInfo> serverHandshake(
       protocol: hello.get<int>('protocol') ?? -1,
       app: hello.get<String>('app') ?? '',
       role: hello.get<String>('role'),
+      token: auth.get<String>('token'),
     );
   } on MuxHandshakeException {
     await c.close();
