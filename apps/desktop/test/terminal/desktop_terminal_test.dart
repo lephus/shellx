@@ -38,6 +38,39 @@ void main() {
     expect(user, ['\x1b[A', '\x1bOA']);
   });
 
+  group('macOS Option+←/→ move by word like Terminal.app and iTerm2', () {
+    late DesktopTerminal mac;
+    late List<String> typed;
+
+    setUp(() {
+      mac = DesktopTerminal(platform: TerminalTargetPlatform.macos);
+      typed = [];
+      mac.onUserInput = typed.add;
+    });
+
+    test('at the shell prompt: ESC b / ESC f (readline, zle, fish)', () {
+      mac.keyInput(TerminalKey.arrowLeft, alt: true);
+      mac.keyInput(TerminalKey.arrowRight, alt: true);
+      expect(typed, ['\x1bb', '\x1bf']);
+    });
+
+    test('with Shift or Ctrl too, and in full-screen programs (alternate '
+        'screen: vim, micro): the xterm modifier form', () {
+      mac.keyInput(TerminalKey.arrowLeft, alt: true, shift: true);
+      mac.write('\x1b[?1049h');
+      mac.keyInput(TerminalKey.arrowLeft, alt: true);
+      expect(typed, ['\x1b[1;4D', '\x1b[1;3D']);
+    });
+
+    test('Windows keeps Alt+arrow as the xterm modifier form', () {
+      final win = DesktopTerminal(platform: TerminalTargetPlatform.windows);
+      final out = <String>[];
+      win.onUserInput = out.add;
+      win.keyInput(TerminalKey.arrowLeft, alt: true);
+      expect(out, ['\x1b[1;3D']);
+    });
+  });
+
   test('pasted and IME text never carries escape sequences', () {
     terminal.paste('safe\x1b[201~evil');
     terminal.textInput('x\x1by\n');

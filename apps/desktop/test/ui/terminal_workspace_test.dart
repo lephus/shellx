@@ -4,7 +4,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xterm/xterm.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
@@ -13,6 +15,7 @@ import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_overlays.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -24,7 +27,11 @@ late TestHarness h;
 late FakeLocalSessions local;
 late ProviderContainer container;
 
-Future<void> pumpWorkspace(WidgetTester tester, {bool signedIn = true}) async {
+Future<void> pumpWorkspace(
+  WidgetTester tester, {
+  bool signedIn = true,
+  Size size = const Size(1100, 720),
+}) async {
   h = TestHarness(settings: {'onboarding_done': true});
   container = ProviderContainer(
     overrides: [
@@ -36,7 +43,7 @@ Future<void> pumpWorkspace(WidgetTester tester, {bool signedIn = true}) async {
   await container
       .read(agentControllerProvider.notifier)
       .bootstrap(watchForWake: false);
-  tester.view.physicalSize = const Size(1100, 720);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -55,6 +62,9 @@ Future<void> pumpWorkspace(WidgetTester tester, {bool signedIn = true}) async {
 }
 
 TerminalTabsState tabs() => container.read(terminalTabsProvider);
+
+TerminalWorkspacePageState page(WidgetTester tester) => tester
+    .state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage));
 
 /// [testWidgets] that tears the workspace down inside the body: bootstrap
 /// starts the periodic update check, and testWidgets fails on pending
@@ -106,10 +116,7 @@ void main() {
     expect(find.text('claude'), findsOneWidget);
     final phoneRow = find.byKey(const ValueKey('tab.2'));
     expect(
-      find.descendant(
-        of: phoneRow,
-        matching: find.byIcon(Icons.smartphone_outlined),
-      ),
+      find.descendant(of: phoneRow, matching: find.byIcon(kPhoneIcon)),
       findsOneWidget,
     );
     expect(
@@ -122,7 +129,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('tab.1')),
-        matching: find.byIcon(Icons.smartphone_outlined),
+        matching: find.byIcon(kPhoneIcon),
       ),
       findsNothing,
     );
@@ -636,5 +643,302 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pane.toast')), findsNothing);
     expect(focusIn(find.byKey(const ValueKey('terminal.1'))), isTrue);
+  });
+
+  group('row close button (ruling I6)', () {
+    Finder close(int id) => find.descendant(
+      of: find.byKey(ValueKey('tab.$id')),
+      matching: find.byKey(const Key('row.close')),
+    );
+
+    testWorkspace('shows on the selected row and on hover only; its slot is '
+        'always kept', (tester) async {
+      local.add(local.summary(1, origin: SessionOrigin.desktop));
+      local.add(local.summary(2));
+      await pumpWorkspace(tester);
+      expect(close(1).hitTestable(), findsOneWidget); // selected
+      expect(close(2).hitTestable(), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('tab.2')),
+          matching: find.byKey(const Key('row.close')),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(
+        location: tester.getCenter(find.byKey(const ValueKey('tab.2'))),
+      );
+      await tester.pump();
+      expect(close(2).hitTestable(), findsOneWidget);
+      expect(tester.getSize(close(2)), const Size(24, 24));
+    });
+
+    testWorkspace('closes an idle tab at once, without selecting it', (
+      tester,
+    ) async {
+      local.add(local.summary(1, origin: SessionOrigin.desktop));
+      await pumpWorkspace(tester);
+      await tester.tap(close(1));
+      await tester.pump();
+      expect(local.closed, [1]);
+    });
+
+    testWorkspace('a running command asks first (D15)', (tester) async {
+      local.add(local.summary(1, title: 'claude', runningCommand: true));
+      await pumpWorkspace(tester);
+      await tester.tap(close(1));
+      await tester.pump();
+      final confirm = container.read(windowRouterProvider).confirm!;
+      expect(confirm.title, 'Close “claude”?');
+      confirm.complete(false);
+      await tester.pump();
+      expect(local.closed, isEmpty);
+    });
+  });
+
+  testWorkspace('the three status dots differ in shape, not only colour '
+      '(S-3)', (tester) async {
+    local.add(local.summary(1));
+    local.add(local.summary(2, runningCommand: true));
+    local.add(local.summary(3));
+    await pumpWorkspace(tester);
+    local.views[3]!.end(1);
+    await tester.pump();
+    await tester.pump();
+    Finder dot(int id, String kind) => find.descendant(
+      of: find.byKey(ValueKey('tab.$id')),
+      matching: find.byKey(Key('dot.$kind')),
+    );
+    expect(dot(1, 'idle'), findsOneWidget);
+    expect(dot(2, 'running'), findsOneWidget);
+    expect(dot(3, 'exited'), findsOneWidget);
+    final running = tester.widget<Container>(dot(2, 'running'));
+    expect(
+      (running.decoration! as BoxDecoration).border,
+      Border.all(color: ShellxDesktopColors.accent, width: 1.5),
+    );
+    // A 4 px filled centre makes it a target.
+    expect(
+      find.descendant(
+        of: dot(2, 'running'),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Container &&
+              (w.decoration as BoxDecoration?)?.color ==
+                  ShellxDesktopColors.accent,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWorkspace('the selected bar is 3×18 and moves inside the keyboard ring '
+      '(S-7)', (tester) async {
+    local.add(local.summary(1));
+    local.add(local.summary(2));
+    await pumpWorkspace(tester);
+    final bar = find.byKey(const Key('row.selectedBar'));
+    expect(tester.getSize(bar), const Size(3, 18));
+    final row = tester.getTopLeft(find.byKey(const ValueKey('tab.1')));
+    expect(tester.getTopLeft(bar).dx - row.dx, 0);
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTraditional;
+    addTearDown(
+      () => FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic,
+    );
+    page(tester).sidebarFocus.requestFocus();
+    await tester.pump();
+    expect(tester.getTopLeft(bar).dx - row.dx, 3);
+  });
+
+  testWorkspace('a cut title shows its tooltip beside the sidebar, not over '
+      'the next row (S-8)', (tester) async {
+    local.add(local.summary(1, title: 'a' * 80));
+    local.add(local.summary(2));
+    await pumpWorkspace(tester);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: tester.getCenter(find.text('a' * 80)));
+    await tester.pump(const Duration(seconds: 1));
+    final tooltip = find
+        .byType(Tooltip)
+        .evaluate()
+        .where((e) => (e.widget as Tooltip).message == 'a' * 80);
+    expect(tooltip, hasLength(1));
+    final label = find.text('a' * 80).last; // the tooltip's own text
+    final box = tester.getRect(label);
+    expect(box.left, greaterThanOrEqualTo(226));
+    final row1 = tester.getRect(find.byKey(const ValueKey('tab.1')));
+    expect(box.center.dy, closeTo(row1.center.dy, 2));
+    expect(box.width, lessThanOrEqualTo(360));
+  });
+
+  group('terminal context menu (ruling I6)', () {
+    Future<void> rightClick(WidgetTester tester) async {
+      await tester.tap(
+        find.byKey(const ValueKey('terminal.1')),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    PopupMenuItem<Object?> item(WidgetTester tester, String key) =>
+        tester.widget<PopupMenuItem<Object?>>(find.byKey(Key(key)));
+
+    testWorkspace('Copy is disabled without a selection; Paste pastes', (
+      tester,
+    ) async {
+      local.add(local.summary(1, origin: SessionOrigin.desktop));
+      await pumpWorkspace(tester);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async =>
+            call.method == 'Clipboard.getData' ? {'text': 'echo hi'} : null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await rightClick(tester);
+      expect(find.text('Copy'), findsOneWidget);
+      expect(item(tester, 'menu.copy').enabled, isFalse);
+      expect(item(tester, 'menu.paste').enabled, isTrue);
+      expect(find.text('Select all'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('menu.paste')));
+      await tester.pumpAndSettle();
+      expect(local.views[1]!.writes, ['echo hi']);
+    });
+
+    testWorkspace('Select all selects the scrollback too; then Copy is '
+        'enabled and copies', (tester) async {
+      local.add(
+        local.summary(1, origin: SessionOrigin.desktop),
+        backlog: 'first\r\nsecond\r\n',
+      );
+      await pumpWorkspace(tester);
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await rightClick(tester);
+      await tester.tap(find.byKey(const Key('menu.selectAll')));
+      await tester.pumpAndSettle();
+      expect(tabs().selected!.selection.selection, isNotNull);
+      await rightClick(tester);
+      expect(item(tester, 'menu.copy').enabled, isTrue);
+      await tester.tap(find.byKey(const Key('menu.copy')));
+      await tester.pumpAndSettle();
+      expect(copied, contains('first'));
+      expect(copied, contains('second'));
+      // The keyboard is back in the terminal.
+      expect(focusIn(find.byKey(const ValueKey('terminal.1'))), isTrue);
+    });
+  });
+
+  group('driver pill placement (S-1, S-2)', () {
+    Rect pill(WidgetTester tester) =>
+        tester.getRect(find.byKey(const Key('pane.driverPill')));
+    Rect pane(WidgetTester tester) =>
+        tester.getRect(find.byKey(const ValueKey('terminal.1')));
+
+    testWorkspace('top-right while the cursor is lower down', (tester) async {
+      local.add(
+        local.summary(1, attachedMobileId: 'm1'),
+        backlog: 'a\r\nb\r\nc\r\nd\r\n\$ ',
+      );
+      await pumpWorkspace(tester);
+      final p = pill(tester);
+      expect(pane(tester).right - p.right, 12);
+      expect(p.top - pane(tester).top, 8);
+    });
+
+    testWorkspace('bottom-right when the prompt is on the first row, so it '
+        'never hides the line being typed', (tester) async {
+      local.add(local.summary(1, attachedMobileId: 'm1'), backlog: r'$ ');
+      await pumpWorkspace(tester);
+      final p = pill(tester);
+      expect(pane(tester).right - p.right, 12);
+      expect(pane(tester).bottom - p.bottom, 8);
+      // Output moves the cursor down: back to the top.
+      local.views[1]!.emit('\r\n1\r\n2\r\n3\r\n\$ ');
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      expect(pill(tester).top - pane(tester).top, 8);
+    });
+
+    testWorkspace('a narrow pane gets the short copy, uncut', (tester) async {
+      local.add(
+        local.summary(1, attachedMobileId: 'm1'),
+        backlog: 'a\r\nb\r\nc\r\nd\r\n',
+      );
+      await pumpWorkspace(tester, size: const Size(640, 400));
+      expect(find.text('Phone in control — type to take over'), findsOneWidget);
+      final text = tester.renderObject<RenderParagraph>(
+        find.text('Phone in control — type to take over'),
+      );
+      expect(text.didExceedMaxLines, isFalse);
+    });
+  });
+
+  testWorkspace('640×400 signed out: the terminal is clipped below the strip '
+      'and starts on its first line (M-1)', (tester) async {
+    local.add(
+      local.summary(1, origin: SessionOrigin.desktop),
+      backlog: 'first line\r\nsecond\r\n\$ ',
+    );
+    await pumpWorkspace(tester, signedIn: false, size: const Size(640, 400));
+    final view = find.byKey(const ValueKey('terminal.1'));
+    expect(
+      find.descendant(of: view, matching: find.byType(ClipRect)),
+      findsWidgets,
+    );
+    final strip = tester.getRect(find.byKey(const Key('pane.signedOutStrip')));
+    expect(tester.getRect(view).top, greaterThanOrEqualTo(strip.bottom));
+    final scroll = tester
+        .widget<TerminalView>(
+          find.descendant(of: view, matching: find.byType(TerminalView)),
+        )
+        .scrollController!;
+    expect(scroll.offset, 0);
+    expect(
+      tabs().selected!.terminal.buffer.getText(),
+      startsWith('first line'),
+    );
+  });
+
+  testWorkspace('a keyboard-focused filled button draws its ring outside '
+      'the fill (S-9)', (tester) async {
+    await pumpWorkspace(tester);
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTraditional;
+    addTearDown(
+      () => FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic,
+    );
+    await tester.pump();
+    final button = find.byKey(const Key('pane.empty.open'));
+    expect(focusIn(button), isTrue);
+    final material = tester.widget<Material>(
+      find.descendant(of: button, matching: find.byType(Material)).first,
+    );
+    expect(material.shape, isA<OutsideFocusRingBorder>());
   });
 }

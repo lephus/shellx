@@ -5,8 +5,11 @@ abstract final class ShellxDesktopColors {
   static const Color bgTerminal = Color(0xFF0B1215);
   static const Color bgSidebar = Color(0xFF111B1E);
   static const Color rowHover = Color(0xFF172427);
-  static const Color rowSelected = Color(0xFF1A272B);
-  static const Color rowPressed = Color(0xFF203034);
+
+  /// 1.26:1 on `bgSidebar` (S-7: the selected row reads at a glance);
+  /// hover stays darker, pressed lighter.
+  static const Color rowSelected = Color(0xFF1F2F34);
+  static const Color rowPressed = Color(0xFF26393E);
   static const Color line = Color(0xFF243337);
   static const Color surface = Color(0xFF172023);
   static const Color surfaceInset = Color(0xFF0D1315);
@@ -71,6 +74,13 @@ abstract final class ShellxSizes {
   static const double driverPill = 28;
   static const double button = 32;
   static const double input = 36;
+
+  /// UI §3.4 field padding (0/10 around a 20 px line: 36 high) and the
+  /// label above it.
+  static const double inputPaddingH = 10;
+  static const double inputPaddingV = 8;
+  static const double labelGap = 6;
+  static const double fieldGap = 16;
   static const double icon = 16;
   static const double iconHit = 28;
   static const double mark = 14;
@@ -87,6 +97,9 @@ abstract final class ShellxSizes {
   static const double toastMaxWidth = 420;
   static const double toastMinHeight = 36;
   static const double pillMaxWidth = 560;
+
+  /// UI §2.5: below this pane width the pill uses the short copy.
+  static const double pillCompactBelow = 520;
   static const double emptyMaxWidth = 320;
   static const EdgeInsets terminalPadding = EdgeInsets.fromLTRB(10, 6, 10, 6);
 
@@ -100,11 +113,22 @@ abstract final class ShellxSizes {
   static const double rowTextLine = 18;
   static const double rowTextPadding = 12;
 
-  /// UI §2.2 tab row: dot slot, selected bar (2 × 16).
+  /// UI §2.2 tab row: dot slot, running dot centre, selected bar (3 × 18;
+  /// 1 px clear of the keyboard ring when both show).
   static const double dotSlot = 16;
   static const double dotRing = 1.5;
-  static const double selectedBarWidth = 2;
-  static const double selectedBarHeight = 16;
+  static const double dotCentre = 4;
+  static const double selectedBarWidth = 3;
+  static const double selectedBarHeight = 18;
+  static const double selectedBarGap = 1;
+
+  /// UI §2.2 row close button: 24 hit, 20 visual, 14 glyph.
+  static const double rowCloseHit = 24;
+  static const double rowCloseVisual = 20;
+  static const double rowCloseGlyph = 14;
+
+  /// UI §3.1: the full-title tooltip beside the sidebar, at most this wide.
+  static const double titleTooltipMaxWidth = 360;
 
   /// UI §2.2 overlay scrollbar.
   static const double scrollbarThickness = 6;
@@ -204,6 +228,84 @@ abstract final class ShellxMotion {
       MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
 }
 
+/// UI §3 focus ring for filled buttons: a ring inside the fill is lost
+/// (`accent` on `primary` is 1.27:1), so a 2 px `accent` ring is drawn
+/// [gap] px outside the button, over whatever is behind it (≥ 3:1 on
+/// `surface` and `bgTerminal`, WCAG 2.4.11).
+class OutsideFocusRingBorder extends RoundedRectangleBorder {
+  const OutsideFocusRingBorder({super.borderRadius, this.gap = ShellxSpace.s2});
+
+  final double gap;
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    final ring = borderRadius
+        .resolve(textDirection)
+        .toRRect(rect)
+        .inflate(gap + ShellxSizes.focusRing / 2);
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ShellxSizes.focusRing
+        ..color = ShellxDesktopColors.accent,
+    );
+  }
+
+  @override
+  OutsideFocusRingBorder copyWith({
+    BorderSide? side,
+    BorderRadiusGeometry? borderRadius,
+  }) => OutsideFocusRingBorder(
+    borderRadius: borderRadius ?? this.borderRadius,
+    gap: gap,
+  );
+
+  @override
+  OutsideFocusRingBorder scale(double t) =>
+      OutsideFocusRingBorder(borderRadius: borderRadius * t, gap: gap * t);
+
+  // The button's shape animates between states (`fast`): never through a
+  // plain RoundedRectangleBorder, which would drop the ring.
+  @override
+  ShapeBorder? lerpFrom(ShapeBorder? a, double t) => t < 0.5 ? a : this;
+
+  @override
+  ShapeBorder? lerpTo(ShapeBorder? b, double t) => t < 0.5 ? this : b;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OutsideFocusRingBorder &&
+      other.borderRadius == borderRadius &&
+      other.gap == gap;
+
+  @override
+  int get hashCode => Object.hash(borderRadius, gap);
+}
+
+/// `r6` buttons; a filled one ([outsideRing]) shows keyboard focus with
+/// [OutsideFocusRingBorder] instead of a ring inside its fill.
+WidgetStateProperty<OutlinedBorder> buttonShape({required bool outsideRing}) {
+  const radius = BorderRadius.all(Radius.circular(ShellxRadius.r6));
+  return WidgetStateProperty.resolveWith(
+    (states) => outsideRing && states.contains(WidgetState.focused)
+        ? const OutsideFocusRingBorder(borderRadius: radius)
+        : const RoundedRectangleBorder(borderRadius: radius),
+  );
+}
+
+/// [style] in the platform UI font of [theme] (SF Pro / Segoe UI): the
+/// [ShellxText] styles carry no family, and a style that replaces the
+/// ambient one (button labels, tooltips, text fields) would otherwise fall
+/// back to the engine default font.
+TextStyle uiFont(TextStyle style, TextTheme theme) {
+  final base = theme.bodyMedium;
+  return style.copyWith(
+    fontFamily: base?.fontFamily,
+    fontFamilyFallback: base?.fontFamilyFallback,
+  );
+}
+
 /// The window's only theme (replaces `colorSchemeSeed` in app.dart).
 ThemeData buildDesktopTheme() {
   const colors = ColorScheme.dark(
@@ -217,7 +319,7 @@ ThemeData buildDesktopTheme() {
     outline: ShellxDesktopColors.borderInput,
     outlineVariant: ShellxDesktopColors.border,
   );
-  return ThemeData(
+  final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: colors,
@@ -228,31 +330,24 @@ ThemeData buildDesktopTheme() {
       thickness: 1,
       space: 1,
     ),
-    tooltipTheme: const TooltipThemeData(
-      waitDuration: ShellxMotion.tooltipWait,
-      textStyle: TextStyle(
-        fontSize: 12,
-        height: 16 / 12,
-        color: ShellxDesktopColors.textPrimary,
-      ),
-      decoration: BoxDecoration(
-        color: ShellxDesktopColors.rowSelected,
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        border: Border.fromBorderSide(
-          BorderSide(color: ShellxDesktopColors.border),
-        ),
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    ),
     inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: ShellxDesktopColors.surfaceInset,
       hintStyle: TextStyle(color: ShellxDesktopColors.textPlaceholder),
-      labelStyle: TextStyle(color: ShellxDesktopColors.textDialog2),
-      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      // UI §3.4: 36 high (20 px `dialogBody` line + 8 + 8), padding 0/10;
+      // the label sits above the field (LabeledField), never inside it.
+      isDense: true,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: ShellxSizes.inputPaddingH,
+        vertical: ShellxSizes.inputPaddingV,
+      ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
         borderSide: BorderSide(color: ShellxDesktopColors.borderInput),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
+        borderSide: BorderSide(color: ShellxDesktopColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
@@ -262,6 +357,45 @@ ThemeData buildDesktopTheme() {
         borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
         borderSide: BorderSide(color: ShellxDesktopColors.errDialog),
       ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
+        borderSide: BorderSide(color: ShellxDesktopColors.errDialog),
+      ),
+    ),
+    // UI §1.1 dark tokens instead of the stock grey Material switch.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? ShellxDesktopColors.accent
+            : ShellxDesktopColors.textSecondary,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? ShellxDesktopColors.primarySoft
+            : ShellxDesktopColors.surfaceInset,
+      ),
+      trackOutlineColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? ShellxDesktopColors.accent
+            : ShellxDesktopColors.borderInput,
+      ),
+    ),
+  );
+  return base.copyWith(
+    tooltipTheme: TooltipThemeData(
+      waitDuration: ShellxMotion.tooltipWait,
+      textStyle: uiFont(
+        ShellxText.small.copyWith(color: ShellxDesktopColors.textPrimary),
+        base.textTheme,
+      ),
+      decoration: const BoxDecoration(
+        color: ShellxDesktopColors.rowSelected,
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
+        border: Border.fromBorderSide(
+          BorderSide(color: ShellxDesktopColors.border),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     ),
   );
 }
@@ -270,9 +404,6 @@ ThemeData buildDesktopTheme() {
 /// from this theme (applied by the dialog host only, so the terminal
 /// workspace keeps its own explicit styles).
 ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
-  const r6 = RoundedRectangleBorder(
-    borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-  );
   const focusRing = BorderSide(
     color: ShellxDesktopColors.accent,
     width: ShellxSizes.focusRing,
@@ -294,10 +425,12 @@ ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
         (states) =>
             states.contains(WidgetState.disabled) ? disabled(color) : color,
       );
+  final text = base.textTheme;
   ButtonStyle shape({
     required WidgetStateProperty<Color> foreground,
     required WidgetStateProperty<Color> background,
     BorderSide? side,
+    bool filled = false,
   }) => ButtonStyle(
     minimumSize: const WidgetStatePropertyAll(
       Size(ShellxSizes.buttonMinWidth, ShellxSizes.button),
@@ -308,43 +441,35 @@ ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: ShellxSizes.buttonPaddingH),
     ),
-    shape: const WidgetStatePropertyAll(r6),
-    textStyle: const WidgetStatePropertyAll(ShellxText.bodyStrong),
+    shape: buttonShape(outsideRing: filled),
+    textStyle: WidgetStatePropertyAll(uiFont(ShellxText.bodyStrong, text)),
     elevation: const WidgetStatePropertyAll(0),
     overlayColor: const WidgetStatePropertyAll(Colors.transparent),
     animationDuration: reduceMotion ? Duration.zero : ShellxMotion.fast,
     foregroundColor: foreground,
     backgroundColor: background,
-    // Material reports `focused` only for keyboard focus (UI §3).
+    // Material reports `focused` only for keyboard focus (UI §3). A filled
+    // button draws its ring outside instead ([OutsideFocusRingBorder]).
     side: WidgetStateProperty.resolveWith(
-      (states) => states.contains(WidgetState.focused) ? focusRing : side,
+      (states) =>
+          !filled && states.contains(WidgetState.focused) ? focusRing : side,
     ),
   );
-  final text = base.textTheme;
+  TextStyle ui(TextStyle style, Color color) =>
+      uiFont(style.copyWith(color: color), text);
   return base.copyWith(
     textTheme: text.copyWith(
-      headlineSmall: ShellxText.dialogTitle.copyWith(
-        color: ShellxDesktopColors.textTitle,
-      ),
-      titleLarge: ShellxText.dialogTitle.copyWith(
-        color: ShellxDesktopColors.textTitle,
-      ),
-      titleMedium: ShellxText.bodyStrong.copyWith(
-        color: ShellxDesktopColors.textTitle,
-      ),
-      bodyLarge: ShellxText.dialogBody.copyWith(
-        color: ShellxDesktopColors.textTitle,
-      ),
-      bodyMedium: ShellxText.dialogBody.copyWith(
-        color: ShellxDesktopColors.textDialog2,
-      ),
-      bodySmall: ShellxText.small.copyWith(
-        color: ShellxDesktopColors.textDialog2,
-      ),
-      labelLarge: ShellxText.bodyStrong,
+      headlineSmall: ui(ShellxText.dialogTitle, ShellxDesktopColors.textTitle),
+      titleLarge: ui(ShellxText.dialogTitle, ShellxDesktopColors.textTitle),
+      titleMedium: ui(ShellxText.bodyStrong, ShellxDesktopColors.textTitle),
+      bodyLarge: ui(ShellxText.dialogBody, ShellxDesktopColors.textTitle),
+      bodyMedium: ui(ShellxText.dialogBody, ShellxDesktopColors.textDialog2),
+      bodySmall: ui(ShellxText.small, ShellxDesktopColors.textDialog2),
+      labelLarge: uiFont(ShellxText.bodyStrong, text),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: shape(
+        filled: true,
         foreground: ink(ShellxDesktopColors.onPrimary),
         background: fill(
           ShellxDesktopColors.primary,

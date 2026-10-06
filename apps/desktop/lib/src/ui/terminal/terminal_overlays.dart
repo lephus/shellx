@@ -45,16 +45,16 @@ class ShellxPrimaryButton extends StatelessWidget {
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: ShellxSizes.buttonPaddingH),
       ),
-      shape: const WidgetStatePropertyAll(_r6),
-      textStyle: const WidgetStatePropertyAll(ShellxText.bodyStrong),
+      // Material reports `focused` only for keyboard focus (highlight mode
+      // traditional), which is what UI §3 asks for; on the fill the ring
+      // is drawn outside the button (S-9).
+      shape: buttonShape(outsideRing: true),
+      textStyle: WidgetStatePropertyAll(
+        uiFont(ShellxText.bodyStrong, Theme.of(context).textTheme),
+      ),
       elevation: const WidgetStatePropertyAll(0),
       overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       animationDuration: ShellxMotion.of(context, ShellxMotion.fast),
-      // Material reports `focused` only for keyboard focus (highlight mode
-      // traditional), which is what UI §3 asks for.
-      side: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.focused) ? _focusRing : null,
-      ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.disabled)
             ? ShellxDesktopColors.onPrimary.withValues(
@@ -369,7 +369,9 @@ class SignedOutStrip extends StatelessWidget {
               ),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: const WidgetStatePropertyAll(_r6),
-              textStyle: const WidgetStatePropertyAll(ShellxText.bodyStrong),
+              textStyle: WidgetStatePropertyAll(
+                uiFont(ShellxText.bodyStrong, Theme.of(context).textTheme),
+              ),
               foregroundColor: const WidgetStatePropertyAll(
                 ShellxDesktopColors.accent,
               ),
@@ -395,10 +397,16 @@ class SignedOutStrip extends StatelessWidget {
   }
 }
 
+/// The phone mark (UI §3.1 phone origin, §2.5 pill): the notch and home
+/// bar read as a phone at 14 px, where `smartphone` is a plain rectangle.
+const IconData kPhoneIcon = Icons.phone_iphone_outlined;
+
 /// UI §2.5: never interactive (clicks reach the terminal), never resizes
-/// the terminal. Announced once when it appears.
+/// the terminal. Announced once when it appears. [compact] (a narrow pane)
+/// uses the short copy, so the instruction is never the part cut off.
 class DriverPill extends StatelessWidget {
-  const DriverPill({super.key});
+  const DriverPill({super.key, this.compact = false});
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -408,10 +416,16 @@ class DriverPill extends StatelessWidget {
         liveRegion: true,
         child: Container(
           key: const Key('pane.driverPill'),
-          height: ShellxSizes.driverPill,
-          // With the 16 px side insets of its Positioned: min(560, pane − 32).
-          constraints: const BoxConstraints(maxWidth: ShellxSizes.pillMaxWidth),
-          padding: const EdgeInsets.symmetric(horizontal: ShellxSpace.s12),
+          // 28 high for one line; with the 12 px insets of its slot at most
+          // min(560, pane − 24) wide.
+          constraints: const BoxConstraints(
+            minHeight: ShellxSizes.driverPill,
+            maxWidth: ShellxSizes.pillMaxWidth,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ShellxSpace.s12,
+            vertical: (ShellxSizes.driverPill - ShellxSizes.rowTextLine) / 2,
+          ),
           decoration: BoxDecoration(
             color: ShellxDesktopColors.warnBg,
             borderRadius: BorderRadius.circular(ShellxRadius.pill),
@@ -423,7 +437,7 @@ class DriverPill extends StatelessWidget {
             children: [
               const ExcludeSemantics(
                 child: Icon(
-                  Icons.smartphone,
+                  kPhoneIcon,
                   size: ShellxSizes.mark,
                   color: ShellxDesktopColors.warn,
                 ),
@@ -431,11 +445,15 @@ class DriverPill extends StatelessWidget {
               const SizedBox(width: ShellxSpace.s6),
               Flexible(
                 child: Text(
-                  l10n.terminalDriverPhone,
+                  compact
+                      ? l10n.terminalDriverPhoneShort
+                      : l10n.terminalDriverPhone,
                   style: ShellxText.body.copyWith(
                     color: ShellxDesktopColors.warn,
                   ),
-                  maxLines: 1,
+                  // Narrow: a second line rather than a cut instruction
+                  // (large text sizes).
+                  maxLines: compact ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

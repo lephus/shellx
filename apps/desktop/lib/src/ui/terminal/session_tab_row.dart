@@ -9,41 +9,23 @@ import 'package:shellx_core/shellx_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
+import 'terminal_overlays.dart';
 
 /// UI §3.1 context menu ("Đóng tab  ⌘W") at [at] (global). Secondary
-/// click, Shift+F10 and the Menu key open it; Esc closes it, ↑/↓ + Enter
-/// operate it (the popup route's own keys).
+/// click, Shift+F10 and the Menu key open it.
 Future<void> showTabContextMenu({
   required BuildContext context,
   required Offset at,
   required VoidCallback onClose,
 }) async {
   final l10n = AppLocalizations.of(context);
-  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
-  final local = overlay.globalToLocal(at);
-  final choice = await showMenu<_TabMenuChoice>(
+  final choice = await showShellxMenu<_TabMenuChoice>(
     context: context,
-    color: ShellxDesktopColors.surface,
-    surfaceTintColor: Colors.transparent,
-    elevation: ShellxShadows.e1Elevation,
-    shadowColor: ShellxShadows.e1ShadowColor,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(ShellxRadius.r8),
-      side: const BorderSide(color: ShellxDesktopColors.border),
-    ),
-    menuPadding: const EdgeInsets.all(ShellxSpace.s4),
-    position: RelativeRect.fromRect(
-      local & const Size(1, 1),
-      Offset.zero & overlay.size,
-    ),
-    constraints: const BoxConstraints(minWidth: ShellxSizes.menuMinWidth),
-    popUpAnimationStyle: AnimationStyle(
-      duration: ShellxMotion.of(context, ShellxMotion.base),
-      reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
-    ),
-    items: [
-      _TabMenuItem(
+    at: at,
+    entries: [
+      ShellxMenuEntry(
         key: const Key('menu.closeTab'),
         value: _TabMenuChoice.close,
         label: l10n.terminalCloseTab,
@@ -55,78 +37,6 @@ Future<void> showTabContextMenu({
 }
 
 enum _TabMenuChoice { close }
-
-/// UI §3.1 menu item: 28 high, padding 0/10, `body`, hover (and keyboard
-/// highlight) `rowSelected` with `r6` corners, shortcut hint right-aligned
-/// in `caption` `textSecondary`.
-class _TabMenuItem extends PopupMenuItem<_TabMenuChoice> {
-  const _TabMenuItem({
-    super.key,
-    required _TabMenuChoice super.value,
-    required this.label,
-    required this.shortcut,
-  }) : super(
-         height: ShellxSizes.menuItem,
-         padding: EdgeInsets.zero,
-         child: null,
-       );
-
-  final String label;
-  final String shortcut;
-
-  @override
-  PopupMenuItemState<_TabMenuChoice, _TabMenuItem> createState() =>
-      _TabMenuItemState();
-}
-
-class _TabMenuItemState
-    extends PopupMenuItemState<_TabMenuChoice, _TabMenuItem> {
-  @override
-  Widget build(BuildContext context) => MergeSemantics(
-    child: buildSemantics(
-      child: InkWell(
-        onTap: handleTap,
-        borderRadius: BorderRadius.circular(ShellxRadius.r6),
-        hoverColor: ShellxDesktopColors.rowSelected,
-        focusColor: ShellxDesktopColors.rowSelected,
-        highlightColor: ShellxDesktopColors.rowPressed,
-        splashFactory: NoSplash.splashFactory,
-        hoverDuration: ShellxMotion.of(context, ShellxMotion.fast),
-        child: SizedBox(
-          height: widget.height,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ShellxSizes.menuItemPaddingH,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ShellxText.body.copyWith(
-                      color: ShellxDesktopColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: ShellxSpace.s16),
-                ExcludeSemantics(
-                  child: Text(
-                    widget.shortcut,
-                    style: ShellxText.caption.copyWith(
-                      color: ShellxDesktopColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
 
 /// One sidebar row (UI §2.2 anatomy, §3.1 states, §3.7 semantics).
 class SessionTabRow extends StatefulWidget {
@@ -247,6 +157,10 @@ class SessionTabRowState extends State<SessionTabRow> {
               : ShellxDesktopColors.textPrimary,
         );
     final driving = tab.driver == DriverSide.phone;
+    // UI §2.2: the close button shows on hover and on the selected row;
+    // its slot is always kept, so a title never re-truncates on hover.
+    final showClose = _hover || widget.selected;
+    final shortcut = closeTabShortcutLabel();
 
     return Semantics(
       button: true,
@@ -297,9 +211,14 @@ class SessionTabRowState extends State<SessionTabRow> {
                 children: [
                   if (widget.selected)
                     Positioned(
-                      left: 0,
+                      // With the keyboard ring on the row's edge, the bar
+                      // moves inside it so both stay visible (UI §3.1).
+                      left: widget.focused
+                          ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
+                          : 0,
                       top: (height - ShellxSizes.selectedBarHeight) / 2,
                       child: Container(
+                        key: const Key('row.selectedBar'),
                         width: ShellxSizes.selectedBarWidth,
                         height: ShellxSizes.selectedBarHeight,
                         decoration: BoxDecoration(
@@ -309,8 +228,14 @@ class SessionTabRowState extends State<SessionTabRow> {
                       ),
                     ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ShellxSpace.s8,
+                    padding: const EdgeInsets.only(
+                      left: ShellxSpace.s8,
+                      // 8 px to the close button's 20 px visual.
+                      right:
+                          ShellxSpace.s8 -
+                          (ShellxSizes.rowCloseHit -
+                                  ShellxSizes.rowCloseVisual) /
+                              2,
                     ),
                     // A2 adds the context line as a second child (UI §2.2).
                     child: Column(
@@ -330,7 +255,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                                 message: l10n.sidebarPhoneOrigin,
                                 excludeFromSemantics: true,
                                 child: const Icon(
-                                  Icons.smartphone_outlined,
+                                  kPhoneIcon,
                                   size: ShellxSizes.mark,
                                   color: ShellxDesktopColors.textSecondary,
                                 ),
@@ -352,6 +277,20 @@ class SessionTabRowState extends State<SessionTabRow> {
                                 ),
                               ),
                             ],
+                            const SizedBox(width: ShellxSpace.s4 - 2),
+                            Visibility(
+                              visible: showClose,
+                              maintainSize: true,
+                              maintainAnimation: true,
+                              maintainState: true,
+                              child: _RowCloseButton(
+                                tooltip: shortcutTooltip(
+                                  l10n.terminalCloseTabTooltip(shortcut),
+                                  shortcut,
+                                ),
+                                onPressed: widget.onClose,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -367,8 +306,66 @@ class SessionTabRowState extends State<SessionTabRow> {
   }
 }
 
+/// The row's "×" (UI §2.2): 24 hit, 20 visual, `Icons.close` 14; hover
+/// `rowPressed` + `textPrimary`. Not a tab stop (the list is one stop;
+/// ⌘W and the row's menu close from the keyboard) and not in semantics
+/// (the row's "Đóng tab" action is).
+class _RowCloseButton extends StatefulWidget {
+  const _RowCloseButton({required this.tooltip, required this.onPressed});
+  final InlineSpan tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  State<_RowCloseButton> createState() => _RowCloseButtonState();
+}
+
+class _RowCloseButtonState extends State<_RowCloseButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    richMessage: widget.tooltip,
+    excludeFromSemantics: true,
+    child: MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        key: const Key('row.close'),
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onPressed,
+        child: SizedBox.square(
+          dimension: ShellxSizes.rowCloseHit,
+          child: Center(
+            child: AnimatedContainer(
+              duration: ShellxMotion.of(context, ShellxMotion.fast),
+              curve: ShellxMotion.fastCurve,
+              width: ShellxSizes.rowCloseVisual,
+              height: ShellxSizes.rowCloseVisual,
+              decoration: BoxDecoration(
+                color: _hover
+                    ? ShellxDesktopColors.rowPressed
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(ShellxRadius.r4),
+              ),
+              child: Icon(
+                Icons.close,
+                size: ShellxSizes.rowCloseGlyph,
+                color: _hover
+                    ? ShellxDesktopColors.textPrimary
+                    : ShellxDesktopColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// One line, ellipsis; the full title as a tooltip only when it is cut
-/// (UI §3.1 hover).
+/// (UI §3.1 hover). The tooltip opens right of the sidebar, level with the
+/// row, so it never covers the next tab (or its marks).
 class _Title extends StatelessWidget {
   const _Title(this.text, this.style);
   final String text;
@@ -395,35 +392,90 @@ class _Title extends StatelessWidget {
       final cut = painter.didExceedMaxLines;
       painter.dispose();
       if (!cut) return title;
-      return Tooltip(message: text, excludeFromSemantics: true, child: title);
+      return Tooltip(
+        message: text,
+        excludeFromSemantics: true,
+        constraints: const BoxConstraints(
+          maxWidth: ShellxSizes.titleTooltipMaxWidth,
+        ),
+        positionDelegate: besideSidebar,
+        child: title,
+      );
     },
   );
 }
 
-/// UI §3.1 status dot (8 px): idle filled `ok`, running a command filled
-/// `accent`, exited non-zero a 1.5 px `err` ring. Shape and colour both
-/// change; the meaning is in the row's semantics label.
+/// Right of the sidebar ([ShellxSizes.sidebarWidth] + 6), vertically
+/// centred on the row, kept inside the window.
+Offset besideSidebar(TooltipPositionContext context) {
+  final overlay = context.overlaySize;
+  final size = context.tooltipSize;
+  final double x = (ShellxSizes.sidebarWidth + ShellxSpace.s6).clamp(
+    0.0,
+    max(0.0, overlay.width - size.width - ShellxSpace.s8),
+  );
+  final double y = (context.target.dy - size.height / 2).clamp(
+    0.0,
+    max(0.0, overlay.height - size.height),
+  );
+  return Offset(x, y);
+}
+
+/// UI §3.1 status dot (8 px), three shapes so it never relies on colour
+/// alone (WCAG 1.4.1): idle a filled `ok` dot; running a command an
+/// `accent` ring with a 4 px centre (a target); exited non-zero a hollow
+/// 1.5 px `err` ring. The meaning is also in the row's semantics label.
 class _Dot extends StatelessWidget {
   const _Dot(this.tab);
   final TerminalTab tab;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: ShellxSizes.dot,
-    height: ShellxSizes.dot,
-    decoration: tab.exited
-        ? BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: ShellxDesktopColors.err,
-              width: ShellxSizes.dotRing,
-            ),
-          )
-        : BoxDecoration(
-            shape: BoxShape.circle,
-            color: tab.runningCommand
-                ? ShellxDesktopColors.accent
-                : ShellxDesktopColors.ok,
+  Widget build(BuildContext context) {
+    if (tab.exited) {
+      return Container(
+        key: const Key('dot.exited'),
+        width: ShellxSizes.dot,
+        height: ShellxSizes.dot,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: ShellxDesktopColors.err,
+            width: ShellxSizes.dotRing,
           ),
-  );
+        ),
+      );
+    }
+    if (tab.runningCommand) {
+      return Container(
+        key: const Key('dot.running'),
+        width: ShellxSizes.dot,
+        height: ShellxSizes.dot,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: ShellxDesktopColors.accent,
+            width: ShellxSizes.dotRing,
+          ),
+        ),
+        child: Container(
+          width: ShellxSizes.dotCentre,
+          height: ShellxSizes.dotCentre,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: ShellxDesktopColors.accent,
+          ),
+        ),
+      );
+    }
+    return Container(
+      key: const Key('dot.idle'),
+      width: ShellxSizes.dot,
+      height: ShellxSizes.dot,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: ShellxDesktopColors.ok,
+      ),
+    );
+  }
 }

@@ -33,4 +33,69 @@ void main() {
     expect(ShellxSizes.minWindow, const Size(640, 400));
     expect(ShellxSizes.defaultWindow, const Size(1100, 720));
   });
+
+  test('row fills step up: hover < selected < pressed (S-7)', () {
+    double l(Color c) => c.computeLuminance();
+    expect(
+      l(ShellxDesktopColors.rowHover),
+      lessThan(l(ShellxDesktopColors.rowSelected)),
+    );
+    expect(
+      l(ShellxDesktopColors.rowSelected),
+      lessThan(l(ShellxDesktopColors.rowPressed)),
+    );
+    final sidebar = l(ShellxDesktopColors.bgSidebar);
+    final ratio =
+        (l(ShellxDesktopColors.rowSelected) + 0.05) / (sidebar + 0.05);
+    expect(ratio, greaterThan(1.25));
+  });
+
+  test('styles that replace the ambient one carry the platform UI font '
+      '(P-4)', () {
+    final theme = buildDesktopTheme();
+    final family = theme.textTheme.bodyMedium!.fontFamily;
+    expect(family, isNotNull);
+    expect(theme.tooltipTheme.textStyle!.fontFamily, family);
+    final dialog = buildDialogTheme(theme, reduceMotion: false);
+    for (final style in [
+      dialog.textTheme.titleLarge,
+      dialog.textTheme.headlineSmall,
+      dialog.textTheme.bodyLarge,
+      dialog.textTheme.bodyMedium,
+      dialog.textTheme.bodySmall,
+      dialog.textTheme.labelLarge,
+      dialog.filledButtonTheme.style!.textStyle!.resolve({}),
+      dialog.outlinedButtonTheme.style!.textStyle!.resolve({}),
+    ]) {
+      expect(style!.fontFamily, family);
+      expect(style.fontFamily, isNot('JetBrainsMono'));
+    }
+    expect(dialog.textTheme.titleLarge!.fontSize, 17);
+  });
+
+  test('filled dialog buttons ring outside the fill on keyboard focus; '
+      'outlined ones keep the inside ring (S-9)', () {
+    final dialog = buildDialogTheme(buildDesktopTheme(), reduceMotion: false);
+    final filled = dialog.filledButtonTheme.style!;
+    expect(
+      filled.shape!.resolve({WidgetState.focused}),
+      isA<OutsideFocusRingBorder>(),
+    );
+    expect(filled.shape!.resolve({}), isNot(isA<OutsideFocusRingBorder>()));
+    expect(filled.side!.resolve({WidgetState.focused}), isNull);
+    final outlined = dialog.outlinedButtonTheme.style!;
+    expect(
+      outlined.side!.resolve({WidgetState.focused})!.color,
+      ShellxDesktopColors.accent,
+    );
+  });
+
+  test('text fields are 36 high with the label above (UI §3.4)', () {
+    final input = buildDesktopTheme().inputDecorationTheme;
+    expect(input.isDense, isTrue);
+    expect(
+      input.contentPadding,
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    );
+  });
 }

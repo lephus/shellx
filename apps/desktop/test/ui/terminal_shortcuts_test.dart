@@ -205,6 +205,23 @@ void main() {
       ),
       isA<FontBiggerIntent>(),
     );
+    // Select all, scrollback included: ⌘A / Ctrl+Shift+A (Windows
+    // Terminal's), never plain Ctrl+A (readline's line start).
+    expect(
+      lookup(mac, const SingleActivator(LogicalKeyboardKey.keyA, meta: true)),
+      isA<SelectAllIntent>(),
+    );
+    expect(
+      lookup(
+        win,
+        const SingleActivator(
+          LogicalKeyboardKey.keyA,
+          control: true,
+          shift: true,
+        ),
+      ),
+      isA<SelectAllIntent>(),
+    );
     // F6 belongs to the shell inside the terminal (htop, mc); Ctrl+F6
     // leaves it, and works in the rest of the window too.
     for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {

@@ -190,19 +190,16 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         selectedId: opened
             ? id
             : (state.selected?.id ?? state.tabs.firstOrNull?.id),
-        opening: false,
       );
     } on SessionLimitException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SessionLimitNotice(error.max), opening: false);
-      }
+      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
     } on SpawnFailedException catch (error) {
       if (ref.mounted) {
-        _set(
-          notice: SpawnFailedNotice(spawnFailureOf(error.message)),
-          opening: false,
-        );
+        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
       }
+    } finally {
+      // Whatever happened (an unexpected error too), `+` is usable again.
+      if (ref.mounted) _set(opening: false);
     }
   }
 
@@ -310,6 +307,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     terminal.onUserInput = (data) => _onUserInput(s.id, data);
     terminal.onReply = (data) => view.reply(utf8.encode(data));
     terminal.onResize = (cols, rows, _, _) {
+      // Every tab's view is mounted (IndexedStack), so a window resize lays
+      // them all out; only the selected one tells its session, so a hidden
+      // tab the phone drives keeps the phone driver (and its size). A tab
+      // sends its size when it becomes selected ([_selectionChanged]).
+      if (state.selectedId != s.id) return;
       _grid = (cols: cols, rows: rows);
       view.resize(cols, rows);
     };
@@ -389,12 +391,26 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (selected == id) {
       selected = tabs.isEmpty ? null : tabs[min(i, tabs.length - 1)].id;
     }
+    final before = state.selectedId;
     state = TerminalTabsState(
       tabs: tabs,
       selectedId: selected,
       notice: state.notice,
       opening: state.opening,
     );
+    if (state.selectedId != before) _selectionChanged();
+  }
+
+  /// The newly selected tab's view tells its session the size it was laid
+  /// out at while hidden (a resize while it was not selected went nowhere).
+  void _selectionChanged() {
+    final id = state.selectedId;
+    final link = id == null ? null : _links[id];
+    final tab = id == null ? null : _tab(id);
+    if (link == null || tab == null || tab.exited) return;
+    final terminal = link.terminal;
+    _grid = (cols: terminal.viewWidth, rows: terminal.viewHeight);
+    link.view.resize(terminal.viewWidth, terminal.viewHeight);
   }
 
   static const Object _keep = Object();
@@ -405,6 +421,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     Object? notice = _keep,
     bool? opening,
   }) {
+    final before = state.selectedId;
     state = TerminalTabsState(
       tabs: tabs ?? state.tabs,
       selectedId: identical(selectedId, _keep)
@@ -413,6 +430,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       notice: identical(notice, _keep) ? state.notice : notice as TabNotice?,
       opening: opening ?? state.opening,
     );
+    if (state.selectedId != before) _selectionChanged();
   }
 
   TerminalTargetPlatform _platform() => switch (defaultTargetPlatform) {

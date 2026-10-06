@@ -5,7 +5,8 @@ import 'package:xterm/core.dart';
 /// xterm.dart 4.0.0's keytab (a) derives application cursor mode from DECKPAM
 /// (`ESC =`) instead of DECCKM (`ESC [ ? 1 h`) and (b) encodes Alt/Shift+arrow
 /// as Ctrl+arrow and drops Ctrl+Alt+arrow. This handler runs first and fixes
-/// both; every other key falls through to [defaultInputHandler].
+/// both, and sends macOS Option+←/→ at the shell as ESC b / ESC f; every
+/// other key falls through to [defaultInputHandler].
 final class CursorKeysInputHandler implements TerminalInputHandler {
   const CursorKeysInputHandler();
 
@@ -21,6 +22,17 @@ final class CursorKeysInputHandler implements TerminalInputHandler {
       _ => null,
     };
     if (letter == null) return null;
+    // macOS: Option+←/→ alone at the shell (main screen) moves by word,
+    // as Terminal.app and iTerm2 send it: ESC b / ESC f, which readline,
+    // zle and fish all bind. Full-screen programs get the xterm form.
+    if (event.platform == TerminalTargetPlatform.macos &&
+        event.alt &&
+        !event.shift &&
+        !event.ctrl &&
+        !event.altBuffer &&
+        (letter == 'D' || letter == 'C')) {
+      return letter == 'D' ? '\x1bb' : '\x1bf';
+    }
     final modifier =
         1 + (event.shift ? 1 : 0) + (event.alt ? 2 : 0) + (event.ctrl ? 4 : 0);
     if (modifier > 1) return '\x1b[1;$modifier$letter';

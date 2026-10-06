@@ -32,6 +32,12 @@ class PasteClipboardIntent extends Intent {
   const PasteClipboardIntent();
 }
 
+/// The whole buffer, scrollback included (Terminal.app, iTerm2, Windows
+/// Terminal), not only the screen.
+class SelectAllIntent extends Intent {
+  const SelectAllIntent();
+}
+
 class FontBiggerIntent extends Intent {
   const FontBiggerIntent();
 }
@@ -107,11 +113,8 @@ Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
         const CloseTabIntent(),
     primary(LogicalKeyboardKey.keyC): const CopySelectionIntent(),
     primary(LogicalKeyboardKey.keyV): const PasteClipboardIntent(),
-    // TerminalView's own default, kept because this map replaces it; the
-    // workspace has no action for it, so outside the terminal it is a no-op.
-    if (mac)
-      const SingleActivator(LogicalKeyboardKey.keyA, meta: true):
-          const SelectAllTextIntent(SelectionChangedCause.keyboard),
+    // ⌘A / Ctrl+Shift+A (Windows Terminal's), like the terminal's menu.
+    primary(LogicalKeyboardKey.keyA): const SelectAllIntent(),
     for (var i = 0; i < _digits.length; i++)
       (mac
               ? SingleActivator(_digits[i], meta: true)

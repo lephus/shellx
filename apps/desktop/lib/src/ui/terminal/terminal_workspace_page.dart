@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xterm/xterm.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
@@ -150,6 +151,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       PasteClipboardIntent: run<PasteClipboardIntent>((_) {
         unawaited(_paste());
       }),
+      SelectAllIntent: run<SelectAllIntent>(
+        (_) => _selectAll(),
+        // Outside the terminal (sidebar, a toast…) the key does nothing.
+        enabled: (_) => ref.read(terminalTabsProvider).selected != null,
+      ),
       FontBiggerIntent: run<FontBiggerIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).increase(),
       ),
@@ -174,6 +180,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       ),
     );
     tab.selection.clearSelection();
+  }
+
+  /// ⌘A / Ctrl+Shift+A / the menu: every line, scrollback included.
+  void _selectAll() {
+    final tab = ref.read(terminalTabsProvider).selected;
+    if (tab == null) return;
+    final buffer = tab.terminal.buffer;
+    tab.selection.setSelection(
+      buffer.createAnchor(0, 0),
+      buffer.createAnchor(tab.terminal.viewWidth, buffer.height - 1),
+      mode: SelectionMode.line,
+    );
   }
 
   /// ⌘V / Ctrl+Shift+V into the selected tab, sanitised (and bracketed when

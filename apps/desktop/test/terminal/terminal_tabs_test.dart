@@ -141,6 +141,54 @@ void main() {
     expect(local.views[1]!.resizes, [(90, 30)]);
   });
 
+  test('only the selected tab reports its layout size: a hidden tab the '
+      'phone drives keeps the phone driver until it is selected', () {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    local.add(local.summary(2)); // phone-origin, the phone drives
+    boot();
+    expect(state().selectedId, 1);
+    for (final view in local.views.values) {
+      view.resizes.clear();
+    }
+    // The window grows: every mounted TerminalView lays out again.
+    for (final tab in state().tabs) {
+      tab.terminal.resize(100, 30);
+    }
+    expect(local.views[1]!.resizes, [(100, 30)]);
+    expect(local.views[2]!.resizes, isEmpty);
+
+    tabs().select(2);
+    expect(local.views[2]!.resizes, [(100, 30)]);
+    // Re-selecting the first tab sends its (unchanged) size again; the
+    // session ignores a size it already has.
+    tabs().select(1);
+    expect(local.views[1]!.resizes, [(100, 30), (100, 30)]);
+  });
+
+  test('a tab selected because its neighbour closed sends its size', () {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    local.add(local.summary(2));
+    boot();
+    for (final tab in state().tabs) {
+      tab.terminal.resize(90, 28);
+    }
+    local.views[2]!.resizes.clear();
+    tabs().close(1);
+    expect(state().selectedId, 2);
+    expect(local.views[2]!.resizes, [(90, 28)]);
+  });
+
+  test('openTab always clears the busy flag, even on an unexpected '
+      'error', () async {
+    boot();
+    local.openError = StateError('boom');
+    await expectLater(tabs().openTab(), throwsStateError);
+    expect(state().opening, isFalse);
+    local.openError = null;
+    await tabs().openTab();
+    expect(local.opens, hasLength(2));
+  });
+
   test('output keeps reaching a tab that is not selected (spec §5)', () async {
     local.add(local.summary(1));
     local.add(local.summary(2));
