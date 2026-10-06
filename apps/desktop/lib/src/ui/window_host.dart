@@ -67,6 +67,10 @@ final class WindowPresenter {
     return _run(state.visible ? _host.show : _host.hide);
   }
 
+  /// Completes once every host call queued so far has run (failed or
+  /// not). Never completes with an error.
+  Future<void> settled() => _last;
+
   Future<void> _run(Future<void> Function() call) {
     final done = _last.then((_) => call());
     // A failed call is reported to this caller; the next one still runs.
@@ -249,6 +253,11 @@ final class WindowManagerHost with WindowListener implements WindowHost {
 
   @override
   void onWindowBlur() => onFocusChanged?.call(false);
+
+  /// A minimized window is never focused (D25), even where the platform
+  /// sends no blur with the minimize.
+  @override
+  void onWindowMinimize() => onFocusChanged?.call(false);
 
   @override
   void onWindowResized() => _remember();

@@ -229,3 +229,36 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 - [ ] 5. `WindowsPortProbe` trên Windows thật (chạy `%SystemRoot%\System32\netstat.exe` và `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` bằng đường dẫn tuyệt đối — một `netstat.exe` giả trong thư mục làm việc hay đầu PATH không được chạy): `netstat -ano` + CIM (`Get-CimInstance Win32_Process`) cho cổng đúng theo cây tiến trình của tab; thử Windows có netstat bản địa hóa (Đức/Pháp/Việt) → vẫn đúng cổng; không có cửa sổ console nháy lên mỗi 3 s.
 - [ ] 6. Narrator trên cây workspace: đọc đúng tên, số tab, mở/thu gọn, vị trí "tab n trên m"; ←/→ và F2 chạy.
 - [ ] 7. Bộ gõ Telex/Unikey/EVKey trong ô tên tab và workspace; double-click để đổi tên so với click đơn để chọn (như macOS 16, 17); kéo thả danh sách dài + tự cuộn (như macOS 15).
+
+## 13. Thông báo kiểu cmux — A4 (2026-10-07)
+
+- Spec: `docs/superpowers/specs/2026-10-07-desktop-notifications-a4-design.md`; UI: `docs/superpowers/design/2026-10-07-shellx-desktop-ui-a4.md`; plan: `docs/superpowers/plans/2026-10-07-desktop-notifications-a4.md`.
+- Trạng thái: nhánh `feat/desktop-a4`; số test agent/desktop: xem kiểm tra cuối khi merge.
+- Push sang điện thoại không đổi (N8); OSC 99 và BEL chỉ ở máy tính. Chữ thông báo không bao giờ vào log, cài đặt hay đĩa (N9).
+
+Thử tay trên macOS 14/15 và Windows 10/11 thật (CI không có):
+
+### Thử tay — macOS
+- [ ] 1. Tab B không chọn: `printf '\e]9;Build xong\a'` → badge 1 + dòng "Build xong" ≤ 200 ms; Dock hiện 1.
+- [ ] 2. `printf '\e]777;notify;CI;Đã xanh\a'`, `shellx notify xong`, `printf '\e]99;;Xin chào\e\\'`, OSC 99 hai mảnh (`i=1:d=0` rồi `i=1:p=body`), `e=1` base64 tiếng Việt.
+- [ ] 3. Claude Code với `preferredNotifChannel` = `kitty`, `iterm2`, `terminal_bell`: tab của nó có badge khi chờ trả lời.
+- [ ] 4. `printf '\a'` liên tục 10 s → tối đa 2 chuông; gõ Tab-completion sai trong tab đang xem → không có gì.
+- [ ] 5. Ngưỡng 10 s: `sleep 11; false` trong tab không chọn → "✗ … · mã 1 · 11 giây"; Tắt → không.
+- [ ] 6. Chọn tab có badge, rời trước 1 s → còn; ở lại 1 s → mất; vòng sáng quanh terminal khi cửa sổ ở sau app khác rồi focus lại; giảm chuyển động (Cài đặt hệ thống) → vòng tĩnh.
+- [ ] 7. ⌘⇧I / Ctrl+Shift+I: bảng, ↑/↓/Enter nhảy tới tab trong workspace thu gọn; ⌘⇧U lần lượt các tab chưa đọc; hết → toast.
+- [ ] 8. Cửa sổ ở sau app khác / thu nhỏ / ở Space khác: thông báo hệ thống tới; bấm trong Notification Center → cửa sổ lên trước (đúng Space, hết thu nhỏ), đúng tab (workspace thu gọn tự mở), badge của tab mất ngay, gõ được ngay; vòng lặp 20 OSC 9 → 2 thông báo; đọc tab → thông báo biến khỏi Notification Center. Đóng tab rồi bấm thông báo cũ của nó → chỉ đưa cửa sổ lên.
+- [ ] 9. Focus: cửa sổ trước + tab đang xem → không badge, không thông báo; thu nhỏ cửa sổ (⌘M) rồi gửi OSC 9 vào tab đang chọn → có badge và thông báo; chuyển Space khác → cũng vậy.
+- [ ] 10. Tray → Thông báo: tắt "Thông báo trên máy tính" → không còn thông báo hệ thống (badge vẫn); tắt "Chỉ khi…" → tab không chọn khi cửa sổ đang trước cũng thông báo; còn sau khi khởi động lại; dùng được khi **chưa đăng nhập**.
+- [ ] 11. Dock badge trên macOS 14+: khi app đã được cấp quyền thông báo có "Badges" (Cài đặt hệ thống → Thông báo → ShellX) → số hiện trên icon Dock, `99+` khi quá 99, mất khi đọc hết; tắt "Badges" → không hiện, không lỗi. Ghi lại ở đây có cần quyền badge riêng không.
+- [ ] 12. Ẩn cửa sổ (nút đỏ) rồi hiện lại → Dock badge vẫn đúng số (icon Dock trở lại trước, badge sau).
+- [ ] 13. Điện thoại đã ghép: OSC 9/777 và lệnh chạy lâu vẫn push như trước; OSC 99 và BEL không push.
+- [ ] 14. VoiceOver: dòng tab đọc "N thông báo chưa đọc, mới nhất: …"; cửa sổ đang trước, thông báo tới tab khác → đọc "Thông báo mới từ {tab}: {chữ}" một lần (OSC 9 dồn dập trong 3 s chỉ đọc cái đầu); tab đang xem hoặc cửa sổ ở sau → không đọc. Mở bảng ⌘⇧I → "Thông báo, N mục".
+- [ ] 15. Focus/Không làm phiền bật → không lỗi, badge/vòng vẫn chạy.
+
+### Thử tay — Windows
+- [ ] 1. `flutter build windows` thành công (CMake bật `/W4 /WX`: mọi cảnh báo trong `windows/runner/flutter_window.cpp` là lỗi).
+- [ ] 2. Mục 1–7, 10, 13, 15 của macOS với Ctrl+Shift+I, Ctrl+Shift+U.
+- [ ] 3. Chấm accent trên nút taskbar khi có chưa đọc (Narrator đọc mô tả "N thông báo chưa đọc"); gỡ khi đọc hết; Explorer khởi động lại (`taskkill /f /im explorer.exe` rồi chạy lại) → chấm trở lại khi còn chưa đọc.
+- [ ] 4. Nút taskbar nháy khi có thông báo mới lúc app khác đang ở trước (và lúc cửa sổ thu nhỏ); không nháy khi cửa sổ đang focus.
+- [ ] 5. Toast trong Action Center: bấm → cửa sổ lên trước, đúng tab, badge mất, gõ được ngay; đọc tab → toast biến khỏi Action Center; tab đã đóng → chỉ đưa cửa sổ lên.
+- [ ] 6. Narrator: dòng tab đọc "N thông báo chưa đọc, mới nhất: …"; thông báo tới tab khác khi cửa sổ đang trước được đọc một lần.

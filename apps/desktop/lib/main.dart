@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:win32/win32.dart' as win32;
+import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
 import 'src/agent/agent_controller.dart';
@@ -21,6 +23,8 @@ import 'src/agent/session_core.dart';
 import 'src/config.dart';
 import 'src/l10n/locale.dart';
 import 'src/platform/app_reopen.dart';
+import 'src/platform/attention_badge.dart';
+import 'src/platform/desktop_notifications.dart';
 import 'src/platform/keep_awake.dart';
 import 'src/platform/launch_at_login.dart';
 import 'src/platform/notifier.dart';
@@ -32,8 +36,11 @@ import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
+import 'src/terminal/attention_announcer.dart';
 import 'src/terminal/local_sessions_provider.dart';
 import 'src/terminal/port_watch.dart';
+import 'src/terminal/tab_attention.dart';
+import 'src/terminal/terminal_tabs.dart';
 import 'src/terminal_sharing/attach_throttle.dart';
 import 'src/terminal_sharing/powershell.dart';
 import 'src/terminal_sharing/sharing_paths.dart';
@@ -46,6 +53,7 @@ import 'src/ui/activation.dart';
 import 'src/ui/app.dart';
 import 'src/ui/window_bounds.dart';
 import 'src/ui/window_coordinator.dart';
+import 'src/ui/window_focus.dart';
 import 'src/ui/window_host.dart';
 import 'src/ui/window_router.dart';
 
@@ -111,6 +119,10 @@ Future<void> _start(
     onCloseRequested: () =>
         container.read(windowRouterProvider.notifier).hideWindow(),
     bounds: WindowBoundsStore(settings),
+    // A4 D25. The window is hidden until showTerminal() below, so no focus
+    // event comes before the container exists.
+    onFocusChanged: (focused) =>
+        container.read(windowFocusProvider.notifier).set(focused),
   );
   await windowHost.init();
 
@@ -228,6 +240,15 @@ Future<void> _start(
     ],
   );
 
+  // A4 D25: the focus the window has now; events keep it current.
+  try {
+    container
+        .read(windowFocusProvider.notifier)
+        .set(await windowManager.isFocused());
+  } catch (error) {
+    debugPrint('ShellX: reading the window focus failed: ${error.runtimeType}');
+  }
+
   final windowPresenter = WindowPresenter(windowHost);
   container.listen<WindowState>(
     windowRouterProvider,
@@ -279,6 +300,68 @@ Future<void> _start(
     run: (call) => _unawaitedLogged(call, 'window title'),
   );
   listenForPortWatch(container: container, sessions: core.sessions);
+
+  // A4: tab attention — system notifications (D14–D16), Dock/taskbar
+  // badge (D18–D19), screen-reader announcements (D24). Reading the
+  // attention provider here builds it before the first shell starts. None
+  // of this needs a signed-in account (N1).
+  final desktopNotifications = DesktopNotifications(
+    notifier: notifier,
+    settings: settings,
+    l10n: l10n,
+    onOpen: (id) => openTabFromNotification(
+      container,
+      id,
+      activateApp: Platform.isMacOS
+          ? () => _unawaitedLogged(activateMacApp(), 'activate')
+          : null,
+    ),
+  );
+  listenForDesktopNotifications(
+    container: container,
+    notifications: desktopNotifications,
+    l10n: l10n,
+  );
+  listenForAttentionBadge(
+    container: container,
+    // macOS: after the window's queued show, which sets the Dock policy
+    // (A1 D10) the badge needs.
+    host: Platform.isMacOS
+        ? AfterWindowBadge(
+            const MacDockBadge(),
+            windowSettled: windowPresenter.settled,
+          )
+        : Platform.isWindows
+        ? const WindowsTaskbarBadge()
+        : const NoBadge(),
+    l10n: l10n,
+    run: (call) => _unawaitedLogged(call, 'badge'),
+  );
+  final announcer = AttentionAnnouncer(
+    l10n: l10n,
+    announce: (text) {
+      final view = PlatformDispatcher.instance.implicitView;
+      if (view == null) return;
+      _unawaitedLogged(
+        SemanticsService.sendAnnouncement(view, text, TextDirection.ltr),
+        'announcement',
+      );
+    },
+  );
+  container.read(tabAttentionProvider.notifier).arrivals.listen((a) {
+    final tabs = container.read(terminalTabsProvider);
+    final tab = tabs.tabs.where((t) => t.id == a.tabId).firstOrNull;
+    if (tab == null) return;
+    announcer.arrived(
+      a,
+      tab: tab.label,
+      // windowActiveProvider's rule from its sources (see its doc).
+      windowFocused:
+          container.read(windowFocusProvider) &&
+          container.read(windowRouterProvider).visible,
+      tabSelected: tabs.selectedId == a.tabId,
+    );
+  });
 
   registerFontLicenses();
   runApp(

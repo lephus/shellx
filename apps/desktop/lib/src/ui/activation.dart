@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../terminal/tab_attention.dart';
 import '../terminal/terminal_tabs.dart';
 import 'window_router.dart';
 
@@ -24,3 +25,18 @@ Future<void> handleActivation(ProviderContainer container) =>
       router: container.read(windowRouterProvider.notifier),
       tabs: container.read(terminalTabsProvider.notifier),
     );
+
+/// A4 D16: a system notification was clicked. The window comes to the
+/// front (no new tab, unlike activation; [activateApp] is macOS
+/// `NSApp.activate`), then the tab is selected, its workspace expanded,
+/// read at once and the terminal focused. A closed tab only raises the
+/// window.
+void openTabFromNotification(
+  ProviderContainer container,
+  int tabId, {
+  void Function()? activateApp,
+}) {
+  container.read(windowRouterProvider.notifier).showTerminal();
+  activateApp?.call();
+  container.read(tabAttentionProvider.notifier).jumpTo(tabId);
+}

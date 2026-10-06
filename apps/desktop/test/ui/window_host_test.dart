@@ -83,6 +83,19 @@ void main() {
     expect(focus, [true, false]);
   });
 
+  test('minimizing counts as losing the focus (A4 D25 backstop)', () {
+    final focus = <bool>[];
+    final h = WindowManagerHost(
+      onCloseRequested: () {},
+      bounds: WindowBoundsStore(settings),
+      native: native,
+      onFocusChanged: focus.add,
+    );
+    h.onWindowFocus();
+    h.onWindowMinimize();
+    expect(focus, [true, false]);
+  });
+
   group('bringToFront (ruling C1)', () {
     test('a minimized window is restored, shown, focused and the app '
         'activated (macOS)', () async {

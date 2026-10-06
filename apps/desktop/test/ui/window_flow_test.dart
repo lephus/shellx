@@ -631,6 +631,21 @@ void main() {
     ]);
   });
 
+  test('WindowPresenter.settled waits for the queued show (A4 D18: the '
+      'Dock badge after the policy)', () async {
+    final host = _SlowWindowHost();
+    final presenter = WindowPresenter(host);
+    final shown = presenter.apply(const WindowState(terminal: true));
+    var settled = false;
+    unawaited(presenter.settled().then((_) => settled = true));
+    await pumpEventQueue();
+    expect(settled, isFalse);
+    host.gate.complete();
+    await shown;
+    await pumpEventQueue();
+    expect(settled, isTrue);
+  });
+
   test('the native title is set only when it changes (ruling I3)', () async {
     final l10n = lookupAppLocalizations(const Locale('en'));
     final local = FakeLocalSessions();

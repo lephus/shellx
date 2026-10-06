@@ -59,6 +59,28 @@ final class NoBadge implements BadgeHost {
   Future<void> flash() async {}
 }
 
+/// macOS: the Dock tile comes back with the `.regular` activation policy
+/// (A1 D10), which the window's show sets. Each call waits for the window
+/// calls already queued ([windowSettled], `WindowPresenter.settled`), so the
+/// re-apply on show lands after the policy, never before it.
+final class AfterWindowBadge implements BadgeHost {
+  const AfterWindowBadge(this._inner, {required this.windowSettled});
+  final BadgeHost _inner;
+  final Future<void> Function() windowSettled;
+
+  @override
+  Future<void> setUnread(int count, String description) =>
+      _after(() => _inner.setUnread(count, description));
+
+  @override
+  Future<void> flash() => _after(_inner.flash);
+
+  /// A failed window call is the presenter's to report; the badge still
+  /// goes on.
+  Future<void> _after(Future<void> Function() call) =>
+      windowSettled().then((_) {}, onError: (Object _) {}).then((_) => call());
+}
+
 /// `main.dart`. [run] logs a failed call by type (never the count's text).
 void listenForAttentionBadge({
   required ProviderContainer container,

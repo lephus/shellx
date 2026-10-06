@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,5 +71,25 @@ void main() {
     expect(dockBadgeLabel(0), '');
     expect(dockBadgeLabel(5), '5');
     expect(dockBadgeLabel(120), '99+');
+  });
+
+  test('macOS: a badge call waits for the window calls already queued, so '
+      'the show sets the Dock policy first (A1 D10, D18)', () async {
+    final host = _Host();
+    var window = Completer<void>();
+    final badge = AfterWindowBadge(host, windowSettled: () => window.future);
+    unawaited(badge.setUnread(3, '3 unread notifications'));
+    unawaited(badge.flash());
+    await pumpEventQueue();
+    expect(host.unread, isEmpty);
+    expect(host.flashes, 0);
+    window.complete();
+    await pumpEventQueue();
+    expect(host.unread, [(3, '3 unread notifications')]);
+    expect(host.flashes, 1);
+    // A failed window call does not hold the badge back.
+    window = Completer<void>()..completeError(StateError('no window'));
+    await badge.setUnread(0, '0 unread notifications');
+    expect(host.unread.last, (0, '0 unread notifications'));
   });
 }
