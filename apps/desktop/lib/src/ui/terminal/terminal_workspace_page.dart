@@ -21,6 +21,9 @@ class TerminalWorkspacePage extends ConsumerStatefulWidget {
 class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   final terminalFocus = FocusNode(debugLabel: 'terminal');
   final sidebarFocus = FocusNode(debugLabel: 'sidebar');
+
+  /// The empty state's "Open new tab" (focused when the last tab closes).
+  final emptyFocus = FocusNode(debugLabel: 'open new tab');
   final sidebarScroll = ScrollController();
 
   /// Map of shortcuts handed to every TerminalView (filled by Task 8).
@@ -49,6 +52,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   void dispose() {
     terminalFocus.dispose();
     sidebarFocus.dispose();
+    emptyFocus.dispose();
     sidebarScroll.dispose();
     super.dispose();
   }
@@ -60,6 +64,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     // keep the focus in the list.
     ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
       if (id != null && !sidebarFocus.hasFocus) focusTerminal();
+    });
+    // The last tab closed: the keyboard goes to "Open new tab" instead of
+    // vanishing with the terminal (after the frame that builds the button).
+    ref.listen(terminalTabsProvider.select((s) => s.tabs.isEmpty), (
+      wasEmpty,
+      empty,
+    ) {
+      if (empty && wasEmpty == false) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) emptyFocus.requestFocus();
+        });
+      }
     });
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,6 +96,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         Expanded(
           child: TerminalPane(
             terminalFocus: terminalFocus,
+            emptyFocus: emptyFocus,
             shortcuts: terminalShortcuts,
           ),
         ),

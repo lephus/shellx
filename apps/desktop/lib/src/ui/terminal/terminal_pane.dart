@@ -20,10 +20,18 @@ import 'terminal_overlays.dart';
 /// TerminalView per tab (all mounted, so hidden tabs keep their buffer),
 /// and the overlays that never resize the terminal (driver pill, toast).
 class TerminalPane extends ConsumerStatefulWidget {
-  const TerminalPane({super.key, required this.terminalFocus, this.shortcuts});
+  const TerminalPane({
+    super.key,
+    required this.terminalFocus,
+    required this.emptyFocus,
+    this.shortcuts,
+  });
 
   /// The selected tab's TerminalView focus (UI §3.6 region 1).
   final FocusNode terminalFocus;
+
+  /// The empty state's "Open new tab" button.
+  final FocusNode emptyFocus;
 
   /// Passed to every TerminalView (Task 8: window shortcuts must win over
   /// xterm's own key handling).
@@ -69,6 +77,12 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     if (identical(ref.read(terminalTabsProvider).notice, notice)) {
       ref.read(terminalTabsProvider.notifier).dismissNotice();
     }
+  }
+
+  /// Where the keyboard goes when the toast it was on disappears.
+  void _returnFocus() {
+    final empty = ref.read(terminalTabsProvider).tabs.isEmpty;
+    (empty ? widget.emptyFocus : widget.terminalFocus).requestFocus();
   }
 
   @override
@@ -141,7 +155,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                   children: [
                     if (state.tabs.isEmpty)
                       Positioned.fill(
-                        child: EmptyTerminalState(onOpen: tabs.openTab),
+                        child: EmptyTerminalState(
+                          onOpen: tabs.openTab,
+                          buttonFocus: widget.emptyFocus,
+                        ),
                       )
                     else
                       Positioned.fill(
@@ -206,6 +223,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                   key: ObjectKey(notice),
                                   notice: notice,
                                   onDismiss: () => _dismiss(notice),
+                                  onReturnFocus: _returnFocus,
                                 ),
                         ),
                       ),

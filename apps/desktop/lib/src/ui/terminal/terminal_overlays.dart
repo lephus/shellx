@@ -25,13 +25,16 @@ class ShellxPrimaryButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
+    this.focusNode,
   });
   final String label;
   final VoidCallback? onPressed;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) => FilledButton(
     onPressed: onPressed,
+    focusNode: focusNode,
     style: ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(
         Size(ShellxSizes.buttonMinWidth, ShellxSizes.button),
@@ -141,8 +144,10 @@ class _ShellxIconButtonState extends State<ShellxIconButton> {
       onShowHoverHighlight: (value) => setState(() => _hover = value),
       child: Semantics(
         button: true,
+        // Busy: announced as unavailable, since presses are ignored (UI §3.2).
+        enabled: !widget.busy,
         label: widget.semanticLabel,
-        onTap: _activate,
+        onTap: widget.busy ? null : _activate,
         excludeSemantics: true,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -439,40 +444,74 @@ class DriverPill extends StatelessWidget {
 }
 
 /// UI §2.8 error toast: visible 6 s (the timer runs even with reduced
-/// motion), paused while hovered, one at a time (a new notice replaces the
-/// old one and restarts the timer).
+/// motion), paused while hovered or while its close button has the
+/// keyboard, one at a time (a new notice replaces the old one and restarts
+/// the timer).
 class NoticeToast extends StatefulWidget {
-  const NoticeToast({super.key, required this.notice, required this.onDismiss});
+  const NoticeToast({
+    super.key,
+    required this.notice,
+    required this.onDismiss,
+    this.onReturnFocus,
+  });
   final TabNotice notice;
   final VoidCallback onDismiss;
+
+  /// Called after a dismissal while the close button had the keyboard, so
+  /// the focus does not vanish with the toast.
+  final VoidCallback? onReturnFocus;
 
   @override
   State<NoticeToast> createState() => _NoticeToastState();
 }
 
 class _NoticeToastState extends State<NoticeToast> {
+  final _closeFocus = FocusNode(debugLabel: 'toast close');
   Timer? _timer;
+  bool _hovered = false;
 
   @override
   void initState() {
     super.initState();
+    _closeFocus.addListener(_onFocus);
     _start();
   }
 
   @override
-  void didUpdateWidget(NoticeToast old) {
-    super.didUpdateWidget(old);
-    if (!identical(old.notice, widget.notice)) _start();
+  void didUpdateWidget(NoticeToast oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.notice, widget.notice)) _start();
   }
 
+  bool get _paused => _hovered || _closeFocus.hasFocus;
+
+  /// A fresh 6 s, unless the pointer or the keyboard is on the toast.
   void _start() {
     _timer?.cancel();
-    _timer = Timer(ShellxMotion.toastVisibleError, widget.onDismiss);
+    _timer = _paused
+        ? null
+        : Timer(ShellxMotion.toastVisibleError, widget.onDismiss);
+  }
+
+  void _onFocus() => _paused ? _timer?.cancel() : _start();
+
+  void _close() {
+    final hadFocus = _closeFocus.hasFocus;
+    widget.onDismiss();
+    if (hadFocus) widget.onReturnFocus?.call();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    // Replaced by a newer notice while the keyboard was on this one.
+    if (_closeFocus.hasFocus) {
+      final returnFocus = widget.onReturnFocus;
+      if (returnFocus != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => returnFocus());
+      }
+    }
+    _closeFocus.dispose();
     super.dispose();
   }
 
@@ -485,8 +524,14 @@ class _NoticeToastState extends State<NoticeToast> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return MouseRegion(
-      onEnter: (_) => _timer?.cancel(),
-      onExit: (_) => _start(),
+      onEnter: (_) {
+        _hovered = true;
+        _timer?.cancel();
+      },
+      onExit: (_) {
+        _hovered = false;
+        _start();
+      },
       child: Semantics(
         liveRegion: true,
         container: true,
@@ -531,7 +576,8 @@ class _NoticeToastState extends State<NoticeToast> {
                 icon: Icons.close,
                 semanticLabel: l10n.toastDismiss,
                 tooltip: TextSpan(text: l10n.toastDismiss),
-                onPressed: widget.onDismiss,
+                onPressed: _close,
+                focusNode: _closeFocus,
                 hitSize: ShellxSizes.toastClose,
                 visualSize: ShellxSizes.toastClose,
                 glyphSize: ShellxSizes.toastCloseGlyph,
@@ -548,8 +594,11 @@ class _NoticeToastState extends State<NoticeToast> {
 
 /// UI §2.7: shown in the pane when there is no tab.
 class EmptyTerminalState extends StatelessWidget {
-  const EmptyTerminalState({super.key, required this.onOpen});
+  const EmptyTerminalState({super.key, required this.onOpen, this.buttonFocus});
   final VoidCallback onOpen;
+
+  /// "Open new tab" gets the keyboard when the last tab closes.
+  final FocusNode? buttonFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -596,6 +645,7 @@ class EmptyTerminalState extends StatelessWidget {
                 key: const Key('pane.empty.open'),
                 label: l10n.terminalEmptyAction,
                 onPressed: onOpen,
+                focusNode: buttonFocus,
               ),
               const SizedBox(height: ShellxSpace.s8),
               ExcludeSemantics(

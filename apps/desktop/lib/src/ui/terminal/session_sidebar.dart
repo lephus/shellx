@@ -144,6 +144,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               container: true,
               child: Focus(
                 focusNode: widget.focusNode,
+                // An empty list is no tab stop (UI §3.6).
+                canRequestFocus: state.tabs.isNotEmpty,
+                skipTraversal: state.tabs.isEmpty,
                 onKeyEvent: _onKey,
                 child: ShellxScrollbar(
                   controller: widget.scrollController,

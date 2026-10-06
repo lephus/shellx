@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -62,12 +61,33 @@ TerminalTabsState tabs() => container.read(terminalTabsProvider);
 /// timers before any addTearDown callback could dispose the container.
 void testWorkspace(
   String description,
-  Future<void> Function(WidgetTester tester) body,
-) => testWidgets(description, (tester) async {
-  await body(tester);
-  await tester.pumpWidget(const SizedBox());
-  container.dispose();
+  Future<void> Function(WidgetTester tester) body, {
+  TestVariant<Object?> variant = const DefaultTestVariant(),
+}) => testWidgets(description, variant: variant, (tester) async {
+  try {
+    await body(tester);
+  } finally {
+    await tester.pumpWidget(const SizedBox());
+    container.dispose();
+  }
 });
+
+/// The primary focus sits inside [finder] (UI §3.6 focus checks).
+bool focusIn(Finder finder) {
+  final focused = FocusManager.instance.primaryFocus?.context;
+  if (focused == null) return false;
+  return find
+      .descendant(
+        of: finder,
+        matching: find.byElementPredicate(
+          (e) => identical(e, focused),
+          skipOffstage: false,
+        ),
+        skipOffstage: false,
+      )
+      .evaluate()
+      .isNotEmpty;
+}
 
 void main() {
   setUp(() => local = FakeLocalSessions());
@@ -79,21 +99,30 @@ void main() {
     local.add(local.summary(2, title: 'claude', attachedMobileId: 'm1'));
     await pumpWorkspace(tester);
 
-    expect(find.text('zsh 1'), findsWidgets); // row + macOS pane header
+    expect(
+      find.text('zsh 1'),
+      findsOneWidget,
+    ); // the row (no pane header off macOS)
     expect(find.text('claude'), findsOneWidget);
     final phoneRow = find.byKey(const ValueKey('tab.2'));
     expect(
-      find.descendant(of: phoneRow, matching: find.byIcon(Icons.smartphone)),
+      find.descendant(
+        of: phoneRow,
+        matching: find.byIcon(Icons.smartphone_outlined),
+      ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: phoneRow, matching: find.byIcon(Icons.visibility)),
+      find.descendant(
+        of: phoneRow,
+        matching: find.byIcon(Icons.visibility_outlined),
+      ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('tab.1')),
-        matching: find.byIcon(Icons.smartphone),
+        matching: find.byIcon(Icons.smartphone_outlined),
       ),
       findsNothing,
     );
@@ -331,7 +360,7 @@ void main() {
         .widget<Icon>(
           find.descendant(
             of: find.byKey(ValueKey('tab.$id')),
-            matching: find.byIcon(Icons.visibility),
+            matching: find.byIcon(Icons.visibility_outlined),
           ),
         )
         .color!;
@@ -421,6 +450,9 @@ void main() {
     await mouse.addPointer(location: const Offset(400, 10));
     await mouse.moveTo(tester.getCenter(find.byKey(const Key('pane.toast'))));
     await tester.pump(const Duration(seconds: 7));
+    // Let a dismissal (if any) finish its exit animation.
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const Key('pane.toast')), findsOneWidget);
     await mouse.moveTo(const Offset(400, 10));
     await tester.pump(const Duration(seconds: 7));
@@ -431,7 +463,6 @@ void main() {
 
   testWorkspace('macOS: 38 px header band with + on the traffic-light line, '
       'pane header with the title (UI §2.1)', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     local.add(local.summary(1, title: 'claude'));
     await pumpWorkspace(tester);
     expect(tester.getTopLeft(find.byKey(const ValueKey('tab.1'))).dy, 42);
@@ -440,18 +471,170 @@ void main() {
     // 24 px visual centred in the 28 px hit box, 8 px from the right edge.
     expect(plus.dx + 12, 220 - 8);
     expect(find.text('claude'), findsNWidgets(2)); // row + pane header
-    debugDefaultTargetPlatformOverride = null;
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
-  testWorkspace('Windows: 36 px header band, no pane header (UI §2.1)', (
+  testWorkspace(
+    'Windows: 36 px header band, no pane header (UI §2.1)',
+    (tester) async {
+      local.add(local.summary(1, title: 'claude'));
+      await pumpWorkspace(tester);
+      expect(tester.getTopLeft(find.byKey(const ValueKey('tab.1'))).dy, 40);
+      expect(tester.getCenter(find.byKey(const Key('sidebar.newTab'))).dy, 18);
+      expect(find.text('claude'), findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWorkspace('the exited dot is a hollow red ring (UI §3.1)', (
     tester,
   ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    local.add(local.summary(1, title: 'claude'));
+    local.add(local.summary(1));
+    local.add(local.summary(2));
     await pumpWorkspace(tester);
-    expect(tester.getTopLeft(find.byKey(const ValueKey('tab.1'))).dy, 40);
-    expect(tester.getCenter(find.byKey(const Key('sidebar.newTab'))).dy, 18);
-    expect(find.text('claude'), findsOneWidget);
-    debugDefaultTargetPlatformOverride = null;
+    local.views[1]!.end(2);
+    await tester.pump();
+    await tester.pump();
+    BoxDecoration dot(int id) =>
+        tester
+                .widget<Container>(
+                  find.descendant(
+                    of: find.byKey(ValueKey('tab.$id')),
+                    matching: find.byWidgetPredicate(
+                      (w) =>
+                          w is Container &&
+                          w.decoration is BoxDecoration &&
+                          (w.decoration! as BoxDecoration).shape ==
+                              BoxShape.circle,
+                    ),
+                  ),
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(dot(1).color, isNull);
+    expect(
+      dot(1).border,
+      Border.all(color: ShellxDesktopColors.err, width: 1.5),
+    );
+    expect(dot(2).color, ShellxDesktopColors.ok);
+    expect(dot(2).border, isNull);
+  });
+
+  testWorkspace('no driver pill for an exited tab (UI §2.5)', (tester) async {
+    local.add(local.summary(1)); // phone-origin: the phone drives
+    await pumpWorkspace(tester);
+    expect(find.byKey(const Key('pane.driverPill')), findsOneWidget);
+    local.views[1]!.end(2);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.driverPill')), findsNothing);
+  });
+
+  testWorkspace('the driver pill follows the selected tab', (tester) async {
+    local.add(local.summary(1)); // the phone drives
+    local.add(local.summary(2, origin: SessionOrigin.desktop));
+    await pumpWorkspace(tester);
+    expect(find.byKey(const Key('pane.driverPill')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tab.2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.driverPill')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('tab.1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.driverPill')), findsOneWidget);
+  });
+
+  testWorkspace('the signed-out strip goes away once signed in (UI §2.4)', (
+    tester,
+  ) async {
+    await pumpWorkspace(tester, signedIn: false);
+    expect(find.byKey(const Key('pane.signedOutStrip')), findsOneWidget);
+    await container
+        .read(agentControllerProvider.notifier)
+        .signIn(email: 'a@b.co', password: '12345678', register: false);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.signedOutStrip')), findsNothing);
+  });
+
+  testWorkspace('closing the last tab moves the keyboard to "Open new tab"', (
+    tester,
+  ) async {
+    local.add(local.summary(1));
+    await pumpWorkspace(tester);
+    container.read(terminalTabsProvider.notifier).close(1);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('pane.empty')), findsOneWidget);
+    expect(focusIn(find.byKey(const Key('pane.empty.open'))), isTrue);
+  });
+
+  testWorkspace('with no tabs the sidebar list is not a focus stop', (
+    tester,
+  ) async {
+    await pumpWorkspace(tester);
+    final page = tester.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    expect(page.sidebarFocus.canRequestFocus, isFalse);
+    expect(page.sidebarFocus.skipTraversal, isTrue);
+    await tester.tap(find.byKey(const Key('sidebar.newTab')));
+    await tester.pump();
+    await tester.pump();
+    expect(page.sidebarFocus.canRequestFocus, isTrue);
+    expect(page.sidebarFocus.skipTraversal, isFalse);
+  });
+
+  testWorkspace('a busy + is announced as not available (UI §3.2)', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpWorkspace(tester);
+    final plus = find.bySemanticsLabel('New tab');
+    expect(
+      tester.getSemantics(plus),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: true),
+    );
+    final gate = local.openGate = Completer<void>();
+    await tester.tap(find.byKey(const Key('sidebar.newTab')));
+    await tester.pump();
+    expect(
+      tester.getSemantics(plus),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
+    gate.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(tester.getSemantics(plus), isSemantics(isEnabled: true));
+    semantics.dispose();
+  });
+
+  testWorkspace('the toast waits while its close button has keyboard focus; '
+      'dismissing it gives the keyboard back to the terminal (UI §2.8)', (
+    tester,
+  ) async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    await pumpWorkspace(tester);
+    local.openError = const SessionLimitException(32);
+    await tester.tap(find.byKey(const Key('sidebar.newTab')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    final closeButton = find.byKey(const Key('pane.toast.close'));
+    Focus.of(
+      tester.element(
+        find.descendant(
+          of: closeButton,
+          matching: find.byType(GestureDetector),
+        ),
+      ),
+    ).requestFocus();
+    await tester.pump();
+    expect(focusIn(closeButton), isTrue);
+    await tester.pump(const Duration(seconds: 7));
+    // Let a dismissal (if any) finish its exit animation.
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('pane.toast')), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.toast')), findsNothing);
+    expect(focusIn(find.byKey(const ValueKey('terminal.1'))), isTrue);
   });
 }

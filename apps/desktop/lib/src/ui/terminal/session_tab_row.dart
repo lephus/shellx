@@ -328,7 +328,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                                 message: l10n.sidebarPhoneOrigin,
                                 excludeFromSemantics: true,
                                 child: const Icon(
-                                  Icons.smartphone,
+                                  Icons.smartphone_outlined,
                                   size: ShellxSizes.mark,
                                   color: ShellxDesktopColors.textSecondary,
                                 ),
@@ -342,7 +342,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                                     : l10n.sidebarPhoneViewing,
                                 excludeFromSemantics: true,
                                 child: Icon(
-                                  Icons.visibility,
+                                  Icons.visibility_outlined,
                                   size: ShellxSizes.mark,
                                   color: driving
                                       ? ShellxDesktopColors.warn
