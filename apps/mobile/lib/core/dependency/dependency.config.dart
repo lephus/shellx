@@ -42,6 +42,8 @@ import '../../features/terminal/presentation/controllers/terminal_workspace.dart
     as _i667;
 import '../../features/voice/data/speech_to_text_input.dart' as _i546;
 import '../../features/voice/domain/speech_input.dart' as _i498;
+import '../../features/voice/presentation/controllers/voice_composer_controller.dart'
+    as _i495;
 import '../auth/auth_event.dart' as _i909;
 import '../auth/auth_storage.dart' as _i657;
 import '../auth/session_enforcer.dart' as _i954;
@@ -142,6 +144,12 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i907.DeleteAccountController>(
       () => _i907.DeleteAccountController(gh<_i351.SessionHolder>()),
+    );
+    gh.factory<_i495.VoiceComposerController>(
+      () => _i495.VoiceComposerController(
+        gh<_i498.SpeechInput>(),
+        gh<_i351.AppSettings>(),
+      ),
     );
     gh.factory<_i313.AuthGuard>(
       () => _i313.AuthGuard(gh<_i56.SessionHolder>()),
