@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -100,6 +101,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
 
   Map<Type, Action<Intent>> _actions() {
     final tabs = ref.read(terminalTabsProvider.notifier);
+    final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     Action<T> run<T extends Intent>(
       void Function(T intent) body, {
       bool Function(T intent)? enabled,
@@ -120,7 +122,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       }),
       SelectTabIntent: run<SelectTabIntent>(
         (intent) {
-          tabs.selectIndex(intent.position);
+          workspaces.selectVisible(intent.position);
           focusTerminal();
         },
         // On Windows AltGr arrives as Ctrl+Alt, and AltGr+digit types
@@ -133,12 +135,17 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
             ),
       ),
       NextTabIntent: run<NextTabIntent>((_) {
-        tabs.next();
+        workspaces.step(1);
         focusTerminal();
       }),
       PreviousTabIntent: run<PreviousTabIntent>((_) {
-        tabs.previous();
+        workspaces.step(-1);
         focusTerminal();
+      }),
+      // The new workspace's name field takes the keyboard (D15); it hands
+      // it to the terminal when it closes.
+      NewWorkspaceIntent: run<NewWorkspaceIntent>((_) {
+        unawaited(workspaces.create());
       }),
       // ⌘C / Ctrl+Shift+C copies only with a selection; otherwise the key
       // stays the terminal's (spec §3.2).
@@ -234,9 +241,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   Widget build(BuildContext context) {
     // A new selection gets the keyboard (UI §3.6), except while the
     // sidebar has it: its arrow keys (Task 8) move the selection and must
-    // keep the focus in the list.
+    // keep the focus in the list. An open name field keeps it too (D15).
     ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
-      if (id != null && !sidebarFocus.hasFocus) focusTerminal();
+      if (id != null &&
+          !sidebarFocus.hasFocus &&
+          ref.read(sidebarWorkspacesProvider).renaming == null) {
+        focusTerminal();
+      }
     });
     // The last tab closed: the keyboard goes to "Open new tab" instead of
     // vanishing with the terminal (after the frame that builds the button).

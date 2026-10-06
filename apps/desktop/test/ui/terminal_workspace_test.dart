@@ -14,6 +14,7 @@ import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_overlays.dart';
@@ -1005,4 +1006,53 @@ void main() {
     await tester.pump();
     expect(find.text("Couldn't open the browser."), findsOneWidget);
   });
+
+  testWorkspace(
+    '⌘⇧N makes a workspace with a tab; ⌘1 and ↓ in the list follow the '
+    'visible order (C5)',
+    (tester) async {
+      local
+        ..add(local.summary(1, origin: SessionOrigin.desktop))
+        ..add(local.summary(2, origin: SessionOrigin.desktop));
+      await pumpWorkspace(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      final sidebar = container.read(sidebarWorkspacesProvider);
+      expect(sidebar.workspaces, hasLength(2));
+      final ws = sidebar.workspaces.last.id;
+      final created = sidebar.tabsOf(ws).single;
+      container.read(sidebarWorkspacesProvider.notifier)
+        ..endRename()
+        ..setCollapsed(kDefaultWorkspaceId, true);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+      expect(tabs().selectedId, created);
+      expect(find.byKey(const ValueKey('tab.1')), findsNothing); // collapsed
+
+      // ↓ and Home in the list: Default [2, 1], then the new tab — not the
+      // creation order 1, 2, new.
+      container.read(sidebarWorkspacesProvider.notifier)
+        ..setCollapsed(kDefaultWorkspaceId, false)
+        ..moveTab(1, kDefaultWorkspaceId);
+      container.read(terminalTabsProvider.notifier).select(2);
+      await tester.pump(); // the selection hands the terminal the focus
+      page(tester).sidebarFocus.requestFocus();
+      await tester.pump();
+      expect(page(tester).sidebarFocus.hasFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(tabs().selectedId, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      await tester.pump();
+      expect(tabs().selectedId, 2);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 }

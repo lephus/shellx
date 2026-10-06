@@ -618,4 +618,39 @@ void main() {
     expect(tabs().selectedId, 9);
     expect(find.byKey(const ValueKey('tab.9')), findsOneWidget);
   });
+
+  test('⌘⇧N / Ctrl+Shift+N make a workspace, without key repeat (C5)', () {
+    final mac = desktopShortcuts(TargetPlatform.macOS);
+    final win = desktopShortcuts(TargetPlatform.windows);
+    const macKey = SingleActivator(
+      LogicalKeyboardKey.keyN,
+      meta: true,
+      shift: true,
+      includeRepeats: false,
+    );
+    const winKey = SingleActivator(
+      LogicalKeyboardKey.keyN,
+      control: true,
+      shift: true,
+      includeRepeats: false,
+    );
+    expect(lookup(mac, macKey), isA<NewWorkspaceIntent>());
+    expect(lookup(win, winKey), isA<NewWorkspaceIntent>());
+    expect(
+      lookup(terminalViewShortcuts(TargetPlatform.macOS), macKey),
+      isA<NewWorkspaceIntent>(),
+    );
+    // Activators have no `==`: check the repeat flag on the bound one.
+    for (final (table, key) in [(mac, macKey), (win, winKey)]) {
+      final bound = table.keys.whereType<SingleActivator>().singleWhere(
+        (k) =>
+            k.trigger == key.trigger &&
+            k.control == key.control &&
+            k.shift == key.shift &&
+            k.alt == key.alt &&
+            k.meta == key.meta,
+      );
+      expect(bound.includeRepeats, isFalse);
+    }
+  });
 }

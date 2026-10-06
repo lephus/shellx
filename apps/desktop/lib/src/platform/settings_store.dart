@@ -29,6 +29,10 @@ abstract final class SettingKeys {
   /// the next launch maximizes it again over the last normal bounds.
   static const String windowMaximized = 'window_maximized';
 
+  /// A2 D17: the sidebar's workspaces, in order — one JSON object
+  /// `{"id","name","collapsed"}` per entry. Membership is not stored.
+  static const String terminalWorkspaces = 'terminal_workspaces';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -43,6 +47,7 @@ abstract final class SettingKeys {
     windowWidth,
     windowHeight,
     windowMaximized,
+    terminalWorkspaces,
   };
 }
 

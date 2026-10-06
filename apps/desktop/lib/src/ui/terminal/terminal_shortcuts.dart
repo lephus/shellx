@@ -9,6 +9,11 @@ class CloseTabIntent extends Intent {
   const CloseTabIntent();
 }
 
+/// ⌘⇧N / Ctrl+Shift+N (A2 C5): a new workspace with a tab in it.
+class NewWorkspaceIntent extends Intent {
+  const NewWorkspaceIntent();
+}
+
 class SelectTabIntent extends Intent {
   const SelectTabIntent(this.position);
 
@@ -114,6 +119,20 @@ Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
         const NewTabIntent(),
     primary(LogicalKeyboardKey.keyW, includeRepeats: false):
         const CloseTabIntent(),
+    (mac
+            ? const SingleActivator(
+                LogicalKeyboardKey.keyN,
+                meta: true,
+                shift: true,
+                includeRepeats: false,
+              )
+            : const SingleActivator(
+                LogicalKeyboardKey.keyN,
+                control: true,
+                shift: true,
+                includeRepeats: false,
+              )):
+        const NewWorkspaceIntent(),
     primary(LogicalKeyboardKey.keyC): const CopySelectionIntent(),
     primary(LogicalKeyboardKey.keyV): const PasteClipboardIntent(),
     // ⌘A / Ctrl+Shift+A (Windows Terminal's), like the terminal's menu.

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
@@ -71,6 +72,15 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   void _onHighlightMode(FocusHighlightMode _) => _refresh();
 
+  /// The rows on screen, in the sidebar's visible order (C5).
+  List<TerminalTab> _visibleTabs() {
+    final byId = {for (final t in ref.read(terminalTabsProvider).tabs) t.id: t};
+    return [
+      for (final id in ref.read(sidebarWorkspacesProvider).visibleTabIds)
+        ?byId[id],
+    ];
+  }
+
   /// The ring shows only for keyboard focus (UI §3).
   bool get _showFocus =>
       widget.focusNode.hasFocus &&
@@ -87,7 +97,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     }
     final key = event.logicalKey;
     final state = ref.read(terminalTabsProvider);
-    final tabs = ref.read(terminalTabsProvider.notifier);
+    final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final menu =
         key == LogicalKeyboardKey.contextMenu ||
         (key == LogicalKeyboardKey.f10 &&
@@ -109,13 +119,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     }
     switch (key) {
       case LogicalKeyboardKey.arrowDown:
-        tabs.next();
+        workspaces.step(1);
       case LogicalKeyboardKey.arrowUp:
-        tabs.previous();
+        workspaces.step(-1);
       case LogicalKeyboardKey.home:
-        tabs.selectIndex(1);
+        workspaces.selectVisible(1);
       case LogicalKeyboardKey.end:
-        tabs.selectIndex(state.tabs.length);
+        workspaces.selectVisible(_visibleTabs().length);
       case LogicalKeyboardKey.enter ||
           LogicalKeyboardKey.numpadEnter ||
           LogicalKeyboardKey.space:
@@ -148,7 +158,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   void _reveal(int id, {int retries = 2}) {
     final controller = widget.scrollController;
     if (!mounted || !controller.hasClients) return;
-    final tabs = ref.read(terminalTabsProvider).tabs;
+    final tabs = _visibleTabs();
     final index = tabs.indexWhere((t) => t.id == id);
     if (index < 0) return;
     final row = SessionTabRow.heightFor(MediaQuery.textScalerOf(context));
@@ -177,6 +187,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(terminalTabsProvider);
+    ref.watch(sidebarWorkspacesProvider);
+    final rows = _visibleTabs();
     // Keyboard or ⌘1…⌘9 moved the selection: keep its row on screen.
     ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
       if (id == null) return;
@@ -221,7 +233,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       ),
     );
 
-    final ids = {for (final tab in state.tabs) tab.id};
+    final ids = {for (final tab in rows) tab.id};
     _rows.removeWhere((id, _) => !ids.contains(id));
 
     return ColoredBox(
@@ -237,8 +249,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               child: Focus(
                 focusNode: widget.focusNode,
                 // An empty list is no tab stop (UI §3.6).
-                canRequestFocus: state.tabs.isNotEmpty,
-                skipTraversal: state.tabs.isEmpty,
+                canRequestFocus: rows.isNotEmpty,
+                skipTraversal: rows.isEmpty,
                 onKeyEvent: _onKey,
                 child: ShellxScrollbar(
                   controller: widget.scrollController,
@@ -251,11 +263,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                       ShellxSizes.listMarginH,
                       ShellxSizes.listBottom,
                     ),
-                    itemCount: state.tabs.length,
+                    itemCount: rows.length,
                     separatorBuilder: (_, _) =>
                         const SizedBox(height: ShellxSizes.rowGap),
                     itemBuilder: (context, i) {
-                      final tab = state.tabs[i];
+                      final tab = rows[i];
                       final selected = tab.id == state.selectedId;
                       return KeyedSubtree(
                         key: ValueKey('tab.${tab.id}'),
@@ -265,7 +277,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                           selected: selected,
                           focused: selected && _showFocus,
                           position: i + 1,
-                          count: state.tabs.length,
+                          count: rows.length,
                           onSelect: () => widget.onSelected(tab.id),
                           onClose: () => widget.onClose(tab),
                         ),
