@@ -276,7 +276,11 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
               key: const Key('panel.markAll'),
               focusNode: _markAll,
               onPressed: markAllEnabled
-                  ? () => ref.read(tabAttentionProvider.notifier).markAllRead()
+                  ? () {
+                      ref.read(tabAttentionProvider.notifier).markAllRead();
+                      // Disabled now: the keyboard goes back to the list.
+                      _list.requestFocus();
+                    }
                   : null,
               style: _markAllStyle(context),
               child: Text(l10n.attentionMarkAllRead),
@@ -340,6 +344,9 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
               closed: e.closed,
               cursor: i == cursor,
               keyboardRing: i == cursor && keyboardRing,
+              // Where screen readers place the cursor while the list holds
+              // the keyboard (like the sidebar's rows, D14).
+              focused: i == cursor && _list.hasPrimaryFocus,
               onTap: () {
                 setState(() => _cursorSeq = e.seq);
                 _open(e);
@@ -484,6 +491,7 @@ class _PanelItem extends StatefulWidget {
     required this.closed,
     required this.cursor,
     required this.keyboardRing,
+    required this.focused,
     required this.onTap,
   });
 
@@ -492,6 +500,7 @@ class _PanelItem extends StatefulWidget {
   final bool closed;
   final bool cursor;
   final bool keyboardRing;
+  final bool focused;
   final VoidCallback onTap;
 
   @override
@@ -519,6 +528,7 @@ class _PanelItemState extends State<_PanelItem> {
     return Semantics(
       button: !closed,
       selected: widget.cursor,
+      focused: widget.focused,
       label: entry.semantics,
       onTap: closed ? null : widget.onTap,
       excludeSemantics: true,

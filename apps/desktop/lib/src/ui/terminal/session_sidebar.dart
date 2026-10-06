@@ -1318,7 +1318,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           const Spacer(),
           // Tab order: bell → `+` → list (UI-A4 §5.1).
           Padding(padding: buttonTop, child: bell),
-          const SizedBox(width: ShellxSizes.headerBellGap),
+          // 4 px between the 24 px visuals (A1 band): the hit squares touch.
+          const SizedBox(width: ShellxSizes.headerBellGap - 2 * _bellInset),
           Padding(padding: buttonTop, child: newTab),
           // 8 px from the right edge to the 24 px visual (28 hit − 24) / 2.
           const SizedBox(
@@ -1595,7 +1596,19 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (mac) DragToMoveArea(child: band) else band,
+          // The drag area lies under the buttons, not around them: a click
+          // on the bell or `+` never waits for its double-click (zoom).
+          if (mac)
+            Stack(
+              children: [
+                const Positioned.fill(
+                  child: DragToMoveArea(child: SizedBox.expand()),
+                ),
+                band,
+              ],
+            )
+          else
+            band,
           Expanded(
             child: Semantics(
               label: l10n.sidebarLabel,

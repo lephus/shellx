@@ -362,10 +362,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           debugLabel: 'workspace',
           child: Stack(
             children: [
-              Positioned.fill(child: _body()),
+              // Modal for screen readers too while the panel is open.
+              Positioned.fill(
+                child: ExcludeSemantics(excluding: panelOpen, child: _body()),
+              ),
               // UI-A4 §5.3: a click outside closes the panel (and only that).
+              // macOS: it starts under the band, so the window still drags
+              // (and the bell still toggles) while the panel is open.
               if (panelOpen)
-                Positioned.fill(
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  top: isMacDesktop ? ShellxSizes.headerBandMac : 0,
                   child: ExcludeSemantics(
                     child: GestureDetector(
                       key: const Key('panel.barrier'),

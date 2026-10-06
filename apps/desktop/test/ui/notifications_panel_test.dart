@@ -1,6 +1,5 @@
 import 'dart:ui' show Tristate;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -286,10 +285,14 @@ void main() {
       findsOneWidget,
     );
     expect(dot, findsNothing);
-    // Bell, 4, then `+` (UI-A4 §5.1).
-    final plus = tester.getRect(find.byKey(const Key('sidebar.newTab')));
-    expect(tester.getRect(bell).right + 4, plus.left);
-    expect(tester.getRect(bell).top, plus.top);
+    // Bell, 4, then `+`, between the 24 px visuals (UI-A4 §5.1, A1 band).
+    Rect visualOf(Finder button) => tester.getRect(
+      find.descendant(of: button, matching: find.byType(AnimatedContainer)),
+    );
+    final plus = visualOf(find.byKey(const Key('sidebar.newTab')));
+    expect(visualOf(bell).width, 24);
+    expect(plus.left - visualOf(bell).right, 4);
+    expect(visualOf(bell).top, plus.top);
     local.notice(2, SessionNoticeKind.message, body: 'a');
     await deliver(tester);
     expect(
@@ -316,16 +319,18 @@ void main() {
         isToggled: false,
       ),
     );
-    // The macOS band is a DragToMoveArea (double-click zooms): a click
-    // resolves after the double-tap timeout.
+    // The band's drag area lies under the buttons: a click is immediate.
     await tester.tap(bell);
-    await tester.pump(kDoubleTapTimeout);
+    await tester.pump();
+    expect(page(tester).panelOpen, isTrue);
     await tester.pumpAndSettle();
     expect(page(tester).panelOpen, isTrue);
     expect(panel, findsOneWidget);
+    // The panel is modal for screen readers: the window behind it, the
+    // bell included, leaves the tree until it closes (Esc).
     expect(
-      tester.getSemantics(bellNode),
-      isSemantics(hasToggledState: true, isToggled: true),
+      find.semantics.byLabel('Notifications, 1 unread notification'),
+      findsNothing,
     );
     final visual = tester.widget<AnimatedContainer>(
       find.descendant(of: bell, matching: find.byType(AnimatedContainer)),
@@ -334,9 +339,8 @@ void main() {
       (visual.decoration! as BoxDecoration).color,
       const Color(0xFF1F2F34), // rowSelected
     );
-    // The barrier over it takes the click: it closes as well.
-    await tester.tapAt(tester.getCenter(bell));
-    await tester.pump(kDoubleTapTimeout);
+    // The band stays out of the barrier: the bell itself closes it.
+    await tester.tap(bell);
     await tester.pumpAndSettle();
     expect(panel, findsNothing);
     handle.dispose();
@@ -379,8 +383,135 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
     await tester.pump();
     expect(panel, findsOneWidget);
+    // Fully shown after one frame: no fade, no slide.
+    expect(
+      tester
+          .widget<FadeTransition>(
+            find
+                .ancestor(of: panel, matching: find.byType(FadeTransition))
+                .first,
+          )
+          .opacity
+          .value,
+      1,
+    );
+    expect(
+      tester
+          .widget<Transform>(
+            find.ancestor(of: panel, matching: find.byType(Transform)).first,
+          )
+          .transform
+          .getTranslation()
+          .y,
+      0,
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
+    expect(panel, findsNothing);
+  });
+
+  testSidebar('screen readers follow the ↑/↓ cursor: the item is focused '
+      'in semantics while the list holds the keyboard', (tester) async {
+    await pumpSidebar(tester);
+    final handle = tester.ensureSemantics();
+    local.notice(2, SessionNoticeKind.message, body: 'a'); // seq 0
+    local.notice(3, SessionNoticeKind.message, body: 'b'); // seq 1
+    await deliver(tester);
+    await openPanel(tester);
+    Tristate focused(int seq) => tester
+        .getSemantics(find.byKey(Key('panel.item.$seq')))
+        .flagsCollection
+        .isFocused;
+    expect(focused(1), Tristate.isTrue);
+    expect(focused(0), isNot(Tristate.isTrue));
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expect(focused(0), Tristate.isTrue);
+    expect(focused(1), isNot(Tristate.isTrue));
+    // On "Mark all as read" the item is no longer where the keyboard is.
+    await press(tester, LogicalKeyboardKey.tab);
+    expect(focused(0), isNot(Tristate.isTrue));
+    handle.dispose();
+  });
+
+  testSidebar('the panel is modal for screen readers too', (tester) async {
+    await pumpSidebar(tester);
+    final handle = tester.ensureSemantics();
+    expect(find.semantics.byLabel('Terminal zsh'), findsOne);
+    await openPanel(tester);
+    expect(find.semantics.byLabel('Terminal zsh'), findsNothing);
+    expect(find.semantics.byLabel('Notifications'), findsOne);
+    await press(tester, LogicalKeyboardKey.escape);
+    expect(find.semantics.byLabel('Terminal zsh'), findsOne);
+    handle.dispose();
+  });
+
+  testSidebar('after Enter on "Mark all as read" the keyboard is back on '
+      'the list: arrows and Esc still work', (tester) async {
+    await pumpSidebar(tester);
+    local.notice(2, SessionNoticeKind.message, body: 'a'); // seq 0
+    local.notice(3, SessionNoticeKind.message, body: 'b'); // seq 1
+    await deliver(tester);
+    await openPanel(tester);
+    await press(tester, LogicalKeyboardKey.tab);
+    await press(tester, LogicalKeyboardKey.enter);
+    expect(container.read(tabAttentionProvider).totalUnread, 0);
+    bool selected(int seq) =>
+        tester
+            .getSemantics(find.byKey(Key('panel.item.$seq')))
+            .flagsCollection
+            .isSelected ==
+        Tristate.isTrue;
+    expect(selected(1), isTrue);
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expect(selected(0), isTrue);
+    await press(tester, LogicalKeyboardKey.escape);
+    expect(panel, findsNothing);
+    expect(page(tester).terminalFocus.hasFocus, isTrue);
+  });
+
+  testSidebar('with 50 entries the cursor opens scrolled into view and '
+      'Home / End follow it', (tester) async {
+    await pumpSidebar(tester);
+    // Oldest: 5 on tab 2 (unread, seq 0…4); newer: 45 on tab 3, read.
+    for (var i = 0; i < 5; i++) {
+      local.notice(2, SessionNoticeKind.message, body: 'old $i');
+    }
+    for (var i = 0; i < 45; i++) {
+      local.notice(3, SessionNoticeKind.message, body: 'new $i');
+    }
+    await deliver(tester);
+    container.read(tabAttentionProvider.notifier).markRead(3);
+    await tester.pump();
+    expect(container.read(tabAttentionProvider).history, hasLength(50));
+    await openPanel(tester);
+    final box = tester.getRect(panel);
+    expect(box.height, lessThanOrEqualTo(480));
+    bool shown(int seq) {
+      final item = find.byKey(Key('panel.item.$seq'));
+      if (item.evaluate().isEmpty) return false;
+      final r = tester.getRect(item);
+      return r.top >= box.top && r.bottom <= box.bottom;
+    }
+
+    // The first unread is the 46th entry (seq 4).
+    expect(shown(4), isTrue);
+    expect(shown(49), isFalse);
+    await press(tester, LogicalKeyboardKey.home);
+    expect(shown(49), isTrue);
+    expect(shown(4), isFalse);
+    await press(tester, LogicalKeyboardKey.end);
+    expect(shown(0), isTrue);
+  });
+
+  testSidebar('the band stays draggable while the panel is open: the '
+      'barrier starts under it (macOS)', (tester) async {
+    await pumpSidebar(tester);
+    await openPanel(tester);
+    final barrier = tester.getRect(find.byKey(const Key('panel.barrier')));
+    expect(barrier.top, 38);
+    // A click on the rest of the window still closes it.
+    await tester.tapAt(const Offset(150, 300));
+    await tester.pumpAndSettle();
     expect(panel, findsNothing);
   });
 
