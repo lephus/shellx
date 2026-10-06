@@ -144,14 +144,14 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 ## 11. Cửa sổ terminal trên desktop — A1 (2026-10-06)
 
 - Spec: `docs/superpowers/specs/2026-10-06-desktop-terminal-a1-design.md`; UI: `docs/superpowers/design/2026-10-06-shellx-desktop-ui.md`; plan: `docs/superpowers/plans/2026-10-06-desktop-terminal-a1.md`.
-- Trạng thái: code A1 nằm trên nhánh `feat/desktop-a1` (chưa vào `main`). Test: agent 383 xanh (`dart test`), desktop 565 xanh (`flutter test`; 1 test benchmark bị bỏ qua mặc định; khi chạy cả bộ lúc máy đang bận từng thấy `startup_test.dart` "runBounded gives up after the timeout" đỏ lẻ tẻ, chạy riêng thì xanh). Windows **chưa thử trên máy thật**.
+- Trạng thái: code A1 nằm trên nhánh `feat/desktop-a1`, chưa merge vào `main`. Số test: xem kiểm tra cuối khi merge. Windows **chưa thử trên máy thật**.
 - Benchmark xterm (`flutter test --run-skipped --tags benchmark test/terminal/xterm_benchmark_test.dart`, MacBook Mac16,10 / Apple M4, flutter test VM chế độ debug, lát 256 KiB, lưới 160x48; số từ commit `da98f80`):
   - `yes x2M: total 925ms, slowest slice 77ms, 6.2 MB/s (met)`
   - `cat 50 MB: total 1638ms, slowest slice 11ms, 30.5 MB/s (met)`
   - `SGR 8 MB: total 336ms, slowest slice 13ms, 23.7 MB/s (met)`
   - `TerminalFeed: 50 MiB in, 1.06 MiB written, 87 drops`
-- Sửa spec v1: D2, §3.2, §8.3 (tắt truy cập từ xa / đăng xuất không còn đóng phiên; chỉ Thoát mới đóng).
-- Quyền riêng tư: **không đổi** — nội dung terminal của cửa sổ chỉ ở trong tiến trình ShellX trên máy; điện thoại vẫn nhận qua kênh mã hóa đầu cuối như cũ; không thêm dữ liệu nào gửi lên relay; thông báo đẩy khi chưa đăng nhập không rời máy (API không có token thì từ chối ngay tại chỗ). Không cần sửa `web/src/pages/privacy.md` / `en/privacy.md`.
+- Sửa spec v1 (`2026-09-25-shellx-v1-design.md`): D2; §3.2 (terminal trên desktop nay trong phạm vi); đăng xuất agent và 4002/401 (ngắt điện thoại, phiên vẫn chạy, chỉ Thoát mới đóng); giới hạn phiên 10 → 32 (§ giao thức, bảng lỗi, phần kiểm thử); §8.2 (Dock/thanh menu khi cửa sổ hiện, D10); §8.3 (mục tray "Mở cửa sổ terminal" ở đầu menu, tắt truy cập từ xa không đóng phiên).
+- Quyền riêng tư: nội dung terminal của cửa sổ chỉ ở trong tiến trình ShellX trên máy; điện thoại vẫn nhận qua kênh mã hóa đầu cuối như cũ; không thêm loại dữ liệu mới gửi lên relay ngoài ngoại lệ thông báo đẩy N3 (nay áp dụng cả cho tab mở trên desktop: mọi phiên ShellX, dù do điện thoại hay desktop mở, đều đi qua `SessionManager` và cùng một `SessionNotifier`); khi chưa đăng nhập thì không có token, API từ chối ngay tại chỗ và không gì rời máy. Không cần sửa `web/src/pages/privacy.md` / `en/privacy.md`.
 
 ### Thử tay — macOS (máy thật)
 

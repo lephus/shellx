@@ -146,10 +146,10 @@ shellx/
 - **Giới hạn tần suất** (bộ giới hạn cửa sổ trượt trong bộ nhớ của relay, cửa sổ 60 giây; IP lấy từ `X-Real-IP` của nginx-proxy): đăng nhập 10 lần/IP và 5 lần/email; đăng ký 3 lần/IP; nâng cấp WebSocket (`/v1/ws`) 60 lần/IP, tính mọi lần thử, trước khi kiểm tra token. Vượt giới hạn trả HTTP 429 (với nâng cấp WebSocket: từ chối nâng cấp bằng HTTP 429, client thử lại theo backoff).
 - **Số thiết bị online cùng lúc:** mỗi tài khoản tối đa 16 thiết bị kết nối WebSocket cùng lúc. Một thiết bị chưa kết nối mà tới khi tài khoản đã đủ 16 thì bị đóng với mã 1013 (`too many devices online`), client thử lại theo backoff; 16 kết nối đang có không bị động tới. Thiết bị đang kết nối thì luôn kết nối lại được, vì socket mới thay socket cũ. Số thiết bị đăng ký trong tài khoản không bị giới hạn.
 - **Đổi mật khẩu:** chỉ token của agent được gọi, không cần mật khẩu cũ (máy đang đăng nhập là bằng chứng; thay cho "quên mật khẩu"). Sau khi đổi: thu hồi token của mọi thiết bị khác và đóng WebSocket của chúng (mã 4002). **Ghép nối giữ nguyên.**
-- **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong cơ sở dữ liệu, xóa danh sách tin cậy cục bộ, đóng mọi phiên. Đăng nhập lại phải ghép nối lại.
+- **Đăng xuất trên agent:** xóa token, xóa các bản ghi ghép nối của agent trong cơ sở dữ liệu, xóa danh sách tin cậy cục bộ, ngắt mọi điện thoại; **các phiên vẫn chạy** trong cửa sổ terminal, chỉ Thoát mới đóng chúng (sửa 2026-10-06, A1 D7). Đăng nhập lại phải ghép nối lại.
 - **Đăng xuất trên mobile:** chỉ xóa token. Khóa thiết bị (một khóa chung cho điện thoại, vì lúc đăng nhập phải gửi khóa công khai trước khi biết `user_id`) và danh sách máy đã ghim (lưu theo `user_id`) được giữ lại, để đăng nhập lại cùng tài khoản không mất ghép nối. Tài khoản khác đăng nhập trên cùng điện thoại không thấy danh sách máy đã ghim đó.
 - **Xóa tài khoản** (bắt buộc theo quy định App Store 5.1.1(v)): trong Cài đặt của mobile app, người dùng nhập lại mật khẩu để xác nhận. Relay xóa người dùng cùng mọi thiết bị, token và ghép nối, rồi đóng WebSocket của mọi thiết bị với mã 4002.
-- **Agent nhận 4002 (hoặc bị từ chối 401 khi kết nối):** agent không phân biệt được "đổi mật khẩu" với "xóa tài khoản", nên luôn: xóa token, đóng mọi phiên, **giữ** khóa thiết bị và danh sách tin cậy, rồi hiện cửa sổ đăng nhập. Khi đăng nhập lại thành công, nếu `user_id` khác `user_id` đã lưu thì xóa danh sách tin cậy (đổi tài khoản hoặc tài khoản cũ đã bị xóa); cùng `user_id` thì giữ nguyên ghép nối.
+- **Agent nhận 4002 (hoặc bị từ chối 401 khi kết nối):** agent không phân biệt được "đổi mật khẩu" với "xóa tài khoản", nên luôn: xóa token, ngắt mọi điện thoại (các phiên vẫn chạy, chỉ Thoát mới đóng; sửa 2026-10-06, A1 D7), **giữ** khóa thiết bị và danh sách tin cậy, rồi hiện cửa sổ đăng nhập. Khi đăng nhập lại thành công, nếu `user_id` khác `user_id` đã lưu thì xóa danh sách tin cậy (đổi tài khoản hoặc tài khoản cũ đã bị xóa); cùng `user_id` thì giữ nguyên ghép nối.
 - **Hỗ trợ khẩn cấp:** script quản trị `relay/src/scripts/reset-password.ts` đặt lại mật khẩu thủ công, chạy trong container: `docker compose exec relay node dist/scripts/reset-password.js`.
 
 ### 5.3 Ghép nối bằng QR
@@ -274,7 +274,7 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
   - macOS: shell mặc định trong bản ghi tài khoản người dùng (đọc bằng `dscl . -read /Users/<user> UserShell`), chạy dạng login shell (`-l`) để nạp PATH từ profile; nếu không đọc được thì dùng `/bin/zsh`.
   - Windows: `pwsh.exe` nếu có trong PATH, nếu không thì `powershell.exe`.
 - **Môi trường:** thư mục ban đầu là home; `TERM=xterm-256color`, `COLORTERM=truecolor`, `LANG=en_US.UTF-8` nếu chưa đặt, `SHELLX=1`.
-- **Giới hạn:** tối đa **10 phiên** mỗi máy. Vượt thì trả `error {code: "session_limit"}`.
+- **Giới hạn:** tối đa **32 phiên** mỗi máy (sửa 2026-10-06, A1 D8; trước đây 10). Vượt thì trả `error {code: "session_limit"}`.
 - **Bộ đệm vòng** 256 KiB mỗi phiên, lưu `[start, end)` theo `seq`. Agent đọc PTY liên tục kể cả khi không có client gắn vào; khi đầy thì ghi đè dữ liệu cũ nhất.
 - **Một client mỗi phiên:** `session.attach` từ điện thoại khác làm client cũ nhận `session.detached {reason: "taken_over"}`. Kênh của client bị hủy thì phiên trở thành không gắn (không cần tin nhắn).
 - **Gắn lại:**
@@ -299,16 +299,16 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
 
 1. Cửa sổ **đăng nhập / đăng ký**.
 2. Onboarding: bật "Khởi động cùng hệ thống" (mặc định bật); trên macOS hướng dẫn cấp **Full Disk Access** (nút mở `x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles`); giải thích rằng gập nắp laptop thì máy vẫn ngủ.
-3. Ẩn cửa sổ; từ đó chỉ còn icon tray. macOS dùng `LSUIElement = true` (không hiện Dock).
+3. Ẩn cửa sổ; từ đó chỉ còn icon tray. macOS dùng `LSUIElement = true`; **sửa 2026-10-06 (A1 D10):** icon Dock và thanh menu chỉ hiện khi cửa sổ terminal đang hiện (chính sách kích hoạt đổi lúc chạy), ẩn cửa sổ thì không còn Dock.
 
 Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ liệu ứng dụng).
 
 ### 8.3 Menu tray
 
 ```
-● Đã kết nối — user@email.com
-─────────────────────────────
   Mở cửa sổ terminal
+─────────────────────────────
+● Đã kết nối — user@email.com
 ─────────────────────────────
 ✓ Cho phép truy cập từ xa
   Phiên đang hoạt động (n)      ▸  [từng phiên: Đóng] · Đóng tất cả
@@ -485,7 +485,7 @@ CREATE TABLE pairings (
 | HS2 `untrusted` | "Máy không còn tin cậy điện thoại này. Hãy ghép nối lại." và xóa khóa đã ghim |
 | Mã QR sai hoặc hết hạn (HS2 `pairing_invalid` hoặc không giải mã được HS2) | "Mã QR không hợp lệ hoặc đã hết hạn. Hãy tạo mã mới trên máy tính." |
 | Lệch phiên bản (HS2 `proto_unsupported`, hoặc `/v1/version` cao hơn phiên bản app) | "Cần cập nhật app" kèm link tải |
-| `error session_limit` | "Máy đã mở tối đa 10 phiên. Hãy đóng bớt phiên." |
+| `error session_limit` | "Máy đã mở tối đa 32 phiên. Hãy đóng bớt phiên." |
 | `error spawn_failed` | Hiện lý do lỗi trong tab |
 | WebSocket đóng với 4002 | Xóa token, về màn hình đăng nhập |
 | WebSocket đóng với 4001 | Không tự kết nối lại (một phiên bản khác của app đã kết nối) |
@@ -497,7 +497,7 @@ CREATE TABLE pairings (
 ## 13. Kiểm thử
 
 - **`shellx_core`:** Noise IK và IKpsk2 với bộ test vector chính thức; mã hóa/giải mã khung relay và tin nhắn CBOR; logic kết nối lại với đồng hồ giả lập.
-- **`shellx_agent`:** quản lý phiên với `Pty` giả; bộ đệm vòng, `seq`, gắn lại, reset, cửa sổ gửi; danh sách tin cậy; giới hạn 10 phiên; luồng ghép nối bên nhận.
+- **`shellx_agent`:** quản lý phiên với `Pty` giả; bộ đệm vòng, `seq`, gắn lại, reset, cửa sổ gửi; danh sách tin cậy; giới hạn 32 phiên (A1 D8); luồng ghép nối bên nhận.
 - **`shellx_client`:** trạng thái tab, gắn lại theo `last_seq`, xử lý `session.reset`, luồng ghép nối bên khởi tạo, lịch gửi `ack`.
 - **Relay:** Vitest trên Node (mỗi test một cơ sở dữ liệu SQLite tạm, server thật trên cổng ngẫu nhiên, client `ws` thật; chạy cả trong bước build image): đăng ký/đăng nhập, kiểm tra email và domain tạm, token, đổi mật khẩu thu hồi token, **không chuyển khung giữa hai tài khoản**, PRESENCE, giới hạn khung, mã đóng 4001/4002/4003.
 - **Desktop:** test tích hợp PTY thật (`flutter_pty`) chạy trên máy macOS và Windows trong CI; test widget cho các cửa sổ.
