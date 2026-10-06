@@ -140,3 +140,45 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 - [ ] Từ chối quyền → dòng lỗi + "Mở Cài đặt" mở đúng trang cài đặt của ShellX.
 - [ ] Đang nghe thì có cuộc gọi / khoá màn hình → dừng nghe, chữ còn nguyên, không tự gửi.
 - [ ] App Store Connect / Play Console: cập nhật nhãn quyền riêng tư (Audio data — dùng cho chức năng app, không thu thập về máy chủ ShellX) nếu biểu mẫu yêu cầu.
+
+## 11. Cửa sổ terminal trên desktop — A1 (2026-10-06)
+
+- Spec: `docs/superpowers/specs/2026-10-06-desktop-terminal-a1-design.md`; UI: `docs/superpowers/design/2026-10-06-shellx-desktop-ui.md`; plan: `docs/superpowers/plans/2026-10-06-desktop-terminal-a1.md`.
+- Trạng thái: code A1 nằm trên nhánh `feat/desktop-a1` (chưa vào `main`). Test: agent 383 xanh (`dart test`), desktop 565 xanh (`flutter test`; 1 test benchmark bị bỏ qua mặc định; khi chạy cả bộ lúc máy đang bận từng thấy `startup_test.dart` "runBounded gives up after the timeout" đỏ lẻ tẻ, chạy riêng thì xanh). Windows **chưa thử trên máy thật**.
+- Benchmark xterm (`flutter test --run-skipped --tags benchmark test/terminal/xterm_benchmark_test.dart`, MacBook Mac16,10 / Apple M4, flutter test VM chế độ debug, lát 256 KiB, lưới 160x48; số từ commit `da98f80`):
+  - `yes x2M: total 925ms, slowest slice 77ms, 6.2 MB/s (met)`
+  - `cat 50 MB: total 1638ms, slowest slice 11ms, 30.5 MB/s (met)`
+  - `SGR 8 MB: total 336ms, slowest slice 13ms, 23.7 MB/s (met)`
+  - `TerminalFeed: 50 MiB in, 1.06 MiB written, 87 drops`
+- Sửa spec v1: D2, §3.2, §8.3 (tắt truy cập từ xa / đăng xuất không còn đóng phiên; chỉ Thoát mới đóng).
+- Quyền riêng tư: **không đổi** — nội dung terminal của cửa sổ chỉ ở trong tiến trình ShellX trên máy; điện thoại vẫn nhận qua kênh mã hóa đầu cuối như cũ; không thêm dữ liệu nào gửi lên relay; thông báo đẩy khi chưa đăng nhập không rời máy (API không có token thì từ chối ngay tại chỗ). Không cần sửa `web/src/pages/privacy.md` / `en/privacy.md`.
+
+### Thử tay — macOS (máy thật)
+
+- [ ] 1. Mở ShellX từ Finder/Launchpad: cửa sổ terminal hiện, có một tab zsh (`-l`) ở `~`, gõ được ngay; icon ShellX ở Dock, có trong ⌘Tab, thanh menu có "Quit ShellX ⌘Q".
+- [ ] 2. `vim`, `htop`, `less` (phím mũi tên, Esc, màu 256/truecolor: `printf '\e[38;2;255;100;0mTRUECOLOR\e[0m\n'`), Claude Code; kéo đổi cỡ cửa sổ → chương trình vẽ lại đúng.
+- [ ] 3. Bộ gõ tiếng Việt (Telex, Unikey/macOS VN): gõ "Tiếng Việt" trong zsh và trong vim, không mất/lặp ký tự. **Lặp lại sau khi chuyển qua lại giữa các tab** (⌘1/⌘2, bấm sidebar) — vẫn gõ Telex đúng ở tab vừa chọn.
+- [ ] 4. ⌘T, ⌘W (tab rảnh: đóng ngay; tab đang chạy `sleep 100`: hỏi xác nhận), ⌘1…⌘9, ⌃Tab/⌃⇧Tab, chọn chữ rồi ⌘C, ⌘V (dán nhiều dòng trong vim khi bracketed paste bật), ⌘+/⌘−/⌘0.
+- [ ] 5. Chuyển vùng bằng **Ctrl+F6** (sidebar ↔ terminal), ↑/↓ trong sidebar, Esc về terminal. **F6 thường phải tới được chương trình TUI** (ví dụ `htop`: F6 mở "Sort by", không bị cửa sổ nuốt).
+- [ ] 6. Điện thoại: tab mở trên desktop hiện trong danh sách phiên của điện thoại ≤ 2 s; gõ cùng lúc trên cả hai, không ai bị đẩy ra; khi điện thoại gõ, dải vàng "Điện thoại đang dùng…" hiện, cỡ PTY theo điện thoại; gõ trên desktop (sau 1 s) lấy lại. Điện thoại mở phiên → tab mới có biểu tượng điện thoại, không tự chọn.
+- [ ] 7. Điện thoại "Đóng" một tab mở trên desktop → chỉ tách, shell vẫn chạy trên desktop.
+- [ ] 8. Nút đỏ đóng cửa sổ → ẩn, icon Dock biến mất; điện thoại vẫn dùng được; mở lại từ Dock/Finder/tray "Mở cửa sổ terminal" → tab còn nguyên, nội dung gần nhất hiện lại; vị trí/cỡ cửa sổ được nhớ (kể cả sau khi thoát và mở lại app).
+- [ ] 9. **Dock và thanh menu đi theo cửa sổ:** cửa sổ hiện → icon Dock + thanh menu ShellX (có trong ⌘Tab); cửa sổ ẩn → Dock/⌘Tab không còn ShellX, chỉ còn icon tray; mở lại → trở lại như cũ, không chớp hay mất menu.
+- [ ] 10. Đăng xuất (tray) → điện thoại bị ngắt, shell vẫn chạy, dải "Đăng nhập để dùng từ điện thoại" hiện; mở lại app khi chưa đăng nhập → không bật hộp thoại đăng nhập, terminal dùng được.
+- [ ] 11. Tắt "Cho phép truy cập từ xa" khi có điện thoại kết nối → hỏi (câu mới), shell vẫn chạy.
+- [ ] 12. **⌘Q từ menu ứng dụng** (Quit ShellX) với tab đang mở → một hộp xác nhận; đồng ý → mọi shell (cả cây tiến trình, kiểm tra `ps`) bị đóng, app thoát. ⌘Q lần hai khi hộp đang mở → vẫn chỉ một hộp. Hủy → mọi shell còn nguyên.
+- [ ] 13. **Đăng xuất macOS / Khởi động lại / Tắt máy không bị ShellX chặn**, kể cả khi một tab đang chạy lệnh (`sleep 1000`): hệ thống không hiện "ShellX đã ngăn tắt máy", không có hộp xác nhận ⌘Q.
+- [ ] 14. `yes` chạy 10 s rồi Ctrl+C, và `cat` một file 50 MB: UI không treo quá 1 s; ẩn cửa sổ trong lúc chạy rồi mở lại → thấy output mới nhất.
+- [ ] 15. Shell thoát mã 0 (`exit`) ở tab không được chọn → tab đó tự đóng, tab đang chọn giữ nguyên; `exit 3` → dòng "[Tiến trình đã thoát, mã 3] — Enter để đóng", Enter đóng tab.
+- [ ] 16. **Màn hình ngoài bị rút:** kéo cửa sổ sang màn hình ngoài, thoát app, rút màn hình, mở lại → cửa sổ hiện **ở giữa** màn hình còn lại (không nằm ngoài tầm nhìn). Cũng thử: rút màn hình khi app đang chạy rồi mở lại cửa sổ từ Dock/tray.
+- [ ] 17. **Prompt đầu tiên không bị vẽ lại lúc khởi động:** mở app (và ⌘T tab mới), dòng prompt zsh đầu tiên xuất hiện đúng một lần, không bị xóa/vẽ lại bởi lần đổi cỡ ngay sau khi cửa sổ hiện.
+
+### Thử tay — Windows (máy thật, Windows 10 1809+ / 11)
+
+- [ ] 1. Mở ShellX từ Start menu: cửa sổ terminal hiện với một tab PowerShell ở `%USERPROFILE%`; **có nút trên taskbar khi cửa sổ hiện, mất khi ẩn**; **title bar hệ thống tối** (dark) ngay từ khung hình đầu, không chớp trắng.
+- [ ] 2. Ctrl+Shift+T / Ctrl+Shift+W / Ctrl+Alt+1…9 / Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+Shift+C (có vùng chọn) / Ctrl+Shift+V / Ctrl+= / Ctrl+− / Ctrl+0; Ctrl+C trong PowerShell vẫn ngắt lệnh; Ctrl+Shift+C không có vùng chọn không làm gì sai. Chuyển vùng bằng Ctrl+F6; F6 thường tới được TUI.
+- [ ] 3. **AltGr:** bàn phím có AltGr (ví dụ Đức/Pháp/Tây Ban Nha): AltGr+Q → `@`, AltGr+7 → `{`, AltGr+8 → `[`… gõ ra đúng ký tự trong PowerShell và trong vim, không bị coi là Ctrl+Alt (không kích hoạt Ctrl+Alt+1…9).
+- [ ] 4. Các mục 2, 3 (bộ gõ tiếng Việt Unikey/EVKey, cả sau khi chuyển tab), 6–8, 10–11, 14–15, 17 của macOS (chuyển ⌘ thành Ctrl+Shift).
+- [ ] 5. Alt+F4 / nút X → ẩn vào khay, shell vẫn chạy; mở lại lần hai (chạy ShellX.exe lần nữa) → cửa sổ hiện lại, không có tab thứ hai.
+- [ ] 6. Tray "Thoát" với tab đang mở → hỏi; đồng ý → `Get-Process pwsh,powershell` không còn tiến trình con của ShellX. Đăng xuất / tắt máy Windows không bị ShellX chặn.
+- [ ] 7. Snap layouts (Win+Z) và kéo đổi cỡ: tối thiểu 640×400, nhớ vị trí; rút màn hình ngoài rồi mở lại → cửa sổ hiện ở giữa màn hình còn lại.

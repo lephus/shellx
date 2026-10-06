@@ -28,7 +28,7 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 | # | Chủ đề | Quyết định |
 |---|---|---|
 | D1 | Đối tượng | Sản phẩm công khai, nhiều người dùng |
-| D2 | Vai trò desktop app v1.0 | Chỉ là agent nền ở tray/menu bar. Mọi phiên terminal do điện thoại mở. Máy tính không hiển thị terminal |
+| D2 | Vai trò desktop app v1.0 | Chỉ là agent nền ở tray/menu bar. Mọi phiên terminal do điện thoại mở. Máy tính không hiển thị terminal **Sửa 2026-10-06 (A1):** desktop có cửa sổ terminal; phiên dùng chung với điện thoại — xem `2026-10-06-desktop-terminal-a1-design.md` (D2–D7). |
 | D3 | Tài khoản | Email + mật khẩu. Không OTP, không xác thực email. Kiểm tra định dạng email và chặn domain email tạm (yopmail, mailinator, …) |
 | D4 | Tin cậy thiết bị | Đăng nhập **và** quét QR một lần cho mỗi cặp (điện thoại, máy). Một điện thoại điều khiển được nhiều máy; một máy ghép được với nhiều điện thoại |
 | D5 | Tính năng v1.0 | Nhiều phiên dạng tab; thanh phím phụ; copy/paste, chỉnh cỡ chữ, xoay ngang; giữ máy không ngủ |
@@ -50,7 +50,7 @@ ShellX cho phép người dùng điều khiển terminal trên máy tính (macOS
 
 ### 3.2 Ngoài phạm vi v1.0
 
-- Hiển thị/mirror terminal trên desktop.
+- ~~Hiển thị/mirror terminal trên desktop.~~ Nay trong phạm vi (2026-10-06): `2026-10-06-desktop-terminal-a1-design.md`.
 - ~~Push notification.~~ Nay trong phạm vi (2026-10-05): `2026-10-05-push-notifications-design.md`.
 - Truyền file.
 - Kết nối P2P (WebRTC).
@@ -308,6 +308,8 @@ Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ li�
 ```
 ● Đã kết nối — user@email.com
 ─────────────────────────────
+  Mở cửa sổ terminal
+─────────────────────────────
 ✓ Cho phép truy cập từ xa
   Phiên đang hoạt động (n)      ▸  [từng phiên: Đóng] · Đóng tất cả
   Ghép nối điện thoại…
@@ -322,7 +324,7 @@ Chỉ một bản agent chạy cùng lúc (khóa file trong thư mục dữ li�
 
 - **Icon tray** có 3 trạng thái: bình thường, mất kết nối (xám), đang có điện thoại điều khiển (màu nổi).
 - **Thông báo hệ thống** mỗi khi một điện thoại mở phiên mới ("<tên điện thoại> vừa mở phiên terminal"). Mặc định bật.
-- **Tắt "Cho phép truy cập từ xa":** ngắt WebSocket tới relay và đóng mọi phiên; hỏi xác nhận nếu đang có phiên. Trạng thái bật/tắt được nhớ qua các lần khởi động.
+- **Tắt "Cho phép truy cập từ xa":** ngắt WebSocket tới relay và ngắt mọi điện thoại; **các phiên vẫn chạy** trong cửa sổ terminal (sửa 2026-10-06, A1 D7); hỏi xác nhận nếu đang có điện thoại kết nối. Trạng thái bật/tắt được nhớ qua các lần khởi động.
 - **Giữ máy không ngủ** (mặc định bật):
   - macOS: tiến trình con `caffeinate -i -w <pid agent>`.
   - Windows: `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
