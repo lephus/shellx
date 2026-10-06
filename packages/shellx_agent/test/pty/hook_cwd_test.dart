@@ -75,4 +75,49 @@ void main() {
       expect(text.toString(), contains('\x1b]7;file://'));
     });
   }
+  test('zsh: OSC 7 stays right when the user\'s .zshrc sets options that '
+      'change indexing and globbing (emulate -L zsh)', () async {
+    final temp = Directory.systemTemp.createTempSync('shellx-osc7-opts-');
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final home = Directory('${temp.path}/home')..createSync();
+    File(
+      '${home.path}/.zshrc',
+    ).writeAsStringSync('setopt ksh_arrays sh_word_split no_multibyte\n');
+    final target = Directory('${temp.path}/x y/Tài liệu')
+      ..createSync(recursive: true);
+    final manager = SessionManager(
+      ptyFactory: const ProcessPtyFactory(),
+      shellResolver: const FixedShellResolver(
+        ShellCommand(executable: '/bin/zsh', arguments: ['-i'], name: 'zsh'),
+      ),
+      homeDirectory: home.path,
+      baseEnvironment: {
+        'HOME': home.path,
+        'PATH': '/usr/bin:/bin',
+        'LANG': 'en_US.UTF-8',
+      },
+      shellIntegration: ShellIntegration(directory: '${temp.path}/hooks'),
+    );
+    addTearDown(manager.closeAll);
+    final id = await manager.open(cols: 80, rows: 24);
+    final view = manager.view(id);
+    final text = StringBuffer();
+    final sub = view.output.listen(
+      (data) => text.write(utf8.decode(data, allowMalformed: true)),
+    );
+    addTearDown(sub.cancel);
+    final deadline = DateTime.now().add(const Duration(seconds: 15));
+    Future<void> waitFor(String needle) async {
+      while (!text.toString().contains(needle)) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('no ${jsonEncode(needle)} in ${jsonEncode(text.toString())}');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+    }
+
+    await waitFor('${_encode(home.path)}\x07');
+    view.write(utf8.encode("cd '${target.path}'\n"));
+    await waitFor('${_encode(target.path)}\x07');
+  });
 }

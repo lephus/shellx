@@ -35,6 +35,7 @@ fi
 const zshHookBody = r'''
   if (( ! ${+functions[__shellx_precmd]} )); then
     __shellx_osc7() {
+      builtin emulate -L zsh
       local url_path= i ch hexch LC_CTYPE=C LC_COLLATE=C LC_ALL= LANG=
       for (( i = 1; i <= ${#PWD}; ++i )); do
         ch=${PWD[i]}

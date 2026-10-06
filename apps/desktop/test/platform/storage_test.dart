@@ -35,6 +35,20 @@ void main() {
     );
   });
 
+  test('SharedPrefsSettingsStore.getStrings reads a value of another type '
+      '(older or corrupted install) as empty instead of throwing', () async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.withData({
+          SettingKeys.terminalWorkspaces: 'not a list',
+          SettingKeys.terminalSharingFiles: 42,
+        });
+    final settings = await SharedPrefsSettingsStore.open();
+    expect(settings.getStrings(SettingKeys.terminalWorkspaces), isEmpty);
+    expect(settings.getStrings(SettingKeys.terminalSharingFiles), isEmpty);
+    await settings.setStrings(SettingKeys.terminalWorkspaces, ['a']);
+    expect(settings.getStrings(SettingKeys.terminalWorkspaces), ['a']);
+  });
+
   test('InMemorySettingsStore returns defaults until set', () async {
     final settings = InMemorySettingsStore();
     expect(settings.getBool(SettingKeys.keepAwake, defaultValue: true), isTrue);

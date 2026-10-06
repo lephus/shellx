@@ -944,7 +944,12 @@ final class SessionManager implements AgentSessions, LocalSessions {
     unawaited(
       git
           .branchFor(cwd, refresh: refresh)
-          .then((branch) => _setBranch(session, branch, generation)),
+          .then<void>(
+            (branch) => _setBranch(session, branch, generation),
+            // Too slow: the branch is unknown, so the one shown stays (an
+            // unknown answer is not "not a repo").
+            onError: (Object _) {},
+          ),
     );
   }
 

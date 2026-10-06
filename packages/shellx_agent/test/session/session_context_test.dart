@@ -89,6 +89,27 @@ void main() {
     },
   );
 
+  test('a lookup that times out keeps the branch already shown (unknown is '
+      'not "no repo")', () async {
+    final lookup = _Lookup();
+    final rig = SessionRig(gitHeads: lookup);
+    await rig.manager.open(cols: 80, rows: 24);
+    rig.pty(0).emit(_osc7('/r'));
+    await pumpEventQueue();
+    lookup.answers.last.complete('main');
+    await pumpEventQueue();
+    rig.pty(0).emit('$_esc]133;C$_bel$_esc]133;D;0$_bel');
+    await pumpEventQueue();
+    lookup.answers.last.completeError(TimeoutException('slow mount'));
+    await pumpEventQueue();
+    expect(rig.manager.sessions.single.gitBranch, 'main');
+    rig.pty(0).emit('$_esc]133;C$_bel$_esc]133;D;0$_bel');
+    await pumpEventQueue();
+    lookup.answers.last.complete(null); // a real "not a repo" clears it
+    await pumpEventQueue();
+    expect(rig.manager.sessions.single.gitBranch, isNull);
+  });
+
   test('OSC 133;D looks the branch up again with refresh', () async {
     final lookup = _Lookup();
     final rig = SessionRig(gitHeads: lookup);

@@ -2,11 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-/// The git branch of a directory (A2 C2). Never throws.
+/// The git branch of a directory (A2 C2).
 abstract interface class GitBranchLookup {
   /// The branch name, a 7-character SHA when HEAD is detached, or null
-  /// (not a repo, unreadable, too slow). [refresh] forgets what is cached
-  /// for [directory] first (a command just ran: `git init`, `git switch`).
+  /// (not a repo, unreadable). [refresh] forgets what is cached for
+  /// [directory] first (a command just ran: `git init`, `git switch`).
+  ///
+  /// Fails only with a [TimeoutException] when the lookup was too slow (a
+  /// slow network mount): the branch is then *unknown*, which a caller
+  /// must not mistake for "not a repo" (it keeps what it already shows).
   Future<String?> branchFor(String directory, {bool refresh = false});
 }
 
@@ -70,7 +74,8 @@ String? parseGitHead(String content) {
       final name = ref.substring(heads.length);
       return name.isEmpty ? null : clip(name);
     }
-    return clip(ref.startsWith('refs/') ? ref.substring(5) : ref);
+    final name = ref.startsWith('refs/') ? ref.substring(5) : ref;
+    return name.isEmpty ? null : clip(name);
   }
   return _sha.hasMatch(text) ? text.substring(0, 7) : null;
 }
@@ -81,8 +86,8 @@ String? parseGitHead(String content) {
 /// costs the same as a tiny one. `directory → git dir` is cached (LRU,
 /// [cacheSize]), including "not a repo"; HEAD is read again every time.
 /// One lookup per directory runs at a time; one that takes longer than
-/// [timeout] (a slow network mount) answers null and finishes in the
-/// background.
+/// [timeout] (a slow network mount) fails with a [TimeoutException] and
+/// finishes in the background.
 final class GitHeadReader implements GitBranchLookup {
   GitHeadReader({
     GitFiles files = const IoGitFiles(),
@@ -125,7 +130,7 @@ final class GitHeadReader implements GitBranchLookup {
     }
     // Each caller waits at most [timeout]; the walk itself stays in flight
     // until it finishes, so a hung mount is walked once, not once per call.
-    return walk.result.timeout(timeout, onTimeout: () => null);
+    return walk.result.timeout(timeout);
   }
 
   Future<String?> _resolve(String directory, _Walk walk) async {

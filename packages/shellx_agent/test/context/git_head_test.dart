@@ -135,16 +135,19 @@ void main() {
     expect(files.entryCalls, 4); // C:\r\src, C:\r; D:\x, D:\ (root ends it)
   });
 
-  test('a lookup slower than 500 ms gives null', () {
+  test('a lookup slower than 500 ms fails with TimeoutException (the '
+      'branch is unknown, not absent)', () {
     fakeAsync((async) {
       final files = _Files({}, {})..gate = Completer<void>();
       final reader = GitHeadReader(files: files, windows: false);
-      String? result = 'pending';
-      reader.branchFor('/slow/mount').then((b) => result = b);
+      Object? result = 'pending';
+      reader
+          .branchFor('/slow/mount')
+          .then<void>((b) => result = b, onError: (Object e) => result = e);
       async.elapse(const Duration(milliseconds: 499));
       expect(result, 'pending');
       async.elapse(const Duration(milliseconds: 2));
-      expect(result, isNull);
+      expect(result, isA<TimeoutException>());
     });
   });
 
@@ -175,12 +178,14 @@ void main() {
     fakeAsync((async) {
       final files = _Files({}, {})..gate = Completer<void>();
       final reader = GitHeadReader(files: files, windows: false);
-      final results = <String?>[];
+      final results = <Object?>[];
       for (var i = 0; i < 5; i++) {
-        reader.branchFor('/hung').then(results.add);
+        reader
+            .branchFor('/hung')
+            .then<void>(results.add, onError: (Object e) => results.add(e));
         async.elapse(const Duration(milliseconds: 600));
       }
-      expect(results, everyElement(isNull));
+      expect(results, everyElement(isA<TimeoutException>()));
       expect(results, hasLength(5));
       expect(files.entryCalls, 1);
     });
@@ -192,6 +197,8 @@ void main() {
     expect(parseGitHead('ref: refs/heads/a\x1b[31mb'), 'a[31mb');
     expect(parseGitHead('ref: refs/heads/'), isNull);
     expect(parseGitHead('ref: refs/heads/\n'), isNull);
+    expect(parseGitHead('ref: refs/'), isNull);
+    expect(parseGitHead('ref: refs/\n'), isNull);
   });
 
   test('a gitdir: file pointing nowhere gives null; trailing separators '

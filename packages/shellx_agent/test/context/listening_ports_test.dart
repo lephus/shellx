@@ -97,19 +97,60 @@ void main() {
     });
   });
 
-  test('WindowsPortProbe runs netstat -ano and CIM through PowerShell '
-      '(5 s), never wmic', () async {
-    final calls = <String>[];
+  test('WindowsPortProbe runs %SystemRoot%\\System32 netstat -ano and CIM '
+      'through Windows PowerShell by absolute path (5 s), never wmic', () async {
+    final calls = <List<Object>>[];
     final probe = WindowsPortProbe(
+      environment: const {'SystemRoot': r'D:\Win'},
       run: (exe, args, {required timeout}) async {
-        calls.add('$exe ${args.first} ${timeout.inSeconds}');
-        return ProbeOutput(0, exe == 'netstat' ? _netstat : '4321 100\n');
+        calls.add([exe, args, timeout.inSeconds]);
+        return ProbeOutput(
+          0,
+          exe.endsWith('netstat.exe') ? _netstat : '4321 100\n',
+        );
       },
     );
     expect(await probe.listening(), hasLength(3));
     expect(await probe.parents(), {4321: 100});
-    expect(calls, ['netstat -ano 2', 'powershell -NoProfile 5']);
+    expect(calls, [
+      [
+        r'D:\Win\System32\netstat.exe',
+        ['-ano'],
+        2,
+      ],
+      [
+        r'D:\Win\System32\WindowsPowerShell\v1.0\powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          r"Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId | "
+              r"ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.ParentProcessId }",
+        ],
+        5,
+      ],
+    ]);
   });
+
+  test(
+    r'WindowsPortProbe falls back to C:\Windows without SystemRoot',
+    () async {
+      final exes = <String>[];
+      final probe = WindowsPortProbe(
+        environment: const {},
+        run: (exe, args, {required timeout}) async {
+          exes.add(exe);
+          return const ProbeOutput(0, '');
+        },
+      );
+      await probe.listening();
+      await probe.parents();
+      expect(exes, [
+        r'C:\Windows\System32\netstat.exe',
+        r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe',
+      ]);
+    },
+  );
 
   test(
     'runWithTimeout returns the output, and kills a command that is too slow',

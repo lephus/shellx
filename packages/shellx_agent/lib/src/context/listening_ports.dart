@@ -182,16 +182,32 @@ final class MacPortProbe implements PortProbe {
 
 /// Windows: `netstat -ano` for ports (fast), CIM through PowerShell for
 /// the process tree (about a second, so only when D4 needs it). Not
-/// `wmic`: Windows 11 24H2 removed it (D7).
+/// `wmic`: Windows 11 24H2 removed it (D7). Both run by absolute path
+/// under `%SystemRoot%\System32`, so a `netstat.exe` or `powershell.exe`
+/// earlier on `PATH` (or in the working directory) is never picked up.
 final class WindowsPortProbe implements PortProbe {
-  WindowsPortProbe({TimedCommandRunner run = runWithTimeout}) : _run = run;
+  WindowsPortProbe({
+    TimedCommandRunner run = runWithTimeout,
+    Map<String, String>? environment,
+  }) : _run = run,
+       _system32 =
+           '${_systemRoot(environment ?? Platform.environment)}'
+           r'\System32';
   final TimedCommandRunner _run;
+  final String _system32;
   static const timeout = Duration(seconds: 2);
   static const cimTimeout = Duration(seconds: 5);
 
+  static String _systemRoot(Map<String, String> environment) =>
+      environment['SystemRoot'] ?? environment['SYSTEMROOT'] ?? r'C:\Windows';
+
+  String get _netstat => '$_system32\\netstat.exe';
+  String get _powerShell =>
+      '$_system32\\WindowsPowerShell\\v1.0\\powershell.exe';
+
   @override
   Future<Map<int, Set<int>>> listening() async {
-    final out = await _run('netstat', const ['-ano'], timeout: timeout);
+    final out = await _run(_netstat, const ['-ano'], timeout: timeout);
     if (out.exitCode != 0) {
       throw PortProbeException('netstat exited with code ${out.exitCode}');
     }
@@ -200,7 +216,7 @@ final class WindowsPortProbe implements PortProbe {
 
   @override
   Future<Map<int, int>> parents() async {
-    final out = await _run('powershell', const [
+    final out = await _run(_powerShell, const [
       '-NoProfile',
       '-NonInteractive',
       '-Command',

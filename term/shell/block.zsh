@@ -30,6 +30,7 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
   if [[ -z "${VSCODE_SHELL_INTEGRATION-}" ]]; then
     if (( ! ${+functions[__shellx_precmd]} )); then
       __shellx_osc7() {
+        builtin emulate -L zsh
         local url_path= i ch hexch LC_CTYPE=C LC_COLLATE=C LC_ALL= LANG=
         for (( i = 1; i <= ${#PWD}; ++i )); do
           ch=${PWD[i]}

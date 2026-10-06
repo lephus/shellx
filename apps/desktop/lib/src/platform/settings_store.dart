@@ -81,8 +81,16 @@ final class SharedPrefsSettingsStore implements SettingsStore {
   @override
   Future<void> setBool(String key, bool value) => _prefs.setBool(key, value);
 
+  /// A value of another type (an older or corrupted install) reads as
+  /// empty: `getStringList` would throw a cast error at startup.
   @override
-  List<String> getStrings(String key) => _prefs.getStringList(key) ?? const [];
+  List<String> getStrings(String key) => switch (_prefs.get(key)) {
+    final List<Object?> list => [
+      for (final value in list)
+        if (value is String) value,
+    ],
+    _ => const [],
+  };
 
   @override
   Future<void> setStrings(String key, List<String> values) =>
