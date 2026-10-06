@@ -67,6 +67,8 @@ final class AgentViewState {
     this.update,
     this.terminalSharing = const TerminalSharingView(),
     this.notifyThresholdSeconds = kDefaultNotifyThresholdSeconds,
+    this.desktopNotifications = true,
+    this.desktopNotificationsOnlyUnfocused = true,
   });
 
   final AuthPhase phase;
@@ -92,6 +94,11 @@ final class AgentViewState {
   /// [kNotifyThresholdChoices]; 0 = off.
   final int notifyThresholdSeconds;
 
+  /// A4 D20: "Thông báo trên máy tính" and "Chỉ khi cửa sổ không ở phía
+  /// trước" (tray). Both work signed out (N1).
+  final bool desktopNotifications;
+  final bool desktopNotificationsOnlyUnfocused;
+
   bool get signedIn => phase == AuthPhase.signedIn;
 
   AgentViewState copyWith({
@@ -110,6 +117,8 @@ final class AgentViewState {
     Object? update = _unset,
     TerminalSharingView? terminalSharing,
     int? notifyThresholdSeconds,
+    bool? desktopNotifications,
+    bool? desktopNotificationsOnlyUnfocused,
   }) {
     return AgentViewState(
       phase: phase ?? this.phase,
@@ -130,6 +139,10 @@ final class AgentViewState {
       terminalSharing: terminalSharing ?? this.terminalSharing,
       notifyThresholdSeconds:
           notifyThresholdSeconds ?? this.notifyThresholdSeconds,
+      desktopNotifications: desktopNotifications ?? this.desktopNotifications,
+      desktopNotificationsOnlyUnfocused:
+          desktopNotificationsOnlyUnfocused ??
+          this.desktopNotificationsOnlyUnfocused,
     );
   }
 }

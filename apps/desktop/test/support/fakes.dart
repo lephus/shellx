@@ -380,14 +380,16 @@ final class FlakyKeyValueStore implements KeyValueStore {
 }
 
 final class ShownNotification {
-  const ShownNotification(this.title, this.body, this.onClick);
+  const ShownNotification(this.title, this.body, this.onClick, {this.id});
   final String title;
   final String? body;
   final void Function()? onClick;
+  final String? id;
 }
 
 final class RecordingNotifier implements SystemNotifier {
   final List<ShownNotification> shown = [];
+  final List<String> closed = [];
 
   /// Throws instead of showing (notifications denied by the OS).
   bool fail = false;
@@ -396,11 +398,15 @@ final class RecordingNotifier implements SystemNotifier {
   Future<void> show({
     required String title,
     String? body,
+    String? id,
     void Function()? onClick,
   }) async {
     if (fail) throw Exception('notifications denied');
-    shown.add(ShownNotification(title, body, onClick));
+    shown.add(ShownNotification(title, body, onClick, id: id));
   }
+
+  @override
+  Future<void> close(String id) async => closed.add(id);
 }
 
 final class RecordingUrlOpener implements UrlOpener {

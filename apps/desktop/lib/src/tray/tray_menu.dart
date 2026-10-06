@@ -98,10 +98,39 @@ Menu buildTrayMenu(
     ),
   );
 
+  // A4 D20: in both menus; the long-command threshold moved in here (it
+  // now works signed out too, push §7 amended).
+  MenuItem notifications() =>
+      sub(TrayKeys.notifications, l10n.trayNotifications, [
+        check(
+          TrayKeys.desktopNotifications,
+          l10n.trayDesktopNotifications,
+          state.desktopNotifications,
+        ),
+        check(
+          TrayKeys.desktopNotificationsOnlyUnfocused,
+          l10n.trayDesktopNotificationsUnfocused,
+          state.desktopNotificationsOnlyUnfocused,
+          disabled: !state.desktopNotifications,
+        ),
+        sep(),
+        sub(TrayKeys.notifyThreshold, l10n.trayNotifyThreshold, [
+          for (final seconds in kNotifyThresholdChoices)
+            check(
+              TrayKeys.notifyThresholdChoice(seconds),
+              notifyThresholdLabel(seconds, l10n),
+              seconds == state.notifyThresholdSeconds,
+            ),
+        ]),
+      ]);
+
   if (!state.signedIn) {
     return Menu(
       items: [
         item(TrayKeys.openTerminal, l10n.trayOpenTerminal),
+        sep(),
+        // UI-A4 §7: after the window item, before the status line.
+        notifications(),
         sep(),
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
         sep(),
@@ -205,15 +234,8 @@ Menu buildTrayMenu(
           '⚠ ${l10n.trayTerminalSharingNeedsSetup}',
           disabled: sharing.busy,
         ),
-      // Push spec §7.
-      sub(TrayKeys.notifyThreshold, l10n.trayNotifyThreshold, [
-        for (final seconds in kNotifyThresholdChoices)
-          check(
-            TrayKeys.notifyThresholdChoice(seconds),
-            notifyThresholdLabel(seconds, l10n),
-            seconds == state.notifyThresholdSeconds,
-          ),
-      ]),
+      // UI-A4 §7: where push §7's threshold submenu was.
+      notifications(),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
       item(TrayKeys.quit, l10n.trayQuit),

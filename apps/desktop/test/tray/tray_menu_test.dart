@@ -63,7 +63,7 @@ void main() {
       '---',
       'Giữ máy không ngủ',
       'Khởi động cùng hệ thống',
-      'Thông báo khi lệnh chạy lâu xong',
+      'Thông báo',
       'Đổi mật khẩu…',
       'Đăng xuất',
       'Thoát',
@@ -84,9 +84,11 @@ void main() {
   });
 
   test('long-command notifications submenu (push spec §7): the five choices, '
-      'the current one checked', () {
+      'the current one checked, inside "Thông báo" (A4 D20)', () {
     final menu = buildTrayMenu(_signedIn(), vi, TrayMenuIds());
-    final sub = menu.getMenuItem(TrayKeys.notifyThreshold)!;
+    final notifications = menu.getMenuItem(TrayKeys.notifications)!;
+    expect(notifications.submenu!.items!.last.key, TrayKeys.notifyThreshold);
+    final sub = notifications.submenu!.getMenuItem(TrayKeys.notifyThreshold)!;
     expect(sub.label, 'Thông báo khi lệnh chạy lâu xong');
     expect(_labels(sub.submenu!), [
       'Tắt',
@@ -103,15 +105,19 @@ void main() {
       for (final item in sub.submenu!.items!) item.key,
     ], [0, 10, 30, 60, 300].map(TrayKeys.notifyThresholdChoice).toList());
 
-    final off = buildTrayMenu(
-      AgentViewState(
-        phase: AuthPhase.signedIn,
-        email: 'user@email.com',
-        notifyThresholdSeconds: 0,
-      ),
-      lookupAppLocalizations(const Locale('en')),
-      TrayMenuIds(),
-    ).getMenuItem(TrayKeys.notifyThreshold)!;
+    final off =
+        buildTrayMenu(
+              AgentViewState(
+                phase: AuthPhase.signedIn,
+                email: 'user@email.com',
+                notifyThresholdSeconds: 0,
+              ),
+              lookupAppLocalizations(const Locale('en')),
+              TrayMenuIds(),
+            )
+            .getMenuItem(TrayKeys.notifications)!
+            .submenu!
+            .getMenuItem(TrayKeys.notifyThreshold)!;
     expect(off.label, 'Notify when long commands finish');
     expect(_labels(off.submenu!), [
       'Off',
@@ -173,7 +179,8 @@ void main() {
     expect(menu.items![3].label, 'Tải ShellX 1.1.0…');
   });
 
-  test('signed-out menu offers the window, sign in and quit only', () {
+  test('signed-out menu offers the window, notifications, sign in and quit '
+      'only (A4 D20, UI-A4 §7)', () {
     final menu = buildTrayMenu(
       const AgentViewState(phase: AuthPhase.signedOut),
       vi,
@@ -181,6 +188,8 @@ void main() {
     );
     expect(_labels(menu), [
       'Mở cửa sổ terminal',
+      '---',
+      'Thông báo',
       '---',
       '○ Chưa đăng nhập',
       '---',

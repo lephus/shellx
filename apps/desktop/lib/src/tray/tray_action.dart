@@ -84,6 +84,16 @@ final class SetNotifyThreshold extends TrayAction {
   final int seconds;
 }
 
+/// A4 D20: "Thông báo trên máy tính".
+final class ToggleDesktopNotifications extends TrayAction {
+  const ToggleDesktopNotifications();
+}
+
+/// A4 D20: "Chỉ khi cửa sổ không ở phía trước".
+final class ToggleDesktopNotificationsOnlyUnfocused extends TrayAction {
+  const ToggleDesktopNotificationsOnlyUnfocused();
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -112,6 +122,10 @@ abstract final class TrayKeys {
   static const String terminalSharingSetup = 'terminal_sharing_setup';
   static const String desktopTerminals = 'desktop_terminals';
   static const String notifyThreshold = 'notify_threshold';
+  static const String notifications = 'notifications';
+  static const String desktopNotifications = 'desktop_notifications';
+  static const String desktopNotificationsOnlyUnfocused =
+      'desktop_notifications_only_unfocused';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -162,6 +176,9 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.quit => const Quit(),
     TrayKeys.terminalSharing => const ToggleTerminalSharing(),
     TrayKeys.terminalSharingSetup => const SetUpTerminalSharing(),
+    TrayKeys.desktopNotifications => const ToggleDesktopNotifications(),
+    TrayKeys.desktopNotificationsOnlyUnfocused =>
+      const ToggleDesktopNotificationsOnlyUnfocused(),
     _ => null,
   };
 }

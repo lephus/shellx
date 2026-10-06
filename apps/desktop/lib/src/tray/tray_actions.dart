@@ -98,6 +98,12 @@ final class TrayActions {
         await _agent.setKeepAwake(!state.keepAwake);
       case SetNotifyThreshold(:final seconds):
         await _agent.setNotifyThreshold(seconds);
+      case ToggleDesktopNotifications():
+        await _agent.setDesktopNotifications(!state.desktopNotifications);
+      case ToggleDesktopNotificationsOnlyUnfocused():
+        await _agent.setDesktopNotificationsOnlyUnfocused(
+          !state.desktopNotificationsOnlyUnfocused,
+        );
       case ToggleLaunchAtStartup():
         await _agent.setLaunchAtStartup(!state.launchAtStartup);
       case OpenChangePassword():

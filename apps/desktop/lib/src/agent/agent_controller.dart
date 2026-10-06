@@ -119,6 +119,14 @@ class AgentController extends Notifier<AgentViewState> {
         defaultValue: false,
       ),
       notifyThresholdSeconds: notifyThresholdSeconds(settings),
+      desktopNotifications: settings.getBool(
+        SettingKeys.desktopNotifications,
+        defaultValue: true,
+      ),
+      desktopNotificationsOnlyUnfocused: settings.getBool(
+        SettingKeys.desktopNotificationsOnlyUnfocused,
+        defaultValue: true,
+      ),
     );
     final sharingSetup = _s.terminalSharing;
     if (sharingSetup != null) {
@@ -340,6 +348,22 @@ class AgentController extends Notifier<AgentViewState> {
     await _s.settings.setInt(SettingKeys.notifyThreshold, seconds);
     if (!ref.mounted) return;
     state = state.copyWith(notifyThresholdSeconds: seconds);
+  }
+
+  /// A4 D20: read by DesktopNotifications on every notice (no restart).
+  Future<void> setDesktopNotifications(bool enabled) async {
+    await _s.settings.setBool(SettingKeys.desktopNotifications, enabled);
+    if (!ref.mounted) return;
+    state = state.copyWith(desktopNotifications: enabled);
+  }
+
+  Future<void> setDesktopNotificationsOnlyUnfocused(bool enabled) async {
+    await _s.settings.setBool(
+      SettingKeys.desktopNotificationsOnlyUnfocused,
+      enabled,
+    );
+    if (!ref.mounted) return;
+    state = state.copyWith(desktopNotificationsOnlyUnfocused: enabled);
   }
 
   Future<void> setKeepAwake(bool enabled) async {
