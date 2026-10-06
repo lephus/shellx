@@ -65,7 +65,11 @@ final class NullRestoreFiles implements RestoreFiles {
 }
 
 /// A layout write waiting in the queue; a newer write replaces its
-/// snapshot instead of queueing another (D25).
+/// snapshot instead of queueing another (D25). The newer snapshot is thus
+/// written at the older write's place in the queue, overtaking any
+/// scrollback operations queued in between. That is harmless: those
+/// touch other files. Only [RestoreStore.loadLayout], which reads this
+/// file, is fenced: it closes the slot, so a later write queues anew.
 final class _LayoutSlot {
   _LayoutSlot(this.snapshot);
   RestoreSnapshot snapshot;
@@ -82,8 +86,12 @@ final class RestoreStore implements RestoreFiles {
     bool? posix,
     Future<void> Function(String path)? excludeFromBackup,
     Future<bool> Function(String mode, List<String> paths)? chmod,
+    Future<String> Function(File file)? readLayout,
+    Duration excludeTimeout = const Duration(seconds: 5),
     void Function(String message)? log,
-  }) : _posix = posix ?? !Platform.isWindows,
+  }) : _readLayout = readLayout ?? ((file) => file.readAsString()),
+       _excludeTimeout = excludeTimeout,
+       _posix = posix ?? !Platform.isWindows,
        _exclude = excludeFromBackup,
        _chmod = chmod ?? _systemChmod,
        _log = log ?? ((_) {});
@@ -93,10 +101,13 @@ final class RestoreStore implements RestoreFiles {
   final Future<void> Function(String path)? _exclude;
   final Future<bool> Function(String mode, List<String> paths) _chmod;
   final void Function(String message) _log;
+  final Future<String> Function(File file) _readLayout;
+  final Duration _excludeTimeout;
   final _random = Random.secure();
   Future<void> _tail = Future.value();
   bool _scrollbackAllowed = true;
   _LayoutSlot? _pendingLayout;
+  bool _layoutChmodLogged = false;
 
   String get _sep => Platform.pathSeparator;
   String get _layout => '${directory.path}${_sep}layout.json';
@@ -127,7 +138,7 @@ final class RestoreStore implements RestoreFiles {
       if (!ok) _log('restore: permissions not set; scrollback disabled');
     }
     try {
-      await _exclude?.call(directory.path);
+      await _exclude?.call(directory.path).timeout(_excludeTimeout);
     } on Object catch (error) {
       _log('restore: backup exclusion failed (${error.runtimeType})');
     }
@@ -143,13 +154,19 @@ final class RestoreStore implements RestoreFiles {
       String? reason;
       try {
         if (!await file.exists()) return const RestoreLoad();
-        if (await file.length() > kRestoreMaxLayoutBytes) {
-          reason = 'oversized';
-        } else {
-          final snapshot = RestoreSnapshot.tryParse(await file.readAsString());
-          if (snapshot != null) return RestoreLoad(snapshot: snapshot);
-          reason = 'FormatException';
+        String text;
+        try {
+          text = await _readCapped(file);
+        } on FileSystemException {
+          // A transient lock (another process, antivirus): one retry.
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+          text = await _readCapped(file);
         }
+        final snapshot = RestoreSnapshot.tryParse(text);
+        if (snapshot != null) return RestoreLoad(snapshot: snapshot);
+        reason = 'FormatException';
+      } on _Oversized {
+        reason = 'oversized';
       } on Object catch (error) {
         reason = '${error.runtimeType}';
       }
@@ -163,6 +180,12 @@ final class RestoreStore implements RestoreFiles {
     });
   }
 
+  /// The layout's text; [_Oversized] past [kRestoreMaxLayoutBytes].
+  Future<String> _readCapped(File file) async {
+    if (await file.length() > kRestoreMaxLayoutBytes) throw const _Oversized();
+    return _readLayout(file);
+  }
+
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) {
     final pending = _pendingLayout;
@@ -173,7 +196,7 @@ final class RestoreStore implements RestoreFiles {
     final slot = _pendingLayout = _LayoutSlot(snapshot);
     slot.done = _serial(() {
       if (identical(_pendingLayout, slot)) _pendingLayout = null;
-      return _atomic({_layout: slot.snapshot.encode()});
+      return _atomic({_layout: slot.snapshot.encode()}, private: false);
     });
     return slot.done;
   }
@@ -185,7 +208,7 @@ final class RestoreStore implements RestoreFiles {
         await _atomic({
           for (final MapEntry(:key, :value) in textByKey.entries)
             if (isPaneKey(key)) _scrollPath(key): value,
-        });
+        }, private: true);
       });
 
   /// Sanitized (D6); null when missing, oversized or not UTF-8.
@@ -236,7 +259,9 @@ final class RestoreStore implements RestoreFiles {
   @override
   Future<void> removeOrphans(Set<String> keep) => _serial(() async {
     for (final file in await _files(directory)) {
-      if (file.path.contains('.tmp-')) await _deleteQuietly(file);
+      if (file.uri.pathSegments.last.contains('.tmp-')) {
+        await _deleteQuietly(file);
+      }
     }
     for (final file in await _files(_scrollDir)) {
       final name = file.uri.pathSegments.last;
@@ -261,8 +286,12 @@ final class RestoreStore implements RestoreFiles {
   /// Temp files first, one chmod for all of them before any content goes
   /// in (D2), then content, then rename each over its target. True only
   /// when every file was written; on failure the targets keep their
-  /// previous content (§5).
-  Future<bool> _atomic(Map<String, String> contents) async {
+  /// previous content (§5). A [private] file (scrollback) is never written
+  /// without 0600; the layout is written anyway (§5), logged once.
+  Future<bool> _atomic(
+    Map<String, String> contents, {
+    required bool private,
+  }) async {
     if (contents.isEmpty) return true;
     final temps = <String, File>{
       for (final path in contents.keys)
@@ -276,7 +305,11 @@ final class RestoreStore implements RestoreFiles {
       }
       if (_posix &&
           !await _chmod('600', [for (final t in temps.values) t.path])) {
-        throw const FileSystemException('chmod 600 failed');
+        if (private) throw const FileSystemException('chmod 600 failed');
+        if (!_layoutChmodLogged) {
+          _layoutChmodLogged = true;
+          _log('restore: layout permissions not set; writing anyway');
+        }
       }
       for (final MapEntry(:key, :value) in temps.entries) {
         await value.writeAsString(contents[key]!, flush: true);
@@ -308,4 +341,8 @@ final class RestoreStore implements RestoreFiles {
       return false;
     }
   }
+}
+
+final class _Oversized implements Exception {
+  const _Oversized();
 }

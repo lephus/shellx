@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -145,27 +146,98 @@ void main() {
     expect(File('${layoutPath()}.bak').lengthSync(), padded.length);
   });
 
-  test('a failed layout write returns false, keeps the old file and '
+  test('a failed layout write returns false, leaves no temp file and '
       'succeeds on retry (§5 disk full)', () async {
-    // A non-empty directory where the temp file wants to go makes the
-    // write fail the way a full disk does: before the rename.
-    final blocker = Directory('${root.path}/blocked');
-    final locked = RestoreStore(blocker, log: logs.add);
+    // A non-empty directory at the target makes the final rename fail on
+    // every platform, as a full disk fails a write: nothing is replaced.
+    final blocker = Directory(layoutPath());
     await blocker.create();
-    await File('${blocker.path}/layout.json').create();
-    await Process.run('/bin/chmod', ['500', blocker.path]);
-    expect(await locked.writeLayout(snap()), isFalse);
-    expect(await File('${blocker.path}/layout.json').readAsString(), '');
+    await File('${blocker.path}/keep').create();
+    expect(await store.writeLayout(snap()), isFalse);
+    expect(blocker.existsSync(), isTrue);
     expect(
-      blocker.listSync().map((e) => e.path).where((p) => p.contains('.tmp-')),
+      store.directory
+          .listSync()
+          .map((e) => e.path)
+          .where((p) => p.contains('.tmp-')),
       isEmpty,
     );
-    await Process.run('/bin/chmod', ['700', blocker.path]);
-    expect(await locked.writeLayout(snap('/new')), isTrue);
-    final back = await locked.loadLayout();
+    await blocker.delete(recursive: true);
+    expect(await store.writeLayout(snap('/new')), isTrue);
+    final back = await store.loadLayout();
     expect(back.snapshot!.encode(), snap('/new').encode());
     expect(logs.join(), isNot(contains(root.path)));
-  }, testOn: '!windows');
+  });
+
+  test('a failed private write keeps the previous scrollback', () async {
+    var chmodOk = true;
+    final flaky = RestoreStore(
+      Directory('${root.path}/flaky'),
+      posix: true,
+      chmod: (mode, paths) async => chmodOk,
+      log: logs.add,
+    );
+    expect(await flaky.prepare(), isTrue);
+    await flaky.writeScrollbacks({k1: 'old'});
+    chmodOk = false;
+    await flaky.writeScrollbacks({k1: 'new'});
+    expect(await flaky.readScrollback(k1), 'old');
+    expect(
+      Directory(
+        '${root.path}/flaky/scrollback',
+      ).listSync().map((e) => e.path).where((p) => p.contains('.tmp-')),
+      isEmpty,
+    );
+  });
+
+  test('loadLayout retries once on a file system error (M4)', () async {
+    File(layoutPath()).writeAsStringSync(snap().encode());
+    var reads = 0;
+    final retrying = RestoreStore(
+      store.directory,
+      readLayout: (file) async {
+        if (++reads == 1) throw const FileSystemException('busy');
+        return file.readAsString();
+      },
+      log: logs.add,
+    );
+    final load = await retrying.loadLayout();
+    expect(reads, 2);
+    expect(load.corrupt, isFalse);
+    expect(load.snapshot!.encode(), snap().encode());
+  });
+
+  test('loadLayout gives up after the retry: .bak, corrupt', () async {
+    File(layoutPath()).writeAsStringSync(snap().encode());
+    var reads = 0;
+    final failing = RestoreStore(
+      store.directory,
+      readLayout: (file) async {
+        reads++;
+        throw const FileSystemException('busy');
+      },
+      log: logs.add,
+    );
+    final load = await failing.loadLayout();
+    expect(reads, 2);
+    expect(load.corrupt, isTrue);
+    expect(File('${layoutPath()}.bak').existsSync(), isTrue);
+  });
+
+  test('a parse failure is not retried', () async {
+    File(layoutPath()).writeAsStringSync('garbage');
+    var reads = 0;
+    final counting = RestoreStore(
+      store.directory,
+      readLayout: (file) async {
+        reads++;
+        return file.readAsString();
+      },
+      log: logs.add,
+    );
+    expect((await counting.loadLayout()).corrupt, isTrue);
+    expect(reads, 1);
+  });
 
   test('scrollback: batch write, sanitized read, delete', () async {
     await store.writeScrollbacks({
@@ -258,7 +330,8 @@ void main() {
     );
   });
 
-  test('without POSIX permissions scrollback is never written (§5)', () async {
+  test('without POSIX permissions scrollback is never written, the layout '
+      'still is (§5)', () async {
     // chmod cannot fail for the owner in a temp dir, so it is injected.
     final plain = RestoreStore(
       Directory('${root.path}/no-chmod'),
@@ -269,6 +342,41 @@ void main() {
     expect(await plain.prepare(), isFalse);
     await plain.writeScrollbacks({k1: 'x'});
     expect(await plain.hasScrollback(), isFalse);
+    expect(await plain.writeLayout(snap()), isTrue);
+    expect(await plain.writeLayout(snap('/again')), isTrue);
+    expect(
+      (await plain.loadLayout()).snapshot!.encode(),
+      snap('/again').encode(),
+    );
+    expect(logs.where((l) => l.contains('layout permissions')).length, 1);
+    expect(logs.join(), isNot(contains(root.path)));
+  });
+
+  test('orphan cleanup matches temp names, not a directory path containing '
+      '.tmp- (M1)', () async {
+    final odd = RestoreStore(Directory('${root.path}/x.tmp-1/restore'));
+    expect(await odd.prepare(), isTrue);
+    expect(await odd.writeLayout(snap()), isTrue);
+    await odd.writeScrollbacks({k1: 'a'});
+    await odd.removeOrphans({k1});
+    expect(File('${odd.directory.path}/layout.json').existsSync(), isTrue);
+    expect(await odd.readScrollback(k1), 'a');
+  });
+
+  test('a backup exclusion that never completes does not wedge the queue '
+      '(M2)', () async {
+    final hung = RestoreStore(
+      Directory('${root.path}/hung'),
+      excludeFromBackup: (_) => Completer<void>().future,
+      excludeTimeout: const Duration(milliseconds: 50),
+      log: logs.add,
+    );
+    expect(await hung.prepare(), isTrue);
+    expect(await hung.writeLayout(snap()), isTrue);
+    expect(
+      logs.where((l) => l.contains('backup exclusion failed')),
+      hasLength(1),
+    );
   });
 
   test('NullRestoreFiles stores nothing', () async {
