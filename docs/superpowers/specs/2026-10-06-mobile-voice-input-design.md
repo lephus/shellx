@@ -44,7 +44,8 @@ Trên màn terminal của điện thoại, người dùng **nói** thay vì gõ:
    - composer trượt lên trên thanh phím phụ và bàn phím;
    - mic có hiệu ứng sóng;
    - chữ hiện dần theo kết quả từng phần (partial);
-   - chip **VI / EN** để đổi ngôn ngữ.
+   - chip **VI / EN** để đổi ngôn ngữ;
+   - nghe trên máy trước; nếu lỗi trước khi nghe được chữ nào (ngôn ngữ không có trên máy / lỗi khác), thử lại một lần bằng nhận dạng cloud của hệ điều hành.
 4. Dừng (chạm mic hoặc im lặng ~2 giây) → chữ nằm trong composer, sửa được bằng bàn phím. Chạm mic lần nữa → nói tiếp, **nối thêm** vào chữ đang có (cách bằng một dấu cách).
 5. Gửi: nút **Gửi** hoặc từ khoá gửi. Composer trống lại và vẫn mở để nói tiếp. Nút **✕** đóng composer, bỏ chữ.
 6. Composer gõ tay được — cũng là chỗ soạn câu dài dễ hơn gõ thẳng vào terminal. Khi composer mở, focus và bàn phím ảo thuộc về composer, không thuộc terminal.
@@ -75,12 +76,12 @@ Chỉ trong `apps/mobile`, theo pattern sẵn có: `Controller` + `StateSignal` 
 
 | Thành phần | Vị trí | Vai trò | Phụ thuộc |
 |---|---|---|---|
-| `SpeechInput` (interface) | `domain/speech_input.dart` | `Future<SpeechAvailability> availability(String localeId)` (`onDevice`, `cloud`, `unavailable`); `Future<SpeechPermission> ensurePermission()` (`granted`, `denied`, `permanentlyDenied`); `start(localeId, {required bool onDevice})`; `stop()`; `cancel()`; `Stream<SpeechEvent> events` gồm `SpeechPartial(text)`, `SpeechFinal(text)`, `SpeechError(SpeechErrorKind)`, `SpeechListening(bool)` | không |
+| `SpeechInput` (interface) | `domain/speech_input.dart` | `Future<SpeechPermission> ensurePermission()` (`granted`, `denied`, `unsupported`); `Future<String?> resolveLocale(VoiceLocale)` → mã locale của nền tảng hoặc null khi máy không nhận dạng được; `start(localeId, {required bool onDevice})`; `stop()`; `cancel()`; `Stream<SpeechEvent> events` gồm `SpeechPartial(text)`, `SpeechFinal(text)`, `SpeechFailed(SpeechErrorKind)`, `SpeechListening(bool)` | không |
 | `SpeechToTextInput` | `data/speech_to_text_input.dart` | Cài đặt bằng `speech_to_text`: `pauseFor: 2s`, `partialResults: true`, `onDevice` khi `availability` trả `onDevice`. Ánh xạ mã lỗi plugin → `SpeechErrorKind` (`noPermission`, `localeUnavailable`, `network`, `noMatch`, `interrupted`, `other`) | `speech_to_text` |
 | `VoiceCommandParser` | `domain/voice_command_parser.dart` | Hàm thuần `parse(text, VoiceLocale)` → `VoiceSend(text)` / `VoiceCancel()` / `VoiceAppend(text)` theo §3.2 | không |
 | `VoiceLocale` | `domain/voice_locale.dart` | enum `vi` (`vi-VN`), `en` (`en-US`) | không |
-| `VoiceLocaleStore` | `data/voice_locale_store.dart` | Đọc/ghi lựa chọn VI/EN bằng storage key-value sẵn có của app; mặc định theo ngôn ngữ app | storage hiện có |
-| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | State `VoiceComposerState { phase: closed/idle/listening, text, partial, locale, error, canSend }`. Ghép partial lên chữ đã có; final → parser; `VoiceSend` gọi callback `onSubmit(text)`; quản lý quyền và lỗi theo §5 | `SpeechInput`, `VoiceLocaleStore` |
+| `AppSettings.voiceLocale` / `setVoiceLocale` | `lib/core/settings/app_settings.dart` | Đọc/ghi lựa chọn VI/EN; null = theo ngôn ngữ app. App giữ một đối tượng settings duy nhất, không có `VoiceLocaleStore` riêng | storage hiện có |
+| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | State `VoiceComposerState { phase: closed/idle/listening, text, partial, locale, error, canSend }`. Ghép partial lên chữ đã có; final → parser; `VoiceSend` gọi callback `onSubmit(text)`; quản lý quyền và lỗi theo §5 | `SpeechInput`, `AppSettings` |
 | `VoiceComposer` | `presentation/widgets/voice_composer.dart` | Ô chữ nhiều dòng, chip VI/EN, nút mic (sóng), Gửi, ✕, nhãn tab đích, dòng lỗi; có Semantics label | controller |
 | `MicButton` | `presentation/widgets/mic_button.dart` | Nút mic dùng ở thanh phím phụ | controller |
 
@@ -88,7 +89,7 @@ Chỉ trong `apps/mobile`, theo pattern sẵn có: `Controller` + `StateSignal` 
 
 - `features/terminal/presentation/widgets/extra_keys_bar.dart`: nhận thêm widget đầu hàng (leading) để chèn `MicButton`; enum `ExtraKey` không đổi (đó là các phím gửi vào terminal).
 - `features/terminal/presentation/pages/terminal_page.dart`: hiện `VoiceComposer` trên thanh phím phụ khi `phase != closed`; chuyển focus giữa composer và `TerminalView`; truyền `canSend` theo trạng thái live của tab đang mở.
-- `features/terminal/presentation/controllers/terminal_page_controller.dart`: thêm `submitLine(String text)` = `terminal.paste(text)` (xử lý bracketed paste như nút Dán) rồi gửi `\r` **ngoài** cặp `ESC[200~ … ESC[201~` để Enter thực thi. Text rỗng → chỉ gửi `\r`. Áp dụng modifier dính (Ctrl/Alt one-shot) **không** áp lên dòng gửi từ composer.
+- `features/terminal/presentation/controllers/terminal_page_controller.dart`: thêm `submitLine(String text)` = `terminal.paste(text)` (xử lý bracketed paste như nút Dán) rồi gửi `\r` **ngoài** cặp `ESC[200~ … ESC[201~` để Enter thực thi. Text rỗng → chỉ gửi `\r`. Khi chương trình không bật bracketed paste, xuống dòng trong composer thành dấu cách (tránh chạy sớm từng dòng). Áp dụng modifier dính (Ctrl/Alt one-shot) **không** áp lên dòng gửi từ composer.
 - iOS `Info.plist` + `InfoPlist.strings` (vi, en): `NSMicrophoneUsageDescription`, `NSSpeechRecognitionUsageDescription`.
 - Android `AndroidManifest.xml`: `RECORD_AUDIO`; `<queries><intent><action android:name="android.speech.RecognitionService"/></intent></queries>`.
 - `lib/l10n/intl_vi.arb`, `intl_en.arb`: chuỗi mới (nhãn nút, tooltip, lỗi §5, tab đích).
@@ -114,6 +115,10 @@ Mic → `SpeechInput` → `SpeechPartial`/`SpeechFinal` → `VoiceComposerContro
 | Đổi tab | Chữ giữ nguyên; nhãn tab đích cập nhật; gửi tới tab đang mở |
 | App xuống nền, khoá màn hình (lock gate), cuộc gọi, iOS hết giới hạn ~1 phút mỗi lượt (`interrupted`) | Dừng nghe, giữ chữ, không tự bật lại |
 | Rời màn terminal | Huỷ nghe; composer đóng, chữ bỏ |
+| Máy không có bộ nhận dạng giọng nói | "Máy này không hỗ trợ nhận dạng giọng nói" |
+| Không có phiên live | Nút mic ẩn; composer đang mở vẫn giữ |
+| `done` đến mà không có kết quả cuối (final) | Không chặn mic: lượt nghe đã cạn bị huỷ ở lần chạm mic kế tiếp rồi nghe lượt mới |
+| `done` muộn của lượt nghe trước | Bỏ qua cho tới khi lượt mới báo đã bắt đầu nghe (`SpeechListening(true)`, partial hoặc final), để không kết thúc nhầm lượt mới |
 
 ---
 
@@ -131,7 +136,7 @@ Sửa `web/src/pages/privacy.md` và `web/src/pages/en/privacy.md`, thêm mục 
 ## 7. Kiểm thử
 
 - **Unit `VoiceCommandParser`** (dạng bảng): "chạy test gửi" → `VoiceSend("chạy test")`; "Gửi." → `VoiceSend("")`; "gửi email cho tôi" → `VoiceAppend`; "hủy"/"huỷ" → `VoiceCancel`; "run tests, send" (EN) → `VoiceSend("run tests")`; "send" khi locale VI → `VoiceAppend`; hoa thường, dấu câu, khoảng trắng.
-- **Unit `VoiceComposerController`** với `FakeSpeechInput`: partial ghép lên chữ cũ; final → parser; `VoiceSend` gọi `onSubmit` và làm trống; `VoiceCancel` xoá; mỗi `SpeechErrorKind` → đúng state; không live → không gọi `onSubmit`; nhớ locale qua `VoiceLocaleStore`.
+- **Unit `VoiceComposerController`** với `FakeSpeechInput`: partial ghép lên chữ cũ; final → parser; `VoiceSend` gọi `onSubmit` và làm trống; `VoiceCancel` xoá; mỗi `SpeechErrorKind` → đúng state; không live → không gọi `onSubmit`; nhớ locale qua `AppSettings.voiceLocale`.
 - **Unit `submitLine`**: bracketed paste bật → `ESC[200~text ESC[201~` rồi `\r`; tắt → `text\r`; rỗng → `\r`; modifier one-shot không bị áp.
 - **Widget**: nút mic trên thanh phím phụ, ẩn khi không live; composer hiện/đóng; chip VI/EN; Gửi/✕; nhãn tab đích; Semantics.
 - **Thử tay trên máy thật** (iPhone, Android; không giả lập được micro): tiếng Việt và tiếng Anh; máy có và không có on-device; từ chối quyền; chế độ máy bay; "gửi" khi đang trong Claude Code.

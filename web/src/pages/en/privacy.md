@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: What data ShellX collects, why, how long it is kept, and your rights.
-updated: "2026-10-05"
+updated: "2026-10-06"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -65,6 +65,13 @@ The device private key, access token, the list of trusted phones (on the compute
 - **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
 - **Full Disk Access (macOS):** this optional permission only lets the commands you run in the terminal reach your folders. The agent itself never reads or uploads your files.
+
+### Voice input
+
+- The mobile app uses the microphone only when you tap the mic on the terminal screen; it never records in the background.
+- When your phone supports it, speech is turned into text on the phone. Otherwise the audio is sent to Apple's (iOS) or Google's (Android) speech recognition service and handled under their policies.
+- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, end-to-end encrypted (section 2).
+- Your recognition language choice (Vietnamese/English) is stored on the phone.
 
 ## 5. What we do not do
 

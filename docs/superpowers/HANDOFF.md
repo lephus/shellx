@@ -129,3 +129,13 @@ Việc chỉ người dùng làm được, theo thứ tự:
 9. **Kiểm tay trên máy thật** (spec §10, §11): iPhone và Android đăng nhập, ghép nối một máy → app hỏi quyền thông báo một lần; trên máy tính chọn ngưỡng trong tray "Thông báo khi lệnh chạy lâu xong"; trong một phiên ShellX chạy `sleep 40; false` → điện thoại nhận "✗ sleep 40; false · mã 1 · 40 giây" khi app ở foreground (banner), nền và **đã đóng hẳn**; chạm vào → mở đúng máy (và tab nếu còn); `shellx notify "Build xong"` và `printf '\e]9;Xin chào\a'` → thông báo ngay; terminal máy tính được chia sẻ (sau khi bật lại chia sẻ để cài khối mới) cũng báo; Cài đặt app hiện "Đang bật"; tắt thông báo trong cài đặt điện thoại → Cài đặt app hiện "Đang tắt — Mở Cài đặt hệ thống"; đăng xuất → không còn nhận.
 
 Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã bật "Chia sẻ terminal" sẽ thấy "cần thiết lập lại" một lần sau khi cập nhật app desktop.
+
+## Voice input (mobile) — việc của người dùng
+
+- [ ] iPhone thật: chạm mic → hai hộp thoại quyền (micro, nhận dạng giọng nói) bằng tiếng Việt; nói "chạy git status gửi" trong một phiên zsh → `git status` chạy.
+- [ ] iPhone: trong Claude Code, nói một câu dài rồi "gửi" → câu tới Claude Code đúng một lần, không tách dòng.
+- [ ] iPhone chế độ máy bay: nếu máy nghe được tiếng Việt on-device thì vẫn chạy; nếu không, hiện "Cần kết nối mạng…".
+- [ ] Android thật (có Google app): như trên; máy chưa cài gói tiếng Việt → chip VI mờ + gợi ý EN.
+- [ ] Từ chối quyền → dòng lỗi + "Mở Cài đặt" mở đúng trang cài đặt của ShellX.
+- [ ] Đang nghe thì có cuộc gọi / khoá màn hình → dừng nghe, chữ còn nguyên, không tự gửi.
+- [ ] App Store Connect / Play Console: cập nhật nhãn quyền riêng tư (Audio data — dùng cho chức năng app, không thu thập về máy chủ ShellX) nếu biểu mẫu yêu cầu.
