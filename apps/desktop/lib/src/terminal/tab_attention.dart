@@ -110,20 +110,34 @@ final class AttentionArrival {
 /// UI-A4 §2.1, D8.
 String unreadBadgeLabel(int count) => count > 99 ? '99+' : '$count';
 
-final _controls = RegExp(r'\s*[\x00-\x1f\x7f]+\s*');
+/// C0, DEL, C1 and the Unicode line/paragraph separators: anything that
+/// would break the one line (D9).
+final _controls = RegExp(r'\s*[\x00-\x1f\x7f-\x9f\u2028\u2029]+\s*');
+
+String _oneLine(String? text) => (text ?? '').replaceAll(_controls, ' ').trim();
 
 /// A4 D9: the line a notice shows, on one line.
 String noticeText(SessionNotice n, AppLocalizations l10n) {
-  final text = switch (n.kind) {
-    SessionNoticeKind.message =>
-      n.title == null ? (n.body ?? '') : '${n.title}: ${n.body ?? ''}',
-    SessionNoticeKind.command => NotificationText(
-      l10n.localeName,
-    ).commandBody(n.command!),
-    SessionNoticeKind.bell => l10n.attentionBell,
-  };
-  return text.replaceAll(_controls, ' ').trim();
+  switch (n.kind) {
+    case SessionNoticeKind.message:
+      final title = _oneLine(n.title);
+      final body = _oneLine(n.body);
+      if (title.isEmpty) return body;
+      return body.isEmpty ? title : '$title: $body';
+    case SessionNoticeKind.command:
+      final command = n.command;
+      if (command == null) return '';
+      return _oneLine(NotificationText(l10n.localeName).commandBody(command));
+    case SessionNoticeKind.bell:
+      return l10n.attentionBell;
+  }
 }
+
+AttentionKind _kindOf(SessionNoticeKind kind) => switch (kind) {
+  SessionNoticeKind.message => AttentionKind.message,
+  SessionNoticeKind.command => AttentionKind.command,
+  SessionNoticeKind.bell => AttentionKind.bell,
+};
 
 final tabAttentionProvider = NotifierProvider<TabAttention, AttentionState>(
   TabAttention.new,
@@ -141,9 +155,13 @@ class TabAttention extends Notifier<AttentionState> {
   int? _dwellFor;
   int _seq = 0;
 
+  /// Notices the user has not seen. Consumers subscribe from a
+  /// `ref.listen` of [tabAttentionProvider]'s notifier, not a cached
+  /// stream: a rebuild of this provider closes it.
   Stream<AttentionArrival> get arrivals => _arrivals.stream;
 
   /// Tab ids that were marked read (their system notification is removed).
+  /// Same lifetime rule as [arrivals].
   Stream<int> get reads => _reads.stream;
 
   @override
@@ -154,10 +172,7 @@ class TabAttention extends Notifier<AttentionState> {
       _dropGone(tabs);
       _armDwell();
     });
-    // The sources, not the derived windowActiveProvider: its listeners
-    // hear of a change only once something reads it, and inside a source's
-    // listener it can still hold the old value; either would start or
-    // check the D10 clock wrongly.
+    // The sources, not the derived windowActiveProvider (see its doc).
     ref.listen<bool>(windowFocusProvider, (_, _) => _armDwell());
     ref.listen<bool>(
       windowRouterProvider.select((w) => w.visible),
@@ -172,24 +187,27 @@ class TabAttention extends Notifier<AttentionState> {
     return const AttentionState();
   }
 
-  void markRead(int tabId) {
-    final had = state.hasUnread(tabId);
-    final unread = Map.of(state.unread)..remove(tabId);
+  void markRead(int tabId) => _markRead({tabId});
+
+  /// One state update for all tabs.
+  void markAllRead() => _markRead(state.unread.keys.toSet());
+
+  void _markRead(Set<int> tabIds) {
+    final had = [
+      for (final id in state.unread.keys)
+        if (tabIds.contains(id)) id,
+    ];
+    final stale = state.history.any((e) => !e.read && tabIds.contains(e.tabId));
+    if (_dwellFor != null && tabIds.contains(_dwellFor)) _cancelDwell();
+    if (had.isEmpty && !stale) return;
     state = AttentionState(
-      unread: unread,
+      unread: Map.of(state.unread)..removeWhere((id, _) => tabIds.contains(id)),
       history: [
         for (final e in state.history)
-          e.tabId == tabId && !e.read ? e.copyWith(read: true) : e,
+          !e.read && tabIds.contains(e.tabId) ? e.copyWith(read: true) : e,
       ],
     );
-    if (_dwellFor == tabId) _cancelDwell();
-    if (had) _reads.add(tabId);
-  }
-
-  void markAllRead() {
-    for (final id in state.unread.keys.toList()) {
-      markRead(id);
-    }
+    had.forEach(_reads.add);
   }
 
   /// D13: the next tab with unread after the selected one, in sidebar
@@ -224,9 +242,7 @@ class TabAttention extends Notifier<AttentionState> {
 
   // ---- internals --------------------------------------------------------
 
-  /// [windowActiveProvider]'s rule, read from its sources (see build).
-  bool get _active =>
-      ref.read(windowFocusProvider) && ref.read(windowRouterProvider).visible;
+  bool get _active => readWindowActive(ref);
 
   void _onNotice(SessionNotice notice) {
     if (!ref.mounted) return;
@@ -238,7 +254,7 @@ class TabAttention extends Notifier<AttentionState> {
     if (tab == null) return; // not (or no longer) a tab of this window
     final seen = tabs.selectedId == tab.id && _active;
     if (seen && notice.kind == SessionNoticeKind.bell) return; // D7
-    final kind = AttentionKind.values.byName(notice.kind.name);
+    final kind = _kindOf(notice.kind);
     final text = noticeText(notice, ref.read(appL10nProvider));
     final history = _withEntry(tab, kind, text, notice.at, read: seen);
     if (seen) {
@@ -297,7 +313,8 @@ class TabAttention extends Notifier<AttentionState> {
     ];
   }
 
-  /// D26: tabs that went away lose their unread; history keeps them.
+  /// D26: tabs that went away lose their unread; history keeps them,
+  /// closed and read (nothing is left to read there).
   void _dropGone(TerminalTabsState tabs) {
     final ids = {for (final t in tabs.tabs) t.id};
     final gone = state.unread.keys.where((id) => !ids.contains(id)).toList();
@@ -309,7 +326,9 @@ class TabAttention extends Notifier<AttentionState> {
       unread: Map.of(state.unread)..removeWhere((id, _) => !ids.contains(id)),
       history: [
         for (final e in state.history)
-          !e.closed && !ids.contains(e.tabId) ? e.copyWith(closed: true) : e,
+          !e.closed && !ids.contains(e.tabId)
+              ? e.copyWith(closed: true, read: true)
+              : e,
       ],
     );
     for (final id in gone) {

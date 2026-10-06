@@ -19,10 +19,22 @@ class WindowFocus extends Notifier<bool> {
 
 /// The user can be looking at the window: shown and focused (A4 D7, D10,
 /// D14). Minimized or hidden is never active.
+///
+/// Riverpod recomputes a derived provider lazily: a `ref.listen` on this
+/// one fires only once something reads it (a turn or a frame late), and
+/// reading it inside a listener of [windowFocusProvider] or
+/// [windowRouterProvider] can still give the old value. To react to a
+/// change, listen to those sources; to decide, use [readWindowActive] (or
+/// `ref.read` this provider at decision time, which is safe).
 final windowActiveProvider = Provider<bool>(
   (ref) =>
       ref.watch(windowFocusProvider) && ref.watch(windowRouterProvider).visible,
 );
+
+/// [windowActiveProvider]'s rule read straight from its sources, so it is
+/// current even inside a source's listener.
+bool readWindowActive(Ref ref) =>
+    ref.read(windowFocusProvider) && ref.read(windowRouterProvider).visible;
 
 /// Bumped when something outside the page (a notification click, the
 /// panel, next unread) wants the keyboard in the selected tab's terminal;

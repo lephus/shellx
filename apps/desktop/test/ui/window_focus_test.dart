@@ -15,6 +15,18 @@ void main() {
     expect(c.read(windowActiveProvider), isFalse);
   });
 
+  test('readWindowActive reads the sources at the call (D25)', () {
+    final c = ProviderContainer.test();
+    final probe = Provider<Ref>((ref) => ref);
+    final ref = c.read(probe);
+    expect(readWindowActive(ref), isFalse);
+    c.read(windowFocusProvider.notifier).set(true);
+    c.read(windowRouterProvider.notifier).showTerminal();
+    expect(readWindowActive(ref), isTrue);
+    c.read(windowRouterProvider.notifier).hideWindow();
+    expect(readWindowActive(ref), isFalse);
+  });
+
   test('focus requests count up', () {
     final c = ProviderContainer.test();
     c.read(terminalFocusRequestProvider.notifier).request();

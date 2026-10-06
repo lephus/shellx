@@ -172,6 +172,28 @@ void main() {
     });
   });
 
+  test(
+    'hiding the window restarts the 1 s read even with focus kept (D10)',
+    () {
+      fakeAsync((async) {
+        boot(active: true);
+        local.notice(2, SessionNoticeKind.message, body: 'x');
+        async.flushMicrotasks();
+        c.read(terminalTabsProvider.notifier).select(2);
+        async.elapse(const Duration(milliseconds: 700));
+        final router = c.read(windowRouterProvider.notifier);
+        router.hideWindow(); // focus flag untouched
+        async.elapse(const Duration(seconds: 2));
+        expect(state().hasUnread(2), isTrue);
+        router.showTerminal();
+        async.elapse(const Duration(milliseconds: 999));
+        expect(state().hasUnread(2), isTrue);
+        async.elapse(const Duration(milliseconds: 1));
+        expect(state().hasUnread(2), isFalse);
+      });
+    },
+  );
+
   test('markRead / markAllRead; reads stream reports tab ids (D23)', () async {
     boot();
     final reads = <int>[];
@@ -229,10 +251,75 @@ void main() {
       expect(state().hasUnread(2), isFalse);
       expect(state().history.single.closed, isTrue);
       expect(state().history.single.tabLabel, 'api');
+      expect(state().history.single.read, isTrue); // nothing left to read
       expect(reads, [2]);
       expect(attention().jumpTo(2), isFalse);
     },
   );
+
+  test(
+    'markAllRead after a tab closed leaves nothing unread (D11, D26)',
+    () async {
+      boot();
+      local.notice(2, SessionNoticeKind.message, body: 'a');
+      local.notice(3, SessionNoticeKind.message, body: 'b');
+      await settle();
+      c.read(terminalTabsProvider.notifier).close(2);
+      await settle();
+      attention().markAllRead();
+      expect(state().totalUnread, 0);
+      expect(state().history.every((e) => e.read), isTrue);
+    },
+  );
+
+  test('markRead / markAllRead without unread change nothing; markAllRead '
+      'is one update', () async {
+    boot();
+    var updates = 0;
+    c.listen(tabAttentionProvider, (_, _) => updates++);
+    attention().markRead(2);
+    attention().markAllRead();
+    expect(updates, 0);
+    local.notice(2, SessionNoticeKind.message, body: 'a');
+    local.notice(3, SessionNoticeKind.message, body: 'b');
+    await settle();
+    updates = 0;
+    attention().markAllRead();
+    expect(updates, 1);
+    expect(state().unread, isEmpty);
+  });
+
+  group('noticeText (D9)', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    SessionNotice message({String? title, String? body}) => SessionNotice(
+      sessionId: 1,
+      kind: SessionNoticeKind.message,
+      at: DateTime(2026, 10, 7),
+      title: title,
+      body: body,
+    );
+
+    test('a title without a body is just the title', () {
+      expect(noticeText(message(title: 'CI'), l10n), 'CI');
+      expect(noticeText(message(title: 'CI', body: ' '), l10n), 'CI');
+    });
+
+    test('C0, C1 controls and line/paragraph separators become one space', () {
+      expect(
+        noticeText(message(body: 'a\u0085b\u009bc\u2028d\u2029e\tf'), l10n),
+        'a b c d e f',
+      );
+    });
+
+    test('a command notice without its command does not throw', () {
+      final n = SessionNotice(
+        sessionId: 1,
+        kind: SessionNoticeKind.command,
+        at: DateTime(2026, 10, 7),
+      );
+      expect(noticeText(n, l10n), '');
+    });
+  });
 
   test('next unread follows sidebar order after the selected tab, wrapping '
       '(D13)', () async {
