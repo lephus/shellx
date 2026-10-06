@@ -17,6 +17,15 @@ void main() {
     expect(pipeNameForUser('S-1-5-18'), isNot(pipeNameForUser('S-1-5-19')));
   });
 
+  test('the client opens the pipe at identification level only (SQOS)', () {
+    // A malicious server cannot impersonate the client beyond identifying
+    // it; the flags are pure, so this runs everywhere.
+    expect(kPipeClientFlags & FILE_FLAG_OVERLAPPED, FILE_FLAG_OVERLAPPED);
+    expect(kPipeClientFlags & SECURITY_SQOS_PRESENT, SECURITY_SQOS_PRESENT);
+    // SECURITY_IDENTIFICATION is level 1 in bits 16-17.
+    expect(kPipeClientFlags & 0x30000, SECURITY_IDENTIFICATION);
+  });
+
   String testPipe() =>
       '${pipeNameForUser(currentUserSid())}-test-${DateTime.now().microsecondsSinceEpoch}';
 

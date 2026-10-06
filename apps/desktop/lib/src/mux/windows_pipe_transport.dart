@@ -118,6 +118,12 @@ final _convertStringSd = _advapi32
     >('ConvertStringSecurityDescriptorToSecurityDescriptorW');
 
 const _bufferSize = 65536;
+
+/// Client open flags: overlapped I/O, and identification-level security
+/// QoS so a server that is not ours can identify the client but never
+/// impersonate it.
+const kPipeClientFlags =
+    FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION;
 const _sddlRevision1 = 1;
 
 final class WindowsPipeTransport implements MuxTransport {
@@ -128,14 +134,29 @@ final class WindowsPipeTransport implements MuxTransport {
     final sid = currentUserSid();
     final stop = CreateEvent(nullptr, TRUE, FALSE, nullptr);
     final events = ReceivePort();
-    final isolate = await Isolate.spawn(_listenLoop, (
-      address,
-      sid,
-      stop,
-      events.sendPort,
-    ));
-    final listener = _PipeListener(address, stop, isolate, events);
-    final first = await listener._started.future;
+    final ended = ReceivePort();
+    final Isolate isolate;
+    try {
+      isolate = await Isolate.spawn(
+        _listenLoop,
+        (address, sid, stop, events.sendPort),
+        onExit: ended.sendPort,
+        onError: ended.sendPort,
+      );
+    } on Object {
+      events.close();
+      ended.close();
+      CloseHandle(stop);
+      rethrow;
+    }
+    final listener = _PipeListener(address, stop, isolate, events, ended);
+    final int? first;
+    try {
+      first = await listener._started.future;
+    } on Object {
+      await listener.close();
+      rethrow;
+    }
     if (first != null) {
       await listener.close();
       throw StateError('pipe name taken');
@@ -166,7 +187,7 @@ int? _openClient(String name, int timeoutMs) => using((arena) {
     0,
     nullptr,
     OPEN_EXISTING,
-    FILE_FLAG_OVERLAPPED,
+    kPipeClientFlags,
     0,
   );
   return handle == INVALID_HANDLE_VALUE ? null : handle;
@@ -269,15 +290,31 @@ void _listenLoop((String, String, int, SendPort) args) {
 }
 
 final class _PipeListener implements MuxListener {
-  _PipeListener(this.address, this._stop, this._isolate, this._events) {
+  _PipeListener(
+    this.address,
+    this._stop,
+    this._isolate,
+    this._events,
+    this._ended,
+  ) {
     _events.listen((Object? message) {
       if (!_started.isCompleted) {
         _started.complete(message as int?);
         return;
       }
-      if (message is int) {
+      if (message is! int) return;
+      if (_closed) {
+        CloseHandle(message); // accepted while closing: nobody wants it
+      } else {
         _connections.add(_PipeConnection.start(message));
       }
+    });
+    // The isolate died (error or exit) before it reported: no hang.
+    _ended.listen((_) {
+      if (!_started.isCompleted) {
+        _started.completeError(StateError('pipe listener ended'));
+      }
+      if (!_exited.isCompleted) _exited.complete();
     });
   }
 
@@ -286,6 +323,8 @@ final class _PipeListener implements MuxListener {
   final int _stop;
   final Isolate _isolate;
   final ReceivePort _events;
+  final ReceivePort _ended;
+  final _exited = Completer<void>();
   final _started = Completer<int?>();
   final _connections = StreamController<MuxConnection>.broadcast();
   bool _closed = false;
@@ -297,14 +336,12 @@ final class _PipeListener implements MuxListener {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    final exited = ReceivePort();
-    _isolate.addOnExitListener(exited.sendPort);
     SetEvent(_stop);
-    await exited.first.timeout(
+    await _exited.future.timeout(
       const Duration(seconds: 2),
       onTimeout: () => _isolate.kill(priority: Isolate.immediate),
     );
-    exited.close();
+    _ended.close();
     _events.close();
     CloseHandle(_stop);
     unawaited(_connections.close());
@@ -415,21 +452,29 @@ final class _PipeConnection {
     });
     final writePort = ReceivePort();
     writePort.listen((Object? message) {
-      if (message is SendPort) pipe._writer.complete(message);
+      if (message is SendPort && !pipe._writer.isCompleted) {
+        pipe._writer.complete(message);
+      }
     });
-    pipe._ports.addAll([readPort, writePort]);
+    final readerExit = ReceivePort();
+    final writerExit = ReceivePort();
+    pipe._ports.addAll([readPort, writePort, readerExit, writerExit]);
+    pipe._readerExited = readerExit.first;
+    pipe._writerExited = writerExit.first;
     pipe._reader = Isolate.spawn(_readLoop, (
       handle,
       pipe._stop,
       readPort.sendPort,
-    ));
+    ), onExit: readerExit.sendPort);
     pipe._writerIsolate = Isolate.spawn(_writeLoop, (
       handle,
       pipe._stop,
       writePort.sendPort,
-    ));
+    ), onExit: writerExit.sendPort);
     return StreamMuxConnection(input.stream, pipe._write, pipe._close);
   }
+
+  static const _bound = Duration(seconds: 1);
 
   final int _handle;
   final int _stop;
@@ -437,6 +482,8 @@ final class _PipeConnection {
   final _ports = <ReceivePort>[];
   late final Future<Isolate> _reader;
   late final Future<Isolate> _writerIsolate;
+  late final Future<Object?> _readerExited;
+  late final Future<Object?> _writerExited;
   Future<void> _pending = Future<void>.value();
 
   void _write(Uint8List bytes) {
@@ -444,27 +491,35 @@ final class _PipeConnection {
     _pending = _pending.then((_) async => (await _writer.future).send(chunk));
   }
 
+  /// Null when the isolate never spawned (nothing to wait for).
+  static Future<Isolate?> _spawned(Future<Isolate> isolate) =>
+      isolate.then<Isolate?>((i) => i, onError: (Object _) => null);
+
   Future<void> _close() async {
-    // Queued writes go out first (bounded), then both loops stop.
-    final writer = await _writerIsolate;
-    final writerExit = ReceivePort();
-    writer.addOnExitListener(writerExit.sendPort);
-    await _pending;
-    (await _writer.future).send(null);
-    await writerExit.first.timeout(
-      const Duration(seconds: 1),
-      onTimeout: () => null,
-    );
-    writerExit.close();
-    final reader = await _reader;
-    final readerExit = ReceivePort();
-    reader.addOnExitListener(readerExit.sendPort);
+    final writer = await _spawned(_writerIsolate);
+    final reader = await _spawned(_reader);
+    // Queued writes go out first (bounded), then the writer ends itself.
+    if (writer != null) {
+      try {
+        await _pending.timeout(_bound);
+        (await _writer.future.timeout(_bound)).send(null);
+        await _writerExited.timeout(_bound);
+      } on TimeoutException {
+        // Stuck (peer not reading): the stop event below cancels its I/O.
+      }
+    }
+    // Both loops stop; the handle is closed only once neither uses it.
     SetEvent(_stop);
-    await readerExit.first.timeout(
-      const Duration(seconds: 1),
-      onTimeout: () => null,
-    );
-    readerExit.close();
+    try {
+      await Future.wait([
+        if (reader != null) _readerExited,
+        if (writer != null) _writerExited,
+      ]).timeout(_bound);
+    } on TimeoutException {
+      // A writer still waiting for messages (never got its port): end it.
+      writer?.kill(priority: Isolate.immediate);
+      await _writerExited.timeout(_bound, onTimeout: () => null);
+    }
     CloseHandle(_handle);
     CloseHandle(_stop);
     for (final port in _ports) {
