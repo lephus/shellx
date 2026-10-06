@@ -171,6 +171,21 @@ class TerminalPageController extends Controller {
     workspace.activeTab.peek()?.terminal.peek().paste(text);
   }
 
+  static final RegExp _lineBreaks = RegExp(r'[\r\n]+');
+
+  /// A line from the voice composer (voice spec §4.2), then Enter. The text goes the way of Paste
+  /// (bracketed when the program enabled it, control characters stripped, sticky modifiers never
+  /// applied); Enter is sent after it, outside the paste brackets, so it runs the line. Without
+  /// bracketed paste a line break would itself be Enter, so line breaks become spaces.
+  void submitLine(String line) {
+    if (_closed) return;
+    final terminal = workspace.activeTab.peek()?.terminal.peek();
+    if (terminal == null) return;
+    final text = terminal.bracketedPasteMode ? line : line.replaceAll(_lineBreaks, ' ');
+    if (text.isNotEmpty) terminal.paste(text);
+    terminal.onOutput?.call('\r');
+  }
+
   /// After 4001; a failure to restart (e.g. loading the pins) becomes the notice.
   void reconnectReplaced() => unawaited(_run(_session.reconnectReplaced));
 
