@@ -64,8 +64,10 @@ void main() {
     });
 
     test('a wide character pushed past the wrap column adds no space', () {
-      // 5 columns: "abcd" fills four, "中" needs two, so it moves to the
-      // next row and leaves the last cell of the first row empty.
+      // 5 columns: "abcd" fills four and "中" needs two. xterm 4.0.0 lets it
+      // straddle the wrap (its left half in the last cell, the right half
+      // on the next row); a terminal that moves it down instead leaves the
+      // last cell empty. The encoder handles both without adding a space.
       final t = term(cols: 5)..write('abcd中ef\r\n');
       expect(encodeScrollback(t), 'abcd中ef\r\n');
     });
@@ -199,6 +201,61 @@ void main() {
         ),
         'yesterday 23:59',
       );
+    });
+
+    test('a save later than now (clock skew) reads as today', () {
+      expect(
+        formatRestoreTime(
+          DateTime(2026, 10, 8, 10, 15),
+          DateTime(2026, 10, 7, 9, 0),
+          localeName: 'en',
+          yesterday: (t) => 'yesterday $t',
+        ),
+        '10:15',
+      );
+    });
+
+    group('calendarDaysBetween', () {
+      int days(DateTime a, DateTime b) => calendarDaysBetween(a, b);
+      test('same day, any hours', () {
+        expect(
+          days(DateTime(2026, 10, 7, 0, 0), DateTime(2026, 10, 7, 23, 59)),
+          0,
+        );
+      });
+      test('month boundary', () {
+        expect(days(DateTime(2026, 9, 30, 23), DateTime(2026, 10, 1, 0, 1)), 1);
+        expect(days(DateTime(2026, 1, 31), DateTime(2026, 3, 1)), 29);
+      });
+      test('year boundary', () {
+        expect(days(DateTime(2025, 12, 31, 23, 59), DateTime(2026, 1, 1)), 1);
+        expect(days(DateTime(2025, 1, 1), DateTime(2026, 1, 1)), 365);
+      });
+      test('leap day', () {
+        expect(days(DateTime(2028, 2, 28), DateTime(2028, 2, 29)), 1);
+        expect(days(DateTime(2028, 2, 29), DateTime(2028, 3, 1)), 1);
+        expect(days(DateTime(2027, 2, 28), DateTime(2027, 3, 1)), 1);
+        expect(days(DateTime(2028, 1, 1), DateTime(2029, 1, 1)), 366);
+      });
+      test('March and October DST months count by date, not hours', () {
+        // US switches 8 Mar / 1 Nov 2026, EU 29 Mar / 25 Oct 2026: the
+        // fields are compared, so a 23 h or 25 h local day is still one.
+        expect(
+          days(DateTime(2026, 3, 8, 0, 30), DateTime(2026, 3, 9, 0, 10)),
+          1,
+        );
+        expect(days(DateTime(2026, 3, 28, 23), DateTime(2026, 3, 29, 23)), 1);
+        expect(days(DateTime(2026, 3, 29, 0, 5), DateTime(2026, 3, 30)), 1);
+        expect(days(DateTime(2026, 10, 25, 23, 59), DateTime(2026, 10, 26)), 1);
+        expect(days(DateTime(2026, 10, 24), DateTime(2026, 10, 26, 23)), 2);
+        expect(
+          days(DateTime(2026, 11, 1, 1, 30), DateTime(2026, 11, 2, 0, 30)),
+          1,
+        );
+      });
+      test('negative when the first date is later', () {
+        expect(days(DateTime(2026, 10, 8), DateTime(2026, 10, 7)), -1);
+      });
     });
 
     final dst = _firstDstDay(2026);

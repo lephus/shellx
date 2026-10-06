@@ -240,6 +240,16 @@ const List<String> _enMonths = [
   'Dec',
 ];
 
+/// Whole calendar days from [from]'s date to [to]'s date, read from their
+/// year/month/day fields (negative when [from] is later). Counted on UTC
+/// midnights so a DST switch (a 23 h or 25 h local day) never turns
+/// "yesterday" into "today".
+int calendarDaysBetween(DateTime from, DateTime to) => DateTime.utc(
+  to.year,
+  to.month,
+  to.day,
+).difference(DateTime.utc(from.year, from.month, from.day)).inDays;
+
 /// D23: local time of the pane's last save, 24 h: today → "14:32";
 /// yesterday → [yesterday]("14:32"); older → "6/10 14:32" (vi) or
 /// "Oct 6 14:32" (en).
@@ -253,13 +263,9 @@ String formatRestoreTime(
   final hm =
       '${local.hour.toString().padLeft(2, '0')}:'
       '${local.minute.toString().padLeft(2, '0')}';
-  // Calendar days, counted in UTC so a DST switch (a 23 h or 25 h local
-  // day) never turns "yesterday" into "today".
-  final current = now.toLocal();
-  final today = DateTime.utc(current.year, current.month, current.day);
-  final day = DateTime.utc(local.year, local.month, local.day);
-  final days = today.difference(day).inDays;
-  if (days == 0) return hm;
+  final days = calendarDaysBetween(local, now.toLocal());
+  // A save stamped later than now (clock skew) reads as today.
+  if (days <= 0) return hm;
   if (days == 1) return yesterday(hm);
   return localeName.startsWith('vi')
       ? '${local.day}/${local.month} $hm'
