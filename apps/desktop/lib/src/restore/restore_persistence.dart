@@ -95,6 +95,12 @@ class RestorePersistence extends Notifier<void> {
   /// shutdown that follows must not overwrite or delete it.
   bool _frozen = false;
 
+  /// The layout write of the last [flushAll]; [resume] waits for it.
+  Future<void> _flushWrite = Future.value();
+
+  /// A [resume] waiting for [_flushWrite]; a new clean flush cancels it.
+  bool _resuming = false;
+
   RestoreFiles get _files => ref.read(restoreStoreProvider);
   SettingsStore get _settings => ref.read(settingsStoreProvider);
 
@@ -143,14 +149,24 @@ class RestorePersistence extends Notifier<void> {
   /// (the user cancelled it): saving goes on, and the next layout write
   /// marks the run unclean again (D12). Task 7 calls it.
   void resume() {
-    if (!_frozen || !ref.mounted) return;
-    _frozen = false;
-    _written = null; // the next write must happen even when equal
-    if (_started) {
-      _period?.cancel();
-      _period = Timer.periodic(scrollbackPeriod, (_) => _tick());
-    }
-    _schedule();
+    if (!_frozen || _resuming || !ref.mounted) return;
+    _resuming = true;
+    // The clean layout may still be on its way to the disk: unfreeze once
+    // it is there, so the unclean one is written after it, not skipped as
+    // equal to it.
+    unawaited(
+      _flushWrite.catchError((Object _) {}).then((_) {
+        if (!_resuming || !ref.mounted) return;
+        _resuming = false;
+        _frozen = false;
+        _written = null; // the next write must happen even when equal
+        if (_started) {
+          _period?.cancel();
+          _period = Timer.periodic(scrollbackPeriod, (_) => _tick());
+        }
+        _schedule();
+      }),
+    );
   }
 
   void dismissStrip() => ref.read(restoreStripProvider.notifier).dismiss();
@@ -229,7 +245,11 @@ class RestorePersistence extends Notifier<void> {
       // layout, so nothing is lost; a Quit during the restore writes
       // nothing more ([flushAll]).
       if (snapshot.cleanExit && !_frozen) {
-        await files.writeLayout(snapshot.copyWith(cleanExit: false));
+        try {
+          await files.writeLayout(snapshot.copyWith(cleanExit: false));
+        } on Object catch (error) {
+          debugPrint('restore: marker not saved (${error.runtimeType})');
+        }
       }
       final text = <String, String>{};
       if (enabled) {
@@ -265,6 +285,7 @@ class RestorePersistence extends Notifier<void> {
   /// restore marked them unclean). Returns once any scrollback save that
   /// was already under way has finished too.
   Future<void> flushAll({required bool clean}) async {
+    if (clean) _resuming = false; // quitting again: stay frozen
     if (_frozen) return;
     _cancelPending();
     if (clean) {
@@ -272,7 +293,8 @@ class RestorePersistence extends Notifier<void> {
       _period?.cancel();
     }
     if (_restoring || !ref.mounted) return;
-    await _writeLayout(cleanExit: clean, force: true);
+    final write = _flushWrite = _writeLayout(cleanExit: clean, force: true);
+    await write;
     await _saveDirty();
   }
 

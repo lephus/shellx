@@ -421,6 +421,84 @@ void main() {
     }),
   );
 
+  test(
+    'resume while the clean flush is still writing: the unclean layout '
+    'still reaches the disk after it',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      async.flushMicrotasks();
+      files.layoutGate = null;
+      gate.complete();
+      async.flushMicrotasks();
+      expect(files.layouts.single.cleanExit, isTrue);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(2));
+      expect(files.layouts.last.cleanExit, isFalse);
+    }),
+  );
+
+  test(
+    'resume while the clean flush is slower than the debounce: the clean '
+    'layout is never written last',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 3));
+      files.layoutGate = null;
+      gate.complete();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.first.cleanExit, isTrue);
+      expect(files.layouts.last.cleanExit, isFalse);
+      expect(files.layouts.last.tabs.single.name, 'b');
+    }),
+  );
+
+  test(
+    'a second Quit while resume waits for the flush keeps the files frozen',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      unawaited(persistence().flushAll(clean: true));
+      files.layoutGate = null;
+      gate.complete();
+      async.flushMicrotasks();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts.single.cleanExit, isTrue);
+    }),
+  );
+
+  test(
+    'the unclean marker failing to write does not drop the restore',
+    () async {
+      files.throwLayoutWrites = true;
+      files.stored = {key: 'old\r\n'};
+      boot();
+      await persistence().restoreAtStartup(
+        RestoreLoad(snapshot: saved(cleanExit: true)),
+      );
+      final tab = c.read(terminalTabsProvider).tabs.single;
+      expect(screen(tab), contains('old'));
+    },
+  );
+
   test('a crash during restore is recorded as unclean: the loaded layout is '
       'rewritten with cleanExit false first', () async {
     boot();

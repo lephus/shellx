@@ -24,12 +24,20 @@ final class RecordingFiles implements RestoreFiles {
   bool failLayoutWrites = false;
   bool failScrollbackWrites = false;
 
+  /// When true, [writeLayout] throws (a store that fails unexpectedly).
+  bool throwLayoutWrites = false;
+
+  /// When set, [writeLayout] waits for it (a slow disk).
+  Completer<void>? layoutGate;
+
   @override
   Future<bool> prepare() async => true;
   @override
   Future<RestoreLoad> loadLayout() async => const RestoreLoad();
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async {
+    await layoutGate?.future;
+    if (throwLayoutWrites) throw StateError('layout write failed');
     if (failLayoutWrites) return false;
     layouts.add(snapshot);
     return true;
