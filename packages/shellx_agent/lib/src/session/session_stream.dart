@@ -42,6 +42,11 @@ final class SessionStream {
   int get start => _buffer.start;
   int get end => _buffer.end;
 
+  /// Every byte the buffer still holds, oldest first (the window's backlog,
+  /// A1 §3.1).
+  Uint8List get buffered =>
+      _buffer.read(_buffer.start, _buffer.end - _buffer.start);
+
   /// Every buffered byte has been handed to the attached phone.
   bool get drained => _sent >= _buffer.end;
 

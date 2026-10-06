@@ -171,7 +171,7 @@ final class _Session {
 /// (random start in [1, 2^31) from [random], default `Random.secure()`, then
 /// +1), so a phone re-attaching after an agent restart cannot land on a new
 /// session that reuses its old id (spec §6.4). `index` is still 1..n.
-final class SessionManager implements AgentSessions {
+final class SessionManager implements AgentSessions, LocalSessions {
   SessionManager({
     required PtyFactory ptyFactory,
     required ShellResolver shellResolver,
@@ -250,11 +250,13 @@ final class SessionManager implements AgentSessions {
 
   /// Fires whenever the session list, an attachment, a title, a driver or
   /// a running command changes.
+  @override
   Stream<void> get changes => _changes.stream;
 
   @override
   Stream<SessionOpenedEvent> get opened => _opened.stream;
 
+  @override
   List<SessionSummary> get sessions => [
     for (final s in _sessions.values)
       if (!s.closing)
@@ -443,9 +445,43 @@ final class SessionManager implements AgentSessions {
     }
   }
 
+  @override
+  LocalSessionView view(int id) {
+    final session = _sessions[id];
+    if (session == null) throw StateError('No session $id');
+    return _LocalView(this, session);
+  }
+
+  @override
+  void close(int id) => closeSession(id);
+
+  void _localWrite(_Session session, Uint8List data) {
+    if (session.closing) return;
+    _localActive(session, input: true);
+    session.write(data);
+  }
+
+  void _localReply(_Session session, Uint8List data) {
+    if (session.closing || session.driver != DriverSide.desktop) return;
+    session.write(data);
+  }
+
+  void _localResize(_Session session, int cols, int rows) {
+    if (session.closing) return;
+    final c = _clampDimension(cols);
+    final r = _clampDimension(rows);
+    final known = session.localCols != null;
+    if (known && c == session.localCols && r == session.localRows) return;
+    session.localCols = c;
+    session.localRows = r;
+    if (!known && session.driver == DriverSide.phone) return;
+    _localActive(session, input: false);
+  }
+
   /// A session the computer opens itself (the terminal window): nobody is
   /// attached, the desktop drives. Throws [SessionLimitException] or
   /// [SpawnFailedException].
+  @override
   Future<int> open({required int cols, required int rows}) async {
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
@@ -624,7 +660,6 @@ final class SessionManager implements AgentSessions {
 
   /// The window typed or resized (Task 2's `LocalSessionView`); mirror of
   /// [_phoneActive].
-  // ignore: unused_element
   void _localActive(_Session session, {required bool input}) {
     final now = _clock();
     if (session.driver != DriverSide.desktop) {
@@ -705,12 +740,12 @@ final class SessionManager implements AgentSessions {
   /// Title (OSC 0/2) and running command (OSC 133) from live output.
   void _track(_Session session, Uint8List data) {
     var changed = false;
-    final title = session.titles.feed(data);
-    if (title != null && title != session.title) {
-      session.title = title;
-      changed = true;
-    }
     try {
+      final title = session.titles.feed(data);
+      if (title != null && title != session.title) {
+        session.title = title;
+        changed = true;
+      }
       final wasRunning = session.commands.running;
       for (final event in session.commandEvents.feed(data)) {
         session.commands.handle(event);
@@ -800,4 +835,47 @@ final class SessionManager implements AgentSessions {
 
   void _send(String mobileId, AppMessage message) =>
       _outbound.add(OutboundMessage(mobileId, message));
+}
+
+final class _LocalView implements LocalSessionView {
+  _LocalView(this._manager, this._session)
+    : backlog = _session.stream.buffered {
+    _subscription = _session.local.stream.listen(
+      _output.add,
+      onDone: () => unawaited(_output.close()),
+    );
+  }
+
+  final SessionManager _manager;
+  final _Session _session;
+  final _output = StreamController<Uint8List>();
+  late final StreamSubscription<Uint8List> _subscription;
+
+  @override
+  final Uint8List backlog;
+
+  @override
+  int get id => _session.id;
+  @override
+  Stream<Uint8List> get output => _output.stream;
+  @override
+  Stream<DriverSide> get driver => _session.drivers.stream;
+  @override
+  Future<int> get exitCode => _session.exit.future;
+  @override
+  bool get closedOnRequest => _session.killedOnRequest;
+
+  @override
+  void write(Uint8List data) => _manager._localWrite(_session, data);
+  @override
+  void reply(Uint8List data) => _manager._localReply(_session, data);
+  @override
+  void resize(int cols, int rows) =>
+      _manager._localResize(_session, cols, rows);
+
+  @override
+  void dispose() {
+    unawaited(_subscription.cancel());
+    if (!_output.isClosed) unawaited(_output.close());
+  }
 }
