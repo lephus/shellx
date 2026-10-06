@@ -49,6 +49,8 @@ dependencies:
   package_info_plus: ^9.0.1
   shellx_client: any
   shellx_core: any
+  # Voice input (voice spec V4), BSD-3-Clause. Pinned exactly: 7.5.0+ needs Dart ^3.12 / Flutter 3.44.
+  speech_to_text: 7.4.0
   url_launcher: ^6.3.2
   # Pinned exactly (see signals_flutter): the terminal works around xterm 4.0.0's cursor-key,
   # modifier and paste handling, which a newer version may change.

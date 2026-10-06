@@ -39,6 +39,10 @@
 	<string>ShellX uses the camera to scan the pairing QR code shown on your computer.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>ShellX uses Face ID to unlock the app.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ShellX uses the microphone when you tap the mic to speak a command into your terminal.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>ShellX turns what you say into text for your terminal. When your phone can, this happens on the phone; otherwise Apple's speech recognition service is used.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

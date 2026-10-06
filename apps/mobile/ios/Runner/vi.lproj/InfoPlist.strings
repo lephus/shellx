@@ -1,3 +1,5 @@
 /* The iOS permission prompts in Vietnamese; the English ones are in Info.plist and en.lproj. */
 "NSCameraUsageDescription" = "ShellX dùng camera để quét mã QR ghép nối hiện trên máy tính của bạn.";
 "NSFaceIDUsageDescription" = "ShellX dùng Face ID để mở khóa app.";
+"NSMicrophoneUsageDescription" = "ShellX dùng micro khi bạn chạm nút mic để nói lệnh vào terminal.";
+"NSSpeechRecognitionUsageDescription" = "ShellX chuyển lời bạn nói thành chữ cho terminal. Khi máy hỗ trợ, việc này diễn ra ngay trên điện thoại; nếu không, dịch vụ nhận dạng giọng nói của Apple được dùng.";

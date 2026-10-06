@@ -70,6 +70,18 @@ void main() {
         contains('/* GoogleService-Info.plist in Resources */,'),
       );
     });
+
+    test('microphone and speech recognition prompts: Info.plist and both languages', () {
+      final plist = readFile('ios/Runner/Info.plist');
+      expect(plist, contains('<key>NSMicrophoneUsageDescription</key>'));
+      expect(plist, contains('<key>NSSpeechRecognitionUsageDescription</key>'));
+      for (final language in ['vi', 'en']) {
+        final strings = readFile('ios/Runner/$language.lproj/InfoPlist.strings');
+        expect(strings, contains('"NSMicrophoneUsageDescription" = "'), reason: language);
+        expect(strings, contains('"NSSpeechRecognitionUsageDescription" = "'), reason: language);
+      }
+      expect(readFile('ios/Runner/vi.lproj/InfoPlist.strings'), contains('ShellX dùng micro'));
+    });
   });
 
   group('Android', () {
@@ -139,6 +151,12 @@ void main() {
       expect(Directory('android/app/src/main/kotlin/pro').existsSync(), isFalse);
       expect(readFile('android/app/src/main/res/values/styles.xml'), contains('Theme.AppCompat'));
       expect(readFile('android/app/src/main/res/values-night/styles.xml'), contains('Theme.AppCompat'));
+    });
+
+    test('voice input: RECORD_AUDIO and the speech recognition service query', () {
+      final manifest = readFile('android/app/src/main/AndroidManifest.xml');
+      expect(manifest, contains('android.permission.RECORD_AUDIO'));
+      expect(manifest, contains('<action android:name="android.speech.RecognitionService"/>'));
     });
   });
 

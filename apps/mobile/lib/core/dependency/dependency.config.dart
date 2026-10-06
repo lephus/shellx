@@ -40,6 +40,8 @@ import '../../features/terminal/presentation/controllers/terminal_page_controlle
     as _i229;
 import '../../features/terminal/presentation/controllers/terminal_workspace.dart'
     as _i667;
+import '../../features/voice/data/speech_to_text_input.dart' as _i546;
+import '../../features/voice/domain/speech_input.dart' as _i498;
 import '../auth/auth_event.dart' as _i909;
 import '../auth/auth_storage.dart' as _i657;
 import '../auth/session_enforcer.dart' as _i954;
@@ -84,6 +86,7 @@ extension GetItInjectableX on _i174.GetIt {
       preResolve: true,
     );
     gh.lazySingleton<_i145.ShellxApi>(() => module.api);
+    gh.lazySingleton<_i498.SpeechInput>(() => _i546.SpeechToTextInput());
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
     );
