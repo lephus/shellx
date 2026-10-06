@@ -16,6 +16,8 @@
 | Chữ trong badge | `onPrimary` `#04282D` | `accent` | **8.91** |
 | Chữ dòng thông báo | `textSecondary` `#93A5A9` | `bgSidebar` / `rowHover` / `rowSelected` / `rowPressed` | 6.8 / 6.22 / 5.41 / 4.72 |
 | Icon đầu dòng thông báo | `accent` | như trên | ≥ 6.91 |
+| Icon đầu dòng thông báo, chấm chưa đọc trong bảng — **lệnh lỗi** (✗, mã ≠ 0) | `err` `#F07178` | `bgSidebar` / `rowHover` / `rowSelected` / `rowPressed` / `surface` | 6.12 / 5.57 / 4.85 / 4.22 / 5.79 (thành phần ≥ 3) |
+| Bảng: vòng con trỏ bàn phím trên mục "Tab đã đóng" (không nhảy được) | `dim` `#6C8288` (chỉ cho vòng, không cho chữ) | `rowSelected` | 3.42 (thành phần ≥ 3) |
 | Chấm tổng hợp trên tiêu đề nhóm, chấm chưa đọc trong bảng, chấm trên nút chuông | `accent` | `bgSidebar` / `rowHover` / `surface` / `rowSelected` | 10.0 / 9.11 / 9.47 / 7.93 |
 | Vòng sáng (nét ngoài) | `accent` 100 % | `bgTerminal` `#0B1215` | **10.8** |
 | Vòng sáng (nét trong, "glow") | `accent` 40 % (`#665FD4E2`, trùng màu vùng chọn của terminal) | `bgTerminal` | trang trí; nét ngoài đã đạt ≥ 3 |
@@ -86,7 +88,8 @@ Badge: cao `max(16, scale(14) + 2)`; chữ theo `textScaler`. Mục bảng: `max
 
 - **Badge** nằm **ngay sau tiêu đề** (tiêu đề co lại trước, badge không bao giờ bị cắt), cách 4; sau badge 4 rồi các dấu A1. Không có chưa đọc → không có badge và **không giữ chỗ** (tiêu đề giãn ra). (Sửa A1 §2.2: chỗ badge không còn ở sau ×.)
 - Badge: cao 16, rộng tối thiểu 16, đệm ngang 4, `rPill`, nền `accent`, chữ `caption` **w600** `onPrimary`, canh giữa. Nội dung `1`…`99`, `99+`. Chữ số dạng tabular (`FontFeature.tabularFigures()`).
-- **Dòng thông báo**: lề trái 32 (`contextInset`, thẳng tiêu đề), icon `Icons.notifications_none` 11 `accent`, 4, chữ `caption` `textSecondary` một dòng, cắt cuối. Chữ = D9 (spec). Dòng chuông: "Chuông" (bell không có chữ khác).
+- **Dòng thông báo**: lề trái 32 (`contextInset`, thẳng tiêu đề), icon `Icons.notifications_none` 11 `accent` (**`err`** khi thông báo mới nhất là lệnh lỗi ✗, để phân biệt với tin nhắn thường mà không chỉ dựa vào chữ), 4, chữ `caption` `textSecondary` một dòng, cắt cuối. Chữ = D9 (spec). Dòng chuông: "Chuông" (bell không có chữ khác).
+- Chữ được **dựng lúc vẽ** theo ngôn ngữ đang hiện (lưu dữ liệu thông báo, không lưu chuỗi), nên "Chuông"/"Bell", "mã 1"/"exit 1" luôn theo ngôn ngữ hiện tại.
 - Thứ tự: tiêu đề → thông báo → ngữ cảnh A2. Dòng thông báo **biến mất khi đọc**; dòng cao/thấp tức thì (không hoạt ảnh, A1 §1.5 "chèn dòng tức thì").
 - Tooltip trên dòng thông báo (chờ 500 ms, bên phải sidebar như A1 §3.1, max-width 360): chữ đầy đủ (không cắt, tối đa 200 ký tự), chỉ khi bị cắt.
 - Thanh chọn 3×18 `accent` (A1) canh giữa **cả dòng** (46/62).
@@ -108,11 +111,11 @@ Giữ A1 §3.1 và A2 §2.5. Thêm:
 ## 3. Tiêu đề workspace — chấm tổng hợp
 
 ```
-|6|4|▸|4| Backend (small 600)                 |4|●|4| 3 |2|[+]|4|6|
+|6|4|▸|4| Backend (small 600)                 |4|●|4|3|  (ô số 24, số canh giữa) |6|
                                                 6
 ```
 
-- Chỉ khi nhóm **thu gọn** và có ít nhất một tab chưa đọc (D22). Chấm 6 `accent` tròn, canh giữa dọc, cách số tab 4 về bên trái. Không chiếm chỗ khi không hiện.
+- Chỉ khi nhóm **thu gọn** và có ít nhất một tab chưa đọc (D22). Chấm 6 `accent` tròn, canh giữa dọc, mép phải chấm cách **mép trái của chữ số** 4 (đo theo chữ số thật, không theo ô 24 nó canh giữa trong đó). Khi hiện, tên nhóm nhường 10 (6 + 4); không hiện → không chiếm chỗ.
 - Kết hợp với "thu gọn + chứa tab đang chọn" (A2 §3.2) bình thường: thanh 3×12 bên trái và chấm bên phải cùng hiện.
 - Tooltip trên tiêu đề (đã có của A2 nếu có) không đổi; ý nghĩa ở Semantics (§8).
 
@@ -153,7 +156,7 @@ Windows:|                         spacer        |[🔔]|4|[+]|8|
 ### 5.2 Bảng (popover)
 
 ```
- x=8 (trong cửa sổ), y = đáy dải đầu sidebar + 4
+ x=6 (trong cửa sổ, trùng mép thanh chọn 3 px của dòng → thanh không lộ ra bên trái bảng), y = đáy dải đầu sidebar + 4
 ╭──────────────────────────────────────── 360 ───────────────────────────────────╮
 │ Thông báo                                        Đánh dấu tất cả đã đọc        │ 36
 │────────────────────────────────────────────────────────────────────────────────│ 1 px line
@@ -168,15 +171,15 @@ Windows:|                         spacer        |[🔔]|4|[+]|8|
 ╰────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-- Hộp: `surface`, viền 1 px `border`, `r8`, `e1`, padding 4. Cao theo nội dung, tối đa `min(480, cao cửa sổ − 64)`; danh sách cuộn (thanh cuộn phủ A1 §2.2).
+- Hộp: `surface`, viền 1 px `border`, `r8`, `e1`, padding 4. Cao theo nội dung, tối đa `min(480, cao cửa sổ − 64)`; danh sách cuộn (thanh cuộn phủ A1 §2.2), **thanh cuộn luôn hiện khi danh sách dài hơn bảng** (không chỉ khi rê chuột), để mục bị khuất không trông như không tồn tại.
 - **Tiêu đề** 36: "Thông báo" `small` w600 `textPrimary`, lề trái 8. Phải: nút chữ "Đánh dấu tất cả đã đọc" (`small` w600 `accent`, cao 28, đệm 0/8, hover `rowHover` `r6`), **mờ 38 %** khi tổng chưa đọc = 0. Dưới tiêu đề: vạch 1 px `line`.
 - **Mục** 52, `r6`, đệm 8/8:
-  - Ô trái 16: chấm 6 `accent` nếu mục chưa đọc; trống nếu đã đọc.
+  - Ô trái 16: chấm 6 `accent` nếu mục chưa đọc (`err` nếu là lệnh lỗi ✗); trống nếu đã đọc.
   - Dòng 1 (16): `small` `textSecondary`: "`<tab>` · `<workspace>`" (workspace chỉ khi sidebar có tiêu đề nhóm, A2 D10), cắt cuối; phải: thời gian tương đối `caption` `textSecondary`, cách 8.
   - Dòng 2 (18): `body`, `textPrimary` (chưa đọc) / `textSecondary` (đã đọc), một dòng, cắt cuối. Chữ = D9; chuông gộp "Chuông ×N".
   - Tab đã đóng: dòng 1 "Tab đã đóng · `<tên cuối>`"; không nhảy được (Enter/bấm không làm gì, con trỏ mặc định, không hover).
-- **Trạng thái mục:** hover `rowHover`; con trỏ bàn phím: `rowSelected` + vòng focus 2 px `accent` bên trong `r6` (chỉ khi focus bàn phím, A1 §3); nhấn `rowPressed`.
-- **Thời gian tương đối:** < 60 s "vừa xong" / "now"; < 60 phút "{n} phút" / "{n} min"; < 24 giờ "{n} giờ" / "{n} h"; còn lại giờ:phút theo 24 h (`HH:mm`). Cập nhật mỗi 30 s khi bảng mở.
+- **Trạng thái mục:** hover `rowHover`; con trỏ bàn phím: `rowSelected` + vòng focus 2 px `accent` bên trong `r6` (chỉ khi focus bàn phím, A1 §3); trên mục "Tab đã đóng" vòng là `dim` (Enter không làm gì); nhấn `rowPressed`.
+- **Thời gian tương đối:** < 60 s "vừa xong" / "now"; < 60 phút "{n} phút" / "{n} min"; < 24 giờ "{n} giờ" / "{n} h"; từ 24 giờ trở lên và thuộc ngày hôm qua "Hôm qua HH:mm" / "Yesterday HH:mm"; cũ hơn "dd/MM HH:mm" (vi, ví dụ "05/10 22:05") / "MMM d, HH:mm" (en, ví dụ "Oct 5, 22:05"); giờ 24 h. Cập nhật mỗi 30 s khi bảng mở.
 - **Trống:** canh giữa, đệm 24: `Icons.notifications_none` 24 `textSecondary` → 8 → "Chưa có thông báo nào" `body` `textPrimary` → 4 → gợi ý `caption` `textSecondary` (canh giữa, tối đa 2 dòng) "Chương trình trong tab gửi thông báo bằng OSC 9, 99, 777 hoặc lệnh shellx notify." Nút "Đánh dấu tất cả…" mờ.
 - **Chân** (chỉ khi có mục): dòng 24, `caption` `textSecondary`, lề trái 8: "Chưa đọc tiếp theo  ⌘⇧U" / "Next unread  Ctrl+Shift+U".
 - **Mở:** fade + `translateY −4→0` `base` 150 ms; đóng: fade `exit` 120 ms; giảm chuyển động → tức thì.
@@ -231,7 +234,7 @@ Vị trí: menu đã đăng nhập — chỗ submenu ngưỡng cũ (sau "Chia s�
 ## 8. Trợ năng
 
 - **Dòng tab:** nhãn A2 §8 thêm, ngay sau trạng thái: `attentionRowSemantics` "{count} thông báo chưa đọc, mới nhất: {text}" (chữ đầy đủ, không cắt). Ví dụ vi: "api, đang chờ lệnh, 2 thông báo chưa đọc, mới nhất: ✗ npm test · mã 1 · 45 giây, nhánh dev, tab 2 trên 3 trong Backend". Badge, icon, dòng thông báo: `ExcludeSemantics`.
-- **Custom actions của dòng** thêm "Đánh dấu đã đọc" (chỉ khi có chưa đọc).
+- **Custom actions của dòng** theo đúng thứ tự menu dòng (§10.4): "Đánh dấu đã đọc" (chỉ khi tab có chưa đọc), "Đánh dấu tất cả đã đọc" (chỉ khi tổng > 0), đổi tên, chuyển workspace, lên/xuống, (cổng), "Đóng tab" cuối. Trình đọc màn hình xếp action theo mã định danh cấp lần đầu, nên sidebar đăng ký các nhãn này theo thứ tự menu trước khi dựng dòng; action cổng (tạo lúc chạy) đứng sau "Đóng tab".
 - **Tiêu đề nhóm thu gọn có chưa đọc:** nhãn A2 + ", " + `workspaceHasUnread` "có thông báo chưa đọc".
 - **Terminal:** khi có vòng, nhãn pane `terminalPaneUnreadLabel` "Terminal {title}, có thông báo chưa đọc".
 - **Thông báo đến (D24):** cửa sổ focus, tab không chọn → `SemanticsService.announce(attentionAnnounce, assertiveness: polite)` "Thông báo mới từ {tab}: {text}", tối đa một lần/3 s/tab.
@@ -270,6 +273,9 @@ Giọng văn A1 §5. "tab", "workspace", "terminal" giữ tiếng Anh.
 | `notificationsTimeNow` | vừa xong | now |
 | `notificationsTimeMinutes` | {count} phút | {count} min |
 | `notificationsTimeHours` | {count} giờ | {count} h |
+| `notificationsTimeYesterday` | Hôm qua {time} | Yesterday {time} |
+| `notificationsTimeDate` | {dayPadded}/{month} {time} | {month} {day}, {time} |
+| `notificationsMonthShort` | `m1`…`m12` → 01…12 | `m1`…`m12` → Jan…Dec |
 | `notificationsItemUnread` | chưa đọc | unread |
 | `noUnreadNotifications` | Không còn thông báo chưa đọc | No unread notifications |
 | `systemNotifyCoalesced` | {count} thông báo mới · {text} | {count} new notifications · {text} |
@@ -278,6 +284,7 @@ Giọng văn A1 §5. "tab", "workspace", "terminal" giữ tiếng Anh.
 | `trayDesktopNotificationsUnfocused` | Chỉ khi cửa sổ không ở phía trước | Only when the window isn't in front |
 
 - `count` là `int` trong metadata `@`; tiếng Việt không chia số nhiều.
+- `time` là `HH:mm`; `day` không đệm, `dayPadded` hai chữ số; `month` của `notificationsTimeDate` là kết quả `notificationsMonthShort` (select theo `m<tháng>`).
 - Chuỗi có sẵn dùng lại: `trayNotifyThreshold`, `trayNotifyOff`, `trayNotifySeconds`, `trayNotifyMinutes` (push §7), `sidebarPosition*`, `workspaceHeaderSemantics` (A2).
 - Mô tả overlay taskbar Windows dùng `attentionUnreadCount`.
 
@@ -319,7 +326,7 @@ Giọng văn A1 §5. "tab", "workspace", "terminal" giữ tiếng Anh.
 │ │┃● api · Backend                   2 phút ┃│                             │
 │ │┃  ✗ npm test · mã 1 · 45 giây            ┃│                             │
 │ │┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛│                             │
-│ │   zsh 1 · Mặc định                 12:04  │                             │
+│ │   zsh 1 · Mặc định         Hôm qua 12:04  │                             │
 │ │   Chuông ×3                               │                             │
 │ │ Chưa đọc tiếp theo  ⌘⇧U                   │                             │
 │ ╰───────────────────────────────────────────╯                             │

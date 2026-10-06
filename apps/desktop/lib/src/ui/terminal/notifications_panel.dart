@@ -15,14 +15,27 @@ import 'shortcut_labels.dart';
 import 'terminal_overlays.dart' show ShellxScrollbar;
 
 /// UI-A4 §5.2: < 60 s "now"; < 60 min "{n} min"; < 24 h "{n} h"; older
-/// `HH:mm` (24 h). A time slightly ahead (clock skew) is "now".
+/// and from yesterday "Yesterday HH:mm"; before that "MMM d, HH:mm" (vi
+/// "dd/MM HH:mm"), 24 h clock. A time slightly ahead (clock skew) is "now".
 String relativeTime(DateTime at, DateTime now, AppLocalizations l10n) {
   final d = now.difference(at);
   if (d.inSeconds < 60) return l10n.notificationsTimeNow;
   if (d.inMinutes < 60) return l10n.notificationsTimeMinutes(d.inMinutes);
   if (d.inHours < 24) return l10n.notificationsTimeHours(d.inHours);
   String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(at.hour)}:${two(at.minute)}';
+  final time = '${two(at.hour)}:${two(at.minute)}';
+  final yesterday = DateTime(now.year, now.month, now.day - 1);
+  if (at.year == yesterday.year &&
+      at.month == yesterday.month &&
+      at.day == yesterday.day) {
+    return l10n.notificationsTimeYesterday(time);
+  }
+  return l10n.notificationsTimeDate(
+    l10n.notificationsMonthShort('m${at.month}'),
+    '${at.day}',
+    two(at.day),
+    time,
+  );
 }
 
 /// UI-A4 §5: the last 50 notifications, newest first, keyboard first
@@ -39,6 +52,10 @@ class NotificationsPanel extends ConsumerStatefulWidget {
 }
 
 class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
+  /// The thumb with its margin on both sides.
+  static const double _scrollGutter =
+      ShellxSizes.scrollbarThickness + 2 * ShellxSizes.scrollbarMargin;
+
   final _list = FocusNode(debugLabel: 'notifications panel');
   final _markAll = FocusNode(debugLabel: 'mark all as read');
   final _scroll = ScrollController();
@@ -213,6 +230,16 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
     final view = View.of(context);
     final height = view.physicalSize.height / view.devicePixelRatio;
     final extent = _itemExtent(context);
+    final maxHeight = max(0.0, min(ShellxSizes.panelMaxHeight, height - 64));
+    // Border, padding, header, its line and the footer around the list.
+    final listMax =
+        maxHeight -
+        2 -
+        2 * ShellxSpace.s4 -
+        ShellxSizes.panelHeader -
+        1 -
+        ShellxSizes.panelFooter;
+    final overflows = items.length * extent > listMax;
     final markAllEnabled = attention.totalUnread > 0;
     final cursor = _cursorIn(items);
     final keyboardRing =
@@ -326,13 +353,17 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
         ),
       );
     } else {
+      // Always shown while the list overflows: entries below the fold
+      // must not look like they do not exist (UI-A4 §5.2). The items then
+      // leave the thumb its own gutter, so it never covers the time or
+      // the cursor ring.
       body = ShellxScrollbar(
         controller: _scroll,
-        showOnHover: true,
+        alwaysVisible: true,
         child: ListView.builder(
           controller: _scroll,
           shrinkWrap: true,
-          padding: EdgeInsets.zero,
+          padding: EdgeInsets.only(right: overflows ? _scrollGutter : 0),
           itemCount: items.length,
           itemExtent: extent,
           itemBuilder: (_, i) {
@@ -342,6 +373,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
               entry: entry(e),
               unread: !e.read,
               closed: e.closed,
+              failed: e.failed,
               cursor: i == cursor,
               keyboardRing: i == cursor && keyboardRing,
               // Where screen readers place the cursor while the list holds
@@ -369,9 +401,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
         child: Container(
           key: const Key('panel'),
           width: ShellxSizes.panelWidth,
-          constraints: BoxConstraints(
-            maxHeight: max(0, min(ShellxSizes.panelMaxHeight, height - 64)),
-          ),
+          constraints: BoxConstraints(maxHeight: maxHeight),
           padding: const EdgeInsets.all(ShellxSpace.s4),
           decoration: BoxDecoration(
             color: ShellxDesktopColors.surface,
@@ -395,7 +425,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
               ),
               if (items.isNotEmpty)
                 SizedBox(
-                  height: 24,
+                  height: ShellxSizes.panelFooter,
                   child: Padding(
                     padding: const EdgeInsets.only(left: ShellxSpace.s8),
                     child: Align(
@@ -489,6 +519,7 @@ class _PanelItem extends StatefulWidget {
     required this.entry,
     required this.unread,
     required this.closed,
+    this.failed = false,
     required this.cursor,
     required this.keyboardRing,
     required this.focused,
@@ -498,6 +529,9 @@ class _PanelItem extends StatefulWidget {
   final _PanelEntry entry;
   final bool unread;
   final bool closed;
+
+  /// A command that ended non-zero: the unread dot is `err`.
+  final bool failed;
   final bool cursor;
   final bool keyboardRing;
   final bool focused;
@@ -548,12 +582,15 @@ class _PanelItemState extends State<_PanelItem> {
               color: fill,
               borderRadius: BorderRadius.circular(ShellxRadius.r6),
             ),
-            // In front, so the ring never pushes the content (A1 §3).
+            // In front, so the ring never pushes the content (A1 §3). On a
+            // closed tab's entry (Enter does nothing) the ring is `dim`.
             foregroundDecoration: widget.keyboardRing
                 ? BoxDecoration(
                     borderRadius: BorderRadius.circular(ShellxRadius.r6),
                     border: Border.all(
-                      color: ShellxDesktopColors.accent,
+                      color: closed
+                          ? ShellxDesktopColors.dim
+                          : ShellxDesktopColors.accent,
                       width: ShellxSizes.focusRing,
                     ),
                   )
@@ -570,8 +607,10 @@ class _PanelItemState extends State<_PanelItem> {
                             key: const Key('panel.item.dot'),
                             width: ShellxSizes.bellDot,
                             height: ShellxSizes.bellDot,
-                            decoration: const BoxDecoration(
-                              color: ShellxDesktopColors.accent,
+                            decoration: BoxDecoration(
+                              color: widget.failed
+                                  ? ShellxDesktopColors.err
+                                  : ShellxDesktopColors.accent,
                               shape: BoxShape.circle,
                             ),
                           ),

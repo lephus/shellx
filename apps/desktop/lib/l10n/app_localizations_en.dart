@@ -894,6 +894,41 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String notificationsTimeYesterday(String time) {
+    return 'Yesterday $time';
+  }
+
+  @override
+  String notificationsTimeDate(
+    String month,
+    String day,
+    String dayPadded,
+    String time,
+  ) {
+    return '$month $day, $time';
+  }
+
+  @override
+  String notificationsMonthShort(String month) {
+    String _temp0 = intl.Intl.selectLogic(month, {
+      'm1': 'Jan',
+      'm2': 'Feb',
+      'm3': 'Mar',
+      'm4': 'Apr',
+      'm5': 'May',
+      'm6': 'Jun',
+      'm7': 'Jul',
+      'm8': 'Aug',
+      'm9': 'Sep',
+      'm10': 'Oct',
+      'm11': 'Nov',
+      'm12': 'Dec',
+      'other': '',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get notificationsItemUnread => 'unread';
 
   @override

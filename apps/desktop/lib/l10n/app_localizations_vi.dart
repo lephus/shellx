@@ -879,6 +879,41 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String notificationsTimeYesterday(String time) {
+    return 'Hôm qua $time';
+  }
+
+  @override
+  String notificationsTimeDate(
+    String month,
+    String day,
+    String dayPadded,
+    String time,
+  ) {
+    return '$dayPadded/$month $time';
+  }
+
+  @override
+  String notificationsMonthShort(String month) {
+    String _temp0 = intl.Intl.selectLogic(month, {
+      'm1': '01',
+      'm2': '02',
+      'm3': '03',
+      'm4': '04',
+      'm5': '05',
+      'm6': '06',
+      'm7': '07',
+      'm8': '08',
+      'm9': '09',
+      'm10': '10',
+      'm11': '11',
+      'm12': '12',
+      'other': '',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get notificationsItemUnread => 'chưa đọc';
 
   @override

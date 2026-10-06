@@ -1,12 +1,13 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 
 import '../support/fake_local_sessions.dart';
 import 'sidebar_test_harness.dart';
@@ -198,6 +199,79 @@ void main() {
     await tester.pump();
     expect(container.read(tabAttentionProvider).hasUnread(2), isFalse);
     expect(hasAction(), isFalse);
+  });
+
+  testSidebar('custom actions follow the row menu: mark read, mark all, '
+      'rename, move, close (UI-A4 §8)', (tester) async {
+    await pumpSidebar(tester);
+    local.notice(2, SessionNoticeKind.message, body: 'a');
+    await deliver(tester);
+    final labels = [
+      for (final id
+          in tester
+              .getSemantics(row(2))
+              .getSemanticsData()
+              .customSemanticsActionIds!)
+        CustomSemanticsAction.getAction(id)!.label,
+    ];
+    expect(labels, [
+      'Mark as read',
+      'Mark all as read',
+      'Rename tab',
+      'Move to workspace…',
+      'Move up',
+      'Close tab',
+    ]);
+  });
+
+  testSidebar('the line is worded in the language shown, not the one of '
+      'its arrival (F-4); a failed command tints the icon `err`', (
+    tester,
+  ) async {
+    await pumpSidebar(tester, locale: const Locale('vi'));
+    local.notice(2, SessionNoticeKind.bell); // arrives with the en provider
+    await deliver(tester);
+    expect(
+      find.descendant(of: row(2), matching: find.text('Chuông')),
+      findsOneWidget,
+    );
+    Color icon() => tester
+        .widget<Icon>(
+          find.descendant(
+            of: row(2),
+            matching: find.byKey(const Key('row.notificationIcon')),
+          ),
+        )
+        .color!;
+    expect(icon(), ShellxDesktopColors.accent);
+    local.notice(
+      2,
+      SessionNoticeKind.command,
+      command: const CompletedCommand(
+        commandLine: 'npm test',
+        exitCode: 2,
+        duration: Duration(seconds: 3),
+      ),
+    );
+    await deliver(tester);
+    expect(icon(), ShellxDesktopColors.err);
+  });
+
+  testSidebar('collapsed header: the dot sits 4 px left of the count '
+      'glyph (UI-A4 §3)', (tester) async {
+    await pumpSidebar(tester);
+    await workspaces().create(moveTab: 2);
+    workspaces().toggleCollapsed(sidebar().workspaceOf(2)!);
+    local.notice(2, SessionNoticeKind.message, body: 'a');
+    await deliver(tester);
+    await tester.pumpAndSettle();
+    final dot = tester.getRect(find.byKey(const Key('header.unreadDot')).first);
+    final count = find.byKey(const Key('header.count')).first;
+    final glyph = tester.renderObject<RenderParagraph>(count);
+    final box = tester.getRect(count);
+    final glyphLeft =
+        box.left + (box.width - glyph.getMaxIntrinsicWidth(box.height)) / 2;
+    expect(glyphLeft - dot.right, closeTo(4, 0.01));
   });
 
   testSidebar('renaming hides the badge, keeps the line, and the open name '

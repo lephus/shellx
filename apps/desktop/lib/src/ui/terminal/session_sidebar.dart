@@ -881,13 +881,20 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     return box.localToGlobal(Offset(ShellxSpace.s8, box.size.height));
   }
 
-  /// UI-A2 §8: rename, move (only what can be done), one per port.
+  /// UI-A2 §8 + UI-A4 §8, in the row menu's order (the row adds "Mark
+  /// as read" before and "Close tab" after): mark all as read (when
+  /// anything is unread), rename, move (only what can be done), one per
+  /// port.
   Map<CustomSemanticsAction, VoidCallback> _rowActions(
     AppLocalizations l10n,
     TerminalTab tab,
   ) {
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
+    final anyUnread = ref.read(tabAttentionProvider).totalUnread > 0;
     return {
+      if (anyUnread)
+        CustomSemanticsAction(label: l10n.attentionMarkAllRead): () =>
+            ref.read(tabAttentionProvider.notifier).markAllRead(),
       CustomSemanticsAction(label: l10n.tabRename): () =>
           _startTabRename(tab.id, fromList: widget.focusNode.hasFocus),
       CustomSemanticsAction(label: l10n.tabMoveTo): () => unawaited(
@@ -1236,7 +1243,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final state = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final home = ref.watch(homeDirectoryProvider);
-    final attention = ref.watch(tabAttentionProvider);
+    registerRowActionOrder(l10n);
+    // Only the unread map: history alone (a notice the user saw) does not
+    // rebuild the sidebar.
+    final unread = ref.watch(tabAttentionProvider.select((s) => s.unread));
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final scaler = MediaQuery.textScalerOf(context);
     final items = _items();
@@ -1263,7 +1273,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     );
     // UI-A4 §5.1: hollow at 0; filled with a 6 px dot when anything is
     // unread; `rowSelected` ("on") while the panel is open.
-    final total = attention.totalUnread;
+    final total = unread.values.fold(0, (sum, u) => sum + u.count);
     final bellShortcut = notificationsShortcutLabel();
     final bell = Stack(
       clipBehavior: Clip.none,
@@ -1454,7 +1464,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         onMenu: (at) => unawaited(_rowMenu(tab, at)),
         extraActions: _rowActions(l10n, tab),
         menuOpen: _menuFor == ('row', tab.id),
-        unread: attention.unread[tab.id],
+        unread: unread[tab.id],
         onMarkRead: () =>
             ref.read(tabAttentionProvider.notifier).markRead(tab.id),
       );

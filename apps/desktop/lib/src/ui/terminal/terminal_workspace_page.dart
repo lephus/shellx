@@ -368,9 +368,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
               ),
               // UI-A4 §5.3: a click outside closes the panel (and only that).
               // macOS: it starts under the band, so the window still drags
-              // (and the bell still toggles) while the panel is open.
+              // (and the bell still toggles) while the panel is open. Both
+              // slots are keyed: the barrier coming and going must not
+              // shift the panel's AnimatedSwitcher to a new element (its
+              // fade would never play).
               if (panelOpen)
                 Positioned(
+                  key: const ValueKey('panel.barrierSlot'),
                   left: 0,
                   right: 0,
                   bottom: 0,
@@ -385,7 +389,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
                   ),
                 ),
               Positioned(
-                left: ShellxSpace.s8,
+                key: const ValueKey('panel.slot'),
+                // x 6: over the selected row's 3 px bar (x 6), not beside
+                // it (UI-A4 §5.2).
+                left: ShellxSpace.s6,
                 top:
                     (isMacDesktop
                         ? ShellxSizes.headerBandMac

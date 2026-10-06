@@ -24,6 +24,7 @@ Future<void> pumpSidebar(
   WidgetTester tester, {
   double textScale = 1,
   bool disableAnimations = false,
+  Locale locale = const Locale('en'),
 }) async {
   h = TestHarness(settings: {'onboarding_done': true});
   container = ProviderContainer(
@@ -52,7 +53,7 @@ Future<void> pumpSidebar(
           theme: buildDesktopTheme(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
+          locale: locale,
           home: const Scaffold(body: TerminalWorkspacePage()),
         ),
       ),

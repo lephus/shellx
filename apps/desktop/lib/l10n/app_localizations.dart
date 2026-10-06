@@ -1406,6 +1406,29 @@ abstract class AppLocalizations {
   /// **'{count} h'**
   String notificationsTimeHours(int count);
 
+  /// Panel time of an entry from yesterday (older than 24 h); time is HH:mm.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday {time}'**
+  String notificationsTimeYesterday(String time);
+
+  /// Panel time of an entry older than yesterday: en 'MMM d, HH:mm', vi 'dd/MM HH:mm'. month is notificationsMonthShort; day is unpadded, dayPadded two digits; time is HH:mm.
+  ///
+  /// In en, this message translates to:
+  /// **'{month} {day}, {time}'**
+  String notificationsTimeDate(
+    String month,
+    String day,
+    String dayPadded,
+    String time,
+  );
+
+  /// Month in notificationsTimeDate: m1 (January) to m12.
+  ///
+  /// In en, this message translates to:
+  /// **'{month, select, m1{Jan} m2{Feb} m3{Mar} m4{Apr} m5{May} m6{Jun} m7{Jul} m8{Aug} m9{Sep} m10{Oct} m11{Nov} m12{Dec} other{}}'**
+  String notificationsMonthShort(String month);
+
   /// No description provided for @notificationsItemUnread.
   ///
   /// In en, this message translates to:

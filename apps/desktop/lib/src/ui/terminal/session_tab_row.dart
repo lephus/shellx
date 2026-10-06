@@ -433,12 +433,14 @@ class SessionTabRowState extends State<SessionTabRow> {
       selected: widget.selected,
       label: _semanticsLabel(l10n),
       onTap: renaming ? null : widget.onSelect,
+      // The row menu's order (UI-A4 §10.4): mark as read first, close
+      // last.
       customSemanticsActions: {
-        CustomSemanticsAction(label: l10n.terminalCloseTab): widget.onClose,
         if (withNotification && widget.onMarkRead != null)
           CustomSemanticsAction(label: l10n.attentionMarkRead):
               widget.onMarkRead!,
         ...widget.extraActions,
+        CustomSemanticsAction(label: l10n.terminalCloseTab): widget.onClose,
       },
       // While renaming, the name field is the row's one child node
       // ("Tab name", UI-A2 §4).
@@ -541,7 +543,8 @@ class SessionTabRowState extends State<SessionTabRow> {
                         right: 0,
                         // With a notification or context line: the title
                         // line's centre stays 6 + line/2 from the top.
-                        // Without: centred in the row (A1). The box is as tall as the 24 px ×.
+                        // Without: centred in the row (A1). The box is as
+                        // tall as the 24 px ×.
                         top: withLines ? titleTop : (height - titleBox) / 2,
                         height: titleBox,
                         child: Padding(padding: rowPadding, child: titleRow),
@@ -561,7 +564,10 @@ class SessionTabRowState extends State<SessionTabRow> {
                               0.0,
                               titleTop + titleBox - notificationTop,
                             ),
-                            child: NotificationLine(text: unread.text(l10n)),
+                            child: NotificationLine(
+                              text: unread.text(l10n),
+                              failed: unread.failed,
+                            ),
                           ),
                         ),
                       if (withContext)
@@ -731,20 +737,23 @@ class _Title extends StatelessWidget {
   );
 }
 
-/// Right of the sidebar ([ShellxSizes.sidebarWidth] + 6), vertically
-/// centred on the row, kept inside the window.
-Offset besideSidebar(TooltipPositionContext context) {
-  final overlay = context.overlaySize;
-  final size = context.tooltipSize;
-  final double x = (ShellxSizes.sidebarWidth + ShellxSpace.s6).clamp(
-    0.0,
-    max(0.0, overlay.width - size.width - ShellxSpace.s8),
-  );
-  final double y = (context.target.dy - size.height / 2).clamp(
-    0.0,
-    max(0.0, overlay.height - size.height),
-  );
-  return Offset(x, y);
+/// Screen readers list a node's custom actions by identifier, and an
+/// identifier is handed out the first time its action is seen. Seeing the
+/// row menu's actions here first, in the menu's order, lists them in that
+/// order (UI-A4 §8). Port actions, made at run time, come after "Close
+/// tab".
+void registerRowActionOrder(AppLocalizations l10n) {
+  for (final label in [
+    l10n.attentionMarkRead,
+    l10n.attentionMarkAllRead,
+    l10n.tabRename,
+    l10n.tabMoveTo,
+    l10n.tabMoveUp,
+    l10n.tabMoveDown,
+    l10n.terminalCloseTab,
+  ]) {
+    CustomSemanticsAction.getIdentifier(CustomSemanticsAction(label: label));
+  }
 }
 
 /// UI §3.1 status dot (8 px), three shapes so it never relies on colour

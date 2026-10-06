@@ -229,6 +229,9 @@ abstract final class ShellxSizes {
   static const double panelMaxHeight = 480;
   static const double panelOffsetY = 4;
   static const double panelHeader = 36;
+
+  /// UI-A4 §5.2: the footer line ("Next unread  ⌘⇧U").
+  static const double panelFooter = 24;
   static const double panelItem = 52;
   static const double panelUnreadSlot = 16;
   static const double panelEmptyIcon = 24;

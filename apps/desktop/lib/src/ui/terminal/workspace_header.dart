@@ -7,7 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'inline_name_field.dart';
-import 'session_tab_row.dart' show besideSidebar;
+import 'terminal_overlays.dart' show besideSidebar;
 
 /// UI-A2 §3: a workspace's header row — chevron, name, tab count, `+` on
 /// hover/focus; click toggles, double-click renames, secondary click /
@@ -132,6 +132,22 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
       if (widget.hasUnread) l10n.workspaceHasUnread,
     ].join(', ');
 
+    final countText = '${widget.count}';
+    final countStyle = ShellxText.caption.copyWith(
+      color: ShellxDesktopColors.textSecondary,
+    );
+    // Where the dot goes: 4 px left of the glyph (UI-A4 §3).
+    final countPainter = TextPainter(
+      text: TextSpan(
+        text: countText,
+        style: DefaultTextStyle.of(context).style.merge(countStyle),
+      ),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final countWidth = countPainter.width;
+    countPainter.dispose();
     // |4| chevron 20 |4| name |4| [count | +] 24 |6| (UI-A2 §3.1, V10):
     // the count and the `+` share one slot in the rows' × column, so the
     // name never gives up width to a hidden button.
@@ -183,39 +199,50 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                 ),
         ),
         const SizedBox(width: ShellxSpace.s4),
-        // UI-A4 §3: |4|●|4| before the count slot; no space when absent.
-        if (widget.hasUnread) ...[
-          Container(
-            key: const Key('header.unreadDot'),
-            width: ShellxSizes.aggregateDot,
-            height: ShellxSizes.aggregateDot,
-            decoration: const BoxDecoration(
-              color: ShellxDesktopColors.accent,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: ShellxSpace.s4),
-        ],
+        // UI-A4 §3: |●|4| before the count's glyph, not the 24 px slot it
+        // is centred in; the name gives up the dot's width only while it
+        // shows.
+        if (widget.hasUnread)
+          const SizedBox(width: ShellxSizes.aggregateDot + ShellxSpace.s4),
         // The slot: the count shows here unless the `+` (drawn above, see
         // below) does; both hidden while renaming, the slot kept.
         SizedBox(
           width: ShellxSizes.headerAddHit,
-          child: Visibility(
-            visible: !renaming && !showAdd,
-            maintainSize: true,
-            maintainAnimation: true,
-            maintainState: true,
-            child: Text(
-              '${widget.count}',
-              key: const Key('header.count'),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.visible,
-              style: ShellxText.caption.copyWith(
-                color: ShellxDesktopColors.textSecondary,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Visibility(
+                visible: !renaming && !showAdd,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: Text(
+                  countText,
+                  key: const Key('header.count'),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  style: countStyle,
+                ),
               ),
-            ),
+              if (widget.hasUnread)
+                Positioned(
+                  right:
+                      (ShellxSizes.headerAddHit + countWidth) / 2 +
+                      ShellxSpace.s4,
+                  child: Container(
+                    key: const Key('header.unreadDot'),
+                    width: ShellxSizes.aggregateDot,
+                    height: ShellxSizes.aggregateDot,
+                    decoration: const BoxDecoration(
+                      color: ShellxDesktopColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(width: _trailing),

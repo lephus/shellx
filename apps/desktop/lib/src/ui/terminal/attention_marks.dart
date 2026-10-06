@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../terminal/tab_attention.dart';
 import '../theme/shellx_desktop_theme.dart';
-import 'session_tab_row.dart' show besideSidebar;
+import 'terminal_overlays.dart' show besideSidebar;
 
 /// UI-A4 §2.1: accent pill with the unread count (`1`…`99`, `99+`), right
 /// after the title. The count is in the row's semantics label (§8).
@@ -52,8 +52,11 @@ class UnreadBadge extends StatelessWidget {
 /// the end; the full text (at most [tooltipMaxChars]) as a tooltip only
 /// when it is cut. The text is in the row's semantics label (§8).
 class NotificationLine extends StatelessWidget {
-  const NotificationLine({super.key, required this.text});
+  const NotificationLine({super.key, required this.text, this.failed = false});
   final String text;
+
+  /// A command that ended non-zero: the icon is `err`, not `accent`.
+  final bool failed;
 
   /// UI-A4 §2.1: "tối đa 200 ký tự".
   static const tooltipMaxChars = 200;
@@ -67,10 +70,13 @@ class NotificationLine extends StatelessWidget {
       child: Row(
         key: const Key('row.notification'),
         children: [
-          const Icon(
+          Icon(
             Icons.notifications_none,
+            key: const Key('row.notificationIcon'),
             size: ShellxSizes.notificationIcon,
-            color: ShellxDesktopColors.accent,
+            color: failed
+                ? ShellxDesktopColors.err
+                : ShellxDesktopColors.accent,
           ),
           const SizedBox(width: ShellxSizes.notificationIconGap),
           Expanded(

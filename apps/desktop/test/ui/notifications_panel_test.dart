@@ -9,7 +9,10 @@ import 'package:shellx_desktop/l10n/app_localizations_vi.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/notifications_panel.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_overlays.dart'
+    show ShellxScrollbar;
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
+import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 
 import '../support/fake_local_sessions.dart';
 import 'sidebar_test_harness.dart';
@@ -89,20 +92,25 @@ void main() {
     expect(page(tester).sidebarFocus.hasFocus, isTrue);
   });
 
-  testSidebar('geometry: x 8, under the header band + 4, 360 wide '
+  testSidebar('geometry: x 6, under the header band + 4, 360 wide '
       '(UI-A4 §5.2)', (tester) async {
     await pumpSidebar(tester);
     local.notice(2, SessionNoticeKind.message, body: 'a');
     await deliver(tester);
     await openPanel(tester);
     final rect = tester.getRect(panel);
-    expect(rect.left, 8);
+    expect(rect.left, 6);
+    // The selected row's 3 px bar is covered, not peeking out (F-3).
+    final bar = tester.getRect(find.byKey(const Key('row.selectedBar')));
+    expect(rect.left, lessThanOrEqualTo(bar.left));
     expect(rect.top, 38 + 4); // macOS band
     expect(rect.width, 360);
     // border 1 + padding 4 + header 36 + line 1 + item 52 + footer 24
     // + padding 4 + border 1.
     expect(rect.height, 1 + 4 + 36 + 1 + 52 + 24 + 4 + 1);
     expect(tester.getSize(find.byKey(const Key('panel.item.0'))).height, 52);
+    // Everything fits: no scrollbar gutter, items span the panel's inside.
+    expect(tester.getSize(find.byKey(const Key('panel.item.0'))).width, 350);
   });
 
   testSidebar('↓ + Enter jumps to the tab, reads it and closes (N5)', (
@@ -515,7 +523,115 @@ void main() {
     expect(panel, findsNothing);
   });
 
-  test('relative time (UI-A4 §5.2)', () {
+  double fade(WidgetTester tester) => tester
+      .widget<FadeTransition>(
+        find.ancestor(of: panel, matching: find.byType(FadeTransition)).first,
+      )
+      .opacity
+      .value;
+
+  testSidebar('the panel fades in and out (I1)', (tester) async {
+    await pumpSidebar(tester);
+    local.notice(2, SessionNoticeKind.message, body: 'a');
+    await deliver(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(fade(tester), allOf(greaterThan(0), lessThan(1)));
+    await tester.pumpAndSettle();
+    expect(fade(tester), 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(panel, findsOneWidget); // still fading out
+    expect(fade(tester), allOf(greaterThan(0), lessThan(1)));
+    await tester.pumpAndSettle();
+    expect(panel, findsNothing);
+  });
+
+  testSidebar('more entries than fit: the scrollbar stays visible (F-1)', (
+    tester,
+  ) async {
+    await pumpSidebar(tester);
+    for (var i = 0; i < 12; i++) {
+      local.notice(2, SessionNoticeKind.message, body: '$i');
+    }
+    await deliver(tester);
+    await openPanel(tester);
+    final bar = tester.widget<ShellxScrollbar>(
+      find.descendant(of: panel, matching: find.byType(ShellxScrollbar)),
+    );
+    expect(bar.alwaysVisible, isTrue);
+    // The list does overflow: entries are below the fold.
+    final list = tester.state<ScrollableState>(
+      find.descendant(of: panel, matching: find.byType(Scrollable)),
+    );
+    expect(list.position.maxScrollExtent, greaterThan(0));
+    // The thumb has its own gutter: items end 10 px (6 + 2 × 2) short of
+    // the list, so it never covers the time column.
+    final item = tester.getRect(find.byKey(const Key('panel.item.11')));
+    final scroller = tester.getRect(
+      find.descendant(of: panel, matching: find.byType(Scrollable)),
+    );
+    expect(scroller.right - item.right, 10);
+  });
+
+  testSidebar('a failed command is tinted `err`; the cursor on a closed '
+      'entry has the dimmer ring (F-9)', (tester) async {
+    await pumpSidebar(tester);
+    local.notice(
+      2,
+      SessionNoticeKind.command,
+      command: const CompletedCommand(
+        commandLine: 'npm test',
+        exitCode: 1,
+        duration: Duration(seconds: 45),
+      ),
+    );
+    local.notice(3, SessionNoticeKind.message, body: 'bye');
+    await deliver(tester);
+    Color dot(int seq) =>
+        ((tester
+                    .widget<Container>(
+                      find.descendant(
+                        of: find.byKey(Key('panel.item.$seq')),
+                        matching: find.byKey(const Key('panel.item.dot')),
+                      ),
+                    )
+                    .decoration!
+                as BoxDecoration)
+            .color!);
+    container.read(terminalTabsProvider.notifier).close(3);
+    await tester.pumpAndSettle();
+    await openPanel(tester); // cursor: the first unread (seq 0, failed)
+    expect(dot(0), ShellxDesktopColors.err);
+    await press(tester, LogicalKeyboardKey.arrowUp); // seq 1, closed
+    Color ring(int seq) =>
+        ((tester
+                            .widget<Container>(
+                              find
+                                  .descendant(
+                                    of: find.byKey(Key('panel.item.$seq')),
+                                    matching: find.byType(Container),
+                                  )
+                                  .first,
+                            )
+                            .foregroundDecoration!
+                        as BoxDecoration)
+                    .border!
+                as Border)
+            .top
+            .color;
+    expect(ring(1), ShellxDesktopColors.dim);
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expect(ring(0), ShellxDesktopColors.accent);
+  });
+
+  test('relative time (UI-A4 §5.2, F-2)', () {
     final en = AppLocalizationsEn();
     final vi = AppLocalizationsVi();
     final now = DateTime(2026, 10, 7, 12);
@@ -532,7 +648,25 @@ void main() {
       relativeTime(now.subtract(const Duration(hours: 3)), now, en),
       '3 h',
     );
-    expect(relativeTime(DateTime(2026, 10, 5, 9, 4), now, en), '09:04');
+    // Yesterday but within 24 h: still hours.
+    expect(relativeTime(DateTime(2026, 10, 6, 13), now, en), '23 h');
+    expect(
+      relativeTime(DateTime(2026, 10, 6, 9, 4), now, en),
+      'Yesterday 09:04',
+    );
+    expect(relativeTime(DateTime(2026, 10, 6, 9, 4), now, vi), 'Hôm qua 09:04');
+    expect(relativeTime(DateTime(2026, 10, 5, 22, 5), now, en), 'Oct 5, 22:05');
+    expect(relativeTime(DateTime(2026, 10, 5, 22, 5), now, vi), '05/10 22:05');
+    // 25 h old, two calendar days back: dated, not "yesterday".
+    final early = DateTime(2026, 10, 7, 0, 30);
+    expect(
+      relativeTime(DateTime(2026, 10, 5, 23, 30), early, en),
+      'Oct 5, 23:30',
+    );
+    expect(
+      relativeTime(DateTime(2025, 12, 31, 8, 0), now, en),
+      'Dec 31, 08:00',
+    );
     expect(
       relativeTime(now.subtract(const Duration(minutes: 5)), now, vi),
       '5 phút',

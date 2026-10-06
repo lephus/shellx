@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -533,7 +534,8 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice;
 
-  /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is on the toast.
+  /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
+  /// on the toast.
   void _start() {
     _timer?.cancel();
     _timer = _paused
@@ -726,4 +728,20 @@ class EmptyTerminalState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Right of the sidebar ([ShellxSizes.sidebarWidth] + 6), vertically
+/// centred on the row, kept inside the window.
+Offset besideSidebar(TooltipPositionContext context) {
+  final overlay = context.overlaySize;
+  final size = context.tooltipSize;
+  final double x = (ShellxSizes.sidebarWidth + ShellxSpace.s6).clamp(
+    0.0,
+    max(0.0, overlay.width - size.width - ShellxSpace.s8),
+  );
+  final double y = (context.target.dy - size.height / 2).clamp(
+    0.0,
+    max(0.0, overlay.height - size.height),
+  );
+  return Offset(x, y);
 }
