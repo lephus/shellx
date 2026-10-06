@@ -36,6 +36,7 @@ import 'src/terminal_sharing/attach_throttle.dart';
 import 'src/terminal_sharing/powershell.dart';
 import 'src/terminal_sharing/sharing_paths.dart';
 import 'src/terminal_sharing/terminal_sharing_setup.dart';
+import 'src/ui/theme/font_licenses.dart';
 import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/activation.dart';
@@ -259,6 +260,7 @@ Future<void> _start(
   );
   if (Platform.isMacOS) listenForReopen(activate);
 
+  registerFontLicenses();
   runApp(
     UncontrolledProviderScope(
       container: container,

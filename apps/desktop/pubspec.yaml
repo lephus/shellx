@@ -33,6 +33,11 @@ dependencies:
   tray_manager: ^0.5.3
   win32: ^5.15.0
   window_manager: ^0.5.2
+  # Pinned exactly, same version as apps/mobile (A1 D12): the terminal works
+  # around xterm 4.0.0's cursor-key and paste handling (terminal_input.dart),
+  # which a newer version may change. Bump together with mobile, with the
+  # benchmark (test/terminal/xterm_benchmark_test.dart) and a full test run.
+  xterm: 4.0.0
 
 dev_dependencies:
   fake_async: ^1.3.3
@@ -48,3 +53,16 @@ flutter:
   generate: true
   assets:
     - assets/tray/
+    - assets/licenses/
+  fonts:
+    # Terminal font (A1 D16), SIL OFL 1.1: assets/licenses/JetBrainsMono-OFL.txt
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/JetBrainsMono-Italic.ttf
+          style: italic
+        - asset: assets/fonts/JetBrainsMono-BoldItalic.ttf
+          weight: 700
+          style: italic
