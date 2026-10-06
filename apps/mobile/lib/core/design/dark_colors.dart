@@ -69,6 +69,18 @@ class DarkColors extends LightColors {
   @override
   Color get scrim => const Color(0x99000000);
 
+  /// Dark primary already passes: 8.4:1 on background, 7.5:1 on surface, 5.9:1 on primarySoft.
+  @override
+  Color get link => const Color(0xFF2DBFCF);
+
+  /// 7.4:1 on the dark keyboard.
+  @override
+  Color get keyboardLink => const Color(0xFF2DBFCF);
+
+  /// 5.6:1 on the dark keyboard.
+  @override
+  Color get keyboardError => const Color(0xFFF26A70);
+
   @override
   Color get keyboardBackground => const Color(0xFF1E1F21);
 

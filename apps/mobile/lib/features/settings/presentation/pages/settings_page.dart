@@ -110,7 +110,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 _controller.biometricsAvailable.value
                     ? strings.settingsLockFootnote
                     : strings.settingsBiometricUnavailable,
-                style: context.typo.metadata12.copyWith(color: colors.disable),
+                style: context.typo.metadata12.copyWith(color: colors.secondaryText),
               ),
             ),
             children: [
@@ -135,7 +135,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 header: strings.settingsNotificationsGroup,
                 footer: Text(
                   on ? strings.settingsNotificationsFootnote : strings.settingsNotificationsOffFootnote,
-                  style: context.typo.metadata12.copyWith(color: colors.disable),
+                  style: context.typo.metadata12.copyWith(color: colors.secondaryText),
                 ),
                 children: [
                   _Row(
@@ -160,7 +160,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         : _Row(
                             title: strings.settingsNotificationsOpenSystem,
                             action: true,
-                            trailing: Icon(Icons.open_in_new, size: 18, color: colors.primary),
+                            trailing: Icon(Icons.open_in_new, size: 18, color: colors.link),
                             onTap: _controller.openNotificationSettings,
                           ),
                   ],
@@ -214,7 +214,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(version, style: context.typo.metadata12.copyWith(color: colors.disable)),
+                  child: Text(version, style: context.typo.metadata12.copyWith(color: colors.secondaryText)),
                 ),
               ),
             ),
@@ -320,7 +320,7 @@ class _Row extends StatelessWidget {
     final style = danger
         ? context.typo.subHeader15.bold.copyWith(color: colors.error)
         : action
-        ? context.typo.subHeader15.bold.copyWith(color: colors.primary)
+        ? context.typo.subHeader15.bold.copyWith(color: colors.link)
         : context.typo.subHeader15.copyWith(color: muted ? colors.secondaryText : colors.primaryText);
     return InkWell(
       onTap: onTap,
@@ -374,7 +374,7 @@ class _FailedRow extends StatelessWidget {
             ),
             TextButton(
               onPressed: onRetry,
-              child: Text(strings.retry, style: context.typo.paragraph.bold.copyWith(color: colors.primary)),
+              child: Text(strings.retry, style: context.typo.paragraph.bold.copyWith(color: colors.link)),
             ),
           ],
         ),

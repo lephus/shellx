@@ -17,7 +17,7 @@ class NoticeBanner extends StatelessWidget {
     final colors = context.colors;
     final (background, foreground) = switch (tone) {
       NoticeTone.warn => (colors.warnSoft, colors.warn),
-      NoticeTone.info => (colors.primarySoft, colors.primary),
+      NoticeTone.info => (colors.primarySoft, colors.link),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

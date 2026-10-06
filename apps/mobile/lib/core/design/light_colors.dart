@@ -97,6 +97,18 @@ class LightColors extends AppColors {
   @override
   Color get scrim => const Color(0x730A1418);
 
+  /// 4.9:1 on background, 5.3:1 on surface, 4.5:1 on primarySoft.
+  @override
+  Color get link => const Color(0xFF007785);
+
+  /// 4.8:1 on the keyboard grey (`#007785` there is only 3.6:1).
+  @override
+  Color get keyboardLink => const Color(0xFF00616C);
+
+  /// 5.3:1 on the keyboard grey (`error #CB232B` there is 3.7:1).
+  @override
+  Color get keyboardError => const Color(0xFFA3161D);
+
   @override
   Color get keyboardBackground => const Color(0xFFD1D4DA);
 

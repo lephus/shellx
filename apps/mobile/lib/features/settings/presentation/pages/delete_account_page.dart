@@ -115,7 +115,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                           title: strings.actionCancel,
                           width: double.infinity,
                           backgroundColor: Colors.transparent,
-                          textColor: colors.primary,
+                          textColor: colors.link,
                           state: busy ? ButtonState.disable : ButtonState.available,
                           onTap: () => context.router.maybePop(),
                         ),

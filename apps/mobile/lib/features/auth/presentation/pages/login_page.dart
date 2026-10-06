@@ -119,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
                               onPressed: () => context.router.push(const RegisterRoute()),
                               child: Text(
                                 strings.createAccountLink,
-                                style: context.typo.subHeader15.bold.copyWith(color: colors.primary),
+                                style: context.typo.subHeader15.bold.copyWith(color: colors.link),
                               ),
                             ),
                           ],

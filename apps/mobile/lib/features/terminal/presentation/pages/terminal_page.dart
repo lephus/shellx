@@ -496,7 +496,7 @@ class _TitleBlock extends StatelessWidget {
                   status,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: context.typo.metadata12.copyWith(color: TerminalColors.dim, height: 1.3),
+                  style: context.typo.metadata12.copyWith(color: TerminalColors.muted, height: 1.3),
                 ),
               ),
             ],
@@ -622,7 +622,7 @@ class _TabChip extends StatelessWidget {
                     Icon(
                       Icons.desktop_windows_outlined,
                       size: 13,
-                      color: selected ? const Color(0xFFEAF3F5) : TerminalColors.dim,
+                      color: selected ? const Color(0xFFEAF3F5) : TerminalColors.muted,
                       semanticLabel: S.of(context).desktopTerminalLabel,
                     ),
                     const SizedBox(width: 6),
@@ -639,7 +639,7 @@ class _TabChip extends StatelessWidget {
                         fontFamily: FontFamily.jetBrainsMono,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: selected ? const Color(0xFFEAF3F5) : TerminalColors.dim,
+                        color: selected ? const Color(0xFFEAF3F5) : TerminalColors.muted,
                       ),
                     ),
                   ),
@@ -650,7 +650,7 @@ class _TabChip extends StatelessWidget {
                       child: const SizedBox(
                         width: 36,
                         height: 39,
-                        child: Icon(Icons.close, size: 14, color: TerminalColors.dim),
+                        child: Icon(Icons.close, size: 14, color: TerminalColors.muted),
                       ),
                     ),
                   ),
@@ -674,7 +674,7 @@ class _NoTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = S.of(context);
-    final dim = context.typo.paragraph.copyWith(color: TerminalColors.dim);
+    final dim = context.typo.paragraph.copyWith(color: TerminalColors.muted);
     if (busy) {
       return Padding(
         padding: const EdgeInsets.all(12),
@@ -882,7 +882,7 @@ class _EndedCard extends StatelessWidget {
           Text(title, style: context.typo.subHeader15.bold.copyWith(color: Colors.white)),
           if (body != null) ...[
             4.sizedHeight,
-            Text(body, style: context.typo.paragraph13.copyWith(color: TerminalColors.dim)),
+            Text(body, style: context.typo.paragraph13.copyWith(color: TerminalColors.muted)),
           ],
           10.sizedHeight,
           Row(

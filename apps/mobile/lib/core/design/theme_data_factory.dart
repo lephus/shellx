@@ -37,6 +37,8 @@ class ThemeDataFactory {
       iconTheme: IconThemeData(
         color: appColors.primary,
       ),
+      // Light primary on the light backgrounds is 3.0–3.5:1; text buttons take the AA link colour.
+      textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: appColors.link)),
       brightness: brightness,
       useMaterial3: true,
       fontFamily: FontFamily.raleway,

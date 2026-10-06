@@ -234,7 +234,7 @@ class _SessionRow extends StatelessWidget {
                 ),
               ),
               10.sizedWidth,
-              Text(strings.pickerOpen, style: context.typo.subHeader15.bold.copyWith(color: colors.primary)),
+              Text(strings.pickerOpen, style: context.typo.subHeader15.bold.copyWith(color: colors.link)),
             ],
           ),
         ),

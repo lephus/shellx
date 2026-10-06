@@ -170,10 +170,10 @@ class _MachineListPageState extends State<MachineListPage> {
                       child: AppButton(
                         title: strings.pairNewMachine,
                         backgroundColor: context.colors.primarySoft,
-                        textColor: context.colors.primary,
+                        textColor: context.colors.link,
                         prefix: Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: Icon(Icons.qr_code_2, color: context.colors.primary),
+                          child: Icon(Icons.qr_code_2, color: context.colors.link),
                         ),
                         onTap: _scan,
                       ),
@@ -317,7 +317,7 @@ class MachineCard extends StatelessWidget {
                     decoration: BoxDecoration(color: colors.primarySoft, borderRadius: BorderRadius.circular(999)),
                     child: Text(
                       strings.machineNotPaired,
-                      style: context.typo.metadata12.bold.copyWith(color: colors.primary),
+                      style: context.typo.metadata12.bold.copyWith(color: colors.link),
                     ),
                   )
                 else if (onTap != null)
@@ -352,7 +352,7 @@ class _EmptyState extends StatelessWidget {
           height: 28,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: colors.primarySoft, shape: BoxShape.circle),
-          child: Text('$number', style: context.typo.paragraph.bold.copyWith(color: colors.primary)),
+          child: Text('$number', style: context.typo.paragraph.bold.copyWith(color: colors.link)),
         ),
         12.sizedWidth,
         Expanded(child: body),
@@ -390,7 +390,7 @@ class _EmptyState extends StatelessWidget {
                     strings.emptyStep1(site),
                     parts: {site: () => getIt<ExternalLinks>().openOrToast(AppConfig.downloadPage)},
                     style: text,
-                    partStyle: text.bold.copyWith(color: colors.primary),
+                    partStyle: text.bold.copyWith(color: colors.link),
                   ),
                 ),
                 14.sizedHeight,

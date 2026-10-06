@@ -32,7 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final strings = S.of(context);
     final colors = context.colors;
-    final fine = context.typo.metadata12.copyWith(color: colors.disable, height: 1.5);
+    final fine = context.typo.metadata12.copyWith(color: colors.secondaryText, height: 1.5);
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(),
@@ -91,7 +91,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   },
                   textAlign: TextAlign.center,
                   style: fine,
-                  partStyle: fine.copyWith(color: colors.primary, fontWeight: FontWeight.w700),
+                  partStyle: fine.copyWith(color: colors.link, fontWeight: FontWeight.w700),
                 ),
               ],
             ),

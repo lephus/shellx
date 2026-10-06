@@ -52,6 +52,16 @@ abstract class AppColors {
   /// Dimming behind sheets and dialogs.
   Color get scrim;
 
+  /// Link and action text on [background], [surface] and [primarySoft] (≥ 4.5:1; light
+  /// [primary] is only 3.0–3.5:1 there). Desktop UI doc §7.3: `--accent #007785`.
+  Color get link;
+
+  /// Link text on [keyboardBackground] ("Mở Cài đặt" in the voice composer).
+  Color get keyboardLink;
+
+  /// Error text on [keyboardBackground] (the voice composer's issue line).
+  Color get keyboardError;
+
   /// Extra keys bar (`--kb-*`): it follows the system keyboard's light or dark look.
   Color get keyboardBackground;
   Color get keyboardKey;

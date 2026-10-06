@@ -8,7 +8,13 @@ abstract final class TerminalColors {
   static const Color chrome2 = Color(0xFF1A272B);
   static const Color line = Color(0xFF243337);
   static const Color foreground = Color(0xFFD4E1E4);
+
+  /// Decoration only (inactive dots, the prompt's `%`): 4.3:1 on [chrome], 3.8:1 on [chrome2].
   static const Color dim = Color(0xFF6C8288);
+
+  /// Secondary text on the terminal chrome and cards (status line, inactive tabs, card bodies):
+  /// 6.8:1 on [chrome], 6.0:1 on [chrome2]. Desktop UI doc §1 `textSecondary`.
+  static const Color muted = Color(0xFF93A5A9);
   static const Color title = Color(0xFFE8F0F2);
   static const Color green = Color(0xFF7ED492);
   static const Color cyan = Color(0xFF5FD4E2);
