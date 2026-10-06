@@ -27,14 +27,12 @@ class _AppErrorWidgetState extends State<AppErrorWidget> {
           if (widget.retry != null)
             AppButton(
               backgroundColor: context.colors.primaryFill,
-              textColor: context.colors.white,
+              // onPrimary: white in light (5.3:1), dark ink on dark primary (7.0:1; white was 2.2:1).
+              textColor: context.colors.onPrimary,
               title: S.of(context).retry,
               prefix: Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Icon(
-                  Icons.refresh,
-                  color: Colors.white,
-                ),
+                child: Icon(Icons.refresh, color: context.colors.onPrimary),
               ),
               onTap: widget.retry,
             ),

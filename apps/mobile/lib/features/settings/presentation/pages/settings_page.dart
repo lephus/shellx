@@ -90,7 +90,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 15),
                       child: Row(
                         children: [
-                          Text('A', style: context.typo.metadata11.copyWith(color: colors.disable)),
+                          ExcludeSemantics(
+                            child: Text('A', style: context.typo.metadata11.copyWith(color: colors.secondaryText)),
+                          ),
                           Expanded(
                             child: Slider(
                               min: AppSettings.minFontSize,
@@ -103,7 +105,9 @@ class _SettingsPageState extends State<SettingsPage> {
                               onChangeEnd: _controller.setFontSize,
                             ),
                           ),
-                          Text('A', style: context.typo.title.copyWith(color: colors.disable)),
+                          ExcludeSemantics(
+                            child: Text('A', style: context.typo.title.copyWith(color: colors.secondaryText)),
+                          ),
                         ],
                       ),
                     ),
@@ -254,7 +258,11 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _Row(
                 title: strings.settingsEmail,
-                trailing: Text(_controller.email, style: context.typo.paragraph.copyWith(color: colors.secondaryText)),
+                trailing: Text(
+                  _controller.email,
+                  textAlign: TextAlign.end,
+                  style: context.typo.paragraph.copyWith(color: colors.secondaryText),
+                ),
               ),
               Divider(height: 1, color: colors.divider),
               Watch((context) {
@@ -405,7 +413,14 @@ class _Row extends StatelessWidget {
             children: [
               if (leading != null) ...[leading!, 10.sizedWidth],
               Expanded(child: Text(title, style: style)),
-              ?trailing,
+              // Shares the width with the title, so a long value (the email) or a large text size
+              // wraps instead of pushing the row off the card.
+              if (trailing != null) ...[
+                8.sizedWidth,
+                Flexible(
+                  child: Align(alignment: AlignmentDirectional.centerEnd, child: trailing),
+                ),
+              ],
             ],
           ),
         ),

@@ -354,7 +354,7 @@ void main() {
       expect(machine.resizes, hasLength(2));
     });
 
-    test('while the computer drives, a new view size is kept, not sent: only a tap or typing claims', () {
+    test('the banner appearing changes the grid but sends nothing and does not claim', () {
       fakeAsync((async) {
         desktopHandle.emit(const TabDriver(DriverSide.desktop));
         // The driver banner takes a row of the chrome: the view loses a row.
@@ -362,11 +362,41 @@ void main() {
         async.elapse(const Duration(seconds: 1));
         expect(machine.resizes, isEmpty);
         expect(desktop.showDriverBanner.value, isTrue);
+      });
+    });
 
+    test('rotation (or the keyboard, or a font size) while the computer drives claims the size', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        desktop.terminal.value.resize(80, 23); // the banner's own row
+        async.elapse(const Duration(seconds: 1));
+        desktop.terminal.value.resize(120, 18); // landscape
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, [(id: 40, cols: 120, rows: 18)]);
+      });
+    });
+
+    test('a size the view took after the claim is sent when the phone gets the size back', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        async.elapse(const Duration(seconds: 1));
         desktop.claimSize();
-        expect(machine.resizes, [(id: 40, cols: 80, rows: 23)]);
+        expect(machine.resizes, [(id: 40, cols: 80, rows: 24)]);
+        desktop.terminal.value.resize(100, 30);
+        // The agent confirms before the debounced resize goes out; no further layout follows.
+        desktopHandle.emit(const TabDriver(DriverSide.phone));
+        expect(machine.resizes, [(id: 40, cols: 80, rows: 24), (id: 40, cols: 100, rows: 30)]);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, hasLength(2));
+      });
+    });
 
-        // The agent confirms; the banner goes and the view gets its row back, which is sent.
+    test('the banner going away gives the row back, and that size is sent', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        desktop.terminal.value.resize(80, 23);
+        async.elapse(const Duration(seconds: 1));
+        desktop.claimSize();
         desktopHandle.emit(const TabDriver(DriverSide.phone));
         desktop.terminal.value.resize(80, 24);
         async.elapse(const Duration(seconds: 1));

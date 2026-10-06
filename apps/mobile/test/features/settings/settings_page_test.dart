@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -180,6 +181,47 @@ void main() {
       expect(find.text('Giao diện'), findsNothing);
     });
 
+    for (final locale in [vi, en]) {
+      testWidgets('Giao diện at 2× text on 320 pt (${locale.languageCode}): every label shows, nothing clips', (
+        tester,
+      ) async {
+        SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+        tester.view.physicalSize = const Size(640, 1600);
+        tester.view.devicePixelRatio = 2;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final app = routedApp(
+          open: () => const SettingsRoute(),
+          routes: [AutoRoute(page: SettingsRoute.page)],
+          locale: locale,
+        );
+        await tester.pumpWidget(
+          AdaptiveTheme(
+            light: ThemeDataFactory.create(Brightness.light),
+            dark: ThemeDataFactory.create(Brightness.dark),
+            initial: AdaptiveThemeMode.system,
+            builder: (_, _) => app,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await openPushed(tester);
+        await tester.scrollUntilVisible(find.byType(SegmentedButton<AdaptiveThemeMode>), 200);
+        expect(tester.takeException(), isNull);
+        final labels = locale == vi ? ['Theo máy', 'Sáng', 'Tối'] : ['System', 'Light', 'Dark'];
+        final control = tester.getRect(find.byType(SegmentedButton<AdaptiveThemeMode>));
+        for (final label in labels) {
+          final text = find.text(label);
+          expect(text, findsOneWidget, reason: label);
+          final rect = tester.getRect(text);
+          expect(rect.left, greaterThanOrEqualTo(control.left), reason: label);
+          expect(rect.right, lessThanOrEqualTo(control.right), reason: label);
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+        }
+      });
+    }
+
     testWidgets('Giao diện: Theo máy / Sáng / Tối switches and remembers the theme', (tester) async {
       SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
       tester.view.physicalSize = const Size(800, 1600);
@@ -214,10 +256,13 @@ void main() {
     });
   });
 
-  testWidgets('footnotes and the version line use secondaryText (AA), not the disabled grey', (tester) async {
+  testWidgets('footnotes, the version line and the font size "A"s use secondaryText (AA)', (tester) async {
     await openSettings(tester);
     final colors = Brightness.light.appColors;
     expect(tester.widget<Text>(find.text('ShellX 1.0.0 (1)')).style!.color, colors.secondaryText);
+    for (final a in tester.widgetList<Text>(find.text('A'))) {
+      expect(a.style!.color, colors.secondaryText);
+    }
   });
 
   testWidgets('font size slider previews while it moves and stores the size on release', (tester) async {

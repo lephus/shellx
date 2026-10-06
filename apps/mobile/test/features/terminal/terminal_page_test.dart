@@ -1313,6 +1313,42 @@ void main() {
       await tester.pump(const Duration(milliseconds: 150));
     });
 
+    testWidgets('the mic is a button the screen reader can tap while the tab is live', (tester) async {
+      await openQuiet(tester);
+      expect(
+        tester.getSemantics(mic()),
+        matchesSemantics(
+          label: 'Nói lệnh',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+    });
+
+    testWidgets('listening, the mic still stops the listen after the tab stopped being live', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      machine.handles.single.emit(const TabExited(0));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(mic()),
+        matchesSemantics(
+          label: 'Dừng nghe',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      await tester.tap(mic());
+      await tester.pump();
+      expect(speech.stops, 1);
+      await tester.pump(const Duration(milliseconds: 150));
+    });
+
     testWidgets('a session taken by another device says to reattach', (tester) async {
       await openQuiet(tester);
       await tester.tap(mic());

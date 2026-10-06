@@ -18,17 +18,21 @@ class MicButton extends StatelessWidget {
     return Watch((context) {
       final listening = controller.phase.value == VoicePhase.listening;
       final strings = S.of(context);
+      // Listening, the mic stays usable even if the tab stopped being live: "Dừng nghe" must work.
+      final active = enabled || listening;
       return Semantics(
         button: true,
-        enabled: enabled,
+        enabled: active,
+        // The GestureDetector's own action is excluded with the icon; the screen reader taps here.
+        onTap: active ? onTap : null,
         label: listening ? strings.voiceStopTooltip : strings.voiceMicTooltip,
         excludeSemantics: true,
         child: GestureDetector(
           key: const ValueKey('voice-mic'),
           behavior: HitTestBehavior.opaque,
-          onTap: enabled ? onTap : null,
+          onTap: active ? onTap : null,
           child: Opacity(
-            opacity: enabled ? 1 : 0.4,
+            opacity: active ? 1 : 0.4,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
               child: AnimatedContainer(

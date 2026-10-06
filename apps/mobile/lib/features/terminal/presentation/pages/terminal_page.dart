@@ -344,7 +344,7 @@ class _TerminalPageState extends State<TerminalPage> {
           showReconnecting: false,
         ),
         // In the chrome, never over the cells, so no row is cut in half. The row it takes from the
-        // view is not sent while the computer drives (`TerminalTabController._sendResize`).
+        // view does not take the size back (`TerminalTabController._sendResize`, `fromBanner`).
         Watch((context) {
           if (_controller.closing.value) return const SizedBox.shrink();
           final tab = workspace.activeTab.value;

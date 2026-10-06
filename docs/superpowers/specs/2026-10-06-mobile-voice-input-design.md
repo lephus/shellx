@@ -25,7 +25,7 @@ Trên màn terminal của điện thoại, người dùng **nói** thay vì gõ:
 | # | Chủ đề | Quyết định |
 |---|---|---|
 | V1 | Nghĩa của "nói để ra lệnh" | Đọc chính tả là chính + vài từ khoá điều khiển ("gửi"/"send", "huỷ"/"cancel"). Không dịch ngôn ngữ tự nhiên → lệnh shell |
-| V2 | Ngôn ngữ | Mỗi lượt một ngôn ngữ, chọn VI/EN bằng chip; mặc định theo ngôn ngữ app; nhớ lựa chọn |
+| V2 | Ngôn ngữ | Mỗi lượt một ngôn ngữ, chọn VI/EN bằng nút chọn hai phần (segmented); mặc định theo ngôn ngữ app; nhớ lựa chọn |
 | V3 | Đưa chữ vào terminal | Qua ô soạn thảo (composer) sửa được; chỉ gửi khi bấm Gửi hoặc nói từ khoá gửi |
 | V4 | Engine | Nhận dạng của hệ điều hành (Apple Speech, Android SpeechRecognizer) qua package `speech_to_text`; Android: ưu tiên on-device, không có thì dùng nhận dạng cloud của hệ điều hành. iOS: không ép on-device (plugin không tự quay về cloud trong cùng một lượt: khi máy không nghe on-device được, nó trả lỗi nhưng vẫn chạy lượt on-device), để Apple tự chọn xử lý trên máy hay trên máy chủ. Loại bỏ: chỉ on-device tuyệt đối, Whisper cloud qua relay (phá nguyên tắc relay mù), whisper.cpp on-device (nặng) |
 | V5 | Bật micro | Chạm để bật, chạm lại hoặc im lặng ~2 giây để dừng |
@@ -38,18 +38,19 @@ Trên màn terminal của điện thoại, người dùng **nói** thay vì gõ:
 
 ### 3.1 Luồng
 
-1. Nút **mic** ở đầu thanh phím phụ (`ExtraKeysBar`), chỉ hiện khi phiên đang live.
+1. Nút **mic** ở đầu thanh phím phụ (`ExtraKeysBar`), biểu tượng màu nhấn để khác các phím. Luôn ở đúng chỗ đó: khi phiên không live thì mờ (40 %) và bị vô hiệu (Semantics `enabled: false`), không biến mất, để các phím sau không xê dịch. Đang nghe thì mic vẫn bấm được ("Dừng nghe") kể cả khi phiên vừa hết live.
 2. Chạm lần đầu → xin quyền micro và quyền nhận dạng giọng nói.
 3. Đang nghe:
    - composer trượt lên trên thanh phím phụ và bàn phím;
-   - mic có hiệu ứng sóng;
-   - chữ hiện dần theo kết quả từng phần (partial);
-   - chip **VI / EN** để đổi ngôn ngữ;
+   - mic có hiệu ứng sóng (đứng yên khi hệ thống yêu cầu giảm chuyển động);
+   - ô chữ trống thì gợi ý đổi thành "Đang nghe… nói “gửi” để gửi" (EN: "Listening… say “send” to send"), và trình đọc màn hình được báo "Đang nghe" mỗi lần bắt đầu nghe;
+   - chữ hiện dần theo kết quả từng phần (partial), bằng font JetBrains Mono như terminal (gợi ý vẫn Raleway);
+   - nút chọn hai phần **VI | EN** (mỗi phần ≥ 44 pt, không có dấu ✓ nên không xê dịch) để đổi ngôn ngữ;
    - Android: nghe trên máy trước; nếu lỗi trước khi nghe được chữ nào (ngôn ngữ không có trên máy / lỗi khác), thử lại một lần bằng nhận dạng cloud của hệ điều hành. iOS: một lượt, Apple tự chọn trên máy hay cloud (V4).
 4. Dừng (chạm mic hoặc im lặng ~2 giây) → chữ nằm trong composer, sửa được bằng bàn phím. Chạm mic lần nữa → nói tiếp, **nối thêm** vào chữ đang có (cách bằng một dấu cách).
 5. Gửi: nút **Gửi** hoặc từ khoá gửi. Composer trống lại và vẫn mở để nói tiếp. Nút **✕** đóng composer, bỏ chữ.
 6. Composer gõ tay được — cũng là chỗ soạn câu dài dễ hơn gõ thẳng vào terminal. Mở composer thì bàn phím của terminal ẩn đi; chạm vào ô chữ thì bàn phím hiện lại và gõ vào composer, không vào terminal. ✕ trả focus về terminal.
-7. Composer hiện tên tab đích (ví dụ "→ zsh · MacBook"). Đổi tab khi đang soạn: chữ giữ nguyên, gửi luôn tới tab **đang mở**.
+7. Composer hiện tên tab đích (ví dụ "Gửi tới: zsh · MacBook", EN "To: zsh · MacBook"). Ô chữ trống thì tooltip của Gửi là "Gửi phím Enter". Đổi tab khi đang soạn: chữ giữ nguyên, gửi luôn tới tab **đang mở**.
 
 ### 3.2 Từ khoá
 
@@ -81,9 +82,9 @@ Chỉ trong `apps/mobile`, theo pattern sẵn có: `Controller` + `StateSignal` 
 | `VoiceCommandParser` | `domain/voice_command_parser.dart` | Hàm thuần `parse(text, VoiceLocale)` → `VoiceSend(text)` / `VoiceCancel()` / `VoiceAppend(text)` theo §3.2 | không |
 | `VoiceLocale` | `domain/voice_locale.dart` | enum `vi` (`vi-VN`), `en` (`en-US`), kèm từ khoá gửi/huỷ của từng ngôn ngữ | không |
 | `AppSettings.voiceLocale` / `setVoiceLocale` | `lib/core/settings/app_settings.dart` | Đọc/ghi lựa chọn VI/EN; null = theo ngôn ngữ app. App giữ một đối tượng settings duy nhất, không có `VoiceLocaleStore` riêng | storage hiện có |
-| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | Signals `phase` (`closed`/`idle`/`listening`), `issue` (`VoiceIssue`: `noPermission`, `unsupported`, `localeUnavailable`, `network`, `failed`), `locale`, `unavailable` (chip mờ; xoá khi composer mở lại từ trạng thái đóng) + `TextEditingController text`; `attach(canSend, onSubmit)`. Một lượt nghe tại một thời điểm: partial ghép lên chữ đã có; final → parser; `VoiceSend` gọi `onSubmit(text)`; lượt đầu `onDevice: tryOnDeviceFirst`, thử lại cloud chỉ sau một lượt on-device; lượt đã cạn và `done` muộn xử lý theo §5. `pause()` (app không còn active) huỷ lượt đang nghe, và nếu đang chuẩn bị (quyền, locale) thì lượt đó không bắt đầu; lần chạm mic sau nghe lại bình thường | `SpeechInput`, `AppSettings` |
-| `VoiceComposer` | `presentation/widgets/voice_composer.dart` | Ô chữ nhiều dòng, chip VI/EN, nút mic (sóng), Gửi, ✕, nhãn tab đích, dòng lỗi; có Semantics label | controller |
-| `MicButton` | `presentation/widgets/mic_button.dart` | Nút mic dùng ở thanh phím phụ | controller |
+| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | Signals `phase` (`closed`/`idle`/`listening`), `issue` (`VoiceIssue`: `noPermission`, `unsupported`, `localeUnavailable`, `network`, `failed`), `locale`, `unavailable` (phần ngôn ngữ đó bị vô hiệu; xoá khi composer mở lại từ trạng thái đóng) + `TextEditingController text`; `attach(canSend, onSubmit)`. Một lượt nghe tại một thời điểm: partial ghép lên chữ đã có; final → parser; `VoiceSend` gọi `onSubmit(text)`; lượt đầu `onDevice: tryOnDeviceFirst`, thử lại cloud chỉ sau một lượt on-device; lượt đã cạn và `done` muộn xử lý theo §5. `pause()` (app không còn active) huỷ lượt đang nghe, và nếu đang chuẩn bị (quyền, locale) thì lượt đó không bắt đầu; lần chạm mic sau nghe lại bình thường | `SpeechInput`, `AppSettings` |
+| `VoiceComposer` | `presentation/widgets/voice_composer.dart` | Ô chữ nhiều dòng (JetBrains Mono), nút chọn VI/EN, Gửi, ✕, nhãn "Gửi tới:", dòng lỗi, dòng chú thích khi không gửi được (`VoiceSendBlock`: ended / detached / disconnected); báo "Đang nghe" cho trình đọc màn hình; có Semantics label | controller |
+| `MicButton` | `presentation/widgets/mic_button.dart` | Nút mic dùng ở thanh phím phụ; `enabled` theo phiên live (vẫn bật khi đang nghe); có hành động chạm cho trình đọc màn hình | controller |
 
 ### 4.2 Sửa code có sẵn
 
@@ -107,16 +108,16 @@ Mic → `SpeechInput` → `SpeechPartial`/`SpeechFinal` → `VoiceComposerContro
 
 | Tình huống | Hành vi |
 |---|---|
-| Từ chối quyền (micro hoặc nhận dạng) | Dòng lỗi trong composer "Cần quyền micro và nhận dạng giọng nói để nói lệnh" + nút **Mở Cài đặt** ngay trên dòng đó. Nút mic vẫn hiện; chạm lần sau kiểm tra lại quyền |
-| Ngôn ngữ đang chọn `unavailable` (bộ nhận dạng báo lỗi ngôn ngữ, hoặc iOS báo thiếu gói `error_assets_not_installed`) | Dòng lỗi "Máy chưa hỗ trợ nhận dạng tiếng Việt" (hoặc tiếng Anh) + gợi ý đổi ngôn ngữ; chip ngôn ngữ đó mờ tới khi composer đóng rồi mở lại |
+| Từ chối quyền (micro hoặc nhận dạng) | Dòng lỗi trong composer "Cần quyền micro và nhận dạng giọng nói để nói lệnh", bên dưới là nút **Mở Cài đặt** (cao 44 pt). Màu chữ đạt AA trên nền bàn phím. Nút mic vẫn hiện; chạm lần sau kiểm tra lại quyền |
+| Ngôn ngữ đang chọn `unavailable` (bộ nhận dạng báo lỗi ngôn ngữ, hoặc iOS báo thiếu gói `error_assets_not_installed`) | Dòng lỗi "Máy chưa hỗ trợ nhận dạng tiếng Việt" (hoặc tiếng Anh) + gợi ý đổi ngôn ngữ; phần ngôn ngữ đó trong nút chọn VI|EN bị vô hiệu tới khi composer đóng rồi mở lại |
 | Không on-device và mất mạng (`network`) | "Cần kết nối mạng để nhận dạng giọng nói"; chữ giữ nguyên |
 | `noMatch` (không nghe được gì) | Dừng nghe, không báo lỗi to; chữ giữ nguyên |
-| Phiên hết live khi đang soạn | Chữ giữ nguyên; Gửi và từ khoá gửi vô hiệu, có dòng chú thích; live lại thì gửi được |
+| Phiên hết live khi đang soạn | Chữ giữ nguyên; Gửi và từ khoá gửi vô hiệu, có dòng chú thích theo lý do: phiên đã thoát / mất / lỗi (hoặc không còn tab) → "Phiên đã kết thúc — mở phiên mới để gửi"; thiết bị khác chiếm phiên hoặc máy tính ngắt điện thoại → "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi"; đang kết nối lại → "Phiên chưa kết nối — gửi được khi kết nối lại" (live lại thì gửi được) |
 | Đổi tab | Chữ giữ nguyên; nhãn tab đích cập nhật; gửi tới tab đang mở |
 | App xuống nền, khoá màn hình (lock gate), cuộc gọi, iOS hết giới hạn ~1 phút mỗi lượt (`interrupted`) | Dừng nghe, giữ chữ, không tự bật lại |
 | Rời màn terminal | Huỷ nghe; composer đóng, chữ bỏ |
 | Máy không có bộ nhận dạng giọng nói, hoặc nhận dạng bị tắt (iOS `error_speech_recognizer_disabled`) | "Máy này không hỗ trợ nhận dạng giọng nói" |
-| Không có phiên live | Nút mic ẩn; composer đang mở vẫn giữ |
+| Không có phiên live | Nút mic mờ và vô hiệu tại chỗ (trừ khi đang nghe: vẫn dừng được); composer đang mở vẫn giữ |
 | `done` đến mà không có kết quả cuối (final) | Không chặn mic: lượt nghe đã cạn bị huỷ ở lần chạm mic kế tiếp rồi nghe lượt mới |
 | `done` muộn của lượt nghe trước | Bỏ qua cho tới khi lượt mới báo đã bắt đầu nghe (`SpeechListening(true)`, partial hoặc final), để không kết thúc nhầm lượt mới |
 
@@ -141,7 +142,7 @@ Mic → `SpeechInput` → `SpeechPartial`/`SpeechFinal` → `VoiceComposerContro
 - **Unit `VoiceCommandParser`** (dạng bảng): "chạy test gửi" → `VoiceSend("chạy test")`; "Gửi." → `VoiceSend("")`; "gửi email cho tôi" → `VoiceAppend`; "hủy"/"huỷ" → `VoiceCancel`; "run tests, send" (EN) → `VoiceSend("run tests")`; "send" khi locale VI → `VoiceAppend`; hoa thường, dấu câu, khoảng trắng.
 - **Unit `VoiceComposerController`** với `FakeSpeechInput`: partial ghép lên chữ cũ; final → parser; `VoiceSend` gọi `onSubmit` và làm trống; `VoiceCancel` xoá; mỗi `SpeechErrorKind` → đúng state; không live → không gọi `onSubmit`; nhớ locale qua `AppSettings.voiceLocale`.
 - **Unit `submitLine`**: bracketed paste bật → `ESC[200~text ESC[201~` rồi `\r`; tắt → `text\r`; rỗng → `\r`; modifier one-shot không bị áp.
-- **Widget**: nút mic trên thanh phím phụ, ẩn khi không live; composer hiện/đóng; chip VI/EN; Gửi/✕; nhãn tab đích; Semantics.
+- **Widget**: nút mic trên thanh phím phụ, mờ và vô hiệu tại chỗ khi không live (vẫn dừng được khi đang nghe); composer hiện/đóng; "Đang nghe…" và thông báo cho trình đọc màn hình; nút chọn VI/EN (≥ 44 pt, không xê dịch); font JetBrains Mono; Gửi/✕; nhãn "Gửi tới:"; chú thích ended/detached/disconnected; màu AA của dòng lỗi và "Mở Cài đặt"; Semantics.
 - **Thử tay trên máy thật** (iPhone, Android; không giả lập được micro): tiếng Việt và tiếng Anh; máy có và không có on-device; từ chối quyền; chế độ máy bay; "gửi" khi đang trong Claude Code.
 
 ---
