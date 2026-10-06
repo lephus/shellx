@@ -32,4 +32,43 @@ void main() {
       c.dispose();
     });
   });
+
+  test('M1: a mark ends at its own expiry, not 10 s after the last '
+      'touch of any other', () {
+    fakeAsync((async) {
+      final t0 = DateTime(2026, 10, 7, 9);
+      final c = ProviderContainer(
+        overrides: [
+          agentMarksClockProvider.overrideWithValue(
+            () => t0.add(async.elapsed),
+          ),
+        ],
+      );
+      final marks = c.read(agentMarksProvider.notifier);
+      marks.touch(tab: 5);
+      async.elapse(const Duration(seconds: 5));
+      marks.touch(tab: 6);
+      async.elapse(const Duration(seconds: 5));
+      expect(c.read(agentMarksProvider).tabs.keys, [6]);
+      async.elapse(const Duration(seconds: 5));
+      expect(c.read(agentMarksProvider).tabs, isEmpty);
+      expect(async.pendingTimers, isEmpty);
+      c.dispose();
+    });
+  });
+
+  test('M2: no announcer yet → the 60 s gap is not used up', () {
+    var now = DateTime(2026, 10, 7, 9);
+    final c = ProviderContainer(
+      overrides: [agentMarksClockProvider.overrideWithValue(() => now)],
+    );
+    addTearDown(c.dispose);
+    final marks = c.read(agentMarksProvider.notifier);
+    marks.touch(tab: 1);
+    final announced = <int>[];
+    marks.onAnnounce = announced.add;
+    now = now.add(const Duration(seconds: 1));
+    marks.touch(tab: 2);
+    expect(announced, [2]);
+  });
 }

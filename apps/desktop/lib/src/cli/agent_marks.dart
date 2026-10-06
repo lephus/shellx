@@ -57,13 +57,15 @@ class AgentMarks extends Notifier<AgentMarksState> {
       tabs: {...state.tabs, tab: now},
       panes: {...state.panes, ?pane: now},
     );
+    // Only an announcement made counts toward the gap.
+    final announce = onAnnounce;
     final last = _lastAnnounce;
-    if (last == null || now.difference(last) >= kAgentAnnounceGap) {
+    if (announce != null &&
+        (last == null || now.difference(last) >= kAgentAnnounceGap)) {
       _lastAnnounce = now;
-      onAnnounce?.call(tab);
+      announce(tab);
     }
-    _expiry?.cancel();
-    _expiry = Timer(kAgentMarkFor, _prune);
+    _schedule();
   }
 
   void _prune() {
@@ -73,8 +75,17 @@ class AgentMarks extends Notifier<AgentMarksState> {
         if (AgentMarksState._active(e.value, now)) e.key: e.value,
     };
     state = AgentMarksState(tabs: live(state.tabs), panes: live(state.panes));
-    if (state.tabs.isNotEmpty || state.panes.isNotEmpty) {
-      _expiry = Timer(const Duration(seconds: 1), _prune);
-    }
+    _schedule();
+  }
+
+  /// The next prune: when the oldest mark left ends.
+  void _schedule() {
+    _expiry?.cancel();
+    _expiry = null;
+    final marks = [...state.tabs.values, ...state.panes.values];
+    if (marks.isEmpty) return;
+    final oldest = marks.reduce((a, b) => a.isBefore(b) ? a : b);
+    final wait = oldest.add(kAgentMarkFor).difference(_now);
+    _expiry = Timer(wait.isNegative ? Duration.zero : wait, _prune);
   }
 }
