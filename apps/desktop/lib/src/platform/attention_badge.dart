@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -82,14 +83,30 @@ final class AfterWindowBadge implements BadgeHost {
 }
 
 /// `main.dart`. [run] logs a failed call by type (never the count's text).
-void listenForAttentionBadge({
+/// A host without its platform channel (an old Windows runner) fails every
+/// call the same way: [log] says so once, and nothing goes to [run] again.
+AttentionListener listenForAttentionBadge({
   required ProviderContainer container,
   required BadgeHost host,
   required AppLocalizations l10n,
   required void Function(Future<void> call) run,
+  void Function(String message)? log,
 }) {
+  final say = log ?? debugPrint;
+  var missing = false;
+  void call(Future<void> Function() f) {
+    if (missing) return;
+    run(
+      f().catchError((Object _) {
+        if (missing) return;
+        missing = true;
+        say('ShellX: badge unavailable (no platform channel)');
+      }, test: (e) => e is MissingPluginException),
+    );
+  }
+
   void apply(int count) =>
-      run(host.setUnread(count, l10n.attentionUnreadCount(count)));
+      call(() => host.setUnread(count, l10n.attentionUnreadCount(count)));
   container.listen<int>(
     tabAttentionProvider.select((s) => s.totalUnread),
     (_, count) => apply(count),
@@ -103,12 +120,11 @@ void listenForAttentionBadge({
     if (shown) apply(container.read(tabAttentionProvider).totalUnread);
   });
   // Arrivals come only while the user is not looking at that tab; flash
-  // only when the whole window is not active (D19). The sources are read,
-  // not the derived windowActiveProvider (see its doc).
-  container.read(tabAttentionProvider.notifier).arrivals.listen((_) {
-    final active =
-        container.read(windowFocusProvider) &&
-        container.read(windowRouterProvider).visible;
-    if (!active) run(host.flash());
-  });
+  // only when the whole window is not active (D19).
+  return listenAttention(
+    container,
+    onArrival: (_) {
+      if (!readWindowActive(container.read)) call(host.flash);
+    },
+  );
 }

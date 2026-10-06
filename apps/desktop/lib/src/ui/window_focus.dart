@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import 'window_router.dart';
 
@@ -31,10 +32,14 @@ final windowActiveProvider = Provider<bool>(
       ref.watch(windowFocusProvider) && ref.watch(windowRouterProvider).visible,
 );
 
+/// Reads a provider: `ref.read` or `container.read`.
+typedef ProviderReader = T Function<T>(ProviderListenable<T> provider);
+
 /// [windowActiveProvider]'s rule read straight from its sources, so it is
-/// current even inside a source's listener.
-bool readWindowActive(Ref ref) =>
-    ref.read(windowFocusProvider) && ref.read(windowRouterProvider).visible;
+/// current even inside a source's listener. [read] is `ref.read` or
+/// `container.read`.
+bool readWindowActive(ProviderReader read) =>
+    read(windowFocusProvider) && read(windowRouterProvider).visible;
 
 /// Bumped when something outside the page (a notification click, the
 /// panel, next unread) wants the keyboard in the selected tab's terminal;

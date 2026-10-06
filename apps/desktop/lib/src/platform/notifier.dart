@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:local_notifier/local_notifier.dart';
 
 abstract interface class SystemNotifier {
@@ -19,6 +20,10 @@ abstract interface class SystemNotifier {
 final class LocalSystemNotifier implements SystemNotifier {
   LocalSystemNotifier._();
 
+  /// Without [setup]: tests answer the plugin's channel themselves.
+  @visibleForTesting
+  LocalSystemNotifier.forTest();
+
   static Future<LocalSystemNotifier> setup() async {
     await localNotifier.setup(
       appName: 'ShellX',
@@ -36,14 +41,20 @@ final class LocalSystemNotifier implements SystemNotifier {
     String? id,
     void Function()? onClick,
   }) async {
-    if (id != null) await close(id);
     final notification = LocalNotification(
       identifier: id,
       title: title,
       body: body,
     );
     notification.onClick = onClick;
-    if (id != null) _shown[id] = notification;
+    if (id != null) {
+      // Registered before the first await, so a close(id) that comes
+      // while the previous one is going away removes this one too.
+      final previous = _shown[id];
+      _shown[id] = notification;
+      if (previous != null) await previous.destroy();
+      if (!identical(_shown[id], notification)) return; // closed meanwhile
+    }
     await notification.show();
   }
 

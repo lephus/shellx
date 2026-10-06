@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -8,17 +8,26 @@ import '../terminal/sidebar_workspaces.dart';
 import '../terminal/tab_attention.dart';
 import '../terminal/terminal_tabs.dart';
 import '../ui/window_focus.dart';
-import '../ui/window_router.dart';
 import 'notifier.dart';
 import 'settings_store.dart';
 
+/// Whether the user can see a tab now (D14): read at each decision.
+typedef AttentionView = ({bool windowFocused, bool tabSelected});
+
 /// One tab's D15 coalescing window: what arrived after the first post.
 final class _Burst {
-  _Burst(this.title);
+  _Burst(this.title, {required this.bellsOnly});
   String title;
   int extra = 0;
   String latest = '';
   Timer? timer;
+
+  /// The first notice was refused by the rate limit: the coalesced post
+  /// counts it too.
+  bool firstSkipped = false;
+
+  /// Only bells so far: D14's bell rule applies at the flush.
+  bool bellsOnly;
 }
 
 /// Native notifications for tabs (A4 N6, D14–D17). Never throws; never
@@ -29,6 +38,7 @@ final class DesktopNotifications {
     required SettingsStore settings,
     required AppLocalizations l10n,
     required void Function(int tabId) onOpen,
+    AttentionView Function(int tabId)? viewOf,
     DateTime Function()? now,
     this.coalesce = const Duration(seconds: 3),
     this.perTab = 6,
@@ -39,6 +49,7 @@ final class DesktopNotifications {
        _settings = settings,
        _l10n = l10n,
        _onOpen = onOpen,
+       _viewOf = viewOf ?? _unseen,
        _now = now ?? DateTime.now,
        _log = log ?? debugPrint;
 
@@ -53,6 +64,7 @@ final class DesktopNotifications {
   final SettingsStore _settings;
   final AppLocalizations _l10n;
   final void Function(int tabId) _onOpen;
+  final AttentionView Function(int tabId) _viewOf;
   final DateTime Function() _now;
   final void Function(String message) _log;
   final Duration coalesce;
@@ -63,12 +75,50 @@ final class DesktopNotifications {
   final _postsByTab = <int, List<DateTime>>{};
   final _posts = <DateTime>[];
 
-  /// D14: whether [a] becomes a system notification, then D15. Both
-  /// settings are read here, on every notice, so a tray change applies at
-  /// once; a missing value means on.
+  /// When the rate limit was last logged: once per [window].
+  DateTime? _limitLogged;
+  AttentionListener? _listener;
+
+  static AttentionView _unseen(int _) =>
+      (windowFocused: false, tabSelected: false);
+
+  /// D14: whether [a] becomes a system notification, then D15.
   void arrived(
     AttentionArrival a, {
     required String title,
+    required bool windowFocused,
+    required bool tabSelected,
+  }) {
+    final bell = a.kind == AttentionKind.bell;
+    if (!_wanted(
+      bell: bell,
+      windowFocused: windowFocused,
+      tabSelected: tabSelected,
+    )) {
+      return;
+    }
+    final body = bell ? _l10n.attentionBellBody : a.text;
+    final burst = _bursts[a.tabId];
+    if (burst != null) {
+      burst
+        ..title = title
+        ..extra += 1
+        ..latest = body
+        ..bellsOnly = burst.bellsOnly && bell;
+      return;
+    }
+    final fresh = _Burst(title, bellsOnly: bell);
+    fresh.timer = Timer(coalesce, () => _flush(a.tabId));
+    _bursts[a.tabId] = fresh;
+    fresh.firstSkipped = !_post(a.tabId, title, body);
+  }
+
+  /// D14. Both settings are read at each decision, so a tray change
+  /// applies at once (also to a pending coalesced post); a missing value
+  /// means on. A bell only when the window is not in front, whatever the
+  /// switch.
+  bool _wanted({
+    required bool bell,
     required bool windowFocused,
     required bool tabSelected,
   }) {
@@ -76,31 +126,14 @@ final class DesktopNotifications {
       SettingKeys.desktopNotifications,
       defaultValue: true,
     );
-    if (!enabled) return;
+    if (!enabled) return false;
     final onlyUnfocused = _settings.getBool(
       SettingKeys.desktopNotificationsOnlyUnfocused,
       defaultValue: true,
     );
-    // A bell only when the window is not in front, whatever the switch.
-    final post = a.kind == AttentionKind.bell
+    return bell
         ? !windowFocused
         : !windowFocused || (!onlyUnfocused && !tabSelected);
-    if (!post) return;
-    final body = a.kind == AttentionKind.bell
-        ? _l10n.attentionBellBody
-        : a.text;
-    final burst = _bursts[a.tabId];
-    if (burst != null) {
-      burst
-        ..title = title
-        ..extra += 1
-        ..latest = body;
-      return;
-    }
-    final fresh = _Burst(title);
-    fresh.timer = Timer(coalesce, () => _flush(a.tabId));
-    _bursts[a.tabId] = fresh;
-    _post(a.tabId, title, body);
   }
 
   /// The tab was read (or closed): no pending burst, and its delivered
@@ -110,36 +143,54 @@ final class DesktopNotifications {
     unawaited(_guard(() => _notifier.close(idFor(tabId))));
   }
 
+  /// Stops listening (see [listenForDesktopNotifications]) and cancels
+  /// pending bursts.
   void dispose() {
+    _listener?.close();
+    _listener = null;
     for (final b in _bursts.values) {
       b.timer?.cancel();
     }
     _bursts.clear();
   }
 
+  /// D15: the coalesced post, if the user still wants one now: the
+  /// settings and the window may have changed during the 3 s.
   void _flush(int tabId) {
     final burst = _bursts.remove(tabId);
     if (burst == null || burst.extra == 0) return;
-    _post(
-      tabId,
-      burst.title,
-      _l10n.systemNotifyCoalesced(burst.extra, burst.latest),
-    );
-  }
-
-  void _post(int tabId, String title, String body) {
-    final now = _now();
-    bool full(List<DateTime> times, int max) {
-      times.removeWhere((t) => now.difference(t) >= window);
-      return times.length >= max;
-    }
-
-    final tabPosts = _postsByTab.putIfAbsent(tabId, () => []);
-    if (full(tabPosts, perTab) || full(_posts, perApp)) {
-      _log('ShellX: system notification skipped (rate limit)');
+    final view = _viewOf(tabId);
+    if (!_wanted(
+      bell: burst.bellsOnly,
+      windowFocused: view.windowFocused,
+      tabSelected: view.tabSelected,
+    )) {
       return;
     }
-    tabPosts.add(now);
+    final count = burst.extra + (burst.firstSkipped ? 1 : 0);
+    _post(tabId, burst.title, _l10n.systemNotifyCoalesced(count, burst.latest));
+  }
+
+  /// False when the rate limit refused it.
+  bool _post(int tabId, String title, String body) {
+    final now = _now();
+    bool old(DateTime t) => now.difference(t) >= window;
+    _posts.removeWhere(old);
+    // Tabs without a post in the window are forgotten.
+    _postsByTab.removeWhere((_, times) {
+      times.removeWhere(old);
+      return times.isEmpty;
+    });
+    final tabPosts = _postsByTab[tabId] ?? const <DateTime>[];
+    if (tabPosts.length >= perTab || _posts.length >= perApp) {
+      final logged = _limitLogged;
+      if (logged == null || now.difference(logged) >= window) {
+        _limitLogged = now;
+        _log('ShellX: system notifications skipped (rate limit)');
+      }
+      return false;
+    }
+    _postsByTab.putIfAbsent(tabId, () => []).add(now);
     _posts.add(now);
     unawaited(
       _guard(
@@ -151,7 +202,12 @@ final class DesktopNotifications {
         ),
       ),
     );
+    return true;
   }
+
+  /// Tabs with a post in the current rate-limit window.
+  @visibleForTesting
+  int get trackedTabs => _postsByTab.length;
 
   Future<void> _guard(Future<void> Function() call) async {
     try {
@@ -181,36 +237,40 @@ String systemNotificationTitle(
   return name == null ? tab.label : '${tab.label} · $name';
 }
 
+/// [DesktopNotifications.arrived]'s window state for [tabId], read from
+/// [windowActiveProvider]'s sources at decision time: the derived provider
+/// can lag (see TabAttention.build).
+AttentionView attentionView(ProviderContainer container, int tabId) => (
+  windowFocused: readWindowActive(container.read),
+  tabSelected: container.read(terminalTabsProvider).selectedId == tabId,
+);
+
 /// `main.dart`: arrivals → [DesktopNotifications.arrived], reads →
-/// [DesktopNotifications.tabRead]. Reading [tabAttentionProvider] here
-/// also builds it at startup, so no notice is missed.
+/// [DesktopNotifications.tabRead], until [DesktopNotifications.dispose].
 void listenForDesktopNotifications({
   required ProviderContainer container,
   required DesktopNotifications notifications,
   required AppLocalizations l10n,
 }) {
-  final attention = container.read(tabAttentionProvider.notifier);
-  attention.arrivals.listen((a) {
-    final tabs = container.read(terminalTabsProvider);
-    TerminalTab? tab;
-    for (final t in tabs.tabs) {
-      if (t.id == a.tabId) tab = t;
-    }
-    if (tab == null) return;
-    notifications.arrived(
-      a,
-      title: systemNotificationTitle(
-        tab,
-        container.read(sidebarWorkspacesProvider),
-        l10n,
-      ),
-      // windowActiveProvider's rule, read from its sources at decision
-      // time: the derived provider can lag (see TabAttention.build).
-      windowFocused:
-          container.read(windowFocusProvider) &&
-          container.read(windowRouterProvider).visible,
-      tabSelected: tabs.selectedId == a.tabId,
-    );
-  });
-  attention.reads.listen(notifications.tabRead);
+  notifications._listener?.close();
+  notifications._listener = listenAttention(
+    container,
+    onArrival: (a) {
+      final tabs = container.read(terminalTabsProvider);
+      final tab = tabs.tabs.where((t) => t.id == a.tabId).firstOrNull;
+      if (tab == null) return;
+      final view = attentionView(container, a.tabId);
+      notifications.arrived(
+        a,
+        title: systemNotificationTitle(
+          tab,
+          container.read(sidebarWorkspacesProvider),
+          l10n,
+        ),
+        windowFocused: view.windowFocused,
+        tabSelected: view.tabSelected,
+      );
+    },
+    onRead: notifications.tabRead,
+  );
 }

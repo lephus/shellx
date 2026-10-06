@@ -196,7 +196,7 @@ class SessionTabRowState extends State<SessionTabRow> {
         l10n.sidebarStatusIdle,
       // UI-A4 §8: right after the status, the full text (not cut).
       if (widget.unread case final u?)
-        l10n.attentionRowSemantics(u.count, u.text),
+        l10n.attentionRowSemantics(u.count, u.text(l10n)),
       if (tab.gitBranch case final branch?) l10n.sidebarBranch(branch),
       if (tab.cwd case final cwd?)
         l10n.sidebarFolder(
@@ -561,7 +561,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                               0.0,
                               titleTop + titleBox - notificationTop,
                             ),
-                            child: NotificationLine(text: unread.text),
+                            child: NotificationLine(text: unread.text(l10n)),
                           ),
                         ),
                       if (withContext)

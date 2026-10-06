@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/services.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -24,6 +26,22 @@ final class _Host implements BadgeHost {
       unread.add((count, description));
   @override
   Future<void> flash() async => flashes++;
+}
+
+final class _MissingHost implements BadgeHost {
+  _MissingHost(this._onCall);
+  final void Function() _onCall;
+  @override
+  Future<void> setUnread(int count, String description) async {
+    _onCall();
+    throw MissingPluginException();
+  }
+
+  @override
+  Future<void> flash() async {
+    _onCall();
+    throw MissingPluginException();
+  }
 }
 
 void main() {
@@ -65,6 +83,40 @@ void main() {
     expect(host.flashes, 2);
     c.read(tabAttentionProvider.notifier).markAllRead();
     expect(host.unread.last.$1, 0);
+  });
+
+  test('a host without its channel is logged once, then left alone', () async {
+    final local = FakeLocalSessions();
+    local.add(local.summary(1, title: 'a'));
+    local.add(local.summary(2, title: 'b'));
+    final c = ProviderContainer.test(
+      overrides: [
+        localSessionsProvider.overrideWithValue(local),
+        appL10nProvider.overrideWithValue(
+          lookupAppLocalizations(const Locale('en')),
+        ),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    c.read(terminalTabsProvider);
+    final logs = <String>[];
+    final failures = <Object>[];
+    var calls = 0;
+    listenForAttentionBadge(
+      container: c,
+      host: _MissingHost(() => calls++),
+      l10n: lookupAppLocalizations(const Locale('en')),
+      run: (f) => f.catchError(failures.add),
+      log: logs.add,
+    );
+    await pumpEventQueue();
+    for (var i = 0; i < 3; i++) {
+      local.notice(2, SessionNoticeKind.message, body: '$i');
+    }
+    await pumpEventQueue();
+    expect(logs, hasLength(1));
+    expect(failures, isEmpty);
+    expect(calls, 1); // nothing more is tried
   });
 
   test('dock label', () {

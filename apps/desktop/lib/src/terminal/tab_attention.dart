@@ -18,16 +18,23 @@ enum AttentionKind { message, command, bell }
 final class TabUnread {
   const TabUnread({
     required this.count,
-    required this.text,
+    required this.notice,
     required this.kind,
     required this.at,
   });
   final int count;
 
-  /// The last one's text (the sidebar line).
-  final String text;
+  /// The last one (the sidebar line). Kept as the notice, not its words,
+  /// so the line is worded in the language shown now.
+  final SessionNotice notice;
   final AttentionKind kind;
   final DateTime at;
+
+  /// The sidebar line (D9) in [l10n]'s language.
+  String text(AppLocalizations l10n) => noticeText(notice, l10n);
+
+  /// A command that ended with a non-zero code (the ✗ line).
+  bool get failed => noticeFailed(notice);
 }
 
 /// One panel entry (A4 D11). Text lives only in memory (N9).
@@ -38,7 +45,7 @@ final class AttentionEntry {
     required this.tabId,
     required this.tabLabel,
     required this.kind,
-    required this.text,
+    required this.notice,
     required this.at,
     this.read = false,
     this.repeat = 1,
@@ -50,7 +57,9 @@ final class AttentionEntry {
   /// The tab's label when it arrived (shown once the tab is gone).
   final String tabLabel;
   final AttentionKind kind;
-  final String text;
+
+  /// What arrived; worded at render time ([text]), in the language shown.
+  final SessionNotice notice;
   final DateTime at;
   final bool read;
 
@@ -59,6 +68,12 @@ final class AttentionEntry {
 
   /// The tab is gone: shown as "Tab đã đóng", not jumpable.
   final bool closed;
+
+  /// The panel's line 2 (D9) in [l10n]'s language.
+  String text(AppLocalizations l10n) => noticeText(notice, l10n);
+
+  /// A command that ended with a non-zero code (the ✗ line).
+  bool get failed => noticeFailed(notice);
 
   AttentionEntry copyWith({
     bool? read,
@@ -70,7 +85,7 @@ final class AttentionEntry {
     tabId: tabId,
     tabLabel: tabLabel,
     kind: kind,
-    text: text,
+    notice: notice,
     at: at ?? this.at,
     read: read ?? this.read,
     repeat: repeat ?? this.repeat,
@@ -133,6 +148,10 @@ String noticeText(SessionNotice n, AppLocalizations l10n) {
   }
 }
 
+/// A command notice whose command ended with a non-zero code.
+bool noticeFailed(SessionNotice n) =>
+    n.kind == SessionNoticeKind.command && (n.command?.exitCode ?? 0) != 0;
+
 AttentionKind _kindOf(SessionNoticeKind kind) => switch (kind) {
   SessionNoticeKind.message => AttentionKind.message,
   SessionNoticeKind.command => AttentionKind.command,
@@ -142,6 +161,53 @@ AttentionKind _kindOf(SessionNoticeKind kind) => switch (kind) {
 final tabAttentionProvider = NotifierProvider<TabAttention, AttentionState>(
   TabAttention.new,
 );
+
+/// A subscription made by [listenAttention].
+final class AttentionListener {
+  AttentionListener._();
+  ProviderSubscription<TabAttention>? _notifier;
+  StreamSubscription<AttentionArrival>? _arrivals;
+  StreamSubscription<int>? _reads;
+
+  void close() {
+    _notifier?.close();
+    _notifier = null;
+    unawaited(_arrivals?.cancel());
+    unawaited(_reads?.cancel());
+    _arrivals = null;
+    _reads = null;
+  }
+}
+
+/// [onArrival] / [onRead] for [TabAttention.arrivals] / [TabAttention.reads]
+/// that survive a rebuild of the provider (the local sessions change):
+/// the streams live as long as the notifier, and a new notifier gets a new
+/// subscription. Building the provider here (fireImmediately) also means
+/// no notice is missed.
+AttentionListener listenAttention(
+  ProviderContainer container, {
+  void Function(AttentionArrival arrival)? onArrival,
+  void Function(int tabId)? onRead,
+}) {
+  final listener = AttentionListener._();
+  void attach(TabAttention attention) {
+    unawaited(listener._arrivals?.cancel());
+    unawaited(listener._reads?.cancel());
+    listener._arrivals = onArrival == null
+        ? null
+        : attention.arrivals.listen(onArrival);
+    listener._reads = onRead == null ? null : attention.reads.listen(onRead);
+  }
+
+  listener._notifier = container.listen<TabAttention>(
+    tabAttentionProvider.notifier,
+    (previous, next) {
+      if (!identical(previous, next)) attach(next);
+    },
+    fireImmediately: true,
+  );
+  return listener;
+}
 
 /// Which tabs want the user (A4 N2–N5, D4, D7–D13, D26). UI state of this
 /// window only; the agent just reports notices.
@@ -155,9 +221,9 @@ class TabAttention extends Notifier<AttentionState> {
   int? _dwellFor;
   int _seq = 0;
 
-  /// Notices the user has not seen. Consumers subscribe from a
-  /// `ref.listen` of [tabAttentionProvider]'s notifier, not a cached
-  /// stream: a rebuild of this provider closes it.
+  /// Notices the user has not seen. Consumers subscribe through
+  /// [listenAttention], which follows a new notifier if Riverpod ever
+  /// makes one.
   Stream<AttentionArrival> get arrivals => _arrivals.stream;
 
   /// Tab ids that were marked read (their system notification is removed).
@@ -178,11 +244,11 @@ class TabAttention extends Notifier<AttentionState> {
       windowRouterProvider.select((w) => w.visible),
       (_, _) => _armDwell(),
     );
+    // The streams stay open: Riverpod keeps this notifier across a
+    // rebuild (onDispose runs then too), and its listeners stay with it.
     ref.onDispose(() {
       unawaited(sub.cancel());
-      _dwell?.cancel();
-      unawaited(_arrivals.close());
-      unawaited(_reads.close());
+      _cancelDwell();
     });
     return const AttentionState();
   }
@@ -242,7 +308,7 @@ class TabAttention extends Notifier<AttentionState> {
 
   // ---- internals --------------------------------------------------------
 
-  bool get _active => readWindowActive(ref);
+  bool get _active => readWindowActive(ref.read);
 
   void _onNotice(SessionNotice notice) {
     if (!ref.mounted) return;
@@ -255,8 +321,7 @@ class TabAttention extends Notifier<AttentionState> {
     final seen = tabs.selectedId == tab.id && _active;
     if (seen && notice.kind == SessionNoticeKind.bell) return; // D7
     final kind = _kindOf(notice.kind);
-    final text = noticeText(notice, ref.read(appL10nProvider));
-    final history = _withEntry(tab, kind, text, notice.at, read: seen);
+    final history = _withEntry(tab, kind, notice, read: seen);
     if (seen) {
       state = AttentionState(unread: state.unread, history: history);
       return;
@@ -267,13 +332,15 @@ class TabAttention extends Notifier<AttentionState> {
         ...state.unread,
         tab.id: TabUnread(
           count: (before?.count ?? 0) + 1,
-          text: text,
+          notice: notice,
           kind: kind,
           at: notice.at,
         ),
       },
       history: history,
     );
+    // Worded now: arrivals are handled at once, in the language shown.
+    final text = noticeText(notice, ref.read(appL10nProvider));
     _arrivals.add(
       AttentionArrival(tabId: tab.id, kind: kind, text: text, at: notice.at),
     );
@@ -283,10 +350,10 @@ class TabAttention extends Notifier<AttentionState> {
   List<AttentionEntry> _withEntry(
     TerminalTab tab,
     AttentionKind kind,
-    String text,
-    DateTime at, {
+    SessionNotice notice, {
     required bool read,
   }) {
+    final at = notice.at;
     final history = state.history;
     final first = history.firstOrNull;
     if (kind == AttentionKind.bell &&
@@ -305,7 +372,7 @@ class TabAttention extends Notifier<AttentionState> {
         tabId: tab.id,
         tabLabel: tab.label,
         kind: kind,
-        text: text,
+        notice: notice,
         at: at,
         read: read,
       ),

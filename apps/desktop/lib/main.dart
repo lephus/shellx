@@ -316,6 +316,7 @@ Future<void> _start(
           ? () => _unawaitedLogged(activateMacApp(), 'activate')
           : null,
     ),
+    viewOf: (id) => attentionView(container, id),
   );
   listenForDesktopNotifications(
     container: container,
@@ -348,20 +349,21 @@ Future<void> _start(
       );
     },
   );
-  container.read(tabAttentionProvider.notifier).arrivals.listen((a) {
-    final tabs = container.read(terminalTabsProvider);
-    final tab = tabs.tabs.where((t) => t.id == a.tabId).firstOrNull;
-    if (tab == null) return;
-    announcer.arrived(
-      a,
-      tab: tab.label,
-      // windowActiveProvider's rule from its sources (see its doc).
-      windowFocused:
-          container.read(windowFocusProvider) &&
-          container.read(windowRouterProvider).visible,
-      tabSelected: tabs.selectedId == a.tabId,
-    );
-  });
+  listenAttention(
+    container,
+    onArrival: (a) {
+      final tabs = container.read(terminalTabsProvider);
+      final tab = tabs.tabs.where((t) => t.id == a.tabId).firstOrNull;
+      if (tab == null) return;
+      final view = attentionView(container, a.tabId);
+      announcer.arrived(
+        a,
+        tab: tab.label,
+        windowFocused: view.windowFocused,
+        tabSelected: view.tabSelected,
+      );
+    },
+  );
 
   registerFontLicenses();
   runApp(

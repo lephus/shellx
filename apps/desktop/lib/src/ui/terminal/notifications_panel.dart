@@ -231,7 +231,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
           : sidebar.workspace(ws)?.displayName(l10n);
       final text = e.kind == AttentionKind.bell && e.repeat > 1
           ? l10n.attentionBellRepeat(e.repeat)
-          : e.text;
+          : e.text(l10n);
       final time = relativeTime(e.at, now, l10n);
       return _PanelEntry(
         line1: e.closed

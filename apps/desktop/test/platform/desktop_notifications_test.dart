@@ -24,6 +24,7 @@ void main() {
   late List<String> logs;
   late DateTime now;
   late DesktopNotifications n;
+  late AttentionView view;
 
   AttentionArrival msg(
     int tab,
@@ -37,11 +38,13 @@ void main() {
     opened = [];
     logs = [];
     now = DateTime(2026, 10, 7, 9);
+    view = (windowFocused: false, tabSelected: false);
     n = DesktopNotifications(
       notifier: notifier,
       settings: settings,
       l10n: lookupAppLocalizations(const Locale('en')),
       onOpen: opened.add,
+      viewOf: (_) => view,
       now: () => now,
       log: logs.add,
     );
@@ -268,6 +271,95 @@ void main() {
     });
   });
 
+  void burst(int tab, List<String> texts, {AttentionKind? kind}) {
+    for (final text in texts) {
+      n.arrived(
+        msg(tab, text, kind: kind ?? AttentionKind.message),
+        title: 'api',
+        windowFocused: false,
+        tabSelected: false,
+      );
+    }
+  }
+
+  test('the coalesced post re-checks the settings and the window at the '
+      'flush (D14, D15)', () {
+    fakeAsync((async) {
+      boot();
+      burst(1, ['a', 'b']);
+      settings.values[SettingKeys.desktopNotifications] = false;
+      async.elapse(const Duration(seconds: 3));
+      expect(notifier.shown, hasLength(1)); // switched off meanwhile
+
+      settings.values[SettingKeys.desktopNotifications] = true;
+      burst(2, ['a', 'b']);
+      view = (windowFocused: true, tabSelected: false); // user came back
+      async.elapse(const Duration(seconds: 3));
+      expect(notifier.shown, hasLength(2));
+
+      // "Only when not in front" off: an unselected tab still notifies
+      // in a focused window, but not a bell burst.
+      settings.values[SettingKeys.desktopNotificationsOnlyUnfocused] = false;
+      burst(3, ['a', 'b']);
+      burst(4, ['x', 'y'], kind: AttentionKind.bell);
+      async.elapse(const Duration(seconds: 3));
+      expect(notifier.shown.map((s) => s.id).toList(), [
+        DesktopNotifications.idFor(1),
+        DesktopNotifications.idFor(2),
+        DesktopNotifications.idFor(3),
+        DesktopNotifications.idFor(4),
+        DesktopNotifications.idFor(3),
+      ]);
+    });
+  });
+
+  test('the rate limit is logged once per window', () {
+    fakeAsync((async) {
+      boot();
+      for (var tab = 0; tab < 25; tab++) {
+        burst(tab, ['x']);
+      }
+      async.flushMicrotasks();
+      expect(notifier.shown, hasLength(20));
+      expect(logs, hasLength(1));
+      expect(logs.single, contains('rate limit'));
+      now = now.add(const Duration(seconds: 61));
+      for (var tab = 30; tab < 52; tab++) {
+        burst(tab, ['x']);
+      }
+      expect(logs, hasLength(2));
+    });
+  });
+
+  test('a coalesced post counts a first notice the rate limit refused', () {
+    fakeAsync((async) {
+      boot();
+      for (var tab = 0; tab < 20; tab++) {
+        burst(tab, ['x']);
+      }
+      async.elapse(const Duration(seconds: 3));
+      now = now.add(const Duration(seconds: 59, milliseconds: 999));
+      burst(99, ['first']); // refused: 20 in the last 60 s
+      now = now.add(const Duration(milliseconds: 1));
+      burst(99, ['second', 'third']);
+      async.elapse(const Duration(seconds: 3));
+      expect(notifier.shown.last.body, '3 new notifications · third');
+    });
+  });
+
+  test('tabs without a recent post are forgotten', () {
+    fakeAsync((async) {
+      boot();
+      for (var tab = 0; tab < 5; tab++) {
+        burst(tab, ['x']);
+      }
+      expect(n.trackedTabs, 5);
+      now = now.add(const Duration(seconds: 61));
+      burst(7, ['x']);
+      expect(n.trackedTabs, 1);
+    });
+  });
+
   group('listenForDesktopNotifications', () {
     late FakeLocalSessions local;
     late ProviderContainer c;
@@ -314,6 +406,21 @@ void main() {
       await pumpEventQueue();
       expect(notifier.closed, [DesktopNotifications.idFor(2)]);
       n.dispose();
+    });
+
+    test('a rebuilt attention provider still reaches it; dispose stops '
+        'listening', () async {
+      setActive(false);
+      c.invalidate(tabAttentionProvider);
+      c.read(tabAttentionProvider);
+      await pumpEventQueue();
+      local.notice(2, SessionNoticeKind.message, body: 'after rebuild');
+      await pumpEventQueue();
+      expect(notifier.shown.map((s) => s.body), ['after rebuild']);
+      n.dispose();
+      local.notice(1, SessionNoticeKind.message, body: 'after dispose');
+      await pumpEventQueue();
+      expect(notifier.shown, hasLength(1));
     });
 
     test('with workspace headers the title names the workspace '

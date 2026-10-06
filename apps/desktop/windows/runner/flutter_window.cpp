@@ -44,6 +44,12 @@ bool FlutterWindow::OnCreate() {
   // A4 D19. Explorer sends this when the window's taskbar button is
   // (re)created, e.g. when the window comes back from the tray.
   taskbar_button_created_ = RegisterWindowMessage(L"TaskbarButtonCreated");
+  // An elevated ShellX would otherwise never get it from (non-elevated)
+  // Explorer: UIPI filters registered messages sent from lower integrity.
+  if (taskbar_button_created_ != 0) {
+    ChangeWindowMessageFilterEx(GetHandle(), taskbar_button_created_,
+                                MSGFLT_ALLOW, nullptr);
+  }
   taskbar_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(),
@@ -58,7 +64,11 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
-  taskbar_channel_ = nullptr;
+  // No call may reach `this` while the channel goes away.
+  if (taskbar_channel_) {
+    taskbar_channel_->SetMethodCallHandler(nullptr);
+    taskbar_channel_ = nullptr;
+  }
   if (taskbar_) {
     taskbar_->Release();
     taskbar_ = nullptr;

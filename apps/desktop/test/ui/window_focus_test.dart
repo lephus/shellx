@@ -19,12 +19,13 @@ void main() {
     final c = ProviderContainer.test();
     final probe = Provider<Ref>((ref) => ref);
     final ref = c.read(probe);
-    expect(readWindowActive(ref), isFalse);
+    expect(readWindowActive(ref.read), isFalse);
     c.read(windowFocusProvider.notifier).set(true);
     c.read(windowRouterProvider.notifier).showTerminal();
-    expect(readWindowActive(ref), isTrue);
+    expect(readWindowActive(ref.read), isTrue);
     c.read(windowRouterProvider.notifier).hideWindow();
-    expect(readWindowActive(ref), isFalse);
+    expect(readWindowActive(ref.read), isFalse);
+    expect(readWindowActive(c.read), isFalse); // a container reads too
   });
 
   test('focus requests count up', () {

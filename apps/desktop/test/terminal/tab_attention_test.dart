@@ -21,6 +21,7 @@ void main() {
 
   AttentionState state() => c.read(tabAttentionProvider);
   TabAttention attention() => c.read(tabAttentionProvider.notifier);
+  AppLocalizations l10n() => c.read(appL10nProvider);
 
   /// Notices reach listeners asynchronously; let them land.
   Future<void> settle() => pumpEventQueue();
@@ -69,13 +70,60 @@ void main() {
       local.notice(2, SessionNoticeKind.message, body: 'two');
       await settle();
       expect(state().unread[2]!.count, 2);
-      expect(state().unread[2]!.text, 'two');
-      expect(state().history.first.text, 'two');
-      expect(state().history.last.text, 'CI: green ok');
+      expect(state().unread[2]!.text(l10n()), 'two');
+      expect(state().history.first.text(l10n()), 'two');
+      expect(state().history.last.text(l10n()), 'CI: green ok');
       expect(state().totalUnread, 2);
       expect(arrivals.map((a) => a.tabId), [2, 2]);
     },
   );
+
+  test('the text is worded when shown, in the language shown then (F-4); '
+      'a failed command is marked', () async {
+    boot(locale: 'vi');
+    local.notice(
+      2,
+      SessionNoticeKind.command,
+      command: const CompletedCommand(
+        commandLine: 'npm test',
+        exitCode: 1,
+        duration: Duration(seconds: 45),
+      ),
+    );
+    local.notice(2, SessionNoticeKind.bell);
+    await settle();
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(state().unread[2]!.text(en), 'Bell');
+    expect(state().history.last.text(en), '✗ npm test · exit 1 · 45 s');
+    expect(state().history.last.failed, isTrue);
+    expect(state().history.first.failed, isFalse);
+  });
+
+  test('listenAttention re-subscribes when the provider rebuilds', () async {
+    boot();
+    final arrivals = <int>[];
+    final reads = <int>[];
+    final listener = listenAttention(
+      c,
+      onArrival: (a) => arrivals.add(a.tabId),
+      onRead: reads.add,
+    );
+    local.notice(2, SessionNoticeKind.message, body: 'one');
+    await settle();
+    expect(arrivals, [2]);
+    c.invalidate(tabAttentionProvider);
+    state(); // rebuilt
+    await settle();
+    local.notice(3, SessionNoticeKind.message, body: 'two');
+    await settle();
+    expect(arrivals, [2, 3]);
+    attention().markRead(3);
+    expect(reads, [3]);
+    listener.close();
+    local.notice(2, SessionNoticeKind.message, body: 'three');
+    await settle();
+    expect(arrivals, [2, 3]);
+  });
 
   test(
     'a command notice uses the push wording in the app language (D5)',
@@ -91,7 +139,7 @@ void main() {
         ),
       );
       await settle();
-      expect(state().unread[2]!.text, '✗ npm test · mã 1 · 45 giây');
+      expect(state().unread[2]!.text(l10n()), '✗ npm test · mã 1 · 45 giây');
     },
   );
 
@@ -223,7 +271,7 @@ void main() {
     expect(state().history.single.repeat, 2);
     expect(state().history.single.at, t.add(const Duration(seconds: 6)));
     expect(state().unread[2]!.count, 2);
-    expect(state().unread[2]!.text, 'Bell');
+    expect(state().unread[2]!.text(l10n()), 'Bell');
   });
 
   test('a flood keeps the newest 50 in history (D11)', () async {
@@ -233,8 +281,8 @@ void main() {
     }
     await settle();
     expect(state().history, hasLength(TabAttention.historyLimit));
-    expect(state().history.first.text, '59');
-    expect(state().history.last.text, '10');
+    expect(state().history.first.text(l10n()), '59');
+    expect(state().history.last.text(l10n()), '10');
     expect(state().unread[2]!.count, 60);
   });
 
