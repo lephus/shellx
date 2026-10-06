@@ -45,6 +45,9 @@ UninstallDisplayName=ShellX
 UninstallDisplayIcon={app}\{#AppExeName}
 ; The agent is stopped explicitly in PrepareToInstall; no Restart Manager prompt needed.
 CloseApplications=no
+; A7 D8: the uninstaller removes our entry from the user's Path; this makes it broadcast
+; WM_SETTINGCHANGE so Explorer and new terminals stop seeing it.
+ChangesEnvironment=yes
 ; Pick the language from the Windows UI language; ask only when neither matches.
 ShowLanguageDialog=auto
 #ifdef AppIcon
@@ -90,6 +93,9 @@ Type: filesandordirs; Name: "{localappdata}\ShellX\bin"
 Type: filesandordirs; Name: "{localappdata}\ShellX\term"
 ; A5a D22: saved session layout and terminal contents.
 Type: filesandordirs; Name: "{localappdata}\ShellX\restore"
+; A7 D7: the shellx command (a copy of shellx-term.exe); its Path entry goes in
+; CurUninstallStepChanged.
+Type: filesandordirs; Name: "{localappdata}\ShellX\cli"
 
 [Code]
 const
@@ -139,8 +145,44 @@ begin
   Result := '';
 end;
 
+{ A7 D8: "Install the shellx command for all terminals..." added the cli folder to the user's
+  own Path (HKCU\Environment, REG_EXPAND_SZ). Drops every entry naming it (case-insensitive, a
+  trailing backslash ignored), keeps the rest in order, and writes back only when it changed. }
+procedure RemoveCliFromUserPath();
+var
+  OldPath, NewPath, Entry, Dir: String;
+  P: Integer;
+  Changed: Boolean;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OldPath) then
+    exit;
+  Dir := ExpandConstant('{localappdata}\ShellX\cli');
+  NewPath := '';
+  Changed := False;
+  OldPath := OldPath + ';';
+  while OldPath <> '' do
+  begin
+    P := Pos(';', OldPath);
+    Entry := Copy(OldPath, 1, P - 1);
+    Delete(OldPath, 1, P);
+    if Entry = '' then
+      continue;
+    if CompareText(RemoveBackslashUnlessRoot(Entry), Dir) = 0 then
+      Changed := True
+    else if NewPath = '' then
+      NewPath := Entry
+    else
+      NewPath := NewPath + ';' + Entry;
+  end;
+  if Changed then
+    if not RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', NewPath) then
+      Log('Path could not be updated');
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
+  if CurUninstallStep = usUninstall then
+    RemoveCliFromUserPath();
   { launch_at_startup (apps/desktop) registers the HKCU Run value "ShellX". }
   if CurUninstallStep = usPostUninstall then
     if not RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'ShellX') then
