@@ -163,24 +163,23 @@ final class TrayActions {
   }
 
   /// The tray's "Đóng" on one session: the same rules as ⌘W (D15: asks
-  /// while a command runs). A session the window has no tab for yet closes
-  /// at once.
+  /// while a command runs). The tray lists sessions, and a split tab holds
+  /// several (A3 D1, final ruling I-1): one pane of a split tab closes as
+  /// that pane (the pane dialog); a one-pane tab as the tab (A1's dialog).
+  /// A session the window has no tab for yet closes at once.
   Future<void> _closeSession(int id) async {
     final tabs = _ref.read(terminalTabsProvider.notifier);
-    final tab = _ref
-        .read(terminalTabsProvider)
-        .tabs
-        .where((t) => t.id == id)
-        .firstOrNull;
+    final tab = _ref.read(terminalTabsProvider).tabOfSession(id);
     if (tab == null) {
       _agent.closeSession(id);
       return;
     }
-    await closeTabWithConfirm(
+    await closePaneWithConfirm(
       tabs: tabs,
       router: _router,
       l10n: _services.l10n,
       tab: tab,
+      paneId: id,
     );
   }
 
