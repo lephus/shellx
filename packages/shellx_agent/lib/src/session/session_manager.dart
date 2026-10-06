@@ -960,15 +960,13 @@ final class SessionManager implements AgentSessions, LocalSessions {
     String? body,
     CompletedCommand? command,
   }) {
-    if (session.closing) return;
+    if (session.closing || session.exited) return;
     final now = _clock();
-    if (!session.noticeLimit.allow(kind, now)) {
-      final dropped = session.noticeLimit.dropped;
-      if (dropped == 1 || dropped % 100 == 0) {
-        _log?.call('session notices dropped: $dropped');
-      }
-      return;
+    final allowed = session.noticeLimit.allow(kind, now);
+    for (final count in session.noticeLimit.takeLogReports()) {
+      _log?.call('session notices dropped: $count');
     }
+    if (!allowed) return;
     _notices.add(
       SessionNotice(
         sessionId: session.id,

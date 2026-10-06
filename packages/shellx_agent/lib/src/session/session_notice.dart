@@ -48,23 +48,42 @@ final class NoticeLimiter {
   final _recent = <DateTime>[];
   DateTime? _lastBell;
   int _dropped = 0;
+  int _windowDrops = 0;
+  DateTime? _dropStart;
+  final _reports = <int>[];
 
-  /// Notices refused so far.
+  /// Messages and commands refused so far (bells excluded).
   int get dropped => _dropped;
+
+  /// What is worth a log line, at most two per window: 1 when a window first
+  /// saturates, then the window's total once it has ended. Emptied by the call.
+  List<int> takeLogReports() {
+    final out = List<int>.of(_reports);
+    _reports.clear();
+    return out;
+  }
 
   bool allow(SessionNoticeKind kind, DateTime now) {
     if (kind == SessionNoticeKind.bell) {
       final last = _lastBell;
-      if (last != null && now.difference(last) < bellGap) {
-        _dropped++;
-        return false;
-      }
+      // Bells are cheap noise (D3): refused silently, never counted.
+      if (last != null && now.difference(last) < bellGap) return false;
       _lastBell = now;
       return true;
+    }
+    final start = _dropStart;
+    if (start != null && now.difference(start) >= window) {
+      _reports.add(_windowDrops); // the saturated window ended: summary
+      _windowDrops = 0;
+      _dropStart = null;
     }
     _recent.removeWhere((t) => now.difference(t) >= window);
     if (_recent.length >= maxPerWindow) {
       _dropped++;
+      if (_windowDrops++ == 0) {
+        _dropStart = now;
+        _reports.add(1); // first refusal of this window
+      }
       return false;
     }
     _recent.add(now);

@@ -21,6 +21,7 @@ final class SessionRig {
     GitBranchLookup? gitHeads,
     PortProbe? portProbe,
     Duration? Function()? commandNoticeThreshold,
+    void Function(String message)? log,
   }) {
     manager = SessionManager(
       ptyFactory: factory,
@@ -36,6 +37,7 @@ final class SessionRig {
       gitHeads: gitHeads,
       portProbe: portProbe,
       commandNoticeThreshold: commandNoticeThreshold,
+      log: log,
       localHostName: 'mbp.local',
     );
     manager.outbound.listen(sent.add);

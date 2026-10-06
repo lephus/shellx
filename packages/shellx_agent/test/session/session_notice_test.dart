@@ -85,10 +85,38 @@ void main() {
   test('a closing session emits nothing', () async {
     await boot();
     final id = rig.manager.sessions.single.id;
+    rig.pty(0).closeOutputOnKill = false; // the output outlives the close
     rig.manager.close(id);
-    await emit('$esc]9;late$bel');
+    await emit('$esc]9;late$bel$bel');
     expect(got, isEmpty);
   });
+
+  test('a shell that exited emits nothing while its output drains', () async {
+    await boot();
+    rig.pty(0).exit(0, closeOutput: false);
+    await pumpEventQueue();
+    await emit('$esc]9;late$bel$bel');
+    expect(got, isEmpty);
+  });
+
+  test(
+    'a flood logs at most two lines per window, never the text (D3, N9)',
+    () async {
+      final logs = <String>[];
+      rig = SessionRig(log: logs.add);
+      got = [];
+      rig.manager.notices.listen(got.add);
+      await rig.manager.open(cols: 80, rows: 24);
+      final burst = [for (var i = 0; i < 100000; i++) '$esc]9;secret$bel$bel'];
+      await emit(burst.join());
+      expect(logs, hasLength(1));
+      rig.now = rig.now.add(const Duration(seconds: 61));
+      await emit('$esc]9;next$bel');
+      expect(logs, hasLength(2));
+      expect(logs.last, contains('99970'));
+      expect(logs.join(), isNot(contains('secret')));
+    },
+  );
 
   test('toString never contains the text (N9)', () {
     final n = SessionNotice(
@@ -110,5 +138,20 @@ void main() {
       expect(l.allow(SessionNoticeKind.bell, t), isTrue);
       expect(l.dropped, 1);
     });
+
+    test(
+      'refused bells are not counted; messages and commands share a window',
+      () {
+        final l = NoticeLimiter(maxPerWindow: 2);
+        final t = DateTime(2026);
+        expect(l.allow(SessionNoticeKind.bell, t), isTrue);
+        expect(l.allow(SessionNoticeKind.bell, t), isFalse);
+        expect(l.dropped, 0);
+        expect(l.allow(SessionNoticeKind.message, t), isTrue);
+        expect(l.allow(SessionNoticeKind.command, t), isTrue);
+        expect(l.allow(SessionNoticeKind.message, t), isFalse);
+        expect(l.dropped, 1);
+      },
+    );
   });
 }

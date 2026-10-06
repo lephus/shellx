@@ -10,7 +10,7 @@ import 'package:shellx_core/shellx_core.dart';
 final class FakeLocalSessions implements LocalSessions {
   final _changes = StreamController<void>.broadcast(sync: true);
   final summaries = <SessionSummary>[];
-  final _notices = StreamController<SessionNotice>.broadcast(sync: true);
+  final _notices = StreamController<SessionNotice>.broadcast();
 
   @override
   Stream<SessionNotice> get notices => _notices.stream;

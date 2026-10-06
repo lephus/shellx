@@ -26,6 +26,10 @@ final class FakePty implements Pty, PtyProcessId {
   final resizes = <(int, int)>[];
   bool killed = false;
 
+  /// False: [kill] ends the process but the output stream stays open, as a
+  /// PTY that still drains after the exit.
+  bool closeOutputOnKill = true;
+
   /// The shell's pid for port tests (A2 D3); null = unknown.
   @override
   int? processId;
@@ -55,7 +59,7 @@ final class FakePty implements Pty, PtyProcessId {
   @override
   void kill() {
     killed = true;
-    exit(killExitCode);
+    exit(killExitCode, closeOutput: closeOutputOnKill);
   }
 
   void emit(String text) => emitBytes(utf8.encode(text));

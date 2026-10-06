@@ -59,7 +59,7 @@ final class SessionCore {
       portProbe: portProbe,
       windowsPaths: Platform.isWindows,
       localHostName: Platform.localHostname,
-      log: (message) => debugPrint('ShellX ports: $message'),
+      log: (message) => debugPrint('ShellX sessions: $message'),
     );
     return SessionCore._(ids, agentNotifications, sessions);
   }
