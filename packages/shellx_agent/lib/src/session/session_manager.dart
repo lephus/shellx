@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -230,6 +231,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     String localHostName = '',
     void Function(String message)? log,
     Duration? Function()? commandNoticeThreshold,
+    Future<bool> Function(String path)? directoryExists,
   }) : _ptyFactory = ptyFactory,
        _gitHeads = gitHeads,
        _windowsPaths = windowsPaths,
@@ -237,6 +239,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
        _notifications = notifications,
        _log = log,
        _commandNoticeThreshold = commandNoticeThreshold ?? _noThreshold,
+       _directoryExists = directoryExists ?? _directoryExistsOnDisk,
        _shellIntegration = shellIntegration,
        _shellResolver = shellResolver,
        _homeDirectory = homeDirectory,
@@ -268,6 +271,15 @@ final class SessionManager implements AgentSessions, LocalSessions {
   final Duration? Function() _commandNoticeThreshold;
   final ShellResolver _shellResolver;
   final String _homeDirectory;
+
+  final Future<bool> Function(String path) _directoryExists;
+
+  static Future<bool> _directoryExistsOnDisk(String path) =>
+      Directory(path).exists();
+
+  /// A3 D17: how long a new pane waits for its directory to be confirmed
+  /// before it starts at home (a hung network mount must not hold a split).
+  static const cwdProbeTimeout = Duration(milliseconds: 300);
   final Map<String, String> _baseEnvironment;
   final int _maxSessions;
   final int _bufferCapacity;
@@ -628,10 +640,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// attached, the desktop drives. Throws [SessionLimitException] or
   /// [SpawnFailedException].
   @override
-  Future<int> open({required int cols, required int rows}) async {
+  Future<int> open({required int cols, required int rows, String? cwd}) async {
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
-    final session = await _spawn(c, r, origin: SessionOrigin.desktop);
+    final session = await _spawn(c, r, origin: SessionOrigin.desktop, cwd: cwd);
     if (session == null) {
       throw const SpawnFailedException('ShellX is closing every session');
     }
@@ -685,6 +697,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     int cols,
     int rows, {
     required SessionOrigin origin,
+    String? cwd,
   }) async {
     if (_sessions.length + _pendingOpens >= _maxSessions) {
       throw SessionLimitException(_maxSessions);
@@ -696,10 +709,11 @@ final class SessionManager implements AgentSessions, LocalSessions {
     final Pty pty;
     try {
       command = await _shellResolver.resolve();
+      final workingDirectory = await _workingDirectoryFor(cwd);
       final launch = _launch(command);
       pty = _ptyFactory.spawn(
         launch.command,
-        workingDirectory: _homeDirectory,
+        workingDirectory: workingDirectory,
         environment: launch.environment,
         cols: cols,
         rows: rows,
@@ -747,6 +761,31 @@ final class SessionManager implements AgentSessions, LocalSessions {
     _watch(session);
     _portWatcher?.sessionsChanged();
     return session;
+  }
+
+  /// D17: [cwd] when it is usable, else home. Never throws.
+  Future<String> _workingDirectoryFor(String? cwd) async {
+    if (cwd == null || cwd.isEmpty || !_isAbsoluteLocal(cwd)) {
+      return _homeDirectory;
+    }
+    try {
+      if (await _directoryExists(cwd).timeout(cwdProbeTimeout)) return cwd;
+    } on Object {
+      // TimeoutException, FileSystemException: start at home instead.
+    }
+    _log?.call('session: cwd fallback to home'); // never the path (N9)
+    return _homeDirectory;
+  }
+
+  /// Absolute and on this machine: `/…` (POSIX), `C:\…` / `C:/…` (Windows).
+  /// UNC shares are refused: cmd.exe cannot start in one, and a dead
+  /// server would stall the probe.
+  bool _isAbsoluteLocal(String path) {
+    if (_windowsPaths) {
+      if (path.startsWith(r'\\') || path.startsWith('//')) return false;
+      return RegExp(r'^[A-Za-z]:[\\/]').hasMatch(path);
+    }
+    return path.startsWith('/');
   }
 
   ShellLaunch _launch(ShellCommand command) {

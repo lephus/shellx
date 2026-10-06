@@ -22,6 +22,8 @@ final class SessionRig {
     PortProbe? portProbe,
     Duration? Function()? commandNoticeThreshold,
     void Function(String message)? log,
+    Future<bool> Function(String path)? directoryExists,
+    bool windowsPaths = false,
   }) {
     manager = SessionManager(
       ptyFactory: factory,
@@ -38,6 +40,8 @@ final class SessionRig {
       portProbe: portProbe,
       commandNoticeThreshold: commandNoticeThreshold,
       log: log,
+      directoryExists: directoryExists,
+      windowsPaths: windowsPaths,
       localHostName: 'mbp.local',
     );
     manager.outbound.listen(sent.add);

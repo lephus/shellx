@@ -35,6 +35,9 @@ final class FakeLocalSessions implements LocalSessions {
   );
   final views = <int, FakeSessionView>{};
   final opens = <(int, int)>[];
+
+  /// The `cwd` of each [open] call, in order (null when none was given).
+  final openCwds = <String?>[];
   final closed = <int>[];
   int nextId = 100;
 
@@ -53,8 +56,9 @@ final class FakeLocalSessions implements LocalSessions {
   Stream<void> get changes => _changes.stream;
 
   @override
-  Future<int> open({required int cols, required int rows}) async {
+  Future<int> open({required int cols, required int rows, String? cwd}) async {
     opens.add((cols, rows));
+    openCwds.add(cwd);
     await openGate?.future;
     final error = openError;
     if (error != null) throw error;

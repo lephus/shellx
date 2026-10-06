@@ -19,9 +19,12 @@ abstract interface class LocalSessions {
   /// replay. Broadcast; delivered asynchronously.
   Stream<SessionNotice> get notices;
 
-  /// Starts a login shell in the home directory. Throws
-  /// [SessionLimitException] or [SpawnFailedException].
-  Future<int> open({required int cols, required int rows});
+  /// Starts a login shell in [cwd] when it is an absolute, local directory
+  /// that exists (checked within [SessionManager.cwdProbeTimeout]);
+  /// otherwise — no cwd, relative, a UNC share, missing, slow — in the home
+  /// directory (A3 D17). Throws [SessionLimitException] or
+  /// [SpawnFailedException].
+  Future<int> open({required int cols, required int rows, String? cwd});
 
   /// One local viewer of session [id]. Throws [StateError] when there is no
   /// such session. The caller must listen to [LocalSessionView.output] or
