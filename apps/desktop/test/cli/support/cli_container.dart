@@ -39,3 +39,8 @@ PaneMetrics tinyPaneMetrics() => const PaneMetrics(
   minPane: Size(176, 100),
   divider: 1,
 );
+
+/// Lets a pane's output reach its terminal ([TerminalFeed] writes on a
+/// later turn).
+Future<void> pumpFeed() =>
+    Future<void>.delayed(const Duration(milliseconds: 20));

@@ -16,6 +16,19 @@ extension TerminalTabsPanes on TerminalTabs {
     _removePane(sessionId);
   }
 
+  /// A7 D21: how session [id] ended, while it is one of the last 64 that
+  /// ended here; null otherwise.
+  int? lastExitCode(int id) => _lastExitCodes[id];
+
+  void _recordExit(int id, int code) {
+    _lastExitCodes
+      ..remove(id)
+      ..[id] = code;
+    if (_lastExitCodes.length > 64) {
+      _lastExitCodes.remove(_lastExitCodes.keys.first);
+    }
+  }
+
   /// Stores the size for later decisions only: safe during layout.
   void reportPaneMetrics(PaneMetrics metrics) => _metrics = metrics;
 

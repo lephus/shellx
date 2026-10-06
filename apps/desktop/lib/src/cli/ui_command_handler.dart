@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
+import 'package:xterm/xterm.dart';
 
+import '../terminal/desktop_terminal.dart';
 import '../terminal/local_sessions_provider.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/sidebar_workspaces.dart';
@@ -10,6 +13,8 @@ import '../terminal/tab_attention.dart';
 import '../terminal/terminal_tabs.dart';
 import 'agent_marks.dart';
 import 'cli_targets.dart';
+import 'pane_text.dart';
+import 'pane_waiter.dart';
 
 final uiCommandHandlerProvider = Provider<UiCommandHandler>(
   (ref) => UiCommandHandler(ref),
@@ -22,21 +27,45 @@ const _runningCommand = CliFailure(
   'a command is running; use --force',
 );
 
+/// A7 D32: a text field of a request (`send` text) is at most this much
+/// UTF-8.
+const kSendMaxBytes = 49152;
+
+/// A7 D16: `--cmd` is at most this much UTF-8.
+const kCmdMaxBytes = 16384;
+
+/// A7 D21: a `wait --match` pattern is at most this much UTF-8.
+const kPatternMaxBytes = 1024;
+
 /// A7 §3.3: the `ui.*` requests of the command line, run on the window's
 /// tabs and sidebar. Browser panes (A6) are not here yet: `ls` lists
 /// terminal panes only and `ui.browser.*` is `unknown_type`.
 ///
-/// Never logs request contents (cwd, commands, names).
+/// Never logs request contents (cwd, commands, names, text sent or read).
 final class UiCommandHandler implements UiApi {
-  UiCommandHandler(this._ref, {this.openWait = const Duration(seconds: 10)});
+  UiCommandHandler(this._ref, {this.openWait = const Duration(seconds: 10)}) {
+    final injector = CommandInjector(_probe, (pane, text) {
+      try {
+        _send(pane, text: text, enter: true);
+      } on CliFailure {
+        // The pane ended before its shell was ready: nothing to type into.
+      }
+    });
+    onCommand = (pane, cmd) {
+      try {
+        injector.inject(pane, cmd);
+      } on CliFailure {
+        // The pane is already gone.
+      }
+    };
+  }
 
   final Ref _ref;
 
   /// D33: how long a request waits for another open in flight.
   final Duration openWait;
 
-  /// D16, Task 7 (`CommandInjector`): runs `--cmd` once the new shell is
-  /// ready. Until then a `cmd` is accepted and not run.
+  /// D16 (`CommandInjector`): types `--cmd` once the new shell is ready.
   void Function(int pane, String cmd)? onCommand;
 
   /// D17 `--raise`: shows and activates the window (A1 D11); set by the
@@ -65,7 +94,10 @@ final class UiCommandHandler implements UiApi {
       CliType.uiWorkspaceNew => _workspaceNew(request, cancelled),
       CliType.uiWorkspaceRename => _workspaceRename(request),
       CliType.uiWorkspaceMove => _workspaceMove(request),
-      // Task 7: ui.pane.send / read / wait. Task 8: ui.notify, events.
+      CliType.uiPaneSend => _sendRequest(request),
+      CliType.uiPaneRead => _read(request),
+      CliType.uiPaneWait => _wait(request, cancelled),
+      // Task 8: ui.notify, events.
       // ui.browser.*: pending A6.
       _ => throw CliFailure(MuxError.unknownType, 'unknown request $t'),
     };
@@ -78,6 +110,22 @@ final class UiCommandHandler implements UiApi {
     if (v == null) return null;
     if (v is! String || v.length > max) {
       throw _bad('$key must be text of at most $max characters');
+    }
+    return v;
+  }
+
+  /// D32: text of at most [maxBytes] of UTF-8 ([limit] says it in KiB).
+  String? _text(
+    MuxMessage r,
+    String key, {
+    required int maxBytes,
+    required String limit,
+  }) {
+    final v = r.fields[key];
+    if (v == null) return null;
+    if (v is! String) throw _bad('$key must be text');
+    if (v.length > maxBytes || utf8.encode(v).length > maxBytes) {
+      throw _bad('$key is over $limit');
     }
     return v;
   }
@@ -215,7 +263,7 @@ final class UiCommandHandler implements UiApi {
   ) async {
     final wsKey = _string(r, 'workspace');
     final cwd = _string(r, 'cwd');
-    final cmd = _string(r, 'cmd', max: 16384);
+    final cmd = _text(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final select = _flag(r, 'focus');
     final tab = await _opening(
       () => _tabs.openTabFor(
@@ -246,7 +294,7 @@ final class UiCommandHandler implements UiApi {
       _ => throw _bad('direction is right or down'),
     };
     final cwd = _string(r, 'cwd');
-    final cmd = _string(r, 'cmd', max: 16384);
+    final cmd = _text(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final focus = _flag(r, 'focus');
     final pane = await _opening(
       () => _tabs.splitPaneFor(target, axis, cwd: cwd, focus: focus),
@@ -353,6 +401,165 @@ final class UiCommandHandler implements UiApi {
     return const {};
   }
 
+  // ---- send, read, wait (D19-D21) ----------------------------------------
+
+  /// A terminal pane that exists (exited or not).
+  PaneSession _pane(int id) =>
+      _tabsState.tabOfSession(id)?.panes[id] ??
+      (throw CliFailure(MuxError.notFound, 'no pane p$id'));
+
+  /// D19: a browser pane (negative id, A6) is `bad_request`.
+  int _paneArg(MuxMessage r) {
+    final raw = r.fields['pane'];
+    if (raw is int && raw < 0) {
+      throw _bad('p$raw is a browser pane; use shellx browser');
+    }
+    return resolvePane(_tabsState, parseTarget(raw, null));
+  }
+
+  void _touchPane(int pane) =>
+      _marks.touch(tab: _tabsState.tabOfSession(pane)!.id, pane: pane);
+
+  Future<Map<String, Object?>> _sendRequest(MuxMessage r) async {
+    final pane = _paneArg(r);
+    final text = _text(r, 'text', maxBytes: kSendMaxBytes, limit: '48 KiB');
+    final rawKeys = r.fields['keys'] ?? const <Object?>[];
+    if (rawKeys is! List) throw _bad('keys must be a list of key names');
+    final keys = [for (final k in rawKeys) _key(k)];
+    final enter = _flag(r, 'enter');
+    if ((text == null || text.isEmpty) && keys.isEmpty && !enter) {
+      throw _bad('nothing to send');
+    }
+    _send(pane, text: text, keys: keys, enter: enter);
+    return const {};
+  }
+
+  /// As the user would type it (the desktop drives, A1 D6): [text] through
+  /// the clipboard's paste (controls stripped, bracketed when the shell
+  /// asked), then [keys], then Enter.
+  void _send(
+    int pane, {
+    String? text,
+    List<void Function(DesktopTerminal)> keys = const [],
+    bool enter = false,
+  }) {
+    final p = _pane(pane);
+    if (p.exited) throw const CliFailure(CliError.exited, 'the pane exited');
+    final t = p.terminal;
+    if (text != null && text.isNotEmpty) t.paste(text);
+    for (final k in keys) {
+      k(t);
+    }
+    if (enter) t.keyInput(TerminalKey.enter);
+    _touchPane(pane);
+  }
+
+  static const _named = <String, TerminalKey>{
+    'enter': TerminalKey.enter,
+    'tab': TerminalKey.tab,
+    'esc': TerminalKey.escape,
+    'backspace': TerminalKey.backspace,
+    'up': TerminalKey.arrowUp,
+    'down': TerminalKey.arrowDown,
+    'left': TerminalKey.arrowLeft,
+    'right': TerminalKey.arrowRight,
+    'home': TerminalKey.home,
+    'end': TerminalKey.end,
+    'pageup': TerminalKey.pageUp,
+    'pagedown': TerminalKey.pageDown,
+  };
+
+  static final _ctrlKey = RegExp(r'^ctrl-([a-z\\\]])$');
+
+  /// D19: through `keyInput`/`charInput`, so cursor keys follow the
+  /// application's cursor mode.
+  void Function(DesktopTerminal) _key(Object? name) {
+    if (name is! String) throw _bad('a key is a name');
+    final k = _named[name];
+    if (k != null) return (t) => t.keyInput(k);
+    final ctrl = _ctrlKey.firstMatch(name);
+    if (ctrl != null) {
+      final ch = ctrl.group(1)!.codeUnitAt(0);
+      return (t) => t.charInput(ch, ctrl: true);
+    }
+    throw _bad(name.length <= 32 ? 'unknown key "$name"' : 'unknown key');
+  }
+
+  Future<Map<String, Object?>> _read(MuxMessage r) async {
+    final pane = _paneArg(r);
+    final lines = r.fields['lines'];
+    if (lines != null &&
+        (lines is! int || lines < 1 || lines > kReadMaxLines)) {
+      throw _bad('lines is 1–$kReadMaxLines');
+    }
+    final offset = r.fields['offset'] ?? 0;
+    if (offset is! int || offset < 0) throw _bad('bad offset');
+    final page = readPage(
+      _pane(pane).terminal,
+      lines: lines as int?,
+      ansi: _flag(r, 'ansi'),
+      offset: offset,
+    );
+    _touchPane(pane);
+    return {'text': page.text, 'next': ?page.next};
+  }
+
+  /// D21: holds the connection until done; ends at once when the client
+  /// goes ([cancelled]).
+  Future<Map<String, Object?>> _wait(
+    MuxMessage r,
+    Future<void>? cancelled,
+  ) async {
+    final pane = _paneArg(r);
+    final ms = r.fields['timeoutMs'] ?? 30000;
+    if (ms is! int || ms < 1 || ms > 3600000) {
+      throw _bad('timeout is 1 ms–3600 s');
+    }
+    final timeout = Duration(milliseconds: ms);
+    final Future<Map<String, Object?>> Function(PaneProbe) start;
+    switch (r.fields['mode']) {
+      case 'idle':
+        final quiet = r.fields['quietMs'] ?? 500;
+        if (quiet is! int || quiet < 0 || quiet > 60000) {
+          throw _bad('quiet is 0–60000 ms');
+        }
+        start = (p) => waitIdle(
+          p,
+          quiet: Duration(milliseconds: quiet),
+          timeout: timeout,
+          cancelled: cancelled,
+        );
+      case 'exit':
+        start = (p) => waitExit(p, timeout: timeout, cancelled: cancelled);
+      case 'match':
+        final pattern =
+            _text(r, 'pattern', maxBytes: kPatternMaxBytes, limit: '1 KiB') ??
+            (throw _bad('pattern is needed'));
+        final RegExp re;
+        try {
+          re = RegExp(pattern, multiLine: true);
+        } on FormatException {
+          throw _bad('invalid regular expression');
+        }
+        final fromNow = _flag(r, 'fromNow');
+        start = (p) => waitMatch(
+          p,
+          re,
+          fromNow: fromNow,
+          timeout: timeout,
+          cancelled: cancelled,
+        );
+      default:
+        throw _bad('mode is idle, exit or match');
+    }
+    _touchPane(pane);
+    return start(_probe(pane));
+  }
+
+  /// A live view of one pane, for waits and `--cmd`. Throws `not_found`
+  /// when the pane is gone.
+  PaneProbe _probe(int pane) => _LivePane(_ref, pane, _pane(pane).terminal);
+
   // ---- completed in Task 8 ------------------------------------------------
 
   @override
@@ -364,4 +571,49 @@ final class UiCommandHandler implements UiApi {
   @override
   bool notifyPane(int pane, {String? title, required String body}) =>
       _ref.read(localSessionsProvider).notify(pane, title: title, body: body);
+}
+
+final class _LivePane implements PaneProbe {
+  _LivePane(this._ref, this.id, this.terminal);
+  final Ref _ref;
+  final int id;
+
+  /// Kept: an exit with code 0 removes the pane, not what it showed.
+  @override
+  final Terminal terminal;
+
+  PaneSession? get _p =>
+      _ref.read(terminalTabsProvider).tabOfSession(id)?.panes[id];
+
+  @override
+  bool get hooked => _p?.cwd != null;
+  @override
+  bool get running => _p?.runningCommand ?? false;
+  @override
+  bool get exited => _p?.exited ?? true;
+
+  /// Exit 0 removed the pane (A3 D7): the code the tab list kept.
+  @override
+  int? get exitCode =>
+      _p?.exitCode ?? _ref.read(terminalTabsProvider.notifier).lastExitCode(id);
+
+  @override
+  Stream<void> get output => _ref
+      .read(terminalTabsProvider.notifier)
+      .paneOutputs
+      .where((p) => p == id)
+      .map((_) {});
+
+  @override
+  Stream<void> get changes {
+    ProviderSubscription<TerminalTabsState>? sub;
+    late final StreamController<void> c;
+    c = StreamController<void>(
+      sync: true,
+      onListen: () =>
+          sub = _ref.listen(terminalTabsProvider, (_, _) => c.add(null)),
+      onCancel: () => sub?.close(),
+    );
+    return c.stream;
+  }
 }

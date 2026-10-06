@@ -434,6 +434,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// A5a D4: the session whose pane just received output.
   Stream<int> get paneOutputs => _paneOutputs.stream;
 
+  /// A7 D21: the exit codes of the last 64 sessions that ended here (exit
+  /// 0 removes the pane; `wait --exit` still reports it).
+  final _lastExitCodes = <int, int>{};
+
   /// A5a D16: a restore is reopening saved panes.
   bool get restoring => _restoring != null;
 
@@ -786,6 +790,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (!ref.mounted) return;
     final link = _links[id];
     if (link == null) return; // Already closed here.
+    _recordExit(id, code);
     if (code == 0 || link.view.closedOnRequest) {
       _removePane(id);
       return;
