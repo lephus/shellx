@@ -42,7 +42,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ShellX uses the microphone when you tap the mic to speak a command into your terminal.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>ShellX turns what you say into text for your terminal. When your phone can, this happens on the phone; otherwise Apple's speech recognition service is used.</string>
+	<string>ShellX turns what you say into text for your terminal using Apple's speech recognition, which may process it on your phone or on Apple's servers.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
