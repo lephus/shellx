@@ -51,3 +51,4 @@ Ruling (Task 7 review, D18 amended): a committed user Quit is final (RestorePers
 Ruling: A5a merged to main (2def7f6) after final review + fix wave; Windows runner C++ and Inno Pascal never compiled here — release is gated on the windows-check/a5a CI run and HANDOFF §15 manual checks — cost: a Windows compile error surfaces at release build.
 Ruling: A6 Task 1 engine-spike gate needs interactive checks on a real Mac and Windows PC (locked Mac, no Windows) — A6 is BLOCKED at its gate; A7 proceeds without browser commands per its own plan (skips recorded) — cost: browser automation arrives with A6.
 Ruling: execution order now A7 (mergeable) → A9, A5b, A8 (each built and reviewed on its branch; merge only after their ⚠ manual gates pass).
+Ruling (A7 amendment detail): token-less CLI clients may only call api.version and a pane-less notify; everything else needs SHELLX_CLI_TOKEN or the tray "Allow other terminals" setting.
