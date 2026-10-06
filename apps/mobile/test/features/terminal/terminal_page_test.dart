@@ -1058,6 +1058,64 @@ void main() {
       expect(machine.attached.map((a) => a.id), [40, 40]);
     });
 
+    List<({int id, int cols, int rows})> desktopResizes() => [
+      for (final r in machine.resizes)
+        if (r.id == 40) r,
+    ];
+
+    /// The desktop tab with the computer driving, every resize of the banner's own row settled.
+    Future<int> computerDrives(WidgetTester tester) async {
+      await openDesktop(tester);
+      await tester.pump(const Duration(milliseconds: 200));
+      machine.handle(40).emit(const TabDriver(DriverSide.desktop));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      return desktopResizes().length;
+    }
+
+    testWidgets('switching back to a desktop tab the computer drives sends nothing', (tester) async {
+      final sent = await computerDrives(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      expect(registry.forMachine(agentA).tabs.value, hasLength(2));
+      await tester.tap(find.byKey(const ValueKey('tab-40')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Máy tính đang dùng terminal này · Chạm để dùng tiếp'), findsOneWidget);
+      expect(desktopResizes(), hasLength(sent));
+    });
+
+    testWidgets('rotating while the computer drives takes the size back', (tester) async {
+      final sent = await computerDrives(tester);
+      final before = registry.forMachine(agentA).activeTab.value!.terminal.value.viewWidth;
+      await rotate(tester);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(desktopResizes(), hasLength(sent + 1));
+      expect(desktopResizes().last.cols, greaterThan(before));
+      addTearDown(tester.view.reset);
+    });
+
+    testWidgets('the keyboard showing while the computer drives takes the size back', (tester) async {
+      final sent = await computerDrives(tester);
+      final before = registry.forMachine(agentA).activeTab.value!.terminal.value.viewHeight;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(desktopResizes(), hasLength(sent + 1));
+      expect(desktopResizes().last.rows, lessThan(before));
+    });
+
+    testWidgets('a font size change while the computer drives takes the size back', (tester) async {
+      final sent = await computerDrives(tester);
+      await tester.tap(find.byTooltip('Cỡ chữ'));
+      await tester.pumpAndSettle();
+      tester.widget<Slider>(find.byType(Slider)).onChanged!(20);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(desktopResizes(), hasLength(sent + 1));
+    });
+
     testWidgets('typing while the computer drives sends the phone size before the keys', (tester) async {
       await openDesktop(tester);
       machine.handle(40).emit(const TabDriver(DriverSide.desktop));

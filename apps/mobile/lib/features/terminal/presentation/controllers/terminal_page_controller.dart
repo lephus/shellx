@@ -126,9 +126,20 @@ class TerminalPageController extends Controller {
   ReadonlySignal<MachineConnectionState> get machineState => _machineState;
   ReadonlySignal<RelayConnectionState> get relayState => _relayState;
 
+  /// Pinch or the "Aa" sheet: a size the user chose, so the grid change it brings is a size intent.
   void setFontSize(double size) {
     if (_closed) return;
-    _fontSize.value = AppSettings.clampFontSize(size);
+    final clamped = AppSettings.clampFontSize(size);
+    if (clamped == _fontSize.peek()) return;
+    noteSizeIntent();
+    _fontSize.value = clamped;
+  }
+
+  /// The user changed the phone's size (orientation, keyboard, font size): the active tab may take
+  /// the size back from the computer with the grid change that follows (terminal sharing §5.5).
+  void noteSizeIntent() {
+    if (_closed || _closing.peek()) return;
+    workspace.activeTab.peek()?.noteSizeIntent();
   }
 
   /// First visit: connect and `session.list`; null on later visits or on error.

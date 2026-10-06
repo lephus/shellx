@@ -140,11 +140,9 @@ class TerminalTabController extends Controller {
   StreamSubscription<TabEvent>? _events;
   Timer? _resizeTimer;
 
-  /// The driver banner was just shown or hidden: the next layout-driven resize is the banner's own
-  /// row, not the phone changing size, so it must not take the size back. Cleared by that resize,
-  /// or after [_bannerSettle] if the banner changed no grid size.
-  bool _bannerResize = false;
-  Timer? _bannerSettleTimer;
+  /// The user changed the phone's size since the last send ([noteSizeIntent]): while the computer
+  /// drives, only such a grid change is sent.
+  bool _sizeIntent = false;
   ({int cols, int rows})? _lastSent;
   bool _disposed = false;
 
@@ -215,9 +213,7 @@ class TerminalTabController extends Controller {
         }
       case TabDriver(:final by):
         _claimed = false;
-        final bannerBefore = _showDriverBanner.peek();
         _driver.value = by;
-        if (_showDriverBanner.peek() != bannerBefore) _expectBannerResize();
         if (by == DriverSide.phone) _sendViewSizeIfChanged();
       case TabDetached(:final reason):
         _banner.value = TabBanner(switch (reason) {
@@ -248,18 +244,19 @@ class TerminalTabController extends Controller {
     final rows = current.viewHeight;
     if (cols < 1 || rows < 1) return;
     _claimed = true;
+    _sizeIntent = false;
     _lastSent = (cols: cols, rows: rows);
     _machine.resize(id, cols, rows);
   }
 
-  void _expectBannerResize() {
-    _bannerResize = true;
-    _bannerSettleTimer?.cancel();
-    _bannerSettleTimer = Timer(_bannerSettle, () => _bannerResize = false);
+  /// The page saw the user change the phone's size: the orientation, the keyboard (bottom inset)
+  /// or the font size (pinch, "Aa"). The next grid change is then sent even while the computer
+  /// drives, which takes the size back (terminal sharing §5.5). The banner showing or hiding, a
+  /// view mounted again (switching tabs, `session.reset`) carry no intent.
+  void noteSizeIntent() {
+    if (_disposed) return;
+    _sizeIntent = true;
   }
-
-  /// Long enough for the page to lay out again after the banner changed.
-  Duration get _bannerSettle => resizeDebounce * 2;
 
   /// The phone has the size again: a size the view took meanwhile (laid out after the claim, its
   /// debounced resize not sent yet) goes out now, so the PTY matches what the phone shows.
@@ -269,28 +266,26 @@ class TerminalTabController extends Controller {
   }
 
   void _onResize(int cols, int rows, int pixelWidth, int pixelHeight) {
-    final fromBanner = _bannerResize;
-    _bannerResize = false;
-    _bannerSettleTimer?.cancel();
     // Coalesce the burst of sizes produced while the keyboard slides or the
     // phone rotates; only the final size is sent.
     _resizeTimer?.cancel();
-    _resizeTimer = Timer(resizeDebounce, () => _sendResize(cols, rows, fromBanner: fromBanner));
+    _resizeTimer = Timer(resizeDebounce, () => _sendResize(cols, rows));
   }
 
   /// Never sends a size below 1×1 (a zero-sized viewport while the keyboard slides or the phone
   /// rotates), never repeats the last size.
   ///
-  /// Terminal sharing §5.5: the phone takes the size when it attaches, types or changes size, so
-  /// a rotation, the keyboard or a font size claims it back even while the computer drives; §9.2
-  /// adds a tap and a keystroke ([claimSize]). The one exception is the row the driver banner takes
-  /// or gives back ([fromBanner]): while the computer drives that is not the phone changing size,
-  /// and sending it would take the size back the moment the banner appears.
-  void _sendResize(int cols, int rows, {bool fromBanner = false}) {
+  /// While the phone drives every grid change is sent. While the computer drives (terminal sharing
+  /// §5.5: the phone takes the size when it attaches, types or changes size; §9.2: a tap or a
+  /// keystroke, [claimSize]) a grid change is sent, and so claims the size, only after a user size
+  /// intent ([noteSizeIntent]) since the last send: the banner's own row, a tab switched to or a
+  /// view rebuilt by `session.reset` are not the phone changing size.
+  void _sendResize(int cols, int rows) {
     if (_disposed || !_isLive.peek() || cols < 1 || rows < 1) return;
-    if (fromBanner && _showDriverBanner.peek()) return;
+    if (_showDriverBanner.peek() && !_sizeIntent) return;
     final size = (cols: cols, rows: rows);
     if (size == _lastSent) return;
+    _sizeIntent = false;
     _lastSent = size;
     _machine.resize(id, cols, rows);
   }
@@ -343,7 +338,6 @@ class TerminalTabController extends Controller {
   void dispose() {
     _disposed = true;
     _resizeTimer?.cancel();
-    _bannerSettleTimer?.cancel();
     unawaited(_events?.cancel());
     selection.dispose();
     _showDriverBanner.dispose();

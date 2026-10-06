@@ -50,6 +50,10 @@ class _TerminalPageState extends State<TerminalPage> {
   TerminalGrid _grid = fallbackGrid;
   bool _leaving = false;
 
+  /// Last seen orientation and keyboard inset: a change is the user changing the phone's size.
+  Orientation? _orientation;
+  double? _keyboardInset;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +71,18 @@ class _TerminalPageState extends State<TerminalPage> {
       wasOpen = open;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final orientation = MediaQuery.orientationOf(context);
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    final changed =
+        (_orientation != null && orientation != _orientation) || (_keyboardInset != null && inset != _keyboardInset);
+    _orientation = orientation;
+    _keyboardInset = inset;
+    if (changed) _controller.noteSizeIntent();
   }
 
   @override
@@ -344,7 +360,7 @@ class _TerminalPageState extends State<TerminalPage> {
           showReconnecting: false,
         ),
         // In the chrome, never over the cells, so no row is cut in half. The row it takes from the
-        // view does not take the size back (`TerminalTabController._sendResize`, `fromBanner`).
+        // view carries no size intent, so it does not take the size back (`noteSizeIntent`).
         Watch((context) {
           if (_controller.closing.value) return const SizedBox.shrink();
           final tab = workspace.activeTab.value;

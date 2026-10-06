@@ -357,7 +357,7 @@ void main() {
     test('the banner appearing changes the grid but sends nothing and does not claim', () {
       fakeAsync((async) {
         desktopHandle.emit(const TabDriver(DriverSide.desktop));
-        // The driver banner takes a row of the chrome: the view loses a row.
+        // The driver banner takes a row of the chrome: the view loses a row. No size intent.
         desktop.terminal.value.resize(80, 23);
         async.elapse(const Duration(seconds: 1));
         expect(machine.resizes, isEmpty);
@@ -365,14 +365,57 @@ void main() {
       });
     });
 
-    test('rotation (or the keyboard, or a font size) while the computer drives claims the size', () {
+    test('the banner going away with the session (exit) sends nothing', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        desktopHandle.emit(const TabExited(0));
+        desktop.terminal.value.resize(80, 25);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, isEmpty);
+      });
+    });
+
+    test('a remount after session.reset while the computer drives sends nothing', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        desktopHandle.emit(const TabReset());
+        desktop.terminal.value.resize(80, 23); // the new view lays out under the banner
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, isEmpty);
+      });
+    });
+
+    test('a size intent (rotation, keyboard, font size) while the computer drives claims the size', () {
       fakeAsync((async) {
         desktopHandle.emit(const TabDriver(DriverSide.desktop));
         desktop.terminal.value.resize(80, 23); // the banner's own row
         async.elapse(const Duration(seconds: 1));
+        desktop.noteSizeIntent();
         desktop.terminal.value.resize(120, 18); // landscape
         async.elapse(const Duration(seconds: 1));
         expect(machine.resizes, [(id: 40, cols: 120, rows: 18)]);
+        // One intent, one send: a later grid change without intent is not sent.
+        desktop.terminal.value.resize(120, 17);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, hasLength(1));
+      });
+    });
+
+    test('a rotation still pending when the computer takes the size goes out', () {
+      fakeAsync((async) {
+        desktop.noteSizeIntent();
+        desktop.terminal.value.resize(120, 18);
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, [(id: 40, cols: 120, rows: 18)]);
+      });
+    });
+
+    test('while the phone drives, every grid change is sent as before', () {
+      fakeAsync((async) {
+        desktop.terminal.value.resize(90, 20);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, [(id: 40, cols: 90, rows: 20)]);
       });
     });
 
