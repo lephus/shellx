@@ -407,6 +407,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// once the user chose a tab meanwhile (⌘T, a click).
   bool _restoreMaySelect = false;
 
+  /// A5a m1: set by [cancelRestore]; the running restore stops.
+  bool _restoreCancelled = false;
+
   /// Never closed on a rebuild (the notifier outlives it, Riverpod 3):
   /// only when the provider really goes ([_dispose]).
   final _paneOutputs = StreamController<int>.broadcast(sync: true);
@@ -416,6 +419,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// A5a D16: a restore is reopening saved panes.
   bool get restoring => _restoring != null;
+
+  /// A5a m1: Quit or a power-off during a restore. The restore opens no
+  /// further pane and ends without a toast or taking the selection; what
+  /// it already opened still becomes tabs. Nothing when none runs.
+  void cancelRestore() {
+    if (_restoring != null) _restoreCancelled = true;
+  }
 
   /// For the restore extension (`terminal_tabs_restore.dart`).
   Ref get _ref => ref;

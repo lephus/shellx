@@ -525,4 +525,31 @@ void main() {
       expect(view.writes, isEmpty);
     }
   });
+
+  test('cancelRestore (Quit, power-off during a restore): no further pane '
+      'opens, no toast, no selection taken (A5a m1)', () async {
+    boot();
+    local.failOpens = {'/w/x'}; // one failure before the cancel
+    final gate = Completer<void>();
+    local.openGate = gate;
+    final restoring = restore();
+    await pumpEventQueue();
+    // The first open (/w/x, the selected tab) is under way.
+    expect(local.openCwds, ['/w/x']);
+    tabs().cancelRestore();
+    gate.complete();
+    local.openGate = null;
+    final out = await restoring;
+    expect(local.openCwds, ['/w/x']);
+    expect(out.tabsRestored, 0);
+    expect(state().notice, isNull);
+    expect(tabs().restoring, isFalse);
+  });
+
+  test('a cancel does not carry over to the next restore', () async {
+    boot();
+    tabs().cancelRestore(); // none running: nothing to cancel
+    final out = await restore();
+    expect(out.tabsRestored, 2);
+  });
 }

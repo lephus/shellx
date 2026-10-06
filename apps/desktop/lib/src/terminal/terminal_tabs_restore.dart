@@ -67,8 +67,11 @@ extension _Restore on TerminalTabs {
     if (_restoring != null) return RestoreOutcome.none;
     final done = _restoring = Completer<void>();
     _restoreMaySelect = true;
+    _restoreCancelled = false;
     final local = _local;
-    bool alive() => _ref.mounted && identical(_local, local);
+    bool live() => _ref.mounted && identical(_local, local);
+    // A5a m1: a Quit or power-off meanwhile stops the restore.
+    bool alive() => live() && !_restoreCancelled;
     var order = const <SavedTab>[];
     try {
       final plan = await pending;
@@ -130,9 +133,12 @@ extension _Restore on TerminalTabs {
       // Never throws: what was restored so far stays.
       debugPrint('restore stopped: ${error.runtimeType}');
     } finally {
-      if (alive()) {
+      if (live()) {
         _restoreHeld.clear();
         _sync(); // anything opened elsewhere meanwhile becomes its own tab
+      }
+      // Cancelled (A5a m1): no selection taken, no toast.
+      if (alive()) {
         if (_restoreMaySelect) {
           // Every restored tab is hidden: the first one in sidebar order.
           final first = order
@@ -144,6 +150,7 @@ extension _Restore on TerminalTabs {
         if (failed > 0) _set(notice: RestorePanesFailedNotice(failed));
       }
       _restoreMaySelect = false;
+      _restoreCancelled = false;
       _restoring = null;
       done.complete();
     }

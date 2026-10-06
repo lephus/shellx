@@ -119,6 +119,14 @@ class RestorePersistence extends Notifier<void> {
   bool _started = false;
   bool _restoring = false;
 
+  /// The layout the startup restore loaded (A5a m1): a clean flush during
+  /// the restore writes it back, marked clean.
+  RestoreSnapshot? _loaded;
+
+  /// A clean flush stopped the startup restore (A5a m1): it ends without
+  /// a strip and deletes no file.
+  bool _restoreStopped = false;
+
   /// Set by `flushAll(clean: true)`: what Quit saved is final (D12); the
   /// shutdown that follows must not overwrite or delete it.
   bool _frozen = false;
@@ -213,9 +221,17 @@ class RestorePersistence extends Notifier<void> {
     _cancelPending(); // I7: never a partial layout mid-restore
     final files = _files;
     DateTime? newest;
-    final planned = _plan(load, (at) {
-      if (newest == null || at.isAfter(newest!)) newest = at;
-    });
+    // A5a m2: an unexpected error is not "nothing saved": then no file is
+    // deleted as an orphan.
+    var unreadable = false;
+    final planned =
+        _plan(load, (at) {
+          if (newest == null || at.isAfter(newest!)) newest = at;
+        }).catchError((Object error) {
+          debugPrint('restore: saved state unreadable (${error.runtimeType})');
+          unreadable = true;
+          return null;
+        });
     try {
       final outcome = await ref
           .read(terminalTabsProvider.notifier)
@@ -225,7 +241,9 @@ class RestorePersistence extends Notifier<void> {
       _keys.addAll(outcome.keyBySession);
       _filed.addAll(outcome.keyBySession.values);
       if (plan == null) {
-        if (!_frozen) await files.removeOrphans(const {});
+        if (!_frozen && !unreadable && !_restoreStopped) {
+          await files.removeOrphans(const {});
+        }
         _savedChanged();
         return;
       }
@@ -239,13 +257,13 @@ class RestorePersistence extends Notifier<void> {
           );
       // D15. Not once Quit froze the files: the panes are going away and
       // the saved layout still names them.
-      if (!_frozen) {
+      if (!_frozen && !_restoreStopped) {
         await files.removeOrphans(outcome.keyBySession.values.toSet());
       }
       if (!ref.mounted) return;
       _savedChanged();
       // D12: an unclean end, and something to show for it.
-      if (!snapshot.cleanExit && outcome.tabsRestored > 0) {
+      if (!snapshot.cleanExit && outcome.tabsRestored > 0 && !_restoreStopped) {
         ref
             .read(restoreStripProvider.notifier)
             .show(
@@ -256,6 +274,8 @@ class RestorePersistence extends Notifier<void> {
       debugPrint('restore: startup failed (${error.runtimeType})');
     } finally {
       _restoring = false;
+      _loaded = null;
+      _restoreStopped = false;
       // D12: the first write of this run marks it unclean.
       _schedule();
     }
@@ -263,61 +283,58 @@ class RestorePersistence extends Notifier<void> {
 
   /// The plan for [load]: per pane key, its saved text — sanitized here
   /// (D6, whatever [RestoreFiles] did) — ending its line, then the divider
-  /// (D8, D23). Null when there is nothing to restore. Never throws.
+  /// (D8, D23). Null when there is nothing to restore; throws when the
+  /// saved state could not be read (A5a m2).
   Future<RestorePlan?> _plan(
     FutureOr<RestoreLoad> load,
     void Function(DateTime at) savedAt,
   ) async {
-    try {
-      final files = _files;
-      final enabled = scrollbackEnabled;
-      final l10n = ref.read(appL10nProvider);
-      final now = ref.read(clockProvider)();
-      final snapshot = (await load).snapshot;
-      if (snapshot == null || !ref.mounted) return null;
-      // D12: a crash while restoring must read as unclean next time. Same
-      // layout, so nothing is lost; a Quit during the restore writes
-      // nothing more ([flushAll]).
-      if (snapshot.cleanExit && !_frozen) {
-        try {
-          await files.writeLayout(snapshot.copyWith(cleanExit: false));
-        } on Object catch (error) {
-          debugPrint('restore: marker not saved (${error.runtimeType})');
-        }
+    final files = _files;
+    final enabled = scrollbackEnabled;
+    final l10n = ref.read(appL10nProvider);
+    final now = ref.read(clockProvider)();
+    final snapshot = (await load).snapshot;
+    if (snapshot == null || !ref.mounted) return null;
+    _loaded = snapshot;
+    // D12: a crash while restoring must read as unclean next time. Same
+    // layout, so nothing is lost; a Quit during the restore writes it
+    // back clean ([flushAll], A5a m1).
+    if (snapshot.cleanExit && !_frozen) {
+      try {
+        await files.writeLayout(snapshot.copyWith(cleanExit: false));
+      } on Object catch (error) {
+        debugPrint('restore: marker not saved (${error.runtimeType})');
       }
-      final text = <String, String>{};
-      if (enabled) {
-        for (final key in snapshot.paneKeys) {
-          final raw = await files.readScrollback(key);
-          if (raw == null) continue;
-          var saved = sanitizeRestored(raw);
-          if (saved.isEmpty) continue;
-          if (!saved.endsWith('\n')) saved += '\r\n';
-          final at = await files.scrollbackSavedAt(key) ?? snapshot.savedAt;
-          savedAt(at);
-          final time = formatRestoreTime(
-            at,
-            now,
-            localeName: l10n.localeName,
-            yesterday: l10n.restoreTimeYesterday,
-          );
-          text[key] =
-              saved + restoreDivider(l10n.terminalRestoredDivider(time));
-        }
-      }
-      return RestorePlan(snapshot: snapshot, textByKey: text);
-    } on Object catch (error) {
-      debugPrint('restore: saved state unreadable (${error.runtimeType})');
-      return null;
     }
+    final text = <String, String>{};
+    if (enabled) {
+      for (final key in snapshot.paneKeys) {
+        final raw = await files.readScrollback(key);
+        if (raw == null) continue;
+        var saved = sanitizeRestored(raw);
+        if (saved.isEmpty) continue;
+        if (!saved.endsWith('\n')) saved += '\r\n';
+        final at = await files.scrollbackSavedAt(key) ?? snapshot.savedAt;
+        savedAt(at);
+        final time = formatRestoreTime(
+          at,
+          now,
+          localeName: l10n.localeName,
+          yesterday: l10n.restoreTimeYesterday,
+        );
+        text[key] = saved + restoreDivider(l10n.terminalRestoredDivider(time));
+      }
+    }
+    return RestorePlan(snapshot: snapshot, textByKey: text);
   }
 
   /// Quit and OS power-off (clean, D12, D18), window hidden (not clean).
   /// A clean flush is the last write of this run: persistence stops (the
-  /// sessions closing after it must not undo it). During a restore
-  /// nothing is written — the files on disk still hold everything (the
-  /// restore marked them unclean). Returns once any scrollback save that
-  /// was already under way has finished too.
+  /// sessions closing after it must not undo it). During a restore a
+  /// clean flush stops it (no more panes open, A5a m1) and writes back
+  /// the layout it loaded, marked clean — the window holds only part of
+  /// it; scrollback files stay as they are. Returns once any scrollback
+  /// save that was already under way has finished too.
   Future<void> flushAll({required bool clean}) async {
     if (clean) _resuming = false; // quitting again: stay frozen
     if (_frozen) return;
@@ -326,10 +343,29 @@ class RestorePersistence extends Notifier<void> {
       _frozen = true;
       _period?.cancel();
     }
-    if (_restoring || !ref.mounted) return;
+    if (!ref.mounted) return;
+    if (_restoring) {
+      if (!clean) return;
+      _restoreStopped = true;
+      ref.read(terminalTabsProvider.notifier).cancelRestore();
+      final loaded = _loaded;
+      if (loaded != null) {
+        final write = _flushWrite = _writeLoadedClean(loaded);
+        await write;
+      }
+      return;
+    }
     final write = _flushWrite = _writeLayout(cleanExit: clean, force: true);
     await write;
     await _saveDirty();
+  }
+
+  Future<void> _writeLoadedClean(RestoreSnapshot loaded) async {
+    try {
+      await _files.writeLayout(loaded.copyWith(cleanExit: true));
+    } on Object catch (error) {
+      debugPrint('restore: layout not saved (${error.runtimeType})');
+    }
   }
 
   /// The user's Quit (tray, ⌘Q, Windows Restart Manager): a clean flush

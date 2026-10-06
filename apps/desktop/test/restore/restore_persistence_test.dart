@@ -361,11 +361,111 @@ void main() {
     );
     await pumpEventQueue();
     await persistence().flushAll(clean: true);
-    expect(files.layouts, isEmpty);
+    // A5a m1: the loaded layout goes back as a clean exit — nothing of it
+    // is lost, and the next launch shows no strip.
+    final written = files.layouts.single;
+    expect(written.cleanExit, isTrue);
+    expect(written.sameLayoutAs(saved()), isTrue);
     expect(files.deleted, isEmpty);
     local.openGate!.complete();
     await restoring;
+    expect(files.layouts, hasLength(1));
     expect(files.keptOrphans, isNull); // frozen: nothing removed
+  });
+
+  RestoreSnapshot twoTabs({bool cleanExit = false}) {
+    final other = 'f' * 32;
+    return RestoreSnapshot(
+      savedAt: DateTime(2026, 10, 7, 14, 31),
+      cleanExit: cleanExit,
+      selectedTab: key,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [key, other]),
+      ],
+      tabs: [
+        SavedTab(
+          key: key,
+          focused: key,
+          layout: SavedPane(key: key, cwd: '/w'),
+        ),
+        SavedTab(
+          key: other,
+          focused: other,
+          layout: SavedPane(key: other, cwd: '/v'),
+        ),
+      ],
+    );
+  }
+
+  for (final (name, quit) in [
+    ('Quit', () => persistence().flushForQuit()),
+    ('power-off', () => persistence().flushAll(clean: true)),
+  ]) {
+    test('$name during a restore: no more panes open, no toast, no strip; '
+        'the loaded layout is written back clean (A5a m1)', () async {
+      boot();
+      local.failOpens = {'/w'};
+      local.openGate = Completer<void>();
+      final restoring = persistence().restoreAtStartup(
+        RestoreLoad(snapshot: twoTabs()),
+      );
+      await pumpEventQueue();
+      expect(local.openCwds, ['/w']);
+      await quit();
+      local.openGate!.complete();
+      await restoring;
+      expect(local.openCwds, ['/w']); // '/v' never opened
+      expect(c.read(terminalTabsProvider).notice, isNull);
+      expect(strip(), isNull);
+      expect(files.layouts.single.cleanExit, isTrue);
+      expect(files.layouts.single.sameLayoutAs(twoTabs()), isTrue);
+    });
+  }
+
+  test('Quit during a restore after a clean exit: the unclean marker is '
+      'followed by the clean layout (A5a m1)', () async {
+    boot();
+    local.openGate = Completer<void>();
+    final restoring = persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved(cleanExit: true)),
+    );
+    await pumpEventQueue();
+    await persistence().flushForQuit();
+    local.openGate!.complete();
+    await restoring;
+    expect(files.layouts.map((l) => l.cleanExit), [false, true]);
+  });
+
+  test('Quit while the layout still loads writes nothing: the files keep '
+      'what they hold (A5a m1)', () async {
+    boot();
+    final load = Completer<RestoreLoad>();
+    final restoring = persistence().restoreAtStartup(load.future);
+    await pumpEventQueue();
+    await persistence().flushForQuit();
+    load.complete(RestoreLoad(snapshot: saved()));
+    await restoring;
+    expect(files.layouts, isEmpty);
+    expect(local.openCwds, isEmpty);
+    expect(files.keptOrphans, isNull);
+  });
+
+  test('an unexpected error while planning never deletes saved text: no '
+      'orphan removal (A5a m2)', () async {
+    boot();
+    await persistence().restoreAtStartup(
+      Future<RestoreLoad>.error(StateError('disk')),
+    );
+    expect(files.keptOrphans, isNull);
+    expect(c.read(terminalTabsProvider).tabs, isEmpty);
+  });
+
+  test('an error reading saved text never deletes saved text either '
+      '(A5a m2)', () async {
+    files.readError = StateError('io');
+    boot();
+    await persistence().restoreAtStartup(RestoreLoad(snapshot: saved()));
+    expect(files.keptOrphans, isNull);
   });
 
   test(

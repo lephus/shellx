@@ -54,9 +54,14 @@ final class RecordingFiles implements RestoreFiles {
     return true;
   }
 
+  /// When set, [readScrollback] throws it.
+  Object? readError;
+
   @override
   Future<String?> readScrollback(String key) async {
     reads.add(key);
+    final error = readError;
+    if (error != null) throw error;
     return stored[key];
   }
 
