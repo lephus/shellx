@@ -45,6 +45,12 @@ void main() {
     expect(screenText(t), 'a   b\n');
   });
 
+  test('C1 controls a cell holds are never read out (Task 7 review M4)', () {
+    final t = term('a\u0085b\u009cc\u009bd', cols: 20);
+    expect(readPage(t).text, 'abcd\n');
+    expect(readPage(t, lines: 1, ansi: true).text, 'abcd\n');
+  });
+
   test('--ansi keeps SGR only, never title or clipboard sequences', () {
     final t = term(
       '\x1b]0;title\x07\x1b[31mred\x1b[0m ok\x1b]52;c;aGk=\x07',

@@ -10,10 +10,14 @@ const kReadMaxLines = 10000;
 
 final _sgr = RegExp(r'\x1b\[[0-9;]*m');
 
+/// C1 controls (U+0080–U+009F): a cell may hold one; never read out.
+final _c1 = RegExp('[\u0080-\u009f]');
+
 /// One logical line per entry (soft-wrapped rows joined), oldest first.
 /// [fromRow]: start at this absolute row (moved back to the start of its
 /// logical line). [last]: keep only the newest N. Trailing blank rows are
-/// dropped. Always re-encoded from the cells, never the PTY's bytes:
+/// dropped, and C1 controls with them. Always re-encoded from the cells,
+/// never the PTY's bytes:
 /// [ansi] keeps SGR (A5a D5), else plain text with trailing spaces cut.
 List<String> logicalLines(
   Buffer buffer, {
@@ -39,7 +43,7 @@ List<String> logicalLines(
     while (start > first && rows[start].isWrapped) {
       start--;
     }
-    final encoded = encodeLogicalLines(buffer, start, i);
+    final encoded = encodeLogicalLines(buffer, start, i).replaceAll(_c1, '');
     out.add(ansi ? encoded : encoded.replaceAll(_sgr, '').trimRight());
     i = start - 1;
   }
