@@ -1590,6 +1590,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{The command running in 1 pane will be stopped.} other{The commands running in {count} panes will be stopped.}}'**
   String confirmCloseRunningPanesBody(int count);
+
+  /// No description provided for @terminalRestoredDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'— Session restored · {time} —'**
+  String terminalRestoredDivider(String time);
+
+  /// No description provided for @restoreTimeYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'yesterday {time}'**
+  String restoreTimeYesterday(String time);
+
+  /// No description provided for @trayTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get trayTerminal;
+
+  /// No description provided for @trayRestoreScrollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Save terminal contents on quit'**
+  String get trayRestoreScrollback;
+
+  /// No description provided for @trayClearSavedScrollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear saved contents'**
+  String get trayClearSavedScrollback;
+
+  /// No description provided for @restoreAbnormalStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX didn\'t close normally last time. Reopened {count, plural, =1{1 tab} other{{count} tabs}}; contents as of {time}.'**
+  String restoreAbnormalStrip(int count, String time);
+
+  /// No description provided for @restoreAbnormalNoText.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX didn\'t close normally last time. Reopened {count, plural, =1{1 tab} other{{count} tabs}}.'**
+  String restoreAbnormalNoText(int count);
+
+  /// No description provided for @restoreStripCloseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss restore notice'**
+  String get restoreStripCloseLabel;
+
+  /// No description provided for @restorePanesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Couldn\'t reopen 1 pane} other{Couldn\'t reopen {count} panes}}'**
+  String restorePanesFailed(int count);
 }
 
 class _AppLocalizationsDelegate

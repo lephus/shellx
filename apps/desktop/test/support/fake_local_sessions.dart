@@ -50,6 +50,17 @@ final class FakeLocalSessions implements LocalSessions {
   /// Runs once [open] made session `id`, before it returns.
   void Function(int id)? afterOpen;
 
+  /// The backlog of the next sessions [open] makes (A5a: what the new
+  /// shell printed before the view attached).
+  String nextBacklog = '';
+
+  /// [open] with one of these `cwd`s throws [SpawnFailedException].
+  Set<String> failOpens = {};
+
+  /// When true, [open] emits [changes] before it returns, as the real
+  /// `SessionManager.open` does.
+  bool notifyOnOpen = false;
+
   @override
   List<SessionSummary> get sessions => List.of(summaries);
   @override
@@ -62,8 +73,15 @@ final class FakeLocalSessions implements LocalSessions {
     await openGate?.future;
     final error = openError;
     if (error != null) throw error;
+    if (failOpens.contains(cwd)) {
+      throw const SpawnFailedException('No such file or directory');
+    }
     final id = nextId++;
-    add(summary(id, origin: SessionOrigin.desktop), notify: false);
+    add(
+      summary(id, origin: SessionOrigin.desktop),
+      notify: notifyOnOpen,
+      backlog: nextBacklog,
+    );
     afterOpen?.call(id);
     return id;
   }

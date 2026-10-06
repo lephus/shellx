@@ -10,12 +10,15 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
 import 'terminal_feed.dart';
 import 'terminal_style.dart';
+
+part 'terminal_tabs_restore.dart';
 
 enum SpawnFailure { notFound, denied, other }
 
@@ -384,9 +387,39 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// The pane's grid, so a new shell starts at the size it will be shown.
   TerminalGrid _grid = (cols: 80, rows: 24);
 
-  /// D5: this window's own open is in flight; a desktop session that
-  /// appears meanwhile waits for the opener to place it.
-  bool _awaitingOpen = false;
+  /// D5: how many of this window's own opens are in flight (⌘T, a split,
+  /// each pane a restore reopens); a desktop session that appears meanwhile
+  /// waits for its opener to place it.
+  int _awaitingOpens = 0;
+
+  /// A5a: sessions restore opened and has not placed in a tab yet; [_merge]
+  /// never makes them tabs of their own (Review Focus 1).
+  final _restoreHeld = <int>{};
+
+  /// A5a D8: saved text (+ divider) written into a pane's terminal before
+  /// its backlog. Consumed by [_attach].
+  final _restoreText = <int, String>{};
+
+  /// A5a D16: completes when the running restore ends; null when none runs.
+  Completer<void>? _restoring;
+
+  /// A5a D10: restore still picks the selection; false once it did, or
+  /// once the user chose a tab meanwhile (⌘T, a click).
+  bool _restoreMaySelect = false;
+
+  /// Never closed on a rebuild (the notifier outlives it, Riverpod 3):
+  /// only when the provider really goes ([_dispose]).
+  final _paneOutputs = StreamController<int>.broadcast(sync: true);
+
+  /// A5a D4: the session whose pane just received output.
+  Stream<int> get paneOutputs => _paneOutputs.stream;
+
+  /// A5a D16: a restore is reopening saved panes.
+  bool get restoring => _restoring != null;
+
+  /// For the restore extension (`terminal_tabs_restore.dart`).
+  Ref get _ref => ref;
+  TerminalTabsState get _state => state;
 
   /// D4: the last pane area the view reported; null until the first layout
   /// (then nothing is refused or clamped beyond [clampRatio]).
@@ -406,17 +439,26 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   Future<void> openTab() async {
     if (state.opening) return;
     _set(opening: true);
-    _awaitingOpen = true;
+    _awaitingOpens++;
+    var held = true;
+    void release() {
+      if (!held) return;
+      held = false;
+      _awaitingOpens--;
+    }
+
     var synced = false;
     try {
       final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
       if (!ref.mounted) return;
-      _awaitingOpen = false;
-      _sync();
+      release();
+      // A5a D16: placed now, even while a restore's opens are pending.
+      _sync(own: id);
       synced = true;
       // The new shell may already be gone (exit 0, or ended before it could
       // be viewed): then keep a selection that exists.
       final opened = state.tabOfSession(id);
+      if (opened != null) _restoreMaySelect = false;
       _set(
         selectedId:
             opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
@@ -428,7 +470,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
       }
     } finally {
-      _awaitingOpen = false;
+      release();
       if (ref.mounted) {
         // D5: desktop sessions held back while the open was pending get
         // their tabs now, even when the open failed.
@@ -439,14 +481,29 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     }
   }
 
-  /// D11: activation and startup open a tab when there is none.
+  /// D11: activation and startup open a tab when there is none. During a
+  /// restore it waits for the restore (A5a D16): restored tabs count.
   Future<void> ensureTab() async {
+    final restoring = _restoring;
+    if (restoring != null) {
+      await restoring.future;
+      if (!ref.mounted) return;
+    }
     if (state.tabs.isEmpty && !state.opening) await openTab();
   }
 
   void select(int id) {
-    if (state.tabs.any((t) => t.id == id)) _set(selectedId: id);
+    if (state.tabs.any((t) => t.id == id)) {
+      _restoreMaySelect = false;
+      _set(selectedId: id);
+    }
   }
+
+  /// A5a D7–D10: reopens every saved pane in its directory, the selected
+  /// tab first, then in sidebar order; rebuilds each tree without the
+  /// panes that failed; selects the saved tab as soon as it is there.
+  /// Never throws.
+  Future<RestoreOutcome> restore(RestorePlan plan) => _runRestore(plan);
 
   /// ⌘1…⌘9: the n-th tab (1-based); nothing when there is none.
   void selectIndex(int position) {
@@ -525,7 +582,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final pane = tab.panes[target]!;
     final grid = _halfGrid(pane, axis);
     _set(opening: true);
-    _awaitingOpen = true;
+    _awaitingOpens++;
+    var held = true;
+    void release() {
+      if (!held) return;
+      held = false;
+      _awaitingOpens--;
+    }
+
     var synced = false;
     try {
       final id = await _local.open(
@@ -534,7 +598,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         cwd: pane.cwd,
       );
       if (!ref.mounted) return;
-      _awaitingOpen = false;
+      release();
       _adoptPane(id, tabId: tab.id, target: target, axis: axis, size: grid);
       synced = true; // [_adoptPane] synced.
     } on SessionLimitException catch (error) {
@@ -544,7 +608,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
       }
     } finally {
-      _awaitingOpen = false;
+      release();
       if (ref.mounted) {
         // D5: as in [openTab], desktop sessions held back while the open
         // was pending get their tabs now, even when the open failed.
@@ -685,17 +749,20 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     return null;
   }
 
-  void _sync() {
+  /// [own]: a session this window just opened, placed even while other
+  /// opens are pending (A5a D16).
+  void _sync({int? own}) {
     if (!ref.mounted) return;
-    final tabs = _merge(state.tabs);
+    final tabs = _merge(state.tabs, own: own);
     _set(tabs: tabs, selectedId: state.selectedId ?? tabs.firstOrNull?.id);
   }
 
   /// Existing tabs keep their place (and their panes stay while a session
   /// is gone but its exit is not handled yet); new sessions are appended as
   /// one-pane tabs — except a desktop session while this window's own open
-  /// is pending (D5): the opener decides whether it is a tab or a pane.
-  List<TerminalTab> _merge(List<TerminalTab> current) {
+  /// is pending (D5): the opener decides whether it is a tab or a pane —
+  /// and a session a restore holds for its tree (A5a).
+  List<TerminalTab> _merge(List<TerminalTab> current, {int? own}) {
     final summaries = {for (final s in _local.sessions) s.id: s};
     final next = <TerminalTab>[];
     for (final tab in current) {
@@ -719,7 +786,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       next.add(updated);
     }
     for (final s in summaries.values) {
-      if (_awaitingOpen && s.origin == SessionOrigin.desktop) continue;
+      if (_restoreHeld.contains(s.id)) continue;
+      if (_awaitingOpens > 0 &&
+          s.origin == SessionOrigin.desktop &&
+          s.id != own) {
+        continue;
+      }
       final pane = _attach(s);
       if (pane != null) next.add(TerminalTab.single(pane));
     }
@@ -741,6 +813,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     // the pane's width, and a phone keeps driving until the user acts.
     final grid = size ?? _grid;
     terminal.resize(grid.cols, grid.rows);
+    // A5a D8: the saved text sits above everything the new shell prints,
+    // in this terminal only — never the PTY, never a phone.
+    final restored = _restoreText.remove(s.id);
+    if (restored != null) feed.add(utf8.encode(restored));
     feed.add(view.backlog);
     feed.drain();
     // Plain assignments: a cascade after an arrow closure would be parsed
@@ -758,7 +834,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       view.resize(cols, rows);
     };
     link.subscriptions
-      ..add(view.output.listen(feed.add))
+      ..add(
+        view.output.listen((bytes) {
+          feed.add(bytes);
+          if (!_paneOutputs.isClosed) _paneOutputs.add(s.id);
+        }),
+      )
       ..add(
         view.driver.listen(
           (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),
@@ -914,7 +995,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final summary = _local.sessions.where((s) => s.id == id).firstOrNull;
     final tab = _tab(tabId);
     if (summary == null || tab == null) {
-      _sync();
+      _sync(own: id);
       if (state.tabOfSession(id) case final own?) _set(selectedId: own.id);
       return;
     }
@@ -1118,5 +1199,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       link.dispose();
     }
     _links.clear();
+    // Sessions of the old [LocalSessions]: nothing to hold or write now.
+    _restoreHeld.clear();
+    _restoreText.clear();
+    // A rebuild reuses this notifier and keeps the stream; only a real
+    // dispose leaves the ref unmounted once this turn is over.
+    scheduleMicrotask(() {
+      bool alive;
+      try {
+        alive = ref.mounted;
+      } on Object {
+        alive = false;
+      }
+      if (!alive) unawaited(_paneOutputs.close());
+    });
   }
 }

@@ -565,7 +565,8 @@ class _NoticeToastState extends State<NoticeToast> {
   bool get _neutral =>
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
-      widget.notice is PaneNoRoomNotice;
+      widget.notice is PaneNoRoomNotice ||
+      widget.notice is RestorePanesFailedNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -611,6 +612,7 @@ class _NoticeToastState extends State<NoticeToast> {
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
+    RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
   };
 
   @override

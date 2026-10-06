@@ -9,6 +9,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import '../../l10n/app_localizations.dart';
 import '../agent/desktop_services.dart';
 import '../platform/settings_store.dart';
+import '../restore/restore_snapshot.dart';
 import 'local_sessions_provider.dart';
 import 'terminal_tabs.dart';
 
@@ -254,8 +255,17 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     final successor = ref.read(closeSuccessorProvider);
     int? choose(int closed) => state.successorOf(closed);
     successor.choose = choose;
+    // A5a D10: restore's fallback selection only picks a tab one sees.
+    final placement = ref.read(restorePlacementProvider);
+    bool isShown(String? id) {
+      final w = state.workspace(id ?? kDefaultWorkspaceId);
+      return !state.showHeaders || !(w ?? state.defaultWorkspace).collapsed;
+    }
+
+    placement.isShown = isShown;
     ref.onDispose(() {
       if (successor.choose == choose) successor.choose = null;
+      if (placement.isShown == isShown) placement.isShown = null;
     });
     return _reconcile(
       SidebarState(workspaces: loadWorkspaces(stored), members: const {}),
@@ -449,6 +459,47 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     _tabs.select(next ?? (delta > 0 ? visible.first : visible.last));
   }
 
+  /// A5a D1, D10: puts restored tabs in their saved order. Workspaces no
+  /// longer in the settings send their tabs to the end of Default; tabs
+  /// not mentioned keep their place. The selected tab's workspace becomes
+  /// current. Nothing expands (criterion 1).
+  void adopt(
+    List<SavedWorkspace> workspaces,
+    Map<String, int> tabIdByKey, {
+    int? selectedTabId,
+  }) {
+    final moved = <int>{};
+    final members = <String, List<int>>{
+      for (final w in state.workspaces) w.id: <int>[],
+    };
+    final live = {for (final ids in state.members.values) ...ids};
+    for (final saved in workspaces) {
+      final target = members.containsKey(saved.id)
+          ? saved.id
+          : kDefaultWorkspaceId;
+      for (final key in saved.tabs) {
+        final id = tabIdByKey[key];
+        if (id == null || !live.contains(id) || !moved.add(id)) continue;
+        members[target]!.add(id);
+      }
+    }
+    for (final w in state.workspaces) {
+      members[w.id]!.addAll(
+        state.tabsOf(w.id).where((id) => !moved.contains(id)),
+      );
+    }
+    final selectedIn = selectedTabId == null
+        ? null
+        : members.entries
+              .where((e) => e.value.contains(selectedTabId))
+              .firstOrNull
+              ?.key;
+    state = state.copyWith(
+      members: members,
+      currentId: selectedIn ?? state.currentId,
+    );
+  }
+
   void startRename(RenameTarget target) =>
       state = state.copyWith(renaming: target);
 
@@ -467,8 +518,19 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     };
     final placed = {for (final ids in members.values) ...ids};
     final expand = <String>{};
+    final restored = ref.read(restorePlacementProvider).pending;
     for (final tab in tabs.tabs) {
       if (placed.contains(tab.id)) continue;
+      if (restored.containsKey(tab.id)) {
+        // A5a criterion 1: back where it was saved, its workspace left
+        // collapsed or expanded as the settings say.
+        final saved = restored.remove(tab.id);
+        members[saved != null && members.containsKey(saved)
+                ? saved
+                : kDefaultWorkspaceId]!
+            .add(tab.id);
+        continue;
+      }
       if (tab.origin == SessionOrigin.phone) {
         members[kDefaultWorkspaceId]!.add(tab.id);
         continue;
