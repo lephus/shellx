@@ -1,4 +1,3 @@
-// apps/mobile/lib/features/voice/presentation/widgets/mic_button.dart
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
 import 'package:shellx_mobile/shared/shared.dart';

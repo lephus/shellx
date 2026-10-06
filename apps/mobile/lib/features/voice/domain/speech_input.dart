@@ -10,7 +10,17 @@ enum SpeechPermission {
   unsupported,
 }
 
-enum SpeechErrorKind { noPermission, localeUnavailable, network, noMatch, interrupted, other }
+enum SpeechErrorKind {
+  noPermission,
+  localeUnavailable,
+  network,
+  noMatch,
+  interrupted,
+
+  /// Speech recognition is turned off on the phone (iOS Settings → Siri, or a restriction).
+  unsupported,
+  other,
+}
 
 /// What the recognizer reports while the composer listens (voice spec §4.1).
 sealed class SpeechEvent {
@@ -48,6 +58,10 @@ final class SpeechListening extends SpeechEvent {
 abstract interface class SpeechInput {
   /// Broadcast: every event of every listen.
   Stream<SpeechEvent> get events;
+
+  /// Whether the first listen should ask for on-device recognition (a failure before any words is
+  /// then retried with the cloud recognizer).
+  bool get tryOnDeviceFirst;
 
   /// Asks for the microphone and speech recognition permissions the first time.
   Future<SpeechPermission> ensurePermission();

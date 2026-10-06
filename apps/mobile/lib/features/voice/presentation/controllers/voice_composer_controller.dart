@@ -1,4 +1,3 @@
-// apps/mobile/lib/features/voice/presentation/controllers/voice_composer_controller.dart
 import 'dart:async';
 
 import 'package:shellx_mobile/core/core.dart';
@@ -44,6 +43,9 @@ class VoiceComposerController extends Controller {
   bool _onDeviceAttempt = false;
   bool _heard = false;
 
+  /// [pause] came while a listen was being set up: do not start it. Cleared by the next mic tap.
+  bool _paused = false;
+
   /// This listen has shown it started (status, partial or final): an earlier listen's late `done` must
   /// not end it.
   bool _started = false;
@@ -64,12 +66,15 @@ class VoiceComposerController extends Controller {
   /// comes and is applied).
   Future<void> toggleMic(String appLanguageCode) async {
     if (_disposed) return;
+    _paused = false;
     if (_phase.peek() == VoicePhase.listening) {
       await _speech.stop();
       return;
     }
     if (_phase.peek() == VoicePhase.closed) {
       _locale.value = _settings.voiceLocale.peek() ?? VoiceLocale.fromLanguageCode(appLanguageCode);
+      // A language marked earlier gets another try (the phone may have it by now).
+      _unavailable.value = const {};
       _phase.value = VoicePhase.idle;
     }
     await _startListening();
@@ -94,10 +99,12 @@ class VoiceComposerController extends Controller {
     _onSubmit(line);
   }
 
-  /// The app went inactive (call, lock, background): stop hearing, keep what is shown.
+  /// The app went inactive (call, lock, background): stop hearing, keep what is shown. A listen
+  /// still being set up (permission, locale) does not start.
   void pause() {
-    if (_disposed || !_active) return;
-    _cancelListen();
+    if (_disposed) return;
+    _paused = true;
+    if (_active) _cancelListen();
   }
 
   /// ✕: nothing is sent; the next mic tap opens an empty composer.
@@ -133,14 +140,15 @@ class VoiceComposerController extends Controller {
         _markUnavailable(locale);
         return;
       }
+      if (_paused) return;
       _localeId = localeId;
       _committed = text.text.trim();
       _heard = false;
-      _onDeviceAttempt = true;
+      _onDeviceAttempt = _speech.tryOnDeviceFirst;
       _started = false;
       _active = true;
       _phase.value = VoicePhase.listening;
-      await _speech.start(localeId, onDevice: true);
+      await _speech.start(localeId, onDevice: _onDeviceAttempt);
     } finally {
       _starting = false;
     }
@@ -190,8 +198,9 @@ class VoiceComposerController extends Controller {
     _committed = text.text;
   }
 
-  /// Spec V4: on-device first; a phone that cannot do it on the device fails before any words, and
-  /// gets one more try with the OS cloud recognizer.
+  /// Spec V4: on-device first where the recognizer can fall back ([SpeechInput.tryOnDeviceFirst]);
+  /// a phone that cannot do it on the device fails before any words, and gets one more try with the
+  /// OS cloud recognizer.
   void _onFailed(SpeechErrorKind kind) {
     final retry =
         _onDeviceAttempt && !_heard && (kind == SpeechErrorKind.localeUnavailable || kind == SpeechErrorKind.other);
@@ -207,6 +216,8 @@ class VoiceComposerController extends Controller {
     switch (kind) {
       case SpeechErrorKind.noPermission:
         _issue.value = VoiceIssue.noPermission;
+      case SpeechErrorKind.unsupported:
+        _issue.value = VoiceIssue.unsupported;
       case SpeechErrorKind.localeUnavailable:
         _markUnavailable(_locale.peek());
       case SpeechErrorKind.network:

@@ -9,6 +9,9 @@ class FakeSpeechInput implements SpeechInput {
 
   SpeechPermission permission = SpeechPermission.granted;
 
+  @override
+  bool tryOnDeviceFirst = true;
+
   /// Completes [ensurePermission] when set (to hold it open in a test).
   Completer<void>? permissionGate;
 

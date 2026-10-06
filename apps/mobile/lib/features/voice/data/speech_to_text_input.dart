@@ -24,15 +24,29 @@ String? pickLocaleId(Iterable<String> available, VoiceLocale locale) {
   return sameLanguage;
 }
 
-/// The plugin reports Android `SpeechRecognizer` error names and a few iOS ones as strings.
+/// The id to listen with: the phone's own id for the language when [available] lists it, else
+/// [VoiceLocale.preferredLocaleId] — also when the list could not be read (null). Android 13+ lists
+/// only on-device languages, yet the cloud recognizer may still know the language; when it does
+/// not, the listen fails with a language error and the chip is marked then.
+String localeIdOrPreferred(Iterable<String>? available, VoiceLocale locale) =>
+    (available == null ? null : pickLocaleId(available, locale)) ?? locale.preferredLocaleId;
+
+/// The plugin reports Android `SpeechRecognizer` error names and the iOS ones of
+/// `SpeechToTextPlugin.swift` as strings.
 SpeechErrorKind speechErrorKind(String errorMsg) => switch (errorMsg) {
   'error_insufficient_permissions' || 'error_permission' => SpeechErrorKind.noPermission,
   'error_network' ||
   'error_network_timeout' ||
   'error_server' ||
-  'error_server_disconnected' => SpeechErrorKind.network,
+  'error_server_disconnected' ||
+  'error_retry' ||
+  'error_speech_recognizer_connection_invalidated' ||
+  'error_speech_recognizer_connection_interrupted' => SpeechErrorKind.network,
   'error_no_match' || 'error_speech_timeout' => SpeechErrorKind.noMatch,
-  'error_language_not_supported' || 'error_language_unavailable' => SpeechErrorKind.localeUnavailable,
+  'error_language_not_supported' ||
+  'error_language_unavailable' ||
+  'error_assets_not_installed' => SpeechErrorKind.localeUnavailable,
+  'error_speech_recognizer_disabled' => SpeechErrorKind.unsupported,
   'error_audio_error' => SpeechErrorKind.interrupted,
   _ => SpeechErrorKind.other,
 };
@@ -48,6 +62,11 @@ class SpeechToTextInput implements SpeechInput {
   @override
   Stream<SpeechEvent> get events => _events.stream;
 
+  /// On iOS the plugin cannot fall back from on-device to the cloud within one listen, so iOS asks
+  /// Apple's recognizer directly and lets it choose.
+  @override
+  bool get tryOnDeviceFirst => defaultTargetPlatform == TargetPlatform.android;
+
   @override
   Future<SpeechPermission> ensurePermission() async {
     try {
@@ -61,15 +80,18 @@ class SpeechToTextInput implements SpeechInput {
     }
   }
 
+  /// Never null: a language the phone does not list is still tried (see [localeIdOrPreferred]).
+  /// On Android 13+ the plugin may never answer `locales()`, hence the timeout.
   @override
   Future<String?> resolveLocale(VoiceLocale locale) async {
+    Iterable<String>? available;
     try {
-      final locales = await _speech.locales();
-      return pickLocaleId(locales.map((l) => l.localeId), locale);
+      final locales = await _speech.locales().timeout(const Duration(seconds: 2));
+      available = locales.map((l) => l.localeId);
     } catch (error) {
       if (kDebugMode) debugPrint('SpeechToTextInput locales error: ${error.runtimeType}');
-      return null;
     }
+    return localeIdOrPreferred(available, locale);
   }
 
   @override

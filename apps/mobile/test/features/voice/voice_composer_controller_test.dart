@@ -1,4 +1,3 @@
-// apps/mobile/test/features/voice/voice_composer_controller_test.dart
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -247,5 +246,55 @@ void main() {
     expect(voice.phase.value, VoicePhase.listening);
     speech.emit(const SpeechListening(false));
     expect(voice.phase.value, VoicePhase.idle);
+  });
+
+  test('no on-device first (iOS): the first listen asks the cloud and a failure is not retried', () async {
+    speech.tryOnDeviceFirst = false;
+    await listen();
+    expect(speech.starts.single, (localeId: 'vi-VN', onDevice: false));
+    speech.emit(const SpeechFailed(SpeechErrorKind.other));
+    expect(speech.starts, hasLength(1));
+    expect(voice.issue.value, VoiceIssue.failed);
+    expect(voice.phase.value, VoicePhase.idle);
+  });
+
+  test('recognizer disabled: unsupported, not retried', () async {
+    await listen();
+    speech.emit(const SpeechFailed(SpeechErrorKind.unsupported));
+    expect(speech.starts, hasLength(1));
+    expect(voice.issue.value, VoiceIssue.unsupported);
+    expect(voice.phase.value, VoicePhase.idle);
+  });
+
+  test('pause while permission is pending: no listen starts; the next tap listens', () async {
+    speech.permissionGate = Completer<void>();
+    final tap = voice.toggleMic('vi');
+    voice.pause();
+    speech.permissionGate!.complete();
+    await tap;
+    expect(speech.starts, isEmpty);
+    expect(voice.phase.value, VoicePhase.idle);
+    speech.permissionGate = null;
+    await voice.toggleMic('vi');
+    expect(speech.starts, hasLength(1));
+    expect(voice.phase.value, VoicePhase.listening);
+  });
+
+  test('a language marked unavailable is tried again once the composer reopens', () async {
+    speech.localeIds = {VoiceLocale.vi: null, VoiceLocale.en: 'en-US'};
+    await voice.toggleMic('vi');
+    expect(voice.unavailable.value, {VoiceLocale.vi});
+    voice.close();
+    speech.localeIds = {VoiceLocale.vi: 'vi-VN', VoiceLocale.en: 'en-US'};
+    await voice.toggleMic('vi');
+    expect(voice.unavailable.value, isEmpty);
+    expect(speech.starts.single.localeId, 'vi-VN');
+  });
+
+  test('the marked language stays marked while the composer stays open', () async {
+    speech.localeIds = {VoiceLocale.vi: null, VoiceLocale.en: 'en-US'};
+    await voice.toggleMic('vi');
+    await voice.toggleMic('vi');
+    expect(voice.unavailable.value, {VoiceLocale.vi});
   });
 }

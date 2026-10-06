@@ -24,6 +24,22 @@ void main() {
     });
   });
 
+  group('localeIdOrPreferred', () {
+    test('the picked id when the phone lists the language', () {
+      expect(localeIdOrPreferred(['vi_VN', 'en_US'], VoiceLocale.vi), 'vi_VN');
+      expect(localeIdOrPreferred(['en-GB'], VoiceLocale.en), 'en-GB');
+    });
+
+    test('the preferred id when the list is empty or lacks the language (Android 13+ on-device list)', () {
+      expect(localeIdOrPreferred([], VoiceLocale.vi), 'vi-VN');
+      expect(localeIdOrPreferred(['en_US'], VoiceLocale.vi), 'vi-VN');
+    });
+
+    test('the preferred id when the locales could not be read (timeout or error)', () {
+      expect(localeIdOrPreferred(null, VoiceLocale.en), 'en-US');
+    });
+  });
+
   group('speechErrorKind', () {
     test('maps the platform error names', () {
       expect(speechErrorKind('error_insufficient_permissions'), SpeechErrorKind.noPermission);
@@ -37,6 +53,12 @@ void main() {
       expect(speechErrorKind('error_language_not_supported'), SpeechErrorKind.localeUnavailable);
       expect(speechErrorKind('error_language_unavailable'), SpeechErrorKind.localeUnavailable);
       expect(speechErrorKind('error_audio_error'), SpeechErrorKind.interrupted);
+      // iOS (SpeechToTextPlugin.swift).
+      expect(speechErrorKind('error_retry'), SpeechErrorKind.network);
+      expect(speechErrorKind('error_speech_recognizer_connection_invalidated'), SpeechErrorKind.network);
+      expect(speechErrorKind('error_speech_recognizer_connection_interrupted'), SpeechErrorKind.network);
+      expect(speechErrorKind('error_assets_not_installed'), SpeechErrorKind.localeUnavailable);
+      expect(speechErrorKind('error_speech_recognizer_disabled'), SpeechErrorKind.unsupported);
       expect(speechErrorKind('error_busy'), SpeechErrorKind.other);
       expect(speechErrorKind('error_listen_failed'), SpeechErrorKind.other);
       expect(speechErrorKind('something new'), SpeechErrorKind.other);
