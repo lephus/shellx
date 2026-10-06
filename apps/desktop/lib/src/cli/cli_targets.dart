@@ -28,16 +28,28 @@ const _focused = '@focused';
 
 CliFailure _bad(String message) => CliFailure(MuxError.badRequest, message);
 
-/// D12 on the wire: exactly one of [pane] and [tab], each an id or
-/// `"@focused"`.
+final _paneForm = RegExp(r'^p(-?\d{1,15})$');
+final _tabForm = RegExp(r'^t(\d{1,15})$');
+
+/// D12 on the wire: exactly one of [pane] and [tab], each an id, its
+/// written form (`p<id>`, `p-<n>`, `t<id>`) or `"@focused"`.
 CliTarget parseTarget(Object? pane, Object? tab) {
   if ((pane == null) == (tab == null)) {
     throw _bad('give exactly one pane or tab');
   }
   final value = pane ?? tab;
   if (value == _focused) return const FocusedRef();
-  if (value is! int) throw _bad('a target is an id or @focused');
-  return pane != null ? PaneRef(value) : TabRef(value);
+  final id = switch (value) {
+    final int id => id,
+    final String s => switch ((pane != null ? _paneForm : _tabForm).firstMatch(
+      s,
+    )) {
+      final m? => int.parse(m[1]!),
+      null => throw _bad('a target is an id or @focused'),
+    },
+    _ => throw _bad('a target is an id or @focused'),
+  };
+  return pane != null ? PaneRef(id) : TabRef(id);
 }
 
 CliFailure _noPane(int id) => CliFailure(MuxError.notFound, 'no pane p$id');

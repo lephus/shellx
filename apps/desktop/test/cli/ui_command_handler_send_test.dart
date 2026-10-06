@@ -168,6 +168,19 @@ void main() {
       );
     });
 
+    test('I2: the wait --exit shortcut also takes the p<id> form', () async {
+      await call('ui.pane.send', {
+        'pane': 'p100',
+        'text': 'exit',
+        'enter': true,
+      });
+      local.views[100]!.end(0);
+      await pumpFeed();
+      expect(await call('ui.pane.wait', {'pane': 'p100', 'mode': 'exit'}), {
+        'exitCode': 0,
+      });
+    });
+
     test('M6: an unknown key is not echoed back', () async {
       await expectLater(
         call('ui.pane.send', {

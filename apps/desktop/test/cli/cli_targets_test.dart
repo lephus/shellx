@@ -26,7 +26,25 @@ void main() {
     expect(parseTarget(null, 7), isA<TabRef>().having((t) => t.id, 'id', 7));
     expect(parseTarget('@focused', null), isA<FocusedRef>());
     expect(parseTarget(null, '@focused'), isA<FocusedRef>());
-    for (final bad in [(null, null), (1, 2), ('x', null), (1.5, null)]) {
+    expect(
+      parseTarget('p12', null),
+      isA<PaneRef>().having((t) => t.id, 'id', 12),
+    );
+    expect(
+      parseTarget('p-3', null),
+      isA<PaneRef>().having((t) => t.id, 'id', -3),
+    );
+    expect(parseTarget(null, 't7'), isA<TabRef>().having((t) => t.id, 'id', 7));
+    for (final bad in [
+      (null, null),
+      (1, 2),
+      ('x', null),
+      (1.5, null),
+      ('t7', null),
+      (null, 'p7'),
+      ('p', null),
+      ('p1x', null),
+    ]) {
       expect(() => parseTarget(bad.$1, bad.$2), fails('bad_request'));
     }
   });

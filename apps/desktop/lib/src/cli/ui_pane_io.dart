@@ -59,11 +59,11 @@ final class PaneIoCommands {
 
   /// D19: a browser pane (negative id, A6) is `bad_request`.
   int _paneArg(MuxMessage r) {
-    final raw = r.fields['pane'];
-    if (raw is int && raw < 0) {
-      throw badRequest('p$raw is a browser pane; use shellx browser');
+    final target = parseTarget(r.fields['pane'], null);
+    if (target is PaneRef && target.id < 0) {
+      throw badRequest('p${target.id} is a browser pane; use shellx browser');
     }
-    return resolvePane(_tabsState, parseTarget(raw, null));
+    return resolvePane(_tabsState, target);
   }
 
   void _touchPane(int pane) =>
@@ -166,12 +166,13 @@ final class PaneIoCommands {
     }
     // A shell that already ended with 0 left no pane (A3 D7): `send exit`
     // then `wait --exit` still gets its code.
-    final raw = r.fields['pane'];
-    if (r.fields['mode'] == 'exit' &&
-        raw is int &&
-        _tabsState.tabOfSession(raw) == null) {
-      final code = _ref.read(terminalTabsProvider.notifier).lastExitCode(raw);
-      if (code != null) return {'exitCode': code};
+    if (r.fields['mode'] == 'exit') {
+      if (parseTarget(r.fields['pane'], null) case PaneRef(
+        :final id,
+      ) when _tabsState.tabOfSession(id) == null) {
+        final code = _ref.read(terminalTabsProvider.notifier).lastExitCode(id);
+        if (code != null) return {'exitCode': code};
+      }
     }
     final pane = _paneArg(r);
     final timeout = Duration(milliseconds: ms);
