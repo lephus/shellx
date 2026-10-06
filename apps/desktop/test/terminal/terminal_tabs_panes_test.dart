@@ -489,6 +489,110 @@ void main() {
       expect(root().ratio, closeTo(fair, 1e-9));
     });
 
+    test('a split that finishes after a tab switch keeps the tab the user '
+        'chose (final m-1)', () async {
+      local.add(local.summary(2));
+      boot();
+      local.openGate = Completer<void>();
+      final split = tabs().split(SplitAxis.row);
+      tabs().select(2);
+      final r1 = local.views[1]!.resizes.length;
+      local.openGate!.complete();
+      await split;
+      expect(state().selectedId, 2);
+      expect(only1().paneOrder, [1, 100]);
+      expect(only1().focusedPaneId, 100);
+      // Tab 1 is hidden: its panes tell their sessions nothing (D13).
+      expect(local.views[1]!.resizes.length, r1);
+    });
+
+    test('no room (D4) at the exact boundary: both snapped halves must hold '
+        'the minimum (final m-2)', () async {
+      boot();
+      // 2·176 + 1 = 353: the old sum rule allowed it, but splitExtents
+      // gives round(176.5) = 177 | 1 | 175, one pixel short.
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(353, 400),
+          minPane: Size(176, 100),
+          divider: 1,
+        ),
+      );
+      await tabs().split(SplitAxis.row);
+      expect(local.opens, isEmpty);
+      expect(state().notice, isA<PaneNoRoomNotice>());
+      tabs().dismissNotice();
+      // 354: 177 | 1 | 176.
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(354, 400),
+          minPane: Size(176, 100),
+          divider: 1,
+        ),
+      );
+      await tabs().split(SplitAxis.row);
+      expect(local.opens, hasLength(1));
+      expect(state().notice, isNull);
+    });
+
+    test('no room (D4) down: the same snapped rule on the height, at dpr '
+        '1.25 (final m-2)', () async {
+      boot();
+      // 2·100 + 1 = 201 at dpr 1.25: round(100.5·1.25)/1.25 = 100.8, so the
+      // second side gets 201 − 1 − 100.8 = 99.2 < 100.
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(600, 201),
+          minPane: Size(176, 100),
+          divider: 1,
+          devicePixelRatio: 1.25,
+        ),
+      );
+      await tabs().split(SplitAxis.column);
+      expect(local.opens, isEmpty);
+      expect(state().notice, isA<PaneNoRoomNotice>());
+    });
+
+    test('a ratio for a split of the other axis is ignored: a drag never '
+        'moves a split that took its path (final m-3)', () async {
+      boot();
+      await tabs().split(SplitAxis.row);
+      await tabs().split(SplitAxis.column); // 1 | (100 / 101)
+      tabs().closePane(1); // the root is now the column split
+      final layout = only().layout as PaneSplit;
+      expect(layout.axis, SplitAxis.column);
+      tabs().setRatio(1, '', 0.3, axis: SplitAxis.row);
+      expect(only().layout, layout);
+      tabs().setRatio(1, '', 0.3, axis: SplitAxis.column);
+      expect((only().layout as PaneSplit).ratio, 0.3);
+    });
+
+    test('keyboard resize and equalize unzoom first, and re-send the grids '
+        'of the panes that come back (D10, final m-4)', () async {
+      boot();
+      await tabs().split(SplitAxis.row); // 1 | 100, focus 100
+      tabs().toggleZoom();
+      only().panes[1]!.terminal.resize(30, 20);
+      final r1 = local.views[1]!.resizes;
+      expect(r1, isNot(contains((30, 20))));
+      tabs().resizeFocused(PaneDirection.left);
+      expect(only().zoomedPaneId, isNull);
+      expect((only().layout as PaneSplit).ratio, closeTo(0.45, 1e-9));
+      expect(r1.last, (30, 20));
+
+      tabs().toggleZoom();
+      only().panes[1]!.terminal.resize(31, 20);
+      tabs().equalize();
+      expect(only().zoomedPaneId, isNull);
+      expect((only().layout as PaneSplit).ratio, 0.5);
+      expect(r1.last, (31, 20));
+
+      // A resize with no split of that axis does nothing, zoom included.
+      tabs().toggleZoom();
+      tabs().resizeFocused(PaneDirection.down);
+      expect(only().zoomedPaneId, 100);
+    });
+
     test('an exited pane never resizes its session', () async {
       boot();
       await tabs().split(SplitAxis.row);

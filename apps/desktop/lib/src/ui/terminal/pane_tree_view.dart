@@ -93,10 +93,14 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     PaneLeaf(:final sessionId) =>
       sessionId == hide ? const SizedBox.expand() : _pane(sessionId),
     final PaneSplit s => _SplitBox(
-      key: ValueKey('split.$path'),
+      // The axis is part of the key (final ruling m-3): when a close hands
+      // this path to a split across, the divider (and a drag on it) goes
+      // with the old split instead of carrying on with the new one.
+      key: ValueKey('split.$path.${s.axis.name}'),
       split: s,
       path: path,
-      onRatio: (ratio) => _tabs.setRatio(widget.tab.id, path, ratio),
+      onRatio: (ratio) =>
+          _tabs.setRatio(widget.tab.id, path, ratio, axis: s.axis),
       onEqualize: () => _tabs.equalizeAt(widget.tab.id, path),
       first: _node(s.first, '${path}0', hide: hide),
       second: _node(s.second, '${path}1', hide: hide),

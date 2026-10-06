@@ -598,11 +598,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     return zoom;
   }
 
-  /// ⌘⌃= (D11).
+  /// ⌘⌃= (D11). Unzooms first (D10, final ruling m-4): a layout change
+  /// the user cannot see would only surprise them later.
   void equalize() {
     final tab = state.selected;
     if (tab == null || !tab.isSplit) return;
-    _replaceTab(tab.copyWith(layout: equalized(tab.layout)));
+    _replaceTab(
+      tab.copyWith(layout: equalized(tab.layout), zoomedPaneId: null),
+    );
+    if (tab.zoomedPaneId != null) _visibleChanged();
   }
 
   /// Double-click on a divider (D11).
@@ -613,10 +617,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   }
 
   /// A divider drag (D14): ignored when [path] is no longer a split (a
-  /// pane closed mid-drag); clamped to the pixel minimums (D4).
-  void setRatio(int tabId, PanePath path, double ratio) {
+  /// pane closed mid-drag), or is a split of another [axis] than the one
+  /// the drag began on (final ruling m-3: a close can hand the path to a
+  /// split across); clamped to the pixel minimums (D4).
+  void setRatio(int tabId, PanePath path, double ratio, {SplitAxis? axis}) {
     final tab = _tab(tabId);
-    if (tab == null || nodeAt(tab.layout, path) is! PaneSplit) return;
+    final node = tab == null ? null : nodeAt(tab.layout, path);
+    if (tab == null || node is! PaneSplit) return;
+    if (axis != null && node.axis != axis) return;
     _replaceTab(
       tab.copyWith(
         layout: withRatio(tab.layout, path, _clampForPixels(tab, path, ratio)),
@@ -641,6 +649,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final forward =
         direction == PaneDirection.right || direction == PaneDirection.down;
     const step = ShellxSizes.paneResizeStep;
+    // D10, final ruling m-4: as a directional focus does, a resize shows
+    // the panes it changes.
+    if (tab.zoomedPaneId != null) {
+      _replaceTab(tab.copyWith(zoomedPaneId: null));
+      _visibleChanged();
+    }
     setRatio(tab.id, path, split.ratio + (forward ? step : -step));
   }
 
@@ -911,11 +925,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       ),
     );
     _sync();
-    if (state.selectedId != tabId) {
-      _set(selectedId: tabId);
-    } else if (wasZoomed) {
-      _visibleChanged();
-    }
+    // Final ruling m-1: a split that finishes after the user moved to
+    // another tab stays in its own tab; it never pulls the user back.
+    if (state.selectedId == tabId && wasZoomed) _visibleChanged();
   }
 
   /// D13 estimate; the real grid follows at the next layout.
@@ -927,8 +939,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         : (cols: cols, rows: max(1, (rows - 1) ~/ 2 - 1));
   }
 
-  /// D4: room for two minimum panes and the divider, in the pixels the
-  /// pane really has ([panePixelSizes]).
+  /// D4: room for two minimum panes, in the pixels the pane really has
+  /// ([panePixelSizes]) and the halves the new split will really get
+  /// ([splitExtents] at 0.5: the first half is snapped, so a sum check can
+  /// leave the second one a pixel short — final ruling m-2).
   bool _roomToSplit(TerminalTab tab, int target, SplitAxis axis) {
     final m = _metrics;
     if (m == null) return true;
@@ -939,10 +953,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       m.devicePixelRatio,
     )[target];
     if (size == null) return false;
-    final (w, h) = (size.width, size.height);
-    return axis == SplitAxis.row
-        ? w >= 2 * m.minPane.width + m.divider && h >= m.minPane.height
-        : h >= 2 * m.minPane.height + m.divider && w >= m.minPane.width;
+    final row = axis == SplitAxis.row;
+    final (along, across) = row
+        ? (size.width, size.height)
+        : (size.height, size.width);
+    final (minAlong, minAcross) = row
+        ? (m.minPane.width, m.minPane.height)
+        : (m.minPane.height, m.minPane.width);
+    final (a, b) = splitExtents(along, 0.5, m.divider, m.devicePixelRatio);
+    return a >= minAlong && b >= minAlong && across >= minAcross;
   }
 
   /// D4: no pane of either side may end up below [PaneMetrics.minPane].

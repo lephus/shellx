@@ -223,6 +223,28 @@ void main() {
     await t.pump(kDoubleTapTimeout);
   });
 
+  testSidebar('a drag on a divider whose split closes mid-drag never moves '
+      'the split across that takes its path (final m-3)', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    await splitDown(t); // 1 | (100 / 101)
+    final hit = t.getRect(find.byKey(const Key('pane.divider.')));
+    final gesture = await t.startGesture(hit.center);
+    await gesture.moveBy(const Offset(30, 0));
+    await t.pump();
+    panes().closePane(1); // the root is now the column split (100 / 101)
+    await t.pump();
+    final root = only().layout as PaneSplit;
+    expect(root.axis, SplitAxis.column);
+    await gesture.moveBy(const Offset(0, 40));
+    await gesture.moveBy(const Offset(60, 0));
+    await t.pump();
+    await gesture.up();
+    await t.pump();
+    expect(only().layout, root);
+    await t.pump(kDoubleTapTimeout);
+  });
+
   testSidebar('zoom shows only the focused pane with its indicator', (t) async {
     await pumpSidebar(t);
     final area = t.getRect(find.byType(TerminalView));
