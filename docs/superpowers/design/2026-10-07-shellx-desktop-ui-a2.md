@@ -34,14 +34,17 @@
 | `portHit` | 24 | chiều cao vùng bấm một cổng (WCAG 2.5.8), canh giữa dòng ngữ cảnh |
 | `portGap` | 4 | giữa hai cổng |
 | `portPadH` | 2 | đệm ngang trong vùng bấm cổng (nền hover `rowPressed`, `r4`) |
-| `portsMaxShare` | 0.6 | cụm cổng chiếm tối đa 60 % bề rộng dòng ngữ cảnh |
+| `portsMaxShare` | 0.6 | cụm cổng chiếm tối đa 60 % bề rộng dòng ngữ cảnh, **và** không lấn tới mức thư mục mất thành phần cuối (§2.2) |
+| `branchGlyph` | 10 | biểu tượng nhánh (`Icons.call_split`, `textSecondary`) trước tên nhánh |
+| `branchGlyphGap` | 2 | giữa biểu tượng nhánh và tên nhánh |
 | `branchMaxShare` | 0.45 | nhánh tối đa 45 % phần còn lại (tối thiểu 48 px nếu đủ chỗ) |
-| `pathMin` | 24 | thư mục hẹp hơn mức này thì bỏ hẳn |
+| `pathMin` | 40 | chỗ cho thư mục hẹp hơn mức này (và thư mục không vừa nguyên) thì bỏ hẳn |
 | `workspaceHeader` | 28 | chiều cao tiêu đề nhóm |
 | `workspaceHeaderTop` | 8 | khoảng trên mỗi tiêu đề (trừ tiêu đề đầu: dùng `listTop` 4) |
 | `chevronHit` | 20 | vùng mũi tên thu gọn (icon 14) |
 | `headerAddHit` | 24 | nút `+` trên tiêu đề (icon 14, nhìn 20 `r4`) |
-| `headerCountMin` | 16 | bề rộng tối thiểu ô số tab |
+| `headerCountMin` | — | (không dùng nữa) số tab dùng chung ô 24 với `+`, xem §3.1 |
+| `workspaceRowIndent` | 8 | dòng tab (và dòng gợi ý nhóm trống) thụt vào 8 dưới tiêu đề khi có tiêu đề |
 | `collapsedMarkHeight` | 12 | thanh `accent` 3×12 ở mép trái tiêu đề khi nhóm thu gọn chứa tab đang chọn |
 | `renameField` | 22 | chiều cao ô đổi tên trong dòng/tiêu đề |
 | `renameMaxLength` | 64 | ký tự |
@@ -49,6 +52,9 @@
 | `dragAutoScrollZone` | 32 | vùng mép trên/dưới danh sách tự cuộn khi kéo |
 | `dragAutoScrollSpeed` | 240 | px/giây |
 | `dragExpandDelay` | 600 ms | rê tab trên tiêu đề nhóm thu gọn → tự mở rộng |
+| `dragGhostOffsetX` / `Y` | 12 / 10 | góc trên-trái chip kéo so với con trỏ |
+| `dragGhostMaxWidth` | 208 | chip kéo rộng tối đa |
+| `dragGhostClearance` | 4 | khoảng chip kéo giữ cách vạch thả / đích thả |
 | `emptyWorkspaceRow` | 30 | dòng gợi ý của nhóm trống |
 
 Thang khoảng cách, bo góc, độ nổi, chuyển động: A1 §1.2–§1.5 (không thêm token).
@@ -78,16 +84,18 @@ Thang khoảng cách, bo góc, độ nổi, chuyển động: A1 §1.2–§1.5 (
 - Dòng ngữ cảnh: `caption` (11/14, 500), một dòng, không xuống dòng. Phần nào không có thì bỏ cả phần đó lẫn dấu ngăn. Dấu ngăn: `" · "` (`textSecondary`).
 - Thứ tự cố định: **nhánh · thư mục · cổng**.
 - Không có phần nào (phiên không hook, chưa có cổng) → **dòng 30 px của A1**, không chừa chỗ trống.
-- Tab đã thoát (mã ≠ 0): giữ dòng ngữ cảnh cuối cùng, chữ `textSecondary`, cổng **không** còn là liên kết (cũng `textSecondary`, không hover).
+- Tab đã thoát (mã ≠ 0): giữ nhánh và thư mục cuối cùng (`textSecondary`). **Cổng biến mất** (M7): server đã chết cùng shell, agent bỏ cổng của phiên ngay khi shell thoát, nên dòng không hiện cổng cũ (trung thực). Nếu một cổng vẫn còn trong lúc chuyển tiếp, nó là chữ `textSecondary`, không phải liên kết, không hover.
+- Nhánh có **biểu tượng nhánh** 10 px (`Icons.call_split`, `textSecondary`) + 2 px trước tên (V8): phân biệt nhánh với thư mục khi cả hai đều có `/`. Thư mục không có biểu tượng (`~`, `/`, `C:\` đã đọc là đường dẫn). Biểu tượng nằm trong `ExcludeSemantics` (nhãn đã có "nhánh X").
+- Khi có tiêu đề nhóm, cả dòng tab thụt vào 8 (`workspaceRowIndent`, V9): dòng ngữ cảnh còn 160 px.
 
 ### 2.2 Bố trí khi chật (hàm thuần `layoutContextLine`, D12)
 
 Bề rộng W = bề rộng dòng − 32 − 8 (168 px ở 220).
 
-1. **Cổng:** đo cụm `:p1 :p2 :p3` (tối đa 3 cổng nhỏ nhất, cách nhau `portGap` 4 + đệm 2×2 mỗi cổng) và `+N` nếu còn. Nếu cụm > 60 % W thì bớt cổng (giữ cổng nhỏ nhất) và tăng N, tới khi vừa hoặc còn 1 cổng. Cổng **không bao giờ bị cắt chữ**.
+1. **Cổng:** đo cụm `:p1 :p2 :p3` (tối đa 3 cổng nhỏ nhất, cách nhau `portGap` 4 + đệm 2×2 mỗi cổng) và `+N` nếu còn. Trần của cụm = `min(0.6 W, W − dấu ngăn − chỗ tối thiểu của thư mục − chỗ tối thiểu của nhánh)`; chỗ tối thiểu của thư mục = `min(cả thư mục, max(40, đo("…/" + thành phần cuối)))`, của nhánh = biểu tượng + `min(nhánh, 48)` + dấu ngăn. Quá trần thì bớt cổng (giữ cổng nhỏ nhất) và tăng N, tới khi vừa hoặc còn 1 cổng. Nghĩa là: **bỏ cổng thứ hai trước khi cắt mất thành phần cuối của thư mục** (V2) — thư mục là thứ nhận ra tab nhất. Cổng **không bao giờ bị cắt chữ**.
 2. Phần còn lại R = W − cụm cổng − dấu ngăn.
-3. **Nhánh:** bề rộng tự nhiên, tối đa `max(48, 0.45 × R)` (nếu R < 48 thì tối đa R); quá thì **cắt cuối** (`feat/mobile-ui-p…`).
-4. **Thư mục:** phần còn lại; quá thì **cắt giữa** theo thành phần: giữ thành phần đầu (`~`, gốc `/` hoặc ổ `C:`), thay các thành phần giữa bằng `…`, và giữ **nhiều thành phần cuối nhất** còn vừa: `~/…/apps/desktop`. Nếu cắt rồi vẫn > chỗ, cắt giữa theo ký tự (`~/wo…sktop`). Nếu chỗ < 24 px → bỏ thư mục.
+3. **Nhánh:** biểu tượng + bề rộng tự nhiên, tối đa `max(48, 0.45 × R)` (nếu R < 48 thì tối đa R), và không lấn chỗ tối thiểu của thư mục (nhưng không dưới 48); quá thì **cắt cuối** (`feat/mobile-ui-p…`).
+4. **Thư mục:** phần còn lại. Vừa nguyên → giữ nguyên (kể cả khi chỗ < 40). Không vừa → (a) giữ thành phần đầu (`~`, gốc `/` hoặc ổ `C:`), thay các thành phần giữa bằng `…`, giữ **nhiều thành phần cuối nhất** còn vừa: `~/…/apps/desktop`; (b) chỉ thành phần cuối: `…/desktop` (Windows `…\desktop`); (c) thành phần cuối nguyên: `desktop`; (d) thành phần cuối cắt cuối, **giữ ít nhất 3 ký tự** trước `…`: `deskt…`. Không bao giờ cắt ký tự giữa cả đường dẫn (bỏ kiểu `~/w…llx`, `~/…x` — không chỉ ra thư mục nào). Không còn cách nào, hoặc chỗ < 40 px → bỏ thư mục (tooltip bước 5 vẫn có chuỗi đầy đủ).
 5. Toàn bộ dòng ngữ cảnh có tooltip (chờ 500 ms, đặt **bên phải sidebar** như tooltip tiêu đề A1 §3.1, max-width 360) với chuỗi đầy đủ không cắt: `main · ~/work/shellx/apps/desktop · :3000 :5173 :8080 :9229` — chỉ hiện khi có phần bị cắt hoặc bị bỏ.
 
 ### 2.3 Hiển thị thư mục
@@ -129,15 +137,17 @@ Chỉ hiện khi có **từ hai workspace** (D10). Một workspace = sidebar A1 
 ### 3.1 Giải phẫu (28 cao, lề ngang 6 như dòng, `r6`)
 
 ```
-|6|4|▾|4| Backend (small 600, 1 dòng, ellipsis)          |4| 3 |2|[+]|4|6|
-      20 (chevron 14)                                        ≥16   24
+|6|4|▾|4| Backend (small 600, 1 dòng, ellipsis)               |4|[ 3 | + ]|6|6|
+      20 (chevron 14)                                     24: số, hoặc + khi hover/focus/nhóm trống
  [thu gọn & chứa tab đang chọn: thanh accent 3×12 ở mép trái, tên textPrimary]
 ```
 
 - Chevron: `Icons.expand_more` (mở) / `Icons.chevron_right` (thu gọn), 14, `textSecondary`. Đổi trạng thái: xoay 90° trong `base` 150 ms `easeOutCubic`; giảm chuyển động → tức thì.
 - Tên: `small` 12/16 **w600**, `textSecondary`; tên rỗng không bao giờ xảy ra (Mặc định dùng chuỗi bản địa hoá khi tên lưu là `null`).
-- Số tab: `caption` `textSecondary`, căn phải, bề rộng tối thiểu 16, số tab **của nhóm** (kể cả tab đã thoát chưa đóng).
-- `+`: `Icons.add` 14 trong vùng 24×24 (nhìn 20, `r4`), chỉ hiện khi hover hoặc khi tiêu đề có focus bàn phím; chỗ luôn được giữ. Hover: nền `rowPressed`, icon `textPrimary`. Tooltip `workspaceNewTab` "Tab mới trong workspace này". Bấm → mở tab trong nhóm này (nhóm thu gọn thì tự mở rộng).
+- Số tab: `caption` `textSecondary`, trong ô cuối 24 (xem dưới), số tab **của nhóm** (kể cả tab đã thoát chưa đóng).
+- **Ô cuối dùng chung (V10):** một ô 24 px thẳng cột với nút × của dòng tab (mép phải cách 6, như vùng bấm ×). Bình thường ô hiện **số tab** (canh giữa); khi hover, khi tiêu đề có focus bàn phím, hoặc khi nhóm **trống** (V4) thì `+` thay chỗ số. Tên có thêm chỗ (không còn giữ chỗ cho `+` ẩn), không có gì đổi bố cục khi hover.
+- `+`: `Icons.add` 14 trong vùng 24×24 (nhìn 20, `r4`). Hover: nền `rowPressed`, icon `textPrimary`. Tooltip `workspaceNewTab` "Tab mới trong workspace này", đặt **bên phải sidebar** như mọi tooltip sidebar (V11). Bấm → mở tab trong nhóm này (nhóm thu gọn thì tự mở rộng).
+- Thanh 3×12 "nhóm thu gọn chứa tab đang chọn": khi tiêu đề có vòng focus, thanh dời vào trong vòng (`focusRing + selectedBarGap` = 3), như thanh chọn của dòng (V3).
 - Khoảng trên mỗi tiêu đề 8 (tiêu đề đầu tiên: 4 = `listTop`). Dòng tab đầu tiên ngay dưới tiêu đề cách 2 (`rowGap`).
 
 ### 3.2 Trạng thái
@@ -151,6 +161,7 @@ Chỉ hiện khi có **từ hai workspace** (D10). Một workspace = sidebar A1 
 | Nhấn | `rowPressed` |
 | Focus bàn phím | vòng 2 px `accent` bên trong `r6` (A1 §3) |
 | Đang đổi tên | ô đổi tên thay tên (§4), cao 22, chữ `small` w600 `textTitle`; số tab và `+` ẩn (giữ chỗ) |
+| Menu ngữ cảnh đang mở (V6) | nền `rowPressed` + viền 1 px `border` `r6` tới khi menu (và menu con) đóng |
 | Đích thả | nền `primarySoft`, viền 1 px `accent`, `r6` |
 
 ### 3.3 Tương tác
@@ -162,14 +173,18 @@ Chỉ hiện khi có **từ hai workspace** (D10). Một workspace = sidebar A1 
 
 ### 3.4 Nhóm trống (mở rộng, 0 tab)
 
-Một dòng gợi ý 30 cao dưới tiêu đề, lề trái 32, `caption` `textSecondary`: `workspaceEmptyHint` "Trống. Kéo tab vào đây hoặc bấm +." Không tương tác, không phải điểm dừng tab; là **đích thả** (nền `primarySoft` + viền `accent` khi đang rê tab trên nó). Semantics: chỉ đọc qua nhãn tiêu đề ("0 tab").
+Một dòng gợi ý 30 cao dưới tiêu đề, lề trái 32 (thụt thêm 8 như dòng tab), `caption` `textSecondary`: `workspaceEmptyHint` "Trống — kéo tab vào đây" / "Empty — drag a tab here" (V4: ngắn để vừa 160 px một dòng ở 11 px; `+` của nhóm trống luôn hiện trên tiêu đề, nên gợi ý không cần nhắc tới nó). Không tương tác, không phải điểm dừng tab; là **đích thả** (nền `primarySoft` + viền `accent` khi đang rê tab trên nó). Semantics: chỉ đọc qua nhãn tiêu đề ("0 tab").
+
+### 3.5 Tiêu đề dính (V7)
+
+Khi cuộn, tiêu đề của nhóm đang ở đầu danh sách **dính ở trên cùng** vùng danh sách (một bản sao, nền `bgSidebar`, vạch 1 px `line` bên dưới), cho tới khi tiêu đề nhóm kế tiếp đẩy nó lên. Bản sao hoạt động như tiêu đề thật (bấm thu gọn, menu, `+`, đích thả khi kéo), không có ô đổi tên, không có vòng focus, `ExcludeSemantics` (tiêu đề thật vẫn trong cây trợ năng). Không có tiêu đề (một workspace) hoặc chưa tới tiêu đề nào: khi danh sách đã cuộn (`offset > 0`), một vạch 1 px `line` ở mép trên danh sách cho biết nội dung đang trượt dưới dải `+`. Cuộn tới dòng bằng bàn phím trừ chiều cao tiêu đề dính để dòng không bị che.
 
 ---
 
 ## 4. Ô đổi tên tại chỗ (tab và workspace)
 
 - Mở bằng: double-click dòng tab / tên workspace; F2 khi danh sách có focus (trên dòng hoặc tiêu đề); menu "Đổi tên tab" / "Đổi tên workspace"; ⌘⇧N (ô tên của workspace mới).
-- Hình: cao 22, nền `surfaceInset`, viền 1 px `accent`, `r4`, padding 0/4 (chữ canh giữa dọc), con trỏ `accent`. Tab: chữ `body` `textTitle`; workspace: `small` w600 `textTitle`. Rộng = chỗ của tên (dòng tab: từ sau ô chấm tới trước các dấu điện thoại; tiêu đề: từ sau chevron tới trước số tab).
+- Hình: cao 22 (khung viền là cả hộp 22, kể cả khi theme nền tảng dùng mật độ `compact` — ô dùng `VisualDensity.standard` và `constraints` cao 22; V5), nền `surfaceInset`, viền 1 px `accent`, `r4`, padding 2/4 (chữ canh giữa dọc), con trỏ `accent`. Ô được vẽ lệch trái 8 px (lề trong của khung viền + đệm 4, đo bằng test) để **chữ đứng đúng chỗ tiêu đề/tên cũ**, không nhảy ngang khi mở (V5). Tab: chữ `body` `textTitle`; workspace: `small` w600 `textTitle`. Rộng = chỗ của tên (dòng tab: từ sau ô chấm tới trước các dấu điện thoại; tiêu đề: từ sau chevron tới trước số tab).
 - Mở ra: chữ hiện tại được **chọn hết** (tab: tên đang hiển thị, kể cả tên tự động).
 - Enter / Numpad Enter → lưu; **mất focus → lưu**; Esc → huỷ. Sau đó bàn phím về chỗ cũ (danh sách nếu mở từ danh sách, terminal nếu mở từ chuột hoặc ⌘⇧N).
 - Tối đa 64 ký tự (`maxLength`, không hiện bộ đếm). Cắt khoảng trắng hai đầu.
@@ -194,9 +209,12 @@ Hình menu A1 §3.1 (`surface`, `r8`, mục 28 cao, gợi ý phím `caption` ph�
 | Chuyển lên / Move up | `⌥↑` / `Alt+↑` | mờ khi đã ở đầu thứ tự nhìn thấy |
 | Chuyển xuống / Move down | `⌥↓` / `Alt+↓` | mờ khi ở cuối |
 | — vạch — (chỉ khi có cổng) | | |
-| Mở cổng 3000 trong trình duyệt / Open port 3000 in browser | — | một mục mỗi cổng, tối đa 5 cổng nhỏ nhất |
+| Mở cổng 3000 trong trình duyệt / Open port 3000 in browser | — | một hoặc hai cổng: một mục mỗi cổng |
+| Mở cổng trong trình duyệt… / Open port in browser… | — | **từ 3 cổng** (V12): một mục mở menu con tại cùng chỗ, mỗi cổng một mục `portOpenTooltip` "Mở http://localhost:3000" (tối đa 5 cổng nhỏ nhất) |
 | — vạch — | | |
 | Đóng tab / Close tab | `⌘W` / `Ctrl+Shift+W` | luôn (A1, quy tắc D15) |
+
+Dòng (hoặc tiêu đề) mà menu đang tác động được tô `rowPressed` + viền 1 px `border` tới khi menu đóng, kể cả trong menu con "Chuyển tới workspace…" (V6), như danh sách gốc macOS. Thanh cuộn của danh sách nằm trong lề phải 6 px (`crossAxisMargin` 0), không đè lên mép phải/cột × của dòng (V12).
 
 ### 5.2 Menu tiêu đề workspace
 
@@ -206,22 +224,22 @@ Hình menu A1 §3.1 (`surface`, `r8`, mục 28 cao, gợi ý phím `caption` ph�
 | Đổi tên workspace / Rename workspace | `F2` | luôn |
 | Thu gọn / Collapse — hoặc — Mở rộng / Expand | `←` / `→` | theo trạng thái |
 | — vạch — | | |
-| Xóa workspace / Delete workspace | — | mờ với Mặc định |
+| Xóa workspace / Delete workspace | — | mờ với Mặc định, kèm tooltip lý do `workspaceDeleteDefaultReason` "Không xóa được workspace Mặc định" (V12) |
 
 ### 5.3 Menu "Chuyển tới workspace…"
 
-Mở tại cùng vị trí menu trước. Mục: mọi workspace **trừ** nhóm hiện tại của tab, theo thứ tự sidebar (tên đầy đủ, ellipsis ở 280 px); vạch; "Workspace mới" / "New workspace" (`⌘⇧N` / `Ctrl+Shift+N`) → tạo workspace (D15, không mở thêm tab) rồi chuyển tab vào đó và mở ô đổi tên. Tab được chuyển vào **cuối** nhóm đích; nhóm đích thu gọn thì tự mở rộng; tab vẫn được chọn.
+Mở tại cùng vị trí menu trước. Dòng đầu là tiêu đề không chọn được (`caption` `textSecondary`) `tabMoveToTitle` "Chuyển “api” tới" / "Move “api” to" (V6) — menu con nói rõ tab nào đang được chuyển. Rồi: mọi workspace **trừ** nhóm hiện tại của tab, theo thứ tự sidebar (tên đầy đủ, ellipsis ở 280 px); vạch; "Workspace mới" / "New workspace" (`⌘⇧N` / `Ctrl+Shift+N`) → tạo workspace (D15, không mở thêm tab) rồi chuyển tab vào đó và mở ô đổi tên. Tab được chuyển vào **cuối** nhóm đích; nhóm đích thu gọn thì tự mở rộng; tab vẫn được chọn.
 
 ---
 
 ## 6. Kéo thả
 
 - **Bắt đầu:** nhấn giữ chuột trái trên dòng tab và di > 4 px (`Draggable` với `affinity: null`, nút trái). Bấm thường vẫn là chọn tab (A1). Không kéo được tiêu đề workspace trong A2 (sắp xếp workspace: dùng thứ tự tạo; follow-up).
-- **Bóng kéo (feedback):** bản sao dòng rộng 208, nền `rowSelected`, viền 1 px `border`, `r6`, `e1`, độ đục 92 %; nguồn ở chỗ cũ 38 %. Con trỏ `grabbing`.
+- **Bóng kéo (feedback, V1):** một **chip gọn**: chấm trạng thái + tiêu đề trên một dòng 30 cao, rộng theo tiêu đề tối đa 208, nền `rowSelected` **đục 100 %** (không lộ chữ bên dưới), viền 1 px `border`, `r6`, `e1`. Góc trên-trái chip ở **con trỏ + (12, 10)**; bị kẹp trong danh sách theo chiều ngang (lề 6); nếu chip sẽ che vạch thả hoặc đích thả (tiêu đề, nhóm trống) thì dời xuống dưới đích 4 px (hoặc lên trên nếu dưới hết chỗ). Phép tính chỗ thả dùng **vị trí con trỏ**, không dùng góc chip. Nguồn ở chỗ cũ 38 %. Con trỏ `grabbing`.
 - **Vạch chỗ thả:** 2 px `accent`, bo 1, rộng bằng dòng (lề 6), nằm **giữa khe 2 px** giữa hai dòng (trên dòng đầu: sát dưới tiêu đề; dưới dòng cuối: sát dưới dòng cuối). Nửa trên dòng → thả trước dòng; nửa dưới → thả sau.
 - **Rê trên tiêu đề:** tiêu đề thành đích thả (§3.2); thả → vào cuối nhóm. Nhóm thu gọn: rê 600 ms → tự mở rộng (giảm chuyển động: vẫn mở, không hoạt ảnh).
 - **Nhóm trống:** dòng gợi ý là đích thả.
-- **Tự cuộn:** con trỏ trong 32 px mép trên/dưới danh sách → cuộn 240 px/s.
+- **Tự cuộn:** con trỏ trong 32 px mép trên/dưới danh sách → cuộn với tốc độ **cố định** 240 px/s (không tăng dần).
 - **Huỷ:** thả ngoài sidebar hoặc ngoài mọi đích → không đổi gì, bóng biến mất ngay (`Draggable` mặc định; không có hoạt ảnh bay về trong A2). Esc trong lúc kéo: không hỗ trợ trong A2 (Flutter `Draggable` không có huỷ bằng phím; follow-up).
 - **Thả:** đổi chỗ ngay, không hoạt ảnh (A1: chèn/chọn dòng tức thì). Tab vẫn được chọn nếu đang được chọn; không chọn tab khác.
 - **Một sidebar, một workspace:** khi chỉ có Mặc định (không tiêu đề), kéo thả vẫn sắp xếp lại các dòng (D18).
@@ -242,7 +260,8 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
 | `workspaceDelete` | Xóa workspace | Delete workspace |
 | `workspaceCollapse` | Thu gọn | Collapse |
 | `workspaceExpand` | Mở rộng | Expand |
-| `workspaceEmptyHint` | Trống. Kéo tab vào đây hoặc bấm +. | Empty. Drag a tab here or press +. |
+| `workspaceEmptyHint` | Trống — kéo tab vào đây | Empty — drag a tab here |
+| `workspaceDeleteDefaultReason` | Không xóa được workspace Mặc định | The Default workspace can't be deleted |
 | `workspaceNameField` | Tên workspace | Workspace name |
 | `workspaceDeleted` | Đã xóa workspace “{name}”. Các tab đã chuyển về {defaultName}. | Deleted workspace “{name}”. Its tabs moved to {defaultName}. |
 | `workspaceHeaderSemantics` | Workspace {name}, {count} tab | Workspace {name}, {count, plural, =1{1 tab} other{{count} tabs}} |
@@ -251,6 +270,8 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
 | `tabNameField` | Tên tab | Tab name |
 | `tabUseAutomaticName` | Dùng tên tự động | Use automatic name |
 | `tabMoveTo` | Chuyển tới workspace… | Move to workspace… |
+| `tabMoveToTitle` | Chuyển “{name}” tới | Move “{name}” to |
+| `tabOpenPortMenu` | Mở cổng trong trình duyệt… | Open port in browser… |
 | `tabMoveUp` | Chuyển lên | Move up |
 | `tabMoveDown` | Chuyển xuống | Move down |
 | `tabOpenPort` | Mở cổng {port} trong trình duyệt | Open port {port} in browser |
@@ -273,7 +294,7 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
 - **Dòng tab:** nhãn A1 §3.7 mở rộng, các phần nối bằng ", ": tiêu đề · trạng thái · [nhánh X] · [thư mục Y] · [cổng …] · [gốc điện thoại] · [điện thoại xem/dùng] · vị trí. Thư mục đọc dạng đầy đủ đã thay `~` (không cắt). Vị trí: có tiêu đề nhóm → `sidebarPositionInWorkspace` (vị trí trong nhóm); không → A1 `sidebarPosition`. Ví dụ vi: "claude, đang chạy lệnh, nhánh main, thư mục ~/work/shellx, cổng 3000, 5173, tab 2 trên 3 trong Backend".
 - **Custom actions của dòng:** "Đóng tab" (A1), "Đổi tên tab", "Chuyển tới workspace…", "Chuyển lên", "Chuyển xuống" (chỉ khi làm được), mỗi cổng "Mở cổng N trong trình duyệt".
 - **Tiêu đề nhóm:** `Semantics(header: true, button: true, expanded: !collapsed, label: workspaceHeaderSemantics [+ ", " + workspaceContainsSelected])`, `onTap` = bật/tắt thu gọn; custom actions "Đổi tên workspace", "Tab mới trong workspace này", "Xóa workspace" (trừ Mặc định).
-- **Cổng, chevron, `+` tiêu đề, dòng gợi ý:** `ExcludeSemantics` (đã có trong nhãn/hành động của dòng hoặc tiêu đề) — giống dấu và chấm A1.
+- **Cổng, chevron, `+` tiêu đề, dòng gợi ý, biểu tượng nhánh, tiêu đề dính:** `ExcludeSemantics` (đã có trong nhãn/hành động của dòng hoặc tiêu đề) — giống dấu và chấm A1.
 - **Kéo thả (WCAG 2.5.7):** mọi kết quả kéo đều làm được bằng một cú bấm (menu §5.1/§5.3) và bằng bàn phím (⌥↑/⌥↓, menu). Thông báo sau khi chuyển: `SemanticsService.announce` tên tab + nhãn vị trí mới (live, một lần).
 - **Bàn phím (D14):** danh sách vẫn là **một điểm dừng tab**. Khi có tiêu đề: ↑/↓ đi qua tiêu đề + dòng nhìn thấy; Home/End; ←: trên dòng → về tiêu đề nhóm, trên tiêu đề mở → thu gọn; →: trên tiêu đề thu gọn → mở rộng, trên tiêu đề mở → dòng đầu; Enter/Space: dòng → về terminal (A1), tiêu đề → bật/tắt; F2 đổi tên; Shift+F10/Menu; ⌥↑/⌥↓ (Windows Alt+↑/↓) chuyển tab đang chọn; Esc → terminal. Không có tiêu đề: đúng hành vi A1 + F2 + ⌥↑/⌥↓.
 - **Tương phản:** bảng §1.1, mọi chữ ≥ 4.72:1, thành phần không phải chữ ≥ 3:1.
@@ -300,6 +321,7 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
 │ ▸ Frontend           3 │                                                  │
 └────────────────────────┴──────────────────────────────────────────────────┘
  ▾/▸ chevron · số tab phải · dòng 2: caption textSecondary, cổng accent
+ Từ đợt sửa cuối (§11): dòng tab thụt 8 dưới tiêu đề; số tab nằm ở cột ×; nhánh có biểu tượng nhánh trước tên
  Dòng "api" thật ra: "dev · ~/w/api · :8080 :9229" cắt vừa 168 px (vẽ tràn ở đây chỉ để minh hoạ)
 ```
 
@@ -310,7 +332,11 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
  feat/mobile-ui-pass · ~/w/shellx · :3000         → feat/mobile-u… · ~/w/shellx · :3000
  main · ~/w/x · :3000 :5173 :8080 :9229 :24678    → main · ~/w/x · :3000 :5173 :8080 +2
  a-very-long-branch-name · ~/deep/path · :3000 :4000 :5000 :6000
-                                                  → a-very-l… · ~/…/path · :3000 :4000 +2
+                                                  → a-very-l… · …/path · :3000 +3
+ main · ~/work/shellx · :3000 :5173               → main · …/shellx · :3000 +1   (V2: bỏ cổng thứ hai trước khi mất "shellx")
+ ~/w/x · :3000 :5173 (có nhánh main)              → nguyên (vừa)
+ cực chật: …/desktop → desktop → deskt… (≥ 3 ký tự) → bỏ thư mục; không bao giờ ~/w…llx
+ (dòng thật có thêm biểu tượng nhánh 10 + 2 trước tên nhánh)
 ```
 
 ### 9.3 Kéo tab "api" vào Frontend (thu gọn)
@@ -324,7 +350,7 @@ Giọng văn A1 §5. "workspace", "tab" giữ tiếng Anh (D13). Dấu "…" ch�
 │┃▸ Frontend          3 ┃│   ← đích thả: primarySoft + viền accent; rê 600 ms → mở rộng
 │┗━━━━━━━━━━━━━━━━━━━━━━┛│
 │   ╭──────────────────╮ │
-│   │ ● api   📱       │ │   ← bóng kéo, e1, 92 %
+│   │ ● api            │ │   ← chip kéo (§6): 30 cao, đục, e1; con trỏ + (12, 10), dời xuống dưới đích để không che
 │   ╰──────────────────╯ │
 ```
 
@@ -350,9 +376,9 @@ Sau khi Frontend mở rộng, vạch thả 2 px `accent` giữa hai dòng:
 
 ```
 │ ┏━━━━━━━━━━━━━━━━━━━━━━┓ │
-│ ┃▾ Ops              0 [+]┃ │  ← vòng focus 2 px accent; `+` hiện khi focus
+│ ┃▾ Ops                [+]┃ │  ← vòng focus 2 px accent; nhóm trống: `+` luôn hiện (thay số 0)
 │ ┗━━━━━━━━━━━━━━━━━━━━━━┛ │
-│    Trống. Kéo tab vào đây hoặc bấm +.
+│      Trống — kéo tab vào đây
 ```
 
 ### 9.6 Menu dòng tab (có hai cổng, tên tuỳ chỉnh)
@@ -380,3 +406,17 @@ Sau khi Frontend mở rộng, vạch thả 2 px `accent` giữa hai dòng:
 1. Mobile hiện `branch · cwd` dưới tên phiên trong danh sách phiên và thanh tab (cùng quy tắc `~` + cắt giữa của §2.3; dùng `caption` của mobile).
 2. Đưa hàm `displayPath` / `ellipsizeMiddle` vào gói dùng chung khi có `packages/shellx_design` (A1 §7 follow-up 1).
 3. Khi mobile cần cổng: thêm `ports` vào `SessionInfo` theo đúng quy tắc khoá tuỳ chọn của C4.
+
+---
+
+## 11. Đợt sửa cuối A2 (visual QA V1–V12) — các lựa chọn đã ghi
+
+Khi có nhiều phương án, chọn cái người dùng terminal thấy tự nhiên nhất:
+
+- **V7 — tiêu đề dính** (không chỉ vạch 1 px): như mục nhóm của Finder/VS Code; người dùng luôn biết mình đang ở workspace nào khi cuộn. Vạch 1 px vẫn có khi không có tiêu đề nào để dính.
+- **V9 — thụt 8 px** thay vì vạch ngăn trên tiêu đề: thụt là quy ước cây quen thuộc nhất (Explorer, Finder); tốn 8 px của dòng ngữ cảnh (168 → 160), bù lại nhờ V2.
+- **V10 — số tab và `+` chung một ô** ở cột ×: tên dài không bị cắt sớm, không có gì nhảy khi hover (như huy hiệu số của Slack/Mail đổi thành nút khi hover).
+- **V4 — copy ngắn một dòng** thay vì hai dòng: dòng gợi ý giữ 30 px như dòng tab; `+` luôn hiện trên nhóm trống nên copy không cần nhắc nó.
+- **V12 — tooltip lý do** cho "Xóa workspace" mờ (giữ mục để menu không đổi hình); **menu con cổng từ 3 cổng** (một hai cổng vẫn bấm một lần).
+- **V1 — chip kéo đặt theo con trỏ**, không theo chỗ nắm: thấy rõ vạch thả, phép tính thả dùng con trỏ.
+- **V8 — biểu tượng nhánh** `Icons.call_split` (bộ Material không có biểu tượng git); thư mục không cần biểu tượng.
