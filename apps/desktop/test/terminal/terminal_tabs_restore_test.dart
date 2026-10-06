@@ -552,4 +552,71 @@ void main() {
     final out = await restore();
     expect(out.tabsRestored, 2);
   });
+
+  group('A7 D29: restored panes know their tab', () {
+    /// One tab created by k1, whose pane now sits second: (k2 | k1).
+    RestoreSnapshot creatorSecond() => RestoreSnapshot(
+      savedAt: DateTime.utc(2026, 10, 7, 14, 32),
+      cleanExit: true,
+      selectedTab: k1,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [k1]),
+      ],
+      tabs: [
+        SavedTab(
+          key: k1,
+          focused: k1,
+          layout: SavedSplit(
+            axis: SplitAxis.row,
+            ratio: 0.5,
+            first: SavedPane(key: k2, cwd: '/w/two'),
+            second: SavedPane(key: k1, cwd: '/w/one'),
+          ),
+        ),
+      ],
+    );
+
+    test('the creating pane opens first; the others carry its id, which '
+        'is the tab id', () async {
+      boot();
+      final out = await restore(creatorSecond());
+      expect(local.openCwds, ['/w/one', '/w/two']);
+      final creator = sessionOf(out, k1);
+      expect(local.openTabIds, [null, creator]);
+      expect(out.tabIdByKey[k1], creator);
+      final tab = state().tabs.single;
+      expect(tab.id, creator);
+      expect(tab.paneOrder, [sessionOf(out, k2), creator]);
+    });
+
+    test('every pane of the default snapshot carries its tab id', () async {
+      boot();
+      final out = await restore();
+      expect(local.openTabIds, [null, null, sessionOf(out, k1)]);
+    });
+
+    test('a creating pane that fails: the others open without a tab id '
+        '(accepted residual)', () async {
+      boot();
+      local.failOpens = {'/w/one'};
+      final out = await restore(creatorSecond());
+      expect(local.openTabIds, [null, null]);
+      expect(out.panesFailed, 1);
+      expect(state().tabs.single.id, sessionOf(out, k2));
+    });
+
+    test('a command-line tab opened during a restore is placed at once '
+        '(A5a D16)', () async {
+      boot();
+      final gate = local.cwdGates['/w/x'] = Completer<void>();
+      final restoring = restore();
+      await pumpEventQueue();
+      expect(tabs().restoring, isTrue);
+      final id = await tabs().openTabFor(cwd: '/cli');
+      expect(state().tabOfSession(id)!.id, id);
+      gate.complete();
+      await restoring;
+      expect(state().tabs.map((t) => t.id), contains(id));
+    });
+  });
 }

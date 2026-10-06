@@ -301,6 +301,23 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     }
   }
 
+  /// A7 D22: a workspace for the command line — appended, named [name]
+  /// (blank: "Workspace N"), saved; the current workspace stays and no
+  /// name field opens. Returns its id.
+  String createFor({String? name}) {
+    final id = _newId();
+    final clean = name?.trim() ?? '';
+    state = state.copyWith(
+      workspaces: [
+        ...state.workspaces,
+        Workspace(id: id, name: clean.isEmpty ? _numberedName() : _clip(clean)),
+      ],
+      members: {...state.members, id: const <int>[]},
+    );
+    _save();
+    return id;
+  }
+
   /// Header `+` (UI-A2 §3.1): a new tab in [id], which expands.
   Future<void> openTabIn(String id) async {
     if (state.workspace(id) == null) return;

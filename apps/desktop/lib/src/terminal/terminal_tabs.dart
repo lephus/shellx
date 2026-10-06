@@ -78,6 +78,22 @@ final class PaneNoRoomNotice extends TabNotice {
   const PaneNoRoomNotice();
 }
 
+/// A7 D33: another open of this window is in flight (`opening`).
+final class OpenBusyException implements Exception {
+  const OpenBusyException();
+}
+
+/// A3 D4 for a command-line split: the pane cannot hold two (no toast).
+final class PaneNoRoomException implements Exception {
+  const PaneNoRoomException();
+}
+
+/// The target pane is not here, or the new shell ended before it could be
+/// placed.
+final class PaneGoneException implements Exception {
+  const PaneGoneException();
+}
+
 /// What the pane area looks like (D4), reported by the terminal pane on
 /// every layout: the tab list needs pixels to refuse a split or clamp a
 /// divider.
@@ -446,8 +462,30 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   void reportGrid(TerminalGrid grid) => _grid = grid;
 
+  /// ⌘T, `+`: a selected tab; a failure is a toast.
   Future<void> openTab() async {
     if (state.opening) return;
+    try {
+      await openTabFor(select: true);
+    } on SessionLimitException catch (error) {
+      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (ref.mounted) {
+        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
+      }
+    } on PaneGoneException {
+      // The new shell is already gone: the selection that exists stays.
+    }
+  }
+
+  /// A new tab, placed like any desktop tab (the current workspace); with
+  /// [select] it is selected, else the selection stays (A7 D14: the
+  /// command line does not take the keyboard). Returns its id. Throws
+  /// [OpenBusyException] while another open is in flight,
+  /// [SessionLimitException], [SpawnFailedException], and
+  /// [PaneGoneException] when the shell ended before it could be placed.
+  Future<int> openTabFor({String? cwd, bool select = false}) async {
+    if (state.opening) throw const OpenBusyException();
     _set(opening: true);
     _awaitingOpens++;
     var held = true;
@@ -459,8 +497,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
     var synced = false;
     try {
-      final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
-      if (!ref.mounted) return;
+      final id = await _local.open(
+        cols: _grid.cols,
+        rows: _grid.rows,
+        cwd: cwd,
+      );
+      if (!ref.mounted) throw const PaneGoneException();
       release();
       // A5a D16: placed now, even while a restore's opens are pending.
       _sync(own: id);
@@ -468,17 +510,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       // The new shell may already be gone (exit 0, or ended before it could
       // be viewed): then keep a selection that exists.
       final opened = state.tabOfSession(id);
-      if (opened != null) _restoreMaySelect = false;
-      _set(
-        selectedId:
-            opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
-      );
-    } on SessionLimitException catch (error) {
-      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
-    } on SpawnFailedException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
+      if (select) {
+        if (opened != null) _restoreMaySelect = false;
+        _set(
+          selectedId:
+              opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
+        );
       }
+      if (opened == null) throw const PaneGoneException();
+      return opened.id;
     } finally {
       release();
       if (ref.mounted) {
@@ -589,16 +629,44 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   void reportPaneMetrics(PaneMetrics metrics) => _metrics = metrics;
 
   /// ⌘D / ⌘⇧D (D3): the selected tab's focused pane, in its directory
-  /// (D17), at half its grid; the new pane is focused.
+  /// (D17), at half its grid; the new pane is focused. Failures are toasts.
   Future<void> split(SplitAxis axis) async {
     final tab = state.selected;
     if (tab == null || state.opening) return;
-    final target = tab.focusedPaneId;
-    if (!_roomToSplit(tab, target, axis)) {
-      _set(notice: const PaneNoRoomNotice());
-      return;
+    try {
+      await splitPaneFor(tab.focusedPaneId, axis, focus: true);
+    } on PaneNoRoomException {
+      if (ref.mounted) _set(notice: const PaneNoRoomNotice());
+    } on SessionLimitException catch (error) {
+      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (ref.mounted) {
+        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
+      }
+    } on PaneGoneException {
+      // The new shell ended before it could be placed: nothing to show.
     }
-    final pane = tab.panes[target]!;
+  }
+
+  /// D3 for pane [target] of any tab, selected or not (A7 D15): in [cwd],
+  /// else the target's directory (D17), at half its grid. The new session
+  /// knows its tab (A7 D29). With [focus] the new pane becomes its tab's
+  /// focused pane; without it the tab's focus and zoom stay. Never changes
+  /// the selection. Returns the new pane's id. Throws
+  /// [PaneGoneException] (no such pane, or the shell ended before it could
+  /// be placed), [OpenBusyException], [PaneNoRoomException] (D4),
+  /// [SessionLimitException], [SpawnFailedException].
+  Future<int> splitPaneFor(
+    int target,
+    SplitAxis axis, {
+    String? cwd,
+    bool focus = false,
+  }) async {
+    final tab = state.tabOfSession(target);
+    final pane = tab?.panes[target];
+    if (tab == null || pane == null) throw const PaneGoneException();
+    if (state.opening) throw const OpenBusyException();
+    if (!_roomToSplit(tab, target, axis)) throw const PaneNoRoomException();
     final grid = _halfGrid(pane, axis);
     _set(opening: true);
     _awaitingOpens++;
@@ -614,23 +682,27 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       final id = await _local.open(
         cols: grid.cols,
         rows: grid.rows,
-        cwd: pane.cwd,
+        cwd: cwd ?? pane.cwd,
+        tabId: tab.id,
       );
-      if (!ref.mounted) return;
+      if (!ref.mounted) throw const PaneGoneException();
       release();
-      _adoptPane(id, tabId: tab.id, target: target, axis: axis, size: grid);
+      _adoptPane(
+        id,
+        tabId: tab.id,
+        target: target,
+        axis: axis,
+        size: grid,
+        focus: focus,
+      );
       synced = true; // [_adoptPane] synced.
-    } on SessionLimitException catch (error) {
-      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
-    } on SpawnFailedException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
-      }
+      if (state.tabOfSession(id) == null) throw const PaneGoneException();
+      return id;
     } finally {
       release();
       if (ref.mounted) {
-        // D5: as in [openTab], desktop sessions held back while the open
-        // was pending get their tabs now, even when the open failed.
+        // D5: as in [openTabFor], desktop sessions held back while the
+        // open was pending get their tabs now, even when the open failed.
         if (!synced) _sync();
         _set(opening: false);
       }
@@ -1006,23 +1078,29 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (unzoom && state.selectedId == tab.id) _visibleChanged();
   }
 
-  /// D3: session [id] (opened by [split]) joins tab [tabId] next to
-  /// [target]. When it ended already, or its tab went while it opened, the
-  /// normal rules apply: a tab of its own, selected.
+  /// D3: session [id] (opened by [splitPaneFor]) joins tab [tabId] next
+  /// to [target]. When it ended already, or its tab went while it opened,
+  /// the normal rules apply: a tab of its own, selected only with [focus]
+  /// (A7 D15: a command-line split never takes the selection). Without
+  /// [focus] the tab keeps its focused pane and zoom; the new pane comes
+  /// second in the focus history.
   void _adoptPane(
     int id, {
     required int tabId,
     required int target,
     required SplitAxis axis,
     required TerminalGrid size,
+    required bool focus,
   }) {
     final summary = _local.sessions.where((s) => s.id == id).firstOrNull;
     final tab = _tab(tabId);
     if (summary == null || tab == null) {
       _sync(own: id);
-      if (state.tabOfSession(id) case final own?) {
-        _restoreMaySelect = false;
-        _set(selectedId: own.id);
+      if (focus) {
+        if (state.tabOfSession(id) case final own?) {
+          _restoreMaySelect = false;
+          _set(selectedId: own.id);
+        }
       }
       return;
     }
@@ -1032,20 +1110,32 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       return;
     }
     final at = tab.panes.containsKey(target) ? target : tab.paneOrder.first;
-    final wasZoomed = tab.zoomedPaneId != null;
+    final unzoom = focus && tab.zoomedPaneId != null;
+    final layout = splitPane(tab.layout, at, id, axis);
+    final panes = {...tab.panes, id: pane};
     _replaceTab(
-      tab.copyWith(
-        layout: splitPane(tab.layout, at, id, axis),
-        panes: {...tab.panes, id: pane},
-        focusedPaneId: id,
-        zoomedPaneId: null,
-        paneHistory: [id, ...tab.paneHistory],
-      ),
+      focus
+          ? tab.copyWith(
+              layout: layout,
+              panes: panes,
+              focusedPaneId: id,
+              zoomedPaneId: null,
+              paneHistory: [id, ...tab.paneHistory],
+            )
+          : tab.copyWith(
+              layout: layout,
+              panes: panes,
+              paneHistory: [
+                ...tab.paneHistory.take(1),
+                id,
+                ...tab.paneHistory.skip(1),
+              ],
+            ),
     );
     _sync();
     // Final ruling m-1: a split that finishes after the user moved to
     // another tab stays in its own tab; it never pulls the user back.
-    if (state.selectedId == tabId && wasZoomed) _visibleChanged();
+    if (state.selectedId == tabId && unzoom) _visibleChanged();
   }
 
   /// D13 estimate; the real grid follows at the next layout.

@@ -53,6 +53,10 @@ final class FakeLocalSessions implements LocalSessions {
   /// When set, [open] waits for it.
   Completer<void>? openGate;
 
+  /// [open] with one of these `cwd`s waits for its completer (one open
+  /// held while others go through).
+  final cwdGates = <String, Completer<void>>{};
+
   /// Runs once [open] made session `id`, before it returns.
   void Function(int id)? afterOpen;
 
@@ -83,6 +87,7 @@ final class FakeLocalSessions implements LocalSessions {
     openCwds.add(cwd);
     openTabIds.add(tabId);
     await openGate?.future;
+    await cwdGates[cwd]?.future;
     final error = openError;
     if (error != null) throw error;
     if (failOpens.contains(cwd)) {
@@ -137,6 +142,28 @@ final class FakeLocalSessions implements LocalSessions {
     summaries.add(summary);
     views[summary.id] = FakeSessionView(summary.id, backlog);
     if (notify) _changes.add(null);
+  }
+
+  /// Session [id] starts or stops running a command (A1 D15); fires
+  /// [changes].
+  void setRunning(int id, bool running) {
+    final s = summaries.firstWhere((s) => s.id == id);
+    replace(
+      SessionSummary(
+        id: s.id,
+        index: s.index,
+        shell: s.shell,
+        createdAt: s.createdAt,
+        attachedMobileId: s.attachedMobileId,
+        origin: s.origin,
+        title: s.title,
+        runningCommand: running,
+        driver: s.driver,
+        cwd: s.cwd,
+        gitBranch: s.gitBranch,
+        ports: s.ports,
+      ),
+    );
   }
 
   void replace(SessionSummary summary) {
