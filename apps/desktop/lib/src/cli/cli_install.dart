@@ -218,26 +218,59 @@ Future<ProcessOutcome> systemProcessRunner(
   );
 }
 
-/// Like [systemProcessRunner], but a process still running after [limit]
-/// is killed and [ProcessTimeout] thrown.
+/// Like [systemProcessRunner], but bounded: when the process has not both
+/// exited and closed its stdout and stderr within [limit] (a child it left
+/// behind may hold them open), it is killed, its output dropped and
+/// [ProcessTimeout] thrown. A process killed by a signal is an ordinary
+/// outcome (its negative exit code), never mistaken for the timeout.
 ProcessRunner boundedProcessRunner(Duration limit) => (exe, args) async {
   final process = await Process.start(exe, args);
-  final out = process.stdout.transform(systemEncoding.decoder).join();
-  final err = process.stderr.transform(systemEncoding.decoder).join();
-  final code = await process.exitCode.timeout(
-    limit,
-    onTimeout: () {
+  final out = StringBuffer();
+  final err = StringBuffer();
+  final outDone = Completer<void>();
+  final errDone = Completer<void>();
+  final outSub = process.stdout
+      .transform(systemEncoding.decoder)
+      .listen(out.write, onDone: outDone.complete, onError: (Object _) {});
+  final errSub = process.stderr
+      .transform(systemEncoding.decoder)
+      .listen(err.write, onDone: errDone.complete, onError: (Object _) {});
+  final finished = Future.wait<Object?>([
+    process.exitCode,
+    outDone.future,
+    errDone.future,
+  ]).then<_Bounded>((r) => _Finished(r.first! as int));
+  final timer = Completer<_Bounded>();
+  final t = Timer(limit, () => timer.complete(const _TimedOut()));
+  final result = await Future.any([finished, timer.future]);
+  t.cancel();
+  switch (result) {
+    case _Finished(:final exitCode):
+      return ProcessOutcome(
+        exitCode: exitCode,
+        stdout: out.toString(),
+        stderr: err.toString(),
+      );
+    case _TimedOut():
       process.kill(ProcessSignal.sigkill);
-      return -1;
-    },
-  );
-  if (code == -1) {
-    unawaited(out.then<void>((_) {}, onError: (Object _) {}));
-    unawaited(err.then<void>((_) {}, onError: (Object _) {}));
-    throw const ProcessTimeout();
+      unawaited(outSub.cancel());
+      unawaited(errSub.cancel());
+      throw const ProcessTimeout();
   }
-  return ProcessOutcome(exitCode: code, stdout: await out, stderr: await err);
 };
+
+sealed class _Bounded {
+  const _Bounded();
+}
+
+final class _Finished extends _Bounded {
+  const _Finished(this.exitCode);
+  final int exitCode;
+}
+
+final class _TimedOut extends _Bounded {
+  const _TimedOut();
+}
 
 /// `/bin/test -w`: the user may create files in [dir].
 Future<bool> posixWritable(String dir) async =>
@@ -439,6 +472,13 @@ final class LoginPathCheck {
 
   static const _known = {'zsh', 'bash', 'sh'};
 
+  /// ASCII record separator: printed around `PATH` so profile output
+  /// (banners, `echo`s) is told apart from it.
+  static const _mark = '\x1e';
+  static const _script =
+      r"printf '\036%s\036' "
+      r'"$PATH"';
+
   final String shell;
   final String linkDir;
   final ProcessRunner _run;
@@ -446,12 +486,17 @@ final class LoginPathCheck {
   Future<LoginPathHint?> missing() async {
     final ProcessOutcome r;
     try {
-      r = await _run(shell, ['-lc', r'printf %s "$PATH"']);
+      r = await _run(shell, ['-lc', _script]);
     } on Object {
       return null;
     }
     if (r.exitCode != 0) return null;
-    if (r.stdout.trim().split(':').contains(linkDir)) return null;
+    // Only what sits between the markers: a profile may print anything.
+    final start = r.stdout.indexOf(_mark);
+    final end = start < 0 ? -1 : r.stdout.indexOf(_mark, start + 1);
+    if (end < 0) return null;
+    final path = r.stdout.substring(start + 1, end);
+    if (path.split(':').contains(linkDir)) return null;
     return LoginPathHint(
       file: switch (p.posix.basename(shell)) {
         'zsh' => '~/.zprofile',

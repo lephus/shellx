@@ -348,18 +348,58 @@ void main() {
         '/bin/zsh',
         const ProcessOutcome(
           exitCode: 0,
-          stdout: '/opt/x:/usr/local/bin:/usr/bin',
+          stdout: '\x1e/opt/x:/usr/local/bin:/usr/bin\x1e',
         ),
         calls: calls,
       ).missing();
       expect(hint, isNull);
-      expect(calls.single, ['/bin/zsh', '-lc', r'printf %s "$PATH"']);
+      expect(calls.single, [
+        '/bin/zsh',
+        '-lc',
+        r"printf '\036%s\036' "
+            r'"$PATH"',
+      ]);
+    });
+
+    test('profile noise around the marked PATH is ignored', () async {
+      // A profile that prints a banner naming /usr/local/bin: only the
+      // marked PATH counts.
+      final hint = await check(
+        '/bin/zsh',
+        const ProcessOutcome(
+          exitCode: 0,
+          stdout: 'motd /usr/local/bin:\n\x1e/usr/bin:/bin\x1e\nbye',
+        ),
+      ).missing();
+      expect(hint?.file, '~/.zprofile');
+      // Noise before, PATH has it: no hint.
+      expect(
+        await check(
+          '/bin/zsh',
+          const ProcessOutcome(
+            exitCode: 0,
+            stdout: 'hello\n\x1e/usr/local/bin:/bin\x1e',
+          ),
+        ).missing(),
+        isNull,
+      );
+      // No markers (the shell printed something else): unknown, no hint.
+      expect(
+        await check(
+          '/bin/zsh',
+          const ProcessOutcome(exitCode: 0, stdout: '/usr/bin:/bin'),
+        ).missing(),
+        isNull,
+      );
     });
 
     test(
       'missing: the exact line and the file for zsh / bash / other',
       () async {
-        const out = ProcessOutcome(exitCode: 0, stdout: '/usr/bin:/bin');
+        const out = ProcessOutcome(
+          exitCode: 0,
+          stdout: '\x1e/usr/bin:/bin\x1e',
+        );
         final zsh = (await check('/bin/zsh', out).missing())!;
         expect(zsh.file, '~/.zprofile');
         expect(zsh.line, 'export PATH="/usr/local/bin:\$PATH"');
@@ -402,6 +442,24 @@ void main() {
       expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
       final ok = await run('/bin/echo', ['hi']);
       expect(ok.stdout.trim(), 'hi');
+    });
+
+    test('the bound covers the output too: a child that keeps stdout open '
+        'after its parent exits is a timeout', () async {
+      final run = boundedProcessRunner(const Duration(milliseconds: 300));
+      final watch = Stopwatch()..start();
+      await expectLater(
+        run('/bin/sh', ['-c', '/bin/sleep 5 & exit 0']),
+        throwsA(isA<ProcessTimeout>()),
+      );
+      expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('a process killed by a signal is an outcome, not a timeout', () async {
+      final run = boundedProcessRunner(const Duration(seconds: 2));
+      // SIGHUP: Dart reports -1, the old timeout sentinel.
+      final r = await run('/bin/sh', ['-c', r'kill -HUP $$']);
+      expect(r.exitCode, -1);
     });
   });
 }
