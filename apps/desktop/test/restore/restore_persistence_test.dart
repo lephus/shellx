@@ -367,4 +367,112 @@ void main() {
     await restoring;
     expect(files.keptOrphans, isNull); // frozen: nothing removed
   });
+
+  test(
+    'output that never pauses still gets the layout written within 5 s '
+    '(max wait)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      tabs().rename(1, 'a');
+      // A title that changes every 500 ms (a clock in the prompt).
+      for (var i = 0; i < 12; i++) {
+        async.elapse(const Duration(milliseconds: 500));
+        local.replace(local.summary(1, title: 't$i'));
+      }
+      expect(files.layouts.single.tabs.single.name, 'a');
+    }),
+  );
+
+  test(
+    'switched back on: every live pane is saved at the next tick (D13)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().setScrollbackEnabled(false));
+      async.flushMicrotasks();
+      local.views[1]!.emit('idle\r\n');
+      async.elapse(const Duration(seconds: 60)); // dropped: switched off
+      expect(files.scrollbacks, isEmpty);
+      unawaited(persistence().setScrollbackEnabled(true));
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.values.single, 'idle\r\n');
+    }),
+  );
+
+  test(
+    'resume after a cancelled power-off: saving goes on, marked unclean',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      expect(files.layouts.single.cleanExit, isTrue);
+      persistence().resume();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(2));
+      expect(files.layouts.last.cleanExit, isFalse);
+      local.views[1]!.emit('again\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.values.single, 'again\r\n');
+    }),
+  );
+
+  test('a crash during restore is recorded as unclean: the loaded layout is '
+      'rewritten with cleanExit false first', () async {
+    boot();
+    local.openGate = Completer<void>();
+    final restoring = persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved(cleanExit: true)),
+    );
+    await pumpEventQueue();
+    final marker = files.layouts.single;
+    expect(marker.cleanExit, isFalse);
+    expect(marker.sameLayoutAs(saved(cleanExit: true)), isTrue);
+    local.openGate!.complete();
+    await restoring;
+  });
+
+  test(
+    'nothing is scheduled before start(); start() works again after a '
+    'rebuild',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot(start: false);
+      c.read(restorePersistenceProvider);
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, isEmpty);
+      persistence().start();
+      c.invalidate(restorePersistenceProvider);
+      c.read(restorePersistenceProvider);
+      persistence().start();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.single.tabs.single.name, 'b');
+    }),
+  );
+
+  test(
+    'flushAll waits for a scrollback write already under way',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('x\r\n');
+      final gate = files.scrollbackGate = Completer<void>();
+      async.elapse(const Duration(seconds: 60)); // the tick's write waits
+      var done = false;
+      unawaited(persistence().flushAll(clean: true).then((_) => done = true));
+      async.flushMicrotasks();
+      expect(done, isFalse);
+      gate.complete();
+      async.flushMicrotasks();
+      expect(done, isTrue);
+      expect(files.scrollbacks.values.single, 'x\r\n');
+    }),
+  );
 }

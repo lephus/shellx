@@ -55,6 +55,10 @@ final restorePersistenceProvider = NotifierProvider<RestorePersistence, void>(
 /// tests that touch it run no timer.
 class RestorePersistence extends Notifier<void> {
   static const layoutDebounce = Duration(seconds: 1);
+
+  /// A layout change is written at most this long after it happened, even
+  /// while changes keep coming (a title that ticks every second).
+  static const layoutMaxWait = Duration(seconds: 5);
   static const scrollbackPeriod = Duration(seconds: 60);
 
   /// D14: session id → pane key. Kept while the session is a live pane or
@@ -73,7 +77,13 @@ class RestorePersistence extends Notifier<void> {
   final _dirty = <int>{};
 
   Timer? _debounce;
+
+  /// Started with the first change of a burst; never restarted (I1).
+  Timer? _maxWait;
   Timer? _period;
+
+  /// The scrollback save under way; [flushAll] waits for it.
+  Future<void> _saving = Future.value();
 
   /// The last layout on disk; null before the first write and after a
   /// failed one (§5: the next save retries).
@@ -97,8 +107,11 @@ class RestorePersistence extends Notifier<void> {
   @override
   void build() {
     ref.onDispose(() {
-      _debounce?.cancel();
+      _cancelPending();
       _period?.cancel();
+      // The listeners [start] made go with this build: a rebuild (the
+      // notifier is reused) needs [start] again.
+      _started = false;
     });
   }
 
@@ -126,6 +139,20 @@ class RestorePersistence extends Notifier<void> {
 
   Future<bool> hasSavedScrollback() => _files.hasScrollback();
 
+  /// After `flushAll(clean: true)` the quit or power-off did not happen
+  /// (the user cancelled it): saving goes on, and the next layout write
+  /// marks the run unclean again (D12). Task 7 calls it.
+  void resume() {
+    if (!_frozen || !ref.mounted) return;
+    _frozen = false;
+    _written = null; // the next write must happen even when equal
+    if (_started) {
+      _period?.cancel();
+      _period = Timer.periodic(scrollbackPeriod, (_) => _tick());
+    }
+    _schedule();
+  }
+
   void dismissStrip() => ref.read(restoreStripProvider.notifier).dismiss();
 
   /// D7–D16. Call before anything may open a tab: from this call on, an
@@ -135,7 +162,8 @@ class RestorePersistence extends Notifier<void> {
   Future<void> restoreAtStartup(FutureOr<RestoreLoad> load) async {
     if (_restoring || _frozen) return;
     _restoring = true;
-    _debounce?.cancel(); // I7: never a partial layout mid-restore
+    _cancelPending(); // I7: never a partial layout mid-restore
+    final files = _files;
     DateTime? newest;
     final planned = _plan(load, (at) {
       if (newest == null || at.isAfter(newest!)) newest = at;
@@ -149,7 +177,7 @@ class RestorePersistence extends Notifier<void> {
       _keys.addAll(outcome.keyBySession);
       _filed.addAll(outcome.keyBySession.values);
       if (plan == null) {
-        if (!_frozen) await _files.removeOrphans(const {});
+        if (!_frozen) await files.removeOrphans(const {});
         return;
       }
       final snapshot = plan.snapshot;
@@ -163,7 +191,7 @@ class RestorePersistence extends Notifier<void> {
       // D15. Not once Quit froze the files: the panes are going away and
       // the saved layout still names them.
       if (!_frozen) {
-        await _files.removeOrphans(outcome.keyBySession.values.toSet());
+        await files.removeOrphans(outcome.keyBySession.values.toSet());
       }
       if (!ref.mounted) return;
       // D12: an unclean end, and something to show for it.
@@ -191,19 +219,27 @@ class RestorePersistence extends Notifier<void> {
     void Function(DateTime at) savedAt,
   ) async {
     try {
+      final files = _files;
+      final enabled = scrollbackEnabled;
+      final l10n = ref.read(appL10nProvider);
+      final now = ref.read(clockProvider)();
       final snapshot = (await load).snapshot;
-      if (snapshot == null) return null;
+      if (snapshot == null || !ref.mounted) return null;
+      // D12: a crash while restoring must read as unclean next time. Same
+      // layout, so nothing is lost; a Quit during the restore writes
+      // nothing more ([flushAll]).
+      if (snapshot.cleanExit && !_frozen) {
+        await files.writeLayout(snapshot.copyWith(cleanExit: false));
+      }
       final text = <String, String>{};
-      if (scrollbackEnabled) {
-        final l10n = ref.read(appL10nProvider);
-        final now = ref.read(clockProvider)();
+      if (enabled) {
         for (final key in snapshot.paneKeys) {
-          final raw = await _files.readScrollback(key);
+          final raw = await files.readScrollback(key);
           if (raw == null) continue;
           var saved = sanitizeRestored(raw);
           if (saved.isEmpty) continue;
           if (!saved.endsWith('\n')) saved += '\r\n';
-          final at = await _files.scrollbackSavedAt(key) ?? snapshot.savedAt;
+          final at = await files.scrollbackSavedAt(key) ?? snapshot.savedAt;
           savedAt(at);
           final time = formatRestoreTime(
             at,
@@ -225,10 +261,12 @@ class RestorePersistence extends Notifier<void> {
   /// Quit and OS power-off (clean, D12, D18), window hidden (not clean).
   /// A clean flush is the last write of this run: persistence stops (the
   /// sessions closing after it must not undo it). During a restore
-  /// nothing is written — the files on disk still hold everything.
+  /// nothing is written — the files on disk still hold everything (the
+  /// restore marked them unclean). Returns once any scrollback save that
+  /// was already under way has finished too.
   Future<void> flushAll({required bool clean}) async {
     if (_frozen) return;
-    _debounce?.cancel();
+    _cancelPending();
     if (clean) {
       _frozen = true;
       _period?.cancel();
@@ -240,9 +278,22 @@ class RestorePersistence extends Notifier<void> {
 
   /// D13: off deletes every saved text now and stops saving it; the
   /// layout is still saved.
+  /// Switched back on, every live pane is saved at the next tick, idle
+  /// or not: what was dropped while off is not on disk (D13).
   Future<void> setScrollbackEnabled(bool enabled) async {
+    final files = _files;
     await _settings.setBool(SettingKeys.terminalRestoreScrollback, enabled);
-    if (!enabled) await clearScrollback();
+    if (!enabled) {
+      _dirty.clear();
+      await files.deleteAllScrollback();
+      return;
+    }
+    if (!ref.mounted) return;
+    for (final tab in ref.read(terminalTabsProvider).tabs) {
+      for (final pane in tab.panes.values) {
+        if (!pane.exited) _dirty.add(pane.id);
+      }
+    }
   }
 
   Future<void> clearScrollback() async {
@@ -250,22 +301,31 @@ class RestorePersistence extends Notifier<void> {
     await _files.deleteAllScrollback();
   }
 
-  bool get _paused => _frozen || _restoring || !ref.mounted;
+  bool get _paused => !_started || _frozen || _restoring || !ref.mounted;
+
+  void _cancelPending() {
+    _debounce?.cancel();
+    _maxWait?.cancel();
+    _debounce = _maxWait = null;
+  }
 
   void _schedule() {
     if (_paused) return;
-    _debounce?.cancel();
-    _debounce = Timer(layoutDebounce, () {
+    void write() {
+      _cancelPending();
       if (!_paused) unawaited(_writeLayout(cleanExit: false));
-    });
+    }
+
+    _debounce?.cancel();
+    _debounce = Timer(layoutDebounce, write);
+    _maxWait ??= Timer(layoutMaxWait, write);
   }
 
   void _tick() {
     if (_paused) return;
-    // §5: a layout that never reached the disk is retried.
-    if (_written == null && !(_debounce?.isActive ?? false)) {
-      unawaited(_writeLayout(cleanExit: false));
-    }
+    // §5: a layout that did not reach the disk is retried; an equal one
+    // is skipped.
+    unawaited(_writeLayout(cleanExit: false));
     unawaited(_saveDirty());
   }
 
@@ -274,6 +334,7 @@ class RestorePersistence extends Notifier<void> {
     bool force = false,
   }) async {
     if (!ref.mounted) return;
+    final files = _files;
     final tabs = ref.read(terminalTabsProvider);
     final next = captureSnapshot(
       tabs: tabs,
@@ -294,7 +355,7 @@ class RestorePersistence extends Notifier<void> {
     );
     bool ok;
     try {
-      ok = await _files.writeLayout(next);
+      ok = await files.writeLayout(next);
     } on Object catch (error) {
       debugPrint('restore: layout not saved (${error.runtimeType})');
       ok = false;
@@ -307,12 +368,21 @@ class RestorePersistence extends Notifier<void> {
     final doomed = List.of(_doomed);
     _doomed.clear();
     for (final key in doomed) {
-      await _files.deleteScrollback(key);
+      await files.deleteScrollback(key);
     }
   }
 
-  Future<void> _saveDirty() async {
+  /// One save at a time, in call order (MINOR 7: [flushAll] returns after
+  /// the one under way).
+  Future<void> _saveDirty() {
+    final run = _saving.then((_) => _saveDirtyNow());
+    _saving = run.catchError((Object _) {});
+    return run;
+  }
+
+  Future<void> _saveDirtyNow() async {
     if (!ref.mounted || _dirty.isEmpty) return;
+    final files = _files;
     if (!scrollbackEnabled) {
       _dirty.clear();
       return;
@@ -333,12 +403,12 @@ class RestorePersistence extends Notifier<void> {
     if (batch.isEmpty) return;
     bool ok;
     try {
-      ok = await _files.writeScrollbacks(batch);
+      ok = await files.writeScrollbacks(batch);
     } on Object catch (error) {
       debugPrint('restore: scrollback not saved (${error.runtimeType})');
       ok = false;
     }
     // §5: kept dirty, saved at the next tick (unless switched off since).
-    if (!ok && scrollbackEnabled) _dirty.addAll(saved);
+    if (!ok && ref.mounted && scrollbackEnabled) _dirty.addAll(saved);
   }
 }

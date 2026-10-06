@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:shellx_desktop/src/restore/restore_snapshot.dart';
 import 'package:shellx_desktop/src/restore/restore_store.dart';
 
@@ -33,8 +35,12 @@ final class RecordingFiles implements RestoreFiles {
     return true;
   }
 
+  /// When set, [writeScrollbacks] waits for it (a slow disk).
+  Completer<void>? scrollbackGate;
+
   @override
   Future<bool> writeScrollbacks(Map<String, String> textByKey) async {
+    await scrollbackGate?.future;
     if (failScrollbackWrites) return false;
     scrollbacks.addAll(textByKey);
     return true;
