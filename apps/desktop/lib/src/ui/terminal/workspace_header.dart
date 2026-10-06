@@ -32,6 +32,7 @@ class WorkspaceHeader extends StatefulWidget {
     required this.onDelete,
     this.workspaceId,
     this.menuOpen = false,
+    this.hasUnread = false,
   });
 
   final String name;
@@ -62,6 +63,10 @@ class WorkspaceHeader extends StatefulWidget {
   /// V6: this header's context menu is open: it keeps the pressed fill and
   /// a 1 px outline until the menu closes, so the menu's target is plain.
   final bool menuOpen;
+
+  /// Collapsed and holding a tab with unread notifications: the 6 px
+  /// accent dot left of the count (UI-A4 §3, D22).
+  final bool hasUnread;
 
   /// UI-A2 §1.3: max(28, 16·s + 12).
   static double heightFor(TextScaler scaler) => max(
@@ -124,6 +129,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
     final label = [
       l10n.workspaceHeaderSemantics(widget.name, widget.count),
       if (widget.containsSelected) l10n.workspaceContainsSelected,
+      if (widget.hasUnread) l10n.workspaceHasUnread,
     ].join(', ');
 
     // |4| chevron 20 |4| name |4| [count | +] 24 |6| (UI-A2 §3.1, V10):
@@ -177,6 +183,19 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                 ),
         ),
         const SizedBox(width: ShellxSpace.s4),
+        // UI-A4 §3: |4|●|4| before the count slot; no space when absent.
+        if (widget.hasUnread) ...[
+          Container(
+            key: const Key('header.unreadDot'),
+            width: ShellxSizes.aggregateDot,
+            height: ShellxSizes.aggregateDot,
+            decoration: const BoxDecoration(
+              color: ShellxDesktopColors.accent,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: ShellxSpace.s4),
+        ],
         // The slot: the count shows here unless the `+` (drawn above, see
         // below) does; both hidden while renaming, the slot kept.
         SizedBox(

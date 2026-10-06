@@ -400,8 +400,9 @@ void main() {
     await tester.tap(row(2), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('menu.automaticName')), findsOneWidget);
-    // rename | automatic ─ move to, up, down ─ ports ─ close
-    expect(find.byType(PopupMenuDivider), findsNWidgets(3));
+    // mark read, mark all read (UI-A4 §10.4) ─ rename | automatic ─
+    // move to, up, down ─ ports ─ close
+    expect(find.byType(PopupMenuDivider), findsNWidgets(4));
     expect(
       tester.getTopLeft(find.byKey(const Key('menu.port.3000'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const Key('menu.port.5173'))).dy),
@@ -422,7 +423,7 @@ void main() {
 
     await tester.tap(row(1), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
-    expect(find.byType(PopupMenuDivider), findsNWidgets(2)); // no ports
+    expect(find.byType(PopupMenuDivider), findsNWidgets(3)); // no ports
     await tester.tap(find.byKey(const Key('menu.renameTab')));
     await tester.pumpAndSettle();
     expect(sidebar().renaming, const RenameTab(1));

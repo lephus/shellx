@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart';
 import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/sidebar_workspaces.dart';
+import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
@@ -140,6 +141,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   List<_Item> _items() {
     final s = ref.read(sidebarWorkspacesProvider);
     final tabsState = ref.read(terminalTabsProvider);
+    final attention = ref.read(tabAttentionProvider);
     final byId = {for (final t in tabsState.tabs) t.id: t};
     final items = <_Item>[];
     for (final w in s.workspaces) {
@@ -150,6 +152,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             w,
             tabs.length,
             w.collapsed && tabs.any((t) => t.id == tabsState.selectedId),
+            // UI-A4 §3 (D22): only while collapsed.
+            hasUnread:
+                w.collapsed && tabs.any((t) => attention.hasUnread(t.id)),
           ),
         );
         if (w.collapsed) continue;
@@ -159,7 +164,15 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         }
       }
       for (final (i, tab) in tabs.indexed) {
-        items.add(_RowItem(tab, w, i, tabs.length));
+        items.add(
+          _RowItem(
+            tab,
+            w,
+            i,
+            tabs.length,
+            notified: attention.hasUnread(tab.id),
+          ),
+        );
       }
     }
     return items;
@@ -180,12 +193,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       ? ShellxSizes.workspaceHeaderTop
       : ShellxSizes.rowGap;
 
-  /// UI-A2 §1.3 heights.
+  /// UI-A2 §1.3 + UI-A4 §1.3 heights.
   static double _extent(_Item item, TextScaler scaler) => switch (item) {
     _HeaderItem() => WorkspaceHeader.heightFor(scaler),
-    _RowItem(:final tab) => SessionTabRow.heightFor(
+    _RowItem(:final tab, :final notified) => SessionTabRow.heightFor(
       scaler,
       context: tab.hasContext,
+      notification: notified,
     ),
     _EmptyItem() => max(
       ShellxSizes.emptyWorkspaceRow,
@@ -672,16 +686,31 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         ? const <int>[]
         : ([...tab.ports]..sort()).take(5).toList();
     final portSubmenu = ports.length > 2;
+    final attention = ref.read(tabAttentionProvider);
     await _withMenuOpen(('row', tab.id), () async {
       final choice = await showShellxMenu<Object>(
         context: context,
         at: at,
         entries: [
+          // UI-A4 §10.4 (D23): first, dimmed when there is nothing to read.
+          ShellxMenuEntry(
+            key: const Key('menu.markRead'),
+            value: _RowAction.markRead,
+            label: l10n.attentionMarkRead,
+            enabled: attention.hasUnread(tab.id),
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.markAllRead'),
+            value: _RowAction.markAllRead,
+            label: l10n.attentionMarkAllRead,
+            enabled: attention.totalUnread > 0,
+          ),
           ShellxMenuEntry(
             key: const Key('menu.renameTab'),
             value: _RowAction.rename,
             label: l10n.tabRename,
             shortcut: renameShortcutLabel(),
+            dividerBefore: true,
           ),
           if (tab.customTitle != null)
             ShellxMenuEntry(
@@ -735,6 +764,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       );
       if (!mounted) return null;
       switch (choice) {
+        case _RowAction.markRead:
+          ref.read(tabAttentionProvider.notifier).markRead(tab.id);
+        case _RowAction.markAllRead:
+          ref.read(tabAttentionProvider.notifier).markAllRead();
         case _RowAction.rename:
           _startTabRename(tab.id, fromList: fromList);
         case _RowAction.automaticName:
@@ -1192,6 +1225,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final state = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final home = ref.watch(homeDirectoryProvider);
+    final attention = ref.watch(tabAttentionProvider);
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final scaler = MediaQuery.textScalerOf(context);
     final items = _items();
@@ -1275,6 +1309,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               count: item.count,
               collapsed: w.collapsed,
               containsSelected: item.containsSelected,
+              hasUnread: item.hasUnread,
               focused: !sticky && _showFocus && cursor == w.id,
               renaming: !sticky && sidebar.renaming == RenameWorkspace(w.id),
               dropTarget: _dropTarget == w.id,
@@ -1367,6 +1402,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         onMenu: (at) => unawaited(_rowMenu(tab, at)),
         extraActions: _rowActions(l10n, tab),
         menuOpen: _menuFor == ('row', tab.id),
+        unread: attention.unread[tab.id],
+        onMarkRead: () =>
+            ref.read(tabAttentionProvider.notifier).markRead(tab.id),
       );
       // V9: under a header, rows sit 8 px in. The padding is always
       // there (0 without headers): the row's subtree never changes shape.
@@ -1571,6 +1609,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 }
 
 enum _RowAction {
+  markRead,
+  markAllRead,
   rename,
   automaticName,
   moveTo,
@@ -1588,21 +1628,39 @@ sealed class _Item {
 }
 
 final class _HeaderItem extends _Item {
-  const _HeaderItem(this.workspace, this.count, this.containsSelected);
+  const _HeaderItem(
+    this.workspace,
+    this.count,
+    this.containsSelected, {
+    this.hasUnread = false,
+  });
   final Workspace workspace;
   final int count;
 
   /// Collapsed while holding the selected tab (UI-A2 §3.2).
   final bool containsSelected;
+
+  /// Collapsed while holding a tab with unread (UI-A4 §3, D22).
+  final bool hasUnread;
 }
 
 /// A tab's row: [index] (0-based) of [count] in [workspace].
 final class _RowItem extends _Item {
-  const _RowItem(this.tab, this.workspace, this.index, this.count);
+  const _RowItem(
+    this.tab,
+    this.workspace,
+    this.index,
+    this.count, {
+    this.notified = false,
+  });
   final TerminalTab tab;
   final Workspace workspace;
   final int index;
   final int count;
+
+  /// The tab has unread: the row grows by the notification line
+  /// (UI-A4 §1.3).
+  final bool notified;
 }
 
 /// The hint of an expanded workspace without tabs (UI-A2 §3.4).

@@ -9,8 +9,10 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/context_line.dart';
+import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'attention_marks.dart';
 import 'inline_name_field.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
@@ -63,6 +65,8 @@ class SessionTabRow extends StatefulWidget {
     this.extraActions = const {},
     this.home = '',
     this.menuOpen = false,
+    this.unread,
+    this.onMarkRead,
   });
 
   final TerminalTab tab;
@@ -106,23 +110,43 @@ class SessionTabRow extends StatefulWidget {
   /// outline stay until it closes, so the menu's target is plain.
   final bool menuOpen;
 
-  /// UI-A1 §1.3 / UI-A2 §1.3: max(30, 18·s + 12); with a context line
-  /// max(46, 18·s + 14·s + 14). The sidebar sums them to scroll a row it
-  /// has not built yet into view.
-  static double heightFor(TextScaler textScaler, {bool context = false}) =>
-      context
-      ? max(
-          ShellxSizes.rowWithContext,
-          textScaler.scale(ShellxSizes.rowTextLine) +
-              textScaler.scale(ShellxSizes.contextLine) +
-              2 * ShellxSizes.rowContextPadding +
-              ShellxSizes.contextGap,
-        )
-      : max(
-          ShellxSizes.row,
-          textScaler.scale(ShellxSizes.rowTextLine) +
-              ShellxSizes.rowTextPadding,
-        );
+  /// A4: this tab's unread notifications (badge + notification line,
+  /// UI-A4 §2); null when it has none.
+  final TabUnread? unread;
+
+  /// The "Mark as read" custom semantics action (UI-A4 §8).
+  final VoidCallback? onMarkRead;
+
+  /// UI-A1 §1.3, UI-A2 §1.3, UI-A4 §1.3: the title line, then an optional
+  /// notification line and an optional context line, each 14·s plus a
+  /// 2 px gap: max(30, 18·s + 12); one extra line max(46, 18·s + 14·s +
+  /// 14); both max(62, 18·s + 2·14·s + 16). The sidebar sums them to
+  /// scroll a row it has not built yet into view.
+  static double heightFor(
+    TextScaler textScaler, {
+    bool context = false,
+    bool notification = false,
+  }) {
+    final lines = (context ? 1 : 0) + (notification ? 1 : 0);
+    if (lines == 0) {
+      return max(
+        ShellxSizes.row,
+        textScaler.scale(ShellxSizes.rowTextLine) + ShellxSizes.rowTextPadding,
+      );
+    }
+    return max(
+      lines == 2
+          ? ShellxSizes.rowWithNotificationAndContext
+          : context
+          ? ShellxSizes.rowWithContext
+          : ShellxSizes.rowWithNotification,
+      textScaler.scale(ShellxSizes.rowTextLine) +
+          lines *
+              (textScaler.scale(ShellxSizes.contextLine) +
+                  ShellxSizes.contextGap) +
+          2 * ShellxSizes.rowContextPadding,
+    );
+  }
 
   @override
   State<SessionTabRow> createState() => SessionTabRowState();
@@ -170,6 +194,9 @@ class SessionTabRowState extends State<SessionTabRow> {
         l10n.sidebarStatusRunning
       else
         l10n.sidebarStatusIdle,
+      // UI-A4 §8: right after the status, the full text (not cut).
+      if (widget.unread case final u?)
+        l10n.attentionRowSemantics(u.count, u.text),
       if (tab.gitBranch case final branch?) l10n.sidebarBranch(branch),
       if (tab.cwd case final cwd?)
         l10n.sidebarFolder(
@@ -255,7 +282,16 @@ class SessionTabRowState extends State<SessionTabRow> {
     final renaming = widget.renaming;
     final scaler = MediaQuery.textScalerOf(context);
     final withContext = tab.hasContext;
-    final height = SessionTabRow.heightFor(scaler, context: withContext);
+    // UI-A4 §2.2: the notification line also shows while renaming (only
+    // the badge hides).
+    final unread = widget.unread;
+    final withNotification = unread != null;
+    final height = SessionTabRow.heightFor(
+      scaler,
+      context: withContext,
+      notification: withNotification,
+    );
+    final withLines = withContext || withNotification;
     final background = _pressed || (widget.menuOpen && !widget.selected)
         ? ShellxDesktopColors.rowPressed
         : widget.selected
@@ -295,12 +331,26 @@ class SessionTabRowState extends State<SessionTabRow> {
     // ports keep their full 24 px.
     final titleTop =
         ShellxSizes.rowContextPadding + titleLine / 2 - titleBox / 2;
+    final notificationLine = scaler.scale(ShellxSizes.notificationLine);
+    final notificationTop =
+        ShellxSizes.rowContextPadding + titleLine + ShellxSizes.notificationGap;
+    // UI-A4 §2.1: title → notification → context; the notification line
+    // pushes the context line (and its port hit boxes) down.
+    final shift = withNotification
+        ? notificationLine + ShellxSizes.notificationGap
+        : 0.0;
     final contextTop =
         ShellxSizes.rowContextPadding +
         titleLine +
-        ShellxSizes.contextGap -
+        ShellxSizes.contextGap +
+        shift -
         (contextBox - contextLine) / 2;
     final overlap = max(0.0, titleTop + titleBox - contextTop);
+    // The ×'s column, measured from a line's right edge: the lines end
+    // 8 px in, the × hit area 6.
+    final closeColumn = showClose
+        ? ShellxSizes.rowCloseHit - (ShellxSpace.s8 - rowPadding.right)
+        : 0.0;
 
     final titleRow = Row(
       children: [
@@ -320,7 +370,18 @@ class SessionTabRowState extends State<SessionTabRow> {
                   onCommit: (text) => widget.onRename?.call(text),
                   onCancel: () => widget.onCancelRename?.call(),
                 )
-              : _Title(tab.label, titleStyle),
+              // UI-A4 §2.1: the badge follows the title, 4 apart; the
+              // title gives way first, the badge is never cut. No unread:
+              // no badge and no kept slot. Hidden while renaming (§2.2).
+              : Row(
+                  children: [
+                    Flexible(child: _Title(tab.label, titleStyle)),
+                    if (unread != null) ...[
+                      const SizedBox(width: ShellxSizes.badgeGap),
+                      UnreadBadge(count: unread.count),
+                    ],
+                  ],
+                ),
         ),
         if (tab.origin == SessionOrigin.phone) ...[
           const SizedBox(width: ShellxSpace.s4),
@@ -374,6 +435,9 @@ class SessionTabRowState extends State<SessionTabRow> {
       onTap: renaming ? null : widget.onSelect,
       customSemanticsActions: {
         CustomSemanticsAction(label: l10n.terminalCloseTab): widget.onClose,
+        if (withNotification && widget.onMarkRead != null)
+          CustomSemanticsAction(label: l10n.attentionMarkRead):
+              widget.onMarkRead!,
         ...widget.extraActions,
       },
       // While renaming, the name field is the row's one child node
@@ -405,102 +469,122 @@ class SessionTabRowState extends State<SessionTabRow> {
             onSecondaryTapUp: renaming
                 ? null
                 : (details) => _menu(details.globalPosition),
-            child: AnimatedContainer(
-              duration: _instant
-                  ? Duration.zero
-                  : ShellxMotion.of(context, ShellxMotion.fast),
-              curve: ShellxMotion.fastCurve,
+            // The height changes at once when a notification or context
+            // line comes or goes (UI-A4 §2.1, A1 §1.5): only the fill
+            // fades.
+            child: SizedBox(
               height: height,
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(ShellxRadius.r6),
-              ),
-              child: DecoratedBox(
-                // The keyboard ring switches at once (UI §1.5, §3): in
-                // front, outside the hover fade. Never null: a decoration
-                // that comes and goes would change the subtree and
-                // rebuild an open name field.
-                position: DecorationPosition.foreground,
-                decoration: widget.focused
-                    ? BoxDecoration(
-                        borderRadius: BorderRadius.circular(ShellxRadius.r6),
-                        border: Border.all(
-                          color: ShellxDesktopColors.accent,
-                          width: ShellxSizes.focusRing,
-                        ),
-                      )
-                    : widget.menuOpen
-                    ? BoxDecoration(
-                        borderRadius: BorderRadius.circular(ShellxRadius.r6),
-                        border: Border.all(color: ShellxDesktopColors.border),
-                      )
-                    : const BoxDecoration(),
-                // One structure whatever the row shows (I1): the bar's
-                // slot, the title box and the context box are always the
-                // same keyed children in the same places, so an open name
-                // field is never rebuilt (and never loses what was typed)
-                // when the context line or the selected bar comes or goes.
-                child: Stack(
-                  children: [
-                    Positioned(
-                      key: const ValueKey('row.barSlot'),
-                      // With the keyboard ring on the row's edge, the bar
-                      // moves inside it so both stay visible (UI §3.1).
-                      // UI-A2 §2.1: centred on the whole row, 46 included.
-                      left: widget.focused
-                          ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
-                          : 0,
-                      top: (height - ShellxSizes.selectedBarHeight) / 2,
-                      width: ShellxSizes.selectedBarWidth,
-                      height: ShellxSizes.selectedBarHeight,
-                      child: widget.selected
-                          ? Container(
-                              key: const Key('row.selectedBar'),
-                              decoration: BoxDecoration(
-                                color: ShellxDesktopColors.accent,
-                                borderRadius: BorderRadius.circular(
-                                  ShellxRadius.r4,
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    Positioned(
-                      key: const ValueKey('row.titleBox'),
-                      left: 0,
-                      right: 0,
-                      // With context: the title line's centre stays
-                      // 6 + line/2 from the top. Without: centred in the
-                      // row (A1). The box is as tall as the 24 px ×.
-                      top: withContext ? titleTop : (height - titleBox) / 2,
-                      height: titleBox,
-                      child: Padding(padding: rowPadding, child: titleRow),
-                    ),
-                    if (withContext)
+              child: AnimatedContainer(
+                duration: _instant
+                    ? Duration.zero
+                    : ShellxMotion.of(context, ShellxMotion.fast),
+                curve: ShellxMotion.fastCurve,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                ),
+                child: DecoratedBox(
+                  // The keyboard ring switches at once (UI §1.5, §3): in
+                  // front, outside the hover fade. Never null: a decoration
+                  // that comes and goes would change the subtree and
+                  // rebuild an open name field.
+                  position: DecorationPosition.foreground,
+                  decoration: widget.focused
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                          border: Border.all(
+                            color: ShellxDesktopColors.accent,
+                            width: ShellxSizes.focusRing,
+                          ),
+                        )
+                      : widget.menuOpen
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                          border: Border.all(color: ShellxDesktopColors.border),
+                        )
+                      : const BoxDecoration(),
+                  // One structure whatever the row shows (I1): the bar's
+                  // slot, the title box, the notification box and the
+                  // context box are always the same keyed children in the
+                  // same places, so an open name field is never rebuilt
+                  // (and never loses what was typed) when a notification
+                  // line, the context line or the selected bar comes or
+                  // goes.
+                  child: Stack(
+                    children: [
                       Positioned(
-                        key: const ValueKey('row.contextBox'),
-                        left: ShellxSizes.contextInset,
-                        right: ShellxSpace.s8,
-                        // The 14 px line sits 2 below the title line; the
-                        // box grows to the 24 px port hit area around it.
-                        top: contextTop,
-                        height: contextBox,
-                        child: _HitBand(
-                          // The ×'s column, measured from the line's right
-                          // edge: the line ends 8 px in, the × hit area 6.
-                          cornerWidth: showClose
-                              ? ShellxSizes.rowCloseHit -
-                                    (ShellxSpace.s8 - rowPadding.right)
-                              : 0,
-                          cornerHeight: overlap,
-                          child: _ContextLine(
-                            tab: tab,
-                            home: widget.home,
-                            onOpenPort: widget.onOpenPort,
+                        key: const ValueKey('row.barSlot'),
+                        // With the keyboard ring on the row's edge, the bar
+                        // moves inside it so both stay visible (UI §3.1).
+                        // UI-A2 §2.1: centred on the whole row, 46 included.
+                        left: widget.focused
+                            ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
+                            : 0,
+                        top: (height - ShellxSizes.selectedBarHeight) / 2,
+                        width: ShellxSizes.selectedBarWidth,
+                        height: ShellxSizes.selectedBarHeight,
+                        child: widget.selected
+                            ? Container(
+                                key: const Key('row.selectedBar'),
+                                decoration: BoxDecoration(
+                                  color: ShellxDesktopColors.accent,
+                                  borderRadius: BorderRadius.circular(
+                                    ShellxRadius.r4,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      Positioned(
+                        key: const ValueKey('row.titleBox'),
+                        left: 0,
+                        right: 0,
+                        // With a notification or context line: the title
+                        // line's centre stays 6 + line/2 from the top.
+                        // Without: centred in the row (A1). The box is as tall as the 24 px ×.
+                        top: withLines ? titleTop : (height - titleBox) / 2,
+                        height: titleBox,
+                        child: Padding(padding: rowPadding, child: titleRow),
+                      ),
+                      if (unread != null)
+                        Positioned(
+                          key: const ValueKey('row.notificationBox'),
+                          left: ShellxSizes.contextInset,
+                          right: ShellxSpace.s8,
+                          top: notificationTop,
+                          height: notificationLine,
+                          // Same rule as the context line: where a shown ×
+                          // reaches down (1 px at 1×), the × wins.
+                          child: _HitBand(
+                            cornerWidth: closeColumn,
+                            cornerHeight: max(
+                              0.0,
+                              titleTop + titleBox - notificationTop,
+                            ),
+                            child: NotificationLine(text: unread.text),
                           ),
                         ),
-                      ),
-                  ],
+                      if (withContext)
+                        Positioned(
+                          key: const ValueKey('row.contextBox'),
+                          left: ShellxSizes.contextInset,
+                          right: ShellxSpace.s8,
+                          // The 14 px line sits 2 below the title line; the
+                          // box grows to the 24 px port hit area around it.
+                          top: contextTop,
+                          height: contextBox,
+                          child: _HitBand(
+                            cornerWidth: closeColumn,
+                            cornerHeight: overlap,
+                            child: _ContextLine(
+                              tab: tab,
+                              home: widget.home,
+                              onOpenPort: widget.onOpenPort,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
