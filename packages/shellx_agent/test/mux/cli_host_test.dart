@@ -51,6 +51,14 @@ final class _ThrowingConnection implements MuxConnection {
   @override
   void send(MuxMessage message) => throw StateError('broken');
   @override
+  int get pendingBytes => 0;
+  @override
+  Future<void> get drained async {}
+  @override
+  void pauseInput() {}
+  @override
+  void resumeInput() {}
+  @override
   Future<void> close() async {
     if (!_done.isCompleted) _done.complete();
   }
