@@ -9,6 +9,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/context_line.dart';
+import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -391,8 +392,14 @@ class SessionTabRowState extends State<SessionTabRow> {
                           key: Key('row.paneCount.${tab.id}'),
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.view_column_outlined,
+                            // Final N-3: the icon follows the root split
+                            // (side by side: columns; stacked: rows).
+                            Icon(
+                              switch (tab.layout) {
+                                PaneSplit(axis: SplitAxis.column) =>
+                                  Icons.view_agenda_outlined,
+                                _ => Icons.view_column_outlined,
+                              },
                               size: ShellxSizes.paneCountIcon,
                               color: ShellxDesktopColors.textSecondary,
                             ),

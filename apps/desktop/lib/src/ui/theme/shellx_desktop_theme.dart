@@ -85,6 +85,14 @@ abstract final class ShellxSizes {
   static const double paneHeaderDot = 6;
   static const double paneHeaderClose = 18;
   static const double paneFocusOutline = 1;
+
+  /// Final ruling S-1: the divider while hovered or dragged (paint only;
+  /// the layout line stays [paneDivider]).
+  static const double paneDividerActive = 3;
+
+  /// Final ruling S-3: an unfocused pane's ring sits this far inside the
+  /// pane, clear of a neighbour's focus outline.
+  static const double paneRingInset = 2;
   static const int paneMinCols = 20;
   static const int paneMinRows = 5;
   static const double paneResizeStep = 0.05;
@@ -123,6 +131,9 @@ abstract final class ShellxSizes {
 
   /// UI §2.5: below this pane width the pill uses the short copy.
   static const double pillCompactBelow = 520;
+
+  /// Final ruling S-4: below this pane width the pill is its icon only.
+  static const double pillIconOnlyBelow = 260;
   static const double emptyMaxWidth = 320;
   static const EdgeInsets terminalPadding = EdgeInsets.fromLTRB(10, 6, 10, 6);
 

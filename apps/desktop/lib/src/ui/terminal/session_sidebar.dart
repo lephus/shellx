@@ -790,7 +790,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ShellxMenuEntry(
             key: const Key('menu.closeTab'),
             value: _RowAction.close,
-            label: l10n.terminalCloseTab,
+            // Final N-2: a split tab says every pane goes.
+            label: tab.isSplit
+                ? l10n.terminalCloseTabAllPanes
+                : l10n.terminalCloseTab,
             // D6: ⌘W closes a pane of a split tab.
             shortcut: tab.isSplit ? null : closeTabShortcutLabel(),
             dividerBefore: true,

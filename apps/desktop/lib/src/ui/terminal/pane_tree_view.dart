@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
@@ -14,6 +15,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../theme/terminal_colors.dart';
 import 'attention_marks.dart' show AttentionRing;
+import 'device_pixel_lines.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart' show DriverPill, ShellxScrollbar, kPhoneIcon;
@@ -151,24 +153,26 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             ),
           ),
           // UI-A3 §2.5 layers: terminal < focus outline < ring < pill.
+          // Final ruling S-2: a hairline on whole device pixels.
           if (split && focused && tab.zoomedPaneId == null)
-            const Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  key: Key('pane.focusOutline'),
-                  decoration: BoxDecoration(
-                    border: Border.fromBorderSide(
-                      BorderSide(
-                        color: ShellxDesktopColors.accent,
-                        width: ShellxSizes.paneFocusOutline,
-                      ),
-                    ),
-                  ),
-                ),
+            Positioned.fill(
+              child: DevicePixelOutline(
+                key: const Key('pane.focusOutline'),
+                color: ShellxDesktopColors.accent,
+                devicePixelRatio: View.of(context).devicePixelRatio,
               ),
             ),
           // UI-A3 §2.5: A4's ring, around the pane (one pane: A4's rect).
-          Positioned.fill(child: AttentionRing(visible: ringed)),
+          // Final ruling S-3: an unfocused pane's ring sits inside it, so
+          // it never merges with the focused neighbour's outline.
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.all(
+                split && !focused ? ShellxSizes.paneRingInset : 0,
+              ),
+              child: AttentionRing(visible: ringed),
+            ),
+          ),
           // UI §2.5 (ruling S-2), in the pane under its header: top-right,
           // clear of where people read; when the cursor (the prompt line)
           // is under that corner it moves to the bottom-right.
@@ -197,6 +201,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                           compact:
                               constraints.maxWidth <
                               ShellxSizes.pillCompactBelow,
+                          iconOnly:
+                              constraints.maxWidth <
+                              ShellxSizes.pillIconOnlyBelow,
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -424,6 +431,7 @@ class _SplitBox extends StatelessWidget {
       final hitStart = a + line / 2 - hit / 2;
       final divider = _PaneDivider(
         key: Key('pane.divider.$path'),
+        path: path,
         axis: split.axis,
         ratio: split.ratio,
         start: a,
@@ -475,6 +483,7 @@ class _SplitBox extends StatelessWidget {
 class _PaneDivider extends StatefulWidget {
   const _PaneDivider({
     super.key,
+    required this.path,
     required this.axis,
     required this.ratio,
     required this.start,
@@ -483,6 +492,7 @@ class _PaneDivider extends StatefulWidget {
     required this.onEqualize,
   });
 
+  final PanePath path;
   final SplitAxis axis;
   final double ratio;
 
@@ -508,6 +518,11 @@ class _PaneDividerState extends State<_PaneDivider> {
 
   bool get _row => widget.axis == SplitAxis.row;
 
+  /// [ShellxSizes.paneDividerActive] hairlines (3 px at 1× and 2×; 3
+  /// device pixels, 2.4 px, at 1.25×).
+  static int _activePixels(double dpr) =>
+      ShellxSizes.paneDividerActive.round() * hairlineDevicePixels(dpr);
+
   void _step(double delta) => widget.onRatio(widget.ratio + delta);
 
   static String _percent(double ratio) =>
@@ -517,6 +532,8 @@ class _PaneDividerState extends State<_PaneDivider> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final active = _hovered || _from != null;
+    final dpr = View.of(context).devicePixelRatio;
+    final hairline = hairlineDevicePixels(dpr);
     return Semantics(
       slider: true,
       label: l10n.paneDividerLabel,
@@ -550,14 +567,22 @@ class _PaneDividerState extends State<_PaneDivider> {
           onPanEnd: (_) => setState(() => _from = null),
           onPanCancel: () => setState(() => _from = null),
           onDoubleTap: widget.onEqualize,
-          child: Center(
-            child: AnimatedContainer(
-              duration: ShellxMotion.of(context, ShellxMotion.fast),
-              width: _row ? ShellxSizes.paneDivider : double.infinity,
-              height: _row ? double.infinity : ShellxSizes.paneDivider,
-              color: active
+          // Final rulings S-1, S-2: on whole device pixels; a wider
+          // accent band while active, so the cue shows next to a focus
+          // outline of the same colour. The layout line stays 1 px.
+          child: TweenAnimationBuilder<Color?>(
+            tween: ColorTween(
+              end: active
                   ? ShellxDesktopColors.accent
                   : ShellxDesktopColors.line,
+            ),
+            duration: ShellxMotion.of(context, ShellxMotion.fast),
+            builder: (context, color, _) => DevicePixelLine(
+              key: Key('pane.dividerLine.${widget.path}'),
+              vertical: _row,
+              color: color ?? ShellxDesktopColors.line,
+              devicePixels: active ? _activePixels(dpr) : hairline,
+              devicePixelRatio: dpr,
             ),
           ),
         ),
@@ -715,29 +740,37 @@ class _PaneHeaderState extends State<_PaneHeader> {
                 ),
                 if (widget.zoomed case final zoomed?) ...[
                   const SizedBox(width: ShellxSpace.s4),
-                  GestureDetector(
-                    key: const Key('pane.zoomed'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: widget.onToggleZoom,
-                    child: SizedBox(
-                      height: height,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (widget.hiddenUnread) ...[
-                            const _Dot(key: Key('pane.zoom.unread')),
-                            const SizedBox(width: ShellxSpace.s4),
-                          ],
-                          Text(
-                            zoomed,
-                            maxLines: 1,
-                            softWrap: false,
-                            style: ShellxText.caption.copyWith(
-                              color: ShellxDesktopColors.accent,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  // Final N-5: it looks like the button it is.
+                  Tooltip(
+                    message: l10n.paneUnzoom,
+                    excludeFromSemantics: true,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        key: const Key('pane.zoomed'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: widget.onToggleZoom,
+                        child: SizedBox(
+                          height: height,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.hiddenUnread) ...[
+                                const _Dot(key: Key('pane.zoom.unread')),
+                                const SizedBox(width: ShellxSpace.s4),
+                              ],
+                              Text(
+                                zoomed,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: ShellxText.caption.copyWith(
+                                  color: ShellxDesktopColors.accent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -894,6 +927,10 @@ class DriverPillSlot extends StatefulWidget {
 }
 
 class _DriverPillSlotState extends State<DriverPillSlot> {
+  /// The pill's laid-out height (final ruling S-4: a wrapped pill is two
+  /// lines); never less than one line, so a pill that is just appearing
+  /// does not start in a corner it covers.
+  double _pillHeight = ShellxSizes.driverPill;
   late bool _down = _cursorUnderCorner();
 
   @override
@@ -918,18 +955,27 @@ class _DriverPillSlotState extends State<DriverPillSlot> {
     super.dispose();
   }
 
-  /// The rows under the pill's corner: its 8 px inset and 28 px height,
+  /// The rows under the pill's corner: its 8 px inset and its height,
   /// past the terminal's own top padding.
   bool _cursorUnderCorner() {
     final cell = widget.cellHeight;
     if (cell <= 0) return false;
     final covered =
-        ((ShellxSpace.s8 +
-                    ShellxSizes.driverPill -
-                    ShellxSizes.terminalPadding.top) /
+        ((ShellxSpace.s8 + _pillHeight - ShellxSizes.terminalPadding.top) /
                 cell)
             .ceil();
     return widget.terminal.buffer.cursorY < covered;
+  }
+
+  void _onPillSize(Size size) {
+    final height = size.height < ShellxSizes.driverPill
+        ? ShellxSizes.driverPill
+        : size.height;
+    if (!mounted || height == _pillHeight) return;
+    setState(() {
+      _pillHeight = height;
+      _down = _cursorUnderCorner();
+    });
   }
 
   void _onTerminal() {
@@ -942,6 +988,35 @@ class _DriverPillSlotState extends State<DriverPillSlot> {
     alignment: _down && widget.canMoveDown
         ? Alignment.bottomRight
         : Alignment.topRight,
-    child: widget.child,
+    child: _SizeReport(onSize: _onPillSize, child: widget.child),
   );
+}
+
+/// Tells [onSize] its child's size after a layout that changed it (in a
+/// post-frame callback: never a rebuild during layout).
+class _SizeReport extends SingleChildRenderObjectWidget {
+  const _SizeReport({required this.onSize, super.child});
+  final ValueChanged<Size> onSize;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSizeReport(onSize);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderSizeReport render) =>
+      render.onSize = onSize;
+}
+
+class _RenderSizeReport extends RenderProxyBox {
+  _RenderSizeReport(this.onSize);
+  ValueChanged<Size> onSize;
+  Size? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (size == _reported) return;
+    final now = _reported = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onSize(now));
+  }
 }

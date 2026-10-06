@@ -37,7 +37,10 @@
 | `paneHeaderPadH` | 8 | lề ngang trong đầu pane |
 | `paneHeaderDot` | 6 | chấm trạng thái trong đầu pane (ô 12) |
 | `paneHeaderClose` | 18 | nút × nhìn 18 (`r4`), vùng bấm 22×22 = cả chiều cao đầu pane; glyph 12 |
-| `paneFocusOutline` | 1 | viền focus |
+| `paneFocusOutline` | 1 | viền focus (vẽ = 1 px thiết bị dưới 2×, 2 px ở 2×; sửa đợt cuối S-2) |
+| `paneDividerActive` | 3 | dải `accent` khi hover/kéo đường chia, chỉ vẽ (bố trí giữ 1 px; sửa đợt cuối S-1) |
+| `paneRingInset` | 2 | vòng chú ý của pane **không** focus lùi vào trong pane (sửa đợt cuối S-3) |
+| `pillIconOnlyBelow` | 260 | pane hẹp hơn → dải driver chỉ còn biểu tượng (sửa đợt cuối S-4) |
 | `paneMinCols` | 20 | cột tối thiểu (D4) |
 | `paneMinRows` | 5 | dòng tối thiểu (D4) |
 | `paneResizeStep` | 0.05 | bước đổi cỡ bằng phím (D12) |
@@ -74,15 +77,16 @@ x=221 (sau sidebar)                         ↓ đường chia 1 px (vùng bấm
 - **Chuột giữa** trên đầu pane = ×. **Nháy đúp** đầu pane = bật/tắt phóng to.
 - Đầu pane **không** kéo được cửa sổ (đầu pane macOS 28 vẫn là vùng kéo).
 - **Terminal trong pane:** padding A1 (10/6) giữ nguyên; clip trong pane; thanh cuộn overlay A1 trong mép phải pane.
-- **Viền focus:** 1 px `accent` vẽ đè (IgnorePointer) **trong** hình chữ nhật pane (đầu + terminal), không đổi constraints. Chỉ khi ≥ 2 pane và không phóng to.
-- **Dải driver A1 §2.5:** trong pane của phiên đó (góc phải trên **dưới đầu pane**, quy tắc dời xuống giữ nguyên); bề rộng tối đa `min(560, pane − 24)`; pane < 520 → chữ ngắn.
+- **Viền focus:** 1 px `accent` vẽ đè (IgnorePointer) **trong** hình chữ nhật pane (đầu + terminal), không đổi constraints. Chỉ khi ≥ 2 pane và không phóng to. **Sửa đợt cuối S-2:** mép viền khớp điểm ảnh thiết bị của cửa sổ (làm tròn từng mép), bề dày `max(1, floor(dpr))` điểm ảnh thiết bị (1,25× → 1 px thiết bị = 0,8 px logic) — viền luôn là một nét `accent` đặc, không nhoè ở 125 %.
+- **Dải driver A1 §2.5:** trong pane của phiên đó (góc phải trên **dưới đầu pane**, quy tắc dời xuống giữ nguyên); bề rộng tối đa `min(560, pane − 24)`; pane < 520 → chữ ngắn. **Sửa đợt cuối S-4:** pane < 260 → chỉ biểu tượng 📱 trong viên tròn 28×28 (nền/viền như dải), tooltip và nhãn trợ năng là câu đầy đủ `terminalDriverPhone` (lời dặn không bao giờ bị cắt); viên này nhận chuột (cho tooltip). Quy tắc dời xuống dùng **chiều cao thật** của dải (dải ngắn xuống 2 dòng cao ~52), không giả định 28.
 - **Toast A1 §2.8:** vẫn một cái, đáy giữa **cả vùng terminal** (không theo pane).
 
 ### 2.2 Đường chia
 
 - Nét 1 px `line`, chiếm 1 px giữa hai pane. Vùng bấm 6 px canh giữa nét (`MouseRegion` + `GestureDetector`, đè lên mép hai pane, không chiếm chỗ).
 - Con trỏ: `SystemMouseCursors.resizeColumn` (đường dọc) / `resizeRow` (đường ngang).
-- Hover (chờ 0 ms) hoặc đang kéo: nét đổi sang `accent` (`fast` 80 ms; giảm chuyển động → tức thì). Bề dày nét vẫn 1 px.
+- Hover (chờ 0 ms) hoặc đang kéo: nét đổi sang `accent` (`fast` 80 ms; giảm chuyển động → tức thì). **Sửa đợt cuối S-1:** khi hover/kéo vẽ một **dải `accent` 3 px** (`paneDividerActive` × nét mảnh: 3 px ở 1× và 2×, 3 px thiết bị ở 1,25×) canh giữa nét, nằm trong vùng bấm 6 px — cạnh viền focus cùng màu vẫn thấy rõ. Chỉ vẽ: bố trí vẫn 1 px, pane không xê dịch.
+- Nét (thường và dải) khớp điểm ảnh thiết bị của cửa sổ, bề dày thường `max(1, floor(dpr))` px thiết bị (sửa đợt cuối S-2).
 - Kéo: tỉ lệ theo vị trí con trỏ trong nút cha, kẹp theo cỡ tối thiểu (§1.2) của **mọi** pane hai bên. Nháy đúp: cân bằng nút đó (spec D11).
 - Tooltip: không (đường chia hẹp, tooltip che chữ).
 
@@ -96,7 +100,7 @@ x=221 (sau sidebar)                         ↓ đường chia 1 px (vùng bấm
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Chỉ báo `paneZoomedIndicator` "Phóng to · {index}/{count}": `caption` w600 `accent`, không nền; đứng trước ×. Có chấm `accent` 6 đứng trước chữ khi **pane ẩn** có chưa đọc (A4). Bấm chỉ báo = bỏ phóng to (vùng bấm 22 cao).
+- Chỉ báo `paneZoomedIndicator` "Phóng to · {index}/{count}": `caption` w600 `accent`, không nền; đứng trước ×. Có chấm `accent` 6 đứng trước chữ khi **pane ẩn** có chưa đọc (A4). Bấm chỉ báo = bỏ phóng to (vùng bấm 22 cao). **Sửa đợt cuối N-5:** con trỏ `click`, tooltip `paneUnzoom` "Bỏ phóng to".
 - Chuyển tức thì (không phóng/thu hoạt ảnh).
 
 ### 2.4 Trạng thái pane
@@ -106,14 +110,16 @@ x=221 (sau sidebar)                         ↓ đường chia 1 px (vùng bấm
 | Focus | đầu `rowSelected`, chữ `textPrimary`, × hiện, viền `accent` |
 | Không focus | đầu `bgSidebar`, chữ `textSecondary`, × khi hover |
 | Không focus, hover đầu | đầu `rowHover` |
-| Có chưa đọc (A4) | vòng A4 (2 px + 1 px 40 %) quanh **pane** (đè lên viền focus nếu pane đó focus); chấm `accent` trên đầu pane |
+| Có chưa đọc (A4) | vòng A4 (2 px + 1 px 40 %) quanh **pane** (đè lên viền focus nếu pane đó focus); pane **không** focus: vòng lùi vào trong `paneRingInset` 2 px (sửa đợt cuối S-3); chấm `accent` trên đầu pane |
 | Đã thoát (mã ≠ 0) | chấm vòng `err`, tiêu đề `textSecondary`; dòng thoát A1 §2.6 trong buffer |
 | Điện thoại lái | dải driver trong pane; 👁 `warn` trên đầu pane |
 | Không đủ chỗ để chia | toast trung tính `paneSplitNoRoom` |
 
 ### 2.5 Vòng sáng theo pane (sửa A4 §4)
 
-Vòng A4 vẽ trong **hình chữ nhật của từng pane** có chưa đọc thuộc tab đang chọn (gồm cả đầu pane). Tab một pane: hình chữ nhật pane = vùng terminal A4 → **trùng khít A4**. Thứ tự lớp trong pane: terminal < viền focus < vòng < dải driver. Chuyển động như A4.
+Vòng A4 vẽ trong **hình chữ nhật của từng pane** có chưa đọc thuộc tab đang chọn (gồm cả đầu pane). Tab một pane: hình chữ nhật pane = vùng terminal A4 → **trùng khít A4**.
+
+**Sửa đợt cuối S-3:** pane **không** focus vẽ vòng lùi vào trong 2 px (`paneRingInset`), nên vòng của nó không bao giờ dính với viền focus của pane bên cạnh thành một vạch dày (trước đây pane có vòng trông như pane đang focus). Pane focus: vòng đúng mép pane (đè viền focus). Dấu hiệu mạnh hơn của pane focus trên đầu pane giữ nguyên: nền `rowSelected`, tiêu đề `textPrimary` (pane không focus: `bgSidebar`, `textSecondary`), × hiện. Thứ tự lớp trong pane: terminal < viền focus < vòng < dải driver. Chuyển động như A4.
 
 ---
 
@@ -126,7 +132,7 @@ Vòng A4 vẽ trong **hình chữ nhật của từng pane** có chưa đọc th
 |6|— 32 —| main · ~/work/shellx · :3000 (pane focus)    |8|
 ```
 
-- Dấu số pane (`Icons.view_column_outlined` 12 + `caption` số): chỉ khi ≥ 2 pane; không bao giờ cắt; tooltip `sidebarPaneCount` "{count} pane". Thứ tự dấu: badge A4 → số pane → 📱 → 👁 → ×.
+- Dấu số pane (`Icons.view_column_outlined` 12 + `caption` số; **sửa đợt cuối N-3:** gốc cây là chia xuống → `Icons.view_agenda_outlined`): chỉ khi ≥ 2 pane; không bao giờ cắt; tooltip `sidebarPaneCount` "{count} pane". Thứ tự dấu: badge A4 → số pane → 📱 → 👁 → ×.
 - × dòng / "Đóng tab": đóng **cả tab**; tooltip × chỉ có gợi ý `⌘W` khi tab 1 pane (spec D6): nhiều pane → tooltip `terminalCloseTabAllPanes` "Đóng tab (mọi pane)".
 - Chiều cao dòng: không đổi so với A4 (dấu nằm trên dòng tiêu đề).
 
@@ -155,7 +161,7 @@ Bấm chuột phải vào pane không focus → pane đó nhận focus **trướ
 
 ### 4.2 Menu dòng tab (A2 §5.1 + A4 §10.4 + A3)
 
-Thêm nhóm sau "Dùng tên tự động" (vạch trước): "Chia sang phải" (`⌘D`), "Chia xuống dưới" (`⌘⇧D`), "Cân bằng pane" (`⌘⌃=`, chỉ khi ≥ 2 pane). Chọn mục chia → tab được chọn, chia pane focus của tab, bàn phím về pane mới. Mục "Đóng tab" giữ cuối.
+Thêm nhóm sau "Dùng tên tự động" (vạch trước): "Chia sang phải" (`⌘D`), "Chia xuống dưới" (`⌘⇧D`), "Cân bằng pane" (`⌘⌃=`, chỉ khi ≥ 2 pane). Chọn mục chia → tab được chọn, chia pane focus của tab, bàn phím về pane mới. Mục "Đóng tab" giữ cuối; **sửa đợt cuối N-2:** tab ≥ 2 pane → nhãn `terminalCloseTabAllPanes` "Đóng tab (mọi pane)" (không gợi ý ⌘W, spec D6).
 
 ---
 

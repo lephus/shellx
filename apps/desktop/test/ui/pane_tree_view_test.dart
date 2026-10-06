@@ -7,9 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
+import 'package:shellx_desktop/src/terminal/terminal_font_size.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/attention_marks.dart';
+import 'package:shellx_desktop/src/ui/terminal/pane_tree_view.dart'
+    show DriverPillSlot;
 import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
@@ -57,6 +60,37 @@ Size cell() => measureTerminalCell(
   desktopTerminalStyle(kTerminalFontSizeDefault),
   TextScaler.noScaling,
 );
+
+/// The rectangles [finder]'s render object fills, in global logical px.
+List<(Rect, Paint)> paintedRects(WidgetTester t, Finder finder) {
+  final box = t.renderObject<RenderBox>(finder);
+  final origin = box.localToGlobal(Offset.zero);
+  final out = <(Rect, Paint)>[];
+  expect(
+    box,
+    paints..everything((method, args) {
+      if (method == #drawRect) {
+        out.add(((args[0] as Rect).shift(origin), args[1] as Paint));
+      }
+      return true;
+    }),
+  );
+  return out;
+}
+
+bool onDevicePixel(double v, double dpr) =>
+    ((v * dpr) - (v * dpr).roundToDouble()).abs() < 1e-6;
+
+/// Every rectangle is filled, on whole device pixels.
+void expectCrisp(List<(Rect, Paint)> rects, double dpr) {
+  expect(rects, isNotEmpty);
+  for (final (r, paint) in rects) {
+    expect(paint.style, PaintingStyle.fill);
+    for (final v in [r.left, r.top, r.right, r.bottom]) {
+      expect(onDevicePixel(v, dpr), isTrue, reason: '$r at dpr $dpr');
+    }
+  }
+}
 
 void main() {
   setUp(() {
@@ -522,7 +556,12 @@ void main() {
     );
     expect(rings, findsOneWidget);
     final ring = t.getRect(rings);
-    expect(ring.left, t.getRect(find.byKey(const Key('pane.header.1'))).left);
+    // Final S-3: the unfocused pane's ring sits 2 px inside it.
+    expect(
+      ring.left,
+      t.getRect(find.byKey(const Key('pane.header.1'))).left +
+          ShellxSizes.paneRingInset,
+    );
     expect(
       ring.right,
       lessThan(t.getRect(find.byKey(const Key('pane.header.100'))).left),
@@ -547,4 +586,226 @@ void main() {
     await t.pump();
     expect(dot(), findsOneWidget);
   });
+
+  testSidebar('the divider shows a 3 px accent band while hovered or '
+      'dragged; the layout keeps its 1 px line (final S-1)', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    final line = find.byKey(const Key('pane.dividerLine.'));
+    // The colour fades in `fast`; the band is there at once.
+    Future<void> fade() async {
+      await t.pump();
+      await t.pump(ShellxMotion.fast);
+    }
+
+    double thickness() => paintedRects(t, line).single.$1.width;
+    int colour() => paintedRects(t, line).single.$2.color.toARGB32();
+    expect(thickness(), 1);
+    expect(colour(), ShellxDesktopColors.line.toARGB32());
+    final left = paneRect(t, 1);
+    final hit = t.getRect(find.byKey(const Key('pane.divider.')));
+    final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: hit.center - const Offset(100, 0));
+    await mouse.moveTo(hit.center);
+    await fade();
+    expect(thickness(), 3);
+    expect(colour(), ShellxDesktopColors.accent.toARGB32());
+    // Centred on the line, inside the 6 px hit area.
+    final band = paintedRects(t, line).single.$1;
+    expect(band.center.dx, left.right + 0.5);
+    expect(band.left, greaterThanOrEqualTo(hit.left));
+    expect(band.right, lessThanOrEqualTo(hit.right));
+    // Layout unchanged: the second pane still starts 1 px after the first.
+    expect(paneRect(t, 100).left, left.right + 1);
+    await mouse.moveTo(hit.center - const Offset(100, 0));
+    await fade();
+    expect(thickness(), 1);
+    // A drag (touch: no hover) keeps the band while it lasts.
+    final drag = await t.startGesture(hit.center);
+    await drag.moveBy(const Offset(0, 300));
+    await fade();
+    expect(thickness(), 3);
+    await drag.up();
+    await fade();
+    expect(thickness(), 1);
+    await mouse.removePointer();
+    await t.pump(kDoubleTapTimeout);
+  });
+
+  for (final dpr in [1.0, 1.25, 2.0]) {
+    testSidebar('dpr $dpr: the focus outline and the divider line are '
+        'filled on whole device pixels, at least one wide (final S-2)', (
+      t,
+    ) async {
+      await pumpSidebar(t);
+      t.view.physicalSize = Size(1100 * dpr, 720 * dpr);
+      t.view.devicePixelRatio = dpr;
+      await t.pump();
+      await splitRight(t);
+      panes().setRatio(only().id, '', 0.437);
+      await t.pump();
+      final hairline = (dpr < 2 ? 1 : dpr.floor()) / dpr;
+      final outline = paintedRects(
+        t,
+        find.byKey(const Key('pane.focusOutline')),
+      );
+      expectCrisp(outline, dpr);
+      // Four sides of one device-pixel-wide hairline (2 px at dpr 2).
+      expect(outline, hasLength(4));
+      for (final (r, _) in outline) {
+        expect(r.shortestSide, closeTo(hairline, 1e-9));
+      }
+      final pane = paneRect(t, 100);
+      final bounds = outline
+          .map((e) => e.$1)
+          .reduce((a, b) => a.expandToInclude(b));
+      // Snapped: within half a device pixel of the pane's own rectangle.
+      expect((bounds.left - pane.left).abs(), lessThanOrEqualTo(0.5 / dpr));
+      expect((bounds.right - pane.right).abs(), lessThanOrEqualTo(0.5 / dpr));
+      final line = paintedRects(t, find.byKey(const Key('pane.dividerLine.')));
+      expectCrisp(line, dpr);
+      expect(line.single.$1.width, closeTo(hairline, 1e-9));
+    });
+  }
+
+  testSidebar("an unfocused pane's ring sits 2 px inside the pane, clear of "
+      "the neighbour's outline; the focused pane's ring is on its edge "
+      '(final S-3)', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t); // pane 100 focused
+    container.read(windowFocusProvider.notifier).set(false);
+    local.notice(1, SessionNoticeKind.message, body: 'done');
+    local.notice(100, SessionNoticeKind.message, body: 'here');
+    await t.pump();
+    await t.pump();
+    final rings = find.byWidgetPredicate(
+      (w) => w is AttentionRing && w.visible,
+    );
+    expect(rings, findsNWidgets(2));
+    final rects = [
+      for (final e in rings.evaluate()) t.getRect(find.byWidget(e.widget)),
+    ];
+    expect(rects, containsAll([paneRect(t, 1).deflate(2), paneRect(t, 100)]));
+    // The focused header keeps the stronger title.
+    Text title(int id) => t.widget<Text>(
+      find.descendant(
+        of: find.byKey(Key('pane.header.$id')),
+        matching: find.text(only().panes[id]!.automaticLabel),
+      ),
+    );
+    expect(title(100).style!.color, ShellxDesktopColors.textPrimary);
+    expect(title(1).style!.color, ShellxDesktopColors.textSecondary);
+  });
+
+  testSidebar('below 260 px the driver pill is icon-only, its words in the '
+      'tooltip and the label (final S-4)', (t) async {
+    final semantics = t.ensureSemantics();
+    local.add(local.summary(2), notify: false); // phone drives
+    await pumpSidebar(t);
+    panes().select(2);
+    await t.pump();
+    await t.pump();
+    await panes().split(SplitAxis.row); // 2 | 100
+    await t.pump();
+    await t.pump();
+    final pill = find.byKey(const Key('pane.driverPill'));
+    expect(find.descendant(of: pill, matching: find.byType(Text)), findsOne);
+    final tab = tabs().selected!;
+    // The test font's cells are wide: at 9 pt a 20-column pane fits in
+    // 200 px, as a 13 pt one does with the real font.
+    for (var i = 0; i < 4; i++) {
+      container.read(terminalFontSizeProvider.notifier).decrease();
+    }
+    await t.pump();
+    panes().setRatio(tab.id, '', 0.25);
+    await t.pump();
+    await t.pump();
+    expect(paneRect2(t, tab, 2).width, lessThan(260));
+    expect(
+      find.descendant(of: pill, matching: find.byType(Text)),
+      findsNothing,
+    );
+    const words = 'Your phone is using this terminal — type to take it back';
+    expect(
+      t
+          .widget<Tooltip>(
+            find.ancestor(of: pill, matching: find.byType(Tooltip)).first,
+          )
+          .message,
+      words,
+    );
+    // Merged into the pane's region, as the pill's words always were.
+    expect(find.bySemanticsLabel(RegExp(RegExp.escape(words))), findsOneWidget);
+    expect(t.getSize(pill), const Size.square(ShellxSizes.driverPill));
+    semantics.dispose();
+  });
+
+  testWidgets('the pill moves down when the cursor is under its real, '
+      'wrapped height (final S-4)', (t) async {
+    final terminal = Terminal()..write('\r\n\r\n'); // cursor on row 2
+    Future<Alignment> alignmentFor(double pillHeight) async {
+      await t.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            width: 400,
+            height: 400,
+            child: DriverPillSlot(
+              key: ValueKey(pillHeight),
+              terminal: terminal,
+              cellHeight: 17,
+              canMoveDown: true,
+              child: SizedBox(width: 100, height: pillHeight),
+            ),
+          ),
+        ),
+      );
+      await t.pump();
+      return t.widget<Align>(find.byType(Align)).alignment as Alignment;
+    }
+
+    // 8 + 28 − 6 = 30 px: rows 0–1.
+    expect(await alignmentFor(28), Alignment.topRight);
+    // 8 + 52 − 6 = 54 px: rows 0–3, the cursor's row 2 among them.
+    expect(await alignmentFor(52), Alignment.bottomRight);
+  });
+
+  testSidebar('the zoom indicator looks clickable: click cursor and an '
+      '"Unzoom pane" tooltip (final N-5)', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    panes().toggleZoom();
+    await t.pump();
+    final indicator = find.byKey(const Key('pane.zoomed'));
+    expect(
+      t
+          .widget<Tooltip>(
+            find.ancestor(of: indicator, matching: find.byType(Tooltip)).first,
+          )
+          .message,
+      'Unzoom pane',
+    );
+    expect(
+      t
+          .widget<MouseRegion>(
+            find
+                .ancestor(of: indicator, matching: find.byType(MouseRegion))
+                .first,
+          )
+          .cursor,
+      SystemMouseCursors.click,
+    );
+  });
+}
+
+/// [paneRect] for a tab that is not [only].
+Rect paneRect2(WidgetTester t, TerminalTab tab, int id) {
+  final header = t.getRect(find.byKey(Key('pane.header.$id')));
+  final view = t.getRect(
+    find.byWidgetPredicate(
+      (w) =>
+          w is TerminalView && identical(w.terminal, tab.panes[id]!.terminal),
+    ),
+  );
+  return header.expandToInclude(view);
 }

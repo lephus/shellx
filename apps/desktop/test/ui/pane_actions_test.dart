@@ -160,6 +160,13 @@ void main() {
       ),
       findsOneWidget,
     );
+    // Final N-3: a stack (split down) shows the stacked icon.
+    Finder countIcon(IconData icon) => find.descendant(
+      of: find.byKey(const Key('row.paneCount.1')),
+      matching: find.byIcon(icon),
+    );
+    expect(countIcon(Icons.view_agenda_outlined), findsOneWidget);
+    expect(countIcon(Icons.view_column_outlined), findsNothing);
     expect(find.bySemanticsLabel(RegExp(r'^zsh 2, 2 panes, ')), findsOneWidget);
     expect(closeTooltip(), 'Close tab (all panes)');
     await t.tap(row(1), buttons: kSecondaryButton);
@@ -171,6 +178,14 @@ void main() {
         matching: find.text('⌘W'),
       ),
       findsNothing,
+    );
+    // Final N-2: the row menu says it closes every pane.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('menu.closeTab')),
+        matching: find.text('Close tab (all panes)'),
+      ),
+      findsOneWidget,
     );
     semantics.dispose();
   });
