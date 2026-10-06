@@ -46,8 +46,9 @@ class FlutterWindow : public Win32Window {
       taskbar_channel_;
 
   // A5a D18: pro.shellx.desktop/app. WM_QUERYENDSESSION asks Dart to save
-  // the restore files; WM_ENDSESSION waits (at most 3 s) for the answer, or
-  // tells Dart the shut down was cancelled.
+  // the restore files; WM_ENDSESSION waits (at most 3 s) for the answer
+  // (then, for Restart Manager, asks Dart to quit), or tells Dart the shut
+  // down was cancelled.
   void SaveBeforeExit();
   void WaitForSave();
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>

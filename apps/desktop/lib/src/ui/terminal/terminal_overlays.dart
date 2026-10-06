@@ -332,14 +332,14 @@ class _HoverThumbScrollbarState
   }
 }
 
-/// UI §2.4: a layout row at the top of the pane (it may resize the terminal:
-/// it is rare and shows before phones attach).
 /// UI §2.4 / UI-A5 §4: the strips over the terminal area (signed out,
-/// abnormal end): `rowSelected`, a `line` bottom border, 12 / 8 insets.
+/// abnormal end): `rowSelected` with a `line` bottom border.
 const BoxDecoration stripDecoration = BoxDecoration(
   color: ShellxDesktopColors.rowSelected,
   border: Border(bottom: BorderSide(color: ShellxDesktopColors.line)),
 );
+
+/// The strips' insets: 12 before the icon or text, 8 after the button.
 const EdgeInsets stripPadding = EdgeInsets.only(
   left: ShellxSpace.s12,
   right: ShellxSpace.s8,
@@ -376,6 +376,8 @@ ButtonStyle stripTextButtonStyle(BuildContext context) => ButtonStyle(
   ),
 );
 
+/// UI §2.4: a layout row at the top of the pane (it may resize the terminal:
+/// it is rare and shows before phones attach).
 class SignedOutStrip extends StatelessWidget {
   const SignedOutStrip({super.key, required this.onSignIn, this.focusNode});
   final VoidCallback onSignIn;

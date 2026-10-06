@@ -76,8 +76,10 @@ class AppDelegate: FlutterAppDelegate {
         if replied { return }
         replied = true
         NSApp.reply(toApplicationShouldTerminate: true)
-        // Still running long after agreeing: the log out or shut down did
-        // not happen, so Dart goes on saving (A5a D12).
+        // Still running 10 s after agreeing: the terminate stalled or did
+        // not happen (AppKit gives no callback for a cancelled one), so
+        // Dart goes on saving (A5a D12). A heuristic; harmless once the
+        // process has exited.
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
           AppChannel.exitCancelled()
         }

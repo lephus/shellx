@@ -74,6 +74,18 @@ void main() {
     listenForAppChannel(onReopen: () {}, onQuitRequested: () {});
     await send('saveBeforeExit');
     await send('exitCancelled');
+    await send('quitAfterSave');
+  });
+
+  test('quitAfterSave (Windows Restart Manager) reaches its handler', () async {
+    var quits = 0;
+    listenForAppChannel(
+      onReopen: () {},
+      onQuitRequested: () {},
+      onQuitAfterSave: () => quits++,
+    );
+    await send('quitAfterSave');
+    expect(quits, 1);
   });
 
   test('AppDelegate.swift: power-off waits (at most 3 s) for saveBeforeExit; '
@@ -101,6 +113,9 @@ void main() {
     expect(cpp, contains('WaitForSave()'));
     expect(cpp, contains('case WM_ENDSESSION:'));
     expect(cpp, contains('InvokeMethod("exitCancelled"'));
+    // Restart Manager: once saved, quit through Dart's Quit (D18 amended).
+    expect(cpp, contains('ENDSESSION_CLOSEAPP'));
+    expect(cpp, contains('InvokeMethod("quitAfterSave"'));
     final header = File('windows/runner/flutter_window.h').readAsStringSync();
     expect(header, contains('app_channel_'));
   });

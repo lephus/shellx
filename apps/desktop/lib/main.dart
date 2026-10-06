@@ -348,21 +348,24 @@ Future<void> _start(
     onError: (Object error) =>
         debugPrint('ShellX: activation watch failed: ${error.runtimeType}'),
   );
-  // Both platforms: Windows sends only saveBeforeExit and exitCancelled.
-  var exitSave = Future<void>.value();
+  // Both platforms: Windows sends only the three A5a calls.
   listenForAppChannel(
     onReopen: activate,
     // ⌘Q / app menu Quit (A1 D10): the same flow as the tray's "Thoát".
     onQuitRequested: () => unawaited(trayActions.handle(const Quit())),
     // A5a D18: log out, restart, shut down — a clean, final save.
-    onSaveBeforeExit: () => exitSave = runBounded(
+    onSaveBeforeExit: () => runBounded(
       () => restore.flushAll(clean: true),
       timeout: _quitStepTimeout,
       label: 'saving before power-off',
     ),
-    // The exit did not happen: saving goes on once that save is done.
-    onExitCancelled: () =>
-        _unawaitedLogged(exitSave.then((_) => restore.resume()), 'restore'),
+    // The exit did not happen: saving goes on once the clean layout is on
+    // disk (resume waits for it). A newer saveBeforeExit, or a committed
+    // Quit, keeps it frozen.
+    onExitCancelled: restore.resume,
+    // Windows Restart Manager (D18 amended): saved; quit, nothing to ask.
+    onQuitAfterSave: () =>
+        unawaited(trayActions.handle(const Quit(confirm: false))),
   );
   listenForWindowTitle(
     container: container,

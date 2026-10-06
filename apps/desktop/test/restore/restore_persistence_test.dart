@@ -486,6 +486,47 @@ void main() {
   );
 
   test(
+    'after a committed Quit, a cancelled power-off never resumes saving',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushForQuit());
+      async.flushMicrotasks();
+      persistence().resume();
+      async.flushMicrotasks();
+      tabs().rename(1, 'b');
+      local.views[1]!.emit('later\r\n');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts.single.cleanExit, isTrue);
+      expect(files.scrollbacks, isEmpty);
+    }),
+  );
+
+  test(
+    'a power-off asked, cancelled, then asked again (Windows) leaves the '
+    'second one frozen',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.last.cleanExit, isFalse);
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      final writes = files.layouts.length;
+      expect(files.layouts.last.cleanExit, isTrue);
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, hasLength(writes));
+      expect(files.layouts.last.cleanExit, isTrue);
+    }),
+  );
+
+  test(
     'the unclean marker failing to write does not drop the restore',
     () async {
       files.throwLayoutWrites = true;

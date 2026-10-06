@@ -64,7 +64,11 @@ final class Reconnect extends TrayAction {
 }
 
 final class Quit extends TrayAction {
-  const Quit();
+  const Quit({this.confirm = true});
+
+  /// False for the Windows Restart Manager quit (A5a D18 amended): the
+  /// system asked the app to close and the save is done; nothing to ask.
+  final bool confirm;
 }
 
 /// The terminal-sharing switch (spec §7.6, §10.1, §10.5).

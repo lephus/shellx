@@ -162,9 +162,9 @@ final class TrayActions {
         }
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
-      case Quit():
+      case Quit(:final confirm):
         if (_quitting) return;
-        if (state.sessions.isNotEmpty) {
+        if (confirm && state.sessions.isNotEmpty) {
           final ok = await _router.confirm(
             ConfirmRequest(
               title: l10n.confirmQuitTitle,
@@ -176,11 +176,10 @@ final class TrayActions {
         }
         _quitting = true;
         // A5a D12: the last save is clean, contents included, and final:
-        // the sessions the shutdown closes must not change it.
+        // the sessions the shutdown closes, or a late "power-off
+        // cancelled", must not change it.
         await runBounded(
-          () => _ref
-              .read(restorePersistenceProvider.notifier)
-              .flushAll(clean: true),
+          () => _ref.read(restorePersistenceProvider.notifier).flushForQuit(),
           timeout: const Duration(seconds: 2),
           label: 'saving the session layout',
         );

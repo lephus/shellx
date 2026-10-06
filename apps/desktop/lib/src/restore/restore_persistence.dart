@@ -129,6 +129,10 @@ class RestorePersistence extends Notifier<void> {
   /// A [resume] waiting for [_flushWrite]; a new clean flush cancels it.
   bool _resuming = false;
 
+  /// Set by [flushForQuit]: the user's Quit has committed, so nothing
+  /// (a cancelled power-off) resumes saving.
+  bool _quitCommitted = false;
+
   RestoreFiles get _files => ref.read(restoreStoreProvider);
   SettingsStore get _settings => ref.read(settingsStoreProvider);
 
@@ -177,7 +181,7 @@ class RestorePersistence extends Notifier<void> {
   /// (the user cancelled it): saving goes on, and the next layout write
   /// marks the run unclean again (D12). Task 7 calls it.
   void resume() {
-    if (!_frozen || _resuming || !ref.mounted) return;
+    if (_quitCommitted || !_frozen || _resuming || !ref.mounted) return;
     _resuming = true;
     // The clean layout may still be on its way to the disk: unfreeze once
     // it is there, so the unclean one is written after it, not skipped as
@@ -326,6 +330,13 @@ class RestorePersistence extends Notifier<void> {
     final write = _flushWrite = _writeLayout(cleanExit: clean, force: true);
     await write;
     await _saveDirty();
+  }
+
+  /// The user's Quit (tray, ⌘Q, Windows Restart Manager): a clean flush
+  /// that is final — no later [resume] undoes it.
+  Future<void> flushForQuit() {
+    _quitCommitted = true;
+    return flushAll(clean: true);
   }
 
   /// D13: off deletes every saved text now and stops saving it; the

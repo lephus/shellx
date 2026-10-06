@@ -100,19 +100,25 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     }
   }
 
-  /// The strip last read to a screen reader: each strip is read once.
-  RestoreStripState? _announcedStrip;
+  @override
+  void initState() {
+    super.initState();
+    // UI-A5 §4: polite, once, when a strip appears (also one shown before
+    // this pane was built).
+    ref.listenManual<RestoreStripState?>(restoreStripProvider, (_, next) {
+      if (next != null) _announceStrip(next);
+    }, fireImmediately: true);
+  }
 
-  /// UI-A5 §4: polite, once, when the strip appears.
-  void _announceStrip(RestoreStripState strip, String text) {
-    if (identical(strip, _announcedStrip)) return;
-    _announcedStrip = strip;
+  void _announceStrip(RestoreStripState strip) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || !identical(ref.read(restoreStripProvider), strip)) {
+        return;
+      }
       unawaited(
         SemanticsService.sendAnnouncement(
           View.of(context),
-          text,
+          _restoreStripText(strip),
           Directionality.of(context),
         ),
       );
@@ -125,11 +131,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     _returnFocus();
   }
 
-  Widget _restoreStrip(RestoreStripState? strip) {
-    if (strip == null) return const SizedBox.shrink();
+  String _restoreStripText(RestoreStripState strip) {
     final l10n = AppLocalizations.of(context);
     final at = strip.contentsAt;
-    final text = at == null
+    return at == null
         ? l10n.restoreAbnormalNoText(strip.tabs)
         : l10n.restoreAbnormalStrip(
             strip.tabs,
@@ -140,12 +145,16 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
               yesterday: l10n.restoreTimeYesterday,
             ),
           );
-    _announceStrip(strip, text);
+  }
+
+  Widget _restoreStrip(RestoreStripState? strip) {
+    if (strip == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
     return InfoStrip(
       key: const Key('pane.restoreStrip'),
       icon: Icons.history,
       iconColor: ShellxDesktopColors.textSecondary,
-      text: text,
+      text: _restoreStripText(strip),
       closeText: l10n.actionClose,
       closeLabel: l10n.restoreStripCloseLabel,
       focusNode: widget.restoreStripFocus,

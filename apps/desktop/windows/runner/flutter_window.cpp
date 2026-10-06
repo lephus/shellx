@@ -124,6 +124,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       if (wparam) {
         // The process may end once this returns.
         WaitForSave();
+        // Restart Manager (an installer) asks the app to close itself:
+        // quit through Dart's Quit, without asking (A5a D18 amended).
+        if ((lparam & ENDSESSION_CLOSEAPP) && app_channel_) {
+          app_channel_->InvokeMethod("quitAfterSave", nullptr);
+        }
       } else if (app_channel_) {
         // Shut down cancelled: Dart goes on saving (A5a D12).
         app_channel_->InvokeMethod("exitCancelled", nullptr);

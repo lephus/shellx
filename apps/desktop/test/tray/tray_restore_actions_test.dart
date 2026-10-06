@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
@@ -80,20 +83,37 @@ void main() {
     expect(local().restoreScrollback, isFalse);
   });
 
-  test('Quit saves a clean, final layout before the shutdown closes the '
-      'sessions (A5a D12)', () async {
-    bool? cleanAtShutdown;
-    h.ptyKills = () async {
-      cleanAtShutdown = files.layouts.lastOrNull?.cleanExit;
-    };
-    c.read(restorePersistenceProvider.notifier).start();
-    await c.read(trayActionsProvider).handle(const Quit());
-    expect(cleanAtShutdown, isTrue);
-    expect(h.quits, 1);
-    final writes = files.layouts.length;
-    // Frozen: nothing after the shutdown overwrites the clean layout.
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    expect(files.layouts, hasLength(writes));
-    expect(files.layouts.last.cleanExit, isTrue);
-  });
+  test(
+    'Quit saves a clean, final layout before the shutdown closes the '
+    'sessions (A5a D12)',
+    () => fakeAsync((async) {
+      bool? cleanAtShutdown;
+      h.ptyKills = () async {
+        cleanAtShutdown = files.layouts.lastOrNull?.cleanExit;
+      };
+      c.read(restorePersistenceProvider.notifier).start();
+      var done = false;
+      unawaited(
+        c.read(trayActionsProvider).handle(const Quit()).then((_) {
+          done = true;
+        }),
+      );
+      async.flushMicrotasks();
+      expect(done, isTrue);
+      expect(cleanAtShutdown, isTrue);
+      expect(h.quits, 1);
+      final writes = files.layouts.length;
+      // Frozen: nothing after the shutdown overwrites the clean layout,
+      // not even the 1 s debounce of the sessions it closed.
+      async.elapse(const Duration(seconds: 5));
+      expect(files.layouts, hasLength(writes));
+      expect(files.layouts.last.cleanExit, isTrue);
+      // A committed Quit is final: a late "power-off cancelled" changes
+      // nothing.
+      c.read(restorePersistenceProvider.notifier).resume();
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, hasLength(writes));
+      expect(files.layouts.last.cleanExit, isTrue);
+    }),
+  );
 }
