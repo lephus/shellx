@@ -83,6 +83,33 @@ void main() {
     expect(user, ['\x1b[200~echo hi\x1b[201~']);
   });
 
+  test('a narrower window wraps lines without pushing the first one into '
+      'the scrollback while blank rows are left below the cursor (M-1)', () {
+    terminal.resize(80, 10);
+    terminal.write('${'x' * 60} git status\r\nOn branch\r\n\$ ');
+    terminal.resize(40, 10);
+    expect(terminal.buffer.scrollBack, 0);
+    expect(terminal.buffer.lines[0].getText().trim(), startsWith('xxx'));
+    // The cursor is still after the prompt.
+    expect(terminal.buffer.cursorX, 2);
+    expect(
+      terminal.buffer.lines[terminal.buffer.absoluteCursorY].getText().trim(),
+      r'$',
+    );
+  });
+
+  test('a full screen still scrolls into the scrollback on a narrower '
+      'window', () {
+    terminal.resize(80, 3);
+    terminal.write('${'x' * 60}\r\na\r\nb');
+    terminal.resize(40, 3);
+    expect(terminal.buffer.scrollBack, 1);
+    expect(
+      terminal.buffer.lines[terminal.buffer.absoluteCursorY].getText().trim(),
+      'b',
+    );
+  });
+
   test('keeps 10 000 lines of scrollback (spec §3.2)', () {
     expect(terminal.maxLines, 10000);
   });

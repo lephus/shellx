@@ -31,6 +31,30 @@ final class DesktopTerminal extends Terminal {
     }
   }
 
+  /// xterm's reflow keeps every blank row under the cursor, so wrapping
+  /// the lines for a narrower window pushes the top line into the
+  /// scrollback while the screen ends in empty rows (the prompt scrolls
+  /// off, M-1). Blank rows below the cursor are dropped instead, until
+  /// the screen fits, as iTerm2 and Terminal.app do.
+  @override
+  void resize(
+    int newWidth,
+    int newHeight, [
+    int? pixelWidth,
+    int? pixelHeight,
+  ]) {
+    super.resize(newWidth, newHeight, pixelWidth, pixelHeight);
+    if (isUsingAltBuffer) return;
+    final buffer = mainBuffer;
+    while (buffer.scrollBack > 0 &&
+        buffer.height - 1 > buffer.absoluteCursorY &&
+        buffer.lines[buffer.height - 1].getTrimmedLength() == 0) {
+      buffer.lines.pop();
+      // The screen's top moved up one row: keep the cursor on its line.
+      buffer.setCursorY(buffer.cursorY + 1);
+    }
+  }
+
   @override
   bool keyInput(
     TerminalKey key, {
