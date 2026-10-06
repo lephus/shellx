@@ -120,4 +120,55 @@ void main() {
     expect(ancestorSplit(tee(), 1, SplitAxis.column), isNull);
     expect(ancestorSplit(const PaneLeaf(1), 1, SplitAxis.row), isNull);
   });
+
+  group('splitExtents (device-pixel snapping, divider from the second)', () {
+    for (final dpr in [1.0, 1.25, 2.0]) {
+      test('dpr $dpr: the first extent lands on a device pixel; the three '
+          'parts fill the extent exactly', () {
+        for (final extent in [300.0, 641.6, 1099.2]) {
+          for (final ratio in [0.05, 0.333, 0.5, 0.71, 0.95]) {
+            final (first, second) = splitExtents(extent, ratio, 1, dpr);
+            final device = first * dpr;
+            expect(device, closeTo(device.roundToDouble(), 1e-9));
+            expect(
+              (first - extent * ratio).abs(),
+              lessThanOrEqualTo(0.5 / dpr + 1e-9),
+            );
+            expect(first + 1 + second, closeTo(extent, 1e-9));
+          }
+        }
+      });
+    }
+
+    test('never negative, even in a box smaller than the divider', () {
+      expect(splitExtents(0.5, 0.5, 1, 1), (0.0, 0.0));
+      final (a, b) = splitExtents(10, 0.99, 1, 1);
+      expect(a + b, 9);
+      expect(b, greaterThanOrEqualTo(0));
+    });
+
+    test('splitPixelSize walks the same snapped extents', () {
+      const tree = PaneSplit(
+        axis: SplitAxis.row,
+        ratio: 0.333,
+        first: PaneLeaf(1),
+        second: PaneSplit(
+          axis: SplitAxis.column,
+          ratio: 0.5,
+          first: PaneLeaf(2),
+          second: PaneLeaf(3),
+        ),
+      );
+      const area = Size(1000, 601);
+      expect(splitPixelSize(tree, '', area, 1, 1), area);
+      // 333 | 1 | 666; then 300.5 rounds to 301, 1, 299.
+      expect(splitPixelSize(tree, '1', area, 1, 1), const Size(666, 601));
+      expect(splitPixelSize(tree, '0', area, 1, 1), isNull);
+      expect(panePixelSizes(tree, area, 1, 1), {
+        1: const Size(333, 601),
+        2: const Size(666, 301),
+        3: const Size(666, 299),
+      });
+    });
+  });
 }

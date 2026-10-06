@@ -173,6 +173,9 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           ShellxSizes.paneHeaderFor(scaler),
                     ),
                     divider: ShellxSizes.paneDivider,
+                    // The real one: a test or an embedder may override
+                    // MediaQuery's.
+                    devicePixelRatio: View.of(context).devicePixelRatio,
                   ),
                 );
                 return Stack(

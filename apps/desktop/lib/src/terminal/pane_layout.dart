@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show Rect;
+import 'dart:ui' show Rect, Size;
 
 import 'package:flutter/foundation.dart';
 
@@ -297,4 +297,80 @@ PanePath? ancestorSplit(PaneNode node, int id, SplitAxis axis) {
 
   visit(node, '');
   return found;
+}
+
+/// The pixel contract every split follows, shared by the layout (the pane
+/// view) and the pixel clamp (the tab list), so they never disagree: a
+/// split of [extent] at [ratio] gives its first child `ratio·extent`
+/// snapped to a whole device pixel (at [devicePixelRatio]), then the
+/// [divider], then the rest to the second child. Snapping keeps each line
+/// crisp; a shared edge is computed once, so panes never gap or overlap.
+(double, double) splitExtents(
+  double extent,
+  double ratio,
+  double divider,
+  double devicePixelRatio,
+) {
+  final room = math.max(0.0, extent - divider);
+  final dpr = devicePixelRatio > 0 ? devicePixelRatio : 1.0;
+  final first = ((extent * ratio * dpr).roundToDouble() / dpr)
+      .clamp(0.0, room)
+      .toDouble();
+  return (first, room - first);
+}
+
+/// The pixel size of the split at [path] inside [area] under
+/// [splitExtents]; null when [path] is not a split.
+Size? splitPixelSize(
+  PaneNode root,
+  PanePath path,
+  Size area,
+  double divider,
+  double devicePixelRatio,
+) {
+  var node = root;
+  var w = area.width;
+  var h = area.height;
+  for (final step in path.split('')) {
+    if (node is! PaneSplit) return null;
+    final first = step == '0';
+    if (node.axis == SplitAxis.row) {
+      final (a, b) = splitExtents(w, node.ratio, divider, devicePixelRatio);
+      w = first ? a : b;
+    } else {
+      final (a, b) = splitExtents(h, node.ratio, divider, devicePixelRatio);
+      h = first ? a : b;
+    }
+    node = first ? node.first : node.second;
+  }
+  return node is PaneSplit ? Size(w, h) : null;
+}
+
+/// Every leaf's pixel size inside [area] under [splitExtents].
+Map<int, Size> panePixelSizes(
+  PaneNode root,
+  Size area,
+  double divider,
+  double devicePixelRatio,
+) {
+  final out = <int, Size>{};
+  void visit(PaneNode n, Size s) {
+    switch (n) {
+      case PaneLeaf(:final sessionId):
+        out[sessionId] = s;
+      case PaneSplit(:final axis, :final ratio, :final first, :final second):
+        final row = axis == SplitAxis.row;
+        final (a, b) = splitExtents(
+          row ? s.width : s.height,
+          ratio,
+          divider,
+          devicePixelRatio,
+        );
+        visit(first, row ? Size(a, s.height) : Size(s.width, a));
+        visit(second, row ? Size(b, s.height) : Size(s.width, b));
+    }
+  }
+
+  visit(root, area);
+  return out;
 }

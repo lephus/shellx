@@ -308,10 +308,12 @@ void main() {
         expect((only().layout as PaneSplit).ratio, closeTo(0.176, 1e-9));
         tabs().setRatio(1, '', 0.99); // second side holds two panes
         // Inner split at 0.55: its second pane (101) needs 176 px of
-        // (0.45·X − 1), so the side needs X = 177 / 0.45, plus the divider.
+        // X − 1 − snap(0.55·X) ≥ 0.45·X − 1.5 (half a pixel may go to the
+        // rounding, Task 6 snapping), so the side needs X = 177.5 / 0.45;
+        // the root's first side ends on the whole pixel before that.
         expect(
           (only().layout as PaneSplit).ratio,
-          closeTo(1 - (177 / 0.45 + 1) / 1000, 1e-9),
+          closeTo((1000 - 1 - 177.5 / 0.45).floorToDouble() / 1000, 1e-9),
         );
         tabs().equalizeAt(1, '1');
         expect(((only().layout as PaneSplit).second as PaneSplit).ratio, 0.5);
@@ -407,16 +409,65 @@ void main() {
       // 101 gets 0.3·X − 1 of the right side's X: X ≥ 177 / 0.3, and the
       // root's divider comes on top. (The old span rule allowed 101 to
       // shrink to 0.3·(2·176 + 1) − 1 ≈ 105 px.)
+      // (Task 6 snapping: half a pixel may go to the inner rounding, and
+      // the root's edge sits on a whole pixel.)
       tabs().setRatio(1, '', 0.99);
-      const side = 177 / 0.3;
-      expect(root().ratio, closeTo(1 - (side + 1) / 1400, 1e-9));
-      final secondPx = (1 - root().ratio) * 1400 - 1;
-      expect((1 - inner().ratio) * secondPx - 1, closeTo(176, 1e-6));
-      expect(inner().ratio * secondPx, greaterThanOrEqualTo(176 - 1e-6));
+      const side = 177.5 / 0.3;
+      expect(
+        root().ratio,
+        closeTo((1400 - 1 - side).floorToDouble() / 1400, 1e-9),
+      );
+      final px = panePixelSizes(only().layout, const Size(1400, 600), 1, 1);
+      expect(px[101]!.width, greaterThanOrEqualTo(176));
+      expect(px[101]!.width, lessThan(178));
+      expect(px[100]!.width, greaterThanOrEqualTo(176));
       // Keys go through the same clamp.
       tabs().resizeFocused(PaneDirection.left); // 101: inner '1' → 0.65
       expect(inner().ratio, closeTo(0.65, 1e-9));
     });
+
+    for (final dpr in [1.0, 1.25, 2.0]) {
+      test('dpr $dpr: at every clamp limit each pane keeps its minimum in '
+          'snapped pixels (splitExtents), nested ones too (D4)', () async {
+        boot();
+        await tabs().split(SplitAxis.row);
+        await tabs().split(SplitAxis.column); // 1 | (100 / 101)
+        tabs().focusPane(1);
+        await tabs().split(SplitAxis.row); // (1 | 102) | (100 / 101)
+        const area = Size(1099.2, 641.6);
+        const min = Size(176.3, 100.7);
+        tabs().reportPaneMetrics(
+          PaneMetrics(
+            area: area,
+            minPane: min,
+            divider: 1,
+            devicePixelRatio: dpr,
+          ),
+        );
+        void checkAll() {
+          final sizes = panePixelSizes(only().layout, area, 1, dpr);
+          for (final size in sizes.values) {
+            expect(size.width, greaterThanOrEqualTo(min.width - 1e-9));
+            expect(size.height, greaterThanOrEqualTo(min.height - 1e-9));
+          }
+        }
+
+        // Each split to both limits and back. (Alternating extremes of a
+        // nested ratio and its parent can make a side infeasible, where
+        // Task 5's fair-point rule applies instead.)
+        for (final path in ['0', '', '1']) {
+          for (final r in [0.01, 0.99, 0.37]) {
+            tabs().setRatio(only().id, path, r);
+            checkAll();
+          }
+        }
+        // The limit is reached, not merely respected: the first pane sits
+        // within one device pixel of its minimum.
+        tabs().setRatio(only().id, '0', 0.01);
+        final first = panePixelSizes(only().layout, area, 1, dpr)[1]!;
+        expect(first.width - min.width, lessThan(1 / dpr + 1e-9));
+      });
+    }
 
     test('too small for both sides: a drag may only relieve the more '
         'squeezed side (D4)', () async {

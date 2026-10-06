@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:xterm/xterm.dart';
@@ -101,11 +105,11 @@ void main() {
     expect(t.getSize(find.byKey(const Key('pane.header.1'))).height, 22);
     expect(left.left, area.left);
     expect(right.right, area.right);
-    // The divider contract of TerminalTabs._clampForPixels: first r·E,
-    // then the line, then (1 − r)·E − divider.
-    expect(left.width, area.width * 0.5);
+    // The pixel contract shared with TerminalTabs._clampForPixels.
+    final (first, second) = splitExtents(area.width, 0.5, 1, 1);
+    expect(left.width, first);
     expect(right.left, left.right + ShellxSizes.paneDivider);
-    expect(right.width, area.width * 0.5 - ShellxSizes.paneDivider);
+    expect(right.width, second);
     expect(left.top, area.top);
     expect(right.bottom, area.bottom);
     // The 6 px hit area is centred on the 1 px line.
@@ -288,5 +292,194 @@ void main() {
     final header = t.getRect(find.byKey(const Key('pane.header.2')));
     expect(pill.top, greaterThanOrEqualTo(header.bottom));
     expect(pill.right, lessThanOrEqualTo(header.right));
+  });
+
+  for (final dpr in [1.25, 2.0]) {
+    testSidebar('dpr $dpr: every split extent is whole device pixels; the '
+        'line is 1 px; the clamp limit keeps 20 × 5 cells', (t) async {
+      await pumpSidebar(t);
+      // The same logical window, denser pixels.
+      t.view.physicalSize = Size(1100 * dpr, 720 * dpr);
+      t.view.devicePixelRatio = dpr;
+      await t.pump();
+      // Extents snap relative to the area (the ruling: the area's own
+      // origin, 221 px after the sidebar, is A1's layout).
+      final area = t.getRect(find.byType(TerminalView));
+      await splitRight(t);
+      await splitDown(t);
+      bool onDevicePixel(double v) =>
+          ((v * dpr) - (v * dpr).roundToDouble()).abs() < 1e-6;
+      for (final ratio in [0.5, 0.437, 0.01, 0.99]) {
+        panes().setRatio(only().id, '', ratio);
+        panes().setRatio(only().id, '1', 1 - ratio);
+        await t.pump();
+        final left = paneRect(t, 1);
+        final top = paneRect(t, 100);
+        final bottom = paneRect(t, 101);
+        expect(onDevicePixel(left.right - area.left), isTrue);
+        expect(onDevicePixel(top.bottom - area.top), isTrue);
+        expect(top.left, left.right + 1);
+        expect(bottom.top, top.bottom + 1);
+        for (final id in [1, 100, 101]) {
+          final terminal = only().panes[id]!.terminal;
+          expect(terminal.viewWidth, greaterThanOrEqualTo(20));
+          expect(terminal.viewHeight, greaterThanOrEqualTo(5));
+        }
+      }
+    });
+  }
+
+  testSidebar('the first split and the close back to one pane keep pane '
+      "1's TerminalView (no remount)", (t) async {
+    await pumpSidebar(t);
+    State view1() => t.state(
+      find.byWidgetPredicate(
+        (w) =>
+            w is TerminalView &&
+            identical(w.terminal, only().panes[1]!.terminal),
+      ),
+    );
+    final before = view1();
+    await splitRight(t);
+    expect(view1(), same(before));
+    panes().toggleZoom();
+    await t.pump();
+    panes().focusPane(1);
+    await t.pump();
+    expect(view1(), same(before));
+    panes().closePane(100);
+    await t.pump();
+    await t.pump();
+    expect(view1(), same(before));
+  });
+
+  testSidebar('a click on a header takes the keyboard from the sidebar, '
+      'also on the focused pane and on the zoom indicator', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    Future<void> fromSidebar(Finder target) async {
+      page.sidebarFocus.requestFocus();
+      await t.pump();
+      expect(page.terminalFocus.hasFocus, isFalse);
+      await t.tap(target);
+      await t.pump();
+      await t.pump();
+      expect(page.terminalFocus.hasFocus, isTrue);
+      await t.pump(kDoubleTapTimeout);
+    }
+
+    await fromSidebar(find.byKey(const Key('pane.header.100'))); // focused
+    await fromSidebar(find.byKey(const Key('pane.header.1'))); // the other
+    expect(only().focusedPaneId, 1);
+    panes().toggleZoom();
+    await t.pump();
+    await fromSidebar(find.byKey(const Key('pane.zoomed')));
+    expect(only().zoomedPaneId, isNull);
+  });
+
+  testSidebar('the × keeps 4 px from the pane edge with its whole 22 px '
+      'target, clear of the divider hit area', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    final header = t.getRect(find.byKey(const Key('pane.header.1')));
+    final close = t.getRect(find.byKey(const Key('pane.close.1')));
+    expect(close.size, const Size(22, 22));
+    expect(header.right - close.right, 4);
+    final hit = t.getRect(find.byKey(const Key('pane.divider.')));
+    expect(close.right, lessThan(hit.left));
+  });
+
+  testSidebar('pane regions offer close, zoom and split as screen reader '
+      'actions (UI-A3 §8)', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t);
+    Map<CustomSemanticsAction, VoidCallback> actionsOf(String label) => t
+        .widget<Semantics>(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == label,
+          ),
+        )
+        .properties
+        .customSemanticsActions!;
+    VoidCallback action(String region, String name) =>
+        actionsOf(region).entries.firstWhere((e) => e.key.label == name).value;
+
+    expect(actionsOf('Pane 1 of 2 — zsh 1').keys.map((a) => a.label), [
+      'Close pane',
+      'Zoom pane',
+      'Split right',
+      'Split down',
+    ]);
+    action('Pane 1 of 2 — zsh 1', 'Zoom pane')();
+    await t.pump();
+    expect(only().zoomedPaneId, 1);
+    action('Pane 1 of 2 — zsh 1', 'Unzoom pane')();
+    await t.pump();
+    expect(only().zoomedPaneId, isNull);
+    action('Pane 1 of 2 — zsh 1', 'Split down')();
+    await t.pump();
+    await t.pump();
+    expect(only().paneOrder, [1, 101, 100]);
+    expect(local.openCwds, hasLength(2));
+    action('Pane 3 of 3 — zsh 2', 'Close pane')();
+    await t.pump();
+    expect(only().paneOrder, [1, 101]);
+  });
+
+  testSidebar('closing a pane that runs a command asks with the pane '
+      'words; cancel keeps it and the keyboard comes back', (t) async {
+    local.summaries[0] = local.summary(
+      1,
+      origin: SessionOrigin.desktop,
+      title: 'claude',
+      runningCommand: true,
+    );
+    await pumpSidebar(t);
+    await splitRight(t);
+    await t.tap(find.byKey(const Key('pane.header.1')));
+    await t.pump();
+    await t.pump(kDoubleTapTimeout);
+    await t.tap(find.byKey(const Key('pane.close.1')));
+    await t.pump();
+    var confirm = container.read(windowRouterProvider).confirm!;
+    expect(confirm.title, 'Close “claude”?');
+    expect(confirm.body, 'The command running in this pane will be stopped.');
+    expect(confirm.confirmLabel, 'Close pane');
+    confirm.complete(false);
+    await t.pump();
+    await t.pump();
+    expect(only().paneOrder, [1, 100]);
+    expect(local.closed, isEmpty);
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    expect(page.terminalFocus.hasFocus, isTrue);
+    expect(viewOf(t, 1).focusNode, same(page.terminalFocus));
+
+    await t.tap(find.byKey(const Key('pane.close.1')));
+    await t.pump();
+    container.read(windowRouterProvider).confirm!.complete(true);
+    await t.pump();
+    await t.pump();
+    expect(only().paneOrder, [100]);
+    expect(local.closed, [1]);
+    expect(page.terminalFocus.hasFocus, isTrue);
+
+    // One pane: the A1 tab dialog, word for word.
+    local.replace(
+      local.summary(100, origin: SessionOrigin.desktop, runningCommand: true),
+    );
+    await t.pump();
+    unawaited(page.closePane(only(), 100));
+    await t.pump();
+    confirm = container.read(windowRouterProvider).confirm!;
+    expect(confirm.body, 'The command running in this tab will be stopped.');
+    expect(confirm.confirmLabel, isNot('Close pane'));
+    confirm.complete(false);
+    await t.pump();
+    expect(tabs().tabs, hasLength(1));
   });
 }

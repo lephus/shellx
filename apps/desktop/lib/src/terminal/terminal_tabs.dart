@@ -84,6 +84,7 @@ final class PaneMetrics {
     required this.area,
     required this.minPane,
     required this.divider,
+    this.devicePixelRatio = 1,
   });
 
   /// The whole terminal area of a tab.
@@ -93,6 +94,9 @@ final class PaneMetrics {
   /// header (UI-A3 §1.2).
   final Size minPane;
   final double divider;
+
+  /// Split extents snap to device pixels at this ratio ([splitExtents]).
+  final double devicePixelRatio;
 }
 
 /// D19: the longest tab name, in characters.
@@ -923,14 +927,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         : (cols: cols, rows: max(1, (rows - 1) ~/ 2 - 1));
   }
 
-  /// D4: room for two minimum panes and the divider.
+  /// D4: room for two minimum panes and the divider, in the pixels the
+  /// pane really has ([panePixelSizes]).
   bool _roomToSplit(TerminalTab tab, int target, SplitAxis axis) {
     final m = _metrics;
     if (m == null) return true;
-    final unit = paneRects(tab.layout)[target];
-    if (unit == null) return false;
-    final w = unit.width * m.area.width;
-    final h = unit.height * m.area.height;
+    final size = panePixelSizes(
+      tab.layout,
+      m.area,
+      m.divider,
+      m.devicePixelRatio,
+    )[target];
+    if (size == null) return false;
+    final (w, h) = (size.width, size.height);
     return axis == SplitAxis.row
         ? w >= 2 * m.minPane.width + m.divider && h >= m.minPane.height
         : h >= 2 * m.minPane.height + m.divider && w >= m.minPane.width;
@@ -938,9 +947,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// D4: no pane of either side may end up below [PaneMetrics.minPane].
   ///
-  /// Divider contract (Task 6 lays panes out the same way): a split of
-  /// extent E at ratio r gives its first child `r·E` pixels and its second
-  /// child `(1 − r)·E − divider`; the divider is taken from the second side.
+  /// Pixel contract ([splitExtents], the same function the pane view lays
+  /// out with): a split of extent E at ratio r gives its first child
+  /// `r·E` snapped to a device pixel, then the divider, then the rest. The
+  /// limits are whole device pixels, so the snapped layout at a limit
+  /// still holds every minimum.
   ///
   /// When the split cannot hold both sides at all (lo > hi), the ratio may
   /// only move toward the point where both sides fall short by the same
@@ -949,15 +960,33 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   double _clampForPixels(TerminalTab tab, PanePath path, double ratio) {
     final m = _metrics;
     final node = nodeAt(tab.layout, path);
-    final size = _splitSize(tab.layout, path);
+    final size = m == null
+        ? null
+        : splitPixelSize(
+            tab.layout,
+            path,
+            m.area,
+            m.divider,
+            m.devicePixelRatio,
+          );
     if (m == null || node is! PaneSplit || size == null) {
       return clampRatio(ratio);
     }
     final row = node.axis == SplitAxis.row;
     final extent = row ? size.width : size.height;
     if (extent <= 0) return node.ratio;
-    final lo = _minExtent(node.first, node.axis) / extent;
-    final hi = 1 - (_minExtent(node.second, node.axis) + m.divider) / extent;
+    final dpr = m.devicePixelRatio > 0 ? m.devicePixelRatio : 1.0;
+    // Tolerates float noise in a minimum that already is a device pixel.
+    const noise = 1e-9;
+    final firstMin =
+        (_minExtent(node.first, node.axis) * dpr - noise).ceilToDouble() / dpr;
+    final firstMax =
+        ((extent - m.divider - _minExtent(node.second, node.axis)) * dpr +
+                noise)
+            .floorToDouble() /
+        dpr;
+    final lo = firstMin / extent;
+    final hi = firstMax / extent;
     if (lo <= hi) return clampRatio(ratio.clamp(lo, hi).toDouble());
     final fair = (lo + hi) / 2;
     final towards = node.ratio < fair
@@ -966,40 +995,22 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     return clampRatio(towards.toDouble());
   }
 
-  /// The pixel size of the split at [path], under the divider contract of
-  /// [_clampForPixels]; null when [path] is not a split.
-  Size? _splitSize(PaneNode root, PanePath path) {
-    final m = _metrics;
-    if (m == null) return null;
-    var node = root;
-    var w = m.area.width;
-    var h = m.area.height;
-    for (final step in path.split('')) {
-      if (node is! PaneSplit) return null;
-      final first = step == '0';
-      if (node.axis == SplitAxis.row) {
-        w = first ? node.ratio * w : (1 - node.ratio) * w - m.divider;
-      } else {
-        h = first ? node.ratio * h : (1 - node.ratio) * h - m.divider;
-      }
-      node = first ? node.first : node.second;
-    }
-    return node is PaneSplit ? Size(w, h) : null;
-  }
-
   /// The smallest extent along [axis] that keeps every pane of [node] at
-  /// its minimum, with [node]'s own ratios kept as they are.
+  /// its minimum, with [node]'s own ratios kept as they are. A nested
+  /// split's first side is snapped ([splitExtents]): it may lose up to half
+  /// a device pixel to rounding, and its second side may lose the same.
   double _minExtent(PaneNode node, SplitAxis axis) {
     final m = _metrics!;
+    final half = 0.5 / (m.devicePixelRatio > 0 ? m.devicePixelRatio : 1.0);
     switch (node) {
       case PaneLeaf():
         return axis == SplitAxis.row ? m.minPane.width : m.minPane.height;
       case PaneSplit(axis: final a, :final ratio, :final first, :final second)
           when a == axis:
-        // r·X ≥ min(first); (1 − r)·X − divider ≥ min(second).
+        // snap(r·X) ≥ min(first); X − divider − snap(r·X) ≥ min(second).
         return max(
-          _minExtent(first, axis) / ratio,
-          (_minExtent(second, axis) + m.divider) / (1 - ratio),
+          (_minExtent(first, axis) + half) / ratio,
+          (_minExtent(second, axis) + m.divider + half) / (1 - ratio),
         );
       case PaneSplit(:final first, :final second):
         return max(_minExtent(first, axis), _minExtent(second, axis));

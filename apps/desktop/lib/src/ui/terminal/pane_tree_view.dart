@@ -112,26 +112,28 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final ringed = widget.ringed.contains(id);
     final scaler = MediaQuery.textScalerOf(context);
     final headerHeight = split ? ShellxSizes.paneHeaderFor(scaler) : 0.0;
-    Widget terminal = PaneTerminal(
-      pane: pane,
-      scrollController: widget.scrollFor(id),
-      focusNode: widget.selected && focused ? widget.terminalFocus : null,
-      style: widget.style,
-      shortcuts: widget.shortcuts,
-      onMenu: (at) => _menu(id, at),
+    // One widget shape for one pane and for many (only properties
+    // differ), so the first split and the close back to one pane keep
+    // this pane's TerminalView: same state, no remount, no resize.
+    final terminal = Semantics(
+      // One pane: A1/A4's label on the terminal itself, as before A3.
+      container: !split,
+      label: split
+          ? null
+          : ringed
+          ? l10n.terminalPaneUnreadLabel(tab.label)
+          : l10n.terminalPaneLabel(tab.label),
+      child: PaneTerminal(
+        pane: pane,
+        scrollController: widget.scrollFor(id),
+        focusNode: widget.selected && focused ? widget.terminalFocus : null,
+        style: widget.style,
+        shortcuts: widget.shortcuts,
+        onMenu: (at) => _menu(id, at),
+      ),
     );
-    if (!split) {
-      // A1/A4 label on the terminal itself, exactly as before A3.
-      terminal = Semantics(
-        label: ringed
-            ? l10n.terminalPaneUnreadLabel(tab.label)
-            : l10n.terminalPaneLabel(tab.label),
-        container: true,
-        child: terminal,
-      );
-    }
     final phoneDrives = !pane.exited && pane.driver == DriverSide.phone;
-    Widget body = LayoutBuilder(
+    final body = LayoutBuilder(
       builder: (context, constraints) => Stack(
         children: [
           Positioned.fill(
@@ -139,7 +141,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (split) _header(id, pane, focused: focused, ringed: ringed),
-                Expanded(child: terminal),
+                // Keyed: the header coming or going never rebuilds it.
+                Expanded(key: const ValueKey('pane.terminal'), child: terminal),
               ],
             ),
           ),
@@ -199,17 +202,17 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         ],
       ),
     );
-    if (split) {
-      final number = tab.paneNumber(id);
-      body = Listener(
-        // Before xterm handles the press: the model focuses this pane, the
-        // workspace then hands it the terminal focus (D2, UI-A3 §6).
-        onPointerDown: (_) {
-          if (!focused) _tabs.focusPane(id);
-        },
+    final number = tab.paneNumber(id);
+    return KeyedSubtree(
+      key: _keyFor(id),
+      child: Listener(
+        onPointerDown: (_) => _pointerDown(id),
         child: Semantics(
-          container: true,
-          label: ringed
+          // Many panes: one region per pane (UI-A3 §8), header included.
+          container: split,
+          label: !split
+              ? null
+              : ringed
               ? l10n.paneRegionUnreadLabel(
                   number,
                   tab.paneCount,
@@ -221,23 +224,42 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                   pane.automaticLabel,
                 ),
           // UI-A3 §8: what the header's mouse targets do.
-          customSemanticsActions: {
-            CustomSemanticsAction(label: l10n.paneClose): () =>
-                widget.onClosePane(id),
-            CustomSemanticsAction(
-              label: tab.zoomedPaneId == id ? l10n.paneUnzoom : l10n.paneZoom,
-            ): () =>
-                _toggleZoom(id),
-            CustomSemanticsAction(label: l10n.paneSplitRight): () =>
-                _split(id, SplitAxis.row),
-            CustomSemanticsAction(label: l10n.paneSplitDown): () =>
-                _split(id, SplitAxis.column),
-          },
+          customSemanticsActions: !split
+              ? null
+              : {
+                  CustomSemanticsAction(label: l10n.paneClose): () =>
+                      widget.onClosePane(id),
+                  CustomSemanticsAction(
+                    label: tab.zoomedPaneId == id
+                        ? l10n.paneUnzoom
+                        : l10n.paneZoom,
+                  ): () =>
+                      _toggleZoom(id),
+                  CustomSemanticsAction(label: l10n.paneSplitRight): () =>
+                      _split(id, SplitAxis.row),
+                  CustomSemanticsAction(label: l10n.paneSplitDown): () =>
+                      _split(id, SplitAxis.column),
+                },
           child: body,
         ),
-      );
-    }
-    return KeyedSubtree(key: _keyFor(id), child: body);
+      ),
+    );
+  }
+
+  /// Before xterm handles the press: the model focuses this pane, and the
+  /// keyboard follows (D2, UI-A3 §6) — also from the header, which xterm
+  /// never sees, and while another region (the sidebar) has the keyboard.
+  void _pointerDown(int id) {
+    final tab = widget.tab;
+    if (!tab.isSplit) return; // A1: xterm focuses its own view.
+    if (tab.focusedPaneId != id) _tabs.focusPane(id);
+    if (!widget.selected) return;
+    final focus = widget.terminalFocus;
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted && focus.context != null) focus.requestFocus();
+      })
+      ..ensureVisualUpdate();
   }
 
   Widget _header(
@@ -277,7 +299,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
   bool _invoke<T extends Intent>(T intent) {
     final action = Actions.maybeFind<T>(context, intent: intent);
-    if (action == null || !action.isActionEnabled) return false;
+    if (action == null || !action.isEnabled(intent)) return false;
     Actions.invoke(context, intent);
     return true;
   }
@@ -320,12 +342,11 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   }
 }
 
-/// UI-A3 §2.2: the 1 px line, a 6 px hit area centred on it. The divider
-/// contract of `TerminalTabs._clampForPixels`, exactly: a split of extent E
-/// at ratio r gives its first child `r·E`, the line the next pixel, the
-/// second child `(1 − r)·E − 1`. No rounding — the clamp does not round,
-/// so a pane at its clamp limit keeps its 20 × 5 cells to the pixel; each
-/// shared edge is computed once, so panes never gap or overlap.
+/// UI-A3 §2.2: the 1 px line, a 6 px hit area centred on it. Laid out by
+/// [splitExtents], the function `TerminalTabs._clampForPixels` clamps
+/// with: the first child `r·E` snapped to a device pixel, the line, the
+/// rest. The line stays crisp, a pane at its clamp limit keeps its 20 × 5
+/// cells, and each shared edge is computed once (no gap, no overlap).
 class _SplitBox extends StatelessWidget {
   const _SplitBox({
     super.key,
@@ -351,8 +372,12 @@ class _SplitBox extends StatelessWidget {
       final extent = row ? c.maxWidth : c.maxHeight;
       const line = ShellxSizes.paneDivider;
       const hit = ShellxSizes.paneDividerHit;
-      final room = extent - line < 0 ? 0.0 : extent - line;
-      final a = (extent * split.ratio).clamp(0.0, room);
+      final (a, _) = splitExtents(
+        extent,
+        split.ratio,
+        line,
+        View.of(context).devicePixelRatio,
+      );
       final hitStart = a + line / 2 - hit / 2;
       final divider = _PaneDivider(
         key: Key('pane.divider.$path'),
@@ -690,7 +715,9 @@ class _PaneHeaderState extends State<_PaneHeader> {
                     ),
                   ),
                 ),
-                const SizedBox(width: ShellxSpace.s4 - _closeInset),
+                // 4 px to the whole 22 px target (not to its 18 px
+                // visual): the divider's 2.5 px overhang never covers it.
+                const SizedBox(width: ShellxSpace.s4),
               ],
             ),
           ),
