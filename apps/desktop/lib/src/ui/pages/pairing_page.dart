@@ -8,7 +8,9 @@ import 'package:shellx_core/shellx_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/desktop_services.dart';
+import '../dialogs/dialog_layout.dart';
 import '../form_rules.dart';
+import '../theme/shellx_desktop_theme.dart';
 
 /// QR pairing window (spec §5.3): QR of the pairing URI and a countdown to
 /// expiry. Closing the window invalidates the code (see WindowRouter).
@@ -46,66 +48,61 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     final remaining = pairing?.expiresAt.difference(now) ?? Duration.zero;
     final expired = pairing == null || remaining <= Duration.zero;
 
-    return Padding(
-      padding: const EdgeInsets.all(24), // UI §4 dialog padding
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(l10n.pairingTitle, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(l10n.pairingInstructions),
-          const SizedBox(height: 16),
-          Center(
-            child: SizedBox.square(
-              dimension: 260,
-              child: expired
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            l10n.pairingExpired,
-                            key: const Key('pairing.expired'),
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            key: const Key('pairing.new'),
-                            onPressed: () => ref
-                                .read(agentControllerProvider.notifier)
-                                .startPairing(),
-                            child: Text(l10n.pairingNewCode),
-                          ),
-                        ],
-                      ),
-                    )
-                  : QrImageView(
-                      key: const Key('pairing.qr'),
-                      data: pairing.uri.toUriString(),
-                      size: 260,
-                      backgroundColor: Colors.white,
-                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+    return DialogBody(
+      title: l10n.pairingTitle,
+      content: [
+        Text(l10n.pairingInstructions),
+        const SizedBox(height: ShellxSpace.s16),
+        Center(
+          child: SizedBox.square(
+            dimension: 260,
+            child: expired
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.pairingExpired,
+                          key: const Key('pairing.expired'),
+                        ),
+                        const SizedBox(height: ShellxSpace.s12),
+                        FilledButton(
+                          key: const Key('pairing.new'),
+                          onPressed: () => ref
+                              .read(agentControllerProvider.notifier)
+                              .startPairing(),
+                          child: Text(l10n.pairingNewCode),
+                        ),
+                      ],
                     ),
-            ),
+                  )
+                : QrImageView(
+                    key: const Key('pairing.qr'),
+                    data: pairing.uri.toUriString(),
+                    size: 260,
+                    backgroundColor: Colors.white,
+                    errorCorrectionLevel: QrErrorCorrectLevel.M,
+                  ),
           ),
-          const SizedBox(height: 12),
-          if (!expired)
-            Text(
-              l10n.pairingExpiresIn(formatCountdown(remaining)),
-              key: const Key('pairing.countdown'),
-              textAlign: TextAlign.center,
-            ),
-          if (state.relay != RelayConnectionState.connected) ...[
-            const SizedBox(height: 12),
-            Text(
-              l10n.pairingOfflineWarning,
-              key: const Key('pairing.offline'),
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-          ],
-          const Spacer(),
-          Text(l10n.pairingSecretWarning, style: theme.textTheme.bodySmall),
+        ),
+        const SizedBox(height: ShellxSpace.s12),
+        if (!expired)
+          Text(
+            l10n.pairingExpiresIn(formatCountdown(remaining)),
+            key: const Key('pairing.countdown'),
+            textAlign: TextAlign.center,
+          ),
+        if (state.relay != RelayConnectionState.connected) ...[
+          const SizedBox(height: ShellxSpace.s12),
+          Text(
+            l10n.pairingOfflineWarning,
+            key: const Key('pairing.offline'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
         ],
-      ),
+        const SizedBox(height: ShellxSpace.s24),
+        Text(l10n.pairingSecretWarning, style: theme.textTheme.bodySmall),
+      ],
     );
   }
 }

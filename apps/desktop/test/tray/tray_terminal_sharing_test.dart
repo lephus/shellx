@@ -299,7 +299,7 @@ void main() {
         expect(request.body, contains('/Users/phu/.zshrc'));
         expect(request.long, isTrue);
         expect(request.destructive, isFalse);
-        expect(dialogSizeFor(window()).width, 520);
+        expect(dialogWidthFor(window()), 520);
         await answer(false);
         await done;
         expect(setup.calls, isNot(contains('enable')));

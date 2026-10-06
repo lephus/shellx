@@ -4,7 +4,9 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
+import '../dialogs/dialog_layout.dart';
 import '../form_rules.dart';
+import '../theme/shellx_desktop_theme.dart';
 
 /// Login / register window (spec §8.2 step 1).
 class LoginPage extends ConsumerStatefulWidget {
@@ -83,80 +85,85 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final notice = ref.watch(
       agentControllerProvider.select((s) => s.signedOutNotice),
     );
-    return Padding(
-      padding: const EdgeInsets.all(24), // UI §4 dialog padding
-      child: AutofillGroup(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    const fieldGap = SizedBox(height: ShellxSizes.fieldGap);
+    return AutofillGroup(
+      child: DialogBody(
+        title: _register ? l10n.authRegisterTitle : l10n.authSignInTitle,
+        content: [
+          if (notice) ...[
             Text(
-              _register ? l10n.authRegisterTitle : l10n.authSignInTitle,
-              style: theme.textTheme.headlineSmall,
-            ),
-            if (notice) ...[
-              const SizedBox(height: 12),
-              Text(
-                l10n.authSignedOutNotice,
-                key: const Key('login.notice'),
-                style: TextStyle(color: theme.colorScheme.error),
+              l10n.authSignedOutNotice,
+              key: const Key('login.notice'),
+              style: theme.textTheme.bodyMedium!.copyWith(
+                color: ShellxDesktopColors.errDialog,
               ),
-            ],
-            const SizedBox(height: 24),
-            TextField(
+            ),
+          ],
+          const SizedBox(height: ShellxSpace.s8),
+          LabeledField(
+            label: l10n.authEmailLabel,
+            field: TextField(
               key: const Key('login.email'),
               autofocus: true, // UI §3.7: forms start on the first field.
               controller: _email,
               enabled: !_busy,
               autofillHints: const [AutofillHints.email],
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(labelText: l10n.authEmailLabel),
             ),
-            const SizedBox(height: 12),
-            TextField(
+          ),
+          fieldGap,
+          LabeledField(
+            label: l10n.authPasswordLabel,
+            field: TextField(
               key: const Key('login.password'),
               controller: _password,
               enabled: !_busy,
               obscureText: true,
               autofillHints: const [AutofillHints.password],
-              decoration: InputDecoration(labelText: l10n.authPasswordLabel),
               onSubmitted: (_) => _register ? null : _submit(),
             ),
-            if (_register) ...[
-              const SizedBox(height: 12),
-              TextField(
+          ),
+          if (_register) ...[
+            fieldGap,
+            LabeledField(
+              label: l10n.authConfirmPasswordLabel,
+              field: TextField(
                 key: const Key('login.confirm'),
                 controller: _confirm,
                 enabled: !_busy,
                 obscureText: true,
-                decoration: InputDecoration(
-                  labelText: l10n.authConfirmPasswordLabel,
-                ),
                 onSubmitted: (_) => _submit(),
               ),
-            ],
-            const SizedBox(height: 16),
-            if (_error != null)
-              Text(
-                _error!,
-                key: const Key('login.error'),
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-            const SizedBox(height: 16),
-            FilledButton(
-              key: const Key('login.submit'),
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      _register
-                          ? l10n.authRegisterButton
-                          : l10n.authSignInButton,
-                    ),
             ),
-            TextButton(
+          ],
+          if (_error != null)
+            DialogError(_error!, key: const Key('login.error')),
+          const SizedBox(height: ShellxSpace.s24),
+          FilledButton(
+            key: const Key('login.submit'),
+            onPressed: _busy ? null : _submit,
+            // UI §3.3 loading: the label stays, a spinner leads it.
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_busy) ...[
+                  const SizedBox.square(
+                    dimension: ShellxSizes.buttonSpinner,
+                    child: CircularProgressIndicator(
+                      strokeWidth: ShellxSizes.spinnerStroke,
+                    ),
+                  ),
+                  const SizedBox(width: ShellxSpace.s8),
+                ],
+                Text(
+                  _register ? l10n.authRegisterButton : l10n.authSignInButton,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: ShellxSpace.s8),
+          Center(
+            child: TextButton(
               key: const Key('login.toggle'),
               onPressed: _busy
                   ? null
@@ -168,10 +175,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 _register ? l10n.authSwitchToSignIn : l10n.authSwitchToRegister,
               ),
             ),
-            const Spacer(),
-            Text(l10n.authForgotPasswordHint, style: theme.textTheme.bodySmall),
-          ],
-        ),
+          ),
+          const SizedBox(height: ShellxSpace.s16),
+          Text(l10n.authForgotPasswordHint, style: theme.textTheme.bodySmall),
+        ],
       ),
     );
   }

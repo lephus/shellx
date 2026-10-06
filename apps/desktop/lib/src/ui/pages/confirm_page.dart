@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../terminal/shortcut_labels.dart';
+import '../dialogs/dialog_layout.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
 
-/// A confirm dialog body (UI §4): title → 8 → body (scrolls) → 24 →
-/// actions. macOS `[Cancel] [Action]`, Windows `[Action] [Cancel]`, so the
+/// A confirm dialog body (UI §4): title → 8 → body → 24 → actions; as
+/// tall as its text, and a long body scrolls under pinned actions. macOS `[Cancel] [Action]`, Windows `[Action] [Cancel]`, so the
 /// Tab order matches what is seen. A destructive confirm starts on Cancel;
 /// any other starts on its action (Enter confirms).
 class ConfirmPage extends StatelessWidget {
@@ -32,35 +33,14 @@ class ConfirmPage extends StatelessWidget {
       child: Text(request.confirmLabel),
     );
     const gap = SizedBox(width: ShellxSpace.s8);
-    return Padding(
-      padding: const EdgeInsets.all(ShellxSpace.s24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            // Windows: clear of the close button (28 at inset 12).
-            padding: EdgeInsets.only(
-              right: isMacDesktop
-                  ? 0
-                  : ShellxSizes.iconHit + ShellxSpace.s12 - ShellxSpace.s24,
-            ),
-            child: Text(request.title, style: theme.textTheme.titleLarge),
-          ),
-          const SizedBox(height: ShellxSpace.s8),
-          Expanded(
-            child: SingleChildScrollView(
-              child: SelectableText(
-                request.body,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-          ),
-          const SizedBox(height: ShellxSpace.s24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: isMacDesktop ? [cancel, gap, ok] : [ok, gap, cancel],
-          ),
-        ],
+    return DialogBody(
+      title: request.title,
+      content: [
+        SelectableText(request.body, style: theme.textTheme.bodyMedium),
+      ],
+      footer: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: isMacDesktop ? [cancel, gap, ok] : [ok, gap, cancel],
       ),
     );
   }

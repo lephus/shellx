@@ -94,6 +94,9 @@ abstract final class ShellxSizes {
   static const double dialogWidth = 400;
   static const double dialogWidthOnboarding = 480;
   static const double dialogWidthLong = 520;
+
+  /// The `dialogTitle` line (17/22), for centring the Windows close button.
+  static const double dialogTitleLine = 22;
   static const double toastMaxWidth = 420;
   static const double toastMinHeight = 36;
   static const double pillMaxWidth = 560;
@@ -142,6 +145,9 @@ abstract final class ShellxSizes {
   static const double iconVisual = 24;
   static const double spinner = 12;
   static const double spinnerStroke = 1.5;
+
+  /// UI §3.3 loading button: a 14 px spinner before the label.
+  static const double buttonSpinner = 14;
 
   /// UI §3.3 buttons: min width 80, padding 0/14; text button 28 high,
   /// padding 0/10.

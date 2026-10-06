@@ -347,4 +347,142 @@ void main() {
     await tester.pumpAndSettle();
     expect(router.current, isNull);
   });
+
+  group('dialogs follow their content (M-2, S-4, S-5, P-3)', () {
+    Rect rect(WidgetTester tester, String key) =>
+        tester.getRect(find.byKey(Key(key)));
+
+    testApp('a short confirm: body → 24 → actions → 24, no empty band', (
+      tester,
+    ) async {
+      await pump(tester);
+      final answer = container
+          .read(windowRouterProvider.notifier)
+          .confirm(ConfirmRequest(title: 't', body: 'b', confirmLabel: 'ok'));
+      await tester.pumpAndSettle();
+      final dialog = rect(tester, 'dialog');
+      final ok = rect(tester, 'confirm.ok');
+      final body = tester.getRect(find.text('b'));
+      // 1 px border inside the Container on each side.
+      expect(dialog.bottom - ok.bottom, closeTo(24 + 1, 0.5));
+      expect(ok.top - body.bottom, closeTo(24, 0.5));
+      expect(dialog.height, lessThan(200));
+      container.read(windowRouterProvider.notifier).close();
+      expect(await answer, isFalse);
+    });
+
+    testApp('login: as tall as its form, the hint 16 under the links', (
+      tester,
+    ) async {
+      await pump(tester);
+      container.read(windowRouterProvider.notifier).open(const LoginRoute());
+      await tester.pumpAndSettle();
+      final dialog = rect(tester, 'dialog');
+      final hint = tester.getRect(find.textContaining('Forgot your password'));
+      expect(dialog.bottom - hint.bottom, closeTo(24 + 1, 0.5));
+      expect(dialog.height, lessThan(520));
+    });
+
+    testApp('text fields: label above, 36 high, 16 apart (UI §3.4)', (
+      tester,
+    ) async {
+      await pump(tester);
+      container.read(windowRouterProvider.notifier).open(const LoginRoute());
+      await tester.pumpAndSettle();
+      final email = rect(tester, 'login.email');
+      final password = rect(tester, 'login.password');
+      final emailLabel = tester.getRect(find.text('Email'));
+      final passwordLabel = tester.getRect(find.text('Password'));
+      expect(email.height, 36);
+      expect(password.height, 36);
+      expect(email.top - emailLabel.bottom, 6);
+      expect(passwordLabel.top - email.bottom, 16);
+      // Not a floating label inside the outline.
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('login.email')),
+      );
+      expect(field.decoration?.labelText, isNull);
+    });
+
+    testApp('a field is announced with its label', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pump(tester);
+      container.read(windowRouterProvider.notifier).open(const LoginRoute());
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(find.byKey(const Key('login.email'))),
+        isSemantics(label: 'Email', isTextField: true),
+      );
+      semantics.dispose();
+    });
+
+    testApp('onboarding at 640×400: Finish is pinned on screen under a line, '
+        'the body scrolls with its scrollbar shown', (tester) async {
+      await pump(tester, size: ShellxSizes.minWindow);
+      container
+          .read(windowRouterProvider.notifier)
+          .open(const OnboardingRoute());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final finish = find.byKey(const Key('onboarding.finish'));
+      expect(finish.hitTestable(), findsOneWidget); // no scrolling needed
+      expect(
+        rect(tester, 'dialog').bottom - tester.getRect(finish).bottom,
+        closeTo(24 + 1, 0.5),
+      );
+      final line = tester.widget<Container>(
+        find.byKey(const Key('dialog.footerLine')),
+      );
+      expect(line.color, ShellxDesktopColors.line);
+      final scrollbar = tester.widget<RawScrollbar>(
+        find.descendant(
+          of: find.byKey(const Key('dialog')),
+          matching: find.byWidgetPredicate((w) => w is RawScrollbar),
+        ),
+      );
+      expect(scrollbar.thumbVisibility, isTrue);
+    });
+
+    testApp('onboarding: the settings link is flush with its paragraph and '
+        'the switch uses the dark tokens', (tester) async {
+      await pump(tester);
+      container
+          .read(windowRouterProvider.notifier)
+          .open(const OnboardingRoute());
+      await tester.pumpAndSettle();
+      final link = tester.getRect(
+        find.descendant(
+          of: find.byKey(const Key('onboarding.fda')),
+          matching: find.byType(Text),
+        ),
+      );
+      final paragraph = tester.getRect(
+        find.text(h.l10n.onboardingFullDiskBody),
+      );
+      expect(link.left, paragraph.left);
+      final theme = Theme.of(tester.element(find.byType(Switch)));
+      expect(
+        theme.switchTheme.thumbColor!.resolve({WidgetState.selected}),
+        ShellxDesktopColors.accent,
+      );
+    }, variant: const TargetPlatformVariant({TargetPlatform.macOS}));
+
+    testApp(
+      'Windows: the close button is centred on the title line (P-3)',
+      (tester) async {
+        await pump(tester);
+        final answer = container
+            .read(windowRouterProvider.notifier)
+            .confirm(ConfirmRequest(title: 't', body: 'b', confirmLabel: 'ok'));
+        await tester.pumpAndSettle();
+        final close = rect(tester, 'dialog.close');
+        final dialog = rect(tester, 'dialog');
+        // The title line is 22 high and starts 24 (+1 border) down.
+        expect(close.center.dy - dialog.top, closeTo(1 + 24 + 11, 0.5));
+        container.read(windowRouterProvider.notifier).close();
+        expect(await answer, isFalse);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.windows}),
+    );
+  });
 }

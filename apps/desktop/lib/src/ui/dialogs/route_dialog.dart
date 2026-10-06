@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,29 +13,28 @@ import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
 import 'dialog_informational.dart';
 
-/// UI §4 widths; heights are the old fixed windows' (the page bodies are
-/// reused as they are and lay out for them).
-Size dialogSizeFor(WindowState state) {
+/// UI §4 widths. The height follows the content (title → 8 → body → 24 →
+/// actions), up to the window's room ([RouteDialogHost]).
+double dialogWidthFor(WindowState state) {
   final confirm = state.confirm;
   if (confirm != null) {
-    return confirm.long
-        ? const Size(ShellxSizes.dialogWidthLong, 560)
-        : const Size(ShellxSizes.dialogWidth, 260);
+    return confirm.long ? ShellxSizes.dialogWidthLong : ShellxSizes.dialogWidth;
   }
   return switch (state.route) {
-    LoginRoute() => const Size(ShellxSizes.dialogWidth, 620),
-    OnboardingRoute() => const Size(ShellxSizes.dialogWidthOnboarding, 660),
-    PairingRoute() => const Size(ShellxSizes.dialogWidth, 660),
-    ChangePasswordRoute() => const Size(ShellxSizes.dialogWidth, 480),
-    null => const Size(ShellxSizes.dialogWidth, 260),
+    OnboardingRoute() => ShellxSizes.dialogWidthOnboarding,
+    LoginRoute() ||
+    PairingRoute() ||
+    ChangePasswordRoute() ||
+    null => ShellxSizes.dialogWidth,
   };
 }
 
 /// The legacy route or confirm as a dialog over the terminal (UI §4):
 /// scrim, focus trapped, Escape = close, informational dialogs (pairing,
 /// change password once done) close on a scrim click, forms and confirms do
-/// not. It is a named route for screen readers (UI §3.7). The window can be
-/// as small as 640×400 (UI §2), so a page taller than the dialog scrolls.
+/// not. It is a named route for screen readers (UI §3.7). The dialog is as
+/// tall as its page, up to the window's room (it can be as small as
+/// 640×400, UI §2); then the page body scrolls ([DialogBody]).
 /// Each new dialog comes in with the `base` scale 0.98→1 (UI §1.5; the
 /// fades in and out are [WindowContent]'s).
 class RouteDialogHost extends ConsumerStatefulWidget {
@@ -130,27 +127,17 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
     final l10n = AppLocalizations.of(context);
     final router = ref.read(windowRouterProvider.notifier);
     final confirm = state.confirm;
-    final Widget routePage = LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          // The pages' Spacers keep working when there is room.
-          child: IntrinsicHeight(
-            child: switch (state.route) {
-              LoginRoute() => const LoginPage(),
-              OnboardingRoute() => const OnboardingPage(),
-              PairingRoute() => const PairingPage(),
-              ChangePasswordRoute() => const ChangePasswordPage(),
-              null => const SizedBox.shrink(),
-            },
-          ),
-        ),
-      ),
-    );
+    final Widget routePage = switch (state.route) {
+      LoginRoute() => const LoginPage(),
+      OnboardingRoute() => const OnboardingPage(),
+      PairingRoute() => const PairingPage(),
+      ChangePasswordRoute() => const ChangePasswordPage(),
+      null => const SizedBox.shrink(),
+    };
     // A confirm over a route hides the route page but keeps it mounted, so
     // what was typed or finished there is still there after the confirm.
+    // Offstage takes no room: the dialog is the shown page's height.
     final Widget page = Stack(
-      fit: StackFit.expand,
       children: [
         if (state.route != null)
           Offstage(
@@ -160,7 +147,6 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
               child: ExcludeFocus(excluding: confirm != null, child: routePage),
             ),
           ),
-        // The confirm body scrolls by itself (Expanded body).
         if (confirm != null)
           ConfirmPage(key: ValueKey(confirm), request: confirm),
       ],
@@ -170,7 +156,6 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
         (state.route is PairingRoute ||
             (state.route is ChangePasswordRoute && _doneInformational));
     final screen = MediaQuery.sizeOf(context);
-    final size = dialogSizeFor(state);
     final maxHeight = confirm?.long ?? false
         ? screen.height * 0.8
         : screen.height - 2 * ShellxSpace.s24;
@@ -206,8 +191,8 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
                     label: _title(l10n),
                     child: Container(
                       key: const Key('dialog'),
-                      width: size.width,
-                      height: min(size.height, maxHeight),
+                      width: dialogWidthFor(state),
+                      constraints: BoxConstraints(maxHeight: maxHeight),
                       clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: ShellxDesktopColors.surface,
@@ -227,10 +212,16 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
                               },
                               child: Stack(
                                 children: [
-                                  Positioned.fill(child: page),
+                                  page,
                                   if (!isMacDesktop)
                                     Positioned(
-                                      top: ShellxSpace.s12,
+                                      // Centred on the 22 px title line
+                                      // that starts 24 down (P-3).
+                                      top:
+                                          ShellxSpace.s24 +
+                                          (ShellxSizes.dialogTitleLine -
+                                                  ShellxSizes.iconHit) /
+                                              2,
                                       right: ShellxSpace.s12,
                                       child: SizedBox.square(
                                         dimension: ShellxSizes.iconHit,

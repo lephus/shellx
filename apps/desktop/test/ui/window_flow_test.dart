@@ -670,14 +670,11 @@ void main() {
     expect(tab.label, isNotEmpty);
   });
 
-  test('dialog sizes follow UI §4 widths', () {
-    expect(dialogSizeFor(const WindowState(route: LoginRoute())).width, 400);
+  test('dialog widths follow UI §4 (heights follow the content)', () {
+    expect(dialogWidthFor(const WindowState(route: LoginRoute())), 400);
+    expect(dialogWidthFor(const WindowState(route: OnboardingRoute())), 480);
     expect(
-      dialogSizeFor(const WindowState(route: OnboardingRoute())).width,
-      480,
-    );
-    expect(
-      dialogSizeFor(
+      dialogWidthFor(
         WindowState(
           confirm: ConfirmRequest(
             title: 't',
@@ -686,7 +683,7 @@ void main() {
             long: true,
           ),
         ),
-      ).width,
+      ),
       520,
     );
   });

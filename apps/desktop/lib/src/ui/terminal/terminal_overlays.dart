@@ -234,11 +234,16 @@ class ShellxScrollbar extends StatefulWidget {
     required this.controller,
     required this.child,
     this.showOnHover = false,
+    this.alwaysVisible = false,
   });
 
   final ScrollController controller;
   final Widget child;
   final bool showOnHover;
+
+  /// The thumb stays while the content overflows (a dialog body, so it is
+  /// clear that more is below).
+  final bool alwaysVisible;
 
   @override
   State<ShellxScrollbar> createState() => _ShellxScrollbarState();
@@ -251,7 +256,8 @@ class _ShellxScrollbarState extends State<ShellxScrollbar> {
   Widget build(BuildContext context) {
     final scrollbar = _HoverThumbScrollbar(
       controller: widget.controller,
-      thumbVisibility: widget.showOnHover && _pointerInside,
+      thumbVisibility:
+          widget.alwaysVisible || (widget.showOnHover && _pointerInside),
       fadeDuration: ShellxMotion.of(context, ShellxMotion.fast),
       child: widget.child,
     );
