@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:shellx_core/shellx_core.dart';
 
 import 'session_manager.dart';
+import 'session_notice.dart';
 
 /// The terminal window's way into the agent's sessions (A1 spec §3.1). The
 /// window never talks to `SessionManager` directly, so A5 can move the
@@ -13,6 +14,10 @@ abstract interface class LocalSessions {
 
   /// Fires when [sessions] (or anything in a summary) changes.
   Stream<void> get changes;
+
+  /// Programs asking for attention (A4 D4): live output only, never a
+  /// replay. Broadcast; delivered asynchronously.
+  Stream<SessionNotice> get notices;
 
   /// Starts a login shell in the home directory. Throws
   /// [SessionLimitException] or [SpawnFailedException].

@@ -54,6 +54,7 @@ final class SessionCore {
           ? null
           : ShellIntegration(directory: hooks),
       clock: now,
+      commandNoticeThreshold: notifications?.threshold,
       gitHeads: gitHeads,
       portProbe: portProbe,
       windowsPaths: Platform.isWindows,

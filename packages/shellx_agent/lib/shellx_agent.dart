@@ -23,6 +23,7 @@ export 'src/session/local_sessions.dart';
 export 'src/session/ring_buffer.dart';
 export 'src/session/session_ids.dart';
 export 'src/session/session_manager.dart';
+export 'src/session/session_notice.dart';
 export 'src/session/session_router.dart';
 export 'src/session/session_stream.dart';
 export 'src/term/term_auth.dart';

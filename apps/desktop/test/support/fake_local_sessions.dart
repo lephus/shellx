@@ -10,6 +10,29 @@ import 'package:shellx_core/shellx_core.dart';
 final class FakeLocalSessions implements LocalSessions {
   final _changes = StreamController<void>.broadcast(sync: true);
   final summaries = <SessionSummary>[];
+  final _notices = StreamController<SessionNotice>.broadcast(sync: true);
+
+  @override
+  Stream<SessionNotice> get notices => _notices.stream;
+
+  /// A notice from session [id], as the agent would emit it (A4).
+  void notice(
+    int id,
+    SessionNoticeKind kind, {
+    String? title,
+    String? body,
+    CompletedCommand? command,
+    DateTime? at,
+  }) => _notices.add(
+    SessionNotice(
+      sessionId: id,
+      kind: kind,
+      at: at ?? DateTime(2026, 10, 7, 9),
+      title: title,
+      body: body,
+      command: command,
+    ),
+  );
   final views = <int, FakeSessionView>{};
   final opens = <(int, int)>[];
   final closed = <int>[];

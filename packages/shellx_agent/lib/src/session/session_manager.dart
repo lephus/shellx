@@ -18,6 +18,7 @@ import '../term/osc_title.dart';
 import 'agent_sessions.dart';
 import 'local_sessions.dart';
 import 'session_ids.dart';
+import 'session_notice.dart';
 import 'session_stream.dart';
 
 /// Who opened a session (A1 D4): the desktop may close any session, a
@@ -82,6 +83,8 @@ int _clampDimension(int value) => value.clamp(_minDimension, _maxDimension);
 
 bool _noPhoneReceivesDriver(String mobileId) => false;
 
+Duration? _noThreshold() => null;
+
 final class _Session {
   _Session({
     required this.id,
@@ -94,7 +97,9 @@ final class _Session {
     required this.rows,
     required this.origin,
     required this.driver,
-  });
+    required Duration? Function() commandThreshold,
+    required DateTime Function() clock,
+  }) : commands = CommandTracker(threshold: commandThreshold, now: clock);
 
   final int id;
   final int index;
@@ -134,7 +139,12 @@ final class _Session {
   /// know it once the process has started).
   bool pidKnown = false;
   final commandEvents = OscEventParser();
-  final commands = CommandTracker(threshold: () => null);
+
+  /// 133 C/D: `runningCommand` (A1 D15) and long commands (A4 D5).
+  final CommandTracker commands;
+
+  /// A4 D3/D6.
+  final noticeLimit = NoticeLimiter();
 
   /// The session ends because someone closed it (desktop, phone, revoke,
   /// quit), not because the shell exited on its own.
@@ -219,11 +229,14 @@ final class SessionManager implements AgentSessions, LocalSessions {
     bool windowsPaths = false,
     String localHostName = '',
     void Function(String message)? log,
+    Duration? Function()? commandNoticeThreshold,
   }) : _ptyFactory = ptyFactory,
        _gitHeads = gitHeads,
        _windowsPaths = windowsPaths,
        _localHostName = localHostName,
        _notifications = notifications,
+       _log = log,
+       _commandNoticeThreshold = commandNoticeThreshold ?? _noThreshold,
        _shellIntegration = shellIntegration,
        _shellResolver = shellResolver,
        _homeDirectory = homeDirectory,
@@ -247,6 +260,12 @@ final class SessionManager implements AgentSessions, LocalSessions {
   }
 
   final PtyFactory _ptyFactory;
+
+  /// Never the text of a notice (A4 N9).
+  final void Function(String message)? _log;
+
+  /// The long-command threshold, read live (A4 D5); null: no command notices.
+  final Duration? Function() _commandNoticeThreshold;
   final ShellResolver _shellResolver;
   final String _homeDirectory;
   final Map<String, String> _baseEnvironment;
@@ -284,6 +303,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
 
   final _outbound = StreamController<OutboundMessage>.broadcast(sync: true);
   final _changes = StreamController<void>.broadcast();
+  final _notices = StreamController<SessionNotice>.broadcast();
+
+  @override
+  Stream<SessionNotice> get notices => _notices.stream;
   final _opened = StreamController<SessionOpenedEvent>.broadcast();
   final _sessions = <int, _Session>{};
   final int Function() _nextId;
@@ -708,6 +731,8 @@ final class SessionManager implements AgentSessions, LocalSessions {
       ),
       cols: cols,
       rows: rows,
+      commandThreshold: _commandNoticeThreshold,
+      clock: _clock,
       origin: origin,
       driver: origin == SessionOrigin.phone
           ? DriverSide.phone
@@ -890,8 +915,27 @@ final class SessionManager implements AgentSessions, LocalSessions {
       }
       final wasRunning = session.commands.running;
       for (final event in session.commandEvents.feed(data)) {
-        session.commands.handle(event);
+        final completed = session.commands.handle(event);
+        if (completed != null) {
+          _notice(session, SessionNoticeKind.command, command: completed);
+        }
         switch (event) {
+          case NotifyRequested(:final title, :final body):
+            _notice(
+              session,
+              SessionNoticeKind.message,
+              title: title,
+              body: body,
+            );
+          case KittyNotifyRequested(:final title, :final body):
+            _notice(
+              session,
+              SessionNoticeKind.message,
+              title: title,
+              body: body,
+            );
+          case BellRung():
+            _notice(session, SessionNoticeKind.bell);
           case CwdReported(:final url):
             if (_setCwd(session, url)) changed = true;
           case CommandFinished():
@@ -905,6 +949,36 @@ final class SessionManager implements AgentSessions, LocalSessions {
       // Parsing never breaks the session.
     }
     if (changed && !session.closing) _changes.add(null);
+  }
+
+  /// A4 D4: live output only (`_track` never sees a replay); a session
+  /// being closed says nothing more. Never the text in the log (N9).
+  void _notice(
+    _Session session,
+    SessionNoticeKind kind, {
+    String? title,
+    String? body,
+    CompletedCommand? command,
+  }) {
+    if (session.closing) return;
+    final now = _clock();
+    if (!session.noticeLimit.allow(kind, now)) {
+      final dropped = session.noticeLimit.dropped;
+      if (dropped == 1 || dropped % 100 == 0) {
+        _log?.call('session notices dropped: $dropped');
+      }
+      return;
+    }
+    _notices.add(
+      SessionNotice(
+        sessionId: session.id,
+        kind: kind,
+        at: now,
+        title: title,
+        body: body,
+        command: command,
+      ),
+    );
   }
 
   /// A2 C1/D2. True when the summary changed.
