@@ -334,6 +334,45 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           label: l10n.terminalSelectAll,
           shortcut: selectAllShortcutLabel(),
         ),
+        // D21, UI-A3 §4.1: splits always; the pane entries with two panes.
+        ShellxMenuEntry(
+          key: const Key('menu.splitRight'),
+          value: const SplitPaneIntent(SplitAxis.row),
+          label: l10n.paneSplitRight,
+          shortcut: splitRightShortcutLabel(),
+          dividerBefore: true,
+        ),
+        ShellxMenuEntry(
+          key: const Key('menu.splitDown'),
+          value: const SplitPaneIntent(SplitAxis.column),
+          label: l10n.paneSplitDown,
+          shortcut: splitDownShortcutLabel(),
+        ),
+        if (widget.tab.isSplit) ...[
+          ShellxMenuEntry(
+            key: const Key('menu.zoomPane'),
+            value: const TogglePaneZoomIntent(),
+            label: widget.tab.zoomedPaneId == null
+                ? l10n.paneZoom
+                : l10n.paneUnzoom,
+            shortcut: zoomPaneShortcutLabel(),
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.equalize'),
+            value: const EqualizePanesIntent(),
+            label: l10n.paneEqualize,
+            shortcut: equalizePanesShortcutLabel(),
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.closePane'),
+            // ⌘W's action closes the focused pane of a split tab; the menu
+            // focused this pane first.
+            value: const CloseTabIntent(),
+            label: l10n.paneClose,
+            shortcut: closePaneShortcutLabel(),
+            dividerBefore: true,
+          ),
+        ],
       ],
     );
     if (intent == null || !mounted) return;

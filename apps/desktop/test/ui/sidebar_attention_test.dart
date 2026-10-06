@@ -218,6 +218,8 @@ void main() {
       'Mark as read',
       'Mark all as read',
       'Rename tab',
+      'Split right', // A3 (UI-A3 §8)
+      'Split down',
       'Move to workspace…',
       'Move up',
       'Close tab',
