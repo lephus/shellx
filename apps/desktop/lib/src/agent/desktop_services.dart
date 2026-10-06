@@ -92,10 +92,11 @@ final class DesktopServices {
 
   /// Completes once every PTY process-tree kill started so far has settled.
   /// `main.dart` wires it to `FlutterPtyFactory.killsSettled()`
-  /// (`Pty.kill()` itself gives nothing to wait for). Sign-out and quit wait
-  /// for it, at most [ptyKillTimeout], after the sessions are closed, so
-  /// the agent never exits halfway through a kill (a frozen survivor would
-  /// stay stopped).
+  /// (`Pty.kill()` itself gives nothing to wait for). Quit waits for it, at
+  /// most [ptyKillTimeout], after closing every session, so the agent never
+  /// exits halfway through a kill (a frozen survivor would stay stopped).
+  /// Sign-out kills nothing (A1 D7) but waits the same way for kills
+  /// already in flight.
   final Future<void> Function()? awaitPtyKills;
   final Duration ptyKillTimeout;
 

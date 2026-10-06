@@ -288,10 +288,16 @@ void main() {
       'quit always reaches quitApp, even when shutting down hangs',
       () async {
         await signedIn(settings: {'onboarding_done': true});
+        await h.sessions.open(cols: 80, rows: 24);
+        await pumpEventQueue();
         // A relay stop that never settles.
         h.runtime.stopGate = Completer<void>();
-        await tray().handle(const Quit());
+        final done = tray().handle(const Quit());
+        await answer(true);
+        await done;
         expect(h.runtime.stopped, isTrue);
+        // The shells die before anything that can hang (A1 D7).
+        expect(h.ptys.ptys.single.killed, isTrue);
         expect(h.quits, 1);
       },
     );

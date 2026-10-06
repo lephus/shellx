@@ -280,11 +280,13 @@ class AgentController extends Notifier<AgentViewState> {
   /// on nothing is emitted, so the logout cannot come back as a 4002, a
   /// spurious AgentRevoked), then the local sign-in is deleted and the
   /// state is signed out — before anything that can take time (the relay
-  /// stop settling, the PTY kills, the logout request). Quitting or
-  /// crashing meanwhile can never come back signed in with the phones still
-  /// trusted. A keychain that refuses a delete still ends signed out, with
-  /// a notification. The future completes once the stop, the kills (at most
-  /// `ptyKillTimeout`) and the logout (at most 10 s) are done. Never throws.
+  /// stop settling, the logout request). Quitting or crashing meanwhile can
+  /// never come back signed in with the phones still trusted. A keychain
+  /// that refuses a delete still ends signed out, with a notification.
+  /// Sign-out ends no shell; it still waits for PTY kills already in flight
+  /// (a tab closed just before, at most `ptyKillTimeout`), usually none.
+  /// The future completes once the stop, that wait and the logout (at most
+  /// 10 s) are done. Never throws.
   Future<void> signOut() async {
     final token = _credentials?.token;
     _credentials = null;
@@ -570,14 +572,17 @@ class AgentController extends Notifier<AgentViewState> {
   /// Before quitting (the caller then runs `quitApp`): disconnect, close
   /// every session (A1 D7: the only path that ends shells), wait (bounded)
   /// for the PTY tree kills, release the sleep assertion. Never throws, so
-  /// quitting always goes on.
+  /// quitting always goes on. The shells are told to die before the relay
+  /// stop is awaited: that stop can outlast Quit's `shutdownTimeout`, and
+  /// the process must not exit with them still running.
   Future<void> shutdown() async {
     _updateTimer?.cancel();
     _updateTimer = null;
     _wakeDetector?.stop();
     _wakeDetector = null;
-    await _stopRuntime();
+    final stopping = _stopRuntime();
     _s.sessions.closeAll();
+    await stopping;
     await _settlePtyKills();
     await _bestEffort(() => _s.keepAwake.setEnabled(false));
   }

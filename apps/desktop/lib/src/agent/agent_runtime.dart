@@ -246,8 +246,11 @@ final class CoreAgentRuntime implements AgentRuntime {
     } catch (_) {
       // Best effort: the windows keep running either way.
     }
-    await stopping;
-    _router.dispose();
+    try {
+      await stopping;
+    } finally {
+      _router.dispose();
+    }
   }
 
   @override
