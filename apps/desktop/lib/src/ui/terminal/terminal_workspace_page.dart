@@ -134,6 +134,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     tab: tab,
   );
 
+  /// The pane ×, middle click on a pane header (UI-A3 §2.1); the keyboard
+  /// then goes to the tab's new focused pane (UI-A3 §6), or back to the
+  /// same pane when the dialog is cancelled.
+  Future<void> closePane(TerminalTab tab, int paneId) async {
+    await closePaneWithConfirm(
+      tabs: ref.read(terminalTabsProvider.notifier),
+      router: ref.read(windowRouterProvider.notifier),
+      l10n: AppLocalizations.of(context),
+      tab: tab,
+      paneId: paneId,
+    );
+    if (mounted) focusTerminal();
+  }
+
   /// UI §3.6 regions: terminal (or "Open new tab" with no tab), sidebar,
   /// signed-out strip (when shown).
   void _cycleRegion(int step) {
@@ -324,13 +338,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     // A new selection gets the keyboard (UI §3.6), except while the
     // sidebar has it: its arrow keys (Task 8) move the selection and must
     // keep the focus in the list. An open name field keeps it too (D15).
-    ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
-      if (id != null &&
-          !sidebarFocus.hasFocus &&
-          ref.read(sidebarWorkspacesProvider).renaming == null) {
-        focusTerminal();
-      }
-    });
+    // A3 (UI-A3 §6): so does a new focused pane of the selected tab.
+    ref.listen(
+      terminalTabsProvider.select(
+        (s) => (s.selectedId, s.selected?.focusedPaneId),
+      ),
+      (_, next) {
+        if (next.$1 != null &&
+            !sidebarFocus.hasFocus &&
+            ref.read(sidebarWorkspacesProvider).renaming == null) {
+          focusTerminal();
+        }
+      },
+    );
     // The last tab closed: the keyboard goes to "Open new tab" instead of
     // vanishing with the terminal (after the frame that builds the button).
     ref.listen(terminalTabsProvider.select((s) => s.tabs.isEmpty), (
@@ -445,6 +465,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           emptyFocus: emptyFocus,
           stripFocus: stripFocus,
           shortcuts: terminalShortcuts,
+          onClosePane: (id) {
+            final tab = ref.read(terminalTabsProvider).tabOfSession(id);
+            if (tab != null) unawaited(closePane(tab, id));
+          },
         ),
       ),
     ],

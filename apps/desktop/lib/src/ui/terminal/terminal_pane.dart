@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shellx_core/shellx_core.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:xterm/xterm.dart';
 
-import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
 import '../../terminal/tab_attention.dart';
@@ -12,12 +9,9 @@ import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
-import '../theme/terminal_colors.dart';
 import '../window_router.dart';
-import 'attention_marks.dart';
-import 'shellx_menu.dart';
+import 'pane_tree_view.dart';
 import 'shortcut_labels.dart';
-import 'terminal_shortcuts.dart';
 import 'terminal_overlays.dart';
 
 /// UI §2.1 pane header (macOS) and §2.3 pane: the signed-out strip, one
@@ -30,6 +24,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     required this.emptyFocus,
     this.stripFocus,
     this.shortcuts,
+    required this.onClosePane,
   });
 
   /// The selected tab's TerminalView focus (UI §3.6 region 1).
@@ -45,20 +40,25 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// xterm's own key handling.
   final Map<ShortcutActivator, Intent>? shortcuts;
 
+  /// A pane's ×, middle click (UI-A3 §2.1): the workspace asks first when
+  /// a command runs there.
+  final void Function(int sessionId) onClosePane;
+
   @override
   ConsumerState<TerminalPane> createState() => _TerminalPaneState();
 }
 
 class _TerminalPaneState extends ConsumerState<TerminalPane> {
-  /// One scrollback controller per tab (the overlay scrollbar of UI §2.3).
+  /// One scrollback controller per pane (the overlay scrollbar of UI §2.3).
   final _scrolls = <int, ScrollController>{};
 
   ScrollController _scrollFor(int id) =>
       _scrolls.putIfAbsent(id, ScrollController.new);
 
-  /// Controllers of closed tabs go after the frame that unmounts their view.
+  /// Controllers of closed panes go after the frame that unmounts their
+  /// view.
   void _dropClosed(List<TerminalTab> tabs) {
-    final ids = {for (final tab in tabs) tab.id};
+    final ids = {for (final tab in tabs) ...tab.panes.keys};
     final gone = [
       for (final id in _scrolls.keys)
         if (!ids.contains(id)) id,
@@ -95,12 +95,11 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final state = ref.watch(terminalTabsProvider);
     final fontSize = ref.watch(terminalFontSizeProvider);
     final phase = ref.watch(agentControllerProvider.select((s) => s.phase));
     final selected = state.selected;
-    // UI-A4 §4: the selected tab's unread rings the terminal.
+    // UI-A4 §4: the selected tab's unread rings its panes.
     final ringed =
         selected != null &&
         ref.watch(tabAttentionProvider.select((a) => a.hasUnread(selected.id)));
@@ -109,10 +108,6 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
     _dropClosed(state.tabs);
     final notice = state.notice;
-    final phoneDrives =
-        selected != null &&
-        !selected.exited &&
-        selected.driver == DriverSide.phone;
 
     return ColoredBox(
       color: ShellxDesktopColors.bgTerminal,
@@ -164,6 +159,22 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                 );
                 // Only stores the size for the next open: safe during layout.
                 if (grid != null) tabs.reportGrid(grid);
+                final scaler = MediaQuery.textScalerOf(context);
+                final cell = measureTerminalCell(style, scaler);
+                // D4: 20 × 5 cells + padding + the pane header.
+                tabs.reportPaneMetrics(
+                  PaneMetrics(
+                    area: constraints.biggest,
+                    minPane: Size(
+                      ShellxSizes.paneMinCols * cell.width +
+                          ShellxSizes.terminalPadding.horizontal,
+                      ShellxSizes.paneMinRows * cell.height +
+                          ShellxSizes.terminalPadding.vertical +
+                          ShellxSizes.paneHeaderFor(scaler),
+                    ),
+                    divider: ShellxSizes.paneDivider,
+                  ),
+                );
                 return Stack(
                   children: [
                     if (state.tabs.isEmpty)
@@ -180,66 +191,26 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           sizing: StackFit.expand,
                           children: [
                             for (final tab in state.tabs)
-                              _TabTerminal(
+                              PaneTreeView(
                                 key: ValueKey('terminal.${tab.id}'),
                                 tab: tab,
-                                label: ringed && tab.id == selected.id
-                                    ? l10n.terminalPaneUnreadLabel(tab.label)
-                                    : l10n.terminalPaneLabel(tab.label),
-                                scrollController: _scrollFor(tab.id),
-                                focusNode: tab.id == selected?.id
-                                    ? widget.terminalFocus
-                                    : null,
+                                selected: tab.id == selected?.id,
+                                terminalFocus: widget.terminalFocus,
                                 style: style,
                                 shortcuts: widget.shortcuts,
+                                scrollFor: _scrollFor,
+                                onClosePane: widget.onClosePane,
+                                // Task 8 narrows this to the panes that
+                                // notified; until then A4's tab-level ring.
+                                ringed: ringed && tab.id == selected.id
+                                    ? tab.panes.keys.toSet()
+                                    : const <int>{},
+                                toastShowing: notice != null,
                               ),
                           ],
                         ),
                       ),
-                    // UI-A4 §4: over the terminal, under the pill and the
-                    // toast; no tab, no ring.
-                    if (selected != null)
-                      Positioned.fill(child: AttentionRing(visible: ringed)),
-                    // UI §2.5 (ruling S-2): top-right, clear of where
-                    // people read; when the cursor (the prompt line) is
-                    // under that corner it moves to the bottom-right.
-                    if (selected != null)
-                      Positioned.fill(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: ShellxSpace.s8,
-                            horizontal: ShellxSpace.s12,
-                          ),
-                          child: _DriverPillSlot(
-                            terminal: selected.terminal,
-                            cellHeight: measureTerminalCell(
-                              style,
-                              MediaQuery.textScalerOf(context),
-                            ).height,
-                            // The toast owns the bottom while it shows.
-                            canMoveDown: notice == null,
-                            child: AnimatedSwitcher(
-                              duration: ShellxMotion.of(
-                                context,
-                                ShellxMotion.base,
-                              ),
-                              reverseDuration: ShellxMotion.of(
-                                context,
-                                ShellxMotion.exit,
-                              ),
-                              switchInCurve: ShellxMotion.baseCurve,
-                              switchOutCurve: ShellxMotion.exitCurve,
-                              child: phoneDrives
-                                  ? DriverPill(
-                                      compact:
-                                          constraints.maxWidth <
-                                          ShellxSizes.pillCompactBelow,
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ),
-                        ),
-                      ),
+                    // UI §2.8: one toast, bottom centre of the whole area.
                     Positioned(
                       bottom: ShellxSpace.s16,
                       left: ShellxSpace.s16,
@@ -295,161 +266,4 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
           child: child,
         ),
       );
-}
-
-/// One tab's terminal with its overlay scrollbar (UI §2.3) and the
-/// "Terminal {title}" label (UI §3.7).
-class _TabTerminal extends StatelessWidget {
-  const _TabTerminal({
-    super.key,
-    required this.tab,
-    required this.label,
-    required this.scrollController,
-    required this.focusNode,
-    required this.style,
-    required this.shortcuts,
-  });
-
-  final TerminalTab tab;
-  final String label;
-  final ScrollController scrollController;
-  final FocusNode? focusNode;
-  final TerminalStyle style;
-  final Map<ShortcutActivator, Intent>? shortcuts;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    label: label,
-    container: true,
-    // A buffer scrolled by part of a row paints that row outside the
-    // view; the clip keeps it off the signed-out strip and pane header.
-    child: ClipRect(
-      child: ShellxScrollbar(
-        controller: scrollController,
-        child: TerminalView(
-          tab.terminal,
-          controller: tab.selection,
-          scrollController: scrollController,
-          focusNode: focusNode,
-          autofocus: focusNode != null,
-          theme: TerminalColors.theme,
-          textStyle: style,
-          padding: ShellxSizes.terminalPadding,
-          shortcuts: shortcuts,
-          // Only when the program did not take the mouse (xterm reports
-          // the click to it first): vim or htop with mouse mode keep it.
-          onSecondaryTapUp: (details, _) =>
-              _menu(context, details.globalPosition),
-        ),
-      ),
-    ),
-  );
-
-  /// Ruling I6: Copy (only with a selection), Paste, Select all, through
-  /// the window's own actions so the menu and the shortcuts do the same.
-  Future<void> _menu(BuildContext context, Offset at) async {
-    final l10n = AppLocalizations.of(context);
-    final intent = await showShellxMenu<Intent>(
-      context: context,
-      at: at,
-      entries: [
-        ShellxMenuEntry(
-          key: const Key('menu.copy'),
-          value: const CopySelectionIntent(),
-          label: l10n.terminalCopy,
-          shortcut: copyShortcutLabel(),
-          enabled: tab.selection.selection != null,
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.paste'),
-          value: const PasteClipboardIntent(),
-          label: l10n.terminalPaste,
-          shortcut: pasteShortcutLabel(),
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.selectAll'),
-          value: const SelectAllIntent(fromMenu: true),
-          label: l10n.terminalSelectAll,
-          shortcut: selectAllShortcutLabel(),
-        ),
-      ],
-    );
-    if (intent == null || !context.mounted) return;
-    Actions.maybeInvoke(context, intent);
-    focusNode?.requestFocus();
-  }
-}
-
-/// Puts the driver pill top-right, or bottom-right while the cursor is on
-/// the rows the top corner covers (a fresh prompt is on the first row).
-/// Follows the terminal as it writes, rebuilding only when the corner
-/// changes.
-class _DriverPillSlot extends StatefulWidget {
-  const _DriverPillSlot({
-    required this.terminal,
-    required this.cellHeight,
-    required this.canMoveDown,
-    required this.child,
-  });
-
-  final Terminal terminal;
-  final double cellHeight;
-  final bool canMoveDown;
-  final Widget child;
-
-  @override
-  State<_DriverPillSlot> createState() => _DriverPillSlotState();
-}
-
-class _DriverPillSlotState extends State<_DriverPillSlot> {
-  late bool _down = _cursorUnderCorner();
-
-  @override
-  void initState() {
-    super.initState();
-    widget.terminal.addListener(_onTerminal);
-  }
-
-  @override
-  void didUpdateWidget(_DriverPillSlot old) {
-    super.didUpdateWidget(old);
-    if (!identical(old.terminal, widget.terminal)) {
-      old.terminal.removeListener(_onTerminal);
-      widget.terminal.addListener(_onTerminal);
-    }
-    _down = _cursorUnderCorner();
-  }
-
-  @override
-  void dispose() {
-    widget.terminal.removeListener(_onTerminal);
-    super.dispose();
-  }
-
-  /// The rows under the pill's corner: its 8 px inset and 28 px height,
-  /// past the terminal's own top padding.
-  bool _cursorUnderCorner() {
-    final cell = widget.cellHeight;
-    if (cell <= 0) return false;
-    final covered =
-        ((ShellxSpace.s8 +
-                    ShellxSizes.driverPill -
-                    ShellxSizes.terminalPadding.top) /
-                cell)
-            .ceil();
-    return widget.terminal.buffer.cursorY < covered;
-  }
-
-  void _onTerminal() {
-    final down = _cursorUnderCorner();
-    if (down != _down && mounted) setState(() => _down = down);
-  }
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: _down && widget.canMoveDown
-        ? Alignment.bottomRight
-        : Alignment.topRight,
-    child: widget.child,
-  );
 }

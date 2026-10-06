@@ -22,3 +22,36 @@ Future<void> closeTabWithConfirm({
   }
   tabs.close(tab.id);
 }
+
+/// ⌘W on a split tab, the pane ×, "Đóng pane" (D6, D28): asks while that
+/// pane runs a command. A one-pane tab goes through [closeTabWithConfirm]
+/// (the A1 dialog, word for word).
+Future<void> closePaneWithConfirm({
+  required TerminalTabs tabs,
+  required WindowRouter router,
+  required AppLocalizations l10n,
+  required TerminalTab tab,
+  required int paneId,
+}) async {
+  final pane = tab.panes[paneId];
+  if (pane == null) return;
+  if (!tab.isSplit) {
+    return closeTabWithConfirm(
+      tabs: tabs,
+      router: router,
+      l10n: l10n,
+      tab: tab,
+    );
+  }
+  if (tabs.needsPaneCloseConfirm(paneId)) {
+    final ok = await router.confirm(
+      ConfirmRequest(
+        title: l10n.confirmCloseRunningTitle(pane.automaticLabel),
+        body: l10n.confirmCloseRunningPaneBody,
+        confirmLabel: l10n.confirmCloseRunningPaneAction,
+      ),
+    );
+    if (!ok) return;
+  }
+  tabs.closePane(paneId);
+}
