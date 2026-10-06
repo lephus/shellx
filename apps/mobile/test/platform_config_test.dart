@@ -50,8 +50,20 @@ void main() {
       final entitlements = readFile('ios/Runner/Runner.entitlements');
       expect(entitlements, contains('<key>aps-environment</key>\n\t<string>development</string>'));
       final project = readFile('ios/Runner.xcodeproj/project.pbxproj');
-      // Debug, Release and Profile of the Runner target.
-      expect('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;'.allMatches(project), hasLength(3));
+      // The Runner target's configurations (the only ones that set entitlements), by name. Since
+      // 1732434 Debug signs with RunnerDebug.entitlements (no push, so a free Apple ID can run it);
+      // Profile and Release keep Runner.entitlements with aps-environment.
+      final signing = <String, String>{
+        for (final block in RegExp(r'isa = XCBuildConfiguration;(.*?)name = (\w+);', dotAll: true).allMatches(project))
+          if (RegExp(r'CODE_SIGN_ENTITLEMENTS = ([^;]+);').firstMatch(block.group(1)!) case final entitlements?)
+            block.group(2)!: entitlements.group(1)!,
+      };
+      expect(signing, {
+        'Profile': 'Runner/Runner.entitlements',
+        'Debug': 'Runner/RunnerDebug.entitlements',
+        'Release': 'Runner/Runner.entitlements',
+      });
+      expect(readFile('ios/Runner/RunnerDebug.entitlements'), isNot(contains('aps-environment')));
       expect(project, contains('path = Runner.entitlements;'));
       expect(project, contains('com.apple.Push = {\n\t\t\t\t\t\t\t\tenabled = 1;'));
       expect(project, contains('com.apple.BackgroundModes = {\n\t\t\t\t\t\t\t\tenabled = 1;'));
