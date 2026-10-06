@@ -52,3 +52,10 @@ Ruling: A5a merged to main (2def7f6) after final review + fix wave; Windows runn
 Ruling: A6 Task 1 engine-spike gate needs interactive checks on a real Mac and Windows PC (locked Mac, no Windows) — A6 is BLOCKED at its gate; A7 proceeds without browser commands per its own plan (skips recorded) — cost: browser automation arrives with A6.
 Ruling: execution order now A7 (mergeable) → A9, A5b, A8 (each built and reviewed on its branch; merge only after their ⚠ manual gates pass).
 Ruling (A7 amendment detail): token-less CLI clients may only call api.version and a pane-less notify; everything else needs SHELLX_CLI_TOKEN or the tray "Allow other terminals" setting.
+
+## A7 (CLI + socket API) — execution
+A7 created the A5b wire (Tasks 2, 3, MuxPaths): A5b executor verifies these files instead of writing them.
+A7 added optional auth.token (A5b D7 additive): `clientHandshake(token:)` sends it in `auth` (only after the host proved the secret), `serverHandshake` returns `MuxPeerInfo.token`; golden vector `cli.auth_token` in `term/protocol/mux_vectors.txt`.
+A7 Task 2 deviations from the A5b plan text (its own tests required them): frozen hello length is 0x4d, not 0x37 (hand-checked 77-byte 5-key map); connection close does not await the inbound controller's close (a paused handshake iterator held it forever); the handshake does not await StreamIterator.cancel (root-zone future escaped fake_async). The A5b executor keeps these.
+MuxPaths: mux directory built from the environment (`muxDirectoryPath`): macOS `$HOME/Library/Application Support/pro.shellx.desktop/mux` (bundle id checked against AppInfo.xcconfig; app unsandboxed, so path_provider's support dir is the same), Windows `%LOCALAPPDATA%\ShellX\mux`; a Dart test pins `…/pro.shellx.desktop/mux/endpoint` (D30). kCliCaps omits `ui.browser` (A6 absent; browser pending A6).
+Windows named-pipe transport (overlapped I/O, owner-only DACL, FILE_FLAG_FIRST_PIPE_INSTANCE): analyzed on macOS only; `apps/desktop/test/mux/windows_pipe_transport_test.dart` (testOn windows) — pending manual on a Windows machine (A5b Task 3 Step 5).
