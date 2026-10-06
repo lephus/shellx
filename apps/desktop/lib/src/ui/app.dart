@@ -40,9 +40,16 @@ class WindowContent extends ConsumerStatefulWidget {
 class _WindowContentState extends ConsumerState<WindowContent> {
   final _workspace = GlobalKey<TerminalWorkspacePageState>();
 
+  /// Counts dialog opens (closed → open), so a dialog opened while the last
+  /// one still fades out (sign out → login) gets its own key and element.
+  int _opens = 0;
+  bool _wasOpen = false;
+
   @override
   Widget build(BuildContext context) {
     final window = ref.watch(windowRouterProvider);
+    if (window.dialogOpen && !_wasOpen) _opens++;
+    _wasOpen = window.dialogOpen;
     // UI §3.6: the terminal regains focus after any dialog closes.
     ref.listen(windowRouterProvider.select((w) => w.dialogOpen), (_, open) {
       if (!open) {
@@ -76,7 +83,7 @@ class _WindowContentState extends ConsumerState<WindowContent> {
               ),
               child: window.dialogOpen
                   ? RouteDialogHost(
-                      key: const ValueKey('dialogHost'),
+                      key: ValueKey(('dialogHost', _opens)),
                       state: window,
                     )
                   : const SizedBox.shrink(key: ValueKey('none')),

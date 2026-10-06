@@ -5,7 +5,7 @@ import 'package:shellx_core/shellx_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../form_rules.dart';
-import '../dialogs/route_dialog.dart';
+import '../dialogs/dialog_informational.dart';
 import '../window_router.dart';
 
 /// "Đổi mật khẩu…" (spec §8.3): new password twice, no old password (§5.2).

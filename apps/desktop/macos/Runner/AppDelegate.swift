@@ -25,12 +25,14 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   /// The `quit` Apple Event that asks us to terminate says why: log out,
-  /// restart or shut down (never held up), or nothing for ⌘Q / menu Quit.
+  /// restart, shut down or a quit-all (never held up), or nothing for ⌘Q / menu Quit.
   private var quitIsForPowerOff: Bool {
     let reasons: [OSType] = [
       OSType(kAELogOut), OSType(kAEReallyLogOut),
       OSType(kAEShowRestartDialog), OSType(kAERestart),
       OSType(kAEShowShutdownDialog), OSType(kAEShutDown),
+      // An installer or system update quitting every app.
+      OSType(kAEQuitAll),
     ]
     guard
       let reason = NSAppleEventManager.shared().currentAppleEvent?

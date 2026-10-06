@@ -291,4 +291,60 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('dialog')), findsNothing);
   });
+
+  testApp('a dialog reopened during the exit fade (sign out → login) is a new, '
+      'working dialog', (tester) async {
+    await pump(tester);
+    final router = container.read(windowRouterProvider.notifier);
+    final answer = router.confirm(
+      ConfirmRequest(title: 'Sign out?', body: 'b', confirmLabel: 'ok'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm.ok')));
+    expect(await answer, isTrue);
+    await tester.pump(const Duration(milliseconds: 40));
+    router.open(const LoginRoute());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    // The confirm still fades out beside the new login dialog: two separate
+    // dialogs, not one element shared between them.
+    expect(find.byKey(const Key('dialog')), findsNWidgets(2));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dialog')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('login.email')), 'a@b.co');
+    expect(find.text('a@b.co'), findsOneWidget);
+  });
+
+  testApp('a confirm over a finished change-password keeps it finished', (
+    tester,
+  ) async {
+    await pump(tester);
+    await container
+        .read(agentControllerProvider.notifier)
+        .signIn(email: 'a@b.co', password: '12345678', register: false);
+    final router = container.read(windowRouterProvider.notifier)
+      ..open(const ChangePasswordRoute());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('password.new')),
+      'long enough 1',
+    );
+    await tester.enterText(
+      find.byKey(const Key('password.confirm')),
+      'long enough 1',
+    );
+    await tester.tap(find.byKey(const Key('password.submit')));
+    await tester.pumpAndSettle();
+    final answer = router.confirm(
+      ConfirmRequest(title: 't', body: 'b', confirmLabel: 'ok'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm.cancel')));
+    expect(await answer, isFalse);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('password.done')), findsOneWidget);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(router.current, isNull);
+  });
 }

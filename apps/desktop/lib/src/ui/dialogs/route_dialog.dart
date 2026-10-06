@@ -14,6 +14,7 @@ import '../pages/pairing_page.dart';
 import '../terminal/shortcut_labels.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
+import 'dialog_informational.dart';
 
 /// UI §4 widths; heights are the old fixed windows' (the page bodies are
 /// reused as they are and lay out for them).
@@ -37,12 +38,6 @@ Size dialogSizeFor(WindowState state) {
 String windowTitleFor(TerminalTab? selected, AppLocalizations l10n) =>
     selected == null ? 'ShellX' : l10n.windowTitle(selected.label);
 
-/// Sent up by a dialog body that has become informational (change
-/// password once it says "done"): a scrim click then closes it (UI §4).
-final class DialogInformationalNotification extends Notification {
-  const DialogInformationalNotification();
-}
-
 /// The legacy route or confirm as a dialog over the terminal (UI §4):
 /// scrim, focus trapped, Escape = close, informational dialogs (pairing,
 /// change password once done) close on a scrim click, forms and confirms do
@@ -58,8 +53,20 @@ class RouteDialogHost extends ConsumerStatefulWidget {
   ConsumerState<RouteDialogHost> createState() => _RouteDialogHostState();
 }
 
-class _RouteDialogHostState extends ConsumerState<RouteDialogHost> {
+class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
+    with SingleTickerProviderStateMixin {
   final FocusScopeNode _scope = FocusScopeNode(debugLabel: 'dialog');
+
+  /// The `base` scale-in, restarted for each new dialog without rebuilding
+  /// the content (a route page under a confirm keeps its state).
+  late final AnimationController _scaleIn = AnimationController(
+    vsync: this,
+    duration: ShellxMotion.base,
+  );
+  late final Animation<double> _scale = Tween<double>(
+    begin: 0.98,
+    end: 1,
+  ).animate(CurvedAnimation(parent: _scaleIn, curve: ShellxMotion.baseCurve));
   bool _doneInformational = false;
 
   Object get _identity =>
@@ -72,10 +79,26 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_scaleIn.status == AnimationStatus.dismissed) _playScaleIn();
+  }
+
+  void _playScaleIn() {
+    _scaleIn.duration = ShellxMotion.of(context, ShellxMotion.base);
+    _scaleIn.forward(from: 0);
+  }
+
+  @override
   void didUpdateWidget(RouteDialogHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Per route: a confirm over a finished change-password (and cancelled)
+    // leaves it finished; the route page stays mounted under the confirm.
+    if (oldWidget.state.route.runtimeType != widget.state.route.runtimeType) {
+      _doneInformational = false;
+    }
     final before = oldWidget.state.confirm ?? oldWidget.state.route.runtimeType;
-    if (before != _identity) _doneInformational = false;
+    if (before != _identity) _playScaleIn();
     _trapFocus();
   }
 
@@ -89,6 +112,7 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost> {
 
   @override
   void dispose() {
+    _scaleIn.dispose();
     _scope.dispose();
     super.dispose();
   }
@@ -111,26 +135,41 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost> {
     final l10n = AppLocalizations.of(context);
     final router = ref.read(windowRouterProvider.notifier);
     final confirm = state.confirm;
-    final Widget page = confirm != null
-        // The confirm body scrolls by itself (Expanded body).
-        ? ConfirmPage(key: ValueKey(confirm), request: confirm)
-        : LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                // The pages' Spacers keep working when there is room.
-                child: IntrinsicHeight(
-                  child: switch (state.route) {
-                    LoginRoute() => const LoginPage(),
-                    OnboardingRoute() => const OnboardingPage(),
-                    PairingRoute() => const PairingPage(),
-                    ChangePasswordRoute() => const ChangePasswordPage(),
-                    null => const SizedBox.shrink(),
-                  },
-                ),
-              ),
+    final Widget routePage = LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          // The pages' Spacers keep working when there is room.
+          child: IntrinsicHeight(
+            child: switch (state.route) {
+              LoginRoute() => const LoginPage(),
+              OnboardingRoute() => const OnboardingPage(),
+              PairingRoute() => const PairingPage(),
+              ChangePasswordRoute() => const ChangePasswordPage(),
+              null => const SizedBox.shrink(),
+            },
+          ),
+        ),
+      ),
+    );
+    // A confirm over a route hides the route page but keeps it mounted, so
+    // what was typed or finished there is still there after the confirm.
+    final Widget page = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (state.route != null)
+          Offstage(
+            offstage: confirm != null,
+            child: TickerMode(
+              enabled: confirm == null,
+              child: ExcludeFocus(excluding: confirm != null, child: routePage),
             ),
-          );
+          ),
+        // The confirm body scrolls by itself (Expanded body).
+        if (confirm != null)
+          ConfirmPage(key: ValueKey(confirm), request: confirm),
+      ],
+    );
     final informational =
         confirm == null &&
         (state.route is PairingRoute ||
@@ -158,13 +197,8 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost> {
             child: FocusScope(
               node: _scope,
               autofocus: true,
-              child: TweenAnimationBuilder<double>(
-                key: ValueKey(_identity),
-                tween: Tween(begin: 0.98, end: 1),
-                duration: ShellxMotion.of(context, ShellxMotion.base),
-                curve: ShellxMotion.baseCurve,
-                builder: (context, scale, child) =>
-                    Transform.scale(scale: scale, child: child),
+              child: ScaleTransition(
+                scale: _scale,
                 child: Theme(
                   data: buildDialogTheme(
                     Theme.of(context),
