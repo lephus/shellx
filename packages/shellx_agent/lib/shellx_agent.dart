@@ -4,6 +4,7 @@ library;
 export 'src/context/cwd_url.dart';
 export 'src/context/git_head.dart';
 export 'src/context/listening_ports.dart';
+export 'src/mux/cli_wire.dart';
 export 'src/mux/mux_endpoint.dart';
 export 'src/mux/mux_handshake.dart';
 export 'src/mux/mux_messages.dart';
