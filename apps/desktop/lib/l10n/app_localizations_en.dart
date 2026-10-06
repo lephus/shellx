@@ -519,4 +519,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get windowsVersionUnsupported =>
       'ShellX requires Windows 10 version 1809 or later.';
+
+  @override
+  String terminalExitedLine(int code) {
+    return '[Process exited with code $code] — press Enter to close';
+  }
 }

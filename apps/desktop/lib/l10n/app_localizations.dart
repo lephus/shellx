@@ -871,6 +871,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ShellX requires Windows 10 version 1809 or later.'**
   String get windowsVersionUnsupported;
+
+  /// No description provided for @terminalExitedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'[Process exited with code {code}] — press Enter to close'**
+  String terminalExitedLine(int code);
 }
 
 class _AppLocalizationsDelegate

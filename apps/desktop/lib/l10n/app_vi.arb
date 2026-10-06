@@ -128,5 +128,6 @@
   "notifyTerminalSharingFailedFile": "ShellX không sửa được {path}. Không có gì bị thay đổi.",
   "notifyAllowScriptsFailedTitle": "Không cho phép được script cục bộ cho {name}",
   "startupFailed": "ShellX không khởi động được. Hãy mở lại; nếu vẫn lỗi, hãy khởi động lại máy.",
-  "windowsVersionUnsupported": "ShellX cần Windows 10 bản 1809 trở lên."
+  "windowsVersionUnsupported": "ShellX cần Windows 10 bản 1809 trở lên.",
+  "terminalExitedLine": "[Tiến trình đã thoát, mã {code}] — Enter để đóng"
 }

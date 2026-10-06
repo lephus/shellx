@@ -16,6 +16,9 @@ abstract final class SettingKeys {
   /// missing = the default, see `notify_threshold.dart`).
   static const String notifyThreshold = 'command_notify_threshold_seconds';
 
+  /// Terminal font size in points (UI §1.3: 9–28, default 13).
+  static const String terminalFontSize = 'terminal_font_size';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -24,6 +27,7 @@ abstract final class SettingKeys {
     terminalSharing,
     terminalSharingFiles,
     notifyThreshold,
+    terminalFontSize,
   };
 }
 

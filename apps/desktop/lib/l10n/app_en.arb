@@ -273,5 +273,11 @@
     }
   },
   "startupFailed": "ShellX could not start. Open it again; if this keeps happening, restart your computer.",
-  "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later."
+  "windowsVersionUnsupported": "ShellX requires Windows 10 version 1809 or later.",
+  "terminalExitedLine": "[Process exited with code {code}] — press Enter to close",
+  "@terminalExitedLine": {
+    "placeholders": {
+      "code": {"type": "int"}
+    }
+  }
 }

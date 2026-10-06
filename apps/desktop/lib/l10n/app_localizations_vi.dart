@@ -515,4 +515,9 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get windowsVersionUnsupported =>
       'ShellX cần Windows 10 bản 1809 trở lên.';
+
+  @override
+  String terminalExitedLine(int code) {
+    return '[Tiến trình đã thoát, mã $code] — Enter để đóng';
+  }
 }
