@@ -24,6 +24,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     super.key,
     required this.terminalFocus,
     required this.emptyFocus,
+    this.stripFocus,
     this.shortcuts,
   });
 
@@ -33,8 +34,11 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// The empty state's "Open new tab" button.
   final FocusNode emptyFocus;
 
-  /// Passed to every TerminalView (Task 8: window shortcuts must win over
-  /// xterm's own key handling).
+  /// The signed-out strip's button (UI §3.6 region 3).
+  final FocusNode? stripFocus;
+
+  /// Passed to every TerminalView: the window shortcuts must win over
+  /// xterm's own key handling.
   final Map<ShortcutActivator, Intent>? shortcuts;
 
   @override
@@ -135,6 +139,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
             layoutBuilder: _stretch,
             child: phase == AuthPhase.signedOut
                 ? SignedOutStrip(
+                    focusNode: widget.stripFocus,
                     onSignIn: () => ref
                         .read(windowRouterProvider.notifier)
                         .open(const LoginRoute()),

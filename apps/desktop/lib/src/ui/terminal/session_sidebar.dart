@@ -18,6 +18,7 @@ class SessionSidebar extends ConsumerStatefulWidget {
     required this.scrollController,
     required this.onSelected,
     required this.onClose,
+    required this.onEscape,
   });
 
   /// The list's single tab stop (UI §3.6).
@@ -29,6 +30,9 @@ class SessionSidebar extends ConsumerStatefulWidget {
   /// After a click: select + focus the terminal (UI §3.1).
   final void Function(int id) onSelected;
   final void Function(TerminalTab tab) onClose;
+
+  /// Esc in the list: back to the terminal (UI §3.6).
+  final VoidCallback onEscape;
 
   @override
   ConsumerState<SessionSidebar> createState() => _SessionSidebarState();
@@ -72,24 +76,112 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       widget.focusNode.hasFocus &&
       FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
 
+  /// UI §3.6 list keys. ↑/↓/Home/End move the selection itself (the
+  /// terminal on the right follows; the workspace does not take the focus
+  /// while the list has it) rather than a separate roving highlight;
+  /// Enter/Space/Esc hand the keyboard back to the terminal; Shift+F10 and
+  /// the Menu key open the selected row's menu.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
+    final state = ref.read(terminalTabsProvider);
+    final tabs = ref.read(terminalTabsProvider.notifier);
     final menu =
         key == LogicalKeyboardKey.contextMenu ||
         (key == LogicalKeyboardKey.f10 &&
             HardwareKeyboard.instance.isShiftPressed);
-    if (!menu) return KeyEventResult.ignored;
-    final id = ref.read(terminalTabsProvider).selectedId;
-    if (id == null) return KeyEventResult.ignored;
-    _rows[id]?.currentState?.openMenu();
+    if (menu) {
+      if (event is KeyRepeatEvent) return KeyEventResult.handled;
+      final id = state.selectedId;
+      if (id == null) return KeyEventResult.ignored;
+      _openMenu(id);
+      return KeyEventResult.handled;
+    }
+    // Plain keys only: chords (Ctrl+Tab, ⌘1…) belong to the window.
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isControlPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    switch (key) {
+      case LogicalKeyboardKey.arrowDown:
+        tabs.next();
+      case LogicalKeyboardKey.arrowUp:
+        tabs.previous();
+      case LogicalKeyboardKey.home:
+        tabs.selectIndex(1);
+      case LogicalKeyboardKey.end:
+        tabs.selectIndex(state.tabs.length);
+      case LogicalKeyboardKey.enter ||
+          LogicalKeyboardKey.numpadEnter ||
+          LogicalKeyboardKey.space:
+        final id = state.selectedId;
+        if (id == null) return KeyEventResult.ignored;
+        widget.onSelected(id); // selects + focuses the terminal
+      case LogicalKeyboardKey.escape:
+        widget.onEscape();
+      default:
+        return KeyEventResult.ignored;
+    }
     return KeyEventResult.handled;
+  }
+
+  /// The list builds only the rows on screen: an off-screen row is
+  /// scrolled in first, then its menu opens.
+  void _openMenu(int id) {
+    _reveal(id);
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) _rows[id]?.currentState?.openMenu();
+      })
+      ..ensureVisualUpdate();
+  }
+
+  /// Scrolls the row of [id] fully into view (rows are a fixed height, so
+  /// this works for rows the list has not built). The lazy list only
+  /// estimates its extent until it builds the rows near the end, so a
+  /// jump the estimate cut short is finished on the next frames.
+  void _reveal(int id, {int retries = 2}) {
+    final controller = widget.scrollController;
+    if (!mounted || !controller.hasClients) return;
+    final tabs = ref.read(terminalTabsProvider).tabs;
+    final index = tabs.indexWhere((t) => t.id == id);
+    if (index < 0) return;
+    final row = SessionTabRow.heightFor(MediaQuery.textScalerOf(context));
+    final top = ShellxSizes.listTop + index * (row + ShellxSizes.rowGap);
+    final bottom = top + row;
+    final position = controller.position;
+    final viewport = position.viewportDimension;
+    double? target;
+    if (top - ShellxSizes.listTop < position.pixels) {
+      target = top - ShellxSizes.listTop;
+    } else if (bottom + ShellxSizes.listBottom > position.pixels + viewport) {
+      target = bottom + ShellxSizes.listBottom - viewport;
+    }
+    if (target == null) return;
+    controller.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+    if (target > position.maxScrollExtent && retries > 0) {
+      WidgetsBinding.instance
+        ..addPostFrameCallback((_) => _reveal(id, retries: retries - 1))
+        ..ensureVisualUpdate();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(terminalTabsProvider);
+    // Keyboard or ⌘1…⌘9 moved the selection: keep its row on screen.
+    ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
+      if (id == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
+    });
     final mac = isMacDesktop;
     final shortcut = newTabShortcutLabel();
     final newTab = ShellxIconButton(

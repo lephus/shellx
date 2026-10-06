@@ -313,8 +313,11 @@ class _HoverThumbScrollbarState
 /// UI §2.4: a layout row at the top of the pane (it may resize the terminal:
 /// it is rare and shows before phones attach).
 class SignedOutStrip extends StatelessWidget {
-  const SignedOutStrip({super.key, required this.onSignIn});
+  const SignedOutStrip({super.key, required this.onSignIn, this.focusNode});
   final VoidCallback onSignIn;
+
+  /// F6 lands here (UI §3.6 region 3).
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -350,6 +353,7 @@ class SignedOutStrip extends StatelessWidget {
           ),
           TextButton(
             key: const Key('pane.signIn'),
+            focusNode: focusNode,
             onPressed: onSignIn,
             style: ButtonStyle(
               minimumSize: const WidgetStatePropertyAll(

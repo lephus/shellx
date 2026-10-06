@@ -154,6 +154,13 @@ class SessionTabRow extends StatefulWidget {
   /// focus ring (UI §3, keyboard focus only).
   final bool focused;
 
+  /// UI §1.3: max(30, 18 · scale + 12). The sidebar uses it to scroll a
+  /// row it has not built yet into view.
+  static double heightFor(TextScaler textScaler) => max(
+    ShellxSizes.row,
+    textScaler.scale(ShellxSizes.rowTextLine) + ShellxSizes.rowTextPadding,
+  );
+
   @override
   State<SessionTabRow> createState() => SessionTabRowState();
 }
@@ -223,12 +230,7 @@ class SessionTabRowState extends State<SessionTabRow> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final tab = widget.tab;
-    final textScaler = MediaQuery.textScalerOf(context);
-    // UI §1.3: max(30, 18 · scale + 12).
-    final height = max(
-      ShellxSizes.row,
-      textScaler.scale(ShellxSizes.rowTextLine) + ShellxSizes.rowTextPadding,
-    );
+    final height = SessionTabRow.heightFor(MediaQuery.textScalerOf(context));
     final background = _pressed
         ? ShellxDesktopColors.rowPressed
         : widget.selected
