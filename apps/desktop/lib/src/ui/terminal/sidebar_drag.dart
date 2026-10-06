@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -79,43 +82,142 @@ class _RowDragPointerState extends MultiDragPointerState {
       starter(initialPosition);
 }
 
-/// UI-A2 §6 drag feedback: a copy of the row, 208 wide, on `rowSelected`
-/// with a 1 px `border`, `r6` and `e1`, at 92 %.
+/// Where the drag chip goes (V1), all in global coordinates: the pointer,
+/// the list it must stay inside, and what it must not cover (the drop
+/// line, or the header or empty group under the pointer).
+@immutable
+final class DragGhostPlacement {
+  const DragGhostPlacement({
+    required this.pointer,
+    required this.bounds,
+    this.avoid,
+  });
+  final Offset pointer;
+  final Rect bounds;
+  final Rect? avoid;
+}
+
+/// V1: the chip's top-left: [ShellxSizes.dragGhostOffsetX]/`Y` right of and
+/// below the pointer, kept inside the list horizontally; moved below what
+/// it would cover (or above it when below leaves the list).
+Offset dragGhostTopLeft(DragGhostPlacement p, Size chip) {
+  final margin = ShellxSizes.listMarginH;
+  final minX = p.bounds.left + margin;
+  final maxX = max(minX, p.bounds.right - margin - chip.width);
+  final x = (p.pointer.dx + ShellxSizes.dragGhostOffsetX).clamp(minX, maxX);
+  var y = p.pointer.dy + ShellxSizes.dragGhostOffsetY;
+  final avoid = p.avoid;
+  if (avoid != null && (Offset(x, y) & chip).overlaps(avoid)) {
+    y = avoid.bottom + ShellxSizes.dragGhostClearance;
+    if (y + chip.height > p.bounds.bottom) {
+      y = avoid.top - ShellxSizes.dragGhostClearance - chip.height;
+    }
+  }
+  return Offset(x, y);
+}
+
+/// UI-A2 §6 (V1) drag feedback: a compact chip — the status dot and the
+/// title on one 30 px line, at most 208 wide — opaque on `rowSelected`
+/// with a 1 px `border`, `r6` and `e1`. It hangs off the pointer (the
+/// draggable anchors its origin there) at [dragGhostTopLeft], so it never
+/// hides the drop line or the target, and never leaves the list.
 class SidebarDragFeedback extends StatelessWidget {
-  const SidebarDragFeedback({super.key, required this.tab, required this.home});
+  const SidebarDragFeedback({
+    super.key,
+    required this.tab,
+    required this.placement,
+  });
   final TerminalTab tab;
-  final String home;
+  final ValueListenable<DragGhostPlacement> placement;
+
+  /// The chip's size for [tab]'s title at [scaler].
+  static Size sizeFor(
+    TerminalTab tab,
+    TextScaler scaler,
+    TextStyle style,
+    TextDirection direction,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: tab.label, style: style),
+      textDirection: direction,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final title = painter.width;
+    painter.dispose();
+    final width = min(
+      ShellxSizes.dragGhostMaxWidth,
+      ShellxSpace.s8 +
+          ShellxSizes.dotSlot +
+          ShellxSpace.s8 +
+          title +
+          ShellxSpace.s8 +
+          2, // the 1 px border on both sides
+    );
+    return Size(width, SessionTabRow.heightFor(scaler));
+  }
 
   @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: IgnorePointer(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Opacity(
-          opacity: 0.92,
-          child: Container(
-            width: ShellxSizes.sidebarWidth - 2 * ShellxSizes.listMarginH,
-            decoration: BoxDecoration(
-              color: ShellxDesktopColors.rowSelected,
-              borderRadius: BorderRadius.circular(ShellxRadius.r6),
-              boxShadow: ShellxShadows.e1,
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final style = DefaultTextStyle.of(context).style.merge(
+      ShellxText.body.copyWith(color: ShellxDesktopColors.textPrimary),
+    );
+    final size = sizeFor(tab, scaler, style, Directionality.of(context));
+    final chip = Container(
+      key: const Key('drag.ghost'),
+      width: size.width,
+      height: size.height,
+      padding: const EdgeInsets.symmetric(horizontal: ShellxSpace.s8),
+      decoration: BoxDecoration(
+        color: ShellxDesktopColors.rowSelected,
+        borderRadius: BorderRadius.circular(ShellxRadius.r6),
+        border: Border.all(color: ShellxDesktopColors.border),
+        boxShadow: ShellxShadows.e1,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: ShellxSizes.dotSlot,
+            child: Center(child: TabStatusDot(tab)),
+          ),
+          const SizedBox(width: ShellxSpace.s8),
+          Flexible(
+            child: Text(
+              tab.label,
+              style: style,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
             ),
-            foregroundDecoration: BoxDecoration(
-              border: Border.all(color: ShellxDesktopColors.border),
-              borderRadius: BorderRadius.circular(ShellxRadius.r6),
-            ),
-            child: SessionTabRow(
-              tab: tab,
-              selected: false,
-              position: 1,
-              count: 1,
-              home: home,
-              onSelect: () {},
-              onClose: () {},
+          ),
+        ],
+      ),
+    );
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: Material(
+          type: MaterialType.transparency,
+          // The feedback's origin is the pointer; the chip is drawn off it.
+          child: SizedBox.shrink(
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minWidth: 0,
+              minHeight: 0,
+              maxWidth: double.infinity,
+              maxHeight: double.infinity,
+              child: ValueListenableBuilder<DragGhostPlacement>(
+                valueListenable: placement,
+                builder: (context, p, child) => Transform.translate(
+                  offset: dragGhostTopLeft(p, size) - p.pointer,
+                  child: child,
+                ),
+                child: chip,
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -62,6 +62,7 @@ class SessionTabRow extends StatefulWidget {
     this.positionLabel,
     this.extraActions = const {},
     this.home = '',
+    this.menuOpen = false,
   });
 
   final TerminalTab tab;
@@ -100,6 +101,10 @@ class SessionTabRow extends StatefulWidget {
 
   /// The user's home, for `~` (UI-A2 §2.3).
   final String home;
+
+  /// V6: this row's context menu is open: the pressed fill and a 1 px
+  /// outline stay until it closes, so the menu's target is plain.
+  final bool menuOpen;
 
   /// UI-A1 §1.3 / UI-A2 §1.3: max(30, 18·s + 12); with a context line
   /// max(46, 18·s + 14·s + 14). The sidebar sums them to scroll a row it
@@ -251,7 +256,7 @@ class SessionTabRowState extends State<SessionTabRow> {
     final scaler = MediaQuery.textScalerOf(context);
     final withContext = tab.hasContext;
     final height = SessionTabRow.heightFor(scaler, context: withContext);
-    final background = _pressed
+    final background = _pressed || (widget.menuOpen && !widget.selected)
         ? ShellxDesktopColors.rowPressed
         : widget.selected
         ? ShellxDesktopColors.rowSelected
@@ -301,7 +306,7 @@ class SessionTabRowState extends State<SessionTabRow> {
       children: [
         SizedBox(
           width: ShellxSizes.dotSlot,
-          child: Center(child: _Dot(tab)),
+          child: Center(child: TabStatusDot(tab)),
         ),
         const SizedBox(width: ShellxSpace.s8),
         Expanded(
@@ -422,6 +427,11 @@ class SessionTabRowState extends State<SessionTabRow> {
                           color: ShellxDesktopColors.accent,
                           width: ShellxSizes.focusRing,
                         ),
+                      )
+                    : widget.menuOpen
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                        border: Border.all(color: ShellxDesktopColors.border),
                       )
                     : const BoxDecoration(),
                 // One structure whatever the row shows (I1): the bar's
@@ -656,8 +666,8 @@ Offset besideSidebar(TooltipPositionContext context) {
 /// alone (WCAG 1.4.1): idle a filled `ok` dot; running a command an
 /// `accent` ring with a 4 px centre (a target); exited non-zero a hollow
 /// 1.5 px `err` ring. The meaning is also in the row's semantics label.
-class _Dot extends StatelessWidget {
-  const _Dot(this.tab);
+class TabStatusDot extends StatelessWidget {
+  const TabStatusDot(this.tab, {super.key});
   final TerminalTab tab;
 
   @override
@@ -752,6 +762,7 @@ class _ContextLine extends StatelessWidget {
           return width;
         });
         final ports = _sortedPorts(tab);
+        final glyph = scaler.scale(ShellxSizes.branchGlyph);
         final layout = layoutContextLine(
           branch: tab.gitBranch,
           path: path,
@@ -759,6 +770,7 @@ class _ContextLine extends StatelessWidget {
           width: constraints.maxWidth,
           measure: measure,
           windows: windows,
+          branchGlyph: glyph + ShellxSizes.branchGlyphGap,
         );
         Widget text(String s) =>
             Text(s, style: style, maxLines: 1, softWrap: false);
@@ -767,7 +779,21 @@ class _ContextLine extends StatelessWidget {
           if (children.isNotEmpty) children.add(text(' · '));
         }
 
-        if (layout.branch case final branch?) children.add(text(branch));
+        if (layout.branch case final branch?) {
+          // V8: a branch glyph tells the branch from the folder (the
+          // semantics label already says "branch").
+          children
+            ..add(
+              Icon(
+                Icons.call_split,
+                key: const Key('row.branchGlyph'),
+                size: glyph,
+                color: ShellxDesktopColors.textSecondary,
+              ),
+            )
+            ..add(const SizedBox(width: ShellxSizes.branchGlyphGap))
+            ..add(text(branch));
+        }
         if (layout.path case final p?) {
           separator();
           children.add(text(p));

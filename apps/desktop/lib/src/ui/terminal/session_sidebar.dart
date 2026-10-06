@@ -79,9 +79,21 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// The tab being dragged: no drop line where it already is.
   int? _draggedId;
 
-  /// Where the pointer holds the dragged row (the feedback keeps it
-  /// there; drop details report the feedback's corner).
-  Offset _grab = Offset.zero;
+  /// V1: where the drag chip goes; the feedback's origin is the pointer,
+  /// so drop details report the pointer itself.
+  final _ghost = ValueNotifier(
+    const DragGhostPlacement(pointer: Offset.zero, bounds: Rect.zero),
+  );
+
+  /// Empty-group hints by workspace id (the chip keeps clear of them).
+  final _emptyKeys = <String, GlobalKey>{};
+
+  /// The pinned copy of the current group's header (V7).
+  final _stickyKey = GlobalKey();
+
+  /// V6: the row (`('row', tabId)`) or header (`('ws', workspaceId)`)
+  /// whose context menu is open.
+  Object? _menuFor;
   Timer? _scrollTimer;
   Timer? _expandTimer;
   double _scrollVelocity = 0;
@@ -107,6 +119,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   void dispose() {
     _scrollTimer?.cancel();
     _expandTimer?.cancel();
+    _ghost.dispose();
     widget.focusNode.removeListener(_refresh);
     FocusManager.instance.removeHighlightModeListener(_onHighlightMode);
     super.dispose();
@@ -450,9 +463,15 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final bottom = found + extent;
     final position = controller.position;
     final viewport = position.viewportDimension;
+    // V7: a row's group header is pinned over the list's top; the row
+    // must show below it.
+    final inset =
+        target is int && ref.read(sidebarWorkspacesProvider).showHeaders
+        ? WorkspaceHeader.heightFor(scaler)
+        : 0.0;
     double? jump;
-    if (found - ShellxSizes.listTop < position.pixels) {
-      jump = found - ShellxSizes.listTop;
+    if (found - ShellxSizes.listTop - inset < position.pixels) {
+      jump = found - ShellxSizes.listTop - inset;
     } else if (bottom + ShellxSizes.listBottom > position.pixels + viewport) {
       jump = bottom + ShellxSizes.listBottom - viewport;
     }
@@ -628,7 +647,21 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _announceMove(id);
   }
 
-  /// UI-A2 §5.1.
+  /// V6: [menuFor] keeps its highlight while [show] (a menu) is open.
+  Future<T?> _withMenuOpen<T>(
+    Object menuFor,
+    Future<T?> Function() show,
+  ) async {
+    setState(() => _menuFor = menuFor);
+    try {
+      return await show();
+    } finally {
+      if (mounted && _menuFor == menuFor) setState(() => _menuFor = null);
+    }
+  }
+
+  /// UI-A2 §5.1. More than two ports go into an "Open port in browser…"
+  /// submenu (V12), so the menu stays short.
   Future<void> _rowMenu(TerminalTab tab, Offset at) async {
     final l10n = AppLocalizations.of(context);
     // Shift+F10 / the Menu key: the list has the keyboard (UI-A2 §4).
@@ -638,75 +671,108 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final ports = tab.exited
         ? const <int>[]
         : ([...tab.ports]..sort()).take(5).toList();
-    final choice = await showShellxMenu<Object>(
+    final portSubmenu = ports.length > 2;
+    await _withMenuOpen(('row', tab.id), () async {
+      final choice = await showShellxMenu<Object>(
+        context: context,
+        at: at,
+        entries: [
+          ShellxMenuEntry(
+            key: const Key('menu.renameTab'),
+            value: _RowAction.rename,
+            label: l10n.tabRename,
+            shortcut: renameShortcutLabel(),
+          ),
+          if (tab.customTitle != null)
+            ShellxMenuEntry(
+              key: const Key('menu.automaticName'),
+              value: _RowAction.automaticName,
+              label: l10n.tabUseAutomaticName,
+            ),
+          ShellxMenuEntry(
+            key: const Key('menu.moveTo'),
+            value: _RowAction.moveTo,
+            label: l10n.tabMoveTo,
+            dividerBefore: true,
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.moveUp'),
+            value: _RowAction.moveUp,
+            label: l10n.tabMoveUp,
+            shortcut: moveUpShortcutLabel(),
+            enabled: workspaces.canMoveUp(tab.id),
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.moveDown'),
+            value: _RowAction.moveDown,
+            label: l10n.tabMoveDown,
+            shortcut: moveDownShortcutLabel(),
+            enabled: workspaces.canMoveDown(tab.id),
+          ),
+          if (portSubmenu)
+            ShellxMenuEntry(
+              key: const Key('menu.ports'),
+              value: _RowAction.ports,
+              label: l10n.tabOpenPortMenu,
+              dividerBefore: true,
+            )
+          else
+            for (final (i, port) in ports.indexed)
+              ShellxMenuEntry(
+                key: Key('menu.port.$port'),
+                value: port,
+                label: l10n.tabOpenPort(port),
+                dividerBefore: i == 0,
+              ),
+          ShellxMenuEntry(
+            key: const Key('menu.closeTab'),
+            value: _RowAction.close,
+            label: l10n.terminalCloseTab,
+            shortcut: closeTabShortcutLabel(),
+            dividerBefore: true,
+          ),
+        ],
+      );
+      if (!mounted) return null;
+      switch (choice) {
+        case _RowAction.rename:
+          _startTabRename(tab.id, fromList: fromList);
+        case _RowAction.automaticName:
+          ref.read(terminalTabsProvider.notifier).rename(tab.id, null);
+        case _RowAction.moveTo:
+          await _moveToMenu(tab, at, fromList: fromList);
+        case _RowAction.ports:
+          await _portMenu(ports, at);
+        case _RowAction.moveUp:
+          _moveUp(tab.id);
+        case _RowAction.moveDown:
+          _moveDown(tab.id);
+        case _RowAction.close:
+          widget.onClose(tab);
+        case final int port:
+          await _openPort(port);
+      }
+      return null;
+    });
+  }
+
+  /// V12: one entry per port ("Open http://localhost:3000"), at the same
+  /// place as the row menu.
+  Future<void> _portMenu(List<int> ports, Offset at) async {
+    final l10n = AppLocalizations.of(context);
+    final port = await showShellxMenu<int>(
       context: context,
       at: at,
       entries: [
-        ShellxMenuEntry(
-          key: const Key('menu.renameTab'),
-          value: _RowAction.rename,
-          label: l10n.tabRename,
-          shortcut: renameShortcutLabel(),
-        ),
-        if (tab.customTitle != null)
-          ShellxMenuEntry(
-            key: const Key('menu.automaticName'),
-            value: _RowAction.automaticName,
-            label: l10n.tabUseAutomaticName,
-          ),
-        ShellxMenuEntry(
-          key: const Key('menu.moveTo'),
-          value: _RowAction.moveTo,
-          label: l10n.tabMoveTo,
-          dividerBefore: true,
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.moveUp'),
-          value: _RowAction.moveUp,
-          label: l10n.tabMoveUp,
-          shortcut: moveUpShortcutLabel(),
-          enabled: workspaces.canMoveUp(tab.id),
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.moveDown'),
-          value: _RowAction.moveDown,
-          label: l10n.tabMoveDown,
-          shortcut: moveDownShortcutLabel(),
-          enabled: workspaces.canMoveDown(tab.id),
-        ),
-        for (final (i, port) in ports.indexed)
+        for (final port in ports)
           ShellxMenuEntry(
             key: Key('menu.port.$port'),
             value: port,
-            label: l10n.tabOpenPort(port),
-            dividerBefore: i == 0,
+            label: l10n.portOpenTooltip(port),
           ),
-        ShellxMenuEntry(
-          key: const Key('menu.closeTab'),
-          value: _RowAction.close,
-          label: l10n.terminalCloseTab,
-          shortcut: closeTabShortcutLabel(),
-          dividerBefore: true,
-        ),
       ],
     );
-    if (!mounted) return;
-    switch (choice) {
-      case _RowAction.rename:
-        _startTabRename(tab.id, fromList: fromList);
-      case _RowAction.automaticName:
-        ref.read(terminalTabsProvider.notifier).rename(tab.id, null);
-      case _RowAction.moveTo:
-        await _moveToMenu(tab, at, fromList: fromList);
-      case _RowAction.moveUp:
-        _moveUp(tab.id);
-      case _RowAction.moveDown:
-        _moveDown(tab.id);
-      case _RowAction.close:
-        widget.onClose(tab);
-      case final int port:
-        await _openPort(port);
-    }
+    if (port != null && mounted) await _openPort(port);
   }
 
   /// UI-A2 §5.3: every other workspace in sidebar order, then "New
@@ -727,6 +793,13 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       context: context,
       at: at,
       entries: [
+        // V6: the submenu names the tab it moves.
+        ShellxMenuEntry(
+          key: const Key('menu.moveTo.title'),
+          value: '',
+          label: l10n.tabMoveToTitle(tab.label),
+          heading: true,
+        ),
         for (final w in others)
           ShellxMenuEntry(
             key: Key('menu.moveTo.${w.id}'),
@@ -738,11 +811,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           value: _newWorkspace,
           label: l10n.workspaceNew,
           shortcut: newWorkspaceShortcutLabel(),
-          dividerBefore: others.isNotEmpty,
+          dividerBefore: true,
         ),
       ],
     );
-    if (choice == null || !mounted) return;
+    if (choice == null || choice.isEmpty || !mounted) return;
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     if (choice == _newWorkspace) {
       await workspaces.create(moveTab: tab.id);
@@ -795,35 +868,40 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final l10n = AppLocalizations.of(context);
     // Shift+F10 / the Menu key: the list has the keyboard (UI-A2 §4).
     final fromList = widget.focusNode.hasFocus;
-    final choice = await showShellxMenu<_HeaderAction>(
-      context: context,
-      at: at,
-      entries: [
-        ShellxMenuEntry(
-          key: const Key('menu.ws.newTab'),
-          value: _HeaderAction.newTab,
-          label: l10n.workspaceNewTab,
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.ws.rename'),
-          value: _HeaderAction.rename,
-          label: l10n.workspaceRename,
-          shortcut: renameShortcutLabel(),
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.ws.toggle'),
-          value: _HeaderAction.toggle,
-          label: w.collapsed ? l10n.workspaceExpand : l10n.workspaceCollapse,
-          shortcut: w.collapsed ? '→' : '←',
-        ),
-        ShellxMenuEntry(
-          key: const Key('menu.ws.delete'),
-          value: _HeaderAction.delete,
-          label: l10n.workspaceDelete,
-          enabled: !w.isDefault,
-          dividerBefore: true,
-        ),
-      ],
+    final choice = await _withMenuOpen(
+      ('ws', w.id),
+      () => showShellxMenu<_HeaderAction>(
+        context: context,
+        at: at,
+        entries: [
+          ShellxMenuEntry(
+            key: const Key('menu.ws.newTab'),
+            value: _HeaderAction.newTab,
+            label: l10n.workspaceNewTab,
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.ws.rename'),
+            value: _HeaderAction.rename,
+            label: l10n.workspaceRename,
+            shortcut: renameShortcutLabel(),
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.ws.toggle'),
+            value: _HeaderAction.toggle,
+            label: w.collapsed ? l10n.workspaceExpand : l10n.workspaceCollapse,
+            shortcut: w.collapsed ? '→' : '←',
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.ws.delete'),
+            value: _HeaderAction.delete,
+            label: l10n.workspaceDelete,
+            enabled: !w.isDefault,
+            // V12: say why it is greyed out.
+            tooltip: w.isDefault ? l10n.workspaceDeleteDefaultReason : null,
+            dividerBefore: true,
+          ),
+        ],
+      ),
     );
     if (!mounted || choice == null) return;
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
@@ -841,9 +919,30 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   // ---- drag and drop (UI-A2 §6) -----------------------------------------
 
-  /// The feedback keeps the row where the pointer grabbed it.
-  Offset _anchor(Draggable<Object> d, BuildContext context, Offset position) =>
-      _grab = childDragAnchorStrategy(d, context, position);
+  /// V1: the feedback's origin is the pointer (the chip hangs off it).
+  Offset _anchor(Draggable<Object> d, BuildContext context, Offset position) {
+    _placeGhost(pointer: position, avoid: null);
+    return Offset.zero;
+  }
+
+  Rect? _globalRect(BuildContext? context) {
+    final box = context?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize || !box.attached) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  /// Moves the chip; [avoid] keeps what it must not cover (unchanged when
+  /// left out).
+  void _placeGhost({Offset? pointer, Object? avoid = _keepAvoid}) {
+    final now = _ghost.value;
+    _ghost.value = DragGhostPlacement(
+      pointer: pointer ?? now.pointer,
+      bounds: _globalRect(_listKey.currentContext) ?? now.bounds,
+      avoid: identical(avoid, _keepAvoid) ? now.avoid : avoid as Rect?,
+    );
+  }
+
+  static const Object _keepAvoid = Object();
 
   void _stopDrag() {
     _scrollTimer?.cancel();
@@ -914,6 +1013,18 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     if (box == null || !box.hasSize) return;
     final before = box.globalToLocal(pointer).dy < box.size.height / 2;
     final slot = (item.workspace.id, item.index + (before ? 0 : 1));
+    // The drop line sits in the 2 px gap above or below the row.
+    final rect = box.localToGlobal(Offset.zero) & box.size;
+    _placeGhost(
+      avoid: _isNoOp(slot)
+          ? null
+          : Rect.fromLTRB(
+              rect.left,
+              before ? rect.top - ShellxSizes.dropLine : rect.bottom,
+              rect.right,
+              before ? rect.top : rect.bottom + ShellxSizes.dropLine,
+            ),
+    );
     if (slot == _drop && _dropTarget == null) return;
     setState(() {
       _drop = slot;
@@ -927,7 +1038,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   /// A header (workspace id) or an empty hint (`empty.<id>`); over a
   /// collapsed header for 600 ms, the workspace expands (UI-A2 §6).
-  void _hoverTarget(String target, {String? header}) {
+  void _hoverTarget(String target, BuildContext? context, {String? header}) {
+    _placeGhost(avoid: _globalRect(context));
     if (_dropTarget == target) return;
     _expandTimer?.cancel();
     _expandTimer = null;
@@ -1011,7 +1123,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     data: tab.id,
     maxSimultaneousDrags: enabled ? null : 0,
     dragAnchorStrategy: _anchor,
-    feedback: SidebarDragFeedback(tab: tab, home: home),
+    feedback: SidebarDragFeedback(tab: tab, placement: _ghost),
     childWhenDragging: Opacity(
       opacity: ShellxDesktopColors.disabledOpacity,
       child: row,
@@ -1028,7 +1140,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// The row and the gap above it: the gap belongs to "before this row",
   /// where its drop line shows.
   Widget _rowTarget(_RowItem item, double gap, Widget row) => DragTarget<int>(
-    onMove: (d) => _hoverRow(item, d.offset + _grab),
+    onMove: (d) => _hoverRow(item, d.offset),
     onLeave: (_) => _leaveRow(),
     onAcceptWithDetails: (d) {
       final drop = _drop;
@@ -1135,29 +1247,36 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _rows.removeWhere((id, _) => !positions.containsKey(id));
     _headerKeys.removeWhere((id, _) => sidebar.workspace(id) == null);
     final cursor = _cursorHeader();
+    final indent = sidebar.showHeaders ? ShellxSizes.workspaceRowIndent : 0.0;
 
-    /// The 8 px above a header drops into it too (no dead band).
-    Widget header(_HeaderItem item, double gap) {
+    /// The 8 px above a header drops into it too (no dead band). [sticky]:
+    /// the pinned copy over the list's top (V7): no name field, no ring,
+    /// not in semantics (the real header is), the same drop target.
+    Widget header(_HeaderItem item, double gap, {bool sticky = false}) {
       final w = item.workspace;
+      final key = sticky
+          ? _stickyKey
+          : _headerKeys.putIfAbsent(w.id, GlobalKey.new);
       return DragTarget<int>(
-        onMove: (_) => _hoverTarget(w.id, header: w.id),
+        onMove: (_) => _hoverTarget(w.id, key.currentContext, header: w.id),
         onLeave: (_) => _leaveTarget(w.id),
         onAcceptWithDetails: (d) => _dropOnTarget(w.id, d.data, w.id),
         builder: (context, _, _) => Padding(
           padding: EdgeInsets.only(top: gap),
           child: KeyedSubtree(
-            key: ValueKey('ws.${w.id}'),
+            key: ValueKey(sticky ? 'sticky.ws.${w.id}' : 'ws.${w.id}'),
             child: WorkspaceHeader(
-              key: _headerKeys.putIfAbsent(w.id, GlobalKey.new),
+              key: key,
               workspaceId: w.id,
               name: w.displayName(l10n),
               count: item.count,
               collapsed: w.collapsed,
               containsSelected: item.containsSelected,
-              focused: _showFocus && cursor == w.id,
-              renaming: sidebar.renaming == RenameWorkspace(w.id),
+              focused: !sticky && _showFocus && cursor == w.id,
+              renaming: !sticky && sidebar.renaming == RenameWorkspace(w.id),
               dropTarget: _dropTarget == w.id,
               deletable: !w.isDefault,
+              menuOpen: _menuFor == ('ws', w.id),
               onToggle: () => workspaces.toggleCollapsed(w.id),
               onStartRename: () => _startWorkspaceRename(w.id, fromList: false),
               onRename: (text) => _commitWorkspaceName(w.id, text),
@@ -1173,37 +1292,41 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
     Widget empty(_EmptyItem item) {
       final target = 'empty.${item.workspaceId}';
+      final key = _emptyKeys.putIfAbsent(item.workspaceId, GlobalKey.new);
       return DragTarget<int>(
-        onMove: (_) => _hoverTarget(target),
+        onMove: (_) => _hoverTarget(target, key.currentContext),
         onLeave: (_) => _leaveTarget(target),
         onAcceptWithDetails: (d) =>
             _dropOnTarget(target, d.data, item.workspaceId, 0),
-        builder: (context, _, _) => Container(
-          key: ValueKey(target),
-          height: _extent(item, scaler),
-          padding: const EdgeInsets.only(left: ShellxSizes.contextInset),
-          alignment: Alignment.centerLeft,
-          decoration: _dropTarget == target
-              ? BoxDecoration(
-                  color: ShellxDesktopColors.primarySoft,
-                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
-                )
-              : null,
-          // The border in front: it never moves the text by 1 px.
-          foregroundDecoration: _dropTarget == target
-              ? BoxDecoration(
-                  border: Border.all(color: ShellxDesktopColors.accent),
-                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
-                )
-              : null,
-          // Read through the header's "0 tabs" (UI-A2 §3.4).
-          child: ExcludeSemantics(
-            child: Text(
-              l10n.workspaceEmptyHint,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ShellxText.caption.copyWith(
-                color: ShellxDesktopColors.textSecondary,
+        builder: (context, _, _) => KeyedSubtree(
+          key: key,
+          child: Container(
+            key: ValueKey(target),
+            height: _extent(item, scaler),
+            padding: const EdgeInsets.only(left: ShellxSizes.contextInset),
+            alignment: Alignment.centerLeft,
+            decoration: _dropTarget == target
+                ? BoxDecoration(
+                    color: ShellxDesktopColors.primarySoft,
+                    borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                  )
+                : null,
+            // The border in front: it never moves the text by 1 px.
+            foregroundDecoration: _dropTarget == target
+                ? BoxDecoration(
+                    border: Border.all(color: ShellxDesktopColors.accent),
+                    borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                  )
+                : null,
+            // Read through the header's "0 tabs" (UI-A2 §3.4).
+            child: ExcludeSemantics(
+              child: Text(
+                l10n.workspaceEmptyHint,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ShellxText.caption.copyWith(
+                  color: ShellxDesktopColors.textSecondary,
+                ),
               ),
             ),
           ),
@@ -1240,22 +1363,104 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         onOpenPort: (port) => unawaited(_openPort(port)),
         onMenu: (at) => unawaited(_rowMenu(tab, at)),
         extraActions: _rowActions(l10n, tab),
+        menuOpen: _menuFor == ('row', tab.id),
       );
-      return _rowTarget(
-        item,
-        gap,
-        KeyedSubtree(
-          key: ValueKey('tab.${tab.id}'),
-          // The open name field takes the clicks and drags (UI-A2 §4). The
-          // draggable stays in the tree (only switched off), so opening the
-          // field never rebuilds the row's subtree.
-          child: _draggable(
-            tab,
-            home,
-            row,
-            enabled: sidebar.renaming != RenameTab(tab.id),
+      // V9: under a header, rows sit 8 px in. The padding is always
+      // there (0 without headers): the row's subtree never changes shape.
+      return Padding(
+        padding: EdgeInsets.only(left: indent),
+        child: _rowTarget(
+          item,
+          gap,
+          KeyedSubtree(
+            key: ValueKey('tab.${tab.id}'),
+            // The open name field takes the clicks and drags (UI-A2 §4).
+            // The draggable stays in the tree (only switched off), so
+            // opening the field never rebuilds the row's subtree.
+            child: _draggable(
+              tab,
+              home,
+              row,
+              enabled: sidebar.renaming != RenameTab(tab.id),
+            ),
           ),
         ),
+      );
+    }
+
+    // Item tops in the list's content, for the pinned header (V7).
+    final tops = <double>[];
+    var nextTop = ShellxSizes.listTop;
+    for (final (i, item) in items.indexed) {
+      nextTop += _gapBefore(items, i);
+      tops.add(nextTop);
+      nextTop += _extent(item, scaler);
+    }
+    final headerHeight = WorkspaceHeader.heightFor(scaler);
+
+    /// V7: once a group's header scrolls above the list's top while its
+    /// rows still show, a copy of it stays pinned there (pushed up by the
+    /// next header), with a 1 px `line` under it. Without a pinned header,
+    /// the same line marks a list scrolled under the band.
+    Widget pinned(BuildContext context, Widget? _) {
+      final controller = widget.scrollController;
+      final pixels = controller.hasClients ? controller.offset : 0.0;
+      if (pixels <= 0) return const SizedBox.shrink();
+      const edge = Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 1,
+        child: ColoredBox(
+          key: Key('sidebar.scrollEdge'),
+          color: ShellxDesktopColors.line,
+        ),
+      );
+      int? at;
+      if (sidebar.showHeaders) {
+        for (final (i, item) in items.indexed) {
+          if (item is _HeaderItem && tops[i] < pixels) at = i;
+        }
+      }
+      if (at == null) return const Stack(children: [edge]);
+      final next = items.indexed
+          .skip(at + 1)
+          .where((e) => e.$2 is _HeaderItem)
+          .firstOrNull;
+      var y = 0.0;
+      if (next != null) {
+        final limit =
+            tops[next.$1] -
+            ShellxSizes.workspaceHeaderTop -
+            pixels -
+            headerHeight;
+        if (limit <= -headerHeight) return const Stack(children: [edge]);
+        y = min(0, limit);
+      }
+      return Stack(
+        children: [
+          Positioned(
+            top: y,
+            left: 0,
+            right: 0,
+            child: ExcludeSemantics(
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: ShellxDesktopColors.bgSidebar,
+                  border: Border(
+                    bottom: BorderSide(color: ShellxDesktopColors.line),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ShellxSizes.listMarginH,
+                  ),
+                  child: header(items[at] as _HeaderItem, 0, sticky: true),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -1285,7 +1490,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             _RowItem() => tabRow(item, gap),
             _HeaderItem() => header(item, gap),
             _EmptyItem() => Padding(
-              padding: EdgeInsets.only(top: gap),
+              padding: EdgeInsets.only(top: gap, left: indent),
               child: empty(item),
             ),
           },
@@ -1313,7 +1518,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                   // The pointer drives auto-scroll even once the dragged
                   // row scrolled out of the list (UI-A2 §6).
                   onPointerMove: (e) {
-                    if (_dragging) _autoScroll(e.position);
+                    if (!_dragging) return;
+                    _autoScroll(e.position);
+                    _placeGhost(pointer: e.position);
                   },
                   // A safety net: whatever ends the drag (or fails to, if
                   // its source row is gone), the drag state never
@@ -1327,7 +1534,14 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                         child: ShellxScrollbar(
                           controller: widget.scrollController,
                           showOnHover: true,
+                          crossAxisMargin: 0,
                           child: list,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: ListenableBuilder(
+                          listenable: widget.scrollController,
+                          builder: pinned,
                         ),
                       ),
                       // UI-A2 §6: `grabbing` over the whole list while a
@@ -1353,7 +1567,15 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   }
 }
 
-enum _RowAction { rename, automaticName, moveTo, moveUp, moveDown, close }
+enum _RowAction {
+  rename,
+  automaticName,
+  moveTo,
+  moveUp,
+  moveDown,
+  ports,
+  close,
+}
 
 enum _HeaderAction { newTab, rename, toggle, delete }
 

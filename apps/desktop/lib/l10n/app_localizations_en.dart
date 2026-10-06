@@ -690,7 +690,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceExpand => 'Expand';
 
   @override
-  String get workspaceEmptyHint => 'Empty. Drag a tab here or press +.';
+  String get workspaceEmptyHint => 'Empty — drag a tab here';
+
+  @override
+  String get workspaceDeleteDefaultReason =>
+      'The Default workspace can\'t be deleted';
 
   @override
   String get workspaceNameField => 'Workspace name';
@@ -731,6 +735,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tabMoveTo => 'Move to workspace…';
+
+  @override
+  String tabMoveToTitle(String name) {
+    return 'Move “$name” to';
+  }
+
+  @override
+  String get tabOpenPortMenu => 'Open port in browser…';
 
   @override
   String get tabMoveUp => 'Move up';

@@ -685,7 +685,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get workspaceExpand => 'Mở rộng';
 
   @override
-  String get workspaceEmptyHint => 'Trống. Kéo tab vào đây hoặc bấm +.';
+  String get workspaceEmptyHint => 'Trống — kéo tab vào đây';
+
+  @override
+  String get workspaceDeleteDefaultReason =>
+      'Không xóa được workspace Mặc định';
 
   @override
   String get workspaceNameField => 'Tên workspace';
@@ -720,6 +724,14 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get tabMoveTo => 'Chuyển tới workspace…';
+
+  @override
+  String tabMoveToTitle(String name) {
+    return 'Chuyển “$name” tới';
+  }
+
+  @override
+  String get tabOpenPortMenu => 'Mở cổng trong trình duyệt…';
 
   @override
   String get tabMoveUp => 'Chuyển lên';

@@ -235,9 +235,14 @@ class ShellxScrollbar extends StatefulWidget {
     required this.child,
     this.showOnHover = false,
     this.alwaysVisible = false,
+    this.crossAxisMargin = ShellxSizes.scrollbarMargin,
   });
 
   final ScrollController controller;
+
+  /// From the edge to the thumb. The sidebar passes 0, so the 6 px thumb
+  /// sits in the list's 6 px right gutter, clear of the rows (V12).
+  final double crossAxisMargin;
   final Widget child;
   final bool showOnHover;
 
@@ -259,6 +264,7 @@ class _ShellxScrollbarState extends State<ShellxScrollbar> {
       thumbVisibility:
           widget.alwaysVisible || (widget.showOnHover && _pointerInside),
       fadeDuration: ShellxMotion.of(context, ShellxMotion.fast),
+      crossAxisMargin: widget.crossAxisMargin,
       child: widget.child,
     );
     if (!widget.showOnHover) return scrollbar;
@@ -276,10 +282,10 @@ class _HoverThumbScrollbar extends RawScrollbar {
     required ScrollController super.controller,
     required bool super.thumbVisibility,
     required super.fadeDuration,
+    required super.crossAxisMargin,
   }) : super(
          thickness: ShellxSizes.scrollbarThickness,
          radius: const Radius.circular(ShellxSizes.scrollbarRadius),
-         crossAxisMargin: ShellxSizes.scrollbarMargin,
          padding: EdgeInsets.zero,
          thumbColor: ShellxDesktopColors.scrollThumb,
          timeToFade: ShellxMotion.scrollbarFade,

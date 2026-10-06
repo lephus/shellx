@@ -11,6 +11,8 @@ final class ShellxMenuEntry<T> {
     this.enabled = true,
     this.key,
     this.dividerBefore = false,
+    this.tooltip,
+    this.heading = false,
   });
 
   final T value;
@@ -26,6 +28,15 @@ final class ShellxMenuEntry<T> {
 
   /// UI-A2 §5: a 1 px `line` separator above this item (4 px above/below).
   final bool dividerBefore;
+
+  /// V12: why a disabled item is disabled ("Default can't be deleted"),
+  /// shown on hover and read by screen readers.
+  final String? tooltip;
+
+  /// V6: a title line naming what the menu acts on ("Move “api” to"):
+  /// `caption` `textSecondary`, never selectable (not at 38 %: it is
+  /// meant to be read).
+  final bool heading;
 }
 
 /// UI §3.1 context menu at [at] (global): `surface`, 1 px `border`, `r8`,
@@ -80,7 +91,7 @@ class _ShellxMenuItem<T> extends PopupMenuItem<T> {
     : super(
         key: entry.key,
         value: entry.value,
-        enabled: entry.enabled,
+        enabled: entry.enabled && !entry.heading,
         height: ShellxSizes.menuItem,
         padding: EdgeInsets.zero,
         child: null,
@@ -99,6 +110,27 @@ class _ShellxMenuItemState<T>
   Widget build(BuildContext context) {
     final entry = widget.entry;
     final shortcut = entry.shortcut;
+    if (entry.heading) {
+      return SizedBox(
+        height: widget.height,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ShellxSizes.menuItemPaddingH,
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              entry.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ShellxText.caption.copyWith(
+                color: ShellxDesktopColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final row = Row(
       children: [
         Expanded(
@@ -124,7 +156,8 @@ class _ShellxMenuItemState<T>
         ],
       ],
     );
-    return MergeSemantics(
+    final tooltip = entry.tooltip;
+    final item = MergeSemantics(
       child: buildSemantics(
         child: InkWell(
           onTap: entry.enabled ? handleTap : null,
@@ -151,5 +184,7 @@ class _ShellxMenuItemState<T>
         ),
       ),
     );
+    if (tooltip == null) return item;
+    return Tooltip(message: tooltip, child: item);
   }
 }

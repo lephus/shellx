@@ -202,10 +202,7 @@ void main() {
     await tester.pumpAndSettle();
     final hint = find.byKey(ValueKey('empty.$ws'));
     expect(
-      find.descendant(
-        of: hint,
-        matching: find.text('Empty. Drag a tab here or press +.'),
-      ),
+      find.descendant(of: hint, matching: find.text('Empty — drag a tab here')),
       findsOneWidget,
     );
     final g = await startDrag(tester, row(2));

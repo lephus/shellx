@@ -38,16 +38,28 @@ void main() {
       expect(ellipsizeEnd('main', 3, _m), '');
     });
 
-    test('ellipsizePath drops middle components first, then characters', () {
+    test('ellipsizePath drops middle components first, then keeps the last '
+        'component: …/last, then last… — never a character cut of a whole '
+        'path (V2)', () {
       const p = '~/work/shellx/apps/desktop';
       expect(ellipsizePath(p, 999, _m, windows: false), p);
       expect(ellipsizePath(p, 126, _m, windows: false), '~/…/apps/desktop');
       expect(ellipsizePath(p, 66, _m, windows: false), '~/…/desktop');
+      expect(ellipsizePath(p, 54, _m, windows: false), '…/desktop');
+      expect(ellipsizePath(p, 42, _m, windows: false), 'desktop');
+      expect(ellipsizePath(p, 36, _m, windows: false), 'deskt…');
+      expect(ellipsizePath(p, 24, _m, windows: false), 'des…');
+      expect(ellipsizePath(p, 23, _m, windows: false), ''); // < 3 letters
       expect(
-        ellipsizePath(p, 40, _m, windows: false),
-        ellipsizeMiddle(p, 40, _m),
+        ellipsizePath('~/work/shellx', 48, _m, windows: false),
+        '…/shellx',
       );
+      expect(ellipsizePath('~/w/x', 24, _m, windows: false), '…/x');
       expect(ellipsizePath(r'C:\a\b\c\d', 48, _m, windows: true), r'C:\…\c\d');
+      expect(
+        ellipsizePath(r'C:\src\shellx', 48, _m, windows: true),
+        r'…\shellx',
+      );
     });
 
     test('ellipsizeMiddle keeps both ends', () {
@@ -151,6 +163,46 @@ void main() {
         (l.branch, l.path, l.ports.single, l.truncated),
         ('feature…', null, 3000, true),
       );
+    });
+
+    test('two ports at 168 px: the folder keeps its last component before '
+        'the second port stays (V2)', () {
+      ContextLineLayout l(String? branch, String path) => layoutContextLine(
+        branch: branch,
+        path: path,
+        ports: [5173, 3000],
+        width: 168,
+        measure: _m,
+        windows: false,
+      );
+      final shellx = l(null, '~/work/shellx');
+      expect(shellx.path, '~/work/shellx');
+      expect(shellx.ports, [3000, 5173]);
+      final withBranch = l('main', '~/work/shellx');
+      expect((withBranch.branch, withBranch.path), ('main', '…/shellx'));
+      expect(withBranch.ports, [3000]);
+      expect((withBranch.morePorts, withBranch.truncated), (1, true));
+      final short = l('main', '~/w/x');
+      expect(
+        (short.branch, short.path, short.truncated),
+        ('main', '~/w/x', false),
+      );
+      expect(short.ports, [3000, 5173]);
+    });
+
+    test('the branch glyph counts toward the branch width (V8)', () {
+      final l = layoutContextLine(
+        branch: 'main',
+        path: '~/w',
+        ports: const [],
+        width: 60,
+        measure: _m,
+        windows: false,
+        branchGlyph: 12,
+      );
+      // 12 + 24 + 18 + 18 = 72 > 60: the path no longer fits whole.
+      expect((l.branch, l.truncated), ('main', true));
+      expect(l.path, isNot('~/w'));
     });
 
     test('nothing known → empty', () {

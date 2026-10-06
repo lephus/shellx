@@ -39,6 +39,11 @@ class InlineNameField extends StatefulWidget {
   /// The newest field per [identity].
   static final _open = <Object, Object>{};
 
+  /// The text's left edge inside the field (the outlined decorator's own
+  /// inset plus the 4 px padding; measured by the V5 test).
+  /// The field is drawn this far left so the text does not jump (V5).
+  static const double textInset = 8;
+
   /// Matches `kTabNameMaxLength` and `kWorkspaceNameMaxLength`.
   static const int maxLength = 64;
 
@@ -154,14 +159,15 @@ class _InlineNameFieldState extends State<InlineNameField> {
     final line = MediaQuery.textScalerOf(
       context,
     ).scale((widget.style.fontSize ?? 13) * (widget.style.height ?? 1));
-    return Focus(
+    final height = max(ShellxSizes.renameField, line + 2 * ShellxSpace.s2);
+    final field = Focus(
       canRequestFocus: false,
       skipTraversal: true,
       onKeyEvent: _onKey,
       child: Shortcuts(
         shortcuts: _editing(),
         child: SizedBox(
-          height: max(ShellxSizes.renameField, line + 2 * ShellxSpace.s2),
+          height: height,
           child: Semantics(
             // The accessible name ("Tab name", UI-A2 §4), on a node of its
             // own: never merged into the row's label.
@@ -181,6 +187,9 @@ class _InlineNameFieldState extends State<InlineNameField> {
               onSubmitted: (_) => _commit(),
               decoration: InputDecoration(
                 isDense: true,
+                // V5: the outline is the whole 22 px box, whatever density
+                // the platform theme applies (compact would hug the text).
+                constraints: BoxConstraints.tightFor(height: height),
                 filled: true,
                 fillColor: ShellxDesktopColors.surfaceInset,
                 counterText: '',
@@ -196,6 +205,16 @@ class _InlineNameFieldState extends State<InlineNameField> {
             ),
           ),
         ),
+      ),
+    );
+    // V5: the platform's compact density would take the vertical padding
+    // away; and the glyphs stay where the title or name was (the border
+    // and the 4 px padding sit left of them).
+    return Theme(
+      data: Theme.of(context).copyWith(visualDensity: VisualDensity.standard),
+      child: Transform.translate(
+        offset: const Offset(-InlineNameField.textInset, 0),
+        child: field,
       ),
     );
   }

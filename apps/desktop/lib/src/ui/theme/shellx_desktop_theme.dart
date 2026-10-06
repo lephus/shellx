@@ -178,6 +178,10 @@ abstract final class ShellxSizes {
   static const double portGap = 4;
   static const double portPadH = 2;
 
+  /// UI-A2 §2.1 (V8): the branch glyph before the branch, and its gap.
+  static const double branchGlyph = 10;
+  static const double branchGlyphGap = 2;
+
   /// UI-A2 §3 workspace header.
   static const double workspaceHeader = 28;
   static const double workspaceHeaderTop = 8;
@@ -189,11 +193,22 @@ abstract final class ShellxSizes {
   static const double collapsedMarkHeight = 12;
   static const double emptyWorkspaceRow = 30;
 
+  /// UI-A2 §3 (V9): tab rows sit this far right of their header while
+  /// headers show, so the tree's depth reads at a glance.
+  static const double workspaceRowIndent = 8;
+
   /// UI-A2 §4, §6.
   static const double renameField = 22;
   static const double dropLine = 2;
   static const double dragAutoScrollZone = 32;
   static const double dragAutoScrollSpeed = 240;
+
+  /// UI-A2 §6 (V1): the drag chip sits this far right of and below the
+  /// pointer, at most this wide, and this far from what it would cover.
+  static const double dragGhostOffsetX = 12;
+  static const double dragGhostOffsetY = 10;
+  static const double dragGhostMaxWidth = 208;
+  static const double dragGhostClearance = 4;
   static const double menuDivider = 9;
 }
 

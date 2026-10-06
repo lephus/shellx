@@ -1145,8 +1145,14 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEmptyHint.
   ///
   /// In en, this message translates to:
-  /// **'Empty. Drag a tab here or press +.'**
+  /// **'Empty — drag a tab here'**
   String get workspaceEmptyHint;
+
+  /// No description provided for @workspaceDeleteDefaultReason.
+  ///
+  /// In en, this message translates to:
+  /// **'The Default workspace can\'t be deleted'**
+  String get workspaceDeleteDefaultReason;
 
   /// No description provided for @workspaceNameField.
   ///
@@ -1207,6 +1213,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move to workspace…'**
   String get tabMoveTo;
+
+  /// No description provided for @tabMoveToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move “{name}” to'**
+  String tabMoveToTitle(String name);
+
+  /// No description provided for @tabOpenPortMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Open port in browser…'**
+  String get tabOpenPortMenu;
 
   /// No description provided for @tabMoveUp.
   ///

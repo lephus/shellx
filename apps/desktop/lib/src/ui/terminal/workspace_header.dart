@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'inline_name_field.dart';
+import 'session_tab_row.dart' show besideSidebar;
 
 /// UI-A2 §3: a workspace's header row — chevron, name, tab count, `+` on
 /// hover/focus; click toggles, double-click renames, secondary click /
@@ -30,6 +31,7 @@ class WorkspaceHeader extends StatefulWidget {
     required this.onMenu,
     required this.onDelete,
     this.workspaceId,
+    this.menuOpen = false,
   });
 
   final String name;
@@ -57,6 +59,10 @@ class WorkspaceHeader extends StatefulWidget {
   /// Identifies the name field (see [InlineNameField.identity]).
   final String? workspaceId;
 
+  /// V6: this header's context menu is open: it keeps the pressed fill and
+  /// a 1 px outline until the menu closes, so the menu's target is plain.
+  final bool menuOpen;
+
   /// UI-A2 §1.3: max(28, 16·s + 12).
   static double heightFor(TextScaler scaler) => max(
     ShellxSizes.workspaceHeader,
@@ -66,6 +72,11 @@ class WorkspaceHeader extends StatefulWidget {
   @override
   State<WorkspaceHeader> createState() => WorkspaceHeaderState();
 }
+
+/// Right of the count/`+` slot: the rows' × hit area ends 6 px in
+/// (8 − (24 − 20) / 2), so the slot sits in the same column.
+const double _trailing =
+    ShellxSpace.s8 - (ShellxSizes.rowCloseHit - ShellxSizes.rowCloseVisual) / 2;
 
 class WorkspaceHeaderState extends State<WorkspaceHeader> {
   bool _hover = false;
@@ -96,18 +107,23 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
     );
     final background = widget.dropTarget
         ? ShellxDesktopColors.primarySoft
-        : _pressed
+        : _pressed || widget.menuOpen
         ? ShellxDesktopColors.rowPressed
         : _hover
         ? ShellxDesktopColors.rowHover
         : Colors.transparent;
-    final showAdd = !renaming && (_hover || widget.focused);
+    // V4: an empty group always shows its `+` (the quickest way to fill
+    // it); V10: otherwise the count holds the slot until hover or focus.
+    final showAdd =
+        !renaming && (_hover || widget.focused || widget.count == 0);
     final label = [
       l10n.workspaceHeaderSemantics(widget.name, widget.count),
       if (widget.containsSelected) l10n.workspaceContainsSelected,
     ].join(', ');
 
-    // |4| chevron 20 |4| name |4| count ≥ 16 |2| + 24 |4| (UI-A2 §3.1).
+    // |4| chevron 20 |4| name |4| [count | +] 24 |6| (UI-A2 §3.1, V10):
+    // the count and the `+` share one slot in the rows' × column, so the
+    // name never gives up width to a hidden button.
     final row = Row(
       children: [
         const SizedBox(width: ShellxSpace.s4),
@@ -156,29 +172,29 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                 ),
         ),
         const SizedBox(width: ShellxSpace.s4),
-        // Hidden while renaming; the slot stays (UI-A2 §3.2).
-        Visibility(
-          visible: !renaming,
-          maintainSize: true,
-          maintainAnimation: true,
-          maintainState: true,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: ShellxSizes.headerCountMin,
-            ),
+        // The slot: the count shows here unless the `+` (drawn above, see
+        // below) does; both hidden while renaming, the slot kept.
+        SizedBox(
+          width: ShellxSizes.headerAddHit,
+          child: Visibility(
+            visible: !renaming && !showAdd,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
             child: Text(
               '${widget.count}',
-              textAlign: TextAlign.right,
+              key: const Key('header.count'),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.visible,
               style: ShellxText.caption.copyWith(
                 color: ShellxDesktopColors.textSecondary,
               ),
             ),
           ),
         ),
-        // The `+` slot: the button itself sits above (see below).
-        const SizedBox(
-          width: ShellxSpace.s2 + ShellxSizes.headerAddHit + ShellxSpace.s4,
-        ),
+        const SizedBox(width: _trailing),
       ],
     );
 
@@ -226,6 +242,11 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                   borderRadius: BorderRadius.circular(ShellxRadius.r6),
                   border: Border.all(color: ShellxDesktopColors.accent),
                 )
+              : widget.menuOpen
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(ShellxRadius.r6),
+                  border: Border.all(color: ShellxDesktopColors.border),
+                )
               : const BoxDecoration(),
           child: AnimatedContainer(
             duration: ShellxMotion.of(context, ShellxMotion.fast),
@@ -262,7 +283,11 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                 ),
                 if (widget.collapsed && widget.containsSelected)
                   Positioned(
-                    left: 0,
+                    // V3: inside the keyboard ring, as the rows' bar does,
+                    // so the mark stays visible under focus.
+                    left: widget.focused
+                        ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
+                        : 0,
                     top: (height - ShellxSizes.collapsedMarkHeight) / 2,
                     child: IgnorePointer(
                       child: Container(
@@ -281,7 +306,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                 Positioned(
                   top: 0,
                   bottom: 0,
-                  right: ShellxSpace.s4,
+                  right: _trailing,
                   child: Center(
                     child: Visibility(
                       visible: showAdd,
@@ -323,6 +348,9 @@ class _HeaderAddState extends State<_HeaderAdd> {
   Widget build(BuildContext context) => Tooltip(
     message: widget.tooltip,
     excludeFromSemantics: true,
+    // V11: beside the sidebar, as every sidebar tooltip (never over the
+    // group's first row).
+    positionDelegate: besideSidebar,
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
