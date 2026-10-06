@@ -121,6 +121,22 @@ void main() {
       },
     );
 
+    test(
+      'OSC 99 and BEL never reach push; OSC 9/777 still do (A4 N8)',
+      () async {
+        await open();
+        final pty = factory.ptys.single;
+        pty.emit('$esc]99;;kitty$esc\\$bel$bel');
+        await Future<void>.delayed(Duration.zero);
+        await push.notifications.sender.idle;
+        expect(push.bodies, isEmpty);
+        pty.emit('$esc]9;nine$bel$esc]777;notify;T;seven$bel');
+        await Future<void>.delayed(Duration.zero);
+        await push.notifications.sender.idle;
+        expect(push.bodies.map((b) => b['body']), ['nine', 'seven']);
+      },
+    );
+
     test('without notifications nothing is sent (the default)', () async {
       final plain = SessionManager(
         ptyFactory: factory,

@@ -189,7 +189,9 @@ void main() {
       final parser = OscEventParser();
       expect(parser.feed(_b('$esc]133;')), isEmpty);
       parser.reset();
-      expect(parser.feed(_b('C$bel')), isEmpty);
+      // The leftover 'C' is plain output now, and its BEL rings (A4 D3);
+      // what matters is that no CommandStarted comes out of it.
+      expect(parser.feed(_b('C$bel')), [const BellRung()]);
       expect(parser.feed(_b('$esc]133;C$bel')), [const CommandStarted()]);
     });
   });

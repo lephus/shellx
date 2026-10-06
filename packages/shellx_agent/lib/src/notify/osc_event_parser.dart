@@ -75,6 +75,43 @@ final class CwdReported extends OscEvent {
   String toString() => 'CwdReported(…)';
 }
 
+/// `OSC 99` (kitty's desktop notification protocol), assembled from its
+/// chunks (A4 D2). A notification that only had a title has that text as
+/// [body] and a null [title]. Desktop only: push ignores it (A4 D1).
+final class KittyNotifyRequested extends OscEvent {
+  const KittyNotifyRequested({required this.title, required this.body});
+  final String? title;
+  final String body;
+  @override
+  bool operator ==(Object other) =>
+      other is KittyNotifyRequested &&
+      other.title == title &&
+      other.body == body;
+  @override
+  int get hashCode => Object.hash(title, body);
+  // Never the text (A4 N9).
+  @override
+  String toString() => 'KittyNotifyRequested(…)';
+}
+
+/// A BEL byte outside every escape sequence: attention without text
+/// (A4 D3). Desktop only: push ignores it (A4 D1).
+final class BellRung extends OscEvent {
+  const BellRung();
+  @override
+  bool operator ==(Object other) => other is BellRung;
+  @override
+  int get hashCode => 7;
+  @override
+  String toString() => 'BellRung()';
+}
+
+final class _KittyDraft {
+  final title = StringBuffer();
+  final body = StringBuffer();
+  int get length => title.length + body.length;
+}
+
 enum _State {
   ground,
   escape,
@@ -85,15 +122,19 @@ enum _State {
   ignoreEscape,
 }
 
-/// Finds OSC 7, 133 (C, D), 633 (E), 9 and 777 (`notify`) in terminal output,
-/// ended by BEL or ST, across chunk boundaries (like `OscTitleParser`).
+/// Finds OSC 7, 9, 99, 133 (C, D), 633 (E) and 777 (`notify`), and BEL outside
+/// sequences, in terminal output, ended by BEL or ST, across chunk boundaries (like `OscTitleParser`).
 /// A payload over 4 KiB is skipped; titles and bodies are cut to 200
 /// characters; malformed UTF-8 is replaced, never fatal. The bytes
 /// themselves are untouched: the terminal output goes on as it was.
 final class OscEventParser {
   static const int maxTextLength = 200;
   static const int maxPayload = 4096;
-  static const _numbers = {'7', '133', '633', '9', '777'};
+  static const int maxKittyDrafts = 4;
+  static const _numbers = {'7', '9', '99', '133', '633', '777'};
+
+  /// Unfinished OSC 99 notifications by id, oldest first (A4 D2).
+  final _kittyDrafts = <String, _KittyDraft>{};
 
   _State _state = _State.ground;
   final _param = StringBuffer();
@@ -105,6 +146,7 @@ final class OscEventParser {
     _state = _State.ground;
     _param.clear();
     _payload.clear();
+    _kittyDrafts.clear();
   }
 
   List<OscEvent> feed(Uint8List data) {
@@ -119,7 +161,11 @@ final class OscEventParser {
   OscEvent? _step(int byte) {
     switch (_state) {
       case _State.ground:
-        if (byte == 0x1b) _state = _State.escape;
+        if (byte == 0x1b) {
+          _state = _State.escape;
+        } else if (byte == 0x07) {
+          return const BellRung();
+        }
       case _State.escape:
         if (byte == 0x5d) {
           _param.clear();
@@ -182,6 +228,7 @@ final class OscEventParser {
       '133' => _semanticPrompt(text),
       '633' => _vscode(text),
       '9' => _osc9(text),
+      '99' => _kitty(text),
       '777' => _osc777(text),
       _ => null,
     };
@@ -224,6 +271,63 @@ final class OscEventParser {
     // OSC 9;4;… is ConEmu / Windows Terminal progress, not a notification.
     if (text.trim().isEmpty || _progress.hasMatch(text)) return null;
     return NotifyRequested(title: null, body: _clip(text));
+  }
+
+  /// `99 ; <k=v:k=v…> ; <payload>`: `i` id, `d=0` more chunks follow, `p`
+  /// title (default) or body, `e=1` base64. Other `p` kinds and every other
+  /// key are ignored (A4 D2); a `p=?` query gets no answer.
+  OscEvent? _kitty(String text) {
+    final split = text.indexOf(';');
+    if (split < 0) return null;
+    var id = '';
+    var done = true;
+    var part = 'title';
+    var encoded = false;
+    for (final pair in text.substring(0, split).split(':')) {
+      final eq = pair.indexOf('=');
+      if (eq <= 0) continue;
+      final value = pair.substring(eq + 1);
+      switch (pair.substring(0, eq)) {
+        case 'i':
+          id = value;
+        case 'd':
+          done = value != '0';
+        case 'p':
+          part = value;
+        case 'e':
+          encoded = value == '1';
+      }
+    }
+    if (part != 'title' && part != 'body') return null;
+    var payload = text.substring(split + 1);
+    if (encoded) {
+      try {
+        payload = utf8.decode(base64.decode(base64.normalize(payload)));
+      } on FormatException {
+        return null;
+      }
+    }
+    final draft = _kittyDrafts.remove(id) ?? _KittyDraft();
+    (part == 'title' ? draft.title : draft.body).write(payload);
+    if (draft.length > maxPayload) return null; // dropped with its chunks
+    if (!done) {
+      if (_kittyDrafts.length >= maxKittyDrafts) {
+        _kittyDrafts.remove(_kittyDrafts.keys.first);
+      }
+      _kittyDrafts[id] = draft;
+      return null;
+    }
+    final title = draft.title.toString().trim();
+    final body = draft.body.toString().trim();
+    if (body.isEmpty) {
+      return title.isEmpty
+          ? null
+          : KittyNotifyRequested(title: null, body: _clip(title));
+    }
+    return KittyNotifyRequested(
+      title: title.isEmpty ? null : _clip(title),
+      body: _clip(body),
+    );
   }
 
   static OscEvent? _osc7(String text) =>
