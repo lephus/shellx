@@ -262,3 +262,23 @@ Thử tay trên macOS 14/15 và Windows 10/11 thật (CI không có):
 - [ ] 4. Nút taskbar nháy khi có thông báo mới lúc app khác đang ở trước (và lúc cửa sổ thu nhỏ); không nháy khi cửa sổ đang focus.
 - [ ] 5. Toast trong Action Center: bấm → cửa sổ lên trước, đúng tab, badge mất, gõ được ngay; đọc tab → toast biến khỏi Action Center; tab đã đóng → chỉ đưa cửa sổ lên.
 - [ ] 6. Narrator: dòng tab đọc "N thông báo chưa đọc, mới nhất: …"; thông báo tới tab khác khi cửa sổ đang trước được đọc một lần.
+
+## 14. Chia pane — A3 (2026-10-07)
+
+- Spec: `docs/superpowers/specs/2026-10-07-desktop-splits-a3-design.md`. Không đổi giao thức, không đổi điện thoại: mỗi pane là một phiên; điện thoại mở phiên luôn thành tab mới.
+
+Thử tay trên **macOS và Windows thật** (CI không có; spec §6):
+
+- [ ] ⌘D / Ctrl+Shift+D trong `~/work/shellx` (zsh, bash, PowerShell có hook) → pane mới bên phải, `pwd` đúng thư mục; ⌘⇧D / Ctrl+Shift+Alt+D → bên dưới. Thử trong một git worktree (cwd là thư mục worktree, không phải repo gốc). Shell không hook (fish, cmd) → home.
+- [ ] Thư mục trên ổ mạng chậm/không phản hồi (`/Volumes/nas`, ổ ánh xạ) → pane mới ở home trong ≤ 0,3 s, không treo; UNC trên Windows → home.
+- [ ] `vim`, `htop`, Claude Code trong hai pane cạnh nhau: `tput cols` mỗi pane đúng cỡ của nó; kéo đường chia → cả hai vẽ lại đúng; nháy đúp đường chia → 50/50.
+- [ ] ⌘⌥mũi tên / Ctrl+Alt+mũi tên chuyển focus đúng theo hình (chữ T, lưới 2×2); máy Windows có driver Intel cũ: kiểm Ctrl+Alt+mũi tên không xoay màn hình (nếu có, ghi lại).
+- [ ] Bàn phím Đức/Ba Lan trên Windows: AltGr+Shift+D, AltGr+mũi tên vẫn gõ ký tự vào shell, không chia/không chuyển pane.
+- [ ] ⌘⇧↩ phóng to/bỏ; pane ẩn vẫn chạy (`ping` vẫn chạy khi quay lại); ⌘⌃= cân bằng ba cột; ⌘⌃mũi tên dời đường chia; không pane nào < 20 cột.
+- [ ] ⌘W đóng pane đang focus, focus về pane dùng gần nhất; pane đang chạy `sleep 100` → hỏi "Lệnh đang chạy trong pane này…"; × dòng sidebar đóng cả tab, hỏi "2 pane đang chạy lệnh…".
+- [ ] `exit` (0) trong một pane → pane biến mất; `exit 3` → dòng thoát, Enter đóng đúng pane đó.
+- [ ] Điện thoại: mỗi pane là một phiên trong danh sách; gõ trên điện thoại vào pane 2 → dải driver chỉ ở pane 2; điện thoại mở phiên → tab mới.
+- [ ] Thông báo: pane không focus `printf '\e]9;xong\a'` → badge dòng, vòng chỉ quanh pane đó; bấm pane đó, chờ 1 s → tắt; ⌘⇧U focus đúng pane.
+- [ ] VoiceOver / Narrator: đọc "Pane 2 trên 3 — vim" khi chuyển focus bằng phím; đọc khi chia/đóng/phóng to; đường chia là thanh trượt tăng/giảm được.
+- [ ] Windows, màn hình 125 % (và 150 %): đường chia 1 px sắc nét, không nhoè hay lệch nửa điểm ảnh. Đã biết: gốc vùng terminal x = 221 không nằm trên lưới điểm ảnh vật lý ở 1,25×; các cạnh chia đã làm tròn theo điểm ảnh thiết bị, nhưng cần nhìn bằng mắt ở 1,25× và ghi lại nếu đường chia mờ.
+- [ ] Tab một pane trông giống hệt trước A3 (so ảnh chụp với bản A4); test tự động: `apps/desktop/test/ui/one_pane_parity_test.dart`.
