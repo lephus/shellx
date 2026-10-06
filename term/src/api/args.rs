@@ -329,6 +329,15 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec {
         needs_ui: false,
         ..c(
+            &["help"],
+            &["COMMAND..."],
+            &[],
+            "show help for a command or command group",
+        )
+    },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
             &["completions"],
             &["SHELL"],
             &[],
@@ -370,6 +379,8 @@ impl Parsed {
 pub enum Invocation {
     Run(Parsed),
     Help(Option<&'static CommandSpec>),
+    /// `shellx help workspace`: the subcommands of a group.
+    HelpGroup(&'static str),
     Version,
     Completions(String),
 }
@@ -382,6 +393,22 @@ fn find(words: &[String]) -> Option<(&'static CommandSpec, usize)> {
         .map(|c| (c, c.path.len()))
 }
 
+/// The group a first word names (`workspace`, `browser`, `skills`).
+fn group(word: &str) -> Option<&'static str> {
+    COMMANDS
+        .iter()
+        .find(|c| c.path.len() > 1 && c.path[0] == word)
+        .map(|c| c.path[0])
+}
+
+fn unknown_subcommand(g: &str, got: Option<&str>) -> String {
+    let subs = words_after(&[g]).join(", ");
+    match got {
+        Some(x) => format!("unknown subcommand '{x}' for '{g}' (one of: {subs})"),
+        None => format!("unknown subcommand for '{g}' (one of: {subs})"),
+    }
+}
+
 pub fn parse(args: &[String]) -> Result<Invocation, String> {
     match args.first().map(String::as_str) {
         None => return Ok(Invocation::Help(None)),
@@ -391,14 +418,26 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             if rest.is_empty() {
                 return Ok(Invocation::Help(None));
             }
-            return find(rest)
-                .map(|(c, _)| Invocation::Help(Some(c)))
-                .ok_or_else(|| format!("unknown command '{}'", rest.join(" ")));
+            if let Some((c, _)) = find(rest) {
+                return Ok(Invocation::Help(Some(c)));
+            }
+            if let (1, Some(g)) = (rest.len(), group(&rest[0])) {
+                return Ok(Invocation::HelpGroup(g));
+            }
+            return Err(format!(
+                "unknown command '{}' (try: shellx help)",
+                rest.join(" ")
+            ));
         }
         _ => {}
     }
-    let (spec, used) =
-        find(args).ok_or_else(|| format!("unknown command '{}' (try: shellx help)", args[0]))?;
+    let Some((spec, used)) = find(args) else {
+        return match group(&args[0]) {
+            Some(g) if args.get(1).is_some_and(|a| a == "--help") => Ok(Invocation::HelpGroup(g)),
+            Some(g) => Err(unknown_subcommand(g, args.get(1).map(String::as_str))),
+            None => Err(format!("unknown command '{}' (try: shellx help)", args[0])),
+        };
+    };
     let mut parsed = Parsed {
         spec,
         positionals: vec![],
@@ -440,7 +479,12 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
                     .ok_or_else(|| format!("--{name} needs {p}"))?,
             ),
         };
-        if !flag.repeat && parsed.has(flag.name) {
+        let seen = match flag.name {
+            "json" => parsed.json,
+            "socket" => parsed.socket.is_some(),
+            n => parsed.has(n),
+        };
+        if !flag.repeat && seen {
             return Err(format!("--{name} given twice"));
         }
         match flag.name {
@@ -498,6 +542,9 @@ pub fn help_text(spec: Option<&CommandSpec>) -> String {
                 };
                 s.push_str(&format!("  {name:<22} {}\n", fl.help));
             }
+            if c.path == ["completions"] {
+                s.push_str(COMPLETIONS_LOAD);
+            }
             s.push('\n');
             s.push_str(EXIT_CODES);
             s.push('\n');
@@ -506,81 +553,267 @@ pub fn help_text(spec: Option<&CommandSpec>) -> String {
     s
 }
 
-fn words_after(prefix: &[&str]) -> Vec<&'static str> {
-    let mut out: Vec<&'static str> = COMMANDS
+pub fn group_help(name: &str) -> Option<String> {
+    let cmds: Vec<&CommandSpec> = COMMANDS
         .iter()
-        .filter(|c| c.path.len() > prefix.len() && c.path[..prefix.len()] == *prefix)
-        .map(|c| c.path[prefix.len()])
+        .filter(|c| c.path.len() > 1 && c.path[0] == name)
         .collect();
-    out.dedup();
+    if cmds.is_empty() {
+        return None;
+    }
+    let mut s = format!("Usage: shellx {name} <subcommand> [flags]\n\nSubcommands:\n");
+    for c in cmds {
+        s.push_str(&format!("  {:<22} {}\n", c.path.join(" "), c.summary));
+    }
+    s.push_str(&format!("\nMore: shellx help {name} <subcommand>\n"));
+    Some(s)
+}
+
+/// Distinct words at `prefix.len()` of the commands under `prefix`, in table order.
+fn words_after(prefix: &[&str]) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for c in COMMANDS {
+        if c.path.len() > prefix.len() && c.path[..prefix.len()] == *prefix {
+            let w = c.path[prefix.len()];
+            if !out.contains(&w) {
+                out.push(w);
+            }
+        }
+    }
     out
 }
 
-pub fn completion_script(shell: &str) -> Option<String> {
-    let top = words_after(&[]).join(" ");
-    let mut cases = String::new();
+const GROUPS: [&str; 3] = ["workspace", "browser", "skills"];
+/// Positionals that name a pane, tab or workspace: completed from `shellx ls --ids`.
+const ID_POSITIONALS: [&str; 4] = ["TARGET", "PANE", "TAB", "WORKSPACE"];
+
+fn flag_words(c: &CommandSpec) -> String {
+    c.flags
+        .iter()
+        .chain(GLOBAL_FLAGS)
+        .map(|f| format!("--{}", f.name))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn zsh_quote(s: &str) -> String {
+    // Inside '...[desc]': no quote, bracket or colon may leak out.
+    s.replace('\'', "")
+        .replace(['[', '('], "(")
+        .replace([']', ')'], ")")
+        .replace(':', " -")
+}
+
+fn bash_script() -> String {
+    let mut flag_cases = String::new();
+    let mut sub_cases = String::new();
     for c in COMMANDS {
-        let flags: Vec<String> = c
-            .flags
-            .iter()
-            .chain(GLOBAL_FLAGS)
-            .map(|f| format!("--{}", f.name))
-            .collect();
-        cases.push_str(&format!("{}|{}\n", c.path.join(" "), flags.join(" ")));
+        flag_cases.push_str(&format!(
+            "    \"{}\") echo \"{}\";;\n",
+            c.path.join(" "),
+            flag_words(c)
+        ));
     }
-    let subs = format!(
-        "workspace:{} browser:{} skills:{}",
-        words_after(&["workspace"]).join(","),
-        words_after(&["browser"]).join(","),
-        words_after(&["skills"]).join(",")
-    );
-    match shell {
-        "bash" | "zsh" => Some(format!(
-            r#"# shellx completion ({shell}). Load with: source <(shellx completions {shell})
-{zsh}_shellx_flags() {{
-  local key="$1"
-  while IFS='|' read -r path flags; do [ "$path" = "$key" ] && echo "$flags"; done <<'EOF'
-{cases}EOF
+    for g in GROUPS {
+        sub_cases.push_str(&format!(
+            "    {g}) subs=\"{}\";;\n",
+            words_after(&[g]).join(" ")
+        ));
+    }
+    let top = words_after(&[]).join(" ");
+    format!(
+        r#"# shellx completion (bash). Load with: source <(shellx completions bash)
+# Ids come from `shellx ls --ids` and are only ever compared as text.
+_shellx_filter() {{
+  local w
+  for w in $1; do
+    case $w in "$cur"*) COMPREPLY+=("$w");; esac
+  done
+}}
+_shellx_flags() {{
+  case "$1" in
+{flag_cases}  esac
+}}
+_shellx_ids() {{
+  local line
+  while IFS= read -r line; do
+    case $line in "$cur"*) COMPREPLY+=("$line");; esac
+  done < <(shellx ls --ids 2>/dev/null)
 }}
 _shellx() {{
-  local cur="${{COMP_WORDS[COMP_CWORD]}}" w1="${{COMP_WORDS[1]}}" w2="${{COMP_WORDS[2]}}"
-  if [ "$COMP_CWORD" -eq 1 ]; then COMPREPLY=($(compgen -W "{top}" -- "$cur")); return; fi
-  case "{subs}" in *"$w1:"*) if [ "$COMP_CWORD" -eq 2 ]; then
-      local s="{subs}"; s="${{s#*$w1:}}"; s="${{s%% *}}"; COMPREPLY=($(compgen -W "${{s//,/ }}" -- "$cur")); return; fi;; esac
-  local key="$w1"; case "$w1" in workspace|browser|skills) key="$w1 $w2";; esac
-  if [[ "$cur" == --* ]]; then COMPREPLY=($(compgen -W "$(_shellx_flags "$key")" -- "$cur")); return; fi
-  COMPREPLY=($(compgen -W "$(shellx ls --ids 2>/dev/null)" -- "$cur"))
+  local cur="${{COMP_WORDS[COMP_CWORD]}}" w1="${{COMP_WORDS[1]}}" w2="${{COMP_WORDS[2]}}" subs="" key
+  COMPREPLY=()
+  if [ "$COMP_CWORD" -eq 1 ]; then _shellx_filter "{top}"; return; fi
+  case "$w1" in
+{sub_cases}  esac
+  key="$w1"
+  if [ -n "$subs" ]; then
+    if [ "$COMP_CWORD" -eq 2 ]; then _shellx_filter "$subs"; return; fi
+    key="$w1 $w2"
+  fi
+  case "$cur" in --*) _shellx_filter "$(_shellx_flags "$key")"; return;; esac
+  _shellx_ids
 }}
 complete -F _shellx shellx
-"#,
-            zsh = if shell == "zsh" {
-                "autoload -U +X bashcompinit && bashcompinit\n"
+"#
+    )
+}
+
+fn zsh_script() -> String {
+    let desc = |name: &str, text: &str| format!("    '{}:{}'\n", name, zsh_quote(text));
+    let mut top = String::new();
+    for w in words_after(&[]) {
+        let text = match COMMANDS.iter().find(|c| c.path == [w]) {
+            Some(c) => c.summary.to_string(),
+            None => format!("{w} commands"),
+        };
+        top.push_str(&desc(w, &text));
+    }
+    let mut group_cases = String::new();
+    for g in GROUPS {
+        let mut items = String::new();
+        for c in COMMANDS
+            .iter()
+            .filter(|c| c.path.len() > 1 && c.path[0] == g)
+        {
+            items.push_str(&desc(c.path[1], c.summary));
+        }
+        group_cases.push_str(&format!("    {g}) _shellx_subs=(\n{items}    );;\n"));
+    }
+    let mut cmd_cases = String::new();
+    for c in COMMANDS {
+        let mut specs = String::new();
+        for fl in c.flags.iter().chain(GLOBAL_FLAGS) {
+            let value = match fl.value {
+                Some(v) => format!(":{}:", zsh_quote(v)),
+                None => String::new(),
+            };
+            let star = if fl.repeat { "*" } else { "" };
+            specs.push_str(&format!(
+                " '{star}--{}[{}]{value}'",
+                fl.name,
+                zsh_quote(fl.help)
+            ));
+        }
+        for (i, p) in c.positionals.iter().enumerate() {
+            let name = p.trim_end_matches('?').trim_end_matches("...");
+            let action = if ID_POSITIONALS.contains(&name) {
+                "_shellx_ids"
             } else {
-                ""
-            },
-        )),
-        "pwsh" => Some(format!(
-            r#"# shellx completion (PowerShell). Load with: shellx completions pwsh | Out-String | Invoke-Expression
-$__shellxFlags = @'
-{cases}'@
+                " "
+            };
+            let rest = if p.ends_with("...") { "*" } else { "" };
+            let n = if rest.is_empty() {
+                (i + 1).to_string()
+            } else {
+                String::new()
+            };
+            let opt = if p.ends_with('?') { ":" } else { "" };
+            specs.push_str(&format!(
+                " '{rest}{n}:{opt}{}:{action}'",
+                name.to_lowercase()
+            ));
+        }
+        cmd_cases.push_str(&format!(
+            "    \"{}\") _arguments -s{specs};;\n",
+            c.path.join(" ")
+        ));
+    }
+    format!(
+        r#"#compdef shellx
+# shellx completion (zsh). Install as ~/.zfunc/_shellx (fpath=(~/.zfunc $fpath) before compinit),
+# or load with: source <(shellx completions zsh)
+# Ids come from `shellx ls --ids` and are only ever added as text.
+_shellx_ids() {{
+  local -a shellx_ids
+  shellx_ids=("${{(@f)$(shellx ls --ids 2>/dev/null)}}")
+  compadd -- "${{shellx_ids[@]}}"
+}}
+_shellx() {{
+  local -a _shellx_subs
+  local shellx_key
+  if (( CURRENT == 2 )); then
+    _shellx_subs=(
+{top}    )
+    _describe -t commands 'shellx command' _shellx_subs
+    return
+  fi
+  shellx_key="${{words[2]}}"
+  case "$shellx_key" in
+{group_cases}  esac
+  if (( ${{#_shellx_subs}} )); then
+    if (( CURRENT == 3 )); then
+      _describe -t commands 'shellx subcommand' _shellx_subs
+      return
+    fi
+    shellx_key="$shellx_key ${{words[3]}}"
+    words=("${{words[1]}}" "${{(@)words[4,-1]}}")
+    (( CURRENT -= 2 ))
+  else
+    words=("${{words[1]}}" "${{(@)words[3,-1]}}")
+    (( CURRENT -= 1 ))
+  fi
+  case "$shellx_key" in
+{cmd_cases}  esac
+}}
+if [ "$funcstack[1]" = "_shellx" ]; then
+  _shellx "$@"
+else
+  compdef _shellx shellx
+fi
+"#
+    )
+}
+
+fn pwsh_script() -> String {
+    let mut flags = String::new();
+    for c in COMMANDS {
+        flags.push_str(&format!("  '{}' = '{}'\n", c.path.join(" "), flag_words(c)));
+    }
+    let mut subs = String::new();
+    for g in GROUPS {
+        subs.push_str(&format!("  '{g}' = '{}'\n", words_after(&[g]).join(" ")));
+    }
+    let top = words_after(&[]).join(" ");
+    format!(
+        r#"# shellx completion (PowerShell). Load with: shellx completions pwsh | Out-String | Invoke-Expression
+# Ids come from `shellx ls --ids` and are only ever compared as text.
+$__shellxFlags = @{{
+{flags}}}
+$__shellxSubs = @{{
+{subs}}}
 Register-ArgumentCompleter -Native -CommandName shellx, shellx.exe -ScriptBlock {{
   param($word, $ast, $cursor)
-  $w = $ast.CommandElements | Select-Object -Skip 1 | ForEach-Object {{ $_.ToString() }}
-  if ($w.Count -le 1 -and -not $word.StartsWith('-')) {{ $c = '{top}'.Split(' ') }}
+  $prior = @($ast.CommandElements | Select-Object -Skip 1 |
+    Where-Object {{ $_.Extent.EndOffset -lt $cursor }} | ForEach-Object {{ $_.ToString() }})
+  $c = @()
+  if ($prior.Count -eq 0) {{ $c = '{top}'.Split(' ') }}
+  elseif ($__shellxSubs.ContainsKey($prior[0]) -and $prior.Count -eq 1) {{ $c = $__shellxSubs[$prior[0]].Split(' ') }}
   elseif ($word.StartsWith('--')) {{
-    $key = if ('workspace','browser','skills' -contains $w[0]) {{ "$($w[0]) $($w[1])" }} else {{ $w[0] }}
-    $line = ($__shellxFlags -split "`n") | Where-Object {{ $_.StartsWith("$key|") }} | Select-Object -First 1
-    $c = if ($line) {{ $line.Split('|')[1].Split(' ') }} else {{ @() }}
-  }} else {{ $c = (& shellx ls --ids 2>$null) }}
+    $key = if ($__shellxSubs.ContainsKey($prior[0]) -and $prior.Count -ge 2) {{ "$($prior[0]) $($prior[1])" }} else {{ $prior[0] }}
+    if ($__shellxFlags.ContainsKey($key)) {{ $c = $__shellxFlags[$key].Split(' ') }}
+  }} else {{ $c = @(& shellx ls --ids 2>$null) }}
   $c | Where-Object {{ $_ -like "$word*" }} | ForEach-Object {{ [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }}
 }}
 "#
-        )),
+    )
+}
+
+pub fn completion_script(shell: &str) -> Option<String> {
+    match shell {
+        "bash" => Some(bash_script()),
+        "zsh" => Some(zsh_script()),
+        "pwsh" => Some(pwsh_script()),
         _ => None,
     }
 }
 
-#[allow(clippy::let_and_return)] // one binding per platform
+const COMPLETIONS_LOAD: &str = "\nLoad:
+  bash  add to ~/.bashrc:   source <(shellx completions bash)
+  zsh   shellx completions zsh > ~/.zfunc/_shellx   (put fpath=(~/.zfunc $fpath) before compinit in ~/.zshrc)
+  pwsh  add to $PROFILE:    shellx completions pwsh | Out-String | Invoke-Expression
+";
+
 pub fn is_cli_name(argv0: &OsStr) -> bool {
     let name = std::path::Path::new(argv0)
         .file_name()
@@ -589,8 +822,8 @@ pub fn is_cli_name(argv0: &OsStr) -> bool {
     #[cfg(windows)]
     let name = name.to_ascii_lowercase();
     #[cfg(windows)]
-    let name = name.strip_suffix(".exe").unwrap_or(&name).to_string();
-    name == "shellx"
+    let name = name.as_str();
+    name.strip_suffix(".exe").unwrap_or(name) == "shellx"
 }
 
 #[cfg(test)]
@@ -713,11 +946,54 @@ mod tests {
     }
 
     #[test]
+    fn every_flag_is_in_help_and_every_completion() {
+        let scripts: Vec<String> = ["bash", "zsh", "pwsh"]
+            .iter()
+            .map(|sh| completion_script(sh).unwrap())
+            .collect();
+        for c in COMMANDS {
+            let h = help_text(Some(c));
+            for fl in c.flags.iter().chain(GLOBAL_FLAGS) {
+                let want = format!("--{}", fl.name);
+                assert!(h.contains(&want), "help {:?} {want}", c.path);
+                for s in &scripts {
+                    assert!(s.contains(&want), "completion {:?} {want}", c.path);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn groups_and_help_are_table_driven() {
+        assert!(COMMANDS.iter().any(|c| c.path == ["help"]));
+        match p(&["help", "workspace"]).unwrap() {
+            Invocation::HelpGroup(g) => assert_eq!(g, "workspace"),
+            _ => panic!(),
+        }
+        assert!(group_help("workspace")
+            .unwrap()
+            .contains("workspace rename"));
+        for bad in [
+            &["workspace"][..],
+            &["workspace", "nope"],
+            &["browser", "x"],
+        ] {
+            let e = p(bad).err().unwrap();
+            assert!(e.contains("unknown subcommand"), "{e}");
+        }
+        assert!(p(&["--json", "--json"]).is_err());
+        assert!(p(&["ls", "--json", "--json"]).is_err());
+        assert!(p(&["ls", "--socket", "a", "--socket", "b"]).is_err());
+        assert!(help_text(Some(find(&["completions".into()]).unwrap().0)).contains("~/.zfunc"));
+    }
+
+    #[test]
     fn name_dispatch() {
         use std::ffi::OsStr;
         assert!(is_cli_name(OsStr::new("/Users/a/cli/shellx")));
         assert!(is_cli_name(OsStr::new("shellx")));
         assert!(!is_cli_name(OsStr::new("/x/shellx-term")));
+        assert!(is_cli_name(OsStr::new("/x/shellx.exe")));
         #[cfg(windows)]
         assert!(is_cli_name(OsStr::new(r"C:\x\SHELLX.EXE")));
     }

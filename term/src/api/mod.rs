@@ -24,11 +24,19 @@ pub fn main(args: Vec<std::ffi::OsString>) -> i32 {
     };
     match args::parse(&args) {
         Err(msg) => {
-            let _ = writeln!(std::io::stderr(), "shellx: {msg}");
+            let _ = writeln!(std::io::stderr(), "shellx: {msg} (usage)");
             2
         }
         Ok(args::Invocation::Help(spec)) => {
             let _ = write!(std::io::stdout(), "{}", args::help_text(spec));
+            0
+        }
+        Ok(args::Invocation::HelpGroup(g)) => {
+            let _ = write!(
+                std::io::stdout(),
+                "{}",
+                args::group_help(g).unwrap_or_default()
+            );
             0
         }
         Ok(args::Invocation::Version) => {
