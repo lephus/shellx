@@ -309,10 +309,15 @@ final class _PipeListener implements MuxListener {
         _connections.add(_PipeConnection.start(message));
       }
     });
-    // The isolate died (error or exit) before it reported: no hang.
+    // The isolate died (error or exit): before it reported, listen fails
+    // (no hang); later, unless we closed it, the connections stream ends
+    // with an error so the host notices it stopped accepting.
     _ended.listen((_) {
       if (!_started.isCompleted) {
         _started.completeError(StateError('pipe listener ended'));
+      } else if (!_closed && !_connections.isClosed) {
+        _connections.addError(StateError('pipe listener ended'));
+        unawaited(_connections.close());
       }
       if (!_exited.isCompleted) _exited.complete();
     });
@@ -459,8 +464,9 @@ final class _PipeConnection {
     final readerExit = ReceivePort();
     final writerExit = ReceivePort();
     pipe._ports.addAll([readPort, writePort, readerExit, writerExit]);
-    pipe._readerExited = readerExit.first;
-    pipe._writerExited = writerExit.first;
+    // Awaited only on close (with a bound); never an unhandled error.
+    pipe._readerExited = readerExit.first..ignore();
+    pipe._writerExited = writerExit.first..ignore();
     pipe._reader = Isolate.spawn(_readLoop, (
       handle,
       pipe._stop,
@@ -516,9 +522,14 @@ final class _PipeConnection {
         if (writer != null) _writerExited,
       ]).timeout(_bound);
     } on TimeoutException {
-      // A writer still waiting for messages (never got its port): end it.
+      // A writer still waiting for messages (never got its port), or a
+      // loop stuck in a call: end both before the handle goes away.
       writer?.kill(priority: Isolate.immediate);
-      await _writerExited.timeout(_bound, onTimeout: () => null);
+      reader?.kill(priority: Isolate.immediate);
+      await Future.wait([
+        if (reader != null) _readerExited,
+        if (writer != null) _writerExited,
+      ]).timeout(_bound, onTimeout: () => const []);
     }
     CloseHandle(_handle);
     CloseHandle(_stop);
