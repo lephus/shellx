@@ -6,6 +6,11 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group(
+    'StreamMuxConnection errors (A7 Task 2 review r2)',
+    streamConnectionErrors,
+  );
+
   late Directory dir;
   setUp(() async => dir = await Directory.systemTemp.createTemp('mux_t'));
   tearDown(() => dir.delete(recursive: true));
@@ -127,4 +132,48 @@ Future<void> _staleSocket(String path) async {
     FileSystemEntity.typeSync(path, followLinks: false),
     FileSystemEntityType.unixDomainSock,
   );
+}
+
+void streamConnectionErrors() {
+  test('send: an oversized message throws ArgumentError to the caller', () {
+    final c = StreamMuxConnection(
+      const Stream<Uint8List>.empty(),
+      (_) {},
+      () async {},
+    );
+    expect(
+      () => c.send(
+        MuxMessage(MuxType.viewOut, fields: {'data': Uint8List(70000)}),
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('send: a dead sink (StateError) is swallowed', () {
+    final c = StreamMuxConnection(
+      StreamController<Uint8List>().stream,
+      (_) => throw StateError('closed'),
+      () async {},
+    );
+    c.send(const MuxMessage(MuxType.result, q: 1));
+  });
+
+  test('close: an unexpected sink error still completes done, then is '
+      'reported to the zone', () async {
+    final errors = <Object>[];
+    final finished = Completer<void>();
+    runZonedGuarded(() async {
+      final c = StreamMuxConnection(
+        StreamController<Uint8List>().stream,
+        (_) {},
+        () async => throw const FormatException('bug'),
+      );
+      await c.close();
+      await c.done.timeout(const Duration(seconds: 1));
+      finished.complete();
+    }, (e, _) => errors.add(e));
+    await finished.future.timeout(const Duration(seconds: 2));
+    await Future<void>.delayed(Duration.zero);
+    expect(errors, [isFormatException]);
+  });
 }

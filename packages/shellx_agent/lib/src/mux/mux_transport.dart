@@ -125,10 +125,15 @@ final class StreamMuxConnection implements MuxConnection {
   @override
   void send(MuxMessage message) {
     if (_closed) return;
+    // Encoding errors (over 64 KiB, an unsupported value) are the caller's
+    // bug: they propagate.
+    final frame = encodeMux(message);
     try {
-      _write(encodeMux(message));
-    } on Object {
-      // The sink is gone (peer vanished): the read side closes the link.
+      _write(frame);
+    } on StateError {
+      // The sink is closed (peer vanished): the read side closes the link.
+    } on SocketException {
+      // Same, reported by the socket.
     }
   }
 
@@ -138,17 +143,30 @@ final class StreamMuxConnection implements MuxConnection {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    Object? unexpected;
+    StackTrace? trace;
     try {
       // Neither awaited: a cancel's future may belong to the root zone,
       // and a paused listener would hold `_in`'s done event (see
       // _MemoryConnection.close).
       unawaited(_sub.cancel().then((_) {}, onError: (Object _) {}));
       await _closeSink();
-    } on Object {
+    } on StateError {
       // Closing a dead link: nothing left to release.
+    } on SocketException {
+      // Same.
+    } on TimeoutException {
+      // Same.
+    } catch (e, s) {
+      unexpected = e;
+      trace = s;
     } finally {
       unawaited(_in.close());
       if (!_done.isCompleted) _done.complete();
+    }
+    // A bug, not a dead peer: reported once `done` has completed.
+    if (unexpected != null) {
+      Zone.current.handleUncaughtError(unexpected, trace!);
     }
   }
 
@@ -199,8 +217,10 @@ final class UnixMuxTransport implements MuxTransport {
     return StreamMuxConnection(s, s.add, () async {
       try {
         await s.close().timeout(_flushFor);
-      } on Object {
-        // Peer gone or not reading: drop what is left.
+      } on SocketException {
+        // Peer gone: drop what is left.
+      } on TimeoutException {
+        // Peer not reading: drop what is left.
       } finally {
         s.destroy();
       }
