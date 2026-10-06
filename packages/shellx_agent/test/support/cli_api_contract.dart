@@ -309,6 +309,163 @@ void cliApiContract(
           await refusedAndClosed(c, 'ui.ls');
         },
       );
+
+      test(
+        'unticking refuses an open connection at its next request',
+        () async {
+          external = true;
+          final c = await host.connect();
+          expect((await ask(c, 'ui.ls')).type, 'result');
+          external = false;
+          await refusedAndClosed(c, 'ui.ls');
+          expect(ui.requests, hasLength(1));
+        },
+      );
+
+      test(
+        'unticking ends a token-less subscription at its next event',
+        () async {
+          external = true;
+          final c = await host.connect();
+          expect((await ask(c, 'cli.events.subscribe')).type, 'result');
+          external = false;
+          final got = c.messages.first;
+          ui.eventsOut.add({'kind': 'tab.opened', 'tab': 1});
+          final e = await got.timeout(const Duration(seconds: 2));
+          expect(
+            [e.type, e.q, e.get<String>('code'), e.get<String>('message')],
+            ['error', null, 'forbidden', _notAShellXShell],
+          );
+          await c.done.timeout(const Duration(seconds: 2));
+        },
+      );
+    });
+
+    test(
+      'notify text made only of control characters is bad_request',
+      () async {
+        final c = await shell();
+        expect(
+          (await ask(c, 'cli.notify', {
+            'body': '\x07\x1b\x00\x9b',
+          })).get<String>('code'),
+          'bad_request',
+        );
+        expect(ui.appNotices, isEmpty);
+      },
+    );
+
+    test('a second subscribe replaces the filter', () async {
+      final c = await shell();
+      final first = await ask(c, 'cli.events.subscribe', {
+        'kinds': ['tab.opened'],
+      });
+      expect(first.get<List<Object?>>('kinds'), ['tab.opened']);
+      final second = await ask(c, 'cli.events.subscribe', {
+        'kinds': ['pane.closed'],
+      });
+      expect(second.get<List<Object?>>('kinds'), ['pane.closed']);
+      final got = c.messages.firstWhere((m) => m.type == 'event');
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': 5});
+      ui.eventsOut.add({'kind': 'pane.closed', 'pane': 6});
+      final e = await got.timeout(const Duration(seconds: 2));
+      expect(e.get<String>('kind'), 'pane.closed');
+      final all = await ask(c, 'cli.events.subscribe');
+      expect([all.type, all.fields.containsKey('kinds')], ['result', false]);
+    });
+
+    test('switch off ends an active subscription with cli_disabled; the '
+        'connection stays (D26)', () async {
+      final c = await shell();
+      expect((await ask(c, 'cli.events.subscribe')).type, 'result');
+      final seen = <MuxMessage>[];
+      c.messages.listen(seen.add);
+      enabled = false;
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': 1});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        [
+          for (final m in seen) [m.type, m.q, m.get<String>('code')],
+        ],
+        [
+          ['error', null, 'cli_disabled'],
+        ],
+      );
+      enabled = true;
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': 2});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(seen, hasLength(1)); // the subscription is over
+      expect((await ask(c, 'api.version')).type, 'result');
+    });
+
+    group('a client that does not read (D24, D32)', () {
+      test(
+        'events beyond 1000 waiting are dropped, then one overflow',
+        () async {
+          final c = await shell();
+          expect((await ask(c, 'cli.events.subscribe')).type, 'result');
+          final events = <MuxMessage>[];
+          c.messages.where((m) => m.type == 'event').listen(events.add);
+          c.pauseInput();
+          for (var i = 0; i < 1500; i++) {
+            ui.eventsOut.add({'kind': 'tab.opened', 'tab': i});
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          c.resumeInput();
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          expect(events, hasLength(1001));
+          expect(events[999].get<int>('tab'), 999);
+          expect(
+            [events.last.get<String>('kind'), events.last.get<int>('dropped')],
+            ['overflow', 500],
+          );
+          ui.eventsOut.add({'kind': 'tab.opened', 'tab': 2000});
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          expect(events.last.get<int>('tab'), 2000);
+        },
+      );
+
+      test('answers piling up stop request intake until it reads', () async {
+        final c = await shell();
+        ui.answer = {'big': 'x' * 40000};
+        final results = <int>[];
+        c.messages
+            .where((m) => m.type == 'result')
+            .listen((m) => results.add(m.q!));
+        c.pauseInput();
+        for (var q = 1; q <= 30; q++) {
+          c.send(MuxMessage('ui.ls', q: q));
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        // 256 KiB of unread answers: about seven 40 KB ones.
+        expect(ui.requests.length, inInclusiveRange(6, 8));
+        c.resumeInput();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(results, [for (var q = 1; q <= 30; q++) q]);
+      });
+
+      test('at most 64 requests wait per connection', () async {
+        final c = await shell();
+        ui.gate = Completer<void>();
+        final busy = <int>[];
+        final results = <int>[];
+        c.messages.listen((m) {
+          if (m.type == 'error' && m.get<String>('code') == 'busy') {
+            busy.add(m.q!);
+          } else if (m.type == 'result') {
+            results.add(m.q!);
+          }
+        });
+        for (var q = 1; q <= 70; q++) {
+          c.send(MuxMessage('ui.ls', q: q));
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(busy, [65, 66, 67, 68, 69, 70]);
+        expect(ui.requests, hasLength(1));
+        ui.gate!.complete();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(results, [for (var q = 1; q <= 64; q++) q]);
+      });
     });
   });
 }

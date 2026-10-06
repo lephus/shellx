@@ -18,16 +18,20 @@ import 'ui_api.dart';
 ///
 /// A7 amendment: a client whose `auth.token` equals [token] (the
 /// per-launch `SHELLX_CLI_TOKEN` of ShellX shells), or any client while
-/// `allowExternal()` ("Allow other terminals") is on when it connects, gets
+/// `allowExternal()` ("Allow other terminals") is on, gets
 /// the full API. Any other client is *limited*: it may send `api.version`
 /// and a pane-less `cli.notify`; anything else is `forbidden` and closes
-/// the connection.
+/// the connection. `allowExternal()` is read per request and per event:
+/// unticking it applies to open connections at once.
 ///
 /// D32: at most [maxClients] authenticated clients and four handshakes at
-/// once; one connection's requests run in order; [maxListeners] event
-/// subscribers. D24: each subscriber has at most 1000 events queued — the
-/// count covers what the event loop has not handed to the transport yet; a
-/// real socket's write buffer is the remaining back-pressure.
+/// once; one connection's requests run in order, at most 64 waiting
+/// (`busy` beyond); [maxListeners] event subscribers. Back-pressure from
+/// the transport (`pendingBytes`/`drained`): while a client leaves over
+/// 256 KiB of answers unread, its requests wait and its input is paused;
+/// D24: over 1000 events it has not taken are dropped, then one
+/// `overflow{dropped}` once it caught up. The Windows pipe cannot count
+/// (A5b residual): there these limits do not engage.
 ///
 /// Never logs tokens, the secret, notification text or request contents.
 final class CliHost {
@@ -161,7 +165,7 @@ final class CliHost {
     final client = _Client(
       this,
       c,
-      full: _isShellXShell(peer.token) || _externalAllowed(),
+      tokenOk: _isShellXShell(peer.token),
       early: peer.early,
     );
     _clients.add(client);
@@ -193,17 +197,10 @@ final class CliHost {
     }
   }
 
-  /// Sends a connection-ending answer, then closes.
+  /// Sends a connection-ending answer, then closes (the transports deliver
+  /// what was sent before a close).
   Future<void> _refuse(MuxConnection c, MuxMessage answer) async {
     _send(c, answer);
-    await _closeAfterSend(c);
-  }
-
-  /// Lets a frame just sent leave before the close: the memory transport
-  /// drops frames still in flight when a side closes (sockets flush on
-  /// close themselves).
-  static Future<void> _closeAfterSend(MuxConnection c) async {
-    await Future<void>.delayed(Duration.zero);
     await c.close();
   }
 
@@ -266,10 +263,11 @@ final class CliHost {
           if (client.events == null && _listeners >= maxListeners) {
             return cliErrorMessage(q, MuxError.busy);
           }
-          client.subscribe(
-            kinds == null ? null : {...(kinds as List<Object?>).cast<String>()},
-          );
-          return cliResult(q);
+          final wanted = kinds == null
+              ? null
+              : [...(kinds as List<Object?>).cast<String>()];
+          client.subscribe(wanted?.toSet());
+          return cliResult(q, {'kinds': ?wanted});
       }
       if (m.type.startsWith('ui.')) {
         if (!_enabled()) return _disabled(q);
@@ -287,7 +285,7 @@ final class CliHost {
     }
   }
 
-  static MuxMessage _disabled(int q) => cliErrorMessage(
+  static MuxMessage _disabled(int? q) => cliErrorMessage(
     q,
     CliError.cliDisabled,
     'Command-line control is off in ShellX (tray → Command line)',
@@ -297,7 +295,11 @@ final class CliHost {
     final rawBody = m.fields['body'];
     final rawTitle = m.fields['title'];
     final pane = m.fields['pane'];
-    if (rawBody is! String || rawBody.trim().isEmpty) {
+    if (rawBody is! String) {
+      return cliErrorMessage(m.q, MuxError.badRequest, 'notify needs text');
+    }
+    final stripped = _stripControls(rawBody);
+    if (stripped.trim().isEmpty) {
       return cliErrorMessage(m.q, MuxError.badRequest, 'notify needs text');
     }
     if (rawTitle != null && rawTitle is! String) {
@@ -306,7 +308,7 @@ final class CliHost {
     if (pane != null && pane is! int) {
       return cliErrorMessage(m.q, MuxError.badRequest, 'pane must be a number');
     }
-    final body = _clip(_stripControls(rawBody), 1024);
+    final body = _clip(stripped, 1024);
     final title = rawTitle == null
         ? null
         : _clip(_stripControls(rawTitle as String), 128);
@@ -330,7 +332,7 @@ final class _Client {
   _Client(
     this.host,
     this.connection, {
-    required this.full,
+    required this.tokenOk,
     required List<MuxMessage> early,
   }) {
     // Read with `auth`, before this listener: first, in order.
@@ -338,53 +340,149 @@ final class _Client {
     _sub = connection.messages.listen(_enqueue);
   }
 
+  /// D32: requests waiting on one connection (more → `busy`).
+  static const _maxWaiting = 64;
+
+  /// D32: unread answers past this stop request intake until they drain.
+  static const _outputLimit = 256 * 1024;
+
+  /// D24: events the client has not taken past this are dropped.
+  static const _maxEventsWaiting = 1000;
+
   final CliHost host;
   final MuxConnection connection;
 
-  /// A ShellX shell (token) or "Allow other terminals": the whole API.
-  final bool full;
+  /// Carried this launch's `SHELLX_CLI_TOKEN`.
+  final bool tokenOk;
   late final StreamSubscription<MuxMessage> _sub;
   Future<void> _chain = Future.value();
   StreamSubscription<Map<String, Object?>>? events;
+  Set<String>? _kinds;
   bool _closed = false;
-  int _queued = 0;
+  bool _inputPaused = false;
+  bool _watchingDrain = false;
+  int _waiting = 0;
+  int _eventsWaiting = 0;
   int _dropped = 0;
 
+  /// A ShellX shell, or "Allow other terminals" ticked right now
+  /// (evaluated per request and per event: unticking applies at once).
+  bool get full => tokenOk || host._externalAllowed();
+
   void _enqueue(MuxMessage m) {
+    if (_closed) return;
+    if (_waiting >= _maxWaiting) {
+      _answer(cliErrorMessage(m.q, MuxError.busy, 'too many requests'));
+      return;
+    }
+    _waiting++;
     // D32: requests on one connection run in order.
     _chain = _chain.then((_) async {
-      if (_closed) return;
-      if (!full && !CliHost._limitedMayAsk(m)) {
-        _closed = true;
-        await host._refuse(
-          connection,
-          cliErrorMessage(m.q, CliError.forbidden, CliHost._notAShellXShell),
-        );
-        return;
+      try {
+        await _outputRoom();
+        if (_closed) return;
+        if (!full && !CliHost._limitedMayAsk(m)) {
+          _revoke(m.q);
+          return;
+        }
+        final answer = await host._answer(m, this);
+        if (!_closed) _answer(answer);
+      } finally {
+        _waiting--;
       }
-      final answer = await host._answer(m, this);
-      if (!_closed) host._send(connection, answer);
     });
   }
 
+  /// Waits while the client leaves more than [_outputLimit] unread.
+  Future<void> _outputRoom() async {
+    while (!_closed && connection.pendingBytes > _outputLimit) {
+      await connection.drained;
+    }
+  }
+
+  /// Limited client: `forbidden` with the tray hint, then close.
+  void _revoke(int? q) {
+    _closed = true;
+    unawaited(
+      host._refuse(
+        connection,
+        cliErrorMessage(q, CliError.forbidden, CliHost._notAShellXShell),
+      ),
+    );
+  }
+
+  void _answer(MuxMessage answer) {
+    host._send(connection, answer);
+    _afterSend();
+  }
+
+  void _afterSend() {
+    if (!_inputPaused && connection.pendingBytes > _outputLimit) {
+      _inputPaused = true;
+      connection.pauseInput();
+    }
+    _watchDrain();
+  }
+
+  /// Once the client has taken everything: count events afresh, read
+  /// requests again, report what was dropped.
+  void _watchDrain() {
+    if (_watchingDrain || _closed) return;
+    if (connection.pendingBytes == 0) {
+      _drained();
+      return;
+    }
+    _watchingDrain = true;
+    unawaited(
+      connection.drained.then((_) {
+        _watchingDrain = false;
+        _watchDrain();
+      }),
+    );
+  }
+
+  void _drained() {
+    _eventsWaiting = 0;
+    if (_inputPaused) {
+      _inputPaused = false;
+      connection.resumeInput();
+    }
+    if (_dropped > 0 && events != null) {
+      final dropped = _dropped;
+      _dropped = 0;
+      _eventsWaiting++;
+      _event({'kind': 'overflow', 'dropped': dropped});
+    }
+  }
+
+  /// A second subscribe replaces the filter.
   void subscribe(Set<String>? kinds) {
+    _kinds = kinds;
     if (events != null) return;
     host._listeners++;
-    events = host._ui.events().listen((e) {
-      if (_closed) return;
-      if (kinds != null && !kinds.contains(e['kind'])) return;
-      if (_queued >= 1000) {
-        _dropped++;
-        return;
-      }
-      if (_dropped > 0) {
-        _event({'kind': 'overflow', 'dropped': _dropped});
-        _dropped = 0;
-      }
-      _queued++;
-      _event(e);
-      scheduleMicrotask(() => _queued--);
-    });
+    events = host._ui.events().listen(_onEvent);
+  }
+
+  void _onEvent(Map<String, Object?> e) {
+    if (_closed) return;
+    if (!full) {
+      _revoke(null);
+      return;
+    }
+    if (!host._enabled()) {
+      // D26: the switch ends the subscription; the connection stays.
+      _unsubscribe();
+      _answer(CliHost._disabled(null));
+      return;
+    }
+    final kinds = _kinds;
+    if (kinds != null && !kinds.contains(e['kind'])) return;
+    if (_eventsWaiting >= _maxEventsWaiting) {
+      _dropped++;
+      return;
+    }
+    _eventsWaiting++;
+    _event(e);
   }
 
   /// An event the wire refuses is dropped (never throws into the UI).
@@ -394,14 +492,22 @@ final class _Client {
     } on Object catch (e) {
       host._log('cli event not sent: ${e.runtimeType}');
     }
+    _afterSend();
+  }
+
+  void _unsubscribe() {
+    final sub = events;
+    if (sub == null) return;
+    events = null;
+    _kinds = null;
+    _dropped = 0;
+    host._listeners--;
+    unawaited(sub.cancel());
   }
 
   void dispose() {
     _closed = true;
     unawaited(_sub.cancel());
-    if (events != null) {
-      host._listeners--;
-      unawaited(events!.cancel());
-    }
+    _unsubscribe();
   }
 }
