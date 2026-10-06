@@ -1899,11 +1899,21 @@ class S {
     );
   }
 
+  /// `Speak or type… say “gửi” to send`
+  String get voiceHintVi {
+    return Intl.message(
+      'Speak or type… say “gửi” to send',
+      name: 'voiceHintVi',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Speak or type… say “send” to send`
-  String get voiceHint {
+  String get voiceHintEn {
     return Intl.message(
       'Speak or type… say “send” to send',
-      name: 'voiceHint',
+      name: 'voiceHintEn',
       desc: '',
       args: [],
     );

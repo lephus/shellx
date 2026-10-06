@@ -1092,6 +1092,16 @@ void main() {
       expect(speech.starts.last.localeId, 'en-US');
     });
 
+    testWidgets('the hint names the send word of the voice language, not of the app', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      expect(find.text('Nói hoặc gõ… nói “gửi” để gửi'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('voice-locale-en')));
+      await tester.pump();
+      expect(find.text('Nói hoặc gõ… nói “send” để gửi'), findsOneWidget);
+    });
+
     testWidgets('an ended session hides the mic and disables Send, keeping the text', (tester) async {
       await openQuiet(tester);
       await tester.tap(mic());

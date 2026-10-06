@@ -472,8 +472,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t recognize that, try again",
     ),
-    "voiceHint": MessageLookupByLibrary.simpleMessage(
+    "voiceHintEn": MessageLookupByLibrary.simpleMessage(
       "Speak or type… say “send” to send",
+    ),
+    "voiceHintVi": MessageLookupByLibrary.simpleMessage(
+      "Speak or type… say “gửi” to send",
     ),
     "voiceLanguageEn": MessageLookupByLibrary.simpleMessage("English"),
     "voiceLanguageVi": MessageLookupByLibrary.simpleMessage("Vietnamese"),

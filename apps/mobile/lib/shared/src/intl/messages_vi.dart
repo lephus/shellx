@@ -465,7 +465,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceFailed": MessageLookupByLibrary.simpleMessage(
       "Không nhận dạng được, hãy thử lại",
     ),
-    "voiceHint": MessageLookupByLibrary.simpleMessage(
+    "voiceHintEn": MessageLookupByLibrary.simpleMessage(
+      "Nói hoặc gõ… nói “send” để gửi",
+    ),
+    "voiceHintVi": MessageLookupByLibrary.simpleMessage(
       "Nói hoặc gõ… nói “gửi” để gửi",
     ),
     "voiceLanguageEn": MessageLookupByLibrary.simpleMessage("Tiếng Anh"),

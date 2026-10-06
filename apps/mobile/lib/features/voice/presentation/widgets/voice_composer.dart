@@ -1,4 +1,3 @@
-// apps/mobile/lib/features/voice/presentation/widgets/voice_composer.dart
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
@@ -93,7 +92,7 @@ class VoiceComposer extends StatelessWidget {
                     maxLines: 4,
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
-                      hintText: strings.voiceHint,
+                      hintText: locale == VoiceLocale.vi ? strings.voiceHintVi : strings.voiceHintEn,
                       isDense: true,
                       filled: true,
                       fillColor: colors.keyboardKey,
