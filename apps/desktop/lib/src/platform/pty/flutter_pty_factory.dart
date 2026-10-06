@@ -241,7 +241,7 @@ final class FlutterPtyFactory implements PtyFactory {
 /// user is shown). Each tree kill (a Future that never fails) is
 /// handed to [onKillStarted] so its owner can wait for it
 /// ([FlutterPtyFactory.killsSettled]).
-final class FlutterPtyAdapter implements Pty {
+final class FlutterPtyAdapter implements Pty, PtyProcessId {
   FlutterPtyAdapter(
     this._native, {
     ProcessTreeKiller? killer,
@@ -284,6 +284,10 @@ final class FlutterPtyAdapter implements Pty {
   bool _reportedDroppedInput = false;
 
   int get pid => _native.pid;
+
+  /// A2 D3: the shell's pid, for the ports its process tree listens on.
+  @override
+  int? get processId => _native.pid;
 
   void _closeOutput() {
     if (_output.isClosed) return;

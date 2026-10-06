@@ -9,3 +9,8 @@ String closeTabShortcutLabel() => isMacDesktop ? '⌘W' : 'Ctrl+Shift+W';
 String copyShortcutLabel() => isMacDesktop ? '⌘C' : 'Ctrl+Shift+C';
 String pasteShortcutLabel() => isMacDesktop ? '⌘V' : 'Ctrl+Shift+V';
 String selectAllShortcutLabel() => isMacDesktop ? '⌘A' : 'Ctrl+Shift+A';
+
+String renameShortcutLabel() => 'F2';
+String moveUpShortcutLabel() => isMacDesktop ? '⌥↑' : 'Alt+↑';
+String moveDownShortcutLabel() => isMacDesktop ? '⌥↓' : 'Alt+↓';
+String newWorkspaceShortcutLabel() => isMacDesktop ? '⌘⇧N' : 'Ctrl+Shift+N';

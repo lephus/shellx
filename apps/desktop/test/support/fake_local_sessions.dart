@@ -48,6 +48,9 @@ final class FakeLocalSessions implements LocalSessions {
     bool runningCommand = false,
     String? attachedMobileId,
     DriverSide? driver,
+    String? cwd,
+    String? gitBranch,
+    List<int> ports = const [],
   }) => SessionSummary(
     id: id,
     index: summaries.length + 1,
@@ -60,6 +63,9 @@ final class FakeLocalSessions implements LocalSessions {
     driver:
         driver ??
         (origin == SessionOrigin.phone ? DriverSide.phone : DriverSide.desktop),
+    cwd: cwd,
+    gitBranch: gitBranch,
+    ports: ports,
   );
 
   void add(SessionSummary summary, {bool notify = true, String backlog = ''}) {
@@ -81,6 +87,12 @@ final class FakeLocalSessions implements LocalSessions {
     view.viewed++;
     return view;
   }
+
+  /// Every `watchPorts` call, in order (A2 D8).
+  final watched = <bool>[];
+
+  @override
+  void watchPorts(bool visible) => watched.add(visible);
 
   @override
   void close(int id) {

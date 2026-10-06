@@ -662,4 +662,117 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get terminalSelectAll => 'Select all';
+
+  @override
+  String get workspaceDefaultName => 'Default';
+
+  @override
+  String workspaceNumberedName(int n) {
+    return 'Workspace $n';
+  }
+
+  @override
+  String get workspaceNew => 'New workspace';
+
+  @override
+  String get workspaceNewTab => 'New tab in this workspace';
+
+  @override
+  String get workspaceRename => 'Rename workspace';
+
+  @override
+  String get workspaceDelete => 'Delete workspace';
+
+  @override
+  String get workspaceCollapse => 'Collapse';
+
+  @override
+  String get workspaceExpand => 'Expand';
+
+  @override
+  String get workspaceEmptyHint => 'Empty. Drag a tab here or press +.';
+
+  @override
+  String get workspaceNameField => 'Workspace name';
+
+  @override
+  String workspaceDeleted(String name, String defaultName) {
+    return 'Deleted workspace “$name”. Its tabs moved to $defaultName.';
+  }
+
+  @override
+  String workspaceHeaderSemantics(String name, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+    );
+    return 'Workspace $name, $_temp0';
+  }
+
+  @override
+  String get workspaceContainsSelected => 'contains the selected tab';
+
+  @override
+  String get tabRename => 'Rename tab';
+
+  @override
+  String get tabNameField => 'Tab name';
+
+  @override
+  String get tabUseAutomaticName => 'Use automatic name';
+
+  @override
+  String get tabMoveTo => 'Move to workspace…';
+
+  @override
+  String get tabMoveUp => 'Move up';
+
+  @override
+  String get tabMoveDown => 'Move down';
+
+  @override
+  String tabOpenPort(int port) {
+    return 'Open port $port in browser';
+  }
+
+  @override
+  String portOpenTooltip(int port) {
+    return 'Open http://localhost:$port';
+  }
+
+  @override
+  String portsMoreTooltip(String ports) {
+    return 'Listening ports: $ports';
+  }
+
+  @override
+  String get portOpenFailed => 'Couldn\'t open the browser.';
+
+  @override
+  String sidebarBranch(String branch) {
+    return 'branch $branch';
+  }
+
+  @override
+  String sidebarFolder(String path) {
+    return 'folder $path';
+  }
+
+  @override
+  String sidebarPorts(int count, String ports) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ports $ports',
+      one: 'port $ports',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sidebarPositionInWorkspace(int index, int count, String workspace) {
+    return 'tab $index of $count in $workspace';
+  }
 }

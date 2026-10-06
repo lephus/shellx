@@ -657,4 +657,110 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get terminalSelectAll => 'Chọn tất cả';
+
+  @override
+  String get workspaceDefaultName => 'Mặc định';
+
+  @override
+  String workspaceNumberedName(int n) {
+    return 'Workspace $n';
+  }
+
+  @override
+  String get workspaceNew => 'Workspace mới';
+
+  @override
+  String get workspaceNewTab => 'Tab mới trong workspace này';
+
+  @override
+  String get workspaceRename => 'Đổi tên workspace';
+
+  @override
+  String get workspaceDelete => 'Xóa workspace';
+
+  @override
+  String get workspaceCollapse => 'Thu gọn';
+
+  @override
+  String get workspaceExpand => 'Mở rộng';
+
+  @override
+  String get workspaceEmptyHint => 'Trống. Kéo tab vào đây hoặc bấm +.';
+
+  @override
+  String get workspaceNameField => 'Tên workspace';
+
+  @override
+  String workspaceDeleted(String name, String defaultName) {
+    return 'Đã xóa workspace “$name”. Các tab đã chuyển về $defaultName.';
+  }
+
+  @override
+  String workspaceHeaderSemantics(String name, int count) {
+    return 'Workspace $name, $count tab';
+  }
+
+  @override
+  String get workspaceContainsSelected => 'có tab đang chọn';
+
+  @override
+  String get tabRename => 'Đổi tên tab';
+
+  @override
+  String get tabNameField => 'Tên tab';
+
+  @override
+  String get tabUseAutomaticName => 'Dùng tên tự động';
+
+  @override
+  String get tabMoveTo => 'Chuyển tới workspace…';
+
+  @override
+  String get tabMoveUp => 'Chuyển lên';
+
+  @override
+  String get tabMoveDown => 'Chuyển xuống';
+
+  @override
+  String tabOpenPort(int port) {
+    return 'Mở cổng $port trong trình duyệt';
+  }
+
+  @override
+  String portOpenTooltip(int port) {
+    return 'Mở http://localhost:$port';
+  }
+
+  @override
+  String portsMoreTooltip(String ports) {
+    return 'Cổng đang nghe: $ports';
+  }
+
+  @override
+  String get portOpenFailed => 'Không mở được trình duyệt.';
+
+  @override
+  String sidebarBranch(String branch) {
+    return 'nhánh $branch';
+  }
+
+  @override
+  String sidebarFolder(String path) {
+    return 'thư mục $path';
+  }
+
+  @override
+  String sidebarPorts(int count, String ports) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'cổng $ports',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sidebarPositionInWorkspace(int index, int count, String workspace) {
+    return 'tab $index trên $count trong $workspace';
+  }
 }

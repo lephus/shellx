@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
@@ -22,6 +25,8 @@ final class SessionCore {
     PushNotificationsSetup? notifications,
     DateTime Function()? now,
     int Function()? sessionIds,
+    GitBranchLookup? gitHeads,
+    PortProbe? portProbe,
   }) {
     final ids = sessionIds ?? sessionIdAllocator();
     // One AgentNotifications for both kinds of session: the 6-per-minute
@@ -49,6 +54,11 @@ final class SessionCore {
           ? null
           : ShellIntegration(directory: hooks),
       clock: now,
+      gitHeads: gitHeads,
+      portProbe: portProbe,
+      windowsPaths: Platform.isWindows,
+      localHostName: Platform.localHostname,
+      log: (message) => debugPrint('ShellX ports: $message'),
     );
     return SessionCore._(ids, agentNotifications, sessions);
   }

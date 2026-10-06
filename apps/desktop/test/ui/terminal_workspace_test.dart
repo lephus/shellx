@@ -980,4 +980,29 @@ void main() {
     );
     expect(material.shape, isA<OutsideFocusRingBorder>());
   });
+
+  testWorkspace('a deleted-workspace notice is a neutral toast; a port '
+      'failure an error toast (UI-A2 §7)', (tester) async {
+    await pumpWorkspace(tester);
+    container
+        .read(terminalTabsProvider.notifier)
+        .showNotice(
+          const WorkspaceDeletedNotice(name: 'Ops', movedTo: 'Default'),
+        );
+    await tester.pump();
+    expect(
+      find.text('Deleted workspace “Ops”. Its tabs moved to Default.'),
+      findsOneWidget,
+    );
+    final box = tester.widget<Container>(find.byKey(const Key('pane.toast')));
+    expect(
+      (box.decoration! as BoxDecoration).color,
+      ShellxDesktopColors.rowSelected,
+    );
+    container
+        .read(terminalTabsProvider.notifier)
+        .showNotice(const PortOpenFailedNotice());
+    await tester.pump();
+    expect(find.text("Couldn't open the browser."), findsOneWidget);
+  });
 }

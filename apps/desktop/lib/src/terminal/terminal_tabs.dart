@@ -48,6 +48,24 @@ final class SpawnFailedNotice extends TabNotice {
   final SpawnFailure kind;
 }
 
+/// A workspace was deleted; its tabs moved to [movedTo] (spec D16).
+/// Neutral toast.
+final class WorkspaceDeletedNotice extends TabNotice {
+  const WorkspaceDeletedNotice({required this.name, required this.movedTo});
+  final String name;
+  final String movedTo;
+}
+
+/// The browser could not be started for a port link (UI-A2 §2.4).
+final class PortOpenFailedNotice extends TabNotice {
+  const PortOpenFailedNotice();
+}
+
+/// D19: the longest tab name, in characters.
+const int kTabNameMaxLength = 64;
+
+const Object _unset = Object();
+
 @immutable
 final class TerminalTab {
   const TerminalTab({
@@ -61,6 +79,10 @@ final class TerminalTab {
     required this.driver,
     required this.terminal,
     required this.selection,
+    this.cwd,
+    this.gitBranch,
+    this.ports = const [],
+    this.customTitle,
     this.exitCode,
   });
 
@@ -77,13 +99,27 @@ final class TerminalTab {
   /// xterm selection (⌘C copies it).
   final TerminalController selection;
 
+  /// A2 C1–C3, from the session; the last values stay after an exit.
+  final String? cwd;
+  final String? gitBranch;
+  final List<int> ports;
+
+  /// C6: the user's name for this tab (desktop only); wins over [title].
+  final String? customTitle;
+
   /// Non-null once the shell exited with a non-zero code (D14).
   final int? exitCode;
 
   bool get exited => exitCode != null;
 
   /// OSC 0/2 title, else `<shell> <index>` (D13, UI §5 terminalDefaultTitle).
-  String get label => title.isNotEmpty ? title : '$shell $index';
+  String get automaticLabel => title.isNotEmpty ? title : '$shell $index';
+
+  /// What the sidebar, the window title and dialogs show.
+  String get label => customTitle ?? automaticLabel;
+
+  /// The row has a context line (UI-A2 §2.1).
+  bool get hasContext => cwd != null || gitBranch != null || ports.isNotEmpty;
 
   TerminalTab copyWith({
     String? title,
@@ -91,6 +127,10 @@ final class TerminalTab {
     bool? runningCommand,
     DriverSide? driver,
     int? exitCode,
+    Object? cwd = _unset,
+    Object? gitBranch = _unset,
+    List<int>? ports,
+    Object? customTitle = _unset,
   }) => TerminalTab(
     id: id,
     index: index,
@@ -102,6 +142,14 @@ final class TerminalTab {
     driver: driver ?? this.driver,
     terminal: terminal,
     selection: selection,
+    cwd: identical(cwd, _unset) ? this.cwd : cwd as String?,
+    gitBranch: identical(gitBranch, _unset)
+        ? this.gitBranch
+        : gitBranch as String?,
+    ports: ports ?? this.ports,
+    customTitle: identical(customTitle, _unset)
+        ? this.customTitle
+        : customTitle as String?,
     exitCode: exitCode ?? this.exitCode,
   );
 }
@@ -238,6 +286,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   void dismissNotice() => _set(notice: null);
 
+  /// C6/D19: the user's name for tab [id]; trimmed, at most
+  /// [kTabNameMaxLength] characters; blank restores the automatic title.
+  void rename(int id, String? name) {
+    final trimmed = name?.trim() ?? '';
+    final value = trimmed.isEmpty
+        ? null
+        : String.fromCharCodes(trimmed.runes.take(kTabNameMaxLength));
+    _update(id, (t) => t.copyWith(customTitle: value));
+  }
+
+  /// A notice from outside the tab list (workspaces, port links).
+  void showNotice(TabNotice notice) => _set(notice: notice);
+
   // ---- internals --------------------------------------------------------
 
   void _step(int delta) {
@@ -276,6 +337,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
                 phoneAttached: s.phoneAttached,
                 runningCommand: s.runningCommand,
                 driver: s.driver,
+                cwd: s.cwd,
+                gitBranch: s.gitBranch,
+                ports: s.ports,
               ),
       );
     }
@@ -334,6 +398,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       driver: s.driver,
       terminal: terminal,
       selection: link.selection,
+      cwd: s.cwd,
+      gitBranch: s.gitBranch,
+      ports: s.ports,
     );
   }
 

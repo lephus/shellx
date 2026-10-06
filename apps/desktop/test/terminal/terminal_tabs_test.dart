@@ -370,6 +370,48 @@ void main() {
     container.dispose();
     expect(_isDisposed(second), isTrue);
   });
+
+  test('cwd, branch and ports follow the summary and stay after an exit '
+      '(A2 C7)', () async {
+    local.add(local.summary(1, cwd: '/w', gitBranch: 'main', ports: [3000]));
+    boot();
+    var tab = state().tabs.single;
+    expect((tab.cwd, tab.gitBranch, tab.hasContext), ('/w', 'main', true));
+    expect(tab.ports, [3000]);
+    local.replace(local.summary(1, cwd: '/w/api'));
+    tab = state().tabs.single;
+    expect((tab.cwd, tab.gitBranch), ('/w/api', null));
+    expect(tab.ports, isEmpty);
+    local.views[1]!.end(2);
+    await pumpEventQueue();
+    expect(state().tabs.single.cwd, '/w/api');
+  });
+
+  test('rename: a name wins over the OSC title; blank restores it; at most '
+      '64 characters (C6, D19)', () {
+    local.add(local.summary(1, title: 'vim'));
+    boot();
+    tabs().rename(1, '  api server  ');
+    expect(state().tabs.single.label, 'api server');
+    local.replace(local.summary(1, title: 'htop'));
+    expect(state().tabs.single.label, 'api server');
+    expect(state().tabs.single.automaticLabel, 'htop');
+    tabs().rename(1, '   ');
+    expect(state().tabs.single.label, 'htop');
+    tabs().rename(1, 'x' * 100);
+    expect(state().tabs.single.label, 'x' * kTabNameMaxLength);
+    tabs().rename(999, 'nobody'); // unknown id: nothing happens
+  });
+
+  test('showNotice replaces the current notice', () {
+    boot();
+    tabs().showNotice(const PortOpenFailedNotice());
+    expect(state().notice, isA<PortOpenFailedNotice>());
+    tabs().showNotice(
+      const WorkspaceDeletedNotice(name: 'Ops', movedTo: 'Default'),
+    );
+    expect(state().notice, isA<WorkspaceDeletedNotice>());
+  });
 }
 
 bool _isDisposed(ChangeNotifier notifier) {

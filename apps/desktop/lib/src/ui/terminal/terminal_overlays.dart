@@ -513,12 +513,20 @@ class _NoticeToastState extends State<NoticeToast> {
 
   bool get _paused => _hovered || _closeFocus.hasFocus;
 
-  /// A fresh 6 s, unless the pointer or the keyboard is on the toast.
+  /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
+  bool get _neutral => widget.notice is WorkspaceDeletedNotice;
+
+  /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is on the toast.
   void _start() {
     _timer?.cancel();
     _timer = _paused
         ? null
-        : Timer(ShellxMotion.toastVisibleError, widget.onDismiss);
+        : Timer(
+            _neutral
+                ? ShellxMotion.toastVisible
+                : ShellxMotion.toastVisibleError,
+            widget.onDismiss,
+          );
   }
 
   void _onFocus() => _paused ? _timer?.cancel() : _start();
@@ -546,11 +554,17 @@ class _NoticeToastState extends State<NoticeToast> {
   String _text(AppLocalizations l10n) => switch (widget.notice) {
     SessionLimitNotice(:final max) => l10n.terminalSessionLimit(max),
     SpawnFailedNotice(:final kind) => l10n.terminalSpawnFailed(kind.name),
+    WorkspaceDeletedNotice(:final name, :final movedTo) =>
+      l10n.workspaceDeleted(name, movedTo),
+    PortOpenFailedNotice() => l10n.portOpenFailed,
   };
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final foreground = _neutral
+        ? ShellxDesktopColors.textPrimary
+        : ShellxDesktopColors.noticeText;
     return MouseRegion(
       onEnter: (_) {
         _hovered = true;
@@ -574,28 +588,32 @@ class _NoticeToastState extends State<NoticeToast> {
             vertical: ShellxSpace.s8,
           ),
           decoration: BoxDecoration(
-            color: ShellxDesktopColors.noticeBg,
+            color: _neutral
+                ? ShellxDesktopColors.rowSelected
+                : ShellxDesktopColors.noticeBg,
             borderRadius: BorderRadius.circular(ShellxRadius.r8),
-            border: Border.all(color: ShellxDesktopColors.noticeBorder),
+            border: Border.all(
+              color: _neutral
+                  ? ShellxDesktopColors.border
+                  : ShellxDesktopColors.noticeBorder,
+            ),
             boxShadow: ShellxShadows.e1,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const ExcludeSemantics(
+              ExcludeSemantics(
                 child: Icon(
-                  Icons.error_outline,
+                  _neutral ? Icons.info_outline : Icons.error_outline,
                   size: ShellxSizes.icon,
-                  color: ShellxDesktopColors.noticeText,
+                  color: foreground,
                 ),
               ),
               const SizedBox(width: ShellxSpace.s8),
               Flexible(
                 child: Text(
                   _text(l10n),
-                  style: ShellxText.body.copyWith(
-                    color: ShellxDesktopColors.noticeText,
-                  ),
+                  style: ShellxText.body.copyWith(color: foreground),
                 ),
               ),
               const SizedBox(width: ShellxSpace.s8),
@@ -609,8 +627,8 @@ class _NoticeToastState extends State<NoticeToast> {
                 hitSize: ShellxSizes.toastClose,
                 visualSize: ShellxSizes.toastClose,
                 glyphSize: ShellxSizes.toastCloseGlyph,
-                color: ShellxDesktopColors.noticeText,
-                hoverColor: ShellxDesktopColors.noticeText,
+                color: foreground,
+                hoverColor: foreground,
               ),
             ],
           ),

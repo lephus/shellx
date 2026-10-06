@@ -1093,6 +1093,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select all'**
   String get terminalSelectAll;
+
+  /// No description provided for @workspaceDefaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get workspaceDefaultName;
+
+  /// No description provided for @workspaceNumberedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace {n}'**
+  String workspaceNumberedName(int n);
+
+  /// No description provided for @workspaceNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New workspace'**
+  String get workspaceNew;
+
+  /// No description provided for @workspaceNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab in this workspace'**
+  String get workspaceNewTab;
+
+  /// No description provided for @workspaceRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename workspace'**
+  String get workspaceRename;
+
+  /// No description provided for @workspaceDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete workspace'**
+  String get workspaceDelete;
+
+  /// No description provided for @workspaceCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get workspaceCollapse;
+
+  /// No description provided for @workspaceExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get workspaceExpand;
+
+  /// No description provided for @workspaceEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty. Drag a tab here or press +.'**
+  String get workspaceEmptyHint;
+
+  /// No description provided for @workspaceNameField.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace name'**
+  String get workspaceNameField;
+
+  /// No description provided for @workspaceDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted workspace “{name}”. Its tabs moved to {defaultName}.'**
+  String workspaceDeleted(String name, String defaultName);
+
+  /// No description provided for @workspaceHeaderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace {name}, {count, plural, =1{1 tab} other{{count} tabs}}'**
+  String workspaceHeaderSemantics(String name, int count);
+
+  /// No description provided for @workspaceContainsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'contains the selected tab'**
+  String get workspaceContainsSelected;
+
+  /// No description provided for @tabRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename tab'**
+  String get tabRename;
+
+  /// No description provided for @tabNameField.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab name'**
+  String get tabNameField;
+
+  /// No description provided for @tabUseAutomaticName.
+  ///
+  /// In en, this message translates to:
+  /// **'Use automatic name'**
+  String get tabUseAutomaticName;
+
+  /// No description provided for @tabMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to workspace…'**
+  String get tabMoveTo;
+
+  /// No description provided for @tabMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get tabMoveUp;
+
+  /// No description provided for @tabMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get tabMoveDown;
+
+  /// No description provided for @tabOpenPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Open port {port} in browser'**
+  String tabOpenPort(int port);
+
+  /// No description provided for @portOpenTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open http://localhost:{port}'**
+  String portOpenTooltip(int port);
+
+  /// No description provided for @portsMoreTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening ports: {ports}'**
+  String portsMoreTooltip(String ports);
+
+  /// No description provided for @portOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the browser.'**
+  String get portOpenFailed;
+
+  /// No description provided for @sidebarBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'branch {branch}'**
+  String sidebarBranch(String branch);
+
+  /// No description provided for @sidebarFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'folder {path}'**
+  String sidebarFolder(String path);
+
+  /// No description provided for @sidebarPorts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{port {ports}} other{ports {ports}}}'**
+  String sidebarPorts(int count, String ports);
+
+  /// No description provided for @sidebarPositionInWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'tab {index} of {count} in {workspace}'**
+  String sidebarPositionInWorkspace(int index, int count, String workspace);
 }
 
 class _AppLocalizationsDelegate

@@ -32,6 +32,8 @@ import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
+import 'src/terminal/local_sessions_provider.dart';
+import 'src/terminal/port_watch.dart';
 import 'src/terminal_sharing/attach_throttle.dart';
 import 'src/terminal_sharing/powershell.dart';
 import 'src/terminal_sharing/sharing_paths.dart';
@@ -165,6 +167,8 @@ Future<void> _start(
     baseEnvironment: environment,
     api: api,
     notifications: pushNotifications,
+    gitHeads: GitHeadReader(),
+    portProbe: Platform.isWindows ? WindowsPortProbe() : MacPortProbe(),
   );
 
   // The process's one SecureKeyValueStore; DesktopServices builds the one
@@ -218,7 +222,10 @@ Future<void> _start(
   );
 
   container = ProviderContainer(
-    overrides: [desktopServicesProvider.overrideWithValue(services)],
+    overrides: [
+      desktopServicesProvider.overrideWithValue(services),
+      homeDirectoryProvider.overrideWithValue(home),
+    ],
   );
 
   final windowPresenter = WindowPresenter(windowHost);
@@ -271,6 +278,7 @@ Future<void> _start(
     l10n: l10n,
     run: (call) => _unawaitedLogged(call, 'window title'),
   );
+  listenForPortWatch(container: container, sessions: core.sessions);
 
   registerFontLicenses();
   runApp(

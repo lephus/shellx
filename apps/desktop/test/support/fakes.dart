@@ -414,6 +414,14 @@ final class RecordingUrlOpener implements UrlOpener {
     if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
     opened.add(uri);
   }
+
+  final List<int> ports = [];
+
+  @override
+  Future<void> openLocalPort(int port) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    ports.add(port);
+  }
 }
 
 final PairingIdGenerator _pairingIds = PairingIdGenerator();
