@@ -520,4 +520,107 @@ class AppLocalizationsVi extends AppLocalizations {
   String terminalExitedLine(int code) {
     return '[Tiến trình đã thoát, mã $code] — Enter để đóng';
   }
+
+  @override
+  String get terminalNewTab => 'Tab mới';
+
+  @override
+  String terminalNewTabTooltip(String shortcut) {
+    return 'Tab mới  $shortcut';
+  }
+
+  @override
+  String get terminalCloseTab => 'Đóng tab';
+
+  @override
+  String get terminalDriverPhone =>
+      'Điện thoại đang dùng terminal này — gõ để dùng lại';
+
+  @override
+  String get terminalSignedOutStrip => 'Đăng nhập để dùng từ điện thoại';
+
+  @override
+  String get terminalSignedOutAction => 'Đăng nhập…';
+
+  @override
+  String get terminalEmptyTitle => 'Không có tab nào đang mở';
+
+  @override
+  String get terminalEmptyBody =>
+      'Mở tab để chạy một shell mới. Phiên bạn mở từ điện thoại cũng hiện ở đây.';
+
+  @override
+  String get terminalEmptyAction => 'Mở tab mới';
+
+  @override
+  String terminalSessionLimit(int max) {
+    return 'Đã mở tối đa $max phiên. Đóng bớt tab để mở tab mới.';
+  }
+
+  @override
+  String terminalSpawnFailed(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'notFound': 'không tìm thấy shell',
+      'denied': 'không có quyền chạy shell',
+      'other': 'lỗi hệ thống',
+    });
+    return 'Không mở được shell: $_temp0. Hãy thử lại.';
+  }
+
+  @override
+  String get toastDismiss => 'Đóng thông báo';
+
+  @override
+  String confirmCloseRunningTitle(String title) {
+    return 'Đóng “$title”?';
+  }
+
+  @override
+  String get confirmCloseRunningBody =>
+      'Lệnh đang chạy trong tab này sẽ bị dừng.';
+
+  @override
+  String get confirmCloseRunningAction => 'Đóng tab';
+
+  @override
+  String get sidebarLabel => 'Danh sách tab';
+
+  @override
+  String get sidebarStatusIdle => 'đang chờ lệnh';
+
+  @override
+  String get sidebarStatusRunning => 'đang chạy lệnh';
+
+  @override
+  String sidebarStatusExited(int code) {
+    return 'đã thoát, mã $code';
+  }
+
+  @override
+  String get sidebarPhoneOrigin => 'Mở từ điện thoại';
+
+  @override
+  String get sidebarPhoneViewing => 'Điện thoại đang xem';
+
+  @override
+  String get sidebarPhoneDriving => 'Điện thoại đang dùng';
+
+  @override
+  String get sidebarPhoneOriginSemantics => 'mở từ điện thoại';
+
+  @override
+  String get sidebarPhoneViewingSemantics => 'điện thoại đang xem';
+
+  @override
+  String get sidebarPhoneDrivingSemantics => 'điện thoại đang dùng';
+
+  @override
+  String sidebarPosition(int index, int count) {
+    return 'tab $index trên $count';
+  }
+
+  @override
+  String terminalPaneLabel(String title) {
+    return 'Terminal $title';
+  }
 }

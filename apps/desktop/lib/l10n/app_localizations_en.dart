@@ -524,4 +524,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String terminalExitedLine(int code) {
     return '[Process exited with code $code] — press Enter to close';
   }
+
+  @override
+  String get terminalNewTab => 'New tab';
+
+  @override
+  String terminalNewTabTooltip(String shortcut) {
+    return 'New tab  $shortcut';
+  }
+
+  @override
+  String get terminalCloseTab => 'Close tab';
+
+  @override
+  String get terminalDriverPhone =>
+      'Your phone is using this terminal — type to take it back';
+
+  @override
+  String get terminalSignedOutStrip =>
+      'Sign in to use this computer from your phone';
+
+  @override
+  String get terminalSignedOutAction => 'Sign in…';
+
+  @override
+  String get terminalEmptyTitle => 'No tabs open';
+
+  @override
+  String get terminalEmptyBody =>
+      'Open a tab to start a new shell. Sessions you open from your phone show up here too.';
+
+  @override
+  String get terminalEmptyAction => 'Open new tab';
+
+  @override
+  String terminalSessionLimit(int max) {
+    return 'You\'ve reached the limit of $max sessions. Close a tab to open a new one.';
+  }
+
+  @override
+  String terminalSpawnFailed(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'notFound': 'shell not found',
+      'denied': 'permission denied',
+      'other': 'system error',
+    });
+    return 'Couldn\'t start the shell: $_temp0. Try again.';
+  }
+
+  @override
+  String get toastDismiss => 'Dismiss';
+
+  @override
+  String confirmCloseRunningTitle(String title) {
+    return 'Close “$title”?';
+  }
+
+  @override
+  String get confirmCloseRunningBody =>
+      'The command running in this tab will be stopped.';
+
+  @override
+  String get confirmCloseRunningAction => 'Close tab';
+
+  @override
+  String get sidebarLabel => 'Tabs';
+
+  @override
+  String get sidebarStatusIdle => 'idle';
+
+  @override
+  String get sidebarStatusRunning => 'running a command';
+
+  @override
+  String sidebarStatusExited(int code) {
+    return 'exited with code $code';
+  }
+
+  @override
+  String get sidebarPhoneOrigin => 'Opened from your phone';
+
+  @override
+  String get sidebarPhoneViewing => 'Your phone is viewing';
+
+  @override
+  String get sidebarPhoneDriving => 'Your phone is using it';
+
+  @override
+  String get sidebarPhoneOriginSemantics => 'opened from your phone';
+
+  @override
+  String get sidebarPhoneViewingSemantics => 'your phone is viewing';
+
+  @override
+  String get sidebarPhoneDrivingSemantics => 'your phone is using it';
+
+  @override
+  String sidebarPosition(int index, int count) {
+    return 'tab $index of $count';
+  }
+
+  @override
+  String terminalPaneLabel(String title) {
+    return 'Terminal $title';
+  }
 }

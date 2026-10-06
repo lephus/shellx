@@ -42,6 +42,9 @@ abstract final class ShellxDesktopColors {
   static const Color primaryHover = Color(0xFF4CCAD8);
   static const Color primaryPressed = Color(0xFF26A9B8);
   static const Color destructiveHover = Color(0xFFF4848A);
+
+  /// UI §3: disabled = 38 % opacity.
+  static const double disabledOpacity = 0.38;
 }
 
 /// UI §1.2 spacing scale (px).
@@ -86,6 +89,54 @@ abstract final class ShellxSizes {
   static const double pillMaxWidth = 560;
   static const double emptyMaxWidth = 320;
   static const EdgeInsets terminalPadding = EdgeInsets.fromLTRB(10, 6, 10, 6);
+
+  /// UI §2.1: macOS header content sits on the traffic-light centre line.
+  static const double trafficLightsCenterY = 14;
+
+  /// UI §2.1: the pane header title takes at most 60 % of the pane.
+  static const double paneHeaderTitleFactor = 0.6;
+
+  /// UI §1.3: row height grows with the text scale: max(30, 18·s + 12).
+  static const double rowTextLine = 18;
+  static const double rowTextPadding = 12;
+
+  /// UI §2.2 tab row: dot slot, selected bar (2 × 16).
+  static const double dotSlot = 16;
+  static const double dotRing = 1.5;
+  static const double selectedBarWidth = 2;
+  static const double selectedBarHeight = 16;
+
+  /// UI §2.2 overlay scrollbar.
+  static const double scrollbarThickness = 6;
+  static const double scrollbarRadius = 3;
+  static const double scrollbarMargin = 2;
+
+  /// UI §3 focused state: 2 px accent ring inside the radius.
+  static const double focusRing = 2;
+
+  /// UI §3.2 `+`: 28 hit, 24 visual; busy spinner 12, stroke 1.5.
+  static const double iconVisual = 24;
+  static const double spinner = 12;
+  static const double spinnerStroke = 1.5;
+
+  /// UI §3.3 buttons: min width 80, padding 0/14; text button 28 high,
+  /// padding 0/10.
+  static const double buttonMinWidth = 80;
+  static const double buttonPaddingH = 14;
+  static const double textButton = 28;
+  static const double textButtonPaddingH = 10;
+
+  /// UI §3.1 context menu: min width 180, item 28 high, padding 0/10.
+  static const double menuMinWidth = 180;
+  static const double menuItem = 28;
+  static const double menuItemPaddingH = 10;
+
+  /// UI §2.8 toast close: 24 × 24 button, 14 glyph.
+  static const double toastClose = 24;
+  static const double toastCloseGlyph = 14;
+
+  /// UI §2.7 empty-state icon.
+  static const double emptyIcon = 32;
 }
 
 /// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).
@@ -125,6 +176,11 @@ abstract final class ShellxShadows {
   static const List<BoxShadow> e1 = [
     BoxShadow(offset: Offset(0, 4), blurRadius: 16, color: Color(0x73000000)),
   ];
+
+  /// [e1] for Material surfaces that only take an elevation (the context
+  /// menu of `showMenu`): a shadow of about the same offset and blur.
+  static const double e1Elevation = 8;
+  static const Color e1ShadowColor = Color(0x73000000);
   static const List<BoxShadow> e2 = [
     BoxShadow(offset: Offset(0, 16), blurRadius: 48, color: Color(0x8C000000)),
   ];

@@ -279,5 +279,68 @@
     "placeholders": {
       "code": {"type": "int"}
     }
+  },
+  "terminalNewTab": "New tab",
+  "terminalNewTabTooltip": "New tab  {shortcut}",
+  "@terminalNewTabTooltip": {
+    "placeholders": {
+      "shortcut": {"type": "String"}
+    }
+  },
+  "terminalCloseTab": "Close tab",
+  "terminalDriverPhone": "Your phone is using this terminal — type to take it back",
+  "terminalSignedOutStrip": "Sign in to use this computer from your phone",
+  "terminalSignedOutAction": "Sign in…",
+  "terminalEmptyTitle": "No tabs open",
+  "terminalEmptyBody": "Open a tab to start a new shell. Sessions you open from your phone show up here too.",
+  "terminalEmptyAction": "Open new tab",
+  "terminalSessionLimit": "You've reached the limit of {max} sessions. Close a tab to open a new one.",
+  "@terminalSessionLimit": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "terminalSpawnFailed": "Couldn't start the shell: {reason, select, notFound{shell not found} denied{permission denied} other{system error}}. Try again.",
+  "@terminalSpawnFailed": {
+    "placeholders": {
+      "reason": {"type": "String"}
+    }
+  },
+  "toastDismiss": "Dismiss",
+  "confirmCloseRunningTitle": "Close “{title}”?",
+  "@confirmCloseRunningTitle": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "confirmCloseRunningBody": "The command running in this tab will be stopped.",
+  "confirmCloseRunningAction": "Close tab",
+  "sidebarLabel": "Tabs",
+  "sidebarStatusIdle": "idle",
+  "sidebarStatusRunning": "running a command",
+  "sidebarStatusExited": "exited with code {code}",
+  "@sidebarStatusExited": {
+    "placeholders": {
+      "code": {"type": "int"}
+    }
+  },
+  "sidebarPhoneOrigin": "Opened from your phone",
+  "sidebarPhoneViewing": "Your phone is viewing",
+  "sidebarPhoneDriving": "Your phone is using it",
+  "sidebarPhoneOriginSemantics": "opened from your phone",
+  "sidebarPhoneViewingSemantics": "your phone is viewing",
+  "sidebarPhoneDrivingSemantics": "your phone is using it",
+  "sidebarPosition": "tab {index} of {count}",
+  "@sidebarPosition": {
+    "placeholders": {
+      "index": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
+  "terminalPaneLabel": "Terminal {title}",
+  "@terminalPaneLabel": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
   }
 }

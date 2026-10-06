@@ -877,6 +877,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'[Process exited with code {code}] — press Enter to close'**
   String terminalExitedLine(int code);
+
+  /// No description provided for @terminalNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get terminalNewTab;
+
+  /// No description provided for @terminalNewTabTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab  {shortcut}'**
+  String terminalNewTabTooltip(String shortcut);
+
+  /// No description provided for @terminalCloseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get terminalCloseTab;
+
+  /// No description provided for @terminalDriverPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone is using this terminal — type to take it back'**
+  String get terminalDriverPhone;
+
+  /// No description provided for @terminalSignedOutStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to use this computer from your phone'**
+  String get terminalSignedOutStrip;
+
+  /// No description provided for @terminalSignedOutAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in…'**
+  String get terminalSignedOutAction;
+
+  /// No description provided for @terminalEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No tabs open'**
+  String get terminalEmptyTitle;
+
+  /// No description provided for @terminalEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a tab to start a new shell. Sessions you open from your phone show up here too.'**
+  String get terminalEmptyBody;
+
+  /// No description provided for @terminalEmptyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open new tab'**
+  String get terminalEmptyAction;
+
+  /// No description provided for @terminalSessionLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the limit of {max} sessions. Close a tab to open a new one.'**
+  String terminalSessionLimit(int max);
+
+  /// No description provided for @terminalSpawnFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start the shell: {reason, select, notFound{shell not found} denied{permission denied} other{system error}}. Try again.'**
+  String terminalSpawnFailed(String reason);
+
+  /// No description provided for @toastDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get toastDismiss;
+
+  /// No description provided for @confirmCloseRunningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close “{title}”?'**
+  String confirmCloseRunningTitle(String title);
+
+  /// No description provided for @confirmCloseRunningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The command running in this tab will be stopped.'**
+  String get confirmCloseRunningBody;
+
+  /// No description provided for @confirmCloseRunningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get confirmCloseRunningAction;
+
+  /// No description provided for @sidebarLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabs'**
+  String get sidebarLabel;
+
+  /// No description provided for @sidebarStatusIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'idle'**
+  String get sidebarStatusIdle;
+
+  /// No description provided for @sidebarStatusRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'running a command'**
+  String get sidebarStatusRunning;
+
+  /// No description provided for @sidebarStatusExited.
+  ///
+  /// In en, this message translates to:
+  /// **'exited with code {code}'**
+  String sidebarStatusExited(int code);
+
+  /// No description provided for @sidebarPhoneOrigin.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened from your phone'**
+  String get sidebarPhoneOrigin;
+
+  /// No description provided for @sidebarPhoneViewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone is viewing'**
+  String get sidebarPhoneViewing;
+
+  /// No description provided for @sidebarPhoneDriving.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone is using it'**
+  String get sidebarPhoneDriving;
+
+  /// No description provided for @sidebarPhoneOriginSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'opened from your phone'**
+  String get sidebarPhoneOriginSemantics;
+
+  /// No description provided for @sidebarPhoneViewingSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'your phone is viewing'**
+  String get sidebarPhoneViewingSemantics;
+
+  /// No description provided for @sidebarPhoneDrivingSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'your phone is using it'**
+  String get sidebarPhoneDrivingSemantics;
+
+  /// No description provided for @sidebarPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'tab {index} of {count}'**
+  String sidebarPosition(int index, int count);
+
+  /// No description provided for @terminalPaneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal {title}'**
+  String terminalPaneLabel(String title);
 }
 
 class _AppLocalizationsDelegate
