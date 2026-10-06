@@ -10,6 +10,7 @@ final class ShellxMenuEntry<T> {
     this.shortcut,
     this.enabled = true,
     this.key,
+    this.dividerBefore = false,
   });
 
   final T value;
@@ -22,6 +23,9 @@ final class ShellxMenuEntry<T> {
   /// shape (Copy without a selection).
   final bool enabled;
   final Key? key;
+
+  /// UI-A2 §5: a 1 px `line` separator above this item (4 px above/below).
+  final bool dividerBefore;
 }
 
 /// UI §3.1 context menu at [at] (global): `surface`, 1 px `border`, `r8`,
@@ -54,7 +58,17 @@ Future<T?> showShellxMenu<T>({
       duration: ShellxMotion.of(context, ShellxMotion.base),
       reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
     ),
-    items: [for (final entry in entries) _ShellxMenuItem<T>(entry)],
+    items: [
+      for (final entry in entries) ...[
+        if (entry.dividerBefore)
+          const PopupMenuDivider(
+            height: ShellxSizes.menuDivider,
+            thickness: 1,
+            color: ShellxDesktopColors.line,
+          ),
+        _ShellxMenuItem<T>(entry),
+      ],
+    ],
   );
 }
 

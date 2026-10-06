@@ -167,6 +167,34 @@ abstract final class ShellxSizes {
 
   /// UI §2.7 empty-state icon.
   static const double emptyIcon = 32;
+
+  /// UI-A2 §1.2: a row with a context line (6 + 18 + 2 + 14 + 6).
+  static const double rowWithContext = 46;
+  static const double rowContextPadding = 6;
+  static const double contextLine = 14;
+  static const double contextGap = 2;
+  static const double contextInset = 32;
+  static const double portHit = 24;
+  static const double portGap = 4;
+  static const double portPadH = 2;
+
+  /// UI-A2 §3 workspace header.
+  static const double workspaceHeader = 28;
+  static const double workspaceHeaderTop = 8;
+  static const double workspaceHeaderText = 16;
+  static const double chevronHit = 20;
+  static const double headerAddHit = 24;
+  static const double headerAddVisual = 20;
+  static const double headerCountMin = 16;
+  static const double collapsedMarkHeight = 12;
+  static const double emptyWorkspaceRow = 30;
+
+  /// UI-A2 §4, §6.
+  static const double renameField = 22;
+  static const double dropLine = 2;
+  static const double dragAutoScrollZone = 32;
+  static const double dragAutoScrollSpeed = 240;
+  static const double menuDivider = 9;
 }
 
 /// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).
@@ -226,6 +254,9 @@ abstract final class ShellxMotion {
   static const Duration toastVisibleError = Duration(seconds: 6);
   static const Duration tooltipWait = Duration(milliseconds: 500);
   static const Duration scrollbarFade = Duration(milliseconds: 800);
+
+  /// UI-A2 §6: hovering a dragged tab over a collapsed header expands it.
+  static const Duration dragExpandDelay = Duration(milliseconds: 600);
   static const Curve fastCurve = Curves.easeOut;
   static const Curve baseCurve = Curves.easeOutCubic;
   static const Curve exitCurve = Curves.easeIn;
