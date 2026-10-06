@@ -217,15 +217,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmRemoteOffTitle => 'Turn off remote access?';
 
   @override
-  String confirmRemoteOffBody(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count open sessions will be closed.',
-      one: '1 open session will be closed.',
-    );
-    return '$_temp0';
-  }
+  String get confirmRemoteOffBody =>
+      'Connected phones will be disconnected. Terminal tabs on this computer keep running.';
 
   @override
   String get confirmRemoteOffAction => 'Turn off';
@@ -235,7 +228,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmSignOutBody =>
-      'All sessions will be closed and every paired phone will be removed. After signing in again you must pair your phones again.';
+      'Connected phones will be disconnected and every paired phone will be removed. Terminal tabs on this computer keep running. After signing in again you must pair your phones again.';
 
   @override
   String get confirmSignOutAction => 'Sign out';
@@ -247,7 +240,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmRevokeBody =>
-      'This phone loses access to this computer immediately and its sessions are closed. To use it again you must pair it again.';
+      'This phone loses access to this computer immediately and the sessions it opened are closed. Tabs opened on this computer keep running. To use it again you must pair it again.';
 
   @override
   String get confirmRevokeAction => 'Revoke';

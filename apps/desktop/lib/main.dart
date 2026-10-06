@@ -17,6 +17,7 @@ import 'src/agent/agent_runtime.dart';
 import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/agent/notify_threshold.dart';
+import 'src/agent/session_core.dart';
 import 'src/config.dart';
 import 'src/l10n/locale.dart';
 import 'src/platform/app_reopen.dart';
@@ -147,33 +148,42 @@ Future<void> _start(
     locale: () => Platform.localeName,
     hooksDirectory: '${supportDirectory.path}${Platform.pathSeparator}hooks',
   );
+  // The app's one ShellxApi: the controller sets its token at sign-in.
+  final api = ShellxApi(baseUri: relayBase);
+  // A1 D7: the process's one SessionManager. It outlives every runtime, so
+  // signing out or losing the relay never ends a shell; Quit does.
+  final core = SessionCore(
+    ptyFactory: ptyFactory,
+    shellResolver: PlatformShellResolver(
+      operatingSystem: Platform.operatingSystem,
+      environment: environment,
+    ),
+    homeDirectory: home,
+    baseEnvironment: environment,
+    api: api,
+    notifications: pushNotifications,
+  );
 
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
     secureStore: SecureKeyValueStore(),
     settings: settings,
-    api: ShellxApi(baseUri: relayBase),
+    api: api,
     createApi: () => ShellxApi(baseUri: relayBase),
     runtimeFactory: (params) => CoreAgentRuntime(
       params,
+      core: core,
       relayBaseUri: relayBase,
       appVersion: info.version,
-      ptyFactory: ptyFactory,
-      shellResolver: PlatformShellResolver(
-        operatingSystem: Platform.operatingSystem,
-        environment: environment,
-      ),
-      homeDirectory: home,
-      baseEnvironment: environment,
       termEndpointPath: sharingSetup == null
           ? null
           : termEndpointPath(
               environment: environment,
               windows: Platform.isWindows,
             ),
-      notifications: pushNotifications,
     ),
+    sessions: core.sessions,
     keepAwake: Platform.isWindows ? WindowsKeepAwake() : CaffeinateKeepAwake(),
     launchAtLogin: PackageLaunchAtLogin(),
     notifier: notifier,

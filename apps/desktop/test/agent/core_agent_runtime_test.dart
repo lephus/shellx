@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
+import 'package:shellx_desktop/src/agent/session_core.dart';
+
+import '../support/fake_pty.dart';
 
 final class FakeRelaySocket implements RelaySocket {
   final StreamController<Object> incoming = StreamController<Object>();
@@ -34,26 +37,27 @@ final class FakeRelaySocket implements RelaySocket {
   }
 }
 
-final class _NoPty implements PtyFactory {
-  @override
-  Pty spawn(
-    ShellCommand command, {
-    required String workingDirectory,
-    required Map<String, String> environment,
-    required int cols,
-    required int rows,
-  }) => throw UnsupportedError('no sessions in this test');
-}
-
 void main() {
   late FakeRelaySocket socket;
   late List<(Uri, Map<String, String>)> connects;
   late NoiseKeyPair identity;
   final now = DateTime(2026, 9, 25, 12);
 
+  late SessionCore core;
+  late FakePtyFactory ptys;
+
   Future<CoreAgentRuntime> build({RelaySocketConnector? connector}) async {
     identity = await NoiseKeyPair.generate();
     final store = InMemoryKeyValueStore();
+    final api = ShellxApi(baseUri: Uri.parse('https://relay.shellx.pro'));
+    ptys = FakePtyFactory();
+    core = SessionCore(
+      ptyFactory: ptys,
+      shellResolver: const FixedShellResolver(),
+      homeDirectory: '/Users/phu',
+      baseEnvironment: const {'HOME': '/Users/phu'},
+      api: api,
+    );
     return CoreAgentRuntime(
       RuntimeParams(
         credentials: const AgentCredentials(
@@ -64,17 +68,11 @@ void main() {
         ),
         identity: identity,
         trusted: TrustedStore(store),
-        api: ShellxApi(baseUri: Uri.parse('https://relay.shellx.pro')),
+        api: api,
       ),
+      core: core,
       relayBaseUri: Uri.parse('https://relay.shellx.pro'),
       appVersion: '1.0.0',
-      ptyFactory: _NoPty(),
-      shellResolver: PlatformShellResolver(
-        operatingSystem: 'macos',
-        environment: const {'HOME': '/Users/phu'},
-      ),
-      homeDirectory: '/Users/phu',
-      baseEnvironment: const {'HOME': '/Users/phu'},
       connector:
           connector ??
           (uri, headers) async {
@@ -86,6 +84,30 @@ void main() {
   }
 
   setUp(() => connects = []);
+
+  test(
+    'stop() disconnects phones and keeps every shell running (A1 D7)',
+    () async {
+      final runtime = await build();
+      await runtime.start();
+      await pumpEventQueue();
+      const phone = '33333333-3333-4333-8333-333333333333';
+      await core.sessions.handle(phone, const SessionOpen(cols: 80, rows: 24));
+      await core.sessions.open(cols: 100, rows: 30);
+      expect(core.sessions.sessions.first.attachedMobileId, phone);
+
+      await runtime.stop();
+
+      expect(ptys.ptys.map((p) => p.killed), [false, false]);
+      expect(core.sessions.sessions, hasLength(2));
+      expect(
+        core.sessions.sessions.map((s) => s.attachedMobileId),
+        everyElement(isNull),
+      );
+      // The next runtime uses the same sessions.
+      expect(runtime.shellSessions, same(core.sessions));
+    },
+  );
 
   test(
     'start() connects to wss://relay.shellx.pro/v1/ws with the bearer token',

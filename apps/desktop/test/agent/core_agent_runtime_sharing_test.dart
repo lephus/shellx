@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
+import 'package:shellx_desktop/src/agent/session_core.dart';
 
 /// A relay socket that never answers: these tests need no phone.
 final class _SilentRelaySocket implements RelaySocket {
@@ -133,6 +134,7 @@ void main() {
 
   Future<CoreAgentRuntime> build({String? endpointPath}) async {
     final identity = await NoiseKeyPair.generate();
+    final api = ShellxApi(baseUri: Uri.parse('https://relay.shellx.pro'));
     return CoreAgentRuntime(
       RuntimeParams(
         credentials: const AgentCredentials(
@@ -143,17 +145,20 @@ void main() {
         ),
         identity: identity,
         trusted: TrustedStore(InMemoryKeyValueStore()),
-        api: ShellxApi(baseUri: Uri.parse('https://relay.shellx.pro')),
+        api: api,
+      ),
+      core: SessionCore(
+        ptyFactory: _NoPty(),
+        shellResolver: PlatformShellResolver(
+          operatingSystem: 'macos',
+          environment: const {'HOME': '/Users/phu'},
+        ),
+        homeDirectory: '/Users/phu',
+        baseEnvironment: const {'HOME': '/Users/phu'},
+        api: api,
       ),
       relayBaseUri: Uri.parse('https://relay.shellx.pro'),
       appVersion: '1.0.0',
-      ptyFactory: _NoPty(),
-      shellResolver: PlatformShellResolver(
-        operatingSystem: 'macos',
-        environment: const {'HOME': '/Users/phu'},
-      ),
-      homeDirectory: '/Users/phu',
-      baseEnvironment: const {'HOME': '/Users/phu'},
       termEndpointPath: endpointPath,
       connector: (uri, headers) async => _SilentRelaySocket(),
     );
@@ -202,15 +207,15 @@ void main() {
     expect(session.connected, isTrue);
     expect(changes, greaterThan(0));
     // Shell sessions stay what they were: desktop terminals are separate.
-    expect(runtime.sessions, isEmpty);
+    expect(runtime.shellSessions.sessions, isEmpty);
     term.destroy();
     await runtime.stop();
   });
 
   // P3 ledger "Ghi cho P4": every "close" path of the app leaves the
   // terminal running (spec §7.2).
-  test('closeSession, closeAllSessions and disconnectDesktopPhone never end '
-      'a desktop terminal', () async {
+  test('closing shell sessions (the close paths of the app, A1 D7) and '
+      'disconnectDesktopPhone never end a desktop terminal', () async {
     final runtime = await build(endpointPath: endpoint);
     await runtime.start();
     await runtime.setTerminalSharing(true);
@@ -218,8 +223,8 @@ void main() {
     await until(() => runtime.desktopSessions.isNotEmpty);
     final id = runtime.desktopSessions.single.id;
 
-    runtime.closeSession(id);
-    runtime.closeAllSessions();
+    runtime.shellSessions.closeSession(id);
+    runtime.shellSessions.closeAll();
     runtime.disconnectDesktopPhone(id);
     await Future<void>.delayed(const Duration(milliseconds: 100));
 

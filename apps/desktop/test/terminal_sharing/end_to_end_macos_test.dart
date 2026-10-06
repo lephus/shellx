@@ -17,6 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
+import 'package:shellx_desktop/src/agent/session_core.dart';
 import 'package:shellx_desktop/src/terminal_sharing/sharing_paths.dart';
 import 'package:shellx_desktop/src/terminal_sharing/shell_blocks.dart';
 import 'package:shellx_desktop/src/terminal_sharing/terminal_sharing_setup.dart';
@@ -96,6 +97,7 @@ void main() {
         executable: p.join(app, 'MacOS', 'ShellX'),
       );
       final setup = TerminalSharingSetup(paths: paths);
+      final api = ShellxApi(baseUri: Uri.parse('https://relay.invalid'));
       final runtime = CoreAgentRuntime(
         RuntimeParams(
           credentials: const AgentCredentials(
@@ -106,17 +108,20 @@ void main() {
           ),
           identity: await NoiseKeyPair.generate(),
           trusted: TrustedStore(InMemoryKeyValueStore()),
-          api: ShellxApi(baseUri: Uri.parse('https://relay.invalid')),
+          api: api,
+        ),
+        core: SessionCore(
+          ptyFactory: _NoPty(),
+          shellResolver: PlatformShellResolver(
+            operatingSystem: 'macos',
+            environment: {'HOME': home},
+          ),
+          homeDirectory: home,
+          baseEnvironment: {'HOME': home},
+          api: api,
         ),
         relayBaseUri: Uri.parse('https://relay.invalid'),
         appVersion: '1.0.0',
-        ptyFactory: _NoPty(),
-        shellResolver: PlatformShellResolver(
-          operatingSystem: 'macos',
-          environment: {'HOME': home},
-        ),
-        homeDirectory: home,
-        baseEnvironment: {'HOME': home},
         termEndpointPath: termEndpointPath(
           environment: {'HOME': home},
           windows: false,
@@ -179,8 +184,8 @@ void main() {
         expect(output.toString(), contains('mark=1 wrapped=yes'));
 
         // Closing paths of the app never end the terminal.
-        runtime.closeAllSessions();
-        runtime.closeSession(session.id);
+        runtime.shellSessions.closeAll();
+        runtime.shellSessions.closeSession(session.id);
         await Future<void>.delayed(const Duration(milliseconds: 200));
         expect(runtime.desktopSessions.single.connected, isTrue);
 

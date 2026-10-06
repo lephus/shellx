@@ -10,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
 import 'package:shellx_desktop/src/agent/notify_threshold.dart';
+import 'package:shellx_desktop/src/agent/session_core.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 
 import '../support/fakes.dart' as fakes show phone;
@@ -86,6 +87,8 @@ void main() {
 
   tearDown(() => hooks.deleteSync(recursive: true));
 
+  late SessionCore core;
+
   Future<CoreAgentRuntime> build({bool push = true}) async {
     final api = ShellxApi(
       baseUri: Uri.parse('https://relay.test'),
@@ -94,6 +97,22 @@ void main() {
         return http.Response('{"sent":$sentValue}', 202);
       }),
     )..token = 'agent-token';
+    core = SessionCore(
+      ptyFactory: ptys,
+      shellResolver: _Zsh(),
+      homeDirectory: '/Users/phu',
+      baseEnvironment: const {'HOME': '/Users/phu'},
+      api: api,
+      notifications: push
+          ? PushNotificationsSetup(
+              threshold: () => notifyThreshold(settings),
+              machineName: () => 'MacBook-Pro',
+              locale: () => 'vi_VN',
+              hooksDirectory: hooks.path,
+            )
+          : null,
+      now: () => now,
+    );
     return CoreAgentRuntime(
       RuntimeParams(
         credentials: const AgentCredentials(
@@ -106,20 +125,9 @@ void main() {
         trusted: TrustedStore(InMemoryKeyValueStore()),
         api: api,
       ),
+      core: core,
       relayBaseUri: Uri.parse('https://relay.test'),
       appVersion: '1.0.0',
-      ptyFactory: ptys,
-      shellResolver: _Zsh(),
-      homeDirectory: '/Users/phu',
-      baseEnvironment: const {'HOME': '/Users/phu'},
-      notifications: push
-          ? PushNotificationsSetup(
-              threshold: () => notifyThreshold(settings),
-              machineName: () => 'MacBook-Pro',
-              locale: () => 'vi_VN',
-              hooksDirectory: hooks.path,
-            )
-          : null,
       connector: (uri, headers) async =>
           throw const SocketException('offline in tests'),
       now: () => now,
@@ -156,7 +164,7 @@ void main() {
       expect(post.headers['authorization'], 'Bearer agent-token');
       expect(body(post)['title'], 'MacBook-Pro · Phiên 1');
       expect(body(post)['body'], '✗ npm test · mã 1 · 3 phút 12 giây');
-      runtime.closeAllSessions();
+      core.sessions.closeAll();
     },
   );
 
@@ -187,7 +195,7 @@ void main() {
       await runtime.notifications!.sender.idle;
       expect(posts, hasLength(2));
       expect(body(posts.last)['title'], 'Build');
-      runtime.closeAllSessions();
+      core.sessions.closeAll();
     },
   );
 
@@ -221,7 +229,7 @@ void main() {
     pty.emit('$esc]9;six$bel');
     await runtime.notifications!.sender.idle;
     expect(posts, hasLength(4));
-    runtime.closeAllSessions();
+    core.sessions.closeAll();
   });
 
   test(
@@ -234,7 +242,24 @@ void main() {
       pty.emit('$esc]9;hello$bel');
       await pumpEventQueue();
       expect(posts, isEmpty);
-      runtime.closeAllSessions();
+      core.sessions.closeAll();
+    },
+  );
+
+  test(
+    'a tab opened in the window gets the same hook and notifications',
+    () async {
+      final runtime = await build();
+      await core.sessions.open(cols: 80, rows: 24);
+      final pty = ptys.ptys.single;
+      expect(
+        ptys.spawned.single.environment['ZDOTDIR'],
+        startsWith(hooks.path),
+      );
+      pty.emit('$esc]9;done$bel');
+      await runtime.notifications!.sender.idle;
+      expect(body(posts.single)['body'], 'done');
+      core.sessions.closeAll();
     },
   );
 }

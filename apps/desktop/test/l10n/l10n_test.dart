@@ -80,9 +80,15 @@ void main() {
   test('plural and select messages render in both languages', () {
     final en = lookupAppLocalizations(const Locale('en'));
     final vi = lookupAppLocalizations(const Locale('vi'));
-    expect(en.confirmRemoteOffBody(1), '1 open session will be closed.');
-    expect(en.confirmRemoteOffBody(3), '3 open sessions will be closed.');
-    expect(vi.confirmRemoteOffBody(3), '3 phiên đang mở sẽ bị đóng.');
+    expect(
+      en.confirmRemoteOffBody,
+      'Connected phones will be disconnected. Terminal tabs on this '
+      'computer keep running.',
+    );
+    expect(
+      vi.confirmSignOutBody,
+      contains('Các tab terminal trên máy này vẫn chạy.'),
+    );
     expect(en.onboardingTrayHint('macos'), contains('menu bar'));
     expect(en.onboardingTrayHint('windows'), contains('system tray'));
   });

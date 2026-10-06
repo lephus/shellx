@@ -197,24 +197,20 @@ void main() {
   });
 
   group('TrayActions', () {
-    List<SessionSummary> oneSession() => [
-      SessionSummary(
-        id: 1,
-        index: 1,
-        shell: 'zsh',
-        createdAt: DateTime(2026),
-        attachedMobileId: null,
-      ),
-    ];
-
     test(
-      'remote access off with sessions asks first; cancel keeps it on',
+      'remote access off with a phone connected asks first; cancel keeps it on',
       () async {
         await signedIn(settings: {'onboarding_done': true});
-        h.runtime.currentSessions = oneSession();
-        h.runtime.sessionController.add(null);
+        h.runtime.eventController.add(const ActiveChannelsChanged(1));
+        await pumpEventQueue();
 
         final done = tray().handle(const ToggleRemoteAccess());
+        await pumpEventQueue();
+        expect(
+          window().confirm!.body,
+          'Connected phones will be disconnected. Terminal tabs on this '
+          'computer keep running.',
+        );
         await answer(false);
         await done;
         expect(agentState().remoteAccess, isTrue);
@@ -227,11 +223,13 @@ void main() {
       },
     );
 
-    test('remote access off without sessions does not ask', () async {
+    test('remote access off with tabs but no phone does not ask', () async {
       await signedIn(settings: {'onboarding_done': true});
+      await h.sessions.open(cols: 80, rows: 24);
       await tray().handle(const ToggleRemoteAccess());
       expect(agentState().remoteAccess, isFalse);
       expect(window().confirm, isNull);
+      expect(h.ptys.ptys.single.killed, isFalse);
     });
 
     test('revoke asks with the phone name, then revokes', () async {
@@ -256,15 +254,33 @@ void main() {
       expect(window().route, isA<LoginRoute>());
     });
 
-    test('quit with sessions asks, then shuts down and quits', () async {
+    test('quit with sessions asks, then kills every shell and quits', () async {
       await signedIn(settings: {'onboarding_done': true});
-      h.runtime.currentSessions = oneSession();
-      h.runtime.sessionController.add(null);
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
       final done = tray().handle(const Quit());
       await answer(true);
       await done;
       expect(h.runtime.stopped, isTrue);
+      expect(h.ptys.ptys.single.killed, isTrue);
       expect(h.keepAwake.last, isFalse);
+      expect(h.quits, 1);
+    });
+
+    test('quit while signed out still asks about open tabs', () async {
+      h = TestHarness();
+      container = ProviderContainer.test(
+        overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+      );
+      await agent().bootstrap(watchForWake: false);
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      final done = tray().handle(const Quit());
+      await pumpEventQueue();
+      expect(window().confirm, isNotNull);
+      await answer(true);
+      await done;
+      expect(h.ptys.ptys.single.killed, isTrue);
       expect(h.quits, 1);
     });
 
@@ -280,13 +296,18 @@ void main() {
       },
     );
 
-    test('close one session / all sessions go to the runtime', () async {
-      await signedIn(settings: {'onboarding_done': true});
-      await tray().handle(const CloseSession(4));
-      await tray().handle(const CloseAllSessions());
-      expect(h.runtime.closedSessions, [4]);
-      expect(h.runtime.closedAll, isTrue);
-    });
+    test(
+      'close one session / all sessions go to the session manager',
+      () async {
+        await signedIn(settings: {'onboarding_done': true});
+        final id = await h.sessions.open(cols: 80, rows: 24);
+        await h.sessions.open(cols: 80, rows: 24);
+        await tray().handle(CloseSession(id));
+        expect(h.ptys.ptys[0].killed, isTrue);
+        await tray().handle(const CloseAllSessions());
+        expect(h.ptys.ptys[1].killed, isTrue);
+      },
+    );
 
     test(
       'reconnect goes straight to the controller, no confirmation',

@@ -455,8 +455,8 @@ abstract class AppLocalizations {
   /// No description provided for @confirmRemoteOffBody.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 open session will be closed.} other{{count} open sessions will be closed.}}'**
-  String confirmRemoteOffBody(int count);
+  /// **'Connected phones will be disconnected. Terminal tabs on this computer keep running.'**
+  String get confirmRemoteOffBody;
 
   /// No description provided for @confirmRemoteOffAction.
   ///
@@ -473,7 +473,7 @@ abstract class AppLocalizations {
   /// No description provided for @confirmSignOutBody.
   ///
   /// In en, this message translates to:
-  /// **'All sessions will be closed and every paired phone will be removed. After signing in again you must pair your phones again.'**
+  /// **'Connected phones will be disconnected and every paired phone will be removed. Terminal tabs on this computer keep running. After signing in again you must pair your phones again.'**
   String get confirmSignOutBody;
 
   /// No description provided for @confirmSignOutAction.
@@ -491,7 +491,7 @@ abstract class AppLocalizations {
   /// No description provided for @confirmRevokeBody.
   ///
   /// In en, this message translates to:
-  /// **'This phone loses access to this computer immediately and its sessions are closed. To use it again you must pair it again.'**
+  /// **'This phone loses access to this computer immediately and the sessions it opened are closed. Tabs opened on this computer keep running. To use it again you must pair it again.'**
   String get confirmRevokeBody;
 
   /// No description provided for @confirmRevokeAction.

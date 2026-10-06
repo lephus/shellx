@@ -40,6 +40,7 @@ class AgentController extends Notifier<AgentViewState> {
   Future<void>? _stopping;
   final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
   StreamSubscription<void>? _trustedSubscription;
+  StreamSubscription<void>? _shellSubscription;
   Timer? _updateTimer;
   WakeDetector? _wakeDetector;
   bool _updateCheckFailed = false;
@@ -73,8 +74,13 @@ class AgentController extends Notifier<AgentViewState> {
     _trustedSubscription = _trusted.changes.listen(
       (_) => unawaited(_refreshTrusted()),
     );
+    // Shell sessions live for the whole process (A1 D7): the tray lists
+    // them and Quit counts them signed in or not.
+    _shellSubscription = _s.sessions.changes.listen((_) {
+      if (ref.mounted) state = state.copyWith(sessions: _s.sessions.sessions);
+    });
     ref.onDispose(_dispose);
-    return const AgentViewState();
+    return AgentViewState(sessions: _s.sessions.sessions);
   }
 
   /// Visible for tests.
@@ -265,9 +271,10 @@ class AgentController extends Notifier<AgentViewState> {
     await _applyKeepAwake();
   }
 
-  /// Spec §5.2 "Đăng xuất trên agent": close sessions, delete the token and
-  /// the server-side pairings (POST /v1/auth/logout), clear the local trusted
-  /// list. Keeps the device key and the email (pre-fills the login form).
+  /// Spec §5.2 "Đăng xuất trên agent": disconnect every phone (the shells
+  /// keep running, A1 D7), delete the token and the server-side pairings
+  /// (POST /v1/auth/logout), clear the local trusted list. Keeps the device
+  /// key and the email (pre-fills the login form).
   ///
   /// Fails closed: the relay link is stopped first (synchronously: from then
   /// on nothing is emitted, so the logout cannot come back as a 4002, a
@@ -310,8 +317,8 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
-  /// Spec §8.3: off disconnects from the relay and closes every session
-  /// (the tray asks first); remembered across restarts.
+  /// Spec §8.3 as amended by A1 D7: off disconnects from the relay and
+  /// every phone; the shells keep running. Remembered across restarts.
   Future<void> setRemoteAccess(bool enabled) async {
     await _s.settings.setBool(SettingKeys.remoteAccess, enabled);
     if (!ref.mounted) return;
@@ -404,7 +411,8 @@ class AgentController extends Notifier<AgentViewState> {
     await _refreshTrusted();
   }
 
-  void closeSession(int id) => _runtime?.closeSession(id);
+  /// Tray: ends shells; works without a runtime.
+  void closeSession(int id) => _s.sessions.closeSession(id);
 
   /// What turning terminal sharing on would change (the confirmation);
   /// null where the switch is not offered.
@@ -507,7 +515,8 @@ class AgentController extends Notifier<AgentViewState> {
   /// Tray "Disconnect phone" on a desktop terminal (spec §7.6).
   void disconnectDesktopPhone(int id) => _runtime?.disconnectDesktopPhone(id);
 
-  void closeAllSessions() => _runtime?.closeAllSessions();
+  /// Tray: ends shells; works without a runtime.
+  void closeAllSessions() => _s.sessions.closeAll();
 
   /// Called by [WakeDetector] after the computer slept: retry now instead of
   /// after the backoff — only while `disconnected`. After a 4001 (`replaced`)
@@ -558,15 +567,17 @@ class AgentController extends Notifier<AgentViewState> {
     );
   }
 
-  /// Before quitting (the caller then runs `quitApp`): close sessions,
-  /// disconnect, wait (bounded) for the PTY tree kills, release the sleep
-  /// assertion. Never throws, so quitting always goes on.
+  /// Before quitting (the caller then runs `quitApp`): disconnect, close
+  /// every session (A1 D7: the only path that ends shells), wait (bounded)
+  /// for the PTY tree kills, release the sleep assertion. Never throws, so
+  /// quitting always goes on.
   Future<void> shutdown() async {
     _updateTimer?.cancel();
     _updateTimer = null;
     _wakeDetector?.stop();
     _wakeDetector = null;
     await _stopRuntime();
+    _s.sessions.closeAll();
     await _settlePtyKills();
     await _bestEffort(() => _s.keepAwake.setEnabled(false));
   }
@@ -624,7 +635,6 @@ class AgentController extends Notifier<AgentViewState> {
     ]);
     state = state.copyWith(
       relay: runtime.relayState,
-      sessions: runtime.sessions,
       activeChannels: 0,
       terminalSharing: state.terminalSharing.copyWith(
         sessions: runtime.desktopSessions,
@@ -652,12 +662,13 @@ class AgentController extends Notifier<AgentViewState> {
     }
   }
 
-  /// Closes every session and disconnects. The runtime is detached and
-  /// told to stop at once (synchronously: from then on it emits nothing,
-  /// AgentRuntime.stop contract), and the state shows it stopped. The
-  /// returned future completes when that stop has finished, which includes
-  /// the relay's wait for an upgrade still in flight; without a runtime it
-  /// is the stop still settling, if any. Never throws.
+  /// Disconnects every phone and the relay; the shells keep running (A1
+  /// D7). The runtime is detached and told to stop at once (synchronously:
+  /// from then on it emits nothing, AgentRuntime.stop contract), and the
+  /// state shows it stopped. The returned future completes when that stop
+  /// has finished, which includes the relay's wait for an upgrade still in
+  /// flight; without a runtime it is the stop still settling, if any. Never
+  /// throws.
   Future<void> _stopRuntime() {
     final runtime = _runtime;
     if (runtime == null) return _stopping ?? Future<void>.value();
@@ -669,7 +680,6 @@ class AgentController extends Notifier<AgentViewState> {
     if (ref.mounted) {
       state = state.copyWith(
         relay: RelayConnectionState.stopped,
-        sessions: const <SessionSummary>[],
         activeChannels: 0,
         pairing: null,
         terminalSharing: state.terminalSharing.copyWith(
@@ -701,10 +711,11 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Relay said 4002, refused the upgrade with 401, or an API call got 401
   /// (spec §5.2 as amended, §12). The agent cannot tell a password change
-  /// from an account deletion, so it always: closes every session, deletes
-  /// the token, KEEPS the device key, user id and trusted list, and returns
-  /// to the login window. [signIn] clears the trusted list only if the next
-  /// account is a different user. Never throws (runs from listeners).
+  /// from an account deletion, so it always: disconnects every phone (the
+  /// shells keep running, A1 D7), deletes the token, KEEPS the device key,
+  /// user id and trusted list, and returns to the login window. [signIn]
+  /// clears the trusted list only if the next account is a different user.
+  /// Never throws (runs from listeners).
   Future<void> _handleRevoked() async {
     if (_revoking || !ref.mounted || state.phase != AuthPhase.signedIn) {
       return;
@@ -848,7 +859,6 @@ class AgentController extends Notifier<AgentViewState> {
     final runtime = _runtime;
     if (runtime == null || !ref.mounted) return;
     state = state.copyWith(
-      sessions: runtime.sessions,
       terminalSharing: state.terminalSharing.copyWith(
         sessions: runtime.desktopSessions,
       ),
@@ -954,6 +964,7 @@ class AgentController extends Notifier<AgentViewState> {
     _updateTimer?.cancel();
     _wakeDetector?.stop();
     unawaited(_trustedSubscription?.cancel());
+    unawaited(_shellSubscription?.cancel());
     for (final subscription in _runtimeSubscriptions) {
       unawaited(subscription.cancel());
     }

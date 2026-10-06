@@ -21,6 +21,8 @@ import 'package:shellx_desktop/src/terminal_sharing/powershell.dart';
 import 'package:shellx_desktop/src/terminal_sharing/sharing_paths.dart';
 import 'package:shellx_desktop/src/terminal_sharing/terminal_sharing_setup.dart';
 
+import 'fake_pty.dart';
+
 /// In-process stand-in for the relay REST API (spec §10.2 wire format).
 final class FakeRelayApi {
   final List<http.Request> requests = [];
@@ -110,15 +112,13 @@ final class FakeAgentRuntime implements AgentRuntime {
       StreamController<void>.broadcast(sync: true);
 
   RelayConnectionState currentRelay = RelayConnectionState.connecting;
-  List<SessionSummary> currentSessions = [];
   bool started = false;
   bool stopped = false;
   int pairingStarts = 0;
   int pairingCancels = 0;
   int reconnects = 0;
   final List<String> revoked = [];
-  final List<int> closedSessions = [];
-  bool closedAll = false;
+  bool phonesDisconnected = false;
 
   void emitRelay(RelayConnectionState state) {
     currentRelay = state;
@@ -136,7 +136,7 @@ final class FakeAgentRuntime implements AgentRuntime {
   @override
   Future<void> stop() async {
     stopped = true;
-    closedAll = true;
+    phonesDisconnected = true;
     await stopGate?.future;
   }
 
@@ -146,8 +146,6 @@ final class FakeAgentRuntime implements AgentRuntime {
   Stream<RelayConnectionState> get relayStates => relayController.stream;
   @override
   Stream<AgentEvent> get events => eventController.stream;
-  @override
-  List<SessionSummary> get sessions => currentSessions;
   @override
   Stream<void> get sessionChanges => sessionController.stream;
 
@@ -173,10 +171,6 @@ final class FakeAgentRuntime implements AgentRuntime {
     await params.trusted.remove(mobileId);
   }
 
-  @override
-  void closeSession(int id) => closedSessions.add(id);
-  @override
-  void closeAllSessions() => closedAll = true;
   @override
   void reconnectNow() => reconnects++;
 
@@ -479,6 +473,15 @@ final class TestHarness {
 
   FakeAgentRuntime get runtime => runtimes.last;
 
+  /// The process's one SessionManager (A1 D7), over fake PTYs.
+  final FakePtyFactory ptys = FakePtyFactory();
+  late final SessionManager sessions = SessionManager(
+    ptyFactory: ptys,
+    shellResolver: const FixedShellResolver(),
+    homeDirectory: '/Users/phu',
+    baseEnvironment: const {'HOME': '/Users/phu'},
+  );
+
   late final ShellxApi api = ShellxApi(
     baseUri: Uri.parse('https://relay.test'),
     httpClient: relay.client,
@@ -512,6 +515,7 @@ final class TestHarness {
       runtimes.add(runtime);
       return runtime;
     },
+    sessions: sessions,
     keepAwake: keepAwake,
     launchAtLogin: launchAtLogin,
     notifier: notifier,

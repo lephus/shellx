@@ -26,6 +26,7 @@ final class DesktopServices {
     required this.api,
     required this.createApi,
     required this.runtimeFactory,
+    required this.sessions,
     required this.keepAwake,
     required this.launchAtLogin,
     required this.notifier,
@@ -60,6 +61,11 @@ final class DesktopServices {
   /// new session has set [api.token]. The caller closes it.
   final ShellxApi Function() createApi;
   final AgentRuntimeFactory runtimeFactory;
+
+  /// The process's one session manager (A1 D7), built in `main.dart` with
+  /// [SessionCore]. It outlives every runtime: signing out or turning
+  /// remote access off never ends a shell; only Quit does.
+  final SessionManager sessions;
   final KeepAwake keepAwake;
   final LaunchAtLogin launchAtLogin;
   final SystemNotifier notifier;

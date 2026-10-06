@@ -216,14 +216,8 @@ class AppLocalizationsVi extends AppLocalizations {
   String get confirmRemoteOffTitle => 'Tắt truy cập từ xa?';
 
   @override
-  String confirmRemoteOffBody(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count phiên đang mở sẽ bị đóng.',
-    );
-    return '$_temp0';
-  }
+  String get confirmRemoteOffBody =>
+      'Điện thoại đang kết nối sẽ bị ngắt. Các tab terminal trên máy này vẫn chạy.';
 
   @override
   String get confirmRemoteOffAction => 'Tắt';
@@ -233,7 +227,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get confirmSignOutBody =>
-      'Mọi phiên sẽ bị đóng và mọi điện thoại đã ghép sẽ bị gỡ. Sau khi đăng nhập lại, bạn phải ghép nối lại điện thoại.';
+      'Điện thoại đang kết nối sẽ bị ngắt và mọi điện thoại đã ghép sẽ bị gỡ. Các tab terminal trên máy này vẫn chạy. Sau khi đăng nhập lại, bạn phải ghép nối lại điện thoại.';
 
   @override
   String get confirmSignOutAction => 'Đăng xuất';
@@ -245,7 +239,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get confirmRevokeBody =>
-      'Điện thoại này mất quyền truy cập máy tính ngay lập tức và các phiên của nó bị đóng. Muốn dùng lại phải ghép nối lại.';
+      'Điện thoại này mất quyền truy cập máy tính ngay lập tức và các phiên nó mở bị đóng. Các tab mở trên máy này vẫn chạy. Muốn dùng lại phải ghép nối lại.';
 
   @override
   String get confirmRevokeAction => 'Thu hồi';

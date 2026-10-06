@@ -12,7 +12,7 @@ import 'tray_action.dart';
 final trayActionsProvider = Provider<TrayActions>(TrayActions.new);
 
 /// Executes tray menu actions, asking for confirmation where an action is
-/// destructive (spec §8.3: turning remote access off with open sessions).
+/// destructive or disconnects a phone.
 final class TrayActions {
   TrayActions(this._ref);
 
@@ -40,11 +40,13 @@ final class TrayActions {
     final state = _state;
     switch (action) {
       case ToggleRemoteAccess():
-        if (state.remoteAccess && state.sessions.isNotEmpty) {
+        // A1 D7: turning off only disconnects phones; ask only when a phone
+        // is connected right now.
+        if (state.remoteAccess && state.activeChannels > 0) {
           final ok = await _router.confirm(
             ConfirmRequest(
               title: l10n.confirmRemoteOffTitle,
-              body: l10n.confirmRemoteOffBody(state.sessions.length),
+              body: l10n.confirmRemoteOffBody,
               confirmLabel: l10n.confirmRemoteOffAction,
             ),
           );

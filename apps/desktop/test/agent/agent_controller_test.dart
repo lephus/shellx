@@ -319,12 +319,13 @@ void main() {
 
   group('token revoked (4002 / 401)', () {
     test(
-      'closes sessions, drops the token, keeps key + user + trusted list',
+      'keeps the shells running, drops the token, keeps key + user + trusted list',
       () async {
         boot();
         await h.seedSignedIn();
         await h.trusted.add(phone('m1', 'iPhone'));
         await controller().bootstrap(watchForWake: false);
+        await h.sessions.open(cols: 80, rows: 24);
         final keyBefore = await h.secureStore.read('device_private_key');
         expect(keyBefore, isNotNull);
 
@@ -334,7 +335,9 @@ void main() {
         expect(state().phase, AuthPhase.signedOut);
         expect(state().signedOutNotice, isTrue);
         expect(h.runtime.stopped, isTrue);
-        expect(h.runtime.closedAll, isTrue);
+        expect(h.runtime.phonesDisconnected, isTrue);
+        expect(h.ptys.ptys.single.killed, isFalse);
+        expect(state().sessions, hasLength(1));
         expect(await h.secureStore.read('auth_token'), isNull);
         expect(await h.secureStore.read('user_id'), h.relay.userId);
         expect(await h.secureStore.read('device_private_key'), keyBefore);
@@ -430,18 +433,20 @@ void main() {
 
   group('sign out', () {
     test(
-      'closes sessions, calls logout, clears token and trusted list',
+      'keeps the shells running, calls logout, clears token and trusted list',
       () async {
         boot();
         await h.seedSignedIn();
         await h.trusted.add(phone('m1', 'iPhone'));
         await controller().bootstrap(watchForWake: false);
+        await h.sessions.open(cols: 80, rows: 24);
         final runtime = h.runtime;
 
         await controller().signOut();
 
         expect(runtime.stopped, isTrue);
-        expect(runtime.closedAll, isTrue);
+        expect(runtime.phonesDisconnected, isTrue);
+        expect(h.ptys.ptys.single.killed, isFalse);
         final logout = h.relay.last('POST /v1/auth/logout');
         expect(h.relay.bearerOf(logout), 'Bearer ${h.relay.token}');
         expect(await h.trusted.list(), isEmpty);
@@ -811,34 +816,48 @@ void main() {
       );
     });
 
-    test('active channel count and session list follow the runtime', () async {
+    test(
+      'the session list follows the session manager, signed in or not',
+      () async {
+        boot();
+        await controller().bootstrap(watchForWake: false); // signed out
+        await h.sessions.open(cols: 80, rows: 24);
+        await pumpEventQueue();
+        expect(state().sessions.single.shell, 'zsh');
+        expect(state().sessions.single.origin, SessionOrigin.desktop);
+      },
+    );
+
+    test('active channel count follows the runtime', () async {
       boot();
       await h.seedSignedIn();
       await controller().bootstrap(watchForWake: false);
       h.runtime.eventController.add(const ActiveChannelsChanged(2));
-      h.runtime.currentSessions = [
-        SessionSummary(
-          id: 1,
-          index: 1,
-          shell: 'zsh',
-          createdAt: DateTime(2026),
-          attachedMobileId: 'm1',
-        ),
-      ];
-      h.runtime.sessionController.add(null);
       await pumpEventQueue();
       expect(state().activeChannels, 2);
-      expect(state().sessions.single.shell, 'zsh');
     });
 
-    test('closing sessions goes to the runtime', () async {
+    test('closing sessions goes to the session manager', () async {
+      boot();
+      await controller().bootstrap(watchForWake: false);
+      final first = await h.sessions.open(cols: 80, rows: 24);
+      await h.sessions.open(cols: 80, rows: 24);
+      controller().closeSession(first);
+      expect(h.ptys.ptys[0].killed, isTrue);
+      expect(h.ptys.ptys[1].killed, isFalse);
+      controller().closeAllSessions();
+      expect(h.ptys.ptys[1].killed, isTrue);
+    });
+
+    test('remote access off keeps the shells running (A1 D7)', () async {
       boot();
       await h.seedSignedIn();
       await controller().bootstrap(watchForWake: false);
-      controller().closeSession(4);
-      expect(h.runtime.closedSessions, [4]);
-      controller().closeAllSessions();
-      expect(h.runtime.closedAll, isTrue);
+      await h.sessions.open(cols: 80, rows: 24);
+      await controller().setRemoteAccess(false);
+      expect(h.runtime.stopped, isTrue);
+      expect(h.ptys.ptys.single.killed, isFalse);
+      expect(state().sessions, hasLength(1));
     });
 
     test('a failing notification is not an unhandled error', () async {
@@ -1151,6 +1170,7 @@ void main() {
         appVersion: appVersion,
         platform: base.platform,
         deviceName: base.deviceName,
+        sessions: base.sessions,
       );
     }
 
@@ -1175,6 +1195,7 @@ void main() {
         boot();
         await h.seedSignedIn();
         await controller().bootstrap(watchForWake: false);
+        await h.sessions.open(cols: 80, rows: 24);
         final runtime = h.runtime;
         final kills = Completer<void>();
         bool? stoppedFirst;
@@ -1187,7 +1208,7 @@ void main() {
         final shutdown = controller().shutdown().then((_) => done = true);
         await pumpEventQueue();
         expect(stoppedFirst, isTrue);
-        expect(runtime.closedAll, isTrue);
+        expect(h.ptys.ptys.single.killed, isTrue);
         expect(h.ptyKillWaits, 1);
         expect(done, isFalse);
         expect(h.keepAwake.last, isTrue);

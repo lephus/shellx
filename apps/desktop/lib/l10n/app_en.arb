@@ -102,15 +102,10 @@
     }
   },
   "confirmRemoteOffTitle": "Turn off remote access?",
-  "confirmRemoteOffBody": "{count, plural, =1{1 open session will be closed.} other{{count} open sessions will be closed.}}",
-  "@confirmRemoteOffBody": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "confirmRemoteOffBody": "Connected phones will be disconnected. Terminal tabs on this computer keep running.",
   "confirmRemoteOffAction": "Turn off",
   "confirmSignOutTitle": "Sign out of ShellX?",
-  "confirmSignOutBody": "All sessions will be closed and every paired phone will be removed. After signing in again you must pair your phones again.",
+  "confirmSignOutBody": "Connected phones will be disconnected and every paired phone will be removed. Terminal tabs on this computer keep running. After signing in again you must pair your phones again.",
   "confirmSignOutAction": "Sign out",
   "confirmRevokeTitle": "Revoke {device}?",
   "@confirmRevokeTitle": {
@@ -118,7 +113,7 @@
       "device": {"type": "String"}
     }
   },
-  "confirmRevokeBody": "This phone loses access to this computer immediately and its sessions are closed. To use it again you must pair it again.",
+  "confirmRevokeBody": "This phone loses access to this computer immediately and the sessions it opened are closed. Tabs opened on this computer keep running. To use it again you must pair it again.",
   "confirmRevokeAction": "Revoke",
   "confirmQuitTitle": "Quit ShellX?",
   "confirmQuitBody": "{count, plural, =1{1 open session will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open sessions will be closed. Your phones cannot reach this computer until ShellX runs again.}}",

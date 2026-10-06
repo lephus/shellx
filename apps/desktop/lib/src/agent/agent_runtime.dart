@@ -5,6 +5,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../config.dart';
+import 'session_core.dart';
 
 /// Pairing codes live 5 minutes (spec §5.3); PairingCodeManager's default TTL.
 const Duration kPairingTtl = Duration(minutes: 5);
@@ -31,33 +32,34 @@ final class PairingView {
 }
 
 /// Everything that exists only while signed in with remote access on: the
-/// relay link, AgentService and SessionManager. The controller talks to this
-/// seam so its tests do not depend on shellx_agent internals.
+/// relay link, AgentService, the router and the desktop-terminal sharing.
+/// The shell sessions are not here (A1 D7, [SessionCore]). The controller
+/// talks to this seam so its tests do not depend on shellx_agent internals.
 abstract interface class AgentRuntime {
   /// Starts AgentService, which calls `relay.start()`.
   Future<void> start();
 
-  /// Closes every session, stops AgentService and disconnects from the relay.
+  /// Disconnects every phone (`closed_by_host`), stops AgentService and
+  /// disconnects from the relay. The shell sessions keep running (A1 D7):
+  /// they belong to [SessionCore]; only Quit closes them.
   ///
   /// Takes effect when called (synchronously): the relay is `stopped` and
   /// nothing more is emitted (no `AgentRevoked`). The future completes once
   /// the socket is closed and an upgrade still in flight has settled
   /// (RelayConnection.stop, bounded), so `api.logout()` and a new runtime's
-  /// relay link can follow. The shells are told to die but not awaited:
-  /// `Pty.kill()` returns nothing to wait for.
+  /// relay link can follow.
   Future<void> stop();
 
   RelayConnectionState get relayState;
   Stream<RelayConnectionState> get relayStates;
   Stream<AgentEvent> get events;
-  List<SessionSummary> get sessions;
+
+  /// Desktop terminals (and shell sessions, through the router) changed.
   Stream<void> get sessionChanges;
 
   PairingView startPairing();
   void cancelPairing();
   Future<void> revoke(String mobileId);
-  void closeSession(int id);
-  void closeAllSessions();
 
   /// Terminals shared through `shellx-term` (spec §7.6); empty while
   /// terminal sharing is off. [sessionChanges] also fires for them.
@@ -133,53 +135,23 @@ final class PushNotificationsSetup {
 final class CoreAgentRuntime implements AgentRuntime {
   CoreAgentRuntime(
     RuntimeParams params, {
+    required SessionCore core,
     required Uri relayBaseUri,
     required String appVersion,
-    required PtyFactory ptyFactory,
-    required ShellResolver shellResolver,
-    required String homeDirectory,
-    required Map<String, String> baseEnvironment,
     String? termEndpointPath,
-    PushNotificationsSetup? notifications,
     RelaySocketConnector connector = ioRelaySocketConnector,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now {
+  }) : _now = now ?? DateTime.now,
+       _core = core {
     final token = params.credentials.token;
     _relay = RelayConnection(
       wsUri: relayWebSocketUri(relayBaseUri),
       token: () => token,
       connector: connector,
     );
-    final ids = sessionIdAllocator();
-    // One AgentNotifications for both kinds of session: the 6-per-minute
-    // limit is per machine (push spec N10). It sends with the signed-in
-    // agent's token (params.api).
-    _notifications = notifications == null
-        ? null
-        : AgentNotifications(
-            NotificationsConfig(
-              api: params.api,
-              threshold: notifications.threshold,
-              machineName: notifications.machineName,
-              locale: notifications.locale,
-            ),
-            now: now,
-          );
-    final hooks = notifications?.hooksDirectory;
-    _sessions = SessionManager(
-      ptyFactory: ptyFactory,
-      shellResolver: shellResolver,
-      homeDirectory: homeDirectory,
-      baseEnvironment: baseEnvironment,
-      nextId: ids,
-      notifications: _notifications,
-      shellIntegration: hooks == null
-          ? null
-          : ShellIntegration(directory: hooks),
-    );
     _desktopSessions = DesktopSessionManager(
-      nextId: ids,
-      notifications: _notifications,
+      nextId: core.ids,
+      notifications: core.notifications,
     );
     _sharing = termEndpointPath == null
         ? null
@@ -188,7 +160,7 @@ final class CoreAgentRuntime implements AgentRuntime {
             sessions: _desktopSessions,
           );
     _router = SessionRouter(
-      shells: _sessions,
+      shells: core.sessions,
       desktop: _desktopSessions,
       desktopSharing: () => _sharing?.enabled ?? false,
     );
@@ -207,9 +179,8 @@ final class CoreAgentRuntime implements AgentRuntime {
   }
 
   final DateTime Function() _now;
-  late final AgentNotifications? _notifications;
+  final SessionCore _core;
   late final RelayConnection _relay;
-  late final SessionManager _sessions;
   late final DesktopSessionManager _desktopSessions;
   late final TerminalSharing? _sharing;
   late final SessionRouter _router;
@@ -225,7 +196,7 @@ final class CoreAgentRuntime implements AgentRuntime {
   PairingCodeManager get pairingCodes => _pairing;
 
   /// Exposed for tests: null without [PushNotificationsSetup].
-  AgentNotifications? get notifications => _notifications;
+  AgentNotifications? get notifications => _core.notifications;
 
   /// A phone opening a channel (the count goes up) or pairing may just have
   /// allowed notifications: the sender's pause after an unheard one ends.
@@ -233,10 +204,10 @@ final class CoreAgentRuntime implements AgentRuntime {
   void onAgentEvent(AgentEvent event) {
     switch (event) {
       case ActiveChannelsChanged(:final count):
-        if (count > _channels) _notifications?.phoneConnected();
+        if (count > _channels) _core.notifications?.phoneConnected();
         _channels = count;
       case MobilePaired():
-        _notifications?.phoneConnected();
+        _core.notifications?.phoneConnected();
       case SessionOpenedByMobile() || AgentRevoked():
         break;
     }
@@ -245,28 +216,30 @@ final class CoreAgentRuntime implements AgentRuntime {
   int _channels = 0;
   StreamSubscription<AgentEvent>? _eventWatch;
 
-  /// Exposed for tests: the ShellX sessions.
-  SessionManager get shellSessions => _sessions;
+  /// Exposed for tests: the ShellX sessions (the core's).
+  SessionManager get shellSessions => _core.sessions;
 
   @override
   Future<void> start() {
     _running = true;
-    if (_notifications != null) {
+    if (_core.notifications != null) {
       _eventWatch ??= _service.events.listen(onAgentEvent);
     }
     return _service.start();
   }
 
-  /// AgentService.stop() drops the channels and stops the relay but leaves
-  /// sessions alone, so they are closed here first (plan 03 contract).
-  /// Desktop terminals only lose their phones (spec §7.2); the local server
-  /// closes and `endpoint` goes, the windows keep running and retrying.
+  /// AgentService.stop() drops the channels and stops the relay; first
+  /// every phone is told `closed_by_host` and let go. No shell is killed
+  /// (A1 D7). Desktop terminals only lose their phones (spec §7.2); the
+  /// local server closes and `endpoint` goes, the windows keep running and
+  /// retrying. The router is disposed last so the shell sessions stop
+  /// forwarding into it.
   @override
   Future<void> stop() async {
     _running = false;
     unawaited(_eventWatch?.cancel());
     _eventWatch = null;
-    _router.closeAll();
+    _router.disconnectAllPhones();
     final stopping = _service.stop();
     try {
       await _sharing?.stop();
@@ -274,6 +247,7 @@ final class CoreAgentRuntime implements AgentRuntime {
       // Best effort: the windows keep running either way.
     }
     await stopping;
+    _router.dispose();
   }
 
   @override
@@ -282,8 +256,6 @@ final class CoreAgentRuntime implements AgentRuntime {
   Stream<RelayConnectionState> get relayStates => _relay.states;
   @override
   Stream<AgentEvent> get events => _service.events;
-  @override
-  List<SessionSummary> get sessions => _sessions.sessions;
   @override
   Stream<void> get sessionChanges => _router.changes;
   @override
@@ -317,10 +289,6 @@ final class CoreAgentRuntime implements AgentRuntime {
   void cancelPairing() => _service.cancelPairing();
   @override
   Future<void> revoke(String mobileId) => _service.revoke(mobileId);
-  @override
-  void closeSession(int id) => _router.closeSession(id);
-  @override
-  void closeAllSessions() => _router.closeAll();
 
   /// RelayConnection.reconnectNow() acts only while disconnected; after a
   /// 4001 close `relay.start()` is what connects again (AgentService is
