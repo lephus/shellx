@@ -16,8 +16,9 @@ final class _Files implements GitFiles {
   @override
   Future<GitEntry> entry(String path) async {
     entryCalls++;
+    final answer = entries[path] ?? GitEntry.none; // taken before the gate
     await gate?.future;
-    return entries[path] ?? GitEntry.none;
+    return answer;
   }
 
   @override
@@ -145,5 +146,64 @@ void main() {
       async.elapse(const Duration(milliseconds: 2));
       expect(result, isNull);
     });
+  });
+
+  test('a refresh during a slow walk keeps the newer answer cached', () async {
+    final files = _Files(
+      {'/r/.git': GitEntry.directory},
+      {'/r/.git/HEAD': 'ref: refs/heads/main'},
+    )..gate = Completer<void>();
+    final reader = GitHeadReader(
+      files: files,
+      windows: false,
+      timeout: const Duration(seconds: 5),
+    );
+    final old = reader.branchFor('/r');
+    final oldGate = files.gate!;
+    files.gate = null;
+    files.entries['/r/.git'] = GitEntry.none; // the repo vanishes
+    expect(await reader.branchFor('/r', refresh: true), isNull);
+    oldGate.complete(); // the stale walk saw the repo
+    expect(await old, 'main');
+    await Future<void>.delayed(Duration.zero);
+    final calls = files.entryCalls;
+    expect(await reader.branchFor('/r'), isNull); // newer answer still cached
+    expect(files.entryCalls, calls);
+  });
+
+  test('a hung walk is shared: five lookups over time, one walk', () {
+    fakeAsync((async) {
+      final files = _Files({}, {})..gate = Completer<void>();
+      final reader = GitHeadReader(files: files, windows: false);
+      final results = <String?>[];
+      for (var i = 0; i < 5; i++) {
+        reader.branchFor('/hung').then(results.add);
+        async.elapse(const Duration(milliseconds: 600));
+      }
+      expect(results, everyElement(isNull));
+      expect(results, hasLength(5));
+      expect(files.entryCalls, 1);
+    });
+  });
+
+  test('parseGitHead: first line only, control characters stripped, empty '
+      'branch is null', () {
+    expect(parseGitHead('ref: refs/heads/a\nignored'), 'a');
+    expect(parseGitHead('ref: refs/heads/a\x1b[31mb'), 'a[31mb');
+    expect(parseGitHead('ref: refs/heads/'), isNull);
+    expect(parseGitHead('ref: refs/heads/\n'), isNull);
+  });
+
+  test('a gitdir: file pointing nowhere gives null; trailing separators '
+      'share a cache key', () async {
+    final files = _Files(
+      {'/r/.git': GitEntry.file},
+      {'/r/.git': 'gitdir: /nowhere'},
+    );
+    final reader = GitHeadReader(files: files, windows: false);
+    expect(await reader.branchFor('/r/'), isNull);
+    final calls = files.entryCalls;
+    expect(await reader.branchFor('/r'), isNull);
+    expect(files.entryCalls, calls);
   });
 }

@@ -43,20 +43,33 @@ final class IoGitFiles implements GitFiles {
   }
 }
 
+/// One running lookup of a directory.
+final class _Walk {
+  late final Future<String?> result;
+}
+
 final _sha = RegExp(r'^[0-9a-f]{40}([0-9a-f]{24})?$');
 
 /// `ref: refs/heads/<name>` → `<name>`; another `ref: refs/<x>` → `<x>`;
 /// a 40/64-hex SHA (detached) → its first 7 characters; else null. At
 /// most 200 characters.
 String? parseGitHead(String content) {
-  final text = content.trim();
+  final text = content
+      .trim()
+      .split(RegExp(r'[\r\n]'))
+      .first
+      .replaceAll(RegExp(r'[\x00-\x1f\x7f]'), '')
+      .trim();
   String clip(String s) =>
       String.fromCharCodes(s.runes.take(GitHeadReader.maxBranchLength));
   if (text.startsWith('ref:')) {
     final ref = text.substring(4).trim();
     if (ref.isEmpty) return null;
     const heads = 'refs/heads/';
-    if (ref.startsWith(heads)) return clip(ref.substring(heads.length));
+    if (ref.startsWith(heads)) {
+      final name = ref.substring(heads.length);
+      return name.isEmpty ? null : clip(name);
+    }
     return clip(ref.startsWith('refs/') ? ref.substring(5) : ref);
   }
   return _sha.hasMatch(text) ? text.substring(0, 7) : null;
@@ -92,35 +105,38 @@ final class GitHeadReader implements GitBranchLookup {
   /// A map literal keeps insertion order: the first key is the least
   /// recently used.
   final _gitDirs = <String, String?>{};
-  final _inFlight = <String, Future<String?>>{};
+  final _inFlight = <String, _Walk>{};
 
   @override
   Future<String?> branchFor(String directory, {bool refresh = false}) {
-    if (refresh) _gitDirs.remove(directory);
-    final running = _inFlight[directory];
-    if (running != null && !refresh) return running;
-    final lookup = _resolve(
-      directory,
-    ).timeout(timeout, onTimeout: () => null).catchError((Object _) => null);
-    _inFlight[directory] = lookup;
-    unawaited(
-      lookup.whenComplete(() {
-        if (identical(_inFlight[directory], lookup)) {
-          _inFlight.remove(directory);
-        }
-      }),
-    );
-    return lookup;
+    if (directory.isEmpty) return Future.value();
+    final key = _trim(directory);
+    if (refresh) _gitDirs.remove(key);
+    var walk = refresh ? null : _inFlight[key];
+    if (walk == null) {
+      final started = walk = _Walk();
+      started.result = _resolve(key, started).catchError((Object _) => null);
+      _inFlight[key] = started;
+      unawaited(
+        started.result.whenComplete(() {
+          if (identical(_inFlight[key], started)) _inFlight.remove(key);
+        }),
+      );
+    }
+    // Each caller waits at most [timeout]; the walk itself stays in flight
+    // until it finishes, so a hung mount is walked once, not once per call.
+    return walk.result.timeout(timeout, onTimeout: () => null);
   }
 
-  Future<String?> _resolve(String directory) async {
+  Future<String?> _resolve(String directory, _Walk walk) async {
     final String? gitDir;
     if (_gitDirs.containsKey(directory)) {
       gitDir = _gitDirs.remove(directory);
       _gitDirs[directory] = gitDir; // most recently used
     } else {
       gitDir = await _findGitDir(directory);
-      _remember(directory, gitDir);
+      // A refresh started a newer walk meanwhile: this answer is stale.
+      if (identical(_inFlight[directory], walk)) _remember(directory, gitDir);
     }
     if (gitDir == null) return null;
     try {
@@ -211,6 +227,7 @@ final class GitHeadReader implements GitBranchLookup {
     }
     if (end == 0) return null;
     final parent = path.substring(0, end); // with its trailing separator
-    return _isRoot(parent) ? parent : _trim(parent);
+    final result = _isRoot(parent) ? parent : _trim(parent);
+    return result == path ? null : result;
   }
 }
