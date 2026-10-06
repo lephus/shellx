@@ -382,8 +382,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       }
     } finally {
       _awaitingOpen = false;
-      // Whatever happened (an unexpected error too), `+` is usable again.
-      if (ref.mounted) _set(opening: false);
+      if (ref.mounted) {
+        // D5: desktop sessions held back while the open was pending get
+        // their tabs now, even when the open failed.
+        _sync();
+        // Whatever happened (an unexpected error too), `+` is usable again.
+        _set(opening: false);
+      }
     }
   }
 

@@ -75,6 +75,22 @@ void main() {
     expect(state().selectedId, 100);
   });
 
+  test('D5: a desktop session held back by an open that fails gets its tab '
+      'at once, without another change event', () async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    boot();
+    local.openGate = Completer<void>();
+    local.openError = const SessionLimitException(32);
+    final opening = tabs().openTab();
+    local.add(local.summary(7, origin: SessionOrigin.desktop));
+    expect(state().tabs.map((t) => t.id), [1]);
+    local.openGate!.complete();
+    await opening;
+    expect(state().tabs.map((t) => t.id), [1, 7]);
+    expect(state().opening, isFalse);
+    expect(state().notice, isA<SessionLimitNotice>());
+  });
+
   test('close(tab) closes every pane session and removes the tab', () {
     local.add(local.summary(1));
     local.add(local.summary(2));
