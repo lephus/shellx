@@ -341,18 +341,25 @@ class RestorePersistence extends Notifier<void> {
       _savedChanged();
       return;
     }
+    _markAllDirty();
+  }
+
+  /// UI-A5 §3: the live panes' text comes back at the next save.
+  Future<void> clearScrollback() async {
+    _dirty.clear();
+    await _files.deleteAllScrollback();
+    _savedChanged();
+    _markAllDirty();
+  }
+
+  /// Every live pane is saved at the next tick, idle or not.
+  void _markAllDirty() {
     if (!ref.mounted) return;
     for (final tab in ref.read(terminalTabsProvider).tabs) {
       for (final pane in tab.panes.values) {
         if (!pane.exited) _dirty.add(pane.id);
       }
     }
-  }
-
-  Future<void> clearScrollback() async {
-    _dirty.clear();
-    await _files.deleteAllScrollback();
-    _savedChanged();
   }
 
   void _savedChanged() {

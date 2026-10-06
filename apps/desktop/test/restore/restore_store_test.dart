@@ -374,10 +374,26 @@ void main() {
     );
     expect(await hung.prepare(), isTrue);
     expect(await hung.writeLayout(snap()), isTrue);
+    // The exclusion runs in the background; its timeout is still logged.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(
       logs.where((l) => l.contains('backup exclusion failed')),
       hasLength(1),
     );
+  });
+
+  test('prepare does not wait for the backup exclusion: the queue moves on '
+      'at once (startup never waits for tmutil)', () async {
+    final slow = RestoreStore(
+      Directory('${root.path}/slow'),
+      excludeFromBackup: (_) => Completer<void>().future,
+      excludeTimeout: const Duration(seconds: 2),
+      log: logs.add,
+    );
+    const quick = Duration(milliseconds: 500);
+    expect(await slow.prepare().timeout(quick), isTrue);
+    expect(await slow.writeLayout(snap()).timeout(quick), isTrue);
+    expect((await slow.loadLayout().timeout(quick)).snapshot, isNotNull);
   });
 
   test('NullRestoreFiles stores nothing', () async {

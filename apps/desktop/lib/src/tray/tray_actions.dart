@@ -154,8 +154,12 @@ final class TrayActions {
       // UI-A5 §3: both apply at once, without asking.
       case ToggleRestoreScrollback():
         final restore = _ref.read(restorePersistenceProvider.notifier);
-        await restore.setScrollbackEnabled(!restore.scrollbackEnabled);
-        _ref.invalidate(trayLocalStateProvider);
+        try {
+          await restore.setScrollbackEnabled(!restore.scrollbackEnabled);
+        } finally {
+          // Failed or not, the menu shows what is stored.
+          _ref.invalidate(trayLocalStateProvider);
+        }
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
       case Quit():

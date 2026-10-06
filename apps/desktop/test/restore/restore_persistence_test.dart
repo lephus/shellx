@@ -537,6 +537,23 @@ void main() {
     }),
   );
 
+  test(
+    'after "Xóa nội dung đã lưu", live panes are saved again at the next '
+    'save, idle or not (UI-A5 §3)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('kept\r\n');
+      async.elapse(const Duration(seconds: 60));
+      unawaited(persistence().clearScrollback());
+      async.flushMicrotasks();
+      expect(files.scrollbacks, isEmpty);
+      async.elapse(const Duration(seconds: 60)); // no new output
+      expect(files.scrollbacks.values.single, 'kept\r\n');
+    }),
+  );
+
   test('savedScrollbackProvider starts from what is on disk', () async {
     files.scrollbacks[key] = 'old';
     boot(start: false);

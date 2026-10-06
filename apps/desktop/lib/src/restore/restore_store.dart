@@ -141,13 +141,18 @@ final class RestoreStore implements RestoreFiles {
       _scrollbackAllowed = ok;
       if (!ok) _log('restore: permissions not set; scrollback disabled');
     }
+    // In the background: the queue (and startup) never waits for it.
+    unawaited(_excludeFromBackup());
+    return _scrollbackAllowed;
+  });
+
+  Future<void> _excludeFromBackup() async {
     try {
       await _exclude?.call(directory.path).timeout(_excludeTimeout);
     } on Object catch (error) {
       _log('restore: backup exclusion failed (${error.runtimeType})');
     }
-    return _scrollbackAllowed;
-  });
+  }
 
   @override
   Future<RestoreLoad> loadLayout() {

@@ -66,4 +66,17 @@ void main() {
     expect(h.settings.values[SettingKeys.terminalRestoreScrollback], isNull);
     expect(local(), const TrayLocalState());
   });
+
+  test('a switch that fails to store still rebuilds the menu from what is '
+      'stored', () async {
+    c.listen(trayLocalStateProvider, (_, _) {});
+    await pumpEventQueue();
+    expect(local().restoreScrollback, isTrue);
+    // Stored off behind the menu's back; then the write fails.
+    h.settings.values[SettingKeys.terminalRestoreScrollback] = false;
+    h.settings.fail = true;
+    await c.read(trayActionsProvider).handle(const ToggleRestoreScrollback());
+    await pumpEventQueue();
+    expect(local().restoreScrollback, isFalse);
+  });
 }
