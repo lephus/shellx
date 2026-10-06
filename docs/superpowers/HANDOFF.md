@@ -320,3 +320,20 @@ Riêng tư: `restore/` (macOS `~/Library/Application Support/pro.shellx.desktop/
 - [ ] Narrator: dải có thể bị đọc **hai lần** (vùng live + `sendAnnouncement`). Ghi lại; nếu đọc hai lần thì bỏ một trong hai
 - [ ] Màn hình 125 % (mang từ A3 §14): đường chia 1 px sắc nét; gốc vùng terminal x = 221 không nằm trên lưới điểm ảnh vật lý ở 1,25× — nhìn bằng mắt, cả khi dải khôi phục đang hiện
 - [ ] Gỡ cài đặt xoá `%LOCALAPPDATA%\ShellX\restore`
+
+## 16. Dòng lệnh shellx — A7 (2026-10-07)
+
+Spec `specs/2026-10-07-desktop-cli-a7-design.md`, plan `plans/2026-10-07-desktop-cli-a7.md`. Lệnh `shellx` (bản chép của `shellx-term`) ở macOS `~/Library/Application Support/ShellX/cli/shellx`, Windows `%LOCALAPPDATA%\ShellX\cli\shellx.exe`; mỗi shell ShellX mở có nó đầu `PATH` cùng `SHELLX_SOCKET` và `SHELLX_CLI_TOKEN` (token mỗi lần chạy, không bao giờ ghi log). Host trong tiến trình cửa sổ: macOS `~/Library/Application Support/pro.shellx.desktop/mux/` (`endpoint`, `mux.sock`, `mux.lock`), Windows `%LOCALAPPDATA%\ShellX\mux\` + pipe. Tray → **Dòng lệnh** (sau "Thông báo"): ☑ điều khiển bằng dòng lệnh, ☐ "Cho phép terminal khác", cài/gỡ lệnh cho mọi terminal, sao chép lệnh cài skill. (Task 11 bổ sung phần còn lại của mục này.)
+
+### Thử tay — macOS (Task 9)
+- [ ] `flutter run -d macos`, trong một tab ShellX: `command -v shellx` → `…/ShellX/cli/shellx`; `echo $SHELLX_PANE_ID $SHELLX_TAB_ID $SHELLX_SOCKET` có giá trị; `echo ${#SHELLX_CLI_TOKEN}` → 64
+- [ ] `ls -l ~/Library/Application\ Support/pro.shellx.desktop/mux/` → socket `srw-------`, endpoint `-rw-------`; `ls -ld` thư mục → `drwx------`
+- [ ] Tray → "Dòng lệnh" có bốn mục; bỏ chọn "Cho phép điều khiển…" → `shellx ls` trong tab ShellX thoát 6 ngay (không cần mở lại kết nối)
+- [ ] Terminal.app (không phải shell ShellX), sau khi cài lệnh cho mọi terminal: `shellx ls` → thoát 6 với gợi ý "Allow other terminals"; tick "Cho phép terminal khác" → chạy được; bỏ tick → bị từ chối ngay (cả `shellx events --follow` đang chạy bị đóng)
+- [ ] "Cài lệnh shellx cho mọi terminal…": `/usr/local/bin` ghi được → không hỏi; không ghi được → hộp mật khẩu hệ thống, Huỷ → không đổi gì, không có thông báo; thành công → toast nhắc bật "Cho phép terminal khác"; "Gỡ…" chỉ gỡ link của ShellX (một `shellx` khác ở đó → toast lỗi kèm đường dẫn, không đụng vào)
+- [ ] `shellx-term uninstall` xoá `ShellX/cli` và link `/usr/local/bin/shellx` nếu nó trỏ vào đó (cần quyền root → in lệnh `sudo rm …`)
+- [ ] Chip "Agent" trên dòng tab và đầu pane đích 10 s sau mỗi lệnh; VoiceOver đọc "An agent is controlling …" tối đa một lần mỗi phút
+
+### Thử tay — Windows (Task 9)
+- [ ] `where shellx` trong tab ShellX; Tray → "Cài…" rồi một cửa sổ Windows Terminal **mới** tìm thấy `shellx` (`HKCU\Environment\Path` có `%LOCALAPPDATA%\ShellX\cli` đúng một lần, kiểu `REG_EXPAND_SZ`); "Gỡ…" bỏ nó
+- [ ] Gỡ cài đặt xoá `cli\` và mục Path đó

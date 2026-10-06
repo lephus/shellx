@@ -20,8 +20,15 @@ import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/agent/notify_threshold.dart';
 import 'src/agent/session_core.dart';
+import 'src/cli/agent_marks.dart';
+import 'src/cli/cli_install.dart';
+import 'src/cli/cli_install_windows.dart';
+import 'src/cli/cli_service.dart';
+import 'src/cli/ui_command_handler.dart';
 import 'src/config.dart';
 import 'src/l10n/locale.dart';
+import 'src/mux/mux_paths.dart';
+import 'src/mux/windows_pipe_transport.dart';
 import 'src/platform/app_reopen.dart';
 import 'src/platform/attention_badge.dart';
 import 'src/platform/desktop_notifications.dart';
@@ -194,6 +201,11 @@ Future<void> _start(
     locale: () => Platform.localeName,
     hooksDirectory: '${supportDirectory.path}${Platform.pathSeparator}hooks',
   );
+  // A7: the command line. Its host address, its folder and this launch's
+  // token go into every ShellX shell's environment (D8, D29, amendment),
+  // so they are known before the first shell. Without them (no HOME /
+  // LOCALAPPDATA) the app runs without the command line.
+  final cli = _cliSetup(environment);
   // The app's one ShellxApi: the controller sets its token at sign-in.
   final api = ShellxApi(baseUri: relayBase);
   // A1 D7: the process's one SessionManager. It outlives every runtime, so
@@ -205,13 +217,24 @@ Future<void> _start(
       environment: environment,
     ),
     homeDirectory: home,
-    baseEnvironment: environment,
+    // Only the shells' environment gains the command line (not the shell
+    // resolver's, nor the paths derived from `environment` above).
+    baseEnvironment: cli == null
+        ? environment
+        : cliSessionEnvironment(
+            environment,
+            cliDir: cli.paths.dir,
+            socket: cli.mux.address,
+            token: cli.token,
+            windows: Platform.isWindows,
+          ),
     api: api,
     notifications: pushNotifications,
     gitHeads: GitHeadReader(),
     portProbe: Platform.isWindows ? WindowsPortProbe() : MacPortProbe(),
   );
 
+  CliService? cliService;
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
@@ -248,6 +271,15 @@ Future<void> _start(
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
     quitApp: () async {
+      // A7: closes the command-line connections, removes the endpoint.
+      final service = cliService;
+      if (service != null) {
+        await runBounded(
+          service.stop,
+          timeout: _quitStepTimeout,
+          label: 'stopping the command-line host',
+        );
+      }
       await runBounded(
         trayHost.destroy,
         timeout: _quitStepTimeout,
@@ -267,6 +299,19 @@ Future<void> _start(
       desktopServicesProvider.overrideWithValue(services),
       homeDirectoryProvider.overrideWithValue(home),
       restoreStoreProvider.overrideWithValue(restoreFiles),
+      if (cli != null) ...[
+        cliMuxPathsProvider.overrideWithValue(cli.mux),
+        cliPathsProvider.overrideWithValue(cli.paths),
+        cliPathInstallerProvider.overrideWithValue(
+          Platform.isWindows
+              ? WindowsPathInstaller(
+                  cli.paths,
+                  reg: WindowsUserEnvironment(),
+                  broadcast: broadcastEnvironmentChange,
+                )
+              : MacPathInstaller(cli.paths),
+        ),
+      ],
     ],
   );
 
@@ -447,6 +492,43 @@ Future<void> _start(
     },
   );
 
+  // A7 D27: "An agent is controlling {tab}", at most once a minute.
+  container.read(agentMarksProvider.notifier).onAnnounce = (tabId) {
+    final tab = container
+        .read(terminalTabsProvider)
+        .tabs
+        .where((t) => t.id == tabId)
+        .firstOrNull;
+    final view = PlatformDispatcher.instance.implicitView;
+    if (tab == null || view == null) return;
+    _unawaitedLogged(
+      SemanticsService.sendAnnouncement(
+        view,
+        l10n.cliAnnounceAgent(tab.label),
+        TextDirection.ltr,
+      ),
+      'announcement',
+    );
+  };
+  // D17 `--raise`: show and activate the window, without opening a tab.
+  container.read(uiCommandHandlerProvider).onRaise = () async {
+    container.read(windowRouterProvider.notifier).showTerminal();
+    if (Platform.isMacOS) await activateMacApp();
+  };
+  // A7 C1: the command-line host, before the first shell can use it. The
+  // single-instance lock is held; the host also takes `mux/mux.lock`.
+  if (cli != null) {
+    try {
+      cliService = await CliService.start(
+        container,
+        appVersion: info.version,
+        token: cli.token,
+      );
+    } catch (error) {
+      debugPrint('ShellX: command-line host failed: ${error.runtimeType}');
+    }
+  }
+
   registerFontLicenses();
   runApp(
     UncontrolledProviderScope(
@@ -466,6 +548,44 @@ Future<void> _start(
   // for it, so a restored window gets no extra tab.
   layoutReady.complete();
   await handleActivation(container);
+}
+
+/// A7: what the command line needs before the first shell starts.
+typedef _CliSetup = ({MuxPaths mux, CliPaths paths, String token});
+
+/// Null when the environment lacks what the paths need.
+_CliSetup? _cliSetup(Map<String, String> environment) {
+  try {
+    final windows = Platform.isWindows;
+    final paths = CliPaths.forPlatform(
+      windows: windows,
+      environment: environment,
+      executable: Platform.resolvedExecutable,
+    );
+    if (paths == null) return null;
+    final mux = MuxPaths(
+      muxDirectory: muxDirectoryPath(
+        windows: windows,
+        environment: environment,
+      ),
+      tmpDirectory: environment['TMPDIR'] ?? '/tmp',
+      uid: windows ? 0 : _uid(),
+      windows: windows,
+      pipeName: windows ? pipeNameForUser(currentUserSid()) : null,
+    );
+    return (mux: mux, paths: paths, token: generateCliToken());
+  } catch (error) {
+    debugPrint('ShellX: no command line: ${error.runtimeType}');
+    return null;
+  }
+}
+
+/// macOS: the user id for the socket's TMPDIR fallback name.
+int _uid() {
+  final r = Process.runSync('/usr/bin/id', ['-u']);
+  final uid = r.exitCode == 0 ? int.tryParse('${r.stdout}'.trim()) : null;
+  if (uid == null) throw StateError('id -u failed');
+  return uid;
 }
 
 /// Spec §7.6, §12: the switch is offered on macOS, and on Windows only with

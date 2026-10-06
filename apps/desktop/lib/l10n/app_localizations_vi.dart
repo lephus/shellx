@@ -1064,4 +1064,52 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get cliNoticeSource => 'Dòng lệnh';
+
+  @override
+  String get trayCommandLine => 'Dòng lệnh';
+
+  @override
+  String get trayCliControl => 'Cho phép điều khiển ShellX bằng dòng lệnh';
+
+  @override
+  String get trayCliAllowExternal => 'Cho phép terminal khác';
+
+  @override
+  String get trayCliInstallPath => 'Cài lệnh shellx cho mọi terminal…';
+
+  @override
+  String get trayCliRemovePath => 'Gỡ lệnh shellx khỏi terminal khác';
+
+  @override
+  String get trayCliCopySkills => 'Sao chép lệnh cài skill cho agent';
+
+  @override
+  String get cliSkillsCopied =>
+      'Đã sao chép “shellx skills install” — dán vào terminal';
+
+  @override
+  String get cliPathInstalled =>
+      'Đã cài lệnh shellx. Để terminal khác điều khiển được ShellX, hãy bật thêm “Cho phép terminal khác” trong menu Dòng lệnh ở khay.';
+
+  @override
+  String cliPathFailed(String path) {
+    return 'Không cài được lệnh shellx. Hãy thêm $path vào PATH.';
+  }
+
+  @override
+  String cliPathRemoveFailed(String path) {
+    return 'Không gỡ được lệnh shellx. Hãy tự gỡ $path.';
+  }
+
+  @override
+  String get agentChip => 'Agent';
+
+  @override
+  String get agentChipTooltip =>
+      'Một chương trình đang điều khiển tab này qua dòng lệnh ShellX';
+
+  @override
+  String cliAnnounceAgent(String tab) {
+    return 'Agent đang điều khiển $tab';
+  }
 }

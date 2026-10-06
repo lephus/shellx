@@ -1650,6 +1650,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Command line'**
   String get cliNoticeSource;
+
+  /// A7 D26: tray submenu, right after Notifications
+  ///
+  /// In en, this message translates to:
+  /// **'Command line'**
+  String get trayCommandLine;
+
+  /// No description provided for @trayCliControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow controlling ShellX from the command line'**
+  String get trayCliControl;
+
+  /// A7 amendment: lets terminals ShellX did not open use the shellx command
+  ///
+  /// In en, this message translates to:
+  /// **'Allow other terminals'**
+  String get trayCliAllowExternal;
+
+  /// No description provided for @trayCliInstallPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the shellx command for all terminals…'**
+  String get trayCliInstallPath;
+
+  /// No description provided for @trayCliRemovePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the shellx command from other terminals'**
+  String get trayCliRemovePath;
+
+  /// No description provided for @trayCliCopySkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the agent skill install command'**
+  String get trayCliCopySkills;
+
+  /// No description provided for @cliSkillsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied “shellx skills install” — paste it in a terminal'**
+  String get cliSkillsCopied;
+
+  /// A7 D8 + amendment: toast after the PATH install; the two settings stay independent
+  ///
+  /// In en, this message translates to:
+  /// **'Installed the shellx command. To let other terminals control ShellX, also tick “Allow other terminals” in the tray’s Command line menu.'**
+  String get cliPathInstalled;
+
+  /// No description provided for @cliPathFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t install the shellx command. Add {path} to your PATH.'**
+  String cliPathFailed(String path);
+
+  /// No description provided for @cliPathRemoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t remove the shellx command. Remove {path} yourself.'**
+  String cliPathRemoveFailed(String path);
+
+  /// No description provided for @agentChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get agentChip;
+
+  /// No description provided for @agentChipTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'A program is controlling this tab through the ShellX command line'**
+  String get agentChipTooltip;
+
+  /// No description provided for @cliAnnounceAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent is controlling {tab}'**
+  String cliAnnounceAgent(String tab);
 }
 
 class _AppLocalizationsDelegate

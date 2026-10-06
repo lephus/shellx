@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
@@ -25,6 +26,7 @@ Future<void> pumpSidebar(
   double textScale = 1,
   bool disableAnimations = false,
   Locale locale = const Locale('en'),
+  List<Override> overrides = const [],
 }) async {
   h = TestHarness(settings: {'onboarding_done': true});
   container = ProviderContainer(
@@ -32,6 +34,7 @@ Future<void> pumpSidebar(
       desktopServicesProvider.overrideWithValue(h.services()),
       localSessionsProvider.overrideWithValue(local),
       homeDirectoryProvider.overrideWithValue(testHome),
+      ...overrides,
     ],
   );
   await h.seedSignedIn();

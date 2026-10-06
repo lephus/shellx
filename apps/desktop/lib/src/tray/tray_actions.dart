@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_state.dart';
 import '../agent/desktop_services.dart';
+import '../cli/cli_install.dart';
+import '../cli/cli_service.dart';
+import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../terminal/terminal_tabs.dart';
@@ -17,15 +21,23 @@ import 'tray_menu.dart';
 final trayActionsProvider = Provider<TrayActions>(TrayActions.new);
 
 /// The tray's "Terminal" submenu (A5a D13). The switch lives in the
-/// settings: invalidated after [ToggleRestoreScrollback].
-final trayLocalStateProvider = Provider<TrayLocalState>(
-  (ref) => TrayLocalState(
+/// settings: invalidated after [ToggleRestoreScrollback]. The "Dòng lệnh"
+/// settings (A7) are watched.
+final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
+  final cli = ref.watch(cliSettingsProvider);
+  return TrayLocalState(
     restoreScrollback: ref
         .read(restorePersistenceProvider.notifier)
         .scrollbackEnabled,
     hasSavedScrollback: ref.watch(savedScrollbackProvider),
-  ),
-);
+    cliControlEnabled: cli.controlEnabled,
+    cliAllowExternal: cli.allowExternal,
+    cliPathInstalled: cli.pathInstalled,
+  );
+});
+
+/// A7 D26: what "Sao chép lệnh cài skill cho agent" copies.
+const kSkillsInstallCommand = 'shellx skills install';
 
 /// Executes tray menu actions, asking for confirmation where an action is
 /// destructive or disconnects a phone.
@@ -162,6 +174,24 @@ final class TrayActions {
         }
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
+      // A7 D26, amendment: at once, without asking; the host rechecks.
+      case ToggleCliControl():
+        final cli = _ref.read(cliSettingsProvider.notifier);
+        await cli.setControlEnabled(
+          !_ref.read(cliSettingsProvider).controlEnabled,
+        );
+      case ToggleCliAllowExternal():
+        final cli = _ref.read(cliSettingsProvider.notifier);
+        await cli.setAllowExternal(
+          !_ref.read(cliSettingsProvider).allowExternal,
+        );
+      case ToggleCliPath():
+        await _toggleCliPath();
+      case CopySkillsCommand():
+        await _ref.read(cliClipboardProvider)(kSkillsInstallCommand);
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const CliSkillsCopiedNotice());
       case Quit(:final confirm):
         if (_quitting) return;
         if (confirm && state.sessions.isNotEmpty) {
@@ -213,6 +243,41 @@ final class TrayActions {
       tab: tab,
       paneId: id,
     );
+  }
+
+  /// A7 D8: installs or removes `shellx` for other terminals. Never at
+  /// startup. Stored only when it worked; a cancelled password prompt
+  /// changes nothing and says nothing; the result shows in the window.
+  Future<void> _toggleCliPath() async {
+    final installer = _ref.read(cliPathInstallerProvider);
+    final paths = _ref.read(cliPathsProvider);
+    if (installer == null || paths == null) return;
+    final cli = _ref.read(cliSettingsProvider.notifier);
+    final removing = _ref.read(cliSettingsProvider).pathInstalled;
+    PathInstallResult result;
+    try {
+      result = removing
+          ? await installer.uninstall()
+          : await installer.install();
+    } on Object catch (e) {
+      debugPrint('ShellX: shellx PATH install failed: ${e.runtimeType}');
+      result = PathInstallResult.failed;
+    }
+    if (result == PathInstallResult.cancelled) return;
+    if (result == PathInstallResult.installed) {
+      await cli.setPathInstalled(!removing);
+    }
+    final notice = switch ((result, removing)) {
+      (PathInstallResult.installed, false) => const CliPathInstalledNotice(),
+      (PathInstallResult.installed, true) => null,
+      (_, false) => CliPathFailedNotice(paths.dir),
+      (_, true) => CliPathRemoveFailedNotice(
+        paths.windows ? paths.dir : paths.systemLink,
+      ),
+    };
+    if (notice == null) return;
+    _router.showTerminal();
+    _ref.read(terminalTabsProvider.notifier).showNotice(notice);
   }
 
   /// Spec §10.1: confirm with the exact files, then (Windows, a PowerShell

@@ -79,6 +79,31 @@ final class PaneNoRoomNotice extends TabNotice {
   const PaneNoRoomNotice();
 }
 
+/// A7 D26: the skill install command is on the clipboard. Neutral toast.
+final class CliSkillsCopiedNotice extends TabNotice {
+  const CliSkillsCopiedNotice();
+}
+
+/// A7 D8: `shellx` now works in other terminals — once "Allow other
+/// terminals" is ticked too (amendment; the two stay independent).
+/// Neutral toast.
+final class CliPathInstalledNotice extends TabNotice {
+  const CliPathInstalledNotice();
+}
+
+/// A7 D8: the install failed (or a `shellx` that is not ours is there):
+/// the folder to add to `PATH` by hand.
+final class CliPathFailedNotice extends TabNotice {
+  const CliPathFailedNotice(this.path);
+  final String path;
+}
+
+/// A7 D8: the removal failed: what to remove by hand.
+final class CliPathRemoveFailedNotice extends TabNotice {
+  const CliPathRemoveFailedNotice(this.path);
+  final String path;
+}
+
 /// A7 D33: another open of this window is in flight (`opening`).
 final class OpenBusyException implements Exception {
   const OpenBusyException();

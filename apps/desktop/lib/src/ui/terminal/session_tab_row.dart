@@ -13,6 +13,7 @@ import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'agent_chip.dart';
 import 'attention_marks.dart';
 import 'inline_name_field.dart';
 import 'shellx_menu.dart';
@@ -68,6 +69,7 @@ class SessionTabRow extends StatefulWidget {
     this.menuOpen = false,
     this.unread,
     this.onMarkRead,
+    this.agent = false,
   });
 
   final TerminalTab tab;
@@ -117,6 +119,9 @@ class SessionTabRow extends StatefulWidget {
 
   /// The "Mark as read" custom semantics action (UI-A4 §8).
   final VoidCallback? onMarkRead;
+
+  /// A7 D27: the command line acted on this tab in the last 10 s.
+  final bool agent;
 
   /// UI-A1 §1.3, UI-A2 §1.3, UI-A4 §1.3: the title line, then an optional
   /// notification line and an optional context line, each 14·s plus a
@@ -199,6 +204,7 @@ class SessionTabRowState extends State<SessionTabRow> {
       // UI-A4 §8: right after the status, the full text (not cut).
       if (widget.unread case final u?)
         l10n.attentionRowSemantics(u.count, u.text(l10n)),
+      if (widget.agent) l10n.agentChipTooltip,
       if (tab.gitBranch case final branch?) l10n.sidebarBranch(branch),
       if (tab.cwd case final cwd?)
         l10n.sidebarFolder(
@@ -413,6 +419,11 @@ class SessionTabRowState extends State<SessionTabRow> {
                           ],
                         ),
                       ),
+                    ],
+                    // A7 D27: after the pane count, before 📱.
+                    if (widget.agent) ...[
+                      const SizedBox(width: ShellxSpace.s4),
+                      const AgentChip(large: false),
                     ],
                   ],
                 ),

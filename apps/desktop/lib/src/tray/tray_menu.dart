@@ -48,18 +48,35 @@ final class TrayLocalState {
   const TrayLocalState({
     this.restoreScrollback = true,
     this.hasSavedScrollback = false,
+    this.cliControlEnabled = true,
+    this.cliAllowExternal = false,
+    this.cliPathInstalled = false,
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
+
+  /// A7 D26, amendment, D8: the "Dòng lệnh" submenu.
+  final bool cliControlEnabled;
+  final bool cliAllowExternal;
+  final bool cliPathInstalled;
 
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
       other.restoreScrollback == restoreScrollback &&
-      other.hasSavedScrollback == hasSavedScrollback;
+      other.hasSavedScrollback == hasSavedScrollback &&
+      other.cliControlEnabled == cliControlEnabled &&
+      other.cliAllowExternal == cliAllowExternal &&
+      other.cliPathInstalled == cliPathInstalled;
 
   @override
-  int get hashCode => Object.hash(restoreScrollback, hasSavedScrollback);
+  int get hashCode => Object.hash(
+    restoreScrollback,
+    hasSavedScrollback,
+    cliControlEnabled,
+    cliAllowExternal,
+    cliPathInstalled,
+  );
 }
 
 /// "Tắt", "10 giây", "1 phút"… (push spec §7).
@@ -159,6 +176,22 @@ Menu buildTrayMenu(
     ),
   ]);
 
+  // A7 D26: right after "Thông báo" in both menus (A6's "Trình duyệt",
+  // when it lands, goes before it). Toggles apply at once, never ask.
+  MenuItem commandLine() => sub(TrayKeys.commandLine, l10n.trayCommandLine, [
+    check(TrayKeys.cliControl, l10n.trayCliControl, local.cliControlEnabled),
+    check(
+      TrayKeys.cliAllowExternal,
+      l10n.trayCliAllowExternal,
+      local.cliAllowExternal,
+    ),
+    item(
+      TrayKeys.cliPath,
+      local.cliPathInstalled ? l10n.trayCliRemovePath : l10n.trayCliInstallPath,
+    ),
+    item(TrayKeys.cliSkills, l10n.trayCliCopySkills),
+  ]);
+
   if (!state.signedIn) {
     return Menu(
       items: [
@@ -167,6 +200,7 @@ Menu buildTrayMenu(
         // UI-A4 §7: after the window item, before the status line.
         terminal(),
         notifications(),
+        commandLine(),
         sep(),
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
         sep(),
@@ -273,6 +307,7 @@ Menu buildTrayMenu(
       // UI-A4 §7: where push §7's threshold submenu was.
       terminal(),
       notifications(),
+      commandLine(),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
       item(TrayKeys.quit, l10n.trayQuit),

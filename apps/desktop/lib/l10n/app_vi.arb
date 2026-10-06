@@ -257,5 +257,18 @@
   "restoreAbnormalNoText": "{count, plural, other{ShellX đã đóng bất thường lần trước. Đã mở lại {count} tab.}}",
   "restoreStripCloseLabel": "Đóng thông báo khôi phục",
   "restorePanesFailed": "Không mở lại được {count} pane",
-  "cliNoticeSource": "Dòng lệnh"
+  "cliNoticeSource": "Dòng lệnh",
+  "trayCommandLine": "Dòng lệnh",
+  "trayCliControl": "Cho phép điều khiển ShellX bằng dòng lệnh",
+  "trayCliAllowExternal": "Cho phép terminal khác",
+  "trayCliInstallPath": "Cài lệnh shellx cho mọi terminal…",
+  "trayCliRemovePath": "Gỡ lệnh shellx khỏi terminal khác",
+  "trayCliCopySkills": "Sao chép lệnh cài skill cho agent",
+  "cliSkillsCopied": "Đã sao chép “shellx skills install” — dán vào terminal",
+  "cliPathInstalled": "Đã cài lệnh shellx. Để terminal khác điều khiển được ShellX, hãy bật thêm “Cho phép terminal khác” trong menu Dòng lệnh ở khay.",
+  "cliPathFailed": "Không cài được lệnh shellx. Hãy thêm {path} vào PATH.",
+  "cliPathRemoveFailed": "Không gỡ được lệnh shellx. Hãy tự gỡ {path}.",
+  "agentChip": "Agent",
+  "agentChipTooltip": "Một chương trình đang điều khiển tab này qua dòng lệnh ShellX",
+  "cliAnnounceAgent": "Agent đang điều khiển {tab}"
 }

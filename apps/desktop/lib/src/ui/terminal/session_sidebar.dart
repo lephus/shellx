@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../cli/agent_marks.dart';
 import '../../agent/desktop_services.dart';
 import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
@@ -1293,6 +1294,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     // Only the unread map: history alone (a notice the user saw) does not
     // rebuild the sidebar.
     final unread = ref.watch(tabAttentionProvider.select((s) => s.unread));
+    // A7 D27: the marks prune themselves at expiry, so watching them is
+    // enough to drop a chip on time.
+    final agentMarks = ref.watch(agentMarksProvider);
+    final now = ref.read(agentMarksClockProvider)();
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final scaler = MediaQuery.textScalerOf(context);
     final items = _items();
@@ -1513,6 +1518,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         unread: unread[tab.id],
         onMarkRead: () =>
             ref.read(tabAttentionProvider.notifier).markRead(tab.id),
+        agent: agentMarks.tabActive(tab.id, now),
       );
       // V9: under a header, rows sit 8 px in. The padding is always
       // there (0 without headers): the row's subtree never changes shape.

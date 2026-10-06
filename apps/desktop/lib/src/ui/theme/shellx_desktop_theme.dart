@@ -104,6 +104,15 @@ abstract final class ShellxSizes {
   static const double paneCountIcon = 12;
   static const double paneCountGap = 2;
 
+  /// A7 D27 (A6 UI §2.1): the "Agent" chip on a sidebar row and on a pane
+  /// header — height, icon and side padding.
+  static const double agentChipRowHeight = 16;
+  static const double agentChipPaneHeight = 20;
+  static const double agentChipRowIcon = 12;
+  static const double agentChipPaneIcon = 14;
+  static const double agentChipRowPadH = 6;
+  static const double agentChipPanePadH = 8;
+
   /// UI-A3 §1.3.
   static double paneHeaderFor(TextScaler scaler) =>
       max(paneHeader, scaler.scale(16) + 6);

@@ -8,7 +8,8 @@ import 'sharing_paths.dart';
 /// Sets a file's mode (macOS); injected in tests.
 typedef Chmod = Future<void> Function(String mode, String path);
 
-Future<void> _systemChmod(String mode, String path) async {
+/// `/bin/chmod`; throws when it fails.
+Future<void> systemChmod(String mode, String path) async {
   final result = await Process.run('/bin/chmod', [mode, path]);
   if (result.exitCode != 0) {
     throw FileSystemException('chmod $mode failed', path);
@@ -21,8 +22,7 @@ Future<void> _systemChmod(String mode, String path) async {
 /// File operations use the host's path rules; [SharingPaths.windows] only
 /// selects the Windows behaviour (rename a locked binary).
 final class TermBinaryInstaller {
-  TermBinaryInstaller(this.paths, {Chmod chmod = _systemChmod})
-    : _chmod = chmod;
+  TermBinaryInstaller(this.paths, {Chmod chmod = systemChmod}) : _chmod = chmod;
 
   final SharingPaths paths;
   final Chmod _chmod;
@@ -59,20 +59,12 @@ final class TermBinaryInstaller {
         bundled.path,
       );
     }
-    final bin = Directory(paths.binDir);
-    await bin.create(recursive: true);
-    final temp = File('${paths.binary}.tmp-$pid');
-    await bundled.copy(temp.path);
-    try {
-      if (!paths.windows) await _chmod('755', temp.path);
-      if (paths.windows && await File(paths.binary).exists()) {
-        await File(paths.binary).rename(await _freeOldName());
-      }
-      await temp.rename(paths.binary);
-    } catch (_) {
-      if (await temp.exists()) await temp.delete();
-      rethrow;
-    }
+    await copyBinary(
+      from: bundled.path,
+      to: paths.binary,
+      windows: paths.windows,
+      chmod: _chmod,
+    );
   }
 
   /// Deletes the `bin` folder. A file Windows keeps locked (a terminal
@@ -119,10 +111,41 @@ final class TermBinaryInstaller {
     }
   }
 
-  Future<String> _freeOldName() async {
-    for (var n = 1; ; n++) {
-      final candidate = p.join(paths.binDir, 'shellx-term.old-$n.exe');
-      if (!await File(candidate).exists()) return candidate;
+  Future<String> _freeOldName() => freeOldName(paths.binary);
+}
+
+/// Copies [from] to [to] (A7 D7 shares it with the command-line copy):
+/// through a temporary file beside [to], renamed over it, so a running
+/// copy keeps its old inode (macOS, mode 755). Windows: a running `.exe`
+/// cannot be replaced, so the old one is renamed to `<name>.old-<n>.exe`
+/// first ([freeOldName]).
+Future<void> copyBinary({
+  required String from,
+  required String to,
+  required bool windows,
+  required Chmod chmod,
+}) async {
+  await File(to).parent.create(recursive: true);
+  final temp = File('$to.tmp-$pid');
+  await File(from).copy(temp.path);
+  try {
+    if (!windows) await chmod('755', temp.path);
+    if (windows && await File(to).exists()) {
+      await File(to).rename(await freeOldName(to));
     }
+    await temp.rename(to);
+  } catch (_) {
+    if (await temp.exists()) await temp.delete();
+    rethrow;
+  }
+}
+
+/// `<dir>/<name>.old-<n>.exe` for [binary] `<dir>/<name>.exe`, with the
+/// first `n` not taken.
+Future<String> freeOldName(String binary) async {
+  final stem = p.basenameWithoutExtension(binary);
+  for (var n = 1; ; n++) {
+    final candidate = p.join(p.dirname(binary), '$stem.old-$n.exe');
+    if (!await File(candidate).exists()) return candidate;
   }
 }
