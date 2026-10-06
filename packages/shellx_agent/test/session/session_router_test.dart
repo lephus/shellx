@@ -333,4 +333,25 @@ void main() {
       expect(rig.sent, isEmpty);
     });
   });
+
+  test('session.list {desktop: true} carries cwd; desktop: false is the A1 '
+      'list exactly (A2 C4)', () async {
+    final rig = _Rig();
+    await rig.shells.open(cols: 80, rows: 24);
+    rig.ptys.ptys[0].emit('\x1b]7;file:///Users/test/w\x07');
+    await pumpEventQueue();
+    await rig.router.handle(phone, const SessionList());
+    final old = rig.to(phone).whereType<SessionListResult>().last;
+    expect(old.sessions.single.toMap().keys, [
+      'id',
+      'index',
+      'shell',
+      'created_at',
+      'attached',
+    ]);
+    await rig.router.handle(tablet, const SessionList(desktop: true));
+    final rich = rig.to(tablet).whereType<SessionListResult>().last;
+    expect(rich.sessions.first.toMap()['cwd'], '/Users/test/w');
+    expect(rich.sessions.first.toMap().containsKey('branch'), isFalse);
+  });
 }

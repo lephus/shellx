@@ -131,6 +131,8 @@ final class SessionInfo {
     this.kind = SessionKind.shellx,
     this.app = '',
     this.title = '',
+    this.cwd = '',
+    this.branch = '',
   });
 
   final int id;
@@ -148,12 +150,23 @@ final class SessionInfo {
   /// Latest window title (desktop sessions only; may be empty).
   final String title;
 
+  /// The session's working directory (A2 C4), empty when unknown. Sent
+  /// only to phones that listed with `desktop: true`; an optional key, so
+  /// every released decoder (which skips unknown keys) reads the list as
+  /// before.
+  final String cwd;
+
+  /// The git branch of [cwd] (A2 C4), empty when unknown.
+  final String branch;
+
   Map<String, Object?> toMap() => {
     'id': id,
     'index': index,
     'shell': shell,
     'created_at': createdAt,
     'attached': attached,
+    if (cwd.isNotEmpty) 'cwd': cwd,
+    if (branch.isNotEmpty) 'branch': branch,
     if (kind == SessionKind.desktop) ...{
       'kind': 'desktop',
       'app': app,
@@ -183,6 +196,8 @@ final class SessionInfo {
       kind: kind,
       app: f.optionalString('app') ?? '',
       title: f.optionalString('title') ?? '',
+      cwd: f.optionalString('cwd') ?? '',
+      branch: f.optionalString('branch') ?? '',
     );
   }
 

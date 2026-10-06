@@ -18,6 +18,8 @@ final class SessionRig {
     int sendWindow = 256 * 1024,
     Duration driverHold = const Duration(seconds: 1),
     Random? random,
+    GitBranchLookup? gitHeads,
+    PortProbe? portProbe,
   }) {
     manager = SessionManager(
       ptyFactory: factory,
@@ -30,6 +32,9 @@ final class SessionRig {
       driverHold: driverHold,
       clock: () => now,
       random: random ?? Random(1),
+      gitHeads: gitHeads,
+      portProbe: portProbe,
+      localHostName: 'mbp.local',
     );
     manager.outbound.listen(sent.add);
   }

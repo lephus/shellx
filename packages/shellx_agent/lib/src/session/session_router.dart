@@ -72,7 +72,9 @@ final class SessionRouter implements AgentSessions {
         _send(
           mobileId,
           SessionListResult([
-            ..._shells.sessionInfos,
+            ...(desktop
+                ? _shells.sessionInfosWithContext
+                : _shells.sessionInfos),
             if (desktop) ..._desktop.sessionInfos,
           ], desktopSharing: desktop ? _desktopSharing() : null),
         );

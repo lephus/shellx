@@ -4,6 +4,9 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../context/cwd_url.dart';
+import '../context/git_head.dart';
+import '../context/listening_ports.dart';
 import '../notify/agent_notifications.dart';
 import '../notify/command_tracker.dart';
 import '../notify/osc_event_parser.dart';
@@ -33,6 +36,9 @@ final class SessionSummary {
     this.title = '',
     this.driver = DriverSide.phone,
     this.runningCommand = false,
+    this.cwd,
+    this.gitBranch,
+    this.ports = const [],
   });
   final int id, index;
   final String shell;
@@ -48,6 +54,16 @@ final class SessionSummary {
 
   /// Between OSC 133;C and 133;D (needs the ShellX shell hook, A1 D15).
   final bool runningCommand;
+
+  /// The shell's directory from its hook's OSC 7 (A2 C1); null without a
+  /// hook, or after an OSC 7 from another host (D2).
+  final String? cwd;
+
+  /// The git branch of [cwd] (C2); null when not a repository or unknown.
+  final String? gitBranch;
+
+  /// Listening TCP ports of the session's process tree, ascending (C3).
+  final List<int> ports;
 
   bool get phoneAttached => attachedMobileId != null;
 }
@@ -106,6 +122,17 @@ final class _Session {
 
   final titles = OscTitleParser();
   String title = '';
+  String? cwd;
+  String? gitBranch;
+  List<int> ports = const [];
+
+  /// Bumped by every branch lookup: a late answer to an older one is
+  /// dropped (the directory changed meanwhile).
+  int branchGeneration = 0;
+
+  /// The shell's pid has been handed to the port watcher ([pty] may only
+  /// know it once the process has started).
+  bool pidKnown = false;
   final commandEvents = OscEventParser();
   final commands = CommandTracker(threshold: () => null);
 
@@ -187,7 +214,15 @@ final class SessionManager implements AgentSessions, LocalSessions {
     int Function()? nextId,
     AgentNotifications? notifications,
     ShellIntegration? shellIntegration,
+    GitBranchLookup? gitHeads,
+    PortProbe? portProbe,
+    bool windowsPaths = false,
+    String localHostName = '',
+    void Function(String message)? log,
   }) : _ptyFactory = ptyFactory,
+       _gitHeads = gitHeads,
+       _windowsPaths = windowsPaths,
+       _localHostName = localHostName,
        _notifications = notifications,
        _shellIntegration = shellIntegration,
        _shellResolver = shellResolver,
@@ -199,7 +234,17 @@ final class SessionManager implements AgentSessions, LocalSessions {
        _driverHold = driverHold,
        _clock = clock ?? DateTime.now,
        receivesDriver = receivesDriver ?? _noPhoneReceivesDriver,
-       _nextId = nextId ?? sessionIdAllocator(random ?? Random.secure());
+       _nextId = nextId ?? sessionIdAllocator(random ?? Random.secure()) {
+    if (portProbe != null) {
+      _portWatcher = PortWatcher(
+        probe: portProbe,
+        shells: _shellPids,
+        onPorts: _applyPorts,
+        now: _clock,
+        log: log,
+      );
+    }
+  }
 
   final PtyFactory _ptyFactory;
   final ShellResolver _shellResolver;
@@ -209,6 +254,18 @@ final class SessionManager implements AgentSessions, LocalSessions {
   final int _bufferCapacity;
   final int _sendWindow;
   final AgentNotifications? _notifications;
+
+  /// Branch lookups (A2 C2); null: no branches.
+  final GitBranchLookup? _gitHeads;
+
+  /// OSC 7 paths are Windows paths (`C:\…`, UNC).
+  final bool _windowsPaths;
+
+  /// `Platform.localHostname`: which OSC 7 hosts are this computer (D2).
+  final String _localHostName;
+
+  /// Listening ports (A2 C3); null: no ports.
+  PortWatcher? _portWatcher;
 
   /// While one side typed less than this ago, a keystroke from the other
   /// side is written but does not take the driver (and the PTY size) away:
@@ -248,8 +305,8 @@ final class SessionManager implements AgentSessions, LocalSessions {
   @override
   Stream<OutboundMessage> get outbound => _outbound.stream;
 
-  /// Fires whenever the session list, an attachment, a title, a driver or
-  /// a running command changes.
+  /// Fires whenever the session list, an attachment, a title, a driver,
+  /// a running command, a directory, a branch or the ports change.
   @override
   Stream<void> get changes => _changes.stream;
 
@@ -270,11 +327,20 @@ final class SessionManager implements AgentSessions, LocalSessions {
           title: s.title,
           driver: s.driver,
           runningCommand: s.commands.running,
+          cwd: s.cwd,
+          gitBranch: s.gitBranch,
+          ports: s.ports,
         ),
   ];
 
-  /// Listable sessions, as `session.list.result` entries.
-  List<SessionInfo> get sessionInfos => [
+  /// Listable sessions, as `session.list.result` entries (A1: no context).
+  List<SessionInfo> get sessionInfos => _infos(context: false);
+
+  /// The same with `cwd` and `branch`, for phones that listed with
+  /// `desktop: true` (A2 C4).
+  List<SessionInfo> get sessionInfosWithContext => _infos(context: true);
+
+  List<SessionInfo> _infos({required bool context}) => [
     for (final s in _sessions.values)
       if (!s.closing)
         SessionInfo(
@@ -283,6 +349,8 @@ final class SessionManager implements AgentSessions, LocalSessions {
           shell: s.shell,
           createdAt: s.createdAt.millisecondsSinceEpoch,
           attached: s.attachedMobileId != null,
+          cwd: context ? s.cwd ?? '' : '',
+          branch: context ? s.gitBranch ?? '' : '',
         ),
   ];
 
@@ -452,6 +520,64 @@ final class SessionManager implements AgentSessions, LocalSessions {
   @override
   void close(int id) => closeSession(id);
 
+  @override
+  void watchPorts(bool visible) => _portWatcher?.setVisible(visible);
+
+  /// Session id → shell pid, for [PortWatcher] (D3: ptys without a pid
+  /// have no ports). An exited shell is left out: its pid stays set but
+  /// may already belong to another process, whose tree must not land on
+  /// this tab.
+  Map<int, int> _shellPids() {
+    final pids = <int, int>{};
+    for (final s in _sessions.values) {
+      if (s.closing || s.exited) continue;
+      final pid = _pidOf(s);
+      if (pid != null) pids[s.id] = pid;
+    }
+    return pids;
+  }
+
+  static int? _pidOf(_Session session) {
+    final pty = session.pty;
+    return pty is PtyProcessId ? (pty as PtyProcessId).processId : null;
+  }
+
+  /// The port watcher classifies listeners against the shells it knew: it
+  /// is told when a shell's pid becomes known.
+  void _notePid(_Session session) {
+    if (session.pidKnown || session.exited || _pidOf(session) == null) return;
+    session.pidKnown = true;
+    _portWatcher?.sessionsChanged();
+  }
+
+  /// The shell exited: its ports go now (the watcher publishes nothing
+  /// once no session is left) and it leaves the watcher's snapshot.
+  void _shellGone(_Session session) {
+    _portWatcher?.sessionsChanged();
+    if (session.ports.isEmpty) return;
+    session.ports = const [];
+    if (!session.closing) _changes.add(null);
+  }
+
+  void _applyPorts(Map<int, List<int>> ports) {
+    var changed = false;
+    for (final s in _sessions.values) {
+      final next = ports[s.id] ?? const <int>[];
+      if (_sameInts(next, s.ports)) continue;
+      s.ports = List.unmodifiable(next);
+      changed = true;
+    }
+    if (changed) _changes.add(null);
+  }
+
+  static bool _sameInts(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   void _localWrite(_Session session, Uint8List data) {
     if (session.closing) return;
     _localActive(session, input: true);
@@ -592,7 +718,9 @@ final class SessionManager implements AgentSessions, LocalSessions {
       index: session.index,
     );
     _sessions[session.id] = session;
+    session.pidKnown = _pidOf(session) != null;
     _watch(session);
+    _portWatcher?.sessionsChanged();
     return session;
   }
 
@@ -730,6 +858,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
         if (!session.local.isClosed) session.local.add(data);
         _pump(session);
         session.notifier?.feed(data);
+        _notePid(session);
         _track(session, data);
       },
       onDone: outputDone.complete,
@@ -738,11 +867,13 @@ final class SessionManager implements AgentSessions, LocalSessions {
     session.pty.exitCode.then(
       (code) async {
         session.exited = true; // First: no kill/write/resize from here on.
+        _shellGone(session);
         await outputDone.future.timeout(_outputDrainGrace, onTimeout: () {});
         _processExited(session, code);
       },
       onError: (Object _) {
         session.exited = true;
+        _shellGone(session);
         _processExited(session, -1);
       },
     );
@@ -760,12 +891,72 @@ final class SessionManager implements AgentSessions, LocalSessions {
       final wasRunning = session.commands.running;
       for (final event in session.commandEvents.feed(data)) {
         session.commands.handle(event);
+        switch (event) {
+          case CwdReported(:final url):
+            if (_setCwd(session, url)) changed = true;
+          case CommandFinished():
+            _lookUpBranch(session, refresh: true); // git switch, git init…
+          default:
+            break;
+        }
       }
       if (session.commands.running != wasRunning) changed = true;
     } catch (_) {
       // Parsing never breaks the session.
     }
     if (changed && !session.closing) _changes.add(null);
+  }
+
+  /// A2 C1/D2. True when the summary changed.
+  bool _setCwd(_Session session, String url) {
+    final reported = parseCwdUrl(
+      url,
+      windows: _windowsPaths,
+      localHostName: _localHostName,
+    );
+    switch (reported) {
+      case null:
+        return false; // malformed: keep what we had
+      case RemoteCwd():
+        if (session.cwd == null && session.gitBranch == null) return false;
+        session.cwd = null;
+        session.gitBranch = null;
+        session.branchGeneration++;
+        return true;
+      case LocalCwd(:final path):
+        if (path == session.cwd) return false;
+        session.cwd = path;
+        // The old branch stays until the lookup answers (no flicker).
+        _lookUpBranch(session, refresh: false);
+        return true;
+    }
+  }
+
+  void _lookUpBranch(_Session session, {required bool refresh}) {
+    final git = _gitHeads;
+    final cwd = session.cwd;
+    if (git == null || cwd == null) return;
+    final generation = ++session.branchGeneration;
+    if (cwd.startsWith(r'\\')) {
+      _setBranch(session, null, generation); // UNC: never looked up (§5)
+      return;
+    }
+    unawaited(
+      git
+          .branchFor(cwd, refresh: refresh)
+          .then((branch) => _setBranch(session, branch, generation)),
+    );
+  }
+
+  void _setBranch(_Session session, String? branch, int generation) {
+    if (generation != session.branchGeneration ||
+        session.closing ||
+        !identical(_sessions[session.id], session) ||
+        branch == session.gitBranch) {
+      return;
+    }
+    session.gitBranch = branch;
+    _changes.add(null);
   }
 
   /// The shell process has exited. If nobody is attached, finishes right
@@ -797,6 +988,8 @@ final class SessionManager implements AgentSessions, LocalSessions {
     session.drainTimer = null;
     final recipient = session.attachedMobileId ?? session.exitRecipient;
     _sessions.remove(session.id);
+    session.ports = const [];
+    _portWatcher?.sessionsChanged();
     session.output?.cancel();
     unawaited(session.local.close());
     unawaited(session.drivers.close());

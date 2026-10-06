@@ -27,6 +27,11 @@ abstract interface class LocalSessions {
   /// Ends session [id] and its process tree (the desktop may close every
   /// session, A1 D4).
   void close(int id);
+
+  /// The terminal window is shown (true) or hidden (A2 D8). Listening
+  /// ports are looked up only while it is shown and a session exists;
+  /// shown again → looked up at once.
+  void watchPorts(bool visible);
 }
 
 /// One local viewer of a session. It is not a phone: it has no send window

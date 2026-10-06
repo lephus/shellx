@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:shellx_agent/shellx_agent.dart';
 
 /// Scriptable [Pty]: tests push output with [emit] and end it with [exit].
-final class FakePty implements Pty {
+final class FakePty implements Pty, PtyProcessId {
   FakePty({
     required this.command,
     required this.workingDirectory,
@@ -25,6 +25,10 @@ final class FakePty implements Pty {
   final writes = <Uint8List>[];
   final resizes = <(int, int)>[];
   bool killed = false;
+
+  /// The shell's pid for port tests (A2 D3); null = unknown.
+  @override
+  int? processId;
 
   /// When set, [write] throws this.
   Object? failWrites;

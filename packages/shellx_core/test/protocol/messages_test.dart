@@ -476,4 +476,37 @@ void main() {
       expect(() => DeviceKind.fromWire('tablet'), throwsFormatException);
     });
   });
+
+  test('SessionInfo cwd/branch are optional keys: absent when empty, '
+      'round-trip when set (A2 C4)', () {
+    const plain = SessionInfo(
+      id: 1,
+      index: 1,
+      shell: 'zsh',
+      createdAt: 5,
+      attached: false,
+    );
+    expect(plain.toMap().keys, [
+      'id',
+      'index',
+      'shell',
+      'created_at',
+      'attached',
+    ]);
+    const rich = SessionListResult([
+      SessionInfo(
+        id: 1,
+        index: 1,
+        shell: 'zsh',
+        createdAt: 5,
+        attached: false,
+        cwd: '/Users/r/Tài liệu',
+        branch: 'feat/a2',
+      ),
+    ]);
+    final decoded = decodeBatch(encodeBatch([rich])).single;
+    expect(decoded, rich);
+    final info = (decoded as SessionListResult).sessions.single;
+    expect((info.cwd, info.branch), ('/Users/r/Tài liệu', 'feat/a2'));
+  });
 }
