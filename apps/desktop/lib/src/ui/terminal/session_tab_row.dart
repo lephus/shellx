@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
@@ -270,6 +270,18 @@ class SessionTabRowState extends State<SessionTabRow> {
     final titleBox = max(titleLine, ShellxSizes.rowCloseHit);
     final contextLine = scaler.scale(ShellxSizes.contextLine);
     final contextBox = max(contextLine, ShellxSizes.portHit);
+    // The 24 px title box (×) and the 24 px context box (ports) overlap
+    // by 6 px in a 46 px row. A port under the × would take the ×'s lower
+    // 6 px; instead the overlap is split at its middle, so each keeps
+    // 21 px there and its full 24 px everywhere else.
+    final titleTop =
+        ShellxSizes.rowContextPadding + titleLine / 2 - titleBox / 2;
+    final contextTop =
+        ShellxSizes.rowContextPadding +
+        titleLine +
+        ShellxSizes.contextGap -
+        (contextBox - contextLine) / 2;
+    final overlap = max(0.0, titleTop + titleBox - contextTop);
 
     final titleRow = Row(
       children: [
@@ -421,28 +433,27 @@ class SessionTabRowState extends State<SessionTabRow> {
                       right: 0,
                       // The title line's centre stays 6 + line/2 from the
                       // top; the box is as tall as the 24 px close button.
-                      top:
-                          ShellxSizes.rowContextPadding +
-                          titleLine / 2 -
-                          titleBox / 2,
+                      top: titleTop,
                       height: titleBox,
-                      child: Padding(padding: rowPadding, child: titleRow),
+                      child: _HitBand(
+                        bottom: overlap / 2,
+                        child: Padding(padding: rowPadding, child: titleRow),
+                      ),
                     ),
                     Positioned(
                       left: ShellxSizes.contextInset,
                       right: ShellxSpace.s8,
                       // The 14 px line sits 2 below the title line; the
                       // box grows to the 24 px port hit area around it.
-                      top:
-                          ShellxSizes.rowContextPadding +
-                          titleLine +
-                          ShellxSizes.contextGap -
-                          (contextBox - contextLine) / 2,
+                      top: contextTop,
                       height: contextBox,
-                      child: _ContextLine(
-                        tab: tab,
-                        home: widget.home,
-                        onOpenPort: widget.onOpenPort,
+                      child: _HitBand(
+                        top: overlap / 2,
+                        child: _ContextLine(
+                          tab: tab,
+                          home: widget.home,
+                          onOpenPort: widget.onOpenPort,
+                        ),
                       ),
                     ),
                   ],
@@ -454,6 +465,38 @@ class SessionTabRowState extends State<SessionTabRow> {
       ),
     );
   }
+}
+
+/// Takes hits only between [top] from its top edge and [bottom] from its
+/// bottom edge; the rest falls through to what lies below (the other line
+/// of the row, or the row itself).
+class _HitBand extends SingleChildRenderObjectWidget {
+  const _HitBand({this.top = 0, this.bottom = 0, required super.child});
+  final double top;
+  final double bottom;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderHitBand(top, bottom);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderHitBand renderObject) {
+    renderObject
+      ..top = top
+      ..bottom = bottom;
+  }
+}
+
+class _RenderHitBand extends RenderProxyBox {
+  _RenderHitBand(this.top, this.bottom);
+  double top;
+  double bottom;
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) =>
+      position.dy >= top &&
+      position.dy < size.height - bottom &&
+      super.hitTest(result, position: position);
 }
 
 /// The row's "×" (UI §2.2): 24 hit, 20 visual, `Icons.close` 14; hover

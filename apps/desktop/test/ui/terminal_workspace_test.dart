@@ -1049,7 +1049,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(tabs().selectedId, 1);
+      // Home is the tree's first node, Default's header (D14, UI-A2 §8):
+      // the tab stays; ↓ then reaches Default's first row.
       await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      await tester.pump();
+      expect(tabs().selectedId, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(tabs().selectedId, 2);
     },
