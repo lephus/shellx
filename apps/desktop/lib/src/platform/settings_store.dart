@@ -33,6 +33,13 @@ abstract final class SettingKeys {
   /// `{"id","name","collapsed"}` per entry. Membership is not stored.
   static const String terminalWorkspaces = 'terminal_workspaces';
 
+  /// A4 D20: "Thông báo trên máy tính" (default on).
+  static const String desktopNotifications = 'desktop_notifications_enabled';
+
+  /// A4 D20: "Chỉ khi cửa sổ không ở phía trước" (default on).
+  static const String desktopNotificationsOnlyUnfocused =
+      'desktop_notifications_only_unfocused';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -48,6 +55,8 @@ abstract final class SettingKeys {
     windowHeight,
     windowMaximized,
     terminalWorkspaces,
+    desktopNotifications,
+    desktopNotificationsOnlyUnfocused,
   };
 }
 

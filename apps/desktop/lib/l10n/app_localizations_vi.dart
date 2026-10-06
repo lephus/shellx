@@ -781,4 +781,121 @@ class AppLocalizationsVi extends AppLocalizations {
   String sidebarPositionInWorkspace(int index, int count, String workspace) {
     return 'tab $index trên $count trong $workspace';
   }
+
+  @override
+  String get attentionBell => 'Chuông';
+
+  @override
+  String attentionBellRepeat(int count) {
+    return 'Chuông ×$count';
+  }
+
+  @override
+  String get attentionBellBody => 'Chuông trong tab này';
+
+  @override
+  String attentionUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count thông báo chưa đọc',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attentionRowSemantics(int count, String text) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count thông báo chưa đọc',
+    );
+    return '$_temp0, mới nhất: $text';
+  }
+
+  @override
+  String get attentionMarkRead => 'Đánh dấu đã đọc';
+
+  @override
+  String get attentionMarkAllRead => 'Đánh dấu tất cả đã đọc';
+
+  @override
+  String attentionAnnounce(String tab, String text) {
+    return 'Thông báo mới từ $tab: $text';
+  }
+
+  @override
+  String get workspaceHasUnread => 'có thông báo chưa đọc';
+
+  @override
+  String terminalPaneUnreadLabel(String title) {
+    return 'Terminal $title, có thông báo chưa đọc';
+  }
+
+  @override
+  String get notificationsPanelTitle => 'Thông báo';
+
+  @override
+  String notificationsPanelTooltip(String shortcut) {
+    return 'Thông báo  $shortcut';
+  }
+
+  @override
+  String get notificationsPanelEmptyTitle => 'Chưa có thông báo nào';
+
+  @override
+  String get notificationsPanelEmptyBody =>
+      'Chương trình trong tab gửi thông báo bằng OSC 9, 99, 777 hoặc lệnh shellx notify.';
+
+  @override
+  String notificationsPanelNextHint(String shortcut) {
+    return 'Chưa đọc tiếp theo  $shortcut';
+  }
+
+  @override
+  String notificationsPanelOpened(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Thông báo, $count mục',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsTabClosed => 'Tab đã đóng';
+
+  @override
+  String get notificationsTimeNow => 'vừa xong';
+
+  @override
+  String notificationsTimeMinutes(int count) {
+    return '$count phút';
+  }
+
+  @override
+  String notificationsTimeHours(int count) {
+    return '$count giờ';
+  }
+
+  @override
+  String get notificationsItemUnread => 'chưa đọc';
+
+  @override
+  String get noUnreadNotifications => 'Không còn thông báo chưa đọc';
+
+  @override
+  String systemNotifyCoalesced(int count, String text) {
+    return '$count thông báo mới · $text';
+  }
+
+  @override
+  String get trayNotifications => 'Thông báo';
+
+  @override
+  String get trayDesktopNotifications => 'Thông báo trên máy tính';
+
+  @override
+  String get trayDesktopNotificationsUnfocused =>
+      'Chỉ khi cửa sổ không ở phía trước';
 }

@@ -793,4 +793,124 @@ class AppLocalizationsEn extends AppLocalizations {
   String sidebarPositionInWorkspace(int index, int count, String workspace) {
     return 'tab $index of $count in $workspace';
   }
+
+  @override
+  String get attentionBell => 'Bell';
+
+  @override
+  String attentionBellRepeat(int count) {
+    return 'Bell ×$count';
+  }
+
+  @override
+  String get attentionBellBody => 'Bell in this tab';
+
+  @override
+  String attentionUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attentionRowSemantics(int count, String text) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0, latest: $text';
+  }
+
+  @override
+  String get attentionMarkRead => 'Mark as read';
+
+  @override
+  String get attentionMarkAllRead => 'Mark all as read';
+
+  @override
+  String attentionAnnounce(String tab, String text) {
+    return 'New notification from $tab: $text';
+  }
+
+  @override
+  String get workspaceHasUnread => 'has unread notifications';
+
+  @override
+  String terminalPaneUnreadLabel(String title) {
+    return 'Terminal $title, has unread notifications';
+  }
+
+  @override
+  String get notificationsPanelTitle => 'Notifications';
+
+  @override
+  String notificationsPanelTooltip(String shortcut) {
+    return 'Notifications  $shortcut';
+  }
+
+  @override
+  String get notificationsPanelEmptyTitle => 'No notifications yet';
+
+  @override
+  String get notificationsPanelEmptyBody =>
+      'Programs in your tabs send notifications with OSC 9, 99, 777 or the shellx notify command.';
+
+  @override
+  String notificationsPanelNextHint(String shortcut) {
+    return 'Next unread  $shortcut';
+  }
+
+  @override
+  String notificationsPanelOpened(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Notifications, $count items',
+      one: 'Notifications, 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsTabClosed => 'Tab closed';
+
+  @override
+  String get notificationsTimeNow => 'now';
+
+  @override
+  String notificationsTimeMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String notificationsTimeHours(int count) {
+    return '$count h';
+  }
+
+  @override
+  String get notificationsItemUnread => 'unread';
+
+  @override
+  String get noUnreadNotifications => 'No unread notifications';
+
+  @override
+  String systemNotifyCoalesced(int count, String text) {
+    return '$count new notifications · $text';
+  }
+
+  @override
+  String get trayNotifications => 'Notifications';
+
+  @override
+  String get trayDesktopNotifications => 'Notifications on this computer';
+
+  @override
+  String get trayDesktopNotificationsUnfocused =>
+      'Only when the window isn\'t in front';
 }

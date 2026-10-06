@@ -210,6 +210,30 @@ abstract final class ShellxSizes {
   static const double dragGhostMaxWidth = 208;
   static const double dragGhostClearance = 4;
   static const double menuDivider = 9;
+
+  /// UI-A4 §1.2.
+  static const double badgeHeight = 16;
+  static const double badgeMinWidth = 16;
+  static const double badgePadH = 4;
+  static const double badgeGap = 4;
+  static const double notificationLine = 14;
+  static const double notificationGap = 2;
+  static const double notificationIcon = 11;
+  static const double notificationIconGap = 4;
+  static const double rowWithNotification = 46;
+  static const double rowWithNotificationAndContext = 62;
+  static const double ringWidth = 2;
+  static const double ringGlowWidth = 1;
+  static const double aggregateDot = 6;
+  static const double panelWidth = 360;
+  static const double panelMaxHeight = 480;
+  static const double panelOffsetY = 4;
+  static const double panelHeader = 36;
+  static const double panelItem = 52;
+  static const double panelUnreadSlot = 16;
+  static const double panelEmptyIcon = 24;
+  static const double headerBellGap = 4;
+  static const double bellDot = 6;
 }
 
 /// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).

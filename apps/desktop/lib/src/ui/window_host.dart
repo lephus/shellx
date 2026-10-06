@@ -155,6 +155,7 @@ final class WindowManagerHost with WindowListener implements WindowHost {
   WindowManagerHost({
     required this.onCloseRequested,
     required this.bounds,
+    this.onFocusChanged,
     Future<List<Rect>> Function()? displays,
     NativeWindow native = const WindowManagerNative(),
     bool? macos,
@@ -165,6 +166,9 @@ final class WindowManagerHost with WindowListener implements WindowHost {
        _windows = windows ?? Platform.isWindows;
 
   final void Function() onCloseRequested;
+
+  /// A4 D25: the window gained (true) or lost the focus.
+  final void Function(bool focused)? onFocusChanged;
   final WindowBoundsStore bounds;
   final Future<List<Rect>> Function() _displays;
   final NativeWindow _native;
@@ -239,6 +243,12 @@ final class WindowManagerHost with WindowListener implements WindowHost {
 
   @override
   void onWindowClose() => onCloseRequested();
+
+  @override
+  void onWindowFocus() => onFocusChanged?.call(true);
+
+  @override
+  void onWindowBlur() => onFocusChanged?.call(false);
 
   @override
   void onWindowResized() => _remember();

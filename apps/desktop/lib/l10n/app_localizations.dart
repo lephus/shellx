@@ -1285,6 +1285,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'tab {index} of {count} in {workspace}'**
   String sidebarPositionInWorkspace(int index, int count, String workspace);
+
+  /// No description provided for @attentionBell.
+  ///
+  /// In en, this message translates to:
+  /// **'Bell'**
+  String get attentionBell;
+
+  /// No description provided for @attentionBellRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Bell ×{count}'**
+  String attentionBellRepeat(int count);
+
+  /// No description provided for @attentionBellBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Bell in this tab'**
+  String get attentionBellBody;
+
+  /// No description provided for @attentionUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread notification} other{{count} unread notifications}}'**
+  String attentionUnreadCount(int count);
+
+  /// No description provided for @attentionRowSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread notification} other{{count} unread notifications}}, latest: {text}'**
+  String attentionRowSemantics(int count, String text);
+
+  /// No description provided for @attentionMarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get attentionMarkRead;
+
+  /// No description provided for @attentionMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get attentionMarkAllRead;
+
+  /// No description provided for @attentionAnnounce.
+  ///
+  /// In en, this message translates to:
+  /// **'New notification from {tab}: {text}'**
+  String attentionAnnounce(String tab, String text);
+
+  /// No description provided for @workspaceHasUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'has unread notifications'**
+  String get workspaceHasUnread;
+
+  /// No description provided for @terminalPaneUnreadLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal {title}, has unread notifications'**
+  String terminalPaneUnreadLabel(String title);
+
+  /// No description provided for @notificationsPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notificationsPanelTitle;
+
+  /// No description provided for @notificationsPanelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications  {shortcut}'**
+  String notificationsPanelTooltip(String shortcut);
+
+  /// No description provided for @notificationsPanelEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet'**
+  String get notificationsPanelEmptyTitle;
+
+  /// No description provided for @notificationsPanelEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Programs in your tabs send notifications with OSC 9, 99, 777 or the shellx notify command.'**
+  String get notificationsPanelEmptyBody;
+
+  /// No description provided for @notificationsPanelNextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Next unread  {shortcut}'**
+  String notificationsPanelNextHint(String shortcut);
+
+  /// No description provided for @notificationsPanelOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Notifications, 1 item} other{Notifications, {count} items}}'**
+  String notificationsPanelOpened(int count);
+
+  /// No description provided for @notificationsTabClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab closed'**
+  String get notificationsTabClosed;
+
+  /// No description provided for @notificationsTimeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'now'**
+  String get notificationsTimeNow;
+
+  /// No description provided for @notificationsTimeMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String notificationsTimeMinutes(int count);
+
+  /// No description provided for @notificationsTimeHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String notificationsTimeHours(int count);
+
+  /// No description provided for @notificationsItemUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'unread'**
+  String get notificationsItemUnread;
+
+  /// No description provided for @noUnreadNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'No unread notifications'**
+  String get noUnreadNotifications;
+
+  /// No description provided for @systemNotifyCoalesced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new notifications · {text}'**
+  String systemNotifyCoalesced(int count, String text);
+
+  /// No description provided for @trayNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get trayNotifications;
+
+  /// No description provided for @trayDesktopNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications on this computer'**
+  String get trayDesktopNotifications;
+
+  /// No description provided for @trayDesktopNotificationsUnfocused.
+  ///
+  /// In en, this message translates to:
+  /// **'Only when the window isn\'t in front'**
+  String get trayDesktopNotificationsUnfocused;
 }
 
 class _AppLocalizationsDelegate

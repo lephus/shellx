@@ -70,6 +70,19 @@ void main() {
     settings = InMemorySettingsStore();
   });
 
+  test('window_manager focus and blur reach onFocusChanged (A4 D25)', () {
+    final focus = <bool>[];
+    final h = WindowManagerHost(
+      onCloseRequested: () {},
+      bounds: WindowBoundsStore(settings),
+      native: native,
+      onFocusChanged: focus.add,
+    );
+    h.onWindowFocus();
+    h.onWindowBlur();
+    expect(focus, [true, false]);
+  });
+
   group('bringToFront (ruling C1)', () {
     test('a minimized window is restored, shown, focused and the app '
         'activated (macOS)', () async {
