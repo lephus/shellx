@@ -14,6 +14,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 - Nội dung terminal (lệnh bạn gõ và kết quả hiển thị) được **mã hóa đầu cuối** giữa điện thoại và máy tính của bạn. Máy chủ chuyển tiếp chỉ chuyển dữ liệu đã mã hóa và **không thể đọc** nội dung đó, ngoại trừ nội dung thông báo đẩy (mục 3).
 - Chúng tôi chỉ lưu những gì cần để vận hành tài khoản: email, mật khẩu ở dạng băm, thông tin thiết bị và bản ghi ghép nối.
 - Thông báo đẩy (push notification): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định) hoặc khi một chương trình gửi thông báo, agent gửi nội dung thông báo qua máy chủ của chúng tôi, Google Firebase Cloud Messaging và Apple Push Notification service, ở dạng không mã hóa đầu cuối, tới điện thoại đã ghép nối và cho phép thông báo (mục 3).
+- Nhập lệnh bằng giọng nói: khi bạn chạm nút mic, lời nói được chuyển thành chữ bằng nhận dạng giọng nói của Apple (iPhone) hoặc Google (Android, khi điện thoại không tự nhận dạng được), có thể xử lý âm thanh trên máy chủ của họ. ShellX không lưu và không nhận âm thanh (mục 2).
 - Không quảng cáo, không công cụ phân tích hay theo dõi, không bán dữ liệu.
 
 ## 1. Dữ liệu lưu trên máy chủ của chúng tôi
@@ -47,6 +48,13 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 Để bù phần output phát sinh khi điện thoại tạm mất kết nối, agent giữ tối đa 256 KiB output gần nhất của mỗi phiên **trong bộ nhớ của máy tính của bạn**. Dữ liệu này không được gửi cho chúng tôi và mất đi khi phiên kết thúc hoặc agent thoát.
 
+### Nhập lệnh bằng giọng nói
+
+- Ứng dụng di động chỉ dùng micro khi bạn chạm nút mic trên màn terminal; không ghi âm nền.
+- Lời nói được chuyển thành chữ bằng tính năng nhận dạng giọng nói của điện thoại, **trước khi** mã hóa đầu cuối. Trên iPhone, ứng dụng dùng nhận dạng giọng nói của Apple: Apple có thể xử lý âm thanh ngay trên điện thoại hoặc trên máy chủ của Apple. Trên Android, lời nói được nhận dạng ngay trên điện thoại khi máy làm được; nếu không, âm thanh được gửi tới dịch vụ nhận dạng giọng nói của Google. Apple và Google xử lý theo chính sách riêng của họ.
+- ShellX không lưu âm thanh và không gửi âm thanh tới máy chủ của ShellX. Chữ bạn gửi đi vào terminal như phím gõ, được mã hóa đầu cuối như trên; máy chủ chuyển tiếp không đọc được.
+- Lựa chọn ngôn ngữ nhận dạng (tiếng Việt/tiếng Anh) được lưu trên điện thoại.
+
 ## 3. Thông báo đẩy
 
 Agent trên máy tính có thể báo cho điện thoại đã ghép nối khi một lệnh chạy lâu kết thúc, hoặc khi một chương trình gửi thông báo — kể cả khi ứng dụng di động đã đóng.
@@ -66,13 +74,6 @@ Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại �
 - **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
 - **Full Disk Access (macOS):** quyền này không bắt buộc và chỉ để các lệnh bạn chạy trong terminal truy cập được thư mục của bạn. Agent không tự đọc hay tải lên tệp nào của bạn.
 
-### Nhập lệnh bằng giọng nói
-
-- Ứng dụng di động chỉ dùng micro khi bạn chạm nút mic trên màn terminal; không ghi âm nền.
-- Khi điện thoại hỗ trợ, lời nói được chuyển thành chữ ngay trên điện thoại. Nếu không, âm thanh được gửi tới dịch vụ nhận dạng giọng nói của Apple (iOS) hoặc Google (Android) và được xử lý theo chính sách của họ.
-- ShellX không lưu âm thanh và không gửi âm thanh tới máy chủ của ShellX. Chữ bạn gửi đi vào terminal như phím gõ, được mã hóa đầu cuối (mục 2).
-- Lựa chọn ngôn ngữ nhận dạng (tiếng Việt/tiếng Anh) được lưu trên điện thoại.
-
 ## 5. Những gì chúng tôi không làm
 
 - Không dùng công cụ phân tích, quảng cáo, pixel theo dõi hay SDK bên thứ ba để theo dõi hành vi. Ứng dụng di động chỉ dùng Firebase Cloud Messaging để nhận thông báo đẩy, không dùng các dịch vụ phân tích của Firebase.
@@ -88,7 +89,7 @@ Chúng tôi chỉ dùng dữ liệu nêu ở mục 1 để: tạo và xác thự
 
 Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **Việt Nam**: máy chủ chuyển tiếp, cơ sở dữ liệu tài khoản cùng các bản sao lưu, trang web và bản cài đặt. Dữ liệu được lưu và xử lý tại **Việt Nam**. Chúng tôi không dùng mạng phân phối nội dung (CDN) hay dịch vụ phân tích của bên thứ ba.
 
-Khi bạn tải ứng dụng từ App Store hoặc Google Play, Apple và Google xử lý dữ liệu theo chính sách riêng của họ. Khi bạn bật thông báo đẩy, nội dung thông báo và mã thông báo đẩy được chuyển cho Google (Firebase Cloud Messaging) và, với iPhone, Apple (Apple Push Notification service) để gửi tới điện thoại (mục 3); các dịch vụ này có thể xử lý dữ liệu ngoài Việt Nam.
+Khi bạn tải ứng dụng từ App Store hoặc Google Play, Apple và Google xử lý dữ liệu theo chính sách riêng của họ. Khi bạn bật thông báo đẩy, nội dung thông báo và mã thông báo đẩy được chuyển cho Google (Firebase Cloud Messaging) và, với iPhone, Apple (Apple Push Notification service) để gửi tới điện thoại (mục 3); các dịch vụ này có thể xử lý dữ liệu ngoài Việt Nam. Khi bạn nhập lệnh bằng giọng nói, âm thanh được xử lý bởi nhận dạng giọng nói của Apple (iPhone) hoặc, khi điện thoại không tự nhận dạng được, của Google (Android); các dịch vụ này cũng có thể xử lý dữ liệu ngoài Việt Nam (mục 2).
 
 Chúng tôi chỉ cung cấp dữ liệu cho cơ quan nhà nước khi pháp luật bắt buộc. Vì nội dung terminal được mã hóa đầu cuối, chúng tôi không có nội dung đó để cung cấp.
 

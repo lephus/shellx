@@ -27,7 +27,7 @@ Trên màn terminal của điện thoại, người dùng **nói** thay vì gõ:
 | V1 | Nghĩa của "nói để ra lệnh" | Đọc chính tả là chính + vài từ khoá điều khiển ("gửi"/"send", "huỷ"/"cancel"). Không dịch ngôn ngữ tự nhiên → lệnh shell |
 | V2 | Ngôn ngữ | Mỗi lượt một ngôn ngữ, chọn VI/EN bằng chip; mặc định theo ngôn ngữ app; nhớ lựa chọn |
 | V3 | Đưa chữ vào terminal | Qua ô soạn thảo (composer) sửa được; chỉ gửi khi bấm Gửi hoặc nói từ khoá gửi |
-| V4 | Engine | Nhận dạng của hệ điều hành (Apple Speech, Android SpeechRecognizer) qua package `speech_to_text`; ưu tiên on-device, không có thì dùng nhận dạng cloud của hệ điều hành. Loại bỏ: chỉ on-device tuyệt đối, Whisper cloud qua relay (phá nguyên tắc relay mù), whisper.cpp on-device (nặng) |
+| V4 | Engine | Nhận dạng của hệ điều hành (Apple Speech, Android SpeechRecognizer) qua package `speech_to_text`; Android: ưu tiên on-device, không có thì dùng nhận dạng cloud của hệ điều hành. iOS: không ép on-device (plugin không tự quay về cloud trong cùng một lượt: khi máy không nghe on-device được, nó trả lỗi nhưng vẫn chạy lượt on-device), để Apple tự chọn xử lý trên máy hay trên máy chủ. Loại bỏ: chỉ on-device tuyệt đối, Whisper cloud qua relay (phá nguyên tắc relay mù), whisper.cpp on-device (nặng) |
 | V5 | Bật micro | Chạm để bật, chạm lại hoặc im lặng ~2 giây để dừng |
 | V6 | Ctrl+C bằng giọng | Không làm — nhận nhầm sẽ ngắt tiến trình; phím Ctrl trên thanh phím phụ vẫn có |
 | V7 | Cách triển khai | Plugin `speech_to_text` sau interface `SpeechInput`; mọi logic (từ khoá, composer, gửi) là Dart thuần, test bằng fake. Đổi sang platform channel tự viết sau này không phải sửa UI |
@@ -45,10 +45,10 @@ Trên màn terminal của điện thoại, người dùng **nói** thay vì gõ:
    - mic có hiệu ứng sóng;
    - chữ hiện dần theo kết quả từng phần (partial);
    - chip **VI / EN** để đổi ngôn ngữ;
-   - nghe trên máy trước; nếu lỗi trước khi nghe được chữ nào (ngôn ngữ không có trên máy / lỗi khác), thử lại một lần bằng nhận dạng cloud của hệ điều hành.
+   - Android: nghe trên máy trước; nếu lỗi trước khi nghe được chữ nào (ngôn ngữ không có trên máy / lỗi khác), thử lại một lần bằng nhận dạng cloud của hệ điều hành. iOS: một lượt, Apple tự chọn trên máy hay cloud (V4).
 4. Dừng (chạm mic hoặc im lặng ~2 giây) → chữ nằm trong composer, sửa được bằng bàn phím. Chạm mic lần nữa → nói tiếp, **nối thêm** vào chữ đang có (cách bằng một dấu cách).
 5. Gửi: nút **Gửi** hoặc từ khoá gửi. Composer trống lại và vẫn mở để nói tiếp. Nút **✕** đóng composer, bỏ chữ.
-6. Composer gõ tay được — cũng là chỗ soạn câu dài dễ hơn gõ thẳng vào terminal. Khi composer mở, focus và bàn phím ảo thuộc về composer, không thuộc terminal.
+6. Composer gõ tay được — cũng là chỗ soạn câu dài dễ hơn gõ thẳng vào terminal. Mở composer thì bàn phím của terminal ẩn đi; chạm vào ô chữ thì bàn phím hiện lại và gõ vào composer, không vào terminal. ✕ trả focus về terminal.
 7. Composer hiện tên tab đích (ví dụ "→ zsh · MacBook"). Đổi tab khi đang soạn: chữ giữ nguyên, gửi luôn tới tab **đang mở**.
 
 ### 3.2 Từ khoá
@@ -76,12 +76,12 @@ Chỉ trong `apps/mobile`, theo pattern sẵn có: `Controller` + `StateSignal` 
 
 | Thành phần | Vị trí | Vai trò | Phụ thuộc |
 |---|---|---|---|
-| `SpeechInput` (interface) | `domain/speech_input.dart` | `Future<SpeechPermission> ensurePermission()` (`granted`, `denied`, `unsupported`); `Future<String?> resolveLocale(VoiceLocale)` → mã locale của nền tảng hoặc null khi máy không nhận dạng được; `start(localeId, {required bool onDevice})`; `stop()`; `cancel()`; `Stream<SpeechEvent> events` gồm `SpeechPartial(text)`, `SpeechFinal(text)`, `SpeechFailed(SpeechErrorKind)`, `SpeechListening(bool)` | không |
-| `SpeechToTextInput` | `data/speech_to_text_input.dart` | Cài đặt bằng `speech_to_text`: `pauseFor: 2s`, `partialResults: true`, `onDevice` khi `availability` trả `onDevice`. Ánh xạ mã lỗi plugin → `SpeechErrorKind` (`noPermission`, `localeUnavailable`, `network`, `noMatch`, `interrupted`, `other`) | `speech_to_text` |
+| `SpeechInput` (interface) | `domain/speech_input.dart` | `Future<SpeechPermission> ensurePermission()` (`granted`, `denied`, `unsupported`); `Future<String?> resolveLocale(VoiceLocale)` → mã locale của nền tảng hoặc null khi máy không nhận dạng được; `bool tryOnDeviceFirst` (lượt đầu có xin on-device không); `start(localeId, {required bool onDevice})`; `stop()`; `cancel()`; `Stream<SpeechEvent> events` gồm `SpeechPartial(text)`, `SpeechFinal(text)`, `SpeechFailed(SpeechErrorKind)`, `SpeechListening(bool)` | không |
+| `SpeechToTextInput` | `data/speech_to_text_input.dart` | Cài đặt bằng `speech_to_text`: `pauseFor: 2s`, `listenFor: 60s`, `partialResults: true`, `ListenMode.dictation`, `cancelOnError: true`, `onDevice` theo controller. `tryOnDeviceFirst`: Android `true`, iOS `false` (V4). `resolveLocale`: `locales()` chờ tối đa 2 s (Android 13+ có thể không bao giờ trả lời); hết giờ, lỗi, hoặc danh sách không có ngôn ngữ đó → dùng mã ưu tiên (`vi-VN`/`en-US`), không trả null — Android 13+ chỉ liệt kê ngôn ngữ on-device trong khi cloud vẫn có thể nhận; nếu thật sự không có, bộ nhận dạng báo `error_language_*` → `localeUnavailable`. Ánh xạ mã lỗi plugin (Android và iOS) → `SpeechErrorKind` (`noPermission`, `localeUnavailable`, `network`, `noMatch`, `interrupted`, `unsupported` — nhận dạng bị tắt trên iOS, `other`). Chỉ ghi log tên lỗi, không ghi lời nói | `speech_to_text` |
 | `VoiceCommandParser` | `domain/voice_command_parser.dart` | Hàm thuần `parse(text, VoiceLocale)` → `VoiceSend(text)` / `VoiceCancel()` / `VoiceAppend(text)` theo §3.2 | không |
-| `VoiceLocale` | `domain/voice_locale.dart` | enum `vi` (`vi-VN`), `en` (`en-US`) | không |
+| `VoiceLocale` | `domain/voice_locale.dart` | enum `vi` (`vi-VN`), `en` (`en-US`), kèm từ khoá gửi/huỷ của từng ngôn ngữ | không |
 | `AppSettings.voiceLocale` / `setVoiceLocale` | `lib/core/settings/app_settings.dart` | Đọc/ghi lựa chọn VI/EN; null = theo ngôn ngữ app. App giữ một đối tượng settings duy nhất, không có `VoiceLocaleStore` riêng | storage hiện có |
-| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | State `VoiceComposerState { phase: closed/idle/listening, text, partial, locale, error, canSend }`. Ghép partial lên chữ đã có; final → parser; `VoiceSend` gọi callback `onSubmit(text)`; quản lý quyền và lỗi theo §5 | `SpeechInput`, `AppSettings` |
+| `VoiceComposerController` | `presentation/controllers/voice_composer_controller.dart` | Signals `phase` (`closed`/`idle`/`listening`), `issue` (`VoiceIssue`: `noPermission`, `unsupported`, `localeUnavailable`, `network`, `failed`), `locale`, `unavailable` (chip mờ; xoá khi composer mở lại từ trạng thái đóng) + `TextEditingController text`; `attach(canSend, onSubmit)`. Một lượt nghe tại một thời điểm: partial ghép lên chữ đã có; final → parser; `VoiceSend` gọi `onSubmit(text)`; lượt đầu `onDevice: tryOnDeviceFirst`, thử lại cloud chỉ sau một lượt on-device; lượt đã cạn và `done` muộn xử lý theo §5. `pause()` (app không còn active) huỷ lượt đang nghe, và nếu đang chuẩn bị (quyền, locale) thì lượt đó không bắt đầu; lần chạm mic sau nghe lại bình thường | `SpeechInput`, `AppSettings` |
 | `VoiceComposer` | `presentation/widgets/voice_composer.dart` | Ô chữ nhiều dòng, chip VI/EN, nút mic (sóng), Gửi, ✕, nhãn tab đích, dòng lỗi; có Semantics label | controller |
 | `MicButton` | `presentation/widgets/mic_button.dart` | Nút mic dùng ở thanh phím phụ | controller |
 
@@ -107,15 +107,15 @@ Mic → `SpeechInput` → `SpeechPartial`/`SpeechFinal` → `VoiceComposerContro
 
 | Tình huống | Hành vi |
 |---|---|
-| Từ chối quyền (micro hoặc nhận dạng) | Snackbar "Cần quyền micro để nói lệnh" + nút **Mở Cài đặt** (cùng mẫu với push). Nút mic vẫn hiện; chạm lần sau kiểm tra lại quyền |
-| Ngôn ngữ đang chọn `unavailable` | Dòng lỗi "Máy chưa hỗ trợ nhận dạng tiếng Việt" (hoặc tiếng Anh) + gợi ý đổi ngôn ngữ; chip ngôn ngữ đó mờ |
+| Từ chối quyền (micro hoặc nhận dạng) | Dòng lỗi trong composer "Cần quyền micro và nhận dạng giọng nói để nói lệnh" + nút **Mở Cài đặt** ngay trên dòng đó. Nút mic vẫn hiện; chạm lần sau kiểm tra lại quyền |
+| Ngôn ngữ đang chọn `unavailable` (bộ nhận dạng báo lỗi ngôn ngữ, hoặc iOS báo thiếu gói `error_assets_not_installed`) | Dòng lỗi "Máy chưa hỗ trợ nhận dạng tiếng Việt" (hoặc tiếng Anh) + gợi ý đổi ngôn ngữ; chip ngôn ngữ đó mờ tới khi composer đóng rồi mở lại |
 | Không on-device và mất mạng (`network`) | "Cần kết nối mạng để nhận dạng giọng nói"; chữ giữ nguyên |
 | `noMatch` (không nghe được gì) | Dừng nghe, không báo lỗi to; chữ giữ nguyên |
 | Phiên hết live khi đang soạn | Chữ giữ nguyên; Gửi và từ khoá gửi vô hiệu, có dòng chú thích; live lại thì gửi được |
 | Đổi tab | Chữ giữ nguyên; nhãn tab đích cập nhật; gửi tới tab đang mở |
 | App xuống nền, khoá màn hình (lock gate), cuộc gọi, iOS hết giới hạn ~1 phút mỗi lượt (`interrupted`) | Dừng nghe, giữ chữ, không tự bật lại |
 | Rời màn terminal | Huỷ nghe; composer đóng, chữ bỏ |
-| Máy không có bộ nhận dạng giọng nói | "Máy này không hỗ trợ nhận dạng giọng nói" |
+| Máy không có bộ nhận dạng giọng nói, hoặc nhận dạng bị tắt (iOS `error_speech_recognizer_disabled`) | "Máy này không hỗ trợ nhận dạng giọng nói" |
 | Không có phiên live | Nút mic ẩn; composer đang mở vẫn giữ |
 | `done` đến mà không có kết quả cuối (final) | Không chặn mic: lượt nghe đã cạn bị huỷ ở lần chạm mic kế tiếp rồi nghe lượt mới |
 | `done` muộn của lượt nghe trước | Bỏ qua cho tới khi lượt mới báo đã bắt đầu nghe (`SpeechListening(true)`, partial hoặc final), để không kết thúc nhầm lượt mới |
@@ -124,11 +124,14 @@ Mic → `SpeechInput` → `SpeechPartial`/`SpeechFinal` → `VoiceComposerContro
 
 ## 6. Quyền riêng tư
 
-Sửa `web/src/pages/privacy.md` và `web/src/pages/en/privacy.md`, thêm mục giọng nói:
+Đã sửa `web/src/pages/privacy.md` và `web/src/pages/en/privacy.md`:
 
+- Mục con "Nhập lệnh bằng giọng nói" nằm trong mục 2 (mã hoá đầu cuối), không còn ở mục 4 (dữ liệu chỉ nằm trên thiết bị), vì âm thanh có thể tới Apple/Google; số mục không đổi.
 - Âm thanh chỉ được ghi khi người dùng bật mic, không ghi nền.
-- Khi máy hỗ trợ, nhận dạng chạy trên máy; nếu không, âm thanh được gửi tới dịch vụ nhận dạng của Apple (iOS) hoặc Google (Android) theo chính sách của họ.
+- iPhone: dùng nhận dạng giọng nói của Apple — Apple có thể xử lý trên điện thoại hoặc trên máy chủ của Apple. Android: nhận dạng trên điện thoại khi máy làm được; nếu không, âm thanh tới dịch vụ của Google. Việc nhận dạng diễn ra trước khi mã hoá đầu cuối.
 - ShellX không lưu và không gửi âm thanh tới máy chủ của ShellX; chữ đã gửi đi như phím gõ (mã hoá đầu cuối).
+- Thêm một gạch đầu dòng ở Tóm tắt và một câu ở mục 7 nêu Apple/Google (nhận dạng giọng nói) là bên xử lý khi dùng giọng nói.
+- Lời xin quyền iOS (`NSSpeechRecognitionUsageDescription`, vi/en) dùng cùng cách nói.
 - Cập nhật nhãn quyền riêng tư của store nếu cần (ghi vào HANDOFF).
 
 ---

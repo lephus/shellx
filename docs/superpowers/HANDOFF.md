@@ -134,8 +134,9 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 
 - [ ] iPhone thật: chạm mic → hai hộp thoại quyền (micro, nhận dạng giọng nói) bằng tiếng Việt; nói "chạy git status gửi" trong một phiên zsh → `git status` chạy.
 - [ ] iPhone: trong Claude Code, nói một câu dài rồi "gửi" → câu tới Claude Code đúng một lần, không tách dòng.
-- [ ] iPhone chế độ máy bay: nếu máy nghe được tiếng Việt on-device thì vẫn chạy; nếu không, hiện "Cần kết nối mạng…".
-- [ ] Android thật (có Google app): như trên; máy chưa cài gói tiếng Việt → chip VI mờ + gợi ý EN.
+- [ ] iPhone chế độ máy bay: app không ép on-device (plugin không tự quay về cloud trên iOS), Apple tự chọn; nếu Apple nhận dạng được ngay trên máy thì vẫn chạy, nếu không thì hiện "Cần kết nối mạng…".
+- [ ] Android thật (có Google app): như trên; máy chưa cài gói tiếng Việt on-device → VI vẫn được thử qua nhận dạng cloud của Google (cần mạng) và chạy; chip VI chỉ mờ + gợi ý EN khi bộ nhận dạng thật sự báo lỗi ngôn ngữ.
+- [ ] Android 13+: lần chạm mic đầu không bị treo (danh sách ngôn ngữ chờ tối đa 2 s rồi dùng `vi-VN`/`en-US`).
 - [ ] Từ chối quyền → dòng lỗi + "Mở Cài đặt" mở đúng trang cài đặt của ShellX.
 - [ ] Đang nghe thì có cuộc gọi / khoá màn hình → dừng nghe, chữ còn nguyên, không tự gửi.
 - [ ] App Store Connect / Play Console: cập nhật nhãn quyền riêng tư (Audio data — dùng cho chức năng app, không thu thập về máy chủ ShellX) nếu biểu mẫu yêu cầu.

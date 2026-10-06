@@ -14,6 +14,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 - Terminal content (the commands you type and the output you see) is **end-to-end encrypted** between your phone and your computer. The relay only forwards encrypted data and **cannot read** it, except for the content of push notifications (section 3).
 - We store only what is needed to run your account: your email, a hash of your password, device information and pairing records.
 - Push notifications: while the computer's "Notify when long commands finish" setting is on (the default), or when a program sends a notification, the agent sends the notification text through our server, Google Firebase Cloud Messaging and Apple Push Notification service, without end-to-end encryption, to paired phones that allowed notifications (section 3).
+- Voice input: when you tap the mic, what you say is turned into text by Apple's (iPhone) or Google's (Android, when the phone cannot do it itself) speech recognition, which may process the audio on their servers. ShellX does not store or receive the audio (section 2).
 - No ads, no analytics or tracking tools, and we never sell data.
 
 ## 1. Data stored on our servers
@@ -47,6 +48,13 @@ Your phone and your computer set up an encrypted channel using the Noise protoco
 
 To replay output produced while your phone is briefly disconnected, the agent keeps up to 256 KiB of the most recent output of each session **in your computer's memory**. It is never sent to us and is gone when the session ends or the agent quits.
 
+### Voice input
+
+- The mobile app uses the microphone only when you tap the mic on the terminal screen; it never records in the background.
+- Speech is turned into text by the phone's speech recognition, **before** end-to-end encryption. On iPhone, Apple's speech recognition is used: Apple may process the audio on the phone or on its servers. On Android, speech is recognized on the phone when it can be; otherwise the audio goes to Google's speech recognition service. Apple and Google handle it under their own policies.
+- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, end-to-end encrypted as above; the relay cannot read it.
+- Your recognition language choice (Vietnamese/English) is stored on the phone.
+
 ## 3. Push notifications
 
 The agent on your computer can tell your paired phones when a long-running command finishes, or when a program sends a notification — even when the mobile app is closed.
@@ -66,13 +74,6 @@ The device private key, access token, the list of trusted phones (on the compute
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
 - **Full Disk Access (macOS):** this optional permission only lets the commands you run in the terminal reach your folders. The agent itself never reads or uploads your files.
 
-### Voice input
-
-- The mobile app uses the microphone only when you tap the mic on the terminal screen; it never records in the background.
-- When your phone supports it, speech is turned into text on the phone. Otherwise the audio is sent to Apple's (iOS) or Google's (Android) speech recognition service and handled under their policies.
-- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, end-to-end encrypted (section 2).
-- Your recognition language choice (Vietnamese/English) is stored on the phone.
-
 ## 5. What we do not do
 
 - No analytics, advertising, tracking pixels or third-party tracking SDKs. The mobile app uses Firebase Cloud Messaging only to receive push notifications, and none of Firebase's analytics services.
@@ -88,7 +89,7 @@ We use the data listed in section 1 only to: create and authenticate your accoun
 
 The Service runs on a private server rented by ShellX in **Vietnam**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **Vietnam**. We use no content delivery network (CDN) and no third-party analytics.
 
-When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies. When you turn on push notifications, their content and the push token are passed to Google (Firebase Cloud Messaging) and, for iPhones, Apple (Apple Push Notification service) to reach your phone (section 3); these services may process data outside Vietnam.
+When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies. When you turn on push notifications, their content and the push token are passed to Google (Firebase Cloud Messaging) and, for iPhones, Apple (Apple Push Notification service) to reach your phone (section 3); these services may process data outside Vietnam. When you use voice input, the audio is processed by Apple's speech recognition (iPhone) or, when the phone cannot recognize it itself, Google's speech recognition (Android), which may also process it outside Vietnam (section 2).
 
 We disclose data to authorities only when the law requires it. Because terminal content is end-to-end encrypted, we do not have it to disclose.
 
