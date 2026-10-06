@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:xterm/xterm.dart';
 
+import 'match_scanner.dart';
 import 'pane_text.dart';
 
 /// What a wait needs to know about one terminal pane.
@@ -130,68 +131,108 @@ Future<Map<String, Object?>> waitExit(
   return _cancelAll(subs);
 });
 
-/// D21 match: [re] on the last 2000 logical lines (≤ 256 KiB) now and
-/// after output, at most every 100 ms; with [fromNow] only the lines from
-/// the cursor's row at the start on. `{match, line}`.
+/// D21 match: [scanner] (the client's pattern, off the UI isolate) on the
+/// last 2000 logical lines (≤ 256 KiB) now and after output, at most every
+/// 100 ms and only when output came since the last look; with [fromNow]
+/// only what the pane shows from the cursor's row at the start on — in
+/// either buffer: text the main buffer held before the wait never counts.
+/// `{match, line}`. [scanner] is closed when the wait ends.
 Future<Map<String, Object?>> waitMatch(
   PaneProbe p,
-  RegExp re, {
+  MatchScanner scanner, {
   required bool fromNow,
   required Duration timeout,
   Future<void>? cancelled,
 }) {
-  final start = p.terminal.buffer;
-  // Follows its row as the scrollback moves; gone once the row left it.
-  final anchor = fromNow ? start.createAnchorFromCursor() : null;
+  final t = p.terminal;
+  final startedOnAlt = t.isUsingAltBuffer;
+  // Anchors follow their rows as the scrollback moves; detached once the
+  // row left the buffer (then all that is left came after the start).
+  final mainAnchor = fromNow ? t.mainBuffer.createAnchorFromCursor() : null;
+  final altAnchor = fromNow && startedOnAlt
+      ? t.altBuffer.createAnchorFromCursor()
+      : null;
+  int? fromRow() {
+    if (!fromNow) return null;
+    final anchor = t.isUsingAltBuffer ? altAnchor : mainAnchor;
+    // The alt screen entered after the start holds only what came after.
+    if (anchor == null || !anchor.attached) return 0;
+    return anchor.y;
+  }
+
   return _race(timeout, cancelled, (done) {
     Timer? pending;
-    void scan() {
+    var scanning = false;
+    var fresh = true; // output since the last look (the start counts)
+    late final void Function() soon;
+    Future<void> scan() async {
       pending = null;
-      if (done.isCompleted) return;
-      final buffer = p.terminal.buffer;
-      int? from;
-      if (anchor != null) {
-        // Another buffer (the alt screen) holds only what came after.
-        from = identical(buffer, start) && anchor.attached ? anchor.y : 0;
+      if (done.isCompleted || scanning) return;
+      if (!fresh) {
+        if (p.exited) done.completeError(_exited);
+        return;
       }
-      final lines = logicalLines(buffer, last: _matchMaxLines, fromRow: from);
-      var text = lines.join('\n');
+      fresh = false;
+      var text = matchLines(
+        t.buffer,
+        last: _matchMaxLines,
+        fromRow: fromRow(),
+      ).join('\n');
       if (text.length > _matchMaxChars) {
         final cut = text.indexOf('\n', text.length - _matchMaxChars);
         text = cut < 0
             ? text.substring(text.length - _matchMaxChars)
             : text.substring(cut + 1);
       }
-      final m = re.firstMatch(text);
+      scanning = true;
+      final MatchSpan? m;
+      try {
+        m = await scanner.scan(text);
+      } on Object catch (e) {
+        if (!done.isCompleted) done.completeError(e);
+        return;
+      } finally {
+        scanning = false;
+      }
+      if (done.isCompleted) return;
       if (m != null) {
         final lineStart = text.lastIndexOf('\n', m.start) + 1;
         final lineEnd = text.indexOf('\n', m.end);
         done.complete({
-          'match': m.group(0),
+          'match': text.substring(m.start, m.end),
           'line': text.substring(
             lineStart,
             lineEnd < 0 ? text.length : lineEnd,
           ),
         });
+      } else if (fresh) {
+        soon(); // output came while the scanner looked
       } else if (p.exited) {
         done.completeError(_exited);
       }
     }
 
-    void soon() {
-      pending ??= Timer(_matchThrottle, scan);
-    }
+    soon = () {
+      pending ??= Timer(_matchThrottle, () => unawaited(scan()));
+    };
 
     final subs = [
-      p.output.listen((_) => soon()),
-      p.changes.listen((_) => soon()),
+      p.output.listen((_) {
+        fresh = true;
+        soon();
+      }),
+      p.changes.listen((_) {
+        if (p.exited) soon();
+      }),
     ];
     soon();
     final cancelSubs = _cancelAll(subs);
     return () {
       pending?.cancel();
-      anchor?.dispose();
+      mainAnchor?.dispose();
+      altAnchor?.dispose();
       cancelSubs();
+      scanner.close();
     };
   });
 }

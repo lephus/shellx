@@ -46,6 +46,38 @@ List<String> logicalLines(
   return out.reversed.toList();
 }
 
+/// A7 D21 (Task 7 review M7): [logicalLines] for `wait --match`, cheaper:
+/// the rows' text as xterm gives it (no SGR codec; a skipped cell is not a
+/// space), trailing spaces cut.
+List<String> matchLines(Buffer buffer, {int? last, int? fromRow}) {
+  final rows = buffer.lines;
+  var end = rows.length - 1;
+  while (end >= 0 &&
+      rows[end].getTrimmedLength() == 0 &&
+      (end + 1 >= rows.length || !rows[end + 1].isWrapped)) {
+    end--;
+  }
+  var first = fromRow ?? 0;
+  while (first > 0 && first < rows.length && rows[first].isWrapped) {
+    first--;
+  }
+  final out = <String>[];
+  var i = end;
+  while (i >= first && (last == null || out.length < last)) {
+    var start = i;
+    while (start > first && rows[start].isWrapped) {
+      start--;
+    }
+    final line = StringBuffer();
+    for (var r = start; r <= i; r++) {
+      line.write(rows[r].getText());
+    }
+    out.add(line.toString().trimRight());
+    i = start - 1;
+  }
+  return out.reversed.toList();
+}
+
 /// D20: the screen of the buffer in use (the alt screen while vim runs).
 String screenText(Terminal t) => _join(_screenLines(t, ansi: false));
 

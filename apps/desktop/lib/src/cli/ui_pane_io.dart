@@ -9,6 +9,7 @@ import '../terminal/terminal_tabs.dart';
 import 'agent_marks.dart';
 import 'cli_fields.dart';
 import 'cli_targets.dart';
+import 'match_scanner.dart';
 import 'pane_text.dart';
 import 'pane_waiter.dart';
 
@@ -198,16 +199,16 @@ final class PaneIoCommands {
               limit: '1 KiB',
             ) ??
             (throw badRequest('pattern is needed'));
-        final RegExp re;
         try {
-          re = RegExp(pattern, multiLine: true);
+          // Compiles only (syntax): the pattern runs off the UI isolate.
+          RegExp(pattern, multiLine: true);
         } on FormatException {
           throw badRequest('invalid regular expression');
         }
         final fromNow = flagField(r, 'fromNow');
         start = (p) => waitMatch(
           p,
-          re,
+          IsolateMatchScanner(pattern),
           fromNow: fromNow,
           timeout: timeout,
           cancelled: cancelled,

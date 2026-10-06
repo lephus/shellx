@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_desktop/src/cli/match_scanner.dart';
 import 'package:shellx_desktop/src/cli/pane_waiter.dart';
 import 'package:xterm/xterm.dart';
 
@@ -27,6 +28,24 @@ final class FakeProbe implements PaneProbe {
     terminal.write(s);
     out.add(null);
   }
+}
+
+/// Runs the pattern here (the tests' fake time); [seen] gets each text.
+final class InlineScanner implements MatchScanner {
+  InlineScanner(this.re, {this.seen});
+  final RegExp re;
+  final List<String>? seen;
+  bool closed = false;
+
+  @override
+  Future<MatchSpan?> scan(String text) async {
+    seen?.add(text);
+    final m = re.firstMatch(text);
+    return m == null ? null : (start: m.start, end: m.end);
+  }
+
+  @override
+  void close() => closed = true;
 }
 
 Matcher failure(String code) =>
@@ -129,7 +148,7 @@ void main() {
       unawaited(
         waitMatch(
           p,
-          RegExp('Serving HTTP', multiLine: true),
+          InlineScanner(RegExp('Serving HTTP', multiLine: true)),
           fromNow: false,
           timeout: const Duration(seconds: 5),
         ).then((v) => old = v),
@@ -141,7 +160,7 @@ void main() {
       unawaited(
         waitMatch(
           p,
-          RegExp(r'ready in \d+', multiLine: true),
+          InlineScanner(RegExp(r'ready in \d+', multiLine: true)),
           fromNow: true,
           timeout: const Duration(seconds: 5),
         ).then((v) => fresh = v),
@@ -150,7 +169,7 @@ void main() {
       unawaited(
         waitMatch(
           p,
-          RegExp('Serving', multiLine: true),
+          InlineScanner(RegExp('Serving', multiLine: true)),
           fromNow: true,
           timeout: const Duration(seconds: 5),
         ).then((v) => again = v),
@@ -173,7 +192,7 @@ void main() {
       unawaited(
         waitMatch(
           p,
-          RegExp('go'),
+          InlineScanner(RegExp('go')),
           fromNow: true,
           timeout: const Duration(seconds: 5),
         ).then((v) => r = v),
@@ -186,6 +205,54 @@ void main() {
       expect(r, isNull);
       async.elapse(const Duration(milliseconds: 20));
       expect(r!['match'], 'go');
+    });
+  });
+
+  test('M2: begun on the alt screen, --from-now never matches what the '
+      'main buffer held before', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..print('old-token\r\n\x1b[?1049hvim');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('old-token')),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      p.print('\x1b[?1049lnew\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, isNull);
+      p.print('old-token again\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, {'match': 'old-token', 'line': 'old-token again'});
+    });
+  });
+
+  test('M7: no output since the last look, no new look', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      final scans = <String>[];
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('never'), seen: scans),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).catchError((Object _) => <String, Object?>{}),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      for (var i = 0; i < 5; i++) {
+        p.ch.add(null); // a change elsewhere in the tab list
+        async.elapse(const Duration(milliseconds: 150));
+      }
+      expect(scans, hasLength(1));
+      p.print('\x1b[31mred\x1b[0m\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(scans, hasLength(2));
+      expect(scans.last, 'red');
     });
   });
 
@@ -219,7 +286,7 @@ void main() {
       unawaited(
         waitMatch(
           p,
-          RegExp('never'),
+          InlineScanner(RegExp('never')),
           fromNow: false,
           timeout: const Duration(seconds: 5),
         ).catchError((Object e) {

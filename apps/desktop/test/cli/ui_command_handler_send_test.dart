@@ -184,6 +184,34 @@ void main() {
       );
     });
 
+    test('M1: a catastrophic pattern never freezes the window; the wait '
+        'fails fast with "pattern is too slow"', () async {
+      local.views[100]!.emit('${'a' * 34}b\r\n');
+      await pumpFeed();
+      var ticks = 0;
+      final tick = Timer.periodic(
+        const Duration(milliseconds: 20),
+        (_) => ticks++,
+      );
+      addTearDown(tick.cancel);
+      final watch = Stopwatch()..start();
+      await expectLater(
+        call('ui.pane.wait', {
+          'pane': 100,
+          'mode': 'match',
+          'pattern': r'(a+)+$',
+          'timeoutMs': 60000,
+        }),
+        throwsA(
+          isA<CliFailure>()
+              .having((e) => e.code, 'code', 'bad_request')
+              .having((e) => e.message, 'message', 'pattern is too slow'),
+        ),
+      );
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      expect(ticks, greaterThan(20)); // the UI isolate kept running
+    });
+
     test('M3: a client that leaves ends its wait with cancelled', () async {
       final left = Completer<void>();
       final r = h.handle(
