@@ -85,4 +85,15 @@ void main() {
     expect(c.read(terminalTabsProvider).selectedId, before);
     expect(c.read(terminalFocusRequestProvider), 0);
   });
+
+  test('A7 review M5: a command-line notification raises the window and '
+      'reads the command-line entries', () {
+    final before = c.read(terminalTabsProvider).selectedId;
+    final raise = c.read(windowRouterProvider).raise;
+    c.read(tabAttentionProvider.notifier).addCommandLine(body: 'cron');
+    open(kCommandLineTabId);
+    expect(c.read(windowRouterProvider).raise, raise + 1);
+    expect(c.read(terminalTabsProvider).selectedId, before);
+    expect(c.read(tabAttentionProvider).history.first.read, isTrue);
+  });
 }

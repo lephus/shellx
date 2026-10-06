@@ -461,12 +461,53 @@ void main() {
     expect(state().history.single.read, isTrue);
   });
 
-  test('A7 D23: command-line entries count toward the 50-entry history', () {
+  test('A7 review I1: at most 10 command-line entries; they never push tab '
+      'entries out', () async {
     boot();
+    for (var i = 0; i < 45; i++) {
+      local.notice(2, SessionNoticeKind.message, body: 't$i');
+    }
+    await settle();
     for (var i = 0; i < 60; i++) {
       attention().addCommandLine(body: '$i');
     }
-    expect(state().history, hasLength(TabAttention.historyLimit));
-    expect(state().history.first.notice.body, '59');
+    List<AttentionEntry> cli() => [
+      for (final e in state().history)
+        if (e.tabId == kCommandLineTabId) e,
+    ];
+    List<AttentionEntry> tab() => [
+      for (final e in state().history)
+        if (e.tabId != kCommandLineTabId) e,
+    ];
+    expect(cli().map((e) => e.notice.body), [
+      for (var i = 59; i >= 50; i--) '$i',
+    ]);
+    expect(tab(), hasLength(45));
+    expect(tab().last.notice.body, 't0');
+    // Tab notices keep their own 50.
+    for (var i = 45; i < 60; i++) {
+      local.notice(2, SessionNoticeKind.message, body: 't$i');
+    }
+    await settle();
+    expect(tab(), hasLength(TabAttention.historyLimit));
+    expect(tab().first.notice.body, 't59');
+    expect(cli(), hasLength(10));
+  });
+
+  test('A7 review M4: reading command-line entries announces tab 0 as read '
+      '(its system notification goes)', () {
+    boot();
+    final reads = <int>[];
+    attention().reads.listen(reads.add);
+    attention().markRead(kCommandLineTabId); // nothing unread
+    expect(reads, isEmpty);
+    attention().addCommandLine(body: 'a');
+    attention().markRead(kCommandLineTabId);
+    expect(reads, [kCommandLineTabId]);
+    attention().addCommandLine(body: 'b');
+    attention().markAllRead();
+    expect(reads, [kCommandLineTabId, kCommandLineTabId]);
+    attention().markAllRead();
+    expect(reads, hasLength(2));
   });
 }

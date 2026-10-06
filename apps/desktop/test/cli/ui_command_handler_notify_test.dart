@@ -86,6 +86,9 @@ void main() {
     }
     // One post, then the 3 s burst; never one per call.
     expect(systemNotificationsSent(c), hasLength(1));
-    expect(c.read(tabAttentionProvider).history, hasLength(30));
+    // The panel keeps the newest 10 (A7 Task 8 review I1).
+    expect(c.read(tabAttentionProvider).history.map((e) => e.notice.body), [
+      for (var i = 29; i >= 20; i--) 'n$i',
+    ]);
   });
 }

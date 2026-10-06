@@ -244,6 +244,10 @@ AttentionListener listenAttention(
 /// window only; the agent just reports notices.
 class TabAttention extends Notifier<AttentionState> {
   static const int historyLimit = 50;
+
+  /// A7 D23: command-line entries kept, apart from the tabs' [historyLimit]
+  /// (a `shellx notify` flood never pushes a tab's entry out).
+  static const int commandLineLimit = 10;
   static const Duration dwell = Duration(seconds: 1);
 
   final _arrivals = StreamController<AttentionArrival>.broadcast(sync: true);
@@ -336,7 +340,7 @@ class TabAttention extends Notifier<AttentionState> {
     );
     state = AttentionState(
       unread: state.unread,
-      history: [
+      history: _capped([
         AttentionEntry(
           seq: _seq++,
           tabId: kCommandLineTabId,
@@ -346,8 +350,8 @@ class TabAttention extends Notifier<AttentionState> {
           notice: notice,
           at: notice.at,
         ),
-        ...state.history.take(historyLimit - 1),
-      ],
+        ...state.history,
+      ]),
     );
     _arrivals.add(
       AttentionArrival(
@@ -365,6 +369,11 @@ class TabAttention extends Notifier<AttentionState> {
     final had = [
       for (final id in state.unread.keys)
         if (tabIds.contains(id)) id,
+      // A7 D23: command-line entries have no unread count; their system
+      // notification goes too.
+      if (tabIds.contains(kCommandLineTabId) &&
+          state.history.any((e) => !e.read && e.tabId == kCommandLineTabId))
+        kCommandLineTabId,
     ];
     final stale = state.history.any((e) => !e.read && tabIds.contains(e.tabId));
     final dwelling = _dwellFor;
@@ -486,7 +495,7 @@ class TabAttention extends Notifier<AttentionState> {
         ...history.skip(1),
       ];
     }
-    return [
+    return _capped([
       AttentionEntry(
         seq: _seq++,
         tabId: tab.id,
@@ -497,7 +506,22 @@ class TabAttention extends Notifier<AttentionState> {
         at: at,
         read: read,
       ),
-      ...history.take(historyLimit - 1),
+      ...history,
+    ]);
+  }
+
+  /// Newest first: the newest [historyLimit] tab entries and the newest
+  /// [commandLineLimit] command-line ones (A7 D23); neither pushes the
+  /// other out.
+  static List<AttentionEntry> _capped(List<AttentionEntry> history) {
+    var tabs = 0;
+    var commandLine = 0;
+    return [
+      for (final e in history)
+        if (e.tabId == kCommandLineTabId
+            ? ++commandLine <= commandLineLimit
+            : ++tabs <= historyLimit)
+          e,
     ];
   }
 

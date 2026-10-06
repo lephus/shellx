@@ -467,6 +467,18 @@ void main() {
       n.dispose();
     });
 
+    test('A7 review M4: reading the command-line entries removes their '
+        'system notification and pending burst', () async {
+      setActive(false);
+      final a = c.read(tabAttentionProvider.notifier);
+      a.addCommandLine(body: 'x');
+      await pumpEventQueue();
+      a.markAllRead();
+      await pumpEventQueue();
+      expect(notifier.closed, [DesktopNotifications.idFor(kCommandLineTabId)]);
+      n.dispose();
+    });
+
     test('A7 D23: the "Command line" title when none was given', () async {
       setActive(false);
       c.read(tabAttentionProvider.notifier).addCommandLine(body: 'x');
