@@ -335,6 +335,12 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     _save();
   }
 
+  /// A4 D13/D16: the workspace holding [tabId] is expanded.
+  void reveal(int tabId) {
+    final id = state.workspaceOf(tabId);
+    if (id != null) setCollapsed(id, false);
+  }
+
   /// D16: no confirmation; the tabs go to the end of Default, which
   /// expands; a neutral toast says so. Default itself stays (D11).
   void delete(String id) {
