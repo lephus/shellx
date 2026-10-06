@@ -640,10 +640,21 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// attached, the desktop drives. Throws [SessionLimitException] or
   /// [SpawnFailedException].
   @override
-  Future<int> open({required int cols, required int rows, String? cwd}) async {
+  Future<int> open({
+    required int cols,
+    required int rows,
+    String? cwd,
+    int? tabId,
+  }) async {
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
-    final session = await _spawn(c, r, origin: SessionOrigin.desktop, cwd: cwd);
+    final session = await _spawn(
+      c,
+      r,
+      origin: SessionOrigin.desktop,
+      cwd: cwd,
+      tabId: tabId,
+    );
     if (session == null) {
       throw const SpawnFailedException('ShellX is closing every session');
     }
@@ -651,6 +662,19 @@ final class SessionManager implements AgentSessions, LocalSessions {
     session.localRows = r;
     _changes.add(null);
     return session.id;
+  }
+
+  @override
+  bool notify(int id, {String? title, required String body}) {
+    final session = _sessions[id];
+    if (session == null || session.closing || session.exited) return false;
+    // The push goes out only when the A4 limiter admits the notice, so a
+    // flood cannot spam the phone (stricter than OSC 777, which pushes
+    // independently of the limiter).
+    if (_notice(session, SessionNoticeKind.message, title: title, body: body)) {
+      session.notifier?.message(title: title, body: body);
+    }
+    return true;
   }
 
   Future<void> _open(String mobileId, int cols, int rows) async {
@@ -698,6 +722,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     int rows, {
     required SessionOrigin origin,
     String? cwd,
+    int? tabId,
   }) async {
     if (_sessions.length + _pendingOpens >= _maxSessions) {
       throw SessionLimitException(_maxSessions);
@@ -705,12 +730,15 @@ final class SessionManager implements AgentSessions, LocalSessions {
     final epoch = _epoch;
     final closeAllEpoch = _closeAllEpoch;
     _pendingOpens++;
+    // A7 D29: the id is known before the shell starts so it can be in its
+    // environment. Ids are never reused, so a failed spawn only skips one.
+    final id = _nextId();
     final ShellCommand command;
     final Pty pty;
     try {
       command = await _shellResolver.resolve();
       final workingDirectory = await _workingDirectoryFor(cwd);
-      final launch = _launch(command);
+      final launch = _launch(command, paneId: id, tabId: tabId ?? id);
       pty = _ptyFactory.spawn(
         launch.command,
         workingDirectory: workingDirectory,
@@ -730,7 +758,6 @@ final class SessionManager implements AgentSessions, LocalSessions {
       pty.kill();
       return null;
     }
-    final id = _nextId();
     final session = _Session(
       id: id,
       index: _lowestFreeIndex(),
@@ -788,8 +815,16 @@ final class SessionManager implements AgentSessions, LocalSessions {
     return path.startsWith('/');
   }
 
-  ShellLaunch _launch(ShellCommand command) {
-    final environment = buildSessionEnvironment(_baseEnvironment);
+  ShellLaunch _launch(
+    ShellCommand command, {
+    required int paneId,
+    required int tabId,
+  }) {
+    final environment = buildSessionEnvironment(
+      _baseEnvironment,
+      paneId: paneId,
+      tabId: tabId,
+    );
     final integration = _shellIntegration;
     if (integration == null) return ShellLaunch(command, environment);
     try {
@@ -992,20 +1027,20 @@ final class SessionManager implements AgentSessions, LocalSessions {
 
   /// A4 D4: live output only (`_track` never sees a replay); a session
   /// being closed says nothing more. Never the text in the log (N9).
-  void _notice(
+  bool _notice(
     _Session session,
     SessionNoticeKind kind, {
     String? title,
     String? body,
     CompletedCommand? command,
   }) {
-    if (session.closing || session.exited) return;
+    if (session.closing || session.exited) return false;
     final now = _clock();
     final allowed = session.noticeLimit.allow(kind, now);
     for (final count in session.noticeLimit.takeLogReports()) {
       _log?.call('session notices dropped: $count');
     }
-    if (!allowed) return;
+    if (!allowed) return false;
     _notices.add(
       SessionNotice(
         sessionId: session.id,
@@ -1016,6 +1051,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
         command: command,
       ),
     );
+    return true;
   }
 
   /// A2 C1/D2. True when the summary changed.

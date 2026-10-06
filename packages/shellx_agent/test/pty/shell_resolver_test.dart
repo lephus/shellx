@@ -34,6 +34,20 @@ void main() {
       );
     });
 
+    test('pane and tab ids (A7 D29)', () {
+      final env = buildSessionEnvironment(
+        {'PATH': '/bin'},
+        paneId: 41,
+        tabId: 7,
+      );
+      expect(env['SHELLX'], '1');
+      expect(env['SHELLX_PANE_ID'], '41');
+      expect(env['SHELLX_TAB_ID'], '7');
+      final none = buildSessionEnvironment({'PATH': '/bin'});
+      expect(none.containsKey('SHELLX_PANE_ID'), isFalse);
+      expect(none.containsKey('SHELLX_TAB_ID'), isFalse);
+    });
+
     test('does not modify the base map', () {
       final base = {'PATH': '/bin'};
       buildSessionEnvironment(base);

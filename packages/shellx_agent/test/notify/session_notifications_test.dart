@@ -78,6 +78,16 @@ void main() {
       return sent.map((o) => o.message).whereType<SessionOpened>().last.id;
     }
 
+    test('LocalSessions.notify pushes exactly like OSC 777 (A7 D23)', () async {
+      final id = await open();
+      expect(manager.notify(id, title: 'CI', body: 'Build xong'), isTrue);
+      await push.notifications.sender.idle;
+      expect(push.bodies.single['title'], 'CI');
+      expect(push.bodies.single['body'], 'Build xong');
+      expect((push.bodies.single['data'] as Map)['kind'], 'message');
+      expect((push.bodies.single['data'] as Map)['session_id'], '$id');
+    });
+
     test('a long command in the live output becomes a notification; the '
         'bytes still reach the phone unchanged', () async {
       final id = await open();

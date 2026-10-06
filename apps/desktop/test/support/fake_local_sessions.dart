@@ -38,6 +38,12 @@ final class FakeLocalSessions implements LocalSessions {
 
   /// The `cwd` of each [open] call, in order (null when none was given).
   final openCwds = <String?>[];
+
+  /// The `tabId` of each [open] call (A7 D29).
+  final openTabIds = <int?>[];
+
+  /// Every [notify] call: (id, title, body).
+  final notified = <(int, String?, String)>[];
   final closed = <int>[];
   int nextId = 100;
 
@@ -67,9 +73,15 @@ final class FakeLocalSessions implements LocalSessions {
   Stream<void> get changes => _changes.stream;
 
   @override
-  Future<int> open({required int cols, required int rows, String? cwd}) async {
+  Future<int> open({
+    required int cols,
+    required int rows,
+    String? cwd,
+    int? tabId,
+  }) async {
     opens.add((cols, rows));
     openCwds.add(cwd);
+    openTabIds.add(tabId);
     await openGate?.future;
     final error = openError;
     if (error != null) throw error;
@@ -84,6 +96,14 @@ final class FakeLocalSessions implements LocalSessions {
     );
     afterOpen?.call(id);
     return id;
+  }
+
+  @override
+  bool notify(int id, {String? title, required String body}) {
+    notified.add((id, title, body));
+    if (!summaries.any((s) => s.id == id)) return false;
+    notice(id, SessionNoticeKind.message, title: title, body: body);
+    return true;
   }
 
   SessionSummary summary(
