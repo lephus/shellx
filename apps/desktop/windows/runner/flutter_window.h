@@ -2,9 +2,13 @@
 #define RUNNER_FLUTTER_WINDOW_H_
 
 #include <flutter/dart_project.h>
+#include <flutter/encodable_value.h>
 #include <flutter/flutter_view_controller.h>
+#include <flutter/method_channel.h>
+#include <shobjidl.h>
 
 #include <memory>
+#include <string>
 
 #include "win32_window.h"
 
@@ -28,6 +32,23 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // A4 D19: taskbar overlay dot + flash (pro.shellx.desktop/taskbar).
+  void HandleTaskbar(
+      const flutter::MethodCall<flutter::EncodableValue>& call,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+  // Sets the overlay for the last count Dart sent. Fails while the window
+  // has no taskbar button (hidden in the tray); "TaskbarButtonCreated"
+  // calls it again when the button comes back.
+  HRESULT ApplyOverlay();
+  HICON UnreadIcon();
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      taskbar_channel_;
+  ITaskbarList3* taskbar_ = nullptr;
+  HICON unread_icon_ = nullptr;
+  UINT taskbar_button_created_ = 0;
+  int unread_count_ = 0;
+  std::wstring unread_description_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_
