@@ -727,7 +727,8 @@ fn zsh_script() -> String {
 _shellx_ids() {{
   local -a shellx_ids
   shellx_ids=("${{(@f)$(shellx ls --ids 2>/dev/null)}}")
-  compadd -- "${{shellx_ids[@]}}"
+  shellx_ids=("${{(@)shellx_ids:#}}")
+  if (( ${{#shellx_ids}} )); then compadd -- "${{shellx_ids[@]}}"; fi
 }}
 _shellx() {{
   local -a _shellx_subs

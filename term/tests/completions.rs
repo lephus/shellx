@@ -122,3 +122,43 @@ fn zsh_completion_keeps_path_and_never_evaluates_ids() {
     assert!(out.contains("ADD -- p1 p2 $(touch "), "{out}");
     assert!(!d.join("PWNED").exists() && !d.join("PWNED2").exists());
 }
+
+/// A temp dir with a fake `shellx` that prints [ids] verbatim.
+fn fake_ids(name: &str, ids: &str) -> PathBuf {
+    let d = std::env::temp_dir().join(format!("shellx-compl-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    let bin = d.join("shellx");
+    std::fs::write(&bin, format!("#!/bin/sh\nprintf '{ids}'\n")).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+    d
+}
+
+#[test]
+fn zsh_id_completion_skips_empty_ids() {
+    if !have("zsh") {
+        return;
+    }
+    let stubs = "compdef(){ :; }; compadd(){ print -r -- \"ADD [$#] $*\"; }; ";
+    // No host (empty output): no candidate at all, not one empty id.
+    let d = fake_ids("zsh-empty", "");
+    let s = d.join("_shellx");
+    std::fs::write(&s, script("zsh")).unwrap();
+    let out = run(
+        "zsh",
+        &d,
+        &format!(r#"{stubs} source {}; _shellx_ids; print END"#, s.display()),
+    );
+    assert_eq!(out, "END\n", "{out}");
+    // Blank lines between ids are dropped.
+    let d = fake_ids("zsh-blank", "\\np1\\n\\np2\\n\\n");
+    let s = d.join("_shellx");
+    std::fs::write(&s, script("zsh")).unwrap();
+    let out = run(
+        "zsh",
+        &d,
+        &format!(r#"{stubs} source {}; _shellx_ids; print END"#, s.display()),
+    );
+    assert_eq!(out, "ADD [3] -- p1 p2\nEND\n", "{out}");
+}
