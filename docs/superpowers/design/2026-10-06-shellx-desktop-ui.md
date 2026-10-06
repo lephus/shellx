@@ -19,8 +19,8 @@ Contrast measured with WCAG 2.x formula against the surface the token is used on
 | `bgTerminal` | `#0B1215` | `--t-bg` | terminal pane, pane header (macOS) | — |
 | `bgSidebar` | `#111B1E` | `--t-chrome` | sidebar, Windows header row | — |
 | `rowHover` | `#172427` | new | sidebar row hover, icon button hover | — |
-| `rowSelected` | `#1A272B` | `--t-chrome2` | selected row, tooltip bg, neutral toast | — |
-| `rowPressed` | `#203034` | new | pressed row/button | — |
+| `rowSelected` | `#1F2F34` | `--t-chrome2`, lightened (final wave S-7) | selected row, tooltip bg, neutral toast | 1.26 vs sidebar (was 1.14) |
+| `rowPressed` | `#26393E` | new (raised with `rowSelected`, so hover < selected < pressed) | pressed row/button, row × hover | — |
 | `line` | `#243337` | `--t-line` | sidebar/pane divider (1 px), menu separators | — |
 | `surface` | `#172023` | `--a-surface` dark | dialogs, context menu | — |
 | `surfaceInset` | `#0D1315` | `--a-bg` dark | text-field fill | — |
@@ -57,7 +57,7 @@ Terminal ANSI palette: reuse `TerminalColors.theme` from mobile **verbatim** (co
 
 ### 1.3 Typography
 
-UI font: **platform default** — do not set `fontFamily` in `ThemeData` (Flutter resolves to SF Pro on macOS, Segoe UI on Windows). Terminal and code: **JetBrains Mono** (bundle `JetBrainsMono-{Regular,Bold,Italic,BoldItalic}.ttf` from `apps/mobile/assets/fonts/`, SIL OFL; add to `pubspec.yaml` `fonts:`).
+UI font: **platform default** — do not set `fontFamily` in `ThemeData` (Flutter resolves to SF Pro on macOS, Segoe UI on Windows). Styles that replace the ambient text style (button labels, tooltips, text fields, the dialog text theme) copy the theme's platform family explicitly (`uiFont`, final wave P-4), so they never fall back to the engine default. Terminal and code: **JetBrains Mono** (bundle `JetBrainsMono-{Regular,Bold,Italic,BoldItalic}.ttf` from `apps/mobile/assets/fonts/`, SIL OFL; add to `pubspec.yaml` `fonts:`).
 
 | Style | Size / line height | Weight | Use |
 |---|---|---|---|
@@ -127,20 +127,21 @@ x=0                 220 221                                                  W
 **Tab row anatomy (A1, single line; reserved slots shown in brackets):**
 
 ```
-|6|8 |—8—|  title (flex, 1 line, ellipsis)  |4|📱|4|👁|  [badge A4]  |8|
-     dot                                       14    14   reserved 0 px in A1
+|6|8 |—8—|  title (flex, 1 line, ellipsis)  |4|📱|4|👁|4|×|  [badge A4]  |8|
+     dot                                       14    14  20   reserved 0 px in A1
      [A4 ring: 2 px accent outline on the whole row, inset 0]
      [A2 context line: second line, caption 11/14, textSecondary, "main · ~/work · :3000" → row 46 px]
 ```
 
-- Left padding 8, status dot slot 16 (dot 8 centred), title `body`, trailing marks 14 px icons with 4 px gap, right padding 8.
+- Left padding 8, status dot slot 16 (dot 8 centred), title `body`, trailing marks 14 px icons with 4 px gap, then the close button, right padding 8.
+- **Close button (final wave, ruling I6):** `Icons.close` 14 in a 20×20 visual (`r4`) inside a 24×24 hit area; shown on hover and on the selected row; its slot is always reserved so a title never re-truncates on hover. Hover: `rowPressed` fill, glyph `textSecondary` → `textPrimary`. Tooltip "Đóng tab  ⌘W" / "Close tab  Ctrl+Shift+W" (`terminalCloseTabTooltip`). Same rules as ⌘W (D15 confirm while a command runs). Not a tab stop and not in semantics (the list is one tab stop; the row's "Đóng tab" custom action and ⌘W cover keyboard and screen readers).
 - Marks in fixed order: phone-origin then phone-viewing. Marks never truncate; the title truncates.
 - A2 will add the second line by making the row height 46 and the title line `bodyStrong`; build the row as a `Column` with an optional second child now so A2 is additive.
 
 ### 2.3 Terminal pane
 
 - `TerminalView` fills the pane under the pane header (macOS) or from the top (Windows); padding `EdgeInsets.fromLTRB(10, 6, 10, 6)` inside `bgTerminal`. Overlay scrollbar same spec as the sidebar (xterm scrollback).
-- Overlays (never change terminal size): **driver pill** (top centre), **toast** (bottom centre). Layout rows (change size, acceptable because they are rare and appear before phones attach): **signed-out strip** (top of pane).
+- Overlays (never change terminal size): **driver pill** (top right, §2.5), **toast** (bottom centre). The terminal is clipped to its area (a buffer scrolled by part of a row never paints over the strip or the pane header). A narrower window drops blank rows under the cursor before pushing lines into the scrollback (xterm's reflow keeps them otherwise), so the prompt stays on screen. Layout rows (change size, acceptable because they are rare and appear before phones attach): **signed-out strip** (top of pane).
 - Inactive tabs stay mounted offstage (`IndexedStack` or `Offstage`) so output keeps writing (spec §5).
 
 ### 2.4 Signed-out strip (D11)
@@ -149,7 +150,7 @@ Top of the terminal pane (under the macOS pane header), full pane width, height 
 
 ### 2.5 Driver pill (D6)
 
-When the selected session's driver is `phone`: floating pill, top centre of the pane, 8 px below the pane header/strip, height 28, padding 0/12, `rPill`, bg `warnBg`, 1 px `warnBorder`, `e1`. Content: `Icons.smartphone` 14 `warn`, 6 gap, text `body` `warn` "Điện thoại đang dùng terminal này — gõ để dùng lại", max-width `min(560, pane − 32)`, ellipsis. **Not interactive** (`IgnorePointer`), so clicks reach the terminal; any key or resize in the window makes the desktop driver and the pill fades out (`exit`). Live region: announced once on appear.
+When the selected session's driver is `phone`: floating pill, **top right** of the pane, 8 px below the pane header/strip and 12 px from the right edge (final wave S-2: the centre sat on the most-read rows). While the cursor is on the rows that corner covers (a fresh prompt on row 1), the pill moves to the **bottom right** (8/12 px), so it never hides the line being typed; it stays top right while a toast owns the bottom. Height 28 (min), padding 5/12, `rPill`, bg `warnBg`, 1 px `warnBorder`, `e1`. Content: `kPhoneIcon` (`Icons.phone_iphone_outlined`) 14 `warn`, 6 gap, text `body` `warn` "Điện thoại đang dùng terminal này — gõ để dùng lại", max-width `min(560, pane − 24)`, ellipsis. Pane narrower than 520 (final wave S-1): the short copy `terminalDriverPhoneShort` "Điện thoại đang dùng — gõ để dùng lại" / "Phone in control — type to take over", wrapping to a second line (the pill grows) rather than cutting the instruction. **Not interactive** (`IgnorePointer`), so clicks reach the terminal; any key or resize in the window makes the desktop driver and the pill fades out (`exit`). Live region: announced once on appear.
 
 ### 2.6 Exit state (D14)
 
@@ -178,23 +179,25 @@ States use these fills unless stated: hover `rowHover` (`fast`), pressed `rowPre
 | State | Visual |
 |---|---|
 | Default | transparent, title `body` `textPrimary` |
-| Hover | `rowHover`; tooltip with full title after 500 ms if truncated |
-| Selected | `rowSelected`, title `bodyStrong` `textTitle`, 2 px × 16 px `accent` bar at the row's left edge, vertically centred, `r4` ends |
+| Hover | `rowHover`; × close button shown; tooltip with full title after 500 ms if truncated, placed **beside the sidebar** (x = 226, centred on the row, max-width 360) so it never covers the next row |
+| Selected | `rowSelected`, title `bodyStrong` `textTitle`, 3 px × 18 px `accent` bar at the row's left edge, vertically centred, `r4` ends; × close button shown |
 | Selected + hover | `rowSelected` (no change) |
 | Pressed | `rowPressed` |
-| Focused (keyboard) | focus ring; may combine with selected |
+| Focused (keyboard) | focus ring; may combine with selected (the selected bar then moves 1 px inside the 2 px ring, so both show) |
 | Exited (non-zero) | hollow red dot, title `textSecondary` |
 | Disabled | n/a |
 
-**Status dot (8 px):** idle = filled `ok`; running a command (`runningCommand`) = filled `accent`; exited non-zero = 1.5 px `err` ring, transparent centre. Shape + colour + Semantics, never colour alone.
+**Status dot (8 px):** idle = filled `ok`; running a command (`runningCommand`) = 1.5 px `accent` ring with a 4 px filled `accent` centre (a target; final wave S-3 — `ok` vs `accent` is 1.02:1, so the shapes must differ); exited non-zero = 1.5 px `err` ring, transparent centre. Shape + colour + Semantics, never colour alone.
 
 **Marks (14 px, `Icons.*_outlined`, monochrome — not emoji, so both OSes match):**
-- Phone origin (`origin == phone`): `Icons.smartphone`, `textSecondary`. Tooltip "Mở từ điện thoại".
+- Phone origin (`origin == phone`): `Icons.phone_iphone_outlined` (final wave P-1: notch and home bar read as a phone at 14 px; `smartphone` read as an empty rectangle), `textSecondary`. Tooltip "Mở từ điện thoại".
 - Phone viewing (`phoneAttached`): `Icons.visibility`, `accent`; when the phone is also the driver: `warn` colour. Tooltip "Điện thoại đang xem" / "Điện thoại đang dùng".
 
 **Interaction:** click = select + focus terminal. Middle-click = close (same rules as ⌘W). Secondary click / `Shift+F10` / Menu key = context menu. New phone-origin tabs are appended and not selected (spec).
 
-**Context menu:** `e1`, `surface`, `r8`, padding 4, min-width 180; item height 28, padding 0/10, `body`, hover `rowSelected` `r6`; shortcut hint right-aligned `caption` `textSecondary`. A1 items: **"Đóng tab"** (`⌘W` / `Ctrl+Shift+W`). Esc closes the menu; ↑/↓ + Enter operate it.
+**Context menu:** `e1`, `surface`, `r8`, padding 4, min-width 180; item height 28, padding 0/10, `body`, hover `rowSelected` `r6`; shortcut hint right-aligned `caption` `textSecondary`; a disabled item stays in place at 38 %. Tab row items: **"Đóng tab"** (`⌘W` / `Ctrl+Shift+W`). Esc closes the menu; ↑/↓ + Enter operate it.
+
+**Terminal context menu (final wave, ruling I6):** secondary click in the terminal opens the same menu with **"Sao chép" / "Copy"** (`⌘C` / `Ctrl+Shift+C`, disabled without a selection), **"Dán" / "Paste"** (`⌘V` / `Ctrl+Shift+V`), **"Chọn tất cả" / "Select all"** (`⌘A` / `Ctrl+Shift+A`; the whole buffer, scrollback included, like Terminal.app, iTerm2 and Windows Terminal). They run the window's own shortcut actions. When the program has taken the mouse (vim, htop with mouse mode) the click goes to the program instead, as in other terminals. The keyboard returns to the terminal afterwards.
 
 **Close with running command (D15):** confirm dialog (§4) before closing; otherwise close immediately.
 
@@ -209,12 +212,13 @@ Height 32, min-width 80, padding 0/14, `r6`, label `bodyStrong`.
 - **Secondary:** transparent, 1 px `borderInput`, `textPrimary`; hover `rowHover`.
 - **Destructive:** `errDialog` / `onErr`; hover `#F4848A`.
 - **Text:** `accent`, no fill; hover `rowHover`.
+- Focus (keyboard): the 2 px `accent` ring inside the radius, except on **filled** buttons (primary, destructive), where it is drawn **outside** the button with a 2 px gap (final wave S-9: `accent` on `primary` is 1.27:1; outside it is ≥ 9:1 on `surface` / `bgTerminal`).
 - Disabled: 38 % opacity. Loading: label stays, 14 px spinner replaces leading space; width does not change.
 - Default button (Enter) = primary; Esc = cancel.
 
 ### 3.4 Text field
 
-Height 36, `surfaceInset`, 1 px `borderInput`, `r6`, padding 0/10, value `dialogBody` `textTitle`, placeholder `textPlaceholder`. Focus: 1 px `accent` + 3 px `primarySoft` halo. Error: 1 px `errDialog`, helper text `small` `errDialog` 4 px below. Label `label` `textDialog2` 6 px above. Password fields keep the existing show/hide behaviour.
+Height 36 (padding 8/10 around the 20 px `dialogBody` line, `isDense`), `surfaceInset`, 1 px `borderInput`, `r6`, value `dialogBody` `textTitle`, placeholder `textPlaceholder`. Focus: 1 px `accent` + 3 px `primarySoft` halo. Error: 1 px `errDialog`, helper text `small` `errDialog` 4 px below. Label `label` `textDialog2` 6 px above (`LabeledField`, merged with the field for screen readers; never a floating label inside the outline). Fields 16 apart. Password fields keep the existing show/hide behaviour. The `+3 px primarySoft` focus halo is not built in A1 (the 1 px accent outline is the focus cue).
 
 ### 3.5 Tooltip
 
@@ -222,9 +226,9 @@ Height 36, `surfaceInset`, 1 px `borderInput`, `r6`, padding 0/10, value `dialog
 
 ### 3.6 Keyboard focus order and regions
 
-Regions cycle with **F6** (forward) / **Shift+F6** (back), on both OSes, because Tab belongs to the shell inside the terminal:
+Regions cycle with **Ctrl+F6** (forward) / **Ctrl+Shift+F6** (back) from the terminal, on both OSes, because Tab belongs to the shell inside the terminal; plain **F6** / **Shift+F6** also cycle when the focus is outside the terminal. Inside the terminal plain F6 reaches the program (htop sorts, mc moves) — controller ruling, final wave I7:
 1. Terminal (initial focus; regained after any dialog/menu closes and after selecting a tab).
-2. Sidebar: `+` button → tab list (one tab stop, roving focus: ↑/↓ move, Home/End, Enter/Space select + focus terminal, Shift+F10 menu). Tab/Shift+Tab move between `+` and the list. Esc returns to the terminal.
+2. Sidebar: `+` button → tab list (one tab stop: ↑/↓ and Home/End **select** the tab at once — the terminal on the right follows while the keyboard stays in the list, like the tab lists of most terminals; Enter/Space/Esc give the keyboard back to the terminal; Shift+F10 / Menu key open the row menu). Final wave S-6 ruling: the doc follows the code, no separate roving highlight. Tab/Shift+Tab move between `+` and the list. Esc returns to the terminal.
 3. Signed-out strip button (only when visible).
 Global shortcuts (spec criterion 2) work from every region. In dialogs: normal Tab order, top to bottom, actions last (primary last on macOS, first on Windows — matches visual order).
 
@@ -246,12 +250,13 @@ Global shortcuts (spec criterion 2) work from every region. In dialogs: normal T
 | Login / register | 400 | email, password, [confirm], error, primary, switch link, forgot hint |
 | Onboarding | 480 | three sections + finish (scroll if needed) |
 | Pairing | 400 | instructions, QR tile 216×216 (`#FFFFFF`, padding 12, `r8` — QR needs a light quiet zone), countdown `small`, warnings |
-| Change password | 400 | two fields, note, primary / done |
+| Change password | 400 | note, two fields, `[Hủy] [Primary]` (macOS) / `[Primary] [Hủy]` (Windows); done: message + Close |
 | Confirm (short) | 400 | title + body |
 | Confirm (long, `confirm.long`) | 520, max-height 80 % window, body scrolls | |
 
 - Container: `surface`, `r12`, `e2`, padding 24, over `scrim`. Spacing: title → 8 → body/fields (fields 16 apart) → 24 → actions.
-- Header: `dialogTitle` `textTitle`, left-aligned. **macOS:** no close button (Esc / Cancel). **Windows:** 28×28 close icon button top-right (inset 12), tooltip "Đóng".
+- **Height follows the content** (final wave M-2): only the width is fixed; max height = window − 48 (long confirm: 80 % of the window). When the content is taller, the body scrolls with its scrollbar shown while the title stays and the actions (confirm, change password, onboarding) stay **pinned** under a 1 px `line` (shown only while the body overflows), so the primary action is always on screen even at 640×400. No `Spacer`s.
+- Header: `dialogTitle` `textTitle`, left-aligned. **macOS:** no close button (Esc / Cancel). **Windows:** 28×28 close icon button right inset 12, vertically centred on the 22 px title line (top = 24 + (22 − 28) / 2 = 21, final wave P-3), tooltip "Đóng"; the title keeps 44 px clear of it.
 - Actions row, right-aligned, 8 px gap. **macOS:** `[Hủy] [Primary]` (primary rightmost, default). **Windows:** `[Primary] [Hủy]`. Destructive confirms use the destructive style for the action and initial focus on Cancel. Form dialogs without Cancel (login when forced) show only primary.
 - Esc = cancel/close (current `CallbackShortcuts` moves into each dialog). Enter submits forms.
 - Scrim click: closes informational dialogs (pairing, change-password done); ignored for forms and confirms.
@@ -292,6 +297,12 @@ Tone (same as mobile): plain, short, second person, no blame, verbs on actions, 
 | `sidebarPhoneDriving` | Điện thoại đang dùng | Your phone is using it |
 | `sidebarPosition` | tab {index} trên {count} | tab {index} of {count} |
 | `terminalPaneLabel` | Terminal {title} | Terminal {title} |
+| `terminalCloseTabTooltip` | Đóng tab  {shortcut} | Close tab  {shortcut} |
+| `terminalDriverPhoneShort` | Điện thoại đang dùng — gõ để dùng lại | Phone in control — type to take over |
+| `terminalCopy` / `terminalPaste` / `terminalSelectAll` | Sao chép / Dán / Chọn tất cả | Copy / Paste / Select all |
+| `confirmCloseAllTitle` | Đóng tất cả {count} tab? | Close all {count} tabs? (1: Close 1 tab?) |
+| `confirmCloseAllBody` | Mọi shell trong các tab này sẽ bị dừng, kể cả lệnh đang chạy. | Every shell in these tabs will be stopped, with any command still running. |
+| `confirmCloseAllAction` | Đóng tất cả | Close all |
 
 Semantics use the lower-case variants of origin/viewing ("mở từ điện thoại"; en "opened from your phone") — add `…Semantics` keys if the translator needs separate casing.
 
@@ -301,9 +312,11 @@ Semantics use the lower-case variants of origin/viewing ("mở từ điện tho�
 |---|---|---|
 | `confirmSignOutBody` | Điện thoại đang kết nối sẽ bị ngắt và mọi điện thoại đã ghép sẽ bị gỡ. Các tab terminal trên máy này vẫn chạy. Sau khi đăng nhập lại, bạn phải ghép nối lại điện thoại. | Connected phones will be disconnected and every paired phone will be removed. Terminal tabs on this computer keep running. After signing in again you must pair your phones again. |
 | `confirmRemoteOffBody` | Điện thoại đang kết nối sẽ bị ngắt. Các tab terminal trên máy này vẫn chạy. | Connected phones will be disconnected. Terminal tabs on this computer keep running. |
-| `onboardingTrayHint` | keep, but prefix: "Terminal của bạn ở cửa sổ ShellX. " | prefix: "Your terminal lives in the ShellX window. " |
+| `onboardingTrayHint` | "Terminal của bạn ở cửa sổ ShellX. ShellX cũng có mặt trên thanh menu (khay hệ thống): chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại." | "Your terminal is in the ShellX window. ShellX also stays in the menu bar (system tray): choose “Pair phone…” there to connect your phone." (final wave: no double "lives") |
+| `confirmQuitBody` | "{count} tab đang mở sẽ bị đóng. Điện thoại không kết nối được máy này cho tới khi ShellX chạy lại." | "{count} open tabs will be closed. …" (final wave: the desktop says tab) |
+| `authForgotPasswordHint` | "Quên mật khẩu? Trên một máy tính khác vẫn đang đăng nhập ShellX, chọn “Đổi mật khẩu…” trong menu khay." | "Forgot your password? On another computer that is still signed in to ShellX, choose “Change password…” in the tray menu." (final wave P-5) |
 
-`confirmQuitBody` stays (quit still closes every shell). Shortcut labels are built from the platform (`⌘T` / `Ctrl+Shift+T`), not translated.
+`confirmQuitBody` keeps its meaning (quit still closes every shell) but counts tabs. Tray "Đóng" on one session follows ⌘W (D15 confirm while a command runs); tray "Đóng tất cả" always asks with the count (final wave I2). Shortcut labels are built from the platform (`⌘T` / `Ctrl+Shift+T`), not translated.
 
 **Tray:** "Mở cửa sổ terminal" / "Open terminal window" is the first item, followed by a separator, then the existing status line and items (sentence case, matching current tray strings such as "Pair phone…"). The macOS app menu (shown while the Dock icon is visible, D10) uses the system Quit item wired to the Dart quit flow.
 
@@ -327,7 +340,7 @@ Semantics use the lower-case variants of origin/viewing ("mở từ điện tho�
 │                        │                                                         │
 └────────────────────────┴─────────────────────────────────────────────────────────┘
  ▌ = 2px accent bar + rowSelected   ● green idle / ● cyan running   ○ red ring = exited
- 📱 = Icons.smartphone (textSecondary)   👁 = Icons.visibility (accent)
+ 📱 = Icons.phone_iphone_outlined (textSecondary)   👁 = Icons.visibility (accent)
 ```
 
 Tab 4 selected shows the exit line in the buffer:
@@ -342,13 +355,14 @@ Tab 4 selected shows the exit line in the buffer:
 ```
 ┌────────────────────────┬─────────────────────────────────────────────────────────┐
 │ ● ● ●              [+] │                        claude                           │
-│                        │   ╭───────────────────────────────────────────────╮     │
-│ ● zsh 1                │   │ ▯ Điện thoại đang dùng terminal này — gõ để dùng lại │
-│▌● claude           👁  │   ╰───────────────────────────────────────────────╯     │
-│ ● htop          📱     │ > Thinking…            (content at the phone's width)   │
+│                        │  > Thinking…  ╭───────────────────────────────────────╮ │
+│ ● zsh 1                │               │ ▯ Điện thoại đang dùng terminal này —… │ │
+│▌◉ claude       👁   ×  │               ╰───────────────────────────────────────╯ │
+│ ● htop          📱     │   (content at the phone's width)                        │
 │ ○ build                │                                                         │
 └────────────────────────┴─────────────────────────────────────────────────────────┘
- pill: warnBg, warnBorder, warn text; 👁 turns warn while the phone drives
+ pill: top right (bottom right while the cursor is under it), warnBg, warnBorder,
+ warn text; 👁 turns warn while the phone drives; ◉ = running (target dot)
 ```
 
 ### 6.3 Signed out

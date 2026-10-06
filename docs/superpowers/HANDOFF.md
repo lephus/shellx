@@ -144,7 +144,8 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 ## 11. Cửa sổ terminal trên desktop — A1 (2026-10-06)
 
 - Spec: `docs/superpowers/specs/2026-10-06-desktop-terminal-a1-design.md`; UI: `docs/superpowers/design/2026-10-06-shellx-desktop-ui.md`; plan: `docs/superpowers/plans/2026-10-06-desktop-terminal-a1.md`.
-- Trạng thái: code A1 nằm trên nhánh `feat/desktop-a1`, chưa merge vào `main`. Số test: xem kiểm tra cuối khi merge. Windows **chưa thử trên máy thật**.
+- Trạng thái: A1 nằm trên `main` (merge từ `feat/desktop-a1` sau đợt sửa cuối, 2026-10-06). Số test lần chạy cuối (đợt sửa cuối, trước merge): `packages/shellx_agent` 386 pass; `apps/desktop` 622 pass + 1 bỏ qua (benchmark có tag). Windows **chưa thử trên máy thật**.
+- Bộ nhớ: tối đa 32 tab × 10 000 dòng scrollback xterm mỗi tab (cộng ring buffer 256 KiB/phiên ở agent). xterm 4.0.0 lưu mỗi ô 16 byte (4 × uint32), nên một tab đầy ở 160 cột ≈ 10 000 × 160 × 16 B ≈ 26 MB (80 cột ≈ 13 MB); 32 tab đầy ở 160 cột ≈ 0,8 GB trong trường hợp xấu nhất. Chấp nhận cho A1 (ít ai giữ 32 tab đầy); nếu đo thật (mục thử tay 23) quá nặng thì giảm `maxLines` cho tab ẩn ở milestone sau.
 - Benchmark xterm (`flutter test --run-skipped --tags benchmark test/terminal/xterm_benchmark_test.dart`, MacBook Mac16,10 / Apple M4, flutter test VM chế độ debug, lát 256 KiB, lưới 160x48; số từ commit `da98f80`):
   - `yes x2M: total 925ms, slowest slice 77ms, 6.2 MB/s (met)`
   - `cat 50 MB: total 1638ms, slowest slice 11ms, 30.5 MB/s (met)`
@@ -172,13 +173,22 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 - [ ] 15. Shell thoát mã 0 (`exit`) ở tab không được chọn → tab đó tự đóng, tab đang chọn giữ nguyên; `exit 3` → dòng "[Tiến trình đã thoát, mã 3] — Enter để đóng", Enter đóng tab.
 - [ ] 16. **Màn hình ngoài bị rút:** kéo cửa sổ sang màn hình ngoài, thoát app, rút màn hình, mở lại → cửa sổ hiện **ở giữa** màn hình còn lại (không nằm ngoài tầm nhìn). Cũng thử: rút màn hình khi app đang chạy rồi mở lại cửa sổ từ Dock/tray.
 - [ ] 17. **Prompt đầu tiên không bị vẽ lại lúc khởi động:** mở app (và ⌘T tab mới), dòng prompt zsh đầu tiên xuất hiện đúng một lần, không bị xóa/vẽ lại bởi lần đổi cỡ ngay sau khi cửa sổ hiện.
+- [ ] 18. **Cửa sổ lên trước khi đang thu nhỏ hoặc bị che:** ⌘M thu nhỏ cửa sổ (hoặc để app khác che, hoặc chuyển sang Space khác) rồi bấm tray "Ghép nối điện thoại…" → cửa sổ bung ra, lên trước, hộp QR hiện; tương tự với tray "Thoát" khi có tab (hộp xác nhận phải thấy được), "Đổi mật khẩu…", "Đăng xuất", "Đóng tất cả".
+- [ ] 19. **Bấm icon Dock sau ⌘M** → cửa sổ bung ra (không chỉ kích hoạt app). Mở ShellX lần nữa từ Finder/Spotlight khi cửa sổ thu nhỏ → cũng bung ra.
+- [ ] 20. **Thông báo trên điện thoại khi tắt truy cập từ xa:** điện thoại đang xem một tab → tắt "Cho phép truy cập từ xa" → điện thoại chỉ thấy mất kết nối (không báo "máy đã đóng phiên"), bật lại → điện thoại tự gắn lại vào tab, shell vẫn chạy.
+- [ ] 21. **Mở app điện thoại khi đang gõ trên desktop:** đang gõ trong một tab desktop, điện thoại kết nối lại vào đúng tab đó (resume) → desktop vẫn là bên điều khiển, không có dải vàng, PTY giữ cỡ desktop; chỉ khi điện thoại gõ/đổi cỡ thì nó mới lấy quyền.
+- [ ] 22. **Thanh menu macOS sau khi chuyển accessory → regular:** ẩn cửa sổ (nút đỏ), mở lại từ tray → thanh menu hiện tên ShellX và menu đầy đủ ngay (không phải bấm ra app khác rồi quay lại), ⌘Q hoạt động.
+- [ ] 23. **Bộ nhớ:** 32 tab, mỗi tab `seq 1 20000` (đầy 10 000 dòng scrollback) → Activity Monitor: bộ nhớ ShellX ổn định, UI vẫn mượt; ghi lại con số vào đây.
+- [ ] 24. **Quét QR từ hộp thoại:** tray "Ghép nối điện thoại…" → điện thoại quét mã trong hộp (cửa sổ 1100×720 và 640×400) → ghép thành công, hộp tự đóng.
+- [ ] 25. **Menu chuột phải trong terminal:** chưa chọn chữ → "Sao chép" mờ; "Dán" dán clipboard; "Chọn tất cả" chọn cả scrollback, rồi chuột phải → "Sao chép" sao chép được. Trong `vim` có `:set mouse=a`, chuột phải đi vào vim (không hiện menu). Nút × trên tab (khi rê chuột hoặc tab đang chọn) đóng tab, hỏi nếu đang chạy lệnh. ⌥←/⌥→ ở prompt zsh nhảy theo từ.
+- [ ] 26. **Phóng to / toàn màn hình được nhớ:** phóng to cửa sổ (nút xanh / double-click thanh tiêu đề), thoát, mở lại → cửa sổ mở phóng to; bỏ phóng to → về đúng cỡ thường trước đó (không phải cỡ toàn màn hình).
 
 ### Thử tay — Windows (máy thật, Windows 10 1809+ / 11)
 
 - [ ] 1. Mở ShellX từ Start menu: cửa sổ terminal hiện với một tab PowerShell ở `%USERPROFILE%`; **có nút trên taskbar khi cửa sổ hiện, mất khi ẩn**; **title bar hệ thống tối** (dark) ngay từ khung hình đầu, không chớp trắng.
 - [ ] 2. Ctrl+Shift+T / Ctrl+Shift+W / Ctrl+Alt+1…9 / Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+Shift+C (có vùng chọn) / Ctrl+Shift+V / Ctrl+= / Ctrl+− / Ctrl+0; Ctrl+C trong PowerShell vẫn ngắt lệnh; Ctrl+Shift+C không có vùng chọn không làm gì sai. Chuyển vùng bằng Ctrl+F6; F6 thường tới được TUI.
 - [ ] 3. **AltGr:** bàn phím có AltGr (ví dụ Đức/Pháp/Tây Ban Nha): AltGr+Q → `@`, AltGr+7 → `{`, AltGr+8 → `[`… gõ ra đúng ký tự trong PowerShell và trong vim, không bị coi là Ctrl+Alt (không kích hoạt Ctrl+Alt+1…9).
-- [ ] 4. Các mục 2, 3 (bộ gõ tiếng Việt Unikey/EVKey, cả sau khi chuyển tab), 6–8, 10–11, 14–15, 17 của macOS (chuyển ⌘ thành Ctrl+Shift).
+- [ ] 4. Các mục 2, 3 (bộ gõ tiếng Việt Unikey/EVKey, cả sau khi chuyển tab), 6–8, 10–11, 14–15, 17, 18 (thu nhỏ rồi dùng tray), 20–21, 23–26 của macOS (chuyển ⌘ thành Ctrl+Shift; Chọn tất cả = Ctrl+Shift+A; ⌥←/→ không áp dụng).
 - [ ] 5. Alt+F4 / nút X → ẩn vào khay, shell vẫn chạy; mở lại lần hai (chạy ShellX.exe lần nữa) → cửa sổ hiện lại, không có tab thứ hai.
 - [ ] 6. Tray "Thoát" với tab đang mở → hỏi; đồng ý → `Get-Process pwsh,powershell` không còn tiến trình con của ShellX. Đăng xuất / tắt máy Windows không bị ShellX chặn.
 - [ ] 7. Snap layouts (Win+Z) và kéo đổi cỡ: tối thiểu 640×400, nhớ vị trí; rút màn hình ngoài rồi mở lại → cửa sổ hiện ở giữa màn hình còn lại.
