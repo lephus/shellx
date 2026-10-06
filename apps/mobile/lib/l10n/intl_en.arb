@@ -399,7 +399,7 @@
   "voiceHintEn": "Speak or type… say “send” to send",
   "voiceSend": "Send",
   "voiceClose": "Close",
-  "voiceTarget": "→ {target}",
+  "voiceTarget": "To: {target}",
   "@voiceTarget": {
     "placeholders": {
       "target": {
@@ -415,5 +415,11 @@
   "voiceLocaleUnavailableEn": "This phone can't recognize English yet — try VI",
   "voiceNetwork": "Speech recognition needs a network connection",
   "voiceFailed": "Couldn't recognize that, try again",
-  "voiceNotLive": "The session isn't connected — you can send once it reconnects"
+  "voiceNotLive": "The session isn't connected — you can send once it reconnects",
+  "voiceListeningVi": "Listening… say “gửi” to send",
+  "voiceListeningEn": "Listening… say “send” to send",
+  "voiceListeningAnnounce": "Listening",
+  "voiceEnded": "Session ended — open a new session to send",
+  "voiceDetached": "This session was disconnected from the phone — reattach to send",
+  "voiceSendEnter": "Send Enter"
 }

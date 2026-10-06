@@ -205,7 +205,7 @@
   "voiceHintEn": "Nói hoặc gõ… nói “send” để gửi",
   "voiceSend": "Gửi",
   "voiceClose": "Đóng",
-  "voiceTarget": "→ {target}",
+  "voiceTarget": "Gửi tới: {target}",
   "@voiceTarget": {
     "placeholders": {
       "target": {
@@ -221,5 +221,11 @@
   "voiceLocaleUnavailableEn": "Máy chưa hỗ trợ nhận dạng tiếng Anh — thử VI",
   "voiceNetwork": "Cần kết nối mạng để nhận dạng giọng nói",
   "voiceFailed": "Không nhận dạng được, hãy thử lại",
-  "voiceNotLive": "Phiên chưa kết nối — gửi được khi kết nối lại"
+  "voiceNotLive": "Phiên chưa kết nối — gửi được khi kết nối lại",
+  "voiceListeningVi": "Đang nghe… nói “gửi” để gửi",
+  "voiceListeningEn": "Đang nghe… nói “send” để gửi",
+  "voiceListeningAnnounce": "Đang nghe",
+  "voiceEnded": "Phiên đã kết thúc — mở phiên mới để gửi",
+  "voiceDetached": "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
+  "voiceSendEnter": "Gửi phím Enter"
 }

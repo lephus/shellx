@@ -28,9 +28,7 @@ class S {
   static const AppLocalizationDelegate delegate = AppLocalizationDelegate();
 
   static Future<S> load(Locale locale) {
-    final name = (locale.countryCode?.isEmpty ?? false)
-        ? locale.languageCode
-        : locale.toString();
+    final name = (locale.countryCode?.isEmpty ?? false) ? locale.languageCode : locale.toString();
     final localeName = Intl.canonicalizedLocale(name);
     return initializeMessages(localeName).then((_) {
       Intl.defaultLocale = localeName;
@@ -1929,10 +1927,10 @@ class S {
     return Intl.message('Close', name: 'voiceClose', desc: '', args: []);
   }
 
-  /// `→ {target}`
+  /// `To: {target}`
   String voiceTarget(String target) {
     return Intl.message(
-      '→ $target',
+      'To: $target',
       name: 'voiceTarget',
       desc: '',
       args: [target],
@@ -2019,6 +2017,66 @@ class S {
     return Intl.message(
       'The session isn\'t connected — you can send once it reconnects',
       name: 'voiceNotLive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Listening… say “gửi” to send`
+  String get voiceListeningVi {
+    return Intl.message(
+      'Listening… say “gửi” to send',
+      name: 'voiceListeningVi',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Listening… say “send” to send`
+  String get voiceListeningEn {
+    return Intl.message(
+      'Listening… say “send” to send',
+      name: 'voiceListeningEn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Listening`
+  String get voiceListeningAnnounce {
+    return Intl.message(
+      'Listening',
+      name: 'voiceListeningAnnounce',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Session ended — open a new session to send`
+  String get voiceEnded {
+    return Intl.message(
+      'Session ended — open a new session to send',
+      name: 'voiceEnded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This session was disconnected from the phone — reattach to send`
+  String get voiceDetached {
+    return Intl.message(
+      'This session was disconnected from the phone — reattach to send',
+      name: 'voiceDetached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Send Enter`
+  String get voiceSendEnter {
+    return Intl.message(
+      'Send Enter',
+      name: 'voiceSendEnter',
       desc: '',
       args: [],
     );

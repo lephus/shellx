@@ -12,7 +12,9 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/termina
 import 'package:shellx_mobile/features/terminal/presentation/pages/terminal_page.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:shellx_mobile/features/voice/domain/speech_input.dart';
+import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
+import 'package:shellx_mobile/shared/shared.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../support/app_harness.dart';
@@ -1037,7 +1039,7 @@ void main() {
       await tester.tap(mic());
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('voice-text')), findsOneWidget);
-      expect(find.textContaining('→ '), findsOneWidget);
+      expect(find.text('Gửi tới: zsh 1 · MacBook-Pro'), findsOneWidget);
       expect(find.textContaining('MacBook-Pro'), findsWidgets);
       expect(speech.starts.single.localeId, 'vi-VN');
     });
@@ -1096,24 +1098,124 @@ void main() {
       await openQuiet(tester);
       await tester.tap(mic());
       await tester.pumpAndSettle();
+      speech
+        ..emit(const SpeechListening(true))
+        ..emit(const SpeechListening(false));
+      await tester.pump();
       expect(find.text('Nói hoặc gõ… nói “gửi” để gửi'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('voice-locale-en')));
       await tester.pump();
       expect(find.text('Nói hoặc gõ… nói “send” để gửi'), findsOneWidget);
     });
 
-    testWidgets('an ended session hides the mic and disables Send, keeping the text', (tester) async {
+    testWidgets('listening says so in the field and to the screen reader', (tester) async {
+      final announced = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(SystemChannels.accessibility, (
+        message,
+      ) async {
+        final map = message! as Map<Object?, Object?>;
+        if (map['type'] == 'announce') announced.add((map['data']! as Map<Object?, Object?>)['message']! as String);
+        return null;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
+          SystemChannels.accessibility,
+          null,
+        ),
+      );
       await openQuiet(tester);
       await tester.tap(mic());
       await tester.pumpAndSettle();
+      expect(find.text('Đang nghe… nói “gửi” để gửi'), findsOneWidget);
+      expect(announced, ['Đang nghe']);
+      speech.emit(const SpeechFinal('ls'));
+      await tester.pump();
+      expect(find.text('Đang nghe… nói “gửi” để gửi'), findsNothing);
+      expect(announced, ['Đang nghe']);
+    });
+
+    testWidgets('VI/EN is a two-segment control: 44 pt targets, the same width selected or not', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      Size segment(String code) => tester.getSize(
+        find.ancestor(of: find.byKey(ValueKey('voice-locale-$code')), matching: find.byType(TextButton)).first,
+      );
+      expect(find.byType(SegmentedButton<VoiceLocale>), findsOneWidget);
+      expect(find.byIcon(Icons.check), findsNothing);
+      final before = (segment('vi'), segment('en'));
+      expect(before.$1.height, greaterThanOrEqualTo(44));
+      expect(before.$1.width, greaterThanOrEqualTo(44));
+      await tester.tap(find.byKey(const ValueKey('voice-locale-en')));
+      await tester.pumpAndSettle();
+      expect((segment('vi'), segment('en')), before);
+    });
+
+    testWidgets('the command is in JetBrains Mono, the hint in Raleway; Send says Enter when empty', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(find.byKey(const ValueKey('voice-text')));
+      expect(field.style!.fontFamily, FontFamily.jetBrainsMono);
+      expect(field.decoration!.hintStyle!.fontFamily, FontFamily.raleway);
+      expect(find.byTooltip('Gửi phím Enter'), findsOneWidget);
+      speech.emit(const SpeechFinal('ls'));
+      await tester.pump();
+      expect(find.byTooltip('Gửi'), findsOneWidget);
+    });
+
+    testWidgets('refused permission: the issue and Mở Cài đặt pass AA on the keyboard grey', (tester) async {
+      speech.permission = SpeechPermission.denied;
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      final colors = Brightness.light.appColors;
+      final issue = tester.widget<Text>(find.text('Cần quyền micro và nhận dạng giọng nói để nói lệnh'));
+      expect(issue.style!.color, colors.keyboardError);
+      final link = tester.widget<Text>(find.text('Mở Cài đặt'));
+      expect(link.style!.color, colors.keyboardLink);
+      await tester.tap(find.text('Mở Cài đặt'));
+      await tester.pump();
+      expect((getIt<ExternalLinks>() as FakeExternalLinks).settingsOpened, 1);
+    });
+
+    testWidgets('an ended session keeps the mic in place, disabled, and says why Send is off', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      final micLeft = tester.getTopLeft(mic());
+      final escLeft = tester.getTopLeft(find.byKey(const ValueKey('extra-key-esc')));
       speech.emit(const SpeechFinal('giữ chữ này'));
       machine.handles.single.emit(const TabExited(0));
       await tester.pumpAndSettle();
-      expect(mic(), findsNothing);
+      expect(mic(), findsOneWidget);
+      expect(tester.getTopLeft(mic()), micLeft);
+      expect(tester.getTopLeft(find.byKey(const ValueKey('extra-key-esc'))), escLeft);
+      expect(
+        tester.getSemantics(mic()),
+        matchesSemantics(label: 'Nói lệnh', isButton: true, hasEnabledState: true, isEnabled: false),
+      );
+      final starts = speech.starts.length;
+      await tester.tap(mic());
+      await tester.pump();
+      expect(speech.starts, hasLength(starts));
       expect(find.text('giữ chữ này'), findsOneWidget);
-      expect(find.text('Phiên chưa kết nối — gửi được khi kết nối lại'), findsOneWidget);
+      expect(find.text('Phiên đã kết thúc — mở phiên mới để gửi'), findsOneWidget);
+      expect(find.text('Phiên chưa kết nối — gửi được khi kết nối lại'), findsNothing);
       final send = tester.widget<IconButton>(find.byKey(const ValueKey('voice-send')));
       expect(send.onPressed, isNull);
+      // The composer grew by the note: let the terminal's resize debounce run.
+      await tester.pump(const Duration(milliseconds: 150));
+    });
+
+    testWidgets('a session taken by another device says to reattach', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      machine.handles.single.emit(const TabDetached(DetachReason.takenOver));
+      await tester.pumpAndSettle();
+      expect(find.text('Phiên đã ngắt khỏi điện thoại — gắn lại để gửi'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 150));
     });
   });
 }

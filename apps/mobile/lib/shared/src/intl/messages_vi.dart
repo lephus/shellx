@@ -22,8 +22,7 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m0(email) => "Xóa tài khoản ${email}, mọi máy và mọi ghép nối.";
 
-  static String m1(site) =>
-      "Cài ShellX trên máy tính (macOS hoặc Windows) từ ${site}.";
+  static String m1(site) => "Cài ShellX trên máy tính (macOS hoặc Windows) từ ${site}.";
 
   static String m2(menu) => "Bấm biểu tượng ShellX → ${menu}, rồi quét mã.";
 
@@ -33,8 +32,7 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m5(day, month, time) => "${day}/${month}, ${time}";
 
-  static String m6(count) =>
-      "${Intl.plural(count, other: '${count} phút trước')}";
+  static String m6(count) => "${Intl.plural(count, other: '${count} phút trước')}";
 
   static String m7(time) => "hôm nay, ${time}";
 
@@ -46,35 +44,28 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m11(count) => "${Intl.plural(count, other: '${count} tab')}";
 
-  static String m12(name) =>
-      "${name} đã tin cậy điện thoại này. Từ giờ chỉ cần chạm vào máy để mở terminal.";
+  static String m12(name) => "${name} đã tin cậy điện thoại này. Từ giờ chỉ cần chạm vào máy để mở terminal.";
 
-  static String m13(count) =>
-      "${Intl.plural(count, other: 'Còn thiếu ${count} ký tự.')}";
+  static String m13(count) => "${Intl.plural(count, other: 'Còn thiếu ${count} ký tự.')}";
 
-  static String m14(count) =>
-      "${Intl.plural(count, other: 'Thừa ${count} ký tự.')}";
+  static String m14(count) => "${Intl.plural(count, other: 'Thừa ${count} ký tự.')}";
 
   static String m15(when) => "mở ${when}";
 
-  static String m16(count) =>
-      "${Intl.plural(count, other: 'Máy này đang có ${count} phiên')}";
+  static String m16(count) => "${Intl.plural(count, other: 'Máy này đang có ${count} phiên')}";
 
   static String m17(menu) =>
       "macOS: bấm biểu tượng ShellX trên thanh menu. Windows: bấm biểu tượng ở khay hệ thống. Chọn ${menu}";
 
-  static String m18(code) =>
-      "Lệnh cuối thoát với mã ${code}. Nội dung ở trên vẫn đọc và copy được.";
+  static String m18(code) => "Lệnh cuối thoát với mã ${code}. Nội dung ở trên vẫn đọc và copy được.";
 
   static String m19(method) => "Khóa bằng ${method}";
 
-  static String m20(name) =>
-      "Bỏ ghép nối ${name}? Bạn sẽ phải quét lại mã QR để dùng máy này.";
+  static String m20(name) => "Bỏ ghép nối ${name}? Bạn sẽ phải quét lại mã QR để dùng máy này.";
 
   static String m21(version, build) => "ShellX ${version} (${build})";
 
-  static String m22(terms, privacy) =>
-      "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
+  static String m22(terms, privacy) => "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
 
   static String m23(length) => "Mật khẩu phải có ít nhất ${length} ký tự";
 
@@ -82,7 +73,7 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m25(length) => "Phải có ít nhất ${length} ký tự";
 
-  static String m26(target) => "→ ${target}";
+  static String m26(target) => "Gửi tới: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -462,6 +453,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "Trường này là bắt buộc",
     ),
     "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
+    "voiceDetached": MessageLookupByLibrary.simpleMessage(
+      "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
+    ),
+    "voiceEnded": MessageLookupByLibrary.simpleMessage(
+      "Phiên đã kết thúc — mở phiên mới để gửi",
+    ),
     "voiceFailed": MessageLookupByLibrary.simpleMessage(
       "Không nhận dạng được, hãy thử lại",
     ),
@@ -473,6 +470,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "voiceLanguageEn": MessageLookupByLibrary.simpleMessage("Tiếng Anh"),
     "voiceLanguageVi": MessageLookupByLibrary.simpleMessage("Tiếng Việt"),
+    "voiceListeningAnnounce": MessageLookupByLibrary.simpleMessage("Đang nghe"),
+    "voiceListeningEn": MessageLookupByLibrary.simpleMessage(
+      "Đang nghe… nói “send” để gửi",
+    ),
+    "voiceListeningVi": MessageLookupByLibrary.simpleMessage(
+      "Đang nghe… nói “gửi” để gửi",
+    ),
     "voiceLocaleUnavailableEn": MessageLookupByLibrary.simpleMessage(
       "Máy chưa hỗ trợ nhận dạng tiếng Anh — thử VI",
     ),
@@ -490,6 +494,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Phiên chưa kết nối — gửi được khi kết nối lại",
     ),
     "voiceSend": MessageLookupByLibrary.simpleMessage("Gửi"),
+    "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Gửi phím Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Dừng nghe"),
     "voiceTarget": m26,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(

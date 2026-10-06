@@ -81,6 +81,14 @@ class _TerminalPageState extends State<TerminalPage> {
     super.dispose();
   }
 
+  /// Why the composer cannot send to [tab] now; null when it can. Reads signals: call it in a Watch.
+  VoiceSendBlock? _sendBlock(TerminalTabController? tab) {
+    if (tab == null) return VoiceSendBlock.ended;
+    if (tab.isLive.value) return null;
+    if (tab.banner.value == null) return VoiceSendBlock.disconnected;
+    return tab.canReattach ? VoiceSendBlock.detached : VoiceSendBlock.ended;
+  }
+
   bool _activeTabLive() =>
       !_controller.closing.peek() && (_controller.workspace.activeTab.peek()?.isLive.peek() ?? false);
 
@@ -386,7 +394,7 @@ class _TerminalPageState extends State<TerminalPage> {
           return VoiceComposer(
             controller: _voice,
             target: tab == null ? null : '${tab.title.value} · ${widget.machineName}',
-            canSend: tab?.isLive.value ?? false,
+            blocked: _sendBlock(tab),
             onOpenSettings: () => unawaited(getIt<ExternalLinks>().openAppSettingsOrToast()),
           );
         }),
@@ -398,13 +406,13 @@ class _TerminalPageState extends State<TerminalPage> {
               controller: workspace.extraKeys,
               onKey: _controller.sendKey,
               onPaste: _paste,
+              // Always there, disabled while the tab cannot take a line: the keys never shift.
               leading: Watch(
-                (context) => (workspace.activeTab.value?.isLive.value ?? false)
-                    ? MicButton(
-                        controller: _voice,
-                        onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
-                      )
-                    : const SizedBox.shrink(),
+                (context) => MicButton(
+                  controller: _voice,
+                  enabled: workspace.activeTab.value?.isLive.value ?? false,
+                  onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
+                ),
               ),
             ),
           ),

@@ -2,12 +2,15 @@ import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
-/// The mic cap at the start of the extra keys row; filled and pulsing while listening.
+/// The mic cap at the start of the extra keys row; filled and pulsing while listening. Its glyph is
+/// tinted so it reads as a feature, not a key. While the active tab cannot take a line it stays in
+/// place, dimmed and disabled, so the keys after it never move.
 class MicButton extends StatelessWidget {
-  const MicButton({super.key, required this.controller, required this.onTap});
+  const MicButton({super.key, required this.controller, required this.onTap, this.enabled = true});
 
   final VoiceComposerController controller;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -17,28 +20,33 @@ class MicButton extends StatelessWidget {
       final strings = S.of(context);
       return Semantics(
         button: true,
+        enabled: enabled,
         label: listening ? strings.voiceStopTooltip : strings.voiceMicTooltip,
+        excludeSemantics: true,
         child: GestureDetector(
           key: const ValueKey('voice-mic'),
           behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              constraints: const BoxConstraints(minWidth: 46),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: listening ? colors.primary : colors.keyboardKey,
-                borderRadius: BorderRadius.circular(9),
-                boxShadow: const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
-              ),
-              child: _Pulse(
-                active: listening,
-                child: Icon(
-                  listening ? Icons.mic : Icons.mic_none,
-                  size: 20,
-                  color: listening ? colors.onPrimary : colors.keyboardInk,
+          onTap: enabled ? onTap : null,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                constraints: const BoxConstraints(minWidth: 46),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: listening ? colors.primary : colors.keyboardKey,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
+                ),
+                child: _Pulse(
+                  active: listening,
+                  child: Icon(
+                    listening ? Icons.mic : Icons.mic_none,
+                    size: 20,
+                    color: listening ? colors.onPrimary : colors.keyboardLink,
+                  ),
                 ),
               ),
             ),
