@@ -129,8 +129,9 @@ enum _State {
   ignoreEscape,
 }
 
-/// Finds OSC 7, 9, 99, 133 (C, D), 633 (E) and 777 (`notify`), and BEL outside
-/// sequences, in terminal output, ended by BEL or ST, across chunk boundaries (like `OscTitleParser`).
+/// Finds OSC 7, 9, 99, 133 (C, D), 633 (E) and 777 (`notify`), and BEL
+/// outside sequences, in terminal output, ended by BEL or ST, across chunk
+/// boundaries (like `OscTitleParser`).
 /// A payload over 4 KiB is skipped; titles and bodies are cut to 200
 /// characters; malformed UTF-8 is replaced, never fatal. The bytes
 /// themselves are untouched: the terminal output goes on as it was.
