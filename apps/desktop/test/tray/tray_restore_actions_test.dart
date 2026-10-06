@@ -79,4 +79,21 @@ void main() {
     await pumpEventQueue();
     expect(local().restoreScrollback, isFalse);
   });
+
+  test('Quit saves a clean, final layout before the shutdown closes the '
+      'sessions (A5a D12)', () async {
+    bool? cleanAtShutdown;
+    h.ptyKills = () async {
+      cleanAtShutdown = files.layouts.lastOrNull?.cleanExit;
+    };
+    c.read(restorePersistenceProvider.notifier).start();
+    await c.read(trayActionsProvider).handle(const Quit());
+    expect(cleanAtShutdown, isTrue);
+    expect(h.quits, 1);
+    final writes = files.layouts.length;
+    // Frozen: nothing after the shutdown overwrites the clean layout.
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    expect(files.layouts, hasLength(writes));
+    expect(files.layouts.last.cleanExit, isTrue);
+  });
 }

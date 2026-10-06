@@ -138,23 +138,31 @@ Future<void> _start(
       environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'] ??
       Directory.current.path;
   final relayBase = Uri.parse(kRelayBaseUrl);
-  // A5a D2: the restore files. Logs carry error types only.
-  final restoreStore = RestoreStore(
-    Directory(
-      restoreDirectoryPath(
-        windows: Platform.isWindows,
-        environment: environment,
-        appSupportPath: supportDirectory.path,
+  // A5a D2: the restore files. Logs carry error types only. Without a
+  // place for them (Windows with no LOCALAPPDATA) nothing is saved or
+  // restored, and the app starts as before.
+  RestoreFiles restoreFiles;
+  try {
+    restoreFiles = RestoreStore(
+      Directory(
+        restoreDirectoryPath(
+          windows: Platform.isWindows,
+          environment: environment,
+          appSupportPath: supportDirectory.path,
+        ),
       ),
-    ),
-    excludeFromBackup: Platform.isMacOS
-        ? (path) async {
-            await Process.run('/usr/bin/tmutil', ['addexclusion', path]);
-          }
-        : null,
-    log: debugPrint,
-  );
-  await restoreStore.prepare();
+      excludeFromBackup: Platform.isMacOS
+          ? (path) async {
+              await Process.run('/usr/bin/tmutil', ['addexclusion', path]);
+            }
+          : null,
+      log: debugPrint,
+    );
+  } on StateError catch (error) {
+    debugPrint('ShellX: no restore directory: ${error.runtimeType}');
+    restoreFiles = const NullRestoreFiles();
+  }
+  await restoreFiles.prepare();
   final notifier = startup.notifier = await LocalSystemNotifier.setup();
   // A failed tree kill (or, on Windows, a shell without a job object) may
   // leave processes behind: the debug log gets the pid and the reason
@@ -258,7 +266,7 @@ Future<void> _start(
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
       homeDirectoryProvider.overrideWithValue(home),
-      restoreStoreProvider.overrideWithValue(restoreStore),
+      restoreStoreProvider.overrideWithValue(restoreFiles),
     ],
   );
 
@@ -271,12 +279,36 @@ Future<void> _start(
     debugPrint('ShellX: reading the window focus failed: ${error.runtimeType}');
   }
 
+  // A5a D16: the restore starts before anything can open a tab (the tray,
+  // a second launch, a reopen, a notification): those wait for it instead
+  // of opening a blank tab. Its panes open once the window is laid out
+  // ([layoutReady]), so their grids come from the real area (D17).
+  final restore = container.read(restorePersistenceProvider.notifier)..start();
+  final layoutReady = Completer<void>();
+  Future<RestoreLoad> loadForRestore() async {
+    final load = await restoreFiles.loadLayout();
+    await layoutReady.future;
+    return load;
+  }
+
+  _unawaitedLogged(restore.restoreAtStartup(loadForRestore()), 'restore');
+
   final windowPresenter = WindowPresenter(windowHost);
   container.listen<WindowState>(
     windowRouterProvider,
     (_, next) => _unawaitedLogged(windowPresenter.apply(next), 'window'),
     fireImmediately: true,
   );
+  // The window hid (the close button, ⌘W on the empty state): save now,
+  // not clean — the shells keep running.
+  container.listen<bool>(windowRouterProvider.select((s) => s.visible), (
+    previous,
+    visible,
+  ) {
+    if (previous == true && !visible) {
+      _unawaitedLogged(restore.flushAll(clean: false), 'restore save');
+    }
+  });
 
   final trayActions = container.read(trayActionsProvider);
   late final TrayPresenter trayPresenter;
@@ -316,13 +348,22 @@ Future<void> _start(
     onError: (Object error) =>
         debugPrint('ShellX: activation watch failed: ${error.runtimeType}'),
   );
-  if (Platform.isMacOS) {
-    listenForAppChannel(
-      onReopen: activate,
-      // ⌘Q / app menu Quit (A1 D10): the same flow as the tray's "Thoát".
-      onQuitRequested: () => unawaited(trayActions.handle(const Quit())),
-    );
-  }
+  // Both platforms: Windows sends only saveBeforeExit and exitCancelled.
+  var exitSave = Future<void>.value();
+  listenForAppChannel(
+    onReopen: activate,
+    // ⌘Q / app menu Quit (A1 D10): the same flow as the tray's "Thoát".
+    onQuitRequested: () => unawaited(trayActions.handle(const Quit())),
+    // A5a D18: log out, restart, shut down — a clean, final save.
+    onSaveBeforeExit: () => exitSave = runBounded(
+      () => restore.flushAll(clean: true),
+      timeout: _quitStepTimeout,
+      label: 'saving before power-off',
+    ),
+    // The exit did not happen: saving goes on once that save is done.
+    onExitCancelled: () =>
+        _unawaitedLogged(exitSave.then((_) => restore.resume()), 'restore'),
+  );
   listenForWindowTitle(
     container: container,
     host: windowHost,
@@ -411,6 +452,9 @@ Future<void> _start(
   // laid-out pane. After the bootstrap, so a signed-out strip is already
   // laid out and the new shell is not resized right after it starts.
   await WidgetsBinding.instance.endOfFrame;
+  // A5a D16: the restore reopens its panes now; the activation below waits
+  // for it, so a restored window gets no extra tab.
+  layoutReady.complete();
   await handleActivation(container);
 }
 

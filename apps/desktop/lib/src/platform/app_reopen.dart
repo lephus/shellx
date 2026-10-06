@@ -1,15 +1,21 @@
 import 'package:flutter/services.dart';
 
-/// `pro.shellx.desktop/app` (AppDelegate.swift). Native → Dart: `reopen`
-/// (Finder, Spotlight, Launchpad or the Dock open the running app again;
-/// macOS sends a reopen event instead of starting a second process, so the
-/// single-instance signal never fires) and `quitRequested` (⌘Q or the app
-/// menu's Quit, A1 D10). Dart → native: `setDockVisible`, `activate`.
+/// `pro.shellx.desktop/app` (AppDelegate.swift; Windows
+/// flutter_window.cpp sends only the two A5a calls). Native → Dart:
+/// `reopen` (Finder, Spotlight, Launchpad or the Dock open the running app
+/// again; macOS sends a reopen event instead of starting a second process,
+/// so the single-instance signal never fires), `quitRequested` (⌘Q or the
+/// app menu's Quit, A1 D10), `saveBeforeExit` (A5a D18: log out, restart
+/// or shut down; answered once the save is done) and `exitCancelled` (that
+/// exit did not happen after all). Dart → native: `setDockVisible`,
+/// `activate`.
 const MethodChannel appChannel = MethodChannel('pro.shellx.desktop/app');
 
 void listenForAppChannel({
   required void Function() onReopen,
   required void Function() onQuitRequested,
+  Future<void> Function()? onSaveBeforeExit,
+  void Function()? onExitCancelled,
   MethodChannel channel = appChannel,
 }) {
   channel.setMethodCallHandler((call) async {
@@ -18,6 +24,12 @@ void listenForAppChannel({
         onReopen();
       case 'quitRequested':
         onQuitRequested();
+      case 'saveBeforeExit':
+        // A5a D18: the OS is shutting down or logging out; the native side
+        // waits (at most 3 s) for this call to return.
+        await onSaveBeforeExit?.call();
+      case 'exitCancelled':
+        onExitCancelled?.call();
     }
   });
 }

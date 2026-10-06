@@ -334,6 +334,48 @@ class _HoverThumbScrollbarState
 
 /// UI §2.4: a layout row at the top of the pane (it may resize the terminal:
 /// it is rare and shows before phones attach).
+/// UI §2.4 / UI-A5 §4: the strips over the terminal area (signed out,
+/// abnormal end): `rowSelected`, a `line` bottom border, 12 / 8 insets.
+const BoxDecoration stripDecoration = BoxDecoration(
+  color: ShellxDesktopColors.rowSelected,
+  border: Border(bottom: BorderSide(color: ShellxDesktopColors.line)),
+);
+const EdgeInsets stripPadding = EdgeInsets.only(
+  left: ShellxSpace.s12,
+  right: ShellxSpace.s8,
+);
+
+/// The text button at the end of a strip ("Sign in", "Close"): 28 high,
+/// accent bodyStrong, hover / pressed fills, focus ring for keyboard
+/// focus only.
+ButtonStyle stripTextButtonStyle(BuildContext context) => ButtonStyle(
+  minimumSize: const WidgetStatePropertyAll(Size(0, ShellxSizes.textButton)),
+  fixedSize: const WidgetStatePropertyAll(
+    Size.fromHeight(ShellxSizes.textButton),
+  ),
+  padding: const WidgetStatePropertyAll(
+    EdgeInsets.symmetric(horizontal: ShellxSizes.textButtonPaddingH),
+  ),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  shape: const WidgetStatePropertyAll(_r6),
+  textStyle: WidgetStatePropertyAll(
+    uiFont(ShellxText.bodyStrong, Theme.of(context).textTheme),
+  ),
+  foregroundColor: const WidgetStatePropertyAll(ShellxDesktopColors.accent),
+  animationDuration: ShellxMotion.of(context, ShellxMotion.fast),
+  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+  backgroundColor: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.pressed)
+        ? ShellxDesktopColors.rowPressed
+        : states.contains(WidgetState.hovered)
+        ? ShellxDesktopColors.rowHover
+        : Colors.transparent,
+  ),
+  side: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.focused) ? _focusRing : null,
+  ),
+);
+
 class SignedOutStrip extends StatelessWidget {
   const SignedOutStrip({super.key, required this.onSignIn, this.focusNode});
   final VoidCallback onSignIn;
@@ -347,14 +389,8 @@ class SignedOutStrip extends StatelessWidget {
     return Container(
       key: const Key('pane.signedOutStrip'),
       height: ShellxSizes.signedOutStrip,
-      decoration: const BoxDecoration(
-        color: ShellxDesktopColors.rowSelected,
-        border: Border(bottom: BorderSide(color: ShellxDesktopColors.line)),
-      ),
-      padding: const EdgeInsets.only(
-        left: ShellxSpace.s12,
-        right: ShellxSpace.s8,
-      ),
+      decoration: stripDecoration,
+      padding: stripPadding,
       child: Row(
         children: [
           const Icon(
@@ -377,40 +413,7 @@ class SignedOutStrip extends StatelessWidget {
             key: const Key('pane.signIn'),
             focusNode: focusNode,
             onPressed: onSignIn,
-            style: ButtonStyle(
-              minimumSize: const WidgetStatePropertyAll(
-                Size(0, ShellxSizes.textButton),
-              ),
-              fixedSize: const WidgetStatePropertyAll(
-                Size.fromHeight(ShellxSizes.textButton),
-              ),
-              padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(
-                  horizontal: ShellxSizes.textButtonPaddingH,
-                ),
-              ),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: const WidgetStatePropertyAll(_r6),
-              textStyle: WidgetStatePropertyAll(
-                uiFont(ShellxText.bodyStrong, Theme.of(context).textTheme),
-              ),
-              foregroundColor: const WidgetStatePropertyAll(
-                ShellxDesktopColors.accent,
-              ),
-              animationDuration: ShellxMotion.of(context, ShellxMotion.fast),
-              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-              backgroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.pressed)
-                    ? ShellxDesktopColors.rowPressed
-                    : states.contains(WidgetState.hovered)
-                    ? ShellxDesktopColors.rowHover
-                    : Colors.transparent,
-              ),
-              side: WidgetStateProperty.resolveWith(
-                (states) =>
-                    states.contains(WidgetState.focused) ? _focusRing : null,
-              ),
-            ),
+            style: stripTextButtonStyle(context),
             child: Text(l10n.terminalSignedOutAction),
           ),
         ],

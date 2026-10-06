@@ -175,6 +175,15 @@ final class TrayActions {
           if (!ok || _quitting) return;
         }
         _quitting = true;
+        // A5a D12: the last save is clean, contents included, and final:
+        // the sessions the shutdown closes must not change it.
+        await runBounded(
+          () => _ref
+              .read(restorePersistenceProvider.notifier)
+              .flushAll(clean: true),
+          timeout: const Duration(seconds: 2),
+          label: 'saving the session layout',
+        );
         // Bounded: Quit must always reach exit (quitApp), even if closing
         // the sessions or the relay link hangs.
         await runBounded(

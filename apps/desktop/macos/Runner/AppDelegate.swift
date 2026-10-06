@@ -65,12 +65,28 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   // ⌘Q and the app menu's Quit (shown while the Dock icon is, A1 D10) go
-  // through Dart's quit flow: confirm, close every shell tree, then exit(0),
-  // which never comes back here. Log out / shut down is never blocked.
+  // through Dart's quit flow: confirm, save, close every shell tree, then
+  // exit(0), which never comes back here. Log out / shut down is never held
+  // up for more than 3 s: Dart saves the restore files first (A5a D18).
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if quitIsForPowerOff || poweringOff || !AppChannel.isReady {
-      return .terminateNow
+    if quitIsForPowerOff || poweringOff {
+      guard AppChannel.isReady else { return .terminateNow }
+      var replied = false
+      let reply = {
+        if replied { return }
+        replied = true
+        NSApp.reply(toApplicationShouldTerminate: true)
+        // Still running long after agreeing: the log out or shut down did
+        // not happen, so Dart goes on saving (A5a D12).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+          AppChannel.exitCancelled()
+        }
+      }
+      AppChannel.saveBeforeExit { reply() }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 3) { reply() }
+      return .terminateLater
     }
+    if !AppChannel.isReady { return .terminateNow }
     AppChannel.quitRequested()
     return .terminateCancel
   }
@@ -113,5 +129,18 @@ enum AppChannel {
 
   static func quitRequested() {
     channel?.invokeMethod("quitRequested", arguments: nil)
+  }
+
+  /// A5a D18: `done` runs once Dart has saved (or failed to).
+  static func saveBeforeExit(_ done: @escaping () -> Void) {
+    guard let channel else {
+      done()
+      return
+    }
+    channel.invokeMethod("saveBeforeExit", arguments: nil) { _ in done() }
+  }
+
+  static func exitCancelled() {
+    channel?.invokeMethod("exitCancelled", arguments: nil)
   }
 }
