@@ -110,6 +110,52 @@ void main() {
     );
   });
 
+  group('after clear (Ctrl+L), a resize keeps the prompt on row 0', () {
+    void clearedScreen() {
+      terminal.resize(40, 6);
+      for (var i = 0; i < 20; i++) {
+        terminal.write('line $i\r\n');
+      }
+      terminal.write('\x1b[H\x1b[2J\$ ');
+    }
+
+    String row(int y) =>
+        terminal.buffer.lines[terminal.buffer.scrollBack + y].getText().trim();
+
+    test('wider', () {
+      clearedScreen();
+      final before = terminal.buffer.scrollBack;
+      terminal.resize(50, 6);
+      expect(terminal.buffer.scrollBack, before);
+      expect(row(0), r'$');
+      expect(terminal.buffer.cursorY, 0);
+    });
+
+    test('taller', () {
+      clearedScreen();
+      final before = terminal.buffer.scrollBack;
+      terminal.resize(40, 9);
+      expect(row(0), r'$');
+      expect(terminal.buffer.cursorY, 0);
+      expect(terminal.buffer.scrollBack, before);
+    });
+  });
+
+  test('rows a shorter window pushed up come back when it grows again', () {
+    terminal.resize(40, 6);
+    for (var i = 0; i < 5; i++) {
+      terminal.write('line $i\r\n');
+    }
+    terminal.write(r'$ ');
+    expect(terminal.buffer.scrollBack, 0);
+    terminal.resize(40, 4); // cursor at the bottom: two rows go up
+    expect(terminal.buffer.scrollBack, 2);
+    terminal.resize(40, 6);
+    expect(terminal.buffer.scrollBack, 0);
+    expect(terminal.buffer.lines[0].getText().trim(), 'line 0');
+    expect(terminal.buffer.cursorY, 5);
+  });
+
   test('keeps 10 000 lines of scrollback (spec §3.2)', () {
     expect(terminal.maxLines, 10000);
   });

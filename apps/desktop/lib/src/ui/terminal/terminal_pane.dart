@@ -356,7 +356,7 @@ class _TabTerminal extends StatelessWidget {
         ),
         ShellxMenuEntry(
           key: const Key('menu.selectAll'),
-          value: const SelectAllIntent(),
+          value: const SelectAllIntent(fromMenu: true),
           label: l10n.terminalSelectAll,
           shortcut: selectAllShortcutLabel(),
         ),

@@ -33,9 +33,12 @@ class PasteClipboardIntent extends Intent {
 }
 
 /// The whole buffer, scrollback included (Terminal.app, iTerm2, Windows
-/// Terminal), not only the screen.
+/// Terminal), not only the screen. From the keyboard it applies only while
+/// the terminal has the focus; the terminal's own menu sets [fromMenu]
+/// (the menu holds the focus while it is open).
 class SelectAllIntent extends Intent {
-  const SelectAllIntent();
+  const SelectAllIntent({this.fromMenu = false});
+  final bool fromMenu;
 }
 
 class FontBiggerIntent extends Intent {

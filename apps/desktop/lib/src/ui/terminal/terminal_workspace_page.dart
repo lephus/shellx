@@ -154,7 +154,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       SelectAllIntent: run<SelectAllIntent>(
         (_) => _selectAll(),
         // Outside the terminal (sidebar, a toast…) the key does nothing.
-        enabled: (_) => ref.read(terminalTabsProvider).selected != null,
+        enabled: (intent) =>
+            ref.read(terminalTabsProvider).selected != null &&
+            (intent.fromMenu || terminalFocus.hasFocus),
       ),
       FontBiggerIntent: run<FontBiggerIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).increase(),

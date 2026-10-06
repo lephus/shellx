@@ -31,11 +31,25 @@ final class DesktopTerminal extends Terminal {
     }
   }
 
-  /// xterm's reflow keeps every blank row under the cursor, so wrapping
-  /// the lines for a narrower window pushes the top line into the
-  /// scrollback while the screen ends in empty rows (the prompt scrolls
-  /// off, M-1). Blank rows below the cursor are dropped instead, until
-  /// the screen fits, as iTerm2 and Terminal.app do.
+  /// Rows earlier resizes pushed into the scrollback (a shorter window
+  /// with the cursor at the bottom) that a taller one may bring back.
+  int _pushedByResize = 0;
+
+  /// The scrollback right after the last resize; a different value at the
+  /// next resize means output scrolled since, and the rows pushed then are
+  /// no longer the ones above the screen.
+  int? _scrollBackAfterResize;
+
+  /// Keeps the screen where it is across a resize (M-1):
+  /// - xterm's reflow keeps every blank row under the cursor, so wrapping
+  ///   for a narrower window pushed the top line into the scrollback while
+  ///   the screen ended in empty rows. Only what this resize pushed is
+  ///   undone, by dropping blank rows below the cursor (as iTerm2 and
+  ///   Terminal.app do).
+  /// - A taller window makes xterm pull scrollback down over the screen;
+  ///   after a clear (Ctrl+L) that brought old output back and moved the
+  ///   prompt down. Only rows an earlier resize pushed up come back; the
+  ///   rest stays in the scrollback and the new rows are blank below.
   @override
   void resize(
     int newWidth,
@@ -43,16 +57,34 @@ final class DesktopTerminal extends Terminal {
     int? pixelWidth,
     int? pixelHeight,
   ]) {
-    super.resize(newWidth, newHeight, pixelWidth, pixelHeight);
-    if (isUsingAltBuffer) return;
     final buffer = mainBuffer;
-    while (buffer.scrollBack > 0 &&
-        buffer.height - 1 > buffer.absoluteCursorY &&
-        buffer.lines[buffer.height - 1].getTrimmedLength() == 0) {
-      buffer.lines.pop();
-      // The screen's top moved up one row: keep the cursor on its line.
-      buffer.setCursorY(buffer.cursorY + 1);
+    final before = buffer.scrollBack;
+    if (_scrollBackAfterResize != before) _pushedByResize = 0;
+    super.resize(newWidth, newHeight, pixelWidth, pixelHeight);
+    if (!isUsingAltBuffer) {
+      while (buffer.scrollBack > before &&
+          buffer.height - 1 > buffer.absoluteCursorY &&
+          buffer.lines[buffer.height - 1].getTrimmedLength() == 0) {
+        buffer.lines.pop();
+        // The screen's top moved up one row: keep the cursor on its line.
+        buffer.setCursorY(buffer.cursorY + 1);
+      }
+      final after = buffer.scrollBack;
+      if (after > before) {
+        _pushedByResize += after - before;
+      } else if (after < before) {
+        final pulled = before - after;
+        final allowed = pulled < _pushedByResize ? pulled : _pushedByResize;
+        _pushedByResize -= allowed;
+        for (var i = allowed; i < pulled; i++) {
+          // Put back one blank row under the screen: its top moves down
+          // one row, so the cursor stays on its line.
+          buffer.lines.push(BufferLine(viewWidth));
+          buffer.setCursorY(buffer.cursorY - 1);
+        }
+      }
     }
+    _scrollBackAfterResize = buffer.scrollBack;
   }
 
   @override

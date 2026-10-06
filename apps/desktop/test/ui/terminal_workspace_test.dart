@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -852,6 +853,44 @@ void main() {
       expect(focusIn(find.byKey(const ValueKey('terminal.1'))), isTrue);
     });
   });
+
+  testWorkspace(
+    '⌘A / Ctrl+Shift+A selects all only while the terminal has '
+    'the keyboard',
+    (tester) async {
+      local.add(
+        local.summary(1, origin: SessionOrigin.desktop),
+        backlog: 'first\r\n',
+      );
+      await pumpWorkspace(tester);
+      final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      Future<void> selectAll() async {
+        await tester.sendKeyDownEvent(
+          mac ? LogicalKeyboardKey.metaLeft : LogicalKeyboardKey.controlLeft,
+        );
+        if (!mac) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+        if (!mac) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyUpEvent(
+          mac ? LogicalKeyboardKey.metaLeft : LogicalKeyboardKey.controlLeft,
+        );
+        await tester.pump();
+      }
+
+      page(tester).sidebarFocus.requestFocus();
+      await tester.pump();
+      await selectAll();
+      expect(tabs().selected!.selection.selection, isNull);
+      page(tester).terminalFocus.requestFocus();
+      await tester.pump();
+      await selectAll();
+      expect(tabs().selected!.selection.selection, isNotNull);
+    },
+    variant: TargetPlatformVariant(const {
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+    }),
+  );
 
   group('driver pill placement (S-1, S-2)', () {
     Rect pill(WidgetTester tester) =>

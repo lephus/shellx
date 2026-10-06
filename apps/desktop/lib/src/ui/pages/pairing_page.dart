@@ -92,14 +92,11 @@ class _PairingPageState extends ConsumerState<PairingPage> {
             key: const Key('pairing.countdown'),
             textAlign: TextAlign.center,
           ),
-        if (state.relay != RelayConnectionState.connected) ...[
-          const SizedBox(height: ShellxSpace.s12),
-          Text(
+        if (state.relay != RelayConnectionState.connected)
+          DialogError(
             l10n.pairingOfflineWarning,
             key: const Key('pairing.offline'),
-            style: TextStyle(color: theme.colorScheme.error),
           ),
-        ],
         const SizedBox(height: ShellxSpace.s24),
         Text(l10n.pairingSecretWarning, style: theme.textTheme.bodySmall),
       ],
