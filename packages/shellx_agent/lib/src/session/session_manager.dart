@@ -848,8 +848,14 @@ final class _LocalView implements LocalSessionView {
 
   final SessionManager _manager;
   final _Session _session;
-  final _output = StreamController<Uint8List>();
+  late final _output = StreamController<Uint8List>(
+    onCancel: () => _subscription.cancel(),
+  );
   late final StreamSubscription<Uint8List> _subscription;
+
+  /// Set by [dispose]: a disposed (or replaced) view must never answer a
+  /// cursor-position or device-attributes query a second time.
+  bool _disposed = false;
 
   @override
   final Uint8List backlog;
@@ -866,15 +872,23 @@ final class _LocalView implements LocalSessionView {
   bool get closedOnRequest => _session.killedOnRequest;
 
   @override
-  void write(Uint8List data) => _manager._localWrite(_session, data);
+  void write(Uint8List data) {
+    if (!_disposed) _manager._localWrite(_session, data);
+  }
+
   @override
-  void reply(Uint8List data) => _manager._localReply(_session, data);
+  void reply(Uint8List data) {
+    if (!_disposed) _manager._localReply(_session, data);
+  }
+
   @override
-  void resize(int cols, int rows) =>
-      _manager._localResize(_session, cols, rows);
+  void resize(int cols, int rows) {
+    if (!_disposed) _manager._localResize(_session, cols, rows);
+  }
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_subscription.cancel());
     if (!_output.isClosed) unawaited(_output.close());
   }

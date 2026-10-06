@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -196,11 +197,20 @@ void main() {
     );
     final view = rig.manager.view(id);
     final live = _Collected(view);
+    var exited = false;
+    unawaited(view.exitCode.then((_) => exited = true));
+    final changesSeenBeforeExit = <bool>[];
+    rig.manager.changes.listen((_) => changesSeenBeforeExit.add(!exited));
     rig.clear();
 
     rig.manager.close(id);
 
     expect(rig.manager.sessions, isEmpty);
+    // `changes` is an async broadcast stream, so "at once" means the first
+    // event is delivered before the shell's exit is reported.
+    await Future<void>.value();
+    expect(changesSeenBeforeExit, isNotEmpty);
+    expect(changesSeenBeforeExit.first, isTrue);
     expect(rig.pty(0).killed, isTrue);
     expect(await view.exitCode, FakePty.killExitCode);
     expect(view.closedOnRequest, isTrue);
@@ -251,5 +261,17 @@ void main() {
     await pumpEventQueue();
     expect(a.text.toString(), isEmpty);
     expect(b.text.toString(), 'after');
+  });
+
+  test('a disposed view never writes, replies or resizes', () async {
+    final rig = SessionRig();
+    final id = await rig.manager.open(cols: 80, rows: 24);
+    final view = rig.manager.view(id);
+    view.dispose();
+    view.reply(_b('\x1b[1;1R'));
+    view.write(_b('x'));
+    view.resize(120, 40);
+    expect(rig.pty(0).writes, isEmpty);
+    expect(rig.pty(0).resizes, isEmpty);
   });
 }

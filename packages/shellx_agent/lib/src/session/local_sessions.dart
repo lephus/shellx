@@ -19,7 +19,9 @@ abstract interface class LocalSessions {
   Future<int> open({required int cols, required int rows});
 
   /// One local viewer of session [id]. Throws [StateError] when there is no
-  /// such session.
+  /// such session. The caller must listen to [LocalSessionView.output] or
+  /// call [LocalSessionView.dispose]: until then the view buffers every byte
+  /// the session prints.
   LocalSessionView view(int id);
 
   /// Ends session [id] and its process tree (the desktop may close every
@@ -63,7 +65,9 @@ abstract interface class LocalSessionView {
   /// asking for the terminal); later sizes make the desktop drive.
   void resize(int cols, int rows);
 
-  /// Stops [output]; the session keeps running.
+  /// Stops [output] and ignores later [write], [reply] and [resize]; the
+  /// session keeps running. [driver] is the session's own stream, shared by
+  /// every view: the caller cancels its subscription to it.
   void dispose();
 }
 
