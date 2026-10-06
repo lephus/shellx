@@ -379,4 +379,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(sidebar().renaming, const RenameTab(1));
   });
+
+  testSidebar('Enter on the untouched automatic name keeps it automatic; '
+      'two clicks far apart are no double-click (C6)', (tester) async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop, title: 'vim'));
+    await pumpSidebar(tester);
+    final left = tester.getTopLeft(row(1)) + const Offset(20, 15);
+    await tester.tapAt(left);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(left + const Offset(kDoubleTapSlop + 20, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('row.renameField')), findsNothing);
+
+    await tester.tapAt(left);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(left + const Offset(4, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('row.renameField')), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(tabs().tabs.single.customTitle, isNull);
+    expect(sidebar().renaming, isNull);
+  });
+
+  testSidebar('⌘W while another tab\'s name field is open commits the '
+      'name first (UI-A2 §4)', (tester) async {
+    local
+      ..add(local.summary(1, origin: SessionOrigin.desktop))
+      ..add(local.summary(2, origin: SessionOrigin.desktop));
+    await pumpSidebar(tester);
+    expect(tabs().selectedId, 1);
+    workspaces().startRename(const RenameTab(2));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('row.renameField')), 'api');
+    await chord(tester, [LogicalKeyboardKey.metaLeft], LogicalKeyboardKey.keyW);
+    await tester.pumpAndSettle();
+    expect(local.closed, [1]);
+    expect(tabs().tabs.single.label, 'api');
+    expect(sidebar().renaming, isNull);
+    expect(find.byKey(const Key('row.renameField')), findsNothing);
+  });
+
+  testSidebar('a name field closed from outside (⌘⇧N) keeps what was '
+      'typed', (tester) async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    await pumpSidebar(tester);
+    workspaces().startRename(const RenameTab(1));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('row.renameField')), 'api');
+    await chord(tester, [
+      LogicalKeyboardKey.metaLeft,
+      LogicalKeyboardKey.shiftLeft,
+    ], LogicalKeyboardKey.keyN);
+    await tester.pumpAndSettle();
+    expect(tabs().tabs.first.label, 'api');
+    expect(sidebar().renaming, RenameWorkspace(sidebar().workspaces.last.id));
+  });
 }

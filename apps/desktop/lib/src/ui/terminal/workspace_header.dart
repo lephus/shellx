@@ -206,7 +206,8 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                     width: ShellxSizes.focusRing,
                   ),
                 )
-              : null,
+              // Never null: see SessionTabRow (keeps an open name field).
+              : const BoxDecoration(),
           child: Stack(
             children: [
               Positioned.fill(

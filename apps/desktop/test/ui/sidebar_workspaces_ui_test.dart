@@ -432,10 +432,8 @@ void main() {
     expect(sidebar().workspace(ws)!.collapsed, isTrue);
   });
 
-  testSidebar('in a 46 px row the × and a port under it split their 6 px '
-      'overlap: the upper half closes, the lower half opens the port', (
-    tester,
-  ) async {
+  testSidebar('in a 46 px row a shown × wins its whole column over a port '
+      'under it; elsewhere a port keeps its full 24 px', (tester) async {
     local
       ..add(
         local.summary(
@@ -445,7 +443,7 @@ void main() {
           ports: [3000],
         ),
       )
-      ..add(local.summary(2, origin: SessionOrigin.desktop));
+      ..add(local.summary(2, origin: SessionOrigin.desktop, ports: [4000]));
     await pumpSidebar(tester);
     expect(tabs().selectedId, 1); // × shown
     final close = tester.getRect(
@@ -457,12 +455,19 @@ void main() {
     expect(x, lessThan(min(close.right, port.right))); // one column
     expect(close.bottom - top, 27);
     expect(port.top - top, 21);
-    await tester.tapAt(Offset(x, top + 25));
-    await tester.pumpAndSettle();
-    expect(h.urlOpener.ports, [3000]);
-    expect(local.closed, isEmpty);
-    await tester.tapAt(Offset(x, top + 23));
+    // The bottom edge of the visible 20 px × (y 5–25), and its hit area
+    // below it, close the tab.
+    await tester.tapAt(Offset(close.center.dx, top + 24.5));
     await tester.pumpAndSettle();
     expect(local.closed, [1]);
+    expect(h.urlOpener.ports, isEmpty);
+
+    // Row 2 (selected now): its port sits left of the × column and takes
+    // its whole 24 px, the top 6 px included.
+    expect(tabs().selectedId, 2);
+    final port2 = tester.getRect(find.byKey(const Key('port.4000')));
+    await tester.tapAt(Offset(port2.center.dx, port2.top + 1));
+    await tester.pumpAndSettle();
+    expect(h.urlOpener.ports, [4000]);
   });
 }

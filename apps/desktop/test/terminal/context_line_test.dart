@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/context_line.dart';
 
@@ -51,6 +52,44 @@ void main() {
 
     test('ellipsizeMiddle keeps both ends', () {
       expect(ellipsizeMiddle('~/workspace', 36, _m), '~/w…ce');
+    });
+  });
+
+  group('ellipsis keeps grapheme clusters whole', () {
+    // macOS hands out decomposed (NFD) names: "Tài liệu" with combining
+    // marks; and emoji joined by ZWJ, and flags of two regional letters.
+    const nfd = 'Tài liệu';
+    const emoji = '👨‍👩‍👧 dev 🇻🇳🇺🇸 x';
+
+    bool isMark(String cluster) {
+      final r = cluster.runes.first;
+      return r >= 0x300 && r <= 0x36F;
+    }
+
+    void wholeClusters(String text, String result) {
+      final original = text.characters.toSet();
+      for (final c in result.characters) {
+        if (c == '…') continue;
+        expect(isMark(c), isFalse, reason: 'orphan mark in "$result"');
+        expect(original, contains(c), reason: 'split cluster in "$result"');
+      }
+    }
+
+    test('ellipsizeEnd never cuts inside a letter or an emoji', () {
+      expect(ellipsizeEnd('liệu', 24, _m), 'li…');
+      for (final text in [nfd, emoji]) {
+        for (var w = 0.0; w <= 120; w += 3) {
+          wholeClusters(text, ellipsizeEnd(text, w, _m));
+        }
+      }
+    });
+
+    test('ellipsizeMiddle never leaves a mark or half an emoji', () {
+      for (final text in [nfd, emoji]) {
+        for (var w = 0.0; w <= 120; w += 3) {
+          wholeClusters(text, ellipsizeMiddle(text, w, _m));
+        }
+      }
     });
   });
 

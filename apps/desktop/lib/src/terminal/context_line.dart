@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 /// UI-A2 §2.2 shares.
 const double _portPadding = 4; // 2 × ShellxSizes.portPadH
@@ -36,10 +37,12 @@ String ellipsizeEnd(
   double Function(String) measure,
 ) {
   if (measure(text) <= maxWidth) return text;
-  final runes = text.runes.toList();
-  String cut(int n) => '${String.fromCharCodes(runes.take(n))}…';
+  // Whole grapheme clusters: an NFD "ệ" (e + two marks) or a ZWJ emoji
+  // is never cut in two.
+  final chars = text.characters.toList();
+  String cut(int n) => '${chars.take(n).join()}…';
   var lo = 0;
-  var hi = runes.length - 1;
+  var hi = chars.length - 1;
   while (lo < hi) {
     final mid = (lo + hi + 1) ~/ 2;
     if (measure(cut(mid)) <= maxWidth) {
@@ -58,16 +61,16 @@ String ellipsizeMiddle(
   double Function(String) measure,
 ) {
   if (measure(text) <= maxWidth) return text;
-  final runes = text.runes.toList();
+  final chars = text.characters.toList(); // whole grapheme clusters
   String cut(int n) {
     final head = (n + 1) ~/ 2;
     final tail = n - head;
-    return '${String.fromCharCodes(runes.take(head))}…'
-        '${String.fromCharCodes(runes.skip(runes.length - tail))}';
+    return '${chars.take(head).join()}…'
+        '${chars.skip(chars.length - tail).join()}';
   }
 
   var lo = 0;
-  var hi = runes.length - 1;
+  var hi = chars.length - 1;
   while (lo < hi) {
     final mid = (lo + hi + 1) ~/ 2;
     if (measure(cut(mid)) <= maxWidth) {

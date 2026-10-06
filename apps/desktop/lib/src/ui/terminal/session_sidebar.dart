@@ -204,8 +204,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   }
 
   /// The ring shows only for keyboard focus (UI §3).
+  /// Not while a name field inside the list has the keyboard: the field's
+  /// own border shows where typing goes.
   bool get _showFocus =>
-      widget.focusNode.hasFocus &&
+      widget.focusNode.hasPrimaryFocus &&
       FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
 
   /// UI §3.6 list keys. ↑/↓/Home/End move the selection itself (the
@@ -461,21 +463,41 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
   }
 
+  /// Enter on the automatic name as it opened changes nothing: storing it
+  /// would freeze the OSC title and offer "Use automatic name" for a name
+  /// the user never chose.
   void _commitTabName(int id, String text) {
-    ref.read(terminalTabsProvider.notifier).rename(id, text);
-    _endRename();
+    if (!mounted) return;
+    final tab = ref
+        .read(terminalTabsProvider)
+        .tabs
+        .where((t) => t.id == id)
+        .firstOrNull;
+    final untouched =
+        tab != null && tab.customTitle == null && text.trim() == tab.label;
+    if (tab != null && !untouched) {
+      ref.read(terminalTabsProvider.notifier).rename(id, text);
+    }
+    _endRename(RenameTab(id));
   }
 
   void _commitWorkspaceName(String id, String text) {
+    if (!mounted) return;
     ref.read(sidebarWorkspacesProvider.notifier).rename(id, text);
-    _endRename();
+    _endRename(RenameWorkspace(id));
   }
 
   /// Closes the name field and hands the keyboard back: to the list when
   /// the list opened it, else to the terminal. A field that closed because
   /// the focus went somewhere on purpose (another click, ⌘T, ⌘1, a
   /// dialog) leaves the focus there.
-  void _endRename() {
+  ///
+  /// A field that went away while another rename took over (⌘⇧N opened
+  /// a workspace's field) only saves its text: [target] is no longer the
+  /// open one, so neither the rename nor the focus is touched.
+  void _endRename(RenameTarget target) {
+    if (!mounted) return;
+    if (ref.read(sidebarWorkspacesProvider).renaming != target) return;
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final fromList =
         _renameFromList != null &&
@@ -880,8 +902,14 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _stopDrag();
   }
 
-  Widget _draggable(TerminalTab tab, String home, Widget row) => _RowDraggable(
+  Widget _draggable(
+    TerminalTab tab,
+    String home,
+    Widget row, {
+    required bool enabled,
+  }) => _RowDraggable(
     data: tab.id,
+    maxSimultaneousDrags: enabled ? null : 0,
     dragAnchorStrategy: _anchor,
     feedback: _DragFeedback(tab: tab, home: home),
     childWhenDragging: Opacity(
@@ -1025,7 +1053,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             onToggle: () => workspaces.toggleCollapsed(w.id),
             onStartRename: () => _startWorkspaceRename(w.id, fromList: false),
             onRename: (text) => _commitWorkspaceName(w.id, text),
-            onCancelRename: _endRename,
+            onCancelRename: () => _endRename(RenameWorkspace(w.id)),
             onNewTab: () => unawaited(workspaces.openTabIn(w.id)),
             onMenu: (at) => unawaited(_headerMenu(w, at)),
             onDelete: () => workspaces.delete(w.id),
@@ -1092,7 +1120,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         onClose: () => widget.onClose(tab),
         onStartRename: () => _startTabRename(tab.id, fromList: false),
         onRename: (text) => _commitTabName(tab.id, text),
-        onCancelRename: _endRename,
+        onCancelRename: () => _endRename(RenameTab(tab.id)),
         onOpenPort: (port) => unawaited(_openPort(port)),
         onMenu: (at) => unawaited(_rowMenu(tab, at)),
         extraActions: _rowActions(l10n, tab),
@@ -1102,10 +1130,15 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         gap,
         KeyedSubtree(
           key: ValueKey('tab.${tab.id}'),
-          // The open name field takes the clicks and drags (UI-A2 §4).
-          child: sidebar.renaming == RenameTab(tab.id)
-              ? row
-              : _draggable(tab, home, row),
+          // The open name field takes the clicks and drags (UI-A2 §4). The
+          // draggable stays in the tree (only switched off), so opening the
+          // field never rebuilds the row's subtree.
+          child: _draggable(
+            tab,
+            home,
+            row,
+            enabled: sidebar.renaming != RenameTab(tab.id),
+          ),
         ),
       );
     }
@@ -1252,6 +1285,7 @@ class _RowDraggable extends Draggable<int> {
     super.onDragStarted,
     super.onDragEnd,
     super.onDraggableCanceled,
+    super.maxSimultaneousDrags,
   });
 
   @override

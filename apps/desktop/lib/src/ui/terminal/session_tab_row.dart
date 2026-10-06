@@ -134,6 +134,10 @@ class SessionTabRowState extends State<SessionTabRow> {
   /// would hold every single click for the double-tap timeout, and A1
   /// switches tabs on the click itself.
   DateTime? _lastTap;
+  Offset? _lastTapAt;
+
+  /// Where the pointer went down for the click being handled.
+  Offset? _downAt;
 
   @override
   void didUpdateWidget(SessionTabRow oldWidget) {
@@ -144,6 +148,7 @@ class SessionTabRowState extends State<SessionTabRow> {
       _hover = false;
       _pressed = false;
       _lastTap = null;
+      _lastTapAt = null;
     }
   }
 
@@ -166,7 +171,7 @@ class SessionTabRowState extends State<SessionTabRow> {
           displayPath(cwd, home: widget.home, windows: windows),
         ),
       if (tab.ports.isNotEmpty)
-        l10n.sidebarPorts(tab.ports.length, tab.ports.join(', ')),
+        l10n.sidebarPorts(tab.ports.length, _sortedPorts(tab).join(', ')),
       if (tab.origin == SessionOrigin.phone) l10n.sidebarPhoneOriginSemantics,
       if (tab.phoneAttached)
         tab.driver == DriverSide.phone
@@ -200,16 +205,25 @@ class SessionTabRowState extends State<SessionTabRow> {
   /// selected the row).
   void _onTap() {
     final now = DateTime.now();
+    final at = _downAt;
     final last = _lastTap;
+    final lastAt = _lastTapAt;
     final rename = widget.onStartRename;
+    // Same rules as Flutter's double-tap: within the timeout and within
+    // kDoubleTapSlop of the first click.
     if (rename != null &&
         last != null &&
-        now.difference(last) < kDoubleTapTimeout) {
+        now.difference(last) < kDoubleTapTimeout &&
+        (at == null ||
+            lastAt == null ||
+            (at - lastAt).distance < kDoubleTapSlop)) {
       _lastTap = null;
+      _lastTapAt = null;
       rename();
       return;
     }
     _lastTap = now;
+    _lastTapAt = at;
     widget.onSelect();
   }
 
@@ -271,9 +285,9 @@ class SessionTabRowState extends State<SessionTabRow> {
     final contextLine = scaler.scale(ShellxSizes.contextLine);
     final contextBox = max(contextLine, ShellxSizes.portHit);
     // The 24 px title box (×) and the 24 px context box (ports) overlap
-    // by 6 px in a 46 px row. A port under the × would take the ×'s lower
-    // 6 px; instead the overlap is split at its middle, so each keeps
-    // 21 px there and its full 24 px everywhere else.
+    // by 6 px in a 46 px row. Where a shown × sits, it wins that strip
+    // whole (its 20 px glyph reaches y 25); left of the ×'s column the
+    // ports keep their full 24 px.
     final titleTop =
         ShellxSizes.rowContextPadding + titleLine / 2 - titleBox / 2;
     final contextTop =
@@ -373,7 +387,12 @@ class SessionTabRowState extends State<SessionTabRow> {
             // While renaming, clicks belong to the field (cursor, selection,
             // its own context menu).
             onTap: renaming ? null : _onTap,
-            onTapDown: renaming ? null : (_) => _setPressed(true),
+            onTapDown: renaming
+                ? null
+                : (details) {
+                    _downAt = details.globalPosition;
+                    _setPressed(true);
+                  },
             onTapUp: renaming ? null : (_) => _setPressed(false),
             onTapCancel: renaming ? null : () => _setPressed(false),
             onSecondaryTapUp: renaming
@@ -397,7 +416,9 @@ class SessionTabRowState extends State<SessionTabRow> {
                         width: ShellxSizes.focusRing,
                       ),
                     )
-                  : null,
+                  // Never null: a decoration that comes and goes would
+                  // change the subtree and rebuild an open name field.
+                  : const BoxDecoration(),
               child: Stack(
                 children: [
                   if (widget.selected)
@@ -435,10 +456,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                       // top; the box is as tall as the 24 px close button.
                       top: titleTop,
                       height: titleBox,
-                      child: _HitBand(
-                        bottom: overlap / 2,
-                        child: Padding(padding: rowPadding, child: titleRow),
-                      ),
+                      child: Padding(padding: rowPadding, child: titleRow),
                     ),
                     Positioned(
                       left: ShellxSizes.contextInset,
@@ -448,7 +466,13 @@ class SessionTabRowState extends State<SessionTabRow> {
                       top: contextTop,
                       height: contextBox,
                       child: _HitBand(
-                        top: overlap / 2,
+                        // The ×'s column, measured from the line's right
+                        // edge: the line ends 8 px in, the × hit area 6.
+                        cornerWidth: showClose
+                            ? ShellxSizes.rowCloseHit -
+                                  (ShellxSpace.s8 - rowPadding.right)
+                            : 0,
+                        cornerHeight: overlap,
                         child: _ContextLine(
                           tab: tab,
                           home: widget.home,
@@ -467,36 +491,41 @@ class SessionTabRowState extends State<SessionTabRow> {
   }
 }
 
-/// Takes hits only between [top] from its top edge and [bottom] from its
-/// bottom edge; the rest falls through to what lies below (the other line
-/// of the row, or the row itself).
+/// Takes no hits in its top-right corner of [cornerWidth] × [cornerHeight]
+/// (where the shown × of the title line reaches down); those fall through
+/// to the × below it.
 class _HitBand extends SingleChildRenderObjectWidget {
-  const _HitBand({this.top = 0, this.bottom = 0, required super.child});
-  final double top;
-  final double bottom;
+  const _HitBand({
+    required this.cornerWidth,
+    required this.cornerHeight,
+    required super.child,
+  });
+  final double cornerWidth;
+  final double cornerHeight;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderHitBand(top, bottom);
+      _RenderHitBand(cornerWidth, cornerHeight);
 
   @override
   void updateRenderObject(BuildContext context, _RenderHitBand renderObject) {
     renderObject
-      ..top = top
-      ..bottom = bottom;
+      ..cornerWidth = cornerWidth
+      ..cornerHeight = cornerHeight;
   }
 }
 
 class _RenderHitBand extends RenderProxyBox {
-  _RenderHitBand(this.top, this.bottom);
-  double top;
-  double bottom;
+  _RenderHitBand(this.cornerWidth, this.cornerHeight);
+  double cornerWidth;
+  double cornerHeight;
 
   @override
-  bool hitTest(BoxHitTestResult result, {required Offset position}) =>
-      position.dy >= top &&
-      position.dy < size.height - bottom &&
-      super.hitTest(result, position: position);
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    final inCorner =
+        position.dx >= size.width - cornerWidth && position.dy < cornerHeight;
+    return !inCorner && super.hitTest(result, position: position);
+  }
 }
 
 /// The row's "×" (UI §2.2): 24 hit, 20 visual, `Icons.close` 14; hover
@@ -713,10 +742,11 @@ class _ContextLine extends StatelessWidget {
           painter.dispose();
           return width;
         });
+        final ports = _sortedPorts(tab);
         final layout = layoutContextLine(
           branch: tab.gitBranch,
           path: path,
-          ports: tab.ports,
+          ports: ports,
           width: constraints.maxWidth,
           measure: measure,
           windows: windows,
@@ -750,7 +780,7 @@ class _ContextLine extends StatelessWidget {
               ..add(const SizedBox(width: ShellxSizes.portGap))
               ..add(
                 Tooltip(
-                  message: l10n.portsMoreTooltip(tab.ports.join(', ')),
+                  message: l10n.portsMoreTooltip(ports.join(', ')),
                   excludeFromSemantics: true,
                   positionDelegate: besideSidebar,
                   child: text('+${layout.morePorts}'),
@@ -769,7 +799,7 @@ class _ContextLine extends StatelessWidget {
           final whole = [
             ?tab.gitBranch,
             ?path,
-            if (tab.ports.isNotEmpty) tab.ports.map((p) => ':$p').join(' '),
+            if (ports.isNotEmpty) ports.map((p) => ':$p').join(' '),
           ].join(' · ');
           line = Tooltip(
             message: whole,
@@ -857,3 +887,6 @@ class _PortLinkState extends State<_PortLink> {
     );
   }
 }
+
+/// One order everywhere (line, tooltips, semantics): the smallest first.
+List<int> _sortedPorts(TerminalTab tab) => [...tab.ports]..sort();

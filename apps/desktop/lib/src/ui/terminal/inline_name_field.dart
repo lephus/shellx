@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -72,9 +73,18 @@ class _InlineNameFieldState extends State<InlineNameField> {
     widget.onCancel();
   }
 
+  /// Closed from outside without Enter or Esc (another rename took over,
+  /// the row scrolled out of the lazy list): what was typed is kept. After
+  /// the frame that removed the field, since the commit changes providers.
   @override
   void dispose() {
     _focus.removeListener(_onFocus);
+    if (!_done) {
+      _done = true;
+      final text = _controller.text;
+      final commit = widget.onCommit;
+      scheduleMicrotask(() => commit(text));
+    }
     _focus.dispose();
     _controller.dispose();
     super.dispose();
@@ -151,7 +161,6 @@ class _InlineNameFieldState extends State<InlineNameField> {
               cursorColor: ShellxDesktopColors.accent,
               maxLines: 1,
               maxLength: InlineNameField.maxLength,
-              maxLengthEnforcement: MaxLengthEnforcement.enforced,
               textAlignVertical: TextAlignVertical.center,
               onSubmitted: (_) => _commit(),
               decoration: InputDecoration(

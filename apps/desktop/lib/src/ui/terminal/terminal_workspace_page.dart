@@ -112,6 +112,12 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         focusTerminal();
       }),
       CloseTabIntent: run<CloseTabIntent>((_) {
+        // UI-A2 §4: an open name field (maybe another tab's) is saved
+        // first; losing the focus commits it.
+        if (ref.read(sidebarWorkspacesProvider).renaming != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          FocusManager.instance.applyFocusChangesIfNeeded();
+        }
         final selected = ref.read(terminalTabsProvider).selected;
         if (selected == null) {
           // UI §2.7 (accepted): ⌘W on the empty state hides the window.
