@@ -479,20 +479,30 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     }
   }
 
-  /// A new tab, placed like any desktop tab (the current workspace); with
+  /// A new tab, placed like any desktop tab (the current workspace), or
+  /// straight into [workspace] when given (A7 D14: never passing through
+  /// the current one, nothing expanded — gone by then: Default); with
   /// [select] it is selected, else the selection stays (A7 D14: the
   /// command line does not take the keyboard). Returns its id. Throws
   /// [OpenBusyException] while another open is in flight,
   /// [SessionLimitException], [SpawnFailedException], and
   /// [PaneGoneException] when the shell ended before it could be placed.
-  Future<int> openTabFor({String? cwd, bool select = false}) => _guardedOpen(
+  Future<int> openTabFor({
+    String? cwd,
+    bool select = false,
+    String? workspace,
+  }) => _guardedOpen(
     () => _local.open(cols: _grid.cols, rows: _grid.rows, cwd: cwd),
     (id) {
+      final placement = ref.read(restorePlacementProvider);
+      // Before the tab appears: the sidebar takes it as it places the tab.
+      if (workspace != null) placement.pending[id] = workspace;
       // A5a D16: placed now, even while a restore's opens are pending.
       _sync(own: id);
       // The new shell may already be gone (exit 0, or ended before it
       // could be viewed): then keep a selection that exists.
       final opened = state.tabOfSession(id);
+      if (opened == null) placement.pending.remove(id);
       if (select) {
         if (opened != null) _restoreMaySelect = false;
         _set(

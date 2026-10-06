@@ -294,4 +294,137 @@ void main() {
     await expectLater(call('ui.nope'), fails('unknown_type'));
     await expectLater(call('ui.browser.list'), fails('unknown_type'));
   });
+
+  group('A7 Task 6 review', () {
+    SidebarWorkspaces sidebar() => c.read(sidebarWorkspacesProvider.notifier);
+
+    /// Every list of tabs the current (Default) workspace showed.
+    List<List<int>> watchDefault() {
+      final seen = <List<int>>[];
+      c.listen<SidebarState>(
+        sidebarWorkspacesProvider,
+        (_, s) => seen.add(s.tabsOf(kDefaultWorkspaceId)),
+      );
+      return seen;
+    }
+
+    test('I1: --workspace places the tab straight there; collapsed '
+        'workspaces stay collapsed', () async {
+      final ws = sidebar().createFor(name: 'api');
+      sidebar().setCollapsed(kDefaultWorkspaceId, true);
+      sidebar().setCollapsed(ws, true);
+      final seen = watchDefault();
+      final r = await call('ui.tab.new', {'workspace': 'api'});
+      expect(side().tabsOf(ws), [r['tab']]);
+      expect(side().workspace(kDefaultWorkspaceId)!.collapsed, isTrue);
+      expect(side().workspace(ws)!.collapsed, isTrue);
+      expect(seen.any((ids) => ids.contains(r['tab'])), isFalse);
+      expect(side().currentId, kDefaultWorkspaceId);
+    });
+
+    test('I1: workspace new never passes through the current workspace; '
+        'the current one stays collapsed', () async {
+      sidebar().setCollapsed(kDefaultWorkspaceId, true);
+      final seen = watchDefault();
+      final w = await call('ui.workspace.new', {'name': 'web'});
+      expect(side().tabsOf(w['workspace']! as String), [w['tab']]);
+      expect(side().workspace(kDefaultWorkspaceId)!.collapsed, isTrue);
+      expect(seen.any((ids) => ids.contains(w['tab'])), isFalse);
+    });
+
+    test(
+      'I1: a workspace whose tab could not open is removed, silently',
+      () async {
+        local.openError = const SessionLimitException(32);
+        await expectLater(
+          call('ui.workspace.new', {'name': 'web'}),
+          fails('session_limit'),
+        );
+        expect(side().workspaces.map((w) => w.id), [kDefaultWorkspaceId]);
+        expect(tabs().notice, isNull);
+      },
+    );
+
+    test('M4: the workspace is resolved again after the wait; deleted '
+        'meanwhile → not_found, nothing opened', () async {
+      final ws = sidebar().createFor(name: 'api');
+      local.openGate = Completer<void>();
+      final user = c.read(terminalTabsProvider.notifier).openTab();
+      final cli = call('ui.tab.new', {'workspace': 'api'});
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      sidebar().delete(ws);
+      local.openGate!.complete();
+      await user;
+      await expectLater(cli, fails('not_found'));
+      expect(local.opens, hasLength(2)); // setUp's and the user's
+    });
+
+    test('M3: a client that leaves during the D33 wait stops it; nothing '
+        'opens after', () async {
+      local.openGate = Completer<void>();
+      final user = c.read(terminalTabsProvider.notifier).openTab();
+      final left = Completer<void>();
+      final cli = h.handle(
+        const MuxMessage('ui.tab.new', q: 1),
+        cancelled: left.future,
+      );
+      final ws = h.handle(
+        const MuxMessage('ui.workspace.new', q: 2),
+        cancelled: left.future,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      left.complete();
+      // At once, not after the 10 s D33 wait.
+      const soon = Duration(milliseconds: 500);
+      await expectLater(cli.timeout(soon), throwsA(isA<CliFailure>()));
+      await expectLater(ws.timeout(soon), throwsA(isA<CliFailure>()));
+      expect(side().workspaces, hasLength(1));
+      local.openGate!.complete();
+      await user;
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      expect(local.opens, hasLength(2));
+    });
+
+    test('M2: closing a tab marks nothing; closing a pane marks only its '
+        'tab', () async {
+      await call('ui.pane.split', {'pane': 100}); // 101
+      c.read(agentMarksProvider.notifier).state = const AgentMarksState();
+      await call('ui.close', {'pane': 101});
+      expect(c.read(agentMarksProvider).tabs.keys, [100]);
+      expect(c.read(agentMarksProvider).panes, isEmpty);
+      await call('ui.tab.new'); // 102
+      c.read(agentMarksProvider.notifier).state = const AgentMarksState();
+      await call('ui.close', {'tab': 102});
+      expect(c.read(agentMarksProvider).tabs, isEmpty);
+      await call('ui.close', {'pane': 100}); // the last pane: the tab goes
+      expect(c.read(agentMarksProvider).tabs, isEmpty);
+    });
+
+    test('M7: close @focused closes the focused pane', () async {
+      await call('ui.pane.split', {'pane': 100, 'focus': true}); // 101
+      await call('ui.close', {'pane': '@focused'});
+      expect(local.closed, [101]);
+      expect(tabs().selected!.paneOrder, [100]);
+    });
+
+    test('M7: focus on an exited pane selects and focuses it', () async {
+      await call('ui.tab.new'); // 101
+      await call('ui.pane.split', {'pane': 101}); // 102
+      local.views[102]!.end(3);
+      await pumpEventQueue();
+      expect(tabs().tabOfSession(102)!.panes[102]!.exited, isTrue);
+      await call('ui.focus', {'pane': 102});
+      expect(tabs().selectedId, 101);
+      expect(tabs().selected!.focusedPaneId, 102);
+    });
+
+    test('M7: new tab with --focus and --workspace makes that workspace '
+        'current', () async {
+      final ws = sidebar().createFor(name: 'api');
+      final r = await call('ui.tab.new', {'workspace': 'api', 'focus': true});
+      expect(tabs().selectedId, r['tab']);
+      expect(side().workspaceOf(r['tab']! as int), ws);
+      expect(side().currentId, ws);
+    });
+  });
 }

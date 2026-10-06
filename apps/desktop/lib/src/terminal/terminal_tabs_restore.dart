@@ -41,10 +41,11 @@ final class RestoreOutcome {
   int get tabsRestored => tabIdByKey.length;
 }
 
-/// A5a criterion 1: where a restored tab goes in the sidebar. The tab
-/// list writes [pending] just before the tab appears; the sidebar takes
-/// the entry when it places the tab — in its saved workspace (null or
-/// gone: Default), without expanding anything. The sidebar sets [isShown]
+/// A5a criterion 1: where a restored tab goes in the sidebar — and A7 D14,
+/// where a command-line tab with a target workspace goes. The tab list
+/// writes [pending] just before the tab appears; the sidebar takes the
+/// entry when it places the tab — in that workspace (null or gone:
+/// Default), without expanding anything. The sidebar sets [isShown]
 /// while it exists, so restore's D10 fallback picks a tab the user sees.
 final class RestorePlacement {
   final pending = <int, String?>{};

@@ -57,12 +57,12 @@ final class UiCommandHandler implements UiApi {
     final t = request.type;
     return switch (t) {
       CliType.uiLs => _ls(),
-      CliType.uiTabNew => _tabNew(request),
+      CliType.uiTabNew => _tabNew(request, cancelled),
       CliType.uiTabRename => _tabRename(request),
-      CliType.uiPaneSplit => _split(request),
+      CliType.uiPaneSplit => _split(request, cancelled),
       CliType.uiFocus => _focus(request),
       CliType.uiClose => _close(request),
-      CliType.uiWorkspaceNew => _workspaceNew(request),
+      CliType.uiWorkspaceNew => _workspaceNew(request, cancelled),
       CliType.uiWorkspaceRename => _workspaceRename(request),
       CliType.uiWorkspaceMove => _workspaceMove(request),
       // Task 7: ui.pane.send / read / wait. Task 8: ui.notify, events.
@@ -90,10 +90,21 @@ final class UiCommandHandler implements UiApi {
   }
 
   /// D33: retries while another open is in flight (every 50 ms, up to
-  /// [openWait]); maps the tab list's failures to wire codes.
-  Future<T> _opening<T>(Future<T> Function() open) async {
+  /// [openWait]); maps the tab list's failures to wire codes. Once the
+  /// client is gone ([cancelled]) it stops waiting and never opens.
+  /// [open] runs afresh on every try (what it resolves may have changed).
+  Future<T> _opening<T>(
+    Future<T> Function() open,
+    Future<void>? cancelled,
+  ) async {
+    var gone = false;
+    final left = cancelled?.then<void>(
+      (_) => gone = true,
+      onError: (Object _) => gone = true,
+    );
     final waited = Stopwatch()..start();
     while (true) {
+      if (gone) throw const CliFailure(MuxError.busy, 'the client left');
       try {
         return await open();
       } on OpenBusyException {
@@ -103,7 +114,10 @@ final class UiCommandHandler implements UiApi {
             'ShellX is opening another shell; try again',
           );
         }
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await Future.any([
+          Future<void>.delayed(const Duration(milliseconds: 50)),
+          ?left,
+        ]);
       } on PaneNoRoomException {
         throw const CliFailure(
           CliError.noRoom,
@@ -190,18 +204,26 @@ final class UiCommandHandler implements UiApi {
 
   /// D14: in [workspace] (default: the current one), not selected unless
   /// `focus`.
-  Future<Map<String, Object?>> _tabNew(MuxMessage r) async {
+  /// The workspace is resolved on every try: one deleted during the D33
+  /// wait is `not_found`, and nothing opens.
+  Future<Map<String, Object?>> _tabNew(
+    MuxMessage r,
+    Future<void>? cancelled,
+  ) async {
     final wsKey = _string(r, 'workspace');
-    final ws = wsKey == null
-        ? null
-        : resolveWorkspace(_sideState, wsKey, _side.displayName);
     final cwd = _string(r, 'cwd');
     final cmd = _string(r, 'cmd', max: 16384);
     final select = _flag(r, 'focus');
     final tab = await _opening(
-      () => _tabs.openTabFor(cwd: cwd, select: select),
+      () => _tabs.openTabFor(
+        cwd: cwd,
+        select: select,
+        workspace: wsKey == null
+            ? null
+            : resolveWorkspace(_sideState, wsKey, _side.displayName),
+      ),
+      cancelled,
     );
-    if (ws != null) _side.moveTab(tab, ws);
     if (select) _side.reveal(tab);
     _marks.touch(tab: tab, pane: tab);
     if (cmd != null) onCommand?.call(tab, cmd);
@@ -210,7 +232,10 @@ final class UiCommandHandler implements UiApi {
 
   /// D15: any pane of any tab; focus and selection stay unless `focus`,
   /// which then focuses the new pane and selects its tab (as `ui.focus`).
-  Future<Map<String, Object?>> _split(MuxMessage r) async {
+  Future<Map<String, Object?>> _split(
+    MuxMessage r,
+    Future<void>? cancelled,
+  ) async {
     final target = resolvePane(_tabsState, parseTarget(r.fields['pane'], null));
     final axis = switch (r.fields['direction'] ?? 'right') {
       'right' => SplitAxis.row,
@@ -222,6 +247,7 @@ final class UiCommandHandler implements UiApi {
     final focus = _flag(r, 'focus');
     final pane = await _opening(
       () => _tabs.splitPaneFor(target, axis, cwd: cwd, focus: focus),
+      cancelled,
     );
     final tab = _tabsState.tabOfSession(pane)!.id;
     if (focus) {
@@ -250,6 +276,8 @@ final class UiCommandHandler implements UiApi {
   }
 
   /// D18: a running command needs `force`; no dialog opens on the window.
+  /// The Agent mark goes on what is left: nothing for a closed tab, the
+  /// tab for a closed pane (unless it was the last).
   Future<Map<String, Object?>> _close(MuxMessage r) async {
     final target = parseTarget(r.fields['pane'], r.fields['tab']);
     final force = _flag(r, 'force');
@@ -257,14 +285,14 @@ final class UiCommandHandler implements UiApi {
     if (target is TabRef) {
       final tab = resolveTab(s, target);
       if (!force && _tabs.needsCloseConfirm(tab)) throw _runningCommand;
-      _marks.touch(tab: tab);
       _tabs.close(tab);
       return const {};
     }
     final pane = resolvePane(s, target);
     if (!force && _tabs.needsPaneCloseConfirm(pane)) throw _runningCommand;
-    _marks.touch(tab: s.tabOfSession(pane)!.id, pane: pane);
+    final tab = s.tabOfSession(pane)!.id;
     _tabs.closePane(pane);
+    if (_tabsState.tabs.any((t) => t.id == tab)) _marks.touch(tab: tab);
     return const {};
   }
 
@@ -278,15 +306,27 @@ final class UiCommandHandler implements UiApi {
 
   // ---- workspaces (D22) ---------------------------------------------------
 
-  /// A new workspace always has a tab (A2): the tab opens first, so a
-  /// failed open leaves no empty workspace behind. The current workspace
-  /// and the selection stay unless `focus`; no name field opens.
-  Future<Map<String, Object?>> _workspaceNew(MuxMessage r) async {
+  /// A new workspace always has a tab (A2): the tab opens straight into it
+  /// (never through the current workspace); when it cannot open, the
+  /// empty workspace goes again, silently. The current workspace and the
+  /// selection stay unless `focus`; no name field opens.
+  Future<Map<String, Object?>> _workspaceNew(
+    MuxMessage r,
+    Future<void>? cancelled,
+  ) async {
     final name = _string(r, 'name', max: 1024);
     final focus = _flag(r, 'focus');
-    final tab = await _opening(() => _tabs.openTabFor(select: focus));
     final ws = _side.createFor(name: name);
-    _side.moveTab(tab, ws);
+    final int tab;
+    try {
+      tab = await _opening(
+        () => _tabs.openTabFor(select: focus, workspace: ws),
+        cancelled,
+      );
+    } on Object {
+      _side.discard(ws); // a workspace always has a tab (A2)
+      rethrow;
+    }
     _marks.touch(tab: tab, pane: tab);
     return {'workspace': ws, 'tab': tab};
   }
