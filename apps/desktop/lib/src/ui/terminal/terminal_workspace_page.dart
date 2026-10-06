@@ -149,14 +149,15 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       paneId: paneId,
     );
     if (!mounted) return;
-    final left = ref
+    final after = ref
         .read(terminalTabsProvider)
         .tabs
         .where((t) => t.id == tab.id)
-        .firstOrNull
-        ?.paneCount;
-    if (tab.isSplit && left != null && left < tab.paneCount) {
-      _announce(l10n.paneAnnounceClosed(left));
+        .firstOrNull;
+    // Only this pane going away is news: a cancelled dialog says nothing,
+    // even when another pane exited meanwhile.
+    if (tab.isSplit && after != null && !after.panes.containsKey(paneId)) {
+      _announce(l10n.paneAnnounceClosed(after.paneCount));
     }
     focusTerminal();
   }
@@ -202,12 +203,17 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   }
 
   /// ⌘D / ⌘⇧D, the menus: the new pane is announced and gets the keyboard.
+  /// Announced only while the split tab is still the one shown: a tab
+  /// switch during a pending open must not speak for another tab.
   Future<void> _splitPane(SplitAxis axis) async {
-    final before = ref.read(terminalTabsProvider).selected?.paneCount ?? 0;
+    final origin = ref.read(terminalTabsProvider).selected;
+    if (origin == null) return;
     await ref.read(terminalTabsProvider.notifier).split(axis);
     if (!mounted) return;
     final tab = ref.read(terminalTabsProvider).selected;
-    if (tab != null && tab.paneCount > before) {
+    if (tab != null &&
+        tab.id == origin.id &&
+        tab.paneCount > origin.paneCount) {
       _announce(
         AppLocalizations.of(
           context,
@@ -280,18 +286,21 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         // AltGr+digit types `{ [ ] }` on many layouts (German, Polish…).
         enabled: _leftAltOnly,
       ),
-      // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell.
-      SplitPaneIntent: run<SplitPaneIntent>(
-        (intent) => unawaited(_splitPane(intent.axis)),
-        enabled: _split,
-      ),
+      // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell; like the
+      // other window shortcuts they close the panel first (UI-A4 §5.3).
+      SplitPaneIntent: run<SplitPaneIntent>((intent) {
+        closePanel();
+        unawaited(_splitPane(intent.axis));
+      }, enabled: _split),
       FocusPaneIntent: run<FocusPaneIntent>((intent) {
+        closePanel();
         if (tabs.focusDirection(intent.direction)) {
           focusTerminal();
           _announceFocusedPane();
         }
       }, enabled: _isSplit),
       TogglePaneZoomIntent: run<TogglePaneZoomIntent>((_) {
+        closePanel();
         final l10n = AppLocalizations.of(context);
         _announce(
           tabs.toggleZoom()
@@ -300,14 +309,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         );
         focusTerminal();
       }, enabled: _isSplit),
-      EqualizePanesIntent: run<EqualizePanesIntent>(
-        (_) => tabs.equalize(),
-        enabled: _isSplit,
-      ),
-      ResizePaneIntent: run<ResizePaneIntent>(
-        (intent) => tabs.resizeFocused(intent.direction),
-        enabled: _isSplit,
-      ),
+      EqualizePanesIntent: run<EqualizePanesIntent>((_) {
+        closePanel();
+        tabs.equalize();
+      }, enabled: _isSplit),
+      ResizePaneIntent: run<ResizePaneIntent>((intent) {
+        closePanel();
+        tabs.resizeFocused(intent.direction);
+      }, enabled: _isSplit),
       NextTabIntent: run<NextTabIntent>((_) {
         closePanel();
         workspaces.step(1);

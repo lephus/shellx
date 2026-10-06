@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -32,6 +35,12 @@ const meta = LogicalKeyboardKey.metaLeft;
 const shift = LogicalKeyboardKey.shiftLeft;
 const alt = LogicalKeyboardKey.altLeft;
 const control = LogicalKeyboardKey.controlLeft;
+
+TerminalWorkspacePageState page(WidgetTester t) =>
+    t.state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage));
+
+Iterable<String> announced(WidgetTester t) =>
+    t.takeAnnouncements().map((a) => a.message);
 
 void main() {
   setUp(() {
@@ -119,8 +128,28 @@ void main() {
     final semantics = t.ensureSemantics();
     await pumpSidebar(t);
     expect(find.byKey(const Key('row.paneCount.1')), findsNothing);
+    String closeTooltip() => t
+        .widget<Tooltip>(
+          find.descendant(
+            of: row(1),
+            matching: find.byWidgetPredicate(
+              (w) => w is Tooltip && w.richMessage != null,
+            ),
+          ),
+        )
+        .richMessage!
+        .toPlainText();
+    expect(closeTooltip(), contains('⌘W'));
     await t.tap(row(1), buttons: kSecondaryButton);
     await t.pumpAndSettle();
+    // D6: one pane, the menu shows the ⌘W hint.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('menu.closeTab')),
+        matching: find.text('⌘W'),
+      ),
+      findsOneWidget,
+    );
     await t.tap(find.byKey(const Key('menu.row.splitDown')));
     await t.pumpAndSettle();
     expect((only().layout as PaneSplit).axis, SplitAxis.column);
@@ -132,6 +161,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.bySemanticsLabel(RegExp(r'^zsh 2, 2 panes, ')), findsOneWidget);
+    expect(closeTooltip(), 'Close tab (all panes)');
     await t.tap(row(1), buttons: kSecondaryButton);
     await t.pumpAndSettle();
     expect(find.byKey(const Key('menu.row.equalize')), findsOneWidget);
@@ -143,6 +173,94 @@ void main() {
       findsNothing,
     );
     semantics.dispose();
+  });
+
+  testSidebar('pane actions close the notifications panel first '
+      '(UI-A4 §5.3)', (t) async {
+    await pumpSidebar(t);
+    page(t).togglePanel();
+    await t.pump();
+    expect(page(t).panelOpen, isTrue);
+    await chord(t, [meta], LogicalKeyboardKey.keyD);
+    expect(only().paneOrder, [1, 100]);
+    expect(page(t).panelOpen, isFalse);
+    for (final (mods, key) in [
+      ([meta, alt], LogicalKeyboardKey.arrowLeft),
+      ([meta, shift], LogicalKeyboardKey.enter),
+      ([meta, control], LogicalKeyboardKey.equal),
+      ([meta, control], LogicalKeyboardKey.arrowRight),
+    ]) {
+      page(t).togglePanel();
+      await t.pump();
+      expect(page(t).panelOpen, isTrue);
+      await chord(t, mods, key);
+      expect(page(t).panelOpen, isFalse, reason: '$key');
+    }
+  });
+
+  testSidebar('closing a split tab names how many panes run a command '
+      '(D28)', (t) async {
+    await pumpSidebar(t);
+    await chord(t, [meta], LogicalKeyboardKey.keyD);
+    local
+      ..replace(
+        local.summary(1, origin: SessionOrigin.desktop, runningCommand: true),
+      )
+      ..replace(
+        local.summary(100, origin: SessionOrigin.desktop, runningCommand: true),
+      );
+    await t.pump();
+    unawaited(page(t).closeTab(only()));
+    await t.pump();
+    final confirm = container.read(windowRouterProvider).confirm!;
+    expect(confirm.body, 'The commands running in 2 panes will be stopped.');
+    confirm.complete(false);
+    await t.pump();
+    expect(only().paneOrder, [1, 100]);
+  });
+
+  testSidebar('a split that fails after a tab switch announces nothing '
+      'for the tab now shown', (t) async {
+    local.add(local.summary(2, origin: SessionOrigin.desktop));
+    await pumpSidebar(t);
+    final notifier = container.read(terminalTabsProvider.notifier);
+    notifier.select(2);
+    await t.pump();
+    await chord(t, [meta], LogicalKeyboardKey.keyD); // tab 2: 2 panes
+    notifier.select(1);
+    await t.pump();
+    final gate = local.openGate = Completer<void>();
+    local.openError = const SessionLimitException(32);
+    await chord(t, [meta], LogicalKeyboardKey.keyD); // pending for tab 1
+    notifier.select(2); // the user moves on to the split tab
+    await t.pump();
+    announced(t); // drop the earlier ones
+    gate.complete();
+    await t.pump();
+    await t.pump();
+    expect(tabs().selectedId, 2);
+    expect(tabs().tabs.firstWhere((x) => x.id == 1).paneCount, 1);
+    expect(announced(t).where((m) => m.startsWith('Split')), isEmpty);
+  });
+
+  testSidebar('a cancelled pane close announces nothing even when another '
+      'pane went away meanwhile', (t) async {
+    await pumpSidebar(t);
+    await chord(t, [meta], LogicalKeyboardKey.keyD);
+    await chord(t, [meta, shift], LogicalKeyboardKey.keyD);
+    expect(only().paneOrder, [1, 100, 101]);
+    local.replace(
+      local.summary(101, origin: SessionOrigin.desktop, runningCommand: true),
+    );
+    await t.pump();
+    announced(t);
+    await chord(t, [meta], LogicalKeyboardKey.keyW); // asks for 101
+    container.read(terminalTabsProvider.notifier).closePane(1);
+    container.read(windowRouterProvider).confirm!.complete(false);
+    await t.pump();
+    await t.pump();
+    expect(only().paneOrder, [100, 101]);
+    expect(announced(t).where((m) => m.startsWith('Pane closed')), isEmpty);
   });
 
   testWidgets(
@@ -166,6 +284,17 @@ void main() {
         expect(only().focusedPaneId, 100); // unchanged
         await chord(t, [control, alt], LogicalKeyboardKey.arrowUp);
         expect(only().focusedPaneId, 1);
+        // Resize and equalize: AltGr never, left Alt yes.
+        final altGr = [control, shift, LogicalKeyboardKey.altRight];
+        double ratio() => (only().layout as PaneSplit).ratio;
+        await chord(t, altGr, LogicalKeyboardKey.arrowDown);
+        expect(ratio(), 0.5);
+        await chord(t, [control, shift, alt], LogicalKeyboardKey.arrowDown);
+        expect(ratio(), closeTo(0.55, 1e-9));
+        await chord(t, altGr, LogicalKeyboardKey.equal);
+        expect(ratio(), closeTo(0.55, 1e-9));
+        await chord(t, [control, shift, alt], LogicalKeyboardKey.equal);
+        expect(ratio(), 0.5);
       } finally {
         await t.pumpWidget(const SizedBox());
         container.dispose();
