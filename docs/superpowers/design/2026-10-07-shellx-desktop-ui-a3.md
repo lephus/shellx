@@ -77,7 +77,7 @@ x=221 (sau sidebar)                         ↓ đường chia 1 px (vùng bấm
 - **Chuột giữa** trên đầu pane = ×. **Nháy đúp** đầu pane = bật/tắt phóng to.
 - Đầu pane **không** kéo được cửa sổ (đầu pane macOS 28 vẫn là vùng kéo).
 - **Terminal trong pane:** padding A1 (10/6) giữ nguyên; clip trong pane; thanh cuộn overlay A1 trong mép phải pane.
-- **Viền focus:** 1 px `accent` vẽ đè (IgnorePointer) **trong** hình chữ nhật pane (đầu + terminal), không đổi constraints. Chỉ khi ≥ 2 pane và không phóng to. **Sửa đợt cuối S-2:** mép viền khớp điểm ảnh thiết bị của cửa sổ (làm tròn từng mép), bề dày `max(1, floor(dpr))` điểm ảnh thiết bị (1,25× → 1 px thiết bị = 0,8 px logic) — viền luôn là một nét `accent` đặc, không nhoè ở 125 %.
+- **Viền focus:** 1 px `accent` vẽ đè (không nhận chuột) **trong** hình chữ nhật pane (đầu + terminal), không đổi constraints. Chỉ khi ≥ 2 pane và không phóng to. **Sửa đợt cuối S-2:** mép viền khớp điểm ảnh thiết bị của cửa sổ (làm tròn từng mép), bề dày `max(1, floor(dpr))` điểm ảnh thiết bị (1,25× → 1 px thiết bị = 0,8 px logic) — viền luôn là một nét `accent` đặc, không nhoè ở 125 %.
 - **Dải driver A1 §2.5:** trong pane của phiên đó (góc phải trên **dưới đầu pane**, quy tắc dời xuống giữ nguyên); bề rộng tối đa `min(560, pane − 24)`; pane < 520 → chữ ngắn. **Sửa đợt cuối S-4:** pane < 260 → chỉ biểu tượng 📱 trong viên tròn 28×28 (nền/viền như dải), tooltip và nhãn trợ năng là câu đầy đủ `terminalDriverPhone` (lời dặn không bao giờ bị cắt); viên này nhận chuột (cho tooltip). Quy tắc dời xuống dùng **chiều cao thật** của dải (dải ngắn xuống 2 dòng cao ~52), không giả định 28.
 - **Toast A1 §2.8:** vẫn một cái, đáy giữa **cả vùng terminal** (không theo pane).
 

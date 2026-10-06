@@ -423,8 +423,8 @@ class SignedOutStrip extends StatelessWidget {
 /// bar read as a phone at 14 px, where `smartphone` is a plain rectangle.
 const IconData kPhoneIcon = Icons.phone_iphone_outlined;
 
-/// UI §2.5: never interactive (clicks reach the terminal), never resizes
-/// the terminal. Announced once when it appears. [compact] (a narrow pane)
+/// UI §2.5: clicks reach the terminal, except on the [iconOnly] pill, which
+/// takes the pointer so its tooltip can show; never resizes the terminal. Announced once when it appears. [compact] (a narrow pane)
 /// uses the short copy, so the instruction is never the part cut off.
 class DriverPill extends StatelessWidget {
   const DriverPill({super.key, this.compact = false, this.iconOnly = false});
