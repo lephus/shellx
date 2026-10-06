@@ -44,6 +44,10 @@ if (-not $env:SHELLX_TERM -and -not $env:SHELLX -and $env:LOCALAPPDATA -and $Hos
           $n = if ($ok) { 0 } elseif ($code -is [int] -and $code -ne 0) { $code } else { 1 }
           $mark = "$([char]27)]133;D;$n$([char]7)"
         }
+        $loc = $executionContext.SessionState.Path.CurrentLocation
+        if ($loc.Provider.Name -eq 'FileSystem') {
+          try { $mark += "$([char]27)]7;$(([System.Uri]$loc.ProviderPath).AbsoluteUri)$([char]7)" } catch { }
+        }
         $text = if ($global:__ShellxUserPrompt) { & $global:__ShellxUserPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
         $global:LASTEXITCODE = $code
         "$mark$text"

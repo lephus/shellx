@@ -29,6 +29,19 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
   # Not where VS Code's own shell integration runs (it already reports commands, as OSC 633).
   if [[ -z "${VSCODE_SHELL_INTEGRATION-}" ]]; then
     if (( ! ${+functions[__shellx_precmd]} )); then
+      __shellx_osc7() {
+        local url_path= i ch hexch LC_CTYPE=C LC_COLLATE=C LC_ALL= LANG=
+        for (( i = 1; i <= ${#PWD}; ++i )); do
+          ch=${PWD[i]}
+          if [[ $ch == [-/._~A-Za-z0-9] ]]; then
+            url_path+=$ch
+          else
+            builtin printf -v hexch '%02X' "'$ch"
+            url_path+="%${hexch: -2:2}"
+          fi
+        done
+        builtin printf '\e]7;file://%s%s\a' "${HOST-}" "$url_path"
+      }
       __shellx_preexec() {
         local s=$1
         s=${s//\\/\\\\}; s=${s//;/\\x3b}; s=${s//$'\n'/\\x0a}
@@ -42,6 +55,7 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
           builtin printf '\e]133;D;%s\a' "$ret"
           builtin unset __shellx_running
         fi
+        __shellx_osc7
         return ret
       }
       __shellx_install() {
@@ -65,6 +79,7 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
             fi
           }
         fi
+        __shellx_osc7
       }
       typeset -ga precmd_functions preexec_functions
       precmd_functions+=(__shellx_install)

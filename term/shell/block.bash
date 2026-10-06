@@ -57,6 +57,17 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
       __shellx_s=${__shellx_s//\\/\\\\}; __shellx_s=${__shellx_s//;/\\x3b}; __shellx_s=${__shellx_s//$nl/\\x0a}
       __shellx_s=${__shellx_s//$cr/\\x0d}; __shellx_s=${__shellx_s//$bel/\\x07}; __shellx_s=${__shellx_s//$esc/\\x1b}
     }
+    __shellx_osc7() {
+      local LC_ALL=C s=$PWD out= c h i
+      for ((i = 0; i < ${#s}; i++)); do
+        c=${s:i:1}
+        case "$c" in
+          [-/._~A-Za-z0-9]) out+=$c ;;
+          *) builtin printf -v h '%02X' "'$c"; out+="%${h: -2:2}" ;;
+        esac
+      done
+      builtin printf '\033]7;file://%s%s\007' "${HOSTNAME-}" "$out"
+    }
     __shellx_bp_preexec() {
       local __shellx_s
       __shellx_esc "${1-}"
@@ -70,6 +81,7 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
         builtin printf '\033]133;D;%s\007' "$ret"
         __shellx_running=
       fi
+      __shellx_osc7
       return $ret
     }
     __shellx_use_bash_preexec() {
@@ -99,6 +111,7 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
         builtin printf '\033]133;D;%s\007' "$ret"
         __shellx_running=
       fi
+      __shellx_osc7
       if [ -z "${__shellx_bp-}" ] && [ -n "${__bp_imported-}${bash_preexec_imported-}" ]; then __shellx_use_bash_preexec; fi
       return $ret
     }
