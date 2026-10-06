@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -63,6 +64,12 @@ final class PortOpenFailedNotice extends TabNotice {
 
 /// D19: the longest tab name, in characters.
 const int kTabNameMaxLength = 64;
+
+/// [text] trimmed, cut to [max] user-perceived characters (grapheme
+/// clusters: an accent never loses its letter, an emoji is never split),
+/// and trimmed again so a cut never leaves a trailing space (M2).
+String clipName(String text, int max) =>
+    text.trim().characters.take(max).toString().trim();
 
 const Object _unset = Object();
 
@@ -198,6 +205,18 @@ final class _Link {
   }
 }
 
+/// I2: who picks the tab selected after the selected one closes. The
+/// sidebar sets [choose] while it exists (it knows the visible order; the
+/// tab list cannot read the sidebar, which listens to it).
+final class CloseSuccessor {
+  /// The tab to select once [closed] is gone; null: the tab list decides.
+  int? Function(int closed)? choose;
+}
+
+final closeSuccessorProvider = Provider<CloseSuccessor>(
+  (ref) => CloseSuccessor(),
+);
+
 final terminalTabsProvider = NotifierProvider<TerminalTabs, TerminalTabsState>(
   TerminalTabs.new,
 );
@@ -289,10 +308,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// C6/D19: the user's name for tab [id]; trimmed, at most
   /// [kTabNameMaxLength] characters; blank restores the automatic title.
   void rename(int id, String? name) {
-    final trimmed = name?.trim() ?? '';
-    final value = trimmed.isEmpty
-        ? null
-        : String.fromCharCodes(trimmed.runes.take(kTabNameMaxLength));
+    final clipped = clipName(name ?? '', kTabNameMaxLength);
+    final value = clipped.isEmpty ? null : clipped;
     _update(id, (t) => t.copyWith(customTitle: value));
   }
 
@@ -456,7 +473,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     tabs.removeAt(i);
     var selected = state.selectedId;
     if (selected == id) {
-      selected = tabs.isEmpty ? null : tabs[min(i, tabs.length - 1)].id;
+      selected = _successorOf(id, tabs);
     }
     final before = state.selectedId;
     state = TerminalTabsState(
@@ -466,6 +483,17 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       opening: state.opening,
     );
     if (state.selectedId != before) _selectionChanged();
+  }
+
+  /// I2: the sidebar decides (its visible order, the same one ⌘1–9,
+  /// Ctrl+Tab and ↑/↓ follow) when it is there; without one, the creation
+  /// order neighbour. [remaining] no longer holds [closed].
+  int? _successorOf(int closed, List<TerminalTab> remaining) {
+    if (remaining.isEmpty) return null;
+    final next = ref.read(closeSuccessorProvider).choose?.call(closed);
+    if (next != null && remaining.any((t) => t.id == next)) return next;
+    final i = state.tabs.indexWhere((t) => t.id == closed);
+    return remaining[min(max(i, 0), remaining.length - 1)].id;
   }
 
   /// The newly selected tab's view tells its session the size it was laid

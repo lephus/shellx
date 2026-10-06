@@ -424,48 +424,50 @@ class SessionTabRowState extends State<SessionTabRow> {
                         ),
                       )
                     : const BoxDecoration(),
+                // One structure whatever the row shows (I1): the bar's
+                // slot, the title box and the context box are always the
+                // same keyed children in the same places, so an open name
+                // field is never rebuilt (and never loses what was typed)
+                // when the context line or the selected bar comes or goes.
                 child: Stack(
                   children: [
-                    if (widget.selected)
+                    Positioned(
+                      key: const ValueKey('row.barSlot'),
+                      // With the keyboard ring on the row's edge, the bar
+                      // moves inside it so both stay visible (UI §3.1).
+                      // UI-A2 §2.1: centred on the whole row, 46 included.
+                      left: widget.focused
+                          ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
+                          : 0,
+                      top: (height - ShellxSizes.selectedBarHeight) / 2,
+                      width: ShellxSizes.selectedBarWidth,
+                      height: ShellxSizes.selectedBarHeight,
+                      child: widget.selected
+                          ? Container(
+                              key: const Key('row.selectedBar'),
+                              decoration: BoxDecoration(
+                                color: ShellxDesktopColors.accent,
+                                borderRadius: BorderRadius.circular(
+                                  ShellxRadius.r4,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    Positioned(
+                      key: const ValueKey('row.titleBox'),
+                      left: 0,
+                      right: 0,
+                      // With context: the title line's centre stays
+                      // 6 + line/2 from the top. Without: centred in the
+                      // row (A1). The box is as tall as the 24 px ×.
+                      top: withContext ? titleTop : (height - titleBox) / 2,
+                      height: titleBox,
+                      child: Padding(padding: rowPadding, child: titleRow),
+                    ),
+                    if (withContext)
                       Positioned(
-                        // With the keyboard ring on the row's edge, the bar
-                        // moves inside it so both stay visible (UI §3.1).
-                        // UI-A2 §2.1: centred on the whole row, 46 included.
-                        left: widget.focused
-                            ? ShellxSizes.focusRing + ShellxSizes.selectedBarGap
-                            : 0,
-                        top: (height - ShellxSizes.selectedBarHeight) / 2,
-                        child: Container(
-                          key: const Key('row.selectedBar'),
-                          width: ShellxSizes.selectedBarWidth,
-                          height: ShellxSizes.selectedBarHeight,
-                          decoration: BoxDecoration(
-                            color: ShellxDesktopColors.accent,
-                            borderRadius: BorderRadius.circular(
-                              ShellxRadius.r4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (!withContext)
-                      Padding(
-                        padding: rowPadding,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [titleRow],
-                        ),
-                      )
-                    else ...[
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        // The title line's centre stays 6 + line/2 from the
-                        // top; the box is as tall as the 24 px close button.
-                        top: titleTop,
-                        height: titleBox,
-                        child: Padding(padding: rowPadding, child: titleRow),
-                      ),
-                      Positioned(
+                        key: const ValueKey('row.contextBox'),
                         left: ShellxSizes.contextInset,
                         right: ShellxSpace.s8,
                         // The 14 px line sits 2 below the title line; the
@@ -487,7 +489,6 @@ class SessionTabRowState extends State<SessionTabRow> {
                           ),
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),

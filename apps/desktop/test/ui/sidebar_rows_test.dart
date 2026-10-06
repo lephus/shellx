@@ -270,6 +270,54 @@ void main() {
     handle.dispose();
   });
 
+  testSidebar('an open name field keeps what was typed when the row gains '
+      'or loses its context line or the selected bar (I1)', (tester) async {
+    local
+      ..add(local.summary(1, origin: SessionOrigin.desktop, title: 'vim'))
+      ..add(local.summary(2, origin: SessionOrigin.desktop));
+    await pumpSidebar(tester);
+    container.read(terminalTabsProvider.notifier).select(2);
+    workspaces().startRename(const RenameTab(1));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('row.renameField'));
+    await tester.enterText(field, 'typed');
+    final state = tester.state<EditableTextState>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    );
+    Future<void> expectKept() async {
+      await tester.pumpAndSettle();
+      expect(sidebar().renaming, const RenameTab(1));
+      final now = tester.state<EditableTextState>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(identical(now, state), isTrue);
+      expect(now.textEditingValue.text, 'typed');
+      expect(now.widget.focusNode.hasFocus, isTrue);
+    }
+
+    local.replace(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        title: 'vim',
+        cwd: '$testHome/work',
+        gitBranch: 'main',
+      ),
+    );
+    await expectKept(); // the context line appeared
+    container.read(terminalTabsProvider.notifier).select(1);
+    await expectKept(); // the selected bar appeared
+    local.replace(
+      local.summary(1, origin: SessionOrigin.desktop, title: 'vim'),
+    );
+    await expectKept(); // the context line went away
+    container.read(terminalTabsProvider.notifier).select(2);
+    await expectKept(); // the selected bar went away
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(tabs().tabs.first.label, 'typed');
+  });
+
   testSidebar('clicking elsewhere commits the name and leaves the focus '
       'where it went (UI-A2 §4)', (tester) async {
     local

@@ -15,8 +15,9 @@ import 'terminal_tabs.dart';
 const String kDefaultWorkspaceId = 'default';
 const int kWorkspaceNameMaxLength = 64;
 
-String _clip(String text) =>
-    String.fromCharCodes(text.runes.take(kWorkspaceNameMaxLength));
+/// At most [kWorkspaceNameMaxLength] user-perceived characters (a cut
+/// never splits an accent from its letter), trimmed after the cut.
+String _clip(String text) => clipName(text, kWorkspaceNameMaxLength);
 
 /// A named group of tabs in the sidebar (spec C5).
 @immutable
@@ -171,6 +172,43 @@ final class SidebarState {
       if (!showHeaders || !w.collapsed) ...tabsOf(w.id),
   ];
 
+  /// I2: which tab is selected when the selected tab [closed] goes (⌘W,
+  /// an exit): the next visible tab in the sidebar, else the previous one.
+  /// A hidden [closed] (its workspace collapsed) gives the nearest visible
+  /// tab below it, else above it; with nothing visible, the next in
+  /// [orderedTabIds], else the previous. Null: no other tab here.
+  int? successorOf(int closed) {
+    final visible = visibleTabIds;
+    final at = visible.indexOf(closed);
+    if (at >= 0) {
+      if (at + 1 < visible.length) return visible[at + 1];
+      return at > 0 ? visible[at - 1] : _orderedNeighbour(closed);
+    }
+    return _nearestVisible(closed, 1) ??
+        _nearestVisible(closed, -1) ??
+        _orderedNeighbour(closed);
+  }
+
+  /// The first visible tab after (or before, [delta] < 0) [id] in
+  /// [orderedTabIds].
+  int? _nearestVisible(int id, int delta) {
+    final ordered = orderedTabIds;
+    final visible = visibleTabIds.toSet();
+    final at = ordered.indexOf(id);
+    final ahead = delta > 0
+        ? ordered.skip(at + 1)
+        : ordered.take(max(at, 0)).toList().reversed;
+    return ahead.where(visible.contains).firstOrNull;
+  }
+
+  int? _orderedNeighbour(int id) {
+    final ordered = orderedTabIds;
+    final at = ordered.indexOf(id);
+    if (at < 0) return null;
+    if (at + 1 < ordered.length) return ordered[at + 1];
+    return at > 0 ? ordered[at - 1] : null;
+  }
+
   SidebarState copyWith({
     List<Workspace>? workspaces,
     Map<String, List<int>>? members,
@@ -212,6 +250,13 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       terminalTabsProvider,
       (_, tabs) => state = _reconcile(state, tabs),
     );
+    // I2: one place decides "which tab next", for a close too.
+    final successor = ref.read(closeSuccessorProvider);
+    int? choose(int closed) => state.successorOf(closed);
+    successor.choose = choose;
+    ref.onDispose(() {
+      if (successor.choose == choose) successor.choose = null;
+    });
     return _reconcile(
       SidebarState(workspaces: loadWorkspaces(stored), members: const {}),
       ref.read(terminalTabsProvider),
@@ -392,12 +437,9 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       _tabs.select(visible[(i + delta) % visible.length]);
       return;
     }
-    final ordered = state.orderedTabIds;
-    final at = selected == null ? -1 : ordered.indexOf(selected);
-    final ahead = delta > 0
-        ? ordered.skip(at + 1)
-        : ordered.take(max(at, 0)).toList().reversed;
-    final next = ahead.where(visible.contains).firstOrNull;
+    final next = selected == null
+        ? null
+        : state._nearestVisible(selected, delta);
     _tabs.select(next ?? (delta > 0 ? visible.first : visible.last));
   }
 

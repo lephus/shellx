@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -133,6 +134,77 @@ void main() {
     tabs().select(1); // hidden (a click before collapsing)
     sidebar().step(1);
     expect(selected(), 100);
+  });
+
+  test('closing the selected tab selects its neighbour in the sidebar '
+      'order: the next visible, else the previous; collapsed workspaces '
+      'are skipped (I2)', () async {
+    addDesktop(1);
+    addDesktop(2);
+    addDesktop(3);
+    boot();
+    sidebar().moveTab(3, kDefaultWorkspaceId, 0); // sidebar: 3, 1, 2
+    tabs().select(3);
+    tabs().close(3);
+    expect(selected(), 1); // creation order would pick 2
+    await sidebar().create(); // ws: 100
+    final ws = state().workspaces.last.id;
+    await sidebar().create(); // ws2: 101
+    sidebar().endRename();
+    sidebar().setCollapsed(ws, true); // visible: 1, 2, 101
+    tabs().select(2);
+    tabs().close(2);
+    expect(selected(), 101); // 100 is hidden
+    tabs().close(101); // the last visible: the previous one
+    expect(selected(), 1);
+  });
+
+  test(
+    'closing a selected tab hidden in a collapsed workspace picks the '
+    'nearest visible tab; with none visible, the sidebar order (I2)',
+    () async {
+      addDesktop(1);
+      addDesktop(2);
+      boot();
+      await sidebar().create(); // ws: 100
+      final ws = state().workspaces.last.id;
+      await sidebar().create(); // ws2: 101
+      sidebar().endRename();
+      final ws2 = state().workspaces.last.id;
+      sidebar().moveTab(2, ws, 0); // Default [1], ws [2, 100], ws2 [101]
+      sidebar().setCollapsed(ws, true);
+      tabs().select(2); // hidden
+      tabs().close(2);
+      expect(selected(), 101); // the nearest visible tab below
+      sidebar().setCollapsed(kDefaultWorkspaceId, true);
+      sidebar().setCollapsed(ws2, true); // nothing visible
+      tabs().select(100);
+      tabs().close(100);
+      expect(selected(), 101); // next in the sidebar order
+    },
+  );
+
+  test('tab and workspace names are cut on whole characters, then trimmed '
+      '(M2)', () async {
+    addDesktop(1);
+    boot();
+    final accented = 'e\u0301' * 70; // 70 user-perceived characters
+    tabs().rename(1, accented);
+    final label = container.read(terminalTabsProvider).tabs.single.label;
+    expect(label.characters.length, 64);
+    expect(label, 'e\u0301' * 64);
+    tabs().rename(1, '${'x' * 63} y');
+    expect(container.read(terminalTabsProvider).tabs.single.label, 'x' * 63);
+    await sidebar().create();
+    final ws = state().workspaces.last.id;
+    sidebar().rename(ws, accented);
+    expect(state().workspace(ws)!.name, 'e\u0301' * 64);
+    sidebar().rename(ws, '${'z' * 63} w');
+    expect(state().workspace(ws)!.name, 'z' * 63);
+    final decoded = Workspace.decode(
+      Workspace(id: 'w1', name: '${'q' * 63} r').encode(),
+    )!;
+    expect(decoded.name, 'q' * 63);
   });
 
   test('with one workspace, collapsed is ignored (no headers, D10)', () {
