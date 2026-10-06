@@ -21,6 +21,9 @@ final class FakeLocalSessions implements LocalSessions {
   /// When set, [open] waits for it.
   Completer<void>? openGate;
 
+  /// Runs once [open] made session `id`, before it returns.
+  void Function(int id)? afterOpen;
+
   @override
   List<SessionSummary> get sessions => List.of(summaries);
   @override
@@ -34,6 +37,7 @@ final class FakeLocalSessions implements LocalSessions {
     if (error != null) throw error;
     final id = nextId++;
     add(summary(id, origin: SessionOrigin.desktop), notify: false);
+    afterOpen?.call(id);
     return id;
   }
 

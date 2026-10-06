@@ -85,4 +85,65 @@ void main() {
       feed.dispose();
     });
   });
+
+  test('a capped redraw without newlines is cut at an escape sequence', () {
+    fakeAsync((async) {
+      final written = <String>[];
+      final feed = TerminalFeed(written.add, budget: 4, cap: 60, keep: 25);
+      feed.add(utf8.encode('x')); // flushed now
+      feed.add(utf8.encode('\x1b[31mab\x1b[0m' * 10));
+      expect(feed.dropped, greaterThan(0));
+      feed.drain();
+      final rest = written.skip(1).join();
+      expect(rest, startsWith('\x1b['));
+      expect(rest, endsWith('\x1b[0m'));
+      feed.dispose();
+    });
+  });
+
+  test('a newline as the last character is not a cut point', () {
+    fakeAsync((async) {
+      final written = <String>[];
+      final feed = TerminalFeed(written.add, budget: 4, cap: 60, keep: 25);
+      feed.add(utf8.encode('x')); // flushed now
+      feed.add(utf8.encode('\x1b[31mab\x1b[0m' * 10 + '\n'));
+      expect(feed.dropped, 1);
+      feed.drain();
+      final rest = written.skip(1).join();
+      expect(rest, startsWith('\x1b['));
+      expect(rest, endsWith('\x1b[0m\n'));
+      feed.dispose();
+    });
+  });
+
+  test('a capped \\r progress bar is cut at a carriage return', () {
+    fakeAsync((async) {
+      final written = <String>[];
+      final feed = TerminalFeed(written.add, budget: 4, cap: 60, keep: 25);
+      feed.add(utf8.encode('x')); // flushed now
+      for (var i = 0; i < 10; i++) {
+        feed.add(utf8.encode('\r[####] ${i}0%'));
+      }
+      feed.drain();
+      final rest = written.skip(1).join();
+      expect(rest, startsWith('\r[####]'));
+      expect(rest, endsWith('90%'));
+      feed.dispose();
+    });
+  });
+
+  test('a cap with no cut point never starts on half a surrogate pair', () {
+    fakeAsync((async) {
+      final written = <String>[];
+      final feed = TerminalFeed(written.add, budget: 4, cap: 40, keep: 21);
+      feed.add(utf8.encode('x')); // flushed now
+      feed.add(utf8.encode('😀' * 30)); // 60 UTF-16 units, no cut point
+      feed.drain();
+      final rest = written.skip(1).join();
+      final first = rest.codeUnitAt(0);
+      expect(first >= 0xDC00 && first <= 0xDFFF, isFalse);
+      expect(rest, '😀' * 10);
+      feed.dispose();
+    });
+  });
 }

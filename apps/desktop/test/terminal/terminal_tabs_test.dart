@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/l10n/app_localizations_en.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
@@ -20,12 +22,12 @@ void main() {
   String text(int id) =>
       state().tabs.firstWhere((t) => t.id == id).terminal.buffer.getText();
 
-  void boot() {
+  void boot({AppLocalizations? l10n}) {
     container = ProviderContainer.test(
       overrides: [
         localSessionsProvider.overrideWithValue(local),
         appL10nProvider.overrideWithValue(
-          lookupAppLocalizations(const Locale('en')),
+          l10n ?? lookupAppLocalizations(const Locale('en')),
         ),
       ],
     );
@@ -266,4 +268,72 @@ void main() {
     container.dispose();
     expect(local.views[1]!.disposed, isTrue);
   });
+
+  test('a new shell that is already gone leaves the selection alone', () async {
+    local.add(local.summary(1));
+    boot();
+    local.afterOpen = (id) => local.views.remove(id); // view() throws
+    await tabs().openTab();
+    expect(state().tabs.map((t) => t.id), [1]);
+    expect(state().selectedId, 1);
+    expect(state().opening, isFalse);
+  });
+
+  test(
+    'a new shell that is already gone, with no tabs, selects nothing',
+    () async {
+      boot();
+      local.afterOpen = (id) => local.views.remove(id);
+      await tabs().openTab();
+      expect(state().tabs, isEmpty);
+      expect(state().selectedId, isNull);
+    },
+  );
+
+  test(
+    'an exit line translated without the number is written uncoloured',
+    () async {
+      local.add(local.summary(1));
+      boot(l10n: _NoNumberL10n());
+      local.views[1]!.end(3);
+      await pumpEventQueue();
+      expect(state().tabs.single.exitCode, 3);
+      expect(text(1), contains('Process exited'));
+    },
+  );
+
+  test('close() on a running tab disposes its view', () {
+    local.add(local.summary(1));
+    boot();
+    tabs().close(1);
+    expect(local.closed, [1]);
+    expect(local.views[1]!.disposed, isTrue);
+  });
+
+  test('a removed tab releases its selection controller', () async {
+    local.add(local.summary(1));
+    local.add(local.summary(2));
+    boot();
+    final first = state().tabs.first.selection;
+    final second = state().tabs.last.selection;
+    tabs().close(1);
+    expect(_isDisposed(first), isTrue);
+    expect(_isDisposed(second), isFalse);
+    container.dispose();
+    expect(_isDisposed(second), isTrue);
+  });
+}
+
+bool _isDisposed(ChangeNotifier notifier) {
+  try {
+    ChangeNotifier.debugAssertNotDisposed(notifier);
+    return false;
+  } on FlutterError {
+    return true;
+  }
+}
+
+final class _NoNumberL10n extends AppLocalizationsEn {
+  @override
+  String terminalExitedLine(int code) => '[Process exited] — press Enter';
 }

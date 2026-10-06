@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
@@ -43,5 +44,21 @@ void main() {
 
   test('the key is in the shared_preferences allow-list', () {
     expect(SettingKeys.all, contains(SettingKeys.terminalFontSize));
+  });
+
+  test('a failed save is logged by error type only', () async {
+    final h = TestHarness();
+    h.settings.fail = true;
+    final logs = <String?>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) => logs.add(message);
+    addTearDown(() => debugPrint = original);
+    final container = ProviderContainer.test(
+      overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+    );
+    container.read(terminalFontSizeProvider.notifier).increase();
+    await pumpEventQueue();
+    expect(container.read(terminalFontSizeProvider), 14);
+    expect(logs, ['terminal font size not saved: StateError']);
   });
 }

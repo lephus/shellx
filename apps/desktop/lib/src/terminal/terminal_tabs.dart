@@ -130,12 +130,14 @@ final class TerminalTabsState {
   }
 }
 
-/// What a tab holds that is not state: its view, feed and subscriptions.
+/// What a tab holds that is not state: its view, feed, selection and
+/// subscriptions, all released when the tab goes.
 final class _Link {
   _Link(this.view, this.terminal, this.feed);
   final LocalSessionView view;
   final DesktopTerminal terminal;
   final TerminalFeed feed;
+  final selection = TerminalController();
   final subscriptions = <StreamSubscription<Object?>>[];
 
   void dispose() {
@@ -144,6 +146,7 @@ final class _Link {
     }
     feed.dispose();
     view.dispose();
+    selection.dispose();
   }
 }
 
@@ -180,7 +183,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
       if (!ref.mounted) return;
       _sync();
-      _set(selectedId: id, opening: false);
+      // The new shell may already be gone (exit 0, or ended before it could
+      // be viewed): then keep a selection that exists.
+      final opened = _tab(id) != null;
+      _set(
+        selectedId: opened
+            ? id
+            : (state.selected?.id ?? state.tabs.firstOrNull?.id),
+        opening: false,
+      );
     } on SessionLimitException catch (error) {
       if (ref.mounted) {
         _set(notice: SessionLimitNotice(error.max), opening: false);
@@ -320,7 +331,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       runningCommand: s.runningCommand,
       driver: s.driver,
       terminal: terminal,
-      selection: TerminalController(),
+      selection: link.selection,
     );
   }
 
@@ -347,13 +358,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final terminal = link.terminal;
     final line = ref.read(appL10nProvider).terminalExitedLine(code);
     final at = line.indexOf('$code');
-    final before = line.substring(0, at);
-    final after = line.substring(at + '$code'.length);
     final newline = terminal.buffer.cursorX == 0 ? '' : '\r\n';
-    // UI §2.6: dim text, the code in red, cursor hidden.
-    terminal.write(
-      '$newline\x1b[2m$before\x1b[22;31m$code\x1b[39;2m$after\x1b[0m\x1b[?25l',
-    );
+    if (at < 0) {
+      // A translation without the number: the whole line dim.
+      terminal.write('$newline\x1b[2m$line\x1b[0m\x1b[?25l');
+    } else {
+      final before = line.substring(0, at);
+      final after = line.substring(at + '$code'.length);
+      // UI §2.6: dim text, the code in red, cursor hidden.
+      terminal.write(
+        '$newline\x1b[2m$before\x1b[22;31m$code\x1b[39;2m$after'
+        '\x1b[0m\x1b[?25l',
+      );
+    }
     _update(id, (t) => t.copyWith(exitCode: code));
   }
 

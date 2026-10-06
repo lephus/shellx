@@ -77,12 +77,25 @@ final class TerminalFeed {
   void _trim() {
     if (_pending.length <= cap) return;
     final text = _pending.toString();
-    var start = text.length - keep;
-    final newline = text.indexOf('\n', start);
-    if (newline != -1 && newline < text.length - 1) start = newline + 1;
+    final start = _cutPoint(text, text.length - keep);
     _pending
       ..clear()
       ..write(text.substring(start));
     dropped++;
+  }
+
+  /// Where the kept tail begins, at or after [from]: the next line start;
+  /// without one (full-screen redraws, `\r` progress bars) the next escape
+  /// sequence or carriage return, so the tail never starts inside an escape
+  /// sequence; failing those, never on the low half of a surrogate pair.
+  static int _cutPoint(String text, int from) {
+    final newline = text.indexOf('\n', from);
+    if (newline != -1 && newline < text.length - 1) return newline + 1;
+    final escape = text.indexOf('\x1b', from);
+    if (escape != -1) return escape;
+    final carriageReturn = text.indexOf('\r', from);
+    if (carriageReturn != -1) return carriageReturn;
+    final unit = text.codeUnitAt(from);
+    return unit >= 0xDC00 && unit <= 0xDFFF ? from + 1 : from;
   }
 }

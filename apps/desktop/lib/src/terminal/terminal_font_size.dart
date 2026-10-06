@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agent/desktop_services.dart';
@@ -33,7 +34,10 @@ class TerminalFontSize extends Notifier<double> {
     unawaited(
       settings
           .setInt(SettingKeys.terminalFontSize, next.round())
-          .catchError((Object _) {}),
+          .catchError(
+            (Object e) =>
+                debugPrint('terminal font size not saved: ${e.runtimeType}'),
+          ),
     );
   }
 
