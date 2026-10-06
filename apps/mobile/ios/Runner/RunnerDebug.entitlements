@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Debug builds carry no push entitlement, so they can be signed with a free
+     Apple ID (personal team) and run on a device without an Apple Developer
+     account. Push on iOS needs Profile/Release (Runner.entitlements) plus an
+     APNs key in Firebase. -->
+<plist version="1.0">
+<dict/>
+</plist>
