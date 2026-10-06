@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart';
 
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
+import 'pane_layout.dart';
 import 'terminal_feed.dart';
 import 'terminal_style.dart';
 
@@ -78,9 +79,11 @@ String clipName(String text, int max) =>
 
 const Object _unset = Object();
 
+/// One pane of a tab: one session's view (A3 D2). These are the fields the
+/// A1/A2 tab record had; the tab now holds one per pane.
 @immutable
-final class TerminalTab {
-  const TerminalTab({
+final class PaneSession {
+  const PaneSession({
     required this.id,
     required this.index,
     required this.shell,
@@ -94,7 +97,6 @@ final class TerminalTab {
     this.cwd,
     this.gitBranch,
     this.ports = const [],
-    this.customTitle,
     this.exitCode,
   });
 
@@ -116,9 +118,6 @@ final class TerminalTab {
   final String? gitBranch;
   final List<int> ports;
 
-  /// C6: the user's name for this tab (desktop only); wins over [title].
-  final String? customTitle;
-
   /// Non-null once the shell exited with a non-zero code (D14).
   final int? exitCode;
 
@@ -127,13 +126,10 @@ final class TerminalTab {
   /// OSC 0/2 title, else `<shell> <index>` (D13, UI §5 terminalDefaultTitle).
   String get automaticLabel => title.isNotEmpty ? title : '$shell $index';
 
-  /// What the sidebar, the window title and dialogs show.
-  String get label => customTitle ?? automaticLabel;
-
   /// The row has a context line (UI-A2 §2.1).
   bool get hasContext => cwd != null || gitBranch != null || ports.isNotEmpty;
 
-  TerminalTab copyWith({
+  PaneSession copyWith({
     String? title,
     bool? phoneAttached,
     bool? runningCommand,
@@ -142,8 +138,7 @@ final class TerminalTab {
     Object? cwd = _unset,
     Object? gitBranch = _unset,
     List<int>? ports,
-    Object? customTitle = _unset,
-  }) => TerminalTab(
+  }) => PaneSession(
     id: id,
     index: index,
     shell: shell,
@@ -159,10 +154,113 @@ final class TerminalTab {
         ? this.gitBranch
         : gitBranch as String?,
     ports: ports ?? this.ports,
+    exitCode: exitCode ?? this.exitCode,
+  );
+}
+
+/// A sidebar tab (A3 P1): a tree of panes, one session each. Its id is the
+/// id of the session that created it and never changes (D1). The A1/A2
+/// getters read the focused pane, so the sidebar, the workspaces and A4
+/// read a tab exactly as before.
+@immutable
+final class TerminalTab {
+  const TerminalTab({
+    required this.id,
+    required this.origin,
+    required this.layout,
+    required this.panes,
+    required this.focusedPaneId,
+    this.zoomedPaneId,
+    this.paneHistory = const [],
+    this.customTitle,
+  });
+
+  factory TerminalTab.single(PaneSession pane) => TerminalTab(
+    id: pane.id,
+    origin: pane.origin,
+    layout: PaneLeaf(pane.id),
+    panes: {pane.id: pane},
+    focusedPaneId: pane.id,
+    paneHistory: [pane.id],
+  );
+
+  final int id;
+
+  /// Where the session that created the tab came from (the 📱 mark, D19).
+  final SessionOrigin origin;
+  final PaneNode layout;
+  final Map<int, PaneSession> panes;
+  final int focusedPaneId;
+
+  /// D10: the pane drawn over the whole area; null when not zoomed.
+  final int? zoomedPaneId;
+
+  /// D8: most recently focused first.
+  final List<int> paneHistory;
+
+  /// C6: the user's name for this tab (desktop only); wins over [title].
+  final String? customTitle;
+
+  PaneSession get focused => panes[focusedPaneId]!;
+
+  /// D23: reading order.
+  List<int> get paneOrder => paneIds(layout);
+  int get paneCount => panes.length;
+  bool get isSplit => panes.length > 1;
+
+  /// 1-based position of [sessionId] in [paneOrder] ("Pane 2 of 3").
+  int paneNumber(int sessionId) => paneOrder.indexOf(sessionId) + 1;
+
+  int get index => focused.index;
+  String get shell => focused.shell;
+  String get title => focused.title;
+  bool get runningCommand => focused.runningCommand;
+  DesktopTerminal get terminal => focused.terminal;
+  TerminalController get selection => focused.selection;
+  String? get cwd => focused.cwd;
+  String? get gitBranch => focused.gitBranch;
+  List<int> get ports => focused.ports;
+  int? get exitCode => focused.exitCode;
+  bool get exited => focused.exited;
+  String get automaticLabel => focused.automaticLabel;
+
+  /// What the sidebar, the window title and dialogs show.
+  String get label => customTitle ?? automaticLabel;
+  bool get hasContext => focused.hasContext;
+
+  /// D19: 👁 when any pane has a phone attached.
+  bool get phoneAttached => panes.values.any((p) => p.phoneAttached);
+
+  /// D19: the 👁 turns `warn` when any attached pane is phone-driven.
+  bool get phoneDriving =>
+      panes.values.any((p) => p.phoneAttached && p.driver == DriverSide.phone);
+  DriverSide get driver => phoneDriving ? DriverSide.phone : focused.driver;
+
+  TerminalTab withPane(int id, PaneSession Function(PaneSession pane) change) {
+    final pane = panes[id];
+    return pane == null ? this : copyWith(panes: {...panes, id: change(pane)});
+  }
+
+  TerminalTab copyWith({
+    PaneNode? layout,
+    Map<int, PaneSession>? panes,
+    int? focusedPaneId,
+    Object? zoomedPaneId = _unset,
+    List<int>? paneHistory,
+    Object? customTitle = _unset,
+  }) => TerminalTab(
+    id: id,
+    origin: origin,
+    layout: layout ?? this.layout,
+    panes: panes ?? this.panes,
+    focusedPaneId: focusedPaneId ?? this.focusedPaneId,
+    zoomedPaneId: identical(zoomedPaneId, _unset)
+        ? this.zoomedPaneId
+        : zoomedPaneId as int?,
+    paneHistory: paneHistory ?? this.paneHistory,
     customTitle: identical(customTitle, _unset)
         ? this.customTitle
         : customTitle as String?,
-    exitCode: exitCode ?? this.exitCode,
   );
 }
 
@@ -185,6 +283,14 @@ final class TerminalTabsState {
   TerminalTab? get selected {
     for (final tab in tabs) {
       if (tab.id == selectedId) return tab;
+    }
+    return null;
+  }
+
+  /// The tab holding session [sessionId] (A3 D1: not always `tab.id`).
+  TerminalTab? tabOfSession(int sessionId) {
+    for (final tab in tabs) {
+      if (tab.panes.containsKey(sessionId)) return tab;
     }
     return null;
   }
@@ -237,6 +343,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// The pane's grid, so a new shell starts at the size it will be shown.
   TerminalGrid _grid = (cols: 80, rows: 24);
 
+  /// D5: this window's own open is in flight; a desktop session that
+  /// appears meanwhile waits for the opener to place it.
+  bool _awaitingOpen = false;
+
   @override
   TerminalTabsState build() {
     _local = ref.watch(localSessionsProvider);
@@ -251,17 +361,18 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   Future<void> openTab() async {
     if (state.opening) return;
     _set(opening: true);
+    _awaitingOpen = true;
     try {
       final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
       if (!ref.mounted) return;
+      _awaitingOpen = false;
       _sync();
       // The new shell may already be gone (exit 0, or ended before it could
       // be viewed): then keep a selection that exists.
-      final opened = _tab(id) != null;
+      final opened = state.tabOfSession(id);
       _set(
-        selectedId: opened
-            ? id
-            : (state.selected?.id ?? state.tabs.firstOrNull?.id),
+        selectedId:
+            opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
       );
     } on SessionLimitException catch (error) {
       if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
@@ -270,6 +381,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
       }
     } finally {
+      _awaitingOpen = false;
       // Whatever happened (an unexpected error too), `+` is usable again.
       if (ref.mounted) _set(opening: false);
     }
@@ -294,18 +406,40 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   void next() => _step(1);
   void previous() => _step(-1);
 
-  /// D15: a close asks first while a command runs.
-  bool needsCloseConfirm(int id) {
-    final tab = _tab(id);
-    return tab != null && !tab.exited && tab.runningCommand;
+  /// D15 for a tab: how many of its panes run a command.
+  int runningPaneCount(int tabId) =>
+      _tab(
+        tabId,
+      )?.panes.values.where((p) => !p.exited && p.runningCommand).length ??
+      0;
+
+  /// D15: a close asks first while a command runs (any pane of the tab).
+  bool needsCloseConfirm(int id) => runningPaneCount(id) > 0;
+
+  /// D6: one pane's D15.
+  bool needsPaneCloseConfirm(int sessionId) {
+    final pane = state.tabOfSession(sessionId)?.panes[sessionId];
+    return pane != null && !pane.exited && pane.runningCommand;
   }
 
-  /// ⌘W, "Đóng tab", middle click: the desktop may close every session (D4).
+  /// "Đóng tab", the row ×, middle click: every pane (D6). The desktop may
+  /// close every session (A1 D4).
   void close(int id) {
     final tab = _tab(id);
     if (tab == null) return;
-    if (!tab.exited) _local.close(id);
-    _remove(id);
+    for (final pane in tab.panes.values) {
+      if (!pane.exited) _local.close(pane.id);
+    }
+    _removeTab(id);
+  }
+
+  /// ⌘W on a split tab, the pane ×, "Đóng pane" (D6): the last pane closes
+  /// the tab.
+  void closePane(int sessionId) {
+    final pane = state.tabOfSession(sessionId)?.panes[sessionId];
+    if (pane == null) return;
+    if (!pane.exited) _local.close(sessionId);
+    _removePane(sessionId);
   }
 
   void dismissNotice() => _set(notice: null);
@@ -344,35 +478,42 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     _set(tabs: tabs, selectedId: state.selectedId ?? tabs.firstOrNull?.id);
   }
 
-  /// Existing tabs keep their place (and stay while their session is gone
-  /// but the exit is not handled yet); new sessions are appended.
+  /// Existing tabs keep their place (and their panes stay while a session
+  /// is gone but its exit is not handled yet); new sessions are appended as
+  /// one-pane tabs — except a desktop session while this window's own open
+  /// is pending (D5): the opener decides whether it is a tab or a pane.
   List<TerminalTab> _merge(List<TerminalTab> current) {
     final summaries = {for (final s in _local.sessions) s.id: s};
     final next = <TerminalTab>[];
     for (final tab in current) {
-      final s = summaries.remove(tab.id);
-      next.add(
-        s == null
-            ? tab
-            : tab.copyWith(
-                title: s.title,
-                phoneAttached: s.phoneAttached,
-                runningCommand: s.runningCommand,
-                driver: s.driver,
-                cwd: s.cwd,
-                gitBranch: s.gitBranch,
-                ports: s.ports,
-              ),
-      );
+      var updated = tab;
+      for (final id in tab.panes.keys) {
+        final s = summaries.remove(id);
+        if (s == null) continue;
+        updated = updated.withPane(
+          id,
+          (p) => p.copyWith(
+            title: s.title,
+            phoneAttached: s.phoneAttached,
+            runningCommand: s.runningCommand,
+            driver: s.driver,
+            cwd: s.cwd,
+            gitBranch: s.gitBranch,
+            ports: s.ports,
+          ),
+        );
+      }
+      next.add(updated);
     }
     for (final s in summaries.values) {
-      final tab = _attach(s);
-      if (tab != null) next.add(tab);
+      if (_awaitingOpen && s.origin == SessionOrigin.desktop) continue;
+      final pane = _attach(s);
+      if (pane != null) next.add(TerminalTab.single(pane));
     }
     return next;
   }
 
-  TerminalTab? _attach(SessionSummary s) {
+  PaneSession? _attach(SessionSummary s, {TerminalGrid? size}) {
     final LocalSessionView view;
     try {
       view = _local.view(s.id);
@@ -385,7 +526,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     _links[s.id] = link;
     // Size first, without telling the session: the backlog is laid out at
     // the pane's width, and a phone keeps driving until the user acts.
-    terminal.resize(_grid.cols, _grid.rows);
+    final grid = size ?? _grid;
+    terminal.resize(grid.cols, grid.rows);
     feed.add(view.backlog);
     feed.drain();
     // Plain assignments: a cascade after an arrow closure would be parsed
@@ -393,23 +535,24 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     terminal.onUserInput = (data) => _onUserInput(s.id, data);
     terminal.onReply = (data) => view.reply(utf8.encode(data));
     terminal.onResize = (cols, rows, _, _) {
-      // Every tab's view is mounted (IndexedStack), so a window resize lays
-      // them all out; only the selected one tells its session, so a hidden
-      // tab the phone drives keeps the phone driver (and its size). A tab
-      // sends its size when it becomes selected ([_selectionChanged]).
-      if (state.selectedId != s.id) return;
-      _grid = (cols: cols, rows: rows);
+      // A3 D13 (A1's rule, per pane): every pane is laid out (IndexedStack,
+      // Offstage under zoom); only visible ones tell their session, so a
+      // hidden pane the phone drives keeps the phone driver and its size.
+      if (!_reportsSize(s.id)) return;
+      if (state.tabOfSession(s.id)?.isSplit == false) {
+        _grid = (cols: cols, rows: rows);
+      }
       view.resize(cols, rows);
     };
     link.subscriptions
       ..add(view.output.listen(feed.add))
       ..add(
         view.driver.listen(
-          (side) => _update(s.id, (t) => t.copyWith(driver: side)),
+          (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),
         ),
       );
     unawaited(view.exitCode.then((code) => _exited(s.id, code)));
-    return TerminalTab(
+    return PaneSession(
       id: s.id,
       index: s.index,
       shell: s.shell,
@@ -427,11 +570,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   }
 
   void _onUserInput(int id, String data) {
-    final tab = _tab(id);
-    if (tab == null) return;
-    if (tab.exited) {
-      // UI §2.6: Enter closes an exited tab; other keys are ignored.
-      if (data.contains('\r')) _remove(id);
+    final pane = state.tabOfSession(id)?.panes[id];
+    if (pane == null) return;
+    if (pane.exited) {
+      // UI §2.6: Enter closes an exited pane (D7); other keys are ignored.
+      if (data.contains('\r')) _removePane(id);
       return;
     }
     _links[id]?.view.write(utf8.encode(data));
@@ -442,7 +585,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final link = _links[id];
     if (link == null) return; // Already closed here.
     if (code == 0 || link.view.closedOnRequest) {
-      _remove(id);
+      _removePane(id);
       return;
     }
     link.feed.drain();
@@ -462,7 +605,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         '\x1b[0m\x1b[?25l',
       );
     }
-    _update(id, (t) => t.copyWith(exitCode: code));
+    _updatePane(id, (p) => p.copyWith(exitCode: code));
   }
 
   void _update(int id, TerminalTab Function(TerminalTab tab) change) {
@@ -470,16 +613,29 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     _set(tabs: [for (final t in state.tabs) t.id == id ? change(t) : t]);
   }
 
-  void _remove(int id) {
-    _links.remove(id)?.dispose();
+  void _updatePane(int sessionId, PaneSession Function(PaneSession) change) {
+    if (!ref.mounted) return;
+    _set(
+      tabs: [
+        for (final t in state.tabs)
+          t.panes.containsKey(sessionId) ? t.withPane(sessionId, change) : t,
+      ],
+    );
+  }
+
+  void _replaceTab(TerminalTab tab) =>
+      _set(tabs: [for (final t in state.tabs) t.id == tab.id ? tab : t]);
+
+  void _removeTab(int tabId) {
     final tabs = List.of(state.tabs);
-    final i = tabs.indexWhere((t) => t.id == id);
+    final i = tabs.indexWhere((t) => t.id == tabId);
     if (i < 0) return;
+    for (final id in tabs[i].panes.keys) {
+      _links.remove(id)?.dispose();
+    }
     tabs.removeAt(i);
     var selected = state.selectedId;
-    if (selected == id) {
-      selected = _successorOf(id, tabs);
-    }
+    if (selected == tabId) selected = _successorOf(tabId, tabs);
     final before = state.selectedId;
     state = TerminalTabsState(
       tabs: tabs,
@@ -487,7 +643,54 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       notice: state.notice,
       opening: state.opening,
     );
-    if (state.selectedId != before) _selectionChanged();
+    if (state.selectedId != before) _visibleChanged();
+  }
+
+  /// D7/D8: the sibling takes the place; focus goes to the most recently
+  /// used remaining pane. The last pane takes the tab with it.
+  void _removePane(int sessionId) {
+    final tab = state.tabOfSession(sessionId);
+    if (tab == null) {
+      _links.remove(sessionId)?.dispose();
+      return;
+    }
+    if (!tab.isSplit) {
+      _removeTab(tab.id);
+      return;
+    }
+    _links.remove(sessionId)?.dispose();
+    final layout = removePane(tab.layout, sessionId)!;
+    final remaining = paneIds(layout);
+    final history = [
+      for (final id in tab.paneHistory)
+        if (id != sessionId && remaining.contains(id)) id,
+    ];
+    var focused = tab.focusedPaneId;
+    if (focused == sessionId) {
+      focused =
+          history.firstOrNull ??
+          siblingLeaf(tab.layout, sessionId) ??
+          remaining.first;
+    }
+    final unzoom = tab.zoomedPaneId == sessionId;
+    _replaceTab(
+      tab.copyWith(
+        layout: layout,
+        panes: Map.of(tab.panes)..remove(sessionId),
+        focusedPaneId: focused,
+        paneHistory: [focused, ...history.where((id) => id != focused)],
+        zoomedPaneId: unzoom ? null : tab.zoomedPaneId,
+      ),
+    );
+    if (unzoom && state.selectedId == tab.id) _visibleChanged();
+  }
+
+  /// D13: the selected tab's panes, minus those a zoom hides.
+  bool _reportsSize(int sessionId) {
+    final tab = state.tabOfSession(sessionId);
+    if (tab == null || tab.id != state.selectedId) return false;
+    final zoomed = tab.zoomedPaneId;
+    return zoomed == null || zoomed == sessionId;
   }
 
   /// I2: the sidebar decides (its visible order, the same one ⌘1–9,
@@ -501,16 +704,23 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     return remaining[min(max(i, 0), remaining.length - 1)].id;
   }
 
-  /// The newly selected tab's view tells its session the size it was laid
-  /// out at while hidden (a resize while it was not selected went nowhere).
-  void _selectionChanged() {
-    final id = state.selectedId;
-    final link = id == null ? null : _links[id];
-    final tab = id == null ? null : _tab(id);
-    if (link == null || tab == null || tab.exited) return;
-    final terminal = link.terminal;
-    _grid = (cols: terminal.viewWidth, rows: terminal.viewHeight);
-    link.view.resize(terminal.viewWidth, terminal.viewHeight);
+  /// Panes that just became visible (a new selection, an unzoom) tell
+  /// their sessions the size they were laid out at while hidden; a size
+  /// that did not change is ignored by the agent.
+  void _visibleChanged() {
+    final tab = state.selected;
+    if (tab == null) return;
+    for (final id in tab.paneOrder) {
+      final pane = tab.panes[id];
+      final link = _links[id];
+      if (pane == null || link == null || pane.exited) continue;
+      if (!_reportsSize(id)) continue;
+      final terminal = link.terminal;
+      if (!tab.isSplit) {
+        _grid = (cols: terminal.viewWidth, rows: terminal.viewHeight);
+      }
+      link.view.resize(terminal.viewWidth, terminal.viewHeight);
+    }
   }
 
   static const Object _keep = Object();
@@ -530,7 +740,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       notice: identical(notice, _keep) ? state.notice : notice as TabNotice?,
       opening: opening ?? state.opening,
     );
-    if (state.selectedId != before) _selectionChanged();
+    if (state.selectedId != before) _visibleChanged();
   }
 
   TerminalTargetPlatform _platform() => switch (defaultTargetPlatform) {
