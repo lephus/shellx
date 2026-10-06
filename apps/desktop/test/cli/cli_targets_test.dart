@@ -35,6 +35,10 @@ void main() {
       isA<PaneRef>().having((t) => t.id, 'id', -3),
     );
     expect(parseTarget(null, 't7'), isA<TabRef>().having((t) => t.id, 'id', 7));
+    expect(
+      parseTarget('p0', null),
+      isA<PaneRef>().having((t) => t.id, 'id', 0),
+    );
     for (final bad in [
       (null, null),
       (1, 2),
@@ -44,6 +48,14 @@ void main() {
       (null, 'p7'),
       ('p', null),
       ('p1x', null),
+      // Canonical forms only (A7 Task 8 review M6).
+      ('p01', null),
+      ('p-0', null),
+      ('p-01', null),
+      (null, 't007'),
+      (null, 't0'),
+      ('p+1', null),
+      ('p1234567890123456', null),
     ]) {
       expect(() => parseTarget(bad.$1, bad.$2), fails('bad_request'));
     }

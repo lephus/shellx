@@ -12,6 +12,9 @@ void _crashingWorker((SendPort, String) args) {
   inbox.listen((_) => throw StateError('boom'));
 }
 
+/// A worker that dies before it sends its inbox port.
+void _deadOnArrival((SendPort, String) args) => throw StateError('boom');
+
 void main() {
   test('finds the first match off the UI isolate', () async {
     final s = IsolateMatchScanner(r'b+');
@@ -37,5 +40,21 @@ void main() {
       ),
     );
     expect(watch.elapsed, lessThan(const Duration(seconds: 4)));
+  });
+
+  test('A7 Task 8 review M7: a worker that dies at once is an internal '
+      'error', () async {
+    final s = IsolateMatchScanner(
+      'a',
+      limit: const Duration(seconds: 5),
+      worker: _deadOnArrival,
+    );
+    addTearDown(s.close);
+    await expectLater(
+      s.scan('a'),
+      throwsA(
+        isA<CliFailure>().having((f) => f.code, 'code', MuxError.internal),
+      ),
+    );
   });
 }

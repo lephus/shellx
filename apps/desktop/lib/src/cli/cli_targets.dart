@@ -28,8 +28,10 @@ const _focused = '@focused';
 
 CliFailure _bad(String message) => CliFailure(MuxError.badRequest, message);
 
-final _paneForm = RegExp(r'^p(-?\d{1,15})$');
-final _tabForm = RegExp(r'^t(\d{1,15})$');
+/// Canonical only (no leading zeros, no `-0`): what `shellx ls` prints and
+/// the Rust CLI sends.
+final _paneForm = RegExp(r'^p(0|-?[1-9]\d{0,14})$');
+final _tabForm = RegExp(r'^t([1-9]\d{0,14})$');
 
 /// D12 on the wire: exactly one of [pane] and [tab], each an id, its
 /// written form (`p<id>`, `p-<n>`, `t<id>`) or `"@focused"`.

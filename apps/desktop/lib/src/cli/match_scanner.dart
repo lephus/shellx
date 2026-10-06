@@ -79,18 +79,34 @@ final class IsolateMatchScanner implements MatchScanner {
     if (ready != null) return ready;
     final port = _fromWorker = ReceivePort();
     final replies = _replies = StreamIterator<Object?>(port);
-    _isolate = await Isolate.spawn(
-      _entry,
-      (port.sendPort, pattern),
-      onError: port.sendPort,
-      debugName: 'shellx wait --match',
-    );
+    try {
+      _isolate = await Isolate.spawn(
+        _entry,
+        (port.sendPort, pattern),
+        onError: port.sendPort,
+        debugName: 'shellx wait --match',
+      );
+    } on Object {
+      close();
+      throw _failed;
+    }
     if (_closed) {
       _isolate?.kill(priority: Isolate.immediate);
       throw StateError('closed');
     }
-    if (!await replies.moveNext() || replies.current is! SendPort) {
-      throw StateError('closed');
+    // A worker that dies before its inbox port arrives (onError sends
+    // `[message, stack]`), or never sends it: the scan cannot run.
+    final bool started;
+    try {
+      started = await replies.moveNext().timeout(limit);
+    } on TimeoutException {
+      close();
+      throw _failed;
+    }
+    if (!started || replies.current is! SendPort) {
+      if (_closed) throw StateError('closed');
+      close();
+      throw _failed;
     }
     _toWorker = replies.current! as SendPort;
     return replies;
