@@ -294,6 +294,17 @@ void main() {
       expect(h.ptys.ptys.single.killed, isTrue);
     });
 
+    test('the Restart Manager quit (Windows, after its save) asks nothing '
+        'and quits', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      await tray().handle(const Quit(confirm: false));
+      expect(window().confirm, isNull);
+      expect(h.quits, 1);
+      expect(h.ptys.ptys.single.killed, isTrue);
+    });
+
     test('⌘Q again while quitting asks nothing and quits once', () async {
       await signedIn(settings: {'onboarding_done': true});
       await h.sessions.open(cols: 80, rows: 24);

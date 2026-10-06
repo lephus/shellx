@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <flutter/method_result_functions.h>
 #include <flutter/standard_method_codec.h>
 
 #include <algorithm>
@@ -60,6 +61,12 @@ bool FlutterWindow::OnCreate() {
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) { HandleTaskbar(call, std::move(result)); });
 
+  // A5a D18: tells Dart the session is ending so it saves the restore files.
+  app_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "pro.shellx.desktop/app",
+          &flutter::StandardMethodCodec::GetInstance());
+
   return true;
 }
 
@@ -69,6 +76,8 @@ void FlutterWindow::OnDestroy() {
     taskbar_channel_->SetMethodCallHandler(nullptr);
     taskbar_channel_ = nullptr;
   }
+  app_channel_ = nullptr;
+  save_pending_ = false;
   if (taskbar_) {
     taskbar_->Release();
     taskbar_ = nullptr;
@@ -107,9 +116,61 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case WM_QUERYENDSESSION:
+      // A5a D18: never blocks the shut down; Dart starts saving now.
+      SaveBeforeExit();
+      return TRUE;
+    case WM_ENDSESSION:
+      if (wparam) {
+        // The process may end once this returns.
+        WaitForSave();
+        // Restart Manager (an installer) asks the app to close itself:
+        // quit through Dart's Quit, without asking (A5a D18 amended).
+        if ((lparam & ENDSESSION_CLOSEAPP) && app_channel_) {
+          app_channel_->InvokeMethod("quitAfterSave", nullptr);
+        }
+      } else if (app_channel_) {
+        // Shut down cancelled: Dart goes on saving (A5a D12).
+        app_channel_->InvokeMethod("exitCancelled", nullptr);
+      }
+      return 0;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::SaveBeforeExit() {
+  if (!app_channel_ || save_pending_) return;
+  save_pending_ = true;
+  auto done = [this]() { save_pending_ = false; };
+  app_channel_->InvokeMethod(
+      "saveBeforeExit", nullptr,
+      std::make_unique<flutter::MethodResultFunctions<flutter::EncodableValue>>(
+          [done](const flutter::EncodableValue*) { done(); },
+          [done](const std::string&, const std::string&,
+                 const flutter::EncodableValue*) { done(); },
+          [done]() { done(); }));
+}
+
+void FlutterWindow::WaitForSave() {
+  // The engine's tasks (and so Dart's answer) arrive as window messages:
+  // pump them until Dart answered, for at most 3 s.
+  const ULONGLONG deadline = GetTickCount64() + 3000;
+  while (save_pending_) {
+    const ULONGLONG now = GetTickCount64();
+    if (now >= deadline) return;
+    MsgWaitForMultipleObjects(0, nullptr, FALSE,
+                              static_cast<DWORD>(deadline - now), QS_ALLINPUT);
+    MSG msg;
+    while (save_pending_ && PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+      if (msg.message == WM_QUIT) {
+        PostQuitMessage(static_cast<int>(msg.wParam));
+        return;
+      }
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+    }
+  }
 }
 
 // 16 px accent (#5FD4E2) dot, drawn once (no .ico asset).

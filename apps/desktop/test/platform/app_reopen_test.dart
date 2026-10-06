@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -36,6 +37,88 @@ void main() {
       expect((reopens, quits), (2, 1));
     },
   );
+
+  test(
+    'saveBeforeExit answers only after the save finished (A5a D18)',
+    () async {
+      final done = Completer<void>();
+      var saved = false;
+      listenForAppChannel(
+        onReopen: () {},
+        onQuitRequested: () {},
+        onSaveBeforeExit: () async {
+          await done.future;
+          saved = true;
+        },
+      );
+      var answered = false;
+      final reply = send('saveBeforeExit').then((_) => answered = true);
+      await pumpEventQueue();
+      expect((saved, answered), (false, false));
+      done.complete();
+      await reply;
+      expect((saved, answered), (true, true));
+    },
+  );
+
+  test('exitCancelled reaches its handler; without handlers both calls '
+      'are answered', () async {
+    var cancelled = 0;
+    listenForAppChannel(
+      onReopen: () {},
+      onQuitRequested: () {},
+      onExitCancelled: () => cancelled++,
+    );
+    await send('exitCancelled');
+    expect(cancelled, 1);
+    listenForAppChannel(onReopen: () {}, onQuitRequested: () {});
+    await send('saveBeforeExit');
+    await send('exitCancelled');
+    await send('quitAfterSave');
+  });
+
+  test('quitAfterSave (Windows Restart Manager) reaches its handler', () async {
+    var quits = 0;
+    listenForAppChannel(
+      onReopen: () {},
+      onQuitRequested: () {},
+      onQuitAfterSave: () => quits++,
+    );
+    await send('quitAfterSave');
+    expect(quits, 1);
+  });
+
+  test('AppDelegate.swift: power-off waits (at most 3 s) for saveBeforeExit; '
+      'a terminate that did not happen resumes saving', () {
+    final swift = File('macos/Runner/AppDelegate.swift').readAsStringSync();
+    final terminate = swift.substring(
+      swift.indexOf('func applicationShouldTerminate(_'),
+      swift.indexOf('enum AppChannel'),
+    );
+    expect(terminate, contains('AppChannel.saveBeforeExit'));
+    expect(terminate, contains('.terminateLater'));
+    expect(terminate, contains('reply(toApplicationShouldTerminate: true)'));
+    expect(terminate, contains('.now() + 3'));
+    expect(terminate, contains('AppChannel.exitCancelled()'));
+    expect(swift, contains('invokeMethod("saveBeforeExit"'));
+    expect(swift, contains('invokeMethod("exitCancelled"'));
+  });
+
+  test('flutter_window.cpp: WM_QUERYENDSESSION asks Dart to save; '
+      'WM_ENDSESSION waits for it, or resumes when cancelled', () {
+    final cpp = File('windows/runner/flutter_window.cpp').readAsStringSync();
+    expect(cpp, contains('"pro.shellx.desktop/app"'));
+    expect(cpp, contains('case WM_QUERYENDSESSION:'));
+    expect(cpp, contains('"saveBeforeExit"'));
+    expect(cpp, contains('WaitForSave()'));
+    expect(cpp, contains('case WM_ENDSESSION:'));
+    expect(cpp, contains('InvokeMethod("exitCancelled"'));
+    // Restart Manager: once saved, quit through Dart's Quit (D18 amended).
+    expect(cpp, contains('ENDSESSION_CLOSEAPP'));
+    expect(cpp, contains('InvokeMethod("quitAfterSave"'));
+    final header = File('windows/runner/flutter_window.h').readAsStringSync();
+    expect(header, contains('app_channel_'));
+  });
 
   test('setDockVisible calls the native side with a bool', () async {
     final calls = <MethodCall>[];

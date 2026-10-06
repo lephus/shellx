@@ -37,26 +37,44 @@ final class TrayPresenter {
   /// (a tab title, a running command, a phone typing) must not rebuild the
   /// native menu (ruling I3; an open menu would also flicker).
   String? _menu;
-  AgentViewState? _pending;
+  AgentViewState? _state;
+  TrayLocalState _local = const TrayLocalState();
+
+  /// The latest (state, local) pair not drawn yet.
+  (AgentViewState, TrayLocalState)? _pending;
   bool _busy = false;
 
-  /// Coalesces bursts of state changes into the latest one.
-  Future<void> render(AgentViewState state) async {
-    _pending = state;
+  /// Coalesces bursts of state changes into the latest one. [local] keeps
+  /// the last one given when omitted.
+  Future<void> render(AgentViewState state, {TrayLocalState? local}) {
+    _state = state;
+    if (local != null) _local = local;
+    return _drain();
+  }
+
+  /// The UI's own part of the menu changed (A5a D13); drawn with the last
+  /// agent state, or with the first one once it comes.
+  Future<void> renderLocal(TrayLocalState local) {
+    _local = local;
+    return _state == null ? Future.value() : _drain();
+  }
+
+  Future<void> _drain() async {
+    _pending = (_state!, _local);
     if (_busy) return;
     _busy = true;
     try {
       while (_pending != null) {
-        final next = _pending!;
+        final (state, local) = _pending!;
         _pending = null;
-        await _render(next);
+        await _render(state, local);
       }
     } finally {
       _busy = false;
     }
   }
 
-  Future<void> _render(AgentViewState state) async {
+  Future<void> _render(AgentViewState state, TrayLocalState local) async {
     final icon = trayIconFor(state);
     if (icon != _icon) {
       await _host.setIcon(
@@ -67,7 +85,7 @@ final class TrayPresenter {
       _icon = icon;
       await _host.setToolTip(_l10n.trayTooltip);
     }
-    final menu = buildTrayMenu(state, _l10n, _ids);
+    final menu = buildTrayMenu(state, _l10n, _ids, local: local);
     final json = jsonEncode(menu.toJson());
     if (json == _menu) return;
     await _host.setMenu(menu);

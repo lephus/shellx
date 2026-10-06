@@ -1,0 +1,760 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:fake_async/fake_async.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/agent/desktop_services.dart'
+    show clockProvider;
+import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/restore/restore_persistence.dart';
+import 'package:shellx_desktop/src/restore/restore_snapshot.dart';
+import 'package:shellx_desktop/src/restore/restore_store.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+
+import '../support/fake_local_sessions.dart';
+import '../support/restore_fakes.dart';
+
+late FakeLocalSessions local;
+late RecordingFiles files;
+late InMemorySettingsStore settings;
+late ProviderContainer c;
+
+RestorePersistence persistence() => c.read(restorePersistenceProvider.notifier);
+TerminalTabs tabs() => c.read(terminalTabsProvider.notifier);
+RestoreStripState? strip() => c.read(restoreStripProvider);
+
+void boot({bool start = true}) {
+  c = ProviderContainer.test(
+    overrides: [
+      localSessionsProvider.overrideWithValue(local),
+      settingsStoreProvider.overrideWithValue(settings),
+      restoreStoreProvider.overrideWithValue(files),
+      clockProvider.overrideWithValue(() => DateTime(2026, 10, 7, 15)),
+      appL10nProvider.overrideWithValue(
+        lookupAppLocalizations(const Locale('vi')),
+      ),
+    ],
+  );
+  c.read(sidebarWorkspacesProvider);
+  if (start) persistence().start();
+}
+
+final key = 'e' * 32;
+
+RestoreSnapshot saved({bool cleanExit = false, String cwd = '/w'}) =>
+    RestoreSnapshot(
+      savedAt: DateTime(2026, 10, 7, 14, 31),
+      cleanExit: cleanExit,
+      selectedTab: key,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [key]),
+      ],
+      tabs: [
+        SavedTab(
+          key: key,
+          focused: key,
+          layout: SavedPane(key: key, cwd: cwd),
+        ),
+      ],
+    );
+
+String screen(TerminalTab tab) => [
+  for (var i = 0; i < tab.terminal.mainBuffer.lines.length; i++)
+    tab.terminal.mainBuffer.lines[i].getText().trimRight(),
+].join('\n');
+
+void main() {
+  setUp(() {
+    local = FakeLocalSessions();
+    files = RecordingFiles();
+    settings = InMemorySettingsStore();
+  });
+
+  test('the default store keeps nothing and building starts no timer', () {
+    final container = ProviderContainer.test();
+    expect(container.read(restoreStoreProvider), isA<NullRestoreFiles>());
+    fakeAsync((async) {
+      local.add(local.summary(1));
+      boot(start: false);
+      c.read(restorePersistenceProvider);
+      expect(async.pendingTimers, isEmpty);
+    });
+  });
+
+  test(
+    'layout: one write 1 s after a burst of changes; none when equal',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(milliseconds: 500));
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(milliseconds: 999));
+      expect(files.layouts, isEmpty);
+      async.elapse(const Duration(milliseconds: 2));
+      expect(files.layouts.single.tabs.single.name, 'b');
+      expect(files.layouts.single.cleanExit, isFalse); // D12 while running
+      tabs().select(1); // no layout change
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(1));
+    }),
+  );
+
+  test(
+    'a failed layout write (disk full) is retried at the next save (§5)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.single.tabs.single.name, 'a');
+      files.failLayoutWrites = true;
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(1));
+      files.failLayoutWrites = false;
+      // Nothing changed since, yet the next save writes it.
+      async.elapse(RestorePersistence.scrollbackPeriod);
+      expect(files.layouts.last.tabs.single.name, 'b');
+    }),
+  );
+
+  test(
+    'scrollback: only dirty panes, every 60 s (D4)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      local.add(local.summary(2));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('hello\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.keys, [persistence().keyOf(1)]);
+      expect(files.scrollbacks.values.single, 'hello\r\n');
+      files.scrollbacks.clear();
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks, isEmpty); // nothing new
+    }),
+  );
+
+  test(
+    'a failed scrollback write keeps the pane dirty (§5)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('hello\r\n');
+      files.failScrollbackWrites = true;
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks, isEmpty);
+      files.failScrollbackWrites = false;
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.values.single, 'hello\r\n');
+    }),
+  );
+
+  test(
+    'flushAll(clean: true) writes layout with cleanExit and dirty panes',
+    () async {
+      local.add(local.summary(1));
+      boot();
+      local.views[1]!.emit('x\r\n');
+      await pumpEventQueue();
+      await persistence().flushAll(clean: true);
+      expect(files.layouts.last.cleanExit, isTrue);
+      expect(files.scrollbacks, isNotEmpty);
+    },
+  );
+
+  test(
+    'after flushAll(clean: true) nothing is written or deleted any more, '
+    'even as every pane closes (D12, Quit)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      local.add(local.summary(2));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('x\r\n');
+      async.flushMicrotasks();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      expect(files.layouts.single.cleanExit, isTrue);
+      expect(files.layouts.single.tabs, hasLength(2));
+      final scrollbacks = Map.of(files.scrollbacks);
+      // The agent shuts down: every session ends.
+      local.views[2]!.emit('more\r\n');
+      local.close(1);
+      local.close(2);
+      async.elapse(const Duration(seconds: 120));
+      expect(files.layouts, hasLength(1));
+      expect(files.deleted, isEmpty);
+      expect(files.scrollbacks, scrollbacks);
+      // A later flush (power-off after Quit) changes nothing either.
+      unawaited(persistence().flushAll(clean: false));
+      async.flushMicrotasks();
+      expect(files.layouts, hasLength(1));
+    }),
+  );
+
+  test('switch off: deletes everything now and stops writing (D13)', () async {
+    local.add(local.summary(1));
+    boot();
+    await persistence().setScrollbackEnabled(false);
+    expect(settings.values[SettingKeys.terminalRestoreScrollback], isFalse);
+    expect(persistence().scrollbackEnabled, isFalse);
+    expect(files.clears, 1);
+    local.views[1]!.emit('x\r\n');
+    await pumpEventQueue();
+    await persistence().flushAll(clean: true);
+    expect(files.scrollbacks, isEmpty);
+    expect(files.layouts, isNotEmpty); // the layout is still saved
+  });
+
+  test('switched off: startup reads no saved text (D13)', () async {
+    settings.values[SettingKeys.terminalRestoreScrollback] = false;
+    files.stored = {key: 'old\r\n'};
+    boot();
+    await persistence().restoreAtStartup(RestoreLoad(snapshot: saved()));
+    expect(files.reads, isEmpty);
+    expect(
+      screen(c.read(terminalTabsProvider).tabs.single),
+      isNot(contains('old')),
+    );
+  });
+
+  test(
+    'closing a pane deletes its file at the next layout write (D15)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      local.add(local.summary(2));
+      boot();
+      async.flushMicrotasks();
+      final key = persistence().keyOf(2);
+      tabs().close(2);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.deleted, [key]);
+      expect(files.layouts.last.paneKeys, isNot(contains(key)));
+      // Only once.
+      tabs().rename(1, 'x');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.deleted, [key]);
+    }),
+  );
+
+  test(
+    'a pane closed after a layout write loses its file too (D15)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      local.add(local.summary(2));
+      boot();
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(seconds: 2));
+      final key = persistence().keyOf(2);
+      expect(files.layouts.single.paneKeys, contains(key));
+      tabs().close(2);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.deleted, [key]);
+    }),
+  );
+
+  test('restoreAtStartup: plan with text + divider, keys kept, strip after an '
+      'unclean exit, orphans removed (D8, D12, D14, D15, D23)', () async {
+    files.stored = {key: 'old\r\n'};
+    boot();
+    await persistence().restoreAtStartup(RestoreLoad(snapshot: saved()));
+    final tab = c.read(terminalTabsProvider).tabs.single;
+    expect(persistence().keyOf(tab.id), key);
+    expect(screen(tab), contains('old\n— Phiên được khôi phục · 14:32 —'));
+    expect(strip()!.tabs, 1);
+    expect(strip()!.contentsAt, DateTime(2026, 10, 7, 14, 32));
+    expect(files.keptOrphans, {key});
+    persistence().dismissStrip();
+    expect(strip(), isNull);
+  });
+
+  test('the divider gets its own line when the saved text does not end a '
+      'line; the text goes through the sanitizer (D6, D8)', () async {
+    // A clear-screen would wipe "old" if it reached the terminal.
+    files.stored = {key: 'old\r\n\x1b[2J\x1b[Hlast'};
+    boot();
+    await persistence().restoreAtStartup(RestoreLoad(snapshot: saved()));
+    final tab = c.read(terminalTabsProvider).tabs.single;
+    expect(
+      screen(tab),
+      contains('old\nlast\n— Phiên được khôi phục · 14:32 —'),
+    );
+  });
+
+  test('restore after a clean exit shows no strip (D12)', () async {
+    boot();
+    await persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved(cleanExit: true)),
+    );
+    expect(c.read(terminalTabsProvider).tabs, hasLength(1));
+    expect(strip(), isNull);
+  });
+
+  test('nothing restored → no strip; every saved file is an orphan', () async {
+    boot();
+    await persistence().restoreAtStartup(const RestoreLoad());
+    expect(strip(), isNull);
+    expect(files.keptOrphans, isEmpty);
+  });
+
+  test(
+    'an activation while the layout still loads adds no tab (D16)',
+    () async {
+      boot();
+      final load = Completer<RestoreLoad>();
+      final restoring = persistence().restoreAtStartup(load.future);
+      final activation = tabs().ensureTab();
+      await pumpEventQueue();
+      expect(c.read(terminalTabsProvider).tabs, isEmpty);
+      load.complete(RestoreLoad(snapshot: saved()));
+      await restoring;
+      await activation;
+      expect(c.read(terminalTabsProvider).tabs, hasLength(1));
+      expect(local.openCwds, ['/w']);
+    },
+  );
+
+  test('panes open at the area grid reported while the layout loaded '
+      '(D17)', () async {
+    boot();
+    final load = Completer<RestoreLoad>();
+    final restoring = persistence().restoreAtStartup(load.future);
+    tabs().reportGrid((cols: 120, rows: 40)); // the first layout
+    load.complete(RestoreLoad(snapshot: saved()));
+    await restoring;
+    expect(local.opens, [(120, 40)]);
+  });
+
+  test(
+    'a pending layout write is dropped when a restore starts; the restored '
+    'layout is written after it (I7)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      tabs().rename(1, 'a'); // debounce pending
+      local.openGate = Completer<void>();
+      unawaited(persistence().restoreAtStartup(RestoreLoad(snapshot: saved())));
+      async.elapse(const Duration(seconds: 5));
+      expect(files.layouts, isEmpty);
+      local.openGate!.complete();
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 2));
+      final written = files.layouts.single;
+      expect(written.tabs, hasLength(2));
+      expect(written.paneKeys, contains(key));
+    }),
+  );
+
+  test('Quit during a restore keeps the saved files (D16)', () async {
+    boot();
+    local.openGate = Completer<void>();
+    final restoring = persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved()),
+    );
+    await pumpEventQueue();
+    await persistence().flushAll(clean: true);
+    // A5a m1: the loaded layout goes back as a clean exit — nothing of it
+    // is lost, and the next launch shows no strip.
+    final written = files.layouts.single;
+    expect(written.cleanExit, isTrue);
+    expect(written.sameLayoutAs(saved()), isTrue);
+    expect(files.deleted, isEmpty);
+    local.openGate!.complete();
+    await restoring;
+    expect(files.layouts, hasLength(1));
+    expect(files.keptOrphans, isNull); // frozen: nothing removed
+  });
+
+  RestoreSnapshot twoTabs({bool cleanExit = false}) {
+    final other = 'f' * 32;
+    return RestoreSnapshot(
+      savedAt: DateTime(2026, 10, 7, 14, 31),
+      cleanExit: cleanExit,
+      selectedTab: key,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [key, other]),
+      ],
+      tabs: [
+        SavedTab(
+          key: key,
+          focused: key,
+          layout: SavedPane(key: key, cwd: '/w'),
+        ),
+        SavedTab(
+          key: other,
+          focused: other,
+          layout: SavedPane(key: other, cwd: '/v'),
+        ),
+      ],
+    );
+  }
+
+  for (final (name, quit) in [
+    ('Quit', () => persistence().flushForQuit()),
+    ('power-off', () => persistence().flushAll(clean: true)),
+  ]) {
+    test('$name during a restore: no more panes open, no toast, no strip; '
+        'the loaded layout is written back clean (A5a m1)', () async {
+      boot();
+      local.failOpens = {'/w'};
+      local.openGate = Completer<void>();
+      final restoring = persistence().restoreAtStartup(
+        RestoreLoad(snapshot: twoTabs()),
+      );
+      await pumpEventQueue();
+      expect(local.openCwds, ['/w']);
+      await quit();
+      local.openGate!.complete();
+      await restoring;
+      expect(local.openCwds, ['/w']); // '/v' never opened
+      expect(c.read(terminalTabsProvider).notice, isNull);
+      expect(strip(), isNull);
+      expect(files.layouts.single.cleanExit, isTrue);
+      expect(files.layouts.single.sameLayoutAs(twoTabs()), isTrue);
+    });
+  }
+
+  test('Quit during a restore after a clean exit: the unclean marker is '
+      'followed by the clean layout (A5a m1)', () async {
+    boot();
+    local.openGate = Completer<void>();
+    final restoring = persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved(cleanExit: true)),
+    );
+    await pumpEventQueue();
+    await persistence().flushForQuit();
+    local.openGate!.complete();
+    await restoring;
+    expect(files.layouts.map((l) => l.cleanExit), [false, true]);
+  });
+
+  test('Quit while the layout still loads writes nothing: the files keep '
+      'what they hold (A5a m1)', () async {
+    boot();
+    final load = Completer<RestoreLoad>();
+    final restoring = persistence().restoreAtStartup(load.future);
+    await pumpEventQueue();
+    await persistence().flushForQuit();
+    load.complete(RestoreLoad(snapshot: saved()));
+    await restoring;
+    expect(files.layouts, isEmpty);
+    expect(local.openCwds, isEmpty);
+    expect(files.keptOrphans, isNull);
+  });
+
+  test('an unexpected error while planning never deletes saved text: no '
+      'orphan removal (A5a m2)', () async {
+    boot();
+    await persistence().restoreAtStartup(
+      Future<RestoreLoad>.error(StateError('disk')),
+    );
+    expect(files.keptOrphans, isNull);
+    expect(c.read(terminalTabsProvider).tabs, isEmpty);
+  });
+
+  test('an error reading saved text never deletes saved text either '
+      '(A5a m2)', () async {
+    files.readError = StateError('io');
+    boot();
+    await persistence().restoreAtStartup(RestoreLoad(snapshot: saved()));
+    expect(files.keptOrphans, isNull);
+  });
+
+  test(
+    'output that never pauses still gets the layout written within 5 s '
+    '(max wait)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      tabs().rename(1, 'a');
+      // A title that changes every 500 ms (a clock in the prompt).
+      for (var i = 0; i < 12; i++) {
+        async.elapse(const Duration(milliseconds: 500));
+        local.replace(local.summary(1, title: 't$i'));
+      }
+      expect(files.layouts.single.tabs.single.name, 'a');
+    }),
+  );
+
+  test(
+    'switched back on: every live pane is saved at the next tick (D13)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().setScrollbackEnabled(false));
+      async.flushMicrotasks();
+      local.views[1]!.emit('idle\r\n');
+      async.elapse(const Duration(seconds: 60)); // dropped: switched off
+      expect(files.scrollbacks, isEmpty);
+      unawaited(persistence().setScrollbackEnabled(true));
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.values.single, 'idle\r\n');
+    }),
+  );
+
+  test(
+    'resume after a cancelled power-off: saving goes on, marked unclean',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      expect(files.layouts.single.cleanExit, isTrue);
+      persistence().resume();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(2));
+      expect(files.layouts.last.cleanExit, isFalse);
+      local.views[1]!.emit('again\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(files.scrollbacks.values.single, 'again\r\n');
+    }),
+  );
+
+  test(
+    'resume while the clean flush is still writing: the unclean layout '
+    'still reaches the disk after it',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      async.flushMicrotasks();
+      files.layoutGate = null;
+      gate.complete();
+      async.flushMicrotasks();
+      expect(files.layouts.single.cleanExit, isTrue);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(2));
+      expect(files.layouts.last.cleanExit, isFalse);
+    }),
+  );
+
+  test(
+    'resume while the clean flush is slower than the debounce: the clean '
+    'layout is never written last',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 3));
+      files.layoutGate = null;
+      gate.complete();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.first.cleanExit, isTrue);
+      expect(files.layouts.last.cleanExit, isFalse);
+      expect(files.layouts.last.tabs.single.name, 'b');
+    }),
+  );
+
+  test(
+    'a second Quit while resume waits for the flush keeps the files frozen',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      final gate = files.layoutGate = Completer<void>();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      unawaited(persistence().flushAll(clean: true));
+      files.layoutGate = null;
+      gate.complete();
+      async.flushMicrotasks();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts.single.cleanExit, isTrue);
+    }),
+  );
+
+  test(
+    'after a committed Quit, a cancelled power-off never resumes saving',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushForQuit());
+      async.flushMicrotasks();
+      persistence().resume();
+      async.flushMicrotasks();
+      tabs().rename(1, 'b');
+      local.views[1]!.emit('later\r\n');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts.single.cleanExit, isTrue);
+      expect(files.scrollbacks, isEmpty);
+    }),
+  );
+
+  test(
+    'a power-off asked, cancelled, then asked again (Windows) leaves the '
+    'second one frozen',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      persistence().resume();
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.last.cleanExit, isFalse);
+      unawaited(persistence().flushAll(clean: true));
+      async.flushMicrotasks();
+      final writes = files.layouts.length;
+      expect(files.layouts.last.cleanExit, isTrue);
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, hasLength(writes));
+      expect(files.layouts.last.cleanExit, isTrue);
+    }),
+  );
+
+  test(
+    'the unclean marker failing to write does not drop the restore',
+    () async {
+      files.throwLayoutWrites = true;
+      files.stored = {key: 'old\r\n'};
+      boot();
+      await persistence().restoreAtStartup(
+        RestoreLoad(snapshot: saved(cleanExit: true)),
+      );
+      final tab = c.read(terminalTabsProvider).tabs.single;
+      expect(screen(tab), contains('old'));
+    },
+  );
+
+  test(
+    'savedScrollbackProvider follows the files: set by a save, cleared by '
+    '"Xóa nội dung đã lưu" and by switching off (D13)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+      local.views[1]!.emit('x\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      unawaited(persistence().clearScrollback());
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+      local.views[1]!.emit('y\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      unawaited(persistence().setScrollbackEnabled(false));
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+    }),
+  );
+
+  test(
+    'savedScrollbackProvider: false once the last pane with a file closes',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('x\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      tabs().close(1);
+      async.elapse(const Duration(seconds: 2));
+      expect(c.read(savedScrollbackProvider), isFalse);
+    }),
+  );
+
+  test(
+    'after "Xóa nội dung đã lưu", live panes are saved again at the next '
+    'save, idle or not (UI-A5 §3)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('kept\r\n');
+      async.elapse(const Duration(seconds: 60));
+      unawaited(persistence().clearScrollback());
+      async.flushMicrotasks();
+      expect(files.scrollbacks, isEmpty);
+      async.elapse(const Duration(seconds: 60)); // no new output
+      expect(files.scrollbacks.values.single, 'kept\r\n');
+    }),
+  );
+
+  test('savedScrollbackProvider starts from what is on disk', () async {
+    files.scrollbacks[key] = 'old';
+    boot(start: false);
+    c.listen(savedScrollbackProvider, (_, _) {});
+    await pumpEventQueue();
+    expect(c.read(savedScrollbackProvider), isTrue);
+  });
+
+  test('a crash during restore is recorded as unclean: the loaded layout is '
+      'rewritten with cleanExit false first', () async {
+    boot();
+    local.openGate = Completer<void>();
+    final restoring = persistence().restoreAtStartup(
+      RestoreLoad(snapshot: saved(cleanExit: true)),
+    );
+    await pumpEventQueue();
+    final marker = files.layouts.single;
+    expect(marker.cleanExit, isFalse);
+    expect(marker.sameLayoutAs(saved(cleanExit: true)), isTrue);
+    local.openGate!.complete();
+    await restoring;
+  });
+
+  test(
+    'nothing is scheduled before start(); start() works again after a '
+    'rebuild',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot(start: false);
+      c.read(restorePersistenceProvider);
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, isEmpty);
+      persistence().start();
+      c.invalidate(restorePersistenceProvider);
+      c.read(restorePersistenceProvider);
+      persistence().start();
+      tabs().rename(1, 'b');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.single.tabs.single.name, 'b');
+    }),
+  );
+
+  test(
+    'flushAll waits for a scrollback write already under way',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('x\r\n');
+      final gate = files.scrollbackGate = Completer<void>();
+      async.elapse(const Duration(seconds: 60)); // the tick's write waits
+      var done = false;
+      unawaited(persistence().flushAll(clean: true).then((_) => done = true));
+      async.flushMicrotasks();
+      expect(done, isFalse);
+      gate.complete();
+      async.flushMicrotasks();
+      expect(done, isTrue);
+      expect(files.scrollbacks.values.single, 'x\r\n');
+    }),
+  );
+}

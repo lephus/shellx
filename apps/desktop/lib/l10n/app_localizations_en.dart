@@ -1046,4 +1046,59 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String terminalRestoredDivider(String time) {
+    return '— Session restored · $time —';
+  }
+
+  @override
+  String restoreTimeYesterday(String time) {
+    return 'yesterday $time';
+  }
+
+  @override
+  String get trayTerminal => 'Terminal';
+
+  @override
+  String get trayRestoreScrollback => 'Save terminal contents on quit';
+
+  @override
+  String get trayClearSavedScrollback => 'Clear saved contents';
+
+  @override
+  String restoreAbnormalStrip(int count, String time) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+    );
+    return 'ShellX didn\'t close normally last time. Reopened $_temp0; contents as of $time.';
+  }
+
+  @override
+  String restoreAbnormalNoText(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+    );
+    return 'ShellX didn\'t close normally last time. Reopened $_temp0.';
+  }
+
+  @override
+  String get restoreStripCloseLabel => 'Dismiss restore notice';
+
+  @override
+  String restorePanesFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Couldn\'t reopen $count panes',
+      one: 'Couldn\'t reopen 1 pane',
+    );
+    return '$_temp0';
+  }
 }

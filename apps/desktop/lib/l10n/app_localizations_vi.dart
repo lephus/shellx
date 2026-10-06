@@ -1013,4 +1013,52 @@ class AppLocalizationsVi extends AppLocalizations {
   String confirmCloseRunningPanesBody(int count) {
     return '$count pane đang chạy lệnh sẽ bị dừng.';
   }
+
+  @override
+  String terminalRestoredDivider(String time) {
+    return '— Phiên được khôi phục · $time —';
+  }
+
+  @override
+  String restoreTimeYesterday(String time) {
+    return 'hôm qua $time';
+  }
+
+  @override
+  String get trayTerminal => 'Terminal';
+
+  @override
+  String get trayRestoreScrollback => 'Lưu nội dung terminal khi thoát';
+
+  @override
+  String get trayClearSavedScrollback => 'Xóa nội dung đã lưu';
+
+  @override
+  String restoreAbnormalStrip(int count, String time) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'ShellX đã đóng bất thường lần trước. Đã mở lại $count tab; nội dung tính tới $time.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String restoreAbnormalNoText(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ShellX đã đóng bất thường lần trước. Đã mở lại $count tab.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get restoreStripCloseLabel => 'Đóng thông báo khôi phục';
+
+  @override
+  String restorePanesFailed(int count) {
+    return 'Không mở lại được $count pane';
+  }
 }

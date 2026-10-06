@@ -64,7 +64,11 @@ final class Reconnect extends TrayAction {
 }
 
 final class Quit extends TrayAction {
-  const Quit();
+  const Quit({this.confirm = true});
+
+  /// False for the Windows Restart Manager quit (A5a D18 amended): the
+  /// system asked the app to close and the save is done; nothing to ask.
+  final bool confirm;
 }
 
 /// The terminal-sharing switch (spec §7.6, §10.1, §10.5).
@@ -92,6 +96,16 @@ final class ToggleDesktopNotifications extends TrayAction {
 /// A4 D20: "Chỉ khi cửa sổ không ở phía trước".
 final class ToggleDesktopNotificationsOnlyUnfocused extends TrayAction {
   const ToggleDesktopNotificationsOnlyUnfocused();
+}
+
+/// A5a D13: "Lưu nội dung terminal khi thoát".
+final class ToggleRestoreScrollback extends TrayAction {
+  const ToggleRestoreScrollback();
+}
+
+/// A5a D13: "Xóa nội dung đã lưu".
+final class ClearSavedScrollback extends TrayAction {
+  const ClearSavedScrollback();
 }
 
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
@@ -126,6 +140,9 @@ abstract final class TrayKeys {
   static const String desktopNotifications = 'desktop_notifications';
   static const String desktopNotificationsOnlyUnfocused =
       'desktop_notifications_only_unfocused';
+  static const String terminal = 'terminal';
+  static const String restoreScrollback = 'restore_scrollback';
+  static const String clearSavedScrollback = 'clear_saved_scrollback';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -179,6 +196,8 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.desktopNotifications => const ToggleDesktopNotifications(),
     TrayKeys.desktopNotificationsOnlyUnfocused =>
       const ToggleDesktopNotificationsOnlyUnfocused(),
+    TrayKeys.restoreScrollback => const ToggleRestoreScrollback(),
+    TrayKeys.clearSavedScrollback => const ClearSavedScrollback(),
     _ => null,
   };
 }

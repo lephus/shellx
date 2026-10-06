@@ -73,6 +73,11 @@ abstract final class ShellxSizes {
   static const double headerBandWindows = 36;
   static const double paneHeaderMac = 28;
   static const double signedOutStrip = 36;
+
+  /// UI-A5 §4: a strip over the terminal grows with the text scale:
+  /// max(36, 18·s + 18).
+  static double infoStripFor(TextScaler scaler) =>
+      max(signedOutStrip, scaler.scale(rowTextLine) + rowTextLine);
   static const double driverPill = 28;
   static const double button = 32;
   static const double input = 36;

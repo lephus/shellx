@@ -1,15 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../agent/desktop_services.dart' show clockProvider;
+import '../../restore/restore_persistence.dart';
+import '../../restore/scrollback_codec.dart' show formatRestoreTime;
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
+import 'info_strip.dart';
 import 'pane_tree_view.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart';
@@ -23,6 +31,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     required this.terminalFocus,
     required this.emptyFocus,
     this.stripFocus,
+    this.restoreStripFocus,
     this.shortcuts,
     required this.onClosePane,
   });
@@ -35,6 +44,10 @@ class TerminalPane extends ConsumerStatefulWidget {
 
   /// The signed-out strip's button (UI §3.6 region 3).
   final FocusNode? stripFocus;
+
+  /// The abnormal-end strip's "Đóng" (UI-A5 §4, between the sidebar and
+  /// the terminal in the region cycle).
+  final FocusNode? restoreStripFocus;
 
   /// Passed to every TerminalView: the window shortcuts must win over
   /// xterm's own key handling.
@@ -87,6 +100,68 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    // UI-A5 §4: polite, once, when a strip appears (also one shown before
+    // this pane was built).
+    ref.listenManual<RestoreStripState?>(restoreStripProvider, (_, next) {
+      if (next != null) _announceStrip(next);
+    }, fireImmediately: true);
+  }
+
+  void _announceStrip(RestoreStripState strip) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(ref.read(restoreStripProvider), strip)) {
+        return;
+      }
+      unawaited(
+        SemanticsService.sendAnnouncement(
+          View.of(context),
+          _restoreStripText(strip),
+          Directionality.of(context),
+        ),
+      );
+    });
+  }
+
+  /// D12, D24: dismissed for this run; the keyboard goes to the terminal.
+  void _dismissStrip() {
+    ref.read(restoreStripProvider.notifier).dismiss();
+    _returnFocus();
+  }
+
+  String _restoreStripText(RestoreStripState strip) {
+    final l10n = AppLocalizations.of(context);
+    final at = strip.contentsAt;
+    return at == null
+        ? l10n.restoreAbnormalNoText(strip.tabs)
+        : l10n.restoreAbnormalStrip(
+            strip.tabs,
+            formatRestoreTime(
+              at,
+              ref.read(clockProvider)(),
+              localeName: l10n.localeName,
+              yesterday: l10n.restoreTimeYesterday,
+            ),
+          );
+  }
+
+  Widget _restoreStrip(RestoreStripState? strip) {
+    if (strip == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    return InfoStrip(
+      key: const Key('pane.restoreStrip'),
+      icon: Icons.history,
+      iconColor: ShellxDesktopColors.textSecondary,
+      text: _restoreStripText(strip),
+      closeText: l10n.actionClose,
+      closeLabel: l10n.restoreStripCloseLabel,
+      focusNode: widget.restoreStripFocus,
+      onClose: _dismissStrip,
+    );
+  }
+
   /// Where the keyboard goes when the toast it was on disappears.
   void _returnFocus() {
     final empty = ref.read(terminalTabsProvider).tabs.isEmpty;
@@ -109,6 +184,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
     _dropClosed(state.tabs);
     final notice = state.notice;
+    final restoreStrip = ref.watch(restoreStripProvider);
 
     return ColoredBox(
       color: ShellxDesktopColors.bgTerminal,
@@ -149,6 +225,17 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                         .open(const LoginRoute()),
                   )
                 : const SizedBox.shrink(),
+          ),
+          // UI-A5 §4: under the signed-out strip; leaves with a 120 ms
+          // fade, taking no keyboard or clicks on its way out.
+          AnimatedSwitcher(
+            duration: ShellxMotion.of(context, ShellxMotion.base),
+            reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
+            switchInCurve: ShellxMotion.baseCurve,
+            switchOutCurve: ShellxMotion.exitCurve,
+            transitionBuilder: _stripTransition,
+            layoutBuilder: _stretch,
+            child: _restoreStrip(restoreStrip),
           ),
           Expanded(
             child: LayoutBuilder(
@@ -260,6 +347,20 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
   /// The strip spans the pane width while it fades.
   static Widget _stretch(Widget? current, List<Widget> previous) =>
       Stack(fit: StackFit.passthrough, children: [...previous, ?current]);
+
+  /// A fade; the outgoing strip takes no clicks and no keyboard.
+  static Widget _stripTransition(Widget child, Animation<double> animation) =>
+      AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final leaving = animation.status == AnimationStatus.reverse;
+          return IgnorePointer(
+            ignoring: leaving,
+            child: ExcludeFocus(excluding: leaving, child: child!),
+          );
+        },
+        child: FadeTransition(opacity: animation, child: child),
+      );
 
   /// UI §1.5 toast: fade + translateY 8 → 0.
   static Widget _toastTransition(Widget child, Animation<double> animation) =>

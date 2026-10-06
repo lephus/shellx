@@ -247,5 +247,14 @@
   "terminalCloseTabAllPanes": "Đóng tab (mọi pane)",
   "confirmCloseRunningPaneBody": "Lệnh đang chạy trong pane này sẽ bị dừng.",
   "confirmCloseRunningPaneAction": "Đóng pane",
-  "confirmCloseRunningPanesBody": "{count} pane đang chạy lệnh sẽ bị dừng."
+  "confirmCloseRunningPanesBody": "{count} pane đang chạy lệnh sẽ bị dừng.",
+  "terminalRestoredDivider": "— Phiên được khôi phục · {time} —",
+  "restoreTimeYesterday": "hôm qua {time}",
+  "trayTerminal": "Terminal",
+  "trayRestoreScrollback": "Lưu nội dung terminal khi thoát",
+  "trayClearSavedScrollback": "Xóa nội dung đã lưu",
+  "restoreAbnormalStrip": "{count, plural, other{ShellX đã đóng bất thường lần trước. Đã mở lại {count} tab; nội dung tính tới {time}.}}",
+  "restoreAbnormalNoText": "{count, plural, other{ShellX đã đóng bất thường lần trước. Đã mở lại {count} tab.}}",
+  "restoreStripCloseLabel": "Đóng thông báo khôi phục",
+  "restorePanesFailed": "Không mở lại được {count} pane"
 }

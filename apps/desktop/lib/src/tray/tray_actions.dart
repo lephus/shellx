@@ -4,6 +4,7 @@ import 'package:shellx_core/shellx_core.dart';
 import '../agent/agent_controller.dart';
 import '../agent/agent_state.dart';
 import '../agent/desktop_services.dart';
+import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
@@ -11,8 +12,20 @@ import '../ui/activation.dart';
 import '../ui/terminal/close_tab.dart';
 import '../ui/window_router.dart';
 import 'tray_action.dart';
+import 'tray_menu.dart';
 
 final trayActionsProvider = Provider<TrayActions>(TrayActions.new);
+
+/// The tray's "Terminal" submenu (A5a D13). The switch lives in the
+/// settings: invalidated after [ToggleRestoreScrollback].
+final trayLocalStateProvider = Provider<TrayLocalState>(
+  (ref) => TrayLocalState(
+    restoreScrollback: ref
+        .read(restorePersistenceProvider.notifier)
+        .scrollbackEnabled,
+    hasSavedScrollback: ref.watch(savedScrollbackProvider),
+  ),
+);
 
 /// Executes tray menu actions, asking for confirmation where an action is
 /// destructive or disconnects a phone.
@@ -138,9 +151,20 @@ final class TrayActions {
         await _setUpTerminalSharing();
       case DisconnectDesktopPhone(:final id):
         _agent.disconnectDesktopPhone(id);
-      case Quit():
+      // UI-A5 §3: both apply at once, without asking.
+      case ToggleRestoreScrollback():
+        final restore = _ref.read(restorePersistenceProvider.notifier);
+        try {
+          await restore.setScrollbackEnabled(!restore.scrollbackEnabled);
+        } finally {
+          // Failed or not, the menu shows what is stored.
+          _ref.invalidate(trayLocalStateProvider);
+        }
+      case ClearSavedScrollback():
+        await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
+      case Quit(:final confirm):
         if (_quitting) return;
-        if (state.sessions.isNotEmpty) {
+        if (confirm && state.sessions.isNotEmpty) {
           final ok = await _router.confirm(
             ConfirmRequest(
               title: l10n.confirmQuitTitle,
@@ -151,6 +175,14 @@ final class TrayActions {
           if (!ok || _quitting) return;
         }
         _quitting = true;
+        // A5a D12: the last save is clean, contents included, and final:
+        // the sessions the shutdown closes, or a late "power-off
+        // cancelled", must not change it.
+        await runBounded(
+          () => _ref.read(restorePersistenceProvider.notifier).flushForQuit(),
+          timeout: const Duration(seconds: 2),
+          label: 'saving the session layout',
+        );
         // Bounded: Quit must always reach exit (quitApp), even if closing
         // the sessions or the relay link hangs.
         await runBounded(

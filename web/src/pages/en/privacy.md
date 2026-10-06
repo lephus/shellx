@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: What data ShellX collects, why, how long it is kept, and your rights.
-updated: "2026-10-06"
+updated: "2026-10-07"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -46,7 +46,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 
 Your phone and your computer set up an encrypted channel using the Noise protocol, with keys that only those two devices hold. The relay sees only encrypted frames, the sending and receiving device IDs, and the size and timing of frames; it cannot read what you type or what is displayed, and it does not even know how many terminal sessions you have open — except for the content of push notifications (section 3). We do not store terminal content.
 
-To replay output produced while your phone is briefly disconnected, the agent keeps up to 256 KiB of the most recent output of each session **in your computer's memory**. It is never sent to us and is gone when the session ends or the agent quits.
+To replay output produced while your phone is briefly disconnected, the agent keeps up to 256 KiB of the most recent output of each session **in your computer's memory**. It is never sent to us and is gone when the session ends or the agent quits. Separately, the desktop app can save recent terminal contents on your computer to restore them when it reopens; see section 4.
 
 ### Voice input
 
@@ -73,6 +73,7 @@ The device private key, access token, the list of trusted phones (on the compute
 - **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
 - **Full Disk Access (macOS):** this optional permission only lets the commands you run in the terminal reach your folders. The agent itself never reads or uploads your files.
+- **Session restore (computer):** to reopen your workspace after you quit the app or restart the computer, ShellX saves the tab/pane layout, each terminal's working folder and — if "Save terminal contents on quit" is on (the default) — up to the last 2,000 lines of each terminal (at most 256 KiB per terminal). These files stay on your computer, in the app's data folder for your account: on macOS `~/Library/Application Support/pro.shellx.desktop/restore`, readable only by your account and excluded from Time Machine backups; on Windows `%LOCALAPPDATA%\ShellX\restore`, deleted when you uninstall. These contents can include anything that was shown in the terminal; they are never sent to our servers, to your phone, or synced anywhere. You can turn off saving the contents, or clear what was saved, at any time from the ShellX menu on the computer → Terminal.
 
 ## 5. What we do not do
 

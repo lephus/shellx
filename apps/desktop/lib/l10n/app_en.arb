@@ -472,5 +472,19 @@
   "confirmCloseRunningPaneBody": "The command running in this pane will be stopped.",
   "confirmCloseRunningPaneAction": "Close pane",
   "confirmCloseRunningPanesBody": "{count, plural, =1{The command running in 1 pane will be stopped.} other{The commands running in {count} panes will be stopped.}}",
-  "@confirmCloseRunningPanesBody": {"placeholders": {"count": {"type": "int"}}}
+  "@confirmCloseRunningPanesBody": {"placeholders": {"count": {"type": "int"}}},
+  "terminalRestoredDivider": "— Session restored · {time} —",
+  "@terminalRestoredDivider": {"placeholders": {"time": {"type": "String"}}},
+  "restoreTimeYesterday": "yesterday {time}",
+  "@restoreTimeYesterday": {"placeholders": {"time": {"type": "String"}}},
+  "trayTerminal": "Terminal",
+  "trayRestoreScrollback": "Save terminal contents on quit",
+  "trayClearSavedScrollback": "Clear saved contents",
+  "restoreAbnormalStrip": "ShellX didn't close normally last time. Reopened {count, plural, =1{1 tab} other{{count} tabs}}; contents as of {time}.",
+  "@restoreAbnormalStrip": {"placeholders": {"count": {"type": "int"}, "time": {"type": "String"}}},
+  "restoreAbnormalNoText": "ShellX didn't close normally last time. Reopened {count, plural, =1{1 tab} other{{count} tabs}}.",
+  "@restoreAbnormalNoText": {"placeholders": {"count": {"type": "int"}}},
+  "restoreStripCloseLabel": "Dismiss restore notice",
+  "restorePanesFailed": "{count, plural, =1{Couldn't reopen 1 pane} other{Couldn't reopen {count} panes}}",
+  "@restorePanesFailed": {"placeholders": {"count": {"type": "int"}}}
 }

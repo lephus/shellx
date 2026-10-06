@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_state.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
+import 'package:shellx_desktop/src/tray/tray_menu.dart';
 import 'package:shellx_desktop/src/tray/tray_presenter.dart';
 import 'package:tray_manager/tray_manager.dart';
 
@@ -165,4 +167,87 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(actions.single, isA<Reconnect>());
   });
+
+  MenuItem clearItem(Menu menu) => menu.items!
+      .firstWhere((i) => i.key == TrayKeys.terminal)
+      .submenu!
+      .items!
+      .firstWhere((i) => i.key == TrayKeys.clearSavedScrollback);
+
+  test(
+    'a change of the local state alone rebuilds the menu (A5a D13)',
+    () async {
+      final host = _FakeTrayHost();
+      final presenter = TrayPresenter(
+        host: host,
+        l10n: lookupAppLocalizations(const Locale('en')),
+        isWindows: false,
+        onAction: (_) async {},
+      );
+      await presenter.render(connected);
+      expect(clearItem(host.menus.last).disabled, isTrue);
+      await presenter.renderLocal(
+        const TrayLocalState(hasSavedScrollback: true),
+      );
+      expect(host.menus, hasLength(2));
+      expect(clearItem(host.menus.last).disabled, isFalse);
+      // The next agent change keeps the local state.
+      await presenter.render(connected.copyWith(email: 'c@d.co'));
+      expect(clearItem(host.menus.last).disabled, isFalse);
+    },
+  );
+
+  test(
+    'a burst keeps the latest state and the latest local state together',
+    () async {
+      final gate = Completer<void>();
+      final host = _GatedHost(gate.future);
+      final presenter = TrayPresenter(
+        host: host,
+        l10n: lookupAppLocalizations(const Locale('en')),
+        isWindows: false,
+        onAction: (_) async {},
+      );
+      final first = presenter.render(connected);
+      unawaited(presenter.render(connected.copyWith(email: 'c@d.co')));
+      unawaited(
+        presenter.renderLocal(const TrayLocalState(hasSavedScrollback: true)),
+      );
+      gate.complete();
+      await first;
+      expect(host.menus, hasLength(2));
+      final status = host.menus.last.items!
+          .firstWhere((i) => i.key == TrayKeys.status)
+          .label!;
+      expect(status, contains('c@d.co'));
+      expect(clearItem(host.menus.last).disabled, isFalse);
+    },
+  );
+
+  test('renderLocal before any agent state draws nothing', () async {
+    final host = _FakeTrayHost();
+    final presenter = TrayPresenter(
+      host: host,
+      l10n: lookupAppLocalizations(const Locale('en')),
+      isWindows: false,
+      onAction: (_) async {},
+    );
+    await presenter.renderLocal(const TrayLocalState(hasSavedScrollback: true));
+    expect(host.menus, isEmpty);
+  });
+}
+
+final class _GatedHost extends _FakeTrayHost {
+  _GatedHost(this.gate);
+  final Future<void> gate;
+  bool _waited = false;
+
+  @override
+  Future<void> setMenu(Menu menu) async {
+    if (!_waited) {
+      _waited = true;
+      await gate;
+    }
+    await super.setMenu(menu);
+  }
 }

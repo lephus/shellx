@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
@@ -43,6 +44,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
 
   /// The signed-out strip's "Sign in" (UI §3.6 region 3).
   final stripFocus = FocusNode(debugLabel: 'signed-out strip');
+
+  /// The abnormal-end strip's "Close" (UI-A5 §4).
+  final restoreStripFocus = FocusNode(debugLabel: 'restore strip');
   final sidebarScroll = ScrollController();
 
   /// The notifications panel is open (UI-A4 §5).
@@ -224,15 +228,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   }
 
   /// UI §3.6 regions: terminal (or "Open new tab" with no tab), sidebar,
-  /// signed-out strip (when shown).
+  /// signed-out strip (when shown), abnormal-end strip (when shown; after
+  /// the sidebar, right before the terminal, UI-A5 §4).
   void _cycleRegion(int step) {
     final signedOut =
         ref.read(agentControllerProvider).phase == AuthPhase.signedOut;
+    final restoreStrip = ref.read(restoreStripProvider) != null;
     final noTab = ref.read(terminalTabsProvider).tabs.isEmpty;
     final regions = [
       noTab ? emptyFocus : terminalFocus,
       if (!noTab) sidebarFocus, // an empty list is no stop (UI §3.6)
       if (signedOut) stripFocus,
+      if (restoreStrip) restoreStripFocus,
     ];
     final current = regions.indexWhere((node) => node.hasFocus);
     // From outside every region (the `+` button, a toast…) the sidebar
@@ -431,6 +438,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     sidebarFocus.dispose();
     emptyFocus.dispose();
     stripFocus.dispose();
+    restoreStripFocus.dispose();
     sidebarScroll.dispose();
     super.dispose();
   }
@@ -566,6 +574,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           terminalFocus: terminalFocus,
           emptyFocus: emptyFocus,
           stripFocus: stripFocus,
+          restoreStripFocus: restoreStripFocus,
           shortcuts: terminalShortcuts,
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);

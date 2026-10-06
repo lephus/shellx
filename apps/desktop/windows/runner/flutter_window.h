@@ -44,6 +44,16 @@ class FlutterWindow : public Win32Window {
   HICON UnreadIcon();
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       taskbar_channel_;
+
+  // A5a D18: pro.shellx.desktop/app. WM_QUERYENDSESSION asks Dart to save
+  // the restore files; WM_ENDSESSION waits (at most 3 s) for the answer
+  // (then, for Restart Manager, asks Dart to quit), or tells Dart the shut
+  // down was cancelled.
+  void SaveBeforeExit();
+  void WaitForSave();
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      app_channel_;
+  bool save_pending_ = false;
   ITaskbarList3* taskbar_ = nullptr;
   HICON unread_icon_ = nullptr;
   UINT taskbar_button_created_ = 0;

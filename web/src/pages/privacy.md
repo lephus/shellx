@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu và quyền của bạn.
-updated: "2026-10-06"
+updated: "2026-10-07"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -46,7 +46,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 Điện thoại và máy tính thiết lập một kênh mã hóa bằng giao thức Noise, với khóa mà chỉ hai thiết bị đó nắm giữ. Máy chủ chuyển tiếp chỉ thấy các gói dữ liệu đã mã hóa, mã thiết bị gửi và nhận, kích thước và thời điểm của gói; nó không đọc được lệnh bạn gõ, kết quả hiển thị, và cũng không biết bạn đang mở bao nhiêu phiên terminal — ngoại trừ nội dung thông báo đẩy (mục 3). Chúng tôi không lưu nội dung terminal.
 
-Để bù phần output phát sinh khi điện thoại tạm mất kết nối, agent giữ tối đa 256 KiB output gần nhất của mỗi phiên **trong bộ nhớ của máy tính của bạn**. Dữ liệu này không được gửi cho chúng tôi và mất đi khi phiên kết thúc hoặc agent thoát.
+Để bù phần output phát sinh khi điện thoại tạm mất kết nối, agent giữ tối đa 256 KiB output gần nhất của mỗi phiên **trong bộ nhớ của máy tính của bạn**. Dữ liệu này không được gửi cho chúng tôi và mất đi khi phiên kết thúc hoặc agent thoát. Riêng việc ứng dụng máy tính lưu nội dung terminal gần nhất trên máy để khôi phục sau khi mở lại được mô tả ở mục 4.
 
 ### Nhập lệnh bằng giọng nói
 
@@ -73,6 +73,7 @@ Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại �
 - **Camera:** ứng dụng di động chỉ dùng camera để quét mã QR ghép nối. Hình ảnh không được lưu hay gửi đi.
 - **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
 - **Full Disk Access (macOS):** quyền này không bắt buộc và chỉ để các lệnh bạn chạy trong terminal truy cập được thư mục của bạn. Agent không tự đọc hay tải lên tệp nào của bạn.
+- **Khôi phục phiên (máy tính):** để mở lại đúng chỗ làm việc sau khi bạn thoát ứng dụng hoặc khởi động lại máy, ShellX lưu bố cục tab/pane, thư mục làm việc của từng terminal và — nếu "Lưu nội dung terminal khi thoát" đang bật (mặc định bật) — tối đa 2.000 dòng nội dung cuối của mỗi terminal (không quá 256 KiB mỗi terminal). Các tệp này chỉ nằm trên máy tính của bạn, trong thư mục dữ liệu của ứng dụng thuộc tài khoản của bạn: trên macOS là `~/Library/Application Support/pro.shellx.desktop/restore`, chỉ tài khoản của bạn đọc được và không đưa vào bản sao lưu Time Machine; trên Windows là `%LOCALAPPDATA%\ShellX\restore`, được xóa khi gỡ cài đặt. Nội dung này có thể chứa bất cứ thứ gì đã hiện trên terminal; nó không bao giờ được gửi lên máy chủ, tới điện thoại hay đồng bộ đi đâu. Bạn có thể tắt việc lưu nội dung hoặc xóa nội dung đã lưu bất cứ lúc nào trong menu ShellX trên máy tính → Terminal.
 
 ## 5. Những gì chúng tôi không làm
 

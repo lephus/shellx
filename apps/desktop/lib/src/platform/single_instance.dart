@@ -10,13 +10,22 @@ final class SingleInstanceLock {
   static const String lockFileName = 'shellx.lock';
   static const String activationFileName = 'activate.signal';
 
+  /// A5a I1: written by the Windows installer before it replaces the
+  /// files, so the running instance quits with a clean, final save.
+  static const String quitFileName = 'quit.signal';
+
   final Directory directory;
   RandomAccessFile? _handle;
+
+  /// One directory watcher for both signal files.
+  Stream<FileSystemEvent>? _events;
 
   String get lockPath =>
       '${directory.path}${Platform.pathSeparator}$lockFileName';
   String get _activationPath =>
       '${directory.path}${Platform.pathSeparator}$activationFileName';
+  String get _quitPath =>
+      '${directory.path}${Platform.pathSeparator}$quitFileName';
 
   /// True if this process now owns the lock.
   Future<bool> acquire() async {
@@ -29,6 +38,14 @@ final class SingleInstanceLock {
       return false;
     }
     _handle = handle;
+    // A5a I1: a quit signal from an earlier run (the installer wrote it
+    // and the app was gone, or quit before deleting it) must not quit
+    // this one. Done before anything watches the directory.
+    try {
+      await File(_quitPath).delete();
+    } on FileSystemException {
+      // None there (the usual case), or not deletable: nothing to do.
+    }
     return true;
   }
 
@@ -51,10 +68,31 @@ final class SingleInstanceLock {
   /// dropped.
   Stream<void> activationRequests({
     Duration coalesce = const Duration(seconds: 1),
+  }) => _requests(activationFileName, coalesce);
+
+  /// A5a I1: fires when the installer writes [quitFileName] (an update
+  /// while ShellX runs); main quits as for the Restart Manager. Only
+  /// while the file is there: the macOS watcher may still report the
+  /// leftover that [acquire] deleted.
+  Stream<void> quitRequests({Duration coalesce = const Duration(seconds: 1)}) =>
+      _requests(
+        quitFileName,
+        coalesce,
+        present: () => File(_quitPath).existsSync(),
+      );
+
+  Stream<void> _requests(
+    String fileName,
+    Duration coalesce, {
+    bool Function()? present,
   }) => coalesceEvents(
-    directory
-        .watch(events: FileSystemEvent.create | FileSystemEvent.modify)
-        .where((event) => _basename(event.path) == activationFileName)
+    (_events ??= directory
+            .watch(events: FileSystemEvent.create | FileSystemEvent.modify)
+            .asBroadcastStream())
+        .where(
+          (event) =>
+              _basename(event.path) == fileName && (present?.call() ?? true),
+        )
         .map((_) {}),
     window: coalesce,
   );

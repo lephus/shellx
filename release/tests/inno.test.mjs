@@ -61,3 +61,30 @@ test('uninstall removes the launch-at-login registry value', () => {
     'missing RegDeleteValue for HKCU Run\\ShellX',
   );
 });
+
+test('uninstall deletes the restore folder (A5a D22)', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\restore"/);
+});
+
+test('an update asks a running ShellX to quit (A5a I1) before the taskkill fallback', () => {
+  // The single-instance folder (path_provider's application-support directory) and the
+  // signal's name must be exactly what the app watches.
+  const dart = readFileSync(
+    new URL('../../apps/desktop/lib/src/platform/single_instance.dart', import.meta.url),
+    'utf8',
+  );
+  const name = dart.match(/static const String quitFileName = '([^']+)';/)?.[1];
+  assert.equal(name, 'quit.signal');
+  const prepare = iss.match(/function PrepareToInstall[\s\S]*?\nend;/)?.[0] ?? '';
+  const signal = prepare.indexOf(`{userappdata}\\pro.shellx\\ShellX\\${name}`);
+  const kill = prepare.indexOf('taskkill.exe');
+  assert.ok(signal >= 0, 'PrepareToInstall must write the quit signal');
+  assert.ok(kill > signal, 'taskkill /F /T stays, after the signal, as the fallback');
+  assert.match(prepare, /WaitForShellXToQuit\(/);
+  assert.match(iss, /^\s*QuitWaitMs = 8000;/m);
+  assert.match(iss, /^\s*QuitPollMs = (2[5-9]\d|[34]\d\d|500);/m);
+  const wait = iss.match(/procedure WaitForShellXToQuit[\s\S]*?\nend;/)?.[0] ?? '';
+  assert.match(wait, /GetTickCount/);
+  assert.match(wait, /Sleep\(QuitPollMs\)/);
+  assert.match(wait, /ShellXRunning\(\)/);
+});

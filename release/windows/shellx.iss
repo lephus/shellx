@@ -88,14 +88,52 @@ Type: filesandordirs; Name: "{userappdata}\pro.shellx\ShellX"
 ; shellx-term.exe that was still running then has exited by now).
 Type: filesandordirs; Name: "{localappdata}\ShellX\bin"
 Type: filesandordirs; Name: "{localappdata}\ShellX\term"
+; A5a D22: saved session layout and terminal contents.
+Type: filesandordirs; Name: "{localappdata}\ShellX\restore"
 
 [Code]
+const
+  { A5a I1: how long a running agent gets to save and quit on its own, and how often to look. }
+  QuitWaitMs = 8000;
+  QuitPollMs = 250;
+
+{ True while ShellX.exe runs for this user: tasklist lists it, find matches it (exit code 0). }
+function ShellXRunning(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec(ExpandConstant('{cmd}'),
+    '/C tasklist /FI "IMAGENAME eq {#AppExeName}" /NH | find /I "{#AppExeName}"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+{ Waits up to QuitWaitMs, looking every QuitPollMs, until ShellX.exe is gone. }
+procedure WaitForShellXToQuit();
+var
+  Start: DWord;
+begin
+  Start := GetTickCount;
+  while ShellXRunning() and (GetTickCount - Start < QuitWaitMs) do
+    Sleep(QuitPollMs);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
-  { Stop a running agent: it keeps its exe and DLLs locked. Its terminal sessions end,
-    exactly as when the agent quits (spec 7). }
+  { A5a I1: ask a running agent to quit first. It watches quit.signal in its single-instance
+    folder (path_provider's application-support directory, %APPDATA%\pro.shellx\ShellX, as in
+    [UninstallDelete]) and quits as for the Windows Restart Manager: it saves its sessions as a
+    clean exit, so the next launch restores them without the "closed unexpectedly" strip. }
+  if ShellXRunning() then
+  begin
+    if SaveStringToFile(ExpandConstant('{userappdata}\pro.shellx\ShellX\quit.signal'), 'update', False) then
+      WaitForShellXToQuit()
+    else
+      Log('quit signal could not be written');
+  end;
+  { Fallback: stop an agent that is still running: it keeps its exe and DLLs locked. Its terminal
+    sessions end, exactly as when the agent quits (spec 7). }
   if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM "{#AppExeName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     Log('taskkill could not be started');
   Result := '';

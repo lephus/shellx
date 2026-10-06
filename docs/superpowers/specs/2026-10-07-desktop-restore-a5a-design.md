@@ -201,3 +201,7 @@ Thoát (tray/⌘Q) ─► flushAll(clean: true) ─► closeAll (A1) ─► exit
 ## 7. Ngoài phạm vi A5a
 
 Giữ shell sống qua thoát/crash/cập nhật giao diện (**A5b**); chạy lại lệnh đang chạy; khôi phục lịch sử thông báo A4; nhiều cửa sổ; mã hoá file nội dung bằng khoá Keychain/DPAPI (follow-up nếu người dùng yêu cầu — hiện dựa vào quyền tệp như các app terminal khác); công tắc tắt hẳn khôi phục bố cục; đồng bộ bố cục giữa các máy; khôi phục trên điện thoại.
+
+
+## Sửa đổi D18 (quyết định của controller, 2026-10-07)
+Trên Windows, `WM_ENDSESSION` (wParam TRUE) **chờ tối đa 3 s** cho lần lưu `saveBeforeExit` trả lời (bơm thông điệp lồng nhau, có giới hạn), vì không chờ thì tiến trình có thể bị giết trước khi lưu xong. Với `ENDSESSION_CLOSEAPP` (Restart Manager), sau khi lưu xong ShellX tự thoát theo đường Thoát thường.
