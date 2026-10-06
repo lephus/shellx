@@ -124,6 +124,34 @@ void main() {
     expect(c.read(terminalTabsProvider).tabs.first.id, 1);
   });
 
+  test('closing a pane keeps the unread of the tab\'s other pane; no read '
+      'is emitted while one is left', () async {
+    await boot(active: false);
+    local.notice(1, SessionNoticeKind.message, body: 'a');
+    local.notice(1, SessionNoticeKind.message, body: 'b');
+    local.notice(100, SessionNoticeKind.message, body: 'c');
+    await settle();
+    expect(state().unread[1]!.count, 3);
+    final reads = <int>[];
+    attention().reads.listen(reads.add);
+    tabs().closePane(100);
+    await settle();
+    expect(state().unread[1]!.panes, {1: 2});
+    expect(state().unread[1]!.count, 2);
+    expect(reads, isEmpty);
+  });
+
+  test('bells from two unfocused panes are two history entries, not one '
+      'x2', () async {
+    await boot(active: false);
+    local.notice(1, SessionNoticeKind.bell);
+    local.notice(100, SessionNoticeKind.bell);
+    await settle();
+    expect(state().history, hasLength(2));
+    expect(state().history.map((e) => e.repeat), [1, 1]);
+    expect(state().history.map((e) => e.paneId).toSet(), {1, 100});
+  });
+
   test('jumpTo focuses the pane with the newest unread notice', () async {
     await boot(active: false);
     tabs().select(2);

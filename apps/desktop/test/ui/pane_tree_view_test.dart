@@ -518,12 +518,7 @@ void main() {
     await t.pump();
     await t.pump();
     expect(container.read(tabAttentionProvider).unreadPanes(1), {100});
-    Finder dot() => find.descendant(
-      of: find.byKey(const Key('pane.zoomed')),
-      matching: find.byWidgetPredicate(
-        (w) => w.runtimeType.toString() == '_Dot',
-      ),
-    );
+    Finder dot() => find.byKey(const Key('pane.zoom.unread'));
     expect(dot(), findsNothing); // the zoomed pane itself is visible
     local.notice(1, SessionNoticeKind.message, body: 'done');
     await t.pump();

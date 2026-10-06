@@ -721,7 +721,7 @@ class _PaneHeaderState extends State<_PaneHeader> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (widget.hiddenUnread) ...[
-                            const _Dot(),
+                            const _Dot(key: Key('pane.zoom.unread')),
                             const SizedBox(width: ShellxSpace.s4),
                           ],
                           Text(
@@ -767,7 +767,7 @@ class _PaneHeaderState extends State<_PaneHeader> {
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot();
+  const _Dot({super.key});
 
   @override
   Widget build(BuildContext context) => Container(

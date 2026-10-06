@@ -100,7 +100,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final phase = ref.watch(agentControllerProvider.select((s) => s.phase));
     final selected = state.selected;
     // UI-A4 §4, A3 D18: the selected tab's panes that notified are ringed.
-    final attention = ref.watch(tabAttentionProvider);
+    // Only the unread map matters here, not the history.
+    final unread = ref.watch(tabAttentionProvider.select((a) => a.unread));
+    Set<int> unreadPanes(int tabId) =>
+        unread[tabId]?.panes.keys.toSet() ?? const <int>{};
     final style = desktopTerminalStyle(fontSize);
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
@@ -202,14 +205,14 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                 scrollFor: _scrollFor,
                                 onClosePane: widget.onClosePane,
                                 ringed: tab.id == selected?.id
-                                    ? attention.unreadPanes(tab.id)
+                                    ? unreadPanes(tab.id)
                                     : const <int>{},
                                 // A pane with unread hidden by the zoom.
                                 hiddenUnread:
                                     tab.zoomedPaneId != null &&
-                                    attention
-                                        .unreadPanes(tab.id)
-                                        .any((id) => id != tab.zoomedPaneId),
+                                    unreadPanes(
+                                      tab.id,
+                                    ).any((id) => id != tab.zoomedPaneId),
                                 toastShowing: notice != null,
                               ),
                           ],
