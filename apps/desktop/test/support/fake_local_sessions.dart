@@ -71,8 +71,19 @@ final class FakeLocalSessions implements LocalSessions {
   /// `SessionManager.open` does.
   bool notifyOnOpen = false;
 
+  /// When set, the next [sessions] listing throws it (once).
+  Object? nextListingError;
+
   @override
-  List<SessionSummary> get sessions => List.of(summaries);
+  List<SessionSummary> get sessions {
+    final error = nextListingError;
+    if (error != null) {
+      nextListingError = null;
+      throw error;
+    }
+    return List.of(summaries);
+  }
+
   @override
   Stream<void> get changes => _changes.stream;
 

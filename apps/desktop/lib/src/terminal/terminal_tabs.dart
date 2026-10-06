@@ -538,8 +538,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       final id = await open();
       if (!ref.mounted) throw const PaneGoneException();
       release();
-      placed = true; // [place] syncs.
-      return place(id);
+      final tab = place(id);
+      placed = true; // [place] synced; a throw there falls back below.
+      return tab;
     } finally {
       release();
       if (ref.mounted) {

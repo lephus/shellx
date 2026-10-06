@@ -102,6 +102,9 @@ final class UiCommandHandler implements UiApi {
       (_) => gone = true,
       onError: (Object _) => gone = true,
     );
+    // A client already gone: its [left] callback is queued before this
+    // turn and runs first, so nothing opens for it.
+    if (left != null) await Future<void>.value();
     final waited = Stopwatch()..start();
     while (true) {
       if (gone) throw const CliFailure(MuxError.busy, 'the client left');
@@ -328,7 +331,8 @@ final class UiCommandHandler implements UiApi {
       rethrow;
     }
     _marks.touch(tab: tab, pane: tab);
-    return {'workspace': ws, 'tab': tab};
+    // Where the tab really is: [ws] may have gone during the D33 wait.
+    return {'workspace': _sideState.workspaceOf(tab) ?? ws, 'tab': tab};
   }
 
   Future<Map<String, Object?>> _workspaceRename(MuxMessage r) async {

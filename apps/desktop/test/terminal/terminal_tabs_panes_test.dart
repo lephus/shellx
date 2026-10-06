@@ -658,6 +658,20 @@ void main() {
       expect(state().selectedId, 100);
     });
 
+    test('a placement that throws still lets the sessions held back during '
+        'the open become tabs (A7 Task 6 review)', () async {
+      boot();
+      await tabs().openTab(); // 100
+      local.afterOpen = (id) {
+        // A desktop session appears while the open is pending: held (D5).
+        local.add(local.summary(200, origin: SessionOrigin.desktop));
+        local.nextListingError = StateError('listing failed');
+      };
+      await expectLater(tabs().openTabFor(), throwsA(isA<StateError>()));
+      expect(state().tabOfSession(200), isNotNull);
+      expect(state().opening, isFalse);
+    });
+
     test('splitPaneFor an unselected tab: focus, zoom and selection stay; '
         'the new pane is next in focus history', () async {
       boot();

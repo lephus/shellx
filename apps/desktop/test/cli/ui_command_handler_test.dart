@@ -385,6 +385,37 @@ void main() {
       expect(local.opens, hasLength(2));
     });
 
+    test('a client that already left opens nothing', () async {
+      final left = Completer<void>()..complete();
+      await expectLater(
+        h.handle(const MuxMessage('ui.tab.new', q: 1), cancelled: left.future),
+        fails('busy'),
+      );
+      await expectLater(
+        h.handle(
+          const MuxMessage('ui.workspace.new', q: 2),
+          cancelled: left.future,
+        ),
+        fails('busy'),
+      );
+      expect(local.opens, hasLength(1)); // setUp's
+      expect(side().workspaces, hasLength(1));
+    });
+
+    test('workspace new reports the workspace the tab really is in', () async {
+      local.openGate = Completer<void>();
+      final user = c.read(terminalTabsProvider.notifier).openTab();
+      final cli = call('ui.workspace.new', {'name': 'web'});
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      // The new workspace goes while its tab waits for the user's open.
+      sidebar().delete(side().workspaces.last.id);
+      local.openGate!.complete();
+      await user;
+      final r = await cli;
+      expect(r['workspace'], side().workspaceOf(r['tab']! as int));
+      expect(r['workspace'], kDefaultWorkspaceId);
+    });
+
     test('M2: closing a tab marks nothing; closing a pane marks only its '
         'tab', () async {
       await call('ui.pane.split', {'pane': 100}); // 101
