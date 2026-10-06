@@ -144,7 +144,7 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 ## 11. Cửa sổ terminal trên desktop — A1 (2026-10-06)
 
 - Spec: `docs/superpowers/specs/2026-10-06-desktop-terminal-a1-design.md`; UI: `docs/superpowers/design/2026-10-06-shellx-desktop-ui.md`; plan: `docs/superpowers/plans/2026-10-06-desktop-terminal-a1.md`.
-- Trạng thái: A1 nằm trên `main` (merge từ `feat/desktop-a1` sau đợt sửa cuối, 2026-10-06). Số test lần chạy cuối (đợt sửa cuối, trước merge): `packages/shellx_agent` 386 pass; `apps/desktop` 622 pass + 1 bỏ qua (benchmark có tag). Windows **chưa thử trên máy thật**.
+- Trạng thái: A1 nằm trên `main` (merge từ `feat/desktop-a1` sau đợt sửa cuối, 2026-10-06). Số test lần chạy cuối (đợt sửa cuối, trước merge): `packages/shellx_agent` 386 pass; `apps/desktop` 627 pass + 1 bỏ qua (benchmark có tag). Windows **chưa thử trên máy thật**.
 - Bộ nhớ: tối đa 32 tab × 10 000 dòng scrollback xterm mỗi tab (cộng ring buffer 256 KiB/phiên ở agent). xterm 4.0.0 lưu mỗi ô 16 byte (4 × uint32), nên một tab đầy ở 160 cột ≈ 10 000 × 160 × 16 B ≈ 26 MB (80 cột ≈ 13 MB); 32 tab đầy ở 160 cột ≈ 0,8 GB trong trường hợp xấu nhất. Chấp nhận cho A1 (ít ai giữ 32 tab đầy); nếu đo thật (mục thử tay 23) quá nặng thì giảm `maxLines` cho tab ẩn ở milestone sau.
 - Benchmark xterm (`flutter test --run-skipped --tags benchmark test/terminal/xterm_benchmark_test.dart`, MacBook Mac16,10 / Apple M4, flutter test VM chế độ debug, lát 256 KiB, lưới 160x48; số từ commit `da98f80`):
   - `yes x2M: total 925ms, slowest slice 77ms, 6.2 MB/s (met)`
