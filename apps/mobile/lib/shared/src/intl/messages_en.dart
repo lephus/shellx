@@ -130,6 +130,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "desktopDriverBanner": MessageLookupByLibrary.simpleMessage(
       "The computer is using this terminal",
     ),
+    "desktopDriverTakeOver": MessageLookupByLibrary.simpleMessage(
+      "Tap to take over",
+    ),
     "desktopStillRunning": MessageLookupByLibrary.simpleMessage(
       "The terminal is still running on the computer.",
     ),

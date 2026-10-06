@@ -124,6 +124,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "desktopDriverBanner": MessageLookupByLibrary.simpleMessage(
       "Máy tính đang dùng terminal này",
     ),
+    "desktopDriverTakeOver": MessageLookupByLibrary.simpleMessage(
+      "Chạm để dùng tiếp",
+    ),
     "desktopStillRunning": MessageLookupByLibrary.simpleMessage(
       "Terminal vẫn chạy trên máy tính.",
     ),

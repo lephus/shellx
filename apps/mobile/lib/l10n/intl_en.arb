@@ -421,5 +421,6 @@
   "voiceListeningAnnounce": "Listening",
   "voiceEnded": "Session ended — open a new session to send",
   "voiceDetached": "This session was disconnected from the phone — reattach to send",
-  "voiceSendEnter": "Send Enter"
+  "voiceSendEnter": "Send Enter",
+  "desktopDriverTakeOver": "Tap to take over"
 }

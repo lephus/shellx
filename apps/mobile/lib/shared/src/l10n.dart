@@ -2081,6 +2081,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Tap to take over`
+  String get desktopDriverTakeOver {
+    return Intl.message(
+      'Tap to take over',
+      name: 'desktopDriverTakeOver',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

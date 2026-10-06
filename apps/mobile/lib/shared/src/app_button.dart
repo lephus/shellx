@@ -29,6 +29,10 @@ class AppButton extends StatelessWidget {
   final MainAxisSize? mainAxisSize;
   final double radius;
 
+  /// Keeps the label on one line, scaled down when it does not fit (a half-width button at a
+  /// large text size) instead of wrapping out of the button.
+  final bool singleLine;
+
   const AppButton({
     super.key,
     this.height = 54,
@@ -45,6 +49,7 @@ class AppButton extends StatelessWidget {
     this.textStyle,
     this.mainAxisSize,
     this.radius = 15,
+    this.singleLine = false,
   });
 
   @override
@@ -79,11 +84,21 @@ class AppButton extends StatelessWidget {
                     children: [
                       ?prefix,
                       Flexible(
-                        child: Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: context.typo.subHeader.bold.copyWith(color: foreground).merge(textStyle),
-                        ),
+                        child: singleLine
+                            ? FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: context.typo.subHeader.bold.copyWith(color: foreground).merge(textStyle),
+                                ),
+                              )
+                            : Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                style: context.typo.subHeader.bold.copyWith(color: foreground).merge(textStyle),
+                              ),
                       ),
                       ?suffix,
                     ],

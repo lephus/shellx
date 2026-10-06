@@ -251,9 +251,13 @@ class TerminalTabController extends Controller {
   }
 
   /// Never sends a size below 1×1 (a zero-sized viewport while the keyboard slides or the phone
-  /// rotates), never repeats the last size.
+  /// rotates), never repeats the last size. Nothing while the computer drives (terminal sharing
+  /// §9.2: only a tap or a keystroke takes the size back, through [claimSize], which sends the view
+  /// size of that moment): the driver banner itself takes room from the view, and sending that
+  /// would take the size back on its own.
   void _sendResize(int cols, int rows) {
     if (_disposed || !_isLive.peek() || cols < 1 || rows < 1) return;
+    if (_showDriverBanner.peek()) return;
     final size = (cols: cols, rows: rows);
     if (size == _lastSent) return;
     _lastSent = size;

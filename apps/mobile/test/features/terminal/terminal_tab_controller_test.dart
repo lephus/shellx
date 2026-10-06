@@ -354,6 +354,26 @@ void main() {
       expect(machine.resizes, hasLength(2));
     });
 
+    test('while the computer drives, a new view size is kept, not sent: only a tap or typing claims', () {
+      fakeAsync((async) {
+        desktopHandle.emit(const TabDriver(DriverSide.desktop));
+        // The driver banner takes a row of the chrome: the view loses a row.
+        desktop.terminal.value.resize(80, 23);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, isEmpty);
+        expect(desktop.showDriverBanner.value, isTrue);
+
+        desktop.claimSize();
+        expect(machine.resizes, [(id: 40, cols: 80, rows: 23)]);
+
+        // The agent confirms; the banner goes and the view gets its row back, which is sent.
+        desktopHandle.emit(const TabDriver(DriverSide.phone));
+        desktop.terminal.value.resize(80, 24);
+        async.elapse(const Duration(seconds: 1));
+        expect(machine.resizes, [(id: 40, cols: 80, rows: 23), (id: 40, cols: 80, rows: 24)]);
+      });
+    });
+
     test('typing while the phone drives sends no resize', () {
       desktop.terminal.value.textInput('ls');
       expect(machine.resizes, isEmpty);

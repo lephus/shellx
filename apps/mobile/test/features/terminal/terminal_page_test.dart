@@ -196,7 +196,7 @@ void main() {
     expect(find.text('Phiên đã kết thúc'), findsOneWidget);
   });
 
-  testWidgets('design: an exited session keeps its content; "Mở phiên mới" replaces the tab', (tester) async {
+  testWidgets('design: an exited session keeps its content; "Phiên mới" replaces the tab', (tester) async {
     await open(tester);
     machine.handles.single.emit(const TabOutput('Built build/ios/iphoneos/Runner.app'));
     machine.handles.single.emit(const TabExited(0));
@@ -205,7 +205,7 @@ void main() {
     expect(find.text('Lệnh cuối thoát với mã 0. Nội dung ở trên vẫn đọc và copy được.'), findsOneWidget);
     expect(screen(), contains('Runner.app'));
 
-    await tester.tap(find.text('Mở phiên mới'));
+    await tester.tap(find.text('Phiên mới'));
     await tester.pumpAndSettle();
     expect(machine.opened, hasLength(2));
     expect(machine.closed, [101]);
@@ -220,15 +220,15 @@ void main() {
     await open(tester);
     expect(find.text('Không mở được shell: pwsh.exe not found'), findsOneWidget);
     expect(find.text('Đóng tab'), findsOneWidget);
-    expect(find.text('Mở phiên mới'), findsOneWidget);
+    expect(find.text('Phiên mới'), findsOneWidget);
     expect(find.text('shell'), findsOneWidget);
     expect(find.text('Chưa có phiên nào đang mở.'), findsNothing);
     await tester.pump(TerminalPageController.noticeDuration);
     expect(find.text('Không mở được shell: pwsh.exe not found'), findsOneWidget);
 
-    // "Mở phiên mới" replaces the failed tab once the shell starts.
+    // "Phiên mới" replaces the failed tab once the shell starts.
     machine.openError = null;
-    await tester.tap(find.text('Mở phiên mới'));
+    await tester.tap(find.text('Phiên mới'));
     await tester.pumpAndSettle();
     expect(find.text('Không mở được shell: pwsh.exe not found'), findsNothing);
     expect(find.text('zsh 1'), findsOneWidget);
@@ -358,17 +358,102 @@ void main() {
     await tester.pump(const Duration(seconds: 1)); // let the debounced resize fire
   });
 
+  testWidgets('tab strip: × is a 44 × 44 pt target; "+" sits on the chips\' centre line', (tester) async {
+    await open(tester);
+    final close = find.byWidgetPredicate((widget) => '${widget.key}'.contains("'tab-close-"));
+    expect(close, findsOneWidget);
+    expect(tester.getSize(close), const Size(44, 44));
+    expect(
+      tester.getCenter(find.byTooltip('Mở phiên mới')).dy,
+      moreOrLessEquals(tester.getCenter(find.text('zsh 1')).dy, epsilon: 1),
+    );
+  });
+
+  testWidgets('the ended card fits "New session" on one line at 320 pt and 1.3× text', (tester) async {
+    tester.view.physicalSize = const Size(640, 1136);
+    tester.view.devicePixelRatio = 2;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(
+      routedApp(
+        open: () => TerminalRoute(agentId: agentA, machineName: 'MacBook-Pro'),
+        routes: [AutoRoute(page: TerminalRoute.page)],
+        locale: en,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await openPushed(tester);
+    machine.handles.single.emit(const TabExited(0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    final button = tester.getRect(find.byKey(const ValueKey('ended-second-action')));
+    final label = find.text('New session');
+    expect(tester.getRect(label).top, greaterThanOrEqualTo(button.top));
+    expect(tester.getRect(label).bottom, lessThanOrEqualTo(button.bottom));
+    expect(tester.widget<Text>(label).maxLines, 1);
+    expect(find.byIcon(Icons.add), findsWidgets);
+    final close = tester.getRect(find.text('Close tab'));
+    expect(close.bottom - close.top, lessThan(button.height));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final (width, scale) in [(320.0, 2.0), (390.0, 2.0)]) {
+    testWidgets('$scale× text at $width pt: live, voice composer and ended card lay out without overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width * 2, 1300);
+      tester.view.devicePixelRatio = 2;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        routedApp(
+          open: () => TerminalRoute(agentId: agentA, machineName: 'MacBook-Pro'),
+          routes: [AutoRoute(page: TerminalRoute.page)],
+          locale: en,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openPushed(tester);
+      expect(tester.takeException(), isNull, reason: 'live');
+      await tester.tap(find.byKey(const ValueKey('voice-mic')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull, reason: 'voice');
+      machine.handles.single.emit(const TabExited(0));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull, reason: 'ended');
+      await tester.pump(const Duration(milliseconds: 200));
+    });
+  }
+
+  testWidgets('"Aa": the font size sheet leaves the terminal undimmed, to see each size live', (tester) async {
+    await open(tester);
+    await tester.tap(find.byTooltip('Cỡ chữ'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsOneWidget);
+    expect(tester.widget<ModalBarrier>(find.byType(ModalBarrier).last).color?.a ?? 0, 0); // no dimming
+  });
+
   testWidgets('landscape: name and tabs share the bar, with a keyboard button', (tester) async {
     tester.view.physicalSize = const Size(2532, 1170);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await open(tester, portrait: false);
     expect(find.byTooltip('Bàn phím'), findsOneWidget);
-    expect(find.byTooltip('Cỡ chữ'), findsNothing);
     expect(
       tester.getCenter(find.text('MacBook-Pro')).dy,
       moreOrLessEquals(tester.getCenter(find.text('zsh 1')).dy, epsilon: 4),
     );
+    // P2: the status line has no room; its dot stays (text as tooltip and label), and "Aa" too.
+    expect(find.text('Đã kết nối · mã hóa đầu cuối'), findsNothing);
+    expect(find.byTooltip('Đã kết nối · mã hóa đầu cuối'), findsOneWidget);
+    expect(find.bySemanticsLabel('Đã kết nối · mã hóa đầu cuối'), findsOneWidget);
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('terminal-status-dot'))).dy,
+      moreOrLessEquals(tester.getCenter(find.text('MacBook-Pro')).dy, epsilon: 2),
+    );
+    expect(find.byTooltip('Cỡ chữ'), findsOneWidget);
   });
 
   // ---- Controller rulings (task-14-rulings.md) ----
@@ -644,12 +729,12 @@ void main() {
     });
   });
 
-  testWidgets('"Mở phiên mới" still replaces the ended tab when the page was left while it opened', (tester) async {
+  testWidgets('"Phiên mới" still replaces the ended tab when the page was left while it opened', (tester) async {
     await open(tester);
     machine.handles.single.emit(const TabExited(0));
     await tester.pump();
     final gate = machine.openGate = Completer<void>();
-    await tester.tap(find.text('Mở phiên mới'));
+    await tester.tap(find.text('Phiên mới'));
     await tester.pump();
 
     await tester.tap(find.byTooltip('Về danh sách máy'));
@@ -791,6 +876,15 @@ void main() {
       expect(find.text('zsh 1'), findsOneWidget);
       expect(find.text('Phiên mới'), findsOneWidget);
       expect(find.byKey(const ValueKey('picker-desktop-hint')), findsNothing);
+      // Both kinds of row lead with an icon, so their labels line up.
+      expect(
+        find.descendant(of: find.byKey(const ValueKey('picker-session-7')), matching: find.byIcon(Icons.terminal)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.text('zsh 1')).dx,
+        tester.getTopLeft(find.text('Terminal — ~/projects/api')).dx,
+      );
 
       await tester.tap(find.text('Terminal — ~/projects/api'));
       await tester.pumpAndSettle();
@@ -864,7 +958,7 @@ void main() {
       tester,
     ) async {
       await openDesktop(tester);
-      const banner = 'Máy tính đang dùng terminal này';
+      const banner = 'Máy tính đang dùng terminal này · Chạm để dùng tiếp';
       expect(find.text(banner), findsNothing);
       await tester.pump(const Duration(milliseconds: 200)); // any resize of the first layout is out
       final sent = machine.resizes.length;
@@ -872,7 +966,11 @@ void main() {
       machine.handle(40).emit(const TabDriver(DriverSide.desktop));
       await tester.pump();
       expect(find.text(banner), findsOneWidget);
-      // Showing the banner (laid over the cells) changes no size: nothing is sent on its own.
+      // In the chrome under the tabs, not over the cells: no row is cut in half.
+      final bannerRect = tester.getRect(find.byKey(const ValueKey('desktop-driver-banner')));
+      expect(bannerRect.top, greaterThanOrEqualTo(tester.getRect(find.text('~/projects/api')).bottom));
+      expect(bannerRect.bottom, lessThanOrEqualTo(tester.getRect(find.byType(TerminalView)).top));
+      // The row it takes from the view is not sent: the computer keeps the size until a tap.
       await tester.pump(const Duration(milliseconds: 200));
       expect(machine.resizes, hasLength(sent));
 
@@ -889,11 +987,15 @@ void main() {
       machine.handle(40).emit(const TabDriver(DriverSide.phone));
       await tester.pump();
       expect(find.text(banner), findsNothing);
+      // The view gets its row back; the phone drives now, so that size goes out.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(machine.resizes, hasLength(sent + 3));
+      expect(machine.resizes.last.rows, greaterThan(machine.resizes[sent].rows));
 
       // While the phone drives, a tap sends nothing.
       await tester.tap(find.byType(TerminalView));
       await tester.pump();
-      expect(machine.resizes, hasLength(sent + 2));
+      expect(machine.resizes, hasLength(sent + 3));
     });
 
     testWidgets('scrolling, a long press and a two-finger pinch on the terminal do not take the size back', (
@@ -927,7 +1029,7 @@ void main() {
       await second.up();
       await tester.pump(const Duration(milliseconds: 200));
       expect(machine.resizes, hasLength(sent));
-      expect(find.text('Máy tính đang dùng terminal này'), findsOneWidget);
+      expect(find.text('Máy tính đang dùng terminal này · Chạm để dùng tiếp'), findsOneWidget);
 
       // A plain tap still does.
       await tester.tap(terminal);
@@ -964,6 +1066,9 @@ void main() {
       registry.forMachine(agentA).activeTab.value!.terminal.value.textInput('ls');
       expect(machine.resizes, hasLength(sent + 1));
       expect(lastInput(), 'ls');
+      // The banner took a row: that size is not sent while the computer drives.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(machine.resizes, hasLength(sent + 1));
     });
 
     testWidgets('session.exited: "Cửa sổ terminal trên máy tính đã đóng." with only "Đóng tab"', (tester) async {

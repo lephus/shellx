@@ -196,15 +196,17 @@ class _SessionRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
           child: Row(
             children: [
-              if (desktop) ...[
+              // Both kinds lead with an icon, so their labels line up.
+              if (desktop)
                 Icon(
                   Icons.desktop_windows_outlined,
                   size: 20,
                   color: colors.secondaryText,
                   semanticLabel: strings.desktopTerminalLabel,
-                ),
-                10.sizedWidth,
-              ],
+                )
+              else
+                ExcludeSemantics(child: Icon(Icons.terminal, size: 20, color: colors.secondaryText)),
+              10.sizedWidth,
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

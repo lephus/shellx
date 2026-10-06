@@ -208,9 +208,11 @@ class _TerminalPageState extends State<TerminalPage> {
     }
   }
 
+  /// No dimming barrier: the terminal above the sheet stays readable and shows each size live.
   Future<void> _showFontSize() => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    barrierColor: Colors.transparent,
     backgroundColor: context.colors.surface,
     builder: (context) => SafeArea(
       child: Padding(
@@ -229,7 +231,9 @@ class _TerminalPageState extends State<TerminalPage> {
               ),
               Row(
                 children: [
-                  Text('A', style: context.typo.metadata11.copyWith(color: context.colors.disable)),
+                  ExcludeSemantics(
+                    child: Text('A', style: context.typo.metadata11.copyWith(color: context.colors.secondaryText)),
+                  ),
                   Expanded(
                     child: Slider(
                       min: AppSettings.minFontSize,
@@ -239,7 +243,9 @@ class _TerminalPageState extends State<TerminalPage> {
                       onChanged: _controller.setFontSize,
                     ),
                   ),
-                  Text('A', style: context.typo.title.copyWith(color: context.colors.disable)),
+                  ExcludeSemantics(
+                    child: Text('A', style: context.typo.title.copyWith(color: context.colors.secondaryText)),
+                  ),
                 ],
               ),
             ],
@@ -276,13 +282,23 @@ class _TerminalPageState extends State<TerminalPage> {
           child: landscape
               ? _ChromeBar(
                   onBack: () => context.router.maybePop(),
+                  // No room for the status line: its dot stays, with the text as tooltip and label.
                   title: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 220),
-                    child: Text(
-                      widget.machineName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.typo.paragraph.bold.copyWith(color: TerminalColors.title),
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _StatusDot(controller: _controller),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            widget.machineName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.typo.paragraph.bold.copyWith(color: TerminalColors.title),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   middle: _TabStrip(
@@ -293,10 +309,16 @@ class _TerminalPageState extends State<TerminalPage> {
                     onClose: _close,
                     inline: true,
                   ),
-                  trailing: IconButton(
-                    tooltip: S.of(context).keyboardTooltip,
-                    icon: const Icon(Icons.keyboard_outlined, color: TerminalColors.cyan),
-                    onPressed: _toggleKeyboard,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _FontSizeButton(onPressed: _showFontSize),
+                      IconButton(
+                        tooltip: S.of(context).keyboardTooltip,
+                        icon: const Icon(Icons.keyboard_outlined, color: TerminalColors.cyan),
+                        onPressed: _toggleKeyboard,
+                      ),
+                    ],
                   ),
                 )
               : Column(
@@ -304,14 +326,7 @@ class _TerminalPageState extends State<TerminalPage> {
                     _ChromeBar(
                       onBack: () => context.router.maybePop(),
                       title: _TitleBlock(name: widget.machineName, controller: _controller),
-                      trailing: IconButton(
-                        tooltip: S.of(context).fontSizeTooltip,
-                        onPressed: _showFontSize,
-                        icon: Text(
-                          'Aa',
-                          style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.cyan),
-                        ),
-                      ),
+                      trailing: _FontSizeButton(onPressed: _showFontSize),
                     ),
                     _TabStrip(
                       workspace: workspace,
@@ -328,6 +343,14 @@ class _TerminalPageState extends State<TerminalPage> {
           onReconnectReplaced: _controller.reconnectReplaced,
           showReconnecting: false,
         ),
+        // In the chrome, never over the cells, so no row is cut in half. The row it takes from the
+        // view is not sent while the computer drives (`TerminalTabController._sendResize`).
+        Watch((context) {
+          if (_controller.closing.value) return const SizedBox.shrink();
+          final tab = workspace.activeTab.value;
+          if (tab == null || !tab.showDriverBanner.value) return const SizedBox.shrink();
+          return _DriverBanner(onTap: tab.claimSize);
+        }),
         Watch(
           (context) => _controller.busy.value ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
         ),
@@ -433,8 +456,9 @@ class _ChromeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
+    // At least 50 pt; taller when a large text size needs it (the title block's two lines).
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 50),
       child: Row(
         children: [
           IconButton(
@@ -456,6 +480,64 @@ class _ChromeBar extends StatelessWidget {
   }
 }
 
+/// The status line's text and dot colour. Design: green when connected, amber while connecting or
+/// reconnecting, red when it failed and the user has to act (another instance took the connection,
+/// the machine is offline, …). Reads signals: call it in a Watch.
+(String, Color) _connectionStatus(BuildContext context, S strings, TerminalPageController controller) {
+  final relay = controller.relayState.value;
+  final machine = controller.machineState.value;
+  // The channel only works while the relay does (the fakes keep the machine ready then).
+  final ready = machine is MachineReady && relay == RelayConnectionState.connected;
+  return switch ((relay, machine)) {
+    (RelayConnectionState.replaced, _) => (strings.bannerReplaced, TerminalColors.red),
+    (RelayConnectionState.disconnected, _) => (strings.bannerReconnecting, TerminalColors.yellow),
+    (_, MachineFailed(:final failure)) => (ErrorText(strings).machine(failure), TerminalColors.red),
+    _ when ready => (strings.terminalConnected, context.colors.okDot),
+    _ => (strings.terminalConnecting, TerminalColors.yellow),
+  };
+}
+
+/// "Aa": the font size sheet.
+class _FontSizeButton extends StatelessWidget {
+  const _FontSizeButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: S.of(context).fontSizeTooltip,
+    onPressed: onPressed,
+    icon: Text('Aa', style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.cyan)),
+  );
+}
+
+/// Landscape: the status line's dot next to the machine name; its text is the tooltip and label.
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.controller});
+
+  final TerminalPageController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = S.of(context);
+    return Watch((context) {
+      final (status, dot) = _connectionStatus(context, strings, controller);
+      return Tooltip(
+        message: status,
+        child: Semantics(
+          label: status,
+          child: Container(
+            key: const ValueKey('terminal-status-dot'),
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          ),
+        ),
+      );
+    });
+  }
+}
+
 /// Machine name and the status line ("Đã kết nối · mã hóa đầu cuối").
 class _TitleBlock extends StatelessWidget {
   const _TitleBlock({required this.name, required this.controller});
@@ -467,19 +549,7 @@ class _TitleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = S.of(context);
     return Watch((context) {
-      final relay = controller.relayState.value;
-      final machine = controller.machineState.value;
-      // The channel only works while the relay does (the fakes keep the machine ready then).
-      final ready = machine is MachineReady && relay == RelayConnectionState.connected;
-      // Design: green when connected, amber while connecting or reconnecting, red when it failed
-      // and the user has to act (another instance took the connection, the machine is offline, …).
-      final (String status, Color dot) = switch ((relay, machine)) {
-        (RelayConnectionState.replaced, _) => (strings.bannerReplaced, TerminalColors.red),
-        (RelayConnectionState.disconnected, _) => (strings.bannerReconnecting, TerminalColors.yellow),
-        (_, MachineFailed(:final failure)) => (ErrorText(strings).machine(failure), TerminalColors.red),
-        _ when ready => (strings.terminalConnected, context.colors.okDot),
-        _ => (strings.terminalConnecting, TerminalColors.yellow),
-      };
+      final (status, dot) = _connectionStatus(context, strings, controller);
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -487,7 +557,7 @@ class _TitleBlock extends StatelessWidget {
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.title),
+            style: context.typo.subHeader15.bold.copyWith(color: TerminalColors.title, height: 1.3),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -540,11 +610,11 @@ class _TabStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = S.of(context);
     return Watch((context) {
-      if (closing.value) return const SizedBox(height: 44);
+      if (closing.value) return const SizedBox(height: _TabChip.stripHeight);
       final tabs = workspace.tabs.value;
       final activeIndex = workspace.activeIndex.value;
       return Container(
-        height: 44,
+        height: _TabChip.stripHeight,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: inline
             ? null
@@ -566,10 +636,14 @@ class _TabStrip extends StatelessWidget {
                 // A desktop terminal keeps running: `×` closes the tab, not the session.
                 closeTooltip: tab.isDesktop ? strings.closeTab : strings.terminalCloseTab,
               ),
-            IconButton(
-              tooltip: strings.terminalOpenNew,
-              icon: const Icon(Icons.add, size: 20, color: TerminalColors.cyan),
-              onPressed: canOpen.value ? onOpen : null,
+            // Centred on the chips' row (below their top inset), not on the whole strip.
+            Padding(
+              padding: const EdgeInsets.only(top: _TabChip.topInset),
+              child: IconButton(
+                tooltip: strings.terminalOpenNew,
+                icon: const Icon(Icons.add, size: 20, color: TerminalColors.cyan),
+                onPressed: canOpen.value ? onOpen : null,
+              ),
             ),
           ],
         ),
@@ -591,6 +665,12 @@ class _TabChip extends StatelessWidget {
 
   static const double _maxLabelWidth = 180;
 
+  /// The strip: a 4 pt inset above 44 pt chips, so `×` gets a 44 × 44 pt target, and the 1 pt
+  /// line under them.
+  static const double topInset = 4;
+  static const double target = 44;
+  static const double stripHeight = topInset + target + 1;
+
   final TerminalTabController tab;
 
   /// Read before [tab], which is disposed with the workspace.
@@ -606,7 +686,7 @@ class _TabChip extends StatelessWidget {
       if (closing.value) return const SizedBox.shrink();
       final live = tab.isLive.value;
       return Padding(
-        padding: const EdgeInsets.only(top: 5, right: 2),
+        padding: const EdgeInsets.only(top: topInset, right: 2),
         child: Material(
           color: selected ? TerminalColors.background : Colors.transparent,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
@@ -651,14 +731,16 @@ class _TabChip extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // 44 × 44 pt: it sits next to the label, and on a desktop tab it detaches without asking.
                   Tooltip(
                     message: closeTooltip,
                     child: InkWell(
+                      key: ValueKey('tab-close-${tab.id}'),
                       onTap: onClose,
-                      child: const SizedBox(
-                        width: 36,
-                        height: 39,
-                        child: Icon(Icons.close, size: 14, color: TerminalColors.muted),
+                      customBorder: const CircleBorder(),
+                      child: const SizedBox.square(
+                        dimension: target,
+                        child: Icon(Icons.close, size: 16, color: TerminalColors.muted),
                       ),
                     ),
                   ),
@@ -744,7 +826,6 @@ class _TerminalPane extends StatelessWidget {
     return Watch((context) {
       if (closing.value) return const SizedBox.expand();
       final banner = tab.banner.value;
-      final computerDrives = tab.showDriverBanner.value;
       return Stack(
         children: [
           Positioned.fill(
@@ -797,15 +878,6 @@ class _TerminalPane extends StatelessWidget {
               ),
             ),
           ),
-          // Over the cells, never above them: pushing the terminal down would change its size and
-          // send a resize that takes the size back on its own.
-          if (computerDrives)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _DriverBanner(onTap: tab.claimSize),
-            ),
           // Every child is positioned, so the stack fills the pane.
           Positioned(
             top: 8,
@@ -874,8 +946,9 @@ class _EndedCard extends StatelessWidget {
       TabNotice.desktopClosed => (strings.desktopWindowClosed, null),
       TabNotice.terminalGone => (strings.desktopTerminalGone, null),
     };
-    // The second button: "Gắn lại", "Mở phiên mới" on a ShellX tab, none on a desktop terminal that is gone.
-    final String? secondLabel = canReattach ? strings.tabReattach : (isDesktop ? null : strings.terminalOpenNew);
+    // The second button: "Gắn lại", "Phiên mới" on a ShellX tab, none on a desktop terminal that is gone.
+    // Short labels on one line: two half-width buttons at 320 pt and a large text size.
+    final String? secondLabel = canReattach ? strings.tabReattach : (isDesktop ? null : strings.pickerNewSession);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -900,6 +973,8 @@ class _EndedCard extends StatelessWidget {
                   title: strings.closeTab,
                   height: 44,
                   radius: 11,
+                  singleLine: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   backgroundColor: TerminalColors.secondaryAction,
                   textColor: const Color(0xFFE6F0F2),
                   onTap: onCloseTab,
@@ -909,9 +984,18 @@ class _EndedCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: AppButton(
+                    key: const ValueKey('ended-second-action'),
                     title: secondLabel,
                     height: 44,
                     radius: 11,
+                    singleLine: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    prefix: canReattach
+                        ? null
+                        : const Padding(
+                            padding: EdgeInsets.only(right: 6),
+                            child: Icon(Icons.add, size: 20, color: TerminalColors.onCyan),
+                          ),
                     backgroundColor: TerminalColors.cyan,
                     textColor: TerminalColors.onCyan,
                     onTap: canReattach ? onReattach : onOpenNew,
@@ -1002,7 +1086,8 @@ class _TapListenerState extends State<_TapListener> {
 }
 
 /// Design "Terminal trên máy tính": the computer has taken this desktop terminal's size (someone typed
-/// or resized the window there). Tapping it, the terminal, or typing hands the size back.
+/// or resized the window there). Tapping it, the terminal, or typing hands the size back; the banner
+/// says so ("Chạm để dùng tiếp"). It sits in the chrome under the tabs.
 class _DriverBanner extends StatelessWidget {
   const _DriverBanner({required this.onTap});
 
@@ -1025,8 +1110,17 @@ class _DriverBanner extends StatelessWidget {
               const Icon(Icons.desktop_windows_outlined, size: 18, color: TerminalColors.yellow),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  S.of(context).desktopDriverBanner,
+                child: Text.rich(
+                  TextSpan(
+                    text: S.of(context).desktopDriverBanner,
+                    children: [
+                      const TextSpan(text: ' · '),
+                      TextSpan(
+                        text: S.of(context).desktopDriverTakeOver,
+                        style: const TextStyle(decoration: TextDecoration.underline),
+                      ),
+                    ],
+                  ),
                   style: context.typo.paragraph13.bold.copyWith(color: TerminalColors.yellow),
                 ),
               ),
