@@ -17,8 +17,8 @@ const int _maxCwd = 4096;
 const int _maxWorkspaceId = 64;
 final RegExp _keyPattern = RegExp(r'^[0-9a-f]{32}$');
 
-/// POSIX `/…`, Windows `C:\…` or UNC `\\…`.
-final RegExp _absolutePath = RegExp(r'^(/|[A-Za-z]:\\|\\\\)');
+/// POSIX `/…`, Windows `C:\…` or `C:/…`, or UNC `\\…`.
+final RegExp _absolutePath = RegExp(r'^(/|[A-Za-z]:[\\/]|\\\\)');
 
 /// C0, DEL and C1 controls (NUL included).
 final RegExp _control = RegExp(r'[\x00-\x1f\x7f-\x9f]');

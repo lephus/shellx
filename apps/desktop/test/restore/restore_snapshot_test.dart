@@ -267,6 +267,13 @@ void main() {
     }
   });
 
+  test('Windows drive paths with a forward slash are restorable', () {
+    expect(isRestorableCwd('C:/Users/a'), isTrue);
+    expect(isRestorableCwd('d:/'), isTrue);
+    expect(isRestorableCwd('C:work'), isFalse);
+    expect(isRestorableCwd('C:'), isFalse);
+  });
+
   test('a tab keeps its creating pane key whether or not that pane is a '
       'leaf of its own tree', () {
     // Own leaf (the usual case) is in sample(); here the creating pane has
