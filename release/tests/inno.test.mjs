@@ -104,6 +104,14 @@ test('uninstall removes the shellx command (A7 D7, D8): the cli folder and our H
   assert.match(remove, /RegWriteExpandStringValue\(HKEY_CURRENT_USER, 'Environment', 'Path', /);
   // Nothing written when our entry is not there.
   assert.match(remove, /if Changed then/);
+  // M4: every other entry stays byte for byte, empty segments included: no entry is skipped,
+  // separators are re-added between the kept entries only.
+  assert.doesNotMatch(remove, /if Entry = '' then/);
+  assert.match(remove, /if not First then\s+NewPath := NewPath \+ ';';/);
   // New terminals learn of it (WM_SETTINGCHANGE from the uninstaller).
   assert.match(iss, /^ChangesEnvironment=yes$/m);
+});
+
+test('uninstall deletes the command-line host folder (A5b D5 / A7 D30)', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\mux"/);
 });
