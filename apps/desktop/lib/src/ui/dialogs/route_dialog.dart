@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../terminal/terminal_tabs.dart';
 import '../pages/change_password_page.dart';
 import '../pages/confirm_page.dart';
 import '../pages/login_page.dart';
@@ -33,10 +32,6 @@ Size dialogSizeFor(WindowState state) {
     null => const Size(ShellxSizes.dialogWidth, 260),
   };
 }
-
-/// UI §2: "{tab} — ShellX", or "ShellX" with no tabs.
-String windowTitleFor(TerminalTab? selected, AppLocalizations l10n) =>
-    selected == null ? 'ShellX' : l10n.windowTitle(selected.label);
 
 /// The legacy route or confirm as a dialog over the terminal (UI §4):
 /// scrim, focus trapped, Escape = close, informational dialogs (pairing,

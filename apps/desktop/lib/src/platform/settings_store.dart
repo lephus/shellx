@@ -25,6 +25,10 @@ abstract final class SettingKeys {
   static const String windowWidth = 'window_width';
   static const String windowHeight = 'window_height';
 
+  /// The window was maximized or full screen when last moved or resized:
+  /// the next launch maximizes it again over the last normal bounds.
+  static const String windowMaximized = 'window_maximized';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -38,6 +42,7 @@ abstract final class SettingKeys {
     windowY,
     windowWidth,
     windowHeight,
+    windowMaximized,
   };
 }
 

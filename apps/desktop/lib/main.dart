@@ -32,7 +32,6 @@ import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
-import 'src/terminal/terminal_tabs.dart';
 import 'src/terminal_sharing/attach_throttle.dart';
 import 'src/terminal_sharing/powershell.dart';
 import 'src/terminal_sharing/sharing_paths.dart';
@@ -43,7 +42,6 @@ import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/activation.dart';
 import 'src/ui/app.dart';
-import 'src/ui/dialogs/route_dialog.dart';
 import 'src/ui/window_bounds.dart';
 import 'src/ui/window_coordinator.dart';
 import 'src/ui/window_host.dart';
@@ -267,12 +265,11 @@ Future<void> _start(
       onQuitRequested: () => unawaited(trayActions.handle(const Quit())),
     );
   }
-  container.listen(
-    terminalTabsProvider.select((s) => s.selected),
-    (_, selected) => _unawaitedLogged(
-      windowHost.setTitle(windowTitleFor(selected, l10n)),
-      'window title',
-    ),
+  listenForWindowTitle(
+    container: container,
+    host: windowHost,
+    l10n: l10n,
+    run: (call) => _unawaitedLogged(call, 'window title'),
   );
 
   registerFontLicenses();

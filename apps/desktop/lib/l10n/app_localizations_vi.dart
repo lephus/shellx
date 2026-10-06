@@ -46,7 +46,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get authForgotPasswordHint =>
-      'Quên mật khẩu? Mở ShellX trên máy tính vẫn đang đăng nhập và chọn “Đổi mật khẩu…” trong menu.';
+      'Quên mật khẩu? Trên một máy tính khác vẫn đang đăng nhập ShellX, chọn “Đổi mật khẩu…” trong menu khay.';
 
   @override
   String get authSignedOutNotice => 'Bạn đã bị đăng xuất. Hãy đăng nhập lại.';
@@ -114,9 +114,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String onboardingTrayHint(String platform) {
     String _temp0 = intl.Intl.selectLogic(platform, {
       'macos':
-          'Terminal của bạn ở cửa sổ ShellX. ShellX giờ nằm trên thanh menu. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
+          'Terminal của bạn ở cửa sổ ShellX. ShellX cũng có mặt trên thanh menu: chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
       'other':
-          'Terminal của bạn ở cửa sổ ShellX. ShellX giờ nằm trong khay hệ thống. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
+          'Terminal của bạn ở cửa sổ ShellX. ShellX cũng có mặt trong khay hệ thống: chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
     });
     return '$_temp0';
   }
@@ -264,7 +264,7 @@ class AppLocalizationsVi extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count phiên đang mở sẽ bị đóng. Điện thoại không kết nối được máy này cho tới khi ShellX chạy lại.',
+          '$count tab đang mở sẽ bị đóng. Điện thoại không kết nối được máy này cho tới khi ShellX chạy lại.',
     );
     return '$_temp0';
   }
@@ -622,4 +622,39 @@ class AppLocalizationsVi extends AppLocalizations {
   String terminalPaneLabel(String title) {
     return 'Terminal $title';
   }
+
+  @override
+  String confirmCloseAllTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Đóng tất cả $count tab?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmCloseAllBody =>
+      'Mọi shell trong các tab này sẽ bị dừng, kể cả lệnh đang chạy.';
+
+  @override
+  String get confirmCloseAllAction => 'Đóng tất cả';
+
+  @override
+  String terminalCloseTabTooltip(String shortcut) {
+    return 'Đóng tab  $shortcut';
+  }
+
+  @override
+  String get terminalDriverPhoneShort =>
+      'Điện thoại đang dùng — gõ để dùng lại';
+
+  @override
+  String get terminalCopy => 'Sao chép';
+
+  @override
+  String get terminalPaste => 'Dán';
+
+  @override
+  String get terminalSelectAll => 'Chọn tất cả';
 }

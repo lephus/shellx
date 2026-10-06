@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_state.dart';
@@ -8,7 +9,7 @@ import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_presenter.dart';
 import 'package:tray_manager/tray_manager.dart';
 
-final class _FakeTrayHost implements TrayHost {
+class _FakeTrayHost implements TrayHost {
   final List<(String, bool)> icons = [];
   final List<Menu> menus = [];
 
@@ -28,6 +29,19 @@ final class _FakeTrayHost implements TrayHost {
   Future<void> setToolTip(String text) async {}
   @override
   Future<void> setMenu(Menu menu) async => menus.add(menu);
+}
+
+final class _FailingMenuHost extends _FakeTrayHost {
+  int menuFailures = 1;
+
+  @override
+  Future<void> setMenu(Menu menu) async {
+    if (menuFailures > 0) {
+      menuFailures--;
+      throw StateError('tray not ready');
+    }
+    await super.setMenu(menu);
+  }
 }
 
 void main() {
@@ -54,9 +68,60 @@ void main() {
         ('assets/tray/tray_normal.png', true),
         ('assets/tray/tray_active.png', false),
       ]);
+      // Each render shows another email in the status line.
+      expect(host.menus, hasLength(3));
+      await presenter.render(connected.copyWith(activeChannels: 2));
+      // Only the channel count changed: the menu shows nothing of it.
       expect(host.menus, hasLength(3));
     },
   );
+
+  test('the native menu is set only when what it shows changes (ruling I3): '
+      'a tab title or a running command does not rebuild it', () async {
+    final host = _FakeTrayHost();
+    final presenter = TrayPresenter(
+      host: host,
+      l10n: lookupAppLocalizations(const Locale('en')),
+      isWindows: false,
+      onAction: (_) async {},
+    );
+    SessionSummary session({String title = '', bool running = false}) =>
+        SessionSummary(
+          id: 7,
+          index: 1,
+          shell: 'zsh',
+          createdAt: DateTime(2026, 10, 6),
+          attachedMobileId: null,
+          title: title,
+          runningCommand: running,
+        );
+    await presenter.render(connected.copyWith(sessions: [session()]));
+    for (var i = 0; i < 20; i++) {
+      await presenter.render(
+        connected.copyWith(
+          sessions: [session(title: 'vim $i', running: i.isEven)],
+        ),
+      );
+    }
+    expect(host.menus, hasLength(1));
+    await presenter.render(
+      connected.copyWith(sessions: [session(), session()]),
+    );
+    expect(host.menus, hasLength(2));
+  });
+
+  test('a menu that failed to set is set again on the next render', () async {
+    final host = _FailingMenuHost();
+    final presenter = TrayPresenter(
+      host: host,
+      l10n: lookupAppLocalizations(const Locale('en')),
+      isWindows: false,
+      onAction: (_) async {},
+    );
+    await expectLater(presenter.render(connected), throwsStateError);
+    await presenter.render(connected);
+    expect(host.menus, hasLength(1));
+  });
 
   test('an icon that failed to set is set again on the next render', () async {
     final host = _FakeTrayHost()..iconFailures = 1;

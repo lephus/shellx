@@ -44,6 +44,21 @@ final class WindowBoundsStore {
       );
     }
   }
+
+  bool readMaximized() =>
+      _settings.getBool(SettingKeys.windowMaximized, defaultValue: false);
+
+  /// Best effort, like [write].
+  Future<void> writeMaximized(bool maximized) async {
+    try {
+      await _settings.setBool(SettingKeys.windowMaximized, maximized);
+    } catch (error) {
+      debugPrint(
+        'ShellX: saving the window state failed: '
+        '${error.runtimeType}',
+      );
+    }
+  }
 }
 
 /// [saved] if the window would still be on one of [displays] (its centre is

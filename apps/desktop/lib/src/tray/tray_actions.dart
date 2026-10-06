@@ -8,6 +8,7 @@ import '../startup.dart';
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
 import '../ui/activation.dart';
+import '../ui/terminal/close_tab.dart';
 import '../ui/window_router.dart';
 import 'tray_action.dart';
 
@@ -65,8 +66,19 @@ final class TrayActions {
         }
         await _agent.setRemoteAccess(!state.remoteAccess);
       case CloseSession(:final id):
-        _agent.closeSession(id);
+        await _closeSession(id);
       case CloseAllSessions():
+        // Ruling I2: every shell goes, so always ask, with the count.
+        final count = state.sessions.length;
+        if (count == 0) return;
+        final ok = await _router.confirm(
+          ConfirmRequest(
+            title: l10n.confirmCloseAllTitle(count),
+            body: l10n.confirmCloseAllBody,
+            confirmLabel: l10n.confirmCloseAllAction,
+          ),
+        );
+        if (!ok) return;
         _agent.closeAllSessions();
       case PairPhone():
         if (_agent.startPairing() != null) _router.open(const PairingRoute());
@@ -142,6 +154,28 @@ final class TrayActions {
         );
         await _services.quitApp?.call();
     }
+  }
+
+  /// The tray's "Đóng" on one session: the same rules as ⌘W (D15: asks
+  /// while a command runs). A session the window has no tab for yet closes
+  /// at once.
+  Future<void> _closeSession(int id) async {
+    final tabs = _ref.read(terminalTabsProvider.notifier);
+    final tab = _ref
+        .read(terminalTabsProvider)
+        .tabs
+        .where((t) => t.id == id)
+        .firstOrNull;
+    if (tab == null) {
+      _agent.closeSession(id);
+      return;
+    }
+    await closeTabWithConfirm(
+      tabs: tabs,
+      router: _router,
+      l10n: _services.l10n,
+      tab: tab,
+    );
   }
 
   /// Spec §10.1: confirm with the exact files, then (Windows, a PowerShell

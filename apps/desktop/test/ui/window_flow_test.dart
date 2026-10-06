@@ -13,11 +13,13 @@ import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
 import 'package:shellx_desktop/src/ui/activation.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/ui/dialogs/route_dialog.dart';
 import 'package:shellx_desktop/src/ui/window_coordinator.dart';
 import 'package:shellx_desktop/src/ui/window_host.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
+import '../support/fake_local_sessions.dart';
 import '../support/fakes.dart';
 
 /// A host whose calls take a while: each call waits for [gate].
@@ -35,6 +37,8 @@ final class _SlowWindowHost implements WindowHost {
   @override
   Future<void> hide() => _call('hide');
   @override
+  Future<void> bringToFront() => _call('front');
+  @override
   Future<void> setTitle(String title) async {}
 }
 
@@ -44,6 +48,8 @@ final class _FakeWindowHost implements WindowHost {
   Future<void> show() async => calls.add('show');
   @override
   Future<void> hide() async => calls.add('hide');
+  @override
+  Future<void> bringToFront() async => calls.add('front');
   @override
   Future<void> setTitle(String title) async => calls.add('title $title');
 }
@@ -407,17 +413,59 @@ void main() {
     );
 
     test(
-      'close one session / all sessions go to the session manager',
+      'close one idle session at once; close all asks with the count first',
       () async {
         await signedIn(settings: {'onboarding_done': true});
         final id = await h.sessions.open(cols: 80, rows: 24);
         await h.sessions.open(cols: 80, rows: 24);
+        await h.sessions.open(cols: 80, rows: 24);
+        await pumpEventQueue();
         await tray().handle(CloseSession(id));
+        expect(window().confirm, isNull); // idle: no question (D15)
         expect(h.ptys.ptys[0].killed, isTrue);
-        await tray().handle(const CloseAllSessions());
+        await pumpEventQueue();
+
+        final cancelled = tray().handle(const CloseAllSessions());
+        await pumpEventQueue();
+        expect(window().confirm!.title, 'Close all 2 tabs?');
+        await answer(false);
+        await cancelled;
+        expect(h.ptys.ptys[1].killed, isFalse);
+
+        final done = tray().handle(const CloseAllSessions());
+        await answer(true);
+        await done;
         expect(h.ptys.ptys[1].killed, isTrue);
+        expect(h.ptys.ptys[2].killed, isTrue);
       },
     );
+
+    test('close one session running a command asks first (D15, ruling '
+        'I2)', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      final id = await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      // Read the tabs once, so the window knows the session.
+      container.read(terminalTabsProvider);
+      h.ptys.ptys.single.emit('\x1b]133;C\x07');
+      await pumpEventQueue();
+      expect(
+        container.read(terminalTabsProvider.notifier).needsCloseConfirm(id),
+        isTrue,
+      );
+
+      final cancelled = tray().handle(CloseSession(id));
+      await pumpEventQueue();
+      expect(window().confirm!.title, 'Close “zsh 1”?');
+      await answer(false);
+      await cancelled;
+      expect(h.ptys.ptys.single.killed, isFalse);
+
+      final done = tray().handle(CloseSession(id));
+      await answer(true);
+      await done;
+      expect(h.ptys.ptys.single.killed, isTrue);
+    });
 
     test(
       'reconnect goes straight to the controller, no confirmation',
@@ -440,6 +488,109 @@ void main() {
       expect(agentState().remoteAccess, isTrue);
       expect(h.notifier.shown, isNotEmpty);
     });
+  });
+
+  group('the window comes to the front (ruling C1)', () {
+    late _FakeWindowHost host;
+
+    /// Wires a presenter like main.dart and shows the window once.
+    Future<void> shown() async {
+      host = _FakeWindowHost();
+      final presenter = WindowPresenter(host);
+      container.listen<WindowState>(
+        windowRouterProvider,
+        (_, next) => presenter.apply(next),
+        fireImmediately: true,
+      );
+      await handleActivation(container);
+      await pumpEventQueue();
+      expect(host.calls, ['show']);
+      host.calls.clear();
+    }
+
+    test('every tray item that opens a dialog brings a shown window '
+        'forward (minimized, behind, another Space)', () async {
+      await signedIn(
+        settings: {'onboarding_done': true},
+        trusted: [phone('m1', 'Pixel')],
+      );
+      await shown();
+      await tray().handle(const PairPhone());
+      await pumpEventQueue();
+      expect(host.calls, ['front']);
+      router().close();
+      await tray().handle(const OpenChangePassword());
+      await pumpEventQueue();
+      expect(host.calls, ['front', 'front']);
+      router().close();
+      final revoke = tray().handle(const RevokeDevice('m1'));
+      await pumpEventQueue();
+      expect(host.calls, ['front', 'front', 'front']);
+      await answer(false);
+      await revoke;
+      final signOut = tray().handle(const SignOut());
+      await pumpEventQueue();
+      expect(host.calls, hasLength(4));
+      await answer(false);
+      await signOut;
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      final quit = tray().handle(const Quit());
+      await pumpEventQueue();
+      expect(host.calls, hasLength(5));
+      await answer(false);
+      await quit;
+      final closeAll = tray().handle(const CloseAllSessions());
+      await pumpEventQueue();
+      expect(host.calls, hasLength(6));
+      await answer(false);
+      await closeAll;
+      // Answering or closing a dialog never raises the window again.
+      router().close();
+      await pumpEventQueue();
+      expect(host.calls, everyElement('front'));
+      expect(host.calls, hasLength(6));
+    });
+
+    test(
+      '"Sign in…" in the tray (signed out) brings the window forward',
+      () async {
+        h = TestHarness();
+        container = ProviderContainer.test(
+          overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+        );
+        await agent().bootstrap(watchForWake: false);
+        await shown();
+        await tray().handle(const SignIn());
+        await pumpEventQueue();
+        expect(host.calls, ['front']);
+      },
+    );
+
+    test('"Open terminal window", a Dock click after ⌘M and a second launch '
+        'each bring the shown window forward', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await shown();
+      await tray().handle(const OpenTerminalWindow());
+      await handleActivation(container); // Dock reopen / second launch
+      await handleActivation(container);
+      await pumpEventQueue();
+      expect(host.calls, ['front', 'front', 'front']);
+      expect(h.ptys.ptys, hasLength(1)); // no extra tab
+    });
+
+    test(
+      'a hidden window is shown (not raised twice) when a dialog opens',
+      () async {
+        await signedIn(settings: {'onboarding_done': true});
+        await shown();
+        router().hideWindow();
+        await pumpEventQueue();
+        await tray().handle(const PairPhone());
+        await pumpEventQueue();
+        expect(host.calls, ['hide', 'show']);
+      },
+    );
   });
 
   test('WindowPresenter shows once while anything is visible, hides when '
@@ -478,6 +629,35 @@ void main() {
       'show start',
       'show end',
     ]);
+  });
+
+  test('the native title is set only when it changes (ruling I3)', () async {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final local = FakeLocalSessions();
+    final c = ProviderContainer.test(
+      overrides: [localSessionsProvider.overrideWithValue(local)],
+    );
+    final host = _FakeWindowHost();
+    listenForWindowTitle(
+      container: c,
+      host: host,
+      l10n: l10n,
+      run: (call) => unawaited(call),
+    );
+    local.add(local.summary(1));
+    await pumpEventQueue();
+    expect(host.calls, ['title zsh 1 — ShellX']);
+    for (var i = 0; i < 5; i++) {
+      local.replace(local.summary(1, runningCommand: i.isEven));
+      local.replace(
+        local.summary(1, attachedMobileId: 'm1', driver: DriverSide.phone),
+      );
+    }
+    await pumpEventQueue();
+    expect(host.calls, hasLength(1));
+    local.replace(local.summary(1, title: 'vim'));
+    await pumpEventQueue();
+    expect(host.calls, ['title zsh 1 — ShellX', 'title vim — ShellX']);
   });
 
   test('window title: "<tab> — ShellX", or "ShellX" without tabs', () async {

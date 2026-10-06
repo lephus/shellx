@@ -12,7 +12,7 @@
   "authRegisterButton": "Create account",
   "authSwitchToRegister": "No account yet? Create one",
   "authSwitchToSignIn": "Already have an account? Sign in",
-  "authForgotPasswordHint": "Forgot your password? Open ShellX on a computer that is still signed in and choose “Change password…” from its menu.",
+  "authForgotPasswordHint": "Forgot your password? On another computer that is still signed in to ShellX, choose “Change password…” in the tray menu.",
   "authSignedOutNotice": "You were signed out. Sign in again.",
   "errorEmailInvalid": "Enter a valid email address.",
   "errorPasswordLength": "Password must be 8–128 characters.",
@@ -36,7 +36,7 @@
   "onboardingOpenSettings": "Open System Settings",
   "onboardingSleepTitle": "Sleep",
   "onboardingSleepBody": "ShellX keeps the computer from sleeping while idle. Closing the laptop lid still puts it to sleep, and then your phone cannot reach it.",
-  "onboardingTrayHint": "{platform, select, macos{Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}",
+  "onboardingTrayHint": "{platform, select, macos{Your terminal is in the ShellX window. ShellX also stays in the menu bar: choose “Pair phone…” there to connect your phone.} other{Your terminal is in the ShellX window. ShellX also stays in the system tray: choose “Pair phone…” there to connect your phone.}}",
   "@onboardingTrayHint": {
     "placeholders": {
       "platform": {"type": "String"}
@@ -120,7 +120,7 @@
   "confirmRevokeBody": "This phone loses access to this computer immediately and the sessions it opened are closed. Tabs opened on this computer keep running. To use it again you must pair it again.",
   "confirmRevokeAction": "Revoke",
   "confirmQuitTitle": "Quit ShellX?",
-  "confirmQuitBody": "{count, plural, =1{1 open session will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open sessions will be closed. Your phones cannot reach this computer until ShellX runs again.}}",
+  "confirmQuitBody": "{count, plural, =1{1 open tab will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open tabs will be closed. Your phones cannot reach this computer until ShellX runs again.}}",
   "@confirmQuitBody": {
     "placeholders": {
       "count": {"type": "int"}
@@ -339,5 +339,23 @@
     "placeholders": {
       "title": {"type": "String"}
     }
-  }
+  },
+  "confirmCloseAllTitle": "{count, plural, =1{Close 1 tab?} other{Close all {count} tabs?}}",
+  "@confirmCloseAllTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "confirmCloseAllBody": "Every shell in these tabs will be stopped, with any command still running.",
+  "confirmCloseAllAction": "Close all",
+  "terminalCloseTabTooltip": "Close tab  {shortcut}",
+  "@terminalCloseTabTooltip": {
+    "placeholders": {
+      "shortcut": {"type": "String"}
+    }
+  },
+  "terminalDriverPhoneShort": "Phone in control — type to take over",
+  "terminalCopy": "Copy",
+  "terminalPaste": "Paste",
+  "terminalSelectAll": "Select all"
 }

@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @authForgotPasswordHint.
   ///
   /// In en, this message translates to:
-  /// **'Forgot your password? Open ShellX on a computer that is still signed in and choose “Change password…” from its menu.'**
+  /// **'Forgot your password? On another computer that is still signed in to ShellX, choose “Change password…” in the tray menu.'**
   String get authForgotPasswordHint;
 
   /// No description provided for @authSignedOutNotice.
@@ -287,7 +287,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingTrayHint.
   ///
   /// In en, this message translates to:
-  /// **'{platform, select, macos{Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}'**
+  /// **'{platform, select, macos{Your terminal is in the ShellX window. ShellX also stays in the menu bar: choose “Pair phone…” there to connect your phone.} other{Your terminal is in the ShellX window. ShellX also stays in the system tray: choose “Pair phone…” there to connect your phone.}}'**
   String onboardingTrayHint(String platform);
 
   /// No description provided for @onboardingFinish.
@@ -527,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @confirmQuitBody.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 open session will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open sessions will be closed. Your phones cannot reach this computer until ShellX runs again.}}'**
+  /// **'{count, plural, =1{1 open tab will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open tabs will be closed. Your phones cannot reach this computer until ShellX runs again.}}'**
   String confirmQuitBody(int count);
 
   /// No description provided for @confirmQuitAction.
@@ -1045,6 +1045,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Terminal {title}'**
   String terminalPaneLabel(String title);
+
+  /// No description provided for @confirmCloseAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Close 1 tab?} other{Close all {count} tabs?}}'**
+  String confirmCloseAllTitle(int count);
+
+  /// No description provided for @confirmCloseAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every shell in these tabs will be stopped, with any command still running.'**
+  String get confirmCloseAllBody;
+
+  /// No description provided for @confirmCloseAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close all'**
+  String get confirmCloseAllAction;
+
+  /// No description provided for @terminalCloseTabTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab  {shortcut}'**
+  String terminalCloseTabTooltip(String shortcut);
+
+  /// No description provided for @terminalDriverPhoneShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone in control — type to take over'**
+  String get terminalDriverPhoneShort;
+
+  /// No description provided for @terminalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get terminalCopy;
+
+  /// No description provided for @terminalPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get terminalPaste;
+
+  /// No description provided for @terminalSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get terminalSelectAll;
 }
 
 class _AppLocalizationsDelegate

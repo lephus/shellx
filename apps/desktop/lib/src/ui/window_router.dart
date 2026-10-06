@@ -57,13 +57,24 @@ final class ConfirmRequest {
 
 @immutable
 final class WindowState {
-  const WindowState({this.route, this.confirm, this.terminal = false});
+  const WindowState({
+    this.route,
+    this.confirm,
+    this.terminal = false,
+    this.raise = 0,
+  });
 
   final WindowRoute? route;
   final ConfirmRequest? confirm;
 
   /// The terminal window is shown (A1 D9). Closing it only hides it.
   final bool terminal;
+
+  /// Bumped each time something asks for the window (launch, the Dock, a
+  /// second launch, a tray item, a dialog or confirm opening): the window
+  /// comes to the front even when it is already shown but minimized,
+  /// behind another app or on another Space.
+  final int raise;
 
   /// A legacy page or a confirm is shown as a dialog over the terminal.
   bool get dialogOpen => route != null || confirm != null;
@@ -88,13 +99,19 @@ class WindowRouter extends Notifier<WindowState> {
     route: state.route,
     confirm: state.confirm,
     terminal: true,
+    raise: state.raise + 1,
   );
 
   /// Opens [route] as a dialog (replacing the open one); the window shows
-  /// first if it was hidden (UI §4).
+  /// (or comes to the front) first (UI §4).
   void open(WindowRoute route) {
     final leaving = state.route;
-    state = WindowState(route: route, confirm: state.confirm, terminal: true);
+    state = WindowState(
+      route: route,
+      confirm: state.confirm,
+      terminal: true,
+      raise: state.raise + 1,
+    );
     _leave(leaving, next: route);
   }
 
@@ -104,11 +121,15 @@ class WindowRouter extends Notifier<WindowState> {
     final confirm = state.confirm;
     if (confirm != null) {
       confirm.complete(false);
-      state = WindowState(route: state.route, terminal: state.terminal);
+      state = WindowState(
+        route: state.route,
+        terminal: state.terminal,
+        raise: state.raise,
+      );
       return;
     }
     final leaving = state.route;
-    state = WindowState(terminal: state.terminal);
+    state = WindowState(terminal: state.terminal, raise: state.raise);
     _leave(leaving, next: null);
   }
 
@@ -117,18 +138,27 @@ class WindowRouter extends Notifier<WindowState> {
   void hideWindow() {
     state.confirm?.complete(false);
     final leaving = state.route;
-    state = const WindowState();
+    state = WindowState(raise: state.raise);
     _leave(leaving, next: null);
   }
 
-  /// Shows [request] as a dialog (the window shows first if hidden). A
-  /// confirm already open is answered "no" and replaced.
+  /// Shows [request] as a dialog (the window shows, or comes to the front,
+  /// first). A confirm already open is answered "no" and replaced.
   Future<bool> confirm(ConfirmRequest request) async {
     state.confirm?.complete(false);
-    state = WindowState(route: state.route, confirm: request, terminal: true);
+    state = WindowState(
+      route: state.route,
+      confirm: request,
+      terminal: true,
+      raise: state.raise + 1,
+    );
     final result = await request.result;
     if (ref.mounted && identical(state.confirm, request)) {
-      state = WindowState(route: state.route, terminal: state.terminal);
+      state = WindowState(
+        route: state.route,
+        terminal: state.terminal,
+        raise: state.raise,
+      );
     }
     return result;
   }

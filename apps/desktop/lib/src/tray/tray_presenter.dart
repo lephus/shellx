@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:tray_manager/tray_manager.dart';
 
@@ -31,6 +32,11 @@ final class TrayPresenter {
   final Future<void> Function(TrayAction action) _onAction;
   final TrayMenuIds _ids = TrayMenuIds();
   TrayIconState? _icon;
+
+  /// The last menu set, as its JSON: a state change the menu does not show
+  /// (a tab title, a running command, a phone typing) must not rebuild the
+  /// native menu (ruling I3; an open menu would also flicker).
+  String? _menu;
   AgentViewState? _pending;
   bool _busy = false;
 
@@ -61,7 +67,12 @@ final class TrayPresenter {
       _icon = icon;
       await _host.setToolTip(_l10n.trayTooltip);
     }
-    await _host.setMenu(buildTrayMenu(state, _l10n, _ids));
+    final menu = buildTrayMenu(state, _l10n, _ids);
+    final json = jsonEncode(menu.toJson());
+    if (json == _menu) return;
+    await _host.setMenu(menu);
+    // Only once it is set: a failed setMenu is retried on the next render.
+    _menu = json;
   }
 
   void onMenuItemClick(MenuItem item) {

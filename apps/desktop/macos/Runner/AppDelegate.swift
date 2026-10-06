@@ -51,11 +51,15 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   // Opening ShellX again (Finder, Spotlight, Launchpad, Dock) while it runs
-  // reopens this process instead of starting a second one. Dart decides what
-  // to show (lib/src/ui/activation.dart).
+  // reopens this process instead of starting a second one. Returning false
+  // skips AppKit's own handling, so a window minimized with ⌘M is brought
+  // back here; Dart decides what else to show (lib/src/ui/activation.dart).
   override func applicationShouldHandleReopen(
     _ sender: NSApplication, hasVisibleWindows flag: Bool
   ) -> Bool {
+    for window in sender.windows where window.isMiniaturized {
+      window.deminiaturize(nil)
+    }
     AppChannel.reopen()
     return false
   }
@@ -90,6 +94,11 @@ enum AppChannel {
         if visible {
           NSApp.activate(ignoringOtherApps: true)
         }
+        result(nil)
+      case "activate":
+        // In front of the app the user was in (a tray click, the Dock, a
+        // second launch): window_manager's focus() does not ignore other apps.
+        NSApp.activate(ignoringOtherApps: true)
         result(nil)
       default:
         result(FlutterMethodNotImplemented)

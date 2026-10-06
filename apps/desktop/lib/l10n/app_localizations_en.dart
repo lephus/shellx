@@ -46,7 +46,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authForgotPasswordHint =>
-      'Forgot your password? Open ShellX on a computer that is still signed in and choose “Change password…” from its menu.';
+      'Forgot your password? On another computer that is still signed in to ShellX, choose “Change password…” in the tray menu.';
 
   @override
   String get authSignedOutNotice => 'You were signed out. Sign in again.';
@@ -115,9 +115,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String onboardingTrayHint(String platform) {
     String _temp0 = intl.Intl.selectLogic(platform, {
       'macos':
-          'Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.',
+          'Your terminal is in the ShellX window. ShellX also stays in the menu bar: choose “Pair phone…” there to connect your phone.',
       'other':
-          'Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.',
+          'Your terminal is in the ShellX window. ShellX also stays in the system tray: choose “Pair phone…” there to connect your phone.',
     });
     return '$_temp0';
   }
@@ -265,9 +265,9 @@ class AppLocalizationsEn extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count open sessions will be closed. Your phones cannot reach this computer until ShellX runs again.',
+          '$count open tabs will be closed. Your phones cannot reach this computer until ShellX runs again.',
       one:
-          '1 open session will be closed. Your phones cannot reach this computer until ShellX runs again.',
+          '1 open tab will be closed. Your phones cannot reach this computer until ShellX runs again.',
     );
     return '$_temp0';
   }
@@ -627,4 +627,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String terminalPaneLabel(String title) {
     return 'Terminal $title';
   }
+
+  @override
+  String confirmCloseAllTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Close all $count tabs?',
+      one: 'Close 1 tab?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmCloseAllBody =>
+      'Every shell in these tabs will be stopped, with any command still running.';
+
+  @override
+  String get confirmCloseAllAction => 'Close all';
+
+  @override
+  String terminalCloseTabTooltip(String shortcut) {
+    return 'Close tab  $shortcut';
+  }
+
+  @override
+  String get terminalDriverPhoneShort => 'Phone in control — type to take over';
+
+  @override
+  String get terminalCopy => 'Copy';
+
+  @override
+  String get terminalPaste => 'Paste';
+
+  @override
+  String get terminalSelectAll => 'Select all';
 }
