@@ -11,10 +11,14 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/termina
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/terminal/presentation/pages/terminal_page.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
+import 'package:shellx_mobile/features/voice/domain/speech_input.dart';
+import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/fake_links.dart';
 import '../../support/fake_popup_handler.dart';
+import '../../support/fake_speech.dart';
 import '../../support/fakes.dart';
 
 void main() {
@@ -24,6 +28,7 @@ void main() {
   late FakeSessionHolder session;
   late WorkspaceRegistry registry;
   late List<Object?> results;
+  late FakeSpeechInput speech;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
@@ -37,6 +42,10 @@ void main() {
       ..registerFactoryParam<TerminalPageController, String, void>(
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       );
+    speech = FakeSpeechInput();
+    getIt
+      ..registerFactory<VoiceComposerController>(() => VoiceComposerController(speech, settings))
+      ..registerSingleton<ExternalLinks>(FakeExternalLinks());
   });
 
   tearDown(() async {
@@ -1007,6 +1016,94 @@ void main() {
       await tester.pumpAndSettle();
       expect(machine.closed, [40]);
       expect(popups().infos, [stillRunning]);
+    });
+  });
+
+  group('voice composer', () {
+    Finder mic() => find.byKey(const ValueKey('voice-mic'));
+
+    /// [open] with "reduce motion" on: the listening pulse then stands still.
+    Future<void> openQuiet(WidgetTester tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(
+        disableAnimations: true,
+      );
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await open(tester);
+    }
+
+    testWidgets('the mic opens the composer, which shows the target tab and listens in Vietnamese', (tester) async {
+      await openQuiet(tester);
+      expect(find.byKey(const ValueKey('voice-text')), findsNothing);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('voice-text')), findsOneWidget);
+      expect(find.textContaining('→ '), findsOneWidget);
+      expect(find.textContaining('MacBook-Pro'), findsWidgets);
+      expect(speech.starts.single.localeId, 'vi-VN');
+    });
+
+    testWidgets('speaking then "gửi" sends the line with Enter to the active session', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      speech.emit(const SpeechPartial('git'));
+      await tester.pump();
+      expect(find.text('git'), findsOneWidget);
+      speech.emit(const SpeechFinal('git status gửi'));
+      await tester.pump();
+      expect(lastInput(), '\r');
+      expect(utf8.decode(machine.inputs[machine.inputs.length - 2].data), 'git status');
+    });
+
+    testWidgets('typed text goes with the Send button; ✕ closes and gives focus back', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      speech.emit(const SpeechListening(false));
+      await tester.enterText(find.byKey(const ValueKey('voice-text')), 'ls -la');
+      await tester.tap(find.byKey(const ValueKey('voice-send')));
+      await tester.pump();
+      expect(lastInput(), '\r');
+      await tester.tap(find.byKey(const ValueKey('voice-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('voice-text')), findsNothing);
+      expect(tester.widget<TerminalView>(find.byType(TerminalView)).focusNode!.hasFocus, isTrue);
+      // The terminal grew back: let its resize debounce run.
+      await tester.pump(const Duration(milliseconds: 150));
+    });
+
+    testWidgets('refused permission shows the issue with Mở Cài đặt', (tester) async {
+      speech.permission = SpeechPermission.denied;
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      expect(find.text('Cần quyền micro và nhận dạng giọng nói để nói lệnh'), findsOneWidget);
+      expect(find.text('Mở Cài đặt'), findsOneWidget);
+    });
+
+    testWidgets('the EN chip switches the language for the next listen', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('voice-locale-en')));
+      await tester.pump();
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      expect(speech.starts.last.localeId, 'en-US');
+    });
+
+    testWidgets('an ended session hides the mic and disables Send, keeping the text', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      speech.emit(const SpeechFinal('giữ chữ này'));
+      machine.handles.single.emit(const TabExited(0));
+      await tester.pumpAndSettle();
+      expect(mic(), findsNothing);
+      expect(find.text('giữ chữ này'), findsOneWidget);
+      expect(find.text('Phiên chưa kết nối — gửi được khi kết nối lại'), findsOneWidget);
+      final send = tester.widget<IconButton>(find.byKey(const ValueKey('voice-send')));
+      expect(send.onPressed, isNull);
     });
   });
 }

@@ -29,6 +29,7 @@ import 'package:shellx_mobile/features/settings/presentation/controllers/delete_
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
+import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 import 'support/fake_biometrics.dart';
@@ -36,6 +37,7 @@ import 'support/fake_links.dart';
 import 'support/fake_popup_handler.dart';
 import 'support/fake_push.dart';
 import 'support/fake_relay_http.dart';
+import 'support/fake_speech.dart';
 import 'support/fakes.dart';
 
 /// The secure store of the phone: in memory, and every read fails while [readError] is set (a
@@ -143,6 +145,7 @@ void main() {
       ..registerFactoryParam<TerminalPageController, String, void>(
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       )
+      ..registerFactory<VoiceComposerController>(() => VoiceComposerController(FakeSpeechInput(), settings))
       ..registerFactory<QrScannerController>(() => QrScannerController(session))
       ..registerFactory<SettingsController>(
         () => SettingsController(

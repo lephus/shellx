@@ -5,7 +5,13 @@ import 'package:shellx_mobile/shared/shared.dart';
 /// The horizontally scrolling extra keys row right above the keyboard (spec §9.3), styled like
 /// the system keyboard (`--kb-*`). Ctrl/Alt: outline = once, filled with a dot = locked.
 class ExtraKeysBar extends StatelessWidget {
-  const ExtraKeysBar({super.key, required this.controller, required this.onKey, required this.onPaste});
+  const ExtraKeysBar({
+    super.key,
+    required this.controller,
+    required this.onKey,
+    required this.onPaste,
+    this.leading,
+  });
 
   static const double height = 50;
 
@@ -14,6 +20,9 @@ class ExtraKeysBar extends StatelessWidget {
   /// Every key except Ctrl, Alt and Paste.
   final ValueChanged<ExtraKey> onKey;
   final VoidCallback onPaste;
+
+  /// Before the keys (the voice mic, voice spec §4.2); not an [ExtraKey]: it sends nothing itself.
+  final Widget? leading;
 
   void _press(ExtraKey key) {
     switch (key) {
@@ -57,6 +66,7 @@ class ExtraKeysBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 3),
         children: [
+          ?leading,
           for (final key in ExtraKey.values)
             Watch(
               key: ValueKey('extra-key-${key.name}'),

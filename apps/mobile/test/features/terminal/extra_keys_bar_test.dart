@@ -38,6 +38,28 @@ void main() {
 
   tearDown(() => keys.dispose());
 
+  testWidgets('a leading widget sits before Esc', (tester) async {
+    await tester.pumpWidget(
+      localized(
+        Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: ExtraKeysBar(
+              controller: keys,
+              onKey: (key) => keys.sendKey(key, terminal),
+              onPaste: () {},
+              leading: const SizedBox(key: ValueKey('lead'), width: 40, height: 40),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('lead'))).dx,
+      lessThan(tester.getTopLeft(find.text('Esc')).dx),
+    );
+  });
+
   testWidgets('shows every key of spec §9.3 with the localised Paste label', (tester) async {
     await tester.pumpWidget(bar());
     expect(find.text('Esc'), findsOneWidget);

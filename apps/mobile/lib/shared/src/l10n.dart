@@ -1878,6 +1878,141 @@ class S {
       args: [],
     );
   }
+
+  /// `Speak a command`
+  String get voiceMicTooltip {
+    return Intl.message(
+      'Speak a command',
+      name: 'voiceMicTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Stop listening`
+  String get voiceStopTooltip {
+    return Intl.message(
+      'Stop listening',
+      name: 'voiceStopTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Speak or type… say “send” to send`
+  String get voiceHint {
+    return Intl.message(
+      'Speak or type… say “send” to send',
+      name: 'voiceHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Send`
+  String get voiceSend {
+    return Intl.message('Send', name: 'voiceSend', desc: '', args: []);
+  }
+
+  /// `Close`
+  String get voiceClose {
+    return Intl.message('Close', name: 'voiceClose', desc: '', args: []);
+  }
+
+  /// `→ {target}`
+  String voiceTarget(String target) {
+    return Intl.message(
+      '→ $target',
+      name: 'voiceTarget',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Vietnamese`
+  String get voiceLanguageVi {
+    return Intl.message(
+      'Vietnamese',
+      name: 'voiceLanguageVi',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `English`
+  String get voiceLanguageEn {
+    return Intl.message('English', name: 'voiceLanguageEn', desc: '', args: []);
+  }
+
+  /// `ShellX needs microphone and speech recognition access to take spoken commands`
+  String get voiceNoPermission {
+    return Intl.message(
+      'ShellX needs microphone and speech recognition access to take spoken commands',
+      name: 'voiceNoPermission',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Speech recognition isn't available on this phone`
+  String get voiceUnsupported {
+    return Intl.message(
+      'Speech recognition isn\'t available on this phone',
+      name: 'voiceUnsupported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This phone can't recognize Vietnamese yet — try EN`
+  String get voiceLocaleUnavailableVi {
+    return Intl.message(
+      'This phone can\'t recognize Vietnamese yet — try EN',
+      name: 'voiceLocaleUnavailableVi',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This phone can't recognize English yet — try VI`
+  String get voiceLocaleUnavailableEn {
+    return Intl.message(
+      'This phone can\'t recognize English yet — try VI',
+      name: 'voiceLocaleUnavailableEn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Speech recognition needs a network connection`
+  String get voiceNetwork {
+    return Intl.message(
+      'Speech recognition needs a network connection',
+      name: 'voiceNetwork',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Couldn't recognize that, try again`
+  String get voiceFailed {
+    return Intl.message(
+      'Couldn\'t recognize that, try again',
+      name: 'voiceFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The session isn't connected — you can send once it reconnects`
+  String get voiceNotLive {
+    return Intl.message(
+      'The session isn\'t connected — you can send once it reconnects',
+      name: 'voiceNotLive',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

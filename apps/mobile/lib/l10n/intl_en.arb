@@ -392,5 +392,27 @@
   "deleteAccountLoseComputers": "Every computer signed in to it is signed out.",
   "deleteAccountLoseSessions": "Open terminal sessions are closed.",
   "deleteAccountPasswordLabel": "Enter your password to confirm",
-  "deleteAccountButton": "Delete permanently"
+  "deleteAccountButton": "Delete permanently",
+  "voiceMicTooltip": "Speak a command",
+  "voiceStopTooltip": "Stop listening",
+  "voiceHint": "Speak or type… say “send” to send",
+  "voiceSend": "Send",
+  "voiceClose": "Close",
+  "voiceTarget": "→ {target}",
+  "@voiceTarget": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceLanguageVi": "Vietnamese",
+  "voiceLanguageEn": "English",
+  "voiceNoPermission": "ShellX needs microphone and speech recognition access to take spoken commands",
+  "voiceUnsupported": "Speech recognition isn't available on this phone",
+  "voiceLocaleUnavailableVi": "This phone can't recognize Vietnamese yet — try EN",
+  "voiceLocaleUnavailableEn": "This phone can't recognize English yet — try VI",
+  "voiceNetwork": "Speech recognition needs a network connection",
+  "voiceFailed": "Couldn't recognize that, try again",
+  "voiceNotLive": "The session isn't connected — you can send once it reconnects"
 }

@@ -82,6 +82,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m25(length) => "Phải có ít nhất ${length} ký tự";
 
+  static String m26(target) => "→ ${target}";
+
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "actionCancel": MessageLookupByLibrary.simpleMessage("Hủy"),
@@ -458,6 +460,37 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationTextMinLength": m25,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "Trường này là bắt buộc",
+    ),
+    "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
+    "voiceFailed": MessageLookupByLibrary.simpleMessage(
+      "Không nhận dạng được, hãy thử lại",
+    ),
+    "voiceHint": MessageLookupByLibrary.simpleMessage(
+      "Nói hoặc gõ… nói “gửi” để gửi",
+    ),
+    "voiceLanguageEn": MessageLookupByLibrary.simpleMessage("Tiếng Anh"),
+    "voiceLanguageVi": MessageLookupByLibrary.simpleMessage("Tiếng Việt"),
+    "voiceLocaleUnavailableEn": MessageLookupByLibrary.simpleMessage(
+      "Máy chưa hỗ trợ nhận dạng tiếng Anh — thử VI",
+    ),
+    "voiceLocaleUnavailableVi": MessageLookupByLibrary.simpleMessage(
+      "Máy chưa hỗ trợ nhận dạng tiếng Việt — thử EN",
+    ),
+    "voiceMicTooltip": MessageLookupByLibrary.simpleMessage("Nói lệnh"),
+    "voiceNetwork": MessageLookupByLibrary.simpleMessage(
+      "Cần kết nối mạng để nhận dạng giọng nói",
+    ),
+    "voiceNoPermission": MessageLookupByLibrary.simpleMessage(
+      "Cần quyền micro và nhận dạng giọng nói để nói lệnh",
+    ),
+    "voiceNotLive": MessageLookupByLibrary.simpleMessage(
+      "Phiên chưa kết nối — gửi được khi kết nối lại",
+    ),
+    "voiceSend": MessageLookupByLibrary.simpleMessage("Gửi"),
+    "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Dừng nghe"),
+    "voiceTarget": m26,
+    "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
+      "Máy này không hỗ trợ nhận dạng giọng nói",
     ),
   };
 }

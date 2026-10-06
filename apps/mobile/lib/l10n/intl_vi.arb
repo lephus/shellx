@@ -198,5 +198,27 @@
   "deleteAccountLoseComputers": "Mọi máy tính đang đăng nhập sẽ bị đăng xuất.",
   "deleteAccountLoseSessions": "Phiên terminal đang mở sẽ đóng.",
   "deleteAccountPasswordLabel": "Nhập mật khẩu để xác nhận",
-  "deleteAccountButton": "Xóa vĩnh viễn"
+  "deleteAccountButton": "Xóa vĩnh viễn",
+  "voiceMicTooltip": "Nói lệnh",
+  "voiceStopTooltip": "Dừng nghe",
+  "voiceHint": "Nói hoặc gõ… nói “gửi” để gửi",
+  "voiceSend": "Gửi",
+  "voiceClose": "Đóng",
+  "voiceTarget": "→ {target}",
+  "@voiceTarget": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceLanguageVi": "Tiếng Việt",
+  "voiceLanguageEn": "Tiếng Anh",
+  "voiceNoPermission": "Cần quyền micro và nhận dạng giọng nói để nói lệnh",
+  "voiceUnsupported": "Máy này không hỗ trợ nhận dạng giọng nói",
+  "voiceLocaleUnavailableVi": "Máy chưa hỗ trợ nhận dạng tiếng Việt — thử EN",
+  "voiceLocaleUnavailableEn": "Máy chưa hỗ trợ nhận dạng tiếng Anh — thử VI",
+  "voiceNetwork": "Cần kết nối mạng để nhận dạng giọng nói",
+  "voiceFailed": "Không nhận dạng được, hãy thử lại",
+  "voiceNotLive": "Phiên chưa kết nối — gửi được khi kết nối lại"
 }

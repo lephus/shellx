@@ -85,6 +85,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m25(length) => "Must be at least ${length} characters";
 
+  static String m26(target) => "→ ${target}";
+
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "actionCancel": MessageLookupByLibrary.simpleMessage("Cancel"),
@@ -465,6 +467,37 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationTextMinLength": m25,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required",
+    ),
+    "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
+    "voiceFailed": MessageLookupByLibrary.simpleMessage(
+      "Couldn\'t recognize that, try again",
+    ),
+    "voiceHint": MessageLookupByLibrary.simpleMessage(
+      "Speak or type… say “send” to send",
+    ),
+    "voiceLanguageEn": MessageLookupByLibrary.simpleMessage("English"),
+    "voiceLanguageVi": MessageLookupByLibrary.simpleMessage("Vietnamese"),
+    "voiceLocaleUnavailableEn": MessageLookupByLibrary.simpleMessage(
+      "This phone can\'t recognize English yet — try VI",
+    ),
+    "voiceLocaleUnavailableVi": MessageLookupByLibrary.simpleMessage(
+      "This phone can\'t recognize Vietnamese yet — try EN",
+    ),
+    "voiceMicTooltip": MessageLookupByLibrary.simpleMessage("Speak a command"),
+    "voiceNetwork": MessageLookupByLibrary.simpleMessage(
+      "Speech recognition needs a network connection",
+    ),
+    "voiceNoPermission": MessageLookupByLibrary.simpleMessage(
+      "ShellX needs microphone and speech recognition access to take spoken commands",
+    ),
+    "voiceNotLive": MessageLookupByLibrary.simpleMessage(
+      "The session isn\'t connected — you can send once it reconnects",
+    ),
+    "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
+    "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
+    "voiceTarget": m26,
+    "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
+      "Speech recognition isn\'t available on this phone",
     ),
   };
 }

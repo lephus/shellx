@@ -15,6 +15,9 @@ import 'package:shellx_mobile/features/terminal/presentation/terminal_shortcuts.
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/session_picker.dart';
+import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
+import 'package:shellx_mobile/features/voice/presentation/widgets/mic_button.dart';
+import 'package:shellx_mobile/features/voice/presentation/widgets/voice_composer.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 import 'package:xterm/xterm.dart';
 
@@ -38,6 +41,11 @@ class _TerminalPageState extends State<TerminalPage> {
 
   late final TerminalPageController _controller = getIt<TerminalPageController>(param1: widget.agentId);
   late final void Function() _stopExit;
+
+  /// Voice spec §3.1: the composer of this page; a line goes to whichever tab is active.
+  late final VoiceComposerController _voice;
+  late final AppLifecycleListener _lifecycle;
+  late final void Function() _stopVoicePhase;
   final FocusNode _terminalFocus = FocusNode();
   TerminalGrid _grid = fallbackGrid;
   bool _leaving = false;
@@ -46,16 +54,35 @@ class _TerminalPageState extends State<TerminalPage> {
   void initState() {
     super.initState();
     _stopExit = _controller.exit.subscribe(_onExit);
+    // Creating it is cheap: the recognizer is only initialised on the first mic tap.
+    _voice = getIt<VoiceComposerController>()..attach(canSend: _activeTabLive, onSubmit: _controller.submitLine);
+    // A call, the lock screen or the app switcher stops the listen; the text stays (spec §5).
+    _lifecycle = AppLifecycleListener(onInactive: _voice.pause, onHide: _voice.pause);
+    // Spec §3.1: while the composer is open the keyboard types into it, not into the terminal.
+    var wasOpen = false;
+    _stopVoicePhase = _voice.phase.subscribe((phase) {
+      final open = phase != VoicePhase.closed;
+      if (open && !wasOpen) _terminalFocus.unfocus();
+      if (!open && wasOpen && mounted) _terminalFocus.requestFocus();
+      wasOpen = open;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
   @override
   void dispose() {
     _stopExit();
+    // Leaving the page cancels the listen and drops the text (spec §5).
+    _stopVoicePhase();
+    _lifecycle.dispose();
+    _voice.dispose();
     _terminalFocus.dispose();
     _controller.dispose();
     super.dispose();
   }
+
+  bool _activeTabLive() =>
+      !_controller.closing.peek() && (_controller.workspace.activeTab.peek()?.isLive.peek() ?? false);
 
   /// Pops this page with [exit] after the current frame: the exit can already be known while the
   /// page is first built (a machine that is no longer pinned), and navigating during a build is
@@ -353,11 +380,33 @@ class _TerminalPageState extends State<TerminalPage> {
             ),
           ),
         ),
+        Watch((context) {
+          if (_voice.phase.value == VoicePhase.closed) return const SizedBox.shrink();
+          final tab = workspace.activeTab.value;
+          return VoiceComposer(
+            controller: _voice,
+            target: tab == null ? null : '${tab.title.value} · ${widget.machineName}',
+            canSend: tab?.isLive.value ?? false,
+            onOpenSettings: () => unawaited(getIt<ExternalLinks>().openAppSettingsOrToast()),
+          );
+        }),
         Container(
           color: context.colors.keyboardBackground,
           child: SafeArea(
             top: false,
-            child: ExtraKeysBar(controller: workspace.extraKeys, onKey: _controller.sendKey, onPaste: _paste),
+            child: ExtraKeysBar(
+              controller: workspace.extraKeys,
+              onKey: _controller.sendKey,
+              onPaste: _paste,
+              leading: Watch(
+                (context) => (workspace.activeTab.value?.isLive.value ?? false)
+                    ? MicButton(
+                        controller: _voice,
+                        onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       ],
