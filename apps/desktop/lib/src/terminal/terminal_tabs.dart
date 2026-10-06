@@ -503,7 +503,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// tab first, then in sidebar order; rebuilds each tree without the
   /// panes that failed; selects the saved tab as soon as it is there.
   /// Never throws.
-  Future<RestoreOutcome> restore(RestorePlan plan) => _runRestore(plan);
+  ///
+  /// The restore counts as running from this call on, while [plan] is
+  /// still being read (null: nothing to restore): an activation meanwhile
+  /// waits instead of opening a blank tab (D16). Pane grids are estimated
+  /// once the plan is there, from the last area grid the view reported —
+  /// 80×24 before the first layout; the real grid then follows at that
+  /// layout, as for any pane (D17).
+  Future<RestoreOutcome> restore(FutureOr<RestorePlan?> plan) =>
+      _runRestore(plan);
 
   /// ⌘1…⌘9: the n-th tab (1-based); nothing when there is none.
   void selectIndex(int position) {

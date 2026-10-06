@@ -40,6 +40,9 @@ abstract final class SettingKeys {
   static const String desktopNotificationsOnlyUnfocused =
       'desktop_notifications_only_unfocused';
 
+  /// A5a D13: "Lưu nội dung terminal khi thoát" (default on).
+  static const String terminalRestoreScrollback = 'terminal_restore_scrollback';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -57,6 +60,7 @@ abstract final class SettingKeys {
     terminalWorkspaces,
     desktopNotifications,
     desktopNotificationsOnlyUnfocused,
+    terminalRestoreScrollback,
   };
 }
 

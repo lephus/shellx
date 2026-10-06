@@ -28,7 +28,11 @@ abstract interface class RestoreFiles {
   /// True only when the layout reached the disk; a failed write (disk full)
   /// keeps the previous file, and the caller retries next time (§5).
   Future<bool> writeLayout(RestoreSnapshot snapshot);
-  Future<void> writeScrollbacks(Map<String, String> textByKey);
+
+  /// False when the files could not be written (disk full): the caller
+  /// keeps them pending. True too when scrollback is never written here
+  /// (permissions, §5): retrying would not help.
+  Future<bool> writeScrollbacks(Map<String, String> textByKey);
   Future<String?> readScrollback(String key);
   Future<DateTime?> scrollbackSavedAt(String key);
   Future<void> deleteScrollback(String key);
@@ -49,7 +53,7 @@ final class NullRestoreFiles implements RestoreFiles {
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async => true;
   @override
-  Future<void> writeScrollbacks(Map<String, String> textByKey) async {}
+  Future<bool> writeScrollbacks(Map<String, String> textByKey) async => true;
   @override
   Future<String?> readScrollback(String key) async => null;
   @override
@@ -202,10 +206,10 @@ final class RestoreStore implements RestoreFiles {
   }
 
   @override
-  Future<void> writeScrollbacks(Map<String, String> textByKey) =>
+  Future<bool> writeScrollbacks(Map<String, String> textByKey) =>
       _serial(() async {
-        if (!_scrollbackAllowed) return;
-        await _atomic({
+        if (!_scrollbackAllowed) return true;
+        return _atomic({
           for (final MapEntry(:key, :value) in textByKey.entries)
             if (isPaneKey(key)) _scrollPath(key): value,
         }, private: true);

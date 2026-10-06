@@ -31,6 +31,13 @@ final class RestoreOutcome {
   /// The new tab id of every restored tab, by saved tab key.
   final Map<String, int> tabIdByKey;
   final int panesFailed;
+
+  /// Nothing was restored (no plan, or a restore already running).
+  static const none = RestoreOutcome(
+    keyBySession: {},
+    tabIdByKey: {},
+    panesFailed: 0,
+  );
   int get tabsRestored => tabIdByKey.length;
 }
 
@@ -53,28 +60,25 @@ final restorePlacementProvider = Provider<RestorePlacement>(
 /// Uses [TerminalTabs._ref] and [TerminalTabs._state]: an extension may
 /// not touch the notifier's protected `ref` and `state` itself.
 extension _Restore on TerminalTabs {
-  Future<RestoreOutcome> _runRestore(RestorePlan plan) async {
+  Future<RestoreOutcome> _runRestore(FutureOr<RestorePlan?> pending) async {
     final keyBySession = <int, String>{};
     final tabIdByKey = <String, int>{};
     var failed = 0;
-    if (_restoring != null) {
-      return RestoreOutcome(
-        keyBySession: keyBySession,
-        tabIdByKey: tabIdByKey,
-        panesFailed: 0,
-      );
-    }
+    if (_restoring != null) return RestoreOutcome.none;
     final done = _restoring = Completer<void>();
     _restoreMaySelect = true;
     final local = _local;
     bool alive() => _ref.mounted && identical(_local, local);
-    final snapshot = plan.snapshot;
-    final workspaceOf = {
-      for (final w in snapshot.workspaces)
-        for (final key in w.tabs) key: w.id,
-    };
-    final order = _restoreOrder(snapshot);
+    var order = const <SavedTab>[];
     try {
+      final plan = await pending;
+      if (plan == null) return RestoreOutcome.none;
+      final snapshot = plan.snapshot;
+      final workspaceOf = {
+        for (final w in snapshot.workspaces)
+          for (final key in w.tabs) key: w.id,
+      };
+      order = _restoreOrder(snapshot);
       for (final saved in order) {
         if (!alive()) break;
         final grids = _restoreGrids(saved.layout, _grid);

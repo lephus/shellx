@@ -178,9 +178,9 @@ void main() {
       log: logs.add,
     );
     expect(await flaky.prepare(), isTrue);
-    await flaky.writeScrollbacks({k1: 'old'});
+    expect(await flaky.writeScrollbacks({k1: 'old'}), isTrue);
     chmodOk = false;
-    await flaky.writeScrollbacks({k1: 'new'});
+    expect(await flaky.writeScrollbacks({k1: 'new'}), isFalse);
     expect(await flaky.readScrollback(k1), 'old');
     expect(
       Directory(
@@ -340,7 +340,8 @@ void main() {
       log: logs.add,
     );
     expect(await plain.prepare(), isFalse);
-    await plain.writeScrollbacks({k1: 'x'});
+    // Dropped, not failed: retrying would not help.
+    expect(await plain.writeScrollbacks({k1: 'x'}), isTrue);
     expect(await plain.hasScrollback(), isFalse);
     expect(await plain.writeLayout(snap()), isTrue);
     expect(await plain.writeLayout(snap('/again')), isTrue);
@@ -386,7 +387,7 @@ void main() {
     final load = await files.loadLayout();
     expect(load.snapshot, isNull);
     expect(load.corrupt, isFalse);
-    await files.writeScrollbacks({k1: 'x'});
+    expect(await files.writeScrollbacks({k1: 'x'}), isTrue);
     expect(await files.readScrollback(k1), isNull);
     expect(await files.scrollbackSavedAt(k1), isNull);
     expect(await files.hasScrollback(), isFalse);
