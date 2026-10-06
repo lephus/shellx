@@ -61,6 +61,20 @@ final class NotifyRequested extends OscEvent {
   String toString() => 'NotifyRequested($title, $body)';
 }
 
+/// `OSC 7 ; file://<host>/<path>`: the shell's working directory, printed
+/// by the ShellX hooks at every prompt (A2 C1). [url] is as sent;
+/// `parseCwdUrl` decodes it.
+final class CwdReported extends OscEvent {
+  const CwdReported(this.url);
+  final String url;
+  @override
+  bool operator ==(Object other) => other is CwdReported && other.url == url;
+  @override
+  int get hashCode => url.hashCode;
+  @override
+  String toString() => 'CwdReported(…)';
+}
+
 enum _State {
   ground,
   escape,
@@ -71,7 +85,7 @@ enum _State {
   ignoreEscape,
 }
 
-/// Finds OSC 133 (C, D), 633 (E), 9 and 777 (`notify`) in terminal output,
+/// Finds OSC 7, 133 (C, D), 633 (E), 9 and 777 (`notify`) in terminal output,
 /// ended by BEL or ST, across chunk boundaries (like `OscTitleParser`).
 /// A payload over 4 KiB is skipped; titles and bodies are cut to 200
 /// characters; malformed UTF-8 is replaced, never fatal. The bytes
@@ -79,7 +93,7 @@ enum _State {
 final class OscEventParser {
   static const int maxTextLength = 200;
   static const int maxPayload = 4096;
-  static const _numbers = {'133', '633', '9', '777'};
+  static const _numbers = {'7', '133', '633', '9', '777'};
 
   _State _state = _State.ground;
   final _param = StringBuffer();
@@ -164,6 +178,7 @@ final class OscEventParser {
     _state = _State.ground;
     final text = utf8.decode(_payload.takeBytes(), allowMalformed: true);
     return switch (_number) {
+      '7' => _osc7(text),
       '133' => _semanticPrompt(text),
       '633' => _vscode(text),
       '9' => _osc9(text),
@@ -210,6 +225,9 @@ final class OscEventParser {
     if (text.trim().isEmpty || _progress.hasMatch(text)) return null;
     return NotifyRequested(title: null, body: _clip(text));
   }
+
+  static OscEvent? _osc7(String text) =>
+      text.startsWith('file://') ? CwdReported(text) : null;
 
   static OscEvent? _osc777(String text) {
     final first = text.indexOf(';');

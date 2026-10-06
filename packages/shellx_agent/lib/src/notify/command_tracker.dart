@@ -78,7 +78,7 @@ final class CommandTracker {
           exitCode: exitCode,
           duration: duration,
         );
-      case NotifyRequested():
+      case NotifyRequested() || CwdReported():
         break;
     }
     return null;
