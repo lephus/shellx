@@ -1464,6 +1464,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only when the window isn\'t in front'**
   String get trayDesktopNotificationsUnfocused;
+
+  /// No description provided for @paneSplitRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Split right'**
+  String get paneSplitRight;
+
+  /// No description provided for @paneSplitDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Split down'**
+  String get paneSplitDown;
+
+  /// No description provided for @paneZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom pane'**
+  String get paneZoom;
+
+  /// No description provided for @paneUnzoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Unzoom pane'**
+  String get paneUnzoom;
+
+  /// No description provided for @paneEqualize.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalize panes'**
+  String get paneEqualize;
+
+  /// No description provided for @paneClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane'**
+  String get paneClose;
+
+  /// No description provided for @paneCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane  {shortcut}'**
+  String paneCloseTooltip(String shortcut);
+
+  /// No description provided for @paneZoomedIndicator.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoomed · {index}/{count}'**
+  String paneZoomedIndicator(int index, int count);
+
+  /// No description provided for @paneRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane {index} of {count} — {title}'**
+  String paneRegionLabel(int index, int count, String title);
+
+  /// No description provided for @paneRegionUnreadLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane {index} of {count} — {title}, has unread notifications'**
+  String paneRegionUnreadLabel(int index, int count, String title);
+
+  /// No description provided for @paneDividerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane divider'**
+  String get paneDividerLabel;
+
+  /// No description provided for @paneSplitNoRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough room to split this pane'**
+  String get paneSplitNoRoom;
+
+  /// No description provided for @paneAnnounceSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split, pane {index} of {count}'**
+  String paneAnnounceSplit(int index, int count);
+
+  /// No description provided for @paneAnnounceClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Pane closed, 1 left} other{Pane closed, {count} left}}'**
+  String paneAnnounceClosed(int count);
+
+  /// No description provided for @paneAnnounceZoomed.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane zoomed'**
+  String get paneAnnounceZoomed;
+
+  /// No description provided for @paneAnnounceUnzoomed.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane unzoomed'**
+  String get paneAnnounceUnzoomed;
+
+  /// No description provided for @sidebarPaneCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 pane} other{{count} panes}}'**
+  String sidebarPaneCount(int count);
+
+  /// No description provided for @terminalCloseTabAllPanes.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab (all panes)'**
+  String get terminalCloseTabAllPanes;
+
+  /// No description provided for @confirmCloseRunningPaneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The command running in this pane will be stopped.'**
+  String get confirmCloseRunningPaneBody;
+
+  /// No description provided for @confirmCloseRunningPaneAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane'**
+  String get confirmCloseRunningPaneAction;
+
+  /// No description provided for @confirmCloseRunningPanesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The command running in 1 pane will be stopped.} other{The commands running in {count} panes will be stopped.}}'**
+  String confirmCloseRunningPanesBody(int count);
 }
 
 class _AppLocalizationsDelegate

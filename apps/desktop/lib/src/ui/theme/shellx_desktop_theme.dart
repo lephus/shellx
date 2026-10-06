@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 /// UI §1.1. One dark theme for the whole window (A1 has no light theme).
@@ -74,6 +76,24 @@ abstract final class ShellxSizes {
   static const double driverPill = 28;
   static const double button = 32;
   static const double input = 36;
+
+  // A3 (UI-A3 §1.2).
+  static const double paneDivider = 1;
+  static const double paneDividerHit = 6;
+  static const double paneHeader = 22;
+  static const double paneHeaderPadH = 8;
+  static const double paneHeaderDot = 6;
+  static const double paneHeaderClose = 18;
+  static const double paneFocusOutline = 1;
+  static const int paneMinCols = 20;
+  static const int paneMinRows = 5;
+  static const double paneResizeStep = 0.05;
+  static const double paneCountIcon = 12;
+  static const double paneCountGap = 2;
+
+  /// UI-A3 §1.3.
+  static double paneHeaderFor(TextScaler scaler) =>
+      max(paneHeader, scaler.scale(16) + 6);
 
   /// UI §3.4 field padding (0/10 around a 20 px line: 36 high) and the
   /// label above it.

@@ -948,4 +948,102 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get trayDesktopNotificationsUnfocused =>
       'Only when the window isn\'t in front';
+
+  @override
+  String get paneSplitRight => 'Split right';
+
+  @override
+  String get paneSplitDown => 'Split down';
+
+  @override
+  String get paneZoom => 'Zoom pane';
+
+  @override
+  String get paneUnzoom => 'Unzoom pane';
+
+  @override
+  String get paneEqualize => 'Equalize panes';
+
+  @override
+  String get paneClose => 'Close pane';
+
+  @override
+  String paneCloseTooltip(String shortcut) {
+    return 'Close pane  $shortcut';
+  }
+
+  @override
+  String paneZoomedIndicator(int index, int count) {
+    return 'Zoomed · $index/$count';
+  }
+
+  @override
+  String paneRegionLabel(int index, int count, String title) {
+    return 'Pane $index of $count — $title';
+  }
+
+  @override
+  String paneRegionUnreadLabel(int index, int count, String title) {
+    return 'Pane $index of $count — $title, has unread notifications';
+  }
+
+  @override
+  String get paneDividerLabel => 'Pane divider';
+
+  @override
+  String get paneSplitNoRoom => 'Not enough room to split this pane';
+
+  @override
+  String paneAnnounceSplit(int index, int count) {
+    return 'Split, pane $index of $count';
+  }
+
+  @override
+  String paneAnnounceClosed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Pane closed, $count left',
+      one: 'Pane closed, 1 left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paneAnnounceZoomed => 'Pane zoomed';
+
+  @override
+  String get paneAnnounceUnzoomed => 'Pane unzoomed';
+
+  @override
+  String sidebarPaneCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count panes',
+      one: '1 pane',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get terminalCloseTabAllPanes => 'Close tab (all panes)';
+
+  @override
+  String get confirmCloseRunningPaneBody =>
+      'The command running in this pane will be stopped.';
+
+  @override
+  String get confirmCloseRunningPaneAction => 'Close pane';
+
+  @override
+  String confirmCloseRunningPanesBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The commands running in $count panes will be stopped.',
+      one: 'The command running in 1 pane will be stopped.',
+    );
+    return '$_temp0';
+  }
 }
