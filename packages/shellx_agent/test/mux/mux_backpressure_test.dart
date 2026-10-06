@@ -107,6 +107,28 @@ void main() {
       await c.drained.timeout(const Duration(seconds: 1));
       expect([c.pendingBytes, written.length], [0, 3]);
     });
+
+    test('once closed: nothing pending, drained at once; a flush that ends '
+        'after the close timeout never subtracts (A7 Task 5 review)', () async {
+      final flush = Completer<void>();
+      final c = StreamMuxConnection(
+        StreamController<Uint8List>().stream,
+        (_) {},
+        () async {},
+        flush: () => flush.future,
+      );
+      c.send(big(1));
+      await Future<void>.delayed(Duration.zero);
+      expect(c.pendingBytes, greaterThan(60000));
+      final closing = c.close(); // waits up to 1 s for the stuck flush
+      expect(c.pendingBytes, 0);
+      await c.drained.timeout(const Duration(milliseconds: 100));
+      await closing.timeout(const Duration(seconds: 3));
+      flush.complete(); // the peer finally took it, after the close
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(c.pendingBytes, 0);
+      await c.drained.timeout(const Duration(milliseconds: 100));
+    });
   });
 
   group('unix socket', () {

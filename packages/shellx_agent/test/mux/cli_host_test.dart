@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -65,6 +66,59 @@ final class _ThrowingConnection implements MuxConnection {
 
   @override
   Future<void> get done => _done.future;
+}
+
+/// A server-side connection whose reader the test drives frame by frame,
+/// like a socket peer that reads slowly: [pendingBytes] counts what was
+/// sent once [counting] and not yet [take]n.
+final class _SlowReader implements MuxConnection {
+  _SlowReader(this._inner);
+  final MuxConnection _inner;
+  final _unread = Queue<int>();
+  Completer<void>? _drain;
+  int _pending = 0;
+  bool counting = false;
+
+  int get unreadFrames => _unread.length;
+
+  /// The reader takes [frames] frames (all when null).
+  void take([int? frames]) {
+    var n = frames ?? _unread.length;
+    while (n-- > 0 && _unread.isNotEmpty) {
+      _pending -= _unread.removeFirst();
+    }
+    if (_pending == 0) {
+      final d = _drain;
+      _drain = null;
+      d?.complete();
+    }
+  }
+
+  @override
+  Stream<MuxMessage> get messages => _inner.messages;
+  @override
+  void send(MuxMessage message) {
+    _inner.send(message);
+    if (!counting) return;
+    final bytes = encodeMux(message).length;
+    _unread.add(bytes);
+    _pending += bytes;
+  }
+
+  @override
+  int get pendingBytes => _pending;
+  @override
+  Future<void> get drained => _pending == 0
+      ? Future<void>.value()
+      : (_drain ??= Completer<void>()).future;
+  @override
+  void pauseInput() => _inner.pauseInput();
+  @override
+  void resumeInput() => _inner.resumeInput();
+  @override
+  Future<void> close() => _inner.close();
+  @override
+  Future<void> get done => _inner.done;
 }
 
 final class InUiHost implements CliTestHost {
@@ -281,5 +335,158 @@ void main() {
     await c.done.timeout(const Duration(seconds: 1));
     expect(h._host.clientCount, 0);
     await h.close();
+  });
+
+  group('A7 Task 5 review leftovers', () {
+    Future<MuxMessage> ask(
+      MuxConnection c,
+      String t, [
+      Map<String, Object?> f = const {},
+    ]) {
+      final answer = c.messages.firstWhere((m) => m.q == 77);
+      c.send(MuxMessage(t, q: 77, fields: f));
+      return answer.timeout(const Duration(seconds: 2));
+    }
+
+    test('the 1000-event limit counts events the reader has not taken, '
+        'even when it never quite catches up', () async {
+      final ui = FakeUiApi();
+      final h = await InUiHost.start(ui, () => true, dir);
+      final (client, server) = MemoryMuxTransport.pair();
+      final slow = _SlowReader(server);
+      h._transport.accept(slow);
+      await clientHandshake(
+        client,
+        secret: h.secret,
+        app: 't',
+        role: 'cli',
+        token: h.token,
+      );
+      slow.counting = true;
+      expect((await ask(client, 'cli.events.subscribe')).type, 'result');
+      final events = <MuxMessage>[];
+      client.messages.where((m) => m.type == 'event').listen(events.add);
+      // Steady load: 100 events a round, the reader takes 90 — it never
+      // drains, its backlog only grows to about 300.
+      var tab = 0;
+      for (var round = 0; round < 30; round++) {
+        for (var i = 0; i < 100; i++) {
+          ui.eventsOut.add({'kind': 'tab.opened', 'tab': tab++});
+        }
+        await Future<void>.delayed(Duration.zero);
+        slow.take(90);
+        expect(slow.pendingBytes, greaterThan(0));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(events, hasLength(3000));
+      expect(events.any((e) => e.get<String>('kind') == 'overflow'), isFalse);
+      // Now it stops reading: only 1000 may wait in all.
+      final backlog = slow.unreadFrames;
+      for (var i = 0; i < 1500; i++) {
+        ui.eventsOut.add({'kind': 'tab.opened', 'tab': tab++});
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final passed = 1000 - backlog;
+      expect(events, hasLength(3000 + passed));
+      slow.take();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        [events.last.get<String>('kind'), events.last.get<int>('dropped')],
+        ['overflow', 1500 - passed],
+      );
+      // Behind again; room returns before it fully catches up: the
+      // overflow notice goes out ahead of the next event.
+      for (var i = 0; i < 1100; i++) {
+        ui.eventsOut.add({'kind': 'tab.opened', 'tab': tab++});
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      slow.take(500);
+      final before = events.length;
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': tab});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        [
+          for (final e in events.skip(before))
+            [e.get<String>('kind'), e.get<int>('dropped') ?? e.get<int>('tab')],
+        ],
+        [
+          ['overflow', 101],
+          ['tab.opened', tab],
+        ],
+      );
+      await client.close();
+      await h.close();
+    });
+
+    test('recheck: unticking "Allow other terminals" ends token-less '
+        'connections that used the full API at once', () async {
+      final ui = FakeUiApi();
+      var external = true;
+      final h = await InUiHost.start(
+        ui,
+        () => true,
+        dir,
+        allowExternal: () => external,
+      );
+      final subscribed = await h.connect();
+      expect((await ask(subscribed, 'cli.events.subscribe')).type, 'result');
+      final asked = await h.connect();
+      expect((await ask(asked, 'ui.ls')).type, 'result');
+      final limited = await h.connect();
+      expect((await ask(limited, 'api.version')).type, 'result');
+      final shell = await h.connect(token: h.token);
+      expect((await ask(shell, 'cli.events.subscribe')).type, 'result');
+      final refusals = [
+        for (final c in [subscribed, asked]) c.messages.first,
+      ];
+      external = false;
+      h._host.recheck();
+      for (final r in refusals) {
+        final e = await r.timeout(const Duration(seconds: 2));
+        expect(
+          [e.type, e.q, e.get<String>('code')],
+          ['error', null, 'forbidden'],
+        );
+      }
+      await subscribed.done.timeout(const Duration(seconds: 2));
+      await asked.done.timeout(const Duration(seconds: 2));
+      // A limited client and a ShellX shell keep their connection.
+      expect((await ask(limited, 'api.version')).type, 'result');
+      final next = shell.messages.firstWhere((m) => m.type == 'event');
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': 1});
+      expect(
+        (await next.timeout(const Duration(seconds: 2))).get<int>('tab'),
+        1,
+      );
+      await h.close();
+    });
+
+    test('recheck: switching command-line control off ends subscriptions '
+        'with cli_disabled at once; the connection stays', () async {
+      final ui = FakeUiApi();
+      var enabled = true;
+      final h = await InUiHost.start(ui, () => enabled, dir);
+      final c = await h.connect(token: h.token);
+      expect((await ask(c, 'cli.events.subscribe')).type, 'result');
+      final seen = <MuxMessage>[];
+      c.messages.listen(seen.add);
+      enabled = false;
+      h._host.recheck();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        [
+          for (final m in seen) [m.type, m.q, m.get<String>('code')],
+        ],
+        [
+          ['error', null, 'cli_disabled'],
+        ],
+      );
+      enabled = true;
+      ui.eventsOut.add({'kind': 'tab.opened', 'tab': 2});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(seen, hasLength(1)); // the subscription is over
+      expect((await ask(c, 'api.version')).type, 'result');
+      await h.close();
+    });
   });
 }

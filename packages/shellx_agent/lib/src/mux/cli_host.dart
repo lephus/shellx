@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -85,6 +86,19 @@ final class CliHost {
   bool _stopped = false;
 
   int get clientCount => _clients.length;
+
+  /// Applies the switch and "Allow other terminals" to open connections
+  /// now, not at their next request or event (the tray calls this when
+  /// either changes): with the switch off, subscriptions end with
+  /// `cli_disabled` (connections stay); token-less connections that used
+  /// the full API are refused (`forbidden`) and closed while external
+  /// access is off.
+  void recheck() {
+    final enabled = _enabled();
+    for (final c in _clients.toList()) {
+      c.recheck(enabled: enabled);
+    }
+  }
 
   Future<void> start() async {
     final r = Random.secure();
@@ -334,7 +348,7 @@ final class _Client {
     this.connection, {
     required this.tokenOk,
     required List<MuxMessage> early,
-  }) {
+  }) : _base = connection.pendingBytes {
     // Read with `auth`, before this listener: first, in order.
     early.forEach(_enqueue);
     _sub = connection.messages.listen(_enqueue);
@@ -352,6 +366,9 @@ final class _Client {
   final CliHost host;
   final MuxConnection connection;
 
+  /// Bytes the transport had pending when this client began (handshake).
+  final int _base;
+
   /// Carried this launch's `SHELLX_CLI_TOKEN`.
   final bool tokenOk;
   late final StreamSubscription<MuxMessage> _sub;
@@ -362,8 +379,18 @@ final class _Client {
   bool _inputPaused = false;
   bool _watchingDrain = false;
   int _waiting = 0;
-  int _eventsWaiting = 0;
   int _dropped = 0;
+
+  /// Bytes this client sent, as the transport counts them.
+  int _sent = 0;
+
+  /// Where each event not yet known to be taken ends, in the stream of
+  /// bytes sent (the reader has taken it once it took that many).
+  final _eventEnds = Queue<int>();
+
+  /// A token-less client that used more than the limited API (while
+  /// "Allow other terminals" was on).
+  bool _usedFull = false;
 
   /// A ShellX shell, or "Allow other terminals" ticked right now
   /// (evaluated per request and per event: unticking applies at once).
@@ -381,9 +408,12 @@ final class _Client {
       try {
         await _outputRoom();
         if (_closed) return;
-        if (!full && !CliHost._limitedMayAsk(m)) {
-          _revoke(m.q);
-          return;
+        if (!CliHost._limitedMayAsk(m)) {
+          if (!full) {
+            _revoke(m.q);
+            return;
+          }
+          _usedFull = true;
         }
         final answer = await host._answer(m, this);
         if (!_closed) _answer(answer);
@@ -412,8 +442,25 @@ final class _Client {
   }
 
   void _answer(MuxMessage answer) {
-    host._send(connection, answer);
+    _counted(() => host._send(connection, answer));
     _afterSend();
+  }
+
+  /// Runs [send] and adds what it queued to [_sent].
+  void _counted(void Function() send) {
+    final before = connection.pendingBytes;
+    send();
+    final queued = connection.pendingBytes - before;
+    if (queued > 0) _sent += queued;
+  }
+
+  /// D24: events sent that the reader has not taken yet.
+  int get _eventsWaiting {
+    final taken = _base + _sent - connection.pendingBytes;
+    while (_eventEnds.isNotEmpty && _eventEnds.first <= taken) {
+      _eventEnds.removeFirst();
+    }
+    return _eventEnds.length;
   }
 
   void _afterSend() {
@@ -442,17 +489,36 @@ final class _Client {
   }
 
   void _drained() {
-    _eventsWaiting = 0;
+    _eventEnds.clear();
     if (_inputPaused) {
       _inputPaused = false;
       connection.resumeInput();
     }
-    if (_dropped > 0 && events != null) {
-      final dropped = _dropped;
-      _dropped = 0;
-      _eventsWaiting++;
-      _event({'kind': 'overflow', 'dropped': dropped});
+    _reportDropped();
+  }
+
+  /// One `overflow{dropped}` once there is room again.
+  void _reportDropped() {
+    if (_dropped == 0 || events == null) return;
+    final dropped = _dropped;
+    _dropped = 0;
+    _event({'kind': 'overflow', 'dropped': dropped});
+  }
+
+  /// See [CliHost.recheck].
+  void recheck({required bool enabled}) {
+    if (_closed) return;
+    if (!tokenOk && (_usedFull || events != null) && !full) {
+      _revoke(null);
+      return;
     }
+    if (!enabled && events != null) _endSubscription();
+  }
+
+  /// D26: the switch ends the subscription; the connection stays.
+  void _endSubscription() {
+    _unsubscribe();
+    _answer(CliHost._disabled(null));
   }
 
   /// A second subscribe replaces the filter.
@@ -470,28 +536,30 @@ final class _Client {
       return;
     }
     if (!host._enabled()) {
-      // D26: the switch ends the subscription; the connection stays.
-      _unsubscribe();
-      _answer(CliHost._disabled(null));
+      _endSubscription();
       return;
     }
     final kinds = _kinds;
     if (kinds != null && !kinds.contains(e['kind'])) return;
-    if (_eventsWaiting >= _maxEventsWaiting) {
+    // Room for the overflow notice and this event.
+    if (_eventsWaiting + (_dropped > 0 ? 1 : 0) >= _maxEventsWaiting) {
       _dropped++;
       return;
     }
-    _eventsWaiting++;
+    _reportDropped();
     _event(e);
   }
 
   /// An event the wire refuses is dropped (never throws into the UI).
   void _event(Map<String, Object?> fields) {
-    try {
-      connection.send(MuxMessage(CliType.event, fields: fields));
-    } on Object catch (e) {
-      host._log('cli event not sent: ${e.runtimeType}');
-    }
+    _counted(() {
+      try {
+        connection.send(MuxMessage(CliType.event, fields: fields));
+      } on Object catch (e) {
+        host._log('cli event not sent: ${e.runtimeType}');
+      }
+    });
+    _eventEnds.add(_base + _sent);
     _afterSend();
   }
 

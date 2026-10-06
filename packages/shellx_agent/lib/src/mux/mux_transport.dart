@@ -229,10 +229,10 @@ final class StreamMuxConnection implements MuxConnection {
   Stream<MuxMessage> get messages => _in.stream;
 
   @override
-  int get pendingBytes => _pending;
+  int get pendingBytes => _closed ? 0 : _pending;
 
   @override
-  Future<void> get drained => _drain.wait(idle: _pending == 0);
+  Future<void> get drained => _drain.wait(idle: _closed || _pending == 0);
 
   @override
   void pauseInput() {
@@ -295,7 +295,9 @@ final class StreamMuxConnection implements MuxConnection {
             alive = false;
           }
         }
-        _pending -= bytes;
+        // Once closed nothing counts: close zeroes it, maybe before this
+        // flush ended. Frames queued before the close still go out.
+        if (!_closed) _pending -= bytes;
         if (!alive) {
           _queue.clear();
           _pending = 0;
@@ -304,7 +306,7 @@ final class StreamMuxConnection implements MuxConnection {
       }
     } finally {
       _pumping = null;
-      if (_pending == 0) _drain.settle();
+      if (_closed || _pending == 0) _drain.settle();
     }
   }
 
@@ -314,6 +316,7 @@ final class StreamMuxConnection implements MuxConnection {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _drain.settle(); // nothing counts as pending any more
     // Frames sent before the close still go out (bounded).
     if (_pumping case final pump?) {
       try {
