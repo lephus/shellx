@@ -37,6 +37,10 @@ final class CommandTracker {
   String? _runningLine;
   DateTime? _startedAt;
 
+  /// A command started (`133;C`) and has not ended (`133;D`) yet. The
+  /// desktop asks before closing such a tab (A1 D15).
+  bool get running => _startedAt != null;
+
   /// Forgets a command that started: its end was missed (e.g. it ended
   /// while a shared terminal was reconnecting), so a later `D` must not be
   /// taken as its end.

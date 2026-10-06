@@ -10,12 +10,13 @@ const phone = 'b0000000-0000-4000-8000-000000000002';
 const tablet = 'b0000000-0000-4000-8000-000000000003';
 
 /// A [SessionManager] over [FakePtyFactory] that records every outbound
-/// message.
+/// message. [now] is the manager's clock (driver hold, createdAt).
 final class SessionRig {
   SessionRig({
     int maxSessions = 10,
     int bufferCapacity = 256 * 1024,
     int sendWindow = 256 * 1024,
+    Duration driverHold = const Duration(seconds: 1),
     Random? random,
   }) {
     manager = SessionManager(
@@ -26,10 +27,14 @@ final class SessionRig {
       maxSessions: maxSessions,
       bufferCapacity: bufferCapacity,
       sendWindow: sendWindow,
+      driverHold: driverHold,
+      clock: () => now,
       random: random ?? Random(1),
     );
     manager.outbound.listen(sent.add);
   }
+
+  DateTime now = DateTime(2026, 10, 6, 9);
 
   final factory = FakePtyFactory();
   late final SessionManager manager;

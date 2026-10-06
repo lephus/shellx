@@ -5,15 +5,23 @@ import 'dart:typed_data';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../notify/agent_notifications.dart';
+import '../notify/command_tracker.dart';
+import '../notify/osc_event_parser.dart';
 import '../pty/pty.dart';
 import '../pty/session_environment.dart';
 import '../pty/shell_integration.dart';
 import '../pty/shell_resolver.dart';
+import '../term/osc_title.dart';
 import 'agent_sessions.dart';
+import 'local_sessions.dart';
 import 'session_ids.dart';
 import 'session_stream.dart';
 
-/// Read-only view of a session for the tray menu.
+/// Who opened a session (A1 D4): the desktop may close any session, a
+/// phone may only end the sessions it opened.
+enum SessionOrigin { desktop, phone }
+
+/// Read-only view of a session for the tray menu and the terminal window.
 final class SessionSummary {
   const SessionSummary({
     required this.id,
@@ -21,11 +29,27 @@ final class SessionSummary {
     required this.shell,
     required this.createdAt,
     required this.attachedMobileId,
+    this.origin = SessionOrigin.phone,
+    this.title = '',
+    this.driver = DriverSide.phone,
+    this.runningCommand = false,
   });
   final int id, index;
   final String shell;
   final DateTime createdAt;
   final String? attachedMobileId;
+  final SessionOrigin origin;
+
+  /// Latest OSC 0/2 title; empty until the shell sets one (A1 D13).
+  final String title;
+
+  /// Whose size the PTY follows right now (A1 D6).
+  final DriverSide driver;
+
+  /// Between OSC 133;C and 133;D (needs the ShellX shell hook, A1 D15).
+  final bool runningCommand;
+
+  bool get phoneAttached => attachedMobileId != null;
 }
 
 const int _minDimension = 1;
@@ -40,6 +64,8 @@ const Duration _drainTimeout = Duration(seconds: 30);
 
 int _clampDimension(int value) => value.clamp(_minDimension, _maxDimension);
 
+bool _noPhoneReceivesDriver(String mobileId) => false;
+
 final class _Session {
   _Session({
     required this.id,
@@ -50,6 +76,8 @@ final class _Session {
     required this.stream,
     required this.cols,
     required this.rows,
+    required this.origin,
+    required this.driver,
   });
 
   final int id;
@@ -58,8 +86,41 @@ final class _Session {
   final DateTime createdAt;
   final Pty pty;
   final SessionStream stream;
+  final SessionOrigin origin;
+
+  /// The PTY's current size.
   int cols;
   int rows;
+
+  /// Whose size the PTY follows (A1 D6).
+  DriverSide driver;
+
+  /// The attached phone's size; null while no phone is attached.
+  int? phoneCols, phoneRows;
+
+  /// The window's size for this session; null until the window sized it.
+  int? localCols, localRows;
+
+  /// Last keystroke from each side, for the driver hold.
+  DateTime? lastPhoneInput, lastLocalInput;
+
+  final titles = OscTitleParser();
+  String title = '';
+  final commandEvents = OscEventParser();
+  final commands = CommandTracker(threshold: () => null);
+
+  /// The session ends because someone closed it (desktop, phone, revoke,
+  /// quit), not because the shell exited on its own.
+  bool killedOnRequest = false;
+
+  /// Completes with the shell's exit code (A1 `LocalSessionView.exitCode`).
+  final exit = Completer<int>();
+
+  /// Live output for local viewers (A1 §3.1: no ack, no send window).
+  final local = StreamController<Uint8List>.broadcast(sync: true);
+
+  /// Driver changes for local viewers.
+  final drivers = StreamController<DriverSide>.broadcast(sync: true);
 
   String? get attachedMobileId => stream.attachedMobileId;
   set attachedMobileId(String? value) => stream.attachedMobileId = value;
@@ -103,7 +164,8 @@ final class _Session {
   }
 }
 
-/// Owns every terminal session of the agent (spec §6.5 and §7).
+/// Owns every terminal session of the agent (spec v1 §6.5 and §7; A1 §3.1).
+/// Created once per process (A1 D7): it outlives every relay connection.
 ///
 /// Session ids come from [nextId]; by default a private `sessionIdAllocator`
 /// (random start in [1, 2^31) from [random], default `Random.secure()`, then
@@ -115,9 +177,12 @@ final class SessionManager implements AgentSessions {
     required ShellResolver shellResolver,
     required String homeDirectory,
     required Map<String, String> baseEnvironment,
-    int maxSessions = 10,
+    int maxSessions = 32,
     int bufferCapacity = 256 * 1024,
     int sendWindow = 256 * 1024,
+    Duration driverHold = const Duration(seconds: 1),
+    DateTime Function()? clock,
+    bool Function(String mobileId)? receivesDriver,
     Random? random,
     int Function()? nextId,
     AgentNotifications? notifications,
@@ -131,6 +196,9 @@ final class SessionManager implements AgentSessions {
        _maxSessions = maxSessions,
        _bufferCapacity = bufferCapacity,
        _sendWindow = sendWindow,
+       _driverHold = driverHold,
+       _clock = clock ?? DateTime.now,
+       receivesDriver = receivesDriver ?? _noPhoneReceivesDriver,
        _nextId = nextId ?? sessionIdAllocator(random ?? Random.secure());
 
   final PtyFactory _ptyFactory;
@@ -141,6 +209,17 @@ final class SessionManager implements AgentSessions {
   final int _bufferCapacity;
   final int _sendWindow;
   final AgentNotifications? _notifications;
+
+  /// While one side typed less than this ago, a keystroke from the other
+  /// side is written but does not take the driver (and the PTY size) away:
+  /// two people typing at once must not resize the PTY on every key.
+  final Duration _driverHold;
+  final DateTime Function() _clock;
+
+  /// Whether [mobileId] understands `session.driver` (it sent
+  /// `session.list {desktop: true}`). `SessionRouter` sets this; an old app
+  /// never gets a message its decoder rejects (spec §7.9).
+  bool Function(String mobileId) receivesDriver;
 
   /// Starts zsh/bash/PowerShell with the push-notification hook (spec
   /// §4.4); null starts the resolved shell unchanged.
@@ -153,10 +232,13 @@ final class SessionManager implements AgentSessions {
   final int Function() _nextId;
   int _pendingOpens = 0;
 
-  /// Bumped by [closeAll] and [closeSessionsAttachedTo] so an open that is
-  /// still awaiting [_shellResolver] can tell it was told to tear down
-  /// everything in the meantime and kill the pty instead of registering it.
+  /// Bumped by [closeAll] and [closeSessionsAttachedTo] so a phone's open
+  /// that is still awaiting [_shellResolver] can tell it was told to tear
+  /// down in the meantime and kill the pty instead of registering it.
   int _epoch = 0;
+
+  /// Bumped by [closeAll] only: a revoke never voids a window's open.
+  int _closeAllEpoch = 0;
 
   /// Messages to deliver, in order. A synchronous broadcast stream: a
   /// listener must not call back into the manager (e.g. `handle`)
@@ -166,7 +248,8 @@ final class SessionManager implements AgentSessions {
   @override
   Stream<OutboundMessage> get outbound => _outbound.stream;
 
-  /// Fires whenever the session list or an attachment changes.
+  /// Fires whenever the session list, an attachment, a title, a driver or
+  /// a running command changes.
   Stream<void> get changes => _changes.stream;
 
   @override
@@ -181,6 +264,10 @@ final class SessionManager implements AgentSessions {
           shell: s.shell,
           createdAt: s.createdAt,
           attachedMobileId: s.attachedMobileId,
+          origin: s.origin,
+          title: s.title,
+          driver: s.driver,
+          runningCommand: s.commands.running,
         ),
   ];
 
@@ -208,10 +295,16 @@ final class SessionManager implements AgentSessions {
       case SessionAttach(:final id, :final cols, :final rows, :final lastSeq):
         _attach(mobileId, id, cols, rows, lastSeq);
       case InputMessage(:final id, :final data):
-        _attachedTo(mobileId, id)?.write(data);
+        final session = _attachedTo(mobileId, id);
+        if (session == null) return;
+        _phoneActive(session, input: true);
+        session.write(data);
       case ResizeMessage(:final id, :final cols, :final rows):
         final session = _attachedTo(mobileId, id);
-        if (session != null) _resize(session, cols, rows);
+        if (session == null) return;
+        session.phoneCols = _clampDimension(cols);
+        session.phoneRows = _clampDimension(rows);
+        _phoneActive(session, input: false);
       case AckMessage(:final id, :final seq):
         final session = _attachedTo(mobileId, id);
         if (session == null) return;
@@ -223,6 +316,19 @@ final class SessionManager implements AgentSessions {
           _notFound(mobileId, id);
           return;
         }
+        if (session.origin == SessionOrigin.desktop) {
+          // A1 D4: a phone never ends a terminal opened on this computer.
+          if (session.attachedMobileId == mobileId && !session.closing) {
+            _send(
+              mobileId,
+              SessionDetached(id: id, reason: DetachReason.closedByHost),
+            );
+            _phoneLeft(session);
+            _changes.add(null);
+          }
+          return;
+        }
+        session.killedOnRequest = true;
         session.kill();
       default:
         // pair.confirm is handled by AgentService; agent→phone types are
@@ -241,7 +347,7 @@ final class SessionManager implements AgentSessions {
     for (final session in _sessions.values.toList()) {
       final wasAttached = session.attachedMobileId == mobileId;
       if (wasAttached) {
-        session.attachedMobileId = null;
+        _phoneLeft(session);
         changed = true;
       }
       if (session.exitRecipient == mobileId) session.exitRecipient = null;
@@ -250,30 +356,71 @@ final class SessionManager implements AgentSessions {
     if (changed) _changes.add(null);
   }
 
-  /// Kills every session attached to [mobileId] (used when revoking a phone).
+  /// [mobileId] was revoked: the sessions it opened and is attached to are
+  /// killed; a desktop-origin session it is attached to only loses it
+  /// (`closed_by_host`, A1 D4).
   ///
-  /// Precondition: no `session.open` is pending (awaiting the shell
-  /// resolver). The epoch bump is global, so it would also void an open
-  /// in flight for another phone. AgentService guarantees this: it calls
-  /// this from its inbox, which awaits every [handle] call, so no open is
-  /// in flight at that point. Only [closeAll] (called by the app outside
-  /// that inbox) can race an open, and it is meant to void every one.
+  /// Precondition: no `session.open` from a phone is pending (awaiting the
+  /// shell resolver). The epoch bump is global for phone opens, so it would
+  /// also void an open in flight for another phone. AgentService guarantees
+  /// this: it calls this from its inbox, which awaits every [handle] call.
+  /// A window's [open] is never voided by a revoke.
   @override
   void closeSessionsAttachedTo(String mobileId) {
     _epoch++;
+    var changed = false;
     for (final session in _sessions.values.toList()) {
-      if (session.attachedMobileId == mobileId) session.kill();
+      if (session.attachedMobileId != mobileId) continue;
+      if (session.origin == SessionOrigin.phone) {
+        session.killedOnRequest = true;
+        session.kill();
+      } else if (!session.closing) {
+        _send(
+          mobileId,
+          SessionDetached(id: session.id, reason: DetachReason.closedByHost),
+        );
+        _phoneLeft(session);
+        changed = true;
+      }
     }
+    if (changed) _changes.add(null);
   }
 
-  /// Closes a session from the tray: `session.detached {closed_by_host}`
-  /// now, `session.exited` once the shell is gone. Marks the session
-  /// closing immediately so a `session.attach` racing the kill cannot steal
-  /// [_Session.exitRecipient] before the shell has actually exited.
+  /// The relay runtime stops (sign-out, remote access off, network loss —
+  /// A1 D7): every phone is told `closed_by_host` and let go; no shell is
+  /// killed. A session already draining after its shell exited finishes now
+  /// (nobody will hear its tail).
+  void disconnectAllPhones() {
+    var changed = false;
+    for (final session in _sessions.values.toList()) {
+      session.exitRecipient = null;
+      final mobileId = session.attachedMobileId;
+      if (mobileId == null) continue;
+      changed = true;
+      if (session.closing) {
+        session.attachedMobileId = null;
+        _finish(session);
+        continue;
+      }
+      _send(
+        mobileId,
+        SessionDetached(id: session.id, reason: DetachReason.closedByHost),
+      );
+      _phoneLeft(session);
+    }
+    if (changed) _changes.add(null);
+  }
+
+  /// Closes a session from the tray or the window: `session.detached
+  /// {closed_by_host}` now, `session.exited` once the shell is gone. Marks
+  /// the session closing immediately so a `session.attach` racing the kill
+  /// cannot steal [_Session.exitRecipient] before the shell has actually
+  /// exited.
   void closeSession(int id) {
     final session = _sessions[id];
     if (session == null || session.closing) return;
     session.closing = true;
+    session.killedOnRequest = true;
     final mobileId = session.attachedMobileId;
     if (mobileId != null) {
       _send(
@@ -282,20 +429,43 @@ final class SessionManager implements AgentSessions {
       );
       session.attachedMobileId = null;
       session.exitRecipient = mobileId;
-      _changes.add(null);
     }
+    _changes.add(null);
     session.kill();
   }
 
+  /// Quit only (A1 D7): every shell ends.
   void closeAll() {
     _epoch++;
+    _closeAllEpoch++;
     for (final id in _sessions.keys.toList()) {
       closeSession(id);
     }
   }
 
+  /// A session the computer opens itself (the terminal window): nobody is
+  /// attached, the desktop drives. Throws [SessionLimitException] or
+  /// [SpawnFailedException].
+  Future<int> open({required int cols, required int rows}) async {
+    final c = _clampDimension(cols);
+    final r = _clampDimension(rows);
+    final session = await _spawn(c, r, origin: SessionOrigin.desktop);
+    if (session == null) {
+      throw const SpawnFailedException('ShellX is closing every session');
+    }
+    session.localCols = c;
+    session.localRows = r;
+    _changes.add(null);
+    return session.id;
+  }
+
   Future<void> _open(String mobileId, int cols, int rows) async {
-    if (_sessions.length + _pendingOpens >= _maxSessions) {
+    final c = _clampDimension(cols);
+    final r = _clampDimension(rows);
+    final _Session? session;
+    try {
+      session = await _spawn(c, r, origin: SessionOrigin.phone);
+    } on SessionLimitException {
       _send(
         mobileId,
         ErrorMessage(
@@ -304,10 +474,41 @@ final class SessionManager implements AgentSessions {
         ),
       );
       return;
+    } on SpawnFailedException catch (error) {
+      _send(
+        mobileId,
+        ErrorMessage(code: AppErrorCode.spawnFailed, message: error.message),
+      );
+      return;
     }
-    final c = _clampDimension(cols);
-    final r = _clampDimension(rows);
+    // closeAll or closeSessionsAttachedTo ran while the shell was still
+    // spawning: the opener already isn't getting a new session either way,
+    // so this is dropped silently rather than answering spawn_failed.
+    if (session == null) return;
+    session.attachedMobileId = mobileId;
+    session.phoneCols = c;
+    session.phoneRows = r;
+    _send(
+      mobileId,
+      SessionOpened(id: session.id, index: session.index, shell: session.shell),
+    );
+    _opened.add(SessionOpenedEvent(mobileId, session.id));
+    _changes.add(null);
+  }
+
+  /// Starts a shell and registers its session (not attached, no event).
+  /// Null when a teardown voided the open while the shell was spawning (the
+  /// pty is killed).
+  Future<_Session?> _spawn(
+    int cols,
+    int rows, {
+    required SessionOrigin origin,
+  }) async {
+    if (_sessions.length + _pendingOpens >= _maxSessions) {
+      throw SessionLimitException(_maxSessions);
+    }
     final epoch = _epoch;
+    final closeAllEpoch = _closeAllEpoch;
     _pendingOpens++;
     final ShellCommand command;
     final Pty pty;
@@ -318,32 +519,27 @@ final class SessionManager implements AgentSessions {
         launch.command,
         workingDirectory: _homeDirectory,
         environment: launch.environment,
-        cols: c,
-        rows: r,
+        cols: cols,
+        rows: rows,
       );
     } catch (error) {
-      _send(
-        mobileId,
-        ErrorMessage(code: AppErrorCode.spawnFailed, message: '$error'),
-      );
-      return;
+      throw SpawnFailedException('$error');
     } finally {
       _pendingOpens--;
     }
-    if (epoch != _epoch) {
-      // closeAll or closeSessionsAttachedTo ran while the shell was still
-      // spawning: don't resurrect a session behind that request's back.
-      // The opener already isn't getting a new session either way, so we
-      // drop this silently rather than answering spawn_failed.
+    final voided = origin == SessionOrigin.phone
+        ? epoch != _epoch
+        : closeAllEpoch != _closeAllEpoch;
+    if (voided) {
       pty.kill();
-      return;
+      return null;
     }
     final id = _nextId();
     final session = _Session(
       id: id,
       index: _lowestFreeIndex(),
       shell: command.name,
-      createdAt: DateTime.now(),
+      createdAt: _clock(),
       pty: pty,
       stream: SessionStream(
         id: id,
@@ -351,22 +547,20 @@ final class SessionManager implements AgentSessions {
         sendWindow: _sendWindow,
         send: _send,
       ),
-      cols: c,
-      rows: r,
+      cols: cols,
+      rows: rows,
+      origin: origin,
+      driver: origin == SessionOrigin.phone
+          ? DriverSide.phone
+          : DriverSide.desktop,
     );
-    session.attachedMobileId = mobileId;
     session.notifier = _notifications?.forShell(
       sessionId: session.id,
       index: session.index,
     );
     _sessions[session.id] = session;
-    _send(
-      mobileId,
-      SessionOpened(id: session.id, index: session.index, shell: session.shell),
-    );
     _watch(session);
-    _opened.add(SessionOpenedEvent(mobileId, session.id));
-    _changes.add(null);
+    return session;
   }
 
   ShellLaunch _launch(ShellCommand command) {
@@ -394,6 +588,10 @@ final class SessionManager implements AgentSessions {
     session.exitRecipient = null;
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
+    session.phoneCols = c;
+    session.phoneRows = r;
+    session.lastPhoneInput = null;
+    _setDriver(session, DriverSide.phone); // A1 D6: attaching drives.
     if (c == session.cols && r == session.rows) {
       // Same size: bounce the height so full-screen programs redraw.
       session.resize(c, r > _minDimension ? r - 1 : r + 1);
@@ -407,13 +605,75 @@ final class SessionManager implements AgentSessions {
     if (previous != mobileId) _changes.add(null);
   }
 
-  void _resize(_Session session, int cols, int rows) {
-    final c = _clampDimension(cols);
-    final r = _clampDimension(rows);
-    if (c == session.cols && r == session.rows) return;
-    session.cols = c;
-    session.rows = r;
-    session.resize(c, r);
+  /// The phone typed or resized. Typing takes the driver unless the window
+  /// typed less than [_driverHold] ago; a resize always takes it.
+  void _phoneActive(_Session session, {required bool input}) {
+    final now = _clock();
+    if (session.driver != DriverSide.phone) {
+      if (input && _recent(session.lastLocalInput, now)) {
+        session.lastPhoneInput = now;
+        return;
+      }
+      _setDriver(session, DriverSide.phone);
+    }
+    if (input) session.lastPhoneInput = now;
+    final c = session.phoneCols;
+    final r = session.phoneRows;
+    if (c != null && r != null) _applySize(session, c, r);
+  }
+
+  /// The window typed or resized (Task 2's `LocalSessionView`); mirror of
+  /// [_phoneActive].
+  // ignore: unused_element
+  void _localActive(_Session session, {required bool input}) {
+    final now = _clock();
+    if (session.driver != DriverSide.desktop) {
+      if (input && _recent(session.lastPhoneInput, now)) {
+        session.lastLocalInput = now;
+        return;
+      }
+      _setDriver(session, DriverSide.desktop);
+    }
+    if (input) session.lastLocalInput = now;
+    final c = session.localCols;
+    final r = session.localRows;
+    if (c != null && r != null) _applySize(session, c, r);
+  }
+
+  bool _recent(DateTime? at, DateTime now) =>
+      at != null && now.difference(at) < _driverHold;
+
+  /// Tells local viewers and an attached phone that understands it.
+  void _setDriver(_Session session, DriverSide side) {
+    if (session.driver == side) return;
+    session.driver = side;
+    if (!session.drivers.isClosed) session.drivers.add(side);
+    final mobileId = session.attachedMobileId;
+    if (mobileId != null && receivesDriver(mobileId)) {
+      _send(mobileId, SessionDriver(id: session.id, by: side));
+    }
+    _changes.add(null);
+  }
+
+  void _applySize(_Session session, int cols, int rows) {
+    if (cols == session.cols && rows == session.rows) return;
+    session.cols = cols;
+    session.rows = rows;
+    session.resize(cols, rows);
+  }
+
+  /// The attached phone is gone (detach, channel loss, revoke, runtime
+  /// stop): the desktop drives again, at the window's size when known.
+  void _phoneLeft(_Session session) {
+    session.attachedMobileId = null;
+    session.phoneCols = null;
+    session.phoneRows = null;
+    session.lastPhoneInput = null;
+    if (session.driver != DriverSide.phone) return;
+    _setDriver(session, DriverSide.desktop);
+    final c = session.localCols;
+    final r = session.localRows;
+    if (c != null && r != null) _applySize(session, c, r);
   }
 
   void _watch(_Session session) {
@@ -421,8 +681,10 @@ final class SessionManager implements AgentSessions {
     session.output = session.pty.output.listen(
       (data) {
         session.stream.append(data);
+        if (!session.local.isClosed) session.local.add(data);
         _pump(session);
         session.notifier?.feed(data);
+        _track(session, data);
       },
       onDone: outputDone.complete,
       onError: (Object _) {},
@@ -440,6 +702,26 @@ final class SessionManager implements AgentSessions {
     );
   }
 
+  /// Title (OSC 0/2) and running command (OSC 133) from live output.
+  void _track(_Session session, Uint8List data) {
+    var changed = false;
+    final title = session.titles.feed(data);
+    if (title != null && title != session.title) {
+      session.title = title;
+      changed = true;
+    }
+    try {
+      final wasRunning = session.commands.running;
+      for (final event in session.commandEvents.feed(data)) {
+        session.commands.handle(event);
+      }
+      if (session.commands.running != wasRunning) changed = true;
+    } catch (_) {
+      // Parsing never breaks the session.
+    }
+    if (changed && !session.closing) _changes.add(null);
+  }
+
   /// The shell process has exited. If nobody is attached, finishes right
   /// away as before. Otherwise, marks the session closing (spec item 4: it
   /// stops being listable/attachable from here on) and, if the send window
@@ -447,6 +729,7 @@ final class SessionManager implements AgentSessions {
   /// arrive rather than dropping the tail — until it is fully drained, the
   /// phone detaches ([mobileDisconnected]), or [_drainTimeout] elapses.
   void _processExited(_Session session, int exitCode) {
+    if (!session.exit.isCompleted) session.exit.complete(exitCode);
     if (!identical(_sessions[session.id], session)) return;
     session.closing = true;
     session.finishedExitCode = exitCode;
@@ -457,6 +740,7 @@ final class SessionManager implements AgentSessions {
       return;
     }
     session.drainTimer = Timer(_drainTimeout, () => _finish(session));
+    _changes.add(null);
   }
 
   /// Removes the session and delivers `session.exited` to whoever should
@@ -468,6 +752,8 @@ final class SessionManager implements AgentSessions {
     final recipient = session.attachedMobileId ?? session.exitRecipient;
     _sessions.remove(session.id);
     session.output?.cancel();
+    unawaited(session.local.close());
+    unawaited(session.drivers.close());
     if (recipient != null) {
       _send(
         recipient,

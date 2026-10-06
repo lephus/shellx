@@ -16,6 +16,7 @@ export 'src/pty/shell_resolver.dart';
 export 'src/service/agent_events.dart';
 export 'src/service/agent_service.dart';
 export 'src/session/agent_sessions.dart';
+export 'src/session/local_sessions.dart';
 export 'src/session/ring_buffer.dart';
 export 'src/session/session_ids.dart';
 export 'src/session/session_manager.dart';

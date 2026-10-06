@@ -270,4 +270,63 @@ void main() {
       expect(count, greaterThanOrEqualTo(2));
     });
   });
+
+  test('only phones that listed with desktop: true get session.driver', () {
+    fakeAsync((async) {
+      final rig = _Rig();
+      rig.router.handle(phone, const SessionList(desktop: true));
+      rig.router.handle(tablet, const SessionList());
+      rig.shells.open(cols: 100, rows: 30).ignore();
+      async.flushMicrotasks();
+      final opened = rig.shells.sessions.single.id;
+      expect(rig.shells.receivesDriver(phone), isTrue);
+      expect(rig.shells.receivesDriver(tablet), isFalse);
+      rig.router.handle(
+        phone,
+        SessionAttach(id: opened, cols: 50, rows: 20, lastSeq: 0),
+      );
+      async.flushMicrotasks();
+      expect(
+        rig.to(phone),
+        contains(SessionDriver(id: opened, by: DriverSide.phone)),
+      );
+    });
+  });
+
+  test('disconnectAllPhones reaches both managers and kills nothing', () {
+    fakeAsync((async) {
+      final rig = _Rig();
+      rig.router.handle(phone, const SessionList(desktop: true));
+      rig.router.handle(phone, const SessionOpen(cols: 80, rows: 24));
+      rig.window(1);
+      async.flushMicrotasks();
+      final desktopId = rig.desktop.sessions.single.id;
+      rig.router.handle(
+        phone,
+        SessionAttach(id: desktopId, cols: 50, rows: 20, lastSeq: 0),
+      );
+      async.flushMicrotasks();
+
+      rig.router.disconnectAllPhones();
+
+      expect(rig.ptys.ptys.single.killed, isFalse);
+      expect(rig.shells.sessions.single.attachedMobileId, isNull);
+      expect(rig.desktop.sessions.single.attachedMobileId, isNull);
+    });
+  });
+
+  test('dispose stops forwarding and unwires receivesDriver', () {
+    fakeAsync((async) {
+      final rig = _Rig();
+      rig.router.handle(phone, const SessionList(desktop: true));
+      async.flushMicrotasks();
+      rig.sent.clear();
+      rig.router.dispose();
+      async.flushMicrotasks();
+      expect(rig.shells.receivesDriver(phone), isFalse);
+      rig.shells.handle(phone, const SessionList());
+      async.flushMicrotasks();
+      expect(rig.sent, isEmpty);
+    });
+  });
 }

@@ -16,8 +16,10 @@ import 'session_manager.dart';
 /// survives channel losses (tabs re-attach without listing) and is dropped
 /// on revoke.
 ///
-/// Every "close" from the host or the phone ends shell sessions as before,
-/// but only disconnects phones from desktop terminals (spec §7.2).
+/// A close from the host ends shell sessions; a phone's close ends only the
+/// shell sessions a phone opened (one opened on this computer only loses
+/// the phone, A1 D4). Desktop terminals only ever lose their phones (spec
+/// §7.2).
 final class SessionRouter implements AgentSessions {
   SessionRouter({
     required SessionManager shells,
@@ -26,11 +28,20 @@ final class SessionRouter implements AgentSessions {
   }) : _shells = shells,
        _desktop = desktop,
        _desktopSharing = desktopSharing {
-    shells.outbound.listen(_outbound.add);
-    desktop.outbound.listen(_outbound.add);
-    shells.changes.listen(_changes.add);
-    desktop.changes.listen(_changes.add);
+    shells.receivesDriver = _receivesDriver;
+    _subscriptions.addAll([
+      shells.outbound.listen(_outbound.add),
+      desktop.outbound.listen(_outbound.add),
+      shells.changes.listen(_changes.add),
+      desktop.changes.listen(_changes.add),
+    ]);
   }
+
+  final _subscriptions = <StreamSubscription<Object?>>[];
+
+  /// `session.driver` is only for phones that listed with `desktop: true`
+  /// (their decoder knows it, spec §7.9) — for shell sessions too (A1 D6).
+  bool _receivesDriver(String mobileId) => _desktopPhones.contains(mobileId);
 
   final SessionManager _shells;
   final DesktopSessionManager _desktop;
@@ -118,11 +129,28 @@ final class SessionRouter implements AgentSessions {
     }
   }
 
-  /// Quit, "Allow remote access" off, logout: shells end, desktop terminals
-  /// only lose their phones.
+  /// Quit: shells end, desktop terminals only lose their phones.
   void closeAll() {
     _shells.closeAll();
     _desktop.disconnectAllPhones();
+  }
+
+  /// The runtime stops (A1 D7): every phone is let go, nothing is killed.
+  void disconnectAllPhones() {
+    _shells.disconnectAllPhones();
+    _desktop.disconnectAllPhones();
+  }
+
+  /// The runtime is gone; the shell sessions live on (A1 D7) and must not
+  /// keep forwarding into this router or asking its phone set.
+  void dispose() {
+    for (final subscription in _subscriptions) {
+      unawaited(subscription.cancel());
+    }
+    _subscriptions.clear();
+    if (_shells.receivesDriver == _receivesDriver) {
+      _shells.receivesDriver = (_) => false;
+    }
   }
 
   void _send(String mobileId, AppMessage message) =>
