@@ -192,3 +192,39 @@ Lưu ý: khối tích hợp `term/shell/block.*` có hook mới, nên máy đã 
 - [ ] 5. Alt+F4 / nút X → ẩn vào khay, shell vẫn chạy; mở lại lần hai (chạy ShellX.exe lần nữa) → cửa sổ hiện lại, không có tab thứ hai.
 - [ ] 6. Tray "Thoát" với tab đang mở → hỏi; đồng ý → `Get-Process pwsh,powershell` không còn tiến trình con của ShellX. Đăng xuất / tắt máy Windows không bị ShellX chặn.
 - [ ] 7. Snap layouts (Win+Z) và kéo đổi cỡ: tối thiểu 640×400, nhớ vị trí; rút màn hình ngoài rồi mở lại → cửa sổ hiện ở giữa màn hình còn lại.
+
+## 12. Sidebar giàu thông tin — A2 (2026-10-07)
+
+- Spec: `docs/superpowers/specs/2026-10-07-desktop-sidebar-a2-design.md`; UI: `docs/superpowers/design/2026-10-07-shellx-desktop-ui-a2.md`; plan: `docs/superpowers/plans/2026-10-07-desktop-sidebar-a2.md`.
+- Trạng thái: nhánh `feat/desktop-a2`; số test agent/core/desktop: xem kiểm tra cuối khi merge.
+- Hook shell (zsh/bash/pwsh) nay phát OSC 7 ở mỗi prompt; `term/shell/block.*` đổi theo (D1). Ai đã bật chia sẻ terminal chỉ có OSC 7 sau khi bật lại.
+- Quyền riêng tư: thư mục và nhánh tới điện thoại (đã opt-in `desktop: true`) qua kênh mã hoá đầu cuối như mọi `SessionInfo`; relay không đọc được; cổng không gửi. Không cần sửa trang privacy.
+- Agent chạy `lsof`/`ps` (macOS) hoặc `netstat`/`powershell` (Windows) mỗi 3 s **chỉ khi cửa sổ hiện**; không bao giờ chạy `git`.
+
+### Thử tay — macOS
+- [ ] 1. Tab mới: dòng thứ hai hiện `~` ngay prompt đầu; `cd ~/Documents/"Tài liệu"` → `~/Documents/Tài liệu` (đúng dấu, không `%20`).
+- [ ] 2. `cd` vào repo → nhánh hiện ≤ 300 ms; `git switch -c test-a2` → nhánh mới; `git checkout HEAD~1` → SHA 7 ký tự; worktree (`git worktree add ../wt`) và submodule đúng nhánh của chính nó.
+- [ ] 3. `python3 -m http.server 8000` → `:8000` ≤ 4 s; bấm mở `http://localhost:8000/` trong trình duyệt, tab không đổi; Ctrl+C → biến mất ≤ 4 s. `npm run dev` (Vite) → `:5173`. Bốn server → 3 cổng + `+1`, tooltip liệt kê đủ.
+- [ ] 4. Ẩn cửa sổ (nút đỏ) → `sudo fs_usage -w -f exec | grep -E 'lsof|ps'` không còn dòng nào trong 30 s; mở lại → cổng cập nhật ngay.
+- [ ] 5. 10 tab, cửa sổ hiện, để yên 1 phút → CPU ShellX trung bình ≤ 2 % (Activity Monitor); ghi số đo vào đây.
+- [ ] 6. Thư mục trên ổ mạng (SMB) và một monorepo lớn → UI không khựng; nhánh hiện hoặc không, không treo.
+- [ ] 7. `ssh` vào máy có tích hợp OSC 7 → thư mục và nhánh biến mất; thoát ssh → hiện lại.
+- [ ] 8. ⌘⇧N → "Workspace 2" có một tab, ô tên mở sẵn; gõ "Backend" Enter → bàn phím về terminal. Double-click tên → đổi tên; menu → Xóa (Mặc định: mục mờ); tab về Mặc định, toast trung tính.
+- [ ] 9. Kéo tab giữa hai workspace và trong một workspace (vạch thả hiện đúng chỗ), kéo lên tiêu đề nhóm thu gọn → 0,6 s tự mở; kéo gần mép → tự cuộn.
+- [ ] 10. ⌘1…⌘9 theo thứ tự nhìn thấy (bỏ nhóm thu gọn); Ctrl+Tab cũng vậy; Ctrl+F6 vào danh sách, ↑/↓ qua tiêu đề, ←/→ thu gọn/mở, F2 đổi tên, ⌥↑/⌥↓ chuyển tab.
+- [ ] 11. Thoát app, mở lại → các workspace, tên, trạng thái thu gọn còn; tab mới vào Mặc định.
+- [ ] 12. Điện thoại mở phiên → tab vào Mặc định, không được chọn. Điện thoại (bản có `desktop: true`) thấy `cwd`/`branch` trong danh sách (kiểm bằng log debug của app mobile); app mobile cũ vẫn liệt kê bình thường.
+- [ ] 13. VoiceOver: dòng tab đọc "…, nhánh main, thư mục ~/…, cổng 3000, tab 2 trên 3 trong Backend"; tiêu đề đọc tên, số tab, trạng thái mở/thu gọn; actions "Đổi tên tab", "Chuyển tới workspace…", "Mở cổng …" chạy được. Bật "Giảm chuyển động" → chevron không xoay.
+- [ ] 14. Hostname macOS có và không có hậu tố `.local` (đổi trong Cài đặt → Chia sẻ → Tên máy cục bộ, hoặc `scutil --set HostName`): `cwd` vẫn được coi là máy cục bộ (thư mục và nhánh hiện, không bị xoá như ssh).
+- [ ] 15. Kéo thả với danh sách dài (≥ 30 tab, nhiều workspace): kéo sát mép trên/dưới → tự cuộn mượt, tốc độ tăng gần mép; thả đúng chỗ vạch hiện; thả ngoài danh sách hoặc Esc → không đổi gì.
+- [ ] 16. Bộ gõ Telex (hoặc Unikey/VNI) trong ô tên tab và tên workspace: gõ "Dịch vụ" (dấu đang soạn) → Enter chỉ chốt khi hết soạn, không mất/lặp ký tự; Esc hủy đúng.
+- [ ] 17. Click một lần chỉ chọn tab/tiêu đề (không mở ô tên); double-click mới đổi tên; click rồi kéo không kích hoạt đổi tên.
+
+### Thử tay — Windows
+- [ ] 1. PowerShell: `cd C:\Users\<bạn>\Tài liệu` → `~\Tài liệu`; ổ khác `D:\src` giữ nguyên; thư mục UNC hiện đường dẫn, không có nhánh.
+- [ ] 2. `python -m http.server 8000` → `:8000` (Windows tiếng Đức/Pháp: vẫn đúng — không dựa chữ LISTENING); tiến trình `powershell` CIM chỉ chạy khi có cổng mới (Process Monitor).
+- [ ] 3. Mục 2, 3, 5, 8–11, 13 (Narrator) của macOS với Ctrl+Shift+N, Ctrl+Alt+1…9, Alt+↑/↓.
+- [ ] 4. Hook PowerShell phát OSC 7 trên Windows thật, cả Windows PowerShell 5.1 và pwsh 7: `cd` vào thư mục có dấu cách, tiếng Việt, `#`, `%` (ví dụ `C:\tmp\a b`, `C:\tmp\Tài liệu`, `C:\tmp\c#1`, `C:\tmp\100%`) → thư mục hiện đúng, không `%20`, không cắt ở `#`.
+- [ ] 5. `WindowsPortProbe` trên Windows thật: `netstat -ano` + CIM (`Get-CimInstance Win32_Process`) cho cổng đúng theo cây tiến trình của tab; thử Windows có netstat bản địa hóa (Đức/Pháp/Việt) → vẫn đúng cổng; không có cửa sổ console nháy lên mỗi 3 s.
+- [ ] 6. Narrator trên cây workspace: đọc đúng tên, số tab, mở/thu gọn, vị trí "tab n trên m"; ←/→ và F2 chạy.
+- [ ] 7. Bộ gõ Telex/Unikey/EVKey trong ô tên tab và workspace; double-click để đổi tên so với click đơn để chọn (như macOS 16, 17); kéo thả danh sách dài + tự cuộn (như macOS 15).

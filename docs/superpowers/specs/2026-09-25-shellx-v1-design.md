@@ -243,7 +243,7 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
 |---|---|---|---|
 | `pair.confirm` | M → A | — | Xác nhận ghép nối (mục 5.3) |
 | `session.list` | M → A | — | Hỏi danh sách phiên |
-| `session.list.result` | A → M | `sessions: [{id, index, shell, created_at, attached}]` | Danh sách phiên trên máy |
+| `session.list.result` | A → M | `sessions: [{id, index, shell, created_at, attached, cwd?, branch?}]` — `cwd`/`branch` (A2, tuỳ chọn) chỉ gửi cho điện thoại đã `session.list {desktop: true}`; bộ giải mã bỏ qua khoá lạ nên app cũ không bị ảnh hưởng | Danh sách phiên trên máy |
 | `session.open` | M → A | `cols, rows` | Mở phiên mới |
 | `session.opened` | A → M | `id, index, shell` | Phiên đã mở và gắn vào điện thoại này |
 | `session.attach` | M → A | `id, cols, rows, last_seq` | Gắn vào phiên có sẵn |
