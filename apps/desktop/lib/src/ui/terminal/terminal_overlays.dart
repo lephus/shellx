@@ -532,7 +532,8 @@ class _NoticeToastState extends State<NoticeToast> {
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
   bool get _neutral =>
       widget.notice is WorkspaceDeletedNotice ||
-      widget.notice is NoUnreadNotice;
+      widget.notice is NoUnreadNotice ||
+      widget.notice is PaneNoRoomNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -577,6 +578,7 @@ class _NoticeToastState extends State<NoticeToast> {
       l10n.workspaceDeleted(name, movedTo),
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
+    PaneNoRoomNotice() => l10n.paneSplitNoRoom,
   };
 
   @override

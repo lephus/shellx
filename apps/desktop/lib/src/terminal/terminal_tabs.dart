@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show StringCharacters;
@@ -9,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
@@ -66,6 +68,31 @@ final class PortOpenFailedNotice extends TabNotice {
 /// ⌘⇧U found nothing (A4 D13). Neutral toast.
 final class NoUnreadNotice extends TabNotice {
   const NoUnreadNotice();
+}
+
+/// D4: the focused pane is too small to hold two (neutral toast).
+final class PaneNoRoomNotice extends TabNotice {
+  const PaneNoRoomNotice();
+}
+
+/// What the pane area looks like (D4), reported by the terminal pane on
+/// every layout: the tab list needs pixels to refuse a split or clamp a
+/// divider.
+@immutable
+final class PaneMetrics {
+  const PaneMetrics({
+    required this.area,
+    required this.minPane,
+    required this.divider,
+  });
+
+  /// The whole terminal area of a tab.
+  final Size area;
+
+  /// 20 columns × 5 rows of the current font, plus padding and the pane
+  /// header (UI-A3 §1.2).
+  final Size minPane;
+  final double divider;
 }
 
 /// D19: the longest tab name, in characters.
@@ -347,6 +374,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// appears meanwhile waits for the opener to place it.
   bool _awaitingOpen = false;
 
+  /// D4: the last pane area the view reported; null until the first layout
+  /// (then nothing is refused or clamped beyond [clampRatio]).
+  PaneMetrics? _metrics;
+
   @override
   TerminalTabsState build() {
     _local = ref.watch(localSessionsProvider);
@@ -362,11 +393,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (state.opening) return;
     _set(opening: true);
     _awaitingOpen = true;
+    var synced = false;
     try {
       final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
       if (!ref.mounted) return;
       _awaitingOpen = false;
       _sync();
+      synced = true;
       // The new shell may already be gone (exit 0, or ended before it could
       // be viewed): then keep a selection that exists.
       final opened = state.tabOfSession(id);
@@ -385,7 +418,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       if (ref.mounted) {
         // D5: desktop sessions held back while the open was pending get
         // their tabs now, even when the open failed.
-        _sync();
+        if (!synced) _sync();
         // Whatever happened (an unexpected error too), `+` is usable again.
         _set(opening: false);
       }
@@ -459,6 +492,153 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// A notice from outside the tab list (workspaces, port links).
   void showNotice(TabNotice notice) => _set(notice: notice);
+
+  // ---- panes (A3) -------------------------------------------------------
+
+  /// Stores the size for later decisions only: safe during layout.
+  void reportPaneMetrics(PaneMetrics metrics) => _metrics = metrics;
+
+  /// ⌘D / ⌘⇧D (D3): the selected tab's focused pane, in its directory
+  /// (D17), at half its grid; the new pane is focused.
+  Future<void> split(SplitAxis axis) async {
+    final tab = state.selected;
+    if (tab == null || state.opening) return;
+    final target = tab.focusedPaneId;
+    if (!_roomToSplit(tab, target, axis)) {
+      _set(notice: const PaneNoRoomNotice());
+      return;
+    }
+    final pane = tab.panes[target]!;
+    final grid = _halfGrid(pane, axis);
+    _set(opening: true);
+    _awaitingOpen = true;
+    var synced = false;
+    try {
+      final id = await _local.open(
+        cols: grid.cols,
+        rows: grid.rows,
+        cwd: pane.cwd,
+      );
+      if (!ref.mounted) return;
+      _awaitingOpen = false;
+      _adoptPane(id, tabId: tab.id, target: target, axis: axis, size: grid);
+      synced = true; // [_adoptPane] synced.
+    } on SessionLimitException catch (error) {
+      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (ref.mounted) {
+        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
+      }
+    } finally {
+      _awaitingOpen = false;
+      if (ref.mounted) {
+        // D5: as in [openTab], desktop sessions held back while the open
+        // was pending get their tabs now, even when the open failed.
+        if (!synced) _sync();
+        _set(opening: false);
+      }
+    }
+  }
+
+  /// A click in a pane, a jump to a notification: [sessionId]'s tab is
+  /// selected and the pane focused; a zoom that hides it ends (D10).
+  void focusPane(int sessionId) {
+    final tab = state.tabOfSession(sessionId);
+    if (tab == null) return;
+    final unzoom = tab.zoomedPaneId != null && tab.zoomedPaneId != sessionId;
+    if (tab.focusedPaneId != sessionId || unzoom) {
+      _replaceTab(
+        tab.copyWith(
+          focusedPaneId: sessionId,
+          paneHistory: [
+            sessionId,
+            ...tab.paneHistory.where((id) => id != sessionId),
+          ],
+          zoomedPaneId: unzoom ? null : tab.zoomedPaneId,
+        ),
+      );
+    }
+    if (state.selectedId != tab.id) {
+      _set(selectedId: tab.id);
+    } else if (unzoom) {
+      _visibleChanged();
+    }
+  }
+
+  /// ⌘⌥arrows (D9). False when there is no pane that way.
+  bool focusDirection(PaneDirection direction) {
+    final tab = state.selected;
+    if (tab == null || !tab.isSplit) return false;
+    final next = neighbourPane(
+      tab.layout,
+      tab.focusedPaneId,
+      direction,
+      mru: tab.paneHistory,
+    );
+    if (next == null) return false;
+    if (tab.zoomedPaneId != null) {
+      _replaceTab(tab.copyWith(zoomedPaneId: null));
+      _visibleChanged();
+    }
+    focusPane(next);
+    return true;
+  }
+
+  /// ⌘⇧↩ (D10): the new state; a one-pane tab is never zoomed.
+  bool toggleZoom() {
+    final tab = state.selected;
+    if (tab == null || !tab.isSplit) return false;
+    final zoom = tab.zoomedPaneId == null;
+    _replaceTab(tab.copyWith(zoomedPaneId: zoom ? tab.focusedPaneId : null));
+    if (!zoom) _visibleChanged();
+    return zoom;
+  }
+
+  /// ⌘⌃= (D11).
+  void equalize() {
+    final tab = state.selected;
+    if (tab == null || !tab.isSplit) return;
+    _replaceTab(tab.copyWith(layout: equalized(tab.layout)));
+  }
+
+  /// Double-click on a divider (D11).
+  void equalizeAt(int tabId, PanePath path) {
+    final tab = _tab(tabId);
+    if (tab == null || nodeAt(tab.layout, path) is! PaneSplit) return;
+    _replaceTab(tab.copyWith(layout: equalizedAt(tab.layout, path)));
+  }
+
+  /// A divider drag (D14): ignored when [path] is no longer a split (a
+  /// pane closed mid-drag); clamped to the pixel minimums (D4).
+  void setRatio(int tabId, PanePath path, double ratio) {
+    final tab = _tab(tabId);
+    if (tab == null || nodeAt(tab.layout, path) is! PaneSplit) return;
+    _replaceTab(
+      tab.copyWith(
+        layout: withRatio(tab.layout, path, _clampForPixels(tab, path, ratio)),
+      ),
+    );
+  }
+
+  /// ⌘⌃arrows (D12): the nearest split of the arrow's axis above the
+  /// focused pane moves [ShellxSizes.paneResizeStep] the arrow's way.
+  void resizeFocused(PaneDirection direction) {
+    final tab = state.selected;
+    if (tab == null || !tab.isSplit) return;
+    final sideways =
+        direction == PaneDirection.left || direction == PaneDirection.right;
+    final path = ancestorSplit(
+      tab.layout,
+      tab.focusedPaneId,
+      sideways ? SplitAxis.row : SplitAxis.column,
+    );
+    if (path == null) return;
+    final split = nodeAt(tab.layout, path)! as PaneSplit;
+    final forward =
+        direction == PaneDirection.right || direction == PaneDirection.down;
+    const step = ShellxSizes.paneResizeStep;
+    setRatio(tab.id, path, split.ratio + (forward ? step : -step));
+  }
 
   // ---- internals --------------------------------------------------------
 
@@ -678,16 +858,106 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
           remaining.first;
     }
     final unzoom = tab.zoomedPaneId == sessionId;
+    // Criterion 13: a tab left with one pane looks exactly like A4 — never
+    // zoomed (the remaining pane was the zoomed one: already visible).
+    final zoomed = unzoom || remaining.length == 1 ? null : tab.zoomedPaneId;
     _replaceTab(
       tab.copyWith(
         layout: layout,
         panes: Map.of(tab.panes)..remove(sessionId),
         focusedPaneId: focused,
         paneHistory: [focused, ...history.where((id) => id != focused)],
-        zoomedPaneId: unzoom ? null : tab.zoomedPaneId,
+        zoomedPaneId: zoomed,
       ),
     );
     if (unzoom && state.selectedId == tab.id) _visibleChanged();
+  }
+
+  /// D3: session [id] (opened by [split]) joins tab [tabId] next to
+  /// [target]. When it ended already, or its tab went while it opened, the
+  /// normal rules apply: a tab of its own, selected.
+  void _adoptPane(
+    int id, {
+    required int tabId,
+    required int target,
+    required SplitAxis axis,
+    required TerminalGrid size,
+  }) {
+    final summary = _local.sessions.where((s) => s.id == id).firstOrNull;
+    final tab = _tab(tabId);
+    if (summary == null || tab == null) {
+      _sync();
+      if (state.tabOfSession(id) case final own?) _set(selectedId: own.id);
+      return;
+    }
+    final pane = _attach(summary, size: size);
+    if (pane == null) {
+      _sync(); // Ended between the listing and now; others may wait (D5).
+      return;
+    }
+    final at = tab.panes.containsKey(target) ? target : tab.paneOrder.first;
+    final wasZoomed = tab.zoomedPaneId != null;
+    _replaceTab(
+      tab.copyWith(
+        layout: splitPane(tab.layout, at, id, axis),
+        panes: {...tab.panes, id: pane},
+        focusedPaneId: id,
+        zoomedPaneId: null,
+        paneHistory: [id, ...tab.paneHistory],
+      ),
+    );
+    _sync();
+    if (state.selectedId != tabId) {
+      _set(selectedId: tabId);
+    } else if (wasZoomed) {
+      _visibleChanged();
+    }
+  }
+
+  /// D13 estimate; the real grid follows at the next layout.
+  TerminalGrid _halfGrid(PaneSession pane, SplitAxis axis) {
+    final cols = pane.terminal.viewWidth;
+    final rows = pane.terminal.viewHeight;
+    return axis == SplitAxis.row
+        ? (cols: max(1, (cols - 1) ~/ 2), rows: max(1, rows - 1))
+        : (cols: cols, rows: max(1, (rows - 1) ~/ 2 - 1));
+  }
+
+  /// D4: room for two minimum panes and the divider.
+  bool _roomToSplit(TerminalTab tab, int target, SplitAxis axis) {
+    final m = _metrics;
+    if (m == null) return true;
+    final unit = paneRects(tab.layout)[target];
+    if (unit == null) return false;
+    final w = unit.width * m.area.width;
+    final h = unit.height * m.area.height;
+    return axis == SplitAxis.row
+        ? w >= 2 * m.minPane.width + m.divider && h >= m.minPane.height
+        : h >= 2 * m.minPane.height + m.divider && w >= m.minPane.width;
+  }
+
+  /// D4: each side keeps its panes at their minimum along the axis.
+  double _clampForPixels(TerminalTab tab, PanePath path, double ratio) {
+    final m = _metrics;
+    final node = nodeAt(tab.layout, path);
+    final rect = splitRect(tab.layout, path);
+    if (m == null || node is! PaneSplit || rect == null) {
+      return clampRatio(ratio);
+    }
+    final row = node.axis == SplitAxis.row;
+    final extent = row
+        ? rect.width * m.area.width
+        : rect.height * m.area.height;
+    final minPane = row ? m.minPane.width : m.minPane.height;
+    double need(PaneNode side) {
+      final n = paneSpan(side, node.axis);
+      return n * minPane + (n - 1) * m.divider;
+    }
+
+    final lo = need(node.first) / extent;
+    final hi = 1 - (need(node.second) + m.divider) / extent;
+    if (lo > hi) return node.ratio; // no room to move at all
+    return clampRatio(ratio.clamp(lo, hi).toDouble());
   }
 
   /// D13: the selected tab's panes, minus those a zoom hides.

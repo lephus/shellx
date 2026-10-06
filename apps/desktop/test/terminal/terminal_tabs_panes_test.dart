@@ -30,6 +30,9 @@ void boot() {
   state();
 }
 
+TerminalTab only() => state().tabs.single;
+TerminalTab only1() => state().tabs.firstWhere((t) => t.id == 1);
+
 void main() {
   setUp(() => local = FakeLocalSessions());
 
@@ -117,5 +120,264 @@ void main() {
     expect(state().tabs.single.panes[1]!.exitCode, 3);
     state().tabs.single.terminal.keyInput(TerminalKey.enter);
     expect(state().tabs, isEmpty);
+  });
+
+  group('pane operations (A3)', () {
+    setUp(() {
+      local.add(
+        local.summary(1, origin: SessionOrigin.desktop, cwd: '/Users/test/w'),
+      );
+    });
+
+    test('split right: cwd, half grid, new pane after and focused '
+        '(D3, D13, D17)', () async {
+      boot();
+      await tabs().split(SplitAxis.row);
+      expect(local.openCwds.single, '/Users/test/w');
+      expect(local.opens.single, (39, 23)); // 80×24 → (80−1)~/2 × (24−1)
+      expect(only().id, 1);
+      expect(
+        only().layout,
+        const PaneSplit(
+          axis: SplitAxis.row,
+          ratio: 0.5,
+          first: PaneLeaf(1),
+          second: PaneLeaf(100),
+        ),
+      );
+      expect(only().focusedPaneId, 100);
+      expect(only().terminal.viewWidth, 39);
+      expect(state().opening, isFalse);
+    });
+
+    test('split down estimates half the rows', () async {
+      boot();
+      await tabs().split(SplitAxis.column);
+      expect(local.opens.single, (80, 10)); // (24−1)~/2 − 1
+    });
+
+    test('D5: changes fired inside open() never make the pane a tab', () async {
+      boot();
+      local.afterOpen = (id) => local.replace(local.summaries.last);
+      await tabs().split(SplitAxis.row);
+      expect(state().tabs, hasLength(1));
+      expect(only().paneOrder, [1, 100]);
+    });
+
+    test('the tab vanished while the pane was opening → own tab', () async {
+      boot();
+      local.openGate = Completer<void>();
+      final split = tabs().split(SplitAxis.row);
+      tabs().close(1);
+      local.openGate!.complete();
+      await split;
+      expect(state().tabs.map((t) => t.id), [100]);
+      expect(state().selectedId, 100);
+    });
+
+    test(
+      'limit / spawn failure: tree unchanged, toast, usable again',
+      () async {
+        boot();
+        local.openError = const SessionLimitException(32);
+        await tabs().split(SplitAxis.row);
+        expect(only().paneOrder, [1]);
+        expect(state().notice, isA<SessionLimitNotice>());
+        expect(state().opening, isFalse);
+      },
+    );
+
+    test(
+      'no room (D4): no open, neutral notice; the other axis fits',
+      () async {
+        boot();
+        tabs().reportPaneMetrics(
+          const PaneMetrics(
+            area: Size(300, 400),
+            minPane: Size(176, 100),
+            divider: 1,
+          ),
+        );
+        await tabs().split(SplitAxis.row);
+        expect(local.opens, isEmpty);
+        expect(state().notice, isA<PaneNoRoomNotice>());
+        await tabs().split(SplitAxis.column);
+        expect(local.opens, hasLength(1));
+      },
+    );
+
+    test('close focuses the most recently used pane; the tab keeps its id '
+        'when its first pane closes (D1, D8)', () async {
+      boot();
+      await tabs().split(SplitAxis.row); // 1 | 100
+      tabs().focusPane(1);
+      await tabs().split(SplitAxis.column); // (1 / 101) | 100
+      expect(only().focusedPaneId, 101);
+      tabs().closePane(101);
+      expect(only().focusedPaneId, 1);
+      tabs().closePane(1);
+      expect(only().id, 1);
+      expect(only().paneOrder, [100]);
+      expect(only().focusedPaneId, 100);
+      expect(local.closed, [101, 1]);
+      tabs().closePane(100);
+      expect(state().tabs, isEmpty);
+    });
+
+    test(
+      'pane exits: 0 removes it, non-zero keeps it until Enter (D7)',
+      () async {
+        boot();
+        await tabs().split(SplitAxis.row);
+        await tabs().split(SplitAxis.row); // 1 | 100 | 101
+        local.views[101]!.end(0);
+        await pumpEventQueue();
+        expect(only().paneOrder, [1, 100]);
+        local.views[100]!.end(2);
+        await pumpEventQueue();
+        expect(only().panes[100]!.exited, isTrue);
+        only().panes[100]!.terminal.keyInput(TerminalKey.enter);
+        expect(only().paneOrder, [1]);
+      },
+    );
+
+    test('only visible panes resize their sessions; unzoom re-sends (D10, '
+        'D13)', () async {
+      local.add(local.summary(2)); // a phone tab, not selected
+      boot();
+      await tabs().split(SplitAxis.row);
+      final r1 = local.views[1]!.resizes;
+      final r2 = local.views[2]!.resizes;
+      expect(tabs().toggleZoom(), isTrue); // zooms 100
+      final before = r1.length;
+      only1().panes[1]!.terminal.resize(50, 20);
+      expect(r1.length, before); // hidden by the zoom
+      state().tabs.firstWhere((t) => t.id == 2).terminal.resize(60, 20);
+      expect(r2, isEmpty); // not the selected tab
+      expect(tabs().toggleZoom(), isFalse);
+      expect(r1.last, (50, 20));
+    });
+
+    test('directional focus, unzooming first; no wrap (D9)', () async {
+      boot();
+      await tabs().split(SplitAxis.row);
+      tabs().toggleZoom();
+      expect(tabs().focusDirection(PaneDirection.left), isTrue);
+      expect(only().focusedPaneId, 1);
+      expect(only().zoomedPaneId, isNull);
+      expect(tabs().focusDirection(PaneDirection.left), isFalse);
+    });
+
+    test(
+      'split while zoomed unzooms; focusing a hidden pane unzooms',
+      () async {
+        boot();
+        await tabs().split(SplitAxis.row);
+        tabs().toggleZoom();
+        await tabs().split(SplitAxis.column);
+        expect(only().zoomedPaneId, isNull);
+        tabs().toggleZoom(); // zoom 101
+        tabs().focusPane(1);
+        expect(only().zoomedPaneId, isNull);
+      },
+    );
+
+    test(
+      'equalize; keyboard resize moves the nearest same-axis divider; '
+      'pixel minimums clamp; stale paths are ignored (D4, D11, D12)',
+      () async {
+        boot();
+        await tabs().split(SplitAxis.row);
+        await tabs().split(SplitAxis.row); // 1 | (100 | 101)
+        tabs().equalize();
+        expect((only().layout as PaneSplit).ratio, closeTo(1 / 3, 1e-9));
+        tabs().resizeFocused(PaneDirection.right); // 101 → split '1'
+        expect(
+          ((only().layout as PaneSplit).second as PaneSplit).ratio,
+          closeTo(0.55, 1e-9),
+        );
+        tabs().resizeFocused(PaneDirection.down); // no column split: no-op
+        tabs().reportPaneMetrics(
+          const PaneMetrics(
+            area: Size(1000, 600),
+            minPane: Size(176, 100),
+            divider: 1,
+          ),
+        );
+        tabs().setRatio(1, '', 0.05);
+        expect((only().layout as PaneSplit).ratio, closeTo(0.176, 1e-9));
+        tabs().setRatio(1, '', 0.99); // second side holds two panes
+        expect(
+          (only().layout as PaneSplit).ratio,
+          closeTo(1 - (2 * 176 + 1 + 1) / 1000, 1e-9),
+        );
+        tabs().equalizeAt(1, '1');
+        expect(((only().layout as PaneSplit).second as PaneSplit).ratio, 0.5);
+        tabs().setRatio(1, '0', 0.3); // a leaf: ignored
+        tabs().setRatio(99, '', 0.3); // no such tab: ignored
+      },
+    );
+
+    test(
+      'closing the zoomed pane unzooms and re-sends the grids (D8, D10)',
+      () async {
+        boot();
+        await tabs().split(SplitAxis.row);
+        await tabs().split(SplitAxis.row); // 1 | 100 | 101
+        tabs().toggleZoom(); // zoom 101
+        only().panes[1]!.terminal.resize(30, 20);
+        final r1 = local.views[1]!.resizes;
+        expect(r1, isNot(contains((30, 20))));
+        tabs().closePane(101);
+        expect(only().zoomedPaneId, isNull);
+        expect(only().focusedPaneId, 100);
+        expect(r1.last, (30, 20));
+      },
+    );
+
+    test(
+      'a removal that leaves one pane clears the zoom (criterion 13)',
+      () async {
+        boot();
+        await tabs().split(SplitAxis.row); // 1 | 100, focus 100
+        tabs().toggleZoom(); // zoom 100
+        tabs().closePane(1);
+        expect(only().id, 1);
+        expect(only().isSplit, isFalse);
+        expect(only().zoomedPaneId, isNull);
+      },
+    );
+
+    test('close(tab) on a split tab closes every pane; counts and numbers '
+        '(D6, D15, D23)', () async {
+      local.add(local.summary(2));
+      boot();
+      await tabs().split(SplitAxis.row);
+      await tabs().split(SplitAxis.row); // 1 | 100 | 101
+      local.replace(local.summary(1, runningCommand: true));
+      local.replace(
+        local.summary(100, origin: SessionOrigin.desktop, runningCommand: true),
+      );
+      expect(tabs().runningPaneCount(1), 2);
+      expect(tabs().needsPaneCloseConfirm(101), isFalse);
+      expect(only1().paneNumber(100), 2);
+      expect(only1().paneNumber(101), 3);
+      expect(only1().paneCount, 3);
+      tabs().close(1);
+      expect(local.closed, unorderedEquals([1, 100, 101]));
+      expect(state().tabs.map((t) => t.id), [2]);
+    });
+
+    test('a split never shows the new session as its own tab, even for one '
+        'state (D5)', () async {
+      boot();
+      final seen = <List<int>>[];
+      container.listen(
+        terminalTabsProvider,
+        (_, next) => seen.add([for (final t in next.tabs) t.id]),
+      );
+      await tabs().split(SplitAxis.row);
+      expect(seen, everyElement([1]));
+    });
   });
 }
