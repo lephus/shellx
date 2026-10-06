@@ -64,21 +64,47 @@ const _digits = [
   LogicalKeyboardKey.digit9,
 ];
 
-/// Spec criterion 2 and UI §3.6. The same map goes to the workspace's
-/// `Shortcuts` and to every `TerminalView` (xterm would otherwise consume
-/// Ctrl+Tab, Ctrl+Shift+T… as terminal input). Windows tab-number and font
+/// Spec criterion 2 and UI §3.6: the workspace's `Shortcuts` (focus in
+/// the sidebar, the strip, "Open new tab"). Windows tab-number and font
 /// chords follow Windows Terminal, which leaves Ctrl+digit to the shell.
-Map<ShortcutActivator, Intent> desktopShortcuts(TargetPlatform platform) {
+/// Regions cycle with F6 / Shift+F6 and, so one chord works everywhere,
+/// Ctrl+F6 / Ctrl+Shift+F6.
+Map<ShortcutActivator, Intent> desktopShortcuts(TargetPlatform platform) => {
+  ..._windowShortcuts(platform),
+  const SingleActivator(LogicalKeyboardKey.f6): const NextRegionIntent(),
+  const SingleActivator(LogicalKeyboardKey.f6, shift: true):
+      const PreviousRegionIntent(),
+};
+
+/// What every `TerminalView` gets (xterm would otherwise consume Ctrl+Tab,
+/// Ctrl+Shift+T… as terminal input). Plain F6 / Shift+F6 are left out on
+/// purpose (controller ruling): they reach the shell, where htop sorts and
+/// mc moves; Ctrl+F6 / Ctrl+Shift+F6 leave the terminal instead.
+Map<ShortcutActivator, Intent> terminalViewShortcuts(TargetPlatform platform) =>
+    _windowShortcuts(platform);
+
+Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
   final mac = platform == TargetPlatform.macOS;
-  SingleActivator primary(LogicalKeyboardKey key) => mac
-      ? SingleActivator(key, meta: true)
-      : SingleActivator(key, control: true, shift: true);
+  SingleActivator primary(
+    LogicalKeyboardKey key, {
+    bool includeRepeats = true,
+  }) => mac
+      ? SingleActivator(key, meta: true, includeRepeats: includeRepeats)
+      : SingleActivator(
+          key,
+          control: true,
+          shift: true,
+          includeRepeats: includeRepeats,
+        );
   SingleActivator font(LogicalKeyboardKey key, {bool shift = false}) => mac
       ? SingleActivator(key, meta: true, shift: shift)
       : SingleActivator(key, control: true, shift: shift);
   return {
-    primary(LogicalKeyboardKey.keyT): const NewTabIntent(),
-    primary(LogicalKeyboardKey.keyW): const CloseTabIntent(),
+    // Holding ⌘T / ⌘W must not open (or close) a tab per key repeat.
+    primary(LogicalKeyboardKey.keyT, includeRepeats: false):
+        const NewTabIntent(),
+    primary(LogicalKeyboardKey.keyW, includeRepeats: false):
+        const CloseTabIntent(),
     primary(LogicalKeyboardKey.keyC): const CopySelectionIntent(),
     primary(LogicalKeyboardKey.keyV): const PasteClipboardIntent(),
     // TerminalView's own default, kept because this map replaces it; the
@@ -105,8 +131,9 @@ Map<ShortcutActivator, Intent> desktopShortcuts(TargetPlatform platform) {
     font(LogicalKeyboardKey.numpadSubtract): const FontSmallerIntent(),
     font(LogicalKeyboardKey.digit0): const FontResetIntent(),
     font(LogicalKeyboardKey.numpad0): const FontResetIntent(),
-    const SingleActivator(LogicalKeyboardKey.f6): const NextRegionIntent(),
-    const SingleActivator(LogicalKeyboardKey.f6, shift: true):
+    const SingleActivator(LogicalKeyboardKey.f6, control: true):
+        const NextRegionIntent(),
+    const SingleActivator(LogicalKeyboardKey.f6, control: true, shift: true):
         const PreviousRegionIntent(),
   };
 }

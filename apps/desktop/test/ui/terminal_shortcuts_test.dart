@@ -103,6 +103,10 @@ Future<void> chord(
   await tester.pumpAndSettle();
 }
 
+/// Ctrl+F6: leaves the terminal (plain F6 is the shell's there).
+Future<void> leaveTerminal(WidgetTester tester) =>
+    chord(tester, [LogicalKeyboardKey.controlLeft], LogicalKeyboardKey.f6);
+
 Future<void> key(WidgetTester tester, LogicalKeyboardKey key) async {
   await tester.sendKeyEvent(key);
   await tester.pumpAndSettle();
@@ -201,6 +205,28 @@ void main() {
       ),
       isA<FontBiggerIntent>(),
     );
+    // F6 belongs to the shell inside the terminal (htop, mc); Ctrl+F6
+    // leaves it, and works in the rest of the window too.
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
+      final view = terminalViewShortcuts(platform);
+      final window = desktopShortcuts(platform);
+      const f6 = SingleActivator(LogicalKeyboardKey.f6);
+      const shiftF6 = SingleActivator(LogicalKeyboardKey.f6, shift: true);
+      const ctrlF6 = SingleActivator(LogicalKeyboardKey.f6, control: true);
+      const ctrlShiftF6 = SingleActivator(
+        LogicalKeyboardKey.f6,
+        control: true,
+        shift: true,
+      );
+      expect(lookup(view, f6), isNull);
+      expect(lookup(view, shiftF6), isNull);
+      expect(lookup(view, ctrlF6), isA<NextRegionIntent>());
+      expect(lookup(view, ctrlShiftF6), isA<PreviousRegionIntent>());
+      expect(lookup(window, f6), isA<NextRegionIntent>());
+      expect(lookup(window, shiftF6), isA<PreviousRegionIntent>());
+      expect(lookup(window, ctrlF6), isA<NextRegionIntent>());
+      expect(lookup(window, ctrlShiftF6), isA<PreviousRegionIntent>());
+    }
     // Plain Ctrl+letters always reach the shell.
     for (final letter in [
       LogicalKeyboardKey.keyC,
@@ -287,15 +313,21 @@ void main() {
   testShortcuts('AltGr+digit (Ctrl+right Alt) stays with the shell on '
       'Windows', (tester, mac) async {
     for (final id in [1, 2]) {
-      local.add(local.summary(id));
+      local.add(local.summary(id, origin: SessionOrigin.desktop));
     }
     await pumpWorkspace(tester);
-    await chord(tester, [
-      LogicalKeyboardKey.controlLeft,
-      LogicalKeyboardKey.altRight,
-    ], LogicalKeyboardKey.digit2);
-    // macOS has no Ctrl+Alt binding at all; Windows skips AltGr.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altRight);
+    final handled = await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altRight);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    // macOS has no Ctrl+Alt binding at all; Windows skips AltGr. The key
+    // went to the focused terminal, which has no sequence for it, so it is
+    // left unhandled and the platform's text input types the character.
     expect(tabs().selectedId, 1);
+    expect(page(tester).terminalFocus.hasFocus, isTrue);
+    expect(handled, isFalse);
   });
 
   testShortcuts('plain Ctrl+letters still reach the shell', (
@@ -385,7 +417,7 @@ void main() {
     expect(container.read(windowRouterProvider).visible, isFalse);
   });
 
-  testShortcuts('F6 moves between the terminal and the sidebar; arrows, '
+  testShortcuts('Ctrl+F6 moves from the terminal to the sidebar; arrows, '
       'Home and End move the selection; Esc comes back', (tester, mac) async {
     for (final id in [1, 2, 3]) {
       local.add(local.summary(id));
@@ -393,7 +425,7 @@ void main() {
     await pumpWorkspace(tester);
     final p = page(tester);
     expect(p.terminalFocus.hasFocus, isTrue);
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
     expect(p.sidebarFocus.hasFocus, isTrue);
     await key(tester, LogicalKeyboardKey.arrowDown);
     expect(tabs().selectedId, 2);
@@ -408,7 +440,7 @@ void main() {
     await key(tester, LogicalKeyboardKey.escape);
     expect(p.terminalFocus.hasFocus, isTrue);
     // Enter selects and hands the keyboard to the terminal too.
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
     await key(tester, LogicalKeyboardKey.arrowDown);
     await key(tester, LogicalKeyboardKey.enter);
     expect(tabs().selectedId, 2);
@@ -423,7 +455,7 @@ void main() {
       local.add(local.summary(id));
     }
     await pumpWorkspace(tester);
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
     expect(page(tester).sidebarFocus.hasFocus, isTrue);
     await chord(
       tester,
@@ -436,24 +468,46 @@ void main() {
     expect(page(tester).terminalFocus.hasFocus, isTrue);
   });
 
-  testShortcuts('signed out, F6 / Shift+F6 cycle terminal → sidebar → strip', (
+  testShortcuts('plain F6 inside the terminal goes to the shell (htop, mc)', (
     tester,
     mac,
   ) async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    await pumpWorkspace(tester);
+    await key(tester, LogicalKeyboardKey.f6);
+    expect(local.views[1]!.writes, ['\x1b[17~']);
+    expect(page(tester).terminalFocus.hasFocus, isTrue);
+  });
+
+  testShortcuts('signed out, regions cycle terminal → sidebar → strip: F6 '
+      'outside the terminal, Ctrl+F6 everywhere', (tester, mac) async {
     local.add(local.summary(1));
     await pumpWorkspace(tester, signedIn: false);
     final p = page(tester);
+    final shift = [LogicalKeyboardKey.shiftLeft];
+    final ctrlShift = [
+      LogicalKeyboardKey.controlLeft,
+      LogicalKeyboardKey.shiftLeft,
+    ];
     expect(find.byKey(const Key('pane.signedOutStrip')), findsOneWidget);
     expect(p.terminalFocus.hasFocus, isTrue);
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
     expect(p.sidebarFocus.hasFocus, isTrue);
     await key(tester, LogicalKeyboardKey.f6);
     expect(p.stripFocus.hasFocus, isTrue);
     await key(tester, LogicalKeyboardKey.f6);
     expect(p.terminalFocus.hasFocus, isTrue);
-    await chord(tester, [LogicalKeyboardKey.shiftLeft], LogicalKeyboardKey.f6);
+    await chord(tester, ctrlShift, LogicalKeyboardKey.f6);
     expect(p.stripFocus.hasFocus, isTrue);
-    await chord(tester, [LogicalKeyboardKey.shiftLeft], LogicalKeyboardKey.f6);
+    await chord(tester, shift, LogicalKeyboardKey.f6);
+    expect(p.sidebarFocus.hasFocus, isTrue);
+    await chord(tester, shift, LogicalKeyboardKey.f6);
+    expect(p.terminalFocus.hasFocus, isTrue);
+    // Ctrl+F6 also works outside the terminal: one chord everywhere.
+    await leaveTerminal(tester);
+    await leaveTerminal(tester);
+    expect(p.stripFocus.hasFocus, isTrue);
+    await chord(tester, ctrlShift, LogicalKeyboardKey.f6);
     expect(p.sidebarFocus.hasFocus, isTrue);
     // A window shortcut from the strip.
     await key(tester, LogicalKeyboardKey.f6);
@@ -461,15 +515,49 @@ void main() {
     await chord(tester, primary(mac), LogicalKeyboardKey.keyT);
     expect(tabs().tabs, hasLength(2));
     expect(p.terminalFocus.hasFocus, isTrue);
+    expect(local.views[1]!.writes, isEmpty);
   });
 
-  testShortcuts('signed in, F6 skips the strip', (tester, mac) async {
+  testShortcuts('signed in, the region cycle skips the strip', (
+    tester,
+    mac,
+  ) async {
     local.add(local.summary(1));
     await pumpWorkspace(tester);
     final p = page(tester);
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
+    expect(p.sidebarFocus.hasFocus, isTrue);
     await key(tester, LogicalKeyboardKey.f6);
     expect(p.terminalFocus.hasFocus, isTrue);
+  });
+
+  testShortcuts('holding the new-tab / close-tab chord acts once', (
+    tester,
+    mac,
+  ) async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    await pumpWorkspace(tester);
+    Future<void> hold(LogicalKeyboardKey key) async {
+      for (final m in primary(mac)) {
+        await tester.sendKeyDownEvent(m);
+      }
+      await tester.sendKeyDownEvent(key);
+      for (var i = 0; i < 5; i++) {
+        await tester.sendKeyRepeatEvent(key);
+      }
+      await tester.sendKeyUpEvent(key);
+      for (final m in primary(mac).reversed) {
+        await tester.sendKeyUpEvent(m);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    await hold(LogicalKeyboardKey.keyT);
+    expect(local.opens, hasLength(1));
+    expect(tabs().tabs, hasLength(2));
+    await hold(LogicalKeyboardKey.keyW);
+    expect(local.closed, [100]);
+    expect(tabs().tabs, hasLength(1));
   });
 
   testShortcuts('the selected row scrolls into view, so Shift+F10 reaches it', (
@@ -480,7 +568,7 @@ void main() {
       local.add(local.summary(id));
     }
     await pumpWorkspace(tester, size: const Size(800, 400));
-    await key(tester, LogicalKeyboardKey.f6);
+    await leaveTerminal(tester);
     await key(tester, LogicalKeyboardKey.end);
     expect(tabs().selectedId, 30);
     final list = tester.getRect(find.byType(ListView));

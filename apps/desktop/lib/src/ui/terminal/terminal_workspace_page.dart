@@ -37,19 +37,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   final stripFocus = FocusNode(debugLabel: 'signed-out strip');
   final sidebarScroll = ScrollController();
 
-  /// Spec criterion 2: the window shortcuts, also handed to every
-  /// TerminalView.
+  /// The TerminalView map (spec criterion 2, without plain F6: it belongs
+  /// to the shell), built once per platform with [_workspaceShortcuts]: a
+  /// new map on every build would make each TerminalView rebuild its
+  /// shortcut index.
   Map<ShortcutActivator, Intent>? terminalShortcuts;
+  Map<ShortcutActivator, Intent>? _workspaceShortcuts;
   TargetPlatform? _shortcutsPlatform;
 
-  /// Built once: a new map on every build would make each TerminalView
-  /// rebuild its shortcut index.
-  Map<ShortcutActivator, Intent> _shortcutsFor(TargetPlatform platform) {
-    if (_shortcutsPlatform != platform || terminalShortcuts == null) {
-      _shortcutsPlatform = platform;
-      terminalShortcuts = desktopShortcuts(platform);
-    }
-    return terminalShortcuts!;
+  void _buildShortcuts(TargetPlatform platform) {
+    if (_shortcutsPlatform == platform && terminalShortcuts != null) return;
+    _shortcutsPlatform = platform;
+    terminalShortcuts = terminalViewShortcuts(platform);
+    _workspaceShortcuts = desktopShortcuts(platform);
   }
 
   /// After the frame, so a TerminalView that just got [terminalFocus] (a
@@ -99,13 +99,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
 
   Map<Type, Action<Intent>> _actions() {
     final tabs = ref.read(terminalTabsProvider.notifier);
-    CallbackAction<T> run<T extends Intent>(void Function(T intent) body) =>
-        CallbackAction<T>(
-          onInvoke: (intent) {
-            body(intent);
-            return null;
-          },
-        );
+    Action<T> run<T extends Intent>(
+      void Function(T intent) body, {
+      bool Function(T intent)? enabled,
+    }) => _WindowAction<T>(body, enabled);
     return <Type, Action<Intent>>{
       NewTabIntent: run<NewTabIntent>((_) {
         unawaited(tabs.openTab());
@@ -120,10 +117,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           unawaited(closeTab(selected));
         }
       }),
-      SelectTabIntent: _SelectTabAction((intent) {
-        tabs.selectIndex(intent.position);
-        focusTerminal();
-      }),
+      SelectTabIntent: run<SelectTabIntent>(
+        (intent) {
+          tabs.selectIndex(intent.position);
+          focusTerminal();
+        },
+        // On Windows AltGr arrives as Ctrl+Alt, and AltGr+digit types
+        // `{ [ ] }` on many layouts (German, Polish…): with the right Alt
+        // held the key stays the shell's.
+        enabled: (_) =>
+            defaultTargetPlatform != TargetPlatform.windows ||
+            !HardwareKeyboard.instance.logicalKeysPressed.contains(
+              LogicalKeyboardKey.altRight,
+            ),
+      ),
       NextTabIntent: run<NextTabIntent>((_) {
         tabs.next();
         focusTerminal();
@@ -132,7 +139,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         tabs.previous();
         focusTerminal();
       }),
-      CopySelectionIntent: _CopyAction(ref),
+      // ⌘C / Ctrl+Shift+C copies only with a selection; otherwise the key
+      // stays the terminal's (spec §3.2).
+      CopySelectionIntent: run<CopySelectionIntent>(
+        (_) => _copy(),
+        enabled: (_) =>
+            ref.read(terminalTabsProvider).selected?.selection.selection !=
+            null,
+      ),
       PasteClipboardIntent: run<PasteClipboardIntent>((_) {
         unawaited(_paste());
       }),
@@ -148,6 +162,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       NextRegionIntent: run<NextRegionIntent>((_) => _cycleRegion(1)),
       PreviousRegionIntent: run<PreviousRegionIntent>((_) => _cycleRegion(-1)),
     };
+  }
+
+  void _copy() {
+    final tab = ref.read(terminalTabsProvider).selected;
+    final range = tab?.selection.selection;
+    if (tab == null || range == null) return;
+    unawaited(
+      Clipboard.setData(
+        ClipboardData(text: tab.terminal.buffer.getText(range)),
+      ),
+    );
+    tab.selection.clearSelection();
   }
 
   /// ⌘V / Ctrl+Shift+V into the selected tab, sanitised (and bracketed when
@@ -204,9 +230,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         });
       }
     });
-    final shortcuts = _shortcutsFor(defaultTargetPlatform);
+    _buildShortcuts(defaultTargetPlatform);
     return Shortcuts(
-      shortcuts: shortcuts,
+      shortcuts: _workspaceShortcuts!,
       child: Actions(
         actions: _actionsMap,
         // Every focus in the window sits inside this scope, so the
@@ -237,7 +263,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
                   terminalFocus: terminalFocus,
                   emptyFocus: emptyFocus,
                   stripFocus: stripFocus,
-                  shortcuts: shortcuts,
+                  shortcuts: terminalShortcuts,
                 ),
               ),
             ],
@@ -248,47 +274,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   }
 }
 
-/// ⌘C / Ctrl+Shift+C copies only when there is a selection; while disabled
-/// the shortcut manager leaves the key to the terminal (spec §3.2).
-class _CopyAction extends Action<CopySelectionIntent> {
-  _CopyAction(this._ref);
-  final WidgetRef _ref;
+/// A window shortcut's action; [enabled] lets a key fall through to the
+/// terminal when it does not apply.
+class _WindowAction<T extends Intent> extends Action<T> {
+  _WindowAction(this._body, this._enabled);
+  final void Function(T intent) _body;
+  final bool Function(T intent)? _enabled;
 
   @override
-  bool isEnabled(CopySelectionIntent intent) =>
-      _ref.read(terminalTabsProvider).selected?.selection.selection != null;
+  bool isEnabled(T intent) => _enabled?.call(intent) ?? true;
 
   @override
-  Object? invoke(CopySelectionIntent intent) {
-    final tab = _ref.read(terminalTabsProvider).selected;
-    final range = tab?.selection.selection;
-    if (tab == null || range == null) return null;
-    unawaited(
-      Clipboard.setData(
-        ClipboardData(text: tab.terminal.buffer.getText(range)),
-      ),
-    );
-    tab.selection.clearSelection();
+  Object? invoke(T intent) {
+    _body(intent);
     return null;
   }
-}
-
-/// ⌘1…⌘9 / Ctrl+Alt+1…9. On Windows AltGr arrives as Ctrl+Alt, and
-/// AltGr+digit types `{ [ ] }` on many layouts (German, Polish…): with the
-/// right Alt held the key stays the shell's.
-class _SelectTabAction extends CallbackAction<SelectTabIntent> {
-  _SelectTabAction(void Function(SelectTabIntent intent) select)
-    : super(
-        onInvoke: (intent) {
-          select(intent);
-          return null;
-        },
-      );
-
-  @override
-  bool isEnabled(SelectTabIntent intent) =>
-      defaultTargetPlatform != TargetPlatform.windows ||
-      !HardwareKeyboard.instance.logicalKeysPressed.contains(
-        LogicalKeyboardKey.altRight,
-      );
 }
