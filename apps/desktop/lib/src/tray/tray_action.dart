@@ -94,6 +94,16 @@ final class ToggleDesktopNotificationsOnlyUnfocused extends TrayAction {
   const ToggleDesktopNotificationsOnlyUnfocused();
 }
 
+/// A5a D13: "Lưu nội dung terminal khi thoát".
+final class ToggleRestoreScrollback extends TrayAction {
+  const ToggleRestoreScrollback();
+}
+
+/// A5a D13: "Xóa nội dung đã lưu".
+final class ClearSavedScrollback extends TrayAction {
+  const ClearSavedScrollback();
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -126,6 +136,9 @@ abstract final class TrayKeys {
   static const String desktopNotifications = 'desktop_notifications';
   static const String desktopNotificationsOnlyUnfocused =
       'desktop_notifications_only_unfocused';
+  static const String terminal = 'terminal';
+  static const String restoreScrollback = 'restore_scrollback';
+  static const String clearSavedScrollback = 'clear_saved_scrollback';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -179,6 +192,8 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.desktopNotifications => const ToggleDesktopNotifications(),
     TrayKeys.desktopNotificationsOnlyUnfocused =>
       const ToggleDesktopNotificationsOnlyUnfocused(),
+    TrayKeys.restoreScrollback => const ToggleRestoreScrollback(),
+    TrayKeys.clearSavedScrollback => const ClearSavedScrollback(),
     _ => null,
   };
 }

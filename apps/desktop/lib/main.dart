@@ -35,6 +35,9 @@ import 'src/platform/single_instance.dart';
 import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
+import 'src/restore/restore_paths.dart';
+import 'src/restore/restore_persistence.dart';
+import 'src/restore/restore_store.dart';
 import 'src/startup.dart';
 import 'src/terminal/attention_announcer.dart';
 import 'src/terminal/local_sessions_provider.dart';
@@ -48,6 +51,7 @@ import 'src/terminal_sharing/terminal_sharing_setup.dart';
 import 'src/ui/theme/font_licenses.dart';
 import 'src/tray/tray_action.dart';
 import 'src/tray/tray_actions.dart';
+import 'src/tray/tray_menu.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/activation.dart';
 import 'src/ui/app.dart';
@@ -134,6 +138,23 @@ Future<void> _start(
       environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'] ??
       Directory.current.path;
   final relayBase = Uri.parse(kRelayBaseUrl);
+  // A5a D2: the restore files. Logs carry error types only.
+  final restoreStore = RestoreStore(
+    Directory(
+      restoreDirectoryPath(
+        windows: Platform.isWindows,
+        environment: environment,
+        appSupportPath: supportDirectory.path,
+      ),
+    ),
+    excludeFromBackup: Platform.isMacOS
+        ? (path) async {
+            await Process.run('/usr/bin/tmutil', ['addexclusion', path]);
+          }
+        : null,
+    log: debugPrint,
+  );
+  await restoreStore.prepare();
   final notifier = startup.notifier = await LocalSystemNotifier.setup();
   // A failed tree kill (or, on Windows, a shell without a job object) may
   // leave processes behind: the debug log gets the pid and the reason
@@ -237,6 +258,7 @@ Future<void> _start(
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
       homeDirectoryProvider.overrideWithValue(home),
+      restoreStoreProvider.overrideWithValue(restoreStore),
     ],
   );
 
@@ -269,13 +291,21 @@ Future<void> _start(
     onAction: trayActions.handle,
   );
   container.listen<AgentViewState>(agentControllerProvider, (previous, next) {
-    _unawaitedLogged(trayPresenter.render(next), 'tray');
+    _unawaitedLogged(
+      trayPresenter.render(next, local: container.read(trayLocalStateProvider)),
+      'tray',
+    );
     coordinateWindows(
       previous,
       next,
       container.read(windowRouterProvider.notifier),
     );
   }, fireImmediately: true);
+  // A5a D13: the "Terminal" submenu follows the switch and the saved text.
+  container.listen<TrayLocalState>(
+    trayLocalStateProvider,
+    (_, local) => _unawaitedLogged(trayPresenter.renderLocal(local), 'tray'),
+  );
 
   // A1 D11: a second launch (Windows, `open -n`; activationRequests
   // coalesces watcher events into one request per launch), a macOS reopen

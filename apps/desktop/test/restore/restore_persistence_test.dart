@@ -499,6 +499,52 @@ void main() {
     },
   );
 
+  test(
+    'savedScrollbackProvider follows the files: set by a save, cleared by '
+    '"Xóa nội dung đã lưu" and by switching off (D13)',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+      local.views[1]!.emit('x\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      unawaited(persistence().clearScrollback());
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+      local.views[1]!.emit('y\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      unawaited(persistence().setScrollbackEnabled(false));
+      async.flushMicrotasks();
+      expect(c.read(savedScrollbackProvider), isFalse);
+    }),
+  );
+
+  test(
+    'savedScrollbackProvider: false once the last pane with a file closes',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      local.views[1]!.emit('x\r\n');
+      async.elapse(const Duration(seconds: 60));
+      expect(c.read(savedScrollbackProvider), isTrue);
+      tabs().close(1);
+      async.elapse(const Duration(seconds: 2));
+      expect(c.read(savedScrollbackProvider), isFalse);
+    }),
+  );
+
+  test('savedScrollbackProvider starts from what is on disk', () async {
+    files.scrollbacks[key] = 'old';
+    boot(start: false);
+    c.listen(savedScrollbackProvider, (_, _) {});
+    await pumpEventQueue();
+    expect(c.read(savedScrollbackProvider), isTrue);
+  });
+
   test('a crash during restore is recorded as unclean: the loaded layout is '
       'rewritten with cleanExit false first', () async {
     boot();

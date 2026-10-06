@@ -64,9 +64,17 @@ final class RecordingFiles implements RestoreFiles {
   Future<DateTime?> scrollbackSavedAt(String key) async =>
       stored.containsKey(key) ? storedAt : null;
   @override
-  Future<void> deleteScrollback(String key) async => deleted.add(key);
+  Future<void> deleteScrollback(String key) async {
+    deleted.add(key);
+    scrollbacks.remove(key);
+  }
+
   @override
-  Future<void> deleteAllScrollback() async => clears++;
+  Future<void> deleteAllScrollback() async {
+    clears++;
+    scrollbacks.clear();
+  }
+
   @override
   Future<bool> hasScrollback() async => scrollbacks.isNotEmpty;
   @override

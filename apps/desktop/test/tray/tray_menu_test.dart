@@ -63,6 +63,7 @@ void main() {
       '---',
       'Giữ máy không ngủ',
       'Khởi động cùng hệ thống',
+      'Terminal',
       'Thông báo',
       'Đổi mật khẩu…',
       'Đăng xuất',
@@ -189,6 +190,7 @@ void main() {
     expect(_labels(menu), [
       'Mở cửa sổ terminal',
       '---',
+      'Terminal',
       'Thông báo',
       '---',
       '○ Chưa đăng nhập',

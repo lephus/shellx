@@ -45,6 +45,34 @@ class RestoreStrip extends Notifier<RestoreStripState?> {
   void dismiss() => state = null;
 }
 
+/// Whether any saved terminal text is on disk (D13: "Xóa nội dung đã lưu"
+/// is greyed out without). Read from the files at first use;
+/// [RestorePersistence] refreshes it whenever it writes or deletes some.
+final savedScrollbackProvider = NotifierProvider<SavedScrollback, bool>(
+  SavedScrollback.new,
+);
+
+class SavedScrollback extends Notifier<bool> {
+  @override
+  bool build() {
+    unawaited(refresh());
+    return false;
+  }
+
+  /// Asks the files. [RestoreStore] runs its operations in call order, so
+  /// the answer reflects every write or delete issued before this call.
+  Future<void> refresh() async {
+    bool has;
+    try {
+      has = await ref.read(restoreStoreProvider).hasScrollback();
+    } on Object catch (error) {
+      debugPrint('restore: saved text not checked (${error.runtimeType})');
+      return;
+    }
+    if (ref.mounted) state = has;
+  }
+}
+
 final restorePersistenceProvider = NotifierProvider<RestorePersistence, void>(
   RestorePersistence.new,
 );
@@ -194,6 +222,7 @@ class RestorePersistence extends Notifier<void> {
       _filed.addAll(outcome.keyBySession.values);
       if (plan == null) {
         if (!_frozen) await files.removeOrphans(const {});
+        _savedChanged();
         return;
       }
       final snapshot = plan.snapshot;
@@ -210,6 +239,7 @@ class RestorePersistence extends Notifier<void> {
         await files.removeOrphans(outcome.keyBySession.values.toSet());
       }
       if (!ref.mounted) return;
+      _savedChanged();
       // D12: an unclean end, and something to show for it.
       if (!snapshot.cleanExit && outcome.tabsRestored > 0) {
         ref
@@ -308,6 +338,7 @@ class RestorePersistence extends Notifier<void> {
     if (!enabled) {
       _dirty.clear();
       await files.deleteAllScrollback();
+      _savedChanged();
       return;
     }
     if (!ref.mounted) return;
@@ -321,6 +352,13 @@ class RestorePersistence extends Notifier<void> {
   Future<void> clearScrollback() async {
     _dirty.clear();
     await _files.deleteAllScrollback();
+    _savedChanged();
+  }
+
+  void _savedChanged() {
+    if (ref.mounted) {
+      unawaited(ref.read(savedScrollbackProvider.notifier).refresh());
+    }
   }
 
   bool get _paused => !_started || _frozen || _restoring || !ref.mounted;
@@ -392,6 +430,7 @@ class RestorePersistence extends Notifier<void> {
     for (final key in doomed) {
       await files.deleteScrollback(key);
     }
+    if (doomed.isNotEmpty) _savedChanged();
   }
 
   /// One save at a time, in call order (MINOR 7: [flushAll] returns after
@@ -432,5 +471,6 @@ class RestorePersistence extends Notifier<void> {
     }
     // §5: kept dirty, saved at the next tick (unless switched off since).
     if (!ok && ref.mounted && scrollbackEnabled) _dirty.addAll(saved);
+    if (ok) _savedChanged();
   }
 }

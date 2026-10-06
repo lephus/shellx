@@ -42,6 +42,26 @@ final class TrayMenuIds {
   void startBuild() => _separators = 0;
 }
 
+/// What the tray shows that the UI process owns (A5a D13; with A5b the
+/// agent state comes from the daemon and cannot carry UI settings).
+final class TrayLocalState {
+  const TrayLocalState({
+    this.restoreScrollback = true,
+    this.hasSavedScrollback = false,
+  });
+  final bool restoreScrollback;
+  final bool hasSavedScrollback;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrayLocalState &&
+      other.restoreScrollback == restoreScrollback &&
+      other.hasSavedScrollback == hasSavedScrollback;
+
+  @override
+  int get hashCode => Object.hash(restoreScrollback, hasSavedScrollback);
+}
+
 /// "Tắt", "10 giây", "1 phút"… (push spec §7).
 String notifyThresholdLabel(int seconds, AppLocalizations l10n) {
   if (seconds == 0) return l10n.trayNotifyOff;
@@ -65,8 +85,9 @@ String _statusLine(AgentViewState state, AppLocalizations l10n) {
 Menu buildTrayMenu(
   AgentViewState state,
   AppLocalizations l10n,
-  TrayMenuIds ids,
-) {
+  TrayMenuIds ids, {
+  TrayLocalState local = const TrayLocalState(),
+}) {
   ids.startBuild();
   MenuItem sep() => ids.assign(MenuItem.separator());
   MenuItem item(String key, String label, {bool disabled = false}) =>
@@ -124,12 +145,27 @@ Menu buildTrayMenu(
         ]),
       ]);
 
+  // A5a D13, UI-A5 §3: right before "Thông báo", in both menus.
+  MenuItem terminal() => sub(TrayKeys.terminal, l10n.trayTerminal, [
+    check(
+      TrayKeys.restoreScrollback,
+      l10n.trayRestoreScrollback,
+      local.restoreScrollback,
+    ),
+    item(
+      TrayKeys.clearSavedScrollback,
+      l10n.trayClearSavedScrollback,
+      disabled: !local.hasSavedScrollback,
+    ),
+  ]);
+
   if (!state.signedIn) {
     return Menu(
       items: [
         item(TrayKeys.openTerminal, l10n.trayOpenTerminal),
         sep(),
         // UI-A4 §7: after the window item, before the status line.
+        terminal(),
         notifications(),
         sep(),
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
@@ -235,6 +271,7 @@ Menu buildTrayMenu(
           disabled: sharing.busy,
         ),
       // UI-A4 §7: where push §7's threshold submenu was.
+      terminal(),
       notifications(),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
