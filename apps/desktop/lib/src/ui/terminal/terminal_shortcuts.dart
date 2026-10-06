@@ -14,6 +14,16 @@ class NewWorkspaceIntent extends Intent {
   const NewWorkspaceIntent();
 }
 
+/// ⌘⇧I / Ctrl+Shift+I: open or close the notifications panel (A4 N5).
+class ToggleNotificationsPanelIntent extends Intent {
+  const ToggleNotificationsPanelIntent();
+}
+
+/// ⌘⇧U / Ctrl+Shift+U: the next tab with unread (A4 N5, D13).
+class JumpToNextUnreadIntent extends Intent {
+  const JumpToNextUnreadIntent();
+}
+
 class SelectTabIntent extends Intent {
   const SelectTabIntent(this.position);
 
@@ -110,6 +120,15 @@ Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
           shift: true,
           includeRepeats: includeRepeats,
         );
+  // ⌘⇧ / Ctrl+Shift, without key repeat (Windows: the same chord as
+  // [primary]; macOS adds ⇧ so ⌘I / ⌘U stay free).
+  SingleActivator shifted(LogicalKeyboardKey key) => SingleActivator(
+    key,
+    meta: mac,
+    control: !mac,
+    shift: true,
+    includeRepeats: false,
+  );
   SingleActivator font(LogicalKeyboardKey key, {bool shift = false}) => mac
       ? SingleActivator(key, meta: true, shift: shift)
       : SingleActivator(key, control: true, shift: shift);
@@ -133,6 +152,10 @@ Map<ShortcutActivator, Intent> _windowShortcuts(TargetPlatform platform) {
                 includeRepeats: false,
               )):
         const NewWorkspaceIntent(),
+    // A4 N5: held down, the panel must not flicker open/closed, nor next
+    // unread run through every tab.
+    shifted(LogicalKeyboardKey.keyI): const ToggleNotificationsPanelIntent(),
+    shifted(LogicalKeyboardKey.keyU): const JumpToNextUnreadIntent(),
     primary(LogicalKeyboardKey.keyC): const CopySelectionIntent(),
     primary(LogicalKeyboardKey.keyV): const PasteClipboardIntent(),
     // ⌘A / Ctrl+Shift+A (Windows Terminal's), like the terminal's menu.

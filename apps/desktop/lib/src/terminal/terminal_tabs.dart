@@ -62,6 +62,11 @@ final class PortOpenFailedNotice extends TabNotice {
   const PortOpenFailedNotice();
 }
 
+/// ⌘⇧U found nothing (A4 D13). Neutral toast.
+final class NoUnreadNotice extends TabNotice {
+  const NoUnreadNotice();
+}
+
 /// D19: the longest tab name, in characters.
 const int kTabNameMaxLength = 64;
 

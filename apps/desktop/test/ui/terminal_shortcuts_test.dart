@@ -653,4 +653,39 @@ void main() {
       expect(bound.includeRepeats, isFalse);
     }
   });
+
+  test('⌘⇧I / ⌘⇧U and Ctrl+Shift+I / U: the panel and next unread, '
+      'without key repeat, also from the terminal (A4 N5)', () {
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
+      final mac = platform == TargetPlatform.macOS;
+      SingleActivator activator(LogicalKeyboardKey key) => mac
+          ? SingleActivator(key, meta: true, shift: true, includeRepeats: false)
+          : SingleActivator(
+              key,
+              control: true,
+              shift: true,
+              includeRepeats: false,
+            );
+      final panelKey = activator(LogicalKeyboardKey.keyI);
+      final nextKey = activator(LogicalKeyboardKey.keyU);
+      for (final table in [
+        desktopShortcuts(platform),
+        terminalViewShortcuts(platform),
+      ]) {
+        expect(lookup(table, panelKey), isA<ToggleNotificationsPanelIntent>());
+        expect(lookup(table, nextKey), isA<JumpToNextUnreadIntent>());
+        for (final key in [panelKey, nextKey]) {
+          final bound = table.keys.whereType<SingleActivator>().singleWhere(
+            (k) =>
+                k.trigger == key.trigger &&
+                k.control == key.control &&
+                k.shift == key.shift &&
+                k.alt == key.alt &&
+                k.meta == key.meta,
+          );
+          expect(bound.includeRepeats, isFalse);
+        }
+      }
+    }
+  });
 }

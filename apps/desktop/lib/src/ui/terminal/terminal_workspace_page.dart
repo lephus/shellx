@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
@@ -10,12 +11,16 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
 import '../../terminal/sidebar_workspaces.dart';
+import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../window_focus.dart';
 import '../window_router.dart';
 import 'close_tab.dart';
+import 'notifications_panel.dart';
 import 'session_sidebar.dart';
+import 'shortcut_labels.dart';
 import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
 
@@ -38,6 +43,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   /// The signed-out strip's "Sign in" (UI §3.6 region 3).
   final stripFocus = FocusNode(debugLabel: 'signed-out strip');
   final sidebarScroll = ScrollController();
+
+  /// The notifications panel is open (UI-A4 §5).
+  bool panelOpen = false;
+
+  /// Where the keyboard was before the panel opened; it goes back there
+  /// when the panel closes (UI-A4 §5.3).
+  FocusNode? _beforePanel;
 
   /// The TerminalView map (spec criterion 2, without plain F6: it belongs
   /// to the shell), built once per platform with [_workspaceShortcuts]: a
@@ -69,6 +81,50 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         (empty ? emptyFocus : terminalFocus).requestFocus();
       })
       ..ensureVisualUpdate();
+  }
+
+  /// ⌘⇧I, the bell.
+  void togglePanel() => panelOpen ? closePanel() : _openPanel();
+
+  void _openPanel() {
+    if (panelOpen) return;
+    _beforePanel = FocusManager.instance.primaryFocus;
+    setState(() => panelOpen = true); // the panel takes the keyboard
+  }
+
+  /// Esc, a click outside, a jump, or another window shortcut. With
+  /// [restoreFocus] the keyboard goes back at once, so a shortcut that
+  /// runs next (F6) starts from where the user was.
+  void closePanel({bool restoreFocus = true}) {
+    if (!panelOpen) return;
+    final before = _beforePanel;
+    _beforePanel = null;
+    setState(() => panelOpen = false);
+    if (!restoreFocus) return;
+    if (before != null && before.context != null && before.canRequestFocus) {
+      before.requestFocus();
+      FocusManager.instance.applyFocusChangesIfNeeded();
+    } else {
+      focusTerminal(); // what it was on went away (a closed tab)
+    }
+  }
+
+  /// D13: the next tab with unread; none → a neutral toast and the same
+  /// words for a screen reader.
+  void _jumpToNextUnread() {
+    closePanel();
+    final attention = ref.read(tabAttentionProvider.notifier);
+    final next = attention.nextUnread();
+    if (next != null && attention.jumpTo(next)) return;
+    // A fresh notice each time: a repeated ⌘⇧U restarts the toast.
+    ref.read(terminalTabsProvider.notifier).showNotice(NoUnreadNotice());
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        AppLocalizations.of(context).noUnreadNotifications,
+        Directionality.of(context),
+      ),
+    );
   }
 
   Future<void> closeTab(TerminalTab tab) => closeTabWithConfirm(
@@ -107,11 +163,15 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       bool Function(T intent)? enabled,
     }) => _WindowAction<T>(body, enabled);
     return <Type, Action<Intent>>{
+      // UI-A4 §5.3: the other window shortcuts still run with the panel
+      // open; they close it first.
       NewTabIntent: run<NewTabIntent>((_) {
+        closePanel();
         unawaited(tabs.openTab());
         focusTerminal();
       }),
       CloseTabIntent: run<CloseTabIntent>((_) {
+        closePanel();
         // UI-A2 §4: an open name field (maybe another tab's) is saved
         // first; losing the focus commits it.
         if (ref.read(sidebarWorkspacesProvider).renaming != null) {
@@ -128,6 +188,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       }),
       SelectTabIntent: run<SelectTabIntent>(
         (intent) {
+          closePanel();
           workspaces.selectVisible(intent.position);
           focusTerminal();
         },
@@ -141,18 +202,27 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
             ),
       ),
       NextTabIntent: run<NextTabIntent>((_) {
+        closePanel();
         workspaces.step(1);
         focusTerminal();
       }),
       PreviousTabIntent: run<PreviousTabIntent>((_) {
+        closePanel();
         workspaces.step(-1);
         focusTerminal();
       }),
       // The new workspace's name field takes the keyboard (D15); it hands
       // it to the terminal when it closes.
       NewWorkspaceIntent: run<NewWorkspaceIntent>((_) {
+        closePanel();
         unawaited(workspaces.create());
       }),
+      ToggleNotificationsPanelIntent: run<ToggleNotificationsPanelIntent>(
+        (_) => togglePanel(),
+      ),
+      JumpToNextUnreadIntent: run<JumpToNextUnreadIntent>(
+        (_) => _jumpToNextUnread(),
+      ),
       // ⌘C / Ctrl+Shift+C copies only with a selection; otherwise the key
       // stays the terminal's (spec §3.2).
       CopySelectionIntent: run<CopySelectionIntent>(
@@ -180,8 +250,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       FontResetIntent: run<FontResetIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).reset(),
       ),
-      NextRegionIntent: run<NextRegionIntent>((_) => _cycleRegion(1)),
-      PreviousRegionIntent: run<PreviousRegionIntent>((_) => _cycleRegion(-1)),
+      NextRegionIntent: run<NextRegionIntent>((_) {
+        closePanel();
+        _cycleRegion(1);
+      }),
+      PreviousRegionIntent: run<PreviousRegionIntent>((_) {
+        closePanel();
+        _cycleRegion(-1);
+      }),
     };
   }
 
@@ -267,6 +343,12 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         });
       }
     });
+    // A notification click, the panel, next unread (A4): the keyboard to
+    // the selected tab's terminal; an open panel closes.
+    ref.listen<int>(terminalFocusRequestProvider, (_, _) {
+      closePanel(restoreFocus: false);
+      focusTerminal();
+    });
     _buildShortcuts(defaultTargetPlatform);
     return Shortcuts(
       shortcuts: _workspaceShortcuts!,
@@ -278,29 +360,41 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         child: FocusScope(
           autofocus: true,
           debugLabel: 'workspace',
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              SizedBox(
-                width: ShellxSizes.sidebarWidth,
-                child: SessionSidebar(
-                  focusNode: sidebarFocus,
-                  scrollController: sidebarScroll,
-                  onSelected: (id) {
-                    ref.read(terminalTabsProvider.notifier).select(id);
-                    focusTerminal();
-                  },
-                  onClose: closeTab,
-                  onEscape: focusTerminal,
+              Positioned.fill(child: _body()),
+              // UI-A4 §5.3: a click outside closes the panel (and only that).
+              if (panelOpen)
+                Positioned.fill(
+                  child: ExcludeSemantics(
+                    child: GestureDetector(
+                      key: const Key('panel.barrier'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: closePanel,
+                      onSecondaryTap: closePanel,
+                    ),
+                  ),
                 ),
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(
-                child: TerminalPane(
-                  terminalFocus: terminalFocus,
-                  emptyFocus: emptyFocus,
-                  stripFocus: stripFocus,
-                  shortcuts: terminalShortcuts,
+              Positioned(
+                left: ShellxSpace.s8,
+                top:
+                    (isMacDesktop
+                        ? ShellxSizes.headerBandMac
+                        : ShellxSizes.headerBandWindows) +
+                    ShellxSizes.panelOffsetY,
+                child: AnimatedSwitcher(
+                  duration: ShellxMotion.of(context, ShellxMotion.base),
+                  reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
+                  switchInCurve: ShellxMotion.baseCurve,
+                  switchOutCurve: ShellxMotion.exitCurve,
+                  transitionBuilder: _panelTransition,
+                  layoutBuilder: _topLeft,
+                  child: panelOpen
+                      ? NotificationsPanel(
+                          key: const ValueKey('panel.open'),
+                          onClose: closePanel,
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ),
             ],
@@ -309,6 +403,66 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       ),
     );
   }
+
+  Widget _body() => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SizedBox(
+        width: ShellxSizes.sidebarWidth,
+        child: SessionSidebar(
+          focusNode: sidebarFocus,
+          scrollController: sidebarScroll,
+          onSelected: (id) {
+            ref.read(terminalTabsProvider.notifier).select(id);
+            focusTerminal();
+          },
+          onClose: closeTab,
+          onEscape: focusTerminal,
+          panelOpen: panelOpen,
+          onToggleNotifications: togglePanel,
+        ),
+      ),
+      const VerticalDivider(width: 1),
+      Expanded(
+        child: TerminalPane(
+          terminalFocus: terminalFocus,
+          emptyFocus: emptyFocus,
+          stripFocus: stripFocus,
+          shortcuts: terminalShortcuts,
+        ),
+      ),
+    ],
+  );
+
+  static Widget _topLeft(Widget? current, List<Widget> previous) =>
+      Stack(alignment: Alignment.topLeft, children: [...previous, ?current]);
+
+  /// UI-A4 §5.2: fade + translateY −4 → 0 in `base`; out, a fade in
+  /// `exit`. The outgoing panel takes no clicks and no keyboard.
+  static Widget _panelTransition(Widget child, Animation<double> animation) =>
+      AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final leaving = animation.status == AnimationStatus.reverse;
+          return IgnorePointer(
+            ignoring: leaving,
+            child: ExcludeFocus(
+              excluding: leaving,
+              child: FadeTransition(
+                opacity: animation,
+                child: Transform.translate(
+                  offset: Offset(
+                    0,
+                    leaving ? 0 : -ShellxSpace.s4 * (1 - animation.value),
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
+          );
+        },
+        child: child,
+      );
 }
 
 /// A window shortcut's action; [enabled] lets a key fall through to the

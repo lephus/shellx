@@ -20,7 +20,11 @@ late ProviderContainer container;
 
 const testHome = '/Users/test';
 
-Future<void> pumpSidebar(WidgetTester tester, {double textScale = 1}) async {
+Future<void> pumpSidebar(
+  WidgetTester tester, {
+  double textScale = 1,
+  bool disableAnimations = false,
+}) async {
   h = TestHarness(settings: {'onboarding_done': true});
   container = ProviderContainer(
     overrides: [
@@ -40,7 +44,10 @@ Future<void> pumpSidebar(WidgetTester tester, {double textScale = 1}) async {
     UncontrolledProviderScope(
       container: container,
       child: MediaQuery(
-        data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+        data: MediaQueryData(
+          textScaler: TextScaler.linear(textScale),
+          disableAnimations: disableAnimations,
+        ),
         child: MaterialApp(
           theme: buildDesktopTheme(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,

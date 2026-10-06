@@ -96,6 +96,7 @@ class ShellxIconButton extends StatefulWidget {
     this.color = ShellxDesktopColors.textSecondary,
     this.hoverColor = ShellxDesktopColors.textPrimary,
     this.focusNode,
+    this.selected,
   });
 
   final IconData icon;
@@ -112,6 +113,11 @@ class ShellxIconButton extends StatefulWidget {
   final Color color;
   final Color hoverColor;
   final FocusNode? focusNode;
+
+  /// A toggle's state (the sidebar bell while the panel is open, UI-A4
+  /// §5.1): on → `rowSelected` fill and `toggled` semantics. Null: a plain
+  /// button.
+  final bool? selected;
 
   @override
   State<ShellxIconButton> createState() => _ShellxIconButtonState();
@@ -146,6 +152,7 @@ class _ShellxIconButtonState extends State<ShellxIconButton> {
         button: true,
         // Busy: announced as unavailable, since presses are ignored (UI §3.2).
         enabled: !widget.busy,
+        toggled: widget.selected,
         label: widget.semanticLabel,
         onTap: widget.busy ? null : _activate,
         excludeSemantics: true,
@@ -169,6 +176,8 @@ class _ShellxIconButtonState extends State<ShellxIconButton> {
                       ? ShellxDesktopColors.rowPressed
                       : _hover
                       ? ShellxDesktopColors.rowHover
+                      : widget.selected ?? false
+                      ? ShellxDesktopColors.rowSelected
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(ShellxRadius.r6),
                   border: _focus ? Border.fromBorderSide(_focusRing) : null,
@@ -520,7 +529,9 @@ class _NoticeToastState extends State<NoticeToast> {
   bool get _paused => _hovered || _closeFocus.hasFocus;
 
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
-  bool get _neutral => widget.notice is WorkspaceDeletedNotice;
+  bool get _neutral =>
+      widget.notice is WorkspaceDeletedNotice ||
+      widget.notice is NoUnreadNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is on the toast.
   void _start() {
@@ -563,6 +574,7 @@ class _NoticeToastState extends State<NoticeToast> {
     WorkspaceDeletedNotice(:final name, :final movedTo) =>
       l10n.workspaceDeleted(name, movedTo),
     PortOpenFailedNotice() => l10n.portOpenFailed,
+    NoUnreadNotice() => l10n.noUnreadNotifications,
   };
 
   @override

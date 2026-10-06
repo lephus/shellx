@@ -21,7 +21,10 @@ import 'sidebar_drag.dart';
 import 'terminal_overlays.dart';
 import 'workspace_header.dart';
 
-/// UI §2.2: header band with `+`, then the tab list.
+/// (hit − visual) / 2: where the 24 px visual of a 28 px icon button starts.
+const double _bellInset = (ShellxSizes.iconHit - ShellxSizes.iconVisual) / 2;
+
+/// UI §2.2: header band with the bell and `+`, then the tab list.
 class SessionSidebar extends ConsumerStatefulWidget {
   const SessionSidebar({
     super.key,
@@ -30,6 +33,8 @@ class SessionSidebar extends ConsumerStatefulWidget {
     required this.onSelected,
     required this.onClose,
     required this.onEscape,
+    this.panelOpen = false,
+    required this.onToggleNotifications,
   });
 
   /// The list's single tab stop (UI §3.6).
@@ -44,6 +49,12 @@ class SessionSidebar extends ConsumerStatefulWidget {
 
   /// Esc in the list: back to the terminal (UI §3.6).
   final VoidCallback onEscape;
+
+  /// The notifications panel is open: the bell shows "on" (UI-A4 §5.1).
+  final bool panelOpen;
+
+  /// The bell: open or close the panel (the page owns it).
+  final VoidCallback onToggleNotifications;
 
   @override
   ConsumerState<SessionSidebar> createState() => _SessionSidebarState();
@@ -1250,6 +1261,51 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       busy: state.opening,
       onPressed: () => ref.read(terminalTabsProvider.notifier).openTab(),
     );
+    // UI-A4 §5.1: hollow at 0; filled with a 6 px dot when anything is
+    // unread; `rowSelected` ("on") while the panel is open.
+    final total = attention.totalUnread;
+    final bellShortcut = notificationsShortcutLabel();
+    final bell = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ShellxIconButton(
+          key: const Key('sidebar.bell'),
+          icon: total > 0 ? Icons.notifications : Icons.notifications_none,
+          semanticLabel: total > 0
+              ? '${l10n.notificationsPanelTitle}, '
+                    '${l10n.attentionUnreadCount(total)}'
+              : l10n.notificationsPanelTitle,
+          tooltip: shortcutTooltip(
+            l10n.notificationsPanelTooltip(bellShortcut),
+            bellShortcut,
+          ),
+          selected: widget.panelOpen,
+          onPressed: widget.onToggleNotifications,
+        ),
+        if (total > 0)
+          const Positioned(
+            // Centre (19, 7) of the 24 visual, which sits 2 px inside 28.
+            left: _bellInset + 19 - ShellxSizes.bellDot / 2,
+            top: _bellInset + 7 - ShellxSizes.bellDot / 2,
+            child: IgnorePointer(
+              child: SizedBox.square(
+                key: Key('sidebar.bell.dot'),
+                dimension: ShellxSizes.bellDot,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: ShellxDesktopColors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+    // macOS: both centred on the traffic-light line y = 14 (UI §2.1).
+    final buttonTop = EdgeInsets.only(
+      top: mac ? ShellxSizes.trafficLightsCenterY - ShellxSizes.iconHit / 2 : 0,
+    );
     final band = SizedBox(
       height: mac ? ShellxSizes.headerBandMac : ShellxSizes.headerBandWindows,
       child: Row(
@@ -1260,15 +1316,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           // macOS: the traffic lights own the left 80 px (UI §2.1).
           if (mac) const SizedBox(width: ShellxSizes.trafficLightsInset),
           const Spacer(),
-          Padding(
-            // macOS: centred on the traffic-light line y = 14 (UI §2.1).
-            padding: EdgeInsets.only(
-              top: mac
-                  ? ShellxSizes.trafficLightsCenterY - ShellxSizes.iconHit / 2
-                  : 0,
-            ),
-            child: newTab,
-          ),
+          // Tab order: bell → `+` → list (UI-A4 §5.1).
+          Padding(padding: buttonTop, child: bell),
+          const SizedBox(width: ShellxSizes.headerBellGap),
+          Padding(padding: buttonTop, child: newTab),
           // 8 px from the right edge to the 24 px visual (28 hit − 24) / 2.
           const SizedBox(
             width:

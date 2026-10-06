@@ -14,3 +14,5 @@ String renameShortcutLabel() => 'F2';
 String moveUpShortcutLabel() => isMacDesktop ? '⌥↑' : 'Alt+↑';
 String moveDownShortcutLabel() => isMacDesktop ? '⌥↓' : 'Alt+↓';
 String newWorkspaceShortcutLabel() => isMacDesktop ? '⌘⇧N' : 'Ctrl+Shift+N';
+String notificationsShortcutLabel() => isMacDesktop ? '⌘⇧I' : 'Ctrl+Shift+I';
+String nextUnreadShortcutLabel() => isMacDesktop ? '⌘⇧U' : 'Ctrl+Shift+U';

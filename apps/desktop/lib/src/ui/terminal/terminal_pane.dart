@@ -7,12 +7,14 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../theme/terminal_colors.dart';
 import '../window_router.dart';
+import 'attention_marks.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'terminal_shortcuts.dart';
@@ -98,6 +100,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final fontSize = ref.watch(terminalFontSizeProvider);
     final phase = ref.watch(agentControllerProvider.select((s) => s.phase));
     final selected = state.selected;
+    // UI-A4 §4: the selected tab's unread rings the terminal.
+    final ringed =
+        selected != null &&
+        ref.watch(tabAttentionProvider.select((a) => a.hasUnread(selected.id)));
     final style = desktopTerminalStyle(fontSize);
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
@@ -177,7 +183,9 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                               _TabTerminal(
                                 key: ValueKey('terminal.${tab.id}'),
                                 tab: tab,
-                                label: l10n.terminalPaneLabel(tab.label),
+                                label: ringed && tab.id == selected.id
+                                    ? l10n.terminalPaneUnreadLabel(tab.label)
+                                    : l10n.terminalPaneLabel(tab.label),
                                 scrollController: _scrollFor(tab.id),
                                 focusNode: tab.id == selected?.id
                                     ? widget.terminalFocus
@@ -188,6 +196,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           ],
                         ),
                       ),
+                    // UI-A4 §4: over the terminal, under the pill and the
+                    // toast; no tab, no ring.
+                    if (selected != null)
+                      Positioned.fill(child: AttentionRing(visible: ringed)),
                     // UI §2.5 (ruling S-2): top-right, clear of where
                     // people read; when the cursor (the prompt line) is
                     // under that corner it moves to the bottom-right.

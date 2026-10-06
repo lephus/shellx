@@ -115,3 +115,48 @@ class NotificationLine extends StatelessWidget {
     );
   }
 }
+
+/// UI-A4 §4: 2 px `accent` with 1 px `accent` 40 % inside, square, over
+/// the terminal area; fades in `base`, out `exit`, never loops, and is
+/// static (instant) with reduced motion. Paint only: the terminal's
+/// constraints never change, so the PTY is never resized (A1 D6).
+class AttentionRing extends StatelessWidget {
+  const AttentionRing({super.key, required this.visible});
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: ExcludeSemantics(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: ShellxMotion.of(
+          context,
+          visible ? ShellxMotion.base : ShellxMotion.exit,
+        ),
+        curve: visible ? ShellxMotion.baseCurve : ShellxMotion.exitCurve,
+        child: DecoratedBox(
+          key: const Key('pane.ring'),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: ShellxDesktopColors.accent,
+              width: ShellxSizes.ringWidth,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(ShellxSizes.ringWidth),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  // `#665FD4E2`, the terminal's selection colour (§1.1).
+                  color: ShellxDesktopColors.accent.withValues(alpha: 0.4),
+                  width: ShellxSizes.ringGlowWidth,
+                ),
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
