@@ -61,7 +61,7 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
     final theme = Theme.of(context);
     final router = ref.read(windowRouterProvider.notifier);
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24), // UI §4 dialog padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -13,7 +13,7 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     LaunchAtLoginChannel.register(
       messenger: flutterViewController.engine.binaryMessenger)
-    AppReopenChannel.register(messenger: flutterViewController.engine.binaryMessenger)
+    AppChannel.register(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }

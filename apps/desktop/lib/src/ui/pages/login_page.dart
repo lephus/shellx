@@ -84,7 +84,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       agentControllerProvider.select((s) => s.signedOutNotice),
     );
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24), // UI §4 dialog padding
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

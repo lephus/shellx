@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
-import 'pages/change_password_page.dart';
-import 'pages/confirm_page.dart';
-import 'pages/login_page.dart';
-import 'pages/onboarding_page.dart';
-import 'pages/pairing_page.dart';
+import 'dialogs/route_dialog.dart';
+import 'terminal/terminal_workspace_page.dart';
+import 'theme/shellx_desktop_theme.dart';
 import 'window_router.dart';
 
-/// Root widget. The one window renders whatever the [WindowRouter] has open.
+/// Root widget: the terminal window (A1 D9), dark only (UI §1).
 class ShellxDesktopApp extends StatelessWidget {
   const ShellxDesktopApp({super.key, required this.locale});
 
@@ -24,42 +21,51 @@ class ShellxDesktopApp extends StatelessWidget {
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF2563EB),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: const Color(0xFF2563EB),
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: buildDesktopTheme(),
+      themeMode: ThemeMode.dark,
       home: const WindowContent(),
     );
   }
 }
 
-class WindowContent extends ConsumerWidget {
+/// The terminal workspace, with the open route or confirm as a dialog over
+/// it (UI §4).
+class WindowContent extends ConsumerStatefulWidget {
   const WindowContent({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WindowContent> createState() => _WindowContentState();
+}
+
+class _WindowContentState extends ConsumerState<WindowContent> {
+  final _workspace = GlobalKey<TerminalWorkspacePageState>();
+
+  @override
+  Widget build(BuildContext context) {
     final window = ref.watch(windowRouterProvider);
-    final confirm = window.confirm;
-    final Widget page = confirm != null
-        ? ConfirmPage(key: ValueKey(confirm), request: confirm)
-        : switch (window.route) {
-            LoginRoute() => const LoginPage(),
-            OnboardingRoute() => const OnboardingPage(),
-            PairingRoute() => const PairingPage(),
-            ChangePasswordRoute() => const ChangePasswordPage(),
-            null => const SizedBox.shrink(),
-          };
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            ref.read(windowRouterProvider.notifier).close(),
-      },
-      child: Focus(autofocus: true, child: Scaffold(body: page)),
+    // UI §3.6: the terminal regains focus after any dialog closes.
+    ref.listen(windowRouterProvider.select((w) => w.dialogOpen), (_, open) {
+      if (!open) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _workspace.currentState?.focusTerminal(),
+        );
+      }
+    });
+    // The window-level Escape binding is gone on purpose: Escape belongs to
+    // the shell (vim); dialogs bind it themselves.
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: ExcludeFocus(
+              excluding: window.dialogOpen,
+              child: TerminalWorkspacePage(key: _workspace),
+            ),
+          ),
+          if (window.dialogOpen)
+            Positioned.fill(child: RouteDialogHost(state: window)),
+        ],
+      ),
     );
   }
 }

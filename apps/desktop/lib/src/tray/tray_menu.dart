@@ -60,7 +60,8 @@ String _statusLine(AgentViewState state, AppLocalizations l10n) {
   };
 }
 
-/// Builds the tray menu of spec §8.3 (signed in) or a minimal one (signed out).
+/// Builds the tray menu of spec §8.3 (signed in) or a minimal one (signed
+/// out), both led by "Mở cửa sổ terminal" (A1 D11, UI §5).
 Menu buildTrayMenu(
   AgentViewState state,
   AppLocalizations l10n,
@@ -100,6 +101,8 @@ Menu buildTrayMenu(
   if (!state.signedIn) {
     return Menu(
       items: [
+        item(TrayKeys.openTerminal, l10n.trayOpenTerminal),
+        sep(),
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
         sep(),
         item(TrayKeys.signIn, l10n.traySignIn),
@@ -158,6 +161,9 @@ Menu buildTrayMenu(
 
   return Menu(
     items: [
+      // UI §5: the terminal window first, then the status line.
+      item(TrayKeys.openTerminal, l10n.trayOpenTerminal),
+      sep(),
       item(TrayKeys.status, _statusLine(state, l10n), disabled: true),
       if (replaced) item(TrayKeys.reconnect, l10n.trayReconnect),
       if (update != null)

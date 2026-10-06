@@ -47,7 +47,7 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     final expired = pairing == null || remaining <= Duration.zero;
 
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24), // UI §4 dialog padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -5,6 +5,11 @@ sealed class TrayAction {
   const TrayAction();
 }
 
+/// A1 D11: the first tray item.
+final class OpenTerminalWindow extends TrayAction {
+  const OpenTerminalWindow();
+}
+
 final class ToggleRemoteAccess extends TrayAction {
   const ToggleRemoteAccess();
 }
@@ -87,6 +92,7 @@ final class DisconnectDesktopPhone extends TrayAction {
 
 /// Menu item keys. Dynamic keys embed the session id / mobile device id.
 abstract final class TrayKeys {
+  static const String openTerminal = 'open_terminal';
   static const String status = 'status';
   static const String downloadUpdate = 'download_update';
   static const String reconnect = 'reconnect';
@@ -142,6 +148,7 @@ TrayAction? trayActionForKey(String? key) {
     return mobileId.isEmpty ? null : RevokeDevice(mobileId);
   }
   return switch (key) {
+    TrayKeys.openTerminal => const OpenTerminalWindow(),
     TrayKeys.remoteAccess => const ToggleRemoteAccess(),
     TrayKeys.closeAll => const CloseAllSessions(),
     TrayKeys.pair => const PairPhone(),

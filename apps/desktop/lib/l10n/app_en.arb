@@ -36,13 +36,17 @@
   "onboardingOpenSettings": "Open System Settings",
   "onboardingSleepTitle": "Sleep",
   "onboardingSleepBody": "ShellX keeps the computer from sleeping while idle. Closing the laptop lid still puts it to sleep, and then your phone cannot reach it.",
-  "onboardingTrayHint": "{platform, select, macos{ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}",
+  "onboardingTrayHint": "{platform, select, macos{Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}",
   "@onboardingTrayHint": {
     "placeholders": {
       "platform": {"type": "String"}
     }
   },
   "onboardingFinish": "Finish",
+  "trayOpenTerminal": "Open terminal window",
+  "windowTitle": "{title} — ShellX",
+  "@windowTitle": {"placeholders": {"title": {"type": "String"}}},
+  "dialogClose": "Close",
   "trayTooltip": "ShellX",
   "trayStatusConnected": "Connected — {email}",
   "@trayStatusConnected": {
@@ -169,13 +173,6 @@
   },
   "notifySignedOutTitle": "ShellX was signed out",
   "notifySignedOutBody": "Sign in again to allow remote access.",
-  "notifyAlreadyRunningTitle": "ShellX is already running",
-  "notifyAlreadyRunningBody": "{platform, select, macos{Find it in the menu bar.} other{Find it in the system tray.}}",
-  "@notifyAlreadyRunningBody": {
-    "placeholders": {
-      "platform": {"type": "String"}
-    }
-  },
   "notifyTerminalProblemTitle": "Processes from a terminal session may still be running",
   "notifyTerminalProblemBody": "{count, plural, =1{Shell process ID: {pids}} other{Shell process IDs: {pids}}}",
   "@notifyTerminalProblemBody": {

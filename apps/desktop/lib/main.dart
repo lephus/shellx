@@ -32,15 +32,19 @@ import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
 import 'src/startup.dart';
+import 'src/terminal/terminal_tabs.dart';
 import 'src/terminal_sharing/attach_throttle.dart';
 import 'src/terminal_sharing/powershell.dart';
 import 'src/terminal_sharing/sharing_paths.dart';
 import 'src/terminal_sharing/terminal_sharing_setup.dart';
 import 'src/ui/theme/font_licenses.dart';
+import 'src/tray/tray_action.dart';
 import 'src/tray/tray_actions.dart';
 import 'src/tray/tray_presenter.dart';
 import 'src/ui/activation.dart';
 import 'src/ui/app.dart';
+import 'src/ui/dialogs/route_dialog.dart';
+import 'src/ui/window_bounds.dart';
 import 'src/ui/window_coordinator.dart';
 import 'src/ui/window_host.dart';
 import 'src/ui/window_router.dart';
@@ -100,12 +104,13 @@ Future<void> _start(
   }
   startup.lock = lock;
 
-  // The close button hides the window to the tray (the router closes what
-  // is open); it never quits the app.
+  final settings = await SharedPrefsSettingsStore.open();
   late final ProviderContainer container;
   final windowHost = WindowManagerHost(
+    // A1 D9: the close button hides the window; shells keep running.
     onCloseRequested: () =>
-        container.read(windowRouterProvider.notifier).close(),
+        container.read(windowRouterProvider.notifier).hideWindow(),
+    bounds: WindowBoundsStore(settings),
   );
   await windowHost.init();
 
@@ -130,7 +135,6 @@ Future<void> _start(
     onProblem: terminalProblems.report,
   );
   late final TrayManagerHost trayHost;
-  final settings = await SharedPrefsSettingsStore.open();
   final sharingSetup = _terminalSharingSetup(
     environment,
     storedEnabled: settings.getBool(
@@ -247,18 +251,29 @@ Future<void> _start(
     );
   }, fireImmediately: true);
 
-  // A second launch (double-click while running) asks us to come forward;
-  // one request per launch (activationRequests coalesces watcher events).
-  // On macOS, Finder/Spotlight reopen the running app instead of launching
-  // a second one: AppDelegate forwards that reopen, handled the same way.
-  void activate() =>
-      unawaited(handleActivation(container, isWindows: Platform.isWindows));
+  // A1 D11: a second launch (Windows, `open -n`; activationRequests
+  // coalesces watcher events into one request per launch), a macOS reopen
+  // (Finder, Spotlight, Dock) and the tray all show the terminal window.
+  void activate() => unawaited(handleActivation(container));
   lock.activationRequests().listen(
     (_) => activate(),
     onError: (Object error) =>
         debugPrint('ShellX: activation watch failed: ${error.runtimeType}'),
   );
-  if (Platform.isMacOS) listenForReopen(activate);
+  if (Platform.isMacOS) {
+    listenForAppChannel(
+      onReopen: activate,
+      // ⌘Q / app menu Quit (A1 D10): the same flow as the tray's "Thoát".
+      onQuitRequested: () => unawaited(trayActions.handle(const Quit())),
+    );
+  }
+  container.listen(
+    terminalTabsProvider.select((s) => s.selected),
+    (_, selected) => _unawaitedLogged(
+      windowHost.setTitle(windowTitleFor(selected, l10n)),
+      'window title',
+    ),
+  );
 
   registerFontLicenses();
   runApp(
@@ -267,9 +282,15 @@ Future<void> _start(
       child: ShellxDesktopApp(locale: locale),
     ),
   );
+  container.read(windowRouterProvider.notifier).showTerminal();
   // The only bootstrap() call. An unreadable keychain does not throw: the
   // controller starts signed out and notifies.
   await container.read(agentControllerProvider.notifier).bootstrap();
+  // D11: every start opens the terminal window with a tab, sized to the
+  // laid-out pane. After the bootstrap, so a signed-out strip is already
+  // laid out and the new shell is not resized right after it starts.
+  await WidgetsBinding.instance.endOfFrame;
+  await handleActivation(container);
 }
 
 /// Spec §7.6, §12: the switch is offered on macOS, and on Windows only with

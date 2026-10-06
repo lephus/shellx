@@ -4,35 +4,52 @@ import 'package:shellx_desktop/src/platform/app_reopen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  Future<void> send(String method) async {
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    await messenger.handlePlatformMessage(
-      appReopenChannel.name,
-      appReopenChannel.codec.encodeMethodCall(MethodCall(method)),
-      (_) {},
-    );
-  }
+  Future<void> send(String method) => messenger.handlePlatformMessage(
+    appChannel.name,
+    appChannel.codec.encodeMethodCall(MethodCall(method)),
+    (_) {},
+  );
 
-  tearDown(() => appReopenChannel.setMethodCallHandler(null));
-
-  test('each reopen from AppDelegate calls the handler once', () async {
-    var reopens = 0;
-    listenForReopen(() => reopens++);
-    await send('reopen');
-    await send('reopen');
-    expect(reopens, 2);
+  tearDown(() {
+    appChannel.setMethodCallHandler(null);
+    messenger.setMockMethodCallHandler(appChannel, null);
   });
 
-  test('other calls are ignored', () async {
-    var reopens = 0;
-    listenForReopen(() => reopens++);
-    await send('somethingElse');
-    expect(reopens, 0);
+  test(
+    'reopen and quitRequested from AppDelegate reach their handlers',
+    () async {
+      var reopens = 0;
+      var quits = 0;
+      listenForAppChannel(
+        onReopen: () => reopens++,
+        onQuitRequested: () => quits++,
+      );
+      await send('reopen');
+      await send('reopen');
+      await send('quitRequested');
+      await send('somethingElse');
+      expect((reopens, quits), (2, 1));
+    },
+  );
+
+  test('setDockVisible calls the native side with a bool', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(appChannel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    await setDockVisible(true);
+    await setDockVisible(false);
+    expect(
+      [for (final c in calls) (c.method, c.arguments)],
+      [('setDockVisible', true), ('setDockVisible', false)],
+    );
   });
 
   test('the channel name matches AppDelegate.swift', () {
-    expect(appReopenChannel.name, 'pro.shellx.desktop/app');
+    expect(appChannel.name, 'pro.shellx.desktop/app');
   });
 }

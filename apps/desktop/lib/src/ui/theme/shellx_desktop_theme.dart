@@ -265,3 +265,135 @@ ThemeData buildDesktopTheme() {
     ),
   );
 }
+
+/// UI §3.3 / §4: the legacy pages reused as dialog bodies get their look
+/// from this theme (applied by the dialog host only, so the terminal
+/// workspace keeps its own explicit styles).
+ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
+  const r6 = RoundedRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
+  );
+  const focusRing = BorderSide(
+    color: ShellxDesktopColors.accent,
+    width: ShellxSizes.focusRing,
+  );
+  Color disabled(Color c) =>
+      c.withValues(alpha: ShellxDesktopColors.disabledOpacity);
+  WidgetStateProperty<Color> fill(Color idle, Color hover, Color pressed) =>
+      WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? disabled(idle)
+            : states.contains(WidgetState.pressed)
+            ? pressed
+            : states.contains(WidgetState.hovered)
+            ? hover
+            : idle,
+      );
+  WidgetStateProperty<Color> ink(Color color) =>
+      WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.disabled) ? disabled(color) : color,
+      );
+  ButtonStyle shape({
+    required WidgetStateProperty<Color> foreground,
+    required WidgetStateProperty<Color> background,
+    BorderSide? side,
+  }) => ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(
+      Size(ShellxSizes.buttonMinWidth, ShellxSizes.button),
+    ),
+    fixedSize: const WidgetStatePropertyAll(
+      Size.fromHeight(ShellxSizes.button),
+    ),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: ShellxSizes.buttonPaddingH),
+    ),
+    shape: const WidgetStatePropertyAll(r6),
+    textStyle: const WidgetStatePropertyAll(ShellxText.bodyStrong),
+    elevation: const WidgetStatePropertyAll(0),
+    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    animationDuration: reduceMotion ? Duration.zero : ShellxMotion.fast,
+    foregroundColor: foreground,
+    backgroundColor: background,
+    // Material reports `focused` only for keyboard focus (UI §3).
+    side: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.focused) ? focusRing : side,
+    ),
+  );
+  final text = base.textTheme;
+  return base.copyWith(
+    textTheme: text.copyWith(
+      headlineSmall: ShellxText.dialogTitle.copyWith(
+        color: ShellxDesktopColors.textTitle,
+      ),
+      titleLarge: ShellxText.dialogTitle.copyWith(
+        color: ShellxDesktopColors.textTitle,
+      ),
+      titleMedium: ShellxText.bodyStrong.copyWith(
+        color: ShellxDesktopColors.textTitle,
+      ),
+      bodyLarge: ShellxText.dialogBody.copyWith(
+        color: ShellxDesktopColors.textTitle,
+      ),
+      bodyMedium: ShellxText.dialogBody.copyWith(
+        color: ShellxDesktopColors.textDialog2,
+      ),
+      bodySmall: ShellxText.small.copyWith(
+        color: ShellxDesktopColors.textDialog2,
+      ),
+      labelLarge: ShellxText.bodyStrong,
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: shape(
+        foreground: ink(ShellxDesktopColors.onPrimary),
+        background: fill(
+          ShellxDesktopColors.primary,
+          ShellxDesktopColors.primaryHover,
+          ShellxDesktopColors.primaryPressed,
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: shape(
+        foreground: ink(ShellxDesktopColors.textPrimary),
+        background: fill(
+          Colors.transparent,
+          ShellxDesktopColors.rowHover,
+          ShellxDesktopColors.rowPressed,
+        ),
+        side: const BorderSide(color: ShellxDesktopColors.borderInput),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: shape(
+        foreground: ink(ShellxDesktopColors.accent),
+        background: fill(
+          Colors.transparent,
+          ShellxDesktopColors.rowHover,
+          ShellxDesktopColors.rowPressed,
+        ),
+      ),
+    ),
+  );
+}
+
+/// UI §3.3 destructive button (closing tabs, signing out, quitting).
+ButtonStyle destructiveButtonStyle() => ButtonStyle(
+  foregroundColor: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.disabled)
+        ? ShellxDesktopColors.onErr.withValues(
+            alpha: ShellxDesktopColors.disabledOpacity,
+          )
+        : ShellxDesktopColors.onErr,
+  ),
+  backgroundColor: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.disabled)
+        ? ShellxDesktopColors.errDialog.withValues(
+            alpha: ShellxDesktopColors.disabledOpacity,
+          )
+        : states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.pressed)
+        ? ShellxDesktopColors.destructiveHover
+        : ShellxDesktopColors.errDialog,
+  ),
+);

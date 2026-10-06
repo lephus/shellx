@@ -25,7 +25,7 @@ class OnboardingPage extends ConsumerWidget {
     );
     final agent = ref.read(agentControllerProvider.notifier);
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24), // UI §4 dialog padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

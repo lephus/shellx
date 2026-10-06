@@ -8,9 +8,11 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/agent_state.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
 import 'package:shellx_desktop/src/ui/activation.dart';
+import 'package:shellx_desktop/src/ui/dialogs/route_dialog.dart';
 import 'package:shellx_desktop/src/ui/window_coordinator.dart';
 import 'package:shellx_desktop/src/ui/window_host.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -20,10 +22,11 @@ import '../support/fakes.dart';
 final class _FakeWindowHost implements WindowHost {
   final List<String> calls = [];
   @override
-  Future<void> show(Size size) async =>
-      calls.add('show ${size.width.toInt()}x${size.height.toInt()}');
+  Future<void> show() async => calls.add('show');
   @override
   Future<void> hide() async => calls.add('hide');
+  @override
+  Future<void> setTitle(String title) async => calls.add('title $title');
 }
 
 void main() {
@@ -74,7 +77,8 @@ void main() {
 
       router().close();
 
-      expect(window().visible, isFalse);
+      expect(window().route, isNull);
+      expect(window().visible, isTrue); // the terminal window stays
       expect(h.runtime.pairingCancels, 1);
       expect(agentState().pairing, isNull);
     });
@@ -112,16 +116,25 @@ void main() {
   });
 
   group('coordinateWindows', () {
-    test('startup signed out opens the login window', () async {
-      h = TestHarness();
-      container = ProviderContainer.test(
-        overrides: [desktopServicesProvider.overrideWithValue(h.services())],
-      );
-      container.listen(
-        agentControllerProvider,
-        (prev, next) => coordinateWindows(prev, next, router()),
-      );
-      await agent().bootstrap(watchForWake: false);
+    test(
+      'startup signed out opens no dialog: the strip invites (D11)',
+      () async {
+        h = TestHarness();
+        container = ProviderContainer.test(
+          overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+        );
+        container.listen(
+          agentControllerProvider,
+          (prev, next) => coordinateWindows(prev, next, router()),
+        );
+        await agent().bootstrap(watchForWake: false);
+        expect(window().route, isNull);
+      },
+    );
+
+    test('a user sign-out still shows the login dialog', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await agent().signOut();
       expect(window().route, isA<LoginRoute>());
     });
 
@@ -139,11 +152,11 @@ void main() {
       await tray().handle(const PairPhone());
       h.runtime.eventController.add(MobilePaired(phone('m1', 'Pixel')));
       await pumpEventQueue();
-      expect(window().visible, isFalse);
+      expect(window().route, isNull);
     });
 
     test(
-      'signing in from the login window hides it (onboarding already done)',
+      'signing in from the login window closes it (onboarding already done)',
       () async {
         h = TestHarness(settings: {'onboarding_done': true});
         container = ProviderContainer.test(
@@ -154,49 +167,121 @@ void main() {
           (prev, next) => coordinateWindows(prev, next, router()),
         );
         await agent().bootstrap(watchForWake: false);
-        expect(window().route, isA<LoginRoute>());
+        // D11: startup opens no login dialog; the strip's button does.
+        router().open(const LoginRoute());
         await agent().signIn(
           email: 'a@b.co',
           password: '12345678',
           register: false,
         );
-        expect(window().visible, isFalse);
+        expect(window().route, isNull);
       },
     );
   });
 
-  group('handleActivation (second launch, macOS reopen)', () {
-    test('signed out: the login window', () async {
-      h = TestHarness();
-      container = ProviderContainer.test(
-        overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+  group('handleActivation (launch, second launch, Dock, macOS reopen)', () {
+    test(
+      'signed out: the terminal window with one tab, no login dialog',
+      () async {
+        h = TestHarness();
+        container = ProviderContainer.test(
+          overrides: [desktopServicesProvider.overrideWithValue(h.services())],
+        );
+        await agent().bootstrap(watchForWake: false);
+        await handleActivation(container);
+        expect(window().terminal, isTrue);
+        expect(window().route, isNull);
+        expect(h.ptys.ptys, hasLength(1));
+        expect(h.notifier.shown, isEmpty);
+      },
+    );
+
+    test('again: the window comes forward, no second tab', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await handleActivation(container);
+      router().hideWindow();
+      await handleActivation(container);
+      expect(window().visible, isTrue);
+      expect(h.ptys.ptys, hasLength(1));
+    });
+
+    test('a phone-opened session counts as a tab (none is added)', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await h.sessions.handle(
+        '33333333-3333-4333-8333-333333333333',
+        const SessionOpen(cols: 80, rows: 24),
       );
-      await agent().bootstrap(watchForWake: false);
+      await pumpEventQueue();
+      await handleActivation(container);
+      expect(h.ptys.ptys, hasLength(1));
+    });
+  });
+
+  group('window close (D9)', () {
+    test(
+      'hides the window, cancels an open confirm, keeps the shells',
+      () async {
+        await signedIn(settings: {'onboarding_done': true});
+        await handleActivation(container);
+        final pending = router().confirm(
+          ConfirmRequest(title: 't', body: 'b', confirmLabel: 'ok'),
+        );
+        router().hideWindow();
+        expect(await pending, isFalse);
+        expect(window().visible, isFalse);
+        expect(h.ptys.ptys.single.killed, isFalse);
+      },
+    );
+
+    test('Escape-style close only closes the dialog', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await handleActivation(container);
+      router().open(const ChangePasswordRoute());
       router().close();
-      expect(window().visible, isFalse);
-
-      await handleActivation(container, isWindows: false);
-      expect(window().route, isA<LoginRoute>());
-      expect(h.notifier.shown, isEmpty);
-    });
-
-    test('signed in: says where ShellX is', () async {
-      await signedIn(settings: {'onboarding_done': true});
-      await handleActivation(container, isWindows: false);
-      expect(window().visible, isFalse);
-      expect(h.notifier.shown.single.title, 'ShellX is already running');
-      expect(h.notifier.shown.single.body, 'Find it in the menu bar.');
-    });
-
-    test('a failing notification is not an unhandled error', () async {
-      await signedIn(settings: {'onboarding_done': true});
-      h.notifier.fail = true;
-      await handleActivation(container, isWindows: true);
-      expect(h.notifier.shown, isEmpty);
+      expect(window().route, isNull);
+      expect(window().visible, isTrue);
     });
   });
 
   group('TrayActions', () {
+    test('"Open terminal window" shows the window with a tab', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await tray().handle(const OpenTerminalWindow());
+      expect(window().terminal, isTrue);
+      expect(h.ptys.ptys, hasLength(1));
+    });
+
+    test('a second ⌘Q while the quit confirm is open leaves one confirm and '
+        'quits once', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      final first = tray().handle(const Quit());
+      await pumpEventQueue();
+      final second = tray().handle(const Quit());
+      await pumpEventQueue();
+      await first; // replaced: answered "no"
+      expect(window().confirm, isNotNull);
+      window().confirm!.complete(true);
+      await second;
+      expect(h.quits, 1);
+      expect(h.ptys.ptys.single.killed, isTrue);
+    });
+
+    test('⌘Q again while quitting asks nothing and quits once', () async {
+      await signedIn(settings: {'onboarding_done': true});
+      await h.sessions.open(cols: 80, rows: 24);
+      await pumpEventQueue();
+      h.runtime.stopGate = Completer<void>();
+      final first = tray().handle(const Quit());
+      await answer(true); // shutting down: the relay stop hangs
+      await tray().handle(const Quit());
+      expect(window().confirm, isNull);
+      h.runtime.stopGate!.complete();
+      await first;
+      expect(h.quits, 1);
+    });
+
     test(
       'remote access off with a phone connected asks first; cancel keeps it on',
       () async {
@@ -338,16 +423,42 @@ void main() {
     });
   });
 
-  test(
-    'WindowPresenter shows with the route size and hides when closed',
-    () async {
-      final host = _FakeWindowHost();
-      final presenter = WindowPresenter(host);
-      await presenter.apply(const WindowState(route: LoginRoute()));
-      await presenter.apply(const WindowState(route: LoginRoute()));
-      await presenter.apply(const WindowState(route: PairingRoute()));
-      await presenter.apply(const WindowState());
-      expect(host.calls, ['show 440x620', 'show 440x660', 'hide']);
-    },
-  );
+  test('WindowPresenter shows once while anything is visible, hides when '
+      'nothing is', () async {
+    final host = _FakeWindowHost();
+    final presenter = WindowPresenter(host);
+    await presenter.apply(const WindowState(terminal: true));
+    await presenter.apply(
+      const WindowState(terminal: true, route: LoginRoute()),
+    );
+    await presenter.apply(const WindowState());
+    await presenter.apply(const WindowState(route: PairingRoute()));
+    expect(host.calls, ['show', 'hide', 'show']);
+  });
+
+  test('window title: "<tab> — ShellX", or "ShellX" without tabs', () {
+    final l10n = lookupAppLocalizations(const Locale('vi'));
+    expect(windowTitleFor(null, l10n), 'ShellX');
+  });
+
+  test('dialog sizes follow UI §4 widths', () {
+    expect(dialogSizeFor(const WindowState(route: LoginRoute())).width, 400);
+    expect(
+      dialogSizeFor(const WindowState(route: OnboardingRoute())).width,
+      480,
+    );
+    expect(
+      dialogSizeFor(
+        WindowState(
+          confirm: ConfirmRequest(
+            title: 't',
+            body: 'b',
+            confirmLabel: 'ok',
+            long: true,
+          ),
+        ),
+      ).width,
+      520,
+    );
+  });
 }

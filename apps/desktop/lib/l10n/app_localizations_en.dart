@@ -115,15 +115,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String onboardingTrayHint(String platform) {
     String _temp0 = intl.Intl.selectLogic(platform, {
       'macos':
-          'ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.',
+          'Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.',
       'other':
-          'ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.',
+          'Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.',
     });
     return '$_temp0';
   }
 
   @override
   String get onboardingFinish => 'Finish';
+
+  @override
+  String get trayOpenTerminal => 'Open terminal window';
+
+  @override
+  String windowTitle(String title) {
+    return '$title — ShellX';
+  }
+
+  @override
+  String get dialogClose => 'Close';
 
   @override
   String get trayTooltip => 'ShellX';
@@ -341,18 +352,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notifySignedOutBody => 'Sign in again to allow remote access.';
-
-  @override
-  String get notifyAlreadyRunningTitle => 'ShellX is already running';
-
-  @override
-  String notifyAlreadyRunningBody(String platform) {
-    String _temp0 = intl.Intl.selectLogic(platform, {
-      'macos': 'Find it in the menu bar.',
-      'other': 'Find it in the system tray.',
-    });
-    return '$_temp0';
-  }
 
   @override
   String get notifyTerminalProblemTitle =>

@@ -1,33 +1,26 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../agent/agent_controller.dart';
-import '../agent/desktop_services.dart';
+import '../terminal/terminal_tabs.dart';
 import 'window_router.dart';
 
-/// The user started ShellX again while it runs: a second launch (Windows,
-/// or `open -n`: SingleInstanceLock.activationRequests) or, on macOS, a
-/// reopen of the running app (app_reopen.dart). Signed out: the login
-/// window. Signed in: a notification saying where ShellX lives (on macOS
-/// the reopen also brings an open window forward). Never throws.
-Future<void> handleActivation(
-  ProviderContainer container, {
-  required bool isWindows,
+/// A1 D11: launch, a second launch, the Dock, a macOS reopen and the tray
+/// all show the terminal window; with no tab at all, one is opened. Never
+/// throws.
+Future<void> openTerminalWindow({
+  required WindowRouter router,
+  required TerminalTabs tabs,
 }) async {
-  if (!container.read(agentControllerProvider).signedIn) {
-    container.read(windowRouterProvider.notifier).open(const LoginRoute());
-    return;
-  }
-  final services = container.read(desktopServicesProvider);
-  final l10n = services.l10n;
+  router.showTerminal();
   try {
-    await services.notifier.show(
-      title: l10n.notifyAlreadyRunningTitle,
-      body: l10n.notifyAlreadyRunningBody(isWindows ? 'windows' : 'macos'),
-    );
+    await tabs.ensureTab();
   } catch (error) {
-    debugPrint(
-      'ShellX: already-running notification failed: ${error.runtimeType}',
-    );
+    debugPrint('ShellX: opening a tab failed: ${error.runtimeType}');
   }
 }
+
+Future<void> handleActivation(ProviderContainer container) =>
+    openTerminalWindow(
+      router: container.read(windowRouterProvider.notifier),
+      tabs: container.read(terminalTabsProvider.notifier),
+    );

@@ -41,7 +41,8 @@ Future<void> pumpApp(
     agentControllerProvider,
     (prev, next) => coordinateWindows(prev, next, router()),
   );
-  tester.view.physicalSize = const Size(520, 700);
+  // UI §2 default window: the dialogs need their full height.
+  tester.view.physicalSize = const Size(1100, 720);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -266,7 +267,7 @@ void main() {
       await tester.tap(find.byKey(const Key('onboarding.finish')));
       await settle(tester);
       expect(agentState().onboardingDone, isTrue);
-      expect(container.read(windowRouterProvider).visible, isFalse);
+      expect(router().current, isNull);
       expect(h.notifier.shown, isNotEmpty);
     });
 
@@ -292,7 +293,7 @@ void main() {
         await settle(tester);
         expect(h.launchAtLogin.enabled, isTrue);
         expect(agentState().onboardingDone, isTrue);
-        expect(container.read(windowRouterProvider).visible, isFalse);
+        expect(router().current, isNull);
       },
     );
   });
@@ -348,7 +349,7 @@ void main() {
       await openPairing(tester);
       h.runtime.eventController.add(MobilePaired(phone('m1', 'Pixel')));
       await tester.pump(const Duration(seconds: 1));
-      expect(container.read(windowRouterProvider).visible, isFalse);
+      expect(router().current, isNull);
       expect(find.byKey(const Key('pairing.qr')), findsNothing);
     });
   });
@@ -410,7 +411,7 @@ void main() {
       expect(find.byKey(const Key('password.done')), findsOneWidget);
       await tester.tap(find.byKey(const Key('password.close')));
       await settle(tester);
-      expect(container.read(windowRouterProvider).visible, isFalse);
+      expect(router().current, isNull);
     });
 
     testWidgets('server-side weak_password is shown', (tester) async {
@@ -437,6 +438,6 @@ void main() {
     await tester.tap(find.byKey(const Key('confirm.ok')));
     await settle(tester);
     expect(await answer, isTrue);
-    expect(container.read(windowRouterProvider).visible, isFalse);
+    expect(container.read(windowRouterProvider).dialogOpen, isFalse);
   });
 }

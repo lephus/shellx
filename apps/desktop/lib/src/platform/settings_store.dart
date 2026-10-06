@@ -19,6 +19,12 @@ abstract final class SettingKeys {
   /// Terminal font size in points (UI §1.3: 9–28, default 13).
   static const String terminalFontSize = 'terminal_font_size';
 
+  /// The terminal window's last bounds (A1 D9), logical pixels.
+  static const String windowX = 'window_x';
+  static const String windowY = 'window_y';
+  static const String windowWidth = 'window_width';
+  static const String windowHeight = 'window_height';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -28,6 +34,10 @@ abstract final class SettingKeys {
     terminalSharingFiles,
     notifyThreshold,
     terminalFontSize,
+    windowX,
+    windowY,
+    windowWidth,
+    windowHeight,
   };
 }
 

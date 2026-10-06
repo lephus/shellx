@@ -114,15 +114,26 @@ class AppLocalizationsVi extends AppLocalizations {
   String onboardingTrayHint(String platform) {
     String _temp0 = intl.Intl.selectLogic(platform, {
       'macos':
-          'ShellX giờ nằm trên thanh menu. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
+          'Terminal của bạn ở cửa sổ ShellX. ShellX giờ nằm trên thanh menu. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
       'other':
-          'ShellX giờ nằm trong khay hệ thống. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
+          'Terminal của bạn ở cửa sổ ShellX. ShellX giờ nằm trong khay hệ thống. Chọn “Ghép nối điện thoại…” ở đó để kết nối điện thoại.',
     });
     return '$_temp0';
   }
 
   @override
   String get onboardingFinish => 'Hoàn tất';
+
+  @override
+  String get trayOpenTerminal => 'Mở cửa sổ terminal';
+
+  @override
+  String windowTitle(String title) {
+    return '$title — ShellX';
+  }
+
+  @override
+  String get dialogClose => 'Đóng';
 
   @override
   String get trayTooltip => 'ShellX';
@@ -338,18 +349,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get notifySignedOutBody => 'Đăng nhập lại để cho phép truy cập từ xa.';
-
-  @override
-  String get notifyAlreadyRunningTitle => 'ShellX đang chạy';
-
-  @override
-  String notifyAlreadyRunningBody(String platform) {
-    String _temp0 = intl.Intl.selectLogic(platform, {
-      'macos': 'Tìm ShellX trên thanh menu.',
-      'other': 'Tìm ShellX trong khay hệ thống.',
-    });
-    return '$_temp0';
-  }
 
   @override
   String get notifyTerminalProblemTitle =>

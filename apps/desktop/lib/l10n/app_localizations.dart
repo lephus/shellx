@@ -287,7 +287,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingTrayHint.
   ///
   /// In en, this message translates to:
-  /// **'{platform, select, macos{ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}'**
+  /// **'{platform, select, macos{Your terminal lives in the ShellX window. ShellX now lives in the menu bar. Choose “Pair phone…” there to connect your phone.} other{Your terminal lives in the ShellX window. ShellX now lives in the system tray. Choose “Pair phone…” there to connect your phone.}}'**
   String onboardingTrayHint(String platform);
 
   /// No description provided for @onboardingFinish.
@@ -295,6 +295,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Finish'**
   String get onboardingFinish;
+
+  /// No description provided for @trayOpenTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open terminal window'**
+  String get trayOpenTerminal;
+
+  /// No description provided for @windowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} — ShellX'**
+  String windowTitle(String title);
+
+  /// No description provided for @dialogClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get dialogClose;
 
   /// No description provided for @trayTooltip.
   ///
@@ -643,18 +661,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in again to allow remote access.'**
   String get notifySignedOutBody;
-
-  /// No description provided for @notifyAlreadyRunningTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'ShellX is already running'**
-  String get notifyAlreadyRunningTitle;
-
-  /// No description provided for @notifyAlreadyRunningBody.
-  ///
-  /// In en, this message translates to:
-  /// **'{platform, select, macos{Find it in the menu bar.} other{Find it in the system tray.}}'**
-  String notifyAlreadyRunningBody(String platform);
 
   /// No description provided for @notifyTerminalProblemTitle.
   ///

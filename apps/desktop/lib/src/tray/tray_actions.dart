@@ -5,7 +5,9 @@ import '../agent/agent_controller.dart';
 import '../agent/agent_state.dart';
 import '../agent/desktop_services.dart';
 import '../startup.dart';
+import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
+import '../ui/activation.dart';
 import '../ui/window_router.dart';
 import 'tray_action.dart';
 
@@ -17,6 +19,10 @@ final class TrayActions {
   TrayActions(this._ref);
 
   final Ref _ref;
+
+  /// Set once a quit is confirmed: a ⌘Q or "Thoát" while shutting down
+  /// must not ask again (A1 D10: exactly one confirmation).
+  bool _quitting = false;
 
   AgentController get _agent => _ref.read(agentControllerProvider.notifier);
   AgentViewState get _state => _ref.read(agentControllerProvider);
@@ -39,6 +45,11 @@ final class TrayActions {
     final l10n = _services.l10n;
     final state = _state;
     switch (action) {
+      case OpenTerminalWindow():
+        await openTerminalWindow(
+          router: _router,
+          tabs: _ref.read(terminalTabsProvider.notifier),
+        );
       case ToggleRemoteAccess():
         // A1 D7: turning off only disconnects phones; ask only when a phone
         // is connected right now.
@@ -110,6 +121,7 @@ final class TrayActions {
       case DisconnectDesktopPhone(:final id):
         _agent.disconnectDesktopPhone(id);
       case Quit():
+        if (_quitting) return;
         if (state.sessions.isNotEmpty) {
           final ok = await _router.confirm(
             ConfirmRequest(
@@ -118,8 +130,9 @@ final class TrayActions {
               confirmLabel: l10n.confirmQuitAction,
             ),
           );
-          if (!ok) return;
+          if (!ok || _quitting) return;
         }
+        _quitting = true;
         // Bounded: Quit must always reach exit (quitApp), even if closing
         // the sessions or the relay link hangs.
         await runBounded(

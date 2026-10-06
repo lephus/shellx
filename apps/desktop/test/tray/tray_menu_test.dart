@@ -52,6 +52,8 @@ void main() {
     );
     final menu = buildTrayMenu(state, vi, TrayMenuIds());
     expect(_labels(menu), [
+      'Mở cửa sổ terminal',
+      '---',
       '● Đã kết nối — user@email.com',
       '---',
       'Cho phép truy cập từ xa',
@@ -167,17 +169,28 @@ void main() {
       vi,
       TrayMenuIds(),
     );
-    expect(menu.items![1].key, TrayKeys.downloadUpdate);
-    expect(menu.items![1].label, 'Tải ShellX 1.1.0…');
+    expect(menu.items![3].key, TrayKeys.downloadUpdate);
+    expect(menu.items![3].label, 'Tải ShellX 1.1.0…');
   });
 
-  test('signed-out menu offers sign in and quit only', () {
+  test('signed-out menu offers the window, sign in and quit only', () {
     final menu = buildTrayMenu(
       const AgentViewState(phase: AuthPhase.signedOut),
       vi,
       TrayMenuIds(),
     );
-    expect(_labels(menu), ['○ Chưa đăng nhập', '---', 'Đăng nhập…', 'Thoát']);
+    expect(_labels(menu), [
+      'Mở cửa sổ terminal',
+      '---',
+      '○ Chưa đăng nhập',
+      '---',
+      'Đăng nhập…',
+      'Thoát',
+    ]);
+  });
+
+  test('"Mở cửa sổ terminal" maps to OpenTerminalWindow', () {
+    expect(trayActionForKey(TrayKeys.openTerminal), isA<OpenTerminalWindow>());
   });
 
   test('menu item ids are stable across rebuilds', () {
@@ -255,8 +268,8 @@ void main() {
         vi,
         TrayMenuIds(),
       );
-      expect(menu.items![1].key, TrayKeys.reconnect);
-      expect(menu.items![1].label, 'Kết nối lại');
+      expect(menu.items![3].key, TrayKeys.reconnect);
+      expect(menu.items![3].label, 'Kết nối lại');
     });
 
     test('no Reconnect item unless the relay was replaced', () {

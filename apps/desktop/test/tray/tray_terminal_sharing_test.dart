@@ -16,7 +16,7 @@ import 'package:shellx_desktop/src/terminal_sharing/terminal_sharing_setup.dart'
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
 import 'package:shellx_desktop/src/tray/tray_menu.dart';
-import 'package:shellx_desktop/src/ui/window_host.dart';
+import 'package:shellx_desktop/src/ui/dialogs/route_dialog.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:tray_manager/tray_manager.dart';
 
@@ -299,7 +299,7 @@ void main() {
         expect(request.body, contains('/Users/phu/.zshrc'));
         expect(request.long, isTrue);
         expect(request.destructive, isFalse);
-        expect(windowSizeFor(window()), const Size(560, 560));
+        expect(dialogSizeFor(window()).width, 520);
         await answer(false);
         await done;
         expect(setup.calls, isNot(contains('enable')));
