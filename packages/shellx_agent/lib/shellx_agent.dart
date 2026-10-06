@@ -3,6 +3,7 @@ library;
 
 export 'src/context/cwd_url.dart';
 export 'src/context/git_head.dart';
+export 'src/context/listening_ports.dart';
 export 'src/notify/agent_notifications.dart';
 export 'src/notify/command_tracker.dart';
 export 'src/notify/notification_sender.dart';

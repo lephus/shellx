@@ -31,7 +31,7 @@ final class ProcessPtyFactory implements PtyFactory {
   }
 }
 
-final class _ProcessPty implements Pty {
+final class _ProcessPty implements Pty, PtyProcessId {
   _ProcessPty(Future<Process> starting) {
     starting.then(_onStarted, onError: _onStartFailed);
   }
@@ -47,6 +47,9 @@ final class _ProcessPty implements Pty {
 
   @override
   Future<int> get exitCode => _exitCode.future;
+
+  @override
+  int? get processId => _process?.pid;
 
   void _onStarted(Process process) {
     _process = process;

@@ -63,3 +63,11 @@ abstract interface class PtyFactory {
     required int rows,
   });
 }
+
+/// A [Pty] that knows its shell's process id (A2 D3), for finding the
+/// ports its process tree listens on. A separate interface so the many
+/// [Pty] fakes stay valid; a pty without it simply has no ports.
+abstract interface class PtyProcessId {
+  /// Null until the process has started.
+  int? get processId;
+}
