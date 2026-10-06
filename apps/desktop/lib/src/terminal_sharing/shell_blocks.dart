@@ -36,6 +36,19 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
   # Not where VS Code's own shell integration runs (it already reports commands, as OSC 633).
   if [[ -z "${VSCODE_SHELL_INTEGRATION-}" ]]; then
     if (( ! ${+functions[__shellx_precmd]} )); then
+      __shellx_osc7() {
+        local url_path= i ch hexch LC_CTYPE=C LC_COLLATE=C LC_ALL= LANG=
+        for (( i = 1; i <= ${#PWD}; ++i )); do
+          ch=${PWD[i]}
+          if [[ $ch == [-/._~A-Za-z0-9] ]]; then
+            url_path+=$ch
+          else
+            builtin printf -v hexch '%02X' "'$ch"
+            url_path+="%${hexch: -2:2}"
+          fi
+        done
+        builtin printf '\e]7;file://%s%s\a' "${HOST-}" "$url_path"
+      }
       __shellx_preexec() {
         local s=$1
         s=${s//\\/\\\\}; s=${s//;/\\x3b}; s=${s//$'\n'/\\x0a}
@@ -49,6 +62,7 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
           builtin printf '\e]133;D;%s\a' "$ret"
           builtin unset __shellx_running
         fi
+        __shellx_osc7
         return ret
       }
       __shellx_install() {
@@ -72,6 +86,7 @@ elif [[ -n "${SHELLX_TERM-}" && "$SHELLX_TERM" == "$TTY" ]]; then
             fi
           }
         fi
+        __shellx_osc7
       }
       typeset -ga precmd_functions preexec_functions
       precmd_functions+=(__shellx_install)
@@ -142,6 +157,17 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
       __shellx_s=${__shellx_s//\\/\\\\}; __shellx_s=${__shellx_s//;/\\x3b}; __shellx_s=${__shellx_s//$nl/\\x0a}
       __shellx_s=${__shellx_s//$cr/\\x0d}; __shellx_s=${__shellx_s//$bel/\\x07}; __shellx_s=${__shellx_s//$esc/\\x1b}
     }
+    __shellx_osc7() {
+      local LC_ALL=C s=$PWD out= c h i
+      for ((i = 0; i < ${#s}; i++)); do
+        c=${s:i:1}
+        case "$c" in
+          [-/._~A-Za-z0-9]) out+=$c ;;
+          *) builtin printf -v h '%02X' "'$c"; out+="%${h: -2:2}" ;;
+        esac
+      done
+      builtin printf '\033]7;file://%s%s\007' "${HOSTNAME-}" "$out"
+    }
     __shellx_bp_preexec() {
       local __shellx_s
       __shellx_esc "${1-}"
@@ -155,6 +181,7 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
         builtin printf '\033]133;D;%s\007' "$ret"
         __shellx_running=
       fi
+      __shellx_osc7
       return $ret
     }
     __shellx_use_bash_preexec() {
@@ -184,6 +211,7 @@ elif [[ $- == *i* && -n "${SHELLX_TERM-}" && -z "${VSCODE_SHELL_INTEGRATION-}" ]
         builtin printf '\033]133;D;%s\007' "$ret"
         __shellx_running=
       fi
+      __shellx_osc7
       if [ -z "${__shellx_bp-}" ] && [ -n "${__bp_imported-}${bash_preexec_imported-}" ]; then __shellx_use_bash_preexec; fi
       return $ret
     }
@@ -310,6 +338,10 @@ if (-not $env:SHELLX_TERM -and -not $env:SHELLX -and $env:LOCALAPPDATA -and $Hos
           $global:__ShellxRunning = $false
           $n = if ($ok) { 0 } elseif ($code -is [int] -and $code -ne 0) { $code } else { 1 }
           $mark = "$([char]27)]133;D;$n$([char]7)"
+        }
+        $loc = $executionContext.SessionState.Path.CurrentLocation
+        if ($loc.Provider.Name -eq 'FileSystem') {
+          try { $mark += "$([char]27)]7;$(([System.Uri]$loc.ProviderPath).AbsoluteUri)$([char]7)" } catch { }
         }
         $text = if ($global:__ShellxUserPrompt) { & $global:__ShellxUserPrompt } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
         $global:LASTEXITCODE = $code
