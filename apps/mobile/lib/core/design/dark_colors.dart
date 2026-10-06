@@ -73,6 +73,14 @@ class DarkColors extends LightColors {
   @override
   Color get link => const Color(0xFF2DBFCF);
 
+  /// onPrimary `#04282D` on it: 7.0:1.
+  @override
+  Color get primaryFill => const Color(0xFF2DBFCF);
+
+  /// 5.2:1 on the dark key cap `#47484B` (`#2DBFCF` there is 4.1:1).
+  @override
+  Color get keyAccent => const Color(0xFF5FD4E2);
+
   /// 7.4:1 on the dark keyboard.
   @override
   Color get keyboardLink => const Color(0xFF2DBFCF);

@@ -101,6 +101,14 @@ class LightColors extends AppColors {
   @override
   Color get link => const Color(0xFF007785);
 
+  /// White on it: 5.3:1 (desktop UI doc §7.3: filled buttons in light mode use `#007785`).
+  @override
+  Color get primaryFill => const Color(0xFF007785);
+
+  /// 5.3:1 on the white key cap.
+  @override
+  Color get keyAccent => const Color(0xFF007785);
+
   /// 4.8:1 on the keyboard grey (`#007785` there is only 3.6:1).
   @override
   Color get keyboardLink => const Color(0xFF00616C);

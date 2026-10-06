@@ -38,6 +38,22 @@ class ThemeDataFactory {
         color: appColors.primary,
       ),
       // Light primary on the light backgrounds is 3.0–3.5:1; text buttons take the AA link colour.
+      // Filled buttons and selected segments: white on light primary is only 3.5:1.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(backgroundColor: appColors.primaryFill, foregroundColor: appColors.onPrimary),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? appColors.primaryFill : null,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) && !states.contains(WidgetState.disabled)
+                ? appColors.onPrimary
+                : null,
+          ),
+        ),
+      ),
       textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: appColors.link)),
       brightness: brightness,
       useMaterial3: true,

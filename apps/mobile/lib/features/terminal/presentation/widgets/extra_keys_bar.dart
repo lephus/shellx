@@ -111,7 +111,7 @@ class _KeyCap extends StatelessWidget {
     final colors = context.colors;
     final once = latch == ModifierLatch.oneShot;
     final locked = latch == ModifierLatch.locked;
-    final foreground = locked ? colors.onPrimary : (once ? colors.primary : colors.keyboardInk);
+    final foreground = locked ? colors.onPrimary : (once ? colors.keyAccent : colors.keyboardInk);
     final textStyle = isPaste
         ? context.typo.paragraph.bold.copyWith(color: foreground)
         : TextStyle(
@@ -139,9 +139,9 @@ class _KeyCap extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: locked ? colors.primary : colors.keyboardKey,
+            color: locked ? colors.primaryFill : colors.keyboardKey,
             borderRadius: BorderRadius.circular(9),
-            border: once ? Border.all(color: colors.primary, width: 2.5) : null,
+            border: once ? Border.all(color: colors.keyAccent, width: 2.5) : null,
             // Design: the one-shot outline replaces the base drop shadow entirely (`.k.mod.once`
             // sets its own box-shadow); the plain and locked caps keep the base `.k` shadow.
             boxShadow: once ? null : const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],

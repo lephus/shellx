@@ -11,7 +11,7 @@ enum ButtonState {
   bool get isLoading => this == loading;
 }
 
-/// ShellX design `.btn`: 54 pt tall, radius 15, bold label on [AppColors.primary]; a disabled
+/// ShellX design `.btn`: 54 pt tall, radius 15, bold label on [AppColors.primaryFill]; a disabled
 /// button keeps its colours at 45 % opacity ("nút mờ tới khi hợp lệ").
 class AppButton extends StatelessWidget {
   final double height;
@@ -54,7 +54,7 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background = backgroundColor ?? context.colors.primary;
+    final background = backgroundColor ?? context.colors.primaryFill;
     final foreground = textColor ?? context.colors.onPrimary;
     final shape = BorderRadius.circular(radius);
     return Opacity(

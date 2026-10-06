@@ -56,6 +56,13 @@ abstract class AppColors {
   /// [primary] is only 3.0–3.5:1 there). Desktop UI doc §7.3: `--accent #007785`.
   Color get link;
 
+  /// Fill under [onPrimary] text: filled buttons, a locked modifier key, the listening mic, a
+  /// selected segment (≥ 4.5:1 with [onPrimary]; light [primary] with white is only 3.5:1).
+  Color get primaryFill;
+
+  /// Accent text and icons on a [keyboardKey] cap (a one-shot Ctrl/Alt, the mic glyph).
+  Color get keyAccent;
+
   /// Link text on [keyboardBackground] ("Mở Cài đặt" in the voice composer).
   Color get keyboardLink;
 

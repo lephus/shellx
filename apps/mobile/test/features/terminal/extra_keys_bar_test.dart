@@ -83,7 +83,9 @@ void main() {
     return tester.widget<Container>(cap).decoration! as BoxDecoration;
   }
 
-  testWidgets('design: Ctrl once = primary outline on a plain key, locked = filled with a dot', (tester) async {
+  testWidgets('design: Ctrl once = accent outline on a plain key, locked = filled (AA fill) with a dot', (
+    tester,
+  ) async {
     final colors = Brightness.light.appColors;
     await tester.pumpWidget(bar());
     expect(capDecoration(tester, ExtraKey.ctrl).border, isNull);
@@ -92,14 +94,14 @@ void main() {
     await tester.pump();
     final once = capDecoration(tester, ExtraKey.ctrl);
     expect(once.color, colors.keyboardKey);
-    expect((once.border! as Border).top.color, colors.primary);
+    expect((once.border! as Border).top.color, colors.keyAccent);
     expect(find.byKey(const ValueKey('latch-locked')), findsNothing);
 
     now = now.add(const Duration(milliseconds: 150));
     await tester.tap(keyCap(ExtraKey.ctrl));
     await tester.pump();
     final locked = capDecoration(tester, ExtraKey.ctrl);
-    expect(locked.color, colors.primary);
+    expect(locked.color, colors.primaryFill);
     expect(locked.border, isNull);
     expect(
       find.descendant(of: keyCap(ExtraKey.ctrl), matching: find.byKey(const ValueKey('latch-locked'))),

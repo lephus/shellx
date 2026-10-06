@@ -36,7 +36,7 @@ class MicButton extends StatelessWidget {
                 constraints: const BoxConstraints(minWidth: 46),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: listening ? colors.primary : colors.keyboardKey,
+                  color: listening ? colors.primaryFill : colors.keyboardKey,
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
                 ),
@@ -45,7 +45,7 @@ class MicButton extends StatelessWidget {
                   child: Icon(
                     listening ? Icons.mic : Icons.mic_none,
                     size: 20,
-                    color: listening ? colors.onPrimary : colors.keyboardLink,
+                    color: listening ? colors.onPrimary : colors.keyAccent,
                   ),
                 ),
               ),

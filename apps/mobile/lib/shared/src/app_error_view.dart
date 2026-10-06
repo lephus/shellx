@@ -26,7 +26,7 @@ class _AppErrorWidgetState extends State<AppErrorWidget> {
           12.sizedHeight,
           if (widget.retry != null)
             AppButton(
-              backgroundColor: context.colors.primary,
+              backgroundColor: context.colors.primaryFill,
               textColor: context.colors.white,
               title: S.of(context).retry,
               prefix: Padding(

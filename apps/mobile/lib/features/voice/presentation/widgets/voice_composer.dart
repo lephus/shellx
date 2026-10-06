@@ -270,7 +270,7 @@ class _LocaleSwitch extends StatelessWidget {
         textStyle: WidgetStatePropertyAll(context.typo.paragraph.bold),
         side: WidgetStatePropertyAll(BorderSide(color: colors.keyboardInk.withValues(alpha: 0.15))),
         backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? colors.link : colors.keyboardKey,
+          (states) => states.contains(WidgetState.selected) ? colors.primaryFill : colors.keyboardKey,
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)

@@ -83,6 +83,9 @@ void main() {
           ('keyboard secondary text', c.secondaryText, c.keyboardBackground),
           ('footnote on background', c.secondaryText, c.background),
           ('footnote on surface', c.secondaryText, c.surface),
+          ('filled button label (onPrimary on primaryFill)', c.onPrimary, c.primaryFill),
+          ('locked modifier / selected segment', c.onPrimary, c.primaryFill),
+          ('one-shot modifier on a key cap', c.keyAccent, c.keyboardKey),
         ]) {
           expect(ratio(fg, bg), greaterThanOrEqualTo(4.5), reason: '$name: ${ratio(fg, bg).toStringAsFixed(2)}');
         }
@@ -94,6 +97,10 @@ void main() {
       expect(c.link, const Color(0xFF007785));
       expect(c.keyboardLink, const Color(0xFF00616C));
       expect(c.keyboardError, const Color(0xFFA3161D));
+      expect(c.primaryFill, const Color(0xFF007785));
+      expect(c.keyAccent, const Color(0xFF007785));
+      expect(ratio(c.onPrimary, c.primary), lessThan(4.5)); // white on #0097A8: 3.5 before
+      expect(ratio(c.primary, c.keyboardKey), lessThan(4.5));
       // What failed before: primary on the keyboard grey and on primarySoft, error on the keyboard grey.
       expect(ratio(c.primary, c.keyboardBackground), lessThan(4.5));
       expect(ratio(c.primary, c.primarySoft), lessThan(4.5));
@@ -110,6 +117,9 @@ void main() {
     expect(theme.scaffoldBackgroundColor, const Color(0xFF0D1315));
     final light = ThemeDataFactory.create(Brightness.light);
     expect(light.textButtonTheme.style!.foregroundColor!.resolve({}), const Color(0xFF007785));
+    expect(light.filledButtonTheme.style!.backgroundColor!.resolve({}), const Color(0xFF007785));
+    expect(light.segmentedButtonTheme.style!.backgroundColor!.resolve({WidgetState.selected}), const Color(0xFF007785));
+    expect(theme.filledButtonTheme.style!.backgroundColor!.resolve({}), const Color(0xFF2DBFCF));
   });
 
   testWidgets('buttons: 54 pt, radius 15; disabled keeps its colours at 45 % opacity', (tester) async {
@@ -134,5 +144,7 @@ void main() {
       find.descendant(of: find.widgetWithText(AppButton, 'off'), matching: find.byType(Opacity)).first,
     );
     expect(dimmed.opacity, 0.45);
+    // Light filled buttons sit on #007785 (white 5.3:1), not on primary #0097A8 (3.5:1).
+    expect((ink.decoration! as BoxDecoration).color, const Color(0xFF007785));
   });
 }
