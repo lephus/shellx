@@ -1,4 +1,10 @@
+import 'dart:ui';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/cli_event_bus.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
@@ -7,6 +13,33 @@ import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import '../support/fake_local_sessions.dart';
 import 'support/cli_container.dart';
+
+/// A sidebar that places tabs only when the test says so: the bus then
+/// sees tabs before their workspace (as when its tab listener runs first).
+final class _ManualSidebar extends SidebarWorkspaces {
+  @override
+  SidebarState build() => const SidebarState(
+    workspaces: [Workspace(id: kDefaultWorkspaceId)],
+    members: {kDefaultWorkspaceId: []},
+  );
+
+  void put(SidebarState s) => state = s;
+}
+
+ProviderContainer _manualContainer(FakeLocalSessions local) {
+  final c = ProviderContainer.test(
+    overrides: [
+      localSessionsProvider.overrideWithValue(local),
+      appL10nProvider.overrideWithValue(
+        lookupAppLocalizations(const Locale('en')),
+      ),
+      settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      sidebarWorkspacesProvider.overrideWith(_ManualSidebar.new),
+    ],
+  );
+  c.read(terminalTabsProvider);
+  return c;
+}
 
 /// Past the 250 ms `pane.changed` window.
 Future<void> settle() =>
@@ -181,5 +214,77 @@ void main() {
     await pumpEventQueue();
     expect(early, isNotEmpty);
     expect(late, isEmpty);
+  });
+
+  group('a tab the sidebar has not placed yet (A7 Task 8 review)', () {
+    late ProviderContainer c;
+    late _ManualSidebar side;
+    late List<Map<String, Object?>> got;
+
+    setUp(() {
+      c = _manualContainer(local);
+      side = c.read(sidebarWorkspacesProvider.notifier) as _ManualSidebar;
+      got = [];
+      c.read(cliEventBusProvider).events.listen(got.add);
+    });
+
+    test('M1: its selection, focus and changes wait for tab.opened', () async {
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab(); // 100, selected
+      await tabs.split(SplitAxis.row); // 101, focused
+      local.setCwd(100, '/a');
+      await settle();
+      expect(got, isEmpty);
+      side.put(
+        const SidebarState(
+          workspaces: [Workspace(id: kDefaultWorkspaceId)],
+          members: {
+            kDefaultWorkspaceId: [100],
+          },
+        ),
+      );
+      await pumpEventQueue();
+      final kinds = got.map((e) => e['kind']).toList();
+      expect(kinds.first, 'tab.opened');
+      expect(
+        kinds,
+        containsAll(['tab.selected', 'pane.opened', 'pane.focused']),
+      );
+      expect(kinds.where((k) => k == 'tab.opened'), hasLength(1));
+    });
+
+    test(
+      'M2: workspace.created comes before the tab.opened it holds',
+      () async {
+        await c.read(terminalTabsProvider.notifier).openTab(); // 100
+        side.put(
+          const SidebarState(
+            workspaces: [
+              Workspace(id: kDefaultWorkspaceId),
+              Workspace(id: 'w1', name: 'api'),
+            ],
+            members: {
+              kDefaultWorkspaceId: [],
+              'w1': [100],
+            },
+          ),
+        );
+        await pumpEventQueue();
+        expect(got.map((e) => e['kind']), [
+          'workspace.created',
+          'tab.opened',
+          'tab.selected', // held for tab.opened (M1)
+        ]);
+        expect(got[1]['workspace'], 'w1');
+      },
+    );
+
+    test('M3: closed before it was placed: nothing at all', () async {
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab(); // 100
+      tabs.close(100);
+      await settle();
+      expect(got, isEmpty);
+    });
   });
 }

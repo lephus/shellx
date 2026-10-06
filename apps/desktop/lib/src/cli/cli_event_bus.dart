@@ -51,8 +51,9 @@ final class CliEventBus {
   final _timers = <int, Timer>{};
 
   /// New tabs the sidebar has not placed yet: `tab.opened` waits for
-  /// their workspace.
+  /// their workspace, and their other events wait for `tab.opened`.
   final _unplaced = <int>{};
+  final _deferred = <int, List<Map<String, Object?>>>{};
 
   static const _changeWindow = Duration(milliseconds: 250);
 
@@ -64,6 +65,15 @@ final class CliEventBus {
     if (_listened) _out.add(e);
   }
 
+  /// An event about [tab]: held while the tab waits for its `tab.opened`.
+  void _emitFor(int tab, Map<String, Object?> e) {
+    if (_unplaced.contains(tab)) {
+      (_deferred[tab] ??= []).add(e);
+    } else {
+      _emit(e);
+    }
+  }
+
   /// The last listener left: nothing pending is kept.
   void _forget() {
     for (final t in _timers.values) {
@@ -73,6 +83,7 @@ final class CliEventBus {
     _waiting.clear();
     _lastSent.clear();
     _unplaced.clear();
+    _deferred.clear();
   }
 
   // ---- tabs and panes -----------------------------------------------------
@@ -87,7 +98,7 @@ final class CliEventBus {
     // A tab that was there: selected before its pane's focus; a new one:
     // after its `tab.opened`.
     if (reselected && old.containsKey(selected)) {
-      _emit({'kind': 'tab.selected', 'tab': selected});
+      _emitFor(selected, {'kind': 'tab.selected', 'tab': selected});
     }
     for (final t in after.tabs) {
       final o = old[t.id];
@@ -98,16 +109,16 @@ final class CliEventBus {
       // A rename (custom title set or cleared); automatic titles follow
       // the panes' `pane.changed`.
       if (o.customTitle != t.customTitle) {
-        _emit({'kind': 'tab.renamed', 'tab': t.id, 'title': t.label});
+        _emitFor(t.id, {'kind': 'tab.renamed', 'tab': t.id, 'title': t.label});
       }
       for (final p in t.panes.values) {
         final op = o.panes[p.id];
         if (op == null) {
-          _emit({'kind': 'pane.opened', 'pane': p.id, 'tab': t.id});
+          _emitFor(t.id, {'kind': 'pane.opened', 'pane': p.id, 'tab': t.id});
           continue;
         }
         if (!op.exited && p.exited) {
-          _emit({
+          _emitFor(t.id, {
             'kind': 'pane.exited',
             'pane': p.id,
             'tab': t.id,
@@ -120,23 +131,29 @@ final class CliEventBus {
       for (final op in o.panes.values) {
         if (!t.panes.containsKey(op.id)) {
           _exitedGone(tabs, op, t.id);
-          _emit({'kind': 'pane.closed', 'pane': op.id, 'tab': t.id});
+          _emitFor(t.id, {'kind': 'pane.closed', 'pane': op.id, 'tab': t.id});
         }
       }
       if (o.focusedPaneId != t.focusedPaneId) {
-        _emit({'kind': 'pane.focused', 'pane': t.focusedPaneId, 'tab': t.id});
+        _emitFor(t.id, {
+          'kind': 'pane.focused',
+          'pane': t.focusedPaneId,
+          'tab': t.id,
+        });
       }
     }
     for (final o in old.values) {
       if (now.containsKey(o.id)) continue;
+      // Never announced: it goes without a word (no orphan tab.closed).
+      final silent = _unplaced.remove(o.id);
+      _deferred.remove(o.id);
       for (final op in o.panes.values) {
-        _exitedGone(tabs, op, o.id);
+        _exitedGone(tabs, op, o.id, silent: silent);
       }
-      _unplaced.remove(o.id);
-      _emit({'kind': 'tab.closed', 'tab': o.id});
+      if (!silent) _emit({'kind': 'tab.closed', 'tab': o.id});
     }
     if (reselected && !old.containsKey(selected)) {
-      _emit({'kind': 'tab.selected', 'tab': selected});
+      _emitFor(selected, {'kind': 'tab.selected', 'tab': selected});
     }
   }
 
@@ -153,10 +170,15 @@ final class CliEventBus {
 
   /// A pane that left: its exit, when its shell ended (exit 0 removes the
   /// pane at once); forgets its `pane.changed` state.
-  void _exitedGone(TerminalTabs tabs, PaneSession p, int tab) {
+  void _exitedGone(
+    TerminalTabs tabs,
+    PaneSession p,
+    int tab, {
+    bool silent = false,
+  }) {
     final code = tabs.lastExitCode(p.id);
-    if (!p.exited && code != null) {
-      _emit({
+    if (!silent && !p.exited && code != null) {
+      _emitFor(tab, {
         'kind': 'pane.exited',
         'pane': p.id,
         'tab': tab,
@@ -195,7 +217,7 @@ final class CliEventBus {
     final snap = _waiting.remove(pane);
     if (snap == null || _same(_lastSent[pane], snap)) return;
     _lastSent[pane] = snap;
-    _emit(snap);
+    _emitFor(snap['tab']! as int, snap);
   }
 
   static bool _same(Map<String, Object?>? a, Map<String, Object?> b) {
@@ -218,13 +240,6 @@ final class CliEventBus {
 
   void _side(SidebarState? before, SidebarState after) {
     if (!_listened || before == null) return;
-    for (final tab in [..._unplaced]) {
-      final ws = after.workspaceOf(tab);
-      if (ws != null) {
-        _unplaced.remove(tab);
-        _emit({'kind': 'tab.opened', 'tab': tab, 'workspace': ws});
-      }
-    }
     final names = _ref.read(sidebarWorkspacesProvider.notifier);
     final old = {for (final w in before.workspaces) w.id: w};
     for (final w in after.workspaces) {
@@ -246,6 +261,15 @@ final class CliEventBus {
     for (final w in before.workspaces) {
       if (after.workspace(w.id) == null) {
         _emit({'kind': 'workspace.deleted', 'workspace': w.id});
+      }
+    }
+    // After the workspace it went into was announced; then what waited.
+    for (final tab in [..._unplaced]) {
+      final ws = after.workspaceOf(tab);
+      if (ws != null) {
+        _unplaced.remove(tab);
+        _emit({'kind': 'tab.opened', 'tab': tab, 'workspace': ws});
+        _deferred.remove(tab)?.forEach(_emit);
       }
     }
     for (final w in after.workspaces) {
