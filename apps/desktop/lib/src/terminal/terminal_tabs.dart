@@ -508,6 +508,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// ⌘1…⌘9: the n-th tab (1-based); nothing when there is none.
   void selectIndex(int position) {
     if (position >= 1 && position <= state.tabs.length) {
+      _restoreMaySelect = false;
       _set(selectedId: state.tabs[position - 1].id);
     }
   }
@@ -637,6 +638,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       );
     }
     if (state.selectedId != tab.id) {
+      _restoreMaySelect = false; // the user chose (A5a D10)
       _set(selectedId: tab.id);
     } else if (unzoom) {
       _visibleChanged();
@@ -739,6 +741,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (tabs.isEmpty) return;
     final i = tabs.indexWhere((t) => t.id == state.selectedId);
     final next = i < 0 ? 0 : (i + delta) % tabs.length;
+    _restoreMaySelect = false; // the user chose (A5a D10)
     _set(selectedId: tabs[next < 0 ? next + tabs.length : next].id);
   }
 
@@ -819,6 +822,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (restored != null) feed.add(utf8.encode(restored));
     feed.add(view.backlog);
     feed.drain();
+    // A5a D8: [onReply] is set only after the drain above — load-bearing.
+    // Saved text holding a query (`ESC[6n`, `ESC[c`) is answered into
+    // nothing; a reply must never reach the new shell.
     // Plain assignments: a cascade after an arrow closure would be parsed
     // as part of that closure's body.
     terminal.onUserInput = (data) => _onUserInput(s.id, data);
@@ -996,7 +1002,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final tab = _tab(tabId);
     if (summary == null || tab == null) {
       _sync(own: id);
-      if (state.tabOfSession(id) case final own?) _set(selectedId: own.id);
+      if (state.tabOfSession(id) case final own?) {
+        _restoreMaySelect = false;
+        _set(selectedId: own.id);
+      }
       return;
     }
     final pane = _attach(summary, size: size);

@@ -471,4 +471,58 @@ void main() {
     expect(seen, [6]);
     await sub.cancel();
   });
+
+  for (final (name, choose) in <(String, void Function())>[
+    ('⌘2', () => tabs().selectIndex(2)),
+    ('next tab', () => tabs().next()),
+    ('previous tab', () => tabs().previous()),
+    ('a click in a pane', () => tabs().focusPane(6)),
+  ]) {
+    test('$name during restore: restore does not take the selection back '
+        '(D10)', () async {
+      local.add(local.summary(5));
+      local.add(local.summary(6));
+      boot();
+      final gate = Completer<void>();
+      local.openGate = gate;
+      final restoring = restore();
+      choose();
+      expect(state().selectedId, 6);
+      gate.complete();
+      local.openGate = null;
+      await restoring;
+      expect(state().selectedId, 6);
+    });
+  }
+
+  test('a reopened shell that ended before its tab was assembled counts as '
+      'failed and has no key (D7)', () async {
+    boot();
+    // Opens: k3 → 100, k1 → 101, k2 → 102. 100 (all of tab B) and 101 end
+    // before assembly.
+    local.afterOpen = (id) {
+      if (id == 100 || id == 101) {
+        local.summaries.removeWhere((s) => s.id == id);
+      }
+    };
+    final out = await restore();
+    expect(out.panesFailed, 2);
+    expect(out.keyBySession, {102: k2});
+    expect(out.tabsRestored, 1);
+    expect(state().tabs.single.layout, PaneLeaf(102));
+    expect((state().notice! as RestorePanesFailedNotice).count, 2);
+  });
+
+  test('saved text with terminal queries sends no reply to the new shell '
+      '(D8)', () async {
+    boot();
+    await tabs().restore(
+      RestorePlan(snapshot: snapshot(), textByKey: {k3: 'q\x1b[6n\x1b[c\r\n'}),
+    );
+    await pumpEventQueue();
+    for (final view in local.views.values) {
+      expect(view.replies, isEmpty);
+      expect(view.writes, isEmpty);
+    }
+  });
 }

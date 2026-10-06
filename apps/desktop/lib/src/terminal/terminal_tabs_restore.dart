@@ -96,6 +96,7 @@ extension _Restore on TerminalTabs {
         }
         if (!alive()) break;
         final layout = buildLayout(saved.layout, sessionByKey);
+        final ended = <int>[];
         final tab = layout == null
             ? null
             : _assemble(
@@ -104,7 +105,12 @@ extension _Restore on TerminalTabs {
                 sessionByKey,
                 grids,
                 workspaceOf[saved.key],
+                ended,
               );
+        // A pane whose shell ended before its tab was assembled did not
+        // come back either (D7).
+        failed += ended.length;
+        ended.forEach(keyBySession.remove);
         if (tab == null) continue;
         tabIdByKey[saved.key] = tab.id;
         // D7/D10: the saved tab is usable as soon as it is there; when it
@@ -222,13 +228,15 @@ extension _Restore on TerminalTabs {
   }
 
   /// Attaches the reopened sessions and adds the tab; null when none of
-  /// them is alive any more (ended in the meantime).
+  /// them is alive any more. Sessions that ended in the meantime are added
+  /// to [ended].
   TerminalTab? _assemble(
     SavedTab saved,
     PaneNode layout,
     Map<String, int> sessionByKey,
     Map<String, TerminalGrid> grids,
     String? workspaceId,
+    List<int> ended,
   ) {
     final summaries = {for (final s in _local.sessions) s.id: s};
     final keyOf = {for (final e in sessionByKey.entries) e.value: e.key};
@@ -241,6 +249,7 @@ extension _Restore on TerminalTabs {
           ? null
           : _attach(summary, size: grids[keyOf[id]]);
       if (pane == null) {
+        ended.add(id);
         _restoreText.remove(id);
         tree = removePane(tree, id) ?? tree;
         continue;
