@@ -6,8 +6,11 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
+import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/terminal/attention_marks.dart';
+import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
@@ -481,5 +484,50 @@ void main() {
     confirm.complete(false);
     await t.pump();
     expect(tabs().tabs, hasLength(1));
+  });
+  testSidebar('the ring surrounds only the pane that notified (D18)', (
+    t,
+  ) async {
+    await pumpSidebar(t);
+    await splitRight(t); // pane 100 focused
+    container.read(windowFocusProvider.notifier).set(false);
+    local.notice(1, SessionNoticeKind.message, body: 'done');
+    await t.pump(); // the notice lands
+    await t.pump(); // the page rebuilds
+    expect(container.read(tabAttentionProvider).unreadPanes(1), {1});
+    final rings = find.byWidgetPredicate(
+      (w) => w is AttentionRing && w.visible,
+    );
+    expect(rings, findsOneWidget);
+    final ring = t.getRect(rings);
+    expect(ring.left, t.getRect(find.byKey(const Key('pane.header.1'))).left);
+    expect(
+      ring.right,
+      lessThan(t.getRect(find.byKey(const Key('pane.header.100'))).left),
+    );
+  });
+
+  testSidebar("zoomed: a hidden pane's unread shows as the dot by the "
+      'zoom indicator', (t) async {
+    await pumpSidebar(t);
+    await splitRight(t); // pane 100 focused
+    panes().toggleZoom();
+    await t.pump();
+    container.read(windowFocusProvider.notifier).set(false);
+    local.notice(100, SessionNoticeKind.message, body: 'seen-ish');
+    await t.pump();
+    await t.pump();
+    expect(container.read(tabAttentionProvider).unreadPanes(1), {100});
+    Finder dot() => find.descendant(
+      of: find.byKey(const Key('pane.zoomed')),
+      matching: find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_Dot',
+      ),
+    );
+    expect(dot(), findsNothing); // the zoomed pane itself is visible
+    local.notice(1, SessionNoticeKind.message, body: 'done');
+    await t.pump();
+    await t.pump();
+    expect(dot(), findsOneWidget);
   });
 }

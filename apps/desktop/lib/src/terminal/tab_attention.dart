@@ -18,11 +18,15 @@ enum AttentionKind { message, command, bell }
 final class TabUnread {
   const TabUnread({
     required this.count,
+    required this.panes,
     required this.notice,
     required this.kind,
     required this.at,
   });
   final int count;
+
+  /// A3 D18: unread per pane (session id); [count] is their sum.
+  final Map<int, int> panes;
 
   /// The last one (the sidebar line). Kept as the notice, not its words,
   /// so the line is worded in the language shown now.
@@ -43,6 +47,7 @@ final class AttentionEntry {
   const AttentionEntry({
     required this.seq,
     required this.tabId,
+    required this.paneId,
     required this.tabLabel,
     required this.kind,
     required this.notice,
@@ -53,6 +58,9 @@ final class AttentionEntry {
   });
   final int seq;
   final int tabId;
+
+  /// A3 D18: the pane (session id) it came from.
+  final int paneId;
 
   /// The tab's label when it arrived (shown once the tab is gone).
   final String tabLabel;
@@ -83,6 +91,7 @@ final class AttentionEntry {
   }) => AttentionEntry(
     seq: seq,
     tabId: tabId,
+    paneId: paneId,
     tabLabel: tabLabel,
     kind: kind,
     notice: notice,
@@ -104,6 +113,13 @@ final class AttentionState {
 
   int get totalUnread => unread.values.fold(0, (sum, u) => sum + u.count);
   bool hasUnread(int tabId) => unread.containsKey(tabId);
+
+  /// A3 D18: the pane rings.
+  bool paneHasUnread(int tabId, int paneId) =>
+      (unread[tabId]?.panes[paneId] ?? 0) > 0;
+
+  Set<int> unreadPanes(int tabId) =>
+      unread[tabId]?.panes.keys.toSet() ?? const {};
 }
 
 /// A notice the user has not seen (not D7): system notification, taskbar
@@ -218,7 +234,9 @@ class TabAttention extends Notifier<AttentionState> {
   final _arrivals = StreamController<AttentionArrival>.broadcast(sync: true);
   final _reads = StreamController<int>.broadcast(sync: true);
   Timer? _dwell;
-  int? _dwellFor;
+
+  /// (tab id, pane id) the dwell timer reads (A3 D18).
+  (int, int)? _dwellFor;
   int _seq = 0;
 
   /// Notices the user has not seen. Consumers subscribe through
@@ -253,7 +271,39 @@ class TabAttention extends Notifier<AttentionState> {
     return const AttentionState();
   }
 
+  /// Every pane of tab [tabId].
   void markRead(int tabId) => _markRead({tabId});
+
+  /// A3 D18: one pane read (the 1 s dwell on the focused pane). The tab's
+  /// system notification goes ([reads]) only when no pane is left unread.
+  void markPaneRead(int tabId, int paneId) {
+    final before = state.unread[tabId];
+    if (before == null || !before.panes.containsKey(paneId)) return;
+    final panes = Map.of(before.panes)..remove(paneId);
+    final unread = Map.of(state.unread);
+    if (panes.isEmpty) {
+      unread.remove(tabId);
+    } else {
+      unread[tabId] = TabUnread(
+        count: before.count - before.panes[paneId]!,
+        panes: panes,
+        notice: before.notice,
+        kind: before.kind,
+        at: before.at,
+      );
+    }
+    state = AttentionState(
+      unread: unread,
+      history: [
+        for (final e in state.history)
+          e.tabId == tabId && e.paneId == paneId && !e.read
+              ? e.copyWith(read: true)
+              : e,
+      ],
+    );
+    if (_dwellFor == (tabId, paneId)) _cancelDwell();
+    if (panes.isEmpty) _reads.add(tabId);
+  }
 
   /// One state update for all tabs.
   void markAllRead() => _markRead(state.unread.keys.toSet());
@@ -264,7 +314,8 @@ class TabAttention extends Notifier<AttentionState> {
         if (tabIds.contains(id)) id,
     ];
     final stale = state.history.any((e) => !e.read && tabIds.contains(e.tabId));
-    if (_dwellFor != null && tabIds.contains(_dwellFor)) _cancelDwell();
+    final dwelling = _dwellFor;
+    if (dwelling != null && tabIds.contains(dwelling.$1)) _cancelDwell();
     if (had.isEmpty && !stale) return;
     state = AttentionState(
       unread: Map.of(state.unread)..removeWhere((id, _) => tabIds.contains(id)),
@@ -292,15 +343,22 @@ class TabAttention extends Notifier<AttentionState> {
     return null;
   }
 
-  /// D16 / panel Enter / next unread: select, expand its workspace, read
-  /// at once (the user asked), keyboard to the terminal. False when the
-  /// tab is gone.
+  /// D16 / panel Enter / next unread: select, expand its workspace, focus
+  /// the pane with the newest unread notice (A3 D18), read at once (the
+  /// user asked), keyboard to the terminal. False when the tab is gone.
   bool jumpTo(int tabId) {
     if (!ref.read(terminalTabsProvider).tabs.any((t) => t.id == tabId)) {
       return false;
     }
+    final newest = state.history
+        .where((e) => e.tabId == tabId && !e.read)
+        .map((e) => e.paneId)
+        .firstOrNull;
+    final tabs = ref.read(terminalTabsProvider.notifier);
     ref.read(sidebarWorkspacesProvider.notifier).reveal(tabId);
-    ref.read(terminalTabsProvider.notifier).select(tabId);
+    tabs.select(tabId);
+    final tab = ref.read(terminalTabsProvider).tabOfSession(newest ?? -1);
+    if (newest != null && tab?.id == tabId) tabs.focusPane(newest);
     markRead(tabId);
     ref.read(terminalFocusRequestProvider.notifier).request();
     return true;
@@ -313,15 +371,15 @@ class TabAttention extends Notifier<AttentionState> {
   void _onNotice(SessionNotice notice) {
     if (!ref.mounted) return;
     final tabs = ref.read(terminalTabsProvider);
-    TerminalTab? tab;
-    for (final t in tabs.tabs) {
-      if (t.id == notice.sessionId) tab = t;
-    }
-    if (tab == null) return; // not (or no longer) a tab of this window
-    final seen = tabs.selectedId == tab.id && _active;
+    final tab = tabs.tabOfSession(notice.sessionId);
+    if (tab == null) return; // not (or no longer) a pane of this window
+    final pane = notice.sessionId;
+    // A3 D18: only the focused pane of the selected tab is in view.
+    final seen =
+        tabs.selectedId == tab.id && tab.focusedPaneId == pane && _active;
     if (seen && notice.kind == SessionNoticeKind.bell) return; // D7
     final kind = _kindOf(notice.kind);
-    final history = _withEntry(tab, kind, notice, read: seen);
+    final history = _withEntry(tab, pane, kind, notice, read: seen);
     if (seen) {
       state = AttentionState(unread: state.unread, history: history);
       return;
@@ -332,6 +390,7 @@ class TabAttention extends Notifier<AttentionState> {
         ...state.unread,
         tab.id: TabUnread(
           count: (before?.count ?? 0) + 1,
+          panes: {...?before?.panes, pane: (before?.panes[pane] ?? 0) + 1},
           notice: notice,
           kind: kind,
           at: notice.at,
@@ -349,6 +408,7 @@ class TabAttention extends Notifier<AttentionState> {
 
   List<AttentionEntry> _withEntry(
     TerminalTab tab,
+    int paneId,
     AttentionKind kind,
     SessionNotice notice, {
     required bool read,
@@ -360,6 +420,7 @@ class TabAttention extends Notifier<AttentionState> {
         first != null &&
         first.kind == AttentionKind.bell &&
         first.tabId == tab.id &&
+        first.paneId == paneId &&
         first.read == read) {
       return [
         first.copyWith(repeat: first.repeat + 1, at: at),
@@ -370,6 +431,7 @@ class TabAttention extends Notifier<AttentionState> {
       AttentionEntry(
         seq: _seq++,
         tabId: tab.id,
+        paneId: paneId,
         tabLabel: tab.label,
         kind: kind,
         notice: notice,
@@ -381,46 +443,77 @@ class TabAttention extends Notifier<AttentionState> {
   }
 
   /// D26: tabs that went away lose their unread; history keeps them,
-  /// closed and read (nothing is left to read there).
+  /// closed and read (nothing is left to read there). A3 D18: so do panes
+  /// that left a tab that is still here (their entries stay jumpable, read).
   void _dropGone(TerminalTabsState tabs) {
-    final ids = {for (final t in tabs.tabs) t.id};
-    final gone = state.unread.keys.where((id) => !ids.contains(id)).toList();
-    final closing = state.history.any(
-      (e) => !e.closed && !ids.contains(e.tabId),
+    final present = {for (final t in tabs.tabs) t.id: t};
+    bool paneGone(int tabId, int paneId) =>
+        !(present[tabId]?.panes.containsKey(paneId) ?? false);
+    final unread = <int, TabUnread>{};
+    final emptied = <int>[];
+    var changed = false;
+    for (final MapEntry(key: id, value: u) in state.unread.entries) {
+      final panes = {
+        for (final MapEntry(key: p, value: n) in u.panes.entries)
+          if (!paneGone(id, p)) p: n,
+      };
+      if (panes.isEmpty) {
+        emptied.add(id);
+        changed = true;
+      } else if (panes.length == u.panes.length) {
+        unread[id] = u;
+      } else {
+        changed = true;
+        unread[id] = TabUnread(
+          count: panes.values.fold(0, (a, b) => a + b),
+          panes: panes,
+          notice: u.notice,
+          kind: u.kind,
+          at: u.at,
+        );
+      }
+    }
+    final stale = state.history.any(
+      (e) =>
+          (!e.closed && !present.containsKey(e.tabId)) ||
+          (!e.read && paneGone(e.tabId, e.paneId)),
     );
-    if (gone.isEmpty && !closing) return;
+    if (!changed && !stale) return;
     state = AttentionState(
-      unread: Map.of(state.unread)..removeWhere((id, _) => !ids.contains(id)),
+      unread: unread,
       history: [
         for (final e in state.history)
-          !e.closed && !ids.contains(e.tabId)
-              ? e.copyWith(closed: true, read: true)
-              : e,
+          if (!e.closed && !present.containsKey(e.tabId))
+            e.copyWith(closed: true, read: true)
+          else if (!e.read && paneGone(e.tabId, e.paneId))
+            e.copyWith(read: true)
+          else
+            e,
       ],
     );
-    for (final id in gone) {
-      _reads.add(id);
-    }
+    emptied.forEach(_reads.add);
   }
 
-  /// D10: one timer for the selected tab while it has unread and the
-  /// window is active; unchanged conditions keep the running timer.
+  /// D10: one timer for the selected tab's focused pane (A3 D18) while it
+  /// has unread and the window is active; unchanged conditions keep the
+  /// running timer.
   void _armDwell() {
     if (!ref.mounted) return;
-    final id = ref.read(terminalTabsProvider).selectedId;
-    final wanted = id != null && state.hasUnread(id) && _active;
-    if (!wanted) {
+    final tab = ref.read(terminalTabsProvider).selected;
+    final key = tab == null ? null : (tab.id, tab.focusedPaneId);
+    if (key == null || !state.paneHasUnread(key.$1, key.$2) || !_active) {
       _cancelDwell();
       return;
     }
-    if (_dwellFor == id && (_dwell?.isActive ?? false)) return;
+    if (_dwellFor == key && (_dwell?.isActive ?? false)) return;
     _cancelDwell();
-    _dwellFor = id;
+    _dwellFor = key;
     _dwell = Timer(dwell, () {
       _dwellFor = null;
       if (!ref.mounted) return;
-      if (ref.read(terminalTabsProvider).selectedId == id && _active) {
-        markRead(id);
+      final now = ref.read(terminalTabsProvider).selected;
+      if (now?.id == key.$1 && now?.focusedPaneId == key.$2 && _active) {
+        markPaneRead(key.$1, key.$2);
       }
     });
   }
