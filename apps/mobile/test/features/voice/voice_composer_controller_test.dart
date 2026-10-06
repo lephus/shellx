@@ -221,4 +221,31 @@ void main() {
     expect(sent, isEmpty);
     // tearDown disposes again: dispose must be idempotent.
   });
+
+  test('a listen that ended with done and no result is replaced by the next mic tap', () async {
+    await listen();
+    speech.emit(const SpeechListening(false));
+    await voice.toggleMic('vi');
+    expect(speech.cancels, 1);
+    expect(speech.starts, hasLength(2));
+    expect(voice.phase.value, VoicePhase.listening);
+  });
+
+  test('the old listen\'s done after the cloud retry started does not end the new listen', () async {
+    await listen();
+    speech.emit(const SpeechFailed(SpeechErrorKind.localeUnavailable));
+    speech.emit(const SpeechListening(false));
+    expect(voice.phase.value, VoicePhase.listening);
+    speech.emit(const SpeechFinal('x gửi'));
+    expect(sent, ['x']);
+  });
+
+  test('after the retry, the started status brings the phase back to listening', () async {
+    await listen();
+    speech.emit(const SpeechFailed(SpeechErrorKind.localeUnavailable));
+    speech.emit(const SpeechListening(true));
+    expect(voice.phase.value, VoicePhase.listening);
+    speech.emit(const SpeechListening(false));
+    expect(voice.phase.value, VoicePhase.idle);
+  });
 }

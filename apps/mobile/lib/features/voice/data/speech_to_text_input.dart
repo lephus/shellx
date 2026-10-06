@@ -27,8 +27,10 @@ String? pickLocaleId(Iterable<String> available, VoiceLocale locale) {
 /// The plugin reports Android `SpeechRecognizer` error names and a few iOS ones as strings.
 SpeechErrorKind speechErrorKind(String errorMsg) => switch (errorMsg) {
   'error_insufficient_permissions' || 'error_permission' => SpeechErrorKind.noPermission,
-  'error_network' || 'error_network_timeout' || 'error_server' || 'error_server_disconnected' =>
-    SpeechErrorKind.network,
+  'error_network' ||
+  'error_network_timeout' ||
+  'error_server' ||
+  'error_server_disconnected' => SpeechErrorKind.network,
   'error_no_match' || 'error_speech_timeout' => SpeechErrorKind.noMatch,
   'error_language_not_supported' || 'error_language_unavailable' => SpeechErrorKind.localeUnavailable,
   'error_audio_error' => SpeechErrorKind.interrupted,
@@ -94,10 +96,22 @@ class SpeechToTextInput implements SpeechInput {
   }
 
   @override
-  Future<void> stop() => _speech.stop();
+  Future<void> stop() async {
+    try {
+      await _speech.stop();
+    } catch (error) {
+      if (kDebugMode) debugPrint('SpeechToTextInput stop error: ${error.runtimeType}');
+    }
+  }
 
   @override
-  Future<void> cancel() => _speech.cancel();
+  Future<void> cancel() async {
+    try {
+      await _speech.cancel();
+    } catch (error) {
+      if (kDebugMode) debugPrint('SpeechToTextInput cancel error: ${error.runtimeType}');
+    }
+  }
 
   void _onResult(SpeechRecognitionResult result) {
     _events.add(result.finalResult ? SpeechFinal(result.recognizedWords) : SpeechPartial(result.recognizedWords));

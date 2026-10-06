@@ -2,7 +2,8 @@
 /// each: "send" said while listening in Vietnamese is just a word.
 enum VoiceLocale {
   vi(languageCode: 'vi', preferredLocaleId: 'vi-VN', sendWords: {'gửi'}, cancelWords: {'huỷ', 'hủy'}),
-  en(languageCode: 'en', preferredLocaleId: 'en-US', sendWords: {'send'}, cancelWords: {'cancel'});
+  en(languageCode: 'en', preferredLocaleId: 'en-US', sendWords: {'send'}, cancelWords: {'cancel'})
+  ;
 
   const VoiceLocale({
     required this.languageCode,

@@ -34,7 +34,10 @@ void main() {
     });
 
     test('plain text is appended trimmed', () {
-      expect(VoiceCommandParser.parse('  sửa bug trong auth service ', vi), const VoiceAppend('sửa bug trong auth service'));
+      expect(
+        VoiceCommandParser.parse('  sửa bug trong auth service ', vi),
+        const VoiceAppend('sửa bug trong auth service'),
+      );
     });
 
     test('empty input appends nothing', () {

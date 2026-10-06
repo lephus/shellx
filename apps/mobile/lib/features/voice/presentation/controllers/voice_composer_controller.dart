@@ -43,6 +43,10 @@ class VoiceComposerController extends Controller {
   bool _starting = false;
   bool _onDeviceAttempt = false;
   bool _heard = false;
+
+  /// This listen has shown it started (status, partial or final): an earlier listen's late `done` must
+  /// not end it.
+  bool _started = false;
   bool _disposed = false;
 
   ReadonlySignal<VoicePhase> get phase => _phase;
@@ -107,7 +111,12 @@ class VoiceComposerController extends Controller {
   }
 
   Future<void> _startListening() async {
-    if (_starting || _active) return;
+    if (_starting) return;
+    // `done` without a result leaves a drained listen: drop it, then start fresh.
+    if (_active) {
+      if (_phase.peek() == VoicePhase.listening) return;
+      _cancelListen();
+    }
     _starting = true;
     try {
       _issue.value = null;
@@ -128,6 +137,7 @@ class VoiceComposerController extends Controller {
       _committed = text.text.trim();
       _heard = false;
       _onDeviceAttempt = true;
+      _started = false;
       _active = true;
       _phase.value = VoicePhase.listening;
       await _speech.start(localeId, onDevice: true);
@@ -141,17 +151,24 @@ class VoiceComposerController extends Controller {
     switch (event) {
       case SpeechPartial(:final text):
         _heard = true;
+        _started = true;
         _show(_join(_committed, text));
       case SpeechFinal(:final text):
         _heard = true;
+        _started = true;
         _active = false;
         _phase.value = VoicePhase.idle;
         _apply(VoiceCommandParser.parse(text, _locale.peek()));
       case SpeechFailed(:final kind):
         _onFailed(kind);
       case SpeechListening(:final listening):
-        // `done` may come before the final result: keep the listen active for it.
-        if (!listening) _phase.value = VoicePhase.idle;
+        if (listening) {
+          _started = true;
+          _phase.value = VoicePhase.listening;
+        } else if (_started) {
+          // `done` may come before the final result: keep the listen active for it.
+          _phase.value = VoicePhase.idle;
+        }
     }
   }
 
@@ -176,9 +193,11 @@ class VoiceComposerController extends Controller {
   /// Spec V4: on-device first; a phone that cannot do it on the device fails before any words, and
   /// gets one more try with the OS cloud recognizer.
   void _onFailed(SpeechErrorKind kind) {
-    final retry = _onDeviceAttempt && !_heard && (kind == SpeechErrorKind.localeUnavailable || kind == SpeechErrorKind.other);
+    final retry =
+        _onDeviceAttempt && !_heard && (kind == SpeechErrorKind.localeUnavailable || kind == SpeechErrorKind.other);
     if (retry) {
       _onDeviceAttempt = false;
+      _started = false;
       unawaited(_speech.start(_localeId!, onDevice: false));
       return;
     }
@@ -212,7 +231,10 @@ class VoiceComposerController extends Controller {
   }
 
   void _show(String value) {
-    text.value = TextEditingValue(text: value, selection: TextSelection.collapsed(offset: value.length));
+    text.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
   }
 
   static String _join(String before, String after) =>
