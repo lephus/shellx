@@ -157,7 +157,12 @@ final class FakeLocalSessions implements LocalSessions {
 
   /// Session [id] starts or stops running a command (A1 D15); fires
   /// [changes].
-  void setRunning(int id, bool running) {
+  void setRunning(int id, bool running) => _update(id, running: running);
+
+  /// Session [id] reports a new working directory (A2); fires [changes].
+  void setCwd(int id, String cwd) => _update(id, cwd: cwd);
+
+  void _update(int id, {bool? running, String? cwd}) {
     final s = summaries.firstWhere((s) => s.id == id);
     replace(
       SessionSummary(
@@ -168,9 +173,9 @@ final class FakeLocalSessions implements LocalSessions {
         attachedMobileId: s.attachedMobileId,
         origin: s.origin,
         title: s.title,
-        runningCommand: running,
+        runningCommand: running ?? s.runningCommand,
         driver: s.driver,
-        cwd: s.cwd,
+        cwd: cwd ?? s.cwd,
         gitBranch: s.gitBranch,
         ports: s.ports,
       ),

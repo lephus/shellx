@@ -204,6 +204,40 @@ void main() {
     expect(tabs().selectedId, isNot(2));
   });
 
+  testSidebar('A7 D23: a "Command line" entry shows its source, never "Tab '
+      'closed"; Enter reads it and closes the panel; it alone enables '
+      '"Mark all as read"', (tester) async {
+    await pumpSidebar(tester);
+    final selected = tabs().selectedId;
+    container
+        .read(tabAttentionProvider.notifier)
+        .addCommandLine(title: 'cron', body: 'backup done');
+    await tester.pump();
+    await openPanel(tester);
+    final texts = panelTexts(tester);
+    expect(texts, contains('Command line'));
+    expect(texts, contains('cron: backup done'));
+    expect(find.textContaining('Tab closed'), findsNothing);
+    final markAll = tester.widget<TextButton>(
+      find.byKey(const Key('panel.markAll')),
+    );
+    expect(markAll.onPressed, isNotNull);
+    await press(tester, LogicalKeyboardKey.enter);
+    expect(panel, findsNothing);
+    expect(tabs().selectedId, selected);
+    expect(container.read(tabAttentionProvider).history.single.read, isTrue);
+  });
+
+  testSidebar('A7 D23: the "Command line" entry follows the language shown', (
+    tester,
+  ) async {
+    await pumpSidebar(tester, locale: const Locale('vi'));
+    container.read(tabAttentionProvider.notifier).addCommandLine(body: 'xong');
+    await tester.pump();
+    await openPanel(tester);
+    expect(panelTexts(tester), contains('Dòng lệnh'));
+  });
+
   testSidebar('empty state and disabled "Mark all as read"', (tester) async {
     await pumpSidebar(tester);
     await openPanel(tester);

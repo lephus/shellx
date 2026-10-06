@@ -425,4 +425,48 @@ void main() {
     expect(unreadBadgeLabel(99), '99');
     expect(unreadBadgeLabel(100), '99+');
   });
+
+  test('A7 D23: command-line entries are history only', () async {
+    boot(active: true);
+    final arrivals = <AttentionArrival>[];
+    attention().arrivals.listen(arrivals.add);
+    final a = attention();
+    a.addCommandLine(title: 'cron', body: 'done');
+    final s = state();
+    expect(s.history.first.tabId, kCommandLineTabId);
+    expect(s.history.first.tabLabel, 'Command line');
+    expect(s.history.first.text(l10n()), 'cron: done');
+    expect(s.history.first.read, isFalse);
+    expect(s.unread, isEmpty);
+    expect(s.totalUnread, 0);
+    expect(a.jumpTo(kCommandLineTabId), isFalse); // raises the window only
+    // Announced as an arrival with its own title, for the system
+    // notification (treated as unfocused there).
+    expect(arrivals.single.tabId, kCommandLineTabId);
+    expect(arrivals.single.title, 'cron');
+    expect(arrivals.single.text, 'done');
+    // Never "Tab closed": tab 0 is never in the tab list.
+    await c.read(terminalTabsProvider.notifier).openTab();
+    await settle();
+    expect(state().history.first.closed, isFalse);
+    expect(state().history.first.read, isFalse);
+    a.markRead(kCommandLineTabId);
+    expect(state().history.first.read, isTrue);
+  });
+
+  test('A7 D23: mark all as read includes command-line entries', () {
+    boot();
+    attention().addCommandLine(body: 'one');
+    attention().markAllRead();
+    expect(state().history.single.read, isTrue);
+  });
+
+  test('A7 D23: command-line entries count toward the 50-entry history', () {
+    boot();
+    for (var i = 0; i < 60; i++) {
+      attention().addCommandLine(body: '$i');
+    }
+    expect(state().history, hasLength(TabAttention.historyLimit));
+    expect(state().history.first.notice.body, '59');
+  });
 }

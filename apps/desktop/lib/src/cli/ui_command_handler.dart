@@ -9,6 +9,7 @@ import '../terminal/sidebar_workspaces.dart';
 import '../terminal/tab_attention.dart';
 import '../terminal/terminal_tabs.dart';
 import 'agent_marks.dart';
+import 'cli_event_bus.dart';
 import 'cli_fields.dart';
 import 'cli_targets.dart';
 import 'ui_pane_io.dart';
@@ -28,7 +29,8 @@ const _runningCommand = CliFailure(
 
 /// A7 §3.3: the `ui.*` requests of the command line, run on the window's
 /// tabs and sidebar. Browser panes (A6) are not here yet: `ls` lists
-/// terminal panes only and `ui.browser.*` is `unknown_type`.
+/// terminal panes only and `ui.browser.*` is `unknown_type` (ledger:
+/// browser pending A6).
 ///
 /// Never logs request contents (cwd, commands, names, text sent or read).
 final class UiCommandHandler implements UiApi {
@@ -78,7 +80,9 @@ final class UiCommandHandler implements UiApi {
       CliType.uiPaneSend => _io.send(request),
       CliType.uiPaneRead => _io.read(request),
       CliType.uiPaneWait => _io.wait(request, cancelled),
-      // Task 8: ui.notify, events.
+      CliType.uiNotify => _uiNotify(request),
+      // D34: arms the daemon's forwarding of [events]; nothing to answer.
+      CliType.uiEventsSubscribe => Future.value(const <String, Object?>{}),
       // ui.browser.*: pending A6.
       _ => throw CliFailure(MuxError.unknownType, 'unknown request $t'),
     };
@@ -346,13 +350,45 @@ final class UiCommandHandler implements UiApi {
     return const {};
   }
 
-  // ---- completed in Task 8 ------------------------------------------------
+  // ---- notify and events (D23, D24) ---------------------------------------
+
+  /// D34: the daemon's pane-less `cli.notify`, checked again here (any
+  /// `ui.*` sender gets the host's rules: text needed, controls go).
+  Future<Map<String, Object?>> _uiNotify(MuxMessage r) async {
+    final body = _plain(
+      textField(r, 'body', maxBytes: kSendMaxBytes, limit: '48 KiB') ?? '',
+    );
+    if (body.trim().isEmpty) throw badRequest('notify needs text');
+    final title = stringField(r, 'title', max: kSendMaxBytes);
+    await notifyApp(title: title == null ? null : _plain(title), body: body);
+    return const {};
+  }
+
+  static final _controls = RegExp('[\x00-\x1F\x7F\u0080-\u009F]');
+
+  static String _plain(String s) => s.replaceAll(_controls, ' ');
 
   @override
-  Stream<Map<String, Object?>> events() => const Stream.empty();
+  Stream<Map<String, Object?>> events() =>
+      _ref.read(cliEventBusProvider).events;
 
+  /// D23 (3): a "Command line" panel entry and its system notification
+  /// (A4 D14 switches, D15 limits: at most 20 per app per minute). Text is
+  /// cut as the host cuts it (title 128, body 1024 characters).
   @override
-  Future<void> notifyApp({String? title, required String body}) async {}
+  Future<void> notifyApp({String? title, required String body}) async {
+    _ref
+        .read(tabAttentionProvider.notifier)
+        .addCommandLine(
+          title: title == null ? null : _cut(title, 128),
+          body: _cut(body, 1024),
+        );
+  }
+
+  static String _cut(String s, int max) {
+    final runes = s.runes;
+    return runes.length <= max ? s : String.fromCharCodes(runes.take(max));
+  }
 
   @override
   bool notifyPane(int pane, {String? title, required String body}) =>

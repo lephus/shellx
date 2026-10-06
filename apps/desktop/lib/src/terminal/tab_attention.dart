@@ -13,6 +13,10 @@ import 'terminal_tabs.dart';
 
 enum AttentionKind { message, command, bell }
 
+/// A7 D23: the "tab" of entries from `shellx notify` outside a pane.
+/// Session ids start at 1 (`sessionIdAllocator`), so 0 is never a tab.
+const int kCommandLineTabId = 0;
+
 /// A tab's unread notifications since it was last read (A4 D8, D9).
 @immutable
 final class TabUnread {
@@ -133,6 +137,7 @@ final class AttentionArrival {
     required this.kind,
     required this.text,
     required this.at,
+    this.title,
   });
   final int tabId;
 
@@ -142,6 +147,10 @@ final class AttentionArrival {
   final AttentionKind kind;
   final String text;
   final DateTime at;
+
+  /// A7 D23: a command-line entry's own title (tabs are titled by their
+  /// label instead).
+  final String? title;
 }
 
 /// UI-A4 §2.1, D8.
@@ -311,8 +320,46 @@ class TabAttention extends Notifier<AttentionState> {
     if (panes.isEmpty) _reads.add(tabId);
   }
 
-  /// One state update for all tabs.
-  void markAllRead() => _markRead(state.unread.keys.toSet());
+  /// One state update for all tabs, and the command-line entries.
+  void markAllRead() => _markRead({...state.unread.keys, kCommandLineTabId});
+
+  /// A7 D23: a `shellx notify` from outside a pane — a panel entry, no
+  /// badge, no ring, never closed. Arrives (for its system notification,
+  /// treated as "window not in front") with its own [title].
+  void addCommandLine({String? title, required String body}) {
+    final notice = SessionNotice(
+      sessionId: kCommandLineTabId,
+      kind: SessionNoticeKind.message,
+      at: DateTime.now(),
+      title: title,
+      body: body,
+    );
+    state = AttentionState(
+      unread: state.unread,
+      history: [
+        AttentionEntry(
+          seq: _seq++,
+          tabId: kCommandLineTabId,
+          paneId: kCommandLineTabId,
+          tabLabel: ref.read(appL10nProvider).cliNoticeSource,
+          kind: AttentionKind.message,
+          notice: notice,
+          at: notice.at,
+        ),
+        ...state.history.take(historyLimit - 1),
+      ],
+    );
+    _arrivals.add(
+      AttentionArrival(
+        tabId: kCommandLineTabId,
+        paneId: kCommandLineTabId,
+        kind: AttentionKind.message,
+        text: _oneLine(body),
+        at: notice.at,
+        title: title,
+      ),
+    );
+  }
 
   void _markRead(Set<int> tabIds) {
     final had = [
@@ -457,9 +504,14 @@ class TabAttention extends Notifier<AttentionState> {
   /// D26: tabs that went away lose their unread; history keeps them,
   /// closed and read (nothing is left to read there). A3 D18: so do panes
   /// that left a tab that is still here (their entries stay jumpable, read).
+  /// Command-line entries (A7 D23) never had a tab: they stay as they are.
   void _dropGone(TerminalTabsState tabs) {
-    final present = {for (final t in tabs.tabs) t.id: t};
+    final present = {
+      for (final t in tabs.tabs) t.id: t,
+      kCommandLineTabId: null,
+    };
     bool paneGone(int tabId, int paneId) =>
+        tabId != kCommandLineTabId &&
         !(present[tabId]?.panes.containsKey(paneId) ?? false);
     final unread = <int, TabUnread>{};
     final emptied = <int>[];

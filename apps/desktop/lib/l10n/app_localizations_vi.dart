@@ -1061,4 +1061,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String restorePanesFailed(int count) {
     return 'Không mở lại được $count pane';
   }
+
+  @override
+  String get cliNoticeSource => 'Dòng lệnh';
 }

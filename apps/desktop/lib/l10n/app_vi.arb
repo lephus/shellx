@@ -256,5 +256,6 @@
   "restoreAbnormalStrip": "{count, plural, other{ShellX đã đóng bất thường lần trước. Đã mở lại {count} tab; nội dung tính tới {time}.}}",
   "restoreAbnormalNoText": "{count, plural, other{ShellX đã đóng bất thường lần trước. Đã mở lại {count} tab.}}",
   "restoreStripCloseLabel": "Đóng thông báo khôi phục",
-  "restorePanesFailed": "Không mở lại được {count} pane"
+  "restorePanesFailed": "Không mở lại được {count} pane",
+  "cliNoticeSource": "Dòng lệnh"
 }

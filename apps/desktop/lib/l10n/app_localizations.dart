@@ -1644,6 +1644,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Couldn\'t reopen 1 pane} other{Couldn\'t reopen {count} panes}}'**
   String restorePanesFailed(int count);
+
+  /// A7 D23: label of a notification sent by `shellx notify` from outside a ShellX pane
+  ///
+  /// In en, this message translates to:
+  /// **'Command line'**
+  String get cliNoticeSource;
 }
 
 class _AppLocalizationsDelegate
