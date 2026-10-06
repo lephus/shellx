@@ -105,4 +105,55 @@ void main() {
       await lock.release();
     },
   );
+
+  File quitSignal() => File(
+    '${dir.path}${Platform.pathSeparator}${SingleInstanceLock.quitFileName}',
+  );
+
+  test('the installer can ask the running instance to quit (A5a I1)', () async {
+    final lock = SingleInstanceLock(dir);
+    expect(await lock.acquire(), isTrue);
+    final request = lock.quitRequests().first;
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await quitSignal().writeAsString('1', flush: true);
+    await request.timeout(const Duration(seconds: 10));
+    await lock.release();
+  });
+
+  test('a quit signal is not an activation request, nor the reverse', () async {
+    final lock = SingleInstanceLock(dir);
+    expect(await lock.acquire(), isTrue);
+    final activations = <void>[];
+    final quits = <void>[];
+    final a = lock.activationRequests().listen(activations.add);
+    final q = lock.quitRequests().listen(quits.add);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await quitSignal().writeAsString('1', flush: true);
+    await SingleInstanceLock(dir).signalRunningInstance();
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while ((activations.isEmpty || quits.isEmpty) &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(activations, hasLength(1));
+    expect(quits, hasLength(1));
+    await a.cancel();
+    await q.cancel();
+    await lock.release();
+  });
+
+  test('a quit signal left from an earlier run is deleted when the lock is '
+      'taken, so it never quits the new instance (A5a I1)', () async {
+    await quitSignal().writeAsString('old', flush: true);
+    final lock = SingleInstanceLock(dir);
+    expect(await lock.acquire(), isTrue);
+    expect(quitSignal().existsSync(), isFalse);
+    final quits = <void>[];
+    final q = lock.quitRequests().listen(quits.add);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect(quits, isEmpty);
+    await q.cancel();
+    await lock.release();
+  });
 }

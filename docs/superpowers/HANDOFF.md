@@ -312,7 +312,8 @@ Riêng tư: `restore/` (macOS `~/Library/Application Support/pro.shellx.desktop/
 - [ ] Như macOS (trừ Time Machine, VoiceOver, Log Out): Thoát ở tray, `seq`/màu, vim, `End task` trong Task Manager → dải, cwd mất/UNC → home, công tắc tray, điện thoại
 - [ ] Start → Restart khi ShellX mở → mở lại: khôi phục đủ, nội dung có (cũ nhất 60 s), không có dải
 - [ ] Huỷ tắt máy (Notepad có chữ chưa lưu → Cancel): việc lưu chạy lại (`exitCancelled`); `End task` sau đó → lần mở sau có dải. Rồi tắt máy lại (hỏi → huỷ → hỏi lại) → lần mở sau **không** có dải
-- [ ] Restart Manager (một trình cài đặt/công cụ gọi `RmShutdown` lên ShellX.exe): ShellX lưu rồi tự thoát, **không** hỏi xác nhận; lần mở sau không có dải. Lưu ý: bản cài ShellX dùng `CloseApplications=no` + `taskkill /F`, nên cập nhật bằng bản cài của chính ShellX **sẽ** hiện dải ở lần mở sau (nội dung cũ nhất 60 s)
+- [ ] Restart Manager (một trình cài đặt/công cụ gọi `RmShutdown` lên ShellX.exe): ShellX lưu rồi tự thoát, **không** hỏi xác nhận; lần mở sau không có dải
+- [ ] Cập nhật khi ShellX đang chạy (update while running → no strip on next launch): chạy bản cài mới → bản cài ghi `%APPDATA%\pro.shellx\ShellX\quit.signal`, ShellX lưu rồi tự thoát (không hỏi) trong ≤ 8 s, rồi mới cài; lần mở sau khôi phục đủ, **không** có dải. `taskkill /F` chỉ còn là đường lùi khi ShellX không thoát kịp (khi đó có dải)
 - [ ] `icacls "%LOCALAPPDATA%\ShellX\restore"` → chỉ tài khoản của bạn (cùng SYSTEM/Administrators thừa hưởng), không có Users/Everyone
 - [ ] Không có LOCALAPPDATA (`set LOCALAPPDATA=` trong cmd rồi chạy ShellX.exe từ đó): app khởi động bình thường, không lưu/không khôi phục gì, không lỗi
 - [ ] Ẩn cửa sổ → `layout.json` đổi giờ sửa ngay

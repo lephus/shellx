@@ -348,6 +348,13 @@ Future<void> _start(
     onError: (Object error) =>
         debugPrint('ShellX: activation watch failed: ${error.runtimeType}'),
   );
+  // A5a I1: the Windows installer, updating a running ShellX, asks it to
+  // quit — the same clean, final save as the Restart Manager's quit.
+  lock.quitRequests().listen(
+    (_) => unawaited(trayActions.handle(const Quit(confirm: false))),
+    onError: (Object error) =>
+        debugPrint('ShellX: quit watch failed: ${error.runtimeType}'),
+  );
   // Both platforms: Windows sends only the three A5a calls.
   listenForAppChannel(
     onReopen: activate,
