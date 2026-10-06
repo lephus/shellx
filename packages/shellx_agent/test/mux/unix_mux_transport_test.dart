@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
@@ -21,10 +23,10 @@ void main() {
   });
 
   test(
-    'socket is 0600; messages flow both ways; a stale file is replaced',
+    'socket is 0600; messages flow both ways; a stale socket is replaced',
     () async {
       final path = '${dir.path}/mux.sock';
-      File(path).writeAsStringSync('stale');
+      await _staleSocket(path);
       final t = UnixMuxTransport();
       final listener = await t.listen(path);
       expect(
@@ -56,4 +58,73 @@ void main() {
       throwsA(isA<SocketException>()),
     );
   }, testOn: 'mac-os || linux');
+
+  test(
+    'a path that is not a socket is never deleted: listen fails',
+    () async {
+      final path = '${dir.path}/mux.sock';
+      File(path).writeAsStringSync('not ours');
+      await expectLater(UnixMuxTransport().listen(path), throwsA(anything));
+      expect(File(path).readAsStringSync(), 'not ours');
+    },
+    testOn: 'mac-os || linux',
+  );
+
+  test('a peer that sends garbage and vanishes under ~3 MB of pending '
+      'writes: done completes, no error escapes', () async {
+    final path = '${dir.path}/mux.sock';
+    final errors = <Object>[];
+    final finished = Completer<void>();
+    runZonedGuarded(
+      () async {
+        final listener = await UnixMuxTransport().listen(path);
+        final serverSide = listener.connections.first;
+        final raw = await Socket.connect(
+          InternetAddress(path, type: InternetAddressType.unix),
+          0,
+        );
+        final server = await serverSide;
+        final chunk = Uint8List(60000);
+        for (var i = 0; i < 50; i++) {
+          server.send(MuxMessage(MuxType.viewOut, fields: {'data': chunk}));
+        }
+        raw.add([0, 0, 0, 2, 0xff, 0xff]); // garbage → the host closes
+        await raw.flush();
+        raw.destroy();
+        await server.done.timeout(const Duration(seconds: 5));
+        server.send(const MuxMessage(MuxType.result, q: 9)); // after close
+        await listener.close();
+        if (!finished.isCompleted) finished.complete();
+      },
+      (e, _) {
+        errors.add(e);
+        if (!finished.isCompleted) finished.complete();
+      },
+    );
+    await finished.future.timeout(const Duration(seconds: 10));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(errors, isEmpty);
+  }, testOn: 'mac-os || linux');
+}
+
+/// A socket file left behind by a host that died.
+Future<void> _staleSocket(String path) async {
+  final server = await ServerSocket.bind(
+    InternetAddress(path, type: InternetAddressType.unix),
+    0,
+  );
+  await server.close();
+  if (FileSystemEntity.typeSync(path, followLinks: false) !=
+      FileSystemEntityType.unixDomainSock) {
+    // Some runtimes unlink on close: recreate it from a child process.
+    Process.runSync('/usr/bin/python3', [
+      '-c',
+      'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])',
+      path,
+    ]);
+  }
+  expect(
+    FileSystemEntity.typeSync(path, followLinks: false),
+    FileSystemEntityType.unixDomainSock,
+  );
 }

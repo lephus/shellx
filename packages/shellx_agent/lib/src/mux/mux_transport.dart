@@ -124,19 +124,32 @@ final class StreamMuxConnection implements MuxConnection {
 
   @override
   void send(MuxMessage message) {
-    if (!_closed) _write(encodeMux(message));
+    if (_closed) return;
+    try {
+      _write(encodeMux(message));
+    } on Object {
+      // The sink is gone (peer vanished): the read side closes the link.
+    }
   }
 
+  /// Always completes [done], even when the peer vanished with writes
+  /// pending; never throws.
   @override
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    await _sub.cancel();
-    await _closeSink();
-    // Not awaited: a paused listener would hold the done event (see
-    // _MemoryConnection.close).
-    unawaited(_in.close());
-    _done.complete();
+    try {
+      // Neither awaited: a cancel's future may belong to the root zone,
+      // and a paused listener would hold `_in`'s done event (see
+      // _MemoryConnection.close).
+      unawaited(_sub.cancel().then((_) {}, onError: (Object _) {}));
+      await _closeSink();
+    } on Object {
+      // Closing a dead link: nothing left to release.
+    } finally {
+      unawaited(_in.close());
+      if (!_done.isCompleted) _done.complete();
+    }
   }
 
   @override
@@ -146,8 +159,13 @@ final class StreamMuxConnection implements MuxConnection {
 final class UnixMuxTransport implements MuxTransport {
   @override
   Future<MuxListener> listen(String address) async {
-    final stale = File(address);
-    if (await stale.exists()) await stale.delete();
+    // A socket left by a host that died is replaced. This relies on the
+    // 0700 mux directory: no other account can plant a file here. Anything
+    // that is not a socket is never deleted — bind then fails.
+    if (await FileSystemEntity.type(address, followLinks: false) ==
+        FileSystemEntityType.unixDomainSock) {
+      await File(address).delete();
+    }
     final server = await ServerSocket.bind(
       InternetAddress(address, type: InternetAddressType.unix),
       0,
@@ -173,11 +191,23 @@ final class UnixMuxTransport implements MuxTransport {
     return _wrap(socket);
   }
 
-  static MuxConnection _wrap(Socket s) =>
-      StreamMuxConnection(s, s.add, () async {
-        await s.close();
+  /// Pending writes get [_flushFor] to drain on close; then the socket is
+  /// destroyed. Write errors (peer gone: broken pipe) surface on `done`,
+  /// which is always handled here.
+  static MuxConnection _wrap(Socket s) {
+    unawaited(s.done.then((_) {}, onError: (Object _) {}));
+    return StreamMuxConnection(s, s.add, () async {
+      try {
+        await s.close().timeout(_flushFor);
+      } on Object {
+        // Peer gone or not reading: drop what is left.
+      } finally {
         s.destroy();
-      });
+      }
+    });
+  }
+
+  static const _flushFor = Duration(seconds: 1);
 }
 
 final class _UnixListener implements MuxListener {
