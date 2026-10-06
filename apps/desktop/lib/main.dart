@@ -358,7 +358,8 @@ Future<void> _start(
       final view = attentionView(container, a.tabId);
       announcer.arrived(
         a,
-        tab: tab.label,
+        // Final ruling m-6: the pane that sent it, in a split tab.
+        tab: tab.noticeLabel(a.paneId),
         windowFocused: view.windowFocused,
         tabSelected: view.tabSelected,
       );

@@ -164,4 +164,30 @@ void main() {
     expect(tab.focusedPaneId, 1);
     expect(state().hasUnread(1), isFalse);
   });
+
+  test('a split tab labels a notice with the pane that sent it, not the '
+      'focused one; a one-pane tab keeps its tab label (final m-6)', () async {
+    await boot(active: false);
+    tabs().rename(2, 'API box');
+    final arrivals = <AttentionArrival>[];
+    attention().arrivals.listen(arrivals.add);
+    final tab = c.read(terminalTabsProvider).tabs.first;
+    expect(tab.label, 'zsh 3'); // the focused pane, 100
+    local.notice(1, SessionNoticeKind.message, body: 'from pane 1');
+    local.notice(2, SessionNoticeKind.message, body: 'from tab 2');
+    await settle();
+    expect(state().history.map((e) => e.tabLabel), ['API box', 'zsh']);
+    expect(arrivals.map((a) => a.paneId), [1, 2]);
+    final now = c.read(terminalTabsProvider).tabs.first;
+    expect(now.noticeLabel(1), 'zsh');
+    expect(now.noticeLabel(100), 'zsh 3');
+    // A pane that left: the tab's own label.
+    expect(now.noticeLabel(7), 'zsh 3');
+    tabs().rename(1, 'build');
+    final renamed = c.read(terminalTabsProvider).tabs.first;
+    expect(renamed.noticeLabel(1), 'zsh');
+    tabs().closePane(100);
+    final single = c.read(terminalTabsProvider).tabs.first;
+    expect(single.noticeLabel(1), 'build');
+  });
 }

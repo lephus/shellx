@@ -257,6 +257,16 @@ final class TerminalTab {
 
   /// What the sidebar, the window title and dialogs show.
   String get label => customTitle ?? automaticLabel;
+
+  /// What a notice from pane [sessionId] is labelled with (final ruling
+  /// m-6): in a split tab the pane that sent it (its automatic label), not
+  /// the focused one; a one-pane tab, or a pane no longer here, uses
+  /// [label].
+  String noticeLabel(int sessionId) {
+    if (!isSplit) return label;
+    return panes[sessionId]?.automaticLabel ?? label;
+  }
+
   bool get hasContext => focused.hasContext;
 
   /// D19: 👁 when any pane has a phone attached.

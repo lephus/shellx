@@ -245,11 +245,16 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
     final keyboardRing =
         _list.hasFocus &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
-    final labels = {for (final t in tabs.tabs) t.id: t.label};
+    final byId = {for (final t in tabs.tabs) t.id: t};
 
     _PanelEntry entry(AttentionEntry e) {
-      // The tab's name now (renamed since?), else the last one it had.
-      final name = labels[e.tabId] ?? e.tabLabel;
+      // The name now (renamed since?), else the last one it had. In a split
+      // tab, the pane that sent it (final ruling m-6); once that pane is
+      // gone, the name it arrived with.
+      final tab = byId[e.tabId];
+      final gone =
+          tab == null || (tab.isSplit && !tab.panes.containsKey(e.paneId));
+      final name = gone ? e.tabLabel : tab.noticeLabel(e.paneId);
       final ws = !e.closed && sidebar.showHeaders
           ? sidebar.workspaceOf(e.tabId)
           : null;

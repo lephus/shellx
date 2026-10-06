@@ -62,7 +62,8 @@ final class AttentionEntry {
   /// A3 D18: the pane (session id) it came from.
   final int paneId;
 
-  /// The tab's label when it arrived (shown once the tab is gone).
+  /// The label it arrived with ([TerminalTab.noticeLabel]: the sending
+  /// pane's in a split tab), shown once the tab or the pane is gone.
   final String tabLabel;
   final AttentionKind kind;
 
@@ -128,11 +129,16 @@ final class AttentionState {
 final class AttentionArrival {
   const AttentionArrival({
     required this.tabId,
+    required this.paneId,
     required this.kind,
     required this.text,
     required this.at,
   });
   final int tabId;
+
+  /// A3 D18: the pane (session id) it came from; it names the
+  /// notification in a split tab ([TerminalTab.noticeLabel]).
+  final int paneId;
   final AttentionKind kind;
   final String text;
   final DateTime at;
@@ -401,7 +407,13 @@ class TabAttention extends Notifier<AttentionState> {
     // Worded now: arrivals are handled at once, in the language shown.
     final text = noticeText(notice, ref.read(appL10nProvider));
     _arrivals.add(
-      AttentionArrival(tabId: tab.id, kind: kind, text: text, at: notice.at),
+      AttentionArrival(
+        tabId: tab.id,
+        paneId: pane,
+        kind: kind,
+        text: text,
+        at: notice.at,
+      ),
     );
     _armDwell();
   }
@@ -432,7 +444,7 @@ class TabAttention extends Notifier<AttentionState> {
         seq: _seq++,
         tabId: tab.id,
         paneId: paneId,
-        tabLabel: tab.label,
+        tabLabel: tab.noticeLabel(paneId),
         kind: kind,
         notice: notice,
         at: at,

@@ -17,6 +17,7 @@ void main() {
     );
     AttentionArrival arrival(String text) => AttentionArrival(
       tabId: 2,
+      paneId: 2,
       kind: AttentionKind.message,
       text: text,
       at: now,

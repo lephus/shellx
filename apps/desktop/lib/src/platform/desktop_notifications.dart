@@ -225,16 +225,20 @@ final class DesktopNotifications {
   }
 }
 
-/// UI-A4 §6: the tab label, or "label · workspace" when headers show.
+/// UI-A4 §6: the tab label, or "label · workspace" when headers show. In a
+/// split tab the label is that of [paneId], the pane that sent it (final
+/// ruling m-6).
 String systemNotificationTitle(
   TerminalTab tab,
   SidebarState sidebar,
-  AppLocalizations l10n,
-) {
-  if (!sidebar.showHeaders) return tab.label;
+  AppLocalizations l10n, {
+  required int paneId,
+}) {
+  final label = tab.noticeLabel(paneId);
+  if (!sidebar.showHeaders) return label;
   final ws = sidebar.workspaceOf(tab.id);
   final name = ws == null ? null : sidebar.workspace(ws)?.displayName(l10n);
-  return name == null ? tab.label : '${tab.label} · $name';
+  return name == null ? label : '$label · $name';
 }
 
 /// [DesktopNotifications.arrived]'s window state for [tabId], read from
@@ -266,6 +270,7 @@ void listenForDesktopNotifications({
           tab,
           container.read(sidebarWorkspacesProvider),
           l10n,
+          paneId: a.paneId,
         ),
         windowFocused: view.windowFocused,
         tabSelected: view.tabSelected,

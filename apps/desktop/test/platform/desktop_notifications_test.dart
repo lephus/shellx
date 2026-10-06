@@ -8,6 +8,7 @@ import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/platform/desktop_notifications.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
+import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
@@ -30,7 +31,13 @@ void main() {
     int tab,
     String text, {
     AttentionKind kind = AttentionKind.message,
-  }) => AttentionArrival(tabId: tab, kind: kind, text: text, at: now);
+  }) => AttentionArrival(
+    tabId: tab,
+    paneId: tab,
+    kind: kind,
+    text: text,
+    at: now,
+  );
 
   void boot() {
     notifier = RecordingNotifier();
@@ -421,6 +428,18 @@ void main() {
       local.notice(1, SessionNoticeKind.message, body: 'after dispose');
       await pumpEventQueue();
       expect(notifier.shown, hasLength(1));
+    });
+
+    test('a split tab titles the notification with the pane that sent it '
+        '(final m-6)', () async {
+      c.read(terminalTabsProvider.notifier).select(1);
+      await c.read(terminalTabsProvider.notifier).split(SplitAxis.row);
+      expect(c.read(terminalTabsProvider).selected!.label, 'zsh 3');
+      setActive(false);
+      local.notice(1, SessionNoticeKind.message, body: 'from pane 1');
+      await pumpEventQueue();
+      expect(notifier.shown.map((s) => s.title), ['zsh']);
+      n.dispose();
     });
 
     test('with workspace headers the title names the workspace '
