@@ -292,10 +292,26 @@ final class DesktopSessionManager {
     }
   }
 
+  /// Quit: every phone gets `session.detached {closed_by_host}`; the
+  /// terminals keep running.
   void disconnectAllPhones() {
     for (final id in _sessions.keys.toList()) {
       disconnectPhone(id);
     }
+  }
+
+  /// The runtime stops (A1 D7): every phone is let go silently, like a
+  /// dropped channel, so it re-attaches once it reconnects; no
+  /// `session.detached` (the terminal keeps running). A session draining
+  /// after its terminal exited is left alone, as in [disconnectPhone].
+  void releaseAllPhones() {
+    var changed = false;
+    for (final s in _sessions.values.toList()) {
+      if (s.closing || s.attachedMobileId == null) continue;
+      _phoneLeft(s);
+      changed = true;
+    }
+    if (changed) _changes.add(null);
   }
 
   /// Sharing switched off (`TerminalSharing.stop`): every session goes now,

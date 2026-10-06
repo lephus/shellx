@@ -135,10 +135,11 @@ final class SessionRouter implements AgentSessions {
     _desktop.disconnectAllPhones();
   }
 
-  /// The runtime stops (A1 D7): every phone is let go, nothing is killed.
+  /// The runtime stops (A1 D7): every phone is let go silently (it sees
+  /// the channel drop and re-attaches later), nothing is killed.
   void disconnectAllPhones() {
     _shells.disconnectAllPhones();
-    _desktop.disconnectAllPhones();
+    _desktop.releaseAllPhones();
   }
 
   /// The runtime is gone; the shell sessions live on (A1 D7) and must not

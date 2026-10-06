@@ -293,7 +293,8 @@ void main() {
     });
   });
 
-  test('disconnectAllPhones reaches both managers and kills nothing', () {
+  test('disconnectAllPhones reaches both managers silently and kills '
+      'nothing', () {
     fakeAsync((async) {
       final rig = _Rig();
       rig.router.handle(phone, const SessionList(desktop: true));
@@ -307,11 +308,14 @@ void main() {
       );
       async.flushMicrotasks();
 
+      rig.sent.clear();
       rig.router.disconnectAllPhones();
 
       expect(rig.ptys.ptys.single.killed, isFalse);
       expect(rig.shells.sessions.single.attachedMobileId, isNull);
       expect(rig.desktop.sessions.single.attachedMobileId, isNull);
+      // Silent (ruling I4): the phone sees the channel drop instead.
+      expect(rig.to(phone).whereType<SessionDetached>(), isEmpty);
     });
   });
 

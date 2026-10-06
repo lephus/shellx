@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -246,6 +247,80 @@ void main() {
       },
     );
 
+    test('a resuming attach (lastSeq > 0) records the phone size but leaves '
+        'the desktop driving; the phone takes over once it types', () async {
+      final rig = SessionRig();
+      rig.manager.receivesDriver = {phone}.contains;
+      final id = await rig.manager.open(cols: 100, rows: 30);
+      rig.pty(0).emitBytes(utf8.encode('hello'));
+      await pumpEventQueue();
+      await rig.manager.handle(
+        phone,
+        SessionAttach(id: id, cols: 50, rows: 20, lastSeq: 0),
+      );
+      rig.manager.mobileDisconnected(phone);
+      expect(rig.pty(0).resizes.last, (100, 30));
+      rig.clear();
+
+      await rig.manager.handle(
+        phone,
+        SessionAttach(id: id, cols: 50, rows: 20, lastSeq: 3),
+      );
+
+      expect(rig.manager.sessions.single.driver, DriverSide.desktop);
+      expect(rig.manager.sessions.single.attachedMobileId, phone);
+      expect(rig.pty(0).resizes.last, (100, 30));
+      // The phone may remember driving before the drop: it is told.
+      expect(rig.to(phone).where((m) => m is! OutputMessage), [
+        SessionDriver(id: id, by: DriverSide.desktop),
+        SessionAttached(id: id),
+      ]);
+
+      await rig.manager.handle(
+        phone,
+        InputMessage(id: id, data: Uint8List.fromList([0x6c])),
+      );
+
+      expect(rig.manager.sessions.single.driver, DriverSide.phone);
+      expect(rig.pty(0).resizes.last, (50, 20));
+      expect(
+        rig.to(phone),
+        contains(SessionDriver(id: id, by: DriverSide.phone)),
+      );
+    });
+
+    test('a resuming attach while the phone still drives (same channel) '
+        'keeps it driving at its new size', () async {
+      final rig = SessionRig();
+      final id = await rig.manager.open(cols: 100, rows: 30);
+      await rig.manager.handle(
+        phone,
+        SessionAttach(id: id, cols: 50, rows: 20, lastSeq: 0),
+      );
+      await rig.manager.handle(
+        phone,
+        SessionAttach(id: id, cols: 60, rows: 22, lastSeq: 1),
+      );
+      expect(rig.manager.sessions.single.driver, DriverSide.phone);
+      expect(rig.pty(0).resizes.last, (60, 22));
+    });
+
+    test('after a resuming attach, a phone resize takes the driver', () async {
+      final rig = SessionRig();
+      final id = await rig.manager.open(cols: 100, rows: 30);
+      await rig.manager.handle(
+        phone,
+        SessionAttach(id: id, cols: 50, rows: 20, lastSeq: 2),
+      );
+      expect(rig.manager.sessions.single.driver, DriverSide.desktop);
+      await rig.manager.handle(
+        phone,
+        ResizeMessage(id: id, cols: 61, rows: 22),
+      );
+      expect(rig.manager.sessions.single.driver, DriverSide.phone);
+      expect(rig.pty(0).resizes.last, (61, 22));
+    });
+
     test('a phone-origin session nobody resized locally keeps its size when '
         'the phone leaves', () async {
       final rig = SessionRig();
@@ -257,7 +332,8 @@ void main() {
   });
 
   test(
-    'disconnectAllPhones detaches every phone and kills nothing (D7)',
+    'disconnectAllPhones lets every phone go silently and kills nothing '
+    '(D7): the channel drop tells the phone, which re-attaches later',
     () async {
       final rig = SessionRig();
       final mine = await rig.manager.open(cols: 80, rows: 24);
@@ -272,20 +348,22 @@ void main() {
 
       expect(rig.pty(0).killed, isFalse);
       expect(rig.pty(1).killed, isFalse);
-      expect(rig.to(phone), [
-        SessionDetached(id: theirs, reason: DetachReason.closedByHost),
-      ]);
-      expect(rig.to(tablet), [
-        SessionDetached(id: mine, reason: DetachReason.closedByHost),
-      ]);
+      // No session.detached {closed_by_host}: that would tell the phone
+      // the shell was closed for good, and it would not re-attach.
+      expect(rig.sent, isEmpty);
+      expect(theirs, isNot(mine));
       expect(
         rig.manager.sessions.map((s) => s.attachedMobileId),
         everyElement(isNull),
       );
+      expect(
+        rig.manager.sessions.map((s) => s.driver),
+        everyElement(DriverSide.desktop),
+      );
       // Output keeps buffering for whoever attaches next; nobody is sent it.
       rig.pty(0).emitBytes(utf8.encode('still here'));
       await pumpEventQueue();
-      expect(rig.sent, hasLength(2));
+      expect(rig.sent, isEmpty);
     },
   );
 

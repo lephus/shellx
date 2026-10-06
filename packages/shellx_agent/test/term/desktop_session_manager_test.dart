@@ -347,29 +347,38 @@ void main() {
       });
     });
 
-    test(
-      'disconnectAllPhones and disconnectPhonesAttachedTo keep terminals',
-      () {
-        fakeAsync((async) {
-          final rig = DesktopRig();
-          final a = rig.connect(1)..snapshot('');
-          final b = rig.connect(2)..snapshot('');
-          async.flushMicrotasks();
-          rig.manager.attach(phone, 100, 80, 24, 0);
-          rig.manager.attach(tablet, 101, 80, 24, 0);
-          rig.manager.disconnectPhonesAttachedTo(phone);
-          expect(
-            rig.manager.sessions
-                .firstWhere((s) => s.id == 101)
-                .attachedMobileId,
-            tablet,
-          );
-          rig.manager.disconnectAllPhones();
-          expect(rig.manager.sessions, hasLength(2));
-          expect(a.closed || b.closed, isFalse);
-        });
-      },
-    );
+    test('releaseAllPhones and disconnectPhonesAttachedTo keep terminals', () {
+      fakeAsync((async) {
+        final rig = DesktopRig();
+        final a = rig.connect(1)..snapshot('');
+        final b = rig.connect(2)..snapshot('');
+        async.flushMicrotasks();
+        rig.manager.attach(phone, 100, 80, 24, 0);
+        rig.manager.attach(tablet, 101, 80, 24, 0);
+        rig.manager.disconnectPhonesAttachedTo(phone);
+        expect(
+          rig.manager.sessions.firstWhere((s) => s.id == 101).attachedMobileId,
+          tablet,
+        );
+        final detachedBefore = rig
+            .to(tablet)
+            .whereType<SessionDetached>()
+            .length;
+        rig.manager.releaseAllPhones();
+        expect(rig.manager.sessions, hasLength(2));
+        expect(a.closed || b.closed, isFalse);
+        // The runtime stopping lets phones go silently (like a dropped
+        // channel): they re-attach once they reconnect.
+        expect(
+          rig.to(tablet).whereType<SessionDetached>(),
+          hasLength(detachedBefore),
+        );
+        expect(
+          rig.manager.sessions.map((s) => s.attachedMobileId),
+          everyElement(isNull),
+        );
+      });
+    });
 
     test('clear (sharing switched off) drops sessions and links only', () {
       fakeAsync((async) {

@@ -389,25 +389,22 @@ final class SessionManager implements AgentSessions, LocalSessions {
   }
 
   /// The relay runtime stops (sign-out, remote access off, network loss —
-  /// A1 D7): every phone is told `closed_by_host` and let go; no shell is
-  /// killed. A session already draining after its shell exited finishes now
-  /// (nobody will hear its tail).
+  /// A1 D7): every phone is let go silently, like a dropped channel; no
+  /// shell is killed. No `session.detached {closed_by_host}`: that tells a
+  /// phone the shell is gone for good, while it keeps running and the
+  /// phone should re-attach once it reconnects. A session already draining
+  /// after its shell exited finishes now (nobody will hear its tail).
   void disconnectAllPhones() {
     var changed = false;
     for (final session in _sessions.values.toList()) {
       session.exitRecipient = null;
-      final mobileId = session.attachedMobileId;
-      if (mobileId == null) continue;
+      if (session.attachedMobileId == null) continue;
       changed = true;
       if (session.closing) {
         session.attachedMobileId = null;
         _finish(session);
         continue;
       }
-      _send(
-        mobileId,
-        SessionDetached(id: session.id, reason: DetachReason.closedByHost),
-      );
       _phoneLeft(session);
     }
     if (changed) _changes.add(null);
@@ -627,7 +624,21 @@ final class SessionManager implements AgentSessions, LocalSessions {
     session.phoneCols = c;
     session.phoneRows = r;
     session.lastPhoneInput = null;
-    _setDriver(session, DriverSide.phone); // A1 D6: attaching drives.
+    if (lastSeq > 0) {
+      // A resume after a dropped channel (the phone already has the
+      // screen up to lastSeq): it only records its size, so a desktop
+      // typing in this tab keeps the driver until the phone types or
+      // resizes. The phone is told who drives, since it may remember
+      // driving before the drop.
+      if (session.driver == DriverSide.phone) _applySize(session, c, r);
+      if (receivesDriver(mobileId)) {
+        _send(mobileId, SessionDriver(id: id, by: session.driver));
+      }
+      _send(mobileId, SessionAttached(id: id));
+      if (previous != mobileId) _changes.add(null);
+      return;
+    }
+    _setDriver(session, DriverSide.phone); // A1 D6: a fresh attach drives.
     if (c == session.cols && r == session.rows) {
       // Same size: bounce the height so full-screen programs redraw.
       session.resize(c, r > _minDimension ? r - 1 : r + 1);
