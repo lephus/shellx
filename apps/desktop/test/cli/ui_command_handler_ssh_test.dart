@@ -319,6 +319,34 @@ void main() {
       expect(local.views[id]!.writes, isEmpty);
     });
 
+    test('without the hook --cwd is refused up front, nothing opens', () async {
+      final before = local.openLaunches.length;
+      await expectLater(
+        call('ui.ssh.open', {'target': 'devbox', 'cwd': '/srv', 'hook': false}),
+        throwsA(
+          isA<CliFailure>()
+              .having((e) => e.code, 'code', 'bad_request')
+              .having((e) => e.message, 'message', kCwdNeedsHook),
+        ),
+      );
+      expect(local.openLaunches, hasLength(before));
+      // The per-server setting switches the hook off too, and so does a
+      // tab made in such a server's workspace.
+      await c
+          .read(settingsStoreProvider)
+          .setBool(SettingKeys.sshRemoteHook, false);
+      await expectLater(
+        call('ui.ssh.open', {'target': 'devbox', 'cwd': '/srv'}),
+        fails('bad_request'),
+      );
+      final first = await call('ui.ssh.open', {'target': 'devbox'});
+      final id = side().workspaceOf(first['tab']! as int)!;
+      await expectLater(
+        call('ui.tab.new', {'workspace': id, 'cwd': '/srv'}),
+        fails('bad_request'),
+      );
+    });
+
     test('without the hook --cmd is refused up front, nothing opens', () async {
       final before = local.openLaunches.length;
       await expectLater(

@@ -306,10 +306,12 @@ Future<void> _start(
     terminalSharing: sharingSetup,
     // A8 D40: after the clean flush, the CLI host stop and the sessions'
     // close (the tray's Quit), before quitApp.
-    shutdownRemote: () {
-      // D20: no retry may start while the sessions close.
+    // D20: the first step of Quit: no retry may start from here on.
+    stopRemoteRetries: () {
       sshWake?.stop();
       container.read(sshReconnectorProvider.notifier).stop();
+    },
+    shutdownRemote: () {
       return shutdownRemote(
         remoteTools,
         disposeWatcher: core.sessions.disposeRemotePorts,

@@ -5,7 +5,12 @@ import '../../remote/remote_state.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 
-final _controls = RegExp(r'[\x00-\x1f\x7f-\x9f  ]');
+/// C0, DEL, C1, the line and paragraph separators, and the Unicode bidi
+/// controls (marks, embeddings, overrides, isolates, Arabic letter mark):
+/// a server name must not reorder the text around it.
+final _controls = RegExp(
+  r'[\x00-\x1f\x7f-\x9f\u2028\u2029\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]',
+);
 
 /// Text the server (or a config file) supplied, safe to show: control
 /// characters (escape sequences, newlines) removed.

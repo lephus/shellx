@@ -23,6 +23,10 @@ const Duration kTmuxListBound = Duration(seconds: 8);
 /// Why `--cmd` needs the hook on a server.
 const String kCmdNeedsHook = '--cmd needs the server hook';
 
+/// Why `--cwd` needs the hook on a server (without it the folder is never
+/// entered, silently).
+const String kCwdNeedsHook = '--cwd needs the server hook';
+
 /// How long a `--cmd` for a server pane waits for the server shell's hello.
 const Duration kHelloWait = Duration(seconds: 60);
 
@@ -137,9 +141,9 @@ final class SshCommands {
     }
     final focus = flagField(r, 'focus');
     // The setting may switch the hook off for this server too.
-    if (cmd != null && !(hook != false && _ssh.hookFor(target.key))) {
-      throw badRequest(kCmdNeedsHook);
-    }
+    final hooked = hook != false && _ssh.hookFor(target.key);
+    if (cmd != null && !hooked) throw badRequest(kCmdNeedsHook);
+    if (cwd != null && !hooked) throw badRequest(kCwdNeedsHook);
     final tab = await opening(
       () => _remote(
         () => _ssh.connectForCli(

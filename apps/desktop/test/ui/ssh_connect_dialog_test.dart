@@ -137,20 +137,33 @@ void main() {
     expect(local.openLaunches, isEmpty);
   });
 
-  testWidgets('folder and "no hook" travel with the connect', (tester) async {
+  testWidgets('the folder travels with the connect', (tester) async {
     await pump(tester);
     await tester.enterText(find.byKey(const Key('ssh.host')), 'me@box:2222');
     await tester.enterText(find.byKey(const Key('ssh.dir')), '~/srv');
-    await tester.tap(find.byKey(const Key('ssh.nohook')));
     await tester.tap(find.byKey(const Key('ssh.connect')));
     await settle(tester);
     expect(
       local.openLaunches.single,
-      SshLaunch(
-        SshTarget.parse('me@box:2222')!,
-        remoteCwd: '~/srv',
-        hook: false,
-      ),
+      SshLaunch(SshTarget.parse('me@box:2222')!, remoteCwd: '~/srv'),
+    );
+  });
+
+  testWidgets('"no hook" disables the folder (it needs the hook) and is '
+      'remembered', (tester) async {
+    await pump(tester);
+    await tester.enterText(find.byKey(const Key('ssh.host')), 'me@box:2222');
+    await tester.enterText(find.byKey(const Key('ssh.dir')), '~/srv');
+    await tester.tap(find.byKey(const Key('ssh.nohook')));
+    await tester.pump();
+    final dir = tester.widget<TextField>(find.byKey(const Key('ssh.dir')));
+    expect(dir.enabled, isFalse);
+    expect(dir.decoration!.hintText, 'Needs the server hook');
+    await tester.tap(find.byKey(const Key('ssh.connect')));
+    await settle(tester);
+    expect(
+      local.openLaunches.single,
+      SshLaunch(SshTarget.parse('me@box:2222')!, hook: false),
     );
     expect(settings.getStrings(SettingKeys.sshPlainTargets), ['me@box:2222']);
   });

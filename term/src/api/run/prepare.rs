@@ -288,6 +288,9 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
         "ssh" if p.has("no-hook") && p.flag("cmd").is_some() => {
             return Err(usage("--cmd needs the server hook (drop --no-hook)"))
         }
+        "ssh" if p.has("no-hook") && p.flag("cwd").is_some() => {
+            return Err(usage("--cwd needs the server hook (drop --no-hook)"))
+        }
         "ssh" => Prepared::Simple {
             t: "ui.ssh.open",
             fields: vec![

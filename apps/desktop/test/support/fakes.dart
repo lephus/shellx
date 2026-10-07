@@ -544,6 +544,7 @@ final class TestHarness {
       shutdownOrder.add('quit');
       quits++;
     },
+    stopRemoteRetries: () => shutdownOrder.add('retries'),
     shutdownRemote: () async {
       shutdownOrder.add('remote');
       await remoteShutdown();

@@ -1579,6 +1579,19 @@ fn ls_shows_where_a_pane_is_remote() {
 }
 
 #[test]
+fn ssh_cwd_needs_the_hook() {
+    let o = go(
+        &["ssh", "devbox", "--no-hook", "--cwd", "/srv"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.connected), (2, false));
+    assert!(o.err.contains("--cwd needs the server hook"), "{}", o.err);
+}
+
+#[test]
 fn ssh_cmd_needs_the_hook() {
     let o = go(
         &["ssh", "devbox", "--no-hook", "--cmd", "make"],
@@ -1601,4 +1614,18 @@ fn ssh_cmd_needs_the_hook() {
         PLAIN,
     );
     assert_eq!(h.code, 2);
+}
+
+#[test]
+fn plain_drops_controls_and_bidi_controls() {
+    use crate::api::output::plain;
+    assert_eq!(plain("a\u{1b}[31mb\u{7}\u{85}c"), "a[31mbc");
+    // Marks, embeddings and overrides, isolates, the Arabic letter mark.
+    assert_eq!(plain("a\u{200E}b\u{200F}c\u{061C}d"), "abcd");
+    assert_eq!(
+        plain("a\u{202A}b\u{202B}c\u{202C}d\u{202D}e\u{202E}f"),
+        "abcdef"
+    );
+    assert_eq!(plain("a\u{2066}b\u{2067}c\u{2068}d\u{2069}e"), "abcde");
+    assert_eq!(plain("máy-chủ"), "máy-chủ");
 }

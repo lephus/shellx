@@ -302,7 +302,9 @@ void main() {
       final order = <String>[];
       c.read(cliHostControlProvider).stop = () async => order.add('cli');
       h.ptyKills = () async => order.add('shutdown');
+      h.shutdownOrder.clear();
       await tap(const Quit(confirm: false));
+      expect(h.shutdownOrder.first, 'retries');
       expect(order, ['cli', 'shutdown']);
       expect(h.quits, 1);
       expect(c.read(cliHostControlProvider).stop, isNull);

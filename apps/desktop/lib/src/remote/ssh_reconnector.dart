@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../cli/agent_marks.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import 'remote_state.dart';
@@ -356,10 +357,12 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
         );
         continue;
       }
-      final step = id == failedId ? info.attempt + 1 : info.attempt;
+      // An attempt that ended moves every pane of the host one back-off
+      // step; an open that never ran ssh spends only the failed pane's.
+      final advances = !openFailed || id == failedId;
       next[id] = _schedule(
         id,
-        info.copyWith(attempt: openFailed ? step : info.attempt + 1),
+        info.copyWith(attempt: info.attempt + (advances ? 1 : 0)),
         now,
       );
     }
@@ -391,6 +394,7 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
   }
 
   void _replaced(PaneReplacement r) {
+    ref.read(agentMarksProvider.notifier).movePane(r.from, r.to);
     final info = state[r.from];
     _timers.remove(r.from)?.cancel();
     if (info == null) return;

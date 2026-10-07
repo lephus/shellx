@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
@@ -49,10 +51,26 @@ final class SshActions {
       _serial(host, () => _openOnHostNow(host, launch));
 
   Future<void> _openOnHostNow(SshTarget host, SessionLaunch launch) async {
+    // Tabs open one at a time (`openTab` returns at once while another open
+    // runs): wait for it, so the server's tab is never silently dropped.
+    await _untilTabsIdle();
     final existing = _side.workspaceForHost(host.key);
     final workspace = existing ?? _side.createForHost(host);
     await _side.openTabIn(workspace, launch: launch);
     if (existing == null) _side.discard(workspace);
+  }
+
+  /// Completes when no tab open is in flight (at once when none is).
+  Future<void> _untilTabsIdle() {
+    if (!_ref.read(terminalTabsProvider).opening) return Future<void>.value();
+    final idle = Completer<void>();
+    final sub = _ref.listen<bool>(
+      terminalTabsProvider.select((t) => t.opening),
+      (_, opening) {
+        if (!opening && !idle.isCompleted) idle.complete();
+      },
+    );
+    return idle.future.whenComplete(sub.close);
   }
 
   /// ⌘T, sidebar `+` (D23).

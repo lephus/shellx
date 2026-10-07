@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -54,6 +56,25 @@ void main() {
 
   SshActions actions() => container.read(sshActionsProvider);
   SidebarState side() => container.read(sidebarWorkspacesProvider);
+
+  test('connect while another tab is opening waits for it: the server tab '
+      'still opens (never a silent no-op)', () async {
+    local.openGate = Completer<void>();
+    final busy = container.read(terminalTabsProvider.notifier).openTab();
+    await pumpEventQueue();
+    expect(container.read(terminalTabsProvider).opening, isTrue);
+    final connecting = actions().connect(devbox);
+    await pumpEventQueue();
+    local.openGate!.complete();
+    await busy;
+    await connecting;
+    final id = container
+        .read(sidebarWorkspacesProvider.notifier)
+        .workspaceForHost('devbox');
+    expect(id, isNotNull);
+    expect(side().tabsOf(id!), hasLength(1));
+    expect(local.openLaunches.whereType<SshLaunch>(), hasLength(1));
+  });
 
   test(
     'connect: the server\'s workspace (made once), recent targets (D23)',

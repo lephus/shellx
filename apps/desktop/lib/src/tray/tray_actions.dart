@@ -263,6 +263,11 @@ final class TrayActions {
           if (!ok || _quitting) return;
         }
         _quitting = true;
+        // A8 D20: first of all, no reconnect may open a session while the
+        // app shuts down.
+        try {
+          _services.stopRemoteRetries?.call();
+        } catch (_) {}
         // Ruling M6: no command-line request may act while the shells
         // close: the host stops first.
         await runBounded(

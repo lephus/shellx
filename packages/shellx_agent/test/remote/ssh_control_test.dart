@@ -285,6 +285,34 @@ void main() {
     expect(started, hasLength(1));
   });
 
+  test('dead forwards do not count toward the 32 per server (cap)', () async {
+    final listening = <int>{};
+    final ports = FakePorts();
+    final procs = <FakeForward>[];
+    final c = SshControl(
+      sshPath: 'ssh.exe', // no master: one process per forward
+      run: runner.call,
+      ports: _Listening(listening, ports),
+      sleep: (_) async {},
+      startForward: (exe, args) async {
+        listening.add(int.parse(args[args.indexOf('-L') + 1].split(':')[1]));
+        final f = FakeForward();
+        procs.add(f);
+        return f;
+      },
+    );
+    for (var i = 0; i < 32; i++) {
+      await c.forward(devbox, 9000 + i);
+    }
+    await expectLater(
+      c.forward(devbox, 9100),
+      throwsA(isA<ForwardFailedException>()),
+    );
+    procs.first.kill(); // one ended: its slot is free again
+    await pumpEventQueue();
+    expect(await c.forward(devbox, 9100), 9100);
+  });
+
   test('ports outside 1..65535 fail (M6)', () async {
     final c = control();
     for (final port in [0, -1, 65536]) {
@@ -461,6 +489,16 @@ final class _Bound implements LocalPorts {
     return !after();
   }
 
+  @override
+  Future<int> ephemeral() => inner.ephemeral();
+}
+
+final class _Listening implements LocalPorts {
+  _Listening(this.listening, this.inner);
+  final Set<int> listening;
+  final LocalPorts inner;
+  @override
+  Future<bool> isFree(int port) async => !listening.contains(port);
   @override
   Future<int> ephemeral() => inner.ephemeral();
 }

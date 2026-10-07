@@ -1749,6 +1749,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sshNoHookLabel => 'Don’t install the ShellX hook on this server';
 
   @override
+  String get sshRemoteDirNeedsHook => 'Needs the server hook';
+
+  @override
   String get sshNoHookHelp =>
       'The hook tells ShellX the folder, branch and ports on the server. Turn it off for servers that aren’t Unix.';
 
@@ -1864,6 +1867,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sshRetrying => 'Reconnecting…';
+
+  @override
+  String get sshRetryWaiting => 'Retrying automatically';
 
   @override
   String get sshNeedsSignIn => 'Sign in needed';

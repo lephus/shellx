@@ -243,10 +243,14 @@ final class UiCommandHandler implements UiApi {
       onServer = launch is SshLaunch;
       if (launch is SshLaunch) {
         if (cmd != null && !launch.hook) throw badRequest(kCmdNeedsHook);
+        final remoteCwd = _ssh.remoteCwd(r);
+        if (remoteCwd != null && !launch.hook) {
+          throw badRequest(kCwdNeedsHook);
+        }
         return _tabs.openTabFor(
           launch: SshLaunch(
             launch.target,
-            remoteCwd: _ssh.remoteCwd(r),
+            remoteCwd: remoteCwd,
             hook: launch.hook,
           ),
           select: select,

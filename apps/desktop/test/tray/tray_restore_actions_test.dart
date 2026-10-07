@@ -121,7 +121,7 @@ void main() {
       'the process exits, and a hung helper cannot stop it (A8 D40)', () async {
     h.ptyKills = () async => h.shutdownOrder.add('closed');
     await c.read(trayActionsProvider).handle(const Quit());
-    expect(h.shutdownOrder, ['closed', 'remote', 'quit']);
+    expect(h.shutdownOrder, ['retries', 'closed', 'remote', 'quit']);
   });
 
   test(

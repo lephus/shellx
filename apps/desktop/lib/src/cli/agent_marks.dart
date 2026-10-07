@@ -68,6 +68,21 @@ class AgentMarks extends Notifier<AgentMarksState> {
     _schedule();
   }
 
+  /// A8 D22: a reconnect gave pane [from] the id [to]: the "Agent" chip
+  /// follows (the tab's mark is unchanged).
+  void movePane(int from, int to) {
+    final at = state.panes[from];
+    if (at == null) return;
+    state = AgentMarksState(
+      tabs: state.tabs,
+      panes: {
+        for (final e in state.panes.entries)
+          if (e.key != from) e.key: e.value,
+        to: at,
+      },
+    );
+  }
+
   void _prune() {
     final now = _now;
     Map<int, DateTime> live(Map<int, DateTime> marks) => {

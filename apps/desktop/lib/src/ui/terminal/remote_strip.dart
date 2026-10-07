@@ -84,6 +84,20 @@ class _RemoteStripState extends ConsumerState<RemoteStrip> {
     return l10n.sshRetryIn((left.inMilliseconds / 1000).ceil().clamp(0, 60));
   }
 
+  /// The screen-reader text of [_detail]: the state only. The per-second
+  /// countdown stays visual, so the live region is not re-announced every
+  /// tick; it changes with the state.
+  String? _stateDetail(AppLocalizations l10n, RetryInfo? retry, bool lost) {
+    if (!lost || retry == null) return null;
+    if (retry.nextAt != null &&
+        !retry.retrying &&
+        !retry.needsSignIn &&
+        !retry.stopped) {
+      return l10n.sshRetryWaiting;
+    }
+    return _detail(l10n, retry, lost, false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -100,6 +114,7 @@ class _RemoteStripState extends ConsumerState<RemoteStrip> {
         ? l10n.sshStateDisconnected(host)
         : l10n.sshStateFailed(host);
     final detail = _detail(l10n, retry, lost, hookHint);
+    final spoken = lost ? _stateDetail(l10n, retry, lost) : detail;
     final reconnector = ref.read(sshReconnectorProvider.notifier);
     final buttons = <Widget>[
       if (retry == null || !retry.retrying)
@@ -133,7 +148,7 @@ class _RemoteStripState extends ConsumerState<RemoteStrip> {
       key: Key('remote.strip.${pane.id}'),
       container: true,
       liveRegion: true,
-      label: detail == null ? main : '$main · $detail',
+      label: spoken == null ? main : '$main · $spoken',
       child: Container(
         height: ShellxSizes.remoteStripFor(MediaQuery.textScalerOf(context)),
         padding: const EdgeInsets.symmetric(
