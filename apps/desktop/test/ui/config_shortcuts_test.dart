@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Key, Tooltip;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_opener.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
@@ -33,13 +34,15 @@ const shift = LogicalKeyboardKey.shiftLeft;
 const ctrl = LogicalKeyboardKey.controlLeft;
 
 final class RecordingOpener implements ConfigFileOpener {
+  RecordingOpener({this.succeed = true});
+  final bool succeed;
   final opened = <String>[];
   @override
   bool get windows => false;
   @override
-  Future<bool> open(String path, {required String template}) async {
+  Future<bool> open(String path, {required String Function() template}) async {
     opened.add(path);
-    return true;
+    return succeed;
   }
 }
 
@@ -264,6 +267,134 @@ keybind = super+l=run_command:Lint
       expect(page.invokeIntent(const ShowConfigProblemsIntent()), isFalse);
       await chord(tester, [cmd, shift], LogicalKeyboardKey.keyW);
       expect(w.container.read(terminalTabsProvider).tabs, isEmpty);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'a right Alt on its own is not AltGr: the chord runs (Task 8 ruling)',
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(
+        tester,
+        config: 'keybind = alt+t=new_tab\nkeybind = ctrl+shift+alt+k=new_tab\n',
+      );
+      final tabs = w.container.read(terminalTabsProvider).tabs.length;
+      await chord(tester, [
+        LogicalKeyboardKey.altRight,
+      ], LogicalKeyboardKey.keyT);
+      expect(w.container.read(terminalTabsProvider).tabs.length, tabs + 1);
+      // Ctrl + right Alt is AltGr: even a Ctrl+Shift+Alt chord yields.
+      await chord(tester, [
+        ctrl,
+        shift,
+        LogicalKeyboardKey.altRight,
+      ], LogicalKeyboardKey.keyK);
+      expect(w.container.read(terminalTabsProvider).tabs.length, tabs + 1);
+      await chord(tester, [
+        ctrl,
+        shift,
+        LogicalKeyboardKey.altLeft,
+      ], LogicalKeyboardKey.keyK);
+      expect(w.container.read(terminalTabsProvider).tabs.length, tabs + 2);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'macOS has no AltGr: a right Alt chord runs',
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(
+        tester,
+        config: 'keybind = ctrl+alt+q=new_tab\n',
+      );
+      final tabs = w.container.read(terminalTabsProvider).tabs.length;
+      await chord(tester, [
+        ctrl,
+        LogicalKeyboardKey.altRight,
+      ], LogicalKeyboardKey.keyQ);
+      expect(w.container.read(terminalTabsProvider).tabs.length, tabs + 1);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'the pane header, the bell and the panel hint follow a reload (D29)',
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      await chord(tester, [cmd], LogicalKeyboardKey.keyD); // split
+      String tips() => tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .map((t) => t.message ?? t.richMessage?.toPlainText() ?? '')
+          .join('|');
+      expect(tips(), isNot(contains('⌘⇧J')));
+      expect(tips(), isNot(contains('⌘⇧Q')));
+      w.fs.write(
+        testConfigPaths().shellx,
+        'keybind = super+shift+j=toggle_notifications\n'
+        'keybind = super+shift+q=close_surface\n'
+        'keybind = super+shift+u=jump_to_unread\n',
+      );
+      await w.container.read(shellxConfigProvider.notifier).load();
+      await tester.pumpAndSettle();
+      expect(tips(), contains('⌘⇧J')); // the bell
+      expect(tips(), contains('⌘⇧Q')); // the pane header's ×
+      // The panel's footer hint shows once there is something to read.
+      final id = w.container
+          .read(terminalTabsProvider)
+          .tabs
+          .first
+          .paneOrder
+          .first;
+      w.local.notice(id, SessionNoticeKind.message, title: 'Done', body: 'ok');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('sidebar.bell')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('⌘⇧U'), findsOneWidget);
+      w.fs.write(testConfigPaths().shellx, 'keybind = super+shift+u=unbind\n');
+      await w.container.read(shellxConfigProvider.notifier).load();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('⌘⇧U'), findsNothing);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'the focus stays in the terminal across a reload',
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      final page = tester.state<TerminalWorkspacePageState>(
+        find.byType(TerminalWorkspacePage),
+      );
+      expect(page.terminalFocus.hasFocus, isTrue);
+      w.fs.write(testConfigPaths().shellx, 'keybind = super+k=new_tab\n');
+      await w.container.read(shellxConfigProvider.notifier).load();
+      await tester.pumpAndSettle();
+      expect(page.terminalFocus.hasFocus, isTrue);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'a failed open shows the notice',
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(
+        tester,
+        extra: [
+          configFileOpenerProvider.overrideWithValue(
+            RecordingOpener(succeed: false),
+          ),
+        ],
+      );
+      await chord(tester, [cmd], LogicalKeyboardKey.comma);
+      expect(
+        w.container.read(terminalTabsProvider).notice,
+        isA<ConfigOpenFailedNotice>(),
+      );
       await disposeWorkspace(tester, w.container);
     },
   );

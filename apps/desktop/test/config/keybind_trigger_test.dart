@@ -132,4 +132,19 @@ void main() {
     expect(isPrintableKey(LogicalKeyboardKey.comma), isTrue);
     expect(isPrintableKey(LogicalKeyboardKey.arrowLeft), isFalse);
   });
+
+  group('altGrHeld (D26)', () {
+    const right = LogicalKeyboardKey.altRight;
+    const left = LogicalKeyboardKey.controlLeft;
+    test('needs Ctrl and the right Alt, on Windows', () {
+      expect(altGrHeld({left, right}, TargetPlatform.windows), isTrue);
+      expect(altGrHeld({right}, TargetPlatform.windows), isFalse);
+      expect(altGrHeld({left}, TargetPlatform.windows), isFalse);
+      expect(
+        altGrHeld({left, LogicalKeyboardKey.altLeft}, TargetPlatform.windows),
+        isFalse,
+      );
+      expect(altGrHeld({left, right}, TargetPlatform.macOS), isFalse);
+    });
+  });
 }

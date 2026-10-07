@@ -352,3 +352,11 @@ KeyChord? chordOfEvent(KeyEvent event, HardwareKeyboard keyboard) {
     meta: keyboard.isMetaPressed,
   );
 }
+
+/// A9 D26: real AltGr on Windows is Ctrl + right Alt together; the key is
+/// then the keyboard layout's. A right Alt alone (stuck, or a plain Alt
+/// key) is not AltGr, and macOS has none.
+bool altGrHeld(Set<LogicalKeyboardKey> pressed, TargetPlatform platform) =>
+    platform == TargetPlatform.windows &&
+    pressed.contains(LogicalKeyboardKey.altRight) &&
+    pressed.contains(LogicalKeyboardKey.controlLeft);

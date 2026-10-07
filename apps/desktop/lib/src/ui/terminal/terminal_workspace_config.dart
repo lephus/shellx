@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/config_controller.dart';
 import '../../config/config_opener.dart';
 import '../../config/font_probe.dart';
+import '../../config/keybind_trigger.dart' show altGrHeld;
 import '../../config/shellx_config.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../../terminal/user_commands.dart';
@@ -27,11 +28,10 @@ class WindowAction<T extends Intent> extends Action<T> {
   final bool Function(T intent)? _enabled;
   final bool Function() _altGrHeld;
 
-  static bool _hardwareAltGr() =>
-      defaultTargetPlatform == TargetPlatform.windows &&
-      HardwareKeyboard.instance.logicalKeysPressed.contains(
-        LogicalKeyboardKey.altRight,
-      );
+  static bool _hardwareAltGr() => altGrHeld(
+    HardwareKeyboard.instance.logicalKeysPressed,
+    defaultTargetPlatform,
+  );
 
   @override
   bool isEnabled(T intent) => !_altGrHeld() && (_enabled?.call(intent) ?? true);

@@ -86,19 +86,25 @@ class ConfigController extends Notifier<ConfigState> {
   /// [ackGhosttyNotice] ran in this process (its write may be in flight).
   bool _noticeAcked = false;
 
+  /// The label table this container last published (null: none yet).
+  KeyBindings? _ownBindings;
+
   @override
   ConfigState build() {
+    // A rebuilt provider starts from the defaults, not the old table.
+    labelBindings = null;
     ref.onDispose(() {
       _watcher?.stop();
       _watcher = null;
-      labelBindings = null;
+      // Only this container's table: another container may own it now.
+      if (identical(labelBindings, _ownBindings)) labelBindings = null;
     });
     return _last = ConfigState.initial(ref.read(configPlatformProvider));
   }
 
   void _publish(ConfigState next) {
     // Before the state, so a widget rebuilt by it reads the new labels.
-    labelBindings = next.bindings;
+    labelBindings = _ownBindings = next.bindings;
     state = next;
     _last = next;
   }

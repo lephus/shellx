@@ -16,7 +16,7 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
       : [for (final f in ghosttyFiles) '#   $f'];
   return [
     '# ShellX configuration. Ghostty syntax: key = value; lines starting with # are comments.',
-    '# Saved changes apply within a second; reload now with $reload.',
+    '# Saved changes apply within a second or two; reload now with $reload.',
     '# Problems: Command palette → "Show configuration problems", or `shellx config check`.',
     '#',
     '# ShellX also reads fonts and colours from your Ghostty configuration:',

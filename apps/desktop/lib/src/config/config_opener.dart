@@ -25,7 +25,7 @@ class ConfigFileOpener {
   final bool windows;
   final ProcessStarter _start;
 
-  Future<bool> open(String path, {required String template}) async {
+  Future<bool> open(String path, {required String Function() template}) async {
     try {
       final file = File(path);
       if (!await file.exists()) await _create(file, template);
@@ -42,17 +42,22 @@ class ConfigFileOpener {
     }
   }
 
-  /// A temporary file renamed into place, so an editor never sees half a
-  /// template; a file that appeared meanwhile is kept.
-  Future<void> _create(File file, String template) async {
+  /// Created with exclusive semantics: whoever loses a race (a second
+  /// open, another process) finds the file there and keeps it, so an
+  /// existing file is never replaced. The template is built only now.
+  Future<void> _create(File file, String Function() template) async {
     await file.parent.create(recursive: true);
-    final temp = File('${file.path}.tmp-$pid');
     try {
-      await temp.writeAsString(template, flush: true);
+      await file.create(exclusive: true);
+    } on FileSystemException {
       if (await file.exists()) return;
-      await temp.rename(file.path);
-    } finally {
-      if (await temp.exists()) await temp.delete();
+      rethrow;
+    }
+    try {
+      await file.writeAsString(template(), flush: true);
+    } catch (_) {
+      if (await file.exists()) await file.delete();
+      rethrow;
     }
   }
 }
@@ -70,7 +75,7 @@ Future<bool> openShellxConfig(
   final path = read(configPathsProvider).shellx;
   final ok = await read(
     configFileOpenerProvider,
-  ).open(path, template: shellxTemplate(read));
+  ).open(path, template: () => shellxTemplate(read));
   if (!ok) {
     read(
       terminalTabsProvider.notifier,

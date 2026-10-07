@@ -32,7 +32,10 @@ void main() {
       ],
     );
   });
-  tearDown(() => container.dispose());
+  tearDown(() {
+    container.dispose();
+    labelBindings = null;
+  });
 
   const fontProblem = ConfigProblem(
     file: '/f',
@@ -357,6 +360,25 @@ void main() {
       async.flushMicrotasks();
       expect(state().config.fontSize, 18);
     });
+  });
+
+  test('disposing one container leaves another one\'s label table', () async {
+    final other = ProviderContainer(overrides: configOverrides(fs));
+    addTearDown(other.dispose);
+    final s = await other.read(shellxConfigProvider.notifier).load();
+    await controller().load();
+    final mine = labelBindings;
+    expect(mine, isNot(same(s.bindings)));
+    other.dispose();
+    expect(labelBindings, same(mine));
+  });
+
+  test('a rebuilt provider starts without the old label table', () async {
+    await controller().load();
+    expect(labelBindings, isNotNull);
+    container.invalidate(shellxConfigProvider);
+    container.read(shellxConfigProvider);
+    expect(labelBindings, isNull);
   });
 
   test('disposing clears the label table', () async {
