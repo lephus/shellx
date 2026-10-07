@@ -104,6 +104,9 @@ final class _RemoteState {
   int? pid;
   String? home;
   Timer? plainTimer;
+
+  /// D16: only a server's ssh that ran the ShellX hook may speak OSC 6973.
+  bool get hooked => launch.host != null && launch.usesHook;
 }
 
 final class _Session {
@@ -295,6 +298,11 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// A8: ssh/tmux paths and the control helper; null = SSH unavailable.
   final RemoteTools? _remoteTools;
   final Duration _plainConnectedAfter;
+
+  /// D9, D29: opens to a server that have not registered a session yet,
+  /// by order of arrival (the first signs in, the rest wait for its master).
+  final _pendingConnects = <int, SshTarget>{};
+  int _nextConnect = 0;
 
   /// Never the text of a notice (A4 N9).
   final void Function(String message)? _log;
@@ -785,6 +793,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
     // A7 D29: the id is known before the shell starts so it can be in its
     // environment. Ids are never reused, so a failed spawn only skips one.
     final id = _nextId();
+    // D9, D29: marked before the first await, so a concurrent open to the
+    // same server sees this one and waits for it (one sign-in).
+    final connect = launch?.host == null ? null : _nextConnect++;
+    if (connect != null) _pendingConnects[connect] = launch!.host!;
     final ShellCommand command;
     final Pty pty;
     try {
@@ -798,7 +810,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
         // A8 D2: ssh or tmux, started in home. The environment carries the
         // pane and tab ids but never the control-socket secrets: the local
         // ssh process must not hold them.
-        command = await _remoteCommand(launch);
+        command = await _remoteCommand(launch, connect);
         workingDirectory = _homeDirectory;
         started = ShellLaunch(
           command,
@@ -823,6 +835,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       throw SpawnFailedException(launch == null ? '$error' : 'spawn_failed');
     } finally {
       _pendingOpens--;
+      if (connect != null) _pendingConnects.remove(connect);
     }
     final voided = origin == SessionOrigin.phone
         ? epoch != _epoch
@@ -865,12 +878,20 @@ final class SessionManager implements AgentSessions, LocalSessions {
   }
 
   /// A8 D2, D3, D9, D12, D13, D25: the command of an SSH or tmux launch.
-  Future<ShellCommand> _remoteCommand(SessionLaunch launch) async {
+  Future<ShellCommand> _remoteCommand(
+    SessionLaunch launch,
+    int? connect,
+  ) async {
     final tools = _remoteTools;
     if (launch case TmuxLaunch(host: null)) {
       final tmux = tools?.tmuxPath;
       if (tmux == null) throw const SpawnFailedException('tmux_unavailable');
-      return buildLocalTmuxCommand(launch, tmux);
+      try {
+        if (!isValidTmuxName(launch.session)) throw ArgumentError('tmux name');
+        return buildLocalTmuxCommand(launch, tmux);
+      } on ArgumentError {
+        throw const SpawnFailedException('bad_launch');
+      }
     }
     final ssh = tools?.sshPath;
     if (tools == null || ssh == null) {
@@ -878,10 +899,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
     }
     final target = launch.host!;
     final control = tools.control;
-    if (control != null && _connecting(target)) {
+    if (control != null && _connecting(target, before: connect)) {
       await control.awaitMaster(
         target,
-        stillWaiting: () => _connecting(target),
+        stillWaiting: () => _connecting(target, before: connect),
       );
     }
     final keepalive =
@@ -901,14 +922,19 @@ final class SessionManager implements AgentSessions, LocalSessions {
     }
   }
 
-  /// D9: a session to [target] has not reached it yet.
-  bool _connecting(SshTarget target) => _sessions.values.any(
-    (s) =>
-        !s.closing &&
-        s.remote != null &&
-        !s.remote!.connected &&
-        s.remote!.launch.host == target,
-  );
+  /// D9: a session to [target] has not reached it yet, or an earlier open
+  /// to it is still starting ([before]: this open's own number).
+  bool _connecting(SshTarget target, {int? before}) =>
+      _pendingConnects.entries.any(
+        (e) => e.value == target && (before == null || e.key < before),
+      ) ||
+      _sessions.values.any(
+        (s) =>
+            !s.closing &&
+            s.remote != null &&
+            !s.remote!.connected &&
+            s.remote!.launch.host == target,
+      );
 
   void _startRemote(_Session target, SessionLaunch launch) {
     final localTmux = launch is TmuxLaunch && launch.host == null;
@@ -1154,7 +1180,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
                 : _setCwd(session, url);
             if (moved) changed = true;
           case RemoteMetaReported(:final key, :final value):
-            if (session.remote != null &&
+            if (session.remote?.hooked == true &&
                 _applyRemoteMeta(session, key, value)) {
               changed = true;
             }
@@ -1217,17 +1243,19 @@ final class SessionManager implements AgentSessions, LocalSessions {
     final remote = session.remote!;
     switch (key) {
       case 'hello':
-        if (remote.connected) return false;
+        if (value != '1' || remote.connected) return false;
         remote.connected = true;
         remote.plainTimer?.cancel();
-        _remoteHello(remote.launch.host); // Task 6
+        _remoteHello(remote.launch.host);
         return true;
       case 'pid':
-        if (!RegExp(r'^[0-9]{1,10}$').hasMatch(value)) return false;
+        if (remote.pid != null || !RegExp(r'^[0-9]{1,10}$').hasMatch(value)) {
+          return false;
+        }
         final pid = int.parse(value);
         if (pid < 1 || pid > 0x7FFFFFFF) return false;
         remote.pid = pid;
-        _remoteShellsChanged(); // Task 6
+        _remoteShellsChanged();
         return false;
       case 'home':
         if (!value.startsWith('/') ||

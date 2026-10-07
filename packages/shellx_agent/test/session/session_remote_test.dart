@@ -339,4 +339,84 @@ void main() {
       ),
     );
   });
+
+  test('two opens to one server at once: the second waits for the first '
+      '(D9, D29)', () async {
+    final calls = <List<String>>[];
+    final rig = SessionRig(remoteTools: tools(calls: calls));
+    await Future.wait([
+      rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox)),
+      rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox)),
+    ]);
+    expect(rig.manager.sessions, hasLength(2));
+    expect(calls.where((a) => a.contains('check')), hasLength(30));
+    // A failed first open leaves no marker behind.
+    rig.factory.failWith = Exception('x');
+    final other = SshTarget.parse('other')!;
+    await expectLater(
+      rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(other)),
+      throwsA(isA<SpawnFailedException>()),
+    );
+    rig.factory.failWith = null;
+    calls.clear();
+    await rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(other));
+    expect(calls.where((a) => a.contains('check')), isEmpty);
+  });
+
+  test(
+    'hello and pid count once per connection; hello needs 1 (D16)',
+    () async {
+      final rig = SessionRig(remoteTools: tools());
+      await rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox));
+      rig.pty(0).emit(osc('6973;hello=0'));
+      await pumpEventQueue();
+      expect(rig.manager.sessions.single.remote!.connected, isFalse);
+      rig.pty(0).emit('${osc('6973;hello=1')}${osc('6973;pid=4242')}');
+      await pumpEventQueue();
+      expect(rig.manager.sessions.single.remote!.connected, isTrue);
+      // home and branch still follow the server.
+      rig.pty(0).emit('${osc('6973;home=/h')}${osc('6973;branch=b2')}');
+      await pumpEventQueue();
+      expect(rig.manager.sessions.single.remote!.home, '/h');
+      expect(rig.manager.sessions.single.gitBranch, 'b2');
+    },
+  );
+
+  test('6973 is ignored without the hook and by a local tmux pane; tmux '
+      'ignores titles (D16, D26)', () async {
+    final rig = SessionRig(remoteTools: tools());
+    await rig.manager.open(
+      cols: 80,
+      rows: 24,
+      launch: SshLaunch(devbox, hook: false),
+    );
+    rig.pty(0).emit('${osc('6973;hello=1')}${osc('6973;branch=forged')}');
+    await pumpEventQueue();
+    var s = rig.manager.sessions.single;
+    expect(s.remote!.connected, isFalse);
+    expect(s.gitBranch, isNull);
+    await rig.manager.open(cols: 80, rows: 24, launch: const TmuxLaunch('m'));
+    rig.pty(1).emit('${osc('6973;branch=forged')}${osc('0;t')}${osc('2;t')}');
+    await pumpEventQueue();
+    s = rig.manager.sessions.last;
+    expect(s.gitBranch, isNull);
+    expect(s.title, 'tmux: m');
+  });
+
+  test(
+    'a local tmux command that cannot be built is bad_launch (D25)',
+    () async {
+      final rig = SessionRig(remoteTools: tools());
+      await expectLater(
+        rig.manager.open(cols: 80, rows: 24, launch: const TmuxLaunch('a:b')),
+        throwsA(
+          isA<SpawnFailedException>().having(
+            (e) => e.message,
+            'message',
+            'bad_launch',
+          ),
+        ),
+      );
+    },
+  );
 }

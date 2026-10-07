@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../notify/command_tracker.dart';
+import '../remote/session_launch.dart';
 import '../session/session_manager.dart';
 import '../session/session_notice.dart';
 import '../term/term_frames.dart';
@@ -101,6 +102,12 @@ Map<String, Object?> summaryToWire(SessionSummary s) => {
   'cwd': s.cwd,
   'branch': s.gitBranch,
   'ports': s.ports,
+  if (s.remote case final r?)
+    'remote': {
+      'launch': r.launch.toJson(),
+      'connected': r.connected,
+      'home': r.home,
+    },
 };
 
 SessionSummary summaryFromWire(Map<Object?, Object?> m) => SessionSummary(
@@ -119,7 +126,19 @@ SessionSummary summaryFromWire(Map<Object?, Object?> m) => SessionSummary(
   cwd: m['cwd'] as String?,
   gitBranch: m['branch'] as String?,
   ports: [for (final p in m['ports'] as List<Object?>? ?? const []) p! as int],
+  remote: _remoteFromWire(m['remote']),
 );
+
+SessionRemote? _remoteFromWire(Object? json) {
+  if (json is! Map<Object?, Object?>) return null;
+  final launch = SessionLaunch.fromJson(json['launch']);
+  if (launch == null) return null;
+  return SessionRemote(
+    launch: launch,
+    connected: json['connected'] == true,
+    home: json['home'] as String?,
+  );
+}
 
 Map<String, Object?> noticeToWire(SessionNotice n) => {
   'id': n.sessionId,
