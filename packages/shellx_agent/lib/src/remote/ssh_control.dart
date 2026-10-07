@@ -169,13 +169,14 @@ final class SshControl {
     return r.exitCode == 0 && !r.timedOut;
   }
 
-  /// D9: at most 3 s (30 checks, 100 ms apart) while [stillWaiting].
+  /// D9: at most 3 s (checks 100 ms apart) while [stillWaiting].
   Future<void> awaitMaster(
     SshTarget target, {
     required bool Function() stillWaiting,
   }) async {
     if (controlPath == null) return;
-    for (var i = 0; i < 30 && stillWaiting(); i++) {
+    final deadline = _now().add(const Duration(seconds: 3));
+    while (stillWaiting() && _now().isBefore(deadline)) {
       if (await masterAlive(target)) return;
       await _sleep(const Duration(milliseconds: 100));
     }
@@ -194,6 +195,8 @@ final class SshControl {
     '-o',
     'ConnectTimeout=${max(1, timeout.inSeconds)}',
     ...controlOptions(controlPath, master: 'no'),
+    '-o',
+    'ClearAllForwardings=yes',
     ...target.destinationArgs,
     remoteExecCommand(script),
   ], timeout: timeout);
@@ -213,15 +216,25 @@ final class SshControl {
   /// D19: `127.0.0.1:L → localhost:remotePort` on the server; L = the same
   /// port when it is free here. Throws [ForwardFailedException].
   Future<int> forward(SshTarget target, int remotePort) async {
+    if (remotePort < 1 || remotePort > 65535) {
+      throw const ForwardFailedException();
+    }
     final key = '${target.key}\u0000$remotePort';
     final existing = _forwards[key];
-    if (existing != null && !existing.dead) return existing.local;
+    if (existing != null && !existing.dead) {
+      // A forward over a master dies with it: check before reusing.
+      if (existing.process != null || await masterAlive(target)) {
+        return existing.local;
+      }
+      _forwards.remove(key);
+    }
     if (_forwards.values.where((f) => f.target == target).length >= 32) {
       throw const ForwardFailedException();
     }
     final local = await _ports.isFree(remotePort)
         ? remotePort
         : await _ports.ephemeral();
+    if (local < 1 || local > 65535) throw const ForwardFailedException();
     final spec = '127.0.0.1:$local:localhost:$remotePort';
     final path = controlPath;
     if (path != null && await masterAlive(target)) {
@@ -245,6 +258,10 @@ final class SshControl {
       'BatchMode=yes',
       '-o',
       'ExitOnForwardFailure=yes',
+      '-o',
+      'ControlMaster=no',
+      '-o',
+      'ControlPath=none',
       '-L',
       spec,
       ...target.destinationArgs,
@@ -324,15 +341,22 @@ final class SshControl {
 /// `%C` is counted as 64 characters (SHA-256 proof).
 Future<String?> prepareControlDirectory({
   String base = '/tmp',
+  int maxSocketPath = 104,
   CommandRunner? run,
   void Function(String message)? log,
 }) async {
   final runner = run ?? runCommand;
   final id = await runner('/usr/bin/id', ['-u']);
   final uid = id.stdout.trim();
-  if (id.exitCode != 0 || !RegExp(r'^[0-9]+$').hasMatch(uid)) return null;
+  if (id.exitCode != 0 || !RegExp(r'^[0-9]+$').hasMatch(uid)) {
+    log?.call('ssh: control dir user unknown');
+    return null;
+  }
   final dir = '$base/shellx-ssh-$uid';
-  if (dir.length + 1 + 64 + 17 >= 104) return null;
+  if (dir.length + 1 + 64 + 17 >= maxSocketPath) {
+    log?.call('ssh: control dir path too long'); // never the path (D37)
+    return null;
+  }
   try {
     await Directory(dir).create();
   } on FileSystemException {

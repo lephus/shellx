@@ -54,7 +54,7 @@ void main() {
     run: runner.call,
     ports: ports,
     now: () => now,
-    sleep: (_) async {},
+    sleep: (d) async => now = now.add(d),
     startForward: (exe, args) async {
       started.add(args);
       return process;
@@ -139,6 +139,7 @@ void main() {
       );
       expect(args.last, remoteExecCommand('echo hi'));
       expect(args, isNot(contains('ControlPersist=60')));
+      expect(args, containsAllInOrder(['-o', 'ClearAllForwardings=yes']));
     },
   );
 
@@ -159,7 +160,7 @@ void main() {
     );
     final before = runner.calls.length;
     expect(await c.forward(devbox, 8000), 8000);
-    expect(runner.calls.length, before);
+    expect(runner.calls.length, before + 1); // the master is checked (M3)
     ports.busy.add(3000);
     expect(await c.forward(devbox, 3000), 53012);
     expect(c.forwardedPort(devbox, 3000), 53012);
@@ -196,6 +197,10 @@ void main() {
         'BatchMode=yes',
         '-o',
         'ExitOnForwardFailure=yes',
+        '-o',
+        'ControlMaster=no',
+        '-o',
+        'ControlPath=none',
         '-L',
         '127.0.0.1:8000:localhost:8000',
         '--',
@@ -260,11 +265,40 @@ void main() {
     },
   );
 
-  group('prepareControlDirectory (D8)', testOn: 'mac-os || linux', () {
-    late Directory base;
-    // A short base: the socket path (with a 64-char %C) must stay under 104.
-    setUp(() => base = Directory('/tmp/s')..createSync(recursive: true));
-    tearDown(() => base.deleteSync(recursive: true));
+  test('awaitMaster is bounded by a 3 s deadline, not a count (M2)', () async {
+    final c = control();
+    runner.answer = (_) => const CommandResult(255, '', '');
+    final start = now;
+    await c.awaitMaster(devbox, stillWaiting: () => true);
+    expect(now.difference(start), const Duration(seconds: 3));
+  });
+
+  test('a master forward is reused only while the master lives (M3)', () async {
+    final c = control();
+    expect(await c.forward(devbox, 8000), 8000);
+    runner.calls.clear();
+    runner.answer = (_) => const CommandResult(255, '', '');
+    ports.busy.addAll([8000, 53012]); // 8000 taken; the new forward listens
+    expect(await c.forward(devbox, 8000), 53012);
+    // The master is gone: checked, then a standalone process took over.
+    expect(runner.calls.first, contains('check'));
+    expect(started, hasLength(1));
+  });
+
+  test('ports outside 1..65535 fail (M6)', () async {
+    final c = control();
+    for (final port in [0, -1, 65536]) {
+      await expectLater(
+        c.forward(devbox, port),
+        throwsA(isA<ForwardFailedException>()),
+      );
+    }
+    expect(runner.calls, isEmpty);
+  });
+
+  group('prepareControlDirectory (D8)', () {
+    // A base that does not exist: nothing is created on disk.
+    const base = '/nx';
 
     test(
       'owned 0700 directory → used; anything else → off, logged without the path',
@@ -277,8 +311,8 @@ void main() {
             _ => const CommandResult(1, '', ''),
           };
         expect(
-          await prepareControlDirectory(base: base.path, run: r.call),
-          '${base.path}/shellx-ssh-501',
+          await prepareControlDirectory(base: base, run: r.call),
+          '$base/shellx-ssh-501',
         );
         final logs = <String>[];
         r.answer = (args) => switch (args) {
@@ -287,18 +321,47 @@ void main() {
           _ => const CommandResult(0, '', ''),
         };
         expect(
+          await prepareControlDirectory(base: base, run: r.call, log: logs.add),
+          isNull,
+        );
+        expect(logs, ['ssh: control dir unsafe']);
+      },
+    );
+
+    test(
+      'a too-long socket path and a failing id are refused, logged without paths (M7)',
+      () async {
+        final r = FakeRunner()
+          ..answer = (args) => switch (args) {
+            ['-u'] => const CommandResult(0, '501\n', ''),
+            _ => const CommandResult(0, '501 700 Directory\n', ''),
+          };
+        final logs = <String>[];
+        expect(
           await prepareControlDirectory(
-            base: base.path,
+            base: '/${'x' * 60}',
             run: r.call,
             log: logs.add,
           ),
           isNull,
         );
-        expect(logs, ['ssh: control dir unsafe']);
+        expect(logs, ['ssh: control dir path too long']);
         expect(
-          await prepareControlDirectory(base: '/${'x' * 60}', run: r.call),
+          await prepareControlDirectory(
+            base: base,
+            run: r.call,
+            maxSocketPath: 60,
+            log: logs.add,
+          ),
           isNull,
         );
+        logs.clear();
+        r.answer = (_) => const CommandResult(1, '', '');
+        expect(
+          await prepareControlDirectory(base: base, run: r.call, log: logs.add),
+          isNull,
+        );
+        expect(logs, ['ssh: control dir user unknown']);
       },
     );
 
@@ -321,8 +384,8 @@ void main() {
           );
         };
         expect(
-          await prepareControlDirectory(base: base.path, run: r.call),
-          '${base.path}/shellx-ssh-501',
+          await prepareControlDirectory(base: base, run: r.call),
+          '$base/shellx-ssh-501',
         );
         expect(chmods, 1);
         chmods = 0;
@@ -334,12 +397,51 @@ void main() {
           }
           return const CommandResult(0, '501 755 Symbolic Link\n', '');
         };
-        expect(
-          await prepareControlDirectory(base: base.path, run: r.call),
-          isNull,
-        );
+        expect(await prepareControlDirectory(base: base, run: r.call), isNull);
         expect(chmods, 0);
       },
+    );
+
+    test(
+      'real directory 0755 → 0700; a real link is refused untouched',
+      () async {
+        final tmp = await Directory.systemTemp.createTemp('shellx');
+        addTearDown(() => tmp.deleteSync(recursive: true));
+        final uid = (await Process.run('/usr/bin/id', [
+          '-u',
+        ])).stdout.toString().trim();
+        final dir = '${tmp.path}/shellx-ssh-$uid';
+        await Directory(dir).create();
+        await Process.run('/bin/chmod', ['755', dir]);
+        expect(
+          await prepareControlDirectory(base: tmp.path, maxSocketPath: 4096),
+          dir,
+        );
+        final mode = (await Process.run('/usr/bin/stat', [
+          '-f',
+          '%Lp',
+          dir,
+        ])).stdout.toString().trim();
+        expect(mode, '700');
+
+        final other = await Directory.systemTemp.createTemp('shellx');
+        addTearDown(() => other.deleteSync(recursive: true));
+        await Process.run('/bin/chmod', ['755', other.path]);
+        final tmp2 = await Directory.systemTemp.createTemp('shellx');
+        addTearDown(() => tmp2.deleteSync(recursive: true));
+        await Link('${tmp2.path}/shellx-ssh-$uid').create(other.path);
+        expect(
+          await prepareControlDirectory(base: tmp2.path, maxSocketPath: 4096),
+          isNull,
+        );
+        final after = (await Process.run('/usr/bin/stat', [
+          '-f',
+          '%Lp',
+          other.path,
+        ])).stdout.toString().trim();
+        expect(after, '755');
+      },
+      testOn: 'mac-os',
     );
   });
 }

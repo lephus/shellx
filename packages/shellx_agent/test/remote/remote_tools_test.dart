@@ -19,11 +19,11 @@ void main() {
       run: run,
       fileExists: (p) async =>
           p == '/usr/bin/ssh' || p == '/opt/homebrew/bin/tmux',
-      controlBase: '/tmp/s',
+      controlBase: '/nx',
     );
     expect(tools.sshPath, '/usr/bin/ssh');
     expect(tools.tmuxPath, '/opt/homebrew/bin/tmux');
-    expect(tools.control!.controlPath, '/tmp/s/shellx-ssh-501/%C');
+    expect(tools.control!.controlPath, '/nx/shellx-ssh-501/%C');
   });
 
   test('Windows: no multiplexing, no local tmux', () async {
