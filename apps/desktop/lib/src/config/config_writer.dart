@@ -49,12 +49,12 @@ _Line? _parse(String line) {
   return split == null ? null : (trigger: split.trigger, action: split.action);
 }
 
-/// One line of the text: where it starts, where it ends (past its `\n`),
+/// One line of the text (shared with the settings edits): where it starts, where it ends (past its `\n`),
 /// and what it says without the line ending.
-typedef _Span = ({int start, int end, String body});
+typedef ConfigLineSpan = ({int start, int end, String body});
 
-List<_Span> _lines(String text) {
-  final spans = <_Span>[];
+List<ConfigLineSpan> splitConfigLines(String text) {
+  final spans = <ConfigLineSpan>[];
   var pos = 0;
   while (pos < text.length) {
     final nl = text.indexOf('\n', pos);
@@ -74,7 +74,7 @@ List<_Span> _lines(String text) {
 /// A marker quoted in a comment is not a marker (the whole line is).
 typedef _Scan = ({({int start, int end})? block, bool damaged});
 
-_Scan _scan(List<_Span> lines) {
+_Scan _scan(List<ConfigLineSpan> lines) {
   final starts = <int>[];
   final ends = <int>[];
   for (var i = 0; i < lines.length; i++) {
@@ -91,7 +91,7 @@ _Scan _scan(List<_Span> lines) {
 
 /// 1-based lines of the two markers, or null.
 ({int first, int last})? managedLineRange(String text) {
-  final block = _scan(_lines(text)).block;
+  final block = _scan(splitConfigLines(text)).block;
   return block == null ? null : (first: block.start + 1, last: block.end + 1);
 }
 
@@ -101,8 +101,8 @@ bool _sameChord(String trigger, KeyChord chord) =>
 /// The line ending of the line before [index] (the end of the text when
 /// the block is yet to be added); when that line has none, the first one
 /// the text has; else `\n`.
-String _eolBefore(String text, List<_Span> lines, int index) {
-  String? ending(_Span line) {
+String eolBefore(String text, List<ConfigLineSpan> lines, int index) {
+  String? ending(ConfigLineSpan line) {
     final raw = text.substring(line.start, line.end);
     if (raw.endsWith('\r\n')) return '\r\n';
     return raw.endsWith('\n') ? '\n' : null;
@@ -126,13 +126,13 @@ typedef _Item = ({String text, _Line? bind});
 /// D32: edits only the managed block (appended at the end when missing,
 /// removed when it ends up empty); every other byte stays.
 String applyBindingEdits(String text, List<BindingEdit> edits) {
-  final lines = _lines(text);
+  final lines = splitConfigLines(text);
   final scan = _scan(lines);
   if (scan.damaged) {
     throw const ConfigWriteRefused(ConfigWriteRefusal.damagedBlock);
   }
   final found = scan.block;
-  final eol = _eolBefore(text, lines, found?.start ?? lines.length);
+  final eol = eolBefore(text, lines, found?.start ?? lines.length);
   final String head;
   final String tail;
   final items = <_Item>[];
@@ -219,6 +219,10 @@ enum ConfigWriteRefusal {
   /// The managed block's markers are damaged (a lone marker, two blocks):
   /// the app edits nothing rather than guess.
   damagedBlock,
+
+  /// A carriage return that is not part of a CRLF: the loader reads the
+  /// whole file as one line, so an edit could not tell what it replaces.
+  loneCarriageReturn,
 }
 
 final class ConfigWriteRefused implements Exception {
@@ -344,6 +348,20 @@ final class ConfigFileWriter {
     String path,
     List<BindingEdit> edits, {
     required String template,
+  }) => editText(
+    path,
+    (text) => applyBindingEdits(text, edits),
+    template: template,
+  );
+
+  /// [edit] for any text transform (A11 D5: the settings' `applyKeyEdits`).
+  /// [transform] gets the file as text (the BOM is not in it) and returns
+  /// the new text; it may throw [ConfigWriteRefused]. Returning the same
+  /// text writes nothing, not even the template.
+  Future<void> editText(
+    String path,
+    String Function(String text) transform, {
+    required String template,
   }) async {
     final Uint8List? bytes;
     try {
@@ -377,7 +395,7 @@ final class ConfigFileWriter {
         throw const ConfigWriteRefused(ConfigWriteRefusal.notUtf8);
       }
     }
-    final edited = applyBindingEdits(text, edits);
+    final edited = transform(text);
     // Nothing to change: no write (and no file made from the template).
     if (edited == text) return;
     final next = Uint8List.fromList([
