@@ -51,7 +51,7 @@ const ld = [
       <p class="meta">
         {t.published} <time datetime={f.published}>{fmt(f.published)}</time>
         {f.updated !== f.published && <>{' · '}{t.lastUpdated} <time datetime={f.updated}>{fmt(f.updated)}</time></>}
-        {' · '}<a href={author.url} rel="author">{author.name}</a>
+        {' · '}<span>{author.name}</span>
       </p>
       <slot />
     </article>
