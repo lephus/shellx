@@ -62,6 +62,19 @@ void main() {
     });
   });
 
+  group('selectionText', () {
+    test('a rectangle across wrapped rows keeps a break per visual row', () {
+      final t = Terminal(maxLines: 100)..resize(10, 5);
+      t.write('abcdefghijklmnopqrst'); // wraps onto row 1
+      final b = t.buffer;
+      final range = BufferRangeBlock(CellOffset(1, 0), CellOffset(4, 1));
+      expect(b.getText(range), 'bcdlmn', reason: 'xterm glues wrapped rows');
+      expect(selectionText(b, range, SelectionMode.block), 'bcd\nlmn');
+      final stream = BufferRangeLine(CellOffset(1, 0), CellOffset(4, 1));
+      expect(selectionText(b, stream, SelectionMode.line), b.getText(stream));
+    });
+  });
+
   group('ClickSelectLayer', () {
     late Terminal terminal;
     late TerminalController controller;
@@ -99,6 +112,40 @@ void main() {
       await t.tapAt(p, kind: PointerDeviceKind.mouse);
       expect(controller.selection, isNotNull, reason: 'double-click: a word');
       await t.tapAt(p, kind: PointerDeviceKind.mouse);
+      await t.pump();
+      expect(
+        terminal.buffer.getText(controller.selection!).trimRight(),
+        'hello world foo',
+      );
+      await t.pump(const Duration(milliseconds: 400));
+    });
+
+    testWidgets('output streaming in before the frame does not move the line', (
+      t,
+    ) async {
+      terminal = Terminal(maxLines: 40);
+      controller = TerminalController();
+      await t.pumpWidget(
+        MaterialApp(
+          home: ClickSelectLayer(
+            terminal: terminal,
+            controller: controller,
+            viewKey: viewKey,
+            child: TerminalView(terminal, key: viewKey, controller: controller),
+          ),
+        ),
+      );
+      await t.pump();
+      terminal.write('\r\n' * 60); // the buffer is full: new lines trim the top
+      terminal.write('hello world foo\r\n\r\n');
+      await t.pump();
+      final row =
+          terminal.buffer.absoluteCursorY - 2 - terminal.buffer.scrollBack;
+      final p = onText(t, row: row);
+      for (var i = 0; i < 3; i++) {
+        await t.tapAt(p, kind: PointerDeviceKind.mouse);
+      }
+      terminal.write('\r\n\r\n\r\n'); // before the frame that applies it
       await t.pump();
       expect(
         terminal.buffer.getText(controller.selection!).trimRight(),

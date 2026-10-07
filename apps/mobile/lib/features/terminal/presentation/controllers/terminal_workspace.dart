@@ -75,8 +75,9 @@ class TerminalWorkspace extends Controller {
   bool get hasPendingSelect => _pendingSelectId != null;
 
   /// A11 D27: a notification named [sessionId] before its tab exists (the phone is still reconnecting).
-  /// The tab is selected when it appears; the user picking a tab, or [ttl], drops the request. When the
-  /// tab is already open it is selected at once.
+  /// The tab is selected when it appears and stays selected while tabs keep arriving (each new tab takes
+  /// the focus, then this one gets it back); the user picking or opening a tab, or [ttl], drops the
+  /// request. When the tab is already open it is selected at once.
   void pendingSelect(int sessionId, {Duration ttl = const Duration(seconds: 30)}) {
     if (_disposed) return;
     final index = _tabs.peek().indexWhere((tab) => tab.id == sessionId);
@@ -95,13 +96,12 @@ class TerminalWorkspace extends Controller {
     _pendingTimer = null;
   }
 
+  /// Re-asserts the pending tab after the list changed; the request stays until [ttl] or a user pick.
   void _applyPending() {
     final id = _pendingSelectId;
     if (id == null) return;
     final index = _tabs.peek().indexWhere((tab) => tab.id == id);
-    if (index < 0) return;
-    clearPendingSelect();
-    _select(index);
+    if (index >= 0) _select(index);
   }
 
   /// A10 D29: only the active tab's output is written at the foreground's pace.
@@ -154,6 +154,7 @@ class TerminalWorkspace extends Controller {
   /// [TerminalTabController.failed] tab. Throws any other [AppErrorException] (`session_limit`,
   /// shown as the floating notice) and connection failures.
   Future<TerminalTabController> openNew(TerminalGrid grid) async {
+    clearPendingSelect(); // the user asked for a new session: it wins
     await ensureConnected();
     final TabHandle handle;
     try {
@@ -181,7 +182,9 @@ class TerminalWorkspace extends Controller {
     final tabs = _tabs.peek();
     final existing = tabs.indexWhere((tab) => tab.id == session.id);
     if (existing >= 0) {
-      select(existing);
+      // A reconnect re-attaching an open tab is not the user's choice.
+      _select(existing);
+      _applyPending();
       return tabs[existing];
     }
     await ensureConnected();

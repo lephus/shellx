@@ -114,22 +114,26 @@ class _ClickSelectLayerState extends State<ClickSelectLayer> {
     final render = widget.viewKey.currentState?.renderTerminal;
     if (render == null) return;
     final row = render.getCellOffset(e.localPosition).y;
+    final b = widget.terminal.buffer;
+    if (row >= b.lines.length) return;
+    // Anchored now: output that streams in before the frame must not move
+    // the selection onto another line.
+    final range = logicalLineRange(b, row);
+    final from = b.createAnchorFromOffset(CellOffset(0, range.first));
+    final to = b.createAnchorFromOffset(CellOffset(b.viewWidth, range.last));
     // After xterm's own tap handling of this pointer-down has run.
     WidgetsBinding.instance
-      ..addPostFrameCallback((_) => _selectLine(row))
+      ..addPostFrameCallback((_) => _selectLine(from, to))
       ..ensureVisualUpdate();
   }
 
-  void _selectLine(int row) {
-    if (!mounted) return;
-    final b = widget.terminal.buffer;
-    if (row >= b.lines.length) return;
-    final range = logicalLineRange(b, row);
-    widget.controller.setSelection(
-      b.createAnchorFromOffset(CellOffset(0, range.first)),
-      b.createAnchorFromOffset(CellOffset(b.viewWidth, range.last)),
-      mode: SelectionMode.line,
-    );
+  void _selectLine(CellAnchor from, CellAnchor to) {
+    if (!mounted) {
+      from.dispose();
+      to.dispose();
+      return;
+    }
+    widget.controller.setSelection(from, to, mode: SelectionMode.line);
   }
 
   @override
@@ -138,4 +142,17 @@ class _ClickSelectLayerState extends State<ClickSelectLayer> {
     onPointerDown: _down,
     child: widget.child,
   );
+}
+
+/// The text of [range] as copied. A rectangle (⌥-drag) keeps one line break
+/// per visual row, wrapped rows included: `Buffer.getText` joins a wrapped
+/// row to the one above it, which would glue the pieces of a column together.
+String selectionText(Buffer buffer, BufferRange range, SelectionMode mode) {
+  if (mode != SelectionMode.block) return buffer.getText(range);
+  final rows = <String>[];
+  for (final segment in range.normalized.toSegments()) {
+    if (segment.line < 0 || segment.line >= buffer.height) continue;
+    rows.add(buffer.lines[segment.line].getText(segment.start, segment.end));
+  }
+  return rows.join('\n');
 }

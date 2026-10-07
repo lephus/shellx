@@ -32,7 +32,7 @@ void main() {
     expect(workspace.activeTab.peek()?.id, 1);
     await open(7);
     expect(workspace.activeTab.peek()?.id, 7);
-    expect(workspace.hasPendingSelect, isFalse);
+    expect(workspace.hasPendingSelect, isTrue);
   });
 
   test('another tab appearing first does not consume the pending one', () async {
@@ -41,9 +41,32 @@ void main() {
     expect(workspace.hasPendingSelect, isTrue);
     await open(7);
     expect(workspace.activeTab.peek()?.id, 7);
-    expect(workspace.hasPendingSelect, isFalse);
     await open(2);
-    expect(workspace.activeTab.peek()?.id, 2, reason: 'a tab opened afterwards is active as always');
+    expect(workspace.activeTab.peek()?.id, 7, reason: 'the notification\'s tab keeps the focus until the ttl');
+  });
+
+  test('the pending tab wins while the other tabs reconnect; a user pick then sticks', () async {
+    workspace.pendingSelect(2);
+    await open(1);
+    await open(2);
+    await open(3);
+    expect(workspace.activeTab.peek()?.id, 2);
+    expect(workspace.hasPendingSelect, isTrue);
+    await open(2); // re-attaching an open tab is not a user pick
+    expect(workspace.activeTab.peek()?.id, 2);
+    workspace.select(2); // the user taps tab 3
+    expect(workspace.activeTab.peek()?.id, 3);
+    await open(4);
+    expect(workspace.activeTab.peek()?.id, 4);
+    expect(workspace.hasPendingSelect, isFalse);
+  });
+
+  test('a user openNew drops the pending one', () async {
+    workspace.pendingSelect(2);
+    await open(2);
+    await workspace.openNew(grid);
+    expect(workspace.hasPendingSelect, isFalse);
+    expect(workspace.activeTab.peek()?.id, isNot(2));
   });
 
   test('the user choosing a tab cancels the pending one', () async {

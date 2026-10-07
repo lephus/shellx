@@ -31,6 +31,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart';
 import '../window_router.dart';
+import 'click_select.dart' show selectionText;
 import 'close_tab.dart';
 import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
@@ -465,7 +466,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     if (tab == null || range == null) return;
     unawaited(
       Clipboard.setData(
-        ClipboardData(text: tab.terminal.buffer.getText(range)),
+        ClipboardData(
+          text: selectionText(
+            tab.terminal.buffer,
+            range,
+            tab.selection.selectionMode,
+          ),
+        ),
       ),
     );
     tab.selection.clearSelection();
