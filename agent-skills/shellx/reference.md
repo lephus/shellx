@@ -175,10 +175,10 @@ JSON: `{}`. Exit codes: 0, 2, 3, 4 (no such pane), 6, 7.
 
 - `--idle`: a shell with ShellX hooks is back at its prompt (no command running) and quiet for `--quiet` ms (default 500); a shell without hooks: quiet for 2 s. Prints nothing.
 - `--exit`: the shell ended; prints its exit code (`shellx` itself exits 0). Works right after the pane closed.
-- `--match REGEX`: JavaScript/Dart regular expression syntax, multi-line mode (`^`/`$` match at line ends), at most 1 KiB. It runs over the last 2000 logical lines (≤ 256 KiB) at the start and after each burst of output; `--from-now` only looks at text from the cursor onwards. Prints the matching line. An invalid pattern exits 2; each scan has a 1 s budget — a pattern that needs longer (catastrophic backtracking) fails with exit 2 "pattern is too slow".
+- `--match REGEX`: JavaScript/Dart regular expression syntax, multi-line mode (`^`/`$` match at line ends), at most 1 KiB. It runs over the last 2000 logical lines (≤ 256 KiB) at the start and after each burst of output; `--from-now` only looks at text from the cursor onwards. Prints the matching line. `line` and `match` are at most 4096 characters each: a longer line is cut to a window around the match, a longer match keeps its start, and the answer then has `"clipped":true`. An invalid pattern exits 2; each scan has a 1 s budget — a pattern that needs longer (catastrophic backtracking) fails with exit 2 "pattern is too slow".
 - If the pane exits while waiting for `--idle`/`--match`: exit 1 `exited`.
 - Ctrl+C ends the wait on both sides.
-- JSON: `{}` (idle), `{"exitCode":0}` (exit), `{"match":"ready","line":"ready in 4 ms"}` (match).
+- JSON: `{}` (idle), `{"exitCode":0}` (exit), `{"match":"ready","line":"ready in 4 ms"}` (match; plus `"clipped":true` when cut).
 
 Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 

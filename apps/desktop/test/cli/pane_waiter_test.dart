@@ -8,6 +8,8 @@ import 'package:shellx_desktop/src/cli/pane_waiter.dart';
 import 'package:xterm/xterm.dart';
 
 final class FakeProbe implements PaneProbe {
+  FakeProbe({Terminal? terminal})
+    : terminal = terminal ?? (Terminal(maxLines: 1000)..resize(40, 5));
   @override
   bool hooked = true;
   @override
@@ -23,7 +25,7 @@ final class FakeProbe implements PaneProbe {
   @override
   Stream<void> get changes => ch.stream;
   @override
-  final Terminal terminal = Terminal(maxLines: 1000)..resize(40, 5);
+  final Terminal terminal;
   void print(String s) {
     terminal.write(s);
     out.add(null);
@@ -228,6 +230,89 @@ void main() {
       p.print('old-token again\r\n');
       async.elapse(const Duration(milliseconds: 150));
       expect(r, {'match': 'old-token', 'line': 'old-token again'});
+    });
+  });
+
+  test('final I1: a match on a 200 KiB line answers a window of at most '
+      '4 KiB around it, flagged clipped; a short line is not', () {
+    fakeAsync((async) {
+      final p = FakeProbe(terminal: Terminal(maxLines: 8000)..resize(80, 5));
+      final line = '${'a' * 100000}READY${'b' * 104795}';
+      expect(line.length, 200 * 1024);
+      p.print('$line\r\n');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('READY')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r!['match'], 'READY');
+      expect(r!['clipped'], isTrue);
+      final shown = r!['line']! as String;
+      expect(shown.length, lessThanOrEqualTo(4096));
+      expect(shown, contains('READY'));
+      // Centred: the match is in the middle of the window.
+      final at = shown.indexOf('READY');
+      expect((at - (shown.length - at - 5)).abs(), lessThanOrEqualTo(1));
+
+      // The match itself is bounded too.
+      Map<String, Object?>? big;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('a+READYb+')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => big = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect((big!['match']! as String).length, lessThanOrEqualTo(4096));
+      expect((big!['line']! as String).length, lessThanOrEqualTo(4096));
+      expect(big!['clipped'], isTrue);
+
+      p.print('short ok\r\n');
+      Map<String, Object?>? small;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('ok')),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => small = v),
+      );
+      p.print('all ok\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(small, {'match': 'ok', 'line': 'all ok'});
+    });
+  });
+
+  test('final I1: a clipped window never splits a surrogate pair', () {
+    fakeAsync((async) {
+      final p = FakeProbe(terminal: Terminal(maxLines: 8000)..resize(80, 5));
+      // Emoji (2 UTF-16 units each) all around the match, at both edges of
+      // any window.
+      final side = '\u{1F600}' * 6000;
+      p.print('${side}X$side\r\n');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('X')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      final shown = r!['line']! as String;
+      expect(shown.length, lessThanOrEqualTo(4096));
+      expect(shown.contains('X'), isTrue);
+      final units = shown.codeUnits;
+      expect(units.first & 0xFC00, isNot(0xDC00)); // no lone low surrogate
+      expect(units.last & 0xFC00, isNot(0xD800)); // no lone high surrogate
     });
   });
 

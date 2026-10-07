@@ -29,6 +29,10 @@ const _matchThrottle = Duration(milliseconds: 100);
 const _matchMaxLines = 2000;
 const _matchMaxChars = 262144;
 
+/// Final ruling I1: `match` and `line` of a `wait --match` answer are at
+/// most this many UTF-16 code units each (well under the 64 KiB frame).
+const kMatchAnswerMaxUnits = 4096;
+
 const _exited = CliFailure(CliError.exited, 'the pane exited');
 
 typedef _Done = Completer<Map<String, Object?>>;
@@ -196,15 +200,7 @@ Future<Map<String, Object?>> waitMatch(
       }
       if (done.isCompleted) return;
       if (m != null) {
-        final lineStart = text.lastIndexOf('\n', m.start) + 1;
-        final lineEnd = text.indexOf('\n', m.end);
-        done.complete({
-          'match': text.substring(m.start, m.end),
-          'line': text.substring(
-            lineStart,
-            lineEnd < 0 ? text.length : lineEnd,
-          ),
-        });
+        done.complete(matchAnswer(text, m.start, m.end));
       } else if (fresh) {
         soon(); // output came while the scanner looked
       } else if (p.exited) {
@@ -236,6 +232,49 @@ Future<Map<String, Object?>> waitMatch(
     };
   });
 }
+
+/// D21 `{match, line}` for the match [start]–[end] of [text], each at most
+/// [kMatchAnswerMaxUnits] (final ruling I1): a longer match keeps its
+/// start; a longer line becomes a window centred on the match. Cuts never
+/// split a surrogate pair. `clipped: true` when anything was cut.
+Map<String, Object?> matchAnswer(String text, int start, int end) {
+  const max = kMatchAnswerMaxUnits;
+  var clipped = false;
+  var mEnd = end;
+  if (mEnd - start > max) {
+    mEnd = _before(text, start + max);
+    clipped = true;
+  }
+  final lineStart = text.lastIndexOf('\n', start) + 1;
+  final nl = text.indexOf('\n', end);
+  final lineEnd = nl < 0 ? text.length : nl;
+  var from = lineStart;
+  var to = lineEnd;
+  if (to - from > max) {
+    final margin = (max - (mEnd - start)) ~/ 2;
+    from = start - margin < lineStart ? lineStart : start - margin;
+    to = from + max > lineEnd ? lineEnd : from + max;
+    if (to - from < max) from = to - max < lineStart ? lineStart : to - max;
+    from = _after(text, from);
+    to = _before(text, to);
+    clipped = true;
+  }
+  return {
+    'match': text.substring(start, mEnd),
+    'line': text.substring(from, to),
+    if (clipped) 'clipped': true,
+  };
+}
+
+bool _low(int unit) => unit & 0xFC00 == 0xDC00;
+
+/// A cut at [i] moved back so it does not end on a lone high surrogate.
+int _before(String s, int i) =>
+    i > 0 && i < s.length && _low(s.codeUnitAt(i)) ? i - 1 : i;
+
+/// A cut at [i] moved on so it does not start on a lone low surrogate.
+int _after(String s, int i) =>
+    i > 0 && i < s.length && _low(s.codeUnitAt(i)) ? i + 1 : i;
 
 /// D16: types `--cmd` (pasted, then Enter) once the new shell is ready:
 /// when it first reports a cwd (its first prompt), or, for a shell without
