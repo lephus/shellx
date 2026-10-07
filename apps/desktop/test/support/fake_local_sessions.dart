@@ -236,6 +236,16 @@ final class FakeSessionView implements LocalSessionView {
   final int id;
   @override
   final Uint8List backlog;
+
+  /// A5b D10: set to make the view deliver its history late, like a view of
+  /// a session in the daemon; complete it with the history.
+  Completer<Uint8List>? lateBacklog;
+  @override
+  Future<Uint8List>? get pendingBacklog => lateBacklog?.future;
+
+  /// A5b D11: true while a reset replay is being emitted.
+  @override
+  bool replaying = false;
   final outputController = StreamController<Uint8List>();
   final driverController = StreamController<DriverSide>.broadcast(sync: true);
   final _exit = Completer<int>();
@@ -267,7 +277,11 @@ final class FakeSessionView implements LocalSessionView {
   @override
   void write(Uint8List data) => writes.add(utf8.decode(data));
   @override
-  void reply(Uint8List data) => replies.add(utf8.decode(data));
+  void reply(Uint8List data) {
+    // Like RemoteSessionView: no reply while a replay is being written.
+    if (!replaying) replies.add(utf8.decode(data));
+  }
+
   @override
   void resize(int cols, int rows) => resizes.add((cols, rows));
   @override

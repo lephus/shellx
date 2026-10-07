@@ -49,7 +49,8 @@ abstract interface class LocalSessions {
   bool notify(int id, {String? title, required String body});
 
   /// One local viewer of session [id]. Throws [StateError] when there is no
-  /// such session. The caller must listen to [LocalSessionView.output] or
+  /// such session, or (a session in another process) returns a view that
+  /// ends at once with exit code -1, closed on request. The caller must listen to [LocalSessionView.output] or
   /// call [LocalSessionView.dispose]: until then the view buffers every byte
   /// the session prints.
   LocalSessionView view(int id);
@@ -70,10 +71,28 @@ abstract interface class LocalSessionView {
   int get id;
 
   /// What the ring buffer held when the view was made (at most 256 KiB).
+  /// A view of a session in another process (A5b D10) has an empty backlog;
+  /// see [pendingBacklog].
   Uint8List get backlog;
 
+  /// Null when [backlog] is the whole history (a session in this process).
+  /// A view of a session in another process (A5b D10) cannot know its
+  /// backlog when it is made: the ring buffer arrives a moment later and
+  /// completes this future, once, before any byte reaches [output]. A
+  /// consumer treats it exactly like [backlog] (laid out first, queries in
+  /// it answered into nothing), then starts treating [output] as live.
+  Future<Uint8List>? get pendingBacklog;
+
+  /// True while [output] delivers a replay of the ring buffer rather than
+  /// new output (a remote view after `view.reset`, A5b D11); read inside the
+  /// listener. The text is shown but is not "the program printed".
+  bool get replaying;
+
   /// Live output after [backlog], buffered from the moment the view was
-  /// made (single listener). Done once the session has ended.
+  /// made (single listener). Done once the session has ended. A view in
+  /// another process may be reset (A5b D11) when its consumer fell far
+  /// behind: the stream then carries a clear-screen sequence and the ring
+  /// buffer again, so a terminal that renders it stays consistent.
   Stream<Uint8List> get output;
 
   /// Driver changes (A1 D6).
