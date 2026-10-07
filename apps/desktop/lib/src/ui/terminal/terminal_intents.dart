@@ -88,6 +88,22 @@ class SelectAllIntent extends Intent {
   final bool fromMenu;
 }
 
+/// A10 D4: ⌘F — opens (or refocuses) the find bar of the focused pane.
+class StartSearchIntent extends Intent {
+  const StartSearchIntent();
+}
+
+/// A10 D4: ⌘G / ⌘⇧G — the next / previous match of the focused pane's bar.
+class NavigateSearchIntent extends Intent {
+  const NavigateSearchIntent({required this.next});
+  final bool next;
+}
+
+/// A10 D4: closes the focused pane's find bar.
+class EndSearchIntent extends Intent {
+  const EndSearchIntent();
+}
+
 class FontBiggerIntent extends Intent {
   const FontBiggerIntent({this.step = 1});
 

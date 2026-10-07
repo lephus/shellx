@@ -166,6 +166,16 @@ final Map<String, ActionSpec> kActionSpecs = {
       repeats: true,
     ),
     const ActionSpec('select_all', ActionGroup.editing, repeats: true),
+    // A10 D4: Ghostty's names.
+    const ActionSpec('start_search', ActionGroup.editing),
+    ActionSpec(
+      'navigate_search',
+      ActionGroup.editing,
+      repeats: true,
+      param: (r) => _oneOf({'next', 'previous'}, r),
+      paramHint: 'next, previous',
+    ),
+    const ActionSpec('end_search', ActionGroup.editing),
     const ActionSpec(
       'increase_font_size',
       ActionGroup.font,
@@ -290,6 +300,9 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'copy_to_clipboard' => const CopySelectionIntent(),
   'paste_from_clipboard' => const PasteClipboardIntent(),
   'select_all' => const SelectAllIntent(),
+  'start_search' => const StartSearchIntent(),
+  'navigate_search' => NavigateSearchIntent(next: a.param != 'previous'),
+  'end_search' => const EndSearchIntent(),
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),
   'decrease_font_size' => FontSmallerIntent(step: double.parse(a.param ?? '1')),
   'reset_font_size' => const FontResetIntent(),
@@ -316,6 +329,8 @@ String describeIntent(Intent i) => switch (i) {
   ResizePaneIntent(:final direction) => 'ResizePaneIntent(${direction.name})',
   SelectAllIntent(:final fromMenu) =>
     fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
+  NavigateSearchIntent(:final next) =>
+    'NavigateSearchIntent(${next ? 'next' : 'previous'})',
   FontBiggerIntent(:final step) when step != 1 => 'FontBiggerIntent($step)',
   FontSmallerIntent(:final step) when step != 1 => 'FontSmallerIntent($step)',
   RunUserCommandIntent(:final name) => 'RunUserCommandIntent($name)',

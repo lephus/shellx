@@ -13,15 +13,19 @@ import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
 import '../../remote/remote_state.dart';
 import '../../remote/ssh_reconnector.dart';
+import '../../terminal/find_sessions.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_appearance.dart';
+import '../../terminal/terminal_search.dart' show SearchMatch;
 import '../../terminal/terminal_style.dart';
 import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../window_focus.dart' show terminalFocusRequestProvider;
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
+import 'find_bar.dart';
 import 'ime_compose_reset.dart';
 import 'remote_marks.dart';
 import 'remote_strip.dart';
@@ -83,6 +87,38 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
   GlobalKey _keyFor(int id) => _keys.putIfAbsent(id, GlobalKey.new);
 
+  /// A10 D5: each pane's TerminalView state, to find where a row is drawn.
+  final _viewKeys = <int, GlobalKey<TerminalViewState>>{};
+
+  GlobalKey<TerminalViewState> _viewKeyFor(int id) =>
+      _viewKeys.putIfAbsent(id, GlobalKey<TerminalViewState>.new);
+
+  /// A10 D5: brings match [m] to the middle of pane [id]'s view unless it
+  /// is already in it. Reads the render object's own row offsets, so it
+  /// assumes nothing about the scroll controller's units.
+  void _reveal(int id, SearchMatch m) {
+    final render = _viewKeys[id]?.currentState?.renderTerminal;
+    final scroll = widget.scrollFor(id);
+    if (render == null || !scroll.hasClients) return;
+    final y = render.getOffset(CellOffset(m.startCol, m.startRow)).dy;
+    final line = render.lineHeight;
+    final view = scroll.position.viewportDimension;
+    if (y >= 0 && y + line <= view) return;
+    final target = scroll.position.pixels + y - (view - line) / 2;
+    scroll.jumpTo(
+      target.clamp(
+        scroll.position.minScrollExtent,
+        scroll.position.maxScrollExtent,
+      ),
+    );
+  }
+
+  void _closeFind(int id) {
+    ref.read(findSessionsProvider.notifier).close(id);
+    // The keyboard goes back to the terminal (A10 D23 F2).
+    ref.read(terminalFocusRequestProvider.notifier).request();
+  }
+
   TerminalTabs get _tabs => ref.read(terminalTabsProvider.notifier);
 
   StreamSubscription<PaneReplacement>? _replacements;
@@ -95,6 +131,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     _replacements = _tabs.paneReplacements.listen((r) {
       final key = _keys.remove(r.from);
       if (key != null) _keys[r.to] = key;
+      final viewKey = _viewKeys.remove(r.from);
+      if (viewKey != null) _viewKeys[r.to] = viewKey;
     });
   }
 
@@ -110,6 +148,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final tab = widget.tab;
     _keys.removeWhere((id, _) => !tab.panes.containsKey(id));
+    _viewKeys.removeWhere((id, _) => !tab.panes.containsKey(id));
     if (!tab.isSplit) return _pane(tab.focusedPaneId);
     final zoomed = tab.zoomedPaneId;
     final tree = _node(tab.layout, '', hide: zoomed);
@@ -161,6 +200,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final scaler = MediaQuery.textScalerOf(context);
     final headerHeight = split ? ShellxSizes.paneHeaderFor(scaler) : 0.0;
     final appearance = ref.watch(terminalAppearanceProvider);
+    // A10 D3: this pane's find bar, when open.
+    final find = ref.watch(findSessionsProvider.select((m) => m[id]));
+    if (find != null) find.reveal = (m) => _reveal(id, m);
     // One widget shape for one pane and for many (only properties
     // differ), so the first split and the close back to one pane keep
     // this pane's TerminalView: same state, no remount, no resize.
@@ -174,6 +216,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                 remoteSemantics(l10n, pane)
           : l10n.terminalPaneLabel(tab.label) + remoteSemantics(l10n, pane),
       child: PaneTerminal(
+        viewKey: _viewKeyFor(id),
         pane: pane,
         scrollController: widget.scrollFor(id),
         focusNode: widget.selected && focused ? widget.terminalFocus : null,
@@ -231,9 +274,13 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             right: 0,
             bottom: 0,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: ShellxSpace.s8,
-                horizontal: ShellxSpace.s12,
+              // A10 D3: under the find bar when it is open.
+              padding: EdgeInsets.fromLTRB(
+                ShellxSpace.s12,
+                ShellxSpace.s8 +
+                    (find == null ? 0 : FindBar.height + ShellxSpace.s8),
+                ShellxSpace.s12,
+                ShellxSpace.s8,
               ),
               child: DriverPillSlot(
                 terminal: pane.terminal,
@@ -267,6 +314,18 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               right: 0,
               bottom: 0,
               child: RemoteStrip(pane: pane),
+            ),
+          // A10 D3: over the terminal, never changing its grid.
+          if (find != null)
+            Positioned(
+              top: headerHeight + ShellxSpace.s8,
+              right: ShellxSpace.s12,
+              child: FindBar(
+                key: ValueKey('find.$id'),
+                session: find,
+                focusNode: find.focusNode,
+                onClose: () => _closeFind(id),
+              ),
             ),
         ],
       ),
@@ -419,6 +478,12 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           value: const SelectAllIntent(fromMenu: true),
           label: l10n.terminalSelectAll,
           shortcut: selectAllShortcutLabel(),
+        ),
+        ShellxMenuEntry(
+          key: const Key('menu.find'),
+          value: const StartSearchIntent(),
+          label: l10n.findMenuItem,
+          shortcut: findShortcutLabel(),
         ),
         // D21, UI-A3 §4.1: splits always; the pane entries with two panes.
         ShellxMenuEntry(
@@ -974,6 +1039,7 @@ class _HeaderCloseState extends State<_HeaderClose> {
 class PaneTerminal extends StatelessWidget {
   const PaneTerminal({
     super.key,
+    required this.viewKey,
     required this.pane,
     required this.scrollController,
     required this.focusNode,
@@ -986,6 +1052,7 @@ class PaneTerminal extends StatelessWidget {
     required this.onMenu,
   });
 
+  final GlobalKey<TerminalViewState> viewKey;
   final PaneSession pane;
   final ScrollController scrollController;
   final FocusNode? focusNode;
@@ -1008,6 +1075,7 @@ class PaneTerminal extends StatelessWidget {
       child: ImeComposeReset(
         child: TerminalView(
           pane.terminal,
+          key: viewKey,
           controller: pane.selection,
           scrollController: scrollController,
           focusNode: focusNode,

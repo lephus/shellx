@@ -31,6 +31,19 @@ Set<String> a9Additions(String map, String platform) => platform == 'mac'
         'ctrl+shift+6b norepeat -> OpenSshConnectIntent',
       };
 
+/// A10 D4: find in terminal (⌘F/⌘G; Ctrl+Shift+F/G).
+Set<String> a10Additions(String platform) => platform == 'mac'
+    ? const {
+        'meta+66 norepeat -> StartSearchIntent',
+        'meta+67 -> NavigateSearchIntent(next)',
+        'shift+meta+67 -> NavigateSearchIntent(previous)',
+      }
+    : const {
+        'ctrl+shift+66 norepeat -> StartSearchIntent',
+        'ctrl+shift+67 -> NavigateSearchIntent(next)',
+        'ctrl+alt+shift+67 -> NavigateSearchIntent(previous)',
+      };
+
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").
   final maps =
@@ -55,7 +68,10 @@ void main() {
             .readAsLinesSync()
             .where((l) => l.isNotEmpty)
             .toSet();
-        expect(actual.toSet(), expected.union(a9Additions(map, name)));
+        expect(
+          actual.toSet(),
+          expected.union(a9Additions(map, name)).union(a10Additions(name)),
+        );
       });
     }
   }

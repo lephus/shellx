@@ -2010,4 +2010,50 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get pasteTooLarge => 'Nội dung clipboard quá lớn để dán (hơn 16 MB)';
+
+  @override
+  String get findPlaceholder => 'Tìm';
+
+  @override
+  String get findLabel => 'Tìm trong terminal';
+
+  @override
+  String findCount(int current, int total) {
+    return '$current/$total';
+  }
+
+  @override
+  String findCountCapped(int current, int total) {
+    return '$current/$total+';
+  }
+
+  @override
+  String get findNoMatches => 'Không có kết quả';
+
+  @override
+  String get findPrevious => 'Kết quả trước';
+
+  @override
+  String get findNext => 'Kết quả sau';
+
+  @override
+  String get findMatchCase => 'Phân biệt hoa thường';
+
+  @override
+  String get findClose => 'Đóng tìm kiếm';
+
+  @override
+  String get findMenuItem => 'Tìm…';
+
+  @override
+  String get actionStartSearch => 'Tìm trong terminal';
+
+  @override
+  String get actionSearchNext => 'Tìm kết quả sau';
+
+  @override
+  String get actionSearchPrevious => 'Tìm kết quả trước';
+
+  @override
+  String get actionEndSearch => 'Đóng tìm kiếm';
 }

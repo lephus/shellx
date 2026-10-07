@@ -114,6 +114,10 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'copy_to_clipboard' => l10n.actionCopy,
   'paste_from_clipboard' => l10n.actionPaste,
   'select_all' => l10n.actionSelectAll,
+  'start_search' => l10n.actionStartSearch,
+  'navigate_search' =>
+    a.param == 'previous' ? l10n.actionSearchPrevious : l10n.actionSearchNext,
+  'end_search' => l10n.actionEndSearch,
   'goto_tab' => l10n.actionGotoTab(a.param ?? ''),
   'next_tab' => l10n.actionNextTab,
   'previous_tab' => l10n.actionPreviousTab,
@@ -144,6 +148,7 @@ List<String?> actionVariants(ActionSpec spec) => switch (spec.name) {
   'goto_tab' => [for (var i = 1; i <= 9; i++) '$i'],
   'new_split' => ['right', 'down'],
   'goto_split' || 'resize_split' => ['left', 'right', 'up', 'down'],
+  'navigate_search' => ['next', 'previous'],
   'increase_font_size' || 'decrease_font_size' => ['1'],
   _ => [null],
 };
