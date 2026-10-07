@@ -57,7 +57,36 @@ final class CliHost {
        _enabled = enabled,
        _token = utf8.encode(token),
        _allowExternal = allowExternal,
-       _log = log ?? ((_) {});
+       _log = log ?? ((_) {}),
+       _hostKind = (() => 'ui'),
+       _uiAttached = (() => true);
+
+  /// A5b D8: a host with no listener of its own. The daemon's `MuxServer`
+  /// owns the one listener and hands each authenticated `role: "cli"`
+  /// connection to [adopt]; [start] is not available. [hostKind] is what
+  /// `api.version` reports as `host` (`daemon`), [uiAttached] its `ui`.
+  CliHost.adopted({
+    required UiApi ui,
+    required bool Function() enabled,
+    required String token,
+    required bool Function() allowExternal,
+    required this.appVersion,
+    required String Function() hostKind,
+    required bool Function() uiAttached,
+    this.maxClients = 8,
+    this.maxLimited = 2,
+    this.maxListeners = 4,
+    void Function(String message)? log,
+  }) : address = '',
+       _transport = null,
+       _file = null,
+       _ui = ui,
+       _enabled = enabled,
+       _token = utf8.encode(token),
+       _allowExternal = allowExternal,
+       _log = log ?? ((_) {}),
+       _hostKind = hostKind,
+       _uiAttached = uiAttached;
 
   final String address;
   final String appVersion;
@@ -67,8 +96,10 @@ final class CliHost {
   /// other terminals" off) take at most this many of [maxClients].
   final int maxLimited;
   final int maxListeners;
-  final MuxTransport _transport;
-  final MuxEndpointFile _file;
+  final MuxTransport? _transport;
+  final MuxEndpointFile? _file;
+  final String Function() _hostKind;
+  final bool Function() _uiAttached;
   final UiApi _ui;
   final bool Function() _enabled;
   final Uint8List _token;
@@ -113,15 +144,19 @@ final class CliHost {
   }
 
   Future<void> start() async {
+    final transport = _transport, file = _file;
+    if (transport == null || file == null) {
+      throw StateError('an adopting CliHost has no listener of its own');
+    }
     final r = Random.secure();
     _secret = Uint8List.fromList(List.generate(32, (_) => r.nextInt(256)));
     _instance = List.generate(
       16,
       (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ).join();
-    _listener = await _transport.listen(address);
+    _listener = await transport.listen(address);
     _accept = _listener!.connections.listen((c) => unawaited(_onConnection(c)));
-    _written = await _file.write(
+    _written = await file.write(
       MuxEndpointInfo(
         address: address,
         secret: _secret,
@@ -141,7 +176,7 @@ final class CliHost {
       await c.connection.close();
     }
     final written = _written;
-    if (written != null) await _file.deleteIfOwned(written);
+    if (written != null) await _file?.deleteIfOwned(written);
   }
 
   Future<void> _onConnection(MuxConnection c) async {
@@ -184,6 +219,22 @@ final class CliHost {
       unawaited(_refuse(c, cliErrorMessage(null, MuxError.unsupportedRole)));
       return;
     }
+    _admit(c, peer);
+  }
+
+  /// A5b D8: takes over a connection the daemon's `MuxServer` already
+  /// handshook (role `cli`): same token gate, limits and back-pressure as
+  /// a connection of this host's own listener. Synchronous, so no message
+  /// read after the handshake is lost.
+  void adopt(MuxConnection c, MuxPeerInfo peer) {
+    if (_stopped) {
+      unawaited(c.close());
+      return;
+    }
+    _admit(c, peer);
+  }
+
+  void _admit(MuxConnection c, MuxPeerInfo peer) {
     final tokenOk = _isShellXShell(peer.token);
     final limited = !tokenOk && !_externalAllowed();
     if (_clients.length >= maxClients ||
@@ -272,12 +323,15 @@ final class CliHost {
           return cliResult(q, {
             'api': kCliApi,
             'app': appVersion,
-            'host': 'ui',
-            'ui': true,
+            'host': _hostKind(),
+            'ui': _uiAttached(),
             'caps': kCliCaps,
           });
         case MuxType.daemonStatus:
-          return cliResult(q, {'host': 'ui', 'clients': _clients.length});
+          return cliResult(q, {
+            'host': _hostKind(),
+            'clients': _clients.length,
+          });
         case CliType.cliNotify:
           return _notify(m);
         case CliType.cliEventsSubscribe:
