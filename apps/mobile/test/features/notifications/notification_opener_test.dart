@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/notification_opener.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
@@ -51,6 +52,25 @@ void main() {
     expect(workspace.activeTab.value, same(second));
     expect(first.id, isNot(999));
   });
+
+  test(
+    'the tab is not open yet (still reconnecting): the machine opens and the tab is selected when it appears',
+    () async {
+      final workspace = registry.forMachine(agentA);
+      await workspace.openNew(fallbackGrid);
+
+      await opener.open(tapped(sessionId: '777'));
+      expect(workspace.hasPendingSelect, isTrue);
+      expect(navigator.shown, [(agentA, 'MacBook Pro')]);
+
+      await workspace.attach(
+        const SessionInfo(id: 777, index: 3, shell: 'zsh', createdAt: 0, attached: false),
+        fallbackGrid,
+      );
+      await workspace.openNew(fallbackGrid);
+      expect(workspace.activeTab.value?.id, isNot(777), reason: 'a later tab opened by the user wins');
+    },
+  );
 
   test('already on that machine\'s page: only the tab changes', () async {
     final workspace = registry.forMachine(agentA);

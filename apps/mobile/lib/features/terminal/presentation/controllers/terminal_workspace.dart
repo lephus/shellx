@@ -57,10 +57,51 @@ class TerminalWorkspace extends Controller {
   ReadonlySignal<int> get activeIndex => _active;
   ReadonlySignal<TerminalTabController?> get activeTab => _activeTab;
 
+  /// The user picks a tab: a notification's pending selection no longer applies.
   void select(int index) {
+    clearPendingSelect();
+    _select(index);
+  }
+
+  void _select(int index) {
     if (index < 0 || index >= _tabs.peek().length) return;
     _active.value = index;
     _syncActive();
+  }
+
+  int? _pendingSelectId;
+  Timer? _pendingTimer;
+
+  bool get hasPendingSelect => _pendingSelectId != null;
+
+  /// A11 D27: a notification named [sessionId] before its tab exists (the phone is still reconnecting).
+  /// The tab is selected when it appears; the user picking a tab, or [ttl], drops the request. When the
+  /// tab is already open it is selected at once.
+  void pendingSelect(int sessionId, {Duration ttl = const Duration(seconds: 30)}) {
+    if (_disposed) return;
+    final index = _tabs.peek().indexWhere((tab) => tab.id == sessionId);
+    if (index >= 0) {
+      select(index);
+      return;
+    }
+    _pendingSelectId = sessionId;
+    _pendingTimer?.cancel();
+    _pendingTimer = Timer(ttl, clearPendingSelect);
+  }
+
+  void clearPendingSelect() {
+    _pendingSelectId = null;
+    _pendingTimer?.cancel();
+    _pendingTimer = null;
+  }
+
+  void _applyPending() {
+    final id = _pendingSelectId;
+    if (id == null) return;
+    final index = _tabs.peek().indexWhere((tab) => tab.id == id);
+    if (index < 0) return;
+    clearPendingSelect();
+    _select(index);
   }
 
   /// A10 D29: only the active tab's output is written at the foreground's pace.
@@ -175,6 +216,7 @@ class TerminalWorkspace extends Controller {
       _active.value = tabs.length - 1;
     });
     _syncActive();
+    _applyPending();
     return tab;
   }
 
@@ -213,6 +255,7 @@ class TerminalWorkspace extends Controller {
 
   void dispose() {
     _disposed = true;
+    clearPendingSelect();
     for (final tab in _tabs.peek()) {
       tab.dispose();
     }

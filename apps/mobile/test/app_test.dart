@@ -257,6 +257,10 @@ void main() {
     messaging.initial = const PushMessage(data: {'agent_id': agentA, 'session_id': '5'});
     await launch(tester);
     expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+    // Session 5 is not a tab yet (the phone is still reconnecting): it is selected when it appears (A11 D27).
+    final workspace = registry.forMachine(agentA);
+    expect(workspace.hasPendingSelect, isTrue);
+    workspace.clearPendingSelect(); // its 30 s timer would outlive the test
   });
 
   testWidgets('push: a message in the foreground shows the in-app banner (spec §6)', (tester) async {
