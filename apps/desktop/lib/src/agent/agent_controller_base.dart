@@ -14,12 +14,10 @@ import 'agent_state.dart';
 /// (`ControllerAgentBridge`) and to `RemoteAgentController`; the tests
 /// check each name end to end.
 abstract class AgentControllerBase extends Notifier<AgentViewState> {
-  /// The names `agent.call` carries, one per command below. `bootstrap` and
-  /// `shutdown` are here because the daemon's bridge serves them, but the
-  /// remote controller handles them locally (its own `bootstrap` waits for
-  /// the first state; the daemon is stopped by `daemon.quit`).
+  /// The names `agent.call` carries, one per command below except
+  /// `bootstrap` (the daemon bootstraps itself; the remote one waits for the
+  /// first state) and `shutdown` (only `daemon.quit` ends the service).
   static const Set<String> wireCommands = {
-    'bootstrap',
     'signIn',
     'signOut',
     'changePassword',
@@ -44,7 +42,6 @@ abstract class AgentControllerBase extends Notifier<AgentViewState> {
     'closeAllSessions',
     'reconnect',
     'checkForUpdate',
-    'shutdown',
   };
 
   Future<void> bootstrap({bool watchForWake = true});

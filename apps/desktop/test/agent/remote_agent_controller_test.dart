@@ -25,6 +25,7 @@ final class FakeAgentDaemon {
   Object? Function(String m)? valueFor;
   String? failWith;
   int gets = 0;
+  Object? rawState;
 
   void _onMessage(MuxMessage m) {
     switch (m.type) {
@@ -34,7 +35,7 @@ final class FakeAgentDaemon {
           MuxMessage(
             MuxType.result,
             q: m.q,
-            fields: {'state': agentStateToWire(state)},
+            fields: {'state': rawState ?? agentStateToWire(state)},
           ),
         );
       case MuxType.agentCall:
@@ -157,7 +158,7 @@ void main() {
         'prepareTerminalSharing': ((c) => c.prepareTerminalSharing(), {}),
         'enableTerminalSharing': (
           (c) => c.enableTerminalSharing(_plan()),
-          {'plan': sharingPlanToWire(_plan())},
+          {'digest': sharingPlanDigest(_plan())},
         ),
         'disableTerminalSharing': ((c) => c.disableTerminalSharing(), {}),
         'disconnectDesktopPhone': (
@@ -319,4 +320,16 @@ void main() {
       expect(container.read(agentControllerProvider).phase, AuthPhase.signedIn);
     },
   );
+
+  test('bootstrap fails when the first state is unreadable (no silent '
+      'default), and a later call may try again', () async {
+    daemon.rawState = 'garbage';
+    await expectLater(
+      controller().bootstrap(),
+      throwsA(isA<FormatException>()),
+    );
+    daemon.rawState = null;
+    await controller().bootstrap();
+    expect(daemon.gets, 2);
+  });
 }

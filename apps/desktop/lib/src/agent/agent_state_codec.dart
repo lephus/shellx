@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
@@ -68,17 +70,13 @@ AgentViewState agentStateFromWire(Map<Object?, Object?> m) {
     onboardingDone: m['onboardingDone'] as bool? ?? d.onboardingDone,
     relay: _enum(RelayConnectionState.values, m['relay'], d.relay),
     activeChannels: m['channels'] as int? ?? d.activeChannels,
-    sessions: [
-      for (final x in _list(m['sessions']))
-        summaryFromWire(x as Map<Object?, Object?>),
-    ],
-    trusted: [
-      for (final x in _list(m['trusted']))
-        TrustedDevice.fromJson({
-          for (final e in (x as Map<Object?, Object?>).entries)
-            e.key! as String: e.value,
-        }),
-    ],
+    sessions: _entries(m['sessions'], (x) => summaryFromWire(x)),
+    trusted: _entries(
+      m['trusted'],
+      (x) => TrustedDevice.fromJson({
+        for (final e in x.entries) e.key! as String: e.value,
+      }),
+    ),
     pairing: pairing == null ? null : pairingFromWire(pairing),
     update: update == null
         ? null
@@ -94,10 +92,7 @@ AgentViewState agentStateFromWire(Map<Object?, Object?> m) {
             enabled: sharing['enabled'] as bool? ?? false,
             busy: sharing['busy'] as bool? ?? false,
             needsSetup: sharing['needsSetup'] as bool? ?? false,
-            sessions: [
-              for (final x in _list(sharing['sessions']))
-                _desktopSessionFromWire(x as Map<Object?, Object?>),
-            ],
+            sessions: _entries(sharing['sessions'], _desktopSessionFromWire),
           ),
     notifyThresholdSeconds:
         m['notifyThreshold'] as int? ?? d.notifyThresholdSeconds,
@@ -112,6 +107,21 @@ AgentViewState agentStateFromWire(Map<Object?, Object?> m) {
   );
 }
 
+/// The entries that decode; one bad entry (a newer app's shape) is skipped,
+/// not the whole state.
+List<T> _entries<T>(Object? v, T Function(Map<Object?, Object?>) decode) => [
+  for (final x in _list(v))
+    if (x is Map<Object?, Object?>) ?_tryDecode(x, decode),
+];
+
+T? _tryDecode<T>(Map<Object?, Object?> x, T Function(Map<Object?, Object?>) f) {
+  try {
+    return f(x);
+  } on Object {
+    return null;
+  }
+}
+
 List<Object?> _list(Object? v) => v as List<Object?>? ?? const [];
 
 T _enum<T extends Enum>(List<T> values, Object? name, T fallback) {
@@ -119,7 +129,7 @@ T _enum<T extends Enum>(List<T> values, Object? name, T fallback) {
   for (final v in values) {
     if (v.name == name) return v;
   }
-  throw FormatException('unknown ${T.toString()}');
+  return fallback; // a newer app's value: never fail the whole state
 }
 
 Map<String, Object?> pairingToWire(PairingView p) => {
@@ -216,3 +226,8 @@ SharingPlan sharingPlanFromWire(Map<Object?, Object?> m) {
     powerShells: [for (final x in _list(m['powerShells'])) shell(x)],
   );
 }
+
+/// What the UI shows for the confirmation and sends back to enable: the
+/// daemon compares it with its own `prepare()` and enables only its own
+/// plan (a plan carries paths and shell blocks, never taken from a peer).
+String sharingPlanDigest(SharingPlan p) => jsonEncode(sharingPlanToWire(p));

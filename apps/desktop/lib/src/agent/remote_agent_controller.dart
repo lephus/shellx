@@ -35,13 +35,17 @@ final class RemoteAgentController extends AgentControllerBase {
     return const AgentViewState();
   }
 
-  void _apply(Object? wire) {
-    if (!ref.mounted || wire is! Map<Object?, Object?>) return;
+  /// False when [wire] is not a state this app can read.
+  bool _apply(Object? wire) {
+    if (!ref.mounted) return true;
+    if (wire is! Map<Object?, Object?>) return false;
     try {
       state = agentStateFromWire(wire);
+      return true;
     } on Object catch (e) {
       // A state this app cannot read (a newer daemon): keep the last one.
       debugPrint('ShellX: unreadable agent state: ${e.runtimeType}');
+      return false;
     }
   }
 
@@ -57,7 +61,11 @@ final class RemoteAgentController extends AgentControllerBase {
 
   Future<void> _load() async {
     final reply = await _client.request(MuxType.agentGet);
-    _apply(reply.get<Object?>('state'));
+    // The first state must be readable: a silent signed-out default would
+    // show a wrong tray and ask for a sign-in the daemon already has.
+    if (!_apply(reply.get<Object?>('state'))) {
+      throw const FormatException('unreadable agent state');
+    }
   }
 
   Future<Object?> _call(
@@ -152,7 +160,9 @@ final class RemoteAgentController extends AgentControllerBase {
 
   @override
   Future<bool> enableTerminalSharing(SharingPlan plan) async =>
-      await _call('enableTerminalSharing', {'plan': sharingPlanToWire(plan)}) ==
+      await _call('enableTerminalSharing', {
+        'digest': sharingPlanDigest(plan),
+      }) ==
       true;
 
   @override

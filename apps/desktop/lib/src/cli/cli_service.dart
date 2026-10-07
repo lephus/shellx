@@ -48,6 +48,9 @@ final cliClipboardProvider = Provider<Future<void> Function(String text)>(
 /// Final ruling M1: it listens ([listen]) before the shells' environment
 /// is built, so only a running host's address and token reach them; the
 /// window comes later ([attach]) — requests that arrive before wait for it.
+// TODO(A5b Task 7): `cli_control_enabled` and `cli_allow_external` are
+// daemon-owned (D13); this host moves to the daemon, which reads them from
+// its own store. Until then this file is exempt from the ownership scan.
 final class CliService {
   CliService._(
     this._host,

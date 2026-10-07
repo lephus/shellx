@@ -271,4 +271,36 @@ void main() {
     expect(p.profilePath, r'C:\p\profile.ps1');
     expect(p.policy, ScriptPolicy.blockedByGroupPolicy);
   });
+
+  test('unknown enum names fall back to the defaults', () {
+    final b = agentStateFromWire({'phase': 'from_the_future', 'relay': 'x'});
+    expect(b.phase, const AgentViewState().phase);
+    expect(b.relay, const AgentViewState().relay);
+    final plan = sharingPlanFromWire({
+      'files': const [],
+      'powerShells': [
+        {'name': 'p', 'executable': 'e', 'profile': 'f', 'policy': 'nope'},
+      ],
+    });
+    expect(plan.powerShells.single.policy, ScriptPolicy.blocked);
+  });
+
+  test('a bad session or trusted entry is skipped, not the whole state', () {
+    final good = agentStateToWire(fullState());
+    final wire = <Object?, Object?>{
+      ...good,
+      'sessions': [
+        {'id': 'bad'},
+        ...(good['sessions']! as List<Object?>),
+      ],
+      'trusted': [
+        {'mobile_id': 1},
+        ...(good['trusted']! as List<Object?>),
+      ],
+    };
+    final b = agentStateFromWire(wire);
+    expect(b.sessions, hasLength(2));
+    expect(b.trusted, hasLength(2));
+    expect(b.email, 'phu@example.com');
+  });
 }

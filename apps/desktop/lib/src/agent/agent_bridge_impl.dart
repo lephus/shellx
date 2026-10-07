@@ -9,7 +9,8 @@ import 'agent_state_codec.dart';
 /// A5b D12: the daemon's [AgentBridge]: `agent.get` reads [current],
 /// `agent.state` events follow [states] (a change is sent at most once per
 /// [coalesce]), `agent.call` runs the named command of the real
-/// controller. Arguments arrive as CBOR values (a plan as a map); a bad
+/// controller (`bootstrap` and `shutdown` are not offered: only
+/// `daemon.quit` ends the service). Arguments arrive as CBOR values (a plan as a map); a bad
 /// name or argument throws (the server answers `internal` or `bad_request`
 /// with the exception's type only).
 ///
@@ -61,8 +62,6 @@ final class ControllerAgentBridge implements AgentBridge {
     final a = _agent;
     bool enabled() => args['enabled']! as bool;
     switch (method) {
-      case 'bootstrap':
-        await a.bootstrap(watchForWake: args['watchForWake'] as bool? ?? true);
       case 'signIn':
         await a.signIn(
           email: args['email']! as String,
@@ -106,9 +105,14 @@ final class ControllerAgentBridge implements AgentBridge {
         final plan = await a.prepareTerminalSharing();
         return plan == null ? null : sharingPlanToWire(plan);
       case 'enableTerminalSharing':
-        return a.enableTerminalSharing(
-          sharingPlanFromWire(args['plan']! as Map<Object?, Object?>),
-        );
+        // Never a plan from the peer: the daemon prepares its own and
+        // enables it only if it is the one the UI showed.
+        final digest = args['digest']! as String;
+        final own = await a.prepareTerminalSharing();
+        if (own == null || sharingPlanDigest(own) != digest) {
+          throw const SharingPlanChanged();
+        }
+        return a.enableTerminalSharing(own);
       case 'disableTerminalSharing':
         await a.disableTerminalSharing();
       case 'disconnectDesktopPhone':
@@ -119,11 +123,16 @@ final class ControllerAgentBridge implements AgentBridge {
         await a.reconnect();
       case 'checkForUpdate':
         await a.checkForUpdate();
-      case 'shutdown':
-        await a.shutdown();
       default:
         throw ArgumentError.value(method, 'method', 'unknown');
     }
     return null;
   }
+}
+
+/// The files terminal sharing would change are not the ones the UI showed.
+final class SharingPlanChanged implements Exception {
+  const SharingPlanChanged();
+  @override
+  String toString() => 'SharingPlanChanged';
 }
