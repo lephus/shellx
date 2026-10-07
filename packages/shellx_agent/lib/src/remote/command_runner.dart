@@ -62,34 +62,57 @@ Future<CommandResult> runCommand(
       environment: helperEnvironment(parentEnvironment ?? Platform.environment),
       includeParentEnvironment: false,
     );
-  } on ProcessException {
+  } on Object {
     return const CommandResult(127, '', '');
   }
   unawaited(process.stdin.close().catchError((Object _) {}));
-  final out = _collect(process.stdout);
-  final err = _collect(process.stderr);
+  final out = _Capture(process.stdout);
+  final err = _Capture(process.stderr);
   var timedOut = false;
-  final code = await process.exitCode.timeout(
+  var code = await process.exitCode.timeout(
     timeout,
     onTimeout: () {
       timedOut = true;
-      process.kill();
+      // Windows has no SIGKILL; TerminateProcess is what kill() does there.
+      process.kill(
+        Platform.isWindows ? ProcessSignal.sigterm : ProcessSignal.sigkill,
+      );
       return -1;
     },
   );
+  if (timedOut) {
+    code = -1;
+  }
   const grace = Duration(seconds: 1);
   return CommandResult(
     code,
-    await out.timeout(grace, onTimeout: () => ''),
-    await err.timeout(grace, onTimeout: () => ''),
+    await out.text(grace),
+    await err.text(grace),
     timedOut: timedOut,
   );
 }
 
-Future<String> _collect(Stream<List<int>> stream) async {
-  final bytes = BytesBuilder(copy: false);
-  await for (final chunk in stream) {
-    if (bytes.length < _maxOutput) bytes.add(chunk);
+/// A stream's text so far; errors and an endless stream never escape.
+final class _Capture {
+  _Capture(Stream<List<int>> stream) {
+    _subscription = stream.listen(
+      (chunk) {
+        if (_bytes.length < _maxOutput) _bytes.add(chunk);
+      },
+      onError: (Object _) {},
+      onDone: _done.complete,
+      cancelOnError: false,
+    );
   }
-  return const Utf8Decoder(allowMalformed: true).convert(bytes.takeBytes());
+
+  final _bytes = BytesBuilder(copy: false);
+  final _done = Completer<void>();
+  late final StreamSubscription<List<int>> _subscription;
+
+  /// Waits up to [grace] for the stream to end, then keeps what arrived.
+  Future<String> text(Duration grace) async {
+    await _done.future.timeout(grace, onTimeout: () {});
+    unawaited(_subscription.cancel().catchError((Object _) {}));
+    return const Utf8Decoder(allowMalformed: true).convert(_bytes.takeBytes());
+  }
 }

@@ -36,4 +36,31 @@ void main() {
     );
     expect(r.stdout, '||yes');
   });
+
+  test(
+    'a child that ignores SIGTERM is still gone at the timeout (M3)',
+    () async {
+      final watch = Stopwatch()..start();
+      final r = await runCommand('/bin/sh', [
+        '-c',
+        'trap "" TERM; sleep 30',
+      ], timeout: const Duration(milliseconds: 200));
+      expect(r.timedOut, isTrue);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+    },
+  );
+
+  test('partial output survives a timeout (L7)', () async {
+    final r = await runCommand('/bin/sh', [
+      '-c',
+      'printf partial; sleep 30',
+    ], timeout: const Duration(milliseconds: 500));
+    expect(r.timedOut, isTrue);
+    expect(r.stdout, 'partial');
+  });
+
+  test('an empty executable is exit 127 (L7)', () async {
+    final r = await runCommand('', const []);
+    expect(r.exitCode, 127);
+  });
 }
