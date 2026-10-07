@@ -34,6 +34,14 @@ void main() {
   });
   tearDown(() => container.dispose());
 
+  const fontProblem = ConfigProblem(
+    file: '/f',
+    line: 1,
+    severity: ConfigSeverity.warning,
+    code: ConfigProblemCode.fontNotFound,
+    value: 'Nope',
+  );
+
   ConfigController controller() =>
       container.read(shellxConfigProvider.notifier);
   ConfigState state() => container.read(shellxConfigProvider);
@@ -113,10 +121,16 @@ void main() {
       var s = await controller().load();
       expect(s.config.fontFamilies, ['Fira Code']);
       expect(s.ghosttyUsed, isTrue);
-      expect(s.lastLoad!.firstGhostty, isTrue);
+      expect(s.ghosttyNoticePending, isTrue);
+      // Nothing is written while loading: only the UI's ack records it.
+      expect(h.settings.values[SettingKeys.configGhosttyNoticeShown], isNull);
+      s = await controller().load();
+      expect(s.ghosttyNoticePending, isTrue);
+      controller().ackGhosttyNotice();
+      expect(state().ghosttyNoticePending, isFalse);
       expect(h.settings.values[SettingKeys.configGhosttyNoticeShown], isTrue);
       s = await controller().load();
-      expect(s.lastLoad!.firstGhostty, isFalse);
+      expect(s.ghosttyNoticePending, isFalse);
       fs.write(paths.shellx, 'ghostty-config = false\n');
       final reads = fs.reads;
       s = await controller().load();
@@ -133,15 +147,37 @@ void main() {
     final s = await controller().load();
     expect(s.problems, isNotEmpty);
     expect(s.lastLoad!.problemsChanged, isTrue);
-    expect(s.lastLoad!.firstGhostty, isTrue);
+    expect(s.ghosttyNoticePending, isTrue);
+  });
+
+  test('the Ghostty notice stays pending until acknowledged (I1)', () async {
+    fs.write(paths.ghostty[0], 'font-size = 15\n');
+    await controller().load();
+    controller().reportRuntimeProblems(
+      1,
+      {ConfigProblemCode.fontNotFound},
+      [fontProblem],
+    );
+    expect(state().ghosttyNoticePending, isTrue);
+    fs.write(paths.shellx, 'ghostty-config = false\n');
+    await controller().load();
+    expect(state().ghosttyNoticePending, isTrue);
+    controller().ackGhosttyNotice();
+    expect(state().ghosttyNoticePending, isFalse);
     expect(h.settings.values[SettingKeys.configGhosttyNoticeShown], isTrue);
+  });
+
+  test('a notice already shown on an earlier launch is not pending', () async {
+    h.settings.values[SettingKeys.configGhosttyNoticeShown] = true;
+    fs.write(paths.ghostty[0], 'font-size = 15\n');
+    expect((await controller().load()).ghosttyNoticePending, isFalse);
   });
 
   test('no notice, no flag, when the ShellX file is unreadable', () async {
     fs.write(paths.ghostty[0], 'font-size = 15\n');
     fs.unreadable.add(paths.shellx);
     final s = await controller().load();
-    expect(s.lastLoad!.firstGhostty, isFalse);
+    expect(s.ghosttyNoticePending, isFalse);
     expect(h.settings.values[SettingKeys.configGhosttyNoticeShown], isNull);
   });
 
@@ -210,36 +246,105 @@ void main() {
     expect(s.problems, isEmpty);
   });
 
-  test(
-    'runtime problems (font probe) join the current generation only',
-    () async {
-      await controller().load();
-      const font = ConfigProblem(
-        file: '/f',
-        line: 1,
-        severity: ConfigSeverity.warning,
-        code: ConfigProblemCode.fontNotFound,
-        value: 'Nope',
-      );
-      controller().reportRuntimeProblems(
-        1,
-        {ConfigProblemCode.fontNotFound},
-        [font],
-      );
-      expect(state().problems, [font]);
-      expect(state().lastLoad!.problemsChanged, isTrue);
-      controller().reportRuntimeProblems(
-        1,
-        {ConfigProblemCode.fontNotFound},
-        [font],
-      );
-      expect(state().lastLoad!.problemsChanged, isFalse);
-      controller().reportRuntimeProblems(0, {
-        ConfigProblemCode.fontNotFound,
-      }, const []);
-      expect(state().problems, [font]); // stale generation ignored
-    },
-  );
+  test('runtime problems (font probe) join the current generation only; '
+      'lastLoad stays the load event (I3)', () async {
+    await controller().load();
+    final loaded = state().lastLoad;
+    controller().reportRuntimeProblems(
+      1,
+      {ConfigProblemCode.fontNotFound},
+      [fontProblem],
+    );
+    expect(state().problems, [fontProblem]);
+    expect(state().runtimeProblems, [fontProblem]);
+    expect(state().lastLoad, same(loaded));
+    final before = state();
+    controller().reportRuntimeProblems(
+      1,
+      {ConfigProblemCode.fontNotFound},
+      [fontProblem],
+    );
+    expect(state(), same(before)); // identical report: nothing published
+    controller().reportRuntimeProblems(0, {
+      ConfigProblemCode.fontNotFound,
+    }, const []);
+    expect(state().problems, [fontProblem]); // stale generation ignored
+  });
+
+  test('load problems survive a later empty font report (I3)', () async {
+    fs.write(paths.shellx, 'font-size = to\n');
+    await controller().load(manual: true);
+    controller().reportRuntimeProblems(1, {
+      ConfigProblemCode.fontNotFound,
+    }, const []);
+    expect(state().problems.single.code, ConfigProblemCode.badValue);
+    expect(state().errorCount, 1);
+    expect(state().lastLoad!.manual, isTrue);
+    expect(state().lastLoad!.problemsChanged, isTrue);
+  });
+
+  test('a new configuration drops the runtime problems of the old', () async {
+    await controller().load();
+    controller().reportRuntimeProblems(
+      1,
+      {ConfigProblemCode.fontNotFound},
+      [fontProblem],
+    );
+    fs.write(paths.shellx, 'font-size = 14\n');
+    final s = await controller().load();
+    expect(s.problems, isEmpty);
+    expect(s.lastLoad!.problemsChanged, isTrue);
+  });
+
+  test('disposed while a read is in flight: load completes, never throws '
+      '(I2)', () async {
+    final gate = Completer<void>();
+    fs.readGate = gate.future;
+    final pending = controller().load();
+    await pumpEventQueue();
+    container.dispose();
+    gate.complete();
+    final s = await pending;
+    expect(s.generation, 0);
+    // A load asked of a disposed controller does not throw either.
+    container = ProviderContainer(overrides: configOverrides(fs));
+  });
+
+  test('only configOverrides (no desktop services): a Ghostty load works '
+      '(I2)', () async {
+    final bare = ProviderContainer(overrides: configOverrides(fs));
+    addTearDown(bare.dispose);
+    fs.write(paths.ghostty[0], 'font-size = 15\n');
+    final s = await bare.read(shellxConfigProvider.notifier).load();
+    expect(s.config.fontSize, 15);
+    expect(s.problems, isEmpty);
+  });
+
+  test('a read that never ends times out after 10 s; the queue moves on '
+      '(M4)', () {
+    fakeAsync((async) {
+      final logs = captureLogs();
+      fs.write(paths.shellx, 'font-size = 16\n');
+      ConfigState? first;
+      controller().load().then((s) => first = s);
+      async.flushMicrotasks();
+      expect(first!.config.fontSize, 16);
+      fs.readGate = Completer<void>().future; // never completes
+      ConfigState? stuck;
+      ConfigState? next;
+      controller().load().then((s) => stuck = s);
+      controller().load().then((s) => next = s);
+      async.elapse(const Duration(seconds: 9));
+      expect(stuck, isNull);
+      async.elapse(const Duration(seconds: 1));
+      expect(stuck!.config.fontSize, 16);
+      expect(stuck!.problems.single.code, ConfigProblemCode.unreadable);
+      fs.readGate = null;
+      async.elapse(const Duration(seconds: 10));
+      expect(next, isNotNull);
+      expect(logs, everyElement(startsWith('ShellX: config load')));
+    });
+  });
 
   test('watching reloads after a save (D9)', () {
     fakeAsync((async) {
@@ -282,6 +387,7 @@ void main() {
       ConfigProblemCode.internal,
     );
     expect(fs.reads, 0);
+    expect(logs, isNotEmpty);
     expect(logs, everyElement(endsWith('ArgumentError')));
   });
 }
