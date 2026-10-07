@@ -85,4 +85,18 @@ void main() {
       isNot(contains('secret')),
     );
   });
+
+  test('a link cut by the 8-row window is no link (never open half a URL)', () {
+    final t = term('https://example.com/${'a' * 150}', cols: 10);
+    expect(findLinkAt(t, const CellOffset(3, 1), paths: false), isNull);
+    expect(findLinkAt(t, const CellOffset(3, 7), paths: false), isNull);
+  });
+
+  test('a hit is equal to the same hit', () {
+    final t = term('see https://example.com/a');
+    final a = findLinkAt(t, const CellOffset(10, 0), paths: false)!;
+    final b = findLinkAt(t, const CellOffset(12, 0), paths: false)!;
+    expect(a, b);
+    expect(a.hashCode, b.hashCode);
+  });
 }

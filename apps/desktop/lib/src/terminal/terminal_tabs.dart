@@ -461,6 +461,7 @@ final class _Link {
       unawaited(s.cancel());
     }
     feed.dispose();
+    terminal.hyperlinks.dispose();
     view.dispose();
     selection.dispose();
   }

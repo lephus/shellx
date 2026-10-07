@@ -63,23 +63,26 @@ void main() {
   });
 
   group('reveal (A10 D7)', () {
-    test('macOS: -R for a file, the folder itself for a folder', () async {
+    test('macOS: always -R, so nothing is ever launched', () async {
       final mac = SystemUrlOpener(isWindows: false, run: run);
       await mac.reveal('/Users/me/a b.txt', isDirectory: false);
       await mac.reveal('/Users/me/dir', isDirectory: true);
+      // A .app bundle is a directory: `open <dir>` would start the program.
+      await mac.reveal('/Applications/Evil.app', isDirectory: true);
       expect(ran, [
         '["/usr/bin/open","-R","/Users/me/a b.txt"]',
-        '["/usr/bin/open","/Users/me/dir"]',
+        '["/usr/bin/open","-R","/Users/me/dir"]',
+        '["/usr/bin/open","-R","/Applications/Evil.app"]',
       ]);
     });
 
-    test('Windows: explorer /select,', () async {
+    test('Windows: always explorer /select, as one argument', () async {
       final win = SystemUrlOpener(isWindows: true, run: run);
       await win.reveal(r'C:\Users\me\a b.txt', isDirectory: false);
-      await win.reveal(r'C:\Users\me', isDirectory: true);
+      await win.reveal(r'C:\Users\me\Evil.exe', isDirectory: true);
       expect(ran, [
         r'["explorer.exe","/select,C:\\Users\\me\\a b.txt"]',
-        r'["explorer.exe","C:\\Users\\me"]',
+        r'["explorer.exe","/select,C:\\Users\\me\\Evil.exe"]',
       ]);
     });
 
@@ -100,6 +103,14 @@ void main() {
             run: run,
           ).reveal('a.txt', isDirectory: false),
           throwsArgumentError,
+        );
+        await expectLater(
+          SystemUrlOpener(
+            isWindows: true,
+            run: run,
+          ).reveal(r'\\server\share\x.exe', isDirectory: false),
+          throwsArgumentError,
+          reason: 'UNC',
         );
         expect(ran, isEmpty);
       },

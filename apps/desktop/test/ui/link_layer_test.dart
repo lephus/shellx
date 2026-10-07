@@ -227,4 +227,47 @@ void main() {
     await t.pumpAndSettle();
     await disposeWorkspace(t, w.container);
   }, variant: mac);
+
+  testWidgets('the question shows the real host on its own line, whatever '
+      'the userinfo', (t) async {
+    final w = await pumpConfiguredWorkspace(t);
+    final tab = w.container.read(terminalTabsProvider).selected!;
+    final url = 'https://${'u' * 300}@evil.example/path';
+    tab.terminal.write('\x1b]8;;$url\x1b\\paypal.com\x1b]8;;\x1b\\');
+    await t.pump();
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await click(t, cellCentre(t, 2, 0));
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await t.pump(const Duration(milliseconds: 400));
+    final ask = w.container.read(windowRouterProvider).confirm!;
+    expect(ask.body.split('\n'), contains('evil.example'));
+    expect(ask.body.length, lessThan(600));
+    ask.complete(false);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(opener(w).webLinks, isEmpty);
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('a click outside the grid opens nothing', (t) async {
+    final w = await pumpConfiguredWorkspace(t);
+    final tab = w.container.read(terminalTabsProvider).selected!;
+    final cols = tab.terminal.viewWidth;
+    tab.terminal.write('https://example.com/${'a' * cols}');
+    await t.pump();
+    final render = t
+        .state<TerminalViewState>(find.byType(TerminalView))
+        .renderTerminal;
+    final box = t.getRect(find.byType(TerminalView));
+    final gridRight =
+        t.getTopLeft(find.byType(TerminalView)).dx +
+        render.getOffset(CellOffset(cols, 0)).dx;
+    expect(gridRight, lessThan(box.right - 0.5), reason: 'a strip is left');
+    final at = Offset((gridRight + box.right) / 2, cellCentre(t, 0, 0).dy);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await click(t, at);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(opener(w).webLinks, isEmpty);
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
 }

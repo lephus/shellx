@@ -510,7 +510,7 @@
   "actionSearchPrevious": "Tìm kết quả trước",
   "actionEndSearch": "Đóng tìm kiếm",
   "linkConfirmTitle": "Mở liên kết này?",
-  "linkConfirmBody": "Chữ hiển thị không phải địa chỉ này:\n{url}",
+  "linkConfirmBody": "Chữ hiển thị không phải địa chỉ này. Liên kết mở:\n{host}\n{url}",
   "linkConfirmAction": "Mở",
   "linkOpenFailed": "Không mở được liên kết",
   "menuOpenLink": "Mở liên kết",

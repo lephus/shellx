@@ -145,4 +145,23 @@ void main() {
     );
     expect(t.hyperlinks.at(0, 0).toString(), isNot(contains('secret')));
   });
+
+  test('the alternate screen and back drops the ranges (they are tied to '
+      'a buffer)', () {
+    final t = term();
+    t.write('${_open}https://a.b/1${_st}x$_open$_st');
+    expect(t.hyperlinks.at(0, 0), isNotNull);
+    t.write('\x1b[?1049h');
+    expect(t.hyperlinks.at(0, 0), isNull);
+    t.write('\x1b[?1049l');
+    expect(t.hyperlinks.length, 0);
+  });
+
+  test('dispose empties the registry', () {
+    final t = term();
+    t.write('${_open}https://a.b/1${_st}x$_open$_st');
+    t.hyperlinks.dispose();
+    expect(t.hyperlinks.length, 0);
+    expect(t.hyperlinks.at(0, 0), isNull);
+  });
 }

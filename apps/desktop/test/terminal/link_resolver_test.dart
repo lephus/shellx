@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -110,5 +111,96 @@ void main() {
       (await r.resolve('/secret/a'))!.toString(),
       isNot(contains('secret')),
     );
+  });
+
+  test('UNC paths have no answer (a stat would reach the network)', () {
+    final w = LinkResolver(home: r'C:\Users\me', windows: true);
+    expect(w.absoluteOf(r'\\server\share\a.txt'), isNull);
+    expect(w.absoluteOf('//server/share/a.txt'), isNull);
+    expect(w.absoluteOf(r'\\?\C:\a'), isNull);
+  });
+
+  group('a dead mount never hangs (A10 D7)', () {
+    test(
+      'a stat that never answers is "not there" after the timeout',
+      () async {
+        var asked = 0;
+        final r = LinkResolver(
+          home: '/h',
+          windows: false,
+          statTimeout: const Duration(milliseconds: 40),
+          typeOf: (_) {
+            asked++;
+            return Completer<FileSystemEntityType>().future;
+          },
+        );
+        expect(await r.resolve('/mnt/dead/a'), isNull);
+        expect(await r.resolve('/mnt/dead/a'), isNull);
+        expect(asked, 1, reason: 'the answer is remembered');
+      },
+    );
+
+    test('callers of the same path share one stat in flight', () async {
+      var asked = 0;
+      final done = Completer<FileSystemEntityType>();
+      final r = LinkResolver(
+        home: '/h',
+        windows: false,
+        typeOf: (_) {
+          asked++;
+          return done.future;
+        },
+      );
+      final a = r.resolve('/a');
+      final b = r.resolve('/a');
+      done.complete(FileSystemEntityType.file);
+      expect(await a, isNotNull);
+      expect(await b, isNotNull);
+      expect(asked, 1);
+    });
+
+    test('a hung stat is not asked again while it is in flight', () async {
+      var asked = 0;
+      var now = DateTime(2026, 10, 7, 9);
+      final r = LinkResolver(
+        home: '/h',
+        windows: false,
+        now: () => now,
+        statTimeout: const Duration(milliseconds: 20),
+        typeOf: (_) {
+          asked++;
+          return Completer<FileSystemEntityType>().future;
+        },
+      );
+      await r.resolve('/mnt/dead/a');
+      now = now.add(const Duration(seconds: 5));
+      await r.resolve('/mnt/dead/a');
+      expect(asked, 1, reason: 'still waiting for the first');
+    });
+  });
+
+  test('hover asks the file system at most once per 80 ms', () async {
+    var asked = 0;
+    var now = DateTime(2026, 10, 7, 9);
+    final r = LinkResolver(
+      home: '/h',
+      windows: false,
+      now: () => now,
+      typeOf: (_) async {
+        asked++;
+        return FileSystemEntityType.file;
+      },
+    );
+    expect(await r.resolve('/a', throttle: true), isNotNull);
+    expect(await r.resolve('/b', throttle: true), isNull, reason: 'too soon');
+    expect(asked, 1);
+    expect(
+      await r.resolve('/b'),
+      isNotNull,
+      reason: 'a click is never throttled',
+    );
+    now = now.add(const Duration(milliseconds: 100));
+    expect(await r.resolve('/c', throttle: true), isNotNull);
+    expect(asked, 3);
   });
 }

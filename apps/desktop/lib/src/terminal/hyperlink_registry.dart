@@ -100,6 +100,19 @@ final class HyperlinkRegistry {
     return null;
   }
 
+  /// Drops every range and the open one: they belong to the buffer that was
+  /// active (a screen switch makes them point at the wrong lines).
+  void clear() {
+    _openAt?.dispose();
+    _openAt = null;
+    _openUri = null;
+    for (final r in _ranges) {
+      r.begin.dispose();
+      r.end.dispose();
+    }
+    _ranges.clear();
+  }
+
   void dispose() {
     _openAt?.dispose();
     for (final r in _ranges) {

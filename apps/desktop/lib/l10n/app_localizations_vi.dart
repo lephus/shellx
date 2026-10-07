@@ -2061,8 +2061,8 @@ class AppLocalizationsVi extends AppLocalizations {
   String get linkConfirmTitle => 'Mở liên kết này?';
 
   @override
-  String linkConfirmBody(String url) {
-    return 'Chữ hiển thị không phải địa chỉ này:\n$url';
+  String linkConfirmBody(String host, String url) {
+    return 'Chữ hiển thị không phải địa chỉ này. Liên kết mở:\n$host\n$url';
   }
 
   @override

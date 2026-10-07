@@ -2149,8 +2149,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get linkConfirmTitle => 'Open this link?';
 
   @override
-  String linkConfirmBody(String url) {
-    return 'The text shown is not this address:\n$url';
+  String linkConfirmBody(String host, String url) {
+    return 'The text shown is not this address. It opens:\n$host\n$url';
   }
 
   @override

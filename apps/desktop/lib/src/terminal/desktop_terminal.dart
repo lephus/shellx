@@ -25,6 +25,21 @@ final class DesktopTerminal extends Terminal {
   /// A10 D11: where the program put OSC 8 links.
   final hyperlinks = HyperlinkRegistry();
 
+  // The ranges are anchors of one buffer; a screen switch (vim, less)
+  // drops them rather than point them at the other screen's lines. (xterm
+  // 4.0.0 has no RIS, ESC c, to handle.)
+  @override
+  void useAltBuffer() {
+    hyperlinks.clear();
+    super.useAltBuffer();
+  }
+
+  @override
+  void useMainBuffer() {
+    hyperlinks.clear();
+    super.useMainBuffer();
+  }
+
   /// A9 D31: bytes from the user's own key binding (`text:`, `csi:`,
   /// `esc:`), sent as typed input (the desktop takes the driver, A1 D6)
   /// and, like Ghostty, not filtered: the configuration is the user's.

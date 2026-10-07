@@ -19,8 +19,8 @@ abstract interface class UrlOpener {
   /// builds.
   Future<void> openWebLink(Uri uri);
 
-  /// A10 D7: shows [path] (absolute) in Finder / Explorer; a folder is
-  /// opened. Never runs the file. Throws [ArgumentError] for a path that is
+  /// A10 D7: shows [path] (absolute) selected in Finder / Explorer — a
+  /// folder too, so a `.app` bundle is never launched. Never runs the file. Throws [ArgumentError] for a path that is
   /// not absolute or holds a control character.
   Future<void> reveal(String path, {required bool isDirectory});
 }
@@ -94,10 +94,13 @@ final class SystemUrlOpener implements UrlOpener {
     if (!absolute || RegExp(r'[\u0000-\u001f\u007f]').hasMatch(path)) {
       throw ArgumentError.value('path', 'path', 'Not an absolute path');
     }
+    // Always "show", never "open": a `.app` bundle is a directory, and
+    // `open <dir>` (or explorer on an `.exe`) would start the program.
+    // [isDirectory] only matters to the caller's menu text.
     if (_isWindows) {
-      await _run('explorer.exe', [isDirectory ? path : '/select,$path']);
+      await _run('explorer.exe', ['/select,$path']);
     } else {
-      await _run('/usr/bin/open', [if (!isDirectory) '-R', path]);
+      await _run('/usr/bin/open', ['-R', path]);
     }
   }
 

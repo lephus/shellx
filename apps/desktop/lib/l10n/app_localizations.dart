@@ -3171,8 +3171,8 @@ abstract class AppLocalizations {
   /// No description provided for @linkConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The text shown is not this address:\n{url}'**
-  String linkConfirmBody(String url);
+  /// **'The text shown is not this address. It opens:\n{host}\n{url}'**
+  String linkConfirmBody(String host, String url);
 
   /// No description provided for @linkConfirmAction.
   ///

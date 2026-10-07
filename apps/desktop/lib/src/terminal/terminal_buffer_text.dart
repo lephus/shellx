@@ -5,7 +5,20 @@ import 'package:xterm/core.dart';
 /// unit (A10 D9). Link detection runs on [text]; the cells map the result
 /// back to the screen.
 final class LogicalLine {
-  LogicalLine._(this.firstRow, this.text, this._rows, this._cols, this._widths);
+  LogicalLine._(
+    this.firstRow,
+    this.text,
+    this._rows,
+    this._cols,
+    this._widths, {
+    this.clippedBefore = false,
+    this.clippedAfter = false,
+  });
+
+  /// The row cap cut the logical line off before its first / after its last
+  /// character read: a link touching that end may be longer than it looks.
+  final bool clippedBefore;
+  final bool clippedAfter;
 
   /// Buffer row of the first row.
   final int firstRow;
@@ -56,6 +69,8 @@ LogicalLine logicalLineAt(Buffer buffer, int row, {int maxRows = 8}) {
       last - first + 1 < maxRows) {
     last++;
   }
+  final clippedBefore = first > 0 && buffer.lines[first].isWrapped;
+  final clippedAfter = last + 1 < height && buffer.lines[last + 1].isWrapped;
   final text = StringBuffer();
   final rows = <int>[];
   final cols = <int>[];
@@ -77,5 +92,13 @@ LogicalLine logicalLineAt(Buffer buffer, int row, {int maxRows = 8}) {
       text.write(unit);
     }
   }
-  return LogicalLine._(first, text.toString(), rows, cols, widths);
+  return LogicalLine._(
+    first,
+    text.toString(),
+    rows,
+    cols,
+    widths,
+    clippedBefore: clippedBefore,
+    clippedAfter: clippedAfter,
+  );
 }

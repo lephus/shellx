@@ -31,14 +31,32 @@ bool get linkModifierDown => defaultTargetPlatform == TargetPlatform.macOS
     ? HardwareKeyboard.instance.isMetaPressed
     : HardwareKeyboard.instance.isControlPressed;
 
-/// A pane has local paths (not a server's, not a tmux on a server).
+/// A pane has local paths (not a server's, not a tmux on a server). It
+/// follows how the pane was launched: an `ssh` typed by hand inside a local
+/// pane is not known to be remote, so its paths count as local (a path that
+/// exists on this computer is underlined, and may be revealed).
 bool paneHasLocalPaths(PaneSession pane) => pane.remote?.launch.host == null;
 
-/// The address shown in the question about an OSC 8 link: 200 characters at
-/// most, the middle cut, so the host at the start and the tail both show.
-String shortenAddress(String uri) => uri.length <= 200
-    ? uri
-    : '${uri.substring(0, 120)}…${uri.substring(uri.length - 79)}';
+/// The address shown in the question about an OSC 8 link: the user name is
+/// cut to 24 characters (`https://paypal.com@evil.example` must show where it
+/// goes), the path and query to 120 in the middle. The host is never cut; the
+/// question shows it on a line of its own.
+String shortenAddress(String uri) {
+  final parsed = Uri.tryParse(uri);
+  if (parsed == null || !parsed.hasAuthority) {
+    return uri.length <= 200
+        ? uri
+        : '${uri.substring(0, 120)}…${uri.substring(uri.length - 79)}';
+  }
+  final user = parsed.userInfo;
+  final tail = '${parsed.path}${parsed.hasQuery ? '?${parsed.query}' : ''}';
+  final shortTail = tail.length <= 120
+      ? tail
+      : '${tail.substring(0, 70)}…${tail.substring(tail.length - 49)}';
+  final shortUser = user.length <= 24 ? user : '${user.substring(0, 24)}…';
+  return '${parsed.scheme}://${user.isEmpty ? '' : '$shortUser@'}'
+      '${parsed.host}${parsed.hasPort ? ':${parsed.port}' : ''}$shortTail';
+}
 
 /// Opens or reveals [hit] (A10 D6, D7, D10). Never throws; a failure is a
 /// toast.
@@ -58,7 +76,10 @@ Future<void> activateLink(
         final ok = await router.confirm(
           ConfirmRequest(
             title: l10n.linkConfirmTitle,
-            body: l10n.linkConfirmBody(shortenAddress(hit.target)),
+            body: l10n.linkConfirmBody(
+              Uri.tryParse(hit.target)?.host ?? '',
+              shortenAddress(hit.target),
+            ),
             confirmLabel: l10n.linkConfirmAction,
             destructive: false,
           ),
@@ -139,11 +160,24 @@ class _LinkLayerState extends ConsumerState<LinkLayer> {
     return false;
   }
 
-  CellOffset? _cellAt(Offset local) =>
-      widget.viewKey.currentState?.renderTerminal.getCellOffset(local);
+  /// The cell under [local], or null outside the grid (the padding, the
+  /// strip under the last row): xterm clamps those onto the edge cells.
+  CellOffset? _cellAt(Offset local) {
+    final render = widget.viewKey.currentState?.renderTerminal;
+    if (render == null) return null;
+    final cell = render.getCellOffset(local);
+    final origin = render.getOffset(cell);
+    final size = render.cellSize;
+    final inside =
+        local.dx >= origin.dx &&
+        local.dx < origin.dx + size.width &&
+        local.dy >= origin.dy &&
+        local.dy < origin.dy + size.height;
+    return inside ? cell : null;
+  }
 
   void _set(LinkHit? hit) {
-    if (hit == null && _hit == null) return;
+    if (hit == _hit) return;
     setState(() => _hit = hit);
   }
 
@@ -170,7 +204,7 @@ class _LinkLayerState extends ConsumerState<LinkLayer> {
     final ask = ++_ask;
     final found = await ref
         .read(linkResolverProvider)
-        .resolve(hit.target, cwd: widget.pane.cwd);
+        .resolve(hit.target, cwd: widget.pane.cwd, throttle: true);
     if (!mounted || ask != _ask) return;
     _set(found == null ? null : hit);
   }

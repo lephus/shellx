@@ -35,6 +35,18 @@ final class LinkHit {
 
   bool get isWeb => kind == TerminalLinkKind.url;
 
+  @override
+  bool operator ==(Object other) =>
+      other is LinkHit &&
+      other.source == source &&
+      other.kind == kind &&
+      other.target == target &&
+      other.begin == begin &&
+      other.end == end;
+
+  @override
+  int get hashCode => Object.hash(source, kind, target, begin, end);
+
   /// Never shows the target (A10 §5).
   @override
   String toString() => 'LinkHit(…)';
@@ -69,6 +81,11 @@ LinkHit? findLinkAt(
   if (index == null) return null;
   final link = linkAt(line.text, index, paths: paths);
   if (link == null) return null;
+  // A link that runs into the cap's edge may be cut: never open half a URL.
+  if ((line.clippedAfter && link.end >= line.text.length) ||
+      (line.clippedBefore && link.start == 0)) {
+    return null;
+  }
   return LinkHit(
     source: LinkSource.detected,
     kind: link.kind,
