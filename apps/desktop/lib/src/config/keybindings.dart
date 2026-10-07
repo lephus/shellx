@@ -119,6 +119,18 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
   return [
     b(primary(LogicalKeyboardKey.keyT), 'new_tab'),
     b(primary(LogicalKeyboardKey.keyW), 'close_surface'),
+    // A11 D14: Cmd+Shift+T; Ctrl+Shift+T is new_tab on Windows, so Alt too.
+    b(
+      mac
+          ? shifted(LogicalKeyboardKey.keyT)
+          : const KeyChord(
+              LogicalKeyboardKey.keyT,
+              control: true,
+              shift: true,
+              alt: true,
+            ),
+      'reopen_closed',
+    ),
     b(shifted(LogicalKeyboardKey.keyN), 'new_workspace'),
     b(shifted(LogicalKeyboardKey.keyK), 'ssh_connect'),
     b(shifted(LogicalKeyboardKey.keyI), 'toggle_notifications'),
@@ -196,6 +208,19 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
         dir,
       ),
     ],
+    // A11 D15: Cmd+Ctrl+[ / ] on macOS; Ctrl+Alt+[ / ] on Windows (left
+    // Alt only).
+    for (final (key, which) in [
+      (LogicalKeyboardKey.bracketLeft, 'back'),
+      (LogicalKeyboardKey.bracketRight, 'forward'),
+    ])
+      b(
+        mac
+            ? KeyChord(key, meta: true, control: true)
+            : KeyChord(key, control: true, alt: true),
+        'focus_history',
+        which,
+      ),
     for (final enter in [
       LogicalKeyboardKey.enter,
       LogicalKeyboardKey.numpadEnter,
@@ -245,6 +270,8 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
         'delete_word_forward',
       ),
     ],
+    // A11 D13: Cmd+Shift+M / Ctrl+Shift+M.
+    b(shifted(LogicalKeyboardKey.keyM), 'toggle_copy_mode'),
     b(font(LogicalKeyboardKey.equal), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.equal, shift: true), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.add), 'increase_font_size', '1'),

@@ -3287,6 +3287,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show in Explorer'**
   String get menuRevealFileWin;
+
+  /// A11 D13
+  ///
+  /// In en, this message translates to:
+  /// **'Copy mode'**
+  String get actionToggleCopyMode;
+
+  /// No description provided for @copyModeChip.
+  ///
+  /// In en, this message translates to:
+  /// **'COPY MODE'**
+  String get copyModeChip;
+
+  /// No description provided for @copyModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'y copy · v select · Esc exit'**
+  String get copyModeHint;
+
+  /// No description provided for @copyModeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copyModeCopied;
+
+  /// A11 D14
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen closed tab'**
+  String get actionReopenClosed;
+
+  /// No description provided for @reopenedTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopened “{name}”'**
+  String reopenedTab(String name);
+
+  /// No description provided for @reopenNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to reopen'**
+  String get reopenNothing;
+
+  /// A11 D15
+  ///
+  /// In en, this message translates to:
+  /// **'Back to previous pane'**
+  String get actionFocusBack;
+
+  /// No description provided for @actionFocusForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward to next pane'**
+  String get actionFocusForward;
 }
 
 class _AppLocalizationsDelegate

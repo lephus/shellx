@@ -529,5 +529,14 @@
   "menuOpenLink": "Mở liên kết",
   "menuCopyLink": "Sao chép địa chỉ liên kết",
   "menuRevealFile": "Hiện trong Finder",
-  "menuRevealFileWin": "Hiện trong Explorer"
+  "menuRevealFileWin": "Hiện trong Explorer",
+  "actionToggleCopyMode": "Chế độ copy",
+  "copyModeChip": "CHẾ ĐỘ COPY",
+  "copyModeHint": "y chép · v chọn · Esc thoát",
+  "copyModeCopied": "Đã chép",
+  "actionReopenClosed": "Mở lại tab đã đóng",
+  "reopenedTab": "Đã mở lại “{name}”",
+  "reopenNothing": "Không có gì để mở lại",
+  "actionFocusBack": "Quay lại pane trước",
+  "actionFocusForward": "Tới pane kế"
 }

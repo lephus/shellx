@@ -126,6 +126,50 @@ _RowText _rowText(BufferLine line, int row, int cells) {
   return _RowText(row, String.fromCharCodes(units), starts, ends);
 }
 
+/// A11 D13: row [row] of [b] as text (blank cells read as spaces, a wide
+/// character is one unit); the same reading the search uses.
+String bufferRowText(Buffer b, int row) => bufferRowCells(b, row).text;
+
+/// A row's text together with the cell each of its UTF-16 units sits on, so
+/// copy mode can move between text positions and screen cells.
+final class RowCells {
+  RowCells._(this.text, this._starts, this._ends);
+  final String text;
+  final List<int>? _starts;
+  final List<int>? _ends;
+
+  int get _lastEnd =>
+      text.isEmpty ? 0 : (_ends?[text.length - 1] ?? text.length);
+
+  /// The first cell of unit [unit]; past the text, one cell per unit.
+  int cellOfUnit(int unit) {
+    if (unit < text.length) return _starts?[unit] ?? unit;
+    return _lastEnd + (unit - text.length);
+  }
+
+  /// The cell after the character that starts at [unit].
+  int cellEndOfUnit(int unit) {
+    if (unit < text.length) return _ends?[unit] ?? unit + 1;
+    return cellOfUnit(unit) + 1;
+  }
+
+  /// The unit that covers [cell]; past the text, one unit per cell.
+  int unitOfCell(int cell) {
+    final ends = _ends;
+    if (ends == null) return cell;
+    for (var i = 0; i < ends.length; i++) {
+      if (ends[i] > cell) return i;
+    }
+    return text.length + (cell - _lastEnd);
+  }
+}
+
+RowCells bufferRowCells(Buffer b, int row) {
+  final line = b.lines[row];
+  final r = _rowText(line, row, line.length);
+  return RowCells._(r.text, r.starts, r.ends);
+}
+
 /// A search over a [Buffer] that can be run in slices: [step] works for at
 /// most a time budget and says whether it finished, so a huge scrollback
 /// never holds the UI thread (A10 D3). Rows the terminal wrapped are

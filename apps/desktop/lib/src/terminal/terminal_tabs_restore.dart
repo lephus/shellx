@@ -66,11 +66,94 @@ final class RestorePlacement {
 
   /// Whether workspace [id] (null: Default) shows its tabs.
   bool Function(String? id)? isShown;
+
+  /// A11 D14: whether workspace [id] still exists, and which one ⌘T would
+  /// open a tab in now; set by the sidebar like [isShown].
+  bool Function(String id)? hasWorkspace;
+  String Function()? currentWorkspace;
 }
 
 final restorePlacementProvider = Provider<RestorePlacement>(
   (ref) => RestorePlacement(),
 );
+
+/// A11 D14: bringing back what the user closed, over the same restore
+/// path (A5a's divider, grid estimate, placement and selection).
+extension TerminalTabsReopen on TerminalTabs {
+  /// Reopens a closed tab: its panes in their folders (SSH panes on their
+  /// servers), the saved text above each new shell, in its workspace when
+  /// that still exists, else the current one; selected. Never replays
+  /// anything: the shells are new. [RestoreOutcome.none] while a restore
+  /// is running.
+  Future<RestoreOutcome> reopenClosed(
+    ClosedTab c, {
+    required String Function(String key) dividerFor,
+  }) {
+    final placement = _ref.read(restorePlacementProvider);
+    final saved = c.workspaceId;
+    final workspace =
+        saved != null && (placement.hasWorkspace?.call(saved) ?? true)
+        ? saved
+        : placement.currentWorkspace?.call() ?? saved ?? 'default';
+    final snapshot = RestoreSnapshot(
+      savedAt: _ref.read(clockProvider)(),
+      cleanExit: false,
+      selectedTab: c.tab.key,
+      workspaces: [
+        SavedWorkspace(id: workspace, tabs: [c.tab.key]),
+      ],
+      tabs: [c.tab],
+    );
+    final text = {
+      for (final e in c.textByKey.entries) e.key: e.value + dividerFor(e.key),
+    };
+    return _runRestore(RestorePlan(snapshot: snapshot, textByKey: text));
+  }
+
+  /// Reopens a closed pane: next to the focused pane of its old tab when
+  /// that tab is still there (and has room), else as a tab of its own.
+  /// Returns the new pane's id, or null when nothing opened (the notice
+  /// says why, when there is one to say).
+  Future<int?> reopenClosedPane(ClosedPane p, {String divider = ''}) async {
+    final text = p.text.isEmpty ? null : p.text + divider;
+    try {
+      final tab = _state.tabs.where((t) => t.id == p.tabId).firstOrNull;
+      if (tab != null) {
+        try {
+          final id = await splitPaneFor(
+            tab.focusedPaneId,
+            SplitAxis.row,
+            cwd: p.cwd,
+            focus: true,
+            local: p.launch == null,
+            launchOverride: p.launch,
+            ownFolder: true,
+            restoreText: text,
+          );
+          focusPane(id);
+          return id;
+        } on PaneNoRoomException {
+          // No room beside it: the pane gets a tab of its own.
+        }
+      }
+      return await openTabFor(
+        cwd: p.cwd,
+        launch: p.launch,
+        select: true,
+        restoreText: text,
+      );
+    } on SessionLimitException catch (error) {
+      if (_ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (_ref.mounted) _set(notice: spawnNoticeFor(error));
+    } on OpenBusyException {
+      // Another open is in flight: the item stays for the next try.
+    } on PaneGoneException {
+      // The new shell ended before it could be placed.
+    }
+    return null;
+  }
+}
 
 /// Uses [TerminalTabs._ref] and [TerminalTabs._state]: an extension may
 /// not touch the notifier's protected `ref` and `state` itself.

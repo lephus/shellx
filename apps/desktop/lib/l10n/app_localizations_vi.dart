@@ -2121,4 +2121,33 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get menuRevealFileWin => 'Hiện trong Explorer';
+
+  @override
+  String get actionToggleCopyMode => 'Chế độ copy';
+
+  @override
+  String get copyModeChip => 'CHẾ ĐỘ COPY';
+
+  @override
+  String get copyModeHint => 'y chép · v chọn · Esc thoát';
+
+  @override
+  String get copyModeCopied => 'Đã chép';
+
+  @override
+  String get actionReopenClosed => 'Mở lại tab đã đóng';
+
+  @override
+  String reopenedTab(String name) {
+    return 'Đã mở lại “$name”';
+  }
+
+  @override
+  String get reopenNothing => 'Không có gì để mở lại';
+
+  @override
+  String get actionFocusBack => 'Quay lại pane trước';
+
+  @override
+  String get actionFocusForward => 'Tới pane kế';
 }

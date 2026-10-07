@@ -126,6 +126,8 @@ final Map<String, ActionSpec> kActionSpecs = {
     const ActionSpec('new_tab', ActionGroup.tabs),
     const ActionSpec('close_surface', ActionGroup.tabs),
     const ActionSpec('close_tab', ActionGroup.tabs),
+    // A11 D14: the newest closed tab or pane, with its scrollback.
+    const ActionSpec('reopen_closed', ActionGroup.tabs),
     const ActionSpec('new_workspace', ActionGroup.tabs),
     const ActionSpec('ssh_connect', ActionGroup.tabs),
     const ActionSpec('tmux_attach', ActionGroup.tabs),
@@ -159,6 +161,13 @@ final Map<String, ActionSpec> kActionSpecs = {
       param: _resizeDirection,
       paramHint: 'left, right, up, down',
     ),
+    // A11 D15: back / forward through the panes used.
+    ActionSpec(
+      'focus_history',
+      ActionGroup.panes,
+      param: (r) => _oneOf({'back', 'forward'}, r),
+      paramHint: 'back, forward',
+    ),
     const ActionSpec('toggle_split_zoom', ActionGroup.panes),
     const ActionSpec('equalize_splits', ActionGroup.panes),
     const ActionSpec('toggle_notifications', ActionGroup.notifications),
@@ -189,6 +198,8 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint:
           'line_start, line_end, delete_line, delete_word, delete_word_forward',
     ),
+    // A11 D13: vim-style keys over the buffer, no mouse.
+    const ActionSpec('toggle_copy_mode', ActionGroup.editing),
     const ActionSpec(
       'increase_font_size',
       ActionGroup.font,
@@ -295,6 +306,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'new_tab' => const NewTabIntent(),
   'close_surface' => const CloseTabIntent(),
   'close_tab' => const CloseWholeTabIntent(),
+  'reopen_closed' => const ReopenClosedIntent(),
   'new_workspace' => const NewWorkspaceIntent(),
   'ssh_connect' => const OpenSshConnectIntent(),
   'tmux_attach' => const OpenTmuxAttachIntent(),
@@ -306,6 +318,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   ),
   'goto_split' => FocusPaneIntent(_dir(a.param!)),
   'resize_split' => ResizePaneIntent(_dir(a.param!)),
+  'focus_history' => FocusHistoryIntent(back: a.param != 'forward'),
   'toggle_split_zoom' => const TogglePaneZoomIntent(),
   'equalize_splits' => const EqualizePanesIntent(),
   'toggle_notifications' => const ToggleNotificationsPanelIntent(),
@@ -317,6 +330,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'navigate_search' => NavigateSearchIntent(next: a.param != 'previous'),
   'end_search' => const EndSearchIntent(),
   'edit_line' => EditLineIntent(EditLineOp.fromWire(a.param)!),
+  'toggle_copy_mode' => const ToggleCopyModeIntent(),
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),
   'decrease_font_size' => FontSmallerIntent(step: double.parse(a.param ?? '1')),
   'reset_font_size' => const FontResetIntent(),
@@ -344,6 +358,8 @@ String describeIntent(Intent i) => switch (i) {
   SelectAllIntent(:final fromMenu) =>
     fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
   EditLineIntent(:final op) => 'EditLineIntent(${op.wire})',
+  FocusHistoryIntent(:final back) =>
+    'FocusHistoryIntent(${back ? 'back' : 'forward'})',
   NavigateSearchIntent(:final next) =>
     'NavigateSearchIntent(${next ? 'next' : 'previous'})',
   FontBiggerIntent(:final step) when step != 1 => 'FontBiggerIntent($step)',

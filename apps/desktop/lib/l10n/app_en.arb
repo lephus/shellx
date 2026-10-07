@@ -921,5 +921,18 @@
   "menuOpenLink": "Open link",
   "menuCopyLink": "Copy link address",
   "menuRevealFile": "Show in Finder",
-  "menuRevealFileWin": "Show in Explorer"
+  "menuRevealFileWin": "Show in Explorer",
+  "actionToggleCopyMode": "Copy mode",
+  "@actionToggleCopyMode": {"description": "A11 D13"},
+  "copyModeChip": "COPY MODE",
+  "copyModeHint": "y copy · v select · Esc exit",
+  "copyModeCopied": "Copied",
+  "actionReopenClosed": "Reopen closed tab",
+  "@actionReopenClosed": {"description": "A11 D14"},
+  "reopenedTab": "Reopened “{name}”",
+  "@reopenedTab": {"placeholders": {"name": {"type": "String"}}},
+  "reopenNothing": "Nothing to reopen",
+  "actionFocusBack": "Back to previous pane",
+  "@actionFocusBack": {"description": "A11 D15"},
+  "actionFocusForward": "Forward to next pane"
 }

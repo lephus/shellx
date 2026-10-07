@@ -7,6 +7,8 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/remote/remote_state.dart';
+import 'package:shellx_desktop/src/terminal/closed_items.dart';
+import 'package:shellx_desktop/src/terminal/focus_history.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -136,6 +138,41 @@ void main() {
     expect(local.openCwds.last, isNull);
   });
 
+  test('A11 D14: a closed local pane reopens beside a server pane as a local '
+      'shell in its own folder; a closed server pane on its server', () async {
+    local.add(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        remote: ssh(),
+        cwd: '/srv/app',
+      ),
+    );
+    boot();
+    await tabs().reopenClosedPane(
+      ClosedPane(
+        tabId: 1,
+        cwd: '/Users/me/proj',
+        launch: null,
+        text: '',
+        label: 'x',
+      ),
+    );
+    expect(local.openLaunches.last, isNull);
+    expect(local.openCwds.last, '/Users/me/proj');
+    await tabs().reopenClosedPane(
+      ClosedPane(
+        tabId: 1,
+        cwd: null,
+        launch: SshLaunch(devbox, remoteCwd: '/srv/other'),
+        text: '',
+        label: 'x',
+      ),
+    );
+    expect(local.openLaunches.last, SshLaunch(devbox, remoteCwd: '/srv/other'));
+    expect(local.openCwds.last, isNull);
+  });
+
   test('a lost connection keeps the pane with a dim line; Enter reconnects '
       'in place — same terminal, tab id, focus, zoom (D20–D22)', () async {
     local.notifyOnOpen = true; // as the real manager (B2)
@@ -202,6 +239,31 @@ void main() {
     );
     await tabs().reconnect(1);
     expect(idAtEmit, 1);
+  });
+
+  test('A11 D15: focus history follows a reconnect (back and forward reach '
+      'the pane under its new id)', () async {
+    local.notifyOnOpen = true;
+    local.add(local.summary(1, origin: SessionOrigin.desktop, remote: ssh()));
+    boot();
+    final history = container.read(focusHistoryProvider);
+    await tabs().split(SplitAxis.row, local: true); // pane 100
+    tabs().focusPane(1);
+    await lose(1, 255);
+    final fresh = await tabs().reconnect(1);
+    await pumpEventQueue();
+    expect(fresh, isNotNull);
+    expect(history.length, 3);
+    expect(
+      container.read(focusHistoryProvider.notifier).go(back: true),
+      isTrue,
+    );
+    expect(state().selected!.focusedPaneId, 100);
+    expect(
+      container.read(focusHistoryProvider.notifier).go(back: false),
+      isTrue,
+    );
+    expect(state().selected!.focusedPaneId, fresh);
   });
 
   test('never connected → failed line; any other exit after connecting → A1 '

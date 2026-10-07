@@ -44,7 +44,9 @@ Set<String> a10Additions(String platform) => platform == 'mac'
         'ctrl+alt+shift+67 -> NavigateSearchIntent(previous)',
       };
 
-/// A11 D11: macOS line editing at the prompt; Windows binds none.
+/// A11: D11 macOS line editing at the prompt (Windows binds none), D13
+/// copy mode (⌘⇧M / Ctrl+Shift+M), D14 reopen closed (⌘⇧T /
+/// Ctrl+Shift+Alt+T), D15 focus history (⌘⌃[ / ⌘⌃]; Ctrl+Alt+[ / ]).
 Set<String> a11Additions(String platform) => platform == 'mac'
     ? const {
         'meta+100000302 -> EditLineIntent(line_start)',
@@ -52,8 +54,17 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'meta+100000008 -> EditLineIntent(delete_line)',
         'alt+100000008 -> EditLineIntent(delete_word)',
         'alt+10000007f -> EditLineIntent(delete_word_forward)',
+        'shift+meta+6d norepeat -> ToggleCopyModeIntent',
+        'shift+meta+74 norepeat -> ReopenClosedIntent',
+        'ctrl+meta+5b norepeat -> FocusHistoryIntent(back)',
+        'ctrl+meta+5d norepeat -> FocusHistoryIntent(forward)',
       }
-    : const {};
+    : const {
+        'ctrl+shift+6d norepeat -> ToggleCopyModeIntent',
+        'ctrl+alt+shift+74 norepeat -> ReopenClosedIntent',
+        'ctrl+alt+5b norepeat -> FocusHistoryIntent(back)',
+        'ctrl+alt+5d norepeat -> FocusHistoryIntent(forward)',
+      };
 
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").

@@ -17,7 +17,7 @@ RestoreSnapshot captureSnapshot({
 }) {
   final saved = <int, SavedTab>{};
   for (final tab in tabs.tabs) {
-    final layout = _save(tab.layout, tab, keyOf);
+    final layout = savePaneTree(tab.layout, tab, keyOf);
     if (layout == null) continue;
     final leaves = savedLeaves(layout);
     final keys = {for (final p in leaves) p.key};
@@ -58,30 +58,35 @@ RestoreSnapshot captureSnapshot({
   );
 }
 
-SavedPaneNode? _save(
+/// [tab]'s pane tree as saved panes (A5a D9, public for A11 D14's closed
+/// tabs). With [includeExited] a pane whose shell ended is kept too: a
+/// closed tab's text is worth reopening even when its shell is gone.
+SavedPaneNode? savePaneTree(
   PaneNode node,
   TerminalTab tab,
-  String Function(int) keyOf,
-) => switch (node) {
+  String Function(int) keyOf, {
+  bool includeExited = false,
+}) => switch (node) {
   PaneLeaf(:final sessionId) => switch (tab.panes[sessionId]) {
     // A8 D29: a remote pane that lost its connection can reconnect, so it
     // is saved; an exited local one (or a remote one that ended for good)
     // is not.
-    final pane? when !pane.exited || pane.canReconnect => SavedPane(
-      key: keyOf(sessionId),
-      // A remote pane's folder is the server's: it travels in the launch.
-      cwd: switch (pane.cwd) {
-        final cwd? when pane.remote == null && isRestorableCwd(cwd) => cwd,
-        _ => null,
-      },
-      session: sessionId,
-      launch: pane.remote?.launch.forReconnect(pane.cwd),
-    ),
+    final pane? when includeExited || !pane.exited || pane.canReconnect =>
+      SavedPane(
+        key: keyOf(sessionId),
+        // A remote pane's folder is the server's: it travels in the launch.
+        cwd: switch (pane.cwd) {
+          final cwd? when pane.remote == null && isRestorableCwd(cwd) => cwd,
+          _ => null,
+        },
+        session: sessionId,
+        launch: pane.remote?.launch.forReconnect(pane.cwd),
+      ),
     _ => null,
   },
   PaneSplit(:final axis, :final ratio, :final first, :final second) => switch ((
-    _save(first, tab, keyOf),
-    _save(second, tab, keyOf),
+    savePaneTree(first, tab, keyOf, includeExited: includeExited),
+    savePaneTree(second, tab, keyOf, includeExited: includeExited),
   )) {
     (null, final b) => b,
     (final a, null) => a,

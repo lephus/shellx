@@ -10,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../agent/desktop_services.dart' show clockProvider;
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;
@@ -17,6 +18,7 @@ import '../mux/daemon_state.dart' show daemonStateProvider;
 import '../remote/remote_state.dart';
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
+import 'closed_items.dart' show ClosedPane, ClosedTab;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
@@ -87,6 +89,23 @@ final class PortOpenFailedNotice extends TabNotice {
 /// ⌘⇧U found nothing (A4 D13). Neutral toast.
 final class NoUnreadNotice extends TabNotice {
   const NoUnreadNotice();
+}
+
+/// A11 D13: copy mode copied the selection (neutral toast).
+final class CopyModeCopiedNotice extends TabNotice {
+  const CopyModeCopiedNotice();
+}
+
+/// A11 D14: ⌘⇧T with nothing closed to bring back (neutral toast).
+final class ReopenNothingNotice extends TabNotice {
+  const ReopenNothingNotice();
+}
+
+/// A11 D14: a closed tab or pane is back (neutral toast). [name] is the
+/// tab's name as the user saw it; the toast is the only place it is shown.
+final class ReopenedNotice extends TabNotice {
+  const ReopenedNotice(this.name);
+  final String name;
 }
 
 /// D4: the focused pane is too small to hold two (neutral toast).
@@ -639,6 +658,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     SessionLaunch? launch,
     bool select = false,
     String? workspace,
+    String? restoreText,
   }) => _guardedOpen(
     () => _local.open(
       cols: _grid.cols,
@@ -648,10 +668,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     ),
     (id) {
       final placement = ref.read(restorePlacementProvider);
+      // A11 D14: the text a reopened pane showed, above the new shell's.
+      if (restoreText != null) _restoreText[id] = restoreText;
       // Before the tab appears: the sidebar takes it as it places the tab.
       if (workspace != null) placement.pending[id] = workspace;
       // A5a D16: placed now, even while a restore's opens are pending.
       _sync(own: id);
+      _restoreText.remove(id); // the attach took it, or never happened
       // The new shell may already be gone (exit 0, or ended before it
       // could be viewed): then keep a selection that exists.
       final opened = state.tabOfSession(id);

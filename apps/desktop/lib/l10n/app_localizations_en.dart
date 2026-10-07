@@ -2210,4 +2210,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuRevealFileWin => 'Show in Explorer';
+
+  @override
+  String get actionToggleCopyMode => 'Copy mode';
+
+  @override
+  String get copyModeChip => 'COPY MODE';
+
+  @override
+  String get copyModeHint => 'y copy · v select · Esc exit';
+
+  @override
+  String get copyModeCopied => 'Copied';
+
+  @override
+  String get actionReopenClosed => 'Reopen closed tab';
+
+  @override
+  String reopenedTab(String name) {
+    return 'Reopened “$name”';
+  }
+
+  @override
+  String get reopenNothing => 'Nothing to reopen';
+
+  @override
+  String get actionFocusBack => 'Back to previous pane';
+
+  @override
+  String get actionFocusForward => 'Forward to next pane';
 }

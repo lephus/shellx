@@ -8,6 +8,7 @@ import '../../config/config_controller.dart';
 import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
 import '../../config/keybind_actions.dart' show describeIntent;
+import '../../terminal/closed_items.dart' show closedItemsProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
@@ -100,6 +101,11 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         // With no tab there is nothing to paste into (the chord itself
         // stays enabled: it falls through to nothing).
         if (intent is PasteClipboardIntent && !hasTab) return false;
+        // A11 D14: the key still answers "nothing to reopen"; the palette
+        // entry is off while there is nothing.
+        if (intent is ReopenClosedIntent) {
+          return ref.read(closedItemsProvider).length > 0;
+        }
         final action = actionsMap[intent.runtimeType];
         return action != null && action.isEnabled(intent);
       },

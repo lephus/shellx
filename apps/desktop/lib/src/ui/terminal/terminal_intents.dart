@@ -194,3 +194,19 @@ class OpenSshConnectIntent extends Intent {
 class OpenTmuxAttachIntent extends Intent {
   const OpenTmuxAttachIntent();
 }
+
+/// A11 D13 `toggle_copy_mode` (⌘⇧M / Ctrl+Shift+M).
+class ToggleCopyModeIntent extends Intent {
+  const ToggleCopyModeIntent();
+}
+
+/// A11 D14 `reopen_closed` (⌘⇧T / Ctrl+Shift+Alt+T).
+class ReopenClosedIntent extends Intent {
+  const ReopenClosedIntent();
+}
+
+/// A11 D15 `focus_history:back|forward` (⌘⌃[ / ⌘⌃], Ctrl+Alt+[ / ]).
+class FocusHistoryIntent extends Intent {
+  const FocusHistoryIntent({required this.back});
+  final bool back;
+}
