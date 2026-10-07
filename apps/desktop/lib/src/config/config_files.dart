@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -11,6 +12,12 @@ const int kConfigMaxBytes = 256 * 1024;
 
 /// D6: `config-file` nesting below the root.
 const int kConfigMaxIncludeDepth = 4;
+
+/// Files in one chain (the root included); includes beyond are refused.
+const int kConfigMaxFiles = 64;
+
+/// Problems kept per chain; a summary problem follows the cut.
+const int kConfigMaxProblems = 100;
 
 /// What the watcher compares (D9).
 @immutable
@@ -56,10 +63,53 @@ final class IoConfigFs implements ConfigFs {
 
   @override
   Future<Uint8List?> read(String path) async {
-    final file = File(path);
-    if (!await file.exists()) return null;
-    if (await file.length() > kConfigMaxBytes) throw const ConfigTooLarge();
-    return file.readAsBytes();
+    // Device namespaces and NUL never name a config file; refuse before
+    // touching the file system (a device path can block).
+    if (path.contains('\x00') ||
+        path.startsWith(r'\\.\') ||
+        path.startsWith(r'\\?\') ||
+        path.startsWith('//./') ||
+        path.startsWith('//?/')) {
+      throw FileSystemException('not a regular file', path);
+    }
+    final stat = await FileStat.stat(path); // follows symlinks
+    if (stat.type == FileSystemEntityType.notFound) {
+      return _missingOrOddNode(path);
+    }
+    if (stat.type != FileSystemEntityType.file) {
+      throw FileSystemException('not a regular file', path);
+    }
+    // A character device (/dev/zero) also reports "file" and a length of
+    // 0: never trust the size, bound the read itself.
+    final raf = await File(path).open();
+    try {
+      final builder = BytesBuilder(copy: false);
+      var total = 0;
+      while (total <= kConfigMaxBytes) {
+        final chunk = await raf.read(kConfigMaxBytes + 1 - total);
+        if (chunk.isEmpty) break;
+        builder.add(chunk);
+        total += chunk.length;
+      }
+      if (total > kConfigMaxBytes) throw const ConfigTooLarge();
+      return builder.takeBytes();
+    } finally {
+      await raf.close();
+    }
+  }
+
+  /// `stat` reports a missing path and some device nodes (macOS
+  /// `/dev/zero`) alike; opening tells them apart. ENOENT / ENOTDIR (or the
+  /// Windows 2 / 3) is missing; an open that works is not a regular file.
+  Future<Uint8List?> _missingOrOddNode(String path) async {
+    try {
+      await (await File(path).open()).close();
+    } on FileSystemException catch (e) {
+      final code = e.osError?.errorCode;
+      if (code == 2 || code == 3 || code == 20) return null;
+      rethrow;
+    }
+    throw FileSystemException('not a regular file', path);
   }
 
   @override
@@ -105,9 +155,16 @@ String expandConfigPath(
 }) {
   final ctx = _context(windows);
   var path = value.trim();
+  final tilde =
+      path == '~' ||
+      path.startsWith('~/') ||
+      (windows && path.startsWith(r'~\'));
+  if (tilde && home.isEmpty) {
+    throw ArgumentError.value(home, 'home', 'is empty');
+  }
   if (path == '~') {
     path = home;
-  } else if (path.startsWith('~/') || (windows && path.startsWith(r'~\'))) {
+  } else if (tilde) {
     path = ctx.join(home, path.substring(2));
   }
   return ctx.normalize(ctx.isAbsolute(path) ? path : ctx.join(baseDir, path));
@@ -116,6 +173,13 @@ String expandConfigPath(
 /// Reads [path] and its `config-file` includes (D5, D6). [quiet] is the
 /// Ghostty layer (D4): its syntax and include problems are not ShellX's to
 /// report, and a read problem is only a warning. [keep] filters keys.
+///
+/// Only a bad root keeps the previous configuration (`readable` false); a
+/// bad include is a warning at the including line and is skipped. A file
+/// already loaded is skipped, at most [kConfigMaxFiles] files are looked
+/// at, and at most [kConfigMaxProblems] problems are kept (D8). Paths are
+/// compared normalised, ignoring case when [caseInsensitive] (default: on
+/// Windows; callers pass true on macOS).
 Future<ConfigChain> loadConfigChain(
   String path, {
   required ConfigFs fs,
@@ -124,18 +188,45 @@ Future<ConfigChain> loadConfigChain(
   bool windows = false,
   bool quiet = false,
   bool Function(String key)? keep,
+  bool? caseInsensitive,
 }) async {
   final entries = <ConfigEntry>[];
   final files = <String>[];
+  final loaded = <String>{};
   var readable = true;
+  var limitReported = false;
   final ctx = _context(windows);
-  final readSeverity = quiet ? ConfigSeverity.warning : ConfigSeverity.error;
+  final foldCase = caseInsensitive ?? windows;
+  final firstProblem = problems.length;
 
-  void fileProblem(String file, ConfigProblemCode code, int depth) {
-    problems.add(
-      ConfigProblem(file: file, line: 0, severity: readSeverity, code: code),
-    );
-    if (depth == 0) readable = false;
+  String identity(String file) {
+    final n = ctx.normalize(windows ? file.replaceAll('/', r'\') : file);
+    return foldCase ? n.toLowerCase() : n;
+  }
+
+  void fileProblem(String file, ConfigProblemCode code, ConfigEntry? from) {
+    if (from == null) {
+      problems.add(
+        ConfigProblem(
+          file: file,
+          line: 0,
+          severity: quiet ? ConfigSeverity.warning : ConfigSeverity.error,
+          code: code,
+        ),
+      );
+      readable = false;
+    } else {
+      problems.add(
+        ConfigProblem(
+          file: from.file,
+          line: from.line,
+          severity: ConfigSeverity.warning,
+          code: code,
+          key: 'config-file',
+          value: from.value,
+        ),
+      );
+    }
   }
 
   Future<void> visit(
@@ -146,13 +237,14 @@ Future<ConfigChain> loadConfigChain(
     bool optional = false,
   }) async {
     files.add(file);
+    loaded.add(identity(file));
     final Uint8List? bytes;
     try {
       bytes = await fs.read(file);
     } on ConfigTooLarge {
-      return fileProblem(file, ConfigProblemCode.tooLarge, depth);
+      return fileProblem(file, ConfigProblemCode.tooLarge, from);
     } on FileSystemException {
-      return fileProblem(file, ConfigProblemCode.unreadable, depth);
+      return fileProblem(file, ConfigProblemCode.unreadable, from);
     }
     if (bytes == null) {
       if (from != null && !optional && !quiet) {
@@ -173,31 +265,56 @@ Future<ConfigChain> loadConfigChain(
     try {
       text = decodeConfigBytes(bytes);
     } on FormatException {
-      return fileProblem(file, ConfigProblemCode.notUtf8, depth);
+      return fileProblem(file, ConfigProblemCode.notUtf8, from);
     }
     final syntax = quiet ? <ConfigProblem>[] : problems;
     final own = parseConfigText(text, file: file, problems: syntax);
     final includes = <ConfigEntry>[];
     for (final entry in own) {
       if (entry.key == 'config-file') {
-        if (entry.value.isNotEmpty) includes.add(entry);
+        // D5: an empty value resets the list collected so far.
+        if (entry.value.isEmpty) {
+          includes.clear();
+        } else {
+          includes.add(entry);
+        }
       } else if (keep == null || keep(entry.key)) {
         entries.add(entry);
       }
     }
     for (final include in includes) {
       final optionalInclude = include.value.startsWith('?');
-      final target = expandConfigPath(
-        optionalInclude ? include.value.substring(1) : include.value,
-        baseDir: ctx.dirname(file),
-        home: home,
-        windows: windows,
-      );
+      final String target;
+      try {
+        final raw = optionalInclude
+            ? include.value.substring(1)
+            : include.value;
+        if (raw.contains('\x00')) throw const FormatException('NUL in path');
+        target = expandConfigPath(
+          raw,
+          baseDir: ctx.dirname(file),
+          home: home,
+          windows: windows,
+        );
+      } on FormatException {
+        if (!quiet) fileProblem(file, ConfigProblemCode.unreadable, include);
+        continue;
+      } on ArgumentError {
+        if (!quiet) fileProblem(file, ConfigProblemCode.unreadable, include);
+        continue;
+      }
+      final id = identity(target);
       ConfigProblemCode? refused;
-      if (stack.contains(target)) {
+      if (stack.any((s) => identity(s) == id)) {
         refused = ConfigProblemCode.includeCycle;
+      } else if (loaded.contains(id)) {
+        continue; // already loaded through another include: skip silently
       } else if (depth + 1 > kConfigMaxIncludeDepth) {
         refused = ConfigProblemCode.includeDepth;
+      } else if (files.length >= kConfigMaxFiles) {
+        if (limitReported) continue;
+        limitReported = true;
+        refused = ConfigProblemCode.includeLimit;
       }
       if (refused != null) {
         if (!quiet) {
@@ -225,5 +342,18 @@ Future<ConfigChain> loadConfigChain(
   }
 
   await visit(path, 0, [path]);
+  final added = problems.length - firstProblem;
+  if (added > kConfigMaxProblems) {
+    problems.removeRange(firstProblem + kConfigMaxProblems, problems.length);
+    problems.add(
+      ConfigProblem(
+        file: path,
+        line: 0,
+        severity: ConfigSeverity.warning,
+        code: ConfigProblemCode.problemLimit,
+        detail: '$added',
+      ),
+    );
+  }
   return ConfigChain(entries, files, readable: readable);
 }

@@ -14,6 +14,7 @@ enum ConfigProblemCode {
   includeMissing,
   includeCycle,
   includeDepth,
+  includeLimit,
   unreadable,
   notUtf8,
   tooLarge,
@@ -38,6 +39,7 @@ enum ConfigProblemCode {
   sequencePrefixShadows,
   unknownCommand,
   commandLimit,
+  problemLimit,
   internal,
 }
 
@@ -108,6 +110,8 @@ String configProblemEnglish(ConfigProblem p) {
       '“$value” is already loaded (config-file loop)',
     ConfigProblemCode.includeDepth =>
       'config-file is nested more than 4 levels',
+    ConfigProblemCode.includeLimit =>
+      'More than 64 config files — the rest are ignored',
     ConfigProblemCode.unreadable =>
       "Can't read the file — keeping the previous configuration",
     ConfigProblemCode.notUtf8 =>
@@ -149,6 +153,8 @@ String configProblemEnglish(ConfigProblem p) {
     ConfigProblemCode.unknownCommand => "There's no command “$value”",
     ConfigProblemCode.commandLimit =>
       'More than 200 commands — the rest are ignored',
+    ConfigProblemCode.problemLimit =>
+      '$detail problems — showing the first 100',
     ConfigProblemCode.internal =>
       'Unexpected error — keeping the previous configuration',
   };

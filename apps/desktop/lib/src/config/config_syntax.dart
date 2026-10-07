@@ -58,7 +58,7 @@ List<ConfigEntry> parseConfigText(
           line: i + 1,
           severity: ConfigSeverity.error,
           code: ConfigProblemCode.badKey,
-          key: key,
+          key: key.length > 64 ? key.substring(0, 64) : key,
         ),
       );
       continue;
@@ -89,6 +89,18 @@ String decodeConfigBytes(Uint8List bytes) {
       bytes[2] == 0xBF) {
     return utf8.decode(bytes.sublist(3));
   }
+  // UTF-32 is not supported; say so instead of decoding it as UTF-16.
+  if (bytes.length >= 4 &&
+      ((bytes[0] == 0xFF &&
+              bytes[1] == 0xFE &&
+              bytes[2] == 0 &&
+              bytes[3] == 0) ||
+          (bytes[0] == 0 &&
+              bytes[1] == 0 &&
+              bytes[2] == 0xFE &&
+              bytes[3] == 0xFF))) {
+    throw const FormatException('UTF-32 is not supported');
+  }
   if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
     return _utf16(bytes.sublist(2), little: true);
   }
@@ -106,6 +118,21 @@ String _utf16(Uint8List bytes, {required bool little}) {
         ? bytes[2 * i] | (bytes[2 * i + 1] << 8)
         : (bytes[2 * i] << 8) | bytes[2 * i + 1],
   );
+  for (var i = 0; i < units.length; i++) {
+    final u = units[i];
+    if (u >= 0xD800 && u <= 0xDBFF) {
+      if (i + 1 < units.length &&
+          units[i + 1] >= 0xDC00 &&
+          units[i + 1] <= 0xDFFF) {
+        i++;
+        continue;
+      }
+      throw const FormatException('lone UTF-16 surrogate');
+    }
+    if (u >= 0xDC00 && u <= 0xDFFF) {
+      throw const FormatException('lone UTF-16 surrogate');
+    }
+  }
   return String.fromCharCodes(units);
 }
 
@@ -113,7 +140,9 @@ final RegExp _twoHex = RegExp(r'^[0-9a-fA-F]{2}$');
 final RegExp _hexRun = RegExp(r'^[0-9a-fA-F]{1,6}$');
 
 /// D31: Zig string-literal escapes (`\n \r \t \\ \" \' \xHH \u{H…}`).
-/// Null when an escape is invalid.
+/// Null when an escape is invalid. Note for the consumer (Task 4): `\x80`
+/// to `\xff` become the code points U+0080..U+00FF, not raw bytes; the
+/// text is UTF-8 encoded when sent to the pty.
 String? decodeZigString(String s) {
   final out = StringBuffer();
   for (var i = 0; i < s.length; i++) {

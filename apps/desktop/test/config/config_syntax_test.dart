@@ -59,6 +59,12 @@ void main() {
       );
     });
 
+    test('a long bad key is truncated to 64 characters', () {
+      final problems = <ConfigProblem>[];
+      parse('${'K' * 200} = 1\n', problems);
+      expect(problems.single.key, hasLength(64));
+    });
+
     test('a lone quote is not stripped', () {
       final entries = parse('theme = "\n', []);
       expect(entries.single.value, '"');
@@ -91,6 +97,35 @@ void main() {
           Uint8List.fromList([0xFE, 0xFF, 0x00, 0x61, 0x00, 0x3D]),
         ),
         'a=',
+      );
+    });
+
+    test('lone UTF-16 surrogates and UTF-32 BOMs throw', () {
+      expect(
+        () => decodeConfigBytes(Uint8List.fromList([0xFF, 0xFE, 0x00, 0xD8])),
+        throwsFormatException,
+      );
+      expect(
+        () => decodeConfigBytes(Uint8List.fromList([0xFE, 0xFF, 0xDC, 0x00])),
+        throwsFormatException,
+      );
+      expect(
+        decodeConfigBytes(
+          Uint8List.fromList([0xFF, 0xFE, 0x3D, 0xD8, 0x00, 0xDE]),
+        ),
+        '😀',
+      );
+      expect(
+        () => decodeConfigBytes(
+          Uint8List.fromList([0xFF, 0xFE, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00]),
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => decodeConfigBytes(
+          Uint8List.fromList([0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x61]),
+        ),
+        throwsFormatException,
       );
     });
 
@@ -170,6 +205,8 @@ void main() {
       ConfigProblemCode.duplicate: 'kd',
       ConfigProblemCode.includeMissing: 'v',
       ConfigProblemCode.includeCycle: 'v',
+      ConfigProblemCode.includeLimit: '',
+      ConfigProblemCode.problemLimit: 'd',
       ConfigProblemCode.themeNotFound: 'v',
       ConfigProblemCode.fontNotFound: 'v',
       ConfigProblemCode.fontNotMonospace: 'v',
