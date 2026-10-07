@@ -122,8 +122,10 @@ class ShellxTerminal extends Terminal {
   /// characters) sends nothing: no empty input message (A10 D30).
   @override
   void textInput(String text) {
-    final typed = modifiers.applyModifiers(normalizeTypedText(text));
-    if (typed.isNotEmpty) super.textInput(typed);
+    final normalized = normalizeTypedText(text);
+    // Before the modifiers: an empty reset must not consume a one-shot Ctrl/Alt.
+    if (normalized.isEmpty) return;
+    super.textInput(modifiers.applyModifiers(normalized));
   }
 
   /// Spec §9.4: bracketed paste when the application enabled it. Pasted text

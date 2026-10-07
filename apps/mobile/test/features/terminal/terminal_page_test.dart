@@ -1431,7 +1431,8 @@ void main() {
       await tester.pumpAndSettle();
       final field = tester.widget<TextField>(find.byKey(const ValueKey('voice-text')));
       expect(field.autocorrect, isFalse);
-      expect(field.enableSuggestions, isFalse);
+      // Android keeps suggestions (Vietnamese Telex/VNI composing); iOS turns them off.
+      expect(field.enableSuggestions, defaultTargetPlatform == TargetPlatform.android);
       expect(field.enableIMEPersonalizedLearning, isFalse);
       expect(field.smartDashesType, SmartDashesType.disabled);
       expect(field.smartQuotesType, SmartQuotesType.disabled);

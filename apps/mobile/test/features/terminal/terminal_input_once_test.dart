@@ -105,4 +105,13 @@ void main() {
     await tester.pump();
     expect(out, ['\x7f']);
   });
+
+  testWidgets('an empty keyboard reset does not consume a one-shot Ctrl', (tester) async {
+    await pumpView(tester);
+    keys.tapModifier(ExtraKey.ctrl);
+    tester.testTextInput.updateEditingValue(keyboard(''));
+    await tester.pump();
+    expect(out, isEmpty);
+    expect(keys.hasActiveModifiers, isTrue);
+  });
 }

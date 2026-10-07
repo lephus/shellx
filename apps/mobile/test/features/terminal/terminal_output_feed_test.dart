@@ -161,4 +161,42 @@ void main() {
       expect(sizes.fold<int>(0, (a, b) => a + b), 1024 * 1024);
     });
   });
+
+  test('an echo only counts within 50 ms of the key and 10 per second; everything still arrives in order', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 10, 7, 9);
+      final writes = <String>[];
+      final feed = TerminalOutputFeed(writes.add, now: () => now);
+      // Held key: a keystroke, then 30 small writes in the same instant.
+      feed.noteInput();
+      for (var i = 0; i < 30; i++) {
+        feed.add('$i,');
+      }
+      async.elapse(const Duration(seconds: 1));
+      expect(writes.join(), [for (var i = 0; i < 30; i++) '$i,'].join());
+      // 60 ms after the key it is not an echo any more.
+      writes.clear();
+      feed.noteInput();
+      now = now.add(const Duration(milliseconds: 60));
+      feed.add('late');
+      feed.add('x' * 300000);
+      async.elapse(const Duration(seconds: 1));
+      expect(writes.join().length, 4 + 300000);
+      expect(writes.join().startsWith('late'), isTrue);
+    });
+  });
+
+  test('many small chunks queue and leave in order within the budget', () {
+    fakeAsync((async) {
+      final writes = <String>[];
+      final feed = TerminalOutputFeed(writes.add, activeBudget: 1000)..isActive = false;
+      for (var i = 0; i < 500; i++) {
+        feed.add('${i.toString().padLeft(4, '0')}-');
+      }
+      feed.isActive = true;
+      async.elapse(const Duration(seconds: 2));
+      expect(writes.every((w) => w.length <= 1000), isTrue);
+      expect(writes.join(), [for (var i = 0; i < 500; i++) '${i.toString().padLeft(4, '0')}-'].join());
+    });
+  });
 }

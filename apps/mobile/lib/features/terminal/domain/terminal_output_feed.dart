@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 /// Output of one tab on its way to xterm (A10 D29): the foreground tab is written at once and then
 /// at most [activeBudget] characters per [activeTick]; a tab in the background is written every
@@ -17,7 +18,8 @@ final class TerminalOutputFeed {
     this.idleTick = const Duration(milliseconds: 250),
     this.cap = 2 * 1024 * 1024,
     this.keep = 1024 * 1024,
-    this.echoWindow = const Duration(milliseconds: 250),
+    this.echoWindow = const Duration(milliseconds: 50),
+    this.echoMaxPerSecond = 10,
     this.echoMax = 4096,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
@@ -31,9 +33,16 @@ final class TerminalOutputFeed {
   final int keep;
   final Duration echoWindow;
   final int echoMax;
+
+  /// At most this many writes per second skip the queue as an echo (a held key or a flood of
+  /// small writes after one keystroke must not bypass the budget).
+  final int echoMaxPerSecond;
   final DateTime Function() _now;
 
-  final _pending = StringBuffer();
+  // Chunks in arrival order; a flush takes up to the budget from the front without copying the rest.
+  final Queue<String> _pending = Queue<String>();
+  int _pendingLength = 0;
+  final Queue<DateTime> _echoes = Queue<DateTime>();
   Timer? _timer;
   bool _active = true;
   bool _disposed = false;
@@ -43,7 +52,7 @@ final class TerminalOutputFeed {
   int dropped = 0;
 
   /// Characters waiting.
-  int get pendingLength => _pending.length;
+  int get pendingLength => _pendingLength;
 
   bool get isActive => _active;
 
@@ -54,7 +63,7 @@ final class TerminalOutputFeed {
     if (_disposed) return;
     _timer?.cancel();
     _timer = null;
-    if (_pending.isEmpty) return;
+    if (_pendingLength == 0) return;
     // To the front: what waits goes at once. To the back: the slow tick takes over.
     if (_active) {
       _flush();
@@ -69,17 +78,24 @@ final class TerminalOutputFeed {
   void add(String text) {
     if (_disposed || text.isEmpty) return;
     final typed = _typedAt;
+    final now = _now();
+    while (_echoes.isNotEmpty && now.difference(_echoes.first) >= const Duration(seconds: 1)) {
+      _echoes.removeFirst();
+    }
     final echo =
         _active &&
-        _pending.isEmpty &&
+        _pendingLength == 0 &&
         text.length <= echoMax &&
         typed != null &&
-        _now().difference(typed) <= echoWindow;
+        now.difference(typed) <= echoWindow &&
+        _echoes.length < echoMaxPerSecond;
     if (echo) {
+      _echoes.addLast(now);
       _write(text);
       return;
     }
-    _pending.write(text);
+    _pending.addLast(text);
+    _pendingLength += text.length;
     _trim();
     if (_timer != null) return;
     // The foreground tab writes the first piece at once; one in the background waits a tick.
@@ -94,9 +110,10 @@ final class TerminalOutputFeed {
   void drain() {
     _timer?.cancel();
     _timer = null;
-    if (_pending.isEmpty) return;
-    final text = _pending.toString();
+    if (_pendingLength == 0) return;
+    final text = _pending.join();
     _pending.clear();
+    _pendingLength = 0;
     _write(text);
   }
 
@@ -105,6 +122,7 @@ final class TerminalOutputFeed {
     _timer?.cancel();
     _timer = null;
     _pending.clear();
+    _pendingLength = 0;
   }
 
   void dispose() {
@@ -112,33 +130,46 @@ final class TerminalOutputFeed {
     _timer?.cancel();
     _timer = null;
     _pending.clear();
+    _pendingLength = 0;
   }
 
   void _flush() {
     _timer = null;
-    if (_disposed || _pending.isEmpty) return;
+    if (_disposed || _pendingLength == 0) return;
     final budget = _active ? activeBudget : idleBudget;
-    var text = _pending.toString();
-    _pending.clear();
-    if (text.length > budget) {
-      var cut = budget;
+    final out = StringBuffer();
+    var taken = 0;
+    while (_pending.isNotEmpty && taken < budget) {
+      final chunk = _pending.removeFirst();
+      final room = budget - taken;
+      if (chunk.length <= room) {
+        out.write(chunk);
+        taken += chunk.length;
+        continue;
+      }
+      var cut = room;
       // Never split a surrogate pair between two writes.
-      final unit = text.codeUnitAt(cut - 1);
+      final unit = chunk.codeUnitAt(cut - 1);
       if (unit >= 0xD800 && unit <= 0xDBFF) cut--;
-      _pending.write(text.substring(cut));
-      text = text.substring(0, cut);
+      out.write(chunk.substring(0, cut));
+      taken += cut;
+      _pending.addFirst(chunk.substring(cut));
+      break;
     }
-    _write(text);
-    if (_pending.isNotEmpty) _timer = Timer(_active ? activeTick : idleTick, _flush);
+    _pendingLength -= taken;
+    if (taken > 0) _write(out.toString());
+    if (_pendingLength > 0) _timer = Timer(_active ? activeTick : idleTick, _flush);
   }
 
   void _trim() {
-    if (_pending.length <= cap) return;
-    final text = _pending.toString();
+    if (_pendingLength <= cap) return;
+    final text = _pending.join();
     final start = _cutPoint(text, text.length - keep);
+    final kept = text.substring(start);
     _pending
       ..clear()
-      ..write(text.substring(start));
+      ..addLast(kept);
+    _pendingLength = kept.length;
     dropped++;
   }
 
