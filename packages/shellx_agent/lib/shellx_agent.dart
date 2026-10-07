@@ -11,6 +11,7 @@ export 'src/mux/mux_handshake.dart';
 export 'src/mux/mux_messages.dart';
 export 'src/mux/mux_server.dart';
 export 'src/mux/mux_transport.dart';
+export 'src/mux/remote_local_sessions.dart';
 export 'src/mux/ui_api.dart';
 export 'src/notify/agent_notifications.dart';
 export 'src/notify/command_tracker.dart';

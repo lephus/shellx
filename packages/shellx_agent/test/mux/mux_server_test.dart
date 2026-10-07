@@ -6,20 +6,8 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
 
 import '../support/fake_ui_api.dart';
+import '../support/mux_fixtures.dart';
 import '../support/session_rig.dart';
-
-final secret = Uint8List.fromList(List.generate(32, (i) => i + 1));
-
-final class TestListener implements MuxListener {
-  final _c = StreamController<MuxConnection>.broadcast();
-  @override
-  Stream<MuxConnection> get connections => _c.stream;
-  @override
-  String get address => 'test';
-  @override
-  Future<void> close() async {}
-  void push(MuxConnection c) => _c.add(c);
-}
 
 final class FakeBridge implements AgentBridge {
   final controller = StreamController<Map<String, Object?>>.broadcast();
