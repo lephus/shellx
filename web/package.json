@@ -13,7 +13,8 @@
     "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs",
     "astro": "astro",
     "lighthouse": "node scripts/lighthouse.mjs",
-    "images": "node scripts/render-images.mjs"
+    "images": "node scripts/render-images.mjs",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "astro": "^7.3.5"

@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro';
+import { pathFor, ui, type Lang } from '../i18n/ui';
+import { breadcrumbs, guides, siteUrl } from '../lib/seo';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = ui[lang];
+const list = guides(lang);
+const path = pathFor(lang, 'guides');
+const ld = [
+  {
+    '@context': 'https://schema.org', '@type': 'CollectionPage',
+    name: t.guidesTitle, description: t.guidesDescription, inLanguage: lang, url: `${siteUrl}${path}`,
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: list.map((g, i) => ({ '@type': 'ListItem', position: i + 1, url: `${siteUrl}${g.path}`, name: g.title })),
+    },
+  },
+  breadcrumbs([{ name: t.breadcrumbHome, path: pathFor(lang, 'home') }, { name: t.guidesHeading, path }]),
+];
+---
+<Base lang={lang} page="guides" title={t.guidesTitle} description={t.guidesDescription}>
+  <Fragment slot="head">
+    {ld.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+  </Fragment>
+  <div class="wrap gi">
+    <header>
+      <h1>{t.guidesHeading}</h1>
+      <p class="muted">{t.guidesLead}</p>
+    </header>
+    <ul>
+      {list.map((g) => (
+        <li>
+          <a href={g.path}>
+            <h2>{g.title}</h2>
+            <p>{g.description}</p>
+            <span class="more">{t.readGuide} →</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</Base>
+
+<style>
+  .gi { max-width: 60rem; padding-top: 3rem; }
+  .gi h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); }
+  .gi header .muted { font-size: 1.1rem; margin: 0 0 2.5rem; }
+  ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+  li a { display: flex; flex-direction: column; height: 100%; padding: 1.5rem; border-radius: 18px; text-decoration: none;
+         background: var(--card); border: 1px solid var(--border); color: var(--fg); transition: border-color 0.2s, transform 0.2s var(--ease); }
+  li a:hover { border-color: rgba(167, 139, 250, 0.6); transform: translateY(-2px); }
+  li h2 { font-size: 1.25rem; }
+  li p { color: var(--muted); margin: 0 0 1rem; flex: 1; }
+  .more { color: var(--purple-l); font-weight: 600; font-size: 0.95rem; }
+</style>
