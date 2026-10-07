@@ -271,7 +271,14 @@ final class RestoreStore implements RestoreFiles {
     if (newest != null && newest.sameLayoutAs(current)) return;
     try {
       final one = File(_generation(1));
-      if (await one.exists()) await one.rename(_generation(2));
+      if (await one.exists()) {
+        // A damaged generation 1 must not replace a good 2.
+        if (newest != null) {
+          await one.rename(_generation(2));
+        } else {
+          await _deleteQuietly(one);
+        }
+      }
       await _atomic({_generation(1): text}, private: false);
     } on Object catch (error) {
       _log('restore: keeping an earlier layout failed (${error.runtimeType})');
@@ -292,9 +299,22 @@ final class RestoreStore implements RestoreFiles {
       return pending.done;
     }
     final slot = _pendingLayout = _LayoutSlot(snapshot);
-    slot.done = _serial(() {
+    slot.done = _serial(() async {
       if (identical(_pendingLayout, slot)) _pendingLayout = null;
-      return _atomic({_layout: slot.snapshot.encode()}, private: false);
+      final snapshot = slot.snapshot;
+      final written = await _atomic({
+        _layout: snapshot.encode(),
+      }, private: false);
+      // A10 review: the window being empty is the user's doing (a restore
+      // that finished writes nothing before it); a crash after it must not
+      // bring the closed tabs back, so the older generations end here.
+      // A damaged or absent layout (never written empty) still recovers.
+      if (written && snapshot.tabs.isEmpty) {
+        for (final n in const [1, 2]) {
+          await _deleteQuietly(File(_generation(n)));
+        }
+      }
+      return written;
     });
     return slot.done;
   }

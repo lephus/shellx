@@ -124,13 +124,47 @@ void main() {
       );
     });
 
-    test('closing every tab and crashing restores the last run', () async {
+    test('closing every tab and crashing does not bring them back', () async {
+      // The user emptied the window: the write of the empty layout (unclean:
+      // the window hid, or the service died) ends the old generations.
       await store.writeLayout(snap(k1));
       await store.loadLayout(); // generation 1 = k1
-      await store.writeLayout(snap(k1, empty: true)); // crash, not clean
+      await store.writeLayout(snap(k1, empty: true)); // then kill -9
       final load = await store.loadLayout();
-      expect(load.recovered, isTrue);
-      expect(load.snapshot!.tabs.single.key, k1);
+      expect(load.recovered, isFalse);
+      expect(load.snapshot!.tabs, isEmpty);
+      expect(File(path('layout.json.1')).existsSync(), isFalse);
+    });
+
+    test(
+      'an empty unclean layout that nobody wrote is still recovered',
+      () async {
+        // Parseable but empty, not written by this store (a bug elsewhere):
+        // the generations are intact.
+        await store.writeLayout(snap(k1));
+        await store.loadLayout();
+        File(
+          path('layout.json'),
+        ).writeAsStringSync(snap(k1, empty: true).encode());
+        final load = await store.loadLayout();
+        expect(load.recovered, isTrue);
+        expect(load.snapshot!.tabs.single.key, k1);
+      },
+    );
+
+    test('a damaged generation 1 is not rotated over a good 2', () async {
+      await store.writeLayout(snap(k1));
+      await store.loadLayout();
+      await store.writeLayout(snap(k2));
+      await store.loadLayout(); // 1 = k2, 2 = k1
+      File(path('layout.json.1')).writeAsStringSync('garbage');
+      await store.writeLayout(snap(k3));
+      await store.loadLayout();
+      String keyOf(int n) => RestoreSnapshot.tryParse(
+        File(path('layout.json.$n')).readAsStringSync(),
+      )!.tabs.single.key;
+      expect(keyOf(1), k3);
+      expect(keyOf(2), k1);
     });
 
     test(

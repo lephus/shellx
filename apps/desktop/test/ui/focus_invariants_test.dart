@@ -2,11 +2,13 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/config/config_ui_request.dart';
 import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:xterm/xterm.dart';
 
@@ -183,6 +185,52 @@ void main() {
     expect(focusLabel(), 'find');
     await disposeWorkspace(t, w.container);
   }, variant: mac);
+
+  /// A10 review: the window coming back never takes the keyboard from an
+  /// overlay the user is in.
+  Future<void> reactivation(
+    WidgetTester t,
+    ProviderContainer container,
+    String why,
+  ) async {
+    final before = focusLabel();
+    expect(before, isNot('terminal'), reason: why);
+    container.read(windowFocusProvider.notifier).set(false);
+    // The overlay's own focus went away while the window was inactive.
+    FocusManager.instance.primaryFocus?.unfocus();
+    container.read(windowFocusProvider.notifier).set(true);
+    await t.pump();
+    await t.pump();
+    expect(focusLabel(), isNot('terminal'), reason: why);
+  }
+
+  testWidgets('F3: coming back leaves the command palette alone', (t) async {
+    final w = await pumpConfiguredWorkspace(t);
+    await chord(t, [cmd, shift], LogicalKeyboardKey.keyP);
+    await reactivation(t, w.container, 'palette');
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('F3: coming back leaves the notifications panel alone', (
+    t,
+  ) async {
+    final w = await pumpConfiguredWorkspace(t);
+    await chord(t, [cmd, shift], LogicalKeyboardKey.keyI);
+    await reactivation(t, w.container, 'panel');
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  for (final kind in [ConfigUiRequest.shortcuts, ConfigUiRequest.problems]) {
+    testWidgets('F3: coming back leaves the ${kind.name} sheet alone', (
+      t,
+    ) async {
+      final w = await pumpConfiguredWorkspace(t);
+      w.container.read(configUiRequestProvider.notifier).request(kind);
+      await t.pumpAndSettle();
+      await reactivation(t, w.container, kind.name);
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+  }
 
   testWidgets('F4: a click on the other pane focuses it first time', (t) async {
     final w = await pumpConfiguredWorkspace(t);

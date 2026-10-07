@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/app.dart';
 import 'package:shellx_desktop/src/ui/terminal/ssh_connect_dialog.dart';
+import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/config_harness.dart';
@@ -103,6 +104,7 @@ void main() {
   });
 
   pasteConfirmTests();
+  reactivationTests();
 
   testApp('F2: a confirmation cancelled with Esc gives the keyboard back', (
     tester,
@@ -153,5 +155,41 @@ void pasteConfirmTests() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(focusLabel(), 'terminal');
+  });
+}
+
+void reactivationTests() {
+  Future<void> reactivate(WidgetTester tester) async {
+    final before = focusLabel();
+    expect(before, isNot('terminal'));
+    container.read(windowFocusProvider.notifier).set(false);
+    // The overlay's own focus went away while the window was inactive.
+    FocusManager.instance.primaryFocus?.unfocus();
+    container.read(windowFocusProvider.notifier).set(true);
+    await tester.pump();
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(focusLabel(), isNot('terminal'));
+  }
+
+  testApp('F3: coming back leaves the connect dialog alone', (tester) async {
+    container.read(windowRouterProvider.notifier).open(const SshConnectRoute());
+    await tester.pumpAndSettle();
+    expect(find.byType(SshConnectDialog), findsOneWidget);
+    await reactivate(tester);
+    expect(find.byType(SshConnectDialog), findsOneWidget);
+  });
+
+  testApp('F3: coming back leaves a confirmation alone', (tester) async {
+    final ask = container
+        .read(windowRouterProvider.notifier)
+        .confirm(
+          ConfirmRequest(title: 'Sure?', body: 'B', confirmLabel: 'Yes'),
+        );
+    await tester.pumpAndSettle();
+    await reactivate(tester);
+    await tester.tap(find.text('Yes'));
+    await tester.pumpAndSettle();
+    expect(await ask, isTrue);
   });
 }

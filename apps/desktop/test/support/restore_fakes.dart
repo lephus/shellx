@@ -33,11 +33,16 @@ final class RecordingFiles implements RestoreFiles {
   @override
   Future<bool> prepare() async => true;
   @override
-  Future<RestoreLoad> loadLayout() async =>
-      RestoreLoad(snapshot: diskLayout ? layouts.lastOrNull : null);
+  Future<RestoreLoad> loadLayout() async => RestoreLoad(
+    snapshot: diskLayout ? layouts.lastOrNull : null,
+    recovered: diskRecovered,
+  );
 
   /// [loadLayout] returns the last layout written, as a disk would.
   bool diskLayout = false;
+
+  /// [loadLayout] says the snapshot came from an earlier generation.
+  bool diskRecovered = false;
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async {
     await layoutGate?.future;

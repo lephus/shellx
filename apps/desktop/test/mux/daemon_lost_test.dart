@@ -149,6 +149,21 @@ void main() {
     },
   );
 
+  test(
+    'A10 review: a layout recovered from an older generation is never '
+    'reopened after a lost service (tabs the user closed stay closed)',
+    () async {
+      await boot();
+      files.diskRecovered = true;
+      final second = FakeDaemon('b' * 32);
+      connector.queue.add(() async => second.attach());
+      await first.die();
+      await pumpEventQueue();
+      await pumpEventQueue();
+      expect(second.sessions.openCwds, isEmpty);
+    },
+  );
+
   test('a connection we closed ourselves is not a lost service', () async {
     await boot();
     final notifier = c.read(daemonStateProvider.notifier);
