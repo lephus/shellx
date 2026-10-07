@@ -508,5 +508,13 @@
   "actionStartSearch": "Tìm trong terminal",
   "actionSearchNext": "Tìm kết quả sau",
   "actionSearchPrevious": "Tìm kết quả trước",
-  "actionEndSearch": "Đóng tìm kiếm"
+  "actionEndSearch": "Đóng tìm kiếm",
+  "linkConfirmTitle": "Mở liên kết này?",
+  "linkConfirmBody": "Chữ hiển thị không phải địa chỉ này. Liên kết mở:\n{host}\n{url}",
+  "linkConfirmAction": "Mở",
+  "linkOpenFailed": "Không mở được liên kết",
+  "menuOpenLink": "Mở liên kết",
+  "menuCopyLink": "Sao chép địa chỉ liên kết",
+  "menuRevealFile": "Hiện trong Finder",
+  "menuRevealFileWin": "Hiện trong Explorer"
 }

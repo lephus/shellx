@@ -3161,6 +3161,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close find'**
   String get actionEndSearch;
+
+  /// No description provided for @linkConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open this link?'**
+  String get linkConfirmTitle;
+
+  /// No description provided for @linkConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The text shown is not this address. It opens:\n{host}\n{url}'**
+  String linkConfirmBody(String host, String url);
+
+  /// No description provided for @linkConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get linkConfirmAction;
+
+  /// No description provided for @linkOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t open the link'**
+  String get linkOpenFailed;
+
+  /// No description provided for @menuOpenLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Open link'**
+  String get menuOpenLink;
+
+  /// No description provided for @menuCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link address'**
+  String get menuCopyLink;
+
+  /// No description provided for @menuRevealFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Finder'**
+  String get menuRevealFile;
+
+  /// No description provided for @menuRevealFileWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Explorer'**
+  String get menuRevealFileWin;
 }
 
 class _AppLocalizationsDelegate

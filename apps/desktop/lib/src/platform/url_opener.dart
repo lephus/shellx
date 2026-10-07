@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:shellx_core/shellx_core.dart' show webUriOf;
+
 typedef UrlCommandRunner =
     Future<ProcessResult> Function(String executable, List<String> arguments);
 
@@ -10,6 +12,17 @@ abstract interface class UrlOpener {
   /// non-https URL that ever opens. Throws [ArgumentError] for a port
   /// outside 1–65535.
   Future<void> openLocalPort(int port);
+
+  /// A10 D6: a link the user clicked in the terminal — `http` or `https`
+  /// only. Throws [ArgumentError] for anything else without running a
+  /// command. [open] stays https-only: it is for links the app itself
+  /// builds.
+  Future<void> openWebLink(Uri uri);
+
+  /// A10 D7: shows [path] (absolute) selected in Finder / Explorer — a
+  /// folder too, so a `.app` bundle is never launched. Never runs the file. Throws [ArgumentError] for a path that is
+  /// not absolute or holds a control character.
+  Future<void> reveal(String path, {required bool isDirectory});
 }
 
 /// Opens URLs (download links, the macOS Full Disk Access pane) with the OS.
@@ -58,6 +71,36 @@ final class SystemUrlOpener implements UrlOpener {
       await _run('rundll32', ['url.dll,FileProtocolHandler', url]);
     } else {
       await _run('/usr/bin/open', [url]);
+    }
+  }
+
+  @override
+  Future<void> openWebLink(Uri uri) async {
+    if (webUriOf(uri.toString()) == null) {
+      throw ArgumentError.value(uri.scheme, 'uri', 'Only http(s) links open');
+    }
+    if (_isWindows) {
+      await _run('rundll32', ['url.dll,FileProtocolHandler', uri.toString()]);
+    } else {
+      await _run('/usr/bin/open', [uri.toString()]);
+    }
+  }
+
+  @override
+  Future<void> reveal(String path, {required bool isDirectory}) async {
+    final absolute = _isWindows
+        ? RegExp(r'^[A-Za-z]:\\').hasMatch(path)
+        : path.startsWith('/');
+    if (!absolute || RegExp(r'[\u0000-\u001f\u007f]').hasMatch(path)) {
+      throw ArgumentError.value('path', 'path', 'Not an absolute path');
+    }
+    // Always "show", never "open": a `.app` bundle is a directory, and
+    // `open <dir>` (or explorer on an `.exe`) would start the program.
+    // [isDirectory] only matters to the caller's menu text.
+    if (_isWindows) {
+      await _run('explorer.exe', ['/select,$path']);
+    } else {
+      await _run('/usr/bin/open', ['-R', path]);
     }
   }
 

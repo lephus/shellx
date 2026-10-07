@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
 import 'package:shellx_core/shellx_core.dart';
@@ -14,6 +16,7 @@ import '../../cli/agent_marks.dart';
 import '../../remote/remote_state.dart';
 import '../../remote/ssh_reconnector.dart';
 import '../../terminal/find_sessions.dart';
+import '../../terminal/link_finder.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_search.dart' show SearchMatch;
@@ -27,6 +30,7 @@ import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
 import 'find_bar.dart';
 import 'ime_compose_reset.dart';
+import 'link_layer.dart';
 import 'remote_marks.dart';
 import 'remote_strip.dart';
 import 'shellx_menu.dart';
@@ -226,7 +230,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         padding: appearance.padding,
         shortcuts: widget.shortcuts,
         onKeyEvent: widget.onKeyEvent,
-        onMenu: (at) => _menu(id, at),
+        onMenu: (at, cell) => _menu(id, at, cell),
       ),
     );
     final phoneDrives = !pane.exited && pane.driver == DriverSide.phone;
@@ -442,12 +446,22 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
   /// A1 ruling I6 entries; the pane under the pointer is focused first
   /// (D21) so the window actions act on it.
-  Future<void> _menu(int id, Offset at) async {
+  Future<void> _menu(int id, Offset at, CellOffset cell) async {
     _tabs.focusPane(id);
     final l10n = AppLocalizations.of(context);
     final pane = widget.tab.panes[id];
     if (pane == null) return;
     final lost = pane.canReconnect;
+    // A10 D8: a link under the pointer adds its entries first. A path only
+    // counts when it exists (D7).
+    var link = findLinkAt(pane.terminal, cell, paths: paneHasLocalPaths(pane));
+    if (link != null && link.kind == TerminalLinkKind.path) {
+      final found = await ref
+          .read(linkResolverProvider)
+          .resolve(link.target, cwd: pane.cwd);
+      if (found == null) link = null;
+    }
+    if (!mounted) return;
     final choice = await showShellxMenu<Object>(
       context: context,
       at: at,
@@ -459,9 +473,27 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             value: _RemotePaneAction.reconnect,
             label: l10n.sshReconnectAction,
           ),
+        if (link != null) ...[
+          ShellxMenuEntry<Object>(
+            key: const Key('menu.openLink'),
+            dividerBefore: lost,
+            value: _LinkAction.open,
+            label: link.kind == TerminalLinkKind.url
+                ? l10n.menuOpenLink
+                : (defaultTargetPlatform == TargetPlatform.windows
+                      ? l10n.menuRevealFileWin
+                      : l10n.menuRevealFile),
+          ),
+          if (link.kind == TerminalLinkKind.url)
+            ShellxMenuEntry<Object>(
+              key: const Key('menu.copyLink'),
+              value: _LinkAction.copy,
+              label: l10n.menuCopyLink,
+            ),
+        ],
         ShellxMenuEntry<Object>(
           key: const Key('menu.copy'),
-          dividerBefore: lost,
+          dividerBefore: lost || link != null,
           value: const CopySelectionIntent(),
           label: l10n.terminalCopy,
           shortcut: copyShortcutLabel(),
@@ -539,6 +571,12 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         unawaited(ref.read(sshReconnectorProvider.notifier).reconnectNow(id));
       case _RemotePaneAction.splitLocalRight:
         unawaited(_tabs.split(SplitAxis.row, local: true));
+      case _LinkAction.open:
+        if (link != null) unawaited(activateLink(ref, context, link, pane));
+      case _LinkAction.copy:
+        if (link != null) {
+          unawaited(Clipboard.setData(ClipboardData(text: link.target)));
+        }
       case final Intent intent:
         Actions.maybeInvoke(context, intent);
     }
@@ -548,6 +586,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
 /// A8: the menu items that are not window actions.
 enum _RemotePaneAction { reconnect, splitLocalRight }
+
+/// A10 D8: the entries a link under the pointer adds.
+enum _LinkAction { open, copy }
 
 /// UI-A3 §2.2: the 1 px line, a 6 px hit area centred on it. Laid out by
 /// [splitExtents], the function `TerminalTabs._clampForPixels` clamps
@@ -1064,7 +1105,7 @@ class PaneTerminal extends StatelessWidget {
   final EdgeInsets padding;
   final Map<ShortcutActivator, Intent>? shortcuts;
   final KeyEventResult Function(KeyEvent event)? onKeyEvent;
-  final void Function(Offset globalPosition) onMenu;
+  final void Function(Offset globalPosition, CellOffset cell) onMenu;
 
   @override
   Widget build(BuildContext context) => ClipRect(
@@ -1072,25 +1113,33 @@ class PaneTerminal extends StatelessWidget {
     // view; the clip keeps it off the signed-out strip and pane header.
     child: ShellxScrollbar(
       controller: scrollController,
-      child: ImeComposeReset(
-        child: TerminalView(
-          pane.terminal,
-          key: viewKey,
-          controller: pane.selection,
-          scrollController: scrollController,
-          focusNode: focusNode,
-          autofocus: focusNode != null,
-          theme: theme,
-          textStyle: style,
-          cursorType: cursorType,
-          padding: padding,
-          shortcuts: shortcuts,
-          onKeyEvent: onKeyEvent == null
-              ? null
-              : (_, event) => onKeyEvent!(event),
-          // Only when the program did not take the mouse (xterm reports
-          // the click to it first): vim or htop with mouse mode keep it.
-          onSecondaryTapUp: (details, _) => onMenu(details.globalPosition),
+      // A10 D8: ⌘-click opens a link; the layer gives the view its cursor.
+      child: LinkLayer(
+        pane: pane,
+        viewKey: viewKey,
+        scrollController: scrollController,
+        builder: (context, cursor) => ImeComposeReset(
+          child: TerminalView(
+            pane.terminal,
+            key: viewKey,
+            controller: pane.selection,
+            scrollController: scrollController,
+            focusNode: focusNode,
+            autofocus: focusNode != null,
+            theme: theme,
+            textStyle: style,
+            cursorType: cursorType,
+            padding: padding,
+            shortcuts: shortcuts,
+            mouseCursor: cursor,
+            onKeyEvent: onKeyEvent == null
+                ? null
+                : (_, event) => onKeyEvent!(event),
+            // Only when the program did not take the mouse (xterm reports
+            // the click to it first): vim or htop with mouse mode keep it.
+            onSecondaryTapUp: (details, cell) =>
+                onMenu(details.globalPosition, cell),
+          ),
         ),
       ),
     ),
