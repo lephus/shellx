@@ -232,6 +232,7 @@ final class UiCommandHandler implements UiApi {
     final given = stringField(r, 'cwd');
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final select = flagField(r, 'focus');
+    var onServer = false;
     final tab = await _opening(() {
       final workspace = wsKey == null
           ? null
@@ -239,6 +240,7 @@ final class UiCommandHandler implements UiApi {
       // A8 D33: a server's workspace opens that server; --cwd is then a
       // folder there.
       final launch = workspace == null ? null : _side.launchFor(workspace);
+      onServer = launch is SshLaunch;
       if (launch is SshLaunch) {
         if (cmd != null && !launch.hook) throw badRequest(kCmdNeedsHook);
         return _tabs.openTabFor(
@@ -260,15 +262,16 @@ final class UiCommandHandler implements UiApi {
     }, leaving);
     if (select) _side.reveal(tab);
     _marks.touch(tab: tab, pane: tab);
-    if (cmd != null) _typeCommand(tab, cmd);
+    if (cmd != null) _typeCommand(tab, cmd, server: onServer);
     return {'tab': tab, 'pane': tab};
   }
 
   /// D16: `--cmd` for a new pane: a server pane waits for its hello
-  /// (A8), any other for its shell's first prompt.
-  void _typeCommand(int pane, String cmd) {
-    final remote = _tabsState.tabOfSession(pane)?.panes[pane]?.remote;
-    if (remote?.launch.host != null) {
+  /// (A8), any other for its shell's first prompt. [server] is decided by
+  /// the launch, never by the pane's `remote` (which may not be set yet):
+  /// a server launch never falls back to the quiet-window path.
+  void _typeCommand(int pane, String cmd, {required bool server}) {
+    if (server) {
       _ssh.typeOnServer(pane, cmd);
     } else {
       onCommand?.call(pane, cmd);
@@ -307,7 +310,9 @@ final class UiCommandHandler implements UiApi {
       _side.reveal(tab);
     }
     _marks.touch(tab: tab, pane: pane);
-    if (cmd != null) _typeCommand(pane, cmd);
+    if (cmd != null) {
+      _typeCommand(pane, cmd, server: server?.launch.host != null);
+    }
     return {'pane': pane, 'tab': tab};
   }
 

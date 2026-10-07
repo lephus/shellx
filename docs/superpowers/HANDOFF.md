@@ -415,3 +415,43 @@ Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào 
 - [ ] **15. IME macOS** — gõ IME (Nhật/Hàn/Telex qua bộ gõ hệ thống) trong terminal khi đang chờ tiền tố hai bước: xterm 4 giữ trạng thái soạn thảo riêng nên bảo vệ chỉ đầy đủ trên Windows và ô nhập Flutter; kiểm không có phím bị nuốt.
 - [ ] **16. D42** — file cấu hình 1.000 dòng (`for i in $(seq 1000); do echo "keybind = ctrl+alt+shift+f12=new_tab"; done > …`) tải lại ≤ 20 ms trong bản app thật (Dart DevTools timeline); số benchmark ở trên là JIT test.
 - [ ] **17. Linux** — chưa thử (không có máy): đường `$XDG_CONFIG_HOME`/`~/.config`, `chmod` 0600; ghi lại nếu có máy.
+
+## 18. SSH và tmux — A8 (2026-10-07)
+
+Spec `specs/2026-10-07-desktop-ssh-a8-design.md` (D1–D44), plan `plans/2026-10-07-desktop-ssh-a8.md` (có phụ lục giao diện UI-A8), tiến độ/ruling `.superpowers/sdd/2026-10-07-desktop-ssh-a8/` (`progress.md`, `preflight.md`). Branch `feat/desktop-a8`; theo ruling "gates, uniform": merge sau review, danh sách ⚠ bên dưới chặn **phát hành**, các dòng Windows là release blocker.
+
+**Cái gì ở đâu.** Pane SSH là một phiên bình thường chạy `ssh` của hệ thống (đăng nhập — mật khẩu, passphrase, câu hỏi host key — diễn ra trong pane; ShellX không thấy và không lưu). macOS dùng ControlMaster: thư mục điều khiển `/tmp/shellx-ssh-<uid>/` (0700, của bạn, kiểm trước khi dùng; không an toàn thì tắt multiplexing và log một lần `ssh: control dir unsafe`); Windows không multiplex. Bên máy chủ: `~/.cache/shellx/remote-<hash>/` (hook, ghi bằng tệp tạm + `mv`, umask 077, không bao giờ sửa dotfile). Cài đặt: `ssh_recent_targets` (10 máy gần đây), `ssh_plain_targets` (máy không cài hook), `ssh_remote_hook` (mặc định bật); workspace SSH và `launch` trong `layout.json` (A5a). Tray có submenu **SSH** (các máy gần đây, bật/tắt cài hook trên máy chủ, xoá danh sách gần đây); ⌘⇧K / Ctrl+Shift+K mở hộp kết nối (action `ssh_connect`; `tmux_attach` trong bảng lệnh). CLI: `shellx ssh`, `shellx tmux ls|attach`, `ls` có `remote`, sự kiện `pane.replaced` (xem `agent-skills/shellx/reference.md`, mục "SSH and tmux"). Gỡ phía máy chủ: `rm -rf ~/.cache/shellx`. Log không bao giờ chứa đích, host, user, cổng, đường dẫn, nhánh, tên tmux, lệnh (có test).
+
+**Điều người dùng nên biết.**
+- Cổng chuyển tiếp (port forward) bị huỷ khi pane cuối của một máy chủ đóng hoặc mất kết nối; sau khi kết nối lại, bấm lại vào cổng.
+- Chữ tiếng Việt "Cần đăng nhập" (cần đăng nhập) đang chờ người bản ngữ duyệt.
+- File bố cục đã lưu do bạn tự sửa bằng tay mà có `launch` tới máy chủ thì sẽ kết nối tới máy đó khi khởi động (tin cậy cùng người dùng: file nằm trong dữ liệu app của chính bạn).
+- Pane mà `ssh` không thể khởi động (thiếu `ssh`) thì không được khôi phục.
+- Tắt máy (power off) để các ssh control master cho `ControlPersist` tự dọn.
+- Hook hello không có nonce theo từng pane: máy chủ độc hại có thể giả hello trước khi đăng nhập và nhận chữ `--cmd` tại dấu nhắc mật khẩu của nó (nó vốn đã nhận mật khẩu; câu hỏi host key không bị ảnh hưởng). Tương lai: nonce theo pane. Ghi trong `reference.md`.
+- Windows: code A8 chưa biên dịch trên máy cục bộ; nhánh `windows-check/a8` sẽ được đẩy để CI build.
+
+**Riêng tư (D36/D37).** Trang riêng tư (vi/en §4) có thêm một gạch đầu dòng SSH, kể cả việc tên máy chủ và thư mục trên đó có thể hiện trong danh sách phiên của điện thoại đã ghép nối (`SessionInfo.cwd` = `<key>:<đường dẫn từ xa>`, protocol không đổi; điện thoại không mở được phiên SSH).
+
+**Hand-off cho A5b (daemon chưa merge).** Bước daemon của A8 bị bỏ qua. Khi A5b vào: `launch`/`remote` phải đi trên dây (A8 đã thêm `remote` vào `summaryToWire/FromWire` + test); `RemoteTools` phải được dựng trong daemon; `ui.ssh.*`/`ui.tmux.*` phải qua `DaemonUiProxy`; "Thoát hẳn" phải chạy `ssh -O exit` cho các master; kiểm tiêu chí 8 (`top` trong pane SSH sống sau ⌘Q).
+
+**Hand-off cho A6 (browser chưa merge).** Ledger ghi "browser pending A6". Khi mở một cổng của máy chủ trong pane trình duyệt, gọi `RemotePortForwards.localPort(pane, N)` trước rồi mở `http://localhost:<cổng đó>/` (cổng local có thể khác N). Mọi action trình duyệt mới của A6 phải được thêm vào bảng A9 (như đã ghi ở A9). Dòng ⚠ 7 phần "⌥-click → pane trình duyệt" và tiêu chí 3 (mệnh đề cuối) chờ A6.
+
+**Hand-off cho A9 (đã merge).** `agent-skills/shellx-config/SKILL.md` đã liệt kê `ssh_connect`/`tmux_attach`. Còn lại: `agent-skills/shellx/SKILL.md` chưa nhắc SSH/tmux — thêm `shellx ssh`, `shellx tmux ls|attach`, và lưu ý `--cmd` chỉ gõ sau hello, cần hook (`reference.md` đã có).
+
+**Đo (D44).** Đo được trên máy dev (không cần máy chủ): phân tích probe 2000 tiến trình + 50 listener, `parseRemoteProbe` (Dart JIT, Apple M4, 2026-10-07, 30 lần): trung vị 0,8 ms, lần đầu 0,4 ms, một lần ngoại lai 14 ms (GC/JIT) — mục tiêu ≤ 5 ms đạt ở trung vị. **Cần đo trên máy thật (chưa đo):** `ssh -G` + spawn ≤ 80 ms (`time` quanh thao tác mở, hoặc Instruments), hộp kết nối ≤ 50 ms với config 200 host (Dart DevTools timeline), chia pane trên master ≤ 300 ms tới prompt (LAN). Ghi số vào ledger.
+
+Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào ledger (`ledgers/a1-desktop-terminal.md`, mục "A8 (SSH/tmux) — execution").
+
+### ⚠ Thử tay — macOS 13+ và Windows 11
+- [ ] **1. macOS → máy chủ Linux** (tài khoản zsh, bash, fish) có khoá trong agent: tiêu chí spec 1, 3, 4 (không hỏi mật khẩu lần hai, ≤ 500 ms trên LAN), 9, 10, 11 (grep log).
+- [ ] **2. Tài khoản chỉ mật khẩu và tài khoản OTP (PAM):** dấu nhắc hiện trong pane; chia pane khi đang ở dấu nhắc (D9: gõ trong 3 s thì pane thứ hai không hỏi lại); `grep -r` mật khẩu đã gõ trong thư mục app support và `~/Library/Preferences/pro.shellx.desktop.plist` → không thấy gì.
+- [ ] **3. Host key:** lần kết nối đầu (`yes/no` trong pane); khoá bị đổi (cảnh báo của ssh, pane `failed`, `known_hosts` không bị đụng).
+- [ ] **4. Tắt Wi-Fi 60 s rồi bật:** dòng + dải ≤ 50 s, đếm ngược, tự kết nối lại vào cùng chỗ, `~/work/api` được khôi phục, có đường kẻ; máy ngủ 5 phút → thử lại khi thức; sai mật khẩu → không bao giờ tự thử lại.
+- [ ] **5. tmux:** `main` cục bộ (Homebrew tmux) và trên máy chủ; đóng tab → `tmux ls` vẫn thấy; rớt Wi-Fi → kết nối lại gắn lại và `top` trong tmux vẫn chạy; "Tạo và gắn".
+- [ ] **6. Khôi phục (A5a):** tiêu chí spec 7, gồm máy chủ không với tới được (pane `failed`, bố cục giữ). Khi có A5b: tiêu chí 8 (`top` trong pane SSH sống sau ⌘Q).
+- [ ] **7. Cổng:** `python3 -m http.server 8000` trên máy chủ → `:8000` hiện trong ≤ 6 s; bấm → trang của máy chủ; local 8000 đang bận → cổng khác, tooltip cho thấy; (⌥-click → pane trình duyệt: **chờ A6**); đóng pane cuối → `ssh -O check` vẫn ổn và forward mất (`lsof -iTCP:8000` rỗng).
+- [ ] **8. Thư mục điều khiển:** `ls -ld /tmp/shellx-ssh-$(id -u)` là `drwx------` của bạn; tạo trước bằng user khác (hoặc `chmod 777`) → ShellX log một lần `ssh: control dir unsafe` và SSH vẫn chạy không multiplex.
+- [ ] **9. Windows 11** (`ssh.exe` 8.x+, dịch vụ ssh-agent): tiêu chí 1–7 và 10 (mỗi pane tự xác thực; cổng quét mỗi 15 s; forward qua tiến trình `-N`), Ctrl+C, `~.`, đổi cỡ vim, ConPTY với dấu nhắc mật khẩu; không có OpenSSH Client → toast kèm gợi ý Settings. **Release blocker.**
+- [ ] **10. Trợ năng:** VoiceOver/Narrator đọc dòng ("…, on devbox, Lost connection to devbox"), dải một lần (không đọc từng giây), gợi ý của hộp thoại; chỉ dùng bàn phím: ⌘⇧K, ↓ Enter, thứ tự Tab theo UI-A8 §6, Ctrl+F6 vào dải.
+- [ ] **11. Hiệu năng (D44):** `ssh -G` + spawn ≤ 80 ms; hộp mở ≤ 50 ms với config 200 host; số probe 2000 tiến trình ở trên.

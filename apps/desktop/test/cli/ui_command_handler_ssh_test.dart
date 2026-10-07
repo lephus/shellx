@@ -356,6 +356,29 @@ void main() {
       expect(local.views[id]!.writes.join(), contains('ls'));
     });
 
+    test('the new pane has its remote at once; a server launch whose pane '
+        'has none yet types nothing until hello (fails closed)', () async {
+      final first = await call('ui.ssh.open', {'target': 'devbox'});
+      final ws = side().workspaceOf(first['tab']! as int)!;
+      final typed = <String>[];
+      h.onCommand = (_, cmd) => typed.add(cmd);
+      final ok = await call('ui.tab.new', {'workspace': ws});
+      expect(
+        tabs().tabOfSession(ok['tab']! as int)!.panes[ok['tab']!]!.remote,
+        isNotNull,
+      );
+      local.openWithoutRemote = true;
+      final r = await call('ui.tab.new', {'workspace': ws, 'cmd': 'ls'});
+      final id = r['tab']! as int;
+      await pumpEventQueue();
+      await Future<void>.delayed(const Duration(milliseconds: 1700));
+      expect(typed, isEmpty);
+      expect(local.views[id]!.writes, isEmpty);
+      hello(id, SshTarget.parse('devbox')!);
+      await pumpEventQueue();
+      expect(local.views[id]!.writes.join(), contains('ls'));
+    });
+
     test('typeWhenHello: no typing at 1.5 s, 5 s or 10 s; 60 s drops it', () {
       fakeAsync((async) {
         final changes = StreamController<void>.broadcast(sync: true);

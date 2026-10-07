@@ -74,6 +74,9 @@ final class FakeLocalSessions implements LocalSessions {
   /// `SessionManager.open` does.
   bool notifyOnOpen = false;
 
+  /// A server launch whose summary has no `remote` yet (tests of the gap).
+  bool openWithoutRemote = false;
+
   /// When set, the next [sessions] listing throws it (once).
   Object? nextListingError;
 
@@ -114,7 +117,9 @@ final class FakeLocalSessions implements LocalSessions {
       summary(
         id,
         origin: SessionOrigin.desktop,
-        remote: launch == null ? null : SessionRemote(launch: launch),
+        remote: launch == null || openWithoutRemote
+            ? null
+            : SessionRemote(launch: launch),
       ),
       notify: notifyOnOpen,
       backlog: nextBacklog,

@@ -278,7 +278,7 @@ Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or
 
 ## SSH and tmux
 
-Open a server in a tab, or attach a tmux session, from a script. `shellx` itself does not exist on the server; a ShellX SSH pane has `shellx notify` as a shell function there, so notifications from the server still work. Sign-in (password, key passphrase, host key question) happens in the pane: ShellX never sees or stores it.
+Open a server in a tab, or attach a tmux session, from a script. `shellx` itself does not exist on the server; a ShellX SSH pane has `shellx notify` as a shell function there, so notifications from the server still work. Sign-in (password, key passphrase, host key question) happens in the pane: ShellX never sees or stores it. Limit: the hello that releases `--cmd` carries no per-pane secret, so a hostile server could fake it before sign-in and receive the `--cmd` text at its own password prompt (it already receives the password itself; the host key question is unaffected). Only use `--cmd` on servers you trust.
 
 ## shellx ssh
 

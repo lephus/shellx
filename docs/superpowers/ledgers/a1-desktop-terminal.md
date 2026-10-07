@@ -98,3 +98,25 @@ A9 final verification (2026-10-07): desktop 1673 passed / 5 skipped (benchmarks 
 
 ## A9 — merged
 Ruling: A9 merged to main after final whole-branch review (one Important fixed: config human output sanitised); HANDOFF §17 gates the release (Windows lines are release blockers) — cost: Windows/IME/VoiceOver behaviour unverified until the manual pass.
+
+## A8 (SSH/tmux) — execution
+A8 executed on branch feat/desktop-a8 (Tasks 1-15, 2026-10-07; commits in `.superpowers/sdd/2026-10-07-desktop-ssh-a8/progress.md`). Merge state found at the start: A1-A4, A3, A5a, A7, A9 merged; A6 (browser) NOT merged -> "browser pending A6"; A5b (daemon) NOT merged -> daemon steps skipped (hand-off list in HANDOFF §18). HANDOFF section is §18. Gate (ruling "gates, uniform"): merge after review; HANDOFF §18 ⚠ list gates the release; Windows lines are release blockers.
+Ruling: accept preflight per-task rulings in full (real A3/A5a/A7/A9 names; reconnect via _guardedOpen/_awaitingOpens; remote port watcher not disposed by closeAll; Workspace.rename keeps ssh; _attach keeps A9 scrollback/option-as-alt and A5a output events/saved text; ⌘⇧K via kActionSpecs/defaultKeyBindings/intents/action_labels/skill doc with snake_case `ssh_connect` and golden additions extended; Rust in run/{prepare,mod,tests}.rs, caps ui.ssh./ui.tmux., GROUPS += tmux, no pane-id completion for TARGET, real Rust tests; restore parse throws on bad launch; event bus: reconnect is pane.changed not close+open; D33 new-tab --workspace <ssh> gets a task step).
+Ruling (A9 interplay): `working-directory = inherit` inherits only from a LOCAL pane; from an SSH pane a new LOCAL tab opens in home; inside an SSH workspace ⌘T opens on that server per spec.
+Ruling (security hardening): strip SHELLX_CLI_TOKEN and SHELLX_SOCKET from the environment of local ssh processes; control dir stat type before chmod; tests that limited CLI clients get forbidden for ssh/tmux commands.
+Ruling (gate): A8 is release-gated (uniform ledger ruling), not merge-gated — the plan's merge-gate text is superseded.
+Ruling L5 (Task 2): tmux list output lines carry the `SXTMUX\t` sentinel prefix; other lines (MOTD, shell noise) are ignored.
+Ruling (user, 2026-10-07): every task merges to main as soon as it passes review, and main is pulled into working branches often; A8 Tasks 1–14 merged as 643ab87 — cost: main carries reviewed-but-not-final-reviewed work for a short time.
+Ruling: strict fromJson (unknown keys rejected) -> Task 2 first commit (Task 1 review).
+Ruling: on reconnect the pane keeps its widget identity (GlobalKey carried from old to new session id) so TerminalView state (scroll, IME, focus) survives (Task 7).
+Ruling: the empty-terminal 'open' button inside an SSH workspace opens a tab on that server, like ⌘T (Task 8 fix round).
+Ruling: A4 unread of the old pane is dropped on reconnect (spec D22 wins over a vague carry) (Task 9).
+Ruling: an outage is not counted as a sign-in failure: TCP pre-check (Task 9 re-review r1).
+Ruling: hide the A2 "New tab" item in server workspaces (D23 only adds items, a duplicate confuses) - cost: one menu item (Task 11). The sshNeedsSignIn string is accepted; Vietnamese native review pending (HANDOFF §18).
+Ruling: focus returns to the terminal after the connect dialog (UI §3.6 over §6 wording) (Task 12).
+Ruling: commit 2f21939 non-compiling alone is accepted - no squash on shared history, the branch merges as a whole - cost: one bisect step (Task 12).
+Ruling: a remote leaf whose session ended before assemble is kept as a lost pane (D29) - cost: a small extra restore path; a hand-edited snapshot is same-user trust (HANDOFF §18) (Task 13).
+Ruling: remote `--cmd` types only after the hook hello (<= 60 s, dropped otherwise); hook off + --cmd is bad_request - cost: hook-off users cannot use --cmd; 'connecting' <= 10 s then connected with hook off (Task 14). Leftover fixed first in Task 15: the decision is by the launch, not the pane's `remote` (fails closed); the hello carries no per-pane nonce (HANDOFF §18, reference.md).
+Carries: A6 must call `RemotePortForwards.localPort(pane, N)` before `http://localhost:N/` for a remote pane; A5b list in HANDOFF §18; forwards are cancelled when the last pane goes or the connection is lost.
+A8 D44 numbers (Apple M4, 2026-10-07; Dart JIT): probe parse of 2000 processes + 50 listeners: median 0.8 ms, one 14 ms outlier. Real-machine numbers (ssh -G + spawn, dialog with 200 hosts, split on master): to measure (method in HANDOFF §18).
+A8 manual checklist results: NOT RUN yet - every line pending (HANDOFF §18 items 1-11; record pass/fail with date and machine here). Windows lines are release blockers. windows-check/a8 to be pushed for CI.
