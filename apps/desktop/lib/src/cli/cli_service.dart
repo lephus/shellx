@@ -190,6 +190,18 @@ final class _LateUi implements UiApi {
   final _ui = Completer<UiApi>();
   UiApi? _bound;
 
+  /// A window that never attaches (a startup that hangs) cannot hold a
+  /// request open: after this the request fails as `busy`.
+  static const attachWait = Duration(seconds: 15);
+
+  Future<UiApi> _ready() => _bound != null
+      ? Future.value(_bound)
+      : _ui.future.timeout(
+          attachWait,
+          onTimeout: () =>
+              throw const CliFailure('busy', 'ShellX is still starting'),
+        );
+
   void bind(UiApi ui) {
     _bound = ui;
     _ui.complete(ui);
@@ -201,7 +213,7 @@ final class _LateUi implements UiApi {
     Future<void>? cancelled,
     bool Function()? isGone,
   }) async =>
-      (await _ui.future).handle(request, cancelled: cancelled, isGone: isGone);
+      (await _ready()).handle(request, cancelled: cancelled, isGone: isGone);
 
   @override
   Stream<Map<String, Object?>> events() =>
@@ -210,7 +222,7 @@ final class _LateUi implements UiApi {
 
   @override
   Future<void> notifyApp({String? title, required String body}) async =>
-      (await _ui.future).notifyApp(title: title, body: body);
+      (await _ready()).notifyApp(title: title, body: body);
 
   /// No window yet: no pane either.
   @override
