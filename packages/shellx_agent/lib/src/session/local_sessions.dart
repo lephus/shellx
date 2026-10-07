@@ -24,7 +24,22 @@ abstract interface class LocalSessions {
   /// otherwise — no cwd, relative, a UNC share, missing, slow — in the home
   /// directory (A3 D17). Throws [SessionLimitException] or
   /// [SpawnFailedException].
-  Future<int> open({required int cols, required int rows, String? cwd});
+  ///
+  /// [tabId] (A7 D29) is the tab the new pane joins; null means the session
+  /// starts its own tab, whose id is its own (A3 D1). Exposed to the shell
+  /// as `SHELLX_TAB_ID`.
+  Future<int> open({
+    required int cols,
+    required int rows,
+    String? cwd,
+    int? tabId,
+  });
+
+  /// A7 D23: `shellx notify` for session [id]: the push to the phone and a
+  /// [SessionNotice] on [notices], under the session's flood limit (stricter
+  /// than OSC 777: nothing is pushed when the limiter refuses). False when
+  /// there is no live session [id].
+  bool notify(int id, {String? title, required String body});
 
   /// One local viewer of session [id]. Throws [StateError] when there is no
   /// such session. The caller must listen to [LocalSessionView.output] or

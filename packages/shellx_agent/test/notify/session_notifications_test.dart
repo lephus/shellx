@@ -23,7 +23,7 @@ final class _Clock {
 
 /// Notifications over a fake relay; [bodies] are the POSTed JSON bodies.
 final class _Push {
-  _Push({this.threshold = Duration.zero}) {
+  _Push({this.threshold = Duration.zero, int maxPerWindow = 6}) {
     final api = ShellxApi(
       baseUri: Uri.parse('https://relay.test'),
       httpClient: MockClient((request) async {
@@ -32,6 +32,11 @@ final class _Push {
       }),
     )..token = 'agent';
     notifications = AgentNotifications(
+      sender: NotificationSender(
+        api: api,
+        maxPerWindow: maxPerWindow,
+        now: () => clock.now,
+      ),
       NotificationsConfig(
         api: api,
         threshold: () => threshold,
@@ -77,6 +82,41 @@ void main() {
       await manager.handle(phone, const SessionOpen(cols: 80, rows: 24));
       return sent.map((o) => o.message).whereType<SessionOpened>().last.id;
     }
+
+    test('LocalSessions.notify pushes exactly like OSC 777 (A7 D23)', () async {
+      final id = await open();
+      expect(manager.notify(id, title: 'CI', body: 'Build xong'), isTrue);
+      await push.notifications.sender.idle;
+      expect(push.bodies.single['title'], 'CI');
+      expect(push.bodies.single['body'], 'Build xong');
+      expect((push.bodies.single['data'] as Map)['kind'], 'message');
+      expect((push.bodies.single['data'] as Map)['session_id'], '$id');
+    });
+
+    test('notify pushes nothing once the limiter refuses (31 calls → 30 '
+        'pushes)', () async {
+      // The machine-wide sender limit (6/min) is lifted so only the
+      // per-session limiter (30/min) decides.
+      push = _Push(maxPerWindow: 100);
+      manager = SessionManager(
+        ptyFactory: factory,
+        shellResolver: const FixedShellResolver(),
+        homeDirectory: '/Users/test',
+        baseEnvironment: const {'PATH': '/usr/bin'},
+        random: Random(3),
+        notifications: push.notifications,
+      );
+      manager.outbound.listen(sent.add);
+      final id = await open();
+      for (var i = 0; i < 31; i++) {
+        manager.notify(id, title: 'CI', body: 'n$i');
+      }
+      await push.notifications.sender.idle;
+      expect(push.bodies, hasLength(30));
+      expect(push.bodies.map((b) => b['body']), [
+        for (var i = 0; i < 30; i++) 'n$i',
+      ]);
+    });
 
     test('a long command in the live output becomes a notification; the '
         'bytes still reach the phone unchanged', () async {

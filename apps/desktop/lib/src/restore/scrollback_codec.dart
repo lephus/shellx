@@ -45,7 +45,7 @@ String encodeScrollback(
     while (start > 0 && lines[start].isWrapped) {
       start--;
     }
-    final text = _encodeRows(buffer, start, end);
+    final text = encodeLogicalLines(buffer, start, end);
     final size = utf8.encode(text).length + 2;
     if (bytes + size > maxBytes) break;
     bytes += size;
@@ -56,7 +56,9 @@ String encodeScrollback(
   return '${newestFirst.reversed.join('\r\n')}\r\n';
 }
 
-String _encodeRows(Buffer buffer, int start, int end) {
+/// Rows [start]..[end] of [buffer] — one logical line (soft-wrapped rows
+/// joined) — as printable text + SGR (D5). A7 `read --ansi` uses it too.
+String encodeLogicalLines(Buffer buffer, int start, int end) {
   final lines = buffer.lines;
   final out = StringBuffer();
   var fg = 0, bg = 0, attrs = 0; // the terminal default

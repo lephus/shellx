@@ -9,11 +9,13 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../cli/agent_marks.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_style.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../theme/terminal_colors.dart';
+import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
 import 'shellx_menu.dart';
@@ -108,6 +110,14 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
       second: _node(s.second, '${path}1', hide: hide),
     ),
   };
+
+  /// A7 D27: the command line acted on this pane in the last 10 s. Only
+  /// this pane's mark is watched (ruling M7).
+  bool _agent(int id) => ref.watch(
+    agentMarksProvider.select(
+      (m) => m.paneActive(id, ref.read(agentMarksClockProvider)()),
+    ),
+  );
 
   Widget _pane(int id) {
     final l10n = AppLocalizations.of(context);
@@ -223,17 +233,20 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           container: split,
           label: !split
               ? null
-              : ringed
-              ? l10n.paneRegionUnreadLabel(
-                  number,
-                  tab.paneCount,
-                  pane.automaticLabel,
-                )
-              : l10n.paneRegionLabel(
-                  number,
-                  tab.paneCount,
-                  pane.automaticLabel,
-                ),
+              : [
+                  ringed
+                      ? l10n.paneRegionUnreadLabel(
+                          number,
+                          tab.paneCount,
+                          pane.automaticLabel,
+                        )
+                      : l10n.paneRegionLabel(
+                          number,
+                          tab.paneCount,
+                          pane.automaticLabel,
+                        ),
+                  if (_agent(id)) l10n.agentChipTooltip,
+                ].join(', '),
           // UI-A3 §8: what the header's mouse targets do.
           customSemanticsActions: !split
               ? null
@@ -292,6 +305,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           : null,
       hiddenUnread: zoomed && widget.hiddenUnread,
       closeTooltip: l10n.paneCloseTooltip(closePaneShortcutLabel()),
+      agent: _agent(id),
       onClose: () => widget.onClosePane(id),
       onToggleZoom: () => _toggleZoom(id),
     );
@@ -602,6 +616,7 @@ class _PaneHeader extends StatefulWidget {
     required this.zoomed,
     required this.hiddenUnread,
     required this.closeTooltip,
+    required this.agent,
     required this.onClose,
     required this.onToggleZoom,
   });
@@ -614,6 +629,9 @@ class _PaneHeader extends StatefulWidget {
   final String? zoomed;
   final bool hiddenUnread;
   final String closeTooltip;
+
+  /// A7 D27: the "Agent" chip, before ×.
+  final bool agent;
   final VoidCallback onClose;
   final VoidCallback onToggleZoom;
 
@@ -774,6 +792,10 @@ class _PaneHeaderState extends State<_PaneHeader> {
                       ),
                     ),
                   ),
+                ],
+                if (widget.agent) ...[
+                  const SizedBox(width: ShellxSpace.s4),
+                  const AgentChip(large: true),
                 ],
                 const SizedBox(width: ShellxSpace.s4 - _closeInset),
                 // The place stays when hidden: the title never jumps.

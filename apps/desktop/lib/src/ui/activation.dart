@@ -30,7 +30,8 @@ Future<void> handleActivation(ProviderContainer container) =>
 /// front (no new tab, unlike activation; [activateApp] is macOS
 /// `NSApp.activate`), then the tab is selected, its workspace expanded,
 /// read at once and the terminal focused. A closed tab only raises the
-/// window.
+/// window; so does a command-line notification (A7 D23), which also reads
+/// the command-line entries.
 void openTabFromNotification(
   ProviderContainer container,
   int tabId, {
@@ -38,5 +39,10 @@ void openTabFromNotification(
 }) {
   container.read(windowRouterProvider.notifier).showTerminal();
   activateApp?.call();
-  container.read(tabAttentionProvider.notifier).jumpTo(tabId);
+  final attention = container.read(tabAttentionProvider.notifier);
+  if (tabId == kCommandLineTabId) {
+    attention.markRead(kCommandLineTabId);
+    return;
+  }
+  attention.jumpTo(tabId);
 }

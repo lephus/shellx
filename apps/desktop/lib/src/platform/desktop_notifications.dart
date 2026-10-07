@@ -159,7 +159,8 @@ final class DesktopNotifications {
   void _flush(int tabId) {
     final burst = _bursts.remove(tabId);
     if (burst == null || burst.extra == 0) return;
-    final view = _viewOf(tabId);
+    // A7 D23: command-line entries are treated as "window not in front".
+    final view = tabId == kCommandLineTabId ? _unseen(tabId) : _viewOf(tabId);
     if (!_wanted(
       bell: burst.bellsOnly,
       windowFocused: view.windowFocused,
@@ -260,6 +261,17 @@ void listenForDesktopNotifications({
   notifications._listener = listenAttention(
     container,
     onArrival: (a) {
+      if (a.tabId == kCommandLineTabId) {
+        // A7 D23: no tab; same switches (D14) and limits (D15), as if the
+        // window were not in front. A click (onOpen(0)) raises the window.
+        notifications.arrived(
+          a,
+          title: a.title ?? l10n.cliNoticeSource,
+          windowFocused: false,
+          tabSelected: false,
+        );
+        return;
+      }
       final tabs = container.read(terminalTabsProvider);
       final tab = tabs.tabs.where((t) => t.id == a.tabId).firstOrNull;
       if (tab == null) return;

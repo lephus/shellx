@@ -367,6 +367,42 @@ void main() {
     });
   });
 
+  test('A7 D23: command-line posts count toward the 20-per-app limit; their '
+      'coalesced post never asks the window', () {
+    fakeAsync((async) {
+      boot();
+      view = (windowFocused: true, tabSelected: true);
+      final cli = AttentionArrival(
+        tabId: kCommandLineTabId,
+        paneId: kCommandLineTabId,
+        kind: AttentionKind.message,
+        text: 'one',
+        at: now,
+        title: 'cron',
+      );
+      n.arrived(cli, title: 'cron', windowFocused: false, tabSelected: false);
+      n.arrived(cli, title: 'cron', windowFocused: false, tabSelected: false);
+      async.elapse(const Duration(seconds: 4));
+      // The coalesced post went out although viewOf says "in front".
+      expect(notifier.shown, hasLength(2));
+      for (var tab = 10; tab < 40; tab++) {
+        n.arrived(
+          msg(tab, 'x'),
+          title: 't',
+          windowFocused: false,
+          tabSelected: false,
+        );
+      }
+      async.flushMicrotasks();
+      expect(notifier.shown, hasLength(20));
+      now = now.add(const Duration(seconds: 5));
+      n.arrived(cli, title: 'cron', windowFocused: false, tabSelected: false);
+      async.flushMicrotasks();
+      expect(notifier.shown, hasLength(20));
+      expect(logs.single, isNot(contains('one')));
+    });
+  });
+
   group('listenForDesktopNotifications', () {
     late FakeLocalSessions local;
     late ProviderContainer c;
@@ -412,6 +448,42 @@ void main() {
       c.read(tabAttentionProvider.notifier).markRead(2);
       await pumpEventQueue();
       expect(notifier.closed, [DesktopNotifications.idFor(2)]);
+      n.dispose();
+    });
+
+    test('A7 D23: a command-line entry is posted as if the window were not '
+        'in front, titled by its title or "Command line"; a click raises '
+        'the window (onOpen(0))', () async {
+      setActive(true);
+      final a = c.read(tabAttentionProvider.notifier);
+      a.addCommandLine(title: 'cron', body: 'backup done');
+      a.addCommandLine(body: 'second');
+      await pumpEventQueue();
+      expect(notifier.shown.map((s) => (s.title, s.body)), [
+        ('cron', 'backup done'),
+      ]);
+      notifier.shown.single.onClick!();
+      expect(opened, [kCommandLineTabId]);
+      n.dispose();
+    });
+
+    test('A7 review M4: reading the command-line entries removes their '
+        'system notification and pending burst', () async {
+      setActive(false);
+      final a = c.read(tabAttentionProvider.notifier);
+      a.addCommandLine(body: 'x');
+      await pumpEventQueue();
+      a.markAllRead();
+      await pumpEventQueue();
+      expect(notifier.closed, [DesktopNotifications.idFor(kCommandLineTabId)]);
+      n.dispose();
+    });
+
+    test('A7 D23: the "Command line" title when none was given', () async {
+      setActive(false);
+      c.read(tabAttentionProvider.notifier).addCommandLine(body: 'x');
+      await pumpEventQueue();
+      expect(notifier.shown.single.title, en.cliNoticeSource);
       n.dispose();
     });
 

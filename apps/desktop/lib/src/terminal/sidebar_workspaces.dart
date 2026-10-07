@@ -301,6 +301,43 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     }
   }
 
+  /// A7 D22: a workspace for the command line — appended, named [name]
+  /// (blank: "Workspace N"), saved; the current workspace stays and no
+  /// name field opens. Returns its id.
+  String createFor({String? name}) {
+    final id = _newId();
+    final clean = name?.trim() ?? '';
+    state = state.copyWith(
+      workspaces: [
+        ...state.workspaces,
+        Workspace(id: id, name: clean.isEmpty ? _numberedName() : _clip(clean)),
+      ],
+      members: {...state.members, id: const <int>[]},
+    );
+    _save();
+    return id;
+  }
+
+  /// A7 D22: takes back a [createFor] workspace whose tab never came
+  /// (no toast, unlike [delete]). Nothing when it holds a tab.
+  void discard(String id) {
+    final w = state.workspace(id);
+    if (w == null || w.isDefault || state.tabsOf(id).isNotEmpty) return;
+    state = state.copyWith(
+      workspaces: [
+        for (final x in state.workspaces)
+          if (x.id != id) x,
+      ],
+      members: {
+        for (final e in state.members.entries)
+          if (e.key != id) e.key: e.value,
+      },
+      currentId: state.currentId == id ? kDefaultWorkspaceId : state.currentId,
+      renaming: state.renaming == RenameWorkspace(id) ? null : state.renaming,
+    );
+    _save();
+  }
+
   /// Header `+` (UI-A2 §3.1): a new tab in [id], which expands.
   Future<void> openTabIn(String id) async {
     if (state.workspace(id) == null) return;

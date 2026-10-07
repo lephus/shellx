@@ -7,6 +7,16 @@ use shellx_term::{cli, fallback, tty, wrap};
 
 #[cfg(unix)]
 fn main() {
+    {
+        let mut argv = std::env::args_os();
+        let argv0 = argv.next().unwrap_or_default();
+        let rest: Vec<std::ffi::OsString> = argv.collect();
+        let cli_sub = rest.first().is_some_and(|a| a == "cli");
+        if shellx_term::api::args::is_cli_name(&argv0) || cli_sub {
+            let args = if cli_sub { rest[1..].to_vec() } else { rest };
+            std::process::exit(shellx_term::api::main(args));
+        }
+    }
     fallback::remember_sigterm();
     use std::sync::OnceLock;
     static TARGET: OnceLock<fallback::Target> = OnceLock::new();
@@ -84,6 +94,17 @@ fn main() {
 fn main() {
     use shellx_term::{cli, link, wincon, winwrap};
     use std::io::Write;
+
+    {
+        let mut argv = std::env::args_os();
+        let argv0 = argv.next().unwrap_or_default();
+        let rest: Vec<std::ffi::OsString> = argv.collect();
+        let cli_sub = rest.first().is_some_and(|a| a == "cli");
+        if shellx_term::api::args::is_cli_name(&argv0) || cli_sub {
+            let args = if cli_sub { rest[1..].to_vec() } else { rest };
+            std::process::exit(shellx_term::api::main(args));
+        }
+    }
 
     let command = cli::parse(std::env::args_os().skip(1));
     if matches!(command, cli::Command::Wrap(_)) {

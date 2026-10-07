@@ -1,0 +1,444 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_desktop/src/cli/match_scanner.dart';
+import 'package:shellx_desktop/src/cli/pane_waiter.dart';
+import 'package:xterm/xterm.dart';
+
+final class FakeProbe implements PaneProbe {
+  FakeProbe({Terminal? terminal})
+    : terminal = terminal ?? (Terminal(maxLines: 1000)..resize(40, 5));
+  @override
+  bool hooked = true;
+  @override
+  bool running = true;
+  @override
+  bool exited = false;
+  @override
+  int? exitCode;
+  @override
+  bool closed = false;
+  final out = StreamController<void>.broadcast(sync: true);
+  final ch = StreamController<void>.broadcast(sync: true);
+  @override
+  Stream<void> get output => out.stream;
+  @override
+  Stream<void> get changes => ch.stream;
+  @override
+  final Terminal terminal;
+  void print(String s) {
+    terminal.write(s);
+    out.add(null);
+  }
+}
+
+/// Runs the pattern here (the tests' fake time); [seen] gets each text.
+final class InlineScanner implements MatchScanner {
+  InlineScanner(this.re, {this.seen});
+  final RegExp re;
+  final List<String>? seen;
+  bool closed = false;
+
+  @override
+  Future<MatchSpan?> scan(String text) async {
+    seen?.add(text);
+    final m = re.firstMatch(text);
+    return m == null ? null : (start: m.start, end: m.end);
+  }
+
+  @override
+  void close() => closed = true;
+}
+
+Matcher failure(String code) =>
+    isA<CliFailure>().having((f) => f.code, 'code', code);
+
+void main() {
+  test('idle: prompt back and quiet for 500 ms', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      Map<String, Object?>? r;
+      unawaited(
+        waitIdle(
+          p,
+          quiet: const Duration(milliseconds: 500),
+          timeout: const Duration(seconds: 30),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(seconds: 2));
+      expect(r, isNull); // still running
+      p.running = false;
+      p.ch.add(null);
+      async.elapse(const Duration(milliseconds: 400));
+      p.print('x');
+      async.elapse(const Duration(milliseconds: 400));
+      expect(r, isNull); // output reset the quiet timer
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, isNotNull);
+    });
+  });
+
+  test('idle: a change elsewhere (same state) does not reset the quiet '
+      'timer', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..running = false;
+      Map<String, Object?>? r;
+      unawaited(
+        waitIdle(
+          p,
+          quiet: const Duration(milliseconds: 500),
+          timeout: const Duration(seconds: 30),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 400));
+      p.ch.add(null);
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, isNotNull);
+    });
+  });
+
+  test('idle without hooks: 2 s of silence', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..hooked = false;
+      Map<String, Object?>? r;
+      unawaited(
+        waitIdle(
+          p,
+          quiet: const Duration(milliseconds: 500),
+          timeout: const Duration(seconds: 30),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 1900));
+      expect(r, isNull);
+      async.elapse(const Duration(milliseconds: 200));
+      expect(r, isNotNull);
+    });
+  });
+
+  test('exit returns the code; timeout fails with timeout', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      Map<String, Object?>? r;
+      unawaited(
+        waitExit(p, timeout: const Duration(seconds: 5)).then((v) => r = v),
+      );
+      p.exited = true;
+      p.exitCode = 3;
+      p.ch.add(null);
+      async.flushMicrotasks();
+      expect(r, {'exitCode': 3});
+      Object? err;
+      unawaited(
+        waitExit(FakeProbe(), timeout: const Duration(seconds: 5)).catchError((
+          Object e,
+        ) {
+          err = e;
+          return <String, Object?>{};
+        }),
+      );
+      async.elapse(const Duration(seconds: 6));
+      expect(err, failure('timeout'));
+      expect(async.pendingTimers, isEmpty);
+    });
+  });
+
+  test('match: existing text counts unless fromNow; later output '
+      'matches', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..print('Serving HTTP on 0.0.0.0\r\n');
+      Map<String, Object?>? old;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('Serving HTTP', multiLine: true)),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => old = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect(old!['match'], 'Serving HTTP');
+      expect(old!['line'], 'Serving HTTP on 0.0.0.0');
+      Map<String, Object?>? fresh;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp(r'ready in \d+', multiLine: true)),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => fresh = v),
+      );
+      Map<String, Object?>? again;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('Serving', multiLine: true)),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => again = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect(fresh, isNull);
+      expect(again, isNull); // before the cursor: not looked at
+      p.print('ready in 42 ms\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(fresh!['match'], 'ready in 42');
+      expect(fresh!['line'], 'ready in 42 ms');
+      expect(again, isNull);
+    });
+  });
+
+  test('match: output is looked at once per 100 ms', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('go')),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      p.print('g');
+      async.elapse(const Duration(milliseconds: 50));
+      p.print('o');
+      async.elapse(const Duration(milliseconds: 40));
+      expect(r, isNull);
+      async.elapse(const Duration(milliseconds: 20));
+      expect(r!['match'], 'go');
+    });
+  });
+
+  test('M2: begun on the alt screen, --from-now never matches what the '
+      'main buffer held before', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..print('old-token\r\n\x1b[?1049hvim');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('old-token')),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      p.print('\x1b[?1049lnew\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, isNull);
+      p.print('old-token again\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r, {'match': 'old-token', 'line': 'old-token again'});
+    });
+  });
+
+  test('final I1: a match on a 200 KiB line answers a window of at most '
+      '4 KiB around it, flagged clipped; a short line is not', () {
+    fakeAsync((async) {
+      final p = FakeProbe(terminal: Terminal(maxLines: 8000)..resize(80, 5));
+      final line = '${'a' * 100000}READY${'b' * 104795}';
+      expect(line.length, 200 * 1024);
+      p.print('$line\r\n');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('READY')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect(r!['match'], 'READY');
+      expect(r!['clipped'], isTrue);
+      final shown = r!['line']! as String;
+      expect(shown.length, lessThanOrEqualTo(4096));
+      expect(shown, contains('READY'));
+      // Centred: the match is in the middle of the window.
+      final at = shown.indexOf('READY');
+      expect((at - (shown.length - at - 5)).abs(), lessThanOrEqualTo(1));
+
+      // The match itself is bounded too.
+      Map<String, Object?>? big;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('a+READYb+')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => big = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      expect((big!['match']! as String).length, lessThanOrEqualTo(4096));
+      expect((big!['line']! as String).length, lessThanOrEqualTo(4096));
+      expect(big!['clipped'], isTrue);
+
+      p.print('short ok\r\n');
+      Map<String, Object?>? small;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('ok')),
+          fromNow: true,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => small = v),
+      );
+      p.print('all ok\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(small, {'match': 'ok', 'line': 'all ok'});
+    });
+  });
+
+  test('final I1: a clipped window never splits a surrogate pair', () {
+    fakeAsync((async) {
+      final p = FakeProbe(terminal: Terminal(maxLines: 8000)..resize(80, 5));
+      // Emoji (2 UTF-16 units each) all around the match, at both edges of
+      // any window.
+      final side = '\u{1F600}' * 6000;
+      p.print('${side}X$side\r\n');
+      Map<String, Object?>? r;
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('X')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).then((v) => r = v),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      final shown = r!['line']! as String;
+      expect(shown.length, lessThanOrEqualTo(4096));
+      expect(shown.contains('X'), isTrue);
+      final units = shown.codeUnits;
+      expect(units.first & 0xFC00, isNot(0xDC00)); // no lone low surrogate
+      expect(units.last & 0xFC00, isNot(0xD800)); // no lone high surrogate
+    });
+  });
+
+  test('M7: no output since the last look, no new look', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      final scans = <String>[];
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('never'), seen: scans),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).catchError((Object _) => <String, Object?>{}),
+      );
+      async.elapse(const Duration(milliseconds: 150));
+      for (var i = 0; i < 5; i++) {
+        p.ch.add(null); // a change elsewhere in the tab list
+        async.elapse(const Duration(milliseconds: 150));
+      }
+      expect(scans, hasLength(1));
+      p.print('\x1b[31mred\x1b[0m\r\n');
+      async.elapse(const Duration(milliseconds: 150));
+      expect(scans, hasLength(2));
+      expect(scans.last, 'red');
+    });
+  });
+
+  test('a client that goes away ends the wait at once (D21)', () {
+    fakeAsync((async) {
+      final gone = Completer<void>();
+      Object? err;
+      final timers = async.pendingTimers.length;
+      unawaited(
+        waitIdle(
+          FakeProbe(),
+          quiet: const Duration(milliseconds: 500),
+          timeout: const Duration(minutes: 60),
+          cancelled: gone.future,
+        ).catchError((Object e) {
+          err = e;
+          return <String, Object?>{};
+        }),
+      );
+      gone.complete();
+      async.flushMicrotasks();
+      expect(err, failure('cancelled'));
+      expect(async.pendingTimers.length, timers); // the 60-minute timer went
+    });
+  });
+
+  test('a pane that exits fails idle/match with exited', () {
+    fakeAsync((async) {
+      final p = FakeProbe();
+      final errs = <Object>[];
+      unawaited(
+        waitMatch(
+          p,
+          InlineScanner(RegExp('never')),
+          fromNow: false,
+          timeout: const Duration(seconds: 5),
+        ).catchError((Object e) {
+          errs.add(e);
+          return <String, Object?>{};
+        }),
+      );
+      unawaited(
+        waitIdle(
+          p,
+          quiet: const Duration(milliseconds: 500),
+          timeout: const Duration(seconds: 5),
+        ).catchError((Object e) {
+          errs.add(e);
+          return <String, Object?>{};
+        }),
+      );
+      p.exited = true;
+      p.ch.add(null);
+      async.elapse(const Duration(milliseconds: 150));
+      expect(errs, [failure('exited'), failure('exited')]);
+      expect(async.pendingTimers, isEmpty);
+    });
+  });
+
+  test('CommandInjector: pastes after the first cwd report, or after '
+      'quiet, at most 5 s', () {
+    fakeAsync((async) {
+      final p = FakeProbe()..hooked = false;
+      final pasted = <(int, String)>[];
+      final inj = CommandInjector((_) => p, (pane, text) {
+        pasted.add((pane, text));
+      });
+      inj.inject(7, 'npm run dev');
+      p.print('Last login…\r\n');
+      async.elapse(const Duration(milliseconds: 1400));
+      expect(pasted, isEmpty);
+      async.elapse(const Duration(milliseconds: 200)); // 1.5 s quiet
+      expect(pasted, [(7, 'npm run dev')]);
+
+      final q = FakeProbe()..hooked = false;
+      final pasted2 = <String>[];
+      CommandInjector((_) => q, (_, t) => pasted2.add(t)).inject(8, 'ls');
+      q.hooked = true; // first OSC 7
+      q.ch.add(null);
+      async.flushMicrotasks();
+      expect(pasted2, ['ls']);
+
+      final r = FakeProbe()..hooked = false;
+      final pasted3 = <String>[];
+      CommandInjector((_) => r, (_, t) => pasted3.add(t)).inject(9, 'x');
+      for (var i = 0; i < 10; i++) {
+        r.print('.');
+        async.elapse(const Duration(milliseconds: 500));
+      }
+      expect(pasted3, ['x']); // 5 s cap
+
+      final s = FakeProbe()..hooked = false;
+      final pasted4 = <String>[];
+      CommandInjector((_) => s, (_, t) => pasted4.add(t)).inject(10, 'y');
+      s.exited = true;
+      s.ch.add(null);
+      async.elapse(const Duration(seconds: 6));
+      expect(pasted4, isEmpty); // the shell is gone: nothing typed
+      expect(async.pendingTimers, isEmpty);
+    });
+  });
+}

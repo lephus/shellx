@@ -425,4 +425,89 @@ void main() {
     expect(unreadBadgeLabel(99), '99');
     expect(unreadBadgeLabel(100), '99+');
   });
+
+  test('A7 D23: command-line entries are history only', () async {
+    boot(active: true);
+    final arrivals = <AttentionArrival>[];
+    attention().arrivals.listen(arrivals.add);
+    final a = attention();
+    a.addCommandLine(title: 'cron', body: 'done');
+    final s = state();
+    expect(s.history.first.tabId, kCommandLineTabId);
+    expect(s.history.first.tabLabel, 'Command line');
+    expect(s.history.first.text(l10n()), 'cron: done');
+    expect(s.history.first.read, isFalse);
+    expect(s.unread, isEmpty);
+    expect(s.totalUnread, 0);
+    expect(a.jumpTo(kCommandLineTabId), isFalse); // raises the window only
+    // Announced as an arrival with its own title, for the system
+    // notification (treated as unfocused there).
+    expect(arrivals.single.tabId, kCommandLineTabId);
+    expect(arrivals.single.title, 'cron');
+    expect(arrivals.single.text, 'done');
+    // Never "Tab closed": tab 0 is never in the tab list.
+    await c.read(terminalTabsProvider.notifier).openTab();
+    await settle();
+    expect(state().history.first.closed, isFalse);
+    expect(state().history.first.read, isFalse);
+    a.markRead(kCommandLineTabId);
+    expect(state().history.first.read, isTrue);
+  });
+
+  test('A7 D23: mark all as read includes command-line entries', () {
+    boot();
+    attention().addCommandLine(body: 'one');
+    attention().markAllRead();
+    expect(state().history.single.read, isTrue);
+  });
+
+  test('A7 review I1: at most 10 command-line entries; they never push tab '
+      'entries out', () async {
+    boot();
+    for (var i = 0; i < 45; i++) {
+      local.notice(2, SessionNoticeKind.message, body: 't$i');
+    }
+    await settle();
+    for (var i = 0; i < 60; i++) {
+      attention().addCommandLine(body: '$i');
+    }
+    List<AttentionEntry> cli() => [
+      for (final e in state().history)
+        if (e.tabId == kCommandLineTabId) e,
+    ];
+    List<AttentionEntry> tab() => [
+      for (final e in state().history)
+        if (e.tabId != kCommandLineTabId) e,
+    ];
+    expect(cli().map((e) => e.notice.body), [
+      for (var i = 59; i >= 50; i--) '$i',
+    ]);
+    expect(tab(), hasLength(45));
+    expect(tab().last.notice.body, 't0');
+    // Tab notices keep their own 50.
+    for (var i = 45; i < 60; i++) {
+      local.notice(2, SessionNoticeKind.message, body: 't$i');
+    }
+    await settle();
+    expect(tab(), hasLength(TabAttention.historyLimit));
+    expect(tab().first.notice.body, 't59');
+    expect(cli(), hasLength(10));
+  });
+
+  test('A7 review M4: reading command-line entries announces tab 0 as read '
+      '(its system notification goes)', () {
+    boot();
+    final reads = <int>[];
+    attention().reads.listen(reads.add);
+    attention().markRead(kCommandLineTabId); // nothing unread
+    expect(reads, isEmpty);
+    attention().addCommandLine(body: 'a');
+    attention().markRead(kCommandLineTabId);
+    expect(reads, [kCommandLineTabId]);
+    attention().addCommandLine(body: 'b');
+    attention().markAllRead();
+    expect(reads, [kCommandLineTabId, kCommandLineTabId]);
+    attention().markAllRead();
+    expect(reads, hasLength(2));
+  });
 }

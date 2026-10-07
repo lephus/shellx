@@ -38,6 +38,12 @@ final class FakeLocalSessions implements LocalSessions {
 
   /// The `cwd` of each [open] call, in order (null when none was given).
   final openCwds = <String?>[];
+
+  /// The `tabId` of each [open] call (A7 D29).
+  final openTabIds = <int?>[];
+
+  /// Every [notify] call: (id, title, body).
+  final notified = <(int, String?, String)>[];
   final closed = <int>[];
   int nextId = 100;
 
@@ -46,6 +52,10 @@ final class FakeLocalSessions implements LocalSessions {
 
   /// When set, [open] waits for it.
   Completer<void>? openGate;
+
+  /// [open] with one of these `cwd`s waits for its completer (one open
+  /// held while others go through).
+  final cwdGates = <String, Completer<void>>{};
 
   /// Runs once [open] made session `id`, before it returns.
   void Function(int id)? afterOpen;
@@ -61,16 +71,34 @@ final class FakeLocalSessions implements LocalSessions {
   /// `SessionManager.open` does.
   bool notifyOnOpen = false;
 
+  /// When set, the next [sessions] listing throws it (once).
+  Object? nextListingError;
+
   @override
-  List<SessionSummary> get sessions => List.of(summaries);
+  List<SessionSummary> get sessions {
+    final error = nextListingError;
+    if (error != null) {
+      nextListingError = null;
+      throw error;
+    }
+    return List.of(summaries);
+  }
+
   @override
   Stream<void> get changes => _changes.stream;
 
   @override
-  Future<int> open({required int cols, required int rows, String? cwd}) async {
+  Future<int> open({
+    required int cols,
+    required int rows,
+    String? cwd,
+    int? tabId,
+  }) async {
     opens.add((cols, rows));
     openCwds.add(cwd);
+    openTabIds.add(tabId);
     await openGate?.future;
+    await cwdGates[cwd]?.future;
     final error = openError;
     if (error != null) throw error;
     if (failOpens.contains(cwd)) {
@@ -84,6 +112,14 @@ final class FakeLocalSessions implements LocalSessions {
     );
     afterOpen?.call(id);
     return id;
+  }
+
+  @override
+  bool notify(int id, {String? title, required String body}) {
+    notified.add((id, title, body));
+    if (!summaries.any((s) => s.id == id)) return false;
+    notice(id, SessionNoticeKind.message, title: title, body: body);
+    return true;
   }
 
   SessionSummary summary(
@@ -117,6 +153,33 @@ final class FakeLocalSessions implements LocalSessions {
     summaries.add(summary);
     views[summary.id] = FakeSessionView(summary.id, backlog);
     if (notify) _changes.add(null);
+  }
+
+  /// Session [id] starts or stops running a command (A1 D15); fires
+  /// [changes].
+  void setRunning(int id, bool running) => _update(id, running: running);
+
+  /// Session [id] reports a new working directory (A2); fires [changes].
+  void setCwd(int id, String cwd) => _update(id, cwd: cwd);
+
+  void _update(int id, {bool? running, String? cwd}) {
+    final s = summaries.firstWhere((s) => s.id == id);
+    replace(
+      SessionSummary(
+        id: s.id,
+        index: s.index,
+        shell: s.shell,
+        createdAt: s.createdAt,
+        attachedMobileId: s.attachedMobileId,
+        origin: s.origin,
+        title: s.title,
+        runningCommand: running ?? s.runningCommand,
+        driver: s.driver,
+        cwd: cwd ?? s.cwd,
+        gitBranch: s.gitBranch,
+        ports: s.ports,
+      ),
+    );
   }
 
   void replace(SessionSummary summary) {

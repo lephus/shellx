@@ -604,4 +604,158 @@ void main() {
       expect(r.length, before);
     });
   });
+
+  test('A7 D21: the exit codes of the last 64 sessions that ended are kept '
+      '(Task 7 review M8)', () async {
+    for (var id = 1; id <= 66; id++) {
+      local.add(local.summary(id));
+    }
+    boot();
+    for (var id = 1; id <= 66; id++) {
+      local.views[id]!.end(id % 2 == 0 ? 0 : id);
+    }
+    await pumpEventQueue();
+    expect(tabs().lastExitCode(1), isNull);
+    expect(tabs().lastExitCode(2), isNull);
+    expect(tabs().lastExitCode(3), 3);
+    expect(tabs().lastExitCode(4), 0);
+    expect(tabs().lastExitCode(66), 0);
+    expect(tabs().lastExitCode(65), 65);
+  });
+
+  test('A7 D29: a split opens with the tab id; a new tab with none', () async {
+    boot();
+    await tabs().openTab();
+    await tabs().split(SplitAxis.row);
+    expect(local.openTabIds, [null, 100]);
+  });
+
+  group('command-line opens (A7 D14, D15, D33)', () {
+    test('openTabFor: not selected unless asked; returns the tab id; '
+        'busy while another open is in flight', () async {
+      boot();
+      await tabs().openTab(); // 100, selected
+      expect(await tabs().openTabFor(cwd: '/w'), 101);
+      expect(local.openCwds.last, '/w');
+      expect(state().selectedId, 100);
+      expect(await tabs().openTabFor(select: true), 102);
+      expect(state().selectedId, 102);
+      local.openGate = Completer<void>();
+      final user = tabs().openTab();
+      await expectLater(tabs().openTabFor(), throwsA(isA<OpenBusyException>()));
+      await expectLater(
+        tabs().splitPaneFor(100, SplitAxis.row),
+        throwsA(isA<OpenBusyException>()),
+      );
+      local.openGate!.complete();
+      await user;
+      expect(state().opening, isFalse);
+    });
+
+    test('openTabFor: failures throw and leave no notice', () async {
+      boot();
+      local.openError = const SessionLimitException(32);
+      await expectLater(
+        tabs().openTabFor(),
+        throwsA(isA<SessionLimitException>()),
+      );
+      expect([state().notice, state().opening], [null, false]);
+    });
+
+    test('openTabFor: a shell that ended before it was placed is '
+        'PaneGoneException; the selection stays', () async {
+      boot();
+      await tabs().openTab(); // 100
+      local.afterOpen = (id) {
+        local.summaries.removeWhere((s) => s.id == id);
+      };
+      await expectLater(
+        tabs().openTabFor(select: true),
+        throwsA(isA<PaneGoneException>()),
+      );
+      expect(state().selectedId, 100);
+    });
+
+    test('a placement that throws still lets the sessions held back during '
+        'the open become tabs (A7 Task 6 review)', () async {
+      boot();
+      await tabs().openTab(); // 100
+      local.afterOpen = (id) {
+        // A desktop session appears while the open is pending: held (D5).
+        local.add(local.summary(200, origin: SessionOrigin.desktop));
+        local.nextListingError = StateError('listing failed');
+      };
+      await expectLater(tabs().openTabFor(), throwsA(isA<StateError>()));
+      expect(state().tabOfSession(200), isNotNull);
+      expect(state().opening, isFalse);
+    });
+
+    test('splitPaneFor an unselected tab: focus, zoom and selection stay; '
+        'the new pane is next in focus history', () async {
+      boot();
+      await tabs().openTab(); // 100
+      await tabs().split(SplitAxis.row); // 101, focused
+      tabs().toggleZoom(); // 101 zoomed
+      await tabs().openTab(); // 102, selected
+      final id = await tabs().splitPaneFor(100, SplitAxis.column, cwd: '/c');
+      expect(id, 103);
+      expect(local.openCwds.last, '/c');
+      expect(local.openTabIds.last, 100);
+      final t = state().tabOfSession(103)!;
+      expect(t.id, 100);
+      expect(t.focusedPaneId, 101);
+      expect(t.zoomedPaneId, 101);
+      expect(t.paneHistory, [101, 103, 100]);
+      expect(t.paneOrder, [100, 103, 101]);
+      expect(state().selectedId, 102);
+      expect(state().notice, isNull);
+    });
+
+    test('splitPaneFor with focus: the new pane is focused in its tab, the '
+        'selection stays', () async {
+      boot();
+      await tabs().openTab(); // 100
+      await tabs().openTab(); // 101, selected
+      final id = await tabs().splitPaneFor(100, SplitAxis.row, focus: true);
+      expect(state().tabOfSession(id)!.focusedPaneId, id);
+      expect(state().selectedId, 101);
+    });
+
+    test('splitPaneFor: no room and a gone pane throw; no notice, no '
+        'open', () async {
+      boot();
+      await tabs().openTab(); // 100
+      tabs().reportPaneMetrics(
+        const PaneMetrics(
+          area: Size(300, 150),
+          minPane: Size(176, 100),
+          divider: 1,
+        ),
+      );
+      await expectLater(
+        tabs().splitPaneFor(100, SplitAxis.row),
+        throwsA(isA<PaneNoRoomException>()),
+      );
+      await expectLater(
+        tabs().splitPaneFor(999, SplitAxis.row),
+        throwsA(isA<PaneGoneException>()),
+      );
+      expect(local.opens, hasLength(1));
+      expect(state().notice, isNull);
+    });
+
+    test('splitPaneFor whose tab closed meanwhile: an own tab, not '
+        'selected (D15)', () async {
+      boot();
+      await tabs().openTab(); // 100
+      await tabs().openTab(); // 101, selected
+      local.openGate = Completer<void>();
+      final split = tabs().splitPaneFor(100, SplitAxis.row);
+      tabs().close(100);
+      local.openGate!.complete();
+      expect(await split, 102);
+      expect(state().tabs.map((t) => t.id), [101, 102]);
+      expect(state().selectedId, 101);
+    });
+  });
 }

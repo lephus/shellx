@@ -123,7 +123,9 @@ AttentionListener listenForAttentionBadge({
   // only when the whole window is not active (D19).
   return listenAttention(
     container,
-    onArrival: (_) {
+    onArrival: (a) {
+      // A7 D23: a command-line entry wants no tab, so no flash.
+      if (a.tabId == kCommandLineTabId) return;
       if (!readWindowActive(container.read)) call(host.flash);
     },
   );

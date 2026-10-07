@@ -145,7 +145,13 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
       return;
     }
     widget.onClose();
-    ref.read(tabAttentionProvider.notifier).jumpTo(e.tabId);
+    final attention = ref.read(tabAttentionProvider.notifier);
+    if (e.tabId == kCommandLineTabId) {
+      // A7 D23: no tab to go to; the window is already in front.
+      attention.markRead(kCommandLineTabId);
+      return;
+    }
+    attention.jumpTo(e.tabId);
   }
 
   /// The list's keys (UI-A4 §5.3). Repeats move the cursor too.
@@ -240,7 +246,9 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
         1 -
         ShellxSizes.panelFooter;
     final overflows = items.length * extent > listMax;
-    final markAllEnabled = attention.totalUnread > 0;
+    final markAllEnabled =
+        attention.totalUnread > 0 ||
+        items.any((e) => e.tabId == kCommandLineTabId && !e.read);
     final cursor = _cursorIn(items);
     final keyboardRing =
         _list.hasFocus &&
@@ -254,7 +262,12 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
       final tab = byId[e.tabId];
       final gone =
           tab == null || (tab.isSplit && !tab.panes.containsKey(e.paneId));
-      final name = gone ? e.tabLabel : tab.noticeLabel(e.paneId);
+      // A7 D23: "Command line", in the language shown now.
+      final name = e.tabId == kCommandLineTabId
+          ? l10n.cliNoticeSource
+          : gone
+          ? e.tabLabel
+          : tab.noticeLabel(e.paneId);
       final ws = !e.closed && sidebar.showHeaders
           ? sidebar.workspaceOf(e.tabId)
           : null;

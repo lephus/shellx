@@ -116,16 +116,25 @@ final class SessionNotifier {
     }
   }
 
-  void _handle(OscEvent event) {
-    if (event is NotifyRequested) {
+  /// A program's message (OSC 9/777 or `shellx notify`, A7 D23).
+  void message({String? title, required String body}) {
+    try {
       final text = _text();
       _owner.sender.send(
         AgentNotification(
-          title: event.title ?? _title(text),
-          body: event.body,
+          title: title ?? _title(text),
+          body: body,
           data: _data('message'),
         ),
       );
+    } catch (_) {
+      // A notification must never break the session.
+    }
+  }
+
+  void _handle(OscEvent event) {
+    if (event is NotifyRequested) {
+      message(title: event.title, body: event.body);
       return;
     }
     final completed = _tracker.handle(event);

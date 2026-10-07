@@ -10,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../cli/cli_install.dart' show LoginPathHint;
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
@@ -18,6 +19,7 @@ import 'pane_layout.dart';
 import 'terminal_feed.dart';
 import 'terminal_style.dart';
 
+part 'terminal_tabs_panes.dart';
 part 'terminal_tabs_restore.dart';
 
 enum SpawnFailure { notFound, denied, other }
@@ -78,6 +80,54 @@ final class PaneNoRoomNotice extends TabNotice {
   const PaneNoRoomNotice();
 }
 
+/// A7 D26: the skill install command is on the clipboard. Neutral toast.
+final class CliSkillsCopiedNotice extends TabNotice {
+  const CliSkillsCopiedNotice();
+}
+
+/// A7 D8: `shellx` now works in other terminals — once "Allow other
+/// terminals" is ticked too (amendment; the two stay independent).
+/// Neutral toast.
+final class CliPathInstalledNotice extends TabNotice {
+  const CliPathInstalledNotice();
+}
+
+/// A7 D8: the install failed (or a `shellx` that is not ours is there):
+/// the folder to add to `PATH` by hand.
+final class CliPathFailedNotice extends TabNotice {
+  const CliPathFailedNotice(this.path);
+  final String path;
+}
+
+/// A7 ruling M10: installed, but the login shell's `PATH` lacks
+/// `/usr/local/bin`: the exact line to add, and where.
+final class CliPathNotOnPathNotice extends TabNotice {
+  const CliPathNotOnPathNotice(this.hint);
+  final LoginPathHint hint;
+}
+
+/// A7 D8: the removal failed: what to remove by hand.
+final class CliPathRemoveFailedNotice extends TabNotice {
+  const CliPathRemoveFailedNotice(this.path);
+  final String path;
+}
+
+/// A7 D33: another open of this window is in flight (`opening`).
+final class OpenBusyException implements Exception {
+  const OpenBusyException();
+}
+
+/// A3 D4 for a command-line split: the pane cannot hold two (no toast).
+final class PaneNoRoomException implements Exception {
+  const PaneNoRoomException();
+}
+
+/// The target pane is not here, or the new shell ended before it could be
+/// placed.
+final class PaneGoneException implements Exception {
+  const PaneGoneException();
+}
+
 /// What the pane area looks like (D4), reported by the terminal pane on
 /// every layout: the tab list needs pixels to refuse a split or clamp a
 /// divider.
@@ -112,6 +162,11 @@ String clipName(String text, int max) =>
     text.trim().characters.take(max).toString().trim();
 
 const Object _unset = Object();
+
+/// A7 D21, final ruling M2: how a session ended — its exit code, or
+/// [closed] when the user (or `shellx close`) closed it before it ended
+/// (no code then).
+typedef PaneEnd = ({int? exitCode, bool closed});
 
 /// One pane of a tab: one session's view (A3 D2). These are the fields the
 /// A1/A2 tab record had; the tab now holds one per pane.
@@ -417,6 +472,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// A5a D4: the session whose pane just received output.
   Stream<int> get paneOutputs => _paneOutputs.stream;
 
+  /// A7 D21: how the last 64 sessions that ended here ended (exit 0
+  /// removes the pane; `wait --exit` still reports it).
+  final _paneEnds = <int, PaneEnd>{};
+
   /// A5a D16: a restore is reopening saved panes.
   bool get restoring => _restoring != null;
 
@@ -446,8 +505,67 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   void reportGrid(TerminalGrid grid) => _grid = grid;
 
+  /// ⌘T, `+`: a selected tab; a failure is a toast.
   Future<void> openTab() async {
     if (state.opening) return;
+    try {
+      await openTabFor(select: true);
+    } on SessionLimitException catch (error) {
+      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (ref.mounted) {
+        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
+      }
+    } on PaneGoneException {
+      // The new shell is already gone: the selection that exists stays.
+    }
+  }
+
+  /// A new tab, placed like any desktop tab (the current workspace), or
+  /// straight into [workspace] when given (A7 D14: never passing through
+  /// the current one, nothing expanded — gone by then: Default); with
+  /// [select] it is selected, else the selection stays (A7 D14: the
+  /// command line does not take the keyboard). Returns its id. Throws
+  /// [OpenBusyException] while another open is in flight,
+  /// [SessionLimitException], [SpawnFailedException], and
+  /// [PaneGoneException] when the shell ended before it could be placed.
+  Future<int> openTabFor({
+    String? cwd,
+    bool select = false,
+    String? workspace,
+  }) => _guardedOpen(
+    () => _local.open(cols: _grid.cols, rows: _grid.rows, cwd: cwd),
+    (id) {
+      final placement = ref.read(restorePlacementProvider);
+      // Before the tab appears: the sidebar takes it as it places the tab.
+      if (workspace != null) placement.pending[id] = workspace;
+      // A5a D16: placed now, even while a restore's opens are pending.
+      _sync(own: id);
+      // The new shell may already be gone (exit 0, or ended before it
+      // could be viewed): then keep a selection that exists.
+      final opened = state.tabOfSession(id);
+      if (opened == null) placement.pending.remove(id);
+      if (select) {
+        if (opened != null) _restoreMaySelect = false;
+        _set(
+          selectedId:
+              opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
+        );
+      }
+      if (opened == null) throw const PaneGoneException();
+      return opened.id;
+    },
+  );
+
+  /// What every open of this window shares (A3 D5, A5a D16): one at a time
+  /// ([OpenBusyException] otherwise; `opening` meanwhile, the busy `+`);
+  /// desktop sessions that appear while [open] is pending wait for
+  /// [place], which syncs — and get their tabs anyway when the open fails.
+  Future<int> _guardedOpen(
+    Future<int> Function() open,
+    int Function(int id) place,
+  ) async {
+    if (state.opening) throw const OpenBusyException();
     _set(opening: true);
     _awaitingOpens++;
     var held = true;
@@ -457,34 +575,20 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       _awaitingOpens--;
     }
 
-    var synced = false;
+    var placed = false;
     try {
-      final id = await _local.open(cols: _grid.cols, rows: _grid.rows);
-      if (!ref.mounted) return;
+      final id = await open();
+      if (!ref.mounted) throw const PaneGoneException();
       release();
-      // A5a D16: placed now, even while a restore's opens are pending.
-      _sync(own: id);
-      synced = true;
-      // The new shell may already be gone (exit 0, or ended before it could
-      // be viewed): then keep a selection that exists.
-      final opened = state.tabOfSession(id);
-      if (opened != null) _restoreMaySelect = false;
-      _set(
-        selectedId:
-            opened?.id ?? state.selected?.id ?? state.tabs.firstOrNull?.id,
-      );
-    } on SessionLimitException catch (error) {
-      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
-    } on SpawnFailedException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
-      }
+      final tab = place(id);
+      placed = true; // [place] synced; a throw there falls back below.
+      return tab;
     } finally {
       release();
       if (ref.mounted) {
         // D5: desktop sessions held back while the open was pending get
         // their tabs now, even when the open failed.
-        if (!synced) _sync();
+        if (!placed) _sync();
         // Whatever happened (an unexpected error too), `+` is usable again.
         _set(opening: false);
       }
@@ -556,18 +660,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final tab = _tab(id);
     if (tab == null) return;
     for (final pane in tab.panes.values) {
-      if (!pane.exited) _local.close(pane.id);
+      if (!pane.exited) {
+        _local.close(pane.id);
+        _recordClose(pane.id);
+      }
     }
     _removeTab(id);
-  }
-
-  /// ⌘W on a split tab, the pane ×, "Đóng pane" (D6): the last pane closes
-  /// the tab.
-  void closePane(int sessionId) {
-    final pane = state.tabOfSession(sessionId)?.panes[sessionId];
-    if (pane == null) return;
-    if (!pane.exited) _local.close(sessionId);
-    _removePane(sessionId);
   }
 
   void dismissNotice() => _set(notice: null);
@@ -582,175 +680,6 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// A notice from outside the tab list (workspaces, port links).
   void showNotice(TabNotice notice) => _set(notice: notice);
-
-  // ---- panes (A3) -------------------------------------------------------
-
-  /// Stores the size for later decisions only: safe during layout.
-  void reportPaneMetrics(PaneMetrics metrics) => _metrics = metrics;
-
-  /// ⌘D / ⌘⇧D (D3): the selected tab's focused pane, in its directory
-  /// (D17), at half its grid; the new pane is focused.
-  Future<void> split(SplitAxis axis) async {
-    final tab = state.selected;
-    if (tab == null || state.opening) return;
-    final target = tab.focusedPaneId;
-    if (!_roomToSplit(tab, target, axis)) {
-      _set(notice: const PaneNoRoomNotice());
-      return;
-    }
-    final pane = tab.panes[target]!;
-    final grid = _halfGrid(pane, axis);
-    _set(opening: true);
-    _awaitingOpens++;
-    var held = true;
-    void release() {
-      if (!held) return;
-      held = false;
-      _awaitingOpens--;
-    }
-
-    var synced = false;
-    try {
-      final id = await _local.open(
-        cols: grid.cols,
-        rows: grid.rows,
-        cwd: pane.cwd,
-      );
-      if (!ref.mounted) return;
-      release();
-      _adoptPane(id, tabId: tab.id, target: target, axis: axis, size: grid);
-      synced = true; // [_adoptPane] synced.
-    } on SessionLimitException catch (error) {
-      if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
-    } on SpawnFailedException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
-      }
-    } finally {
-      release();
-      if (ref.mounted) {
-        // D5: as in [openTab], desktop sessions held back while the open
-        // was pending get their tabs now, even when the open failed.
-        if (!synced) _sync();
-        _set(opening: false);
-      }
-    }
-  }
-
-  /// A click in a pane, a jump to a notification: [sessionId]'s tab is
-  /// selected and the pane focused; a zoom that hides it ends (D10).
-  void focusPane(int sessionId) {
-    final tab = state.tabOfSession(sessionId);
-    if (tab == null) return;
-    final unzoom = tab.zoomedPaneId != null && tab.zoomedPaneId != sessionId;
-    if (tab.focusedPaneId != sessionId || unzoom) {
-      _replaceTab(
-        tab.copyWith(
-          focusedPaneId: sessionId,
-          paneHistory: [
-            sessionId,
-            ...tab.paneHistory.where((id) => id != sessionId),
-          ],
-          zoomedPaneId: unzoom ? null : tab.zoomedPaneId,
-        ),
-      );
-    }
-    if (state.selectedId != tab.id) {
-      _restoreMaySelect = false; // the user chose (A5a D10)
-      _set(selectedId: tab.id);
-    } else if (unzoom) {
-      _visibleChanged();
-    }
-  }
-
-  /// ⌘⌥arrows (D9). False when there is no pane that way.
-  bool focusDirection(PaneDirection direction) {
-    final tab = state.selected;
-    if (tab == null || !tab.isSplit) return false;
-    final next = neighbourPane(
-      tab.layout,
-      tab.focusedPaneId,
-      direction,
-      mru: tab.paneHistory,
-    );
-    if (next == null) return false;
-    if (tab.zoomedPaneId != null) {
-      _replaceTab(tab.copyWith(zoomedPaneId: null));
-      _visibleChanged();
-    }
-    focusPane(next);
-    return true;
-  }
-
-  /// ⌘⇧↩ (D10): the new state; a one-pane tab is never zoomed.
-  bool toggleZoom() {
-    final tab = state.selected;
-    if (tab == null || !tab.isSplit) return false;
-    final zoom = tab.zoomedPaneId == null;
-    _replaceTab(tab.copyWith(zoomedPaneId: zoom ? tab.focusedPaneId : null));
-    if (!zoom) _visibleChanged();
-    return zoom;
-  }
-
-  /// ⌘⌃= (D11). Unzooms first (D10, final ruling m-4): a layout change
-  /// the user cannot see would only surprise them later.
-  void equalize() {
-    final tab = state.selected;
-    if (tab == null || !tab.isSplit) return;
-    _replaceTab(
-      tab.copyWith(layout: equalized(tab.layout), zoomedPaneId: null),
-    );
-    if (tab.zoomedPaneId != null) _visibleChanged();
-  }
-
-  /// Double-click on a divider (D11).
-  void equalizeAt(int tabId, PanePath path) {
-    final tab = _tab(tabId);
-    if (tab == null || nodeAt(tab.layout, path) is! PaneSplit) return;
-    _replaceTab(tab.copyWith(layout: equalizedAt(tab.layout, path)));
-  }
-
-  /// A divider drag (D14): ignored when [path] is no longer a split (a
-  /// pane closed mid-drag), or is a split of another [axis] than the one
-  /// the drag began on (final ruling m-3: a close can hand the path to a
-  /// split across); clamped to the pixel minimums (D4).
-  void setRatio(int tabId, PanePath path, double ratio, {SplitAxis? axis}) {
-    final tab = _tab(tabId);
-    final node = tab == null ? null : nodeAt(tab.layout, path);
-    if (tab == null || node is! PaneSplit) return;
-    if (axis != null && node.axis != axis) return;
-    _replaceTab(
-      tab.copyWith(
-        layout: withRatio(tab.layout, path, _clampForPixels(tab, path, ratio)),
-      ),
-    );
-  }
-
-  /// ⌘⌃arrows (D12): the nearest split of the arrow's axis above the
-  /// focused pane moves [ShellxSizes.paneResizeStep] the arrow's way.
-  void resizeFocused(PaneDirection direction) {
-    final tab = state.selected;
-    if (tab == null || !tab.isSplit) return;
-    final sideways =
-        direction == PaneDirection.left || direction == PaneDirection.right;
-    final path = ancestorSplit(
-      tab.layout,
-      tab.focusedPaneId,
-      sideways ? SplitAxis.row : SplitAxis.column,
-    );
-    if (path == null) return;
-    final split = nodeAt(tab.layout, path)! as PaneSplit;
-    final forward =
-        direction == PaneDirection.right || direction == PaneDirection.down;
-    const step = ShellxSizes.paneResizeStep;
-    // D10, final ruling m-4: as a directional focus does, a resize shows
-    // the panes it changes.
-    if (tab.zoomedPaneId != null) {
-      _replaceTab(tab.copyWith(zoomedPaneId: null));
-      _visibleChanged();
-    }
-    setRatio(tab.id, path, split.ratio + (forward ? step : -step));
-  }
 
   // ---- internals --------------------------------------------------------
 
@@ -827,7 +756,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       return null; // Ended between the listing and now.
     }
     final terminal = DesktopTerminal(platform: _platform());
-    final feed = TerminalFeed(terminal.write);
+    // A pane output event (A5a D4, A7 waits) fires once the text is in the
+    // terminal; what [_attach] writes itself (saved text, backlog) is not
+    // output.
+    var live = false;
+    final feed = TerminalFeed((text) {
+      terminal.write(text);
+      if (live && !_paneOutputs.isClosed) _paneOutputs.add(s.id);
+    });
     final link = _Link(view, terminal, feed);
     _links[s.id] = link;
     // Size first, without telling the session: the backlog is laid out at
@@ -840,6 +776,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (restored != null) feed.add(utf8.encode(restored));
     feed.add(view.backlog);
     feed.drain();
+    live = true;
     // A5a D8: [onReply] is set only after the drain above — load-bearing.
     // Saved text holding a query (`ESC[6n`, `ESC[c`) is answered into
     // nothing; a reply must never reach the new shell.
@@ -858,12 +795,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       view.resize(cols, rows);
     };
     link.subscriptions
-      ..add(
-        view.output.listen((bytes) {
-          feed.add(bytes);
-          if (!_paneOutputs.isClosed) _paneOutputs.add(s.id);
-        }),
-      )
+      ..add(view.output.listen(feed.add))
       ..add(
         view.driver.listen(
           (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),
@@ -902,6 +834,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (!ref.mounted) return;
     final link = _links[id];
     if (link == null) return; // Already closed here.
+    _recordExit(id, code);
     if (code == 0 || link.view.closedOnRequest) {
       _removePane(id);
       return;
@@ -1004,154 +937,6 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       ),
     );
     if (unzoom && state.selectedId == tab.id) _visibleChanged();
-  }
-
-  /// D3: session [id] (opened by [split]) joins tab [tabId] next to
-  /// [target]. When it ended already, or its tab went while it opened, the
-  /// normal rules apply: a tab of its own, selected.
-  void _adoptPane(
-    int id, {
-    required int tabId,
-    required int target,
-    required SplitAxis axis,
-    required TerminalGrid size,
-  }) {
-    final summary = _local.sessions.where((s) => s.id == id).firstOrNull;
-    final tab = _tab(tabId);
-    if (summary == null || tab == null) {
-      _sync(own: id);
-      if (state.tabOfSession(id) case final own?) {
-        _restoreMaySelect = false;
-        _set(selectedId: own.id);
-      }
-      return;
-    }
-    final pane = _attach(summary, size: size);
-    if (pane == null) {
-      _sync(); // Ended between the listing and now; others may wait (D5).
-      return;
-    }
-    final at = tab.panes.containsKey(target) ? target : tab.paneOrder.first;
-    final wasZoomed = tab.zoomedPaneId != null;
-    _replaceTab(
-      tab.copyWith(
-        layout: splitPane(tab.layout, at, id, axis),
-        panes: {...tab.panes, id: pane},
-        focusedPaneId: id,
-        zoomedPaneId: null,
-        paneHistory: [id, ...tab.paneHistory],
-      ),
-    );
-    _sync();
-    // Final ruling m-1: a split that finishes after the user moved to
-    // another tab stays in its own tab; it never pulls the user back.
-    if (state.selectedId == tabId && wasZoomed) _visibleChanged();
-  }
-
-  /// D13 estimate; the real grid follows at the next layout.
-  TerminalGrid _halfGrid(PaneSession pane, SplitAxis axis) {
-    final cols = pane.terminal.viewWidth;
-    final rows = pane.terminal.viewHeight;
-    return axis == SplitAxis.row
-        ? (cols: max(1, (cols - 1) ~/ 2), rows: max(1, rows - 1))
-        : (cols: cols, rows: max(1, (rows - 1) ~/ 2 - 1));
-  }
-
-  /// D4: room for two minimum panes, in the pixels the pane really has
-  /// ([panePixelSizes]) and the halves the new split will really get
-  /// ([splitExtents] at 0.5: the first half is snapped, so a sum check can
-  /// leave the second one a pixel short — final ruling m-2).
-  bool _roomToSplit(TerminalTab tab, int target, SplitAxis axis) {
-    final m = _metrics;
-    if (m == null) return true;
-    final size = panePixelSizes(
-      tab.layout,
-      m.area,
-      m.divider,
-      m.devicePixelRatio,
-    )[target];
-    if (size == null) return false;
-    final row = axis == SplitAxis.row;
-    final (along, across) = row
-        ? (size.width, size.height)
-        : (size.height, size.width);
-    final (minAlong, minAcross) = row
-        ? (m.minPane.width, m.minPane.height)
-        : (m.minPane.height, m.minPane.width);
-    final (a, b) = splitExtents(along, 0.5, m.divider, m.devicePixelRatio);
-    return a >= minAlong && b >= minAlong && across >= minAcross;
-  }
-
-  /// D4: no pane of either side may end up below [PaneMetrics.minPane].
-  ///
-  /// Pixel contract ([splitExtents], the same function the pane view lays
-  /// out with): a split of extent E at ratio r gives its first child
-  /// `r·E` snapped to a device pixel, then the divider, then the rest. The
-  /// limits are whole device pixels, so the snapped layout at a limit
-  /// still holds every minimum.
-  ///
-  /// When the split cannot hold both sides at all (lo > hi), the ratio may
-  /// only move toward the point where both sides fall short by the same
-  /// number of pixels — a drag that relieves the more squeezed side works,
-  /// one that squeezes it further does not.
-  double _clampForPixels(TerminalTab tab, PanePath path, double ratio) {
-    final m = _metrics;
-    final node = nodeAt(tab.layout, path);
-    final size = m == null
-        ? null
-        : splitPixelSize(
-            tab.layout,
-            path,
-            m.area,
-            m.divider,
-            m.devicePixelRatio,
-          );
-    if (m == null || node is! PaneSplit || size == null) {
-      return clampRatio(ratio);
-    }
-    final row = node.axis == SplitAxis.row;
-    final extent = row ? size.width : size.height;
-    if (extent <= 0) return node.ratio;
-    final dpr = m.devicePixelRatio > 0 ? m.devicePixelRatio : 1.0;
-    // Tolerates float noise in a minimum that already is a device pixel.
-    const noise = 1e-9;
-    final firstMin =
-        (_minExtent(node.first, node.axis) * dpr - noise).ceilToDouble() / dpr;
-    final firstMax =
-        ((extent - m.divider - _minExtent(node.second, node.axis)) * dpr +
-                noise)
-            .floorToDouble() /
-        dpr;
-    final lo = firstMin / extent;
-    final hi = firstMax / extent;
-    if (lo <= hi) return clampRatio(ratio.clamp(lo, hi).toDouble());
-    final fair = (lo + hi) / 2;
-    final towards = node.ratio < fair
-        ? ratio.clamp(node.ratio, fair)
-        : ratio.clamp(fair, node.ratio);
-    return clampRatio(towards.toDouble());
-  }
-
-  /// The smallest extent along [axis] that keeps every pane of [node] at
-  /// its minimum, with [node]'s own ratios kept as they are. A nested
-  /// split's first side is snapped ([splitExtents]): it may lose up to half
-  /// a device pixel to rounding, and its second side may lose the same.
-  double _minExtent(PaneNode node, SplitAxis axis) {
-    final m = _metrics!;
-    final half = 0.5 / (m.devicePixelRatio > 0 ? m.devicePixelRatio : 1.0);
-    switch (node) {
-      case PaneLeaf():
-        return axis == SplitAxis.row ? m.minPane.width : m.minPane.height;
-      case PaneSplit(axis: final a, :final ratio, :final first, :final second)
-          when a == axis:
-        // snap(r·X) ≥ min(first); X − divider − snap(r·X) ≥ min(second).
-        return max(
-          (_minExtent(first, axis) + half) / ratio,
-          (_minExtent(second, axis) + m.divider + half) / (1 - ratio),
-        );
-      case PaneSplit(:final first, :final second):
-        return max(_minExtent(first, axis), _minExtent(second, axis));
-    }
   }
 
   /// D13: the selected tab's live panes, minus those a zoom hides.

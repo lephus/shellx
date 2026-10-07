@@ -108,6 +108,27 @@ final class ClearSavedScrollback extends TrayAction {
   const ClearSavedScrollback();
 }
 
+/// A7 D26: "Cho phép điều khiển ShellX bằng dòng lệnh".
+final class ToggleCliControl extends TrayAction {
+  const ToggleCliControl();
+}
+
+/// A7 amendment: "Cho phép terminal khác".
+final class ToggleCliAllowExternal extends TrayAction {
+  const ToggleCliAllowExternal();
+}
+
+/// A7 D8: "Cài lệnh shellx cho mọi terminal…" / "Gỡ lệnh shellx khỏi
+/// terminal khác".
+final class ToggleCliPath extends TrayAction {
+  const ToggleCliPath();
+}
+
+/// A7 D26: "Sao chép lệnh cài skill cho agent".
+final class CopySkillsCommand extends TrayAction {
+  const CopySkillsCommand();
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -143,6 +164,11 @@ abstract final class TrayKeys {
   static const String terminal = 'terminal';
   static const String restoreScrollback = 'restore_scrollback';
   static const String clearSavedScrollback = 'clear_saved_scrollback';
+  static const String commandLine = 'command_line';
+  static const String cliControl = 'cli_control';
+  static const String cliAllowExternal = 'cli_allow_external';
+  static const String cliPath = 'cli_path';
+  static const String cliSkills = 'cli_skills';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -198,6 +224,10 @@ TrayAction? trayActionForKey(String? key) {
       const ToggleDesktopNotificationsOnlyUnfocused(),
     TrayKeys.restoreScrollback => const ToggleRestoreScrollback(),
     TrayKeys.clearSavedScrollback => const ClearSavedScrollback(),
+    TrayKeys.cliControl => const ToggleCliControl(),
+    TrayKeys.cliAllowExternal => const ToggleCliAllowExternal(),
+    TrayKeys.cliPath => const ToggleCliPath(),
+    TrayKeys.cliSkills => const CopySkillsCommand(),
     _ => null,
   };
 }

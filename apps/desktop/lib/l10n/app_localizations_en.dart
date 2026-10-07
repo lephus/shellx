@@ -1101,4 +1101,62 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get cliNoticeSource => 'Command line';
+
+  @override
+  String get trayCommandLine => 'Command line';
+
+  @override
+  String get trayCliControl => 'Allow controlling ShellX from the command line';
+
+  @override
+  String get trayCliAllowExternal => 'Allow other terminals';
+
+  @override
+  String get trayCliInstallPath =>
+      'Install the shellx command for all terminals…';
+
+  @override
+  String get trayCliRemovePath =>
+      'Remove the shellx command from other terminals';
+
+  @override
+  String get trayCliCopySkills => 'Copy the agent skill install command';
+
+  @override
+  String get cliSkillsCopied =>
+      'Copied “shellx skills install” — paste it in a terminal';
+
+  @override
+  String get cliPathInstalled =>
+      'Installed the shellx command. To let other terminals control ShellX, also tick “Allow other terminals” in the tray’s Command line menu.';
+
+  @override
+  String cliPathFailed(String path) {
+    return 'Couldn’t install the shellx command. Add $path to your PATH.';
+  }
+
+  @override
+  String cliPathRemoveFailed(String path) {
+    return 'Couldn’t remove the shellx command. Remove $path yourself.';
+  }
+
+  @override
+  String get agentChip => 'Agent';
+
+  @override
+  String get agentChipTooltip =>
+      'A program is controlling this tab through the ShellX command line';
+
+  @override
+  String cliAnnounceAgent(String tab) {
+    return 'An agent is controlling $tab';
+  }
+
+  @override
+  String cliPathNotOnPath(String file, String line) {
+    return 'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to $file: $line';
+  }
 }

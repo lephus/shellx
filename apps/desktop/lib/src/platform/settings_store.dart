@@ -43,6 +43,16 @@ abstract final class SettingKeys {
   /// A5a D13: "Lưu nội dung terminal khi thoát" (default on).
   static const String terminalRestoreScrollback = 'terminal_restore_scrollback';
 
+  /// A7 D26: "Cho phép điều khiển ShellX bằng dòng lệnh" (default on).
+  static const String cliControlEnabled = 'cli_control_enabled';
+
+  /// A7 D8: the `shellx` link/PATH entry for other terminals is installed.
+  static const String cliPathInstalled = 'cli_path_installed';
+
+  /// A7 amendment: "Cho phép terminal khác" — clients without the
+  /// per-launch `SHELLX_CLI_TOKEN` get full access (default off).
+  static const String cliAllowExternal = 'cli_allow_external';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -61,6 +71,9 @@ abstract final class SettingKeys {
     desktopNotifications,
     desktopNotificationsOnlyUnfocused,
     terminalRestoreScrollback,
+    cliControlEnabled,
+    cliPathInstalled,
+    cliAllowExternal,
   };
 }
 

@@ -571,7 +571,9 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
       widget.notice is PaneNoRoomNotice ||
-      widget.notice is RestorePanesFailedNotice;
+      widget.notice is RestorePanesFailedNotice ||
+      widget.notice is CliSkillsCopiedNotice ||
+      widget.notice is CliPathInstalledNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -618,6 +620,14 @@ class _NoticeToastState extends State<NoticeToast> {
     NoUnreadNotice() => l10n.noUnreadNotifications,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
+    CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
+    CliPathInstalledNotice() => l10n.cliPathInstalled,
+    CliPathFailedNotice(:final path) => l10n.cliPathFailed(path),
+    CliPathNotOnPathNotice(:final hint) => l10n.cliPathNotOnPath(
+      hint.file,
+      hint.line,
+    ),
+    CliPathRemoveFailedNotice(:final path) => l10n.cliPathRemoveFailed(path),
   };
 
   @override

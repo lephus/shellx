@@ -25,10 +25,12 @@ fn uninstall_cleans_every_file_and_the_shellx_directories() {
     std::fs::write(home.join(".zshrc"), &zshrc).unwrap();
     std::fs::write(home.join(".bashrc"), &bashrc).unwrap();
     let shellx = home.join("Library/Application Support/ShellX");
-    for d in ["bin", "term"] {
+    for d in ["bin", "term", "cli"] {
         std::fs::create_dir_all(shellx.join(d)).unwrap();
     }
     std::fs::write(shellx.join("bin/shellx-term"), "x").unwrap();
+    // A7 D7: the command-line copy goes too.
+    std::fs::write(shellx.join("cli/shellx"), "x").unwrap();
 
     let out = run(&home);
     assert!(out.status.success(), "{out:?}");
@@ -44,6 +46,8 @@ fn uninstall_cleans_every_file_and_the_shellx_directories() {
     assert!(!bashrc_after.contains("ShellX") && bashrc_after.ends_with("alias l=ls\r\n"));
     assert!(!home.join(".bash_profile").exists());
     assert!(!shellx.join("bin").exists() && !shellx.join("term").exists());
+    assert!(!shellx.join("cli").exists());
+    assert!(stdout.contains("ShellX/cli"), "{stdout}");
 
     let again = run(&home);
     assert!(again.status.success());

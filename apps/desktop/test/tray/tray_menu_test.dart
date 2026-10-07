@@ -65,6 +65,8 @@ void main() {
       'Khởi động cùng hệ thống',
       'Terminal',
       'Thông báo',
+      // A7 D26 (A6 absent: no "Trình duyệt" before it).
+      'Dòng lệnh',
       'Đổi mật khẩu…',
       'Đăng xuất',
       'Thoát',
@@ -180,8 +182,8 @@ void main() {
     expect(menu.items![3].label, 'Tải ShellX 1.1.0…');
   });
 
-  test('signed-out menu offers the window, notifications, sign in and quit '
-      'only (A4 D20, UI-A4 §7)', () {
+  test('signed-out menu offers the window, notifications, the command line, '
+      'sign in and quit only (A4 D20, UI-A4 §7, A7 D26)', () {
     final menu = buildTrayMenu(
       const AgentViewState(phase: AuthPhase.signedOut),
       vi,
@@ -192,6 +194,7 @@ void main() {
       '---',
       'Terminal',
       'Thông báo',
+      'Dòng lệnh',
       '---',
       '○ Chưa đăng nhập',
       '---',

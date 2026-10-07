@@ -1,5 +1,7 @@
 //! `shellx-term uninstall`: removes the ShellX integration block from every
-//! shell config file and deletes the `bin` directory (spec §5.1, §10.2, §10.6).
+//! shell config file and deletes the `bin` directory (spec §5.1, §10.2, §10.6),
+//! and the command line's `cli` directory with our `/usr/local/bin/shellx`
+//! link (A7 D7, D8).
 //!
 //! Only the lines from the begin marker to the end marker are removed; the
 //! rest of each file is kept byte for byte, in its own encoding (UTF-8, UTF-8
@@ -11,6 +13,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub const BEGIN: &str = "# >>> ShellX >>>";
+/// A7 D8 (macOS): the link "Install the shellx command for all terminals…"
+/// creates.
+pub const SYSTEM_LINK: &str = "/usr/local/bin/shellx";
 pub const END: &str = "# <<< ShellX <<<";
 
 /// What `remove_block` found.
@@ -164,6 +169,22 @@ pub fn bin_dir(home: &Path, local_app_data: Option<&Path>, windows: bool) -> Pat
     shellx_dir(home, local_app_data, windows).join("bin")
 }
 
+/// A7 D7: the command line's copy of the binary.
+pub fn cli_dir(home: &Path, local_app_data: Option<&Path>, windows: bool) -> PathBuf {
+    shellx_dir(home, local_app_data, windows).join("cli")
+}
+
+/// What became of [`SYSTEM_LINK`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum LinkOutcome {
+    Removed,
+    Missing,
+    /// A file, or a link that does not point into our `cli` folder.
+    NotOurs,
+    /// Ours, but removing it needs more rights; no prompt (reason).
+    Left(String),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum FileOutcome {
     Removed,
@@ -192,6 +213,9 @@ pub struct Report {
     pub profiles_unknown: bool,
     pub bin: (PathBuf, DirOutcome),
     pub term: (PathBuf, DirOutcome),
+    pub cli: (PathBuf, DirOutcome),
+    /// macOS only.
+    pub link: Option<(PathBuf, LinkOutcome)>,
 }
 
 impl Report {
@@ -201,6 +225,7 @@ impl Report {
             || self.file_problem()
             || matches!(self.bin.1, DirOutcome::Failed(_))
             || matches!(self.term.1, DirOutcome::Failed(_))
+            || matches!(self.cli.1, DirOutcome::Failed(_))
     }
 
     fn file_problem(&self) -> bool {
@@ -217,6 +242,11 @@ impl Report {
                 .all(|(_, o)| matches!(o, FileOutcome::NoBlock | FileOutcome::Missing))
             && self.bin.1 == DirOutcome::Missing
             && self.term.1 == DirOutcome::Missing
+            && self.cli.1 == DirOutcome::Missing
+            && self
+                .link
+                .as_ref()
+                .is_none_or(|(_, o)| matches!(o, LinkOutcome::Missing | LinkOutcome::NotOurs))
     }
 }
 
@@ -262,7 +292,18 @@ impl fmt::Display for Report {
             }
         }
         describe(f, &self.bin.0, &self.bin.1)?;
-        describe(f, &self.term.0, &self.term.1)
+        describe(f, &self.term.0, &self.term.1)?;
+        describe(f, &self.cli.0, &self.cli.1)?;
+        match &self.link {
+            Some((path, LinkOutcome::Removed)) => writeln!(f, "Removed {}", path.display()),
+            Some((path, LinkOutcome::Left(why))) => writeln!(
+                f,
+                "Left {} ({why}); remove it with: sudo rm {}",
+                path.display(),
+                path.display()
+            ),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -377,13 +418,45 @@ fn delete_dir(dir: &Path, windows: bool, running: Option<&Path>) -> DirOutcome {
     }
 }
 
+/// Removes `link` only when it is a symlink whose target lies inside
+/// `cli` (a relative target is read from the link's folder). Never a file,
+/// never a link elsewhere; best effort, no prompt.
+fn remove_link(link: &Path, cli: &Path) -> LinkOutcome {
+    let meta = match std::fs::symlink_metadata(link) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return LinkOutcome::Missing,
+        Err(e) => return LinkOutcome::Left(e.to_string()),
+    };
+    if !meta.file_type().is_symlink() {
+        return LinkOutcome::NotOurs;
+    }
+    let Ok(target) = std::fs::read_link(link) else {
+        return LinkOutcome::NotOurs;
+    };
+    let target = match link.parent() {
+        Some(dir) if target.is_relative() => dir.join(target),
+        _ => target,
+    };
+    // Component-wise: `cli-x/shellx` is not inside `cli`.
+    if !target.starts_with(cli) || target.components().any(|c| c.as_os_str() == "..") {
+        return LinkOutcome::NotOurs;
+    }
+    match std::fs::remove_file(link) {
+        Ok(()) => LinkOutcome::Removed,
+        Err(e) => LinkOutcome::Left(e.to_string()),
+    }
+}
+
 /// Does the whole uninstall. `home` is `None` on Windows when the user
 /// profile folder is unknown (the PowerShell profiles are then skipped).
+/// `system_link` is [`SYSTEM_LINK`] on macOS (a test folder in tests),
+/// `None` on Windows.
 pub fn run_with(
     home: Option<&Path>,
     local_app_data: Option<&Path>,
     windows: bool,
     running: Option<&Path>,
+    system_link: Option<&Path>,
 ) -> Report {
     let files: Vec<(PathBuf, FileOutcome)> = home
         .map(|home| config_files(home, windows))
@@ -395,11 +468,11 @@ pub fn run_with(
         })
         .collect();
     let base = shellx_dir(home.unwrap_or(Path::new("")), local_app_data, windows);
-    let (bin, term) = (base.join("bin"), base.join("term"));
+    let (bin, term, cli) = (base.join("bin"), base.join("term"), base.join("cli"));
     let problem = files
         .iter()
         .any(|(_, o)| matches!(o, FileOutcome::Failed(_) | FileOutcome::Skipped(_)));
-    let (bin_outcome, term_outcome) = if problem {
+    let (bin_outcome, term_outcome, cli_outcome) = if problem {
         // Keep the binary: the user fixes the file and runs this again.
         let keep = |dir: &Path| match std::fs::symlink_metadata(dir) {
             Ok(_) => {
@@ -407,24 +480,37 @@ pub fn run_with(
             }
             Err(_) => DirOutcome::Missing,
         };
-        (keep(&bin), keep(&term))
+        (keep(&bin), keep(&term), keep(&cli))
     } else {
         (
             delete_dir(&bin, windows, running),
             delete_dir(&term, windows, running),
+            delete_dir(&cli, windows, running),
         )
     };
+    // Our link points into `cli`, which is gone or going: a dangling link
+    // to it is still ours.
+    let link = system_link.map(|link| (link.to_path_buf(), remove_link(link, &cli)));
     Report {
         files,
         profiles_unknown: home.is_none(),
         bin: (bin, bin_outcome),
         term: (term, term_outcome),
+        cli: (cli, cli_outcome),
+        link,
     }
 }
 
 pub fn run(home: Option<&Path>, local_app_data: Option<&Path>) -> Report {
     let running = std::env::current_exe().ok();
-    run_with(home, local_app_data, cfg!(windows), running.as_deref())
+    let link = (!cfg!(windows)).then(|| Path::new(SYSTEM_LINK));
+    run_with(
+        home,
+        local_app_data,
+        cfg!(windows),
+        running.as_deref(),
+        link,
+    )
 }
 
 /// Entry point of the subcommand: prints the summary, returns the exit code.
@@ -595,6 +681,11 @@ mod tests {
             bin_dir(home, None, false),
             Path::new("/h/Library/Application Support/ShellX/bin")
         );
+        assert_eq!(
+            cli_dir(home, None, false),
+            Path::new("/h/Library/Application Support/ShellX/cli")
+        );
+        assert_eq!(SYSTEM_LINK, "/usr/local/bin/shellx");
     }
 
     #[test]
@@ -603,10 +694,12 @@ mod tests {
         let shellx = root.join("ShellX");
         std::fs::create_dir_all(shellx.join("bin")).unwrap();
         std::fs::create_dir_all(shellx.join("term")).unwrap();
-        let report = run_with(None, Some(&root), true, None);
+        let report = run_with(None, Some(&root), true, None, None);
         assert!(report.profiles_unknown && report.has_errors());
         assert_eq!(report.bin.1, DirOutcome::Removed);
         assert_eq!(report.term.1, DirOutcome::Removed);
+        assert_eq!(report.cli.1, DirOutcome::Missing);
+        assert!(report.link.is_none());
         assert!(report
             .to_string()
             .contains("Skipped the PowerShell profiles"));
@@ -627,7 +720,7 @@ mod tests {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
         fn run_home(home: &Path) -> Report {
-            run_with(Some(home), None, false, None)
+            run_with(Some(home), None, false, None, None)
         }
 
         #[test]
@@ -726,6 +819,110 @@ mod tests {
                 std::fs::read(home.join(".bashrc")).unwrap(),
                 content.as_bytes()
             );
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        fn run_link(home: &Path, link: &Path) -> Report {
+            run_with(Some(home), None, false, None, Some(link))
+        }
+
+        #[test]
+        fn deletes_cli_and_our_usr_local_bin_link() {
+            let home = temp("cli");
+            let cli = cli_dir(&home, None, false);
+            std::fs::create_dir_all(&cli).unwrap();
+            std::fs::write(cli.join("shellx"), "x").unwrap();
+            let bin = home.join("usr-local-bin");
+            std::fs::create_dir_all(&bin).unwrap();
+            let link = bin.join("shellx");
+            std::os::unix::fs::symlink(cli.join("shellx"), &link).unwrap();
+
+            let report = run_link(&home, &link);
+            assert!(!report.has_errors(), "{report}");
+            assert_eq!(report.cli.1, DirOutcome::Removed);
+            assert_eq!(report.link.as_ref().unwrap().1, LinkOutcome::Removed);
+            assert!(!cli.exists());
+            assert!(std::fs::symlink_metadata(&link).is_err());
+            let text = report.to_string();
+            assert!(text.contains("Deleted") && text.contains("/cli"), "{text}");
+            assert!(
+                text.contains(&format!("Removed {}", link.display())),
+                "{text}"
+            );
+
+            let again = run_link(&home, &link);
+            assert!(again.to_string().contains("nothing to remove"));
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn never_removes_a_file_or_a_link_pointing_elsewhere() {
+            let home = temp("cli-other");
+            let cli = cli_dir(&home, None, false);
+            std::fs::create_dir_all(&cli).unwrap();
+            let bin = home.join("usr-local-bin");
+            std::fs::create_dir_all(&bin).unwrap();
+            let link = bin.join("shellx");
+
+            // A regular file of some other tool.
+            std::fs::write(&link, "other").unwrap();
+            let report = run_link(&home, &link);
+            assert_eq!(report.link.as_ref().unwrap().1, LinkOutcome::NotOurs);
+            assert_eq!(std::fs::read(&link).unwrap(), b"other");
+            std::fs::remove_file(&link).unwrap();
+
+            // A link elsewhere, and one into a look-alike folder (`cli-x`).
+            let lookalike = cli.with_file_name("cli-x");
+            for target in [
+                Path::new("/opt/other/shellx").to_path_buf(),
+                lookalike.join("shellx"),
+            ] {
+                std::fs::create_dir_all(&cli).unwrap();
+                std::os::unix::fs::symlink(&target, &link).unwrap();
+                let report = run_link(&home, &link);
+                assert!(!report.has_errors());
+                assert_eq!(report.link.as_ref().unwrap().1, LinkOutcome::NotOurs);
+                assert_eq!(std::fs::read_link(&link).unwrap(), target);
+                std::fs::remove_file(&link).unwrap();
+            }
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn a_link_that_needs_root_is_left_and_its_path_printed() {
+            let home = temp("cli-root");
+            let cli = cli_dir(&home, None, false);
+            std::fs::create_dir_all(&cli).unwrap();
+            let bin = home.join("usr-local-bin");
+            std::fs::create_dir_all(&bin).unwrap();
+            let link = bin.join("shellx");
+            std::os::unix::fs::symlink(cli.join("shellx"), &link).unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o555)).unwrap();
+            let report = run_link(&home, &link);
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+            if std::fs::symlink_metadata(&link).is_ok() {
+                // Not root: no prompt, the link stays and the user is told.
+                assert!(matches!(
+                    report.link.as_ref().unwrap().1,
+                    LinkOutcome::Left(_)
+                ));
+                let text = report.to_string();
+                assert!(
+                    text.contains(&format!("sudo rm {}", link.display())),
+                    "{text}"
+                );
+                assert!(!report.has_errors());
+            }
+            let _ = std::fs::remove_dir_all(&home);
+        }
+
+        #[test]
+        fn no_link_at_all_is_nothing() {
+            let home = temp("cli-none");
+            let link = home.join("usr-local-bin/shellx");
+            let report = run_link(&home, &link);
+            assert_eq!(report.link.as_ref().unwrap().1, LinkOutcome::Missing);
+            assert!(report.to_string().contains("nothing to remove"));
             let _ = std::fs::remove_dir_all(&home);
         }
 

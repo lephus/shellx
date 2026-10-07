@@ -88,3 +88,30 @@ test('an update asks a running ShellX to quit (A5a I1) before the taskkill fallb
   assert.match(wait, /Sleep\(QuitPollMs\)/);
   assert.match(wait, /ShellXRunning\(\)/);
 });
+
+test('uninstall removes the shellx command (A7 D7, D8): the cli folder and our HKCU Path entry', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\cli"/);
+  const step = iss.match(/procedure CurUninstallStepChanged[\s\S]*?\nend;/)?.[0] ?? '';
+  // At usUninstall (before the files go), from the user's own Path only.
+  assert.match(step, /CurUninstallStep = usUninstall/);
+  assert.match(step, /RemoveCliFromUserPath\(\)/);
+  const remove = iss.match(/procedure RemoveCliFromUserPath[\s\S]*?\nend;/)?.[0] ?? '';
+  assert.ok(remove, 'RemoveCliFromUserPath must exist');
+  assert.match(remove, /RegQueryStringValue\(HKEY_CURRENT_USER, 'Environment', 'Path', /);
+  assert.match(remove, /ExpandConstant\('\{localappdata\}\\ShellX\\cli'\)/);
+  // Case-insensitive, every copy, a trailing backslash ignored; written back as REG_EXPAND_SZ.
+  assert.match(remove, /CompareText\(/);
+  assert.match(remove, /RegWriteExpandStringValue\(HKEY_CURRENT_USER, 'Environment', 'Path', /);
+  // Nothing written when our entry is not there.
+  assert.match(remove, /if Changed then/);
+  // M4: every other entry stays byte for byte, empty segments included: no entry is skipped,
+  // separators are re-added between the kept entries only.
+  assert.doesNotMatch(remove, /if Entry = '' then/);
+  assert.match(remove, /if not First then\s+NewPath := NewPath \+ ';';/);
+  // New terminals learn of it (WM_SETTINGCHANGE from the uninstaller).
+  assert.match(iss, /^ChangesEnvironment=yes$/m);
+});
+
+test('uninstall deletes the command-line host folder (A5b D5 / A7 D30)', () => {
+  assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\mux"/);
+});

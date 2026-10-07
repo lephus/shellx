@@ -277,6 +277,59 @@ void main() {
     expect(rig.pty(0).resizes, isEmpty);
   });
 
+  group('A7 D29 pane environment', () {
+    test('a new tab session gets its own id as pane and tab', () async {
+      final rig = SessionRig();
+      final id = await rig.manager.open(cols: 80, rows: 24);
+      final env = rig.pty(0).environment;
+      expect(env['SHELLX_PANE_ID'], '$id');
+      expect(env['SHELLX_TAB_ID'], '$id');
+      expect(env['PATH'], '/usr/bin');
+    });
+
+    test('a split passes the tab id; a phone session is its own tab', () async {
+      final rig = SessionRig();
+      final first = await rig.manager.open(cols: 80, rows: 24);
+      final second = await rig.manager.open(cols: 40, rows: 24, tabId: first);
+      expect(rig.pty(1).environment['SHELLX_PANE_ID'], '$second');
+      expect(rig.pty(1).environment['SHELLX_TAB_ID'], '$first');
+      final phoneId = await rig.open(phone);
+      expect(rig.pty(2).environment['SHELLX_PANE_ID'], '$phoneId');
+      expect(rig.pty(2).environment['SHELLX_TAB_ID'], '$phoneId');
+    });
+  });
+
+  group('A7 D23 notify', () {
+    test(
+      'a live session reports a message notice; unknown ids are false',
+      () async {
+        final rig = SessionRig();
+        final id = await rig.manager.open(cols: 80, rows: 24);
+        final notices = <SessionNotice>[];
+        rig.manager.notices.listen(notices.add);
+        expect(rig.manager.notify(id, title: 'CI', body: 'Build xong'), isTrue);
+        expect(rig.manager.notify(id + 999, body: 'x'), isFalse);
+        await Future<void>.delayed(Duration.zero);
+        expect(notices.single.sessionId, id);
+        expect(notices.single.kind, SessionNoticeKind.message);
+        expect(notices.single.title, 'CI');
+        expect(notices.single.body, 'Build xong');
+      },
+    );
+
+    test('shares the 30-per-minute limiter with OSC notices (A4 D6)', () async {
+      final rig = SessionRig();
+      final id = await rig.manager.open(cols: 80, rows: 24);
+      final notices = <SessionNotice>[];
+      rig.manager.notices.listen(notices.add);
+      for (var i = 0; i < 31; i++) {
+        rig.manager.notify(id, body: '$i');
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(notices, hasLength(30));
+    });
+  });
+
   group('open(cwd:) (A3 D17)', () {
     test('an existing absolute directory is the working directory', () async {
       final probed = <String>[];

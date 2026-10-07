@@ -73,6 +73,11 @@ void main() {
     await pumpEventQueue(); // fake notices arrive asynchronously
     expect(host.unread.last, (2, '2 unread notifications'));
     expect(host.flashes, 2); // window inactive
+    // A7 D23: a command-line entry neither counts nor flashes.
+    c.read(tabAttentionProvider.notifier).addCommandLine(body: 'cron');
+    await pumpEventQueue();
+    expect(host.flashes, 2);
+    expect(host.unread.last.$1, 2);
     final calls = host.unread.length;
     c.read(windowRouterProvider.notifier).showTerminal();
     expect(host.unread.length, calls + 1); // re-applied on show

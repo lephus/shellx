@@ -41,10 +41,11 @@ final class RestoreOutcome {
   int get tabsRestored => tabIdByKey.length;
 }
 
-/// A5a criterion 1: where a restored tab goes in the sidebar. The tab
-/// list writes [pending] just before the tab appears; the sidebar takes
-/// the entry when it places the tab — in its saved workspace (null or
-/// gone: Default), without expanding anything. The sidebar sets [isShown]
+/// A5a criterion 1: where a restored tab goes in the sidebar — and A7 D14,
+/// where a command-line tab with a target workspace goes. The tab list
+/// writes [pending] just before the tab appears; the sidebar takes the
+/// entry when it places the tab — in that workspace (null or gone:
+/// Default), without expanding anything. The sidebar sets [isShown]
 /// while it exists, so restore's D10 fallback picks a tab the user sees.
 final class RestorePlacement {
   final pending = <int, String?>{};
@@ -86,18 +87,26 @@ extension _Restore on TerminalTabs {
         if (!alive()) break;
         final grids = _restoreGrids(saved.layout, _grid);
         final sessionByKey = <String, int>{};
-        for (final pane in savedLeaves(saved.layout)) {
+        // A7 D29: the creating pane first — its session id becomes the tab
+        // id — and the others are told that id. When it fails, they open
+        // without one (their SHELLX_TAB_ID then names no tab: residual).
+        final leaves = savedLeaves(saved.layout);
+        final creator = leaves.where((p) => p.key == saved.key).firstOrNull;
+        int? tabId;
+        for (final pane in [?creator, ...leaves.where((p) => p != creator)]) {
           if (!alive()) break;
           final id = await _openForRestore(
             local,
             pane.cwd,
             grids[pane.key]!,
             plan.textByKey[pane.key],
+            tabId: tabId,
           );
           if (id == null) {
             failed++;
             continue;
           }
+          if (pane == creator) tabId = id;
           sessionByKey[pane.key] = id;
           keyBySession[id] = pane.key;
         }
@@ -214,11 +223,17 @@ extension _Restore on TerminalTabs {
     LocalSessions local,
     String? cwd,
     TerminalGrid grid,
-    String? text,
-  ) async {
+    String? text, {
+    int? tabId,
+  }) async {
     _awaitingOpens++;
     try {
-      final id = await local.open(cols: grid.cols, rows: grid.rows, cwd: cwd);
+      final id = await local.open(
+        cols: grid.cols,
+        rows: grid.rows,
+        cwd: cwd,
+        tabId: tabId,
+      );
       // Held before the count drops: a change event of this open must
       // never make the session a tab of its own.
       if (identical(_local, local)) {

@@ -7,12 +7,13 @@ import 'package:shellx_core/shellx_core.dart';
 const int _blockLength = 64;
 const DartSha256 _sha256 = DartSha256();
 
-Uint8List _hash(List<int> data) =>
+/// SHA-256 of [data] (synchronous; also names the Windows mux pipe).
+Uint8List sha256Bytes(List<int> data) =>
     Uint8List.fromList(_sha256.hashSync(data).bytes);
 
 /// RFC 2104 HMAC-SHA256.
 Uint8List hmacSha256(List<int> key, List<int> data) {
-  final normalized = key.length > _blockLength ? _hash(key) : key;
+  final normalized = key.length > _blockLength ? sha256Bytes(key) : key;
   final inner = Uint8List(_blockLength);
   final outer = Uint8List(_blockLength);
   for (var i = 0; i < _blockLength; i++) {
@@ -20,10 +21,10 @@ Uint8List hmacSha256(List<int> key, List<int> data) {
     inner[i] = k ^ 0x36;
     outer[i] = k ^ 0x5c;
   }
-  return _hash(
+  return sha256Bytes(
     concatBytes([
       outer,
-      _hash(concatBytes([inner, data])),
+      sha256Bytes(concatBytes([inner, data])),
     ]),
   );
 }
