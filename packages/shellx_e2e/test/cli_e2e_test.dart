@@ -488,9 +488,13 @@ void main() {
       expect(await sh(['ls']), exits(3, stderr: 'ShellX is not running'));
     });
 
-    for (final (who, token) in [('no token', null), ('a wrong token', 'x')]) {
+    // Final ruling M1: a token that is not this launch's says so.
+    for (final (who, token, hint) in [
+      ('no token', null, _hint),
+      ('a wrong token', 'x', 'This shell belongs to an earlier ShellX launch'),
+    ]) {
       test('$who (an outside terminal): api.version and a pane-less notify '
-          'only; everything else → exit 6 with the tray hint', () async {
+          'only; everything else → exit 6 with its hint', () async {
         expect(await sh(['notify', 'from', 'cron'], token: token), exits(0));
         expect(ui.appNotices, [(null, 'from cron')]);
         for (final args in [
@@ -502,7 +506,7 @@ void main() {
         ]) {
           expect(
             await sh(args, token: token),
-            exits(6, stderr: _hint),
+            exits(6, stderr: hint),
             reason: args.join(' '),
           );
         }
