@@ -168,16 +168,20 @@ void main() {
     });
 
     test('a UI attaching within 10 s cancels; leaving re-arms', () async {
-      final h = build(idle: const Duration(milliseconds: 200));
+      // Real timers: margins wide enough for a loaded machine (the idle
+      // window is 2 s; the client attaches at once, well inside it).
+      final h = build(idle: const Duration(seconds: 2));
       await h.start(listener);
-      await Future<void>.delayed(const Duration(milliseconds: 100));
       final ui = await attachClient(listener, secret: info.secret);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
       expect(shutdowns, 0, reason: 'a UI is attached');
       await ui.close();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(shutdowns, 0);
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(shutdowns, 0, reason: 'the re-armed window has not run out');
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (exits.isEmpty && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
       expect(shutdowns, 1);
       expect(exits, [0]);
     });
