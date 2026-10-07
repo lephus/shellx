@@ -141,20 +141,101 @@ fn run_real(parsed: &args::Parsed) -> i32 {
 
 /// D23 (2): `$SHELLX_TERM` names this terminal — the window is shared with
 /// the phone by `shellx-term wrap` (Unix: its tty path; Windows:
-/// `conpty:<pid>`).
+/// `conpty:<pid>`). Unix (review M3): compared with the terminal the OSC
+/// goes to — the controlling terminal, which `/dev/tty` opens — not with
+/// whatever stdin is (`echo x | shellx notify` has a pipe there).
+/// `ttyname` of the opened `/dev/tty` cannot be used: it answers
+/// "/dev/tty" (macOS checked), so the device numbers are compared.
 #[allow(clippy::let_and_return)] // one binding per platform
 fn shared_terminal(get: &dyn Fn(&str) -> Option<String>) -> bool {
     let Some(term) = get("SHELLX_TERM") else {
         return false;
     };
     #[cfg(unix)]
-    let shared = {
-        // SAFETY: ttyname returns null or a pointer to a static buffer that
-        // stays valid until the next ttyname call (none in between).
-        let name = unsafe { libc::ttyname(0) };
-        !name.is_null() && unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy() == term
-    };
+    let shared = same_terminal(std::path::Path::new(&term), controlling_tty());
     #[cfg(windows)]
     let shared = term.starts_with("conpty:");
     shared
+}
+
+/// `path` is the character device `ctty` (a device number).
+#[cfg(unix)]
+fn same_terminal(path: &std::path::Path, ctty: Option<u64>) -> bool {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt};
+    match (std::fs::metadata(path), ctty) {
+        (Ok(m), Some(dev)) => m.file_type().is_char_device() && m.rdev() == dev,
+        _ => false,
+    }
+}
+
+/// The controlling terminal's device number, or `None` without one.
+#[cfg(target_os = "macos")]
+fn controlling_tty() -> Option<u64> {
+    // SAFETY: proc_pidinfo writes at most `size` bytes into `info`, a
+    // plain C struct for which all-zero bytes are valid.
+    let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
+    let size = std::mem::size_of::<libc::proc_bsdinfo>() as libc::c_int;
+    let got = unsafe {
+        libc::proc_pidinfo(
+            libc::getpid(),
+            libc::PROC_PIDTBSDINFO,
+            0,
+            (&mut info as *mut libc::proc_bsdinfo).cast(),
+            size,
+        )
+    };
+    // NODEV is all ones.
+    (got == size && info.e_tdev != u32::MAX).then_some(u64::from(info.e_tdev))
+}
+
+/// The controlling terminal's device number (`tty_nr` of /proc/self/stat).
+#[cfg(all(unix, not(target_os = "macos")))]
+fn controlling_tty() -> Option<u64> {
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    // After "pid (comm) ": state ppid pgrp session tty_nr …
+    let rest = &stat[stat.rfind(')')? + 1..];
+    let nr: u64 = rest.split_whitespace().nth(4)?.parse().ok()?;
+    if nr == 0 {
+        return None;
+    }
+    let major = ((nr >> 8) & 0xfff) as libc::c_uint;
+    let minor = ((nr & 0xff) | ((nr >> 12) & 0xfff00)) as libc::c_uint;
+    #[allow(clippy::useless_conversion)] // dev_t is u64 or u32 by platform
+    Some(u64::from(libc::makedev(major, minor)))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::MetadataExt;
+
+    #[test]
+    fn shared_means_the_controlling_terminal_device() {
+        let null = std::path::Path::new("/dev/null");
+        let dev = std::fs::metadata(null).unwrap().rdev();
+        assert!(same_terminal(null, Some(dev)));
+        assert!(!same_terminal(null, Some(dev + 1)));
+        assert!(!same_terminal(null, None));
+        assert!(!same_terminal(
+            std::path::Path::new("/nonexistent/tty"),
+            Some(dev)
+        ));
+        // A regular file is never a terminal, whatever its numbers.
+        let file = std::env::temp_dir();
+        assert!(!same_terminal(
+            &file,
+            Some(std::fs::metadata(&file).unwrap().rdev())
+        ));
+    }
+
+    #[test]
+    fn the_controlling_terminal_is_the_one_stdin_names_when_it_is_one() {
+        // Meaningful under a terminal (`script -q /dev/null cargo test …`);
+        // without one there is nothing to compare.
+        use std::io::IsTerminal;
+        if std::io::stdin().is_terminal() {
+            let dev = std::fs::metadata("/dev/stdin").unwrap().rdev();
+            assert_eq!(controlling_tty(), Some(dev));
+        }
+    }
 }
