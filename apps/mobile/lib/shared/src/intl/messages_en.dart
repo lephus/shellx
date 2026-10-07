@@ -20,11 +20,14 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'en';
 
-  static String m0(email) => "Deletes the account ${email} with all its devices and pairings.";
+  static String m0(email) =>
+      "Deletes the account ${email} with all its devices and pairings.";
 
-  static String m1(site) => "Install ShellX on your computer (macOS or Windows) from ${site}.";
+  static String m1(site) =>
+      "Install ShellX on your computer (macOS or Windows) from ${site}.";
 
-  static String m2(menu) => "Click the ShellX icon, choose ${menu}, then scan the code.";
+  static String m2(menu) =>
+      "Click the ShellX icon, choose ${menu}, then scan the code.";
 
   static String m3(reason) => "Couldn\'t start the shell: ${reason}";
 
@@ -32,7 +35,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m5(day, month, time) => "${month}/${day}, ${time}";
 
-  static String m6(count) => "${Intl.plural(count, one: '1 minute ago', other: '${count} minutes ago')}";
+  static String m6(count) =>
+      "${Intl.plural(count, one: '1 minute ago', other: '${count} minutes ago')}";
 
   static String m7(time) => "today, ${time}";
 
@@ -42,9 +46,11 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m10(when) => "Last online: ${when}";
 
-  static String m11(count) => "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
+  static String m11(count) =>
+      "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
 
-  static String m12(name) => "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
+  static String m12(name) =>
+      "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
 
   static String m13(count) =>
       "${Intl.plural(count, one: '1 more character needed.', other: '${count} more characters needed.')}";
@@ -65,19 +71,24 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m19(method) => "Lock with ${method}";
 
-  static String m20(name) => "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
+  static String m20(name) =>
+      "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
 
   static String m21(version, build) => "ShellX ${version} (${build})";
 
-  static String m22(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
+  static String m22(terms, privacy) =>
+      "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m23(length) => "Password must be at least ${length} characters.";
+  static String m23(length) =>
+      "Password must be at least ${length} characters.";
 
   static String m24(length) => "Must be at most ${length} characters.";
 
   static String m25(length) => "Must be at least ${length} characters.";
 
-  static String m26(target) => "To: ${target}";
+  static String m26(lines) => "Showing the last ${lines} lines";
+
+  static String m27(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -473,6 +484,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
+    "viewAsTextCopyAll": MessageLookupByLibrary.simpleMessage("Copy all"),
+    "viewAsTextEmpty": MessageLookupByLibrary.simpleMessage(
+      "Nothing to show yet",
+    ),
+    "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
+    "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
+    "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
+    "viewAsTextTruncated": m26,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -517,7 +536,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-    "voiceTarget": m26,
+    "voiceTarget": m27,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

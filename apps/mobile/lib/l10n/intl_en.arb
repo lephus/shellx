@@ -430,5 +430,12 @@
   "settingsThemeDark": "Dark",
   "settingsTerms": "Terms of use",
   "settingsPrivacy": "Privacy policy",
-  "settingsLicenses": "Open-source licences"
+  "settingsLicenses": "Open-source licences",
+  "viewAsTextTooltip": "View as text",
+  "viewAsTextTitle": "Terminal text",
+  "viewAsTextCopyAll": "Copy all",
+  "viewAsTextRefresh": "Refresh",
+  "viewAsTextEmpty": "Nothing to show yet",
+  "viewAsTextTruncated": "Showing the last {lines} lines",
+  "@viewAsTextTruncated": {"placeholders": {"lines": {"type": "int"}}}
 }

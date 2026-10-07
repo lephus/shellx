@@ -15,6 +15,7 @@ import 'package:shellx_mobile/features/terminal/presentation/terminal_shortcuts.
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/session_picker.dart';
+import 'package:shellx_mobile/features/terminal/presentation/widgets/view_as_text_sheet.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
 import 'package:shellx_mobile/features/voice/presentation/widgets/mic_button.dart';
 import 'package:shellx_mobile/features/voice/presentation/widgets/voice_composer.dart';
@@ -224,6 +225,13 @@ class _TerminalPageState extends State<TerminalPage> {
     }
   }
 
+  /// A10 D28: the active tab's recent text in a sheet the user can select from.
+  void _showViewAsText() {
+    final tab = _controller.workspace.activeTab.peek();
+    if (tab == null) return;
+    unawaited(showViewAsTextSheet(context, tab.terminal.peek()));
+  }
+
   /// No dimming barrier: the terminal above the sheet stays readable and shows each size live.
   Future<void> _showFontSize() => showModalBottomSheet<void>(
     context: context,
@@ -328,6 +336,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _ViewAsTextButton(onPressed: _showViewAsText),
                       _FontSizeButton(onPressed: _showFontSize),
                       IconButton(
                         tooltip: S.of(context).keyboardTooltip,
@@ -342,7 +351,13 @@ class _TerminalPageState extends State<TerminalPage> {
                     _ChromeBar(
                       onBack: () => context.router.maybePop(),
                       title: _TitleBlock(name: widget.machineName, controller: _controller),
-                      trailing: _FontSizeButton(onPressed: _showFontSize),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ViewAsTextButton(onPressed: _showViewAsText),
+                          _FontSizeButton(onPressed: _showFontSize),
+                        ],
+                      ),
                     ),
                     _TabStrip(
                       workspace: workspace,
@@ -511,6 +526,21 @@ class _ChromeBar extends StatelessWidget {
     _ when ready => (strings.terminalConnected, context.colors.okDot),
     _ => (strings.terminalConnecting, TerminalColors.yellow),
   };
+}
+
+/// A10 D28: opens "View as text" for the active tab.
+class _ViewAsTextButton extends StatelessWidget {
+  const _ViewAsTextButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: const ValueKey('view-as-text'),
+    tooltip: S.of(context).viewAsTextTooltip,
+    onPressed: onPressed,
+    icon: const Icon(Icons.article_outlined, color: TerminalColors.cyan),
+  );
 }
 
 /// "Aa": the font size sheet.

@@ -1184,6 +1184,54 @@ void main() {
     });
   });
 
+  group('A10 D28: view as text', () {
+    Finder button() => find.byKey(const ValueKey('view-as-text'));
+
+    testWidgets('the sheet shows the recent text, selectable, and Copy all copies it', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('git status\r\nXin chào  \r\n\r\n'));
+      await tester.pump();
+      final copied = mockClipboard(tester);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      final body = tester.widget<SelectableText>(find.byKey(const ValueKey('view-as-text-body')));
+      expect(body.data, 'git status\nXin chào');
+      await tester.tap(find.byKey(const ValueKey('view-as-text-copy')));
+      await tester.pumpAndSettle();
+      expect(copied, ['git status\nXin chào']);
+    });
+
+    testWidgets('Refresh takes a new snapshot; an empty terminal says so', (tester) async {
+      await open(tester);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('view-as-text-empty')), findsOneWidget);
+      expect(tester.widget<TextButton>(find.byKey(const ValueKey('view-as-text-copy'))).onPressed, isNull);
+      machine.handles.single.emit(const TabOutput('later output'));
+      await tester.tap(find.byKey(const ValueKey('view-as-text-refresh')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SelectableText>(find.byKey(const ValueKey('view-as-text-body'))).data, 'later output');
+    });
+
+    testWidgets('opening and closing the sheet never resizes the terminal on the computer', (tester) async {
+      await open(tester);
+      final before = machine.resizes.length;
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10)); // the barrier
+      await tester.pumpAndSettle();
+      expect(machine.resizes.length, before);
+    });
+
+    testWidgets('the button is in landscape too', (tester) async {
+      tester.view.physicalSize = const Size(2532, 1170);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await open(tester, portrait: false);
+      expect(button(), findsOneWidget);
+    });
+  });
+
   group('voice composer', () {
     Finder mic() => find.byKey(const ValueKey('voice-mic'));
 
