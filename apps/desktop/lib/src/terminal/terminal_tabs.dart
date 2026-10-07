@@ -486,6 +486,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// its backlog. Consumed by [_attach].
   final _restoreText = <int, String>{};
 
+  /// A8 D29: the summary of a server session restore just opened, kept in
+  /// case the session ends before its tab is built (offline start): the
+  /// leaf is then built as a lost pane, not dropped.
+  final _restoreRemote = <int, SessionSummary>{};
+
   /// A5a D16: completes when the running restore ends; null when none runs.
   Completer<void>? _restoring;
 
@@ -1092,6 +1097,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     // Sessions of the old [LocalSessions]: nothing to hold or write now.
     _restoreHeld.clear();
     _restoreText.clear();
+    _restoreRemote.clear();
     // A rebuild reuses this notifier and keeps the stream; only a real
     // dispose leaves the ref unmounted once this turn is over.
     scheduleMicrotask(() {

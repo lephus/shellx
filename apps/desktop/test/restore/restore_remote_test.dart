@@ -240,7 +240,8 @@ void main() {
     expect(persistence.keyOf(fresh), key);
   });
 
-  test('a replacement of a pane never keyed does not throw (B17)', () async {
+  test('a replacement of a pane never keyed moves nothing and does not '
+      'throw (B17)', () async {
     local.add(
       local.summary(
         1,
@@ -249,8 +250,82 @@ void main() {
       ),
     );
     boot(extra: [restoreStoreProvider.overrideWithValue(RecordingFiles())]);
-    container.read(restorePersistenceProvider.notifier).start();
+    final persistence = container.read(restorePersistenceProvider.notifier)
+      ..start();
     await lose(1, 255);
-    expect(await tabs().reconnect(1), isNotNull);
+    final fresh = (await tabs().reconnect(1))!;
+    // No key was carried over: the new pane gets one of its own, kept.
+    final key = persistence.keyOf(fresh);
+    expect(isPaneKey(key), isTrue);
+    expect(persistence.keyOf(fresh), key);
+    expect(persistence.keyOf(1), isNot(key));
+  });
+
+  test('a tmux pane is captured with its session name and no create flag; '
+      'restore attaches that session', () async {
+    local.add(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        remote: SessionRemote(
+          launch: TmuxLaunch('main', host: devbox, create: true),
+          connected: true,
+        ),
+      ),
+    );
+    boot();
+    final saved = capture({1: k1});
+    final launch = savedLeaves(saved.tabs.single.layout).single.launch!;
+    expect(launch, TmuxLaunch('main', host: devbox));
+    final json = launch.toJson();
+    expect(json['session'], 'main');
+    expect(json.containsKey('create'), isFalse);
+
+    local = FakeLocalSessions();
+    boot();
+    await tabs().restore(
+      RestorePlan(
+        snapshot: snap(SavedPane(key: k1, launch: launch)),
+        textByKey: const {},
+      ),
+    );
+    expect(local.openLaunches, [TmuxLaunch('main', host: devbox)]);
+    expect(local.openCwds, [null]);
+  });
+
+  test('offline start: a server session that ends before its tab is built '
+      'stays as a lost pane, reconnects, and is saved again (D29)', () async {
+    boot();
+    local.afterOpen = (id) {
+      if (local.openLaunches.last != null) {
+        // As the real manager does: gone from the listing, no view left.
+        local.summaries.removeWhere((s) => s.id == id);
+        local.views.remove(id);
+      }
+    };
+    final out = await tabs().restore(
+      RestorePlan(snapshot: snap(twoPanes()), textByKey: {k1: 'old line\r\n'}),
+    );
+    expect(out.panesFailed, 0);
+    final tab = state().tabs.single;
+    expect(tab.paneCount, 2);
+    final sshId = out.keyBySession.entries.firstWhere((e) => e.value == k1).key;
+    final lost = tab.panes[sshId]!;
+    expect(lost.remoteState, RemoteState.failed);
+    expect(lost.canReconnect, isTrue);
+    expect(text(tab), contains('old line'));
+    expect(text(tab), contains('connect to devbox'));
+    final again = capture({sshId: k1, out.keyBySession.keys.last: k2});
+    expect(
+      savedLeaves(
+        again.tabs.single.layout,
+      ).firstWhere((p) => p.key == k1).launch,
+      SshLaunch(devbox, remoteCwd: '/srv/app'),
+    );
+    local.afterOpen = null;
+    final fresh = await tabs().reconnect(sshId);
+    expect(fresh, isNotNull);
+    expect(local.openLaunches.last, SshLaunch(devbox, remoteCwd: '/srv/app'));
+    expect(state().tabs.single.panes[fresh]!.remote, isNotNull);
   });
 }

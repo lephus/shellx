@@ -243,6 +243,19 @@ extension _Restore on TerminalTabs {
       if (identical(_local, local)) {
         _restoreHeld.add(id);
         if (text != null) _restoreText[id] = text;
+        if (launch != null) {
+          _restoreRemote[id] =
+              local.sessions.where((s) => s.id == id).firstOrNull ??
+              SessionSummary(
+                id: id,
+                index: 1,
+                shell: 'ssh',
+                createdAt: DateTime.now(),
+                attachedMobileId: null,
+                origin: SessionOrigin.desktop,
+                remote: SessionRemote(launch: launch),
+              );
+        }
       }
       return id;
     } on SessionLimitException {
@@ -275,9 +288,15 @@ extension _Restore on TerminalTabs {
     for (final id in paneIds(layout)) {
       _restoreHeld.remove(id);
       final summary = summaries[id];
-      final pane = summary == null
+      var pane = summary == null
           ? null
           : _attach(summary, size: grids[keyOf[id]]);
+      // A8 D29: a server session that is gone already (no network) stays
+      // as a lost pane the user can reconnect, never dropped.
+      final remote = _restoreRemote.remove(id);
+      if (pane == null && remote != null) {
+        pane = _lostRemotePane(remote, grids[keyOf[id]]);
+      }
       if (pane == null) {
         ended.add(id);
         _restoreText.remove(id);
@@ -309,5 +328,40 @@ extension _Restore on TerminalTabs {
     _ref.read(restorePlacementProvider).pending[tab.id] = workspaceId;
     _set(tabs: [..._state.tabs, tab]);
     return tab;
+  }
+
+  /// A pane for a server session that ended before it could be attached:
+  /// the saved text, then the "couldn't connect" line; Enter reconnects
+  /// (UI-A8 §3.2). Nothing to write to: there is no session behind it.
+  PaneSession _lostRemotePane(SessionSummary s, TerminalGrid? size) {
+    final terminal = DesktopTerminal(
+      platform: _platform(),
+      maxLines: _ref.read(shellxConfigProvider).config.scrollbackLimit,
+      inputHandler: _inputHandler,
+    );
+    final grid = size ?? _grid;
+    terminal.resize(grid.cols, grid.rows);
+    final restored = _restoreText.remove(s.id);
+    if (restored != null) terminal.write(restored);
+    final host = s.remote!.hostKey!;
+    final newline = terminal.buffer.cursorX == 0 ? '' : '\r\n';
+    final line = _ref.read(appL10nProvider).sshFailedLine(host);
+    terminal.write('$newline\x1b[2m$line\x1b[0m\x1b[?25l');
+    terminal.onUserInput = (data) => _onUserInput(s.id, data);
+    return PaneSession(
+      id: s.id,
+      index: s.index,
+      shell: s.shell,
+      title: s.title,
+      origin: s.origin,
+      phoneAttached: false,
+      runningCommand: false,
+      driver: s.driver,
+      terminal: terminal,
+      selection: TerminalController(),
+      cwd: s.cwd,
+      remote: s.remote,
+      exitCode: 255,
+    );
   }
 }
