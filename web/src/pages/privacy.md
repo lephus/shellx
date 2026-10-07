@@ -3,7 +3,7 @@ layout: ../layouts/Legal.astro
 lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
-description: ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu và quyền của bạn.
+description: "ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu, mã hóa đầu cuối bảo vệ nội dung terminal ra sao, và cách xóa tài khoản của bạn."
 updated: "2026-10-07"
 ---
 
