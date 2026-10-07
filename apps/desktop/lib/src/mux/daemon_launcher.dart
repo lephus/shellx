@@ -82,7 +82,7 @@ final class DaemonLauncher implements DaemonConnector {
   /// one (null: none answered). A daemon of another protocol is reported as
   /// [Incompatible] whatever it holds.
   Future<DaemonConnection?> findRunning() async {
-    final found = await _tryAttach();
+    final found = await _tryAttach(probe: true);
     if (found == null) return null;
     return _classify(found, started: false, replaceEmpty: false);
   }
@@ -140,7 +140,7 @@ final class DaemonLauncher implements DaemonConnector {
     return _connect(replaceEmpty: false);
   }
 
-  Future<(MuxClient, MuxPeerInfo)?> _tryAttach() async {
+  Future<(MuxClient, MuxPeerInfo)?> _tryAttach({bool probe = false}) async {
     final ep = await endpoint.read();
     if (ep == null) return null;
     MuxConnection? c;
@@ -155,7 +155,10 @@ final class DaemonLauncher implements DaemonConnector {
         role: 'ui',
         timeout: attempt,
       );
-      return (MuxClient(c, early: info.early, onRequest: onRequest), info);
+      return (
+        MuxClient(c, early: info.early, onRequest: probe ? null : onRequest),
+        info,
+      );
     } on Object {
       try {
         await c?.close();

@@ -10,6 +10,12 @@ final class RestorePanesFailedNotice extends TabNotice {
   final int count;
 }
 
+/// A5b: "Thoát hoàn toàn" could not stop the background service; the
+/// window stays open (UI-A5 §7.2 follow-up).
+final class DaemonQuitFailedNotice extends TabNotice {
+  const DaemonQuitFailedNotice();
+}
+
 /// What restore needs: the checked snapshot and, per pane key, the saved
 /// text already followed by its divider (A5a D8).
 final class RestorePlan {
@@ -230,9 +236,15 @@ extension _Restore on TerminalTabs {
     }
     // Tabs nobody claimed (sessions opened while the window was away, by a
     // phone or the command line) stay as the one-pane tabs they are.
-    final rest = [
+    // A live tab a saved tab only partly claimed keeps its other panes, one
+    // single-pane tab each (as [_merge] makes them): none is hidden.
+    final rest = <TerminalTab>[
       for (final tab in _state.tabs)
-        if (!tab.panes.keys.any(claimed.contains)) tab,
+        if (!tab.panes.keys.any(claimed.contains))
+          tab
+        else
+          for (final pane in tab.panes.values)
+            if (!claimed.contains(pane.id)) TerminalTab.single(pane),
     ];
     final selected = snapshot.selectedTab == null
         ? null

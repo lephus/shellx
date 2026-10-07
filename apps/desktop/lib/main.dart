@@ -239,6 +239,7 @@ Future<void> _start(
           SettingKeys.backgroundService,
           defaultValue: false,
         ),
+        daemonLockFree: () => MuxLock.isFree(cli!.mux),
         findRunning: launcher.findRunning,
         quit: (client) => _quitService(client, cli!.mux),
       );

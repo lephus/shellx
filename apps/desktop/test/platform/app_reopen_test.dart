@@ -196,4 +196,23 @@ void main() {
     expect(swift, contains('quitAllRequested'));
     expect(swift, contains('#selector(NSApplication.terminate(_:))'));
   });
+
+  test('AppDelegate.swift: the headless service declines a Dock or Apple Event '
+      'quit (shells survive); only a power-off ends it', () {
+    final swift = File('macos/Runner/AppDelegate.swift').readAsStringSync();
+    expect(
+      swift,
+      contains(
+        'if isDaemon { return quitIsForPowerOff ? .terminateNow : .terminateCancel }',
+      ),
+    );
+    final launch = swift.substring(
+      swift.indexOf('override func applicationDidFinishLaunching'),
+      swift.indexOf('@objc private func willPowerOff'),
+    );
+    final observer = launch.indexOf('willPowerOffNotification');
+    final daemonBranch = launch.indexOf('if isDaemon {');
+    expect(observer, greaterThanOrEqualTo(0));
+    expect(observer, lessThan(daemonBranch));
+  });
 }

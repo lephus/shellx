@@ -201,4 +201,41 @@ void main() {
     await persistence.flushAll(clean: true);
     expect(files.layouts.last.daemon, 'i1');
   });
+
+  test('a live tab partly claimed by a saved tab: its unclaimed panes stay, '
+      'one single-pane tab each', () async {
+    // Live tab {5, 6} (a split opened elsewhere); the snapshot only has 5.
+    local.summaries.clear();
+    local.views.clear();
+    for (final id in [5, 6]) {
+      local.add(
+        local.summary(id, origin: SessionOrigin.desktop),
+        notify: false,
+      );
+    }
+    boot();
+    final tabs0 = c.read(terminalTabsProvider);
+    expect(tabs0.tabs, hasLength(2));
+    final one = RestoreSnapshot(
+      savedAt: DateTime(2026, 10, 7, 14, 31),
+      cleanExit: true,
+      daemon: 'i1',
+      selectedTab: k5,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [k5]),
+      ],
+      tabs: [
+        SavedTab(
+          key: k5,
+          focused: k5,
+          layout: SavedPane(key: k5, cwd: '/w', session: 5),
+        ),
+      ],
+    );
+    await c
+        .read(restorePersistenceProvider.notifier)
+        .restoreAtStartup(RestoreLoad(snapshot: one), daemonInstance: 'i1');
+    expect(tabsState().tabs.map((t) => t.id), [5, 6]);
+    expect(tabsState().tabs.every((t) => t.panes.length == 1), isTrue);
+  });
 }

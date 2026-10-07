@@ -25,6 +25,10 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    // Also for the headless service: a log out must not be declined.
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self, selector: #selector(willPowerOff(_:)),
+      name: NSWorkspace.willPowerOffNotification, object: nil)
     if isDaemon {
       let engine = FlutterEngine(name: "shellx-mux", project: nil, allowHeadlessExecution: true)
       engine.run(withEntrypoint: "daemonMain")
@@ -33,9 +37,6 @@ class AppDelegate: FlutterAppDelegate {
       daemonEngine = engine
       return
     }
-    NSWorkspace.shared.notificationCenter.addObserver(
-      self, selector: #selector(willPowerOff(_:)),
-      name: NSWorkspace.willPowerOffNotification, object: nil)
     super.applicationDidFinishLaunching(notification)
   }
 
@@ -119,7 +120,10 @@ class AppDelegate: FlutterAppDelegate {
   // exit(0), which never comes back here. Log out / shut down is never held
   // up for more than 3 s: Dart saves the restore files first (A5a D18).
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if isDaemon { return .terminateNow }
+    // The service holds the user's shells: a Dock or Apple Event quit
+    // (same bundle id as the window) must not end it. It exits through
+    // `daemon.quit`, SIGTERM or the idle exit, all of which bypass this.
+    if isDaemon { return quitIsForPowerOff ? .terminateNow : .terminateCancel }
     if quitIsForPowerOff || poweringOff {
       guard AppChannel.isReady else { return .terminateNow }
       var replied = false

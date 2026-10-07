@@ -291,7 +291,7 @@ class DaemonStateNotifier extends Notifier<DaemonUiState> {
   void dismissStrip() => state = state.copyWith(strip: null, retrying: false);
 
   /// The window is going away: a closing connection is not a lost service.
-  void markQuitting() => _quitting = true;
+  void markQuitting([bool quitting = true]) => _quitting = quitting;
 
   /// "Thoát hoàn toàn": asks the service to stop. True when it answered, or
   /// the link ended right after we asked (the service exits as it replies);

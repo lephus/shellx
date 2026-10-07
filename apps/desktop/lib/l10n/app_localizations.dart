@@ -3041,6 +3041,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Applies the next time ShellX starts.'**
   String get backgroundServiceNextLaunch;
+
+  /// No description provided for @daemonQuitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The background service didn\'t stop. Try again.'**
+  String get daemonQuitFailed;
 }
 
 class _AppLocalizationsDelegate

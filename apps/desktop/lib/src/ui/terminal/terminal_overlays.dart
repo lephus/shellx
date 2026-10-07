@@ -651,6 +651,7 @@ class _NoticeToastState extends State<NoticeToast> {
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
+    DaemonQuitFailedNotice() => l10n.daemonQuitFailed,
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
     CliPathInstalledNotice() => l10n.cliPathInstalled,
     CliPathFailedNotice(:final path) => l10n.cliPathFailed(path),

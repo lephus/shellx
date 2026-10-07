@@ -8,6 +8,7 @@ import 'package:shellx_desktop/src/mux/daemon_state.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/restore/restore_persistence.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -187,6 +188,25 @@ void main() {
       expect(daemon.quits, 1);
       expect(h.quits, 1);
     });
+
+    test(
+      'a service that does not stop: the window stays open and says so',
+      () async {
+        await boot(ids: const []);
+        daemon.onQuit = () => throw StateError('stuck');
+        await run(const QuitAll());
+        expect(h.quits, 0);
+        expect(
+          c.read(terminalTabsProvider).notice,
+          isA<DaemonQuitFailedNotice>(),
+        );
+        // Not stuck in "quitting": the window still answers the next try.
+        expect(daemon.quits, 1);
+        await run(const QuitAll());
+        expect(daemon.quits, 1); // the service remembers its failed quit
+        expect(h.quits, 0);
+      },
+    );
 
     test('a service that dies as it quits is no restart', () async {
       await boot(ids: const []);

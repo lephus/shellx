@@ -1989,4 +1989,7 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get backgroundServiceNextLaunch =>
       'Có hiệu lực ở lần mở ShellX kế tiếp.';
+
+  @override
+  String get daemonQuitFailed => 'Phiên nền chưa dừng được. Hãy thử lại.';
 }

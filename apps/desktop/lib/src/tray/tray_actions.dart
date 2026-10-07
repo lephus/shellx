@@ -412,11 +412,30 @@ final class TrayActions {
         label: 'closing ssh helpers',
       );
     }
-    await runBounded(
-      stopService ? daemon.quitDaemon : daemon.disconnect,
-      timeout: const Duration(seconds: 5),
-      label: stopService ? 'stopping the service' : 'disconnecting',
-    );
+    if (stopService) {
+      var stopped = false;
+      try {
+        stopped = await daemon.quitDaemon().timeout(const Duration(seconds: 5));
+      } on Object catch (error) {
+        debugPrint('ShellX: stopping the service failed: ${error.runtimeType}');
+      }
+      if (!stopped) {
+        // The service is still there with its shells: stay, say so, and let
+        // the user try again (the connection is intact, nothing was lost).
+        _quitting = false;
+        daemon.markQuitting(false);
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const DaemonQuitFailedNotice());
+        return;
+      }
+    } else {
+      await runBounded(
+        daemon.disconnect,
+        timeout: const Duration(seconds: 5),
+        label: 'disconnecting',
+      );
+    }
     await _services.quitApp?.call();
   }
 

@@ -10,8 +10,11 @@ void main() {
   var quits = 0;
   DaemonConnection? running;
 
+  var lockFree = false;
+
   Future<bool> decide({required bool enabled}) => attachThisLaunch(
     enabled: enabled,
+    daemonLockFree: () async => lockFree,
     findRunning: () async {
       probes++;
       return running;
@@ -23,6 +26,7 @@ void main() {
     probes = 0;
     quits = 0;
     running = null;
+    lockFree = false;
   });
 
   Future<Attached> service({int? sessions, int protocol = kMuxProtocol}) async {
@@ -88,6 +92,15 @@ void main() {
       running = Incompatible(client: old.client, info: old.info);
       expect(await decide(enabled: false), isTrue);
       expect(quits, 0);
+    },
+  );
+
+  test(
+    'off and no service holds the lock: no connection is tried at all',
+    () async {
+      lockFree = true;
+      expect(await decide(enabled: false), isFalse);
+      expect(probes, 0);
     },
   );
 }

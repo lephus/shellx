@@ -421,4 +421,25 @@ void main() {
       expect(r.client.onRequest, same(handler));
     },
   );
+
+  test(
+    '11. the probe client answers no requests (it is not the window)',
+    () async {
+      transport.up = true;
+      await writeEndpoint();
+      Future<Map<String, Object?>> handler(MuxMessage m) async => {};
+      final probing = DaemonLauncher(
+        transport: transport,
+        endpoint: endpoint,
+        daemonLockFree: () async => lockFree,
+        spawn: () async => spawns++,
+        appVersion: '1.6.0',
+        onRequest: handler,
+        now: () => clock.now,
+        sleep: clock.sleep,
+      );
+      final r = await probing.findRunning() as Attached;
+      expect(r.client.onRequest, isNull);
+    },
+  );
 }

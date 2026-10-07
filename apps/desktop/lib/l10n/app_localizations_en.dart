@@ -2075,4 +2075,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get backgroundServiceNextLaunch =>
       'Applies the next time ShellX starts.';
+
+  @override
+  String get daemonQuitFailed =>
+      'The background service didn\'t stop. Try again.';
 }

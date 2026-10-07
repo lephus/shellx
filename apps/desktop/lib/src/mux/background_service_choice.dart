@@ -15,10 +15,13 @@ import 'daemon_launcher.dart';
 /// one to exit and closes the link.
 Future<bool> attachThisLaunch({
   required bool enabled,
+  required Future<bool> Function() daemonLockFree,
   required Future<DaemonConnection?> Function() findRunning,
   required Future<void> Function(MuxClient client) quit,
 }) async {
   if (enabled) return true;
+  // No service ever started (nothing holds `mux.lock`): nothing to probe.
+  if (await daemonLockFree()) return false;
   final found = await findRunning();
   final (client, sessions) = switch (found) {
     Attached(:final client, :final info) => (client, info.sessions),

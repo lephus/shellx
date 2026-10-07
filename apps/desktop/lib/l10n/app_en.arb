@@ -867,5 +867,6 @@
   "daemonRestartedStrip": "The background service stopped unexpectedly and was restarted. Shells were reopened in their folders.",
   "daemonLostStrip": "The background service stopped. Shells are no longer running.",
   "trayBackgroundService": "Keep shells running when the window closes",
-  "backgroundServiceNextLaunch": "Applies the next time ShellX starts."
+  "backgroundServiceNextLaunch": "Applies the next time ShellX starts.",
+  "daemonQuitFailed": "The background service didn't stop. Try again."
 }
