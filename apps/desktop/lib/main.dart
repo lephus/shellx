@@ -22,6 +22,7 @@ import 'src/agent/notify_threshold.dart';
 import 'src/agent/session_core.dart';
 import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
+import 'src/remote/ssh_reconnector.dart';
 import 'src/cli/agent_marks.dart';
 import 'src/cli/cli_install.dart';
 import 'src/cli/cli_install_windows.dart';
@@ -45,6 +46,7 @@ import 'src/platform/single_instance.dart';
 import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
 import 'src/platform/url_opener.dart';
+import 'src/platform/wake_detector.dart';
 import 'src/restore/restore_paths.dart';
 import 'src/restore/restore_persistence.dart';
 import 'src/restore/restore_store.dart';
@@ -379,6 +381,11 @@ Future<void> _start(
   // of opening a blank tab. Its panes open once the window is laid out
   // ([layoutReady]), so their grids come from the real area (D17).
   final restore = container.read(restorePersistenceProvider.notifier)..start();
+  // A8 D20: lost SSH panes retry by themselves; a wake retries at once.
+  container.read(sshReconnectorProvider);
+  WakeDetector(
+    onWake: () => container.read(sshReconnectorProvider.notifier).onWake(),
+  ).start();
   final layoutReady = Completer<void>();
   Future<RestoreLoad> loadForRestore() async {
     final load = await restoreFiles.loadLayout();

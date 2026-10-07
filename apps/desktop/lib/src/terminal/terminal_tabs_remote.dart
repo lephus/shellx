@@ -60,6 +60,9 @@ final class _RemoteBook {
   final replaced = <int, int>{};
   final reconnecting = <int>{};
 
+  /// A8 D20: where Enter on a lost pane goes (the reconnector sets it).
+  Future<void> Function(int id)? onReconnectRequest;
+
   Future<void> close() => replacements.close();
 }
 
@@ -67,6 +70,27 @@ extension TerminalTabsRemote on TerminalTabs {
   /// A8 D22: emitted before the tab changes, so listeners can move what
   /// they keep for [PaneReplacement.from] first.
   Stream<PaneReplacement> get paneReplacements => _remote.replacements.stream;
+
+  /// A8 D20: Enter on a lost pane (or the strip's button) asks for a
+  /// reconnect through [onReconnectRequest] when set, else plainly.
+  Future<void> requestReconnect(int id) async {
+    final request = _remote.onReconnectRequest;
+    if (request != null) {
+      await request(id);
+    } else {
+      await reconnect(id);
+    }
+  }
+
+  /// The reconnector's hook; [clearReconnectRequest] only removes its own.
+  void setReconnectRequest(Future<void> Function(int id) request) =>
+      _remote.onReconnectRequest = request;
+
+  void clearReconnectRequest(Future<void> Function(int id) request) {
+    if (_remote.onReconnectRequest == request) {
+      _remote.onReconnectRequest = null;
+    }
+  }
 
   /// A8 D22: the pane a reconnect made of [id] (followed along a chain);
   /// [id] itself when it was never replaced.

@@ -897,7 +897,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       // one (UI-A8 §3.2); other keys are ignored.
       if (data.contains('\r')) {
         if (pane.canReconnect) {
-          unawaited(reconnect(id));
+          unawaited(requestReconnect(id));
         } else {
           _removePane(id);
         }
