@@ -176,7 +176,8 @@ class WindowRouter extends Notifier<WindowState> {
     final agent = ref.read(agentControllerProvider.notifier);
     if (current is PairingRoute && next is! PairingRoute) {
       // Closing the QR dialog invalidates the pairing code (spec §5.3).
-      agent.cancelPairing();
+      // A lost background service is not an error here.
+      unawaited(agent.cancelPairing().catchError((Object _) {}));
     }
     if (current is OnboardingRoute &&
         next is! OnboardingRoute &&

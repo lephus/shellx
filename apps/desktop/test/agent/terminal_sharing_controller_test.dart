@@ -28,7 +28,7 @@ void main() {
   late ProviderContainer container;
 
   AgentController controller() =>
-      container.read(agentControllerProvider.notifier);
+      container.read(agentControllerProvider.notifier) as AgentController;
   TerminalSharingView sharing() =>
       container.read(agentControllerProvider).terminalSharing;
 

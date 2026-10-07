@@ -10,6 +10,8 @@ import 'package:shellx_desktop/src/remote/ssh_settings.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
+import '../support/state_only_agent.dart';
 
 import '../support/fake_local_sessions.dart';
 
@@ -39,6 +41,7 @@ void main() {
 
     container = ProviderContainer.test(
       overrides: [
+        agentControllerProvider.overrideWith(StateOnlyAgent.new),
         localSessionsProvider.overrideWithValue(local),
         settingsStoreProvider.overrideWithValue(settings),
         commandRunnerProvider.overrideWithValue(run),
@@ -108,7 +111,9 @@ void main() {
       expect(actions().hookFor('devbox'), isFalse);
       await actions().connect(devbox, noHook: false);
       expect(actions().hookFor('devbox'), isTrue);
-      await settings.setBool(SettingKeys.sshRemoteHook, false);
+      (container.read(agentControllerProvider.notifier) as StateOnlyAgent).set(
+        (s) => s.copyWith(sshRemoteHook: false),
+      );
       expect(actions().hookFor('devbox'), isFalse);
     },
   );

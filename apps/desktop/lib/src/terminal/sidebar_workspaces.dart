@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../agent/agent_controller_base.dart';
 import '../agent/desktop_services.dart';
 import '../platform/settings_store.dart';
 import '../remote/ssh_settings.dart';
@@ -388,7 +389,11 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     if (target == null) return null;
     return SshLaunch(
       target,
-      hook: sshHookFor(ref.read(settingsStoreProvider), target.key),
+      hook: sshHookFor(
+        ref.read(settingsStoreProvider),
+        target.key,
+        globalOn: ref.read(agentControllerProvider).sshRemoteHook,
+      ),
     );
   }
 

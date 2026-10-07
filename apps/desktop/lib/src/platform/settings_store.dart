@@ -65,6 +65,11 @@ abstract final class SettingKeys {
   /// A8 D11: tray "Install the ShellX hook on servers" (default on).
   static const String sshRemoteHook = 'ssh_remote_hook';
 
+  /// A5b D14: the first-quit explanation ("Thoát" leaves the background
+  /// service running) was shown once. UI-owned.
+  static const String quitKeepsSessionsExplained =
+      'quit_keeps_sessions_explained';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -90,6 +95,54 @@ abstract final class SettingKeys {
     sshRecentTargets,
     sshPlainTargets,
     sshRemoteHook,
+    quitKeepsSessionsExplained,
+  };
+}
+
+/// A5b D13: with the background service, two processes share one
+/// preferences file but each keeps its own cache, so every key has exactly
+/// one process that writes and reads it. The daemon's keys are the ones the
+/// service itself needs; the UI reads and toggles them through
+/// `AgentViewState` and `agent.call`, never through its own store.
+///
+/// Beyond the spec's nine: the CLI host (daemon) reads `cli_control_enabled`
+/// and `cli_allow_external`, and sessions the daemon spawns decide the ssh
+/// hook (`ssh_remote_hook`), while the tray (UI) only toggles them.
+abstract final class DaemonSettingKeys {
+  static const Set<String> all = {
+    SettingKeys.remoteAccess,
+    SettingKeys.keepAwake,
+    SettingKeys.launchAtStartup,
+    SettingKeys.onboardingDone,
+    SettingKeys.terminalSharing,
+    SettingKeys.terminalSharingFiles,
+    SettingKeys.notifyThreshold,
+    SettingKeys.desktopNotifications,
+    SettingKeys.desktopNotificationsOnlyUnfocused,
+    SettingKeys.cliControlEnabled,
+    SettingKeys.cliAllowExternal,
+    SettingKeys.sshRemoteHook,
+  };
+}
+
+/// Everything else: the window, the terminal, the sidebar, the restore and
+/// config notices, the ssh target lists (A8 D6, D11) and `cli_path_installed`
+/// (the `shellx` link is installed from the UI).
+abstract final class UiSettingKeys {
+  static const Set<String> all = {
+    SettingKeys.terminalFontSize,
+    SettingKeys.windowX,
+    SettingKeys.windowY,
+    SettingKeys.windowWidth,
+    SettingKeys.windowHeight,
+    SettingKeys.windowMaximized,
+    SettingKeys.terminalWorkspaces,
+    SettingKeys.terminalRestoreScrollback,
+    SettingKeys.cliPathInstalled,
+    SettingKeys.configGhosttyNoticeShown,
+    SettingKeys.sshRecentTargets,
+    SettingKeys.sshPlainTargets,
+    SettingKeys.quitKeepsSessionsExplained,
   };
 }
 

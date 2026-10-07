@@ -183,7 +183,7 @@ void main() {
           }),
         ],
       );
-      c.read(cliSettingsProvider.notifier).onChanged = () => rechecks++;
+      c.read(cliHostControlProvider).recheck = () => rechecks++;
       c.listen(trayLocalStateProvider, (_, _) {});
     });
 

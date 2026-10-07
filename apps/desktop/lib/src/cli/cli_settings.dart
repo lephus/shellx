@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../agent/agent_controller_base.dart';
 import '../platform/settings_store.dart';
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 
@@ -37,54 +38,50 @@ final cliSettingsProvider = NotifierProvider<CliSettings, CliSettingsState>(
   CliSettings.new,
 );
 
-/// Reads and writes the three settings; the tray menu watches it. The host
-/// reads the store itself on every request; [onChanged] lets it apply a
-/// change of the switch or of "Allow other terminals" to open connections
-/// at once (`CliHost.recheck`).
+/// The tray's "Dòng lệnh" settings. `cli_control_enabled` and
+/// `cli_allow_external` belong to the process that runs the host (A5b D13):
+/// they are read from, and toggled through, the agent, which rechecks the
+/// host's open connections itself. `cli_path_installed` is the UI's own.
 class CliSettings extends Notifier<CliSettingsState> {
-  /// Set by `CliService` while the host runs.
-  void Function()? onChanged;
-
   SettingsStore get _store => ref.read(settingsStoreProvider);
 
   @override
-  CliSettingsState build() => _from(ref.watch(settingsStoreProvider));
+  CliSettingsState build() {
+    final agent = ref.watch(
+      agentControllerProvider.select(
+        (s) => (s.cliControlEnabled, s.cliAllowExternal),
+      ),
+    );
+    return CliSettingsState(
+      controlEnabled: agent.$1,
+      allowExternal: agent.$2,
+      pathInstalled: ref
+          .watch(settingsStoreProvider)
+          .getBool(SettingKeys.cliPathInstalled, defaultValue: false),
+    );
+  }
 
-  static CliSettingsState _from(SettingsStore s) => CliSettingsState(
-    controlEnabled: s.getBool(
-      SettingKeys.cliControlEnabled,
-      defaultValue: true,
-    ),
-    allowExternal: s.getBool(SettingKeys.cliAllowExternal, defaultValue: false),
-    pathInstalled: s.getBool(SettingKeys.cliPathInstalled, defaultValue: false),
-  );
+  AgentControllerBase get _agent => ref.read(agentControllerProvider.notifier);
 
-  Future<void> setControlEnabled(bool value) => _apply(
-    () => _store.setBool(SettingKeys.cliControlEnabled, value),
-    recheck: true,
-  );
+  Future<void> setControlEnabled(bool value) =>
+      _agent.setCliControlEnabled(value);
 
-  Future<void> setAllowExternal(bool value) => _apply(
-    () => _store.setBool(SettingKeys.cliAllowExternal, value),
-    recheck: true,
-  );
+  Future<void> setAllowExternal(bool value) =>
+      _agent.setCliAllowExternal(value);
 
-  Future<void> setPathInstalled(bool value) => _apply(
-    () => _store.setBool(SettingKeys.cliPathInstalled, value),
-    recheck: false,
-  );
-
-  /// Failed or not, the state (and the menu) shows what is stored, and the
-  /// host applies it.
-  Future<void> _apply(
-    Future<void> Function() write, {
-    required bool recheck,
-  }) async {
+  /// Failed or not, the state (and the menu) shows what is stored.
+  Future<void> setPathInstalled(bool value) async {
     try {
-      await write();
+      await _store.setBool(SettingKeys.cliPathInstalled, value);
     } finally {
-      state = _from(_store);
-      if (recheck) onChanged?.call();
+      state = CliSettingsState(
+        controlEnabled: state.controlEnabled,
+        allowExternal: state.allowExternal,
+        pathInstalled: _store.getBool(
+          SettingKeys.cliPathInstalled,
+          defaultValue: false,
+        ),
+      );
     }
   }
 }

@@ -10,9 +10,11 @@ import '../mux/mux_paths.dart';
 import '../mux/windows_pipe_transport.dart';
 import '../platform/settings_store.dart';
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
+import 'cli_host_control.dart';
 import 'cli_install.dart';
-import 'cli_settings.dart';
 import 'ui_command_handler.dart';
+
+export 'cli_host_control.dart';
 
 /// Where the host listens (A5b `MuxPaths`); set in `main.dart`.
 final cliMuxPathsProvider = Provider<MuxPaths>(
@@ -32,23 +34,6 @@ final cliLoginPathCheckProvider = Provider<Future<LoginPathHint?> Function()?>(
   (_) => null,
 );
 
-/// Ruling M6: lets Quit stop the host first, before the sessions close.
-final cliHostControlProvider = Provider<CliHostControl>(
-  (_) => CliHostControl(),
-);
-
-final class CliHostControl {
-  /// Set by a running [CliService].
-  Future<void> Function()? stop;
-
-  /// Stops the host once; nothing when none runs.
-  Future<void> stopNow() async {
-    final s = stop;
-    stop = null;
-    await s?.call();
-  }
-}
-
 /// D26 "Copy the agent skill install command".
 final cliClipboardProvider = Provider<Future<void> Function(String text)>(
   (_) =>
@@ -63,6 +48,9 @@ final cliClipboardProvider = Provider<Future<void> Function(String text)>(
 /// Final ruling M1: it listens ([listen]) before the shells' environment
 /// is built, so only a running host's address and token reach them; the
 /// window comes later ([attach]) — requests that arrive before wait for it.
+// TODO(A5b Task 7): `cli_control_enabled` and `cli_allow_external` are
+// daemon-owned (D13); this host moves to the daemon, which reads them from
+// its own store. Until then this file is exempt from the ownership scan.
 final class CliService {
   CliService._(
     this._host,
@@ -78,7 +66,7 @@ final class CliService {
   final _MuxLock _lock;
   final _LateUi _ui;
   final SettingsStore _settingsStore;
-  CliSettings? _settings;
+  bool _attached = false;
 
   /// The socket path or pipe name (`SHELLX_SOCKET`).
   final String address;
@@ -159,12 +147,12 @@ final class CliService {
   /// recheck open connections; Quit stops the host first (ruling M6).
   /// Once. [c]'s settings store must be the one [listen] got.
   void attach(ProviderContainer c) {
-    if (_stopped || _settings != null) return;
+    if (_stopped || _attached) return;
     assert(identical(c.read(settingsStoreProvider), _settingsStore));
-    final settings = c.read(cliSettingsProvider.notifier)
-      ..onChanged = _host.recheck;
-    _settings = settings;
-    c.read(cliHostControlProvider).stop = stop;
+    _attached = true;
+    c.read(cliHostControlProvider)
+      ..stop = stop
+      ..recheck = _host.recheck;
     _ui.bind(c.read(uiCommandHandlerProvider));
   }
 
@@ -172,10 +160,6 @@ final class CliService {
   Future<void> stop() async {
     if (_stopped) return;
     _stopped = true;
-    final settings = _settings;
-    if (settings != null && settings.onChanged == _host.recheck) {
-      settings.onChanged = null;
-    }
     try {
       await _host.stop();
     } finally {

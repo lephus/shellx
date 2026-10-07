@@ -18,7 +18,7 @@ void main() {
   late ProviderContainer container;
 
   AgentController controller() =>
-      container.read(agentControllerProvider.notifier);
+      container.read(agentControllerProvider.notifier) as AgentController;
   AgentViewState state() => container.read(agentControllerProvider);
 
   void boot([TestHarness? harness]) {
@@ -767,11 +767,11 @@ void main() {
         await h.seedSignedIn();
         await controller().bootstrap(watchForWake: false);
 
-        final view = controller().startPairing()!;
+        final view = (await controller().startPairing())!;
         expect(view.uri.agentDeviceId, h.relay.deviceId);
         expect(state().pairing, same(view));
 
-        controller().cancelPairing();
+        await controller().cancelPairing();
         expect(h.runtime.pairingCancels, 1);
         expect(state().pairing, isNull);
       },
@@ -781,7 +781,7 @@ void main() {
       boot(TestHarness(settings: {SettingKeys.remoteAccess: false}));
       await h.seedSignedIn();
       await controller().bootstrap(watchForWake: false);
-      expect(controller().startPairing(), isNull);
+      expect(await controller().startPairing(), isNull);
     });
 
     test('MobilePaired closes the QR, refreshes trust and notifies', () async {

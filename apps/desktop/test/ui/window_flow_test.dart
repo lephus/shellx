@@ -61,7 +61,8 @@ void main() {
 
   WindowRouter router() => container.read(windowRouterProvider.notifier);
   WindowState window() => container.read(windowRouterProvider);
-  AgentController agent() => container.read(agentControllerProvider.notifier);
+  AgentControllerBase agent() =>
+      container.read(agentControllerProvider.notifier);
   AgentViewState agentState() => container.read(agentControllerProvider);
   TrayActions tray() => container.read(trayActionsProvider);
 

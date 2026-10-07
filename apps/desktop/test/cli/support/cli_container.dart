@@ -9,6 +9,8 @@ import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
+import '../../support/state_only_agent.dart';
 
 import '../../support/fake_local_sessions.dart';
 import '../../support/fakes.dart';
@@ -22,11 +24,16 @@ final _systemNotifiers = Expando<RecordingNotifier>();
 ProviderContainer cliContainer(
   FakeLocalSessions local, {
   List<Override> overrides = const [],
+  SettingsStore? settings,
+
+  /// Replaces the state-only agent (a test of a switch needs a real one).
+  Override? agent,
 }) {
-  final settings = InMemorySettingsStore();
+  settings ??= InMemorySettingsStore();
   final l10n = lookupAppLocalizations(const Locale('en'));
   final c = ProviderContainer.test(
     overrides: [
+      agent ?? agentControllerProvider.overrideWith(StateOnlyAgent.new),
       localSessionsProvider.overrideWithValue(local),
       appL10nProvider.overrideWithValue(l10n),
       settingsStoreProvider.overrideWithValue(settings),
