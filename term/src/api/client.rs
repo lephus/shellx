@@ -23,7 +23,14 @@ pub const MUX_PROTOCOL: i64 = 1;
 pub enum ApiError {
     NotRunning(String),
     Incompatible(String),
-    Remote { code: String, message: String },
+    Remote {
+        code: String,
+        message: String,
+    },
+    /// A failure the command already printed inside its one `--json`
+    /// object (D11): only its exit code is left to give (the host-style
+    /// error `code`).
+    Reported(String),
     Usage(String),
     Io(String),
 }
@@ -36,7 +43,7 @@ impl ApiError {
             ApiError::Incompatible(_) => 7,
             ApiError::Usage(_) => 2,
             ApiError::Io(_) => 1,
-            ApiError::Remote { code, .. } => match code.as_str() {
+            ApiError::Remote { code, .. } | ApiError::Reported(code) => match code.as_str() {
                 "bad_request" => 2,
                 "not_found" | "ambiguous" => 4,
                 "timeout" => 5,

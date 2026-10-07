@@ -4,7 +4,7 @@
 
 use super::args::Parsed;
 use super::client::ApiError;
-use super::run::{already_reported, Ctx};
+use super::run::Ctx;
 use super::value::{to_json, Value};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -194,7 +194,7 @@ pub fn install(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
         }
         writeln!(ctx.out, "{}", to_json(&Value::map(v))).ok();
         if refusal.is_some() {
-            return Err(already_reported("forbidden"));
+            return Err(ApiError::Reported("forbidden".into()));
         }
         return Ok(());
     }

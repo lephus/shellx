@@ -152,7 +152,8 @@ const STDOUT_GONE: Option<fn(std::time::Duration) -> bool> = None;
 /// whose reader closed reports POLLHUP (macOS, checked) or POLLERR
 /// (Linux), a closed terminal POLLHUP. macOS reports these only when
 /// POLLOUT is asked for, so it is, and a stdout that is simply writable
-/// (the usual case) waits out the rest of `wait` instead of spinning.
+/// (the usual case, and /dev/null's POLLNVAL) waits out the rest of
+/// `wait` instead of spinning.
 #[cfg(unix)]
 fn stdout_gone(wait: std::time::Duration) -> bool {
     let started = std::time::Instant::now();
@@ -164,7 +165,9 @@ fn stdout_gone(wait: std::time::Duration) -> bool {
     let ms = wait.as_millis().min(i32::MAX as u128) as libc::c_int;
     // SAFETY: one valid pollfd, count 1.
     let n = unsafe { libc::poll(&mut fd, 1, ms) };
-    if n > 0 && fd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
+    // Not POLLNVAL: macOS answers it for /dev/null (checked), which is
+    // not a reader that left; a truly closed fd 1 fails its next write.
+    if n > 0 && fd.revents & (libc::POLLERR | libc::POLLHUP) != 0 {
         return true;
     }
     std::thread::sleep(wait.saturating_sub(started.elapsed()));

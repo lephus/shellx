@@ -434,3 +434,41 @@ fn events_into_a_file_keep_going() {
         2
     );
 }
+
+#[test]
+fn events_into_dev_null_keep_going() {
+    // macOS answers poll(POLLOUT) on /dev/null with POLLNVAL: that is not
+    // a reader that left.
+    let dir = temp_dir("null");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let host = std::thread::spawn(move || {
+        let mut s = accept_within(&listener);
+        accept(&mut s);
+        let caps = Value::Array(vec![Value::text("cli.events.subscribe")]);
+        answer(&mut s, vec![("api", Value::Int(1)), ("caps", caps)]);
+        answer(&mut s, vec![]);
+        let event = Message::new("event", vec![("kind", Value::text("tab.opened"))]);
+        send(&mut s, &event).unwrap();
+        std::thread::sleep(Duration::from_millis(2500));
+        let _ = send(&mut s, &event);
+    });
+    let started = Instant::now();
+    let status = Command::new(shellx_link())
+        .args(["events", "--follow"])
+        .env("SHELLX_ENDPOINT", &ep)
+        .env("SHELLX_CLI_TOKEN", TOKEN)
+        .env_remove("SHELLX_SOCKET")
+        .stdout(std::fs::File::create("/dev/null").unwrap())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    host.join().unwrap();
+    assert!(
+        started.elapsed() >= Duration::from_millis(2500),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(status.code(), Some(3));
+}
