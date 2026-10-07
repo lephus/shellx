@@ -123,7 +123,7 @@ class AppDelegate: FlutterAppDelegate {
     // The service holds the user's shells: a Dock or Apple Event quit
     // (same bundle id as the window) must not end it. It exits through
     // `daemon.quit`, SIGTERM or the idle exit, all of which bypass this.
-    if isDaemon { return quitIsForPowerOff ? .terminateNow : .terminateCancel }
+    if isDaemon { return (quitIsForPowerOff || poweringOff) ? .terminateNow : .terminateCancel }
     if quitIsForPowerOff || poweringOff {
       guard AppChannel.isReady else { return .terminateNow }
       var replied = false

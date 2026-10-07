@@ -203,7 +203,7 @@ void main() {
     expect(
       swift,
       contains(
-        'if isDaemon { return quitIsForPowerOff ? .terminateNow : .terminateCancel }',
+        'if isDaemon { return (quitIsForPowerOff || poweringOff) ? .terminateNow : .terminateCancel }',
       ),
     );
     final launch = swift.substring(
