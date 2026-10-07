@@ -12,6 +12,7 @@ import '../restore/restore_store.dart' show RestoreLoad;
 import '../startup.dart';
 import '../terminal/local_sessions_provider.dart';
 import '../ui/window_router.dart';
+import 'daemon_host.dart' show kDaemonShutdownBudget;
 import 'daemon_launcher.dart';
 import 'ui_mux_responder.dart';
 
@@ -55,7 +56,11 @@ class DaemonLinkNotifier extends Notifier<DaemonLink?> {
 }
 
 /// UI-A5 §7.5.
-enum DaemonStrip { restarted, lost }
+enum DaemonStrip { restarted, lost, stopping }
+
+/// How long "Thoát hoàn toàn" waits for the service: its own shutdown budget
+/// ([kDaemonShutdownBudget], 12 s) plus 3 s for the reply and the link.
+const Duration kDaemonQuitWait = Duration(seconds: 15);
 
 @immutable
 final class DaemonUiState {
@@ -296,18 +301,28 @@ class DaemonStateNotifier extends Notifier<DaemonUiState> {
   /// "Thoát hoàn toàn": asks the service to stop. True when it answered, or
   /// the link ended right after we asked (the service exits as it replies);
   /// false when it did not answer in [wait].
-  Future<bool> quitDaemon({Duration wait = const Duration(seconds: 4)}) async {
+  ///
+  /// While it waits the window shows [DaemonStrip.stopping]. When it did
+  /// not stop, the window is usable again (the connection is not "quitting").
+  Future<bool> quitDaemon({Duration wait = kDaemonQuitWait}) async {
     _quitting = true;
     final link = ref.read(daemonLinkProvider);
     if (link == null) return true;
+    state = state.copyWith(strip: DaemonStrip.stopping, retrying: false);
+    var stopped = false;
     try {
       await link.client.request(MuxType.daemonQuit).timeout(wait);
-      return true;
+      stopped = true;
     } on MuxRemoteException catch (e) {
-      return e.code == 'disconnected';
+      stopped = e.code == 'disconnected';
     } on Object {
-      return false;
+      stopped = false;
     }
+    if (!stopped && ref.mounted) {
+      _quitting = false;
+      state = state.copyWith(strip: null);
+    }
+    return stopped;
   }
 
   /// "Thoát": the window ends its connection; the service and its shells

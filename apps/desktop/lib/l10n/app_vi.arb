@@ -489,5 +489,6 @@
   "daemonLostStrip": "Phiên nền đã dừng. Các shell không còn chạy.",
   "trayBackgroundService": "Giữ shell chạy khi đóng cửa sổ",
   "backgroundServiceNextLaunch": "Có hiệu lực ở lần mở ShellX kế tiếp.",
-  "daemonQuitFailed": "Phiên nền chưa dừng được. Hãy thử lại."
+  "daemonQuitFailed": "Phiên nền chưa dừng được. Hãy thử lại.",
+  "daemonStoppingStrip": "Đang dừng phiên nền…"
 }

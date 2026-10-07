@@ -410,6 +410,14 @@ class RestorePersistence extends Notifier<void> {
     return flushAll(clean: true);
   }
 
+  /// A quit that could not finish (the background service did not stop):
+  /// the clean, final flush must not leave saving off. Saving resumes and
+  /// the next layout write marks the run unclean again.
+  void cancelQuit() {
+    _quitCommitted = false;
+    resume();
+  }
+
   /// D13: off deletes every saved text now and stops saving it; the
   /// layout is still saved.
   /// Switched back on, every live pane is saved at the next tick, idle

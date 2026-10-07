@@ -196,6 +196,18 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     if (strip == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final lost = strip == DaemonStrip.lost;
+    if (strip == DaemonStrip.stopping) {
+      return InfoStrip(
+        key: const Key('pane.daemonStrip'),
+        icon: Icons.hourglass_empty,
+        iconColor: ShellxDesktopColors.textSecondary,
+        text: l10n.daemonStoppingStrip,
+        closeText: l10n.actionClose,
+        closeLabel: l10n.restoreStripCloseLabel,
+        focusNode: widget.daemonStripFocus,
+        onClose: () => ref.read(daemonStateProvider.notifier).dismissStrip(),
+      );
+    }
     return InfoStrip(
       key: const Key('pane.daemonStrip'),
       icon: lost ? Icons.error_outline : Icons.history,

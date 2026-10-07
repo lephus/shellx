@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/mux/daemon_host.dart';
 import 'package:shellx_desktop/src/mux/daemon_state.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/restore/restore_persistence.dart';
@@ -189,24 +190,51 @@ void main() {
       expect(h.quits, 1);
     });
 
-    test(
-      'a service that does not stop: the window stays open and says so',
-      () async {
-        await boot(ids: const []);
-        daemon.onQuit = () => throw StateError('stuck');
-        await run(const QuitAll());
-        expect(h.quits, 0);
-        expect(
-          c.read(terminalTabsProvider).notice,
-          isA<DaemonQuitFailedNotice>(),
-        );
-        // Not stuck in "quitting": the window still answers the next try.
-        expect(daemon.quits, 1);
-        await run(const QuitAll());
-        expect(daemon.quits, 1); // the service remembers its failed quit
-        expect(h.quits, 0);
-      },
-    );
+    test('a service that does not stop: the window stays open, says so, saving '
+        'is not left frozen, and the stopping state is gone', () async {
+      await boot(ids: const [1]);
+      daemon.onQuit = () => throw StateError('stuck');
+      final done = run(const QuitAll());
+      await answer(primary: true);
+      await done;
+      expect(h.quits, 0);
+      expect(
+        c.read(terminalTabsProvider).notice,
+        isA<DaemonQuitFailedNotice>(),
+      );
+      expect(c.read(daemonStateProvider).strip, isNull);
+      final before = files.layouts.length;
+      c
+          .read(terminalTabsProvider.notifier)
+          .rename(c.read(terminalTabsProvider).tabs.first.id, 'after');
+      await Future<void>.delayed(const Duration(milliseconds: 1300));
+      expect(files.layouts.length, greaterThan(before));
+      expect(files.layouts.last.cleanExit, isFalse);
+    });
+
+    test('while the service stops the window shows it, and a second click '
+        'does nothing', () async {
+      await boot(ids: const []);
+      final gate = Completer<void>();
+      daemon.onQuit = () => gate.future;
+      final first = run(const QuitAll());
+      await pumpEventQueue();
+      expect(c.read(daemonStateProvider).strip, DaemonStrip.stopping);
+      await run(const QuitAll());
+      expect(daemon.quits, 1);
+      gate.complete();
+      await first;
+      expect(h.quits, 1);
+    });
+
+    test('the wait for the service covers its own shutdown budget', () {
+      expect(
+        kDaemonQuitWait,
+        greaterThanOrEqualTo(
+          kDaemonShutdownBudget + const Duration(seconds: 3),
+        ),
+      );
+    });
 
     test('a service that dies as it quits is no restart', () async {
       await boot(ids: const []);

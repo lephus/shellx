@@ -415,7 +415,7 @@ final class TrayActions {
     if (stopService) {
       var stopped = false;
       try {
-        stopped = await daemon.quitDaemon().timeout(const Duration(seconds: 5));
+        stopped = await daemon.quitDaemon();
       } on Object catch (error) {
         debugPrint('ShellX: stopping the service failed: ${error.runtimeType}');
       }
@@ -424,6 +424,7 @@ final class TrayActions {
         // the user try again (the connection is intact, nothing was lost).
         _quitting = false;
         daemon.markQuitting(false);
+        _ref.read(restorePersistenceProvider.notifier).cancelQuit();
         _ref
             .read(terminalTabsProvider.notifier)
             .showNotice(const DaemonQuitFailedNotice());

@@ -2079,4 +2079,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get daemonQuitFailed =>
       'The background service didn\'t stop. Try again.';
+
+  @override
+  String get daemonStoppingStrip => 'Stopping the background service…';
 }

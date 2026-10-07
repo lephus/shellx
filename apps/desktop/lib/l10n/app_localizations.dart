@@ -3047,6 +3047,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The background service didn\'t stop. Try again.'**
   String get daemonQuitFailed;
+
+  /// No description provided for @daemonStoppingStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping the background service…'**
+  String get daemonStoppingStrip;
 }
 
 class _AppLocalizationsDelegate

@@ -164,7 +164,7 @@ void main() {
     expect(answered, isTrue);
     await pumpEventQueue();
     expect(connector.connects, 1);
-    expect(ui().strip, isNull);
+    expect(ui().strip, DaemonStrip.stopping); // until the window exits
   });
 
   test('daemon.quit: a disconnect right after asking is success, and is '

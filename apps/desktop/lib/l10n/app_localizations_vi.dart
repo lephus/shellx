@@ -1992,4 +1992,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get daemonQuitFailed => 'Phiên nền chưa dừng được. Hãy thử lại.';
+
+  @override
+  String get daemonStoppingStrip => 'Đang dừng phiên nền…';
 }
