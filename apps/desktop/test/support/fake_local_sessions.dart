@@ -42,6 +42,9 @@ final class FakeLocalSessions implements LocalSessions {
   /// The `tabId` of each [open] call (A7 D29).
   final openTabIds = <int?>[];
 
+  /// The launch of each [open] call, in order (null: a local shell).
+  final openLaunches = <SessionLaunch?>[];
+
   /// Every [notify] call: (id, title, body).
   final notified = <(int, String?, String)>[];
   final closed = <int>[];
@@ -93,10 +96,12 @@ final class FakeLocalSessions implements LocalSessions {
     required int rows,
     String? cwd,
     int? tabId,
+    SessionLaunch? launch,
   }) async {
     opens.add((cols, rows));
     openCwds.add(cwd);
     openTabIds.add(tabId);
+    openLaunches.add(launch);
     await openGate?.future;
     await cwdGates[cwd]?.future;
     final error = openError;
@@ -106,7 +111,11 @@ final class FakeLocalSessions implements LocalSessions {
     }
     final id = nextId++;
     add(
-      summary(id, origin: SessionOrigin.desktop),
+      summary(
+        id,
+        origin: SessionOrigin.desktop,
+        remote: launch == null ? null : SessionRemote(launch: launch),
+      ),
       notify: notifyOnOpen,
       backlog: nextBacklog,
     );
@@ -132,6 +141,7 @@ final class FakeLocalSessions implements LocalSessions {
     String? cwd,
     String? gitBranch,
     List<int> ports = const [],
+    SessionRemote? remote,
   }) => SessionSummary(
     id: id,
     index: summaries.length + 1,
@@ -147,6 +157,7 @@ final class FakeLocalSessions implements LocalSessions {
     cwd: cwd,
     gitBranch: gitBranch,
     ports: ports,
+    remote: remote,
   );
 
   void add(SessionSummary summary, {bool notify = true, String backlog = ''}) {
@@ -178,6 +189,7 @@ final class FakeLocalSessions implements LocalSessions {
         cwd: cwd ?? s.cwd,
         gitBranch: s.gitBranch,
         ports: s.ports,
+        remote: s.remote,
       ),
     );
   }

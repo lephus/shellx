@@ -106,6 +106,23 @@ final class BellRung extends OscEvent {
   String toString() => 'BellRung()';
 }
 
+/// `OSC 6973 ; <key>=<value>`: ShellX's own report from a server's
+/// bootstrap and hook (A8 D16) — `hello`, `pid`, `home`, `branch`. Only
+/// remote sessions read it; the value never holds a control character.
+final class RemoteMetaReported extends OscEvent {
+  const RemoteMetaReported(this.key, this.value);
+  final String key;
+  final String value;
+  @override
+  bool operator ==(Object other) =>
+      other is RemoteMetaReported && other.key == key && other.value == value;
+  @override
+  int get hashCode => Object.hash(key, value);
+  // Never the value (A8 D37).
+  @override
+  String toString() => 'RemoteMetaReported($key, …)';
+}
+
 /// The bytes of one OSC 99 notification so far. Kept as bytes so a
 /// base64 (`e=1`) chunk may end inside a UTF-8 character: the text is
 /// decoded once, when the last chunk arrives.
@@ -129,7 +146,7 @@ enum _State {
   ignoreEscape,
 }
 
-/// Finds OSC 7, 9, 99, 133 (C, D), 633 (E) and 777 (`notify`), and BEL
+/// Finds OSC 7, 9, 99, 133 (C, D), 633 (E), 777 (`notify`) and 6973, and BEL
 /// outside sequences, in terminal output, ended by BEL or ST, across chunk
 /// boundaries (like `OscTitleParser`).
 /// A payload over 4 KiB is skipped; titles and bodies are cut to 200
@@ -139,7 +156,7 @@ final class OscEventParser {
   static const int maxTextLength = 200;
   static const int maxPayload = 4096;
   static const int maxKittyDrafts = 4;
-  static const _numbers = {'7', '9', '99', '133', '633', '777'};
+  static const _numbers = {'7', '9', '99', '133', '633', '777', '6973'};
 
   /// Unfinished OSC 99 notifications by id, oldest first (A4 D2).
   final _kittyDrafts = <String, _KittyDraft>{};
@@ -182,7 +199,7 @@ final class OscEventParser {
           _state = _State.ground;
         }
       case _State.param:
-        if (byte >= 0x30 && byte <= 0x39 && _param.length < 3) {
+        if (byte >= 0x30 && byte <= 0x39 && _param.length < 4) {
           _param.writeCharCode(byte);
         } else if (byte == 0x3b) {
           _number = _param.toString();
@@ -238,8 +255,21 @@ final class OscEventParser {
       '9' => _osc9(text),
       '99' => _kitty(text),
       '777' => _osc777(text),
+      '6973' => _shellx(text),
       _ => null,
     };
+  }
+
+  static OscEvent? _shellx(String text) {
+    final eq = text.indexOf('=');
+    if (eq <= 0) return null;
+    final value = text.substring(eq + 1);
+    if (value.runes.any(
+      (r) => r < 0x20 || r == 0x7F || (r >= 0x80 && r <= 0x9F),
+    )) {
+      return null;
+    }
+    return RemoteMetaReported(text.substring(0, eq), value);
   }
 
   static OscEvent? _semanticPrompt(String text) {

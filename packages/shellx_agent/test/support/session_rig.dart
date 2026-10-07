@@ -24,12 +24,15 @@ final class SessionRig {
     void Function(String message)? log,
     Future<bool> Function(String path)? directoryExists,
     bool windowsPaths = false,
+    RemoteTools? remoteTools,
+    Map<String, String> baseEnvironment = const {'PATH': '/usr/bin'},
+    Duration plainConnectedAfter = const Duration(seconds: 10),
   }) {
     manager = SessionManager(
       ptyFactory: factory,
       shellResolver: const FixedShellResolver(),
       homeDirectory: '/Users/test',
-      baseEnvironment: const {'PATH': '/usr/bin'},
+      baseEnvironment: baseEnvironment,
       maxSessions: maxSessions,
       bufferCapacity: bufferCapacity,
       sendWindow: sendWindow,
@@ -43,6 +46,8 @@ final class SessionRig {
       directoryExists: directoryExists,
       windowsPaths: windowsPaths,
       localHostName: 'mbp.local',
+      remoteTools: remoteTools,
+      plainConnectedAfter: plainConnectedAfter,
     );
     manager.outbound.listen(sent.add);
   }

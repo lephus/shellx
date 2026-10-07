@@ -195,4 +195,33 @@ void main() {
       expect(parser.feed(_b('$esc]133;C$bel')), [const CommandStarted()]);
     });
   });
+
+  group('OSC 6973 (A8 D16)', () {
+    List<OscEvent> feed(String s) => OscEventParser().feed(utf8.encode(s));
+
+    test('key=value with BEL or ST', () {
+      expect(feed('\x1b]6973;hello=1\x07'), [
+        const RemoteMetaReported('hello', '1'),
+      ]);
+      expect(feed('\x1b]6973;branch=feat;x\x1b\\'), [
+        const RemoteMetaReported('branch', 'feat;x'),
+      ]);
+      expect(feed('\x1b]6973;branch=\x07'), [
+        const RemoteMetaReported('branch', ''),
+      ]);
+    });
+
+    test('no key or a control character: nothing', () {
+      expect(feed('\x1b]6973;=x\x07'), isEmpty);
+      expect(feed('\x1b]6973;hello\x07'), isEmpty);
+      expect(feed('\x1b]6973;home=/a\u0085b\x07'), isEmpty);
+    });
+
+    test('toString never carries the value (D37)', () {
+      expect(
+        const RemoteMetaReported('branch', 'secret').toString(),
+        isNot(contains('secret')),
+      );
+    });
+  });
 }

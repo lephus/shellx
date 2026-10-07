@@ -55,4 +55,20 @@ void main() {
       expect(win('file:///home/r'), isNull);
     });
   });
+
+  test('parseRemoteCwdPath: any host, decoded path (A8 D14)', () {
+    expect(
+      parseRemoteCwdPath('file://devbox/home/me/work%20x'),
+      '/home/me/work x',
+    );
+    expect(parseRemoteCwdPath('file:///srv'), '/srv');
+    expect(parseRemoteCwdPath('file://h/%E1%BA%BF'), '/ế');
+    expect(parseRemoteCwdPath('file://h/a%00b'), isNull);
+    expect(parseRemoteCwdPath('file://h/a%0Ab'), isNull);
+    expect(parseRemoteCwdPath('file://h/a%C2%85b'), isNull);
+    expect(parseRemoteCwdPath('file://h/%ZZ'), isNull);
+    expect(parseRemoteCwdPath('http://h/x'), isNull);
+    expect(parseRemoteCwdPath('file://h'), isNull);
+    expect(parseRemoteCwdPath('file://h/${'a' * 4100}'), isNull);
+  });
 }

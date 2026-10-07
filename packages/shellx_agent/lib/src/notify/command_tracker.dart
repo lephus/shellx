@@ -81,7 +81,8 @@ final class CommandTracker {
       case NotifyRequested() ||
           CwdReported() ||
           KittyNotifyRequested() ||
-          BellRung():
+          BellRung() ||
+          RemoteMetaReported():
         break;
     }
     return null;
