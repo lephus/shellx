@@ -8,8 +8,8 @@ import 'package:shellx_desktop/src/ui/terminal/terminal_shortcuts.dart';
 
 /// Spec D24 / criterion 1: the default tables after A9 are today's tables
 /// plus A9's three new chords. The fixtures were written once, from the
-/// code as it was before A9 (`WRITE_GOLDEN=1`, commit d5bdf16); they are
-/// never regenerated.
+/// code as it was before A9 (commit d5bdf16); they are frozen and this
+/// test can only read them.
 Set<String> signatures(Map<ShortcutActivator, Intent> map) => {
   for (final e in map.entries)
     '${describeActivator(e.key)} -> ${describeIntent(e.value)}',
@@ -48,11 +48,6 @@ void main() {
           actual.map((s) => s.split(' -> ').first).toSet(),
           hasLength(actual.length),
         );
-        if (Platform.environment['WRITE_GOLDEN'] == '1') {
-          file
-            ..createSync(recursive: true)
-            ..writeAsStringSync('${actual.join('\n')}\n');
-        }
         final expected = file
             .readAsLinesSync()
             .where((l) => l.isNotEmpty)

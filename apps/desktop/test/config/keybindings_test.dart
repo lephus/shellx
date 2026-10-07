@@ -196,7 +196,8 @@ keybind = ctrl+a>b>c=new_tab
       parseKeyChord('c'),
     ]);
     expect(lookup(b, 'ctrl+a'), isNull);
-    expect(b.labelOf(const KeyAction('new_tab')), '⌃A C');
+    // Task 4 ruling: a default single chord still bound beats a sequence.
+    expect(b.labelOf(const KeyAction('new_tab')), '⌘T');
     // ctrl+a=new_workspace was shadowed: the default labels it again.
     expect(b.labelOf(const KeyAction('new_workspace')), '⌘⇧N');
     expect(codes(problems), [
@@ -270,7 +271,7 @@ keybind = super+9=increase_font_size:2
 
   test('labels on Windows; sequences', () {
     final (b, _) = resolve('keybind = ctrl+shift+k>n=new_tab', platform: win);
-    expect(b.labelOf(const KeyAction('new_tab')), 'Ctrl+Shift+K N');
+    expect(b.labelOf(const KeyAction('new_tab')), 'Ctrl+Shift+T');
     expect(b.labelOf(const KeyAction('new_workspace')), 'Ctrl+Shift+N');
     expect(
       sequenceLabel(b.sequences.single.sequence, mac: false),
@@ -293,6 +294,47 @@ keybind = super+9=increase_font_size:2
     expect(codes(esc), [
       (1, ConfigProblemCode.plainKeyTrigger, ConfigSeverity.error),
     ]);
+  });
+
+  test('labels: user single > default single > user sequence > default', () {
+    var (b, _) = resolve(
+      'keybind = ctrl+a>c=new_tab\nkeybind = super+k=new_tab',
+    );
+    expect(b.labelOf(const KeyAction('new_tab')), '⌘K');
+    (b, _) = resolve('keybind = ctrl+a>c=new_tab');
+    expect(b.labelOf(const KeyAction('new_tab')), '⌘T');
+    (b, _) = resolve('keybind = super+t=unbind\nkeybind = ctrl+a>c=new_tab');
+    expect(b.labelOf(const KeyAction('new_tab')), '⌃A C');
+  });
+
+  test('text, csi, esc: at most 4096 UTF-8 bytes of the text sent', () {
+    ConfigProblemCode? problem(String a) => parseKeyAction(a).problem;
+    expect(problem('text:${'a' * 4096}'), isNull);
+    expect(problem('text:${'a' * 4097}'), ConfigProblemCode.badActionParam);
+    // Vietnamese and CJK: 3 bytes each, so far fewer than 4096 characters.
+    expect(problem('text:${'ệ' * 1365}'), isNull);
+    expect(problem('text:${'ệ' * 1366}'), ConfigProblemCode.badActionParam);
+    expect(problem('text:${'中' * 1366}'), ConfigProblemCode.badActionParam);
+    // The prefixes count: ESC [ is two bytes, ESC one.
+    expect(problem('csi:${'a' * 4094}'), isNull);
+    expect(problem('csi:${'a' * 4095}'), ConfigProblemCode.badActionParam);
+    expect(problem('esc:${'a' * 4095}'), isNull);
+    expect(problem('esc:${'a' * 4096}'), ConfigProblemCode.badActionParam);
+  });
+
+  test('only resize_split takes an amount', () {
+    expect(
+      parseKeyAction('goto_split:left,10').problem,
+      ConfigProblemCode.badActionParam,
+    );
+    expect(parseKeyAction('resize_split:left,10').action?.param, 'left');
+  });
+
+  test('a binding\'s sequence cannot be changed', () {
+    final d = defaultKeyBindings(mac).first;
+    expect(() => d.sequence.add(d.sequence.first), throwsUnsupportedError);
+    final (b, _) = resolve('keybind = ctrl+a>c=new_tab');
+    expect(() => b.sequences.single.sequence.clear(), throwsUnsupportedError);
   });
 
   test('every default resolves to a spec and passes its own trigger rules', () {

@@ -11,7 +11,8 @@ import 'shellx_config.dart';
 /// One trigger (one chord, or a two-step sequence, D28) and its action.
 @immutable
 final class KeyBinding {
-  const KeyBinding(this.sequence, this.action, {this.origin});
+  KeyBinding(List<KeyChord> sequence, this.action, {this.origin})
+    : sequence = List.unmodifiable(sequence);
   final List<KeyChord> sequence;
   final KeyAction action;
 
@@ -57,13 +58,18 @@ final class KeyBindings {
       if (b.action == a) b.sequence,
   ];
 
-  /// D29 with the controller's criterion-5 ruling: the user's own trigger
-  /// (file order) when there is one, else the first default; null when the
-  /// action is unbound.
+  /// D29 with the controller's rulings: the user's own single chord, else
+  /// a default single chord still bound, else the user's sequence, else a
+  /// default sequence (file order within each); null when unbound.
   String? labelOf(KeyAction a) {
-    final bound = all.where((b) => b.action == a);
+    final bound = all.where((b) => b.action == a).toList();
     final first =
-        bound.where((b) => b.origin != null).firstOrNull ?? bound.firstOrNull;
+        bound
+            .where((b) => b.origin != null && b.sequence.length == 1)
+            .firstOrNull ??
+        bound.where((b) => b.sequence.length == 1).firstOrNull ??
+        bound.where((b) => b.origin != null).firstOrNull ??
+        bound.firstOrNull;
     return first == null ? null : sequenceLabel(first.sequence, mac: _mac);
   }
 

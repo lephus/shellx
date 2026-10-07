@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 
 import '../terminal/pane_layout.dart';
@@ -68,8 +70,16 @@ String? _oneOf(Set<String> allowed, String? raw) =>
     raw != null && allowed.contains(raw.trim()) ? raw.trim() : null;
 
 String? _direction(String? raw) {
-  if (raw == null) return null;
-  final first = raw.split(',').first.trim();
+  if (raw == null || raw.contains(',')) return null;
+  return _side(raw);
+}
+
+/// `resize_split` alone accepts (and ignores, with a note) `,N`.
+String? _resizeDirection(String? raw) =>
+    raw == null ? null : _side(raw.split(',').first);
+
+String? _side(String raw) {
+  final first = raw.trim();
   return switch (first) {
     'left' || 'right' || 'up' || 'down' => first,
     'top' => 'up',
@@ -96,11 +106,14 @@ String? _tabNumber(String? raw) {
 String? _name(String? raw) =>
     raw == null || raw.trim().isEmpty ? null : raw.trim();
 
-String? _escaped(String? raw) {
+/// The text a `text:`/`csi:`/`esc:` binding sends, prefix included, is at
+/// most 4096 UTF-8 bytes.
+String? Function(String?) _escaped(String prefix) => (raw) {
   if (raw == null || raw.isEmpty) return null;
   final decoded = decodeZigString(raw);
-  return decoded == null || decoded.length > 4096 ? null : raw;
-}
+  if (decoded == null) return null;
+  return utf8.encode('$prefix$decoded').length > 4096 ? null : raw;
+};
 
 const _textHint = r'a Zig string, e.g. text:ls\n';
 
@@ -137,7 +150,7 @@ final Map<String, ActionSpec> kActionSpecs = {
       'resize_split',
       ActionGroup.panes,
       repeats: true,
-      param: _direction,
+      param: _resizeDirection,
       paramHint: 'left, right, up, down',
     ),
     const ActionSpec('toggle_split_zoom', ActionGroup.panes),
@@ -184,27 +197,27 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint: 'a command name',
       inPalette: false,
     ),
-    const ActionSpec(
+    ActionSpec(
       'text',
       ActionGroup.commands,
       repeats: true,
-      param: _escaped,
+      param: _escaped(''),
       paramHint: _textHint,
       inPalette: false,
     ),
-    const ActionSpec(
+    ActionSpec(
       'csi',
       ActionGroup.commands,
       repeats: true,
-      param: _escaped,
+      param: _escaped('\x1b['),
       paramHint: _textHint,
       inPalette: false,
     ),
-    const ActionSpec(
+    ActionSpec(
       'esc',
       ActionGroup.commands,
       repeats: true,
-      param: _escaped,
+      param: _escaped('\x1b'),
       paramHint: _textHint,
       inPalette: false,
     ),
