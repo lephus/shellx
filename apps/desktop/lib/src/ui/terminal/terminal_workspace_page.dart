@@ -12,6 +12,7 @@ import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
 import '../../config/config_controller.dart';
 import '../../config/keybindings.dart';
+import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
@@ -60,6 +61,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
 
   /// The abnormal-end strip's "Close" (UI-A5 §4).
   final restoreStripFocus = FocusNode(debugLabel: 'restore strip');
+  final daemonStripFocus = FocusNode(debugLabel: 'service strip');
   final sidebarScroll = ScrollController();
 
   /// The notifications panel is open (UI-A4 §5).
@@ -253,12 +255,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     final signedOut =
         ref.read(agentControllerProvider).phase == AuthPhase.signedOut;
     final restoreStrip = ref.read(restoreStripProvider) != null;
+    final daemonStrip = ref.read(daemonStateProvider).strip != null;
     final noTab = ref.read(terminalTabsProvider).tabs.isEmpty;
     final regions = [
       noTab ? emptyFocus : terminalFocus,
       if (!noTab) sidebarFocus, // an empty list is no stop (UI §3.6)
       if (signedOut) stripFocus,
       if (restoreStrip) restoreStripFocus,
+      if (daemonStrip) daemonStripFocus,
     ];
     final current = regions.indexWhere((node) => node.hasFocus);
     // From outside every region (the `+` button, a toast…) the sidebar
@@ -462,6 +466,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     emptyFocus.dispose();
     stripFocus.dispose();
     restoreStripFocus.dispose();
+    daemonStripFocus.dispose();
     sidebarScroll.dispose();
     super.dispose();
   }
@@ -622,6 +627,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           emptyFocus: emptyFocus,
           stripFocus: stripFocus,
           restoreStripFocus: restoreStripFocus,
+          daemonStripFocus: daemonStripFocus,
           shortcuts: overlay == A9Overlay.shortcuts
               ? const {}
               : terminalShortcuts,
