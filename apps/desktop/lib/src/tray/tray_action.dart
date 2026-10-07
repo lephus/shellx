@@ -129,7 +129,6 @@ final class CopySkillsCommand extends TrayAction {
   const CopySkillsCommand();
 }
 
-/// "Disconnect phone" on a desktop terminal; never ends the terminal.
 /// A9 D45: the "Cấu hình" submenu. Each brings the window to the front.
 final class OpenConfigFile extends TrayAction {
   const OpenConfigFile();
@@ -147,6 +146,7 @@ final class ShowConfigProblemsFromTray extends TrayAction {
   const ShowConfigProblemsFromTray();
 }
 
+/// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
   final int id;

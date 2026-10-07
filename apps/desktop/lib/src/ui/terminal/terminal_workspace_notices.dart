@@ -9,6 +9,7 @@ import '../../config/config_problem.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
+import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'key_sequence.dart';
 import 'shortcut_labels.dart';
@@ -18,9 +19,21 @@ enum A9Overlay { palette, problems, shortcuts }
 
 /// One problem for the toast's "already told" check: where and what, never
 /// the text (D36: a problem that stays is not announced on every reload).
-typedef _ProblemKey = (String, int, ConfigProblemCode);
+typedef ProblemKey = (String, int, ConfigProblemCode);
 
-Set<_ProblemKey> _visibleKeys(Iterable<ConfigProblem> problems) => {
+/// What the toasts already told, kept outside the page: closing and
+/// reopening the window builds a new page that must not tell it again.
+final class ConfigToastMemory {
+  ConfigLoad? handledLoad;
+  Set<ProblemKey> loadKeys = {};
+  Set<ProblemKey> runtimeSeen = {};
+}
+
+final configToastMemoryProvider = Provider<ConfigToastMemory>(
+  (ref) => ConfigToastMemory(),
+);
+
+Set<ProblemKey> _visibleKeys(Iterable<ConfigProblem> problems) => {
   for (final p in problems)
     if (p.severity != ConfigSeverity.info) (p.file, p.line, p.code),
 };
@@ -93,9 +106,21 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     );
   }
 
-  ConfigLoad? _handledLoad;
-  Set<_ProblemKey> _loadKeys = {};
-  Set<_ProblemKey> _runtimeSeen = {};
+  ConfigToastMemory get _memory => ref.read(configToastMemoryProvider);
+
+  /// The latest generation the font probe has reported for (-1: none yet).
+  int _probedGeneration = -1;
+  ConfigLoad? _pendingLoad;
+  Timer? _loadTimer;
+
+  /// How long a load's feedback waits for the probe before it is decided
+  /// without it.
+  static const _probeBound = Duration(milliseconds: 500);
+
+  void disposeConfigUi() {
+    _loadTimer?.cancel();
+    _loadTimer = null;
+  }
 
   /// Toasts follow the loads (D36), the tray's requests open the overlays.
   /// The first look at the state is after the frame: the startup load ran
@@ -106,9 +131,12 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _onConfig(null, ref.read(shellxConfigProvider));
     });
-    // A Ghostty notice waiting for a free toast slot.
+    // A Ghostty notice waiting for a free toast slot or a visible window.
     ref.listenManual(terminalTabsProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) _showGhosttyIfDue();
+    });
+    ref.listenManual(windowRouterProvider.select((s) => s.visible), (_, _) {
+      _showGhosttyIfDue();
     });
     ref.listenManual(configUiRequestProvider, (_, next) {
       if (next == null) return;
@@ -125,22 +153,41 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     // while this notification was on its way: judge the latest state.
     final next = ref.read(shellxConfigProvider);
     final load = next.lastLoad;
-    if (load != null && !identical(load, _handledLoad)) {
-      _handledLoad = load;
-      _onLoad(load, next);
+    if (load != null && !identical(load, _memory.handledLoad)) {
+      _memory.handledLoad = load;
+      if (_probedGeneration >= next.generation) {
+        _onLoad(load, next);
+      } else {
+        // Decided once the probe has reported for this generation, so a
+        // problem that the probe finds again is never taken for a fix.
+        _pendingLoad = load;
+        _loadTimer?.cancel();
+        _loadTimer = Timer(_probeBound, _flushLoad);
+      }
     }
     if (previous == null ||
         !identical(previous.runtimeProblems, next.runtimeProblems)) {
       _onRuntime(next);
     }
+    _refreshCount(next);
     _showGhosttyIfDue();
+  }
+
+  void _flushLoad() {
+    _loadTimer?.cancel();
+    _loadTimer = null;
+    final load = _pendingLoad;
+    _pendingLoad = null;
+    if (load != null && mounted) {
+      _onLoad(load, ref.read(shellxConfigProvider));
+    }
   }
 
   void _onLoad(ConfigLoad load, ConfigState next) {
     final tabs = ref.read(terminalTabsProvider.notifier);
     final keys = _visibleKeys(next.loadProblems);
-    final fresh = keys.difference(_loadKeys);
-    _loadKeys = keys;
+    final fresh = keys.difference(_memory.loadKeys);
+    _memory.loadKeys = keys;
     final count = next.visibleProblemCount;
     if (count > 0) {
       if (fresh.isNotEmpty || load.manual) {
@@ -156,12 +203,26 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     if (load.manual) tabs.showNotice(const ConfigReloadedNotice());
   }
 
+  /// A problems toast that is up shows the current count once the load is
+  /// settled (the probe has reported); it never shows 0 (a fix dismisses it).
+  void _refreshCount(ConfigState next) {
+    if (_pendingLoad != null || _probedGeneration < next.generation) return;
+    final shown = ref.read(terminalTabsProvider).notice;
+    final count = next.visibleProblemCount;
+    if (shown is! ConfigProblemsNotice || count == 0) return;
+    final errors = next.errorCount > 0;
+    if (shown.count == count && shown.hasErrors == errors) return;
+    ref
+        .read(terminalTabsProvider.notifier)
+        .showNotice(ConfigProblemsNotice(count, hasErrors: errors));
+  }
+
   /// What only the window can find (the font probe): told once per
   /// problem, not on every reload that finds it again.
   void _onRuntime(ConfigState next) {
     final current = _visibleKeys(next.runtimeProblems);
-    final fresh = current.difference(_runtimeSeen);
-    _runtimeSeen.addAll(current);
+    final fresh = current.difference(_memory.runtimeSeen);
+    _memory.runtimeSeen.addAll(current);
     if (fresh.isEmpty) return;
     ref
         .read(terminalTabsProvider.notifier)
@@ -173,12 +234,16 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         );
   }
 
-  /// The probe ran for the current load: a runtime problem it no longer
-  /// finds is told again if it comes back.
+  /// The probe has reported for the current generation: a runtime problem
+  /// it no longer finds is told again if it comes back, and the load's
+  /// feedback (waiting for this) is decided.
   void forgetFixedRuntimeProblems() {
-    _runtimeSeen = _runtimeSeen.intersection(
-      _visibleKeys(ref.read(shellxConfigProvider).runtimeProblems),
+    final state = ref.read(shellxConfigProvider);
+    _probedGeneration = state.generation;
+    _memory.runtimeSeen = _memory.runtimeSeen.intersection(
+      _visibleKeys(state.runtimeProblems),
     );
+    if (_pendingLoad != null) _flushLoad();
   }
 
   /// D4: shown once, when no other toast is up; acknowledged only after it
@@ -186,6 +251,8 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   void _showGhosttyIfDue() {
     if (!ref.read(shellxConfigProvider).ghosttyNoticePending) return;
     if (ref.read(terminalTabsProvider).notice != null) return;
+    // Acknowledged only when someone can see it.
+    if (!ref.read(windowRouterProvider).visible) return;
     ref
         .read(terminalTabsProvider.notifier)
         .showNotice(const ConfigGhosttyNotice());

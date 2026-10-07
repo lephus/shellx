@@ -278,15 +278,15 @@ final class TrayActions {
     );
   }
 
-  /// A7 D8: installs or removes `shellx` for other terminals. Never at
-  /// startup. Stored only when it worked; a cancelled password prompt
-  /// changes nothing and says nothing; the result shows in the window.
   /// A1 D11: a window item brings the window forward first.
   Future<void> _showWindow() => openTerminalWindow(
     router: _router,
     tabs: _ref.read(terminalTabsProvider.notifier),
   );
 
+  /// A7 D8: installs or removes `shellx` for other terminals. Never at
+  /// startup. Stored only when it worked; a cancelled password prompt
+  /// changes nothing and says nothing; the result shows in the window.
   Future<void> _toggleCliPath() async {
     final installer = _ref.read(cliPathInstallerProvider);
     final paths = _ref.read(cliPathsProvider);

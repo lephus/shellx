@@ -26,6 +26,7 @@ pumpConfiguredWorkspace(
   String config = '',
   TargetPlatform? platform,
   List<Override> extra = const [],
+  Locale locale = const Locale('en'),
 }) async {
   final fs = MemoryConfigFs();
   if (config.isNotEmpty) fs.write(testConfigPaths().shellx, config);
@@ -48,18 +49,7 @@ pumpConfiguredWorkspace(
   tester.view.physicalSize = const Size(1100, 720);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(
-        theme: buildDesktopTheme(),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(body: TerminalWorkspacePage()),
-      ),
-    ),
-  );
+  await tester.pumpWidget(workspaceApp(container, locale: locale));
   await container.read(terminalTabsProvider.notifier).openTab();
   await tester.pumpAndSettle();
   return (container: container, local: local, fs: fs);
@@ -70,3 +60,19 @@ Future<void> disposeWorkspace(WidgetTester tester, ProviderContainer c) async {
   await tester.pumpWidget(const SizedBox());
   c.dispose();
 }
+
+/// The window around the workspace page (a test may pump it again to model
+/// the window being closed and reopened).
+Widget workspaceApp(
+  ProviderContainer container, {
+  Locale locale = const Locale('en'),
+}) => UncontrolledProviderScope(
+  container: container,
+  child: MaterialApp(
+    theme: buildDesktopTheme(),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    locale: locale,
+    home: const Scaffold(body: TerminalWorkspacePage()),
+  ),
+);

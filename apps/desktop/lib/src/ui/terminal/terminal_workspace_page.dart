@@ -452,6 +452,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   @override
   void dispose() {
     disposeSequences();
+    disposeConfigUi();
     terminalFocus.dispose();
     sidebarFocus.dispose();
     emptyFocus.dispose();
