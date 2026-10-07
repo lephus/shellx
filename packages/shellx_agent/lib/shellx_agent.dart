@@ -24,6 +24,7 @@ export 'src/pty/session_environment.dart';
 export 'src/pty/shell_integration.dart';
 export 'src/pty/shell_resolver.dart';
 export 'src/remote/command_runner.dart';
+export 'src/remote/remote_port_watcher.dart';
 export 'src/remote/remote_probe.dart';
 export 'src/remote/session_launch.dart';
 export 'src/remote/ssh_config_hosts.dart';

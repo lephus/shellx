@@ -16,6 +16,7 @@ import '../pty/session_environment.dart';
 import '../pty/shell_integration.dart';
 import '../pty/shell_resolver.dart';
 import '../remote/command_runner.dart';
+import '../remote/remote_port_watcher.dart';
 import '../remote/remote_tools.dart';
 import '../remote/session_launch.dart';
 import '../remote/ssh_command.dart';
@@ -265,6 +266,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
        _gitHeads = gitHeads,
        _remoteTools = remoteTools,
        _plainConnectedAfter = plainConnectedAfter,
+       _remotePortInterval = remotePortInterval,
        _windowsPaths = windowsPaths,
        _localHostName = localHostName,
        _notifications = notifications,
@@ -291,6 +293,15 @@ final class SessionManager implements AgentSessions, LocalSessions {
         log: log,
       );
     }
+    if (remoteTools?.control case final control?) {
+      _remotePorts = RemotePortWatcher(
+        control: control,
+        shells: _remoteShells,
+        onPorts: _applyRemotePorts,
+        interval: _remotePortInterval,
+        log: log,
+      );
+    }
   }
 
   final PtyFactory _ptyFactory;
@@ -298,6 +309,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// A8: ssh/tmux paths and the control helper; null = SSH unavailable.
   final RemoteTools? _remoteTools;
   final Duration _plainConnectedAfter;
+  final Duration _remotePortInterval;
 
   /// D9, D29: opens to a server that have not registered a session yet,
   /// by order of arrival (the first signs in, the rest wait for its master).
@@ -337,6 +349,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
 
   /// Listening ports (A2 C3); null: no ports.
   PortWatcher? _portWatcher;
+
+  /// A8 D18; null without ssh. Not disposed by [closeAll] (the tray's
+  /// "Close all" is the same call): only a real shutdown would.
+  RemotePortWatcher? _remotePorts;
 
   /// While one side typed less than this ago, a keystroke from the other
   /// side is written but does not take the driver (and the PTY size) away:
@@ -612,7 +628,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
   void close(int id) => closeSession(id);
 
   @override
-  void watchPorts(bool visible) => _portWatcher?.setVisible(visible);
+  void watchPorts(bool visible) {
+    _portWatcher?.setVisible(visible);
+    _remotePorts?.setVisible(visible);
+  }
 
   /// Session id → shell pid, for [PortWatcher] (D3: ptys without a pid
   /// have no ports). An exited shell is left out: its pid stays set but
@@ -645,6 +664,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// once no session is left) and it leaves the watcher's snapshot.
   void _shellGone(_Session session) {
     _portWatcher?.sessionsChanged();
+    _remotePorts?.sessionsChanged();
     if (session.ports.isEmpty) return;
     session.ports = const [];
     if (!session.closing) _changes.add(null);
@@ -1276,9 +1296,37 @@ final class SessionManager implements AgentSessions, LocalSessions {
     return false;
   }
 
-  // Task 6 fills these in.
-  void _remoteHello(SshTarget? target) {}
-  void _remoteShellsChanged() {}
+  /// D18: sessions that said hello and their pid, for [RemotePortWatcher].
+  Map<int, RemoteShell> _remoteShells() => {
+    for (final s in _sessions.values)
+      if (!s.closing &&
+          !s.exited &&
+          s.remote?.connected == true &&
+          s.remote?.pid != null &&
+          s.remote?.launch.host != null)
+        s.id: RemoteShell(target: s.remote!.launch.host!, pid: s.remote!.pid!),
+  };
+
+  /// A probe's result for one server: only its sessions (a partial update).
+  void _applyRemotePorts(Map<int, List<int>> ports) {
+    var changed = false;
+    for (final entry in ports.entries) {
+      final s = _sessions[entry.key];
+      if (s == null || s.remote == null || _sameInts(entry.value, s.ports)) {
+        continue;
+      }
+      s.ports = List.unmodifiable(entry.value);
+      changed = true;
+    }
+    if (changed) _changes.add(null);
+  }
+
+  void _remoteHello(SshTarget? target) {
+    if (target != null) _remotePorts?.resume(target);
+    _remotePorts?.sessionsChanged();
+  }
+
+  void _remoteShellsChanged() => _remotePorts?.sessionsChanged();
 
   /// A2 C1/D2. True when the summary changed.
   bool _setCwd(_Session session, String url) {
@@ -1369,6 +1417,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     _sessions.remove(session.id);
     session.ports = const [];
     _portWatcher?.sessionsChanged();
+    _remotePorts?.sessionsChanged();
     session.output?.cancel();
     unawaited(session.local.close());
     unawaited(session.drivers.close());

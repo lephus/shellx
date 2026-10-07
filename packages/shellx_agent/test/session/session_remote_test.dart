@@ -419,4 +419,50 @@ void main() {
       );
     },
   );
+
+  test('remote ports reach the summary; the pid counts once; closeAll keeps '
+      'the watcher for new sessions (D18)', () {
+    fakeAsync((async) {
+      final remote = tools();
+      final probing = RemoteTools(
+        sshPath: remote.sshPath,
+        tmuxPath: remote.tmuxPath,
+        control: SshControl(
+          sshPath: '/usr/bin/ssh',
+          run: (exe, args, {timeout = const Duration(seconds: 5)}) async =>
+              args.first == '-G'
+              ? const CommandResult(0, 'serveraliveinterval 0\n', '')
+              : const CommandResult(
+                  0,
+                  '#ps\n 4242 1\n#ss\n'
+                      'LISTEN 0 1 *:8000 *:* users:(("p",pid=4242,fd=3))\n',
+                  '',
+                ),
+        ),
+      );
+      final rig = SessionRig(remoteTools: probing);
+      unawaited(
+        rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox)),
+      );
+      async.flushMicrotasks();
+      rig.manager.watchPorts(true);
+      rig.pty(0).emit('${osc('6973;hello=1')}${osc('6973;pid=4242')}');
+      async.elapse(const Duration(milliseconds: 10));
+      expect(rig.manager.sessions.single.ports, [8000]);
+      // A forged later pid does not move the probe to another process.
+      rig.pty(0).emit(osc('6973;pid=99'));
+      async.elapse(const Duration(seconds: 6));
+      expect(rig.manager.sessions.single.ports, [8000]);
+      // "Close all" ends sessions; a session opened after it is probed.
+      rig.manager.closeAll();
+      async.flushMicrotasks();
+      unawaited(
+        rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox)),
+      );
+      async.flushMicrotasks();
+      rig.pty(1).emit('${osc('6973;hello=1')}${osc('6973;pid=4242')}');
+      async.elapse(const Duration(seconds: 6));
+      expect(rig.manager.sessions.single.ports, [8000]);
+    });
+  });
 }
