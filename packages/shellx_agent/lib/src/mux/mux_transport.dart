@@ -13,8 +13,9 @@ abstract interface class MuxConnection {
   void send(MuxMessage message);
 
   /// Bytes given to [send] that the peer has not taken yet (A7 D24/D32
-  /// back-pressure; additive to A5b D4). 0 when the transport cannot tell
-  /// (the Windows pipe) and once closed.
+  /// back-pressure; additive to A5b D4): for a socket, not yet flushed; for
+  /// the Windows pipe, not yet written by its writer isolate (A7 final
+  /// ruling W1). 0 when the transport cannot tell and once closed.
   int get pendingBytes;
 
   /// Completes once [pendingBytes] is 0, or the link is closed.
@@ -185,8 +186,9 @@ String socketPathFor({
 /// Frames over any byte stream (Unix socket, Windows pipe isolate).
 final class StreamMuxConnection implements MuxConnection {
   /// [flush] (optional) completes once everything written so far left the
-  /// process; with it, [send] queues frames and [pendingBytes] counts them
-  /// until flushed. Without it (the Windows pipe) nothing is counted.
+  /// process (the Windows pipe: its writer isolate wrote it); with it,
+  /// [send] queues frames and [pendingBytes] counts them until flushed.
+  /// Without it nothing is counted.
   StreamMuxConnection(
     Stream<Uint8List> input,
     this._write,

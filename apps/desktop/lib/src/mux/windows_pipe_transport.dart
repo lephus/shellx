@@ -21,6 +21,8 @@
 /// - `ReadFile` / `WriteFile` (overlapped) in two isolates per connection:
 ///   a handle opened for synchronous I/O serializes reads and writes, so a
 ///   blocked read would block every write; overlapped I/O lets both run.
+///   The writer reports each chunk written in full, so the connection's
+///   `pendingBytes`/`drained` work here too (A7 final ruling W1).
 /// - `CreateEventW` / `WaitForMultipleObjects` / `SetEvent`: each blocking
 ///   wait also watches a manual-reset "stop" event the main isolate sets on
 ///   close (no race with an I/O not yet issued).
@@ -382,8 +384,11 @@ void _readLoop((int, int, SendPort) args) {
   });
 }
 
-/// Writer isolate: sends its port first; writes each chunk in order; `null`
-/// ends it after the queued writes.
+/// Writer isolate: sends its port first; writes each chunk in order and
+/// reports each one written in full (its length; A7 final ruling W1, so the
+/// connection can count what is still pending), or `-1` once a write
+/// failed (nothing more is written); `null` ends it after the queued
+/// writes.
 void _writeLoop((int, int, SendPort) args) {
   final (handle, stop, out) = args;
   final inbox = ReceivePort();
@@ -423,15 +428,18 @@ void _writeLoop((int, int, SendPort) args) {
             ) !=
             0;
         if (!ok && GetLastError() != ERROR_IO_PENDING) {
+          out.send(-1);
           finish();
           return;
         }
         if (!_await(handle, overlapped, stop, transferred, arena)) {
+          out.send(-1);
           finish();
           return;
         }
         offset += transferred.value;
       }
+      out.send(bytes.length);
     } finally {
       calloc.free(native);
     }
@@ -459,6 +467,8 @@ final class _PipeConnection {
     writePort.listen((Object? message) {
       if (message is SendPort && !pipe._writer.isCompleted) {
         pipe._writer.complete(message);
+      } else if (message is int) {
+        message < 0 ? pipe._writerFailed() : pipe._wrote(message);
       }
     });
     final readerExit = ReceivePort();
@@ -477,7 +487,24 @@ final class _PipeConnection {
       pipe._stop,
       writePort.sendPort,
     ), onExit: writerExit.sendPort);
-    return StreamMuxConnection(input.stream, pipe._write, pipe._close);
+    // A writer that never spawned, or that ended, writes nothing more.
+    unawaited(
+      _spawned(pipe._writerIsolate).then((i) {
+        if (i == null) pipe._writerFailed();
+      }),
+    );
+    unawaited(
+      pipe._writerExited.then(
+        (_) => pipe._writerFailed(),
+        onError: (Object _) => pipe._writerFailed(),
+      ),
+    );
+    return StreamMuxConnection(
+      input.stream,
+      pipe._write,
+      pipe._close,
+      flush: pipe._flush,
+    );
   }
 
   static const _bound = Duration(seconds: 1);
@@ -492,9 +519,47 @@ final class _PipeConnection {
   late final Future<Object?> _writerExited;
   Future<void> _pending = Future<void>.value();
 
+  /// A7 final ruling W1: bytes given to [_write], and those the writer
+  /// isolate reported written in full; [StreamMuxConnection] counts the
+  /// difference as pending (D24/D32 back-pressure) through [_flush].
+  int _given = 0;
+  int _written = 0;
+  bool _writerDead = false;
+  final _flushes = <(int, Completer<void>)>[];
+
   void _write(Uint8List bytes) {
+    if (_writerDead) throw StateError('pipe writer ended');
+    _given += bytes.length;
     final chunk = TransferableTypedData.fromList([bytes]);
     _pending = _pending.then((_) async => (await _writer.future).send(chunk));
+  }
+
+  /// Completes once everything given so far was written to the pipe (the
+  /// peer's buffer took it); throws once the writer ended.
+  Future<void> _flush() {
+    if (_writerDead) return Future.error(StateError('pipe writer ended'));
+    if (_written >= _given) return Future<void>.value();
+    final c = Completer<void>();
+    _flushes.add((_given, c));
+    return c.future;
+  }
+
+  void _wrote(int bytes) {
+    _written += bytes;
+    _flushes.removeWhere((f) {
+      if (f.$1 > _written) return false;
+      f.$2.complete();
+      return true;
+    });
+  }
+
+  void _writerFailed() {
+    if (_writerDead) return;
+    _writerDead = true;
+    for (final f in _flushes) {
+      f.$2.completeError(StateError('pipe writer ended'));
+    }
+    _flushes.clear();
   }
 
   /// Null when the isolate never spawned (nothing to wait for).

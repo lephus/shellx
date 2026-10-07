@@ -32,8 +32,9 @@ import 'ui_api.dart';
 /// the transport (`pendingBytes`/`drained`): while a client leaves over
 /// 256 KiB of answers unread, its requests wait and its input is paused;
 /// D24: over 1000 events it has not taken are dropped, then one
-/// `overflow{dropped}` once it caught up. The Windows pipe cannot count
-/// (A5b residual): there these limits do not engage.
+/// `overflow{dropped}` once it caught up. The Windows pipe counts too: its
+/// writer isolate reports what it wrote (A7 final ruling W1; ⚠ run on
+/// Windows by hand).
 ///
 /// Never logs tokens, the secret, notification text or request contents.
 final class CliHost {

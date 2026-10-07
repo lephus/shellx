@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
@@ -43,6 +44,44 @@ void main() {
     expect((await back).type, MuxType.result);
     await client.close();
     await server.done;
+    await listener.close();
+  }, testOn: 'windows');
+
+  test('A7 final W1: pendingBytes counts what a peer that does not read '
+      'left unwritten; its going away settles drained', () async {
+    final t = WindowsPipeTransport();
+    final listener = await t.listen(testPipe());
+    final serverSide = listener.connections.first;
+    // A raw client that never reads (as a `shellx events` stuck on its
+    // stdout): the pipe's 64 KiB buffer fills, then writes wait.
+    final raw = using(
+      (arena) => CreateFile(
+        listener.address.toNativeUtf16(allocator: arena),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        kPipeClientFlags,
+        0,
+      ),
+    );
+    expect(raw, isNot(INVALID_HANDLE_VALUE));
+    final server = await serverSide;
+    for (var i = 0; i < 64; i++) {
+      server.send(
+        MuxMessage(MuxType.result, q: i, fields: {'pad': 'x' * 30000}),
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect(server.pendingBytes, greaterThan(64 * 1024));
+    var drained = false;
+    unawaited(server.drained.then((_) => drained = true));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(drained, isFalse);
+    CloseHandle(raw);
+    await server.drained.timeout(const Duration(seconds: 5));
+    expect(server.pendingBytes, 0);
+    await server.done.timeout(const Duration(seconds: 5));
     await listener.close();
   }, testOn: 'windows');
 
