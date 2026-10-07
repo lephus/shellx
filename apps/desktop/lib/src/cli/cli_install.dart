@@ -106,12 +106,14 @@ String generateCliToken() {
 /// D8, D29, amendment: what every ShellX shell gets on top of the app's
 /// environment — `<support>/cli` first on `PATH` (Windows: the existing
 /// key, whatever its case, else `Path`), the host address and the
-/// per-launch token. The pane and tab ids are added per session.
+/// per-launch token. The pane and tab ids are added per session. Final
+/// ruling M1: without a running host ([socket] and [token] null) neither
+/// goes in, and inherited ones are dropped.
 Map<String, String> cliSessionEnvironment(
   Map<String, String> base, {
   required String cliDir,
-  required String socket,
-  required String token,
+  required String? socket,
+  required String? token,
   required bool windows,
 }) {
   final env = Map<String, String>.of(base);
@@ -123,8 +125,14 @@ Map<String, String> cliSessionEnvironment(
       : 'PATH';
   final old = env[key] ?? '';
   env[key] = old.isEmpty ? cliDir : '$cliDir${windows ? ';' : ':'}$old';
-  env['SHELLX_SOCKET'] = socket;
-  env['SHELLX_CLI_TOKEN'] = token;
+  if (socket == null || token == null) {
+    env
+      ..remove('SHELLX_SOCKET')
+      ..remove('SHELLX_CLI_TOKEN');
+  } else {
+    env['SHELLX_SOCKET'] = socket;
+    env['SHELLX_CLI_TOKEN'] = token;
+  }
   return env;
 }
 

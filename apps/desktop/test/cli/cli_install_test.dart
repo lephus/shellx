@@ -93,6 +93,20 @@ void main() {
     );
   });
 
+  test('final M1: without a running host the shells get the folder on PATH '
+      'but no address or token (not even inherited ones)', () {
+    final env = cliSessionEnvironment(
+      {'PATH': '/usr/bin', 'SHELLX_SOCKET': '/old', 'SHELLX_CLI_TOKEN': 'old'},
+      cliDir: '/c',
+      socket: null,
+      token: null,
+      windows: false,
+    );
+    expect(env['PATH'], '/c:/usr/bin');
+    expect(env.containsKey('SHELLX_SOCKET'), isFalse);
+    expect(env.containsKey('SHELLX_CLI_TOKEN'), isFalse);
+  });
+
   test('the per-launch token: 32 random bytes as 64 hex digits', () {
     final a = generateCliToken();
     final b = generateCliToken();

@@ -201,11 +201,30 @@ Future<void> _start(
     locale: () => Platform.localeName,
     hooksDirectory: '${supportDirectory.path}${Platform.pathSeparator}hooks',
   );
-  // A7: the command line. Its host address, its folder and this launch's
-  // token go into every ShellX shell's environment (D8, D29, amendment),
-  // so they are known before the first shell. Without them (no HOME /
-  // LOCALAPPDATA) the app runs without the command line.
+  // A7: the command line. Its folder, and — once its host listens — the
+  // host's address and this launch's token go into every ShellX shell's
+  // environment (D8, D29, amendment), so they are known before the first
+  // shell. Without them (no HOME / LOCALAPPDATA) the app runs without the
+  // command line.
   final cli = _cliSetup(environment);
+  // A7 C1, final ruling M1: the host listens before the sessions exist, so
+  // a shell is only told of a host that runs. The single-instance lock is
+  // held; the host also takes `mux/mux.lock`. Requests wait for the window
+  // (attach, below).
+  CliService? cliService;
+  if (cli != null) {
+    try {
+      cliService = await CliService.listen(
+        paths: cli.mux,
+        cliPaths: cli.paths,
+        settings: settings,
+        appVersion: info.version,
+        token: cli.token,
+      );
+    } catch (error) {
+      debugPrint('ShellX: command-line host failed: ${error.runtimeType}');
+    }
+  }
   // The app's one ShellxApi: the controller sets its token at sign-in.
   final api = ShellxApi(baseUri: relayBase);
   // A1 D7: the process's one SessionManager. It outlives every runtime, so
@@ -219,13 +238,16 @@ Future<void> _start(
     homeDirectory: home,
     // Only the shells' environment gains the command line (not the shell
     // resolver's, nor the paths derived from `environment` above).
+    // An address or token inherited from another ShellX never goes on.
     baseEnvironment: cli == null
-        ? environment
+        ? (Map.of(environment)
+            ..remove('SHELLX_SOCKET')
+            ..remove('SHELLX_CLI_TOKEN'))
         : cliSessionEnvironment(
             environment,
             cliDir: cli.paths.dir,
-            socket: cli.mux.address,
-            token: cli.token,
+            socket: cliService?.address,
+            token: cliService == null ? null : cli.token,
             windows: Platform.isWindows,
           ),
     api: api,
@@ -512,21 +534,10 @@ Future<void> _start(
     container.read(windowRouterProvider.notifier).showTerminal();
     if (Platform.isMacOS) await activateMacApp();
   };
-  // A7 C1: the command-line host, before the first shell can use it. The
-  // single-instance lock is held; the host also takes `mux/mux.lock`.
-  if (cli != null) {
-    try {
-      // Quit stops it first, before the shells close (tray Quit, ruling
-      // M6: it registers itself in cliHostControlProvider).
-      await CliService.start(
-        container,
-        appVersion: info.version,
-        token: cli.token,
-      );
-    } catch (error) {
-      debugPrint('ShellX: command-line host failed: ${error.runtimeType}');
-    }
-  }
+  // A7 C1: the window is up; the host's requests reach it now. Quit stops
+  // the host first, before the shells close (tray Quit, ruling M6: attach
+  // registers it in cliHostControlProvider).
+  cliService?.attach(container);
 
   registerFontLicenses();
   runApp(

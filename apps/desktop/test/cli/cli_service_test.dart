@@ -130,6 +130,63 @@ void main() {
     await closed;
   });
 
+  test('final M1: the host listens before the window exists; requests '
+      'wait for attach, then reach the window', () async {
+    // The window's container, attached only later (its store is the one
+    // main.dart hands to listen).
+    final c = cliContainer(
+      FakeLocalSessions(),
+      overrides: [cliMuxPathsProvider.overrideWithValue(paths)],
+    );
+    final svc = await CliService.listen(
+      paths: paths,
+      settings: c.read(settingsStoreProvider),
+      appVersion: '1.7.0',
+      token: token,
+      installBinary: false,
+    );
+    addTearDown(svc.stop);
+    final conn = await connect(token: token);
+    expect((await ask(conn, 'api.version', 1)).get<int>('api'), 1);
+    var answered = false;
+    final ls = ask(conn, 'ui.ls', 2).then((m) {
+      answered = true;
+      return m;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(answered, isFalse); // no window yet: the request waits
+    expect(c.read(cliHostControlProvider).stop, isNull);
+    svc.attach(c);
+    expect((await ls).type, 'result');
+    // Attached: Quit can stop it, the settings recheck it.
+    expect(c.read(cliHostControlProvider).stop, isNotNull);
+    await conn.close();
+  });
+
+  test('final M3: a start that fails after listening closes the listener '
+      'and frees the lock', () async {
+    // The endpoint cannot be written: a non-empty directory in its place.
+    await Directory('${paths.endpoint}/blocked').create(recursive: true);
+    final c = cliContainer(
+      FakeLocalSessions(),
+      overrides: [cliMuxPathsProvider.overrideWithValue(paths)],
+    );
+    await expectLater(
+      CliService.start(
+        c,
+        appVersion: '1.7.0',
+        token: token,
+        installBinary: false,
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      UnixMuxTransport().connect(paths.address),
+      throwsA(anything),
+    );
+    expect(await _lockFromAnotherProcess(paths.lock), isTrue);
+  });
+
   test('the host holds the mux lock: another process cannot take it, so '
       'two hosts never serve one directory', () async {
     final c = cliContainer(

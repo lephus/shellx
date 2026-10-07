@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -58,49 +59,61 @@ final cliClipboardProvider = Provider<Future<void> Function(String text)>(
 /// daemon). Starts after the single-instance lock is held, and also holds
 /// the mux directory's own lock (`mux.lock`, the one A5b's daemon takes),
 /// so two hosts never serve one address.
+///
+/// Final ruling M1: it listens ([listen]) before the shells' environment
+/// is built, so only a running host's address and token reach them; the
+/// window comes later ([attach]) — requests that arrive before wait for it.
 final class CliService {
-  CliService._(this._host, this._lock, this._settings, this.address);
+  CliService._(
+    this._host,
+    this._lock,
+    this._ui,
+    this._settingsStore,
+    this.address,
+  );
 
   bool _stopped = false;
 
   final CliHost _host;
   final _MuxLock _lock;
-  final CliSettings _settings;
+  final _LateUi _ui;
+  final SettingsStore _settingsStore;
+  CliSettings? _settings;
 
   /// The socket path or pipe name (`SHELLX_SOCKET`).
   final String address;
 
-  /// D7: refreshes `<support>/cli/shellx` (failures logged by type only),
-  /// then serves the CLI API. [token] is the launch's `SHELLX_CLI_TOKEN`;
-  /// clients without it get the full API only while "Allow other
-  /// terminals" is ticked (amendment). Throws when the host cannot start
-  /// (the app then runs without the command line).
-  static Future<CliService> start(
-    ProviderContainer c, {
+  /// D7: refreshes [cliPaths]' `shellx` (failures logged by type only),
+  /// then serves the CLI API at [paths]. [token] is the launch's
+  /// `SHELLX_CLI_TOKEN`; clients without it get the full API only while
+  /// "Allow other terminals" is ticked in [settings] (amendment). `ui.*`
+  /// requests wait until [attach]. Throws when the host cannot start (the
+  /// app then runs without the command line); nothing is left listening
+  /// or locked then (final ruling M3).
+  static Future<CliService> listen({
+    required MuxPaths paths,
+    required SettingsStore settings,
     required String appVersion,
     required String token,
+    CliPaths? cliPaths,
     bool installBinary = true,
   }) async {
-    if (installBinary) {
-      final paths = c.read(cliPathsProvider);
-      if (paths != null) {
-        try {
-          await CliBinaryInstaller(paths).ensureCurrent();
-        } on Object catch (e) {
-          debugPrint('ShellX: cli binary install failed: ${e.runtimeType}');
-        }
+    if (installBinary && cliPaths != null) {
+      try {
+        await CliBinaryInstaller(cliPaths).ensureCurrent();
+      } on Object catch (e) {
+        debugPrint('ShellX: cli binary install failed: ${e.runtimeType}');
       }
     }
-    final paths = c.read(cliMuxPathsProvider);
-    final settings = c.read(settingsStoreProvider);
     final lock = await _MuxLock.acquire(paths);
-    final CliHost host;
+    final ui = _LateUi();
+    CliHost? host;
     try {
       host = CliHost(
         transport: paths.windows ? WindowsPipeTransport() : UnixMuxTransport(),
         address: paths.address,
         endpointFile: MuxEndpointFile(paths.endpoint),
-        ui: c.read(uiCommandHandlerProvider),
+        ui: ui,
         enabled: () =>
             settings.getBool(SettingKeys.cliControlEnabled, defaultValue: true),
         token: token,
@@ -111,27 +124,98 @@ final class CliService {
       );
       await host.start();
     } catch (_) {
+      // M3: listening may have begun before the failure (the endpoint file).
+      try {
+        await host?.stop();
+      } on Object catch (e) {
+        debugPrint('ShellX: cli host stop failed: ${e.runtimeType}');
+      }
       await lock.release();
       rethrow;
     }
-    final cliSettings = c.read(cliSettingsProvider.notifier)
-      ..onChanged = host.recheck;
-    final service = CliService._(host, lock, cliSettings, paths.address);
-    c.read(cliHostControlProvider).stop = service.stop;
+    return CliService._(host, lock, ui, settings, paths.address);
+  }
+
+  /// [listen] with what [c] provides, then [attach] to it (tests).
+  static Future<CliService> start(
+    ProviderContainer c, {
+    required String appVersion,
+    required String token,
+    bool installBinary = true,
+  }) async {
+    final service = await listen(
+      paths: c.read(cliMuxPathsProvider),
+      cliPaths: c.read(cliPathsProvider),
+      settings: c.read(settingsStoreProvider),
+      appVersion: appVersion,
+      token: token,
+      installBinary: installBinary,
+    );
+    service.attach(c);
     return service;
+  }
+
+  /// The window is up: requests reach its tabs; the tray's settings
+  /// recheck open connections; Quit stops the host first (ruling M6).
+  /// Once. [c]'s settings store must be the one [listen] got.
+  void attach(ProviderContainer c) {
+    if (_stopped || _settings != null) return;
+    assert(identical(c.read(settingsStoreProvider), _settingsStore));
+    final settings = c.read(cliSettingsProvider.notifier)
+      ..onChanged = _host.recheck;
+    _settings = settings;
+    c.read(cliHostControlProvider).stop = stop;
+    _ui.bind(c.read(uiCommandHandlerProvider));
   }
 
   /// Closes every connection and removes the endpoint file. Once.
   Future<void> stop() async {
     if (_stopped) return;
     _stopped = true;
-    if (_settings.onChanged == _host.recheck) _settings.onChanged = null;
+    final settings = _settings;
+    if (settings != null && settings.onChanged == _host.recheck) {
+      settings.onChanged = null;
+    }
     try {
       await _host.stop();
     } finally {
       await _lock.release();
     }
   }
+}
+
+/// Final ruling M1: the window's [UiApi] once [bind] gave it; until then
+/// requests and notices wait, and events start once it is there.
+final class _LateUi implements UiApi {
+  final _ui = Completer<UiApi>();
+  UiApi? _bound;
+
+  void bind(UiApi ui) {
+    _bound = ui;
+    _ui.complete(ui);
+  }
+
+  @override
+  Future<Map<String, Object?>> handle(
+    MuxMessage request, {
+    Future<void>? cancelled,
+    bool Function()? isGone,
+  }) async =>
+      (await _ui.future).handle(request, cancelled: cancelled, isGone: isGone);
+
+  @override
+  Stream<Map<String, Object?>> events() =>
+      _bound?.events() ??
+      Stream.fromFuture(_ui.future).asyncExpand((ui) => ui.events());
+
+  @override
+  Future<void> notifyApp({String? title, required String body}) async =>
+      (await _ui.future).notifyApp(title: title, body: body);
+
+  /// No window yet: no pane either.
+  @override
+  bool notifyPane(int pane, {String? title, required String body}) =>
+      _bound?.notifyPane(pane, title: title, body: body) ?? false;
 }
 
 /// `mux/mux.lock`, exclusive, for the host's lifetime. The directory is
