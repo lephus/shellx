@@ -208,6 +208,9 @@ final class RemoteLocalSessions implements LocalSessions {
     _client.events.listen(_onEvent);
     disconnected = _client.done.then((_) {
       _connected = false;
+      for (final v in [..._views.values]) {
+        v._lose();
+      }
       if (!_ready.isCompleted) {
         _ready.completeError(const MuxRemoteException('disconnected'));
       }
@@ -326,7 +329,12 @@ final class RemoteLocalSessions implements LocalSessions {
     _views[id] = v;
     _client
         .request(MuxType.viewOpen, {'id': id})
-        .then((_) {}, onError: (Object _) {});
+        .then(
+          (_) {},
+          onError: (Object _) {
+            if (identical(_views[id], v)) v._lose();
+          },
+        );
     return v;
   }
 
@@ -383,7 +391,8 @@ final class RemoteSessionView implements LocalSessionView {
   final RemoteLocalSessions _owner;
   @override
   final int id;
-  final _output = StreamController<Uint8List>();
+  // Sync: [replaying] is read inside the listener, per chunk.
+  final _output = StreamController<Uint8List>(sync: true);
   final _driverChanges = StreamController<DriverSide>.broadcast();
   final _exit = Completer<int>();
   var _onRequest = false;
@@ -409,6 +418,16 @@ final class RemoteSessionView implements LocalSessionView {
   @override
   Future<Uint8List>? get pendingBacklog => _pending.future;
   @override
+  bool get replaying => _replaying && !_first;
+
+  /// The connection ended (or `view.open` failed) before the session did:
+  /// [output] is done and [pendingBacklog] complete, but [exitCode] never
+  /// completes, so no exit line is written. The desktop learns of the loss
+  /// from [RemoteLocalSessions.disconnected] (A5b Task 8).
+  bool get lost => _lost;
+  var _lost = false;
+  Timer? _liveTimer;
+  @override
   Stream<Uint8List> get output => _output.stream;
   @override
   Stream<DriverSide> get driver => _driverChanges.stream;
@@ -422,6 +441,9 @@ final class RemoteSessionView implements LocalSessionView {
     _unacked += data.length;
     if (backlog && _first) {
       _firstBytes.add(data);
+      // A daemon that never says `view.live` must not hold the pane's
+      // input and replies shut.
+      _liveTimer ??= Timer(const Duration(seconds: 5), _live);
     } else if (_holding) {
       _held.add(data);
     } else {
@@ -444,6 +466,8 @@ final class RemoteSessionView implements LocalSessionView {
   }
 
   void _live() {
+    _liveTimer?.cancel();
+    _liveTimer = null;
     _replaying = false;
     if (!_first) return;
     _first = false;
@@ -473,6 +497,7 @@ final class RemoteSessionView implements LocalSessionView {
 
   void _end(int code, {required bool onRequest}) {
     _onRequest = onRequest;
+    _liveTimer?.cancel();
     _ackTimer?.cancel();
     if (!_pending.isCompleted) _pending.complete(_firstBytes.takeBytes());
     for (final d in _held) {
@@ -484,9 +509,25 @@ final class RemoteSessionView implements LocalSessionView {
     unawaited(_driverChanges.close());
   }
 
+  /// The link is gone: stop without an exit (see [lost]).
+  void _lose() {
+    if (_disposed || _lost || _exit.isCompleted) return;
+    _lost = true;
+    _liveTimer?.cancel();
+    _ackTimer?.cancel();
+    if (!_pending.isCompleted) _pending.complete(_firstBytes.takeBytes());
+    for (final d in _held) {
+      if (!_output.isClosed) _output.add(d);
+    }
+    _held.clear();
+    unawaited(_output.close());
+    unawaited(_driverChanges.close());
+  }
+
   /// Another view took this id: stop without an exit.
   void _detach() {
     _disposed = true;
+    _liveTimer?.cancel();
     _ackTimer?.cancel();
     unawaited(_output.close());
     unawaited(_driverChanges.close());
@@ -497,6 +538,9 @@ final class RemoteSessionView implements LocalSessionView {
 
   @override
   void reply(Uint8List data) {
+    // Relies on the consumer writing replay text synchronously (the desktop
+    // TerminalFeed does): a reply to a query in the replay is then made
+    // while [_replaying] still holds, and dropped here.
     if (!_replaying) _data(MuxType.viewReply, data);
   }
 
@@ -519,6 +563,7 @@ final class RemoteSessionView implements LocalSessionView {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _liveTimer?.cancel();
     _ackTimer?.cancel();
     if (identical(_owner._views[id], this)) _owner._views.remove(id);
     _owner._client.send(MuxType.viewClose, {'id': id});

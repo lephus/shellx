@@ -815,6 +815,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     DesktopTerminal? reuse,
     String? preface,
   }) {
+    // The old link first: for a session in the daemon its `view.close` must
+    // reach the daemon before the new `view.open`, or it would close the
+    // new view.
+    _links.remove(s.id)?.dispose();
     final LocalSessionView view;
     try {
       view = _local.view(s.id);
@@ -832,12 +836,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     // terminal; what [_attach] writes itself (saved text, backlog) is not
     // output.
     var live = false;
+    // A reset replay (A5b D11) is text, not output: it is shown, and no
+    // CLI wait fires on it. Set around `feed.add`, which writes at once.
+    var replay = false;
     final feed = TerminalFeed((text) {
       terminal.write(text);
-      if (live && !_paneOutputs.isClosed) _paneOutputs.add(s.id);
+      if (live && !replay && !_paneOutputs.isClosed) _paneOutputs.add(s.id);
     });
     final link = _Link(view, terminal, feed);
-    _links.remove(s.id)?.dispose();
     _links[s.id] = link;
     // Size first, without telling the session: the backlog is laid out at
     // the pane's width, and a phone keeps driving until the user acts.
@@ -887,7 +893,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       view.resize(cols, rows);
     };
     link.subscriptions
-      ..add(view.output.listen(feed.add))
+      ..add(
+        view.output.listen((data) {
+          replay = view.replaying;
+          feed.add(data);
+          replay = false;
+        }),
+      )
       ..add(
         view.driver.listen(
           (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),

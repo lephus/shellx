@@ -152,6 +152,24 @@ void main() {
     expect(local.views[1]!.replies, hasLength(1));
   });
 
+  test('a reset replay is shown but is not pane output (A5b D11)', () async {
+    local.add(local.summary(1));
+    boot();
+    final seen = <int>[];
+    final sub = tabs().paneOutputs.listen(seen.add);
+    final terminal = state().tabs.single.terminal;
+    local.views[1]!.replaying = true;
+    local.views[1]!.emit('replayed');
+    await pumpEventQueue();
+    expect(terminal.buffer.getText(), contains('replayed'));
+    expect(seen, isEmpty);
+    local.views[1]!.replaying = false;
+    local.views[1]!.emit('live');
+    await Future<void>.delayed(const Duration(milliseconds: 40)); // feed tick
+    expect(seen, [1]);
+    await sub.cancel();
+  });
+
   test('layout size goes to resize', () {
     local.add(local.summary(1));
     boot();

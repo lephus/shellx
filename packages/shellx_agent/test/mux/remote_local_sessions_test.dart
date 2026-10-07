@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
 
@@ -388,7 +389,179 @@ void main() {
     await remote.disconnected;
     await pumpEventQueue();
     expect(exited, isFalse);
-    expect(ended, isFalse);
+    expect(ended, isTrue); // output ends, but never an exit (no exit line)
     view.write(Uint8List.fromList([1])); // dropped, not thrown
+  });
+
+  group('round 2', () {
+    test('a second view of an id replaces the first; the first one\'s '
+        'dispose does not close the new view; order does not matter', () async {
+      build();
+      final (conn, peer) = await connect();
+      final remote = RemoteLocalSessions(MuxClient(conn, early: peer.early));
+      await remote.ready;
+      final id = await remote.open(cols: 80, rows: 24);
+      final first = remote.view(id);
+      await first.pendingBacklog;
+      first.dispose(); // the desktop disposes the old link first ...
+      final second = remote.view(id);
+      await second.pendingBacklog;
+      final got = StringBuffer();
+      second.output.listen((d) => got.write(utf8.decode(d)));
+      final third = remote.view(id); // ... or a view is replaced silently
+      await third.pendingBacklog;
+      second.dispose(); // detached: must not close `third`
+      final live = StringBuffer();
+      third.output.listen((d) => live.write(utf8.decode(d)));
+      rig.pty(0).emit('still here');
+      await eventually(() => live.toString() == 'still here');
+    });
+
+    test('a dropped connection before view.live ends the view: the backlog '
+        'future completes, output ends, no exit code, lost', () async {
+      final (client, peerSide) = MemoryMuxTransport.pair();
+      peerSide.messages.listen((m) {
+        if (m.type == MuxType.sessionsList) {
+          peerSide.send(
+            MuxMessage(
+              MuxType.result,
+              q: m.q,
+              fields: {'sessions': <Object?>[]},
+            ),
+          );
+        }
+        // view.open is never answered, view.live never comes.
+      });
+      final remote = RemoteLocalSessions(MuxClient(client));
+      await remote.ready;
+      final view = remote.view(1) as RemoteSessionView;
+      var ended = false;
+      var exited = false;
+      view.output.listen((_) {}, onDone: () => ended = true);
+      unawaited(view.exitCode.then((_) => exited = true));
+      await peerSide.close();
+      expect(
+        (await view.pendingBacklog!.timeout(const Duration(seconds: 2))),
+        isEmpty,
+      );
+      await pumpEventQueue();
+      expect(ended, isTrue);
+      expect(exited, isFalse);
+      expect(view.lost, isTrue);
+    });
+
+    test('a dropped connection after view.live ends the view the same '
+        'way', () async {
+      build();
+      final (conn, peer) = await connect();
+      final remote = RemoteLocalSessions(MuxClient(conn, early: peer.early));
+      await remote.ready;
+      final id = await remote.open(cols: 80, rows: 24);
+      final view = remote.view(id) as RemoteSessionView;
+      await view.pendingBacklog;
+      var ended = false;
+      var exited = false;
+      view.output.listen((_) {}, onDone: () => ended = true);
+      unawaited(view.exitCode.then((_) => exited = true));
+      await server.close();
+      await remote.disconnected;
+      await pumpEventQueue();
+      expect(ended, isTrue);
+      expect(exited, isFalse);
+      expect(view.lost, isTrue);
+    });
+
+    test('a failing view.open ends the view as lost', () async {
+      final (client, peerSide) = MemoryMuxTransport.pair();
+      peerSide.messages.listen((m) {
+        peerSide.send(
+          m.type == MuxType.sessionsList
+              ? MuxMessage(
+                  MuxType.result,
+                  q: m.q,
+                  fields: {'sessions': <Object?>[]},
+                )
+              : MuxMessage(
+                  MuxType.error,
+                  q: m.q,
+                  fields: {'code': MuxError.internal},
+                ),
+        );
+      });
+      final remote = RemoteLocalSessions(MuxClient(client));
+      await remote.ready;
+      final view = remote.view(1) as RemoteSessionView;
+      await view.pendingBacklog!.timeout(const Duration(seconds: 2));
+      expect(view.lost, isTrue);
+    });
+
+    test('without view.live the backlog is handed over 5 s after its first '
+        'frame', () {
+      fakeAsync((async) {
+        final (client, peerSide) = MemoryMuxTransport.pair();
+        peerSide.messages.listen((m) {
+          if (m.type == MuxType.sessionsList) {
+            peerSide.send(
+              MuxMessage(
+                MuxType.result,
+                q: m.q,
+                fields: {'sessions': <Object?>[]},
+              ),
+            );
+          } else if (m.type == MuxType.viewOpen) {
+            peerSide.send(MuxMessage(MuxType.result, q: m.q));
+            peerSide.send(
+              MuxMessage(
+                MuxType.viewOut,
+                fields: {
+                  'id': 1,
+                  'data': Uint8List.fromList(utf8.encode('old')),
+                  'bl': true,
+                },
+              ),
+            );
+          }
+        });
+        final remote = RemoteLocalSessions(MuxClient(client));
+        async.flushMicrotasks();
+        final view = remote.view(1);
+        String? got;
+        unawaited(view.pendingBacklog!.then((d) => got = utf8.decode(d)));
+        async.elapse(const Duration(seconds: 4));
+        expect(got, isNull);
+        async.elapse(const Duration(seconds: 2));
+        expect(got, 'old');
+      });
+    });
+
+    test('a reset replay is marked replaying; live output is not', () async {
+      build(stopAbove: 1000, resumeBelow: 200);
+      final (conn, peer) = await connect();
+      final remote = RemoteLocalSessions(
+        MuxClient(conn, early: peer.early),
+        ackEvery: 1 << 30,
+        ackDelay: const Duration(hours: 1),
+      );
+      await remote.ready;
+      final id = await remote.open(cols: 80, rows: 24);
+      final view = remote.view(id);
+      await view.pendingBacklog;
+      final seen = <(String, bool)>[];
+      view.output.listen((d) => seen.add((utf8.decode(d), view.replaying)));
+      rig.pty(0).emit('a' * 600);
+      await pumpEventQueue();
+      rig.pty(0).emit('b' * 600);
+      await pumpEventQueue();
+      await eventually(() => seen.length >= 2);
+      expect(seen.every((e) => !e.$2), isTrue);
+      remote.client.send(MuxType.viewAck, {'id': id, 'bytes': 1200});
+      await eventually(() => seen.any((e) => e.$1 == kViewResetPrefix));
+      await eventually(() => !view.replaying);
+      final after = seen.skipWhile((e) => e.$1 != kViewResetPrefix).toList();
+      expect(after.every((e) => e.$2), isTrue);
+      rig.pty(0).emit('live');
+      await eventually(() => seen.last.$1 == 'live');
+      expect(seen.last.$2, isFalse);
+    });
   });
 }

@@ -1501,6 +1501,8 @@ final class _LocalView implements LocalSessionView {
 
   @override
   Future<Uint8List>? get pendingBacklog => null;
+  @override
+  bool get replaying => false;
 
   @override
   int get id => _session.id;

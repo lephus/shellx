@@ -242,6 +242,10 @@ final class FakeSessionView implements LocalSessionView {
   Completer<Uint8List>? lateBacklog;
   @override
   Future<Uint8List>? get pendingBacklog => lateBacklog?.future;
+
+  /// A5b D11: true while a reset replay is being emitted.
+  @override
+  bool replaying = false;
   final outputController = StreamController<Uint8List>();
   final driverController = StreamController<DriverSide>.broadcast(sync: true);
   final _exit = Completer<int>();
