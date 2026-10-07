@@ -14,23 +14,26 @@ void main() {
     expect((kTerminalFontSizeMin, kTerminalFontSizeMax), (9.0, 28.0));
   });
 
-  test('font-weight regular draws with the Regular face; a named family is first', () {
-    expect(
-      desktopTerminalStyle(13, regular: true).fontFamily,
-      kTerminalFontFamily,
-    );
-    final named = desktopTerminalStyle(13, families: ['Menlo']);
-    expect(named.fontFamily, 'Menlo');
-    expect(named.fontFamilyFallback, contains(kTerminalFontFamilyLight));
-    expect(
-      desktopTerminalStyle(
-        13,
-        families: ['Menlo'],
-        regular: true,
-      ).fontFamilyFallback,
-      contains(kTerminalFontFamily),
-    );
-  });
+  test(
+    'font-weight regular draws with the Regular face; a named family is first',
+    () {
+      expect(
+        desktopTerminalStyle(13, regular: true).fontFamily,
+        kTerminalFontFamily,
+      );
+      final named = desktopTerminalStyle(13, families: ['Menlo']);
+      expect(named.fontFamily, 'Menlo');
+      expect(named.fontFamilyFallback, contains(kTerminalFontFamilyLight));
+      expect(
+        desktopTerminalStyle(
+          13,
+          families: ['Menlo'],
+          regular: true,
+        ).fontFamilyFallback,
+        contains(kTerminalFontFamily),
+      );
+    },
+  );
 
   test('grid measurement: null below one cell, columns grow with width', () {
     final style = desktopTerminalStyle(13);

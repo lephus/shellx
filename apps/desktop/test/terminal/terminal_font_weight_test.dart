@@ -120,30 +120,33 @@ void main() {
   // CoreText rendering of the same face (Ghostty's font-thicken off). The default
   // therefore draws normal cells with JetBrains Mono Light, registered as
   // its own family so cells keep asking for plain `normal` / `bold`.
-  testWidgets('normal cells use the Light face unless font-weight = regular; bold '
-      'stays Bold', (tester) async {
-    await tester.runAsync(() async {
-      await _load('JetBrainsMono', {
-        'JetBrainsMono-Regular.ttf': 400,
-        'JetBrainsMono-Bold.ttf': 700,
+  testWidgets(
+    'normal cells use the Light face unless font-weight = regular; bold '
+    'stays Bold',
+    (tester) async {
+      await tester.runAsync(() async {
+        await _load('JetBrainsMono', {
+          'JetBrainsMono-Regular.ttf': 400,
+          'JetBrainsMono-Bold.ttf': 700,
+        });
+        await _load('JetBrainsMonoLight', {
+          'JetBrainsMono-Light.ttf': 400,
+          'JetBrainsMono-Bold.ttf': 700,
+        });
       });
-      await _load('JetBrainsMonoLight', {
-        'JetBrainsMono-Light.ttf': 400,
-        'JetBrainsMono-Bold.ttf': 700,
-      });
-    });
-    final regular = await terminalInk(
-      tester,
-      desktopTerminalStyle(13, regular: true),
-    );
-    final w400 = await plainInk(tester, FontWeight.w400);
-    final w700 = await plainInk(tester, FontWeight.w700);
-    final light = await terminalInk(tester, desktopTerminalStyle(13));
-    // ignore: avoid_print
-    print('ink regular=$regular w400=$w400 w700=$w700 light=$light');
-    expect(w700, greaterThan(w400 * 1.1), reason: 'faces must differ');
-    expect(regular, closeTo(w400, w400 * 0.05));
-    expect(light, lessThan(regular * 0.9));
-    expect(light, greaterThan(regular * 0.5));
-  });
+      final regular = await terminalInk(
+        tester,
+        desktopTerminalStyle(13, regular: true),
+      );
+      final w400 = await plainInk(tester, FontWeight.w400);
+      final w700 = await plainInk(tester, FontWeight.w700);
+      final light = await terminalInk(tester, desktopTerminalStyle(13));
+      // ignore: avoid_print
+      print('ink regular=$regular w400=$w400 w700=$w700 light=$light');
+      expect(w700, greaterThan(w400 * 1.1), reason: 'faces must differ');
+      expect(regular, closeTo(w400, w400 * 0.05));
+      expect(light, lessThan(regular * 0.9));
+      expect(light, greaterThan(regular * 0.5));
+    },
+  );
 }

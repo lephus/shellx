@@ -61,13 +61,15 @@ void main() {
     );
     var (c, problems) = build('font-weight = heavy\n');
     expect(c.fontWeight, TerminalFontWeight.light);
-    expect([for (final p in problems) (p.code, p.key, p.hint)], [
-      (ConfigProblemCode.badValue, 'font-weight', 'light, regular'),
-    ]);
+    expect(
+      [for (final p in problems) (p.code, p.key, p.hint)],
+      [(ConfigProblemCode.badValue, 'font-weight', 'light, regular')],
+    );
     (c, problems) = build('font-thicken = heavy\n');
-    expect([for (final p in problems) (p.code, p.key, p.hint)], [
-      (ConfigProblemCode.badValue, 'font-thicken', 'true, false'),
-    ]);
+    expect(
+      [for (final p in problems) (p.code, p.key, p.hint)],
+      [(ConfigProblemCode.badValue, 'font-thicken', 'true, false')],
+    );
   });
 
   test('nothing set: today\'s behaviour (criterion 1)', () {

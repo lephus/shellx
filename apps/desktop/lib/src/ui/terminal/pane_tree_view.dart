@@ -1,4 +1,3 @@
-import 'ime_compose_reset.dart';
 import 'dart:async';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
@@ -23,6 +22,7 @@ import '../theme/shellx_desktop_theme.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
+import 'ime_compose_reset.dart';
 import 'remote_marks.dart';
 import 'remote_strip.dart';
 import 'shellx_menu.dart';
