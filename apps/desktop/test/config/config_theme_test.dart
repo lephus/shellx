@@ -210,7 +210,7 @@ void main() {
     fs
       ..write('/home/me/.config/shellx/other', dracula)
       ..write('/home/me/.config/shellx/themes/../other', dracula);
-    for (final name in ['../other', 'a/b', r'a\b', '..', 'x..y']) {
+    for (final name in ['../other', 'a/b', r'a\b', '..', 'x\x00y']) {
       final (theme, files, problems) = await resolve('theme = $name');
       expect(files, isEmpty, reason: name);
       expect(problems.single.code, ConfigProblemCode.themeNotFound);
@@ -257,5 +257,121 @@ void main() {
     ]) {
       expect(contrastRatio(focusOutlineFor(c), c), greaterThanOrEqualTo(3));
     }
+  });
+
+  test(
+    'a bare name may contain ".." inside it; only ".." itself is refused',
+    () async {
+      fs.write('/home/me/.config/shellx/themes/x..y', dracula);
+      final (theme, files, problems) = await resolve('theme = x..y');
+      expect(problems, isEmpty);
+      expect(files, ['/home/me/.config/shellx/themes/x..y']);
+      expect(theme.background, const Color(0xFF282A36));
+    },
+  );
+
+  test('the contrast ratio is shown truncated, never rounded up', () async {
+    // #747474 on black is 4.49:1: rounding would print a passing "4.5".
+    final (_, _, problems) = await resolve(
+      'background = #000000\nforeground = #747474\n',
+    );
+    expect(problems.single.code, ConfigProblemCode.lowContrast);
+    expect(problems.single.detail, '4.4');
+  });
+
+  test('an empty side of a light:/dark: pair is absent', () async {
+    expect(themeNameFor('light:A,dark:'), 'A');
+    expect(themeNameFor('light:,dark:B'), 'B');
+    fs.write('/home/me/.config/shellx/themes/Day', dracula);
+    final (theme, _, problems) = await resolve('theme = light:Day,dark:');
+    expect(theme.name, 'Day');
+    expect(theme.background, const Color(0xFF282A36));
+    // Only the light side is set: the same note as `light:Day`.
+    expect(
+      (problems.single.code, problems.single.severity),
+      (ConfigProblemCode.unsupportedValue, ConfigSeverity.info),
+    );
+  });
+
+  test('light:/dark: selects the dark theme end to end', () async {
+    fs
+      ..write('/home/me/.config/shellx/themes/Day', 'background = #ffffff\n')
+      ..write('/home/me/.config/shellx/themes/Night', dracula);
+    final (theme, files, problems) = await resolve(
+      'theme = light:Day,dark:Night',
+    );
+    expect(problems, isEmpty);
+    expect(theme.name, 'Night');
+    expect(theme.background, const Color(0xFF282A36));
+    expect(files, ['/home/me/.config/shellx/themes/Night']);
+  });
+
+  test('the contrast warning points at the line that set the colour', () async {
+    fs.write('/t/pale', 'background = #000000\nforeground = #333333\n');
+    var (_, _, problems) = await resolve(
+      'theme = /t/pale\n\nforeground = #444444\n',
+    );
+    expect(
+      (problems.single.code, problems.single.line),
+      (ConfigProblemCode.lowContrast, 3),
+    );
+    (_, _, problems) = await resolve('theme = /t/pale\nbackground = #000000\n');
+    expect(problems.single.line, 2);
+    (_, _, problems) = await resolve('\n\ntheme = /t/pale\n');
+    expect(problems.single.line, 3);
+  });
+
+  group('Windows theme paths', () {
+    final win = configPathsFor(
+      windows: true,
+      env: const {},
+      home: r'C:\Users\me',
+    );
+
+    Future<(ResolvedTheme, List<String>)> resolveWin(String name) async {
+      final r = await resolveTheme(
+        buildShellxConfig(
+          ghostty: const [],
+          shellx: parseConfigText(
+            'theme = $name',
+            file: win.shellx,
+            problems: [],
+          ),
+          problems: [],
+          macos: false,
+          home: r'C:\Users\me',
+        ),
+        win,
+        fs: fs,
+        problems: [],
+      );
+      return (r.theme, r.files);
+    }
+
+    test(r'~\, a drive path and a bare name are looked up', () async {
+      fs
+        ..write(r'C:\Users\me\t\Night', dracula)
+        ..write(r'D:\themes\Night', dracula)
+        ..write(r'C:\Users\me\AppData\Roaming\ShellX\themes\Night', dracula);
+      var (theme, files) = await resolveWin(r'~\t\Night');
+      expect(files, [r'C:\Users\me\t\Night']);
+      expect(theme.background, const Color(0xFF282A36));
+      (theme, files) = await resolveWin(r'D:\themes\Night');
+      expect(files, [r'D:\themes\Night']);
+      expect(theme.name, r'D:\themes\Night');
+      (theme, files) = await resolveWin('Night');
+      expect(files.first, r'C:\Users\me\AppData\Roaming\ShellX\themes\Night');
+      expect(theme.name, 'Night');
+    });
+
+    test('a device path and a colon in a bare name are refused', () async {
+      fs.write(r'\\.\C:\x', dracula);
+      for (final name in [r'\\.\C:\x', r'\\?\C:\x', 'a:b', r'\x', 'C:x']) {
+        final (theme, files) = await resolveWin(name);
+        expect(files, isEmpty, reason: name);
+        expect(theme.background, TerminalColors.background, reason: name);
+      }
+      expect(fs.reads, 0);
+    });
   });
 }

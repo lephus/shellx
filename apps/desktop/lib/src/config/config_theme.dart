@@ -48,25 +48,33 @@ bool _isPairPart(String part) {
   return t.startsWith('light:') || t.startsWith('dark:');
 }
 
-/// `light:A,dark:B` -> `B` (ShellX is dark-only), `light:A` -> `A`; any
-/// other value as is.
-String? themeNameFor(String value) {
-  final parts = value.split(',');
-  if (!parts.any(_isPairPart)) return value.trim();
+/// The `light:` / `dark:` sides of a pair value; an empty side is absent.
+({String? light, String? dark}) _sides(String value) {
   String? light;
   String? dark;
-  for (final part in parts) {
+  for (final part in value.split(',')) {
     final t = part.trim();
     if (t.startsWith('dark:')) dark = t.substring(5).trim();
     if (t.startsWith('light:')) light = t.substring(6).trim();
   }
-  return dark ?? light;
+  return (
+    light: light == null || light.isEmpty ? null : light,
+    dark: dark == null || dark.isEmpty ? null : dark,
+  );
+}
+
+/// `light:A,dark:B` -> `B` (ShellX is dark-only), `light:A` (or
+/// `light:A,dark:`) -> `A`; any other value as is.
+String? themeNameFor(String value) {
+  if (!value.split(',').any(_isPairPart)) return value.trim();
+  final s = _sides(value);
+  return s.dark ?? s.light;
 }
 
 bool _lightOnly(String value) {
-  final parts = value.split(',').map((s) => s.trim()).toList();
-  return parts.any((t) => t.startsWith('light:')) &&
-      !parts.any((t) => t.startsWith('dark:'));
+  if (!value.split(',').any(_isPairPart)) return false;
+  final s = _sides(value);
+  return s.light != null && s.dark == null;
 }
 
 /// D15: `accent` when it reaches 3:1 on [background] (WCAG 1.4.11),
@@ -140,8 +148,8 @@ Future<_ThemeColors?> _readTheme(String path, ConfigFs fs) async {
 }
 
 /// The files a theme [name] may live in; empty when the name is unsafe
-/// (a bare name never leaves its directory: no separator, `..`, NUL, and
-/// on Windows no drive colon).
+/// (a bare name never leaves its directory: no separator, not `..`, no
+/// NUL, and on Windows no drive colon).
 List<String> _candidates(String name, ConfigPaths paths) {
   if (name.contains('\x00')) return const [];
   final ctx = paths.windows ? p.windows : p.posix;
@@ -167,7 +175,7 @@ List<String> _candidates(String name, ConfigPaths paths) {
   }
   if (name.contains('/') ||
       name.contains(r'\') ||
-      name.contains('..') ||
+      name == '..' ||
       (paths.windows && name.contains(':'))) {
     return const [];
   }
@@ -306,7 +314,8 @@ Future<({ResolvedTheme theme, List<String> files})> resolveTheme(
         line: where?.line ?? 0,
         severity: ConfigSeverity.warning,
         code: ConfigProblemCode.lowContrast,
-        detail: ratio.toStringAsFixed(1),
+        // Truncated: 4.49 must not read as a passing "4.5".
+        detail: ((ratio * 10).floor() / 10).toStringAsFixed(1),
       ),
     );
   }

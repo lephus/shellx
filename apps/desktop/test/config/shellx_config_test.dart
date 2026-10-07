@@ -465,6 +465,18 @@ $many
     );
   });
 
+  test('a discarded pair never reports a clamp (A9 Task 3 review)', () {
+    final (c, problems) = build(
+      'window-padding-x = 100,abc\nwindow-padding-y = 99,7\n',
+    );
+    expect(c.padding.left, kDefaultTerminalPadding.left);
+    expect(c.padding.top, 64);
+    expect(
+      [for (final p in problems) (p.line, p.code)],
+      [(1, ConfigProblemCode.badValue), (2, ConfigProblemCode.outOfRange)],
+    );
+  });
+
   test('keybind lines are kept in order for the resolver (Task 4)', () {
     final (c, _) = build(
       'keybind = super+t=new_tab\nkeybind = clear\nkeybind =\nkeybind = super+y=new_tab\n',

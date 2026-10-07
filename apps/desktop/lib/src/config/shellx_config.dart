@@ -290,8 +290,15 @@ final class _Builder {
       values.add(v);
     }
     if (values.isNotEmpty) result = (values.first, values.last);
-    // One problem per line: the first failure wins.
-    if (problems.length > first + 1) {
+    // One problem per line. A discarded pair reports only its bad value (a
+    // clamp note on an earlier half would claim a value that is not used);
+    // a kept pair reports its first clamp.
+    if (result == null && problems.length > first) {
+      final bad = problems.last;
+      problems
+        ..removeRange(first, problems.length)
+        ..add(bad);
+    } else if (problems.length > first + 1) {
       problems.removeRange(first + 1, problems.length);
     }
     return result;
