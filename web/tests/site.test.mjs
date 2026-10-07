@@ -371,7 +371,8 @@ test('guides carry TechArticle and BreadcrumbList JSON-LD with author and dates'
       const art = docs.find((d) => d['@type'] === 'TechArticle');
       assert.ok(art, `${p}: TechArticle missing`);
       assert.match(art.datePublished, /^\d{4}-\d{2}-\d{2}$/);
-      assert.ok(art.author?.sameAs?.includes('https://github.com/lephus'), `${p}: author sameAs`);
+      assert.equal(art.author?.name, 'ShellPro Team', `${p}: author`);
+      assert.ok(html.includes('ShellPro Team'), `${p}: byline`);
       assert.equal(art.mainEntityOfPage, `https://shellx.pro${p}`);
       const crumbs = docs.find((d) => d['@type'] === 'BreadcrumbList');
       assert.equal(crumbs?.itemListElement.at(-1).item, `https://shellx.pro${p}`, `${p}: breadcrumb`);
@@ -382,18 +383,16 @@ test('guides carry TechArticle and BreadcrumbList JSON-LD with author and dates'
   }
 });
 
-test('home JSON-LD: app with features and keywords, HowTo, founder with sameAs', () => {
+test('home JSON-LD: app with features and keywords, HowTo, ShellPro Team as author, no person', () => {
   for (const p of ['/', '/en/']) {
     const docs = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
     const app = docs.find((d) => d['@type'] === 'SoftwareApplication');
     assert.ok(app.featureList.length >= 5 && app.keywords && app.isAccessibleForFree === true);
     const howto = docs.find((d) => d['@type'] === 'HowTo');
     assert.equal(howto?.step.length, 3);
-    const person = docs.find((d) => d['@type'] === 'Person');
-    assert.deepEqual(person?.sameAs, [
-      'https://huuphule.coregenaihub.com', 'https://www.linkedin.com/in/lehuuphu',
-      'https://github.com/lephus', 'https://medium.com/@phule9225',
-    ]);
+    assert.ok(docs.some((d) => d['@type'] === 'Organization' && d.name === 'ShellPro Team'), `${p}: author team`);
+    assert.ok(!docs.some((d) => d['@type'] === 'Person'), `${p}: no Person entity`);
+    assert.ok(!readPage(p).includes('Phu Le'), `${p}: personal name leaked`);
     if (!config.appStoreUrl && !config.googlePlayUrl) assert.ok(!docs.some((d) => d['@type'] === 'MobileApplication'));
   }
 });

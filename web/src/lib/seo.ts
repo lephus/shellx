@@ -4,17 +4,12 @@ import { pathFor, type Lang } from '../i18n/ui';
 
 export const siteUrl = 'https://shellx.pro';
 
+// The byline of every page and guide (the user's choice: a team, not a person).
 export const author = {
-  '@type': 'Person',
-  '@id': `${siteUrl}/#founder`,
-  name: 'Phu Le',
-  url: 'https://huuphule.coregenaihub.com',
-  sameAs: [
-    'https://huuphule.coregenaihub.com',
-    'https://www.linkedin.com/in/lehuuphu',
-    'https://github.com/lephus',
-    'https://medium.com/@phule9225',
-  ],
+  '@type': 'Organization',
+  '@id': `${siteUrl}/#team`,
+  name: 'ShellPro Team',
+  url: `${siteUrl}/`,
 };
 
 export const organization = {
@@ -23,7 +18,6 @@ export const organization = {
   name: 'ShellX',
   url: siteUrl,
   logo: `${siteUrl}/apple-touch-icon.png`,
-  founder: { '@id': author['@id'] },
 };
 
 export const appId = `${siteUrl}/#app`;
