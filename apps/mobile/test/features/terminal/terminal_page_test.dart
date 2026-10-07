@@ -1314,6 +1314,22 @@ void main() {
       expect((segment('vi'), segment('en')), before);
     });
 
+    testWidgets('A10 D30: the composer keeps a command literal: no autocorrect, smart dashes or capitals', (
+      tester,
+    ) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(find.byKey(const ValueKey('voice-text')));
+      expect(field.autocorrect, isFalse);
+      expect(field.enableSuggestions, isFalse);
+      expect(field.enableIMEPersonalizedLearning, isFalse);
+      expect(field.smartDashesType, SmartDashesType.disabled);
+      expect(field.smartQuotesType, SmartQuotesType.disabled);
+      expect(field.textCapitalization, TextCapitalization.none);
+      expect(field.keyboardType, TextInputType.multiline);
+    });
+
     testWidgets('the command is in JetBrains Mono, the hint in Raleway; Send says Enter when empty', (tester) async {
       await openQuiet(tester);
       await tester.tap(mic());
