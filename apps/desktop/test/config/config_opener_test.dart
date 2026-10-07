@@ -119,4 +119,33 @@ void main() {
       path,
     ]);
   });
+
+  test('no hard links: falls back to an exclusive create and write', () async {
+    final opener = ConfigFileOpener(
+      windows: false,
+      start: (_, _) async {},
+      link: (_, _) async => false,
+    );
+    final path = '${dir.path}/shellx/config';
+    expect(await opener.open(path, template: () => '# hi\n'), isTrue);
+    expect(File(path).readAsStringSync(), '# hi\n');
+    expect(Directory('${dir.path}/shellx').listSync().map((e) => e.path), [
+      path,
+    ]);
+  });
+
+  test('the staging file is not in the watched folder', () async {
+    String? staged;
+    final opener = ConfigFileOpener(
+      windows: false,
+      start: (_, _) async {},
+      link: (from, _) async {
+        staged = from;
+        return false;
+      },
+    );
+    await opener.open('${dir.path}/shellx/config', template: () => 'x');
+    expect(staged, isNotNull);
+    expect(staged!.startsWith('${dir.path}/shellx'), isFalse);
+  });
 }
