@@ -51,6 +51,7 @@ final class TrayLocalState {
     this.cliControlEnabled = true,
     this.cliAllowExternal = false,
     this.cliPathInstalled = false,
+    this.configProblemCount = 0,
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
@@ -60,6 +61,9 @@ final class TrayLocalState {
   final bool cliAllowExternal;
   final bool cliPathInstalled;
 
+  /// A9 D45: errors and warnings in the configuration (0: no ⚠ item).
+  final int configProblemCount;
+
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
@@ -67,7 +71,8 @@ final class TrayLocalState {
       other.hasSavedScrollback == hasSavedScrollback &&
       other.cliControlEnabled == cliControlEnabled &&
       other.cliAllowExternal == cliAllowExternal &&
-      other.cliPathInstalled == cliPathInstalled;
+      other.cliPathInstalled == cliPathInstalled &&
+      other.configProblemCount == configProblemCount;
 
   @override
   int get hashCode => Object.hash(
@@ -76,6 +81,7 @@ final class TrayLocalState {
     cliControlEnabled,
     cliAllowExternal,
     cliPathInstalled,
+    configProblemCount,
   );
 }
 
@@ -192,6 +198,20 @@ Menu buildTrayMenu(
     item(TrayKeys.cliSkills, l10n.trayCliCopySkills),
   ]);
 
+  // A9 D45, UI-A9 §6: right after "Dòng lệnh" in both menus.
+  MenuItem config() => sub(TrayKeys.config, l10n.trayConfig, [
+    item(TrayKeys.configOpen, l10n.trayConfigOpen),
+    item(TrayKeys.configReload, l10n.trayConfigReload),
+    item(TrayKeys.configShortcuts, l10n.trayConfigShortcuts),
+    if (local.configProblemCount > 0) ...[
+      sep(),
+      item(
+        TrayKeys.configProblems,
+        l10n.trayConfigProblems(local.configProblemCount),
+      ),
+    ],
+  ]);
+
   if (!state.signedIn) {
     return Menu(
       items: [
@@ -201,6 +221,7 @@ Menu buildTrayMenu(
         terminal(),
         notifications(),
         commandLine(),
+        config(),
         sep(),
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
         sep(),
@@ -308,6 +329,7 @@ Menu buildTrayMenu(
       terminal(),
       notifications(),
       commandLine(),
+      config(),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
       item(TrayKeys.quit, l10n.trayQuit),

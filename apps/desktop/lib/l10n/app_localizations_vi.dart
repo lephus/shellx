@@ -1015,6 +1015,22 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get confirmCloseAlwaysBody => 'Shell trong tab này sẽ đóng.';
+
+  @override
+  String confirmCloseAlwaysPanesBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pane trong tab này sẽ đóng.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmClosePaneAlwaysBody => 'Shell trong pane này sẽ đóng.';
+
+  @override
   String terminalRestoredDivider(String time) {
     return '— Phiên được khôi phục · $time —';
   }
@@ -1116,5 +1132,514 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String cliPathNotOnPath(String file, String line) {
     return 'Đã cài lệnh shellx vào /usr/local/bin nhưng shell của bạn không tìm ở đó. Hãy thêm dòng này vào $file: $line';
+  }
+
+  @override
+  String get userCommandNoTerminal => 'Không có terminal để chạy lệnh này';
+
+  @override
+  String configOpenFailed(String path) {
+    return 'Không mở được $path';
+  }
+
+  @override
+  String sequencePending(String shortcut) {
+    return '$shortcut …';
+  }
+
+  @override
+  String sequencePendingAnnounce(String shortcut) {
+    return 'Đã bấm $shortcut, chờ phím tiếp theo';
+  }
+
+  @override
+  String configProblemsToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cấu hình có $count vấn đề',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get configProblemsShow => 'Xem';
+
+  @override
+  String get configReloaded => 'Đã tải lại cấu hình';
+
+  @override
+  String get configGhosttyNotice =>
+      'Đang dùng font và màu từ cấu hình Ghostty (tắt bằng ghostty-config = false)';
+
+  @override
+  String get configProblemsTitle => 'Vấn đề trong cấu hình';
+
+  @override
+  String get configProblemsNone => 'Cấu hình không có vấn đề.';
+
+  @override
+  String configProblemWhere(String file, int line) {
+    return '$file, dòng $line';
+  }
+
+  @override
+  String configProblemLine(int line) {
+    return 'dòng $line';
+  }
+
+  @override
+  String get configSeverityError => 'Lỗi';
+
+  @override
+  String get configSeverityWarning => 'Cảnh báo';
+
+  @override
+  String get configSeverityInfo => 'Ghi chú';
+
+  @override
+  String get configOpenFile => 'Mở file cấu hình';
+
+  @override
+  String get configReload => 'Tải lại cấu hình';
+
+  @override
+  String get configProblemSyntax =>
+      'Dòng không có dấu “=” (dạng đúng: khoá = giá trị)';
+
+  @override
+  String configProblemBadKey(String key) {
+    return '“$key” không phải tên khoá hợp lệ';
+  }
+
+  @override
+  String configProblemUnknownKey(String key) {
+    return 'ShellX không có khoá “$key”';
+  }
+
+  @override
+  String configProblemBadValue(String key, String value, String hint) {
+    return '$key: “$value” không hợp lệ (cần $hint)';
+  }
+
+  @override
+  String configProblemOutOfRange(
+    String key,
+    String value,
+    String hint,
+    String detail,
+  ) {
+    return '$key: $value nằm ngoài $hint, đã dùng $detail';
+  }
+
+  @override
+  String configProblemDuplicate(String key, String detail) {
+    return '$key: thay cho dòng $detail';
+  }
+
+  @override
+  String configProblemIncludeMissing(String value) {
+    return 'Không tìm thấy file “$value”';
+  }
+
+  @override
+  String configProblemIncludeCycle(String value) {
+    return '“$value” đã được nạp (vòng lặp config-file)';
+  }
+
+  @override
+  String get configProblemIncludeDepth => 'config-file lồng quá 4 tầng';
+
+  @override
+  String get configProblemIncludeLimit => 'Quá 64 file cấu hình — bỏ phần sau';
+
+  @override
+  String get configProblemUnreadable =>
+      'Không đọc được file — đang giữ cấu hình trước';
+
+  @override
+  String get configProblemNotUtf8 =>
+      'File không phải UTF-8 — đang giữ cấu hình trước';
+
+  @override
+  String get configProblemTooLarge =>
+      'File lớn hơn 256 KiB — đang giữ cấu hình trước';
+
+  @override
+  String configProblemThemeNotFound(String value) {
+    return 'Không tìm thấy chủ đề “$value”';
+  }
+
+  @override
+  String configProblemFontNotFound(String value) {
+    return 'Không tìm thấy font “$value” — dùng JetBrains Mono';
+  }
+
+  @override
+  String configProblemFontNotMonospace(String value) {
+    return 'Font “$value” không đơn cách — cột có thể lệch';
+  }
+
+  @override
+  String configProblemLowContrast(String detail) {
+    return 'Chữ và nền tương phản thấp ($detail:1, nên từ 4,5:1)';
+  }
+
+  @override
+  String configProblemUnsupportedValue(String key, String value, String hint) {
+    return '$key = $value chưa được hỗ trợ (dùng $hint)';
+  }
+
+  @override
+  String configProblemNotOnThisPlatform(String key) {
+    return '$key chỉ có tác dụng trên macOS';
+  }
+
+  @override
+  String configProblemBadTrigger(String value) {
+    return '“$value” không phải tổ hợp phím hợp lệ';
+  }
+
+  @override
+  String configProblemUnknownAction(String value) {
+    return 'Không có action “$value”';
+  }
+
+  @override
+  String configProblemBadActionParam(String value, String hint) {
+    return '“$value” không hợp lệ (cần $hint)';
+  }
+
+  @override
+  String configProblemReservedTrigger(String value) {
+    return 'Hệ điều hành giữ $value';
+  }
+
+  @override
+  String configProblemPlainKeyTrigger(String value) {
+    return '$value dùng để gõ chữ — thêm Ctrl, Alt hoặc ⌘';
+  }
+
+  @override
+  String get configProblemRegionTrigger =>
+      'F6 và Shift+F6 luôn dùng để chuyển vùng';
+
+  @override
+  String configProblemShellKeyTrigger(String value) {
+    return '$value sẽ không còn tới shell';
+  }
+
+  @override
+  String configProblemOptionKeyTrigger(String value) {
+    return '$value sẽ không còn gõ ký tự Option';
+  }
+
+  @override
+  String configProblemAltGrTrigger(String value) {
+    return '$value chỉ chạy với Alt trái; AltGr vẫn gõ ký tự';
+  }
+
+  @override
+  String configProblemMissionControlTrigger(String value) {
+    return 'Mission Control có thể giữ $value';
+  }
+
+  @override
+  String configProblemUnsupportedPrefix(String value) {
+    return 'Tiền tố “$value” không được hỗ trợ';
+  }
+
+  @override
+  String get configProblemSequenceTooLong => 'Chuỗi phím tối đa 2 bước';
+
+  @override
+  String configProblemSequencePrefixShadows(String value) {
+    return '$value là đầu một chuỗi phím nên không còn chạy một mình';
+  }
+
+  @override
+  String configProblemSequenceRepeatsPrefix(String value) {
+    return 'Chuỗi này không chạy được: bấm $value hai lần sẽ gửi chính phím đó';
+  }
+
+  @override
+  String configProblemUnknownCommand(String value) {
+    return 'Không có lệnh “$value”';
+  }
+
+  @override
+  String get configProblemCommandLimit => 'Quá 200 lệnh — bỏ phần sau';
+
+  @override
+  String configProblemLimit(String detail) {
+    return '$detail vấn đề — chỉ hiện 100 vấn đề đầu tiên';
+  }
+
+  @override
+  String get configProblemInternal =>
+      'Lỗi không mong đợi — đang giữ cấu hình trước';
+
+  @override
+  String get trayConfig => 'Cấu hình';
+
+  @override
+  String get trayConfigOpen => 'Mở file cấu hình';
+
+  @override
+  String get trayConfigReload => 'Tải lại cấu hình';
+
+  @override
+  String get trayConfigShortcuts => 'Phím tắt…';
+
+  @override
+  String trayConfigProblems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '⚠ $count vấn đề cấu hình…',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteTitle => 'Bảng lệnh';
+
+  @override
+  String get paletteSearchLabel => 'Tìm lệnh';
+
+  @override
+  String get paletteSearchHint => 'Gõ tên lệnh…';
+
+  @override
+  String get paletteNoResults => 'Không có lệnh nào khớp';
+
+  @override
+  String paletteResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lệnh',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteKindUserCommand => 'Lệnh của bạn';
+
+  @override
+  String get paletteKindSnippet => 'Đoạn chữ';
+
+  @override
+  String get paletteKindConfig => 'Cấu hình';
+
+  @override
+  String get actionNewTab => 'Tab mới';
+
+  @override
+  String get actionCloseSurface => 'Đóng pane hoặc tab';
+
+  @override
+  String get actionCloseTab => 'Đóng cả tab';
+
+  @override
+  String get actionNewWorkspace => 'Workspace mới';
+
+  @override
+  String get actionToggleNotifications => 'Bảng thông báo';
+
+  @override
+  String get actionJumpToUnread => 'Tới thông báo chưa đọc';
+
+  @override
+  String get actionCopy => 'Sao chép';
+
+  @override
+  String get actionPaste => 'Dán';
+
+  @override
+  String get actionSelectAll => 'Chọn tất cả';
+
+  @override
+  String actionGotoTab(String n) {
+    return 'Tới tab $n';
+  }
+
+  @override
+  String get actionNextTab => 'Tab sau';
+
+  @override
+  String get actionPreviousTab => 'Tab trước';
+
+  @override
+  String get actionSplitRight => 'Chia sang phải';
+
+  @override
+  String get actionSplitDown => 'Chia xuống dưới';
+
+  @override
+  String actionFocusPane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Sang pane bên trái',
+      'right': 'Sang pane bên phải',
+      'up': 'Lên pane trên',
+      'other': 'Xuống pane dưới',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String actionResizePane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Dời đường chia sang trái',
+      'right': 'Dời đường chia sang phải',
+      'up': 'Dời đường chia lên',
+      'other': 'Dời đường chia xuống',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionToggleZoom => 'Phóng to / bỏ phóng to pane';
+
+  @override
+  String get actionEqualize => 'Cân bằng pane';
+
+  @override
+  String get actionFontBigger => 'Chữ to hơn';
+
+  @override
+  String get actionFontSmaller => 'Chữ nhỏ hơn';
+
+  @override
+  String get actionFontReset => 'Cỡ chữ mặc định';
+
+  @override
+  String get actionNextRegion => 'Vùng tiếp theo';
+
+  @override
+  String get actionPreviousRegion => 'Vùng trước';
+
+  @override
+  String get actionReloadConfig => 'Tải lại cấu hình';
+
+  @override
+  String get actionOpenConfig => 'Mở file cấu hình';
+
+  @override
+  String get actionCommandPalette => 'Bảng lệnh';
+
+  @override
+  String get actionShowShortcuts => 'Phím tắt…';
+
+  @override
+  String get actionShowConfigProblems => 'Xem vấn đề cấu hình';
+
+  @override
+  String actionRunCommand(String name) {
+    return 'Chạy “$name”';
+  }
+
+  @override
+  String get actionSendText => 'Gửi chữ vào terminal';
+
+  @override
+  String get actionIgnore => 'Bỏ qua phím';
+
+  @override
+  String get shortcutsTitle => 'Phím tắt';
+
+  @override
+  String get shortcutsSearchLabel => 'Tìm phím tắt';
+
+  @override
+  String shortcutsGroup(String group) {
+    String _temp0 = intl.Intl.selectLogic(group, {
+      'tabs': 'Tab',
+      'panes': 'Pane',
+      'notifications': 'Thông báo',
+      'editing': 'Chỉnh sửa',
+      'font': 'Cỡ chữ',
+      'browser': 'Trình duyệt',
+      'window': 'Cửa sổ',
+      'config': 'Cấu hình',
+      'other': 'Lệnh của bạn',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get shortcutsAdd => 'Thêm phím';
+
+  @override
+  String shortcutsAddFor(String action) {
+    return 'Thêm phím cho “$action”';
+  }
+
+  @override
+  String get shortcutsReset => 'Đặt lại';
+
+  @override
+  String shortcutsResetFor(String action) {
+    return 'Đặt lại “$action”';
+  }
+
+  @override
+  String shortcutsRemove(String shortcut) {
+    return 'Bỏ $shortcut';
+  }
+
+  @override
+  String get shortcutsNone => 'Chưa gán';
+
+  @override
+  String get shortcutsRecording => 'Bấm tổ hợp phím… (Esc để huỷ)';
+
+  @override
+  String shortcutsHeld(String keys) {
+    return '$keys…';
+  }
+
+  @override
+  String shortcutsConflict(String shortcut, String action) {
+    return '$shortcut đang dùng cho “$action”.';
+  }
+
+  @override
+  String get shortcutsReplace => 'Thay thế';
+
+  @override
+  String get shortcutsCancel => 'Huỷ';
+
+  @override
+  String shortcutsOverridden(String file, int line) {
+    return 'Một dòng sau trong $file:$line ghi đè phím này';
+  }
+
+  @override
+  String shortcutsFromFile(int line) {
+    return 'Đặt trong file cấu hình, dòng $line';
+  }
+
+  @override
+  String shortcutsAssigned(String shortcut, String action) {
+    return 'Đã gán $shortcut cho “$action”';
+  }
+
+  @override
+  String shortcutsRemoved(String shortcut) {
+    return 'Đã bỏ $shortcut';
+  }
+
+  @override
+  String shortcutsResetDone(String action) {
+    return 'Đã đặt lại “$action”';
+  }
+
+  @override
+  String get shortcutsFooter => 'Phím viết tay trong file vẫn được giữ.';
+
+  @override
+  String configWriteFailed(String path) {
+    return 'Không lưu được phím tắt vào $path';
   }
 }

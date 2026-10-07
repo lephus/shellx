@@ -42,7 +42,7 @@ Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` t
 | Code | Meaning | Error codes |
 |---|---|---|
 | 0 | ok | |
-| 1 | other error | `exited`, `no_room`, `session_limit`, `spawn_failed`, `busy`, `eval_error`, `load_failed`, `internal`, `not_installed`, `io` |
+| 1 | other error | `exited`, `no_room`, `session_limit`, `spawn_failed`, `busy`, `eval_error`, `load_failed`, `internal`, `not_installed`, `io`, `config_errors` (`config check` or `reload` found errors) |
 | 2 | usage | `usage`, `bad_request` (also an invalid or too slow `--match` pattern) |
 | 3 | ShellX is not running (no endpoint, stale endpoint, connection or handshake failed) | `not_running` |
 | 4 | not found | `not_found`, `ambiguous` |
@@ -276,13 +276,29 @@ Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or
 
 `shellx browser fill PANE SELECTOR TEXT...` — set the first match's value and fire `input` and `change`. Frameworks that track values through their own setters (React) may not notice; use `eval` then. Exit codes: as `eval`.
 
+## shellx config path
+
+`shellx config path [--ghostty]` — print the path of ShellX's configuration file (with `--ghostty`, then the Ghostty files ShellX reads, one per line). Local: ShellX need not run. `--json`: `{"shellx":"…","ghostty":["…"]}`. Exit codes: 0, 2.
+
+## shellx config check
+
+`shellx config check` — check the configuration files as they are now, without applying anything. Prints `file:line: severity: message` per problem (`file: severity: message` when it concerns the whole file), or `no problems`. Exit 1 when there are errors (warnings alone exit 0). `--json`: `{"problems":[{"file","line","severity","code","key"?,"message"}],"generation"}`. Exit codes: 0, 1, 3, 6, 7, 8.
+
+## shellx config reload
+
+`shellx config reload` — reload now, as Cmd/Ctrl+Shift+, does. Silent when there are no errors; otherwise the problems as in `check`, exit 1. `--json`: the same object as `check`. Exit codes: 0, 1, 3, 6, 7, 8.
+
+## shellx config show
+
+`shellx config show [--defaults]` — every key in effect, as `key = value  # file:line` (`# default` when no line sets it). `--defaults`: a commented file with every key at its default. `--json`: `{"values":[{"key","value","source"}],"files":{"shellx","ghostty":["…"]}}` or `{"template":"…"}`. Exit codes: 0, 3, 6, 7, 8 (7 also on a ShellX older than this command).
+
 ## shellx skills install
 
-`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) into `~/.claude/skills/shellx/` (Claude Code), `~/.agents/skills/shellx/` (Codex; also `~/.codex/skills/shellx/` when `~/.codex` exists, for Codex builds that read it) or `DIR/shellx/`. Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". A changed file you decline (or cannot be asked about) is kept and skipped; the other files are still installed and the command exits 6 at the end. `--json`: `{"installed":[…],"upToDate":[…],"skipped":[…]}` plus `"error"` when something was skipped. Never connects to ShellX. Exit codes: 0, 1, 6.
+`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) and the `shellx-config` skill (`SKILL.md`) into `~/.claude/skills/` (Claude Code), `~/.agents/skills/` (Codex; also `~/.codex/skills/` when `~/.codex` exists, for Codex builds that read it) or `DIR/` (one folder per skill). Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". A changed file you decline (or cannot be asked about) is kept and skipped; the other files are still installed and the command exits 6 at the end. `--json`: `{"installed":[…],"upToDate":[…],"skipped":[…]}` plus `"error"` when something was skipped. Never connects to ShellX. Exit codes: 0, 1, 6.
 
 ## shellx skills print
 
-`shellx skills print [SKILL.md | reference]` — print the embedded skill file (`--json`: `{"files":[{"name":"reference.md","text":"…"}]}`). Exit codes: 0, 2.
+`shellx skills print [SKILL.md | reference | config]` — print the embedded skill file (`--json`: `{"files":[{"name":"reference.md","text":"…"}]}`). Exit codes: 0, 2.
 
 ## shellx help
 

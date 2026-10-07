@@ -26,6 +26,7 @@ import 'src/cli/cli_install_windows.dart';
 import 'src/cli/cli_service.dart';
 import 'src/cli/ui_command_handler.dart';
 import 'src/config.dart';
+import 'src/config/config_controller.dart';
 import 'src/l10n/locale.dart';
 import 'src/mux/mux_paths.dart';
 import 'src/mux/windows_pipe_transport.dart';
@@ -333,6 +334,18 @@ Future<void> _start(
       ],
     ],
   );
+
+  // A9 D10: the configuration before the first frame and before the A5a
+  // restore below (restored panes get the configured scrollback and font).
+  // A few small local reads, bounded by the reader (FIFOs and devices are
+  // refused) and by 1 s here: a slow disk finishes in the background and
+  // applies when done. load() never throws.
+  await runBounded(
+    () => container.read(shellxConfigProvider.notifier).load(),
+    timeout: const Duration(seconds: 1),
+    label: 'reading the configuration',
+  );
+  container.read(shellxConfigProvider.notifier).startWatching();
 
   // A4 D25: the focus the window has now; events keep it current.
   try {

@@ -6,6 +6,7 @@
 pub mod args;
 pub mod browser_js;
 pub mod client;
+pub mod config_path;
 pub mod endpoint;
 pub mod output;
 pub mod run;

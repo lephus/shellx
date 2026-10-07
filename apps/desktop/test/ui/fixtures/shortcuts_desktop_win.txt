@@ -1,0 +1,44 @@
+100000806 -> NextRegionIntent
+ctrl+100000009 -> NextTabIntent
+ctrl+100000806 -> NextRegionIntent
+ctrl+20000022b -> FontBiggerIntent
+ctrl+20000022d -> FontSmallerIntent
+ctrl+200000230 -> FontResetIntent
+ctrl+2b -> FontBiggerIntent
+ctrl+2d -> FontSmallerIntent
+ctrl+30 -> FontResetIntent
+ctrl+3d -> FontBiggerIntent
+ctrl+alt+100000301 -> FocusPaneIntent(down)
+ctrl+alt+100000302 -> FocusPaneIntent(left)
+ctrl+alt+100000303 -> FocusPaneIntent(right)
+ctrl+alt+100000304 -> FocusPaneIntent(up)
+ctrl+alt+31 -> SelectTabIntent(1)
+ctrl+alt+32 -> SelectTabIntent(2)
+ctrl+alt+33 -> SelectTabIntent(3)
+ctrl+alt+34 -> SelectTabIntent(4)
+ctrl+alt+35 -> SelectTabIntent(5)
+ctrl+alt+36 -> SelectTabIntent(6)
+ctrl+alt+37 -> SelectTabIntent(7)
+ctrl+alt+38 -> SelectTabIntent(8)
+ctrl+alt+39 -> SelectTabIntent(9)
+ctrl+alt+shift+100000301 -> ResizePaneIntent(down)
+ctrl+alt+shift+100000302 -> ResizePaneIntent(left)
+ctrl+alt+shift+100000303 -> ResizePaneIntent(right)
+ctrl+alt+shift+100000304 -> ResizePaneIntent(up)
+ctrl+alt+shift+3d norepeat -> EqualizePanesIntent
+ctrl+alt+shift+64 norepeat -> SplitPaneIntent(column)
+ctrl+shift+100000009 -> PreviousTabIntent
+ctrl+shift+10000000d norepeat -> TogglePaneZoomIntent
+ctrl+shift+100000806 -> PreviousRegionIntent
+ctrl+shift+20000020d norepeat -> TogglePaneZoomIntent
+ctrl+shift+3d -> FontBiggerIntent
+ctrl+shift+61 -> SelectAllIntent
+ctrl+shift+63 -> CopySelectionIntent
+ctrl+shift+64 norepeat -> SplitPaneIntent(row)
+ctrl+shift+69 norepeat -> ToggleNotificationsPanelIntent
+ctrl+shift+6e norepeat -> NewWorkspaceIntent
+ctrl+shift+74 norepeat -> NewTabIntent
+ctrl+shift+75 norepeat -> JumpToNextUnreadIntent
+ctrl+shift+76 -> PasteClipboardIntent
+ctrl+shift+77 norepeat -> CloseTabIntent
+shift+100000806 -> PreviousRegionIntent

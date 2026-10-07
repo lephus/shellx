@@ -10,6 +10,8 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../config/config_controller.dart';
+import '../../config/keybindings.dart';
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
@@ -20,11 +22,14 @@ import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart';
 import '../window_router.dart';
 import 'close_tab.dart';
+import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
 import 'session_sidebar.dart';
 import 'shortcut_labels.dart';
 import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
+import 'terminal_workspace_config.dart';
+import 'terminal_workspace_notices.dart';
 
 /// Spec §3.2: `Row(Sidebar 220 px, VerticalDivider, TerminalPane)`.
 class TerminalWorkspacePage extends ConsumerStatefulWidget {
@@ -35,7 +40,12 @@ class TerminalWorkspacePage extends ConsumerStatefulWidget {
       TerminalWorkspacePageState();
 }
 
-class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
+class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
+    with
+        WorkspaceConfig<TerminalWorkspacePage>,
+        WorkspaceConfigUi<TerminalWorkspacePage>,
+        WorkspaceSequences<TerminalWorkspacePage> {
+  @override
   final terminalFocus = FocusNode(debugLabel: 'terminal');
   final sidebarFocus = FocusNode(debugLabel: 'sidebar');
 
@@ -63,12 +73,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   Map<ShortcutActivator, Intent>? terminalShortcuts;
   Map<ShortcutActivator, Intent>? _workspaceShortcuts;
   TargetPlatform? _shortcutsPlatform;
+  KeyBindings? _shortcutsFor;
 
-  void _buildShortcuts(TargetPlatform platform) {
-    if (_shortcutsPlatform == platform && terminalShortcuts != null) return;
+  /// Rebuilt only when the platform or the effective bindings change
+  /// (A9 D24): a reload applies at once, a rebuild costs nothing.
+  void _buildShortcuts(TargetPlatform platform, KeyBindings bindings) {
+    if (_shortcutsPlatform == platform &&
+        identical(_shortcutsFor, bindings) &&
+        terminalShortcuts != null) {
+      return;
+    }
     _shortcutsPlatform = platform;
-    terminalShortcuts = terminalViewShortcuts(platform);
-    _workspaceShortcuts = desktopShortcuts(platform);
+    _shortcutsFor = bindings;
+    terminalShortcuts = terminalViewShortcuts(platform, bindings: bindings);
+    _workspaceShortcuts = desktopShortcuts(platform, bindings: bindings);
   }
 
   /// After the frame, so a TerminalView that just got [terminalFocus] (a
@@ -78,6 +96,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   /// A post-frame callback alone waits for a frame something else asks
   /// for (Esc in the sidebar changes nothing on screen), hence the
   /// explicit request.
+  @override
   void focusTerminal() {
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
@@ -93,6 +112,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
 
   void _openPanel() {
     if (panelOpen) return;
+    closeConfigOverlay(restoreFocus: false); // one surface at a time
     _beforePanel = FocusManager.instance.primaryFocus;
     setState(() => panelOpen = true); // the panel takes the keyboard
   }
@@ -100,7 +120,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   /// Esc, a click outside, a jump, or another window shortcut. With
   /// [restoreFocus] the keyboard goes back at once, so a shortcut that
   /// runs next (F6) starts from where the user was.
+  @override
   void closePanel({bool restoreFocus = true}) {
+    closeConfigOverlay(restoreFocus: restoreFocus); // A9: any shortcut
     if (!panelOpen) return;
     final before = _beforePanel;
     _beforePanel = null;
@@ -132,11 +154,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     );
   }
 
+  @override
   Future<void> closeTab(TerminalTab tab) => closeTabWithConfirm(
     tabs: ref.read(terminalTabsProvider.notifier),
     router: ref.read(windowRouterProvider.notifier),
     l10n: AppLocalizations.of(context),
     tab: tab,
+    confirm: ref.read(shellxConfigProvider).config.confirmClose,
   );
 
   /// ⌘W on a split tab, the pane ×, middle click on a pane header, "Close
@@ -151,6 +175,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       l10n: l10n,
       tab: tab,
       paneId: paneId,
+      confirm: ref.read(shellxConfigProvider).config.confirmClose,
     );
     if (!mounted) return;
     final after = ref
@@ -166,23 +191,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     focusTerminal();
   }
 
-  /// D20 / A1: on Windows AltGr arrives as Ctrl+Alt; with the right Alt
-  /// held, a chord stays the shell's (AltGr+digit, AltGr+Shift+D and
-  /// AltGr+arrows type characters on German or Polish layouts).
-  static bool _leftAltOnly(Intent _) =>
-      defaultTargetPlatform != TargetPlatform.windows ||
-      !HardwareKeyboard.instance.logicalKeysPressed.contains(
-        LogicalKeyboardKey.altRight,
-      );
-
-  bool _split(Intent intent) =>
-      _leftAltOnly(intent) && ref.read(terminalTabsProvider).selected != null;
+  // AltGr (Windows: Ctrl + right Alt) is handled once, for every window
+  // shortcut, by [WindowAction] (A9 D26).
+  bool _split(Intent intent) => ref.read(terminalTabsProvider).selected != null;
 
   /// The pane chords apply only to a split tab; otherwise the key reaches
   /// the shell, like ⌘C without a selection.
   bool _isSplit(Intent intent) =>
-      _leftAltOnly(intent) &&
-      (ref.read(terminalTabsProvider).selected?.isSplit ?? false);
+      ref.read(terminalTabsProvider).selected?.isSplit ?? false;
 
   /// D22: polite, once.
   void _announce(String message) => unawaited(
@@ -249,7 +265,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   }
 
   /// Built once; every action reads the providers when it runs.
-  late final _actionsMap = _actions();
+  @override
+  late final actionsMap = _actions();
 
   Map<Type, Action<Intent>> _actions() {
     final tabs = ref.read(terminalTabsProvider.notifier);
@@ -257,7 +274,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     Action<T> run<T extends Intent>(
       void Function(T intent) body, {
       bool Function(T intent)? enabled,
-    }) => _WindowAction<T>(body, enabled);
+    }) => WindowAction<T>(body, enabled);
     return <Type, Action<Intent>>{
       // UI-A4 §5.3: the other window shortcuts still run with the panel
       // open; they close it first.
@@ -284,15 +301,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           unawaited(closeTab(selected));
         }
       }),
-      SelectTabIntent: run<SelectTabIntent>(
-        (intent) {
-          closePanel();
-          workspaces.selectVisible(intent.position);
-          focusTerminal();
-        },
-        // AltGr+digit types `{ [ ] }` on many layouts (German, Polish…).
-        enabled: _leftAltOnly,
-      ),
+      SelectTabIntent: run<SelectTabIntent>((intent) {
+        closePanel();
+        workspaces.selectVisible(intent.position);
+        focusTerminal();
+      }),
       // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell; like the
       // other window shortcuts they close the panel first (UI-A4 §5.3).
       SplitPaneIntent: run<SplitPaneIntent>((intent) {
@@ -365,10 +378,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
             (intent.fromMenu || terminalFocus.hasFocus),
       ),
       FontBiggerIntent: run<FontBiggerIntent>(
-        (_) => ref.read(terminalFontSizeProvider.notifier).increase(),
+        (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
       FontSmallerIntent: run<FontSmallerIntent>(
-        (_) => ref.read(terminalFontSizeProvider.notifier).decrease(),
+        (i) => ref.read(terminalFontSizeProvider.notifier).decrease(i.step),
       ),
       FontResetIntent: run<FontResetIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).reset(),
@@ -381,6 +394,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         closePanel();
         _cycleRegion(-1);
       }),
+      ...configActions(),
     };
   }
 
@@ -430,10 +444,15 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   void initState() {
     super.initState();
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
+    listenToConfig();
+    listenToConfigUi();
+    listenToSequences();
   }
 
   @override
   void dispose() {
+    disposeSequences();
+    disposeConfigUi();
     terminalFocus.dispose();
     sidebarFocus.dispose();
     emptyFocus.dispose();
@@ -479,71 +498,85 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       closePanel(restoreFocus: false);
       focusTerminal();
     });
-    _buildShortcuts(defaultTargetPlatform);
+    _buildShortcuts(
+      defaultTargetPlatform,
+      ref.watch(shellxConfigProvider.select((s) => s.bindings)),
+    );
     return Shortcuts(
-      shortcuts: _workspaceShortcuts!,
+      shortcuts: overlay == A9Overlay.shortcuts
+          ? const {}
+          : _workspaceShortcuts!,
       child: Actions(
-        actions: _actionsMap,
+        actions: actionsMap,
         // Every focus in the window sits inside this scope, so the
         // shortcuts work from any region and even when the focused node
         // goes away (it falls back to the scope itself, never above it).
         child: FocusScope(
           autofocus: true,
           debugLabel: 'workspace',
-          child: Stack(
-            children: [
-              // Modal for screen readers too while the panel is open.
-              Positioned.fill(
-                child: ExcludeSemantics(excluding: panelOpen, child: _body()),
-              ),
-              // UI-A4 §5.3: a click outside closes the panel (and only that).
-              // macOS: it starts under the band, so the window still drags
-              // (and the bell still toggles) while the panel is open. Both
-              // slots are keyed: the barrier coming and going must not
-              // shift the panel's AnimatedSwitcher to a new element (its
-              // fade would never play).
-              if (panelOpen)
-                Positioned(
-                  key: const ValueKey('panel.barrierSlot'),
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  top: isMacDesktop ? ShellxSizes.headerBandMac : 0,
+          child: sequenceScope(
+            Stack(
+              children: [
+                // Modal for screen readers too while the panel is open.
+                Positioned.fill(
                   child: ExcludeSemantics(
-                    child: GestureDetector(
-                      key: const Key('panel.barrier'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: closePanel,
-                      onSecondaryTap: closePanel,
-                    ),
+                    excluding: panelOpen || overlay != null,
+                    child: _body(),
                   ),
                 ),
-              Positioned(
-                key: const ValueKey('panel.slot'),
-                // x 6: over the selected row's 3 px bar (x 6), not beside
-                // it (UI-A4 §5.2).
-                left: ShellxSpace.s6,
-                top:
-                    (isMacDesktop
-                        ? ShellxSizes.headerBandMac
-                        : ShellxSizes.headerBandWindows) +
-                    ShellxSizes.panelOffsetY,
-                child: AnimatedSwitcher(
-                  duration: ShellxMotion.of(context, ShellxMotion.base),
-                  reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
-                  switchInCurve: ShellxMotion.baseCurve,
-                  switchOutCurve: ShellxMotion.exitCurve,
-                  transitionBuilder: _panelTransition,
-                  layoutBuilder: _topLeft,
-                  child: panelOpen
-                      ? NotificationsPanel(
-                          key: const ValueKey('panel.open'),
-                          onClose: closePanel,
-                        )
-                      : const SizedBox.shrink(),
+                // UI-A4 §5.3: a click outside closes the panel (and only that).
+                // macOS: it starts under the band, so the window still drags
+                // (and the bell still toggles) while the panel is open. Both
+                // slots are keyed: the barrier coming and going must not
+                // shift the panel's AnimatedSwitcher to a new element (its
+                // fade would never play).
+                if (panelOpen)
+                  Positioned(
+                    key: const ValueKey('panel.barrierSlot'),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    top: isMacDesktop ? ShellxSizes.headerBandMac : 0,
+                    child: ExcludeSemantics(
+                      child: GestureDetector(
+                        key: const Key('panel.barrier'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: closePanel,
+                        onSecondaryTap: closePanel,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  key: const ValueKey('panel.slot'),
+                  // x 6: over the selected row's 3 px bar (x 6), not beside
+                  // it (UI-A4 §5.2).
+                  left: ShellxSpace.s6,
+                  top:
+                      (isMacDesktop
+                          ? ShellxSizes.headerBandMac
+                          : ShellxSizes.headerBandWindows) +
+                      ShellxSizes.panelOffsetY,
+                  child: AnimatedSwitcher(
+                    duration: ShellxMotion.of(context, ShellxMotion.base),
+                    reverseDuration: ShellxMotion.of(
+                      context,
+                      ShellxMotion.exit,
+                    ),
+                    switchInCurve: ShellxMotion.baseCurve,
+                    switchOutCurve: ShellxMotion.exitCurve,
+                    transitionBuilder: _panelTransition,
+                    layoutBuilder: _topLeft,
+                    child: panelOpen
+                        ? NotificationsPanel(
+                            key: const ValueKey('panel.open'),
+                            onClose: closePanel,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ),
-              ),
-            ],
+                ?overlaySlot(),
+              ],
+            ),
           ),
         ),
       ),
@@ -575,7 +608,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           emptyFocus: emptyFocus,
           stripFocus: stripFocus,
           restoreStripFocus: restoreStripFocus,
-          shortcuts: terminalShortcuts,
+          shortcuts: overlay == A9Overlay.shortcuts
+              ? const {}
+              : terminalShortcuts,
+          onKeyEvent: sequenceKey,
+          onShowConfigProblems: () => openOverlay(A9Overlay.problems),
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);
             if (tab != null) unawaited(closePane(tab, id));
@@ -614,21 +651,4 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         },
         child: child,
       );
-}
-
-/// A window shortcut's action; [enabled] lets a key fall through to the
-/// terminal when it does not apply.
-class _WindowAction<T extends Intent> extends Action<T> {
-  _WindowAction(this._body, this._enabled);
-  final void Function(T intent) _body;
-  final bool Function(T intent)? _enabled;
-
-  @override
-  bool isEnabled(T intent) => _enabled?.call(intent) ?? true;
-
-  @override
-  Object? invoke(T intent) {
-    _body(intent);
-    return null;
-  }
 }

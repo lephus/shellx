@@ -3,8 +3,10 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'shortcut_labels.dart';
@@ -215,9 +217,15 @@ class _ShellxIconButtonState extends State<ShellxIconButton> {
 }
 
 /// UI §3.5: "label  shortcut" with the shortcut part in `caption`
-/// `textSecondary`. [full] is the translated string that contains
-/// [shortcut] (e.g. `terminalNewTabTooltip`).
-InlineSpan shortcutTooltip(String full, String shortcut) {
+/// `textSecondary`. [message] is the translated string builder that places
+/// the shortcut (e.g. `l10n.terminalNewTabTooltip`); an unbound action
+/// ([shortcut] null) shows the label alone (A9 D29).
+InlineSpan shortcutTooltip(
+  String Function(String shortcut) message,
+  String? shortcut,
+) {
+  final full = withShortcut(message, shortcut);
+  if (shortcut == null) return TextSpan(text: full);
   final at = full.lastIndexOf(shortcut);
   if (at < 0) return TextSpan(text: full);
   return TextSpan(
@@ -534,9 +542,13 @@ class NoticeToast extends StatefulWidget {
     required this.notice,
     required this.onDismiss,
     this.onReturnFocus,
+    this.onAction,
   });
   final TabNotice notice;
   final VoidCallback onDismiss;
+
+  /// The "Show" button of a problems notice (A9 UI §3.1); null: none.
+  final VoidCallback? onAction;
 
   /// Called after a dismissal while the close button had the keyboard, so
   /// the focus does not vanish with the toast.
@@ -564,12 +576,21 @@ class _NoticeToastState extends State<NoticeToast> {
     if (!identical(oldWidget.notice, widget.notice)) _start();
   }
 
+  bool get _warningsOnly {
+    final notice = widget.notice;
+    return notice is ConfigProblemsNotice && !notice.hasErrors;
+  }
+
   bool get _paused => _hovered || _closeFocus.hasFocus;
 
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
   bool get _neutral =>
+      widget.notice is ConfigReloadedNotice ||
+      widget.notice is ConfigGhosttyNotice ||
+      _warningsOnly ||
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
+      widget.notice is NoTerminalForCommandNotice ||
       widget.notice is PaneNoRoomNotice ||
       widget.notice is RestorePanesFailedNotice ||
       widget.notice is CliSkillsCopiedNotice ||
@@ -618,6 +639,12 @@ class _NoticeToastState extends State<NoticeToast> {
       l10n.workspaceDeleted(name, movedTo),
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
+    NoTerminalForCommandNotice() => l10n.userCommandNoTerminal,
+    ConfigOpenFailedNotice(:final path) => l10n.configOpenFailed(path),
+    ConfigWriteFailedNotice(:final path) => l10n.configWriteFailed(path),
+    ConfigProblemsNotice(:final count) => l10n.configProblemsToast(count),
+    ConfigReloadedNotice() => l10n.configReloaded,
+    ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
@@ -688,6 +715,17 @@ class _NoticeToastState extends State<NoticeToast> {
                 ),
               ),
               const SizedBox(width: ShellxSpace.s8),
+              if (widget.notice is ConfigProblemsNotice &&
+                  widget.onAction != null)
+                _ShowButton(
+                  label: l10n.configProblemsShow,
+                  neutral: _neutral,
+                  color: foreground,
+                  onPressed: () {
+                    widget.onAction!();
+                    _close();
+                  },
+                ),
               ShellxIconButton(
                 key: const Key('pane.toast.close'),
                 icon: Icons.close,
@@ -709,8 +747,48 @@ class _NoticeToastState extends State<NoticeToast> {
   }
 }
 
+/// UI-A9 §3.1: the toast's text button (hit 28, padding 0/8); neutral →
+/// accent w600, error → the notice colour underlined.
+class _ShowButton extends StatelessWidget {
+  const _ShowButton({
+    required this.label,
+    required this.neutral,
+    required this.color,
+    required this.onPressed,
+  });
+  final String label;
+  final bool neutral;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    key: const Key('pane.toast.action'),
+    onPressed: onPressed,
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+      fixedSize: const WidgetStatePropertyAll(Size.fromHeight(28)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: ShellxSpace.s8),
+      ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: buttonShape(outsideRing: false),
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    child: Text(
+      label,
+      style: ShellxText.body.copyWith(
+        color: neutral ? ShellxDesktopColors.accent : color,
+        fontWeight: neutral ? FontWeight.w600 : null,
+        decoration: neutral ? null : TextDecoration.underline,
+        decorationColor: color,
+      ),
+    ),
+  );
+}
+
 /// UI §2.7: shown in the pane when there is no tab.
-class EmptyTerminalState extends StatelessWidget {
+class EmptyTerminalState extends ConsumerWidget {
   const EmptyTerminalState({super.key, required this.onOpen, this.buttonFocus});
   final VoidCallback onOpen;
 
@@ -718,7 +796,10 @@ class EmptyTerminalState extends StatelessWidget {
   final FocusNode? buttonFocus;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The caption follows a reload (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
+    final shortcut = newTabShortcutLabel();
     final l10n = AppLocalizations.of(context);
     return Center(
       key: const Key('pane.empty'),
@@ -765,14 +846,15 @@ class EmptyTerminalState extends StatelessWidget {
                 focusNode: buttonFocus,
               ),
               const SizedBox(height: ShellxSpace.s8),
-              ExcludeSemantics(
-                child: Text(
-                  newTabShortcutLabel(),
-                  style: ShellxText.caption.copyWith(
-                    color: ShellxDesktopColors.textSecondary,
+              if (shortcut != null)
+                ExcludeSemantics(
+                  child: Text(
+                    shortcut,
+                    style: ShellxText.caption.copyWith(
+                      color: ShellxDesktopColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

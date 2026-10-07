@@ -12,12 +12,14 @@ import '../../agent/desktop_services.dart' show clockProvider;
 import '../../restore/restore_persistence.dart';
 import '../../restore/scrollback_codec.dart' show formatRestoreTime;
 import '../../terminal/tab_attention.dart';
+import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
 import 'info_strip.dart';
+import 'key_sequence.dart';
 import 'pane_tree_view.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart';
@@ -33,7 +35,9 @@ class TerminalPane extends ConsumerStatefulWidget {
     this.stripFocus,
     this.restoreStripFocus,
     this.shortcuts,
+    this.onKeyEvent,
     required this.onClosePane,
+    this.onShowConfigProblems,
   });
 
   /// The selected tab's TerminalView focus (UI §3.6 region 1).
@@ -53,9 +57,15 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// xterm's own key handling.
   final Map<ShortcutActivator, Intent>? shortcuts;
 
+  /// A key reaching a pane's terminal first (A9 D28 key sequences).
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
+
   /// A pane's ×, middle click (UI-A3 §2.1): the workspace asks first when
   /// a command runs there.
   final void Function(int sessionId) onClosePane;
+
+  /// The toast's "Show" for configuration problems (A9).
+  final VoidCallback? onShowConfigProblems;
 
   @override
   ConsumerState<TerminalPane> createState() => _TerminalPaneState();
@@ -179,7 +189,10 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final unread = ref.watch(tabAttentionProvider.select((a) => a.unread));
     Set<int> unreadPanes(int tabId) =>
         unread[tabId]?.panes.keys.toSet() ?? const <int>{};
-    final style = desktopTerminalStyle(fontSize);
+    // A9: font, theme, cursor and padding follow the configuration live.
+    final appearance = ref.watch(terminalAppearanceProvider);
+    final padding = appearance.padding;
+    final style = desktopTerminalStyle(fontSize, families: appearance.families);
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
     _dropClosed(state.tabs);
@@ -238,105 +251,133 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
             child: _restoreStrip(restoreStrip),
           ),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final grid = measureTerminalGrid(
-                  ShellxSizes.terminalPadding.deflateSize(constraints.biggest),
-                  style,
-                  MediaQuery.textScalerOf(context),
-                );
-                // Only stores the size for the next open: safe during layout.
-                if (grid != null) tabs.reportGrid(grid);
-                final scaler = MediaQuery.textScalerOf(context);
-                final cell = measureTerminalCell(style, scaler);
-                // D4: 20 × 5 cells + padding + the pane header.
-                tabs.reportPaneMetrics(
-                  PaneMetrics(
-                    area: constraints.biggest,
-                    minPane: Size(
-                      ShellxSizes.paneMinCols * cell.width +
-                          ShellxSizes.terminalPadding.horizontal,
-                      ShellxSizes.paneMinRows * cell.height +
-                          ShellxSizes.terminalPadding.vertical +
-                          ShellxSizes.paneHeaderFor(scaler),
+            // D15: the terminal area (padding and the cells around panes)
+            // takes the theme's background; the chrome above keeps ShellX's.
+            child: ColoredBox(
+              key: const ValueKey('terminal.area'),
+              color: appearance.background,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final grid = measureTerminalGrid(
+                    padding.deflateSize(constraints.biggest),
+                    style,
+                    MediaQuery.textScalerOf(context),
+                  );
+                  // Only stores the size for the next open: safe during layout.
+                  if (grid != null) tabs.reportGrid(grid);
+                  final scaler = MediaQuery.textScalerOf(context);
+                  final cell = measureTerminalCell(style, scaler);
+                  // D4: 20 × 5 cells + padding + the pane header.
+                  tabs.reportPaneMetrics(
+                    PaneMetrics(
+                      area: constraints.biggest,
+                      minPane: Size(
+                        ShellxSizes.paneMinCols * cell.width +
+                            padding.horizontal,
+                        ShellxSizes.paneMinRows * cell.height +
+                            padding.vertical +
+                            ShellxSizes.paneHeaderFor(scaler),
+                      ),
+                      divider: ShellxSizes.paneDivider,
+                      // The real one: a test or an embedder may override
+                      // MediaQuery's.
+                      devicePixelRatio: View.of(context).devicePixelRatio,
                     ),
-                    divider: ShellxSizes.paneDivider,
-                    // The real one: a test or an embedder may override
-                    // MediaQuery's.
-                    devicePixelRatio: View.of(context).devicePixelRatio,
-                  ),
-                );
-                return Stack(
-                  children: [
-                    if (state.tabs.isEmpty)
-                      Positioned.fill(
-                        child: EmptyTerminalState(
-                          onOpen: tabs.openTab,
-                          buttonFocus: widget.emptyFocus,
+                  );
+                  return Stack(
+                    children: [
+                      if (state.tabs.isEmpty)
+                        // The empty state uses ShellX's own (dark) text
+                        // tokens, so it keeps ShellX's background even under
+                        // a light theme (D15).
+                        Positioned.fill(
+                          child: ColoredBox(
+                            color: ShellxDesktopColors.bgTerminal,
+                            child: EmptyTerminalState(
+                              onOpen: tabs.openTab,
+                              buttonFocus: widget.emptyFocus,
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned.fill(
+                          child: IndexedStack(
+                            index: selectedIndex < 0 ? 0 : selectedIndex,
+                            sizing: StackFit.expand,
+                            children: [
+                              for (final tab in state.tabs)
+                                PaneTreeView(
+                                  key: ValueKey('terminal.${tab.id}'),
+                                  tab: tab,
+                                  selected: tab.id == selected?.id,
+                                  terminalFocus: widget.terminalFocus,
+                                  style: style,
+                                  shortcuts: widget.shortcuts,
+                                  onKeyEvent: widget.onKeyEvent,
+                                  scrollFor: _scrollFor,
+                                  onClosePane: widget.onClosePane,
+                                  ringed: tab.id == selected?.id
+                                      ? unreadPanes(tab.id)
+                                      : const <int>{},
+                                  // A pane with unread hidden by the zoom.
+                                  hiddenUnread:
+                                      tab.zoomedPaneId != null &&
+                                      unreadPanes(
+                                        tab.id,
+                                      ).any((id) => id != tab.zoomedPaneId),
+                                  toastShowing: notice != null,
+                                ),
+                            ],
+                          ),
                         ),
-                      )
-                    else
-                      Positioned.fill(
-                        child: IndexedStack(
-                          index: selectedIndex < 0 ? 0 : selectedIndex,
-                          sizing: StackFit.expand,
+                      // UI §2.8: one toast, bottom centre of the whole area.
+                      // UI-A9 §5: the sequence pill is bottom right of the area,
+                      // over every pane; above a toast, never under it.
+                      Positioned(
+                        bottom: ShellxSpace.s16,
+                        left: ShellxSpace.s12,
+                        right: ShellxSpace.s12,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final tab in state.tabs)
-                              PaneTreeView(
-                                key: ValueKey('terminal.${tab.id}'),
-                                tab: tab,
-                                selected: tab.id == selected?.id,
-                                terminalFocus: widget.terminalFocus,
-                                style: style,
-                                shortcuts: widget.shortcuts,
-                                scrollFor: _scrollFor,
-                                onClosePane: widget.onClosePane,
-                                ringed: tab.id == selected?.id
-                                    ? unreadPanes(tab.id)
-                                    : const <int>{},
-                                // A pane with unread hidden by the zoom.
-                                hiddenUnread:
-                                    tab.zoomedPaneId != null &&
-                                    unreadPanes(
-                                      tab.id,
-                                    ).any((id) => id != tab.zoomedPaneId),
-                                toastShowing: notice != null,
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: SequenceIndicator(),
+                            ),
+                            if (notice != null)
+                              const SizedBox(height: ShellxSpace.s8),
+                            Center(
+                              child: AnimatedSwitcher(
+                                duration: ShellxMotion.of(
+                                  context,
+                                  ShellxMotion.toastIn,
+                                ),
+                                reverseDuration: ShellxMotion.of(
+                                  context,
+                                  ShellxMotion.exit,
+                                ),
+                                switchInCurve: ShellxMotion.baseCurve,
+                                switchOutCurve: ShellxMotion.exitCurve,
+                                transitionBuilder: _toastTransition,
+                                child: notice == null
+                                    ? const SizedBox.shrink()
+                                    : NoticeToast(
+                                        key: ObjectKey(notice),
+                                        notice: notice,
+                                        onDismiss: () => _dismiss(notice),
+                                        onReturnFocus: _returnFocus,
+                                        onAction: widget.onShowConfigProblems,
+                                      ),
                               ),
+                            ),
                           ],
                         ),
                       ),
-                    // UI §2.8: one toast, bottom centre of the whole area.
-                    Positioned(
-                      bottom: ShellxSpace.s16,
-                      left: ShellxSpace.s16,
-                      right: ShellxSpace.s16,
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: ShellxMotion.of(
-                            context,
-                            ShellxMotion.toastIn,
-                          ),
-                          reverseDuration: ShellxMotion.of(
-                            context,
-                            ShellxMotion.exit,
-                          ),
-                          switchInCurve: ShellxMotion.baseCurve,
-                          switchOutCurve: ShellxMotion.exitCurve,
-                          transitionBuilder: _toastTransition,
-                          child: notice == null
-                              ? const SizedBox.shrink()
-                              : NoticeToast(
-                                  key: ObjectKey(notice),
-                                  notice: notice,
-                                  onDismiss: () => _dismiss(notice),
-                                  onReturnFocus: _returnFocus,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ],

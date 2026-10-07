@@ -754,6 +754,7 @@ void main() {
               key: ValueKey(pillHeight),
               terminal: terminal,
               cellHeight: 17,
+              topPadding: ShellxSizes.terminalPadding.top,
               canMoveDown: true,
               child: SizedBox(width: 100, height: pillHeight),
             ),

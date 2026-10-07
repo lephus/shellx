@@ -1048,6 +1048,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get confirmCloseAlwaysBody => 'The shell in this tab will close.';
+
+  @override
+  String confirmCloseAlwaysPanesBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count panes in this tab will close.',
+      one: '1 pane in this tab will close.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmClosePaneAlwaysBody => 'The shell in this pane will close.';
+
+  @override
   String terminalRestoredDivider(String time) {
     return '— Session restored · $time —';
   }
@@ -1158,5 +1175,520 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String cliPathNotOnPath(String file, String line) {
     return 'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to $file: $line';
+  }
+
+  @override
+  String get userCommandNoTerminal => 'There\'s no terminal to run this in';
+
+  @override
+  String configOpenFailed(String path) {
+    return 'Couldn\'t open $path';
+  }
+
+  @override
+  String sequencePending(String shortcut) {
+    return '$shortcut …';
+  }
+
+  @override
+  String sequencePendingAnnounce(String shortcut) {
+    return '$shortcut pressed, waiting for the next key';
+  }
+
+  @override
+  String configProblemsToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count problems in the configuration',
+      one: '1 problem in the configuration',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get configProblemsShow => 'Show';
+
+  @override
+  String get configReloaded => 'Configuration reloaded';
+
+  @override
+  String get configGhosttyNotice =>
+      'Using fonts and colours from your Ghostty config (turn off with ghostty-config = false)';
+
+  @override
+  String get configProblemsTitle => 'Configuration problems';
+
+  @override
+  String get configProblemsNone => 'No problems in the configuration.';
+
+  @override
+  String configProblemWhere(String file, int line) {
+    return '$file, line $line';
+  }
+
+  @override
+  String configProblemLine(int line) {
+    return 'line $line';
+  }
+
+  @override
+  String get configSeverityError => 'Error';
+
+  @override
+  String get configSeverityWarning => 'Warning';
+
+  @override
+  String get configSeverityInfo => 'Note';
+
+  @override
+  String get configOpenFile => 'Open configuration file';
+
+  @override
+  String get configReload => 'Reload configuration';
+
+  @override
+  String get configProblemSyntax => 'Line has no “=” (expected key = value)';
+
+  @override
+  String configProblemBadKey(String key) {
+    return '“$key” is not a valid key name';
+  }
+
+  @override
+  String configProblemUnknownKey(String key) {
+    return 'ShellX has no key “$key”';
+  }
+
+  @override
+  String configProblemBadValue(String key, String value, String hint) {
+    return '$key: “$value” is not valid (expected $hint)';
+  }
+
+  @override
+  String configProblemOutOfRange(
+    String key,
+    String value,
+    String hint,
+    String detail,
+  ) {
+    return '$key: $value is outside $hint, using $detail';
+  }
+
+  @override
+  String configProblemDuplicate(String key, String detail) {
+    return '$key: replaces line $detail';
+  }
+
+  @override
+  String configProblemIncludeMissing(String value) {
+    return 'File “$value” not found';
+  }
+
+  @override
+  String configProblemIncludeCycle(String value) {
+    return '“$value” is already loaded (config-file loop)';
+  }
+
+  @override
+  String get configProblemIncludeDepth =>
+      'config-file is nested more than 4 levels';
+
+  @override
+  String get configProblemIncludeLimit =>
+      'More than 64 config files — the rest are ignored';
+
+  @override
+  String get configProblemUnreadable =>
+      'Can\'t read the file — keeping the previous configuration';
+
+  @override
+  String get configProblemNotUtf8 =>
+      'The file isn\'t UTF-8 — keeping the previous configuration';
+
+  @override
+  String get configProblemTooLarge =>
+      'The file is larger than 256 KiB — keeping the previous configuration';
+
+  @override
+  String configProblemThemeNotFound(String value) {
+    return 'Theme “$value” not found';
+  }
+
+  @override
+  String configProblemFontNotFound(String value) {
+    return 'Font “$value” not found — using JetBrains Mono';
+  }
+
+  @override
+  String configProblemFontNotMonospace(String value) {
+    return 'Font “$value” isn\'t monospaced — columns may not line up';
+  }
+
+  @override
+  String configProblemLowContrast(String detail) {
+    return 'Low text/background contrast ($detail:1, aim for 4.5:1)';
+  }
+
+  @override
+  String configProblemUnsupportedValue(String key, String value, String hint) {
+    return '$key = $value isn\'t supported (using $hint)';
+  }
+
+  @override
+  String configProblemNotOnThisPlatform(String key) {
+    return '$key only has an effect on macOS';
+  }
+
+  @override
+  String configProblemBadTrigger(String value) {
+    return '“$value” is not a valid key combination';
+  }
+
+  @override
+  String configProblemUnknownAction(String value) {
+    return 'There\'s no action “$value”';
+  }
+
+  @override
+  String configProblemBadActionParam(String value, String hint) {
+    return '“$value” is not valid (expected $hint)';
+  }
+
+  @override
+  String configProblemReservedTrigger(String value) {
+    return '$value is reserved by the system';
+  }
+
+  @override
+  String configProblemPlainKeyTrigger(String value) {
+    return '$value is for typing — add Ctrl, Alt or ⌘';
+  }
+
+  @override
+  String get configProblemRegionTrigger =>
+      'F6 and Shift+F6 always move between regions';
+
+  @override
+  String configProblemShellKeyTrigger(String value) {
+    return '$value will no longer reach the shell';
+  }
+
+  @override
+  String configProblemOptionKeyTrigger(String value) {
+    return '$value will no longer type its Option character';
+  }
+
+  @override
+  String configProblemAltGrTrigger(String value) {
+    return '$value works with the left Alt only; AltGr still types characters';
+  }
+
+  @override
+  String configProblemMissionControlTrigger(String value) {
+    return 'Mission Control may take $value';
+  }
+
+  @override
+  String configProblemUnsupportedPrefix(String value) {
+    return 'The “$value” prefix isn\'t supported';
+  }
+
+  @override
+  String get configProblemSequenceTooLong =>
+      'Key sequences have at most 2 steps';
+
+  @override
+  String configProblemSequencePrefixShadows(String value) {
+    return '$value starts a key sequence, so it no longer works on its own';
+  }
+
+  @override
+  String configProblemSequenceRepeatsPrefix(String value) {
+    return 'This sequence can\'t fire: pressing $value twice sends it';
+  }
+
+  @override
+  String configProblemUnknownCommand(String value) {
+    return 'There\'s no command “$value”';
+  }
+
+  @override
+  String get configProblemCommandLimit =>
+      'More than 200 commands — the rest are ignored';
+
+  @override
+  String configProblemLimit(String detail) {
+    return '$detail problems — showing the first 100';
+  }
+
+  @override
+  String get configProblemInternal =>
+      'Unexpected error — keeping the previous configuration';
+
+  @override
+  String get trayConfig => 'Configuration';
+
+  @override
+  String get trayConfigOpen => 'Open configuration file';
+
+  @override
+  String get trayConfigReload => 'Reload configuration';
+
+  @override
+  String get trayConfigShortcuts => 'Keyboard shortcuts…';
+
+  @override
+  String trayConfigProblems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '⚠ $count configuration problems…',
+      one: '⚠ 1 configuration problem…',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteTitle => 'Command palette';
+
+  @override
+  String get paletteSearchLabel => 'Search commands';
+
+  @override
+  String get paletteSearchHint => 'Type a command…';
+
+  @override
+  String get paletteNoResults => 'No matching commands';
+
+  @override
+  String paletteResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count commands',
+      one: '1 command',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteKindUserCommand => 'Your command';
+
+  @override
+  String get paletteKindSnippet => 'Snippet';
+
+  @override
+  String get paletteKindConfig => 'Configuration';
+
+  @override
+  String get actionNewTab => 'New tab';
+
+  @override
+  String get actionCloseSurface => 'Close pane or tab';
+
+  @override
+  String get actionCloseTab => 'Close whole tab';
+
+  @override
+  String get actionNewWorkspace => 'New workspace';
+
+  @override
+  String get actionToggleNotifications => 'Notifications';
+
+  @override
+  String get actionJumpToUnread => 'Jump to unread';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String get actionPaste => 'Paste';
+
+  @override
+  String get actionSelectAll => 'Select all';
+
+  @override
+  String actionGotoTab(String n) {
+    return 'Go to tab $n';
+  }
+
+  @override
+  String get actionNextTab => 'Next tab';
+
+  @override
+  String get actionPreviousTab => 'Previous tab';
+
+  @override
+  String get actionSplitRight => 'Split right';
+
+  @override
+  String get actionSplitDown => 'Split down';
+
+  @override
+  String actionFocusPane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Focus pane on the left',
+      'right': 'Focus pane on the right',
+      'up': 'Focus pane above',
+      'other': 'Focus pane below',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String actionResizePane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Move divider left',
+      'right': 'Move divider right',
+      'up': 'Move divider up',
+      'other': 'Move divider down',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionToggleZoom => 'Zoom or unzoom pane';
+
+  @override
+  String get actionEqualize => 'Equalize panes';
+
+  @override
+  String get actionFontBigger => 'Bigger text';
+
+  @override
+  String get actionFontSmaller => 'Smaller text';
+
+  @override
+  String get actionFontReset => 'Default text size';
+
+  @override
+  String get actionNextRegion => 'Next region';
+
+  @override
+  String get actionPreviousRegion => 'Previous region';
+
+  @override
+  String get actionReloadConfig => 'Reload configuration';
+
+  @override
+  String get actionOpenConfig => 'Open configuration file';
+
+  @override
+  String get actionCommandPalette => 'Command palette';
+
+  @override
+  String get actionShowShortcuts => 'Keyboard shortcuts…';
+
+  @override
+  String get actionShowConfigProblems => 'Show configuration problems';
+
+  @override
+  String actionRunCommand(String name) {
+    return 'Run “$name”';
+  }
+
+  @override
+  String get actionSendText => 'Send text to the terminal';
+
+  @override
+  String get actionIgnore => 'Ignore key';
+
+  @override
+  String get shortcutsTitle => 'Keyboard shortcuts';
+
+  @override
+  String get shortcutsSearchLabel => 'Search shortcuts';
+
+  @override
+  String shortcutsGroup(String group) {
+    String _temp0 = intl.Intl.selectLogic(group, {
+      'tabs': 'Tabs',
+      'panes': 'Panes',
+      'notifications': 'Notifications',
+      'editing': 'Editing',
+      'font': 'Text size',
+      'browser': 'Browser',
+      'window': 'Window',
+      'config': 'Configuration',
+      'other': 'Your commands',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get shortcutsAdd => 'Add shortcut';
+
+  @override
+  String shortcutsAddFor(String action) {
+    return 'Add a shortcut for “$action”';
+  }
+
+  @override
+  String get shortcutsReset => 'Reset';
+
+  @override
+  String shortcutsResetFor(String action) {
+    return 'Reset “$action”';
+  }
+
+  @override
+  String shortcutsRemove(String shortcut) {
+    return 'Remove $shortcut';
+  }
+
+  @override
+  String get shortcutsNone => 'Not set';
+
+  @override
+  String get shortcutsRecording => 'Press a key combination… (Esc to cancel)';
+
+  @override
+  String shortcutsHeld(String keys) {
+    return '$keys…';
+  }
+
+  @override
+  String shortcutsConflict(String shortcut, String action) {
+    return '$shortcut is used by “$action”.';
+  }
+
+  @override
+  String get shortcutsReplace => 'Replace';
+
+  @override
+  String get shortcutsCancel => 'Cancel';
+
+  @override
+  String shortcutsOverridden(String file, int line) {
+    return 'A later line in $file:$line overrides this';
+  }
+
+  @override
+  String shortcutsFromFile(int line) {
+    return 'Set in the configuration file, line $line';
+  }
+
+  @override
+  String shortcutsAssigned(String shortcut, String action) {
+    return '$shortcut now runs “$action”';
+  }
+
+  @override
+  String shortcutsRemoved(String shortcut) {
+    return 'Removed $shortcut';
+  }
+
+  @override
+  String shortcutsResetDone(String action) {
+    return '“$action” reset';
+  }
+
+  @override
+  String get shortcutsFooter => 'Shortcuts written in the file are kept.';
+
+  @override
+  String configWriteFailed(String path) {
+    return 'Couldn\'t save the shortcut to $path';
   }
 }

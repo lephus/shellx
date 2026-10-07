@@ -50,6 +50,7 @@ const ALL: &[&str] = &[
     "ui.workspace.new",
     "ui.workspace.rename",
     "ui.workspace.move",
+    "ui.config",
     "ui.browser",
 ];
 
@@ -1208,4 +1209,159 @@ fn human_output_never_carries_control_characters() {
         );
         assert!(body.contains("x]52;c;aGk="), "{name}: {s:?}");
     }
+}
+
+fn problem_answer(severity: &str) -> Vec<(&'static str, Result<Message, ApiError>)> {
+    let p = Value::map(vec![
+        ("file", Value::text("/h/.config/shellx/config")),
+        ("line", Value::Int(1)),
+        ("severity", Value::text(severity)),
+        ("code", Value::text("badValue")),
+        ("key", Value::text("font-size")),
+        (
+            "message",
+            Value::text("font-size: “to” is not valid (expected 9–28)"),
+        ),
+    ]);
+    vec![
+        (
+            "ui.config.check",
+            ok(vec![
+                ("problems", Value::Array(vec![p.clone()])),
+                ("generation", Value::Int(0)),
+            ]),
+        ),
+        (
+            "ui.config.reload",
+            ok(vec![
+                ("problems", Value::Array(vec![p])),
+                ("generation", Value::Int(1)),
+            ]),
+        ),
+    ]
+}
+
+#[test]
+fn config_path_is_local_and_never_connects() {
+    let o = go(
+        &["config", "path", "--ghostty"],
+        &[("HOME", "/Users/me")],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 0);
+    assert!(!o.connected);
+    let lines: Vec<&str> = o.out.lines().collect();
+    assert_eq!(lines[0], "/Users/me/.config/shellx/config");
+    assert_eq!(lines.len(), 5);
+    let j = go(
+        &["config", "path", "--json"],
+        &[("HOME", "/Users/me")],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!(j.out.lines().count(), 1);
+    assert!(j
+        .out
+        .contains("\"shellx\":\"/Users/me/.config/shellx/config\""));
+    let none = go(&["config", "path"], &[], vec![], "", PLAIN);
+    assert_eq!(none.code, 2);
+}
+
+#[test]
+fn config_check_exits_1_on_errors_and_prints_them() {
+    let o = go(
+        &["config", "check"],
+        &[],
+        problem_answer("error"),
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 1);
+    assert_eq!(
+        o.out,
+        "/h/.config/shellx/config:1: error: font-size: “to” is not valid (expected 9–28)\n"
+    );
+    assert_eq!(o.err, "");
+    let w = go(
+        &["config", "check"],
+        &[],
+        problem_answer("warning"),
+        "",
+        PLAIN,
+    );
+    assert_eq!(w.code, 0);
+}
+
+#[test]
+fn config_reload_and_json() {
+    let o = go(
+        &["config", "reload"],
+        &[],
+        problem_answer("error"),
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 1);
+    assert!(o.out.contains("error:"));
+    let j = go(
+        &["config", "reload", "--json"],
+        &[],
+        problem_answer("error"),
+        "",
+        PLAIN,
+    );
+    assert_eq!(j.code, 1);
+    assert_eq!(j.out.lines().count(), 1, "{}", j.out);
+    assert!(j.out.starts_with("{\"problems\":[{"), "{}", j.out);
+    assert_eq!(j.err, "");
+}
+
+#[test]
+fn config_show_asks_for_defaults_only_when_told() {
+    let a = go(
+        &["config", "show"],
+        &[],
+        vec![(
+            "ui.config.show",
+            ok(vec![("template", Value::text("# hi\n"))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!((a.code, a.out.as_str()), (0, "# hi\n"));
+    assert_eq!(
+        sent(&a, "ui.config.show").get("defaults"),
+        Some(&Value::Bool(false))
+    );
+    let b = go(&["config", "show", "--defaults"], &[], vec![], "", PLAIN);
+    assert_eq!(
+        sent(&b, "ui.config.show").get("defaults"),
+        Some(&Value::Bool(true))
+    );
+}
+
+#[test]
+fn config_needs_the_cap_and_maps_refusals() {
+    let o = go_caps(&["config", "check"], &[], vec![], "", PLAIN, &["ui.ls"]);
+    assert_eq!(o.code, 7);
+    assert!(o.err.contains("too old"), "{}", o.err);
+    let d = go(
+        &["config", "reload"],
+        &[],
+        vec![("ui.config.reload", remote("cli_disabled", "off"))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(d.code, 6);
+    let f = go(
+        &["config", "show"],
+        &[],
+        vec![("ui.config.show", remote("forbidden", "no token"))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(f.code, 6);
 }

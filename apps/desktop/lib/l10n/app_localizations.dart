@@ -1591,6 +1591,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{The command running in 1 pane will be stopped.} other{The commands running in {count} panes will be stopped.}}'**
   String confirmCloseRunningPanesBody(int count);
 
+  /// A9 D20 confirm-close-surface = always, idle one-pane tab
+  ///
+  /// In en, this message translates to:
+  /// **'The shell in this tab will close.'**
+  String get confirmCloseAlwaysBody;
+
+  /// A9 D20, idle split tab
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 pane in this tab will close.} other{{count} panes in this tab will close.}}'**
+  String confirmCloseAlwaysPanesBody(int count);
+
+  /// A9 D20, idle pane
+  ///
+  /// In en, this message translates to:
+  /// **'The shell in this pane will close.'**
+  String get confirmClosePaneAlwaysBody;
+
   /// No description provided for @terminalRestoredDivider.
   ///
   /// In en, this message translates to:
@@ -1734,6 +1752,725 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to {file}: {line}'**
   String cliPathNotOnPath(String file, String line);
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'There\'s no terminal to run this in'**
+  String get userCommandNoTerminal;
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open {path}'**
+  String configOpenFailed(String path);
+
+  /// UI-A9 §5
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} …'**
+  String sequencePending(String shortcut);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} pressed, waiting for the next key'**
+  String sequencePendingAnnounce(String shortcut);
+
+  /// UI-A9 §3.1
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 problem in the configuration} other{{count} problems in the configuration}}'**
+  String configProblemsToast(int count);
+
+  /// UI-A9 §3.1 toast button
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get configProblemsShow;
+
+  /// UI-A9 §3.1
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration reloaded'**
+  String get configReloaded;
+
+  /// A9 D4, shown once
+  ///
+  /// In en, this message translates to:
+  /// **'Using fonts and colours from your Ghostty config (turn off with ghostty-config = false)'**
+  String get configGhosttyNotice;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration problems'**
+  String get configProblemsTitle;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'No problems in the configuration.'**
+  String get configProblemsNone;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'{file}, line {line}'**
+  String configProblemWhere(String file, int line);
+
+  /// A9 T10: a problem whose file path is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'line {line}'**
+  String configProblemLine(int line);
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get configSeverityError;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get configSeverityWarning;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get configSeverityInfo;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Open configuration file'**
+  String get configOpenFile;
+
+  /// UI-A9 §3.2
+  ///
+  /// In en, this message translates to:
+  /// **'Reload configuration'**
+  String get configReload;
+
+  /// No description provided for @configProblemSyntax.
+  ///
+  /// In en, this message translates to:
+  /// **'Line has no “=” (expected key = value)'**
+  String get configProblemSyntax;
+
+  /// No description provided for @configProblemBadKey.
+  ///
+  /// In en, this message translates to:
+  /// **'“{key}” is not a valid key name'**
+  String configProblemBadKey(String key);
+
+  /// No description provided for @configProblemUnknownKey.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX has no key “{key}”'**
+  String configProblemUnknownKey(String key);
+
+  /// No description provided for @configProblemBadValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}: “{value}” is not valid (expected {hint})'**
+  String configProblemBadValue(String key, String value, String hint);
+
+  /// No description provided for @configProblemOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}: {value} is outside {hint}, using {detail}'**
+  String configProblemOutOfRange(
+    String key,
+    String value,
+    String hint,
+    String detail,
+  );
+
+  /// No description provided for @configProblemDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}: replaces line {detail}'**
+  String configProblemDuplicate(String key, String detail);
+
+  /// No description provided for @configProblemIncludeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'File “{value}” not found'**
+  String configProblemIncludeMissing(String value);
+
+  /// No description provided for @configProblemIncludeCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'“{value}” is already loaded (config-file loop)'**
+  String configProblemIncludeCycle(String value);
+
+  /// No description provided for @configProblemIncludeDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'config-file is nested more than 4 levels'**
+  String get configProblemIncludeDepth;
+
+  /// No description provided for @configProblemIncludeLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'More than 64 config files — the rest are ignored'**
+  String get configProblemIncludeLimit;
+
+  /// No description provided for @configProblemUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t read the file — keeping the previous configuration'**
+  String get configProblemUnreadable;
+
+  /// No description provided for @configProblemNotUtf8.
+  ///
+  /// In en, this message translates to:
+  /// **'The file isn\'t UTF-8 — keeping the previous configuration'**
+  String get configProblemNotUtf8;
+
+  /// No description provided for @configProblemTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is larger than 256 KiB — keeping the previous configuration'**
+  String get configProblemTooLarge;
+
+  /// No description provided for @configProblemThemeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme “{value}” not found'**
+  String configProblemThemeNotFound(String value);
+
+  /// No description provided for @configProblemFontNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Font “{value}” not found — using JetBrains Mono'**
+  String configProblemFontNotFound(String value);
+
+  /// No description provided for @configProblemFontNotMonospace.
+  ///
+  /// In en, this message translates to:
+  /// **'Font “{value}” isn\'t monospaced — columns may not line up'**
+  String configProblemFontNotMonospace(String value);
+
+  /// No description provided for @configProblemLowContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Low text/background contrast ({detail}:1, aim for 4.5:1)'**
+  String configProblemLowContrast(String detail);
+
+  /// No description provided for @configProblemUnsupportedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{key} = {value} isn\'t supported (using {hint})'**
+  String configProblemUnsupportedValue(String key, String value, String hint);
+
+  /// No description provided for @configProblemNotOnThisPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'{key} only has an effect on macOS'**
+  String configProblemNotOnThisPlatform(String key);
+
+  /// No description provided for @configProblemBadTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'“{value}” is not a valid key combination'**
+  String configProblemBadTrigger(String value);
+
+  /// No description provided for @configProblemUnknownAction.
+  ///
+  /// In en, this message translates to:
+  /// **'There\'s no action “{value}”'**
+  String configProblemUnknownAction(String value);
+
+  /// No description provided for @configProblemBadActionParam.
+  ///
+  /// In en, this message translates to:
+  /// **'“{value}” is not valid (expected {hint})'**
+  String configProblemBadActionParam(String value, String hint);
+
+  /// No description provided for @configProblemReservedTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} is reserved by the system'**
+  String configProblemReservedTrigger(String value);
+
+  /// No description provided for @configProblemPlainKeyTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} is for typing — add Ctrl, Alt or ⌘'**
+  String configProblemPlainKeyTrigger(String value);
+
+  /// No description provided for @configProblemRegionTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'F6 and Shift+F6 always move between regions'**
+  String get configProblemRegionTrigger;
+
+  /// No description provided for @configProblemShellKeyTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} will no longer reach the shell'**
+  String configProblemShellKeyTrigger(String value);
+
+  /// No description provided for @configProblemOptionKeyTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} will no longer type its Option character'**
+  String configProblemOptionKeyTrigger(String value);
+
+  /// No description provided for @configProblemAltGrTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} works with the left Alt only; AltGr still types characters'**
+  String configProblemAltGrTrigger(String value);
+
+  /// No description provided for @configProblemMissionControlTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Mission Control may take {value}'**
+  String configProblemMissionControlTrigger(String value);
+
+  /// No description provided for @configProblemUnsupportedPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'The “{value}” prefix isn\'t supported'**
+  String configProblemUnsupportedPrefix(String value);
+
+  /// No description provided for @configProblemSequenceTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Key sequences have at most 2 steps'**
+  String get configProblemSequenceTooLong;
+
+  /// No description provided for @configProblemSequencePrefixShadows.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} starts a key sequence, so it no longer works on its own'**
+  String configProblemSequencePrefixShadows(String value);
+
+  /// No description provided for @configProblemSequenceRepeatsPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'This sequence can\'t fire: pressing {value} twice sends it'**
+  String configProblemSequenceRepeatsPrefix(String value);
+
+  /// No description provided for @configProblemUnknownCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'There\'s no command “{value}”'**
+  String configProblemUnknownCommand(String value);
+
+  /// No description provided for @configProblemCommandLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'More than 200 commands — the rest are ignored'**
+  String get configProblemCommandLimit;
+
+  /// No description provided for @configProblemLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail} problems — showing the first 100'**
+  String configProblemLimit(String detail);
+
+  /// No description provided for @configProblemInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Unexpected error — keeping the previous configuration'**
+  String get configProblemInternal;
+
+  /// UI-A9 §6
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration'**
+  String get trayConfig;
+
+  /// UI-A9 §6
+  ///
+  /// In en, this message translates to:
+  /// **'Open configuration file'**
+  String get trayConfigOpen;
+
+  /// UI-A9 §6
+  ///
+  /// In en, this message translates to:
+  /// **'Reload configuration'**
+  String get trayConfigReload;
+
+  /// UI-A9 §6
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts…'**
+  String get trayConfigShortcuts;
+
+  /// UI-A9 §6
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{⚠ 1 configuration problem…} other{⚠ {count} configuration problems…}}'**
+  String trayConfigProblems(int count);
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get paletteTitle;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Search commands'**
+  String get paletteSearchLabel;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Type a command…'**
+  String get paletteSearchHint;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'No matching commands'**
+  String get paletteNoResults;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 command} other{{count} commands}}'**
+  String paletteResultCount(int count);
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Your command'**
+  String get paletteKindUserCommand;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Snippet'**
+  String get paletteKindSnippet;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration'**
+  String get paletteKindConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get actionNewTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane or tab'**
+  String get actionCloseSurface;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Close whole tab'**
+  String get actionCloseTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'New workspace'**
+  String get actionNewWorkspace;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get actionToggleNotifications;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to unread'**
+  String get actionJumpToUnread;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get actionCopy;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get actionPaste;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get actionSelectAll;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Go to tab {n}'**
+  String actionGotoTab(String n);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Next tab'**
+  String get actionNextTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Previous tab'**
+  String get actionPreviousTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Split right'**
+  String get actionSplitRight;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Split down'**
+  String get actionSplitDown;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Focus pane on the left} right{Focus pane on the right} up{Focus pane above} other{Focus pane below}}'**
+  String actionFocusPane(String direction);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Move divider left} right{Move divider right} up{Move divider up} other{Move divider down}}'**
+  String actionResizePane(String direction);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom or unzoom pane'**
+  String get actionToggleZoom;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Equalize panes'**
+  String get actionEqualize;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Bigger text'**
+  String get actionFontBigger;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller text'**
+  String get actionFontSmaller;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Default text size'**
+  String get actionFontReset;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Next region'**
+  String get actionNextRegion;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Previous region'**
+  String get actionPreviousRegion;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Reload configuration'**
+  String get actionReloadConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Open configuration file'**
+  String get actionOpenConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get actionCommandPalette;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts…'**
+  String get actionShowShortcuts;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Show configuration problems'**
+  String get actionShowConfigProblems;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Run “{name}”'**
+  String actionRunCommand(String name);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Send text to the terminal'**
+  String get actionSendText;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore key'**
+  String get actionIgnore;
+
+  /// UI-A9 §4
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get shortcutsTitle;
+
+  /// UI-A9 §4
+  ///
+  /// In en, this message translates to:
+  /// **'Search shortcuts'**
+  String get shortcutsSearchLabel;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'{group, select, tabs{Tabs} panes{Panes} notifications{Notifications} editing{Editing} font{Text size} browser{Browser} window{Window} config{Configuration} other{Your commands}}'**
+  String shortcutsGroup(String group);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Add shortcut'**
+  String get shortcutsAdd;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Add a shortcut for “{action}”'**
+  String shortcutsAddFor(String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get shortcutsReset;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Reset “{action}”'**
+  String shortcutsResetFor(String action);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {shortcut}'**
+  String shortcutsRemove(String shortcut);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get shortcutsNone;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Press a key combination… (Esc to cancel)'**
+  String get shortcutsRecording;
+
+  /// UI-A9 §4.1: the modifiers held so far while recording
+  ///
+  /// In en, this message translates to:
+  /// **'{keys}…'**
+  String shortcutsHeld(String keys);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} is used by “{action}”.'**
+  String shortcutsConflict(String shortcut, String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get shortcutsReplace;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get shortcutsCancel;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'A later line in {file}:{line} overrides this'**
+  String shortcutsOverridden(String file, int line);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Set in the configuration file, line {line}'**
+  String shortcutsFromFile(int line);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} now runs “{action}”'**
+  String shortcutsAssigned(String shortcut, String action);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Removed {shortcut}'**
+  String shortcutsRemoved(String shortcut);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'“{action}” reset'**
+  String shortcutsResetDone(String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts written in the file are kept.'**
+  String get shortcutsFooter;
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the shortcut to {path}'**
+  String configWriteFailed(String path);
 }
 
 class _AppLocalizationsDelegate

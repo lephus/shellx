@@ -9,10 +9,22 @@ const double kTerminalFontSizeDefault = 13;
 const double kTerminalFontSizeMin = 9;
 const double kTerminalFontSizeMax = 28;
 
-TerminalStyle desktopTerminalStyle(double fontSize) => TerminalStyle(
+/// D11: [families] first (primary, then fallbacks), then the bundled
+/// JetBrains Mono, then xterm's own fallbacks. No families = A1 exactly.
+TerminalStyle desktopTerminalStyle(
+  double fontSize, {
+  List<String> families = const [],
+}) => TerminalStyle(
   fontSize: fontSize,
   height: 1.2,
-  fontFamily: kTerminalFontFamily,
+  fontFamily: families.isEmpty ? kTerminalFontFamily : families.first,
+  fontFamilyFallback: families.isEmpty
+      ? const TerminalStyle().fontFamilyFallback
+      : [
+          ...families.skip(1),
+          kTerminalFontFamily,
+          ...const TerminalStyle().fontFamilyFallback,
+        ],
 );
 
 typedef TerminalGrid = ({int cols, int rows});

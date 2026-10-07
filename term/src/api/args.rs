@@ -308,10 +308,10 @@ pub static COMMANDS: &[CommandSpec] = &[
             &[
                 f(
                     "claude",
-                    "install for Claude Code (~/.claude/skills/shellx)",
+                    "install for Claude Code (~/.claude/skills/shellx and shellx-config)",
                 ),
-                f("codex", "install for Codex (~/.agents/skills/shellx; ~/.codex/skills/shellx too when ~/.codex exists)"),
-                v("dir", "DIR", "install into DIR/shellx"),
+                f("codex", "install for Codex (~/.agents/skills; ~/.codex/skills too when ~/.codex exists)"),
+                v("dir", "DIR", "install into DIR/shellx and DIR/shellx-config"),
                 f("force", "overwrite without asking"),
             ],
             "install the ShellX skill for AI agents",
@@ -323,9 +323,39 @@ pub static COMMANDS: &[CommandSpec] = &[
             &["skills", "print"],
             &["FILE?"],
             &[],
-            "print SKILL.md (or 'reference')",
+            "print SKILL.md (or 'reference', 'config')",
         )
     },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
+            &["config", "path"],
+            &[],
+            &[f("ghostty", "also print the Ghostty files ShellX reads")],
+            "print the configuration file's path",
+        )
+    },
+    c(
+        &["config", "check"],
+        &[],
+        &[],
+        "check the configuration files; exit 1 on errors",
+    ),
+    c(
+        &["config", "reload"],
+        &[],
+        &[],
+        "reload the configuration now",
+    ),
+    c(
+        &["config", "show"],
+        &[],
+        &[f(
+            "defaults",
+            "print a commented file with every key at its default",
+        )],
+        "print the configuration in effect and where each value comes from",
+    ),
     CommandSpec {
         needs_ui: false,
         ..c(
@@ -583,7 +613,7 @@ fn words_after(prefix: &[&str]) -> Vec<&'static str> {
     out
 }
 
-const GROUPS: [&str; 3] = ["workspace", "browser", "skills"];
+const GROUPS: [&str; 4] = ["workspace", "browser", "skills", "config"];
 /// Positionals that name a pane, tab or workspace: completed from `shellx ls --ids`.
 const ID_POSITIONALS: [&str; 4] = ["TARGET", "PANE", "TAB", "WORKSPACE"];
 
@@ -877,6 +907,10 @@ mod tests {
             "browser fill",
             "skills install",
             "skills print",
+            "config path",
+            "config check",
+            "config reload",
+            "config show",
             "completions",
         ] {
             assert!(names.contains(&want.to_string()), "{want}");
@@ -986,6 +1020,44 @@ mod tests {
         assert!(p(&["ls", "--json", "--json"]).is_err());
         assert!(p(&["ls", "--socket", "a", "--socket", "b"]).is_err());
         assert!(help_text(Some(find(&["completions".into()]).unwrap().0)).contains("~/.zfunc"));
+    }
+
+    #[test]
+    fn config_commands() {
+        let x = run(&["config", "path", "--ghostty"]);
+        assert_eq!(x.spec.path, &["config", "path"]);
+        assert!(x.has("ghostty"));
+        assert!(!x.spec.needs_ui);
+        let y = run(&["config", "show", "--defaults", "--json"]);
+        assert_eq!(y.spec.path, &["config", "show"]);
+        assert!(y.has("defaults") && y.json);
+        assert!(run(&["config", "check"]).spec.needs_ui);
+        assert!(run(&["config", "reload"]).spec.needs_ui);
+        let all = help_text(None);
+        for w in [
+            "config path",
+            "config check",
+            "config reload",
+            "config show",
+        ] {
+            assert!(all.contains(w), "{w}");
+        }
+        assert!(group_help("config").unwrap().contains("config reload"));
+        for bad in [
+            &["config"][..],
+            &["config", "nope"],
+            &["config", "check", "x"],
+        ] {
+            assert!(p(bad).is_err(), "{bad:?}");
+        }
+        for sh in ["zsh", "bash", "pwsh"] {
+            let s = completion_script(sh).unwrap();
+            assert!(s.contains("config"), "{sh}");
+            assert!(
+                s.contains("path") && s.contains("check") && s.contains("show"),
+                "{sh}"
+            );
+        }
     }
 
     #[test]

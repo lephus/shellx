@@ -11,10 +11,11 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
 import '../../terminal/pane_layout.dart';
+import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_style.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
-import '../theme/terminal_colors.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
@@ -34,6 +35,7 @@ class PaneTreeView extends ConsumerStatefulWidget {
     required this.terminalFocus,
     required this.style,
     required this.shortcuts,
+    this.onKeyEvent,
     required this.scrollFor,
     required this.onClosePane,
     this.ringed = const {},
@@ -48,6 +50,9 @@ class PaneTreeView extends ConsumerStatefulWidget {
   final FocusNode terminalFocus;
   final TerminalStyle style;
   final Map<ShortcutActivator, Intent>? shortcuts;
+
+  /// A key reaching a pane's terminal before xterm sees it (key sequences).
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
   final ScrollController Function(int sessionId) scrollFor;
   final void Function(int sessionId) onClosePane;
 
@@ -76,6 +81,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
   @override
   Widget build(BuildContext context) {
+    // The pane headers' tooltips follow a reload (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final tab = widget.tab;
     _keys.removeWhere((id, _) => !tab.panes.containsKey(id));
     if (!tab.isSplit) return _pane(tab.focusedPaneId);
@@ -128,6 +135,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final ringed = widget.ringed.contains(id);
     final scaler = MediaQuery.textScalerOf(context);
     final headerHeight = split ? ShellxSizes.paneHeaderFor(scaler) : 0.0;
+    final appearance = ref.watch(terminalAppearanceProvider);
     // One widget shape for one pane and for many (only properties
     // differ), so the first split and the close back to one pane keep
     // this pane's TerminalView: same state, no remount, no resize.
@@ -144,7 +152,11 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         scrollController: widget.scrollFor(id),
         focusNode: widget.selected && focused ? widget.terminalFocus : null,
         style: widget.style,
+        theme: appearance.theme,
+        cursorType: appearance.cursor,
+        padding: appearance.padding,
         shortcuts: widget.shortcuts,
+        onKeyEvent: widget.onKeyEvent,
         onMenu: (at) => _menu(id, at),
       ),
     );
@@ -168,7 +180,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             Positioned.fill(
               child: DevicePixelOutline(
                 key: const Key('pane.focusOutline'),
-                color: ShellxDesktopColors.accent,
+                // A9 D15: readable on the theme's background.
+                color: appearance.focusOutline,
                 devicePixelRatio: View.of(context).devicePixelRatio,
               ),
             ),
@@ -199,6 +212,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               child: DriverPillSlot(
                 terminal: pane.terminal,
                 cellHeight: measureTerminalCell(widget.style, scaler).height,
+                topPadding: appearance.padding.top,
                 // The toast owns the bottom while it shows.
                 canMoveDown: !widget.toastShowing,
                 child: AnimatedSwitcher(
@@ -304,7 +318,10 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           ? l10n.paneZoomedIndicator(tab.paneNumber(id), tab.paneCount)
           : null,
       hiddenUnread: zoomed && widget.hiddenUnread,
-      closeTooltip: l10n.paneCloseTooltip(closePaneShortcutLabel()),
+      closeTooltip: withShortcut(
+        l10n.paneCloseTooltip,
+        closePaneShortcutLabel(),
+      ),
       agent: _agent(id),
       onClose: () => widget.onClosePane(id),
       onToggleZoom: () => _toggleZoom(id),
@@ -891,7 +908,11 @@ class PaneTerminal extends StatelessWidget {
     required this.scrollController,
     required this.focusNode,
     required this.style,
+    required this.theme,
+    required this.cursorType,
+    required this.padding,
     required this.shortcuts,
+    this.onKeyEvent,
     required this.onMenu,
   });
 
@@ -899,7 +920,13 @@ class PaneTerminal extends StatelessWidget {
   final ScrollController scrollController;
   final FocusNode? focusNode;
   final TerminalStyle style;
+
+  /// A9 D13-D16, D18 (`terminalAppearanceProvider`).
+  final TerminalTheme theme;
+  final TerminalCursorType cursorType;
+  final EdgeInsets padding;
   final Map<ShortcutActivator, Intent>? shortcuts;
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
   final void Function(Offset globalPosition) onMenu;
 
   @override
@@ -914,10 +941,14 @@ class PaneTerminal extends StatelessWidget {
         scrollController: scrollController,
         focusNode: focusNode,
         autofocus: focusNode != null,
-        theme: TerminalColors.theme,
+        theme: theme,
         textStyle: style,
-        padding: ShellxSizes.terminalPadding,
+        cursorType: cursorType,
+        padding: padding,
         shortcuts: shortcuts,
+        onKeyEvent: onKeyEvent == null
+            ? null
+            : (_, event) => onKeyEvent!(event),
         // Only when the program did not take the mouse (xterm reports
         // the click to it first): vim or htop with mouse mode keep it.
         onSecondaryTapUp: (details, _) => onMenu(details.globalPosition),
@@ -935,12 +966,16 @@ class DriverPillSlot extends StatefulWidget {
     super.key,
     required this.terminal,
     required this.cellHeight,
+    required this.topPadding,
     required this.canMoveDown,
     required this.child,
   });
 
   final Terminal terminal;
   final double cellHeight;
+
+  /// The terminal's own top padding (A9 D18).
+  final double topPadding;
   final bool canMoveDown;
   final Widget child;
 
@@ -982,10 +1017,8 @@ class _DriverPillSlotState extends State<DriverPillSlot> {
   bool _cursorUnderCorner() {
     final cell = widget.cellHeight;
     if (cell <= 0) return false;
-    final covered =
-        ((ShellxSpace.s8 + _pillHeight - ShellxSizes.terminalPadding.top) /
-                cell)
-            .ceil();
+    final covered = ((ShellxSpace.s8 + _pillHeight - widget.topPadding) / cell)
+        .ceil();
     return widget.terminal.buffer.cursorY < covered;
   }
 

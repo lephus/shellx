@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
 
 /// UI-A2 §4: rename in place. Opens with the text selected; Enter (or
@@ -136,25 +136,6 @@ class _InlineNameFieldState extends State<InlineNameField> {
     return KeyEventResult.ignored;
   }
 
-  static Map<ShortcutActivator, Intent> _editing() {
-    final mac = defaultTargetPlatform == TargetPlatform.macOS;
-    SingleActivator key(LogicalKeyboardKey k) => mac
-        ? SingleActivator(k, meta: true)
-        : SingleActivator(k, control: true);
-    return {
-      key(LogicalKeyboardKey.keyA): const SelectAllTextIntent(
-        SelectionChangedCause.keyboard,
-      ),
-      key(LogicalKeyboardKey.keyC): CopySelectionTextIntent.copy,
-      key(LogicalKeyboardKey.keyX): const CopySelectionTextIntent.cut(
-        SelectionChangedCause.keyboard,
-      ),
-      key(LogicalKeyboardKey.keyV): const PasteTextIntent(
-        SelectionChangedCause.keyboard,
-      ),
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     const outline = OutlineInputBorder(
@@ -171,7 +152,7 @@ class _InlineNameFieldState extends State<InlineNameField> {
       skipTraversal: true,
       onKeyEvent: _onKey,
       child: Shortcuts(
-        shortcuts: _editing(),
+        shortcuts: textEditingShortcuts(),
         child: SizedBox(
           height: height,
           child: Semantics(
