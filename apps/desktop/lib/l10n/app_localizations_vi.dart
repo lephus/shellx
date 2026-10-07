@@ -1141,4 +1141,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String configOpenFailed(String path) {
     return 'Không mở được $path';
   }
+
+  @override
+  String sequencePending(String shortcut) {
+    return '$shortcut …';
+  }
+
+  @override
+  String sequencePendingAnnounce(String shortcut) {
+    return 'Đã bấm $shortcut, chờ phím tiếp theo';
+  }
 }

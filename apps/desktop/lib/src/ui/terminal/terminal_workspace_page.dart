@@ -22,6 +22,7 @@ import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart';
 import '../window_router.dart';
 import 'close_tab.dart';
+import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
 import 'session_sidebar.dart';
 import 'shortcut_labels.dart';
@@ -39,7 +40,9 @@ class TerminalWorkspacePage extends ConsumerStatefulWidget {
 }
 
 class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
-    with WorkspaceConfig<TerminalWorkspacePage> {
+    with
+        WorkspaceConfig<TerminalWorkspacePage>,
+        WorkspaceSequences<TerminalWorkspacePage> {
   @override
   final terminalFocus = FocusNode(debugLabel: 'terminal');
   final sidebarFocus = FocusNode(debugLabel: 'sidebar');
@@ -439,10 +442,12 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     super.initState();
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
     listenToConfig();
+    listenToSequences();
   }
 
   @override
   void dispose() {
+    disposeSequences();
     terminalFocus.dispose();
     sidebarFocus.dispose();
     emptyFocus.dispose();
@@ -502,60 +507,65 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         child: FocusScope(
           autofocus: true,
           debugLabel: 'workspace',
-          child: Stack(
-            children: [
-              // Modal for screen readers too while the panel is open.
-              Positioned.fill(
-                child: ExcludeSemantics(excluding: panelOpen, child: _body()),
-              ),
-              // UI-A4 §5.3: a click outside closes the panel (and only that).
-              // macOS: it starts under the band, so the window still drags
-              // (and the bell still toggles) while the panel is open. Both
-              // slots are keyed: the barrier coming and going must not
-              // shift the panel's AnimatedSwitcher to a new element (its
-              // fade would never play).
-              if (panelOpen)
-                Positioned(
-                  key: const ValueKey('panel.barrierSlot'),
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  top: isMacDesktop ? ShellxSizes.headerBandMac : 0,
-                  child: ExcludeSemantics(
-                    child: GestureDetector(
-                      key: const Key('panel.barrier'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: closePanel,
-                      onSecondaryTap: closePanel,
+          child: sequenceScope(
+            Stack(
+              children: [
+                // Modal for screen readers too while the panel is open.
+                Positioned.fill(
+                  child: ExcludeSemantics(excluding: panelOpen, child: _body()),
+                ),
+                // UI-A4 §5.3: a click outside closes the panel (and only that).
+                // macOS: it starts under the band, so the window still drags
+                // (and the bell still toggles) while the panel is open. Both
+                // slots are keyed: the barrier coming and going must not
+                // shift the panel's AnimatedSwitcher to a new element (its
+                // fade would never play).
+                if (panelOpen)
+                  Positioned(
+                    key: const ValueKey('panel.barrierSlot'),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    top: isMacDesktop ? ShellxSizes.headerBandMac : 0,
+                    child: ExcludeSemantics(
+                      child: GestureDetector(
+                        key: const Key('panel.barrier'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: closePanel,
+                        onSecondaryTap: closePanel,
+                      ),
                     ),
                   ),
+                Positioned(
+                  key: const ValueKey('panel.slot'),
+                  // x 6: over the selected row's 3 px bar (x 6), not beside
+                  // it (UI-A4 §5.2).
+                  left: ShellxSpace.s6,
+                  top:
+                      (isMacDesktop
+                          ? ShellxSizes.headerBandMac
+                          : ShellxSizes.headerBandWindows) +
+                      ShellxSizes.panelOffsetY,
+                  child: AnimatedSwitcher(
+                    duration: ShellxMotion.of(context, ShellxMotion.base),
+                    reverseDuration: ShellxMotion.of(
+                      context,
+                      ShellxMotion.exit,
+                    ),
+                    switchInCurve: ShellxMotion.baseCurve,
+                    switchOutCurve: ShellxMotion.exitCurve,
+                    transitionBuilder: _panelTransition,
+                    layoutBuilder: _topLeft,
+                    child: panelOpen
+                        ? NotificationsPanel(
+                            key: const ValueKey('panel.open'),
+                            onClose: closePanel,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ),
-              Positioned(
-                key: const ValueKey('panel.slot'),
-                // x 6: over the selected row's 3 px bar (x 6), not beside
-                // it (UI-A4 §5.2).
-                left: ShellxSpace.s6,
-                top:
-                    (isMacDesktop
-                        ? ShellxSizes.headerBandMac
-                        : ShellxSizes.headerBandWindows) +
-                    ShellxSizes.panelOffsetY,
-                child: AnimatedSwitcher(
-                  duration: ShellxMotion.of(context, ShellxMotion.base),
-                  reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
-                  switchInCurve: ShellxMotion.baseCurve,
-                  switchOutCurve: ShellxMotion.exitCurve,
-                  transitionBuilder: _panelTransition,
-                  layoutBuilder: _topLeft,
-                  child: panelOpen
-                      ? NotificationsPanel(
-                          key: const ValueKey('panel.open'),
-                          onClose: closePanel,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -588,6 +598,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           stripFocus: stripFocus,
           restoreStripFocus: restoreStripFocus,
           shortcuts: terminalShortcuts,
+          onKeyEvent: sequenceKey,
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);
             if (tab != null) unawaited(closePane(tab, id));

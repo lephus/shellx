@@ -1184,4 +1184,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String configOpenFailed(String path) {
     return 'Couldn\'t open $path';
   }
+
+  @override
+  String sequencePending(String shortcut) {
+    return '$shortcut …';
+  }
+
+  @override
+  String sequencePendingAnnounce(String shortcut) {
+    return '$shortcut pressed, waiting for the next key';
+  }
 }

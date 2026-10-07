@@ -276,5 +276,7 @@
   "cliAnnounceAgent": "Agent đang điều khiển {tab}",
   "cliPathNotOnPath": "Đã cài lệnh shellx vào /usr/local/bin nhưng shell của bạn không tìm ở đó. Hãy thêm dòng này vào {file}: {line}",
   "userCommandNoTerminal": "Không có terminal để chạy lệnh này",
-  "configOpenFailed": "Không mở được {path}"
+  "configOpenFailed": "Không mở được {path}",
+  "sequencePending": "{shortcut} …",
+  "sequencePendingAnnounce": "Đã bấm {shortcut}, chờ phím tiếp theo"
 }

@@ -19,6 +19,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
 import 'info_strip.dart';
+import 'key_sequence.dart';
 import 'pane_tree_view.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart';
@@ -34,6 +35,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     this.stripFocus,
     this.restoreStripFocus,
     this.shortcuts,
+    this.onKeyEvent,
     required this.onClosePane,
   });
 
@@ -53,6 +55,9 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// Passed to every TerminalView: the window shortcuts must win over
   /// xterm's own key handling.
   final Map<ShortcutActivator, Intent>? shortcuts;
+
+  /// A key reaching a pane's terminal first (A9 D28 key sequences).
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
 
   /// A pane's ×, middle click (UI-A3 §2.1): the workspace asks first when
   /// a command runs there.
@@ -304,6 +309,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                   terminalFocus: widget.terminalFocus,
                                   style: style,
                                   shortcuts: widget.shortcuts,
+                                  onKeyEvent: widget.onKeyEvent,
                                   scrollFor: _scrollFor,
                                   onClosePane: widget.onClosePane,
                                   ringed: tab.id == selected?.id
@@ -348,6 +354,13 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                   ),
                           ),
                         ),
+                      ),
+                      // UI-A9 §5: bottom right of the terminal area, over
+                      // every pane.
+                      const Positioned(
+                        right: ShellxSpace.s12,
+                        bottom: ShellxSpace.s12,
+                        child: SequenceIndicator(),
                       ),
                     ],
                   );

@@ -282,6 +282,9 @@ abstract final class ShellxSizes {
   static const double panelEmptyIcon = 24;
   static const double headerBellGap = 4;
   static const double bellDot = 6;
+
+  /// UI-A9 §5: the pending-prefix pill.
+  static const double sequenceIndicatorHeight = 28;
 }
 
 /// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).

@@ -1764,6 +1764,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t open {path}'**
   String configOpenFailed(String path);
+
+  /// UI-A9 §5
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} …'**
+  String sequencePending(String shortcut);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} pressed, waiting for the next key'**
+  String sequencePendingAnnounce(String shortcut);
 }
 
 class _AppLocalizationsDelegate

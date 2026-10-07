@@ -35,6 +35,7 @@ class PaneTreeView extends ConsumerStatefulWidget {
     required this.terminalFocus,
     required this.style,
     required this.shortcuts,
+    this.onKeyEvent,
     required this.scrollFor,
     required this.onClosePane,
     this.ringed = const {},
@@ -49,6 +50,9 @@ class PaneTreeView extends ConsumerStatefulWidget {
   final FocusNode terminalFocus;
   final TerminalStyle style;
   final Map<ShortcutActivator, Intent>? shortcuts;
+
+  /// A key reaching a pane's terminal before xterm sees it (key sequences).
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
   final ScrollController Function(int sessionId) scrollFor;
   final void Function(int sessionId) onClosePane;
 
@@ -152,6 +156,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         cursorType: appearance.cursor,
         padding: appearance.padding,
         shortcuts: widget.shortcuts,
+        onKeyEvent: widget.onKeyEvent,
         onMenu: (at) => _menu(id, at),
       ),
     );
@@ -907,6 +912,7 @@ class PaneTerminal extends StatelessWidget {
     required this.cursorType,
     required this.padding,
     required this.shortcuts,
+    this.onKeyEvent,
     required this.onMenu,
   });
 
@@ -920,6 +926,7 @@ class PaneTerminal extends StatelessWidget {
   final TerminalCursorType cursorType;
   final EdgeInsets padding;
   final Map<ShortcutActivator, Intent>? shortcuts;
+  final KeyEventResult Function(KeyEvent event)? onKeyEvent;
   final void Function(Offset globalPosition) onMenu;
 
   @override
@@ -939,6 +946,9 @@ class PaneTerminal extends StatelessWidget {
         cursorType: cursorType,
         padding: padding,
         shortcuts: shortcuts,
+        onKeyEvent: onKeyEvent == null
+            ? null
+            : (_, event) => onKeyEvent!(event),
         // Only when the program did not take the mouse (xterm reports
         // the click to it first): vim or htop with mouse mode keep it.
         onSecondaryTapUp: (details, _) => onMenu(details.globalPosition),

@@ -519,5 +519,9 @@
   "userCommandNoTerminal": "There's no terminal to run this in",
   "@userCommandNoTerminal": {"description": "UI-A9 §7.1"},
   "configOpenFailed": "Couldn't open {path}",
-  "@configOpenFailed": {"description": "UI-A9 §7.1", "placeholders": {"path": {"type": "String"}}}
+  "@configOpenFailed": {"description": "UI-A9 §7.1", "placeholders": {"path": {"type": "String"}}},
+  "sequencePending": "{shortcut} …",
+  "@sequencePending": {"description": "UI-A9 §5", "placeholders": {"shortcut": {"type": "String"}}},
+  "sequencePendingAnnounce": "{shortcut} pressed, waiting for the next key",
+  "@sequencePendingAnnounce": {"description": "UI-A9 §8", "placeholders": {"shortcut": {"type": "String"}}}
 }
