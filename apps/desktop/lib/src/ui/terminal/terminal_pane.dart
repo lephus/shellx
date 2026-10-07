@@ -207,7 +207,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     final style = desktopTerminalStyle(
       fontSize,
       families: appearance.families,
-      thicken: appearance.thicken,
+      regular: appearance.regular,
     );
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);

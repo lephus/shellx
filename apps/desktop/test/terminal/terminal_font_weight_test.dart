@@ -92,7 +92,7 @@ void main() {
     final key = GlobalKey();
     final style = desktopTerminalStyle(
       13,
-      thicken: true,
+      regular: true,
     ).toTextStyle(color: const Color(0xFF000000));
     await tester.pumpWidget(
       Directionality(
@@ -117,10 +117,10 @@ void main() {
   // Why the default is the Light face: with the Regular face a normal
   // terminal cell is drawn at exactly weight 400 (the first expectation),
   // yet Flutter's grayscale antialiasing looks heavier than Ghostty's
-  // CoreText rendering of the same face (font-thicken off). The default
+  // CoreText rendering of the same face (Ghostty's font-thicken off). The default
   // therefore draws normal cells with JetBrains Mono Light, registered as
   // its own family so cells keep asking for plain `normal` / `bold`.
-  testWidgets('normal cells use the Light face unless font-thicken; bold '
+  testWidgets('normal cells use the Light face unless font-weight = regular; bold '
       'stays Bold', (tester) async {
     await tester.runAsync(() async {
       await _load('JetBrainsMono', {
@@ -134,7 +134,7 @@ void main() {
     });
     final regular = await terminalInk(
       tester,
-      desktopTerminalStyle(13, thicken: true),
+      desktopTerminalStyle(13, regular: true),
     );
     final w400 = await plainInk(tester, FontWeight.w400);
     final w700 = await plainInk(tester, FontWeight.w700);

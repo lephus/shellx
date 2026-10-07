@@ -18,7 +18,7 @@ final class TerminalAppearance {
     required this.cursor,
     required this.padding,
     required this.families,
-    this.thicken = false,
+    this.regular = false,
   });
 
   final TerminalTheme theme;
@@ -34,8 +34,8 @@ final class TerminalAppearance {
   /// Primary family first, then fallbacks (D11); empty = JetBrains Mono.
   final List<String> families;
 
-  /// `font-thicken`: the bundled font's Regular face, not Light.
-  final bool thicken;
+  /// `font-weight = regular`: the bundled font's Regular face, not Light.
+  final bool regular;
 }
 
 TerminalCursorType terminalCursorFor(CursorShape shape) => switch (shape) {
@@ -56,6 +56,6 @@ final terminalAppearanceProvider = Provider<TerminalAppearance>((ref) {
     cursor: terminalCursorFor(config.cursorShape),
     padding: config.padding,
     families: config.fontFamilies,
-    thicken: config.fontThicken,
+    regular: config.fontWeight == TerminalFontWeight.regular,
   );
 });

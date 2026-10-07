@@ -69,8 +69,9 @@ flutter:
         - asset: assets/fonts/JetBrainsMono-BoldItalic.ttf
           weight: 700
           style: italic
+    # SIL OFL 1.1 like the family above: assets/licenses/JetBrainsMono-OFL.txt.
     # The same face one step lighter, as its own family: the default for
-    # normal cells (config `font-thicken` off). Cells still ask for plain
+    # normal cells (config `font-weight` light). Cells still ask for plain
     # normal / bold, so Light is what "normal" resolves to here.
     - family: JetBrainsMonoLight
       fonts:

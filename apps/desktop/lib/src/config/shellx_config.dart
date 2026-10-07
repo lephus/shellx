@@ -28,6 +28,9 @@ enum OptionAsAlt { off, both, left, right }
 /// D20. `whenRunning` = Ghostty's `true`.
 enum ConfirmClose { whenRunning, never, always }
 
+/// `font-weight`: the bundled terminal font's face for normal text.
+enum TerminalFontWeight { light, regular }
+
 enum WorkingDirectoryKind { home, inherit, path }
 
 @immutable
@@ -88,7 +91,7 @@ final class ShellxConfig {
     this.fontFamilies = const [],
     this.fontFamilyOrigins = const [],
     this.fontSize,
-    this.fontThicken = false,
+    this.fontWeight = TerminalFontWeight.light,
     this.theme,
     this.background,
     this.foreground,
@@ -115,9 +118,9 @@ final class ShellxConfig {
   final List<ConfigEntry> fontFamilyOrigins;
   final double? fontSize;
 
-  /// Ghostty's `font-thicken`: the bundled font's Regular face instead of
-  /// Light.
-  final bool fontThicken;
+  /// `font-weight` (or Ghostty's `font-thicken = true`, which means
+  /// regular): the bundled font's face, Light by default.
+  final TerminalFontWeight fontWeight;
   final String? theme;
   final Color? background;
   final Color? foreground;
@@ -205,7 +208,7 @@ final class _Builder {
   var familyOrigins = <ConfigEntry>[];
   var familiesFromGhostty = false;
   double? fontSize;
-  var fontThicken = false;
+  var fontWeight = TerminalFontWeight.light;
   String? theme;
   Color? background, foreground, cursorColor, selectionBackground;
   final palette = <int, Color>{};
@@ -442,10 +445,21 @@ final class _Builder {
           if (pair == null) return;
           padY = pair;
         }
+      case 'font-weight':
+        final w = switch (v) {
+          '' || 'light' => TerminalFontWeight.light,
+          'regular' => TerminalFontWeight.regular,
+          _ => null,
+        };
+        if (w == null) return _badValue(e, g, 'light, regular');
+        fontWeight = w;
       case 'font-thicken':
+        // Ghostty's key (heavier text) read as regular; ShellX's default is
+        // already lighter than that, so false leaves [fontWeight] to the
+        // other key's default.
         final on = v.isEmpty ? false : _bool(v);
         if (on == null) return _badValue(e, g, 'true, false');
-        fontThicken = on;
+        fontWeight = on ? TerminalFontWeight.regular : TerminalFontWeight.light;
       case 'macos-option-as-alt':
         final mode = switch (v) {
           '' || 'false' => OptionAsAlt.off,
@@ -571,7 +585,7 @@ final class _Builder {
     fontFamilies: List.unmodifiable(families),
     fontFamilyOrigins: List.unmodifiable(familyOrigins),
     fontSize: fontSize,
-    fontThicken: fontThicken,
+    fontWeight: fontWeight,
     theme: theme,
     background: background,
     foreground: foreground,
