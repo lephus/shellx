@@ -100,6 +100,12 @@ final class PasteTooLargeNotice extends TabNotice {
   const PasteTooLargeNotice();
 }
 
+/// A10 D6: opening a clicked link failed (no browser, `open` failed).
+/// Error toast.
+final class LinkOpenFailedNotice extends TabNotice {
+  const LinkOpenFailedNotice();
+}
+
 /// A7 D26: the skill install command is on the clipboard. Neutral toast.
 final class CliSkillsCopiedNotice extends TabNotice {
   const CliSkillsCopiedNotice();

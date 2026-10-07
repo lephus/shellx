@@ -2144,4 +2144,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionEndSearch => 'Close find';
+
+  @override
+  String get linkConfirmTitle => 'Open this link?';
+
+  @override
+  String linkConfirmBody(String url) {
+    return 'The text shown is not this address:\n$url';
+  }
+
+  @override
+  String get linkConfirmAction => 'Open';
+
+  @override
+  String get linkOpenFailed => 'Couldn’t open the link';
+
+  @override
+  String get menuOpenLink => 'Open link';
+
+  @override
+  String get menuCopyLink => 'Copy link address';
+
+  @override
+  String get menuRevealFile => 'Show in Finder';
+
+  @override
+  String get menuRevealFileWin => 'Show in Explorer';
 }

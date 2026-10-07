@@ -653,6 +653,7 @@ class _NoticeToastState extends State<NoticeToast> {
     PasteTooLargeNotice() => l10n.pasteTooLarge,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
     DaemonQuitFailedNotice() => l10n.daemonQuitFailed,
+    LinkOpenFailedNotice() => l10n.linkOpenFailed,
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
     CliPathInstalledNotice() => l10n.cliPathInstalled,
     CliPathFailedNotice(:final path) => l10n.cliPathFailed(path),

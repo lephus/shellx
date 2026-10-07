@@ -2056,4 +2056,30 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get actionEndSearch => 'Đóng tìm kiếm';
+
+  @override
+  String get linkConfirmTitle => 'Mở liên kết này?';
+
+  @override
+  String linkConfirmBody(String url) {
+    return 'Chữ hiển thị không phải địa chỉ này:\n$url';
+  }
+
+  @override
+  String get linkConfirmAction => 'Mở';
+
+  @override
+  String get linkOpenFailed => 'Không mở được liên kết';
+
+  @override
+  String get menuOpenLink => 'Mở liên kết';
+
+  @override
+  String get menuCopyLink => 'Sao chép địa chỉ liên kết';
+
+  @override
+  String get menuRevealFile => 'Hiện trong Finder';
+
+  @override
+  String get menuRevealFileWin => 'Hiện trong Explorer';
 }

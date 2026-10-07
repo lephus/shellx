@@ -428,6 +428,24 @@ final class RecordingUrlOpener implements UrlOpener {
     if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
     ports.add(port);
   }
+
+  /// A10: links clicked in the terminal.
+  final List<Uri> webLinks = [];
+
+  @override
+  Future<void> openWebLink(Uri uri) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    webLinks.add(uri);
+  }
+
+  /// A10: paths shown in Finder / Explorer (path, isDirectory).
+  final List<(String, bool)> revealed = [];
+
+  @override
+  Future<void> reveal(String path, {required bool isDirectory}) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    revealed.add((path, isDirectory));
+  }
 }
 
 final PairingIdGenerator _pairingIds = PairingIdGenerator();
