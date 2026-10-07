@@ -154,21 +154,25 @@ CliSetup? cliSetup(Map<String, String> environment) {
       executable: Platform.resolvedExecutable,
     );
     if (paths == null) return null;
-    final mux = MuxPaths(
-      muxDirectory: muxDirectoryPath(
-        windows: windows,
-        environment: environment,
-      ),
-      tmpDirectory: environment['TMPDIR'] ?? '/tmp',
-      uid: windows ? 0 : _uid(),
-      windows: windows,
-      pipeName: windows ? pipeNameForUser(currentUserSid()) : null,
-    );
+    final mux = muxPathsFor(environment);
     return (mux: mux, paths: paths, token: generateCliToken());
   } catch (error) {
     debugPrint('ShellX: no command line: ${error.runtimeType}');
     return null;
   }
+}
+
+/// Where the mux host's files and address are (A5b D5). Throws
+/// [StateError] without `HOME` / `LOCALAPPDATA`.
+MuxPaths muxPathsFor(Map<String, String> environment) {
+  final windows = Platform.isWindows;
+  return MuxPaths(
+    muxDirectory: muxDirectoryPath(windows: windows, environment: environment),
+    tmpDirectory: environment['TMPDIR'] ?? '/tmp',
+    uid: windows ? 0 : _uid(),
+    windows: windows,
+    pipeName: windows ? pipeNameForUser(currentUserSid()) : null,
+  );
 }
 
 /// macOS: the user id for the socket's TMPDIR fallback name.
