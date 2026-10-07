@@ -23,6 +23,8 @@ export 'src/pty/pty.dart';
 export 'src/pty/session_environment.dart';
 export 'src/pty/shell_integration.dart';
 export 'src/pty/shell_resolver.dart';
+export 'src/remote/session_launch.dart';
+export 'src/remote/ssh_target.dart';
 export 'src/service/agent_events.dart';
 export 'src/service/agent_service.dart';
 export 'src/session/agent_sessions.dart';
