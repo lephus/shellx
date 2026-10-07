@@ -37,6 +37,7 @@ List<Map<String, String>> configShowValues(ConfigState s) {
           ? '13 (or the size set with Cmd/Ctrl +/-)'
           : _n(c.fontSize!),
     ),
+    v('font-thicken', '${c.fontThicken}'),
     v('theme', s.theme.name ?? 'ShellX'),
     v('background', _hex(s.theme.background)),
     v('foreground', _hex(s.theme.terminal.foreground)),

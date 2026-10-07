@@ -204,7 +204,11 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     // A9: font, theme, cursor and padding follow the configuration live.
     final appearance = ref.watch(terminalAppearanceProvider);
     final padding = appearance.padding;
-    final style = desktopTerminalStyle(fontSize, families: appearance.families);
+    final style = desktopTerminalStyle(
+      fontSize,
+      families: appearance.families,
+      thicken: appearance.thicken,
+    );
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
     _dropClosed(state.tabs);

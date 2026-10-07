@@ -124,7 +124,7 @@ void main() {
   testWidgets('no file looks like A1 (criterion 1)', (tester) async {
     await pump(tester, MemoryConfigFs());
     final v = view(tester);
-    expect(v.textStyle.fontFamily, kTerminalFontFamily);
+    expect(v.textStyle.fontFamily, kTerminalFontFamilyLight);
     expect(
       v.textStyle.fontFamilyFallback,
       const TerminalStyle().fontFamilyFallback,
@@ -153,7 +153,7 @@ void main() {
     expect(v.textStyle.fontFamily, 'Menlo');
     expect(v.textStyle.fontFamilyFallback, [
       'Symbols',
-      kTerminalFontFamily,
+      kTerminalFontFamilyLight,
       ...const TerminalStyle().fontFamilyFallback,
     ]);
     expect(v.textStyle.fontSize, 16);
@@ -169,7 +169,7 @@ void main() {
     v = view(tester);
     expect(identical(v.terminal, terminal), isTrue);
     expect(v.cursorType, TerminalCursorType.underline);
-    expect(v.textStyle.fontFamily, kTerminalFontFamily);
+    expect(v.textStyle.fontFamily, kTerminalFontFamilyLight);
     expect(v.textStyle.fontSize, 13);
     expect(v.padding, ShellxSizes.terminalPadding);
     expect(themeColors(v.theme), themeColors(TerminalColors.theme));

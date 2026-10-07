@@ -4,28 +4,40 @@ import 'package:xterm/xterm.dart';
 /// Bundled in pubspec.yaml (A1 D16).
 const String kTerminalFontFamily = 'JetBrainsMono';
 
+/// JetBrains Mono Light registered as its own family so normal cells (which
+/// ask for weight normal) get Light and bold cells still get Bold. The
+/// default look: the Regular face drawn by Flutter reads heavier than the
+/// same face in Ghostty (config `font-thicken`, off by default there too).
+const String kTerminalFontFamilyLight = 'JetBrainsMonoLight';
+
 /// UI §1.3: 13 by default, steps of 1, clamped to 9–28.
 const double kTerminalFontSizeDefault = 13;
 const double kTerminalFontSizeMin = 9;
 const double kTerminalFontSizeMax = 28;
 
 /// D11: [families] first (primary, then fallbacks), then the bundled
-/// JetBrains Mono, then xterm's own fallbacks. No families = A1 exactly.
+/// JetBrains Mono, then xterm's own fallbacks. [thicken] (`font-thicken`)
+/// picks the bundled Regular face; off, it is Light. It only reaches the
+/// bundled font: a named family is drawn as the system has it.
 TerminalStyle desktopTerminalStyle(
   double fontSize, {
   List<String> families = const [],
-}) => TerminalStyle(
-  fontSize: fontSize,
-  height: 1.2,
-  fontFamily: families.isEmpty ? kTerminalFontFamily : families.first,
-  fontFamilyFallback: families.isEmpty
-      ? const TerminalStyle().fontFamilyFallback
-      : [
-          ...families.skip(1),
-          kTerminalFontFamily,
-          ...const TerminalStyle().fontFamilyFallback,
-        ],
-);
+  bool thicken = false,
+}) {
+  final bundled = thicken ? kTerminalFontFamily : kTerminalFontFamilyLight;
+  return TerminalStyle(
+    fontSize: fontSize,
+    height: 1.2,
+    fontFamily: families.isEmpty ? bundled : families.first,
+    fontFamilyFallback: families.isEmpty
+        ? const TerminalStyle().fontFamilyFallback
+        : [
+            ...families.skip(1),
+            bundled,
+            ...const TerminalStyle().fontFamilyFallback,
+          ],
+  );
+}
 
 typedef TerminalGrid = ({int cols, int rows});
 

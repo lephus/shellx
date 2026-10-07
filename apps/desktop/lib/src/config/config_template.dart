@@ -26,6 +26,7 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
     '# --- Text ---',
     '# font-family = JetBrains Mono',
     '# font-size = 13  (9–28)',
+    '# font-thicken = false  (true: the bundled font\'s Regular face instead of Light)',
     '',
     '# --- Colours (hex) ---',
     '# theme = Dracula  (a file in the themes folder next to this file, or a Ghostty theme)',

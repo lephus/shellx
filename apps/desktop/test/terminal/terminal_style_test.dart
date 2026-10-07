@@ -5,10 +5,31 @@ import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 void main() {
   test('JetBrains Mono 13, line height 1.2 (UI §1.3)', () {
     final style = desktopTerminalStyle(kTerminalFontSizeDefault);
-    expect(style.fontFamily, 'JetBrainsMono');
+    // font-thicken defaults to false: the light face (see
+    // terminal_font_weight_test.dart for why).
+    expect(style.fontFamily, kTerminalFontFamilyLight);
+    expect(style.fontFamily, 'JetBrainsMonoLight');
     expect(style.fontSize, 13);
     expect(style.height, 1.2);
     expect((kTerminalFontSizeMin, kTerminalFontSizeMax), (9.0, 28.0));
+  });
+
+  test('font-thicken draws with the Regular face; a named family is first', () {
+    expect(
+      desktopTerminalStyle(13, thicken: true).fontFamily,
+      kTerminalFontFamily,
+    );
+    final named = desktopTerminalStyle(13, families: ['Menlo']);
+    expect(named.fontFamily, 'Menlo');
+    expect(named.fontFamilyFallback, contains(kTerminalFontFamilyLight));
+    expect(
+      desktopTerminalStyle(
+        13,
+        families: ['Menlo'],
+        thicken: true,
+      ).fontFamilyFallback,
+      contains(kTerminalFontFamily),
+    );
   });
 
   test('grid measurement: null below one cell, columns grow with width', () {

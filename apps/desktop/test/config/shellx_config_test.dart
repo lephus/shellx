@@ -29,6 +29,19 @@ List<ConfigEntry> lines(String text, {String file = _shellx}) =>
 }
 
 void main() {
+  test('font-thicken follows Ghostty: false by default, true or false from '
+      'either file, anything else is a bad value', () {
+    expect(build('font-thicken = true\n').$1.fontThicken, isTrue);
+    expect(build('font-thicken = false\n').$1.fontThicken, isFalse);
+    expect(build('', ghostty: 'font-thicken = true\n').$1.fontThicken, isTrue);
+    final (c, problems) = build('font-thicken = heavy\n');
+    expect(c.fontThicken, isFalse);
+    expect(
+      [for (final p in problems) (p.code, p.key, p.hint)],
+      [(ConfigProblemCode.badValue, 'font-thicken', 'true, false')],
+    );
+  });
+
   test('nothing set: today\'s behaviour (criterion 1)', () {
     final (c, problems) = build('');
     expect(problems, isEmpty);
@@ -41,6 +54,7 @@ void main() {
     expect(c.padding, const EdgeInsets.fromLTRB(10, 6, 10, 6));
     expect(c.padding, ShellxSizes.terminalPadding);
     expect(c.optionAsAlt, OptionAsAlt.off);
+    expect(c.fontThicken, isFalse);
     expect(c.confirmClose, ConfirmClose.whenRunning);
     expect(c.workingDirectory.kind, WorkingDirectoryKind.home);
     expect(c.keybinds, isEmpty);
