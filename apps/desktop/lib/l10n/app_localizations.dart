@@ -2111,6 +2111,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{⚠ 1 configuration problem…} other{⚠ {count} configuration problems…}}'**
   String trayConfigProblems(int count);
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get paletteTitle;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Search commands'**
+  String get paletteSearchLabel;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Type a command…'**
+  String get paletteSearchHint;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'No matching commands'**
+  String get paletteNoResults;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 command} other{{count} commands}}'**
+  String paletteResultCount(int count);
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Your command'**
+  String get paletteKindUserCommand;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Snippet'**
+  String get paletteKindSnippet;
+
+  /// UI-A9 §2
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration'**
+  String get paletteKindConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get actionNewTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane or tab'**
+  String get actionCloseSurface;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Close whole tab'**
+  String get actionCloseTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'New workspace'**
+  String get actionNewWorkspace;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get actionToggleNotifications;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to unread'**
+  String get actionJumpToUnread;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get actionCopy;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get actionPaste;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get actionSelectAll;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Go to tab {n}'**
+  String actionGotoTab(String n);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Next tab'**
+  String get actionNextTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Previous tab'**
+  String get actionPreviousTab;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Split right'**
+  String get actionSplitRight;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Split down'**
+  String get actionSplitDown;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Focus pane on the left} right{Focus pane on the right} up{Focus pane above} other{Focus pane below}}'**
+  String actionFocusPane(String direction);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Move divider left} right{Move divider right} up{Move divider up} other{Move divider down}}'**
+  String actionResizePane(String direction);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom or unzoom pane'**
+  String get actionToggleZoom;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Equalize panes'**
+  String get actionEqualize;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Bigger text'**
+  String get actionFontBigger;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller text'**
+  String get actionFontSmaller;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Default text size'**
+  String get actionFontReset;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Next region'**
+  String get actionNextRegion;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Previous region'**
+  String get actionPreviousRegion;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Reload configuration'**
+  String get actionReloadConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Open configuration file'**
+  String get actionOpenConfig;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get actionCommandPalette;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts…'**
+  String get actionShowShortcuts;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Show configuration problems'**
+  String get actionShowConfigProblems;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Run “{name}”'**
+  String actionRunCommand(String name);
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Send text to the terminal'**
+  String get actionSendText;
+
+  /// UI-A9 §7.3
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore key'**
+  String get actionIgnore;
 }
 
 class _AppLocalizationsDelegate

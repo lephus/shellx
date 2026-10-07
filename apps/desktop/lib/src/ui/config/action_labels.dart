@@ -2,6 +2,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../l10n/app_localizations.dart';
 import '../../config/config_problem.dart';
+import '../../config/keybind_actions.dart';
 
 /// UI-A9 §7.2: the localized message of [problem] (en = the CLI's text).
 /// Only what the problem carries (key names, values, hints) is shown, never
@@ -98,4 +99,49 @@ String severityText(AppLocalizations l10n, ConfigSeverity s) => switch (s) {
   ConfigSeverity.error => l10n.configSeverityError,
   ConfigSeverity.warning => l10n.configSeverityWarning,
   ConfigSeverity.info => l10n.configSeverityInfo,
+};
+
+/// UI-A9 §7.3: the palette / shortcut-sheet name of an action.
+String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
+  'new_tab' => l10n.actionNewTab,
+  'close_surface' => l10n.actionCloseSurface,
+  'close_tab' => l10n.actionCloseTab,
+  'new_workspace' => l10n.actionNewWorkspace,
+  'toggle_notifications' => l10n.actionToggleNotifications,
+  'jump_to_unread' => l10n.actionJumpToUnread,
+  'copy_to_clipboard' => l10n.actionCopy,
+  'paste_from_clipboard' => l10n.actionPaste,
+  'select_all' => l10n.actionSelectAll,
+  'goto_tab' => l10n.actionGotoTab(a.param ?? ''),
+  'next_tab' => l10n.actionNextTab,
+  'previous_tab' => l10n.actionPreviousTab,
+  'new_split' =>
+    a.param == 'down' ? l10n.actionSplitDown : l10n.actionSplitRight,
+  'goto_split' => l10n.actionFocusPane(a.param ?? 'down'),
+  'resize_split' => l10n.actionResizePane(a.param ?? 'down'),
+  'toggle_split_zoom' => l10n.actionToggleZoom,
+  'equalize_splits' => l10n.actionEqualize,
+  'increase_font_size' => l10n.actionFontBigger,
+  'decrease_font_size' => l10n.actionFontSmaller,
+  'reset_font_size' => l10n.actionFontReset,
+  'next_region' => l10n.actionNextRegion,
+  'previous_region' => l10n.actionPreviousRegion,
+  'reload_config' => l10n.actionReloadConfig,
+  'open_config' => l10n.actionOpenConfig,
+  'toggle_command_palette' => l10n.actionCommandPalette,
+  'show_shortcuts' => l10n.actionShowShortcuts,
+  'show_config_problems' => l10n.actionShowConfigProblems,
+  'run_command' => l10n.actionRunCommand(a.param ?? ''),
+  'text' || 'csi' || 'esc' => l10n.actionSendText,
+  'ignore' => l10n.actionIgnore,
+  _ => a.text,
+};
+
+/// The parameter values a row/palette entry is shown for.
+List<String?> actionVariants(ActionSpec spec) => switch (spec.name) {
+  'goto_tab' => [for (var i = 1; i <= 9; i++) '$i'],
+  'new_split' => ['right', 'down'],
+  'goto_split' || 'resize_split' => ['left', 'right', 'up', 'down'],
+  'increase_font_size' || 'decrease_font_size' => ['1'],
+  _ => [null],
 };

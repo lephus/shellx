@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
 import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
 import '../../terminal/terminal_tabs.dart';
+import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
 import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'key_sequence.dart';
+import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
 
 /// A9's overlays over the workspace (UI-A9 §2-4).
@@ -43,18 +46,58 @@ Set<ProblemKey> _visibleKeys(Iterable<ConfigProblem> problems) => {
 mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   void closePanel({bool restoreFocus = true});
   void focusTerminal();
+  Map<Type, Action<Intent>> get actionsMap;
+  bool invokeIntent(Intent intent);
 
   A9Overlay? overlay;
   FocusNode? _beforeOverlay;
 
-  // The overlays that exist so far (the palette and the shortcut editor
-  // arrive with their own tasks).
-  static const _built = {A9Overlay.problems};
+  // The overlays that exist so far (the shortcut editor arrives with its
+  // own task).
+  static const _built = {A9Overlay.problems, A9Overlay.palette};
+
+  /// D33: the entries are fixed when the palette opens, before the focus
+  /// moves into it (whether copy applies depends on where the keyboard
+  /// was); the last eight run ones, in memory only, newest first.
+  List<PaletteEntry> _paletteEntries = const [];
+  final List<String> _recent = [];
+
+  List<PaletteEntry> _buildPaletteEntries() {
+    final state = ref.read(shellxConfigProvider);
+    final hasTab = ref.read(terminalTabsProvider).selected != null;
+    return paletteEntries(
+      l10n: AppLocalizations.of(context),
+      config: state,
+      enabled: (intent) {
+        if (intent is ShowConfigProblemsIntent) {
+          return state.visibleProblemCount > 0;
+        }
+        if (intent is CommandPaletteIntent) return false;
+        // With no tab there is nothing to paste into (the chord itself
+        // stays enabled: it falls through to nothing).
+        if (intent is PasteClipboardIntent && !hasTab) return false;
+        final action = actionsMap[intent.runtimeType];
+        return action != null && action.isEnabled(intent);
+      },
+    );
+  }
+
+  /// Enter or a click: close first (the keyboard goes back where it was),
+  /// then run, so the action starts from the user's own focus.
+  void _runPalette(PaletteEntry entry) {
+    closeOverlay();
+    _recent
+      ..remove(entry.id)
+      ..insert(0, entry.id);
+    if (_recent.length > 8) _recent.removeLast();
+    invokeIntent(entry.intent);
+  }
 
   void openOverlay(A9Overlay next) {
     if (!_built.contains(next)) return;
     // Before closing whatever is open, which clears it.
     final before = _beforeOverlay ?? FocusManager.instance.primaryFocus;
+    if (next == A9Overlay.palette) _paletteEntries = _buildPaletteEntries();
     closePanel(restoreFocus: false);
     ref.read(keySequenceProvider.notifier).cancel();
     _beforeOverlay = before;
@@ -82,6 +125,28 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
 
   /// The overlay's slot in the window's stack (null: nothing open).
   Widget? overlaySlot() {
+    if (overlay == A9Overlay.palette) {
+      return Positioned(
+        key: const ValueKey('a9.palette'),
+        left: ShellxSizes.sidebarWidth + 1,
+        right: 0,
+        top:
+            (isMacDesktop ? ShellxSizes.paneHeaderMac : 0) +
+            ShellxSizes.paletteTop,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: TapRegion(
+            onTapOutside: (_) => closeOverlay(),
+            child: CommandPalette(
+              entries: _paletteEntries,
+              recent: _recent,
+              onRun: _runPalette,
+              onClose: closeOverlay,
+            ),
+          ),
+        ),
+      );
+    }
     if (overlay != A9Overlay.problems) return null;
     return Positioned(
       key: const ValueKey('a9.problems'),

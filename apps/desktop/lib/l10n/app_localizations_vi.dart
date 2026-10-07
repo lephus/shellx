@@ -1359,7 +1359,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String configProblemSequenceRepeatsPrefix(String value) {
-    return 'Chuỗi này không chạy được: bấm $value hai lần là gửi chính nó';
+    return 'Chuỗi này không chạy được: bấm $value hai lần sẽ gửi chính phím đó';
   }
 
   @override
@@ -1372,7 +1372,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String configProblemLimit(String detail) {
-    return '$detail vấn đề — chỉ hiện 100 vấn đề đầu';
+    return '$detail vấn đề — chỉ hiện 100 vấn đề đầu tiên';
   }
 
   @override
@@ -1400,4 +1400,148 @@ class AppLocalizationsVi extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get paletteTitle => 'Bảng lệnh';
+
+  @override
+  String get paletteSearchLabel => 'Tìm lệnh';
+
+  @override
+  String get paletteSearchHint => 'Gõ tên lệnh…';
+
+  @override
+  String get paletteNoResults => 'Không có lệnh nào khớp';
+
+  @override
+  String paletteResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lệnh',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteKindUserCommand => 'Lệnh của bạn';
+
+  @override
+  String get paletteKindSnippet => 'Đoạn chữ';
+
+  @override
+  String get paletteKindConfig => 'Cấu hình';
+
+  @override
+  String get actionNewTab => 'Tab mới';
+
+  @override
+  String get actionCloseSurface => 'Đóng pane hoặc tab';
+
+  @override
+  String get actionCloseTab => 'Đóng cả tab';
+
+  @override
+  String get actionNewWorkspace => 'Workspace mới';
+
+  @override
+  String get actionToggleNotifications => 'Bảng thông báo';
+
+  @override
+  String get actionJumpToUnread => 'Tới thông báo chưa đọc';
+
+  @override
+  String get actionCopy => 'Sao chép';
+
+  @override
+  String get actionPaste => 'Dán';
+
+  @override
+  String get actionSelectAll => 'Chọn tất cả';
+
+  @override
+  String actionGotoTab(String n) {
+    return 'Tới tab $n';
+  }
+
+  @override
+  String get actionNextTab => 'Tab sau';
+
+  @override
+  String get actionPreviousTab => 'Tab trước';
+
+  @override
+  String get actionSplitRight => 'Chia sang phải';
+
+  @override
+  String get actionSplitDown => 'Chia xuống dưới';
+
+  @override
+  String actionFocusPane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Sang pane bên trái',
+      'right': 'Sang pane bên phải',
+      'up': 'Lên pane trên',
+      'other': 'Xuống pane dưới',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String actionResizePane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Dời đường chia sang trái',
+      'right': 'Dời đường chia sang phải',
+      'up': 'Dời đường chia lên',
+      'other': 'Dời đường chia xuống',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionToggleZoom => 'Phóng to / bỏ phóng to pane';
+
+  @override
+  String get actionEqualize => 'Cân bằng pane';
+
+  @override
+  String get actionFontBigger => 'Chữ to hơn';
+
+  @override
+  String get actionFontSmaller => 'Chữ nhỏ hơn';
+
+  @override
+  String get actionFontReset => 'Cỡ chữ mặc định';
+
+  @override
+  String get actionNextRegion => 'Vùng tiếp theo';
+
+  @override
+  String get actionPreviousRegion => 'Vùng trước';
+
+  @override
+  String get actionReloadConfig => 'Tải lại cấu hình';
+
+  @override
+  String get actionOpenConfig => 'Mở file cấu hình';
+
+  @override
+  String get actionCommandPalette => 'Bảng lệnh';
+
+  @override
+  String get actionShowShortcuts => 'Phím tắt…';
+
+  @override
+  String get actionShowConfigProblems => 'Xem vấn đề cấu hình';
+
+  @override
+  String actionRunCommand(String name) {
+    return 'Chạy “$name”';
+  }
+
+  @override
+  String get actionSendText => 'Gửi chữ vào terminal';
+
+  @override
+  String get actionIgnore => 'Bỏ qua phím';
 }

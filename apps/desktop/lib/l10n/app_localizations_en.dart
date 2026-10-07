@@ -1448,4 +1448,149 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get paletteTitle => 'Command palette';
+
+  @override
+  String get paletteSearchLabel => 'Search commands';
+
+  @override
+  String get paletteSearchHint => 'Type a command…';
+
+  @override
+  String get paletteNoResults => 'No matching commands';
+
+  @override
+  String paletteResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count commands',
+      one: '1 command',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get paletteKindUserCommand => 'Your command';
+
+  @override
+  String get paletteKindSnippet => 'Snippet';
+
+  @override
+  String get paletteKindConfig => 'Configuration';
+
+  @override
+  String get actionNewTab => 'New tab';
+
+  @override
+  String get actionCloseSurface => 'Close pane or tab';
+
+  @override
+  String get actionCloseTab => 'Close whole tab';
+
+  @override
+  String get actionNewWorkspace => 'New workspace';
+
+  @override
+  String get actionToggleNotifications => 'Notifications';
+
+  @override
+  String get actionJumpToUnread => 'Jump to unread';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String get actionPaste => 'Paste';
+
+  @override
+  String get actionSelectAll => 'Select all';
+
+  @override
+  String actionGotoTab(String n) {
+    return 'Go to tab $n';
+  }
+
+  @override
+  String get actionNextTab => 'Next tab';
+
+  @override
+  String get actionPreviousTab => 'Previous tab';
+
+  @override
+  String get actionSplitRight => 'Split right';
+
+  @override
+  String get actionSplitDown => 'Split down';
+
+  @override
+  String actionFocusPane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Focus pane on the left',
+      'right': 'Focus pane on the right',
+      'up': 'Focus pane above',
+      'other': 'Focus pane below',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String actionResizePane(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Move divider left',
+      'right': 'Move divider right',
+      'up': 'Move divider up',
+      'other': 'Move divider down',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionToggleZoom => 'Zoom or unzoom pane';
+
+  @override
+  String get actionEqualize => 'Equalize panes';
+
+  @override
+  String get actionFontBigger => 'Bigger text';
+
+  @override
+  String get actionFontSmaller => 'Smaller text';
+
+  @override
+  String get actionFontReset => 'Default text size';
+
+  @override
+  String get actionNextRegion => 'Next region';
+
+  @override
+  String get actionPreviousRegion => 'Previous region';
+
+  @override
+  String get actionReloadConfig => 'Reload configuration';
+
+  @override
+  String get actionOpenConfig => 'Open configuration file';
+
+  @override
+  String get actionCommandPalette => 'Command palette';
+
+  @override
+  String get actionShowShortcuts => 'Keyboard shortcuts…';
+
+  @override
+  String get actionShowConfigProblems => 'Show configuration problems';
+
+  @override
+  String actionRunCommand(String name) {
+    return 'Run “$name”';
+  }
+
+  @override
+  String get actionSendText => 'Send text to the terminal';
+
+  @override
+  String get actionIgnore => 'Ignore key';
 }

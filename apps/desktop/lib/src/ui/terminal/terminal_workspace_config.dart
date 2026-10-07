@@ -59,6 +59,7 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   // finds.
   void closeConfigOverlay({bool restoreFocus = true});
   void openOverlay(A9Overlay overlay);
+  A9Overlay? get overlay;
   void forgetFixedRuntimeProblems();
 
   /// The actions of the A9 intents.
@@ -93,12 +94,14 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         enabled: (_) => terminalFocus.hasFocus,
       ),
       IgnoreKeyIntent: run<IgnoreKeyIntent>((_) {}),
-      // Registered disabled: Tasks 11-12 turn them on. A disabled action
-      // lets the key through, so a chord bound to one does nothing yet.
+      // ⌘⇧P opens the palette, and closes it when it is open (D33).
       CommandPaletteIntent: run<CommandPaletteIntent>(
-        (_) {},
-        enabled: (_) => false,
+        (_) => overlay == A9Overlay.palette
+            ? closeConfigOverlay()
+            : openOverlay(A9Overlay.palette),
       ),
+      // Registered disabled: Task 12 turns it on. A disabled action lets
+      // the key through, so a chord bound to it does nothing yet.
       ShowShortcutsIntent: run<ShowShortcutsIntent>(
         (_) {},
         enabled: (_) => false,
