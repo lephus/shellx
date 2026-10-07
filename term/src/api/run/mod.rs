@@ -64,6 +64,9 @@ fn usage(m: impl Into<String>) -> ApiError {
 pub fn run(p: &Parsed, ctx: &mut Ctx) -> i32 {
     match execute(p, ctx) {
         Ok(()) => 0,
+        Err(ApiError::Remote { code, message }) if message == REPORTED => {
+            ApiError::Remote { code, message }.exit_code()
+        }
         Err(e) => {
             let (code, message) = describe(&e);
             if p.json {
@@ -81,6 +84,17 @@ pub fn run(p: &Parsed, ctx: &mut Ctx) -> i32 {
             }
             e.exit_code()
         }
+    }
+}
+
+/// Marks an error the command already printed inside its one `--json`
+/// object (D11: exactly one object), so [run] only sets the exit code.
+const REPORTED: &str = "\u{0}already reported";
+
+pub(crate) fn already_reported(code: &str) -> ApiError {
+    ApiError::Remote {
+        code: code.into(),
+        message: REPORTED.into(),
     }
 }
 

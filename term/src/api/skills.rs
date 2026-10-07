@@ -4,8 +4,9 @@
 
 use super::args::Parsed;
 use super::client::ApiError;
-use super::run::Ctx;
-use std::io::Read;
+use super::run::{already_reported, Ctx};
+use super::value::{to_json, Value};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub const SKILL: &str = include_str!("../../../agent-skills/shellx/SKILL.md");
@@ -26,17 +27,25 @@ fn refused(message: String) -> ApiError {
     }
 }
 
-/// `skills print [SKILL.md | reference]`.
+/// `skills print [SKILL.md | reference]`; `--json`: `{"files":[{name, text}]}`.
 pub fn print(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
-    let text = match p.pos(0) {
-        None | Some("SKILL.md") | Some("skill") => SKILL,
-        Some("reference") | Some("reference.md") => REFERENCE,
+    let (name, text) = match p.pos(0) {
+        None | Some("SKILL.md") | Some("skill") => ("SKILL.md", SKILL),
+        Some("reference") | Some("reference.md") => ("reference.md", REFERENCE),
         Some(other) => {
             return Err(ApiError::Usage(format!(
                 "no skill file '{other}' (SKILL.md or reference)"
             )))
         }
     };
+    if p.json {
+        let file = Value::map(vec![
+            ("name", Value::text(name)),
+            ("text", Value::text(text)),
+        ]);
+        let v = Value::map(vec![("files", Value::Array(vec![file]))]);
+        return writeln!(ctx.out, "{}", to_json(&v)).map_err(io);
+    }
     write!(ctx.out, "{text}").map_err(io)
 }
 
@@ -54,11 +63,20 @@ fn answer(stdin: &mut dyn Read) -> String {
     String::from_utf8_lossy(&line).trim().to_string()
 }
 
-/// Through a temporary file and a rename: never a half-written skill.
+/// Through a new temporary file (random name, `create_new`: never an
+/// existing file or link) and a rename: never a half-written skill.
 fn write_file(path: &Path, text: &str) -> Result<(), ApiError> {
-    let tmp = path.with_extension(format!("tmp-{}", std::process::id()));
-    std::fs::write(&tmp, text).map_err(io)?;
-    std::fs::rename(&tmp, path).map_err(|e| {
+    let mut r = [0u8; 8];
+    getrandom::fill(&mut r).map_err(|_| ApiError::Io("no randomness".into()))?;
+    let suffix: String = r.iter().map(|b| format!("{b:02x}")).collect();
+    let tmp = path.with_extension(format!("tmp-{suffix}"));
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+        .and_then(|mut f| f.write_all(text.as_bytes()).and_then(|()| f.sync_all()))
+        .and_then(|()| std::fs::rename(&tmp, path));
+    written.map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         io(e)
     })
@@ -86,7 +104,19 @@ fn targets(p: &Parsed, home: &Path) -> Vec<PathBuf> {
     targets
 }
 
-/// `skills install [--claude] [--codex] [--dir D] [--force]`.
+fn paths(ps: &[PathBuf]) -> Value {
+    Value::Array(
+        ps.iter()
+            .map(|p| Value::text(p.to_string_lossy()))
+            .collect(),
+    )
+}
+
+/// `skills install [--claude] [--codex] [--dir D] [--force]`. A changed
+/// file the user does not let us overwrite (declined, or no terminal to
+/// ask) is skipped; the others are still installed, and the command exits
+/// 6 at the end (review M5). `--json`: one object
+/// `{"installed","upToDate","skipped"[, "error"]}`.
 pub fn install(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     let home = ctx
         .home
@@ -101,39 +131,77 @@ pub fn install(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
                     .into(),
         });
     }
+    let (mut installed, mut up_to_date, mut skipped) = (vec![], vec![], vec![]);
     for base in targets {
         let dir = base.join("shellx");
         for (name, text) in [("SKILL.md", SKILL), ("reference.md", REFERENCE)] {
             let path = dir.join(name);
             match std::fs::read(&path) {
                 Ok(old) if old == text.as_bytes() => {
-                    writeln!(ctx.out, "{} is up to date", path.display()).ok();
+                    if !p.json {
+                        writeln!(ctx.out, "{} is up to date", path.display()).ok();
+                    }
+                    up_to_date.push(path);
                     continue;
                 }
                 Ok(_) if !p.has("force") => {
-                    if !ctx.stdin_is_tty {
-                        return Err(refused(format!(
-                            "{} was changed; rerun with --force to overwrite",
-                            path.display()
-                        )));
-                    }
-                    write!(ctx.err, "Overwrite {}? [y/N] ", path.display()).ok();
-                    ctx.err.flush().ok();
-                    if !matches!(
-                        answer(ctx.stdin).as_str(),
-                        "y" | "Y" | "yes" | "YES" | "Yes"
-                    ) {
-                        return Err(refused(format!("{} not overwritten", path.display())));
+                    let yes = ctx.stdin_is_tty && {
+                        write!(ctx.err, "Overwrite {}? [y/N] ", path.display()).ok();
+                        ctx.err.flush().ok();
+                        matches!(
+                            answer(ctx.stdin).as_str(),
+                            "y" | "Y" | "yes" | "YES" | "Yes"
+                        )
+                    };
+                    if !yes {
+                        if !p.json {
+                            writeln!(ctx.err, "kept your changed {}", path.display()).ok();
+                        }
+                        skipped.push(path);
+                        continue;
                     }
                 }
                 _ => {}
             }
             std::fs::create_dir_all(&dir).map_err(io)?;
             write_file(&path, text)?;
-            writeln!(ctx.out, "installed {}", path.display()).ok();
+            if !p.json {
+                writeln!(ctx.out, "installed {}", path.display()).ok();
+            }
+            installed.push(path);
         }
     }
-    Ok(())
+    let refusal = (!skipped.is_empty()).then(|| {
+        format!(
+            "{} changed file(s) not overwritten; rerun with --force to overwrite",
+            skipped.len()
+        )
+    });
+    if p.json {
+        let mut v = vec![
+            ("installed", paths(&installed)),
+            ("upToDate", paths(&up_to_date)),
+            ("skipped", paths(&skipped)),
+        ];
+        if let Some(m) = &refusal {
+            v.push((
+                "error",
+                Value::map(vec![
+                    ("code", Value::text("forbidden")),
+                    ("message", Value::text(m)),
+                ]),
+            ));
+        }
+        writeln!(ctx.out, "{}", to_json(&Value::map(v))).ok();
+        if refusal.is_some() {
+            return Err(already_reported("forbidden"));
+        }
+        return Ok(());
+    }
+    match refusal {
+        Some(message) => Err(refused(message)),
+        None => Ok(()),
+    }
 }
 
 #[cfg(test)]
@@ -307,5 +375,152 @@ mod tests {
         std::fs::create_dir_all(other.join(".agents")).unwrap();
         assert_eq!(run_skills(&["skills", "install"], &other, "", false).0, 0);
         assert!(other.join(".agents/skills/shellx/reference.md").exists());
+    }
+
+    #[test]
+    fn declining_one_file_keeps_the_others() {
+        let home = temp_home("decline");
+        let dir = home.join("d");
+        let d = dir.to_str().unwrap();
+        assert_eq!(
+            run_skills(&["skills", "install", "--dir", d], &home, "", false).0,
+            0
+        );
+        std::fs::write(dir.join("shellx/SKILL.md"), "a").unwrap();
+        std::fs::write(dir.join("shellx/reference.md"), "b").unwrap();
+        // No to the first, yes to the second: the second is still asked.
+        let (code, _, err) = run_skills(&["skills", "install", "--dir", d], &home, "n\ny\n", true);
+        assert_eq!(code, 6, "{err}");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("shellx/SKILL.md")).unwrap(),
+            "a"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("shellx/reference.md")).unwrap(),
+            REFERENCE
+        );
+        // No terminal: a changed file is skipped, a missing one installed.
+        std::fs::remove_file(dir.join("shellx/reference.md")).unwrap();
+        assert_eq!(
+            run_skills(&["skills", "install", "--dir", d], &home, "", false).0,
+            6
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("shellx/SKILL.md")).unwrap(),
+            "a"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("shellx/reference.md")).unwrap(),
+            REFERENCE
+        );
+    }
+
+    #[test]
+    fn a_skipped_target_does_not_stop_the_next() {
+        let home = temp_home("targets");
+        assert_eq!(
+            run_skills(&["skills", "install", "--claude"], &home, "", false).0,
+            0
+        );
+        std::fs::write(home.join(".claude/skills/shellx/SKILL.md"), "mine").unwrap();
+        let (code, _, _) = run_skills(
+            &["skills", "install", "--claude", "--codex"],
+            &home,
+            "",
+            false,
+        );
+        assert_eq!(code, 6);
+        assert_eq!(
+            std::fs::read_to_string(home.join(".agents/skills/shellx/SKILL.md")).unwrap(),
+            SKILL
+        );
+        assert_eq!(
+            std::fs::read_to_string(home.join(".claude/skills/shellx/SKILL.md")).unwrap(),
+            "mine"
+        );
+    }
+
+    #[test]
+    fn json_is_one_object() {
+        let home = temp_home("json");
+        let dir = home.join("j");
+        let d = dir.to_str().unwrap();
+        let (skill, reference) = (dir.join("shellx/SKILL.md"), dir.join("shellx/reference.md"));
+        let (code, out, err) = run_skills(
+            &["skills", "install", "--dir", d, "--json"],
+            &home,
+            "",
+            false,
+        );
+        assert_eq!((code, err.as_str()), (0, ""));
+        let list = |ps: &[&std::path::Path]| {
+            ps.iter()
+                .map(|p| crate::api::value::json_string(p.to_str().unwrap()))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        assert_eq!(
+            out,
+            format!(
+                "{{\"installed\":[{}],\"upToDate\":[],\"skipped\":[]}}\n",
+                list(&[&skill, &reference])
+            )
+        );
+        std::fs::write(&skill, "a").unwrap();
+        let (code, out, err) = run_skills(
+            &["skills", "install", "--dir", d, "--json"],
+            &home,
+            "",
+            false,
+        );
+        assert_eq!((code, err.as_str()), (6, ""));
+        assert_eq!(out.lines().count(), 1, "{out}");
+        assert!(out.starts_with(&format!("{{\"installed\":[],\"upToDate\":[{}],\"skipped\":[{}],\"error\":{{\"code\":\"forbidden\"", list(&[&reference]), list(&[&skill]))), "{out}");
+        let (code, out, _) = run_skills(
+            &["skills", "print", "reference", "--json"],
+            &home,
+            "",
+            false,
+        );
+        assert_eq!(code, 0);
+        assert_eq!(
+            out,
+            format!(
+                "{{\"files\":[{{\"name\":\"reference.md\",\"text\":{}}}]}}\n",
+                crate::api::value::json_string(REFERENCE)
+            )
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_temporary_file_is_never_an_existing_one() {
+        // A file (or link) already at a predictable temporary name is never
+        // written through.
+        let home = temp_home("tmp");
+        let dir = home.join("t/shellx");
+        std::fs::create_dir_all(&dir).unwrap();
+        let victim = home.join("victim");
+        std::fs::write(&victim, "keep").unwrap();
+        for name in ["SKILL", "reference"] {
+            let link = dir.join(format!("{name}.tmp-{}", std::process::id()));
+            std::os::unix::fs::symlink(&victim, link).unwrap();
+        }
+        let d = home.join("t");
+        assert_eq!(
+            run_skills(
+                &["skills", "install", "--dir", d.to_str().unwrap()],
+                &home,
+                "",
+                false
+            )
+            .0,
+            0
+        );
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("SKILL.md")).unwrap(),
+            SKILL
+        );
     }
 }
