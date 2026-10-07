@@ -55,6 +55,8 @@ List<Map<String, String>> configShowValues(ConfigState s) {
                 .join(', '),
     ),
     v('cursor-style', c.cursorShape.name),
+    v('adjust-cell-height', '${_n(c.cellHeightPercent)}%'),
+    v('cursor-style-blink', '${c.cursorBlink}'),
     v('scrollback-limit', '${c.scrollbackLimit}'),
     v('window-padding-x', _pair(c.padding.left, c.padding.right)),
     v('window-padding-y', _pair(c.padding.top, c.padding.bottom)),

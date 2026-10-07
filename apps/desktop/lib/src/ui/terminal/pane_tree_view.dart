@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, KeyUpEvent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
 import 'package:shellx_core/shellx_core.dart';
@@ -15,6 +16,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
 import '../../remote/remote_state.dart';
 import '../../remote/ssh_reconnector.dart';
+import '../../terminal/cursor_blinker.dart';
+import '../../terminal/desktop_terminal.dart';
 import '../../terminal/find_sessions.dart';
 import '../../terminal/link_finder.dart';
 import '../../terminal/pane_input.dart' show PaneInput;
@@ -25,7 +28,8 @@ import '../../terminal/terminal_style.dart';
 import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
-import '../window_focus.dart' show terminalFocusRequestProvider;
+import '../window_focus.dart'
+    show terminalFocusRequestProvider, windowActiveProvider;
 import '../window_router.dart' show windowRouterProvider;
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
@@ -169,11 +173,62 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   @override
   void dispose() {
     unawaited(_replacements?.cancel());
+    _blinker?.dispose();
     super.dispose();
+  }
+
+  /// A11 D17: the one blinker, on the focused pane of the selected tab. The
+  /// other panes, an unfocused window, a hidden tab and a reduced-motion
+  /// setting keep a solid cursor and run no timer.
+  CursorBlinker? _blinker;
+  DesktopTerminal? _blinkerTerminal;
+  bool _blinkSyncQueued = false;
+
+  void _queueBlinkSync() {
+    if (_blinkSyncQueued) return;
+    _blinkSyncQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _blinkSyncQueued = false;
+      if (mounted) _syncBlinker();
+    });
+  }
+
+  void _syncBlinker() {
+    final tab = widget.tab;
+    final pane = tab.panes[tab.focusedPaneId];
+    final wanted =
+        widget.selected &&
+        pane != null &&
+        !pane.exited &&
+        ref.read(terminalAppearanceProvider).cursorBlink &&
+        ref.read(windowActiveProvider) &&
+        !MediaQuery.disableAnimationsOf(context);
+    final terminal = pane?.terminal;
+    if (!wanted || terminal == null) {
+      _blinker?.dispose();
+      _blinker = null;
+      _blinkerTerminal = null;
+      return;
+    }
+    if (_blinker != null && identical(_blinkerTerminal, terminal)) return;
+    _blinker?.dispose();
+    _blinkerTerminal = terminal;
+    _blinker = CursorBlinker(terminal: terminal, controller: pane.selection)
+      ..start();
+  }
+
+  KeyEventResult _onPaneKey(KeyEvent event) {
+    if (event is! KeyUpEvent) _blinker?.bump();
+    return widget.onKeyEvent?.call(event) ?? KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
+    // A11 D17: blink on/off follows the setting, the window and the focus.
+    ref.watch(terminalAppearanceProvider.select((a) => a.cursorBlink));
+    ref.watch(windowActiveProvider);
+    MediaQuery.disableAnimationsOf(context);
+    _queueBlinkSync();
     // The pane headers' tooltips follow a reload (A9 D29).
     ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final tab = widget.tab;
@@ -258,7 +313,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         cursorType: appearance.cursor,
         padding: appearance.padding,
         shortcuts: widget.shortcuts,
-        onKeyEvent: widget.onKeyEvent,
+        onKeyEvent: widget.onKeyEvent == null && !appearance.cursorBlink
+            ? null
+            : _onPaneKey,
         onMenu: (at, cell) => _menu(id, at, cell),
       ),
     );

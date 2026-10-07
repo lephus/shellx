@@ -532,7 +532,7 @@ extension _Restore on TerminalTabs {
       runningCommand: false,
       driver: s.driver,
       terminal: terminal,
-      selection: TerminalController(),
+      selection: DesktopTerminalController(),
       cwd: s.cwd,
       remote: s.remote,
       exitCode: 255,

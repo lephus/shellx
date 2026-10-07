@@ -40,6 +40,27 @@ final class DesktopTerminal extends Terminal {
     super.useMainBuffer();
   }
 
+  bool _wantsCursor = true;
+  bool _blinkOn = true;
+
+  /// The program's DECTCEM (`ESC[?25h/l`) is remembered; what xterm draws is
+  /// that AND the blink phase.
+  @override
+  void setCursorVisibleMode(bool enabled) {
+    _wantsCursor = enabled;
+    super.setCursorVisibleMode(enabled && _blinkOn);
+  }
+
+  /// Blinker only: the program's wish is untouched. No `notifyListeners()`
+  /// (find, the driver pill and the IME rect listen to the terminal and a
+  /// blink is none of their business; theme changes would also clear
+  /// xterm's glyph cache): the controller repaints instead.
+  void applyBlinkPhase(bool on) {
+    if (_blinkOn == on) return;
+    _blinkOn = on;
+    super.setCursorVisibleMode(_wantsCursor && on);
+  }
+
   /// A9 D31: bytes from the user's own key binding (`text:`, `csi:`,
   /// `esc:`), sent as typed input (the desktop takes the driver, A1 D6)
   /// and, like Ghostty, not filtered: the configuration is the user's.
@@ -146,4 +167,10 @@ final class DesktopTerminal extends Terminal {
     TerminalMouseButtonState buttonState,
     CellOffset position,
   ) => _asUser(() => super.mouseInput(button, buttonState, position));
+}
+
+/// [TerminalController] a blink can ask to repaint without touching the
+/// terminal (A11 D17).
+class DesktopTerminalController extends TerminalController {
+  void repaint() => notifyListeners();
 }

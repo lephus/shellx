@@ -25,7 +25,7 @@ PaneSession pane({
   runningCommand: false,
   driver: DriverSide.desktop,
   terminal: DesktopTerminal(platform: TerminalTargetPlatform.macos),
-  selection: TerminalController(),
+  selection: DesktopTerminalController(),
   remote: remote,
   exitCode: exitCode,
   everConnected: everConnected,

@@ -36,6 +36,8 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
     '# cursor-color = #d4e1e4',
     '# selection-background = #5fd4e2',
     '# cursor-style = block  (block, bar, underline)',
+    '# cursor-style-blink = false',
+    '# adjust-cell-height = 0%  (-10% … 50%)',
     '',
     '# --- Terminal ---',
     '# scrollback-limit = 10000  (lines, for new panes)',

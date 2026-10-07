@@ -17,6 +17,7 @@ import 'package:shellx_desktop/src/ui/terminal/terminal_overlays.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:shellx_desktop/src/ui/theme/terminal_colors.dart';
+import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 import 'package:xterm/xterm.dart';
 
@@ -206,6 +207,46 @@ void main() {
       lessThan(narrower),
     );
     expect(local.views[hidden]!.resizes, isEmpty);
+    await finish(tester);
+  });
+
+  testWidgets('adjust-cell-height changes the style and the rows the session '
+      'is sized to (measure and paint agree, A11 D16)', (tester) async {
+    final fs = MemoryConfigFs();
+    await pump(tester, fs);
+    final id = container.read(terminalTabsProvider).selectedId!;
+    final rowsBefore = view(tester).terminal.viewHeight;
+    await reload(tester, fs, 'adjust-cell-height = 30%\n');
+    expect(view(tester).textStyle.height, closeTo(1.2 * 1.3, 1e-9));
+    final rowsAfter = view(tester).terminal.viewHeight;
+    expect(rowsAfter, lessThan(rowsBefore));
+    expect(local.views[id]!.resizes.last.$2, rowsAfter);
+    await finish(tester);
+  });
+
+  testWidgets('cursor-style-blink blinks the focused pane only while the '
+      'window is active and stops when the setting goes', (tester) async {
+    final fs = MemoryConfigFs();
+    await pump(tester, fs, config: 'cursor-style-blink = true\n');
+    container.read(windowFocusProvider.notifier).set(true);
+    await tester.pump();
+    await tester.pump(); // post-frame sync
+    final term = view(tester).terminal;
+    expect(term.cursorVisibleMode, isTrue);
+    await tester.pump(const Duration(milliseconds: 540));
+    expect(term.cursorVisibleMode, isFalse);
+    // The window loses focus: solid again, no timer left.
+    container.read(windowFocusProvider.notifier).set(false);
+    await tester.pump();
+    await tester.pump();
+    expect(term.cursorVisibleMode, isTrue);
+    container.read(windowFocusProvider.notifier).set(true);
+    await tester.pump();
+    await tester.pump();
+    await reload(tester, fs, 'cursor-style-blink = false\n');
+    expect(term.cursorVisibleMode, isTrue);
+    await tester.pump(const Duration(seconds: 2));
+    expect(term.cursorVisibleMode, isTrue);
     await finish(tester);
   });
 

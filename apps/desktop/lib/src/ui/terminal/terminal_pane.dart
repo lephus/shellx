@@ -269,6 +269,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
       fontSize,
       families: appearance.families,
       regular: appearance.regular,
+      cellHeightPercent: appearance.cellHeightPercent,
     );
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);

@@ -264,7 +264,7 @@ final class PaneSession {
   final DesktopTerminal terminal;
 
   /// xterm selection (⌘C copies it).
-  final TerminalController selection;
+  final DesktopTerminalController selection;
 
   /// A2 C1–C3, from the session; the last values stay after an exit.
   final String? cwd;
@@ -392,7 +392,7 @@ final class TerminalTab {
   String get title => focused.title;
   bool get runningCommand => focused.runningCommand;
   DesktopTerminal get terminal => focused.terminal;
-  TerminalController get selection => focused.selection;
+  DesktopTerminalController get selection => focused.selection;
   String? get cwd => focused.cwd;
   String? get gitBranch => focused.gitBranch;
   List<int> get ports => focused.ports;
@@ -489,7 +489,7 @@ final class _Link {
   final LocalSessionView view;
   final DesktopTerminal terminal;
   final TerminalFeed feed;
-  final selection = TerminalController();
+  final selection = DesktopTerminalController();
   final subscriptions = <StreamSubscription<Object?>>[];
 
   void dispose() {

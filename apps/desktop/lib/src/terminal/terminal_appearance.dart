@@ -19,6 +19,8 @@ final class TerminalAppearance {
     required this.padding,
     required this.families,
     this.regular = false,
+    this.cellHeightPercent = 0,
+    this.cursorBlink = false,
   });
 
   final TerminalTheme theme;
@@ -36,6 +38,12 @@ final class TerminalAppearance {
 
   /// `font-weight = regular`: the bundled font's Regular face, not Light.
   final bool regular;
+
+  /// `adjust-cell-height`, percent (A11 D16).
+  final double cellHeightPercent;
+
+  /// `cursor-style-blink` (A11 D17).
+  final bool cursorBlink;
 }
 
 TerminalCursorType terminalCursorFor(CursorShape shape) => switch (shape) {
@@ -57,5 +65,7 @@ final terminalAppearanceProvider = Provider<TerminalAppearance>((ref) {
     padding: config.padding,
     families: config.fontFamilies,
     regular: config.fontWeight == TerminalFontWeight.regular,
+    cellHeightPercent: config.cellHeightPercent,
+    cursorBlink: config.cursorBlink,
   );
 });
