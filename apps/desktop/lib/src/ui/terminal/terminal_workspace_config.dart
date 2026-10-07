@@ -10,6 +10,7 @@ import '../../config/config_opener.dart';
 import '../../config/font_probe.dart';
 import '../../config/keybind_trigger.dart' show altGrHeld;
 import '../../config/shellx_config.dart';
+import '../../terminal/pane_paste.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../../terminal/user_commands.dart';
 import 'terminal_intents.dart';
@@ -121,7 +122,12 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         .firstOrNull;
     if (command == null) return;
     closePanel();
-    final ran = runUserCommand(ref.read(terminalTabsProvider), command);
+    final ran = runUserCommand(
+      ref.read(terminalTabsProvider),
+      command,
+      sender: ref.read(pasteSenderProvider),
+      tabs: () => ref.read(terminalTabsProvider),
+    );
     if (ran == CommandRun.noTerminal) {
       ref
           .read(terminalTabsProvider.notifier)

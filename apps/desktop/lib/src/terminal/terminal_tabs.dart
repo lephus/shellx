@@ -94,6 +94,12 @@ final class PaneNoRoomNotice extends TabNotice {
   const PaneNoRoomNotice();
 }
 
+/// A10 D13: the clipboard holds more than 16 MiB of text; nothing was
+/// pasted. Error toast.
+final class PasteTooLargeNotice extends TabNotice {
+  const PasteTooLargeNotice();
+}
+
 /// A7 D26: the skill install command is on the clipboard. Neutral toast.
 final class CliSkillsCopiedNotice extends TabNotice {
   const CliSkillsCopiedNotice();

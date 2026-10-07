@@ -5,6 +5,8 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:xterm/xterm.dart';
 
 import '../terminal/desktop_terminal.dart';
+import '../terminal/pane_paste.dart';
+import '../terminal/paste_sender.dart';
 import '../terminal/terminal_tabs.dart';
 import 'agent_marks.dart';
 import 'cli_fields.dart';
@@ -33,11 +35,13 @@ final class PaneIoCommands {
 
   /// Types [text] and Enter into [pane] now.
   void typeNow(int pane, String text) {
-    try {
-      _send(pane, text: text, enter: true);
-    } on CliFailure {
-      // The pane ended before its shell was ready: nothing to type into.
-    }
+    unawaited(() async {
+      try {
+        await _send(pane, text: text, enter: true);
+      } on CliFailure {
+        // The pane ended before its shell was ready: nothing to type into.
+      }
+    }());
   }
 
   final Ref _ref;
@@ -86,23 +90,42 @@ final class PaneIoCommands {
     if ((text == null || text.isEmpty) && keys.isEmpty && !enter) {
       throw badRequest('nothing to send');
     }
-    _send(pane, text: text, keys: keys, enter: enter);
+    await _send(pane, text: text, keys: keys, enter: enter);
     return const {};
   }
 
   /// As the user would type it (the desktop drives, A1 D6): [text] through
-  /// the clipboard's paste (controls stripped, bracketed when the shell
-  /// asked), then [keys], then Enter.
-  void _send(
+  /// the paste sender (controls stripped, bracketed when the shell asked,
+  /// queued behind a paste already running in the pane), then [keys], then
+  /// Enter. The text is at most [kSendMaxBytes] (48 KiB), under the sender's
+  /// direct limit, so no confirmation and no size refusal can arise here; a
+  /// `tooLarge` outcome would still be a `bad_request`.
+  Future<void> _send(
     int pane, {
     String? text,
     List<void Function(DesktopTerminal)> keys = const [],
     bool enter = false,
-  }) {
+  }) async {
     final p = _pane(pane);
     if (p.exited) throw const CliFailure(CliError.exited, 'the pane exited');
     final t = p.terminal;
-    if (text != null && text.isNotEmpty) t.paste(text);
+    final sender = _ref.read(pasteSenderProvider);
+    if (text != null && text.isNotEmpty) {
+      final outcome = await sender.send(
+        pane,
+        text,
+        PanePasteSink(() => _ref.read(terminalTabsProvider), pane, t),
+      );
+      if (outcome == PasteOutcome.tooLarge) throw badRequest('paste too large');
+      if (outcome == PasteOutcome.cancelled) {
+        throw const CliFailure(CliError.exited, 'the pane exited');
+      }
+    } else {
+      await sender.whenIdle(pane);
+    }
+    if (_pane(pane).exited || !identical(_pane(pane).terminal, t)) {
+      throw const CliFailure(CliError.exited, 'the pane exited');
+    }
     for (final k in keys) {
       k(t);
     }

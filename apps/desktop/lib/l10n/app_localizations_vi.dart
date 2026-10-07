@@ -1995,4 +1995,19 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get daemonStoppingStrip => 'Đang dừng phiên nền…';
+
+  @override
+  String pasteLargeTitle(String size) {
+    return 'Dán $size?';
+  }
+
+  @override
+  String get pasteLargeBody =>
+      'Đây là lượng văn bản lớn. Chữ được gửi từng phần và không thể hoàn tác.';
+
+  @override
+  String get pasteLargeAction => 'Dán';
+
+  @override
+  String get pasteTooLarge => 'Nội dung clipboard quá lớn để dán (hơn 16 MB)';
 }

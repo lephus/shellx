@@ -869,5 +869,10 @@
   "trayBackgroundService": "Keep shells running when the window closes",
   "backgroundServiceNextLaunch": "Applies the next time ShellX starts.",
   "daemonQuitFailed": "The background service didn't stop. Try again.",
-  "daemonStoppingStrip": "Stopping the background service…"
+  "daemonStoppingStrip": "Stopping the background service…",
+  "pasteLargeTitle": "Paste {size}?",
+  "@pasteLargeTitle": {"placeholders": {"size": {"type": "String"}}},
+  "pasteLargeBody": "This is a lot of text. It is sent a piece at a time and can’t be undone.",
+  "pasteLargeAction": "Paste",
+  "pasteTooLarge": "The clipboard is too large to paste (over 16 MB)"
 }

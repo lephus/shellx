@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/config/config_syntax.dart';
 import 'package:shellx_desktop/src/config/shellx_config.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
+import 'package:shellx_desktop/src/terminal/pane_paste.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/terminal/user_commands.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
@@ -164,6 +165,8 @@ void main() {
       runUserCommand(
         state,
         UserCommand(name: 'L', text: 'x', enter: true, origin: entry),
+        sender: c.read(pasteSenderProvider),
+        tabs: () => c.read(terminalTabsProvider),
       ),
       CommandRun.noTerminal,
     );
