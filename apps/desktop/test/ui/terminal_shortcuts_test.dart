@@ -7,6 +7,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_font_size.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
@@ -31,6 +32,7 @@ Future<void> pumpWorkspace(
     overrides: [
       desktopServicesProvider.overrideWithValue(h.services()),
       localSessionsProvider.overrideWithValue(local),
+      clipboardMediaProvider.overrideWithValue(const EmptyClipboardMedia()),
     ],
   );
   if (signedIn) await h.seedSignedIn();

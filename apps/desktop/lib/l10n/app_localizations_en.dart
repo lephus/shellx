@@ -2100,6 +2100,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'The clipboard is too large to paste (over 16 MB)';
 
   @override
+  String get pasteImageTooLarge => 'The image is larger than 20 MB';
+
+  @override
+  String get pasteImageFailed => 'Couldn’t read the image from the clipboard';
+
+  @override
+  String get pasteImageSsh => 'Images can’t be pasted into an SSH session';
+
+  @override
+  String get dropHint => 'Drop to insert the path';
+
+  @override
+  String get dropHintSsh => 'Files can’t be dropped into an SSH session';
+
+  @override
+  String get dropRefused =>
+      'A file name has characters a shell can’t take safely';
+
+  @override
+  String get dropSsh => 'Files can’t be dropped into an SSH session. Use scp.';
+
+  @override
   String get findPlaceholder => 'Find';
 
   @override

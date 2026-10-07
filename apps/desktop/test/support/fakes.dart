@@ -16,6 +16,7 @@ import 'package:shellx_desktop/src/platform/launch_at_login.dart';
 import 'package:shellx_desktop/src/platform/notifier.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/platform/url_opener.dart';
+import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
 import 'package:shellx_desktop/src/terminal_sharing/config_file_editor.dart';
 import 'package:shellx_desktop/src/terminal_sharing/powershell.dart';
 import 'package:shellx_desktop/src/terminal_sharing/sharing_paths.dart';
@@ -584,4 +585,16 @@ final class TestHarness {
     await secureStore.write('user_id', relay.userId);
     await secureStore.write('email', email);
   }
+}
+
+/// A10 D15: a clipboard with nothing but text (the default in tests: the
+/// real one talks to a native plugin).
+final class EmptyClipboardMedia implements ClipboardMedia {
+  const EmptyClipboardMedia();
+
+  @override
+  Future<List<String>> files() async => const [];
+
+  @override
+  Future<Uint8List?> image() async => null;
 }

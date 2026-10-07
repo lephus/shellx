@@ -13,6 +13,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
@@ -39,6 +40,7 @@ Future<void> pumpWorkspace(
     overrides: [
       desktopServicesProvider.overrideWithValue(h.services()),
       localSessionsProvider.overrideWithValue(local),
+      clipboardMediaProvider.overrideWithValue(const EmptyClipboardMedia()),
       // A10 D20: these tests check layout, not settling: sizes go at once.
       resizeSettleProvider.overrideWithValue(Duration.zero),
     ],

@@ -13,6 +13,10 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # A10 D19: files dropped on a pane become paths; images on the clipboard
+  # become a temp file. Pinned exactly (native plugins on macOS and
+  # Windows): bump with a manual check of both.
+  desktop_drop: 0.8.4
   ffi: ^2.2.0
   # Vendored and patched, see third_party/flutter_pty/SHELLX_PATCHES.md.
   flutter_pty:
@@ -24,6 +28,7 @@ dependencies:
   launch_at_startup: ^0.5.1
   local_notifier: ^0.1.6
   package_info_plus: ^9.0.1
+  pasteboard: 0.5.0
   path: ^1.9.1
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
