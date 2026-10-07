@@ -71,11 +71,17 @@ abstract interface class LocalSessionView {
   int get id;
 
   /// What the ring buffer held when the view was made (at most 256 KiB).
-  /// A view of a session in another process (A5b D10) has an empty backlog:
-  /// the same bytes arrive first on [output]. Callers must therefore treat
-  /// [backlog] followed by [output] as the whole history, never assume the
-  /// backlog is non-empty.
+  /// A view of a session in another process (A5b D10) has an empty backlog;
+  /// see [pendingBacklog].
   Uint8List get backlog;
+
+  /// Null when [backlog] is the whole history (a session in this process).
+  /// A view of a session in another process (A5b D10) cannot know its
+  /// backlog when it is made: the ring buffer arrives a moment later and
+  /// completes this future, once, before any byte reaches [output]. A
+  /// consumer treats it exactly like [backlog] (laid out first, queries in
+  /// it answered into nothing), then starts treating [output] as live.
+  Future<Uint8List>? get pendingBacklog;
 
   /// Live output after [backlog], buffered from the moment the view was
   /// made (single listener). Done once the session has ended. A view in

@@ -45,17 +45,6 @@ void runLocalSessionsContract(
     });
     tearDown(() => h.dispose());
 
-    Future<String> collect(
-      LocalSessionView view,
-      String until, {
-      Uint8List? first,
-    }) async {
-      final text = StringBuffer(utf8.decode(first ?? view.backlog));
-      view.output.listen((d) => text.write(utf8.decode(d)));
-      await eventually(() => text.toString().length >= until.length);
-      return text.toString();
-    }
-
     test('open → listed in sessions and changes fires', () async {
       final changed = sessions.changes.first;
       final id = await sessions.open(cols: 80, rows: 24);
@@ -83,15 +72,30 @@ void runLocalSessionsContract(
       },
     );
 
-    test('backlog + output carry everything printed, in order', () async {
+    test('backlog is the history and never live output; output is only '
+        'what is printed after it', () async {
       final id = await sessions.open(cols: 80, rows: 24);
-      rig.pty(0).emit('one');
+      rig.pty(0).emit('one\x1b[6n');
       await pumpEventQueue();
       final view = sessions.view(id);
-      final all = collect(view, 'onetwo');
+      final live = StringBuffer();
+      view.output.listen((d) => live.write(utf8.decode(d)));
+      final history =
+          utf8.decode(view.backlog) +
+          utf8.decode(
+            await (view.pendingBacklog ?? Future.value(Uint8List(0))),
+          );
+      expect(history, 'one\x1b[6n');
       rig.pty(0).emit('two');
-      expect(await all, 'onetwo');
+      await eventually(() => live.toString() == 'two');
+      await pumpEventQueue();
+      expect(live.toString(), 'two');
       view.dispose();
+    });
+
+    test('notify right after open returns true', () async {
+      final id = await sessions.open(cols: 80, rows: 24);
+      expect(sessions.notify(id, body: 'b'), isTrue);
     });
 
     test('write reaches the PTY; resize reaches the PTY', () async {
@@ -108,6 +112,7 @@ void runLocalSessionsContract(
     test('reply is written while the desktop drives', () async {
       final id = await sessions.open(cols: 80, rows: 24);
       final view = sessions.view(id);
+      await view.pendingBacklog; // a reply during the replay is dropped
       view.reply(Uint8List.fromList(utf8.encode('\x1b[1;1R')));
       await eventually(() => rig.pty(0).writtenText == '\x1b[1;1R');
       view.dispose();

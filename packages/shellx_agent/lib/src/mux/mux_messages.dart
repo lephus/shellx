@@ -32,6 +32,11 @@ abstract final class MuxType {
   static const viewWrite = 'view.write', viewReply = 'view.reply';
   static const viewResize = 'view.resize', viewAck = 'view.ack';
   static const viewReset = 'view.reset', viewClose = 'view.close';
+
+  /// A5b Task 5 (additive): the ring buffer of a `view.open` or a
+  /// `view.reset` is sent as `view.out` frames flagged `bl: true`, then this
+  /// message; what follows is live output.
+  static const viewLive = 'view.live';
   static const agentState = 'agent.state', agentCall = 'agent.call';
   static const agentGet = 'agent.get';
 }

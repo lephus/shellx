@@ -236,6 +236,12 @@ final class FakeSessionView implements LocalSessionView {
   final int id;
   @override
   final Uint8List backlog;
+
+  /// A5b D10: set to make the view deliver its history late, like a view of
+  /// a session in the daemon; complete it with the history.
+  Completer<Uint8List>? lateBacklog;
+  @override
+  Future<Uint8List>? get pendingBacklog => lateBacklog?.future;
   final outputController = StreamController<Uint8List>();
   final driverController = StreamController<DriverSide>.broadcast(sync: true);
   final _exit = Completer<int>();

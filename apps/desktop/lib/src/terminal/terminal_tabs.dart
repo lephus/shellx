@@ -837,6 +837,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       if (live && !_paneOutputs.isClosed) _paneOutputs.add(s.id);
     });
     final link = _Link(view, terminal, feed);
+    _links.remove(s.id)?.dispose();
     _links[s.id] = link;
     // Size first, without telling the session: the backlog is laid out at
     // the pane's width, and a phone keeps driving until the user acts.
@@ -849,14 +850,32 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (preface != null) feed.add(utf8.encode(preface));
     feed.add(view.backlog);
     feed.drain();
-    live = true;
-    // A5a D8: [onReply] is set only after the drain above — load-bearing.
-    // Saved text holding a query (`ESC[6n`, `ESC[c`) is answered into
-    // nothing; a reply must never reach the new shell.
+    // A5a D8: [onReply] is set only after the backlog drained —
+    // load-bearing. Saved text holding a query (`ESC[6n`, `ESC[c`) is
+    // answered into nothing; a reply must never reach the new shell.
     // Plain assignments: a cascade after an arrow closure would be parsed
     // as part of that closure's body.
-    terminal.onUserInput = (data) => _onUserInput(s.id, data);
-    terminal.onReply = (data) => view.reply(utf8.encode(data));
+    void arm() {
+      live = true;
+      terminal.onUserInput = (data) => _onUserInput(s.id, data);
+      terminal.onReply = (data) => view.reply(utf8.encode(data));
+    }
+
+    // A5b D10: a session in the daemon delivers its backlog a moment later
+    // (before any live byte), through the same gate.
+    final late = view.pendingBacklog;
+    if (late == null) {
+      arm();
+    } else {
+      unawaited(
+        late.then((bytes) {
+          if (!identical(_links[s.id], link)) return;
+          feed.add(bytes);
+          feed.drain();
+          arm();
+        }),
+      );
+    }
     terminal.onResize = (cols, rows, _, _) {
       // A3 D13 (A1's rule, per pane): every pane is laid out (IndexedStack,
       // Offstage under zoom); only visible ones tell their session, so a

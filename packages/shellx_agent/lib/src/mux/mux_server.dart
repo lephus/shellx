@@ -463,7 +463,7 @@ final class _UiLink {
     }
     final link = _ViewLink(view);
     _views[id] = link;
-    _sendOut(id, link, view.backlog);
+    _sendBacklog(id, link, view.backlog);
     _listen(id, link);
     link.driver = view.driver.listen(
       (side) => _send(
@@ -497,14 +497,36 @@ final class _UiLink {
     });
   }
 
-  void _sendOut(int id, _ViewLink link, Uint8List bytes, {bool count = true}) {
+  /// The ring buffer: flagged frames, then `view.live`.
+  void _sendBacklog(
+    int id,
+    _ViewLink link,
+    Uint8List bytes, {
+    bool count = true,
+  }) {
+    _sendOut(id, link, bytes, count: count, backlog: true);
+    _send(MuxMessage(MuxType.viewLive, fields: {'id': id}));
+  }
+
+  void _sendOut(
+    int id,
+    _ViewLink link,
+    Uint8List bytes, {
+    bool count = true,
+    bool backlog = false,
+  }) {
     for (var i = 0; i < bytes.length; i += kTermMaxChunk) {
       final end = i + kTermMaxChunk < bytes.length
           ? i + kTermMaxChunk
           : bytes.length;
       final piece = Uint8List.sublistView(bytes, i, end);
       if (count) link.unacked += piece.length;
-      _send(MuxMessage(MuxType.viewOut, fields: {'id': id, 'data': piece}));
+      _send(
+        MuxMessage(
+          MuxType.viewOut,
+          fields: {'id': id, 'data': piece, if (backlog) 'bl': true},
+        ),
+      );
     }
   }
 
@@ -529,7 +551,7 @@ final class _UiLink {
       _send(MuxMessage(MuxType.viewReset, fields: {'id': id}));
       // The re-sent backlog is not counted: it must not re-pause the view
       // it just resumed (D11).
-      _sendOut(id, link, fresh.backlog, count: false);
+      _sendBacklog(id, link, fresh.backlog, count: false);
       _listen(id, link);
     }
   }

@@ -123,7 +123,9 @@ final class MuxClient {
       unawaited(_answer(m, q));
       return;
     }
-    if (_events.hasListener) {
+    // While earlier messages wait for their drain, later ones queue behind
+    // them: order is kept.
+    if (_events.hasListener && _early.isEmpty) {
       _events.add(m);
     } else {
       _early.add(m);
@@ -212,7 +214,14 @@ final class RemoteLocalSessions implements LocalSessions {
     });
     unawaited(_ready.future.then((_) {}, onError: (Object _) {}));
     // The daemon sends nothing unsolicited: the first list is asked for.
-    unawaited(_refresh().then((_) {}, onError: (Object _) {}));
+    unawaited(
+      _refresh().then(
+        (_) {},
+        onError: (Object e) {
+          if (!_ready.isCompleted) _ready.completeError(e);
+        },
+      ),
+    );
   }
 
   final MuxClient _client;
@@ -288,7 +297,6 @@ final class RemoteLocalSessions implements LocalSessions {
           e.fields['max'] is int ? e.fields['max']! as int : 0,
         ),
         MuxError.spawnFailed => SpawnFailedException(e.message ?? ''),
-        MuxError.badRequest => const SpawnFailedException('bad_launch'),
         _ => e,
       };
     }
@@ -337,7 +345,12 @@ final class RemoteLocalSessions implements LocalSessions {
         case MuxType.sessionsNotice:
           _notices.add(noticeFromWire(m.fields));
         case MuxType.viewOut:
-          _views[m.get<int>('id')]?._out(m.get<Uint8List>('data')!);
+          _views[m.get<int>('id')]?._out(
+            m.get<Uint8List>('data')!,
+            backlog: m.get<bool>('bl') ?? false,
+          );
+        case MuxType.viewLive:
+          _views[m.get<int>('id')]?._live();
         case MuxType.viewReset:
           _views[m.get<int>('id')]?._reset();
         case MuxType.viewDriver:
@@ -359,7 +372,11 @@ final class RemoteLocalSessions implements LocalSessions {
 }
 
 /// One view of a remote session. [backlog] is empty: the daemon streams the
-/// ring buffer as the first `view.out` (D10).
+/// ring buffer first, flagged, and [pendingBacklog] completes with it before
+/// any live byte reaches [output] (D10). After a `view.reset` the replay is
+/// part of [output] (behind a clear-screen), and [reply] is dropped until
+/// it has ended, so a query in replayed text is never answered into the
+/// shell.
 final class RemoteSessionView implements LocalSessionView {
   RemoteSessionView._(this._owner, this.id);
 
@@ -374,8 +391,23 @@ final class RemoteSessionView implements LocalSessionView {
   Timer? _ackTimer;
   var _disposed = false;
 
+  /// The daemon is replaying the ring buffer (first backlog or a reset).
+  var _replaying = true;
+
+  /// The first replay is collected for [pendingBacklog]; later ones stream.
+  var _first = true;
+  final _firstBytes = BytesBuilder(copy: false);
+  final _pending = Completer<Uint8List>();
+
+  /// Live output held for one microtask after [pendingBacklog] completes, so
+  /// its consumer runs first.
+  var _holding = false;
+  final _held = <Uint8List>[];
+
   @override
   Uint8List get backlog => Uint8List(0);
+  @override
+  Future<Uint8List>? get pendingBacklog => _pending.future;
   @override
   Stream<Uint8List> get output => _output.stream;
   @override
@@ -385,10 +417,16 @@ final class RemoteSessionView implements LocalSessionView {
   @override
   bool get closedOnRequest => _onRequest;
 
-  void _out(Uint8List data) {
+  void _out(Uint8List data, {required bool backlog}) {
     if (_disposed || _output.isClosed) return;
-    _output.add(data);
     _unacked += data.length;
+    if (backlog && _first) {
+      _firstBytes.add(data);
+    } else if (_holding) {
+      _held.add(data);
+    } else {
+      _output.add(data);
+    }
     if (_unacked >= _owner.ackEvery) {
       _ack();
     } else {
@@ -405,8 +443,24 @@ final class RemoteSessionView implements LocalSessionView {
     _owner._client.send(MuxType.viewAck, {'id': id, 'bytes': n});
   }
 
+  void _live() {
+    _replaying = false;
+    if (!_first) return;
+    _first = false;
+    _holding = true;
+    _pending.complete(_firstBytes.takeBytes());
+    scheduleMicrotask(() {
+      _holding = false;
+      for (final d in _held) {
+        if (!_output.isClosed) _output.add(d);
+      }
+      _held.clear();
+    });
+  }
+
   void _reset() {
     if (_disposed || _output.isClosed) return;
+    _replaying = true;
     _ackTimer?.cancel();
     _ackTimer = null;
     _unacked = 0;
@@ -420,6 +474,11 @@ final class RemoteSessionView implements LocalSessionView {
   void _end(int code, {required bool onRequest}) {
     _onRequest = onRequest;
     _ackTimer?.cancel();
+    if (!_pending.isCompleted) _pending.complete(_firstBytes.takeBytes());
+    for (final d in _held) {
+      if (!_output.isClosed) _output.add(d);
+    }
+    _held.clear();
     if (!_exit.isCompleted) _exit.complete(code);
     unawaited(_output.close());
     unawaited(_driverChanges.close());
@@ -437,7 +496,9 @@ final class RemoteSessionView implements LocalSessionView {
   void write(Uint8List data) => _data(MuxType.viewWrite, data);
 
   @override
-  void reply(Uint8List data) => _data(MuxType.viewReply, data);
+  void reply(Uint8List data) {
+    if (!_replaying) _data(MuxType.viewReply, data);
+  }
 
   void _data(String type, Uint8List data) {
     if (_disposed) return;

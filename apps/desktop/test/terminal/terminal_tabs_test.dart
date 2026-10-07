@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -130,6 +131,24 @@ void main() {
     terminal.textInput('ls');
     terminal.write('\x1b[6n');
     expect(local.views[1]!.writes, ['ls']);
+    expect(local.views[1]!.replies, hasLength(1));
+  });
+
+  test('a backlog that arrives late (a session in the daemon) is laid out '
+      'first and its queries are answered into nothing (A5b D10)', () async {
+    local.add(local.summary(1));
+    final late = Completer<Uint8List>();
+    local.views[1]!.lateBacklog = late;
+    boot();
+    final terminal = state().tabs.single.terminal;
+    late.complete(Uint8List.fromList(utf8.encode('old\x1b[6n\x1b[c')));
+    await pumpEventQueue();
+    expect(terminal.buffer.getText(), contains('old'));
+    expect(local.views[1]!.replies, isEmpty);
+    local.views[1]!.emit('new');
+    await pumpEventQueue();
+    expect(terminal.buffer.getText(), contains('oldnew'));
+    terminal.write('\x1b[6n');
     expect(local.views[1]!.replies, hasLength(1));
   });
 
