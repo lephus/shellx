@@ -1,3 +1,4 @@
+import 'ime_compose_reset.dart';
 import 'dart:async';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
@@ -1004,23 +1005,25 @@ class PaneTerminal extends StatelessWidget {
     // view; the clip keeps it off the signed-out strip and pane header.
     child: ShellxScrollbar(
       controller: scrollController,
-      child: TerminalView(
-        pane.terminal,
-        controller: pane.selection,
-        scrollController: scrollController,
-        focusNode: focusNode,
-        autofocus: focusNode != null,
-        theme: theme,
-        textStyle: style,
-        cursorType: cursorType,
-        padding: padding,
-        shortcuts: shortcuts,
-        onKeyEvent: onKeyEvent == null
-            ? null
-            : (_, event) => onKeyEvent!(event),
-        // Only when the program did not take the mouse (xterm reports
-        // the click to it first): vim or htop with mouse mode keep it.
-        onSecondaryTapUp: (details, _) => onMenu(details.globalPosition),
+      child: ImeComposeReset(
+        child: TerminalView(
+          pane.terminal,
+          controller: pane.selection,
+          scrollController: scrollController,
+          focusNode: focusNode,
+          autofocus: focusNode != null,
+          theme: theme,
+          textStyle: style,
+          cursorType: cursorType,
+          padding: padding,
+          shortcuts: shortcuts,
+          onKeyEvent: onKeyEvent == null
+              ? null
+              : (_, event) => onKeyEvent!(event),
+          // Only when the program did not take the mouse (xterm reports
+          // the click to it first): vim or htop with mouse mode keep it.
+          onSecondaryTapUp: (details, _) => onMenu(details.globalPosition),
+        ),
       ),
     ),
   );
