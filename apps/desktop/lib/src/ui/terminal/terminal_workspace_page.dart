@@ -10,6 +10,9 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../config/config_controller.dart';
+import '../../config/font_probe.dart';
+import '../../config/shellx_config.dart';
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
@@ -365,10 +368,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
             (intent.fromMenu || terminalFocus.hasFocus),
       ),
       FontBiggerIntent: run<FontBiggerIntent>(
-        (_) => ref.read(terminalFontSizeProvider.notifier).increase(),
+        (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
       FontSmallerIntent: run<FontSmallerIntent>(
-        (_) => ref.read(terminalFontSizeProvider.notifier).decrease(),
+        (i) => ref.read(terminalFontSizeProvider.notifier).decrease(i.step),
       ),
       FontResetIntent: run<FontResetIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).reset(),
@@ -430,6 +433,38 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   void initState() {
     super.initState();
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
+    // A9 D11: probe the configured families once per load (it needs the
+    // engine's fonts, so it runs here, not in the controller). Manual: a
+    // rebuild never re-runs it. The immediate call (the startup load ran
+    // before this page) writes after the frame (Riverpod 3: no provider
+    // writes while the tree builds; preflight D4).
+    ref.listenManual(
+      shellxConfigProvider.select((s) => (s.generation, s.config)),
+      (previous, next) {
+        if (previous == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _probeFonts(next.$1, next.$2);
+          });
+        } else {
+          _probeFonts(next.$1, next.$2);
+        }
+      },
+      fireImmediately: true,
+    );
+  }
+
+  /// `reportRuntimeProblems` changes neither the generation nor the
+  /// configuration, so the listener above does not fire again; it also
+  /// ignores a report for a generation that a newer load replaced.
+  void _probeFonts(int generation, ShellxConfig config) {
+    if (generation == 0) return;
+    ref
+        .read(shellxConfigProvider.notifier)
+        .reportRuntimeProblems(
+          generation,
+          kFontProblemCodes,
+          fontProblems(config, ref.read(fontProbeProvider)),
+        );
   }
 
   @override
