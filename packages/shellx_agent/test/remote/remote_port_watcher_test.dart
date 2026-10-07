@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
@@ -115,6 +117,134 @@ void main() {
       async.elapse(Duration.zero);
       expect(calls, hasLength(2));
       w.dispose();
+    });
+  });
+
+  test('a stopped host is retried every 5 minutes while visible', () {
+    fakeAsync((async) {
+      shells = {1: RemoteShell(target: devbox, pid: 10)};
+      answer = (_) => const CommandResult(255, '', 'Permission denied');
+      final w = watcher()..setVisible(true);
+      async.elapse(const Duration(minutes: 4, seconds: 59));
+      expect(calls, hasLength(1));
+      async.elapse(const Duration(seconds: 1));
+      expect(calls, hasLength(2));
+      answer = (_) => const CommandResult(0, out, '');
+      async.elapse(const Duration(minutes: 5));
+      expect(calls, hasLength(3));
+      expect(published.last, {
+        1: [8000],
+      });
+      async.elapse(const Duration(seconds: 5)); // back to the 5 s rhythm
+      expect(calls, hasLength(4));
+      w.dispose();
+    });
+  });
+
+  test('hiding stops the stopped-host retry; showing resumes it', () {
+    fakeAsync((async) {
+      shells = {1: RemoteShell(target: devbox, pid: 10)};
+      answer = (_) => const CommandResult(255, '', '');
+      final w = watcher()..setVisible(true);
+      async.elapse(Duration.zero);
+      w.setVisible(false);
+      async.elapse(const Duration(minutes: 10));
+      expect(calls, hasLength(1));
+      w.setVisible(true);
+      async.elapse(const Duration(minutes: 5));
+      expect(calls, hasLength(2));
+      w.dispose();
+    });
+  });
+
+  test('a host removed while its probe is in flight publishes nothing', () {
+    fakeAsync((async) {
+      shells = {1: RemoteShell(target: devbox, pid: 10)};
+      final gate = Completer<CommandResult>();
+      final w = RemotePortWatcher(
+        control: SshControl(
+          sshPath: '/usr/bin/ssh',
+          controlDirectory: '/tmp/sx',
+          run: (exe, args, {timeout = const Duration(seconds: 5)}) {
+            calls.add(args);
+            return gate.future;
+          },
+        ),
+        shells: () => shells,
+        onPorts: published.add,
+      )..setVisible(true);
+      async.elapse(Duration.zero);
+      expect(calls, hasLength(1));
+      shells = {};
+      w.sessionsChanged();
+      gate.complete(const CommandResult(0, out, ''));
+      async.elapse(const Duration(seconds: 30));
+      expect(published, isEmpty);
+      expect(calls, hasLength(1));
+      w.dispose();
+    });
+  });
+
+  test('hide then show during a probe: one probe at a time, ports kept', () {
+    fakeAsync((async) {
+      shells = {1: RemoteShell(target: devbox, pid: 10)};
+      final gate = Completer<CommandResult>();
+      var first = true;
+      final w = RemotePortWatcher(
+        control: SshControl(
+          sshPath: '/usr/bin/ssh',
+          controlDirectory: '/tmp/sx',
+          run: (exe, args, {timeout = const Duration(seconds: 5)}) {
+            calls.add(args);
+            if (first) {
+              first = false;
+              return gate.future;
+            }
+            return Future.value(const CommandResult(0, out, ''));
+          },
+        ),
+        shells: () => shells,
+        onPorts: published.add,
+      )..setVisible(true);
+      async.elapse(Duration.zero);
+      w.setVisible(false);
+      w.setVisible(true);
+      async.elapse(const Duration(seconds: 1));
+      expect(calls, hasLength(1)); // still the one in flight
+      gate.complete(const CommandResult(0, out, ''));
+      async.elapse(const Duration(seconds: 5));
+      expect(calls, hasLength(2));
+      w.dispose();
+    });
+  });
+
+  test('a failed probe keeps the old ports (nothing published)', () {
+    fakeAsync((async) {
+      shells = {1: RemoteShell(target: devbox, pid: 10)};
+      final w = watcher()..setVisible(true);
+      async.elapse(Duration.zero);
+      expect(published, hasLength(1));
+      answer = (_) => const CommandResult(1, '', 'boom');
+      async.elapse(const Duration(seconds: 5));
+      expect(calls, hasLength(2));
+      expect(published, hasLength(1));
+      w.dispose();
+    });
+  });
+
+  test('probes do not reuse a master and have a connect timeout', () {
+    fakeAsync((async) {
+      watcher().setVisible(true);
+      async.elapse(Duration.zero);
+      expect(calls, everyElement(contains('ControlMaster=no')));
+      expect(
+        calls,
+        everyElement(
+          predicate<List<String>>(
+            (a) => a.any((x) => x.startsWith('ConnectTimeout=')),
+          ),
+        ),
+      );
     });
   });
 

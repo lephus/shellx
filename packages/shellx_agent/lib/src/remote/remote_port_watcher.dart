@@ -29,6 +29,7 @@ final class RemotePortWatcher {
     required void Function(Map<int, List<int>> ports) onPorts,
     this.interval = const Duration(seconds: 5),
     this.slowInterval = const Duration(seconds: 60),
+    this.signInRetry = const Duration(minutes: 5),
     this.timeout = const Duration(seconds: 4),
     this.maxHosts = 16,
     void Function(String message)? log,
@@ -43,6 +44,9 @@ final class RemotePortWatcher {
   final void Function(String message)? _log;
   final Duration interval;
   final Duration slowInterval;
+
+  /// A stopped (needs sign-in) host is tried again this often while visible.
+  final Duration signInRetry;
   final Duration timeout;
   final int maxHosts;
 
@@ -68,6 +72,10 @@ final class RemotePortWatcher {
     if (host == null) return;
     host.stopped = false;
     host.failures = 0;
+    if (!host.running) {
+      host.timer?.cancel();
+      host.timer = null;
+    }
     sessionsChanged();
   }
 
@@ -82,8 +90,11 @@ final class RemotePortWatcher {
     if (!_visible) return;
     for (final entry in targets.entries.take(maxHosts)) {
       final host = _hosts.putIfAbsent(entry.key, () => _Host(entry.value));
-      if (host.stopped || host.running || host.timer != null) continue;
-      host.timer = Timer(Duration.zero, () => _probe(entry.key));
+      if (host.running || host.timer != null) continue;
+      host.timer = Timer(
+        host.stopped ? signInRetry : Duration.zero,
+        () => _probe(entry.key),
+      );
     }
   }
 
@@ -107,6 +118,9 @@ final class RemotePortWatcher {
       host.stopped = true;
       _log?.call('ssh probe: needs sign-in');
       _onPorts({for (final id in shells.keys) id: const <int>[]});
+      if (_visible && shells.isNotEmpty) {
+        host.timer = Timer(signInRetry, () => _probe(key));
+      }
       return;
     }
     if (result.exitCode != 0 || result.timedOut) {
@@ -116,6 +130,7 @@ final class RemotePortWatcher {
       );
     } else {
       host.failures = 0;
+      host.stopped = false;
       final byPid = parseRemoteProbe(
         result.stdout,
         shells.values.map((s) => s.pid),
