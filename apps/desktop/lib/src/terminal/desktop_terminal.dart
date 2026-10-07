@@ -9,10 +9,18 @@ import 'terminal_input.dart';
 /// the desktop drives (`LocalSessionView.reply`). Callers never set
 /// `onOutput` themselves.
 final class DesktopTerminal extends Terminal {
-  DesktopTerminal({super.maxLines = 10000, super.platform})
-    : super(inputHandler: desktopInputHandler) {
+  DesktopTerminal({
+    super.maxLines = 10000,
+    super.platform,
+    TerminalInputHandler? inputHandler,
+  }) : super(inputHandler: inputHandler ?? desktopInputHandler) {
     onOutput = _route;
   }
+
+  /// A9 D31: bytes from the user's own key binding (`text:`, `csi:`,
+  /// `esc:`), sent as typed input (the desktop takes the driver, A1 D6)
+  /// and, like Ghostty, not filtered: the configuration is the user's.
+  void sendUserText(String data) => _asUser(() => onOutput?.call(data));
 
   void Function(String data)? onUserInput;
   void Function(String data)? onReply;

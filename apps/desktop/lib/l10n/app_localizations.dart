@@ -1591,6 +1591,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{The command running in 1 pane will be stopped.} other{The commands running in {count} panes will be stopped.}}'**
   String confirmCloseRunningPanesBody(int count);
 
+  /// A9 D20 confirm-close-surface = always, idle one-pane tab
+  ///
+  /// In en, this message translates to:
+  /// **'The shell in this tab will close.'**
+  String get confirmCloseAlwaysBody;
+
+  /// A9 D20, idle split tab
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 pane in this tab will close.} other{{count} panes in this tab will close.}}'**
+  String confirmCloseAlwaysPanesBody(int count);
+
+  /// A9 D20, idle pane
+  ///
+  /// In en, this message translates to:
+  /// **'The shell in this pane will close.'**
+  String get confirmClosePaneAlwaysBody;
+
   /// No description provided for @terminalRestoredDivider.
   ///
   /// In en, this message translates to:

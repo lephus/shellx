@@ -11,14 +11,18 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
 import '../cli/cli_install.dart' show LoginPathHint;
+import '../config/config_controller.dart' show shellxConfigProvider;
+import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
 import 'terminal_feed.dart';
+import 'terminal_input.dart' show desktopInputHandlerWith;
 import 'terminal_style.dart';
 
+part 'terminal_tabs_config.dart';
 part 'terminal_tabs_panes.dart';
 part 'terminal_tabs_restore.dart';
 
@@ -494,6 +498,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// (then nothing is refused or clamped beyond [clampRatio]).
   PaneMetrics? _metrics;
 
+  /// A9 D19: read at key time; a lazy field, as `build()` can run again.
+  late final TerminalInputHandler _inputHandler = desktopInputHandlerWith(
+    () => ref.mounted
+        ? ref.read(shellxConfigProvider).config.optionAsAlt
+        : OptionAsAlt.off,
+  );
+
   @override
   TerminalTabsState build() {
     _local = ref.watch(localSessionsProvider);
@@ -509,7 +520,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   Future<void> openTab() async {
     if (state.opening) return;
     try {
-      await openTabFor(select: true);
+      await openTabFor(cwd: newTabCwd(), select: true);
     } on SessionLimitException catch (error) {
       if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
     } on SpawnFailedException catch (error) {
@@ -755,7 +766,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     } on StateError {
       return null; // Ended between the listing and now.
     }
-    final terminal = DesktopTerminal(platform: _platform());
+    final terminal = DesktopTerminal(
+      platform: _platform(),
+      maxLines: ref.read(shellxConfigProvider).config.scrollbackLimit,
+      inputHandler: _inputHandler,
+    );
     // A pane output event (A5a D4, A7 waits) fires once the text is in the
     // terminal; what [_attach] writes itself (saved text, backlog) is not
     // output.

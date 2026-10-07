@@ -1048,6 +1048,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get confirmCloseAlwaysBody => 'The shell in this tab will close.';
+
+  @override
+  String confirmCloseAlwaysPanesBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count panes in this tab will close.',
+      one: '1 pane in this tab will close.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmClosePaneAlwaysBody => 'The shell in this pane will close.';
+
+  @override
   String terminalRestoredDivider(String time) {
     return '— Session restored · $time —';
   }

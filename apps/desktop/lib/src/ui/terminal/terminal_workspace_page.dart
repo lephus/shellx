@@ -140,6 +140,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     router: ref.read(windowRouterProvider.notifier),
     l10n: AppLocalizations.of(context),
     tab: tab,
+    confirm: ref.read(shellxConfigProvider).config.confirmClose,
   );
 
   /// ⌘W on a split tab, the pane ×, middle click on a pane header, "Close
@@ -154,6 +155,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       l10n: l10n,
       tab: tab,
       paneId: paneId,
+      confirm: ref.read(shellxConfigProvider).config.confirmClose,
     );
     if (!mounted) return;
     final after = ref

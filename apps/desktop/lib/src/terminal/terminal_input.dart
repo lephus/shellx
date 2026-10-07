@@ -1,4 +1,7 @@
+import 'package:flutter/services.dart';
 import 'package:xterm/core.dart';
+
+import '../config/shellx_config.dart';
 
 /// Cursor and navigation keys as xterm encodes them.
 ///
@@ -44,6 +47,86 @@ final class CursorKeysInputHandler implements TerminalInputHandler {
 /// xterm's defaults.
 const TerminalInputHandler desktopInputHandler = CascadeInputHandler([
   CursorKeysInputHandler(),
+  defaultInputHandler,
+]);
+
+const Map<TerminalKey, (String, String)> _optionKeys = {
+  TerminalKey.digit1: ('1', '!'),
+  TerminalKey.digit2: ('2', '@'),
+  TerminalKey.digit3: ('3', '#'),
+  TerminalKey.digit4: ('4', r'$'),
+  TerminalKey.digit5: ('5', '%'),
+  TerminalKey.digit6: ('6', '^'),
+  TerminalKey.digit7: ('7', '&'),
+  TerminalKey.digit8: ('8', '*'),
+  TerminalKey.digit9: ('9', '('),
+  TerminalKey.digit0: ('0', ')'),
+  TerminalKey.minus: ('-', '_'),
+  TerminalKey.equal: ('=', '+'),
+  TerminalKey.bracketLeft: ('[', '{'),
+  TerminalKey.bracketRight: (']', '}'),
+  TerminalKey.backslash: (r'\', '|'),
+  TerminalKey.semicolon: (';', ':'),
+  TerminalKey.quote: ("'", '"'),
+  TerminalKey.backquote: ('`', '~'),
+  TerminalKey.comma: (',', '<'),
+  TerminalKey.period: ('.', '>'),
+  TerminalKey.slash: ('/', '?'),
+  TerminalKey.space: (' ', ' '),
+};
+
+String? _optionCharacter(TerminalKey key, {required bool shift}) {
+  final i = key.index - TerminalKey.keyA.index;
+  if (i >= 0 && i < 26) {
+    final c = String.fromCharCode(0x61 + i);
+    return shift ? c.toUpperCase() : c;
+  }
+  final pair = _optionKeys[key];
+  return pair == null ? null : (shift ? pair.$2 : pair.$1);
+}
+
+/// A9 D19: macOS Option as Meta (`ESC` + the base character, US layout
+/// shifts). Runs after [CursorKeysInputHandler], so Option+←/→ keep moving
+/// by word, and before xterm's defaults. [mode] is read at key time, so a
+/// reload applies at once.
+final class OptionAsAltInputHandler implements TerminalInputHandler {
+  OptionAsAltInputHandler(
+    this.mode, {
+    Set<LogicalKeyboardKey> Function()? pressed,
+  }) : _pressed =
+           pressed ?? (() => HardwareKeyboard.instance.logicalKeysPressed);
+
+  final OptionAsAlt Function() mode;
+  final Set<LogicalKeyboardKey> Function() _pressed;
+
+  @override
+  String? call(TerminalKeyboardEvent event) {
+    if (event.platform != TerminalTargetPlatform.macos ||
+        !event.alt ||
+        event.ctrl) {
+      return null;
+    }
+    switch (mode()) {
+      case OptionAsAlt.off:
+        return null;
+      case OptionAsAlt.left:
+        if (!_pressed().contains(LogicalKeyboardKey.altLeft)) return null;
+      case OptionAsAlt.right:
+        if (!_pressed().contains(LogicalKeyboardKey.altRight)) return null;
+      case OptionAsAlt.both:
+        break;
+    }
+    final c = _optionCharacter(event.key, shift: event.shift);
+    return c == null ? null : '\x1b$c';
+  }
+}
+
+/// [desktopInputHandler] with A9 D19 in between.
+TerminalInputHandler desktopInputHandlerWith(
+  OptionAsAlt Function() optionAsAlt,
+) => CascadeInputHandler([
+  const CursorKeysInputHandler(),
+  OptionAsAltInputHandler(optionAsAlt),
   defaultInputHandler,
 ]);
 

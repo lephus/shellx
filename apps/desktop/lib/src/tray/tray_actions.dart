@@ -10,6 +10,7 @@ import '../cli/cli_service.dart';
 import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
 import '../startup.dart';
+import '../config/config_controller.dart' show shellxConfigProvider;
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
 import '../ui/activation.dart';
@@ -252,6 +253,7 @@ final class TrayActions {
       l10n: _services.l10n,
       tab: tab,
       paneId: id,
+      confirm: _ref.read(shellxConfigProvider).config.confirmClose,
     );
   }
 

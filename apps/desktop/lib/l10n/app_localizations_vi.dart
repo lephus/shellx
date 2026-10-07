@@ -1015,6 +1015,22 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get confirmCloseAlwaysBody => 'Shell trong tab này sẽ đóng.';
+
+  @override
+  String confirmCloseAlwaysPanesBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pane trong tab này sẽ đóng.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get confirmClosePaneAlwaysBody => 'Shell trong pane này sẽ đóng.';
+
+  @override
   String terminalRestoredDivider(String time) {
     return '— Phiên được khôi phục · $time —';
   }
