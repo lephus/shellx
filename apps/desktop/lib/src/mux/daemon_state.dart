@@ -268,7 +268,9 @@ class DaemonStateNotifier extends Notifier<DaemonUiState> {
       }
       // The save was "not clean" only because the service died: not an
       // abnormal end of the window (no A5a strip on top of this one).
-      final saved = load.snapshot;
+      // Never a layout recovered from an older generation: tabs the user
+      // closed before the service died stay closed.
+      final saved = load.recovered ? null : load.snapshot;
       await restore.restoreAtStartup(
         RestoreLoad(snapshot: saved?.copyWith(cleanExit: true)),
         daemonInstance: link.instance,

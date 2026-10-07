@@ -236,6 +236,36 @@ void main() {
   });
 
   test(
+    'A10 review: the user closing the last tab drops the older generations',
+    () => fakeAsync((async) {
+      local.add(local.summary(1));
+      boot();
+      async.flushMicrotasks();
+      tabs().rename(1, 'a');
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.last.tabs, isNotEmpty);
+      expect(files.generationsDropped, 0);
+      tabs().close(1);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts.last.tabs, isEmpty);
+      expect(files.generationsDropped, 1);
+    }),
+  );
+
+  test(
+    'A10 review: an empty layout after a restore that opened nothing keeps '
+    'the older generations',
+    () => fakeAsync((async) {
+      boot(); // no session ever: the window is empty from the start
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 70));
+      expect(files.layouts, isNotEmpty);
+      expect(files.layouts.last.tabs, isEmpty);
+      expect(files.generationsDropped, 0);
+    }),
+  );
+
+  test(
     'closing a pane deletes its file at the next layout write (D15)',
     () => fakeAsync((async) {
       local.add(local.summary(1));

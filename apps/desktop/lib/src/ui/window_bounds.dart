@@ -62,11 +62,34 @@ final class WindowBoundsStore {
 }
 
 /// [saved] if the window would still be on one of [displays] (its centre is
-/// on a display's visible area), else null so the host centres the default
-/// size: a window saved on a monitor that is gone must not open off screen.
-/// An empty [displays] (the query failed) keeps [saved].
+/// on a display's visible area, or else its title bar's corner), else null
+/// so the host centres the default size: a window saved on a monitor that
+/// is gone must not open off screen. A10 D27: a window that is too big for
+/// its display (the resolution dropped since) shrinks to the display's
+/// visible area, never below [ShellxSizes.minWindow], and one that hangs
+/// over an edge moves inside it, so it is never cut off or unreachable. An
+/// empty [displays] (the query failed) keeps [saved].
 Rect? restorableBounds(Rect? saved, List<Rect> displays) {
   if (saved == null) return null;
   if (displays.isEmpty) return saved;
-  return displays.any((d) => d.contains(saved.center)) ? saved : null;
+  final corner = saved.topLeft + const Offset(24, 24);
+  final home =
+      displays.where((d) => d.contains(saved.center)).firstOrNull ??
+      displays.where((d) => d.contains(corner)).firstOrNull;
+  if (home == null) return null;
+  const min = ShellxSizes.minWindow;
+  final width = saved.width <= home.width
+      ? saved.width
+      : (home.width < min.width ? min.width : home.width);
+  final height = saved.height <= home.height
+      ? saved.height
+      : (home.height < min.height ? min.height : home.height);
+  // A display smaller than the minimum keeps the window at its corner.
+  final left = width >= home.width
+      ? home.left
+      : saved.left.clamp(home.left, home.right - width);
+  final top = height >= home.height
+      ? home.top
+      : saved.top.clamp(home.top, home.bottom - height);
+  return Rect.fromLTWH(left, top, width, height);
 }

@@ -135,6 +135,10 @@ class RestorePersistence extends Notifier<void> {
   /// shutdown that follows must not overwrite or delete it.
   bool _frozen = false;
 
+  /// A layout with tabs was written in this run: an empty one after it is
+  /// the user closing the last tab (A10 review).
+  bool _hadTabs = false;
+
   /// The layout write of the last [flushAll]; [resume] waits for it.
   Future<void> _flushWrite = Future.value();
 
@@ -523,6 +527,14 @@ class RestorePersistence extends Notifier<void> {
       return;
     }
     _written = next;
+    if (next.tabs.isNotEmpty) {
+      _hadTabs = true;
+    } else if (_hadTabs) {
+      // The user closed the last tab: a crash must not bring the old
+      // layouts back. (A restore that opened nothing never gets here.)
+      _hadTabs = false;
+      await files.dropGenerations();
+    }
     final doomed = List.of(_doomed);
     _doomed.clear();
     for (final key in doomed) {

@@ -604,6 +604,21 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         });
       }
     });
+    // A10 D23 F3: the window is active again. If whatever had the keyboard
+    // went away meanwhile (it fell back to the workspace scope itself, or
+    // to nothing), the keyboard goes to the terminal; a field the user is
+    // typing in, or an open dialog, panel or overlay, keeps it.
+    ref.listen<bool>(windowFocusProvider, (_, focused) {
+      if (!focused) return;
+      // Never from a dialog, the panel or an overlay the user is in.
+      if (panelOpen ||
+          overlay != null ||
+          ref.read(windowRouterProvider).dialogOpen) {
+        return;
+      }
+      final current = FocusManager.instance.primaryFocus;
+      if (current == null || current is FocusScopeNode) focusTerminal();
+    });
     // A notification click, the panel, next unread (A4): the keyboard to
     // the selected tab's terminal; an open panel closes.
     ref.listen<int>(terminalFocusRequestProvider, (_, _) {

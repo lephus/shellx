@@ -12,11 +12,55 @@ import 'scrollback_codec.dart';
 const int kRestoreMaxLayoutBytes = 1048576;
 
 final class RestoreLoad {
-  const RestoreLoad({this.snapshot, this.corrupt = false});
+  const RestoreLoad({
+    this.snapshot,
+    this.corrupt = false,
+    this.recovered = false,
+  });
   final RestoreSnapshot? snapshot;
 
   /// The file existed but was not ours (D11); it is now `layout.json.bak`.
   final bool corrupt;
+
+  /// A10 D25: [snapshot] comes from an earlier generation
+  /// (`layout.json.1` / `.2`) because `layout.json` was unreadable, or empty
+  /// after a crash. It is marked unclean, so the A5a strip shows.
+  final bool recovered;
+}
+
+/// A10 D25: which layout to restore. [current] is `layout.json` parsed
+/// (null: absent or unreadable), [generations] are `.1`, `.2` parsed (null
+/// for a missing or unreadable one).
+///
+/// 1. [current] with at least one tab;
+/// 2. [current] with none after a crash (`cleanExit` false), while the
+///    newest generation has tabs: that generation (closing every tab and
+///    quitting cleanly leaves a clean empty layout, which is respected);
+/// 3. [current] unreadable: the first generation with tabs;
+/// 4. otherwise [current] (possibly empty, possibly null).
+({RestoreSnapshot? snapshot, bool recovered}) pickSnapshot({
+  required RestoreSnapshot? current,
+  required List<RestoreSnapshot?> generations,
+}) {
+  if (current != null && current.tabs.isNotEmpty) {
+    return (snapshot: current, recovered: false);
+  }
+  final fallback = generations.where((g) => g != null && g.tabs.isNotEmpty);
+  if (current == null) {
+    return fallback.isEmpty
+        ? (snapshot: null, recovered: false)
+        : (
+            snapshot: fallback.first!.copyWith(cleanExit: false),
+            recovered: true,
+          );
+  }
+  if (!current.cleanExit && generations.isNotEmpty) {
+    final newest = generations.first;
+    if (newest != null && newest.tabs.isNotEmpty) {
+      return (snapshot: newest.copyWith(cleanExit: false), recovered: true);
+    }
+  }
+  return (snapshot: current, recovered: false);
 }
 
 /// What restore persistence needs from the disk (D2, D3).
@@ -28,6 +72,11 @@ abstract interface class RestoreFiles {
   /// True only when the layout reached the disk; a failed write (disk full)
   /// keeps the previous file, and the caller retries next time (§5).
   Future<bool> writeLayout(RestoreSnapshot snapshot);
+
+  /// A10 review: the user closed the last tab, so a later crash must not
+  /// bring the older layouts (`layout.json.1`, `.2`) back. Only then: an
+  /// empty layout after a restore that opened nothing keeps them.
+  Future<void> dropGenerations();
 
   /// False when the files could not be written (disk full): the caller
   /// keeps them pending. True too when scrollback is never written here
@@ -52,6 +101,8 @@ final class NullRestoreFiles implements RestoreFiles {
   Future<RestoreLoad> loadLayout() async => const RestoreLoad();
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async => true;
+  @override
+  Future<void> dropGenerations() async {}
   @override
   Future<bool> writeScrollbacks(Map<String, String> textByKey) async => true;
   @override
@@ -115,6 +166,9 @@ final class RestoreStore implements RestoreFiles {
 
   String get _sep => Platform.pathSeparator;
   String get _layout => '${directory.path}${_sep}layout.json';
+
+  /// A10 D25: the layouts of the last two runs that had tabs.
+  String _generation(int n) => '$_layout.$n';
   Directory get _scrollDir => Directory('${directory.path}${_sep}scrollback');
   String _scrollPath(String key) => '${_scrollDir.path}$_sep$key.txt';
 
@@ -160,33 +214,82 @@ final class RestoreStore implements RestoreFiles {
     _pendingLayout = null;
     return _serial(() async {
       final file = File(_layout);
+      var corrupt = false;
+      RestoreSnapshot? current;
+      String? text;
       String? reason;
       try {
-        if (!await file.exists()) return const RestoreLoad();
-        String text;
-        try {
-          text = await _readCapped(file);
-        } on FileSystemException {
-          // A transient lock (another process, antivirus): one retry.
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-          text = await _readCapped(file);
+        if (await file.exists()) {
+          try {
+            text = await _readCapped(file);
+          } on FileSystemException {
+            // A transient lock (another process, antivirus): one retry.
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            text = await _readCapped(file);
+          }
+          current = RestoreSnapshot.tryParse(text);
+          if (current == null) reason = 'FormatException';
         }
-        final snapshot = RestoreSnapshot.tryParse(text);
-        if (snapshot != null) return RestoreLoad(snapshot: snapshot);
-        reason = 'FormatException';
       } on _Oversized {
         reason = 'oversized';
       } on Object catch (error) {
         reason = '${error.runtimeType}';
       }
-      _log('restore: layout unreadable ($reason)');
-      try {
-        await file.rename('$_layout.bak');
-      } on Object catch (error) {
-        _log('restore: keeping .bak failed (${error.runtimeType})');
+      if (reason != null) {
+        corrupt = true;
+        _log('restore: layout unreadable ($reason)');
+        try {
+          await file.rename('$_layout.bak');
+        } on Object catch (error) {
+          _log('restore: keeping .bak failed (${error.runtimeType})');
+        }
       }
-      return const RestoreLoad(corrupt: true);
+      final generations = [await _readGeneration(1), await _readGeneration(2)];
+      final pick = pickSnapshot(current: current, generations: generations);
+      if (pick.recovered) _log('restore: recovered from an earlier layout');
+      if (current != null && current.tabs.isNotEmpty && text != null) {
+        await _rotate(text, current, generations.first);
+      }
+      return RestoreLoad(
+        snapshot: pick.snapshot,
+        corrupt: corrupt,
+        recovered: pick.recovered,
+      );
     });
+  }
+
+  Future<RestoreSnapshot?> _readGeneration(int n) async {
+    try {
+      final file = File(_generation(n));
+      if (!await file.exists()) return null;
+      return RestoreSnapshot.tryParse(await _readCapped(file));
+    } on Object {
+      return null; // a missing or damaged generation is just absent
+    }
+  }
+
+  /// A10 D25: [text] (the layout this run starts from) becomes generation
+  /// 1, the old 1 becomes 2 — unless it is the same layout as 1.
+  Future<void> _rotate(
+    String text,
+    RestoreSnapshot current,
+    RestoreSnapshot? newest,
+  ) async {
+    if (newest != null && newest.sameLayoutAs(current)) return;
+    try {
+      final one = File(_generation(1));
+      if (await one.exists()) {
+        // A damaged generation 1 must not replace a good 2.
+        if (newest != null) {
+          await one.rename(_generation(2));
+        } else {
+          await _deleteQuietly(one);
+        }
+      }
+      await _atomic({_generation(1): text}, private: false);
+    } on Object catch (error) {
+      _log('restore: keeping an earlier layout failed (${error.runtimeType})');
+    }
   }
 
   /// The layout's text; [_Oversized] past [kRestoreMaxLayoutBytes].
@@ -209,6 +312,13 @@ final class RestoreStore implements RestoreFiles {
     });
     return slot.done;
   }
+
+  @override
+  Future<void> dropGenerations() => _serial(() async {
+    for (final n in const [1, 2]) {
+      await _deleteQuietly(File(_generation(n)));
+    }
+  });
 
   @override
   Future<bool> writeScrollbacks(Map<String, String> textByKey) =>
@@ -272,12 +382,19 @@ final class RestoreStore implements RestoreFiles {
         await _deleteQuietly(file);
       }
     }
+    // A10 D25: a recovery from an earlier layout may still want the
+    // scrollback of the panes that layout had.
+    final keepAll = {...keep};
+    for (final n in const [1, 2]) {
+      final generation = await _readGeneration(n);
+      if (generation != null) keepAll.addAll(generation.paneKeys);
+    }
     for (final file in await _files(_scrollDir)) {
       final name = file.uri.pathSegments.last;
       final key = name.endsWith('.txt')
           ? name.substring(0, name.length - 4)
           : '';
-      if (!keep.contains(key)) await _deleteQuietly(file);
+      if (!keepAll.contains(key)) await _deleteQuietly(file);
     }
   });
 

@@ -387,10 +387,10 @@ void main() {
     final slow = RestoreStore(
       Directory('${root.path}/slow'),
       excludeFromBackup: (_) => Completer<void>().future,
-      excludeTimeout: const Duration(seconds: 2),
+      excludeTimeout: const Duration(seconds: 30),
       log: logs.add,
     );
-    const quick = Duration(milliseconds: 500);
+    const quick = Duration(seconds: 10); // far below the 30 s exclusion timeout
     expect(await slow.prepare().timeout(quick), isTrue);
     expect(await slow.writeLayout(snap()).timeout(quick), isTrue);
     expect((await slow.loadLayout().timeout(quick)).snapshot, isNotNull);

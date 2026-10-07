@@ -9,6 +9,12 @@ final class RecordingFiles implements RestoreFiles {
   final scrollbacks = <String, String>{};
   final deleted = <String>[];
   int clears = 0;
+
+  /// How often the older layout generations were dropped.
+  int generationsDropped = 0;
+
+  @override
+  Future<void> dropGenerations() async => generationsDropped++;
   Set<String>? keptOrphans;
 
   /// What [readScrollback] returns, by key.
@@ -33,11 +39,16 @@ final class RecordingFiles implements RestoreFiles {
   @override
   Future<bool> prepare() async => true;
   @override
-  Future<RestoreLoad> loadLayout() async =>
-      RestoreLoad(snapshot: diskLayout ? layouts.lastOrNull : null);
+  Future<RestoreLoad> loadLayout() async => RestoreLoad(
+    snapshot: diskLayout ? layouts.lastOrNull : null,
+    recovered: diskRecovered,
+  );
 
   /// [loadLayout] returns the last layout written, as a disk would.
   bool diskLayout = false;
+
+  /// [loadLayout] says the snapshot came from an earlier generation.
+  bool diskRecovered = false;
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async {
     await layoutGate?.future;
