@@ -449,4 +449,28 @@ void main() {
     expect(parseSshG('hostname h\n')!.port, 22);
     expect(parseSshG('nothing'), isNull);
   });
+
+  test('parseSshG: invalid host or port is not a target (fail-open)', () {
+    expect(parseSshG('hostname a b\n'), isNull);
+    expect(parseSshG('hostname a\u0007b\n'), isNull);
+    expect(parseSshG('hostname ${'h' * 254}\n'), isNull);
+    expect(parseSshG('hostname ${'h' * 253}\n'), isNotNull);
+    expect(parseSshG('hostname h\nport 0\n'), isNull);
+    expect(parseSshG('hostname h\nport 65536\n'), isNull);
+    expect(parseSshG('hostname h\nport abc\n'), isNull);
+    expect(parseSshG('hostname h\nport 65535\n')!.port, 65535);
+  });
+
+  test('a new session with no remote state ends the turn, not waits', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      async.elapse(const Duration(seconds: 3));
+      final fresh = local.nextId - 1;
+      local.replace(local.summary(fresh, origin: SessionOrigin.desktop));
+      async.flushMicrotasks();
+      expect(retries().values.where((i) => i.retrying), isEmpty);
+    });
+  });
 }

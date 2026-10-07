@@ -204,6 +204,12 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
               next.remove(pane.id);
               _timers.remove(pane.id)?.cancel();
             }
+          case null:
+            // Not a server pane any more: nothing left to retry.
+            if (info != null) {
+              next.remove(pane.id);
+              _timers.remove(pane.id)?.cancel();
+            }
           case _:
             break;
         }
@@ -371,6 +377,7 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
       RemoteState.disconnected ||
       RemoteState.failed ||
       RemoteState.exited => _Outcome.ended,
+      null => _Outcome.gone, // no longer a server pane: nothing to wait for
       _ => null,
     };
   }

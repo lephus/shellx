@@ -10,8 +10,11 @@ import 'remote_tools_provider.dart';
 /// and whether a jump host or proxy command is in the way.
 typedef ResolvedSshTarget = ({String host, int port, bool proxied});
 
+final _unsafe = RegExp(r'[\s\x00-\x1f\x7f]');
+
 /// Reads `hostname`, `port`, `proxyjump` and `proxycommand` from `ssh -G`
-/// output; null when there is no `hostname` line.
+/// output; null when there is no `hostname` line or the host or port is
+/// not valid (callers treat that as reachable).
 ResolvedSshTarget? parseSshG(String stdout) {
   String? host;
   var port = 22;
@@ -25,14 +28,14 @@ ResolvedSshTarget? parseSshG(String stdout) {
       case 'hostname':
         host = value;
       case 'port':
-        port = int.tryParse(value) ?? 22;
+        port = int.tryParse(value) ?? 0;
       case 'proxyjump' || 'proxycommand':
         if (value.isNotEmpty && value.toLowerCase() != 'none') proxied = true;
     }
   }
-  return host == null || host.isEmpty
-      ? null
-      : (host: host, port: port, proxied: proxied);
+  if (host == null || host.isEmpty || host.length > 253) return null;
+  if (_unsafe.hasMatch(host) || port < 1 || port > 65535) return null;
+  return (host: host, port: port, proxied: proxied);
 }
 
 /// How [sshReachabilityProvider] connects (replaced in tests).
