@@ -253,7 +253,10 @@ abstract interface class ConfigFileStore {
 var _tempCounter = 0;
 
 final class IoConfigFileStore implements ConfigFileStore {
-  const IoConfigFileStore();
+  const IoConfigFileStore({@visibleForTesting this.beforeSwap});
+
+  /// Test seam: runs right before the final look and the rename.
+  final Future<void> Function()? beforeSwap;
 
   @override
   Future<Uint8List?> read(String path) => const IoConfigFs().read(path);
@@ -314,6 +317,13 @@ final class IoConfigFileStore implements ConfigFileStore {
         // The owner's choice (0600, 0444 …) survives; set after the content,
         // so a read-only source can still be replaced.
         await _chmod(temp.path, (stat.mode & 0xFFF).toRadixString(8));
+      }
+      await beforeSwap?.call();
+      // A new file must not land on one created meanwhile (rename replaces).
+      if (mustNotExist &&
+          await FileSystemEntity.type(target) !=
+              FileSystemEntityType.notFound) {
+        throw const ConfigWriteRefused(ConfigWriteRefusal.changed);
       }
       // Last look before the swap: someone saved meanwhile → keep theirs.
       if (expected != null &&
