@@ -316,7 +316,10 @@ fn wait_modes_and_timeouts() {
         &[],
         vec![(
             "ui.pane.wait",
-            ok(vec![("exitCode", Value::Null), ("closed", Value::Bool(true))]),
+            ok(vec![
+                ("exitCode", Value::Null),
+                ("closed", Value::Bool(true)),
+            ]),
         )],
         "",
         PLAIN,
@@ -507,9 +510,15 @@ fn targets() {
     // to that tab's focused pane, so it goes out in its written form.
     let st = go(&["send", "t5", "--text", "x"], &[], vec![], "", PLAIN);
     assert_eq!(st.code, 0);
-    assert_eq!(sent(&st, "ui.pane.send").get("pane"), Some(&Value::text("t5")));
+    assert_eq!(
+        sent(&st, "ui.pane.send").get("pane"),
+        Some(&Value::text("t5"))
+    );
     let wt = go(&["wait", "t5", "--idle"], &[], vec![], "", PLAIN);
-    assert_eq!(sent(&wt, "ui.pane.wait").get("pane"), Some(&Value::text("t5")));
+    assert_eq!(
+        sent(&wt, "ui.pane.wait").get("pane"),
+        Some(&Value::text("t5"))
+    );
     // `cli.notify` takes a pane number only (as with @focused).
     assert_eq!(
         go(&["notify", "--pane", "t5", "hi"], &[], vec![], "", PLAIN).code,
@@ -517,7 +526,14 @@ fn targets() {
     );
     // @tab stays a tab-command form.
     assert_eq!(
-        go(&["send", "@tab", "--enter"], &[("SHELLX_TAB_ID", "5")], vec![], "", PLAIN).code,
+        go(
+            &["send", "@tab", "--enter"],
+            &[("SHELLX_TAB_ID", "5")],
+            vec![],
+            "",
+            PLAIN
+        )
+        .code,
         2
     );
     let s = go(
