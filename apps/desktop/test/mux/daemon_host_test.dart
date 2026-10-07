@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
@@ -20,6 +21,7 @@ void main() {
   var phones = false;
   var shutdowns = 0;
   var shutdownTime = Duration.zero;
+  var shutdownThrows = false;
   final exits = <int>[];
 
   DaemonHost build({
@@ -56,6 +58,7 @@ void main() {
       shutdown: () async {
         shutdowns++;
         await Future<void>.delayed(shutdownTime);
+        if (shutdownThrows) throw StateError('step failed');
       },
       exit: exits.add,
       idle: idle,
@@ -75,6 +78,7 @@ void main() {
     phones = false;
     shutdowns = 0;
     shutdownTime = Duration.zero;
+    shutdownThrows = false;
     exits.clear();
   });
   tearDown(() async {
@@ -254,4 +258,20 @@ void main() {
       greaterThanOrEqualTo(steps.cli + steps.agent + steps.remote),
     );
   });
+
+  test(
+    'a quit whose shutdown throws still ends the process and removes the '
+    'endpoint (the listener is closed: a half-quit service is unreachable)',
+    () {
+      fakeAsync((async) {
+        build();
+        shutdownThrows = true;
+        unawaited(host.start(listener));
+        async.flushMicrotasks();
+        unawaited(host.quit());
+        async.elapse(const Duration(seconds: 1));
+        expect(exits, [0]);
+      });
+    },
+  );
 }

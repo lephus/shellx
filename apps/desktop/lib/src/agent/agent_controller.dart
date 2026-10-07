@@ -512,7 +512,7 @@ class AgentController extends AgentControllerBase {
 
   /// Tray: ends shells; works without a runtime.
   @override
-  Future<void> closeSession(int id) async => _s.sessions.closeSession(id);
+  Future<void> closeSession(int id) async => _s.manager.closeSession(id);
 
   /// What turning terminal sharing on would change (the confirmation);
   /// null where the switch is not offered.
@@ -622,7 +622,7 @@ class AgentController extends AgentControllerBase {
 
   /// Tray: ends shells; works without a runtime.
   @override
-  Future<void> closeAllSessions() async => _s.sessions.closeAll();
+  Future<void> closeAllSessions() async => _s.manager.closeAll();
 
   /// Called by [WakeDetector] after the computer slept: retry now instead of
   /// after the backoff — only while `disconnected`. After a 4001 (`replaced`)
@@ -688,7 +688,7 @@ class AgentController extends AgentControllerBase {
     _wakeDetector?.stop();
     _wakeDetector = null;
     final stopping = _stopRuntime();
-    _s.sessions.closeAll();
+    _s.manager.closeAll();
     await stopping;
     await _settlePtyKills();
     await _bestEffort(() => _s.keepAwake.setEnabled(false));

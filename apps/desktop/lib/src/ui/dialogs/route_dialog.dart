@@ -181,7 +181,8 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
         Center(
           child: CallbackShortcuts(
             bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape): router.close,
+              if (confirm?.escapeCloses ?? true)
+                const SingleActivator(LogicalKeyboardKey.escape): router.close,
             },
             child: FocusScope(
               node: _scope,
@@ -222,7 +223,8 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
                               child: Stack(
                                 children: [
                                   page,
-                                  if (!isMacDesktop)
+                                  if (!isMacDesktop &&
+                                      (confirm?.escapeCloses ?? true))
                                     Positioned(
                                       // Centred on the 22 px title line
                                       // that starts 24 down (P-3).

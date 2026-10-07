@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
 import '../../agent/desktop_services.dart' show clockProvider;
+import '../../mux/daemon_state.dart';
 import '../../restore/restore_persistence.dart';
 import '../../restore/scrollback_codec.dart' show formatRestoreTime;
 import '../../terminal/tab_attention.dart';
@@ -35,6 +36,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     required this.emptyFocus,
     this.stripFocus,
     this.restoreStripFocus,
+    this.daemonStripFocus,
     this.shortcuts,
     this.onKeyEvent,
     required this.onClosePane,
@@ -53,6 +55,10 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// The abnormal-end strip's "Đóng" (UI-A5 §4, between the sidebar and
   /// the terminal in the region cycle).
   final FocusNode? restoreStripFocus;
+
+  /// The background-service strip's "Đóng" (UI-A5 §7.5, right after the
+  /// restore strip).
+  final FocusNode? daemonStripFocus;
 
   /// Passed to every TerminalView: the window shortcuts must win over
   /// xterm's own key handling.
@@ -184,6 +190,61 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     );
   }
 
+  /// UI-A5 §7.5: the service restarted, or could not be restarted.
+  Widget _daemonStrip(DaemonUiState daemon) {
+    final strip = daemon.strip;
+    if (strip == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final lost = strip == DaemonStrip.lost;
+    if (strip == DaemonStrip.stopping) {
+      return InfoStrip(
+        key: const Key('pane.daemonStrip'),
+        icon: Icons.hourglass_empty,
+        iconColor: ShellxDesktopColors.textSecondary,
+        text: l10n.daemonStoppingStrip,
+        closeText: l10n.actionClose,
+        closeLabel: l10n.restoreStripCloseLabel,
+        focusNode: widget.daemonStripFocus,
+        onClose: () => ref.read(daemonStateProvider.notifier).dismissStrip(),
+      );
+    }
+    return InfoStrip(
+      key: const Key('pane.daemonStrip'),
+      icon: lost ? Icons.error_outline : Icons.history,
+      iconColor: lost
+          ? ShellxDesktopColors.err
+          : ShellxDesktopColors.textSecondary,
+      text: lost ? l10n.daemonLostStrip : l10n.daemonRestartedStrip,
+      closeText: l10n.actionClose,
+      closeLabel: l10n.restoreStripCloseLabel,
+      focusNode: widget.daemonStripFocus,
+      onClose: () {
+        ref.read(daemonStateProvider.notifier).dismissStrip();
+        _returnFocus();
+      },
+      actions: [
+        if (lost)
+          TextButton(
+            key: const Key('daemonStrip.retry'),
+            style: stripTextButtonStyle(context),
+            onPressed: daemon.retrying
+                ? null
+                : () =>
+                      unawaited(ref.read(daemonStateProvider.notifier).retry()),
+            child: daemon.retrying
+                ? Semantics(
+                    label: l10n.daemonRetryLabel,
+                    child: const SizedBox.square(
+                      dimension: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : Text(l10n.daemonRetry, semanticsLabel: l10n.daemonRetryLabel),
+          ),
+      ],
+    );
+  }
+
   /// Where the keyboard goes when the toast it was on disappears.
   void _returnFocus() {
     final empty = ref.read(terminalTabsProvider).tabs.isEmpty;
@@ -214,6 +275,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     _dropClosed(state.tabs);
     final notice = state.notice;
     final restoreStrip = ref.watch(restoreStripProvider);
+    final daemon = ref.watch(daemonStateProvider);
 
     return ColoredBox(
       color: ShellxDesktopColors.bgTerminal,
@@ -265,6 +327,16 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
             transitionBuilder: _stripTransition,
             layoutBuilder: _stretch,
             child: _restoreStrip(restoreStrip),
+          ),
+          // UI-A5 §7.5: after the restore strip, same fade.
+          AnimatedSwitcher(
+            duration: ShellxMotion.of(context, ShellxMotion.base),
+            reverseDuration: ShellxMotion.of(context, ShellxMotion.exit),
+            switchInCurve: ShellxMotion.baseCurve,
+            switchOutCurve: ShellxMotion.exitCurve,
+            transitionBuilder: _stripTransition,
+            layoutBuilder: _stretch,
+            child: _daemonStrip(daemon),
           ),
           Expanded(
             // D15: the terminal area (padding and the cells around panes)

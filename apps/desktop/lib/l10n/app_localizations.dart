@@ -2909,6 +2909,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **', on {host}'**
   String paneRemoteSuffix(String host);
+
+  /// No description provided for @trayQuitUi.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get trayQuitUi;
+
+  /// No description provided for @trayQuitAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Completely'**
+  String get trayQuitAll;
+
+  /// No description provided for @appMenuQuitAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Completely'**
+  String get appMenuQuitAll;
+
+  /// No description provided for @quitUiExplainedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shells keep running'**
+  String get quitUiExplainedTitle;
+
+  /// No description provided for @quitUiExplainedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 tab keeps} other{{count} tabs keep}} running in the background and your phones stay connected. Open ShellX again to pick up where you left off. To stop every shell, choose Quit Completely (⌥⌘Q).'**
+  String quitUiExplainedBody(int count);
+
+  /// No description provided for @quitUiExplainedBodyWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 tab keeps} other{{count} tabs keep}} running in the background and your phones stay connected. Open ShellX again to pick up where you left off. To stop every shell, choose Quit Completely in the tray menu.'**
+  String quitUiExplainedBodyWindows(int count);
+
+  /// No description provided for @quitUiAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get quitUiAction;
+
+  /// No description provided for @quitAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Completely'**
+  String get quitAllAction;
+
+  /// No description provided for @confirmQuitAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Completely'**
+  String get confirmQuitAllAction;
+
+  /// No description provided for @daemonOldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The background service is out of date'**
+  String get daemonOldTitle;
+
+  /// No description provided for @daemonOldBody.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX {app} needs to restart the background service (version {old}), which holds {count, plural, =1{1 session} other{{count} sessions}}. Restarting stops those shells; tabs, panes, folders and recent contents are reopened. Choose Later to close ShellX and keep the shells and phones running on the old version.'**
+  String daemonOldBody(String app, String old, int count);
+
+  /// No description provided for @daemonOldRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Service'**
+  String get daemonOldRestart;
+
+  /// No description provided for @daemonOldLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get daemonOldLater;
+
+  /// No description provided for @daemonStartFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start the background service'**
+  String get daemonStartFailedTitle;
+
+  /// No description provided for @daemonStartFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX needs its background service to run shells. Try again; if it still fails, restart the computer or reinstall ShellX.'**
+  String get daemonStartFailedBody;
+
+  /// No description provided for @daemonRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get daemonRetry;
+
+  /// No description provided for @daemonRetryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Try restarting the background service'**
+  String get daemonRetryLabel;
+
+  /// No description provided for @daemonUnavailableEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the background service…'**
+  String get daemonUnavailableEmpty;
+
+  /// No description provided for @daemonRestartedStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'The background service stopped unexpectedly and was restarted. Shells were reopened in their folders.'**
+  String get daemonRestartedStrip;
+
+  /// No description provided for @daemonLostStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'The background service stopped. Shells are no longer running.'**
+  String get daemonLostStrip;
+
+  /// No description provided for @trayBackgroundService.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep shells running when the window closes'**
+  String get trayBackgroundService;
+
+  /// No description provided for @backgroundServiceNextLaunch.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies the next time ShellX starts.'**
+  String get backgroundServiceNextLaunch;
+
+  /// No description provided for @daemonQuitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The background service didn\'t stop. Try again.'**
+  String get daemonQuitFailed;
+
+  /// No description provided for @daemonStoppingStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping the background service…'**
+  String get daemonStoppingStrip;
 }
 
 class _AppLocalizationsDelegate

@@ -67,7 +67,19 @@ final class DesktopServices {
   /// The process's one session manager (A1 D7), built in `main.dart` with
   /// [SessionCore]. It outlives every runtime: signing out or turning
   /// remote access off never ends a shell; only Quit does.
-  final SessionManager sessions;
+  ///
+  /// A window that attaches to the background service (A5b) has a
+  /// `RemoteLocalSessions` here and no agent: only [AgentController] needs
+  /// the [SessionManager] behind it ([manager]), and it never runs there.
+  final LocalSessions sessions;
+
+  /// The in-process [SessionManager] ([AgentController]'s way into the
+  /// shells). Throws [StateError] where the shells live in the background
+  /// service.
+  SessionManager get manager => switch (sessions) {
+    final SessionManager m => m,
+    _ => throw StateError('the shells live in the background service'),
+  };
   final KeepAwake keepAwake;
   final LaunchAtLogin launchAtLogin;
   final SystemNotifier notifier;

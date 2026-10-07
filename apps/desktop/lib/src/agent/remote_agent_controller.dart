@@ -20,20 +20,35 @@ import 'agent_state_codec.dart';
 /// Never logs arguments or results (they carry passwords and pairing
 /// secrets).
 final class RemoteAgentController extends AgentControllerBase {
-  RemoteAgentController(this._client);
+  RemoteAgentController(MuxClient client) : _clientOf = (() => client);
 
-  final MuxClient _client;
+  /// A window that (re)attaches to the service: [clientOf] is asked each
+  /// time the controller is built, so a provider rebuild after a new
+  /// connection reads the new service. Null (not attached yet): nothing is
+  /// read and every command fails as a lost link.
+  RemoteAgentController.lazy(MuxClient? Function() clientOf)
+    : _clientOf = clientOf;
+
+  final MuxClient? Function() _clientOf;
+  MuxClient? _client;
   Future<void>? _first;
 
   @override
   AgentViewState build() {
-    final sub = _client.events.listen((m) {
+    // A rebuilt notifier is the same object: what the last connection read
+    // is forgotten.
+    _client = _clientOf();
+    _first = null;
+    final sub = _client?.events.listen((m) {
       if (m.type != MuxType.agentState) return;
       _apply(m.get<Object?>('state'));
     });
-    ref.onDispose(sub.cancel);
+    ref.onDispose(() => sub?.cancel());
     return const AgentViewState();
   }
+
+  MuxClient get _link =>
+      _client ?? (throw const MuxRemoteException('disconnected'));
 
   /// False when [wire] is not a state this app can read.
   bool _apply(Object? wire) {
@@ -60,7 +75,7 @@ final class RemoteAgentController extends AgentControllerBase {
       });
 
   Future<void> _load() async {
-    final reply = await _client.request(MuxType.agentGet);
+    final reply = await _link.request(MuxType.agentGet);
     // The first state must be readable: a silent signed-out default would
     // show a wrong tray and ask for a sign-in the daemon already has.
     if (!_apply(reply.get<Object?>('state'))) {
@@ -72,7 +87,7 @@ final class RemoteAgentController extends AgentControllerBase {
     String name, [
     Map<String, Object?> args = const {},
   ]) async {
-    final reply = await _client.request(MuxType.agentCall, {
+    final reply = await _link.request(MuxType.agentCall, {
       'm': name,
       'a': args,
     });

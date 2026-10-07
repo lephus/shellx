@@ -117,6 +117,10 @@ class RestorePersistence extends Notifier<void> {
   /// failed one (§5: the next save retries).
   RestoreSnapshot? _written;
   bool _started = false;
+
+  /// A5b D21: the background service instance every save from now on is
+  /// written against (null: this process owns its shells).
+  String? currentDaemon;
   bool _restoring = false;
 
   /// The layout the startup restore loaded (A5a m1): a clean flush during
@@ -227,7 +231,15 @@ class RestorePersistence extends Notifier<void> {
   /// activation waits for the restore (D16) — [load] may still be reading
   /// the file, or waiting for the first layout (so panes open at the real
   /// area grid, D17).
-  Future<void> restoreAtStartup(FutureOr<RestoreLoad> load) async {
+  ///
+  /// A5b D14: with a [daemonInstance] equal to the one the snapshot was
+  /// saved against, the shells are still alive in that background service:
+  /// the saved layout is laid over the live sessions (reattach) instead of
+  /// opening anything.
+  Future<void> restoreAtStartup(
+    FutureOr<RestoreLoad> load, {
+    String? daemonInstance,
+  }) async {
     if (_restoring || _frozen) return;
     _restoring = true;
     _cancelPending(); // I7: never a partial layout mid-restore
@@ -237,7 +249,7 @@ class RestorePersistence extends Notifier<void> {
     // deleted as an orphan.
     var unreadable = false;
     final planned =
-        _plan(load, (at) {
+        _plan(load, daemonInstance, (at) {
           if (newest == null || at.isAfter(newest!)) newest = at;
         }).catchError((Object error) {
           debugPrint('restore: saved state unreadable (${error.runtimeType})');
@@ -299,6 +311,7 @@ class RestorePersistence extends Notifier<void> {
   /// saved state could not be read (A5a m2).
   Future<RestorePlan?> _plan(
     FutureOr<RestoreLoad> load,
+    String? daemonInstance,
     void Function(DateTime at) savedAt,
   ) async {
     final files = _files;
@@ -319,6 +332,16 @@ class RestorePersistence extends Notifier<void> {
       }
     }
     final text = <String, String>{};
+    // D14: the same background service still runs these shells.
+    final reattach =
+        daemonInstance != null && snapshot.daemon == daemonInstance;
+    if (reattach) {
+      return RestorePlan(
+        snapshot: snapshot,
+        textByKey: const {},
+        reattach: true,
+      );
+    }
     if (enabled) {
       for (final key in snapshot.paneKeys) {
         final raw = await files.readScrollback(key);
@@ -385,6 +408,14 @@ class RestorePersistence extends Notifier<void> {
   Future<void> flushForQuit() {
     _quitCommitted = true;
     return flushAll(clean: true);
+  }
+
+  /// A quit that could not finish (the background service did not stop):
+  /// the clean, final flush must not leave saving off. Saving resumes and
+  /// the next layout write marks the run unclean again.
+  void cancelQuit() {
+    _quitCommitted = false;
+    resume();
   }
 
   /// D13: off deletes every saved text now and stops saving it; the
@@ -468,6 +499,7 @@ class RestorePersistence extends Notifier<void> {
       keyOf: keyOf,
       now: ref.read(clockProvider)(),
       cleanExit: cleanExit,
+      daemon: currentDaemon,
     );
     final previous = _written;
     if (!force && previous != null && previous.sameLayoutAs(next)) return;

@@ -70,6 +70,11 @@ abstract final class SettingKeys {
   static const String quitKeepsSessionsExplained =
       'quit_keeps_sessions_explained';
 
+  /// A5b D13 ruling: "Giữ shell chạy khi đóng cửa sổ". Off (default): the
+  /// app runs its shells itself, as before A5b. On: at the next launch the
+  /// UI attaches to the background service. UI-owned.
+  static const String backgroundService = 'background_service_enabled';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -96,6 +101,7 @@ abstract final class SettingKeys {
     sshPlainTargets,
     sshRemoteHook,
     quitKeepsSessionsExplained,
+    backgroundService,
   };
 }
 
@@ -143,6 +149,7 @@ abstract final class UiSettingKeys {
     SettingKeys.sshRecentTargets,
     SettingKeys.sshPlainTargets,
     SettingKeys.quitKeepsSessionsExplained,
+    SettingKeys.backgroundService,
   };
 }
 

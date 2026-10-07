@@ -71,6 +71,13 @@ final class Quit extends TrayAction {
   final bool confirm;
 }
 
+/// A5b D14 "Thoát hoàn toàn": every shell and the background service end.
+/// (`Quit` leaves them running.) Without the background service it is
+/// `Quit`.
+final class QuitAll extends TrayAction {
+  const QuitAll();
+}
+
 /// The terminal-sharing switch (spec §7.6, §10.1, §10.5).
 final class ToggleTerminalSharing extends TrayAction {
   const ToggleTerminalSharing();
@@ -101,6 +108,12 @@ final class ToggleDesktopNotificationsOnlyUnfocused extends TrayAction {
 /// A5a D13: "Lưu nội dung terminal khi thoát".
 final class ToggleRestoreScrollback extends TrayAction {
   const ToggleRestoreScrollback();
+}
+
+/// A5b ruling: "Giữ shell chạy khi đóng cửa sổ" (applies at the next
+/// launch).
+final class ToggleBackgroundService extends TrayAction {
+  const ToggleBackgroundService();
 }
 
 /// A5a D13: "Xóa nội dung đã lưu".
@@ -190,6 +203,7 @@ abstract final class TrayKeys {
   static const String signOut = 'sign_out';
   static const String signIn = 'sign_in';
   static const String quit = 'quit';
+  static const String quitAll = 'quit_all';
   static const String terminalSharing = 'terminal_sharing';
   static const String terminalSharingSetup = 'terminal_sharing_setup';
   static const String desktopTerminals = 'desktop_terminals';
@@ -200,6 +214,7 @@ abstract final class TrayKeys {
       'desktop_notifications_only_unfocused';
   static const String terminal = 'terminal';
   static const String restoreScrollback = 'restore_scrollback';
+  static const String backgroundService = 'background_service';
   static const String clearSavedScrollback = 'clear_saved_scrollback';
   static const String commandLine = 'command_line';
   static const String cliControl = 'cli_control';
@@ -264,12 +279,14 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.downloadUpdate => const DownloadUpdate(),
     TrayKeys.reconnect => const Reconnect(),
     TrayKeys.quit => const Quit(),
+    TrayKeys.quitAll => const QuitAll(),
     TrayKeys.terminalSharing => const ToggleTerminalSharing(),
     TrayKeys.terminalSharingSetup => const SetUpTerminalSharing(),
     TrayKeys.desktopNotifications => const ToggleDesktopNotifications(),
     TrayKeys.desktopNotificationsOnlyUnfocused =>
       const ToggleDesktopNotificationsOnlyUnfocused(),
     TrayKeys.restoreScrollback => const ToggleRestoreScrollback(),
+    TrayKeys.backgroundService => const ToggleBackgroundService(),
     TrayKeys.clearSavedScrollback => const ClearSavedScrollback(),
     TrayKeys.cliControl => const ToggleCliControl(),
     TrayKeys.cliAllowExternal => const ToggleCliAllowExternal(),

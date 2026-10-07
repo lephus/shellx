@@ -110,17 +110,21 @@ final class DaemonHost {
   Future<void> _quitNow() async {
     _idle?.cancel();
     _idle = null;
-    await runBounded(
-      shutdown,
-      timeout: shutdownTimeout,
-      label: 'daemon shutdown',
-      log: log,
-    );
-    final written = _written;
-    if (written != null) await endpoint.deleteIfOwned(written);
-    // The `daemon.quit` reply goes out first (the server answers once this
-    // returns): a UI that sees the link drop without having asked for the
-    // quit knows the daemon died. Exiting closes every link.
-    Timer(exitDelay, () => exit(0));
+    try {
+      await runBounded(
+        shutdown,
+        timeout: shutdownTimeout,
+        label: 'daemon shutdown',
+        log: log,
+      );
+      final written = _written;
+      if (written != null) await endpoint.deleteIfOwned(written);
+    } finally {
+      // Whatever failed above, the process ends: the listener is closed
+      // already, so a half-quit service would be unreachable for good.
+      // The `daemon.quit` reply goes out first (the server answers once
+      // this returns). Exiting closes every link.
+      Timer(exitDelay, () => exit(0));
+    }
   }
 }
