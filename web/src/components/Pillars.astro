@@ -1,0 +1,116 @@
+---
+// "How it works": Desktop / Phone / Notifications cards, each with a looping CSS illustration that
+// only plays once the card has scrolled in (.is-in, set by the Home.astro script).
+import { ui, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const t = ui[Astro.props.lang];
+const pillars = [
+  { id: 'desktop', title: t.pillarDesktopTitle, body: t.pillarDesktopBody },
+  { id: 'phone', title: t.pillarPhoneTitle, body: t.pillarPhoneBody },
+  { id: 'notify', title: t.pillarNotifyTitle, body: t.pillarNotifyBody },
+];
+---
+<div class="pillars">
+  {pillars.map((p, i) => (
+    <article class={`pillar ${p.id}`} data-reveal style={`--i:${i}`}>
+      <div class="ill" aria-hidden="true">
+        {p.id === 'desktop' && (
+          <div class="win">
+            <div class="pane a"><i></i><i></i><i></i></div>
+            <div class="pane b"><i></i><i></i></div>
+            <div class="pane c"><i></i><i></i></div>
+          </div>
+        )}
+        {p.id === 'phone' && (
+          <div class="link">
+            <div class="dev laptop"></div>
+            <div class="wire"><span class="pk"><i></i></span><span class="pk"><i></i></span><span class="pk"><i></i></span><b class="lock"></b></div>
+            <div class="dev mobile"></div>
+          </div>
+        )}
+        {p.id === 'notify' && (
+          <div class="ph">
+            <div class="toast"><span class="dot"></span><span class="txt"><i></i><i></i></span></div>
+            <div class="rows"><i></i><i></i><i></i><i></i></div>
+          </div>
+        )}
+      </div>
+      <h3>{p.title}</h3>
+      <p>{p.body}</p>
+    </article>
+  ))}
+</div>
+
+<style>
+  .pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1.25rem; }
+  .pillar {
+    position: relative; padding: 1.5rem; border-radius: 20px; background: var(--card);
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .pillar::before {
+    content: ''; position: absolute; inset: -40% 30% auto -20%; height: 70%; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--tint), transparent); opacity: 0.5; pointer-events: none;
+  }
+  .desktop { --tint: rgba(59, 130, 246, 0.5); --c: var(--blue-l); }
+  .phone { --tint: rgba(124, 58, 237, 0.55); --c: var(--purple-l); }
+  .notify { --tint: rgba(236, 72, 153, 0.5); --c: var(--pink-l); }
+  .pillar h3 { position: relative; font-size: 1.35rem; margin-top: 1.25rem; }
+  .pillar p { position: relative; color: var(--muted); margin: 0; }
+  .ill {
+    position: relative; height: 9.5rem; border-radius: 14px; display: grid; place-items: center;
+    background: rgba(11, 7, 22, 0.6); border: 1px solid var(--border);
+  }
+
+  /* Desktop: one pane splits into three. */
+  .win { width: 78%; height: 72%; display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; }
+  .pane { border: 1px solid var(--c); border-radius: 6px; padding: 7px; display: flex; flex-direction: column; gap: 5px;
+          background: rgba(96, 165, 250, 0.06); transform-origin: left center; }
+  .pane i { height: 4px; border-radius: 2px; background: var(--c); opacity: 0.55; }
+  .pane i:nth-child(2) { width: 70%; } .pane i:nth-child(3) { width: 45%; }
+  .a { grid-row: span 2; }
+  .c { transform-origin: center top; }
+
+  /* Phone: packets cross a locked wire. */
+  .link { width: 84%; display: flex; align-items: center; }
+  .dev { flex: none; border: 2px solid var(--c); border-radius: 6px; }
+  .laptop { width: 3.6rem; height: 2.4rem; }
+  .mobile { width: 1.7rem; height: 3rem; border-radius: 7px; }
+  .wire { position: relative; flex: 1; height: 2px; margin: 0 6px;
+          background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 10px); }
+  /* Each packet wrapper spans the wire, so translateX(100%) moves its dot exactly across it. */
+  .pk { position: absolute; inset: 0; opacity: 0; }
+  .pk i { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%;
+          background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .lock { position: absolute; left: 50%; top: 50%; width: 1.4rem; height: 1.15rem; transform: translate(-50%, -30%);
+          border-radius: 4px; background: var(--card-2); border: 2px solid var(--c); }
+  .lock::before { content: ''; position: absolute; left: 50%; bottom: 100%; width: 0.75rem; height: 0.6rem;
+                  transform: translateX(-50%); border: 2px solid var(--c); border-bottom: 0; border-radius: 8px 8px 0 0; }
+
+  /* Notifications: a toast drops onto a phone screen. */
+  .ph { position: relative; width: 5.2rem; height: 8.4rem; border: 2px solid var(--c); border-radius: 14px;
+        padding: 1.6rem 0.5rem 0.5rem; overflow: hidden; }
+  .rows { display: flex; flex-direction: column; gap: 6px; }
+  .rows i { height: 4px; border-radius: 2px; background: var(--border); }
+  .rows i:nth-child(odd) { width: 70%; }
+  .toast { position: absolute; left: 0.3rem; right: 0.3rem; top: 0.45rem; display: flex; gap: 5px; align-items: center;
+           padding: 5px; border-radius: 7px; background: var(--card-2); border: 1px solid var(--c);
+           box-shadow: 0 6px 16px -6px var(--c); }
+  .dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--ok); flex: none; }
+  .txt { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .txt i { height: 3px; border-radius: 2px; background: var(--c); }
+  .txt i + i { width: 60%; opacity: 0.6; }
+
+  :global(.motion) .b { animation: split-x 6s var(--ease) infinite; }
+  :global(.motion) .c { animation: split-y 6s var(--ease) infinite; }
+  :global(.motion) .pk { animation: travel 2.4s linear infinite; }
+  :global(.motion) .pk:nth-of-type(2) { animation-delay: 0.8s; }
+  :global(.motion) .pk:nth-of-type(3) { animation-delay: 1.6s; }
+  :global(.motion) .toast { animation: drop 4.5s var(--ease) infinite; }
+  :global(.motion) .pillar:not(.is-in) * { animation-play-state: paused; }
+
+  @keyframes split-x { 0%, 12% { transform: scaleX(0); opacity: 0; } 30%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+  @keyframes split-y { 0%, 32% { transform: scaleY(0); opacity: 0; } 50%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+  @keyframes travel { 0% { transform: translateX(0); opacity: 0; } 10%, 85% { opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
+  @keyframes drop { 0%, 8% { transform: translateY(-150%); opacity: 0; } 20%, 75% { transform: none; opacity: 1; } 90%, 100% { transform: translateY(-150%); opacity: 0; } }
+</style>

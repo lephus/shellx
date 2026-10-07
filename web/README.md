@@ -1,12 +1,12 @@
 # shellx.pro website
 
-Static [Astro](https://astro.build) site for `https://shellx.pro` (spec §11): a minimal home page with
+Static [Astro](https://astro.build) site for `https://shellx.pro` (spec §11): a landing page with
 download links, the privacy policy and the terms of use, in Vietnamese (default, at `/`) and English
-(under `/en/`). Marketing content and design are out of scope for v1.0.
+(under `/en/`). Design: `docs/superpowers/specs/2026-10-07-web-redesign-design.md`.
 
 | Path | Page |
 |---|---|
-| `/` · `/en/` | Home page with download links |
+| `/` · `/en/` | Landing page: hero demo, how it works, features, security, steps, FAQ, downloads |
 | `/privacy/` · `/en/privacy/` | Privacy policy (`#delete-account` explains account deletion) |
 | `/terms/` · `/en/terms/` | Terms of use |
 | any other path | `404.html` |
@@ -20,6 +20,13 @@ download links, the privacy policy and the terms of use, in Vietnamese (default,
 | `npm run build` | Refuse the `[quốc gia]` placeholder, `astro build` into `dist/`, then check pages and links (`tests/`) |
 | `npm test` | Re-run the checks against an existing `dist/` |
 | `CHECK_DOWNLOADS=1 npm test` | Also sends HEAD requests to the installer URLs (needs network) |
+| `npm run lighthouse` | Serve `dist/` locally and run Lighthouse (mobile) on the 6 pages; fails if SEO < 100 or Performance / Accessibility / Best Practices < 95. Needs Chrome and network (npx). `LH_PRESET=desktop` for desktop |
+| `npm run images` | Render `og-src/*.svg` into `public/og/*.png`, `public/apple-touch-icon.png` and `public/icon-512.png` with headless Chrome; commit the PNGs |
+
+Animations are CSS plus one small inline script in `src/components/Home.astro` (scroll reveals,
+hero demo, OS-detected download button). With `prefers-reduced-motion: reduce` or without JS every
+section shows its final, static state. Fonts are self-hosted: Space Grotesk (OFL, latin + vietnamese
+subsets) for headings, JetBrains Mono for terminal text.
 
 ## Links and version
 

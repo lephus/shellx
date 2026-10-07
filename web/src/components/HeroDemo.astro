@@ -1,0 +1,114 @@
+---
+// Hero illustration: a desktop terminal types a session that is mirrored on a phone a beat later,
+// then the phone gets a "finished" notification. Static HTML shows the final frame; the script in
+// Home.astro plays it (data-demo). Decorative, so screen readers get `text` instead.
+interface Props { text: string; phoneStatus: string }
+const { text, phoneStatus } = Astro.props;
+
+// kind: 'cmd' lines are typed, 'out' lines appear whole.
+const lines = [
+  { kind: 'cmd', text: 'git pull && npm run build' },
+  { kind: 'out', text: '✓ 128 modules transformed' },
+  { kind: 'out', text: '✓ built in 4.2s' },
+  { kind: 'cmd', text: './deploy.sh production' },
+  { kind: 'out', text: '→ uploading ██████████ 100%' },
+  { kind: 'ok', text: '✓ deployed to production' },
+];
+---
+<div class="demo" data-demo>
+  <p class="sr-only">{text}</p>
+  <div class="desk" aria-hidden="true">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span>shellx — ~/app — zsh</span></div>
+    <div class="screen">
+      {lines.map((l) => (
+        <p class={`ln ${l.kind}`} data-kind={l.kind}>
+          {l.kind === 'cmd' && <span class="ps1">$ </span>}<span class="tx" data-text={l.text}>{l.text}</span>
+        </p>
+      ))}
+      <p class="ln cur-line"><span class="ps1">$ </span><span class="cursor"></span></p>
+    </div>
+  </div>
+  <div class="phone" aria-hidden="true">
+    <div class="notch"></div>
+    <div class="p-status"><span class="lock">●</span> {phoneStatus}</div>
+    <div class="p-screen">
+      {lines.map((l) => (
+        <p class={`pl ${l.kind}`}>{l.kind === 'cmd' && <span class="ps1">$ </span>}{l.text}</p>
+      ))}
+    </div>
+    <div class="note" data-note>
+      <strong>deploy.sh</strong>
+      <span>✓ exit 0 · 38s</span>
+    </div>
+  </div>
+  <div class="glow g1" aria-hidden="true"></div>
+  <div class="glow g2" aria-hidden="true"></div>
+</div>
+
+<style>
+  .demo { position: relative; aspect-ratio: 6 / 5; max-width: 34rem; width: 100%; margin: 0 auto; }
+  .desk {
+    position: absolute; inset: 8% 14% 28% 0; z-index: 1;
+    background: rgba(21, 16, 38, 0.92); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: 0 30px 80px -30px rgba(124, 58, 237, 0.55); overflow: hidden;
+    font-family: var(--mono); font-size: clamp(0.62rem, 1.5vw, 0.8rem);
+  }
+  .bar { display: flex; align-items: center; gap: 0.8rem; padding: 0.55rem 0.8rem;
+         border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.85em; }
+  .dots { display: inline-flex; gap: 0.35rem; }
+  .dots i { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #f87171; }
+  .dots i:nth-child(2) { background: #fbbf24; }
+  .dots i:nth-child(3) { background: var(--ok); }
+  .screen { padding: 0.8rem 1rem; }
+  .ln, .pl { margin: 0 0 0.35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ps1 { color: var(--pink-l); }
+  .cmd { color: var(--fg); }
+  .out { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .cursor { display: inline-block; width: 0.55em; height: 1.05em; vertical-align: text-bottom;
+            background: var(--purple-l); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .tx.typing::after { content: ''; display: inline-block; width: 0.55em; height: 1.05em;
+                      vertical-align: text-bottom; background: var(--purple-l); }
+
+  .phone {
+    position: absolute; right: 0; bottom: 0; z-index: 2; width: 36%; aspect-ratio: 9 / 18.5;
+    background: #0e0a1c; border: 2px solid #3a2f5c; border-radius: 22px; padding: 1.4rem 0.6rem 0.6rem;
+    box-shadow: 0 30px 60px -20px rgba(236, 72, 153, 0.5); overflow: hidden;
+    font-family: var(--mono); font-size: clamp(0.42rem, 1vw, 0.56rem);
+  }
+  .notch { position: absolute; top: 0.45rem; left: 50%; width: 32%; height: 0.45rem;
+           transform: translateX(-50%); border-radius: 99px; background: #2a2145; }
+  .p-status { color: var(--ok); margin-bottom: 0.6rem; font-size: 0.95em; }
+  .lock { font-size: 0.7em; vertical-align: middle; }
+  .note {
+    position: absolute; left: 0.45rem; right: 0.45rem; bottom: 0.6rem; padding: 0.5rem 0.6rem;
+    display: flex; flex-direction: column; gap: 0.1rem;
+    background: rgba(28, 21, 51, 0.96); border: 1px solid var(--purple); border-radius: 10px;
+    box-shadow: 0 10px 24px -8px rgba(124, 58, 237, 0.8); font-family: var(--sans);
+  }
+  .note strong { color: var(--fg); font-size: 1.15em; }
+  .note span { color: var(--ok); font-size: 1.05em; }
+
+  .glow { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; }
+  .g1 { width: 70%; aspect-ratio: 1; left: -10%; top: -12%;
+        background: radial-gradient(closest-side, rgba(124, 58, 237, 0.45), transparent); }
+  .g2 { width: 60%; aspect-ratio: 1; right: -14%; bottom: -16%;
+        background: radial-gradient(closest-side, rgba(236, 72, 153, 0.35), transparent); }
+
+  /* Playback (Home.astro script): lines hide until shown; phone lines and the note follow. */
+  :global(.motion) .demo.playing .ln:not(.on),
+  :global(.motion) .demo.playing .pl:not(.on) { visibility: hidden; }
+  :global(.motion) .demo .pl.on { animation: fade-in 0.4s var(--ease); }
+  :global(.motion) .demo.playing .note { opacity: 0; transform: translateY(140%); }
+  :global(.motion) .demo .note {
+    transition: opacity 0.4s var(--ease), transform 0.6s var(--ease);
+  }
+  :global(.motion) .demo.playing .note.on { opacity: 1; transform: none; }
+  :global(.motion) .g1 { animation: drift 16s ease-in-out infinite alternate; }
+  :global(.motion) .g2 { animation: drift 19s ease-in-out infinite alternate-reverse; }
+  :global(.motion) .phone { animation: float 7s ease-in-out infinite; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } }
+  @keyframes drift { to { transform: translate(12%, 10%) scale(1.1); } }
+  @keyframes float { 50% { transform: translateY(-8px); } }
+</style>

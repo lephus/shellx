@@ -3,7 +3,7 @@ layout: ../../layouts/Legal.astro
 lang: en
 page: privacy
 title: Privacy Policy
-description: What data ShellX collects, why, how long it is kept, and your rights.
+description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
 updated: "2026-10-07"
 ---
 
