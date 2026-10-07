@@ -16,6 +16,7 @@ import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/byte_size.dart';
 import '../../terminal/clipboard_media.dart';
+import '../../terminal/edit_line.dart';
 import '../../terminal/find_session.dart';
 import '../../terminal/find_sessions.dart';
 import '../../terminal/pane_input.dart';
@@ -417,6 +418,25 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         ref.read(findSessionsProvider.notifier).close(tab.focusedPaneId);
         focusTerminal();
       }, enabled: (_) => _focusedFind() != null),
+      // A11 D11: only at a prompt — a program on the alternate screen
+      // (vim, less) gets the key itself.
+      EditLineIntent: run<EditLineIntent>(
+        (i) => ref
+            .read(terminalTabsProvider)
+            .selected
+            ?.focused
+            .terminal
+            .sendUserText(editLineSequence(i.op)),
+        enabled: (_) {
+          final pane = ref.read(terminalTabsProvider).selected?.focused;
+          return pane != null &&
+              terminalFocus.hasFocus &&
+              canEditLine(
+                exited: pane.exited,
+                altBuffer: pane.terminal.isUsingAltBuffer,
+              );
+        },
+      ),
       FontBiggerIntent: run<FontBiggerIntent>(
         (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),

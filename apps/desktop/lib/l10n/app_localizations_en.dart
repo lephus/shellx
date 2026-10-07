@@ -2165,6 +2165,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionSearchNext => 'Find next';
 
   @override
+  String get actionEditLineStart => 'Go to start of line';
+
+  @override
+  String get actionEditLineEnd => 'Go to end of line';
+
+  @override
+  String get actionEditLineDeleteLine => 'Delete to start of line';
+
+  @override
+  String get actionEditLineDeleteWord => 'Delete previous word';
+
+  @override
+  String get actionEditLineDeleteWordForward => 'Delete next word';
+
+  @override
   String get actionSearchPrevious => 'Find previous';
 
   @override

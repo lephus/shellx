@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../terminal/edit_line.dart';
 import '../../terminal/pane_layout.dart';
 
 // The window intents (A1–A4, A3; A9 adds the last group). The shortcut
@@ -97,6 +98,12 @@ class StartSearchIntent extends Intent {
 class NavigateSearchIntent extends Intent {
   const NavigateSearchIntent({required this.next});
   final bool next;
+}
+
+/// A11 D11: a macOS line-editing key at the prompt (⌘←, ⌘⌫, ⌥⌫ …).
+class EditLineIntent extends Intent {
+  const EditLineIntent(this.op);
+  final EditLineOp op;
 }
 
 /// A10 D4: closes the focused pane's find bar.
