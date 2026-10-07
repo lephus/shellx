@@ -11,7 +11,8 @@ import 'package:shellx_desktop/src/ui/terminal/remote_strip.dart';
 
 import '../support/fake_local_sessions.dart';
 
-final _clock = DateTime(2026, 10, 7, 9);
+final _start = DateTime(2026, 10, 7, 9);
+var _clock = _start;
 
 /// A reconnector whose retry table the test writes (the strip only reads it).
 class _FixedRetries extends SshReconnector {
@@ -23,6 +24,8 @@ class _FixedRetries extends SshReconnector {
 
 void main() {
   final devbox = SshTarget.parse('devbox')!;
+
+  setUp(() => _clock = _start);
 
   Future<ProviderContainer> pump(
     WidgetTester tester, {
@@ -201,9 +204,26 @@ void main() {
       tester.getSemantics(find.byKey(const Key('remote.strip.1'))),
       matchesSemantics(
         isLiveRegion: true,
-        label: 'Lost connection to devbox · Retrying in 3 seconds',
+        label: 'Lost connection to devbox · Retrying automatically',
       ),
     );
+    handle.dispose();
+    await done(tester, c);
+  });
+
+  testWidgets('the live-region label ignores the per-second countdown (a11y)', (
+    tester,
+  ) async {
+    final c = await pump(tester, connected: true);
+    final handle = tester.ensureSemantics();
+    String label() =>
+        tester.getSemantics(find.byKey(const Key('remote.strip.1'))).label;
+    final before = label();
+    expect(before, isNot(contains('Retrying in')));
+    _clock = _start.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('Retrying in 2 seconds'), findsOneWidget);
+    expect(label(), before);
     handle.dispose();
     await done(tester, c);
   });

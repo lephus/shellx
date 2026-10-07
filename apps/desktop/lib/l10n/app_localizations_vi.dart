@@ -1694,6 +1694,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get sshNoHookLabel => 'Không cài hook ShellX trên máy này';
 
   @override
+  String get sshRemoteDirNeedsHook => 'Cần hook trên máy chủ';
+
+  @override
   String get sshNoHookHelp =>
       'Hook cho ShellX biết thư mục, nhánh và cổng trên máy chủ. Tắt khi máy chủ không phải Unix.';
 
@@ -1798,6 +1801,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get sshRetrying => 'Đang kết nối lại…';
+
+  @override
+  String get sshRetryWaiting => 'Tự động thử lại';
 
   @override
   String get sshNeedsSignIn => 'Cần đăng nhập';

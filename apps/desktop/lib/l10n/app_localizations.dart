@@ -2568,6 +2568,12 @@ abstract class AppLocalizations {
   /// **'Don’t install the ShellX hook on this server'**
   String get sshNoHookLabel;
 
+  /// No description provided for @sshRemoteDirNeedsHook.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs the server hook'**
+  String get sshRemoteDirNeedsHook;
+
   /// No description provided for @sshNoHookHelp.
   ///
   /// In en, this message translates to:
@@ -2729,6 +2735,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reconnecting…'**
   String get sshRetrying;
+
+  /// No description provided for @sshRetryWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying automatically'**
+  String get sshRetryWaiting;
 
   /// No description provided for @sshNeedsSignIn.
   ///

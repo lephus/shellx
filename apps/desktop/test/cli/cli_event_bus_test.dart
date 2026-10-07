@@ -346,4 +346,32 @@ void main() {
     expect(kinds, isNot(contains('pane.closed')));
     expect(kinds, isNot(contains('pane.opened')));
   });
+
+  test(
+    'a reconnect carries the pane.changed memory to the new id: what the '
+    'listener last had for the old pane is compared with the new (D22)',
+    () async {
+      local.notifyOnOpen = true;
+      final c = cliContainer(local);
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab(launch: SshLaunch(SshTarget.parse('devbox')!)); // 100
+      final got = <Map<String, Object?>>[];
+      c.read(cliEventBusProvider).events.listen(got.add);
+      await pumpEventQueue();
+      local.setCwd(100, '/a');
+      await settle();
+      local.summaries.removeWhere((s) => s.id == 100);
+      local.views[100]!.end(255);
+      await pumpEventQueue();
+      final fresh = (await tabs.reconnect(100))!;
+      await settle();
+      // The new session starts without a folder: the listener, which last
+      // heard "/a" for this pane, hears that it changed.
+      final changes = got
+          .where((e) => e['kind'] == 'pane.changed' && e['pane'] == fresh)
+          .toList();
+      expect(changes, hasLength(1));
+      expect(changes.single['cwd'], isNull);
+    },
+  );
 }

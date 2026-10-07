@@ -157,7 +157,8 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
         ? rows[_cursor!].$1
         : _host.text;
     final target = SshTarget.parse(text);
-    final dir = _dir.text.trim();
+    // Without the hook the server's folder is never entered: not sent.
+    final dir = _noHook ? '' : _dir.text.trim();
     setState(() {
       _hostError = target == null ? l10n.sshHostInvalid : null;
       _dirError = dir.isNotEmpty && !isValidRemoteCwd(dir)
@@ -453,7 +454,11 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
       TextField(
         key: const Key('ssh.dir'),
         controller: _dir,
-        decoration: InputDecoration(hintText: '/srv/app', errorText: _dirError),
+        enabled: !_noHook,
+        decoration: InputDecoration(
+          hintText: _noHook ? l10n.sshRemoteDirNeedsHook : '/srv/app',
+          errorText: _noHook ? null : _dirError,
+        ),
         onSubmitted: (_) => unawaited(_connect()),
       ),
       const SizedBox(height: ShellxSpace.s12),

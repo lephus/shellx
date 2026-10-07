@@ -228,9 +228,9 @@ final class SshControl {
       }
       _forwards.remove(key);
     }
-    if (_forwards.values.where((f) => f.target == target).length >= 32) {
-      throw const ForwardFailedException();
-    }
+    // Ended forwards (their process exited) hold no slot.
+    final live = _forwards.values.where((f) => f.target == target && !f.dead);
+    if (live.length >= 32) throw const ForwardFailedException();
     final local = await _ports.isFree(remotePort)
         ? remotePort
         : await _ports.ephemeral();

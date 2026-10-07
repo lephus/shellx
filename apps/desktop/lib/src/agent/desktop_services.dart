@@ -37,6 +37,7 @@ final class DesktopServices {
     required this.deviceName,
     this.updateInterval = const Duration(hours: 24),
     this.quitApp,
+    this.stopRemoteRetries,
     this.shutdownRemote,
     this.shutdownTimeout = const Duration(seconds: 10),
     this.awaitPtyKills,
@@ -86,6 +87,11 @@ final class DesktopServices {
   /// releases the single-instance lock (each bounded, so quitting cannot
   /// hang), then exits the process, which closes the window.
   final Future<void> Function()? quitApp;
+
+  /// A8 D20/D40: the first step of Quit, before the command-line host stops
+  /// and before the sessions close: the reconnector and the wake detector
+  /// stop, so no retry opens a session while the app shuts down.
+  final void Function()? stopRemoteRetries;
 
   /// A8 D40: runs after `AgentController.shutdown()` and before [quitApp]
   /// (bounded by the caller): stops the remote port probes, kills the

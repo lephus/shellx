@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/cli/agent_marks.dart';
 import 'package:shellx_desktop/src/remote/ssh_reachability.dart';
 import 'package:shellx_desktop/src/remote/ssh_reconnector.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -34,6 +35,9 @@ void main() {
           probes++;
           return reachable;
         }),
+        agentMarksClockProvider.overrideWithValue(
+          () => DateTime(2026, 10, 7, 9),
+        ),
         reconnectClockProvider.overrideWithValue(
           () => DateTime(2026, 10, 7, 9).add(clock.elapsed),
         ),
@@ -98,6 +102,23 @@ void main() {
       });
     },
   );
+
+  test('a reconnect moves the pane\'s "Agent" mark to the new id (D22)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      final now = DateTime(2026, 10, 7, 9);
+      final marks = container.read(agentMarksProvider.notifier);
+      marks.touch(tab: 1, pane: 1);
+      lose(async, 1);
+      async.elapse(const Duration(seconds: 3));
+      final fresh = local.nextId - 1;
+      expect(fresh, isNot(1));
+      final state = container.read(agentMarksProvider);
+      expect(state.paneActive(fresh, now), isTrue);
+      expect(state.panes.containsKey(1), isFalse);
+    });
+  });
 
   test('failed (never connected) never retries by itself; Enter does', () {
     fakeAsync((async) {

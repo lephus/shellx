@@ -102,6 +102,12 @@ final class CliEventBus {
   void _replaced(PaneReplacement r) {
     if (!_listened) return;
     _swapped[r.from] = r;
+    // A8 D22: what was sent for the old id stands for the new one (the same
+    // pane to the listener): its next change is compared with it.
+    _timers.remove(r.from)?.cancel();
+    _waiting.remove(r.from);
+    final sent = _lastSent.remove(r.from);
+    if (sent != null) _lastSent[r.to] = {...sent, 'pane': r.to};
     _emitFor(r.tabId, {
       'kind': 'pane.replaced',
       'old': r.from,
