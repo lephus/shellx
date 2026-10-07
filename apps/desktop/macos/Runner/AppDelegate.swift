@@ -1,15 +1,38 @@
 import Cocoa
 import FlutterMacOS
+import flutter_secure_storage_darwin
+import local_notifier
+import package_info_plus
+import shared_preferences_foundation
+
+/// A5b D2: the same binary started with `--daemon` is the headless
+/// `shellx-mux`: no window, no Dock icon, no menu bar.
+let isDaemon = CommandLine.arguments.contains("--daemon")
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var daemonEngine: FlutterEngine?
+
   /// Fallback for a quit without a readable reason: macOS announced a log
   /// out, restart or shut down a moment ago. Reset after a while, because a
   /// log out that another app cancels never tells us.
   private var poweringOff = false
   private var poweringOffReset: DispatchWorkItem?
 
+  override func applicationWillFinishLaunching(_ notification: Notification) {
+    if isDaemon { NSApp.setActivationPolicy(.prohibited) }
+    super.applicationWillFinishLaunching(notification)
+  }
+
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    if isDaemon {
+      let engine = FlutterEngine(name: "shellx-mux", project: nil, allowHeadlessExecution: true)
+      engine.run(withEntrypoint: "daemonMain")
+      DaemonPlugins.register(engine)
+      LaunchAtLoginChannel.register(messenger: engine.binaryMessenger)
+      daemonEngine = engine
+      return
+    }
     NSWorkspace.shared.notificationCenter.addObserver(
       self, selector: #selector(willPowerOff(_:)),
       name: NSWorkspace.willPowerOffNotification, object: nil)
@@ -57,6 +80,10 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationShouldHandleReopen(
     _ sender: NSApplication, hasVisibleWindows flag: Bool
   ) -> Bool {
+    if isDaemon {
+      DaemonForwarder.openUi()
+      return false
+    }
     for window in sender.windows where window.isMiniaturized {
       window.deminiaturize(nil)
     }
@@ -69,6 +96,7 @@ class AppDelegate: FlutterAppDelegate {
   // exit(0), which never comes back here. Log out / shut down is never held
   // up for more than 3 s: Dart saves the restore files first (A5a D18).
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    if isDaemon { return .terminateNow }
     if quitIsForPowerOff || poweringOff {
       guard AppChannel.isReady else { return .terminateNow }
       var replied = false
@@ -144,5 +172,28 @@ enum AppChannel {
 
   static func exitCancelled() {
     channel?.invokeMethod("exitCancelled", arguments: nil)
+  }
+}
+
+/// LaunchServices may route a Finder/Dock/Spotlight "open" to the daemon
+/// (same bundle id). The daemon then starts the UI instead.
+enum DaemonForwarder {
+  static func openUi() {
+    let config = NSWorkspace.OpenConfiguration()
+    config.createsNewApplicationInstance = true
+    config.activates = true
+    NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config)
+  }
+}
+
+/// Only what the daemon uses (no window_manager, tray_manager,
+/// screen_retriever: they need a view).
+enum DaemonPlugins {
+  static func register(_ registry: FlutterPluginRegistry) {
+    FlutterSecureStorageDarwinPlugin.register(
+      with: registry.registrar(forPlugin: "FlutterSecureStorageDarwinPlugin"))
+    LocalNotifierPlugin.register(with: registry.registrar(forPlugin: "LocalNotifierPlugin"))
+    FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
+    SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
   }
 }

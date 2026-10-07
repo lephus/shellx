@@ -5,6 +5,11 @@ import window_manager
 
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
+    // A5b D2: the daemon has no view controller (and so no second engine).
+    if isDaemon {
+      super.awakeFromNib()
+      return
+    }
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
     self.contentViewController = flutterViewController

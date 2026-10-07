@@ -120,3 +120,15 @@ Ruling: remote `--cmd` types only after the hook hello (<= 60 s, dropped otherwi
 Carries: A6 must call `RemotePortForwards.localPort(pane, N)` before `http://localhost:N/` for a remote pane; A5b list in HANDOFF §18; forwards are cancelled when the last pane goes or the connection is lost.
 A8 D44 numbers (Apple M4, 2026-10-07; Dart JIT): probe parse of 2000 processes + 50 listeners: median 0.8 ms, one 14 ms outlier. Real-machine numbers (ssh -G + spawn, dialog with 200 hosts, split on master): to measure (method in HANDOFF §18).
 A8 manual checklist results: NOT RUN yet - every line pending (HANDOFF §18 items 1-11; record pass/fail with date and machine here). Windows lines are release blockers. windows-check/a8 to be pushed for CI.
+
+## A5b (daemon) — execution
+
+Task 1 spike (Apple M4, macOS arm64, 2026-10-07; release build, ad-hoc signed copy outside /Applications):
+- PASS: `ShellX --daemon` runs headless: `lsappinfo` type BackgroundOnly at start (UIElement once registered), never Foreground; no window in the window list; no Dock icon or menu bar.
+- PASS: heartbeat (`<mux dir>/heartbeat`, pid + time) updates every 2.0 s. RSS 76-93 MB (limit 150 MB).
+- PASS: with only the daemon running, `open -a <app>` starts a second process (type Foreground, own window objects) while the daemon keeps running. Not told apart: LaunchServices starting it directly vs `DaemonForwarder` (parent is launchd either way). Both satisfy D2; no fallback needed.
+- PASS: SIGTERM to the UI leaves the daemon alive and its heartbeat continuing.
+- Not checked (human): Finder/Dock/Spotlight click, window visible on screen (UI window is hidden at launch by A1 design), Dock click on the running UI reaching the UI.
+- Rulings applied: `daemonMain()` takes no arguments; heartbeat in `muxDirectoryPath` on both OSes; the engine only finds `daemonMain` in the root library, so `main.dart` forwards to `daemon_main.dart` (an `export` is not resolved).
+- Build note: `flutter build macos --release` (universal) fails here: Rust target x86_64-apple-darwin is not installed. Spike built with `xcodebuild ... ARCHS=arm64 ONLY_ACTIVE_ARCH=YES`; product is unsigned, so run it ad-hoc signed (`codesign --force --deep -s -`).
+- pending manual - Windows: `ShellX.exe --daemon` (no window/taskbar button, heartbeat in `%LOCALAPPDATA%\ShellX\mux\heartbeat`, one ShellX.exe), then UI start and close leaves the daemon. C++ (`daemon_runner.cpp/.h`, `main.cpp`, CMake) written, static-checked only.
