@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import 'sidebar_test_harness.dart';
 
@@ -93,6 +94,7 @@ void main() {
     await tester.tap(find.byKey(ValueKey('ws.$id')), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('menu.ws.newRemoteTab')), findsOneWidget);
+    expect(find.byKey(const Key('menu.ws.newTab')), findsNothing);
     expect(find.byKey(const Key('menu.ws.newLocalTab')), findsOneWidget);
     final all = tester.widget<PopupMenuItem<Object?>>(
       find.byKey(const Key('menu.ws.reconnectAll')),
@@ -165,5 +167,72 @@ void main() {
     expect(said.where((m) => m.contains('devbox')), [
       'Lost connection to devbox',
     ]);
+  });
+
+  /// Every announcement the window sends while [body] runs.
+  Future<List<String>> listen(WidgetTester tester) async {
+    final said = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<dynamic>(
+      SystemChannels.accessibility,
+      (message) async {
+        final map = message as Map;
+        if (map['type'] == 'announce') {
+          said.add((map['data'] as Map)['message'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(
+            SystemChannels.accessibility,
+            null,
+          ),
+    );
+    return said;
+  }
+
+  testSidebar('failed retries stay silent: one "lost" per outage, then '
+      'one "Reconnected" (review 1)', (tester) async {
+    final said = await listen(tester);
+    local.add(sshTab(1));
+    await pumpSidebar(tester);
+    final notifier = container.read(terminalTabsProvider.notifier);
+    local.summaries.clear();
+    local.views[1]!.end(255);
+    await tester.pump();
+    await tester.pump();
+    final second = (await tester.runAsync(() => notifier.reconnect(1)))!;
+    await tester.pump();
+    // The retry fails before it connects: still the same outage.
+    local.summaries.removeWhere((s) => s.id == second);
+    local.views[second]!.end(255);
+    await tester.runAsync(pumpEventQueue);
+    await tester.pump();
+    final third = (await tester.runAsync(() => notifier.reconnect(second)))!;
+    await tester.pump();
+    local.replace(sshTab(third, connected: true));
+    await tester.pump();
+    await tester.pump();
+    expect(said.where((m) => m.contains('devbox')), [
+      'Lost connection to devbox',
+      'Reconnected to devbox',
+    ]);
+  });
+
+  testSidebar('the first connection says Connected, a tab switch is silent', (
+    tester,
+  ) async {
+    final said = await listen(tester);
+    local.add(sshTab(1, connected: false));
+    local.add(sshTab(2));
+    await pumpSidebar(tester);
+    local.replace(sshTab(1, connected: true));
+    await tester.pump();
+    await tester.pump();
+    container.read(terminalTabsProvider.notifier).select(2);
+    await tester.pump();
+    await tester.pump();
+    expect(said.where((m) => m.contains('devbox')), ['Connected to devbox']);
   });
 }

@@ -979,17 +979,19 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         at: at,
         entries: [
           ...remoteEntries,
-          ShellxMenuEntry(
-            key: const Key('menu.ws.newTab'),
-            value: _HeaderAction.newTab,
-            label: l10n.workspaceNewTab,
-            dividerBefore: remoteEntries.isNotEmpty,
-          ),
+          // A server workspace's "New SSH tab on …" replaces this one.
+          if (w.ssh == null)
+            ShellxMenuEntry(
+              key: const Key('menu.ws.newTab'),
+              value: _HeaderAction.newTab,
+              label: l10n.workspaceNewTab,
+            ),
           ShellxMenuEntry(
             key: const Key('menu.ws.rename'),
             value: _HeaderAction.rename,
             label: l10n.workspaceRename,
             shortcut: renameShortcutLabel(),
+            dividerBefore: remoteEntries.isNotEmpty,
           ),
           ShellxMenuEntry(
             key: const Key('menu.ws.toggle'),

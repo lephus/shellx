@@ -6,6 +6,7 @@ import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/terminal/desktop_terminal.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/remote_marks.dart';
+import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:xterm/xterm.dart';
 
 final devbox = SshTarget.parse('devbox')!;
@@ -94,6 +95,19 @@ void main() {
       tester.getSize(find.byKey(const Key('dot.connecting'))),
       const Size(8, 8),
     );
+  });
+
+  testWidgets('in the 6 px pane header slot the dot is still 4 px', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(const ConnectingDot(box: ShellxSizes.paneHeaderDot)),
+    );
+    final dot = find.descendant(
+      of: find.byKey(const Key('dot.connecting')),
+      matching: find.byType(Container),
+    );
+    expect(tester.getSize(dot), const Size(4, 4));
   });
 
   test('semantics suffix and announcements (UI-A8 §8)', () {

@@ -59,7 +59,8 @@ class ConnectingDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = ShellxSizes.connectingDot * box / ShellxSizes.dot;
+    // 4 px in whatever box it replaces (UI-A8 §2.2).
+    const size = ShellxSizes.connectingDot;
     return SizedBox(
       width: box,
       height: box,
@@ -108,7 +109,10 @@ String? remoteAnnouncement(
       was == RemoteState.connecting && !before.everConnected
           ? l10n.sshAnnounceConnected(host)
           : l10n.sshAnnounceReconnected(host),
-    RemoteState.disconnected => l10n.sshAnnounceDisconnected(host),
+    // Only a live connection is news when it drops; a retry that fails on
+    // its way (connecting to disconnected) is the same outage.
+    RemoteState.disconnected =>
+      was == RemoteState.connected ? l10n.sshAnnounceDisconnected(host) : null,
     _ => null,
   };
 }

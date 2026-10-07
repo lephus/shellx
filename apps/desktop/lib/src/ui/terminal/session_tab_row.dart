@@ -1015,7 +1015,9 @@ class _ContextLine extends StatelessWidget {
             if (ports.isNotEmpty) ports.map((p) => ':$p').join(' '),
           ].join(' · ');
           line = Tooltip(
-            message: remote == null ? whole : '${remote.hostKey}:$whole',
+            message: remote == null
+                ? whole
+                : '${cleanServerText(remote.hostKey ?? '')}:$whole',
             excludeFromSemantics: true,
             positionDelegate: besideSidebar,
             waitDuration: ShellxMotion.tooltipWait,

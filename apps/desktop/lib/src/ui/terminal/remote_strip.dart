@@ -26,10 +26,35 @@ class _RemoteStripState extends ConsumerState<RemoteStrip> {
   Timer? _tick;
 
   @override
+  void initState() {
+    super.initState();
+    // The countdown ticks only while a retry is waiting; managed here, not
+    // while building.
+    ref.listenManual(
+      sshReconnectorProvider.select((all) => all[widget.pane.id]),
+      (_, retry) => _keepTicking(_counting(retry)),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void didUpdateWidget(RemoteStrip old) {
+    super.didUpdateWidget(old);
+    _keepTicking(_counting(ref.read(sshReconnectorProvider)[widget.pane.id]));
+  }
+
+  @override
   void dispose() {
     _tick?.cancel();
     super.dispose();
   }
+
+  bool _counting(RetryInfo? retry) =>
+      widget.pane.remoteState == RemoteState.disconnected &&
+      retry != null &&
+      !retry.retrying &&
+      !retry.stopped &&
+      retry.nextAt != null;
 
   void _keepTicking(bool counting) {
     if (counting && _tick == null) {
@@ -75,13 +100,6 @@ class _RemoteStripState extends ConsumerState<RemoteStrip> {
         ? l10n.sshStateDisconnected(host)
         : l10n.sshStateFailed(host);
     final detail = _detail(l10n, retry, lost, hookHint);
-    _keepTicking(
-      lost &&
-          retry != null &&
-          !retry.retrying &&
-          !retry.stopped &&
-          retry.nextAt != null,
-    );
     final reconnector = ref.read(sshReconnectorProvider.notifier);
     final buttons = <Widget>[
       if (retry == null || !retry.retrying)
