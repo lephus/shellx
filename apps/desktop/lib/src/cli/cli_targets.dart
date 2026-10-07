@@ -34,13 +34,20 @@ final _paneForm = RegExp(r'^p(0|-?[1-9]\d{0,14})$');
 final _tabForm = RegExp(r'^t([1-9]\d{0,14})$');
 
 /// D12 on the wire: exactly one of [pane] and [tab], each an id, its
-/// written form (`p<id>`, `p-<n>`, `t<id>`) or `"@focused"`.
+/// written form (`p<id>`, `p-<n>`, `t<id>`) or `"@focused"`. A `pane`
+/// given as `t<id>` is that tab (final ruling M4: [resolvePane] gives its
+/// focused pane).
 CliTarget parseTarget(Object? pane, Object? tab) {
   if ((pane == null) == (tab == null)) {
     throw _bad('give exactly one pane or tab');
   }
   final value = pane ?? tab;
   if (value == _focused) return const FocusedRef();
+  if (pane is String) {
+    if (_tabForm.firstMatch(pane) case final m?) {
+      return TabRef(int.parse(m[1]!));
+    }
+  }
   final id = switch (value) {
     final int id => id,
     final String s => switch ((pane != null ? _paneForm : _tabForm).firstMatch(

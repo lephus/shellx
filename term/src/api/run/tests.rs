@@ -503,8 +503,21 @@ fn targets() {
         (m.get("tab"), m.get("name")),
         (Some(&Value::Int(7)), Some(&Value::text("build server")))
     );
+    // Final ruling M4: a pane command takes a tab — the host resolves it
+    // to that tab's focused pane, so it goes out in its written form.
+    let st = go(&["send", "t5", "--text", "x"], &[], vec![], "", PLAIN);
+    assert_eq!(st.code, 0);
+    assert_eq!(sent(&st, "ui.pane.send").get("pane"), Some(&Value::text("t5")));
+    let wt = go(&["wait", "t5", "--idle"], &[], vec![], "", PLAIN);
+    assert_eq!(sent(&wt, "ui.pane.wait").get("pane"), Some(&Value::text("t5")));
+    // `cli.notify` takes a pane number only (as with @focused).
     assert_eq!(
-        go(&["send", "t5", "--text", "x"], &[], vec![], "", PLAIN).code,
+        go(&["notify", "--pane", "t5", "hi"], &[], vec![], "", PLAIN).code,
+        2
+    );
+    // @tab stays a tab-command form.
+    assert_eq!(
+        go(&["send", "@tab", "--enter"], &[("SHELLX_TAB_ID", "5")], vec![], "", PLAIN).code,
         2
     );
     let s = go(

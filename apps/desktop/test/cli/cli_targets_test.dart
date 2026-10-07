@@ -35,6 +35,8 @@ void main() {
       isA<PaneRef>().having((t) => t.id, 'id', -3),
     );
     expect(parseTarget(null, 't7'), isA<TabRef>().having((t) => t.id, 'id', 7));
+    // Final ruling M4: a pane command given a tab means its focused pane.
+    expect(parseTarget('t7', null), isA<TabRef>().having((t) => t.id, 'id', 7));
     expect(
       parseTarget('p0', null),
       isA<PaneRef>().having((t) => t.id, 'id', 0),
@@ -44,7 +46,6 @@ void main() {
       (1, 2),
       ('x', null),
       (1.5, null),
-      ('t7', null),
       (null, 'p7'),
       ('p', null),
       ('p1x', null),
@@ -53,6 +54,9 @@ void main() {
       ('p-0', null),
       ('p-01', null),
       (null, 't007'),
+      ('t07', null),
+      ('t0', null),
+      ('t-1', null),
       (null, 't0'),
       ('p+1', null),
       ('p1234567890123456', null),

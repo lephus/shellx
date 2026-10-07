@@ -42,7 +42,8 @@ pub(super) fn env_id(ctx: &Ctx, var: &str, what: &str, tab: bool) -> Result<i64,
 pub(super) const FORMS: &str = "p<id>, t<id>, @self, @tab, @focused";
 
 /// D12: user text → (`pane` | `tab`, wire value). Ids go out as numbers;
-/// `@focused` as is (the window resolves it).
+/// `@focused` as is (the window resolves it), and so does `t<id>` where a
+/// pane is wanted (final ruling M4: that tab's focused pane).
 pub(super) fn target(raw: &str, want: Want, ctx: &Ctx) -> Result<(&'static str, Value), ApiError> {
     let not_target = || usage(format!("'{raw}' is not a target ({FORMS})"));
     let r = match raw {
@@ -77,9 +78,9 @@ pub(super) fn target(raw: &str, want: Want, ctx: &Ctx) -> Result<(&'static str, 
         s if s.starts_with('t') => {
             let id = canonical(&s[1..], true).ok_or_else(not_target)?;
             if want == Want::Pane {
-                return Err(usage(format!(
-                    "{s} is a tab; this command needs a pane (p<id>)"
-                )));
+                // Final ruling M4: the host resolves a tab to its focused
+                // pane; the written form tells it this is a tab.
+                return Ok(("pane", Value::text(format!("t{id}"))));
             }
             ("tab", Value::Int(id))
         }

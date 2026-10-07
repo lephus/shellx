@@ -13,14 +13,14 @@ Every command: `shellx <command> [args] [--json] [--socket ADDRESS] [--help]`.
 |---|---|
 | `p<id>` | a terminal pane, e.g. `p1712` |
 | `p-<n>` | a browser pane, e.g. `p-2` |
-| `t<id>` | a tab, e.g. `t1712` (the first pane of a tab has the tab's id) |
+| `t<id>` | a tab, e.g. `t1712` (the first pane of a tab has the tab's id); where a pane is needed, the tab's focused pane |
 | `w:<id>` or a name | a workspace (names ignore case; two with the same name → `ambiguous`, use `w:<id>`) |
 | `@self` | your pane (`$SHELLX_PANE_ID`); for tab commands, your tab |
 | `@tab` | your tab (`$SHELLX_TAB_ID`) |
 | `@focused` | the focused pane of the selected tab (or that tab) |
 | bare number | a pane, except for `rename` and `workspace move`, where it is a tab |
 
-Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` take a pane or a tab, so use the prefix (a bare number is a pane). `@self`/`@tab` outside a ShellX pane exit 2. Commands that need a pane refuse a tab (`t…`, `@tab`) with exit 2. Targets are accepted the same way by every command.
+Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` take a pane or a tab, so use the prefix (a bare number is a pane). `@self`/`@tab` outside a ShellX pane exit 2. Commands that need a pane (`send`, `read`, `wait`, `split --pane`) take a tab `t<id>` as that tab's focused pane; `@tab` there exits 2, and `notify --pane` takes only a pane id or `@self`. Targets are accepted the same way by every command.
 
 ## Who may control ShellX
 

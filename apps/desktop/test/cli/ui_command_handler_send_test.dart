@@ -40,6 +40,11 @@ void main() {
       expect(c.read(agentMarksProvider).panes.keys, contains(100));
     });
 
+    test('final M4: a tab (t<id>) means its focused pane', () async {
+      await call('ui.pane.send', {'pane': 't100', 'text': 'ls'});
+      expect(written(100), 'ls');
+    });
+
     test('bracketed paste when the shell asked for it', () async {
       local.views[100]!.emit('\x1b[?2004h');
       await pumpFeed();
