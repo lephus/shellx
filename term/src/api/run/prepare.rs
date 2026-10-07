@@ -339,8 +339,8 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
             let script = match (p.flag("script"), p.flag("file")) {
                 (Some(s), None) => s.to_string(),
                 (None, Some("-")) => read_all(ctx, MAX_SCRIPT)?,
-                (None, Some(f)) => std::fs::read_to_string(ctx.cwd.join(f))
-                    .map_err(|e| usage(format!("cannot read {f}: {}", e.kind())))?,
+                (None, Some(f)) => read_file(&ctx.cwd.join(f), MAX_SCRIPT)
+                    .map_err(|e| usage(format!("cannot read {f}: {e}")))?,
                 _ => return Err(usage("give exactly one of --script or --file")),
             };
             if script.len() > MAX_SCRIPT {
@@ -396,4 +396,19 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
         },
         other => return Err(usage(format!("'{other}' is not a command to run"))),
     })
+}
+
+/// At most `max` bytes (review M4): a huge or endless file (a FIFO,
+/// /dev/zero) is refused, never read to its end.
+fn read_file(path: &std::path::Path, max: usize) -> Result<String, String> {
+    use std::io::Read;
+    let f = std::fs::File::open(path).map_err(|e| e.kind().to_string())?;
+    let mut buf = Vec::new();
+    f.take(max as u64 + 1)
+        .read_to_end(&mut buf)
+        .map_err(|e| e.kind().to_string())?;
+    if buf.len() > max {
+        return Err(format!("it is over {} KiB", max / 1024));
+    }
+    String::from_utf8(buf).map_err(|_| "it is not UTF-8".into())
 }

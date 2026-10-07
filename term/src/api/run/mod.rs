@@ -76,7 +76,8 @@ pub fn run(p: &Parsed, ctx: &mut Ctx) -> i32 {
                 )]);
                 let _ = writeln!(ctx.out, "{}", to_json(&v));
             } else {
-                let _ = writeln!(ctx.err, "shellx: {message} ({code})");
+                let message = output::plain(&message);
+                let _ = writeln!(ctx.err, "shellx: {message} ({})", output::plain(&code));
             }
             e.exit_code()
         }
@@ -292,8 +293,19 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             loop {
                 let e = api.s.next_event()?;
                 let _held = writing.lock();
-                writeln!(ctx.out, "{}", to_json(&output::event_json(&e))).ok();
-                ctx.out.flush().ok();
+                let line = format!("{}\n", to_json(&output::event_json(&e)));
+                // Review I1: nobody reads any more (`| head -1`: Rust
+                // ignores SIGPIPE, so this is EPIPE) — stop; returning
+                // drops the connection, which frees the host's listener.
+                match ctx
+                    .out
+                    .write_all(line.as_bytes())
+                    .and_then(|()| ctx.out.flush())
+                {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => return Ok(()),
+                    Err(e) => return Err(ApiError::Io(format!("cannot write events: {e}"))),
+                }
             }
         }
         Prepared::Eval {
@@ -309,8 +321,11 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
                     ("timeoutMs", timeout_ms(p, 30.0)?),
                 ],
             )?;
+            // The page's JSON, as the host produced it (A6: JSON.stringify).
             let json = r.get("json").and_then(Value::as_str).unwrap_or("null");
-            if print || p.json {
+            if p.json {
+                writeln!(ctx.out, "{{\"json\":{json}}}").ok();
+            } else if print {
                 writeln!(ctx.out, "{json}").ok();
             }
             Ok(())
@@ -350,7 +365,7 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             }
             for e in r.get("entries").and_then(Value::as_array).unwrap_or(&[]) {
                 let seq = e.get("seq").and_then(Value::as_i64).unwrap_or(0);
-                let s = |k: &str| e.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                let s = |k: &str| output::plain(e.get(k).and_then(Value::as_str).unwrap_or(""));
                 if t == "ui.browser.console" {
                     writeln!(ctx.out, "{seq}  {:<5}  {}", s("level"), s("text")).ok();
                 } else {
@@ -379,7 +394,7 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             for x in r.get("panes").and_then(Value::as_array).unwrap_or(&[]) {
                 let id = x.get("pane").and_then(Value::as_i64).unwrap_or(0);
                 let t = x.get("tab").and_then(Value::as_i64).unwrap_or(0);
-                let s = |k: &str| x.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                let s = |k: &str| output::plain(x.get(k).and_then(Value::as_str).unwrap_or(""));
                 writeln!(ctx.out, "p{id}  t{t}  {}  {}", s("title"), s("url")).ok();
             }
             Ok(())

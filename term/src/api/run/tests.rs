@@ -874,3 +874,294 @@ fn events_print_json_lines_until_closed() {
         2
     );
 }
+
+/// Counts `next_event` calls and notes when the session is dropped (the
+/// connection closes, the host frees its listener slot).
+struct Events {
+    events: VecDeque<Message>,
+    pulled: Rc<RefCell<usize>>,
+    dropped: Rc<RefCell<bool>>,
+}
+
+impl Session for Events {
+    fn request(&mut self, t: &str, _: Vec<(&str, Value)>) -> Result<Message, ApiError> {
+        if t == "api.version" {
+            let caps = ALL.iter().map(|c| Value::text(*c)).collect();
+            return Ok(Message::new(
+                "result",
+                vec![("api", Value::Int(1)), ("caps", Value::Array(caps))],
+            ));
+        }
+        Ok(Message::new("result", vec![]))
+    }
+    fn next_event(&mut self) -> Result<Message, ApiError> {
+        *self.pulled.borrow_mut() += 1;
+        self.events
+            .pop_front()
+            .ok_or(ApiError::NotRunning("closed".into()))
+    }
+}
+
+impl Drop for Events {
+    fn drop(&mut self) {
+        *self.dropped.borrow_mut() = true;
+    }
+}
+
+/// A stdout whose reader went away (`shellx events … | head -1`).
+struct Broken(std::io::ErrorKind);
+
+impl Write for Broken {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(self.0.into())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(self.0.into())
+    }
+}
+
+fn follow_into(kind: std::io::ErrorKind) -> (i32, usize, bool) {
+    let args: Vec<String> = ["events", "--follow"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let Ok(Invocation::Run(p)) = parse(&args) else {
+        panic!()
+    };
+    let pulled = Rc::new(RefCell::new(0));
+    let dropped = Rc::new(RefCell::new(false));
+    let (p2, d2) = (pulled.clone(), dropped.clone());
+    let connect = move |_: Option<&str>| -> Result<Box<dyn Session>, ApiError> {
+        let e = || Message::new("event", vec![("kind", Value::text("pane.exited"))]);
+        Ok(Box::new(Events {
+            events: VecDeque::from(vec![e(), e(), e()]),
+            pulled: p2.clone(),
+            dropped: d2.clone(),
+        }))
+    };
+    let get = |_: &str| None;
+    let mut out = Broken(kind);
+    let mut err = Vec::new();
+    let mut input: &[u8] = b"";
+    let mut ctx = Ctx {
+        env: &get,
+        out: &mut out,
+        err: &mut err,
+        stdin: &mut input,
+        stdin_is_tty: false,
+        cwd: PathBuf::from("/"),
+        home: None,
+        tty: None,
+        shared_terminal: false,
+        connect: &connect,
+    };
+    let code = run(&p, &mut ctx);
+    let pulled = *pulled.borrow();
+    let dropped = *dropped.borrow();
+    (code, pulled, dropped)
+}
+
+#[test]
+fn events_end_when_stdout_is_gone() {
+    // `| head -1`: the first failed write ends the stream (exit 0) and
+    // closes the connection; it never keeps reading events.
+    assert_eq!(follow_into(std::io::ErrorKind::BrokenPipe), (0, 1, true));
+    // Any other write error: exit 1, connection closed too.
+    assert_eq!(follow_into(std::io::ErrorKind::Other), (1, 1, true));
+}
+
+#[test]
+fn notify_pane_must_be_a_pane_id() {
+    // The host's cli.notify takes a number: @focused is refused, never
+    // silently sent without a pane.
+    let o = go(
+        &["notify", "--pane", "@focused", "x"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.connected), (2, false));
+    let s = go(
+        &["notify", "--pane", "@self", "x"],
+        &[("SHELLX_PANE_ID", "4")],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!(sent(&s, "cli.notify").get("pane"), Some(&Value::Int(4)));
+}
+
+#[test]
+fn notify_falls_back_to_osc_only_inside_a_shellx_pane() {
+    let no = || Some(ApiError::NotRunning("no".into()));
+    // --pane alone does not make this a ShellX pane: exit 3, nothing written.
+    let o = go(
+        &["notify", "--pane", "p12", "x"],
+        &[],
+        vec![],
+        "",
+        (true, false, no()),
+    );
+    assert_eq!((o.code, o.tty.as_str()), (3, ""));
+    // Inside a ShellX pane, --pane names another pane: still the fallback.
+    let i = go(
+        &["notify", "--pane", "p12", "x"],
+        &[("SHELLX_PANE_ID", "3")],
+        vec![],
+        "",
+        (true, false, no()),
+    );
+    assert_eq!((i.code, i.tty.as_str()), (0, "\u{1b}]777;notify;;x\u{7}"));
+}
+
+#[cfg(unix)]
+#[test]
+fn eval_file_reads_at_most_the_limit() {
+    // A file that never ends (a FIFO kept open) is refused once it is over
+    // 32 KiB, not read to the end.
+    let path = std::env::temp_dir().join(format!("shellx-fifo-{}", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let c = std::ffi::CString::new(path.to_str().unwrap()).unwrap();
+    // SAFETY: a valid C string; mkfifo has no other preconditions.
+    assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o600) }, 0);
+    let w = path.clone();
+    std::thread::spawn(move || {
+        let mut f = std::fs::OpenOptions::new().write(true).open(&w).unwrap();
+        let _ = f.write_all(&vec![b'x'; 40 * 1024]);
+        std::thread::sleep(std::time::Duration::from_secs(10));
+    });
+    let (tx, rx) = std::sync::mpsc::channel();
+    let p = path.to_str().unwrap().to_string();
+    std::thread::spawn(move || {
+        let o = go(
+            &["browser", "eval", "p-1", "--file", &p],
+            &[],
+            vec![],
+            "",
+            PLAIN,
+        );
+        let _ = tx.send((o.code, o.connected));
+    });
+    let r = rx.recv_timeout(std::time::Duration::from_secs(3));
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(r, Ok((2, false)));
+}
+
+#[test]
+fn json_is_honoured_for_eval() {
+    let e = go(
+        &["browser", "eval", "p-1", "--script", "return 1", "--json"],
+        &[],
+        vec![(
+            "ui.browser.eval",
+            ok(vec![("json", Value::text("{\"a\":[1,2]}"))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!(e.out, "{\"json\":{\"a\":[1,2]}}\n");
+    let c = go(
+        &["browser", "click", "p-1", "a", "--json"],
+        &[],
+        vec![("ui.browser.eval", ok(vec![("json", Value::text("true"))]))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(c.out, "{\"json\":true}\n");
+    let n = go(
+        &["browser", "click", "p-1", "a"],
+        &[],
+        vec![("ui.browser.eval", ok(vec![("json", Value::text("true"))]))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(n.out, "");
+}
+
+#[test]
+fn human_output_never_carries_control_characters() {
+    let evil = "x\u{1b}]52;c;aGk=\u{7}\u{1b}[2J\u{9b}31m";
+    let tree = Value::Array(vec![Value::map(vec![
+        ("id", Value::text("w")),
+        ("name", Value::text(evil)),
+        (
+            "tabs",
+            Value::Array(vec![Value::map(vec![
+                ("id", Value::Int(1)),
+                ("title", Value::text(evil)),
+                (
+                    "panes",
+                    Value::Array(vec![Value::map(vec![
+                        ("id", Value::Int(1)),
+                        ("title", Value::text(evil)),
+                        ("cwd", Value::text(evil)),
+                        ("branch", Value::text(evil)),
+                    ])]),
+                ),
+            ])]),
+        ),
+    ])]);
+    let l = go(
+        &["ls"],
+        &[],
+        vec![("ui.ls", ok(vec![("workspaces", tree)]))],
+        "",
+        PLAIN,
+    );
+    let entries = Value::Array(vec![Value::map(vec![
+        ("seq", Value::Int(1)),
+        ("level", Value::text(evil)),
+        ("text", Value::text(evil)),
+        ("method", Value::text(evil)),
+        ("url", Value::text(evil)),
+    ])]);
+    let c = go(
+        &["browser", "console", "p-1"],
+        &[],
+        vec![("ui.browser.console", ok(vec![("entries", entries.clone())]))],
+        "",
+        PLAIN,
+    );
+    let n = go(
+        &["browser", "network", "p-1"],
+        &[],
+        vec![("ui.browser.network", ok(vec![("entries", entries)]))],
+        "",
+        PLAIN,
+    );
+    let panes = Value::Array(vec![Value::map(vec![
+        ("pane", Value::Int(-1)),
+        ("tab", Value::Int(1)),
+        ("title", Value::text(evil)),
+        ("url", Value::text(evil)),
+    ])]);
+    let b = go(
+        &["browser", "ls"],
+        &[],
+        vec![("ui.browser.list", ok(vec![("panes", panes)]))],
+        "",
+        PLAIN,
+    );
+    let h = go(
+        &["read", "p1"],
+        &[],
+        vec![("ui.pane.read", remote("not_found", evil))],
+        "",
+        PLAIN,
+    );
+    for (name, s) in [
+        ("ls", &l.out),
+        ("console", &c.out),
+        ("network", &n.out),
+        ("browser ls", &b.out),
+        ("error", &h.err),
+    ] {
+        let body = s.trim_end_matches('\n');
+        assert!(
+            !body.chars().any(|ch| ch.is_control() && ch != '\n'),
+            "{name}: {s:?}"
+        );
+        assert!(body.contains("x]52;c;aGk="), "{name}: {s:?}");
+    }
+}

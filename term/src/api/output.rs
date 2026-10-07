@@ -74,8 +74,14 @@ fn arr(v: Option<&Value>) -> &[Value] {
     v.and_then(Value::as_array).unwrap_or(&[])
 }
 
-fn text<'a>(v: &'a Value, key: &str) -> &'a str {
-    v.get(key).and_then(Value::as_str).unwrap_or("")
+/// Text from the host or a page, for a terminal: control characters
+/// (C0, DEL, C1 — escape sequences, bells) are dropped (review M8).
+pub fn plain(s: &str) -> String {
+    s.chars().filter(|c| !c.is_control()).collect()
+}
+
+fn text(v: &Value, key: &str) -> String {
+    plain(v.get(key).and_then(Value::as_str).unwrap_or(""))
 }
 
 fn tilde(path: &str, home: Option<&Path>) -> String {
@@ -92,10 +98,10 @@ fn tilde(path: &str, home: Option<&Path>) -> String {
 fn context(v: &Value, home: Option<&Path>) -> String {
     let mut parts = Vec::new();
     if let Some(c) = v.get("cwd").and_then(Value::as_str) {
-        parts.push(tilde(c, home));
+        parts.push(plain(&tilde(c, home)));
     }
     if let Some(b) = v.get("branch").and_then(Value::as_str) {
-        parts.push(b.to_string());
+        parts.push(plain(b));
     }
     for p in arr(v.get("ports")) {
         if let Some(n) = p.as_i64() {
@@ -103,7 +109,7 @@ fn context(v: &Value, home: Option<&Path>) -> String {
         }
     }
     if let Some(u) = v.get("url").and_then(Value::as_str) {
-        parts.push(u.to_string());
+        parts.push(plain(u));
     }
     parts.join("  ")
 }
@@ -129,7 +135,7 @@ pub fn ls_human(m: &Message, home: Option<&Path>) -> String {
             s.push_str("  ");
             s.push_str(&line(&[
                 format!("p{id}"),
-                text(x, "title").into(),
+                text(x, "title"),
                 context(x, home),
             ]));
         }
@@ -138,7 +144,7 @@ pub fn ls_human(m: &Message, home: Option<&Path>) -> String {
     for w in arr(m.get("workspaces")) {
         let current = w.get("current").and_then(Value::as_bool) == Some(true);
         s.push_str(&line(&[
-            text(w, "name").into(),
+            text(w, "name"),
             format!("w:{}", text(w, "id")),
             if current {
                 "(current)".into()
@@ -159,7 +165,7 @@ pub fn ls_human(m: &Message, home: Option<&Path>) -> String {
             s.push_str("  ");
             s.push_str(&line(&[
                 format!("t{tid}"),
-                text(t, "title").into(),
+                text(t, "title"),
                 unread.map(|n| format!("●{n}")).unwrap_or_default(),
                 flag("selected", "(selected)"),
                 flag("agent", "[agent]"),
@@ -179,7 +185,7 @@ pub fn ls_human(m: &Message, home: Option<&Path>) -> String {
                     } else {
                         format!("p{pid}")
                     },
-                    text(p, "title").into(),
+                    text(p, "title"),
                     context(p, home),
                     if focused {
                         "(focused)".into()

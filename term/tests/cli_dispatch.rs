@@ -289,3 +289,59 @@ fn an_endpoint_file_others_can_read_is_refused() {
     assert!(err.contains("refusing the ShellX endpoint file"), "{err}");
     assert!(!err.contains(SECRET_HEX));
 }
+
+#[test]
+fn events_follow_ends_when_its_reader_goes_away() {
+    // `shellx events --follow | head -1`: once the reader closed the pipe,
+    // the next event ends the CLI and closes the connection.
+    use std::io::{BufRead, Read};
+    let dir = temp_dir("pipe");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let (go_on, wait_reader) = std::sync::mpsc::channel::<()>();
+    let host = std::thread::spawn(move || {
+        let mut s = accept_within(&listener);
+        accept(&mut s);
+        let caps = Value::Array(vec![Value::text("cli.events.subscribe")]);
+        answer(&mut s, vec![("api", Value::Int(1)), ("caps", caps)]);
+        let r = answer(&mut s, vec![]);
+        assert_eq!(r.t, "cli.events.subscribe");
+        let event = Message::new("event", vec![("kind", Value::text("pane.exited"))]);
+        send(&mut s, &event).unwrap();
+        wait_reader.recv().unwrap();
+        // The reader is gone: one more event, then the CLI must hang up.
+        let _ = send(&mut s, &event);
+        s.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        let mut rest = Vec::new();
+        s.read_to_end(&mut rest).is_ok()
+    });
+    let mut child = Command::new(shellx_link())
+        .args(["events", "--follow"])
+        .env("SHELLX_ENDPOINT", &ep)
+        .env("SHELLX_CLI_TOKEN", TOKEN)
+        .env_remove("SHELLX_SOCKET")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut out = std::io::BufReader::new(child.stdout.take().unwrap());
+    let mut first = String::new();
+    out.read_line(&mut first).unwrap();
+    assert_eq!(first, "{\"kind\":\"pane.exited\"}\n");
+    drop(out);
+    go_on.send(()).unwrap();
+    let started = Instant::now();
+    let status = loop {
+        if let Some(s) = child.try_wait().unwrap() {
+            break s;
+        }
+        if started.elapsed() > Duration::from_secs(3) {
+            let _ = child.kill();
+            panic!("shellx events kept running after its reader left");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(status.code(), Some(0));
+    assert!(host.join().unwrap(), "the connection was not closed");
+}

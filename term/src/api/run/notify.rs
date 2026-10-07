@@ -24,10 +24,19 @@ pub(super) fn notify(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
         return Err(usage("notify needs text"));
     }
     let title = p.flag("title").map(|t| clip(t, MAX_TITLE));
+    // The host's cli.notify takes a pane number: `@focused` cannot be
+    // resolved there, so it is refused rather than sent without a pane.
     let pane_id = match p.flag("pane") {
-        Some(r) => pane(r, ctx)?.as_i64(),
+        Some(r) => Some(
+            pane(r, ctx)?
+                .as_i64()
+                .ok_or_else(|| usage("notify --pane takes a pane id (p<id>) or @self"))?,
+        ),
         None => (ctx.env)("SHELLX_PANE_ID").and_then(|v| canonical(&v, false)),
     };
+    // D23: the OSC fallback is for ShellX panes (the tty is a ShellX
+    // terminal), not for any terminal that named a pane.
+    let in_shellx_pane = (ctx.env)("SHELLX_PANE_ID").is_some();
     let done = |ctx: &mut Ctx| {
         if p.json {
             print_json(ctx, &Value::Map(vec![]));
@@ -50,7 +59,7 @@ pub(super) fn notify(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     });
     match attempt {
         Ok(_) => {}
-        Err(ApiError::NotRunning(_)) if pane_id.is_some() && ctx.tty.is_some() => {
+        Err(ApiError::NotRunning(_)) if in_shellx_pane && ctx.tty.is_some() => {
             osc(ctx, title.as_deref(), &body)?
         }
         Err(e) => return Err(e),
