@@ -3,7 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
+import 'package:shellx_desktop/src/agent/agent_state.dart';
+import 'package:shellx_desktop/src/agent/agent_state_codec.dart';
+import 'package:shellx_desktop/src/agent/remote_agent_controller.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart'
+    show settingsStoreProvider;
 import 'package:shellx_desktop/src/config/settings_schema.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 import 'package:shellx_desktop/src/tray/tray_actions.dart';
@@ -218,6 +225,46 @@ void main() {
     await t.tap(find.text('Remove the shellx command from other terminals'));
     await t.pumpAndSettle();
     expect(tray.handled.single, isA<ToggleCliPath>());
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('service mode: a daemon-owned switch is a call to the service '
+      'and writes nothing in this process', (t) async {
+    final (ui, daemonEnd) = MemoryMuxTransport.pair();
+    final calls = <String>[];
+    daemonEnd.messages.listen((m) {
+      if (m.type == MuxType.agentGet) {
+        daemonEnd.send(
+          MuxMessage(
+            MuxType.result,
+            q: m.q,
+            fields: {'state': agentStateToWire(const AgentViewState())},
+          ),
+        );
+      } else if (m.type == MuxType.agentCall) {
+        calls.add('${m.get<String>('m')}:${m.get<Map<Object?, Object?>>('a')}');
+        daemonEnd.send(MuxMessage(MuxType.result, q: m.q));
+      }
+    });
+    final store = InMemorySettingsStore();
+    final w = await pumpConfiguredWorkspace(
+      t,
+      extra: [
+        agentControllerProvider.overrideWith(
+          () => RemoteAgentController(MuxClient(ui)),
+        ),
+        settingsStoreProvider.overrideWithValue(store),
+      ],
+    );
+    await open(t, w.container, 'general');
+    final before = {...store.values};
+    await tapSwitch(t, 'keep-awake');
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    expect(calls, ['setKeepAwake:{enabled: false}']);
+    expect(store.values, before);
+    expect(store.ints, isEmpty);
     await disposeWorkspace(t, w.container);
   }, variant: mac);
 }

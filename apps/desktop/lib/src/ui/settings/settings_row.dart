@@ -13,6 +13,7 @@ import '../../config/config_controller.dart';
 import '../../config/config_problem.dart';
 import '../../config/settings_schema.dart';
 import '../../terminal/terminal_font_size.dart';
+import '../../terminal/terminal_tabs.dart';
 import '../../tray/tray_action.dart';
 import '../../tray/tray_actions.dart';
 import '../../tray/tray_menu.dart' show notifyThresholdLabel;
@@ -125,6 +126,7 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   String? _attempted;
   // Kept in a field: `ref` can't be read while the widget is taken apart.
   late final SettingsWriter _writer;
+  late final TerminalTabs _tabs;
 
   SettingDef get def => widget.def;
   bool get _isFile => def.owner == SettingOwner.file;
@@ -133,6 +135,7 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   void initState() {
     super.initState();
     _writer = ref.read(settingsWriterProvider);
+    _tabs = ref.read(terminalTabsProvider.notifier);
     _focus.addListener(_onFocus);
     if (_isFile) {
       _field.text = _currentText();
@@ -159,10 +162,22 @@ class _SettingRowState extends ConsumerState<SettingRow> {
     _debounce?.cancel();
     // A keyboard step still waiting for its write is the user's: keep it.
     final pending = _pending;
-    if (pending != null && _isFile) unawaited(_writer.set(def, pending));
+    if (pending != null && _isFile) unawaited(_flushOnDispose(pending));
     _focus.dispose();
     _field.dispose();
     super.dispose();
+  }
+
+  /// The write of a step the window closed on: with no row left to show an
+  /// error, a refusal still gets its toast.
+  Future<void> _flushOnDispose(String raw) async {
+    final notice = writeNotice(await _writer.set(def, raw));
+    if (notice == null) return;
+    try {
+      _tabs.showNotice(notice);
+    } on StateError {
+      // The whole app is going away: nobody left to tell.
+    }
   }
 
   void _onFocus() {
@@ -202,6 +217,12 @@ class _SettingRowState extends ConsumerState<SettingRow> {
           : null;
       if (result is! Saved) _dragValue = null;
     });
+    // Not written: the field shows the value that is in effect, not the
+    // one that was refused.
+    if (result is Refused || result is Changed) {
+      _field.text = _currentText();
+      _attempted = null;
+    }
   }
 
   void _commitField() => unawaited(_commit(_field.text));

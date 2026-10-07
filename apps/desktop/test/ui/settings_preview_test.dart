@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/config/font_probe.dart';
 import 'package:shellx_desktop/src/config/shellx_config.dart';
 import 'package:shellx_desktop/src/terminal/terminal_appearance.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
+import 'package:shellx_desktop/src/ui/settings/preview_terminal.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_overlay.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_preview.dart';
 import 'package:xterm/xterm.dart';
@@ -100,6 +101,23 @@ Future<void> focusThemeRow(WidgetTester t, String name) async {
 
 void main() {
   final mac = TargetPlatformVariant.only(TargetPlatform.macOS);
+
+  testWidgets('the theme list is scanned once, not on every visit to '
+      'Appearance', (t) async {
+    final w = await openAppearance(t);
+    await t.pumpAndSettle();
+    final first = w.container.read(themeListProvider);
+    expect(first.hasValue, isTrue);
+    await t.tap(find.byKey(const Key('settings.page.general')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('settings.page.appearance')));
+    await t.pumpAndSettle();
+    expect(
+      identical(w.container.read(themeListProvider).value, first.value),
+      isTrue,
+    );
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
 
   testWidgets('Appearance shows a read-only terminal sample', (t) async {
     final w = await openAppearance(t);

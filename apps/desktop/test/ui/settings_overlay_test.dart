@@ -411,6 +411,50 @@ void main() {
     await disposeWorkspace(t, w.container);
   }, variant: mac);
 
+  testWidgets('a refused write puts the value in effect back in the field', (
+    t,
+  ) async {
+    final w = await openSettings(t, config: 'font-size = 13\n');
+    w.fs.replaceError = const FileSystemException('locked');
+    await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
+    await submit(t, 'setting.font-size.field', '15');
+    expect(
+      t
+          .widget<TextField>(find.byKey(const Key('setting.font-size.field')))
+          .controller!
+          .text,
+      '13',
+    );
+    expect(shellxText(w), 'font-size = 13\n');
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('a keyboard step still waiting when the window closes and is '
+      'then refused says so', (t) async {
+    final handle = t.ensureSemantics();
+    final w = await openSettings(t, config: 'font-size = 13\n');
+    w.fs.replaceError = const FileSystemException('locked');
+    await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
+    // ignore: deprecated_member_use
+    final owner = t.binding.pipelineOwner.semanticsOwner!;
+    owner.performAction(
+      t.getSemantics(find.byKey(const Key('setting.font-size.slider'))).id,
+      SemanticsAction.increase,
+    );
+    await t.pump(const Duration(milliseconds: 100));
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
+    expect(find.byType(SettingsOverlay), findsNothing);
+    expect(
+      w.container.read(terminalTabsProvider).notice,
+      isA<SettingsFileUnwritableNotice>(),
+    );
+    handle.dispose();
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
   testWidgets('Reset comments out the user line and the row shows the '
       'default', (t) async {
     final w = await openSettings(t, config: 'font-size = 18\n');

@@ -32,9 +32,9 @@ const String kPreviewSample =
     'Tiếng Việt 日本語 🙂\r\n'
     '\x1b[32mme@mac\x1b[0m \x1b[34m~/work\x1b[0m \$ ';
 
-/// The themes on this computer, ShellX's own first (read once per opening of
-/// Settings).
-final themeListProvider = FutureProvider.autoDispose<List<ThemeEntry>>(
+/// The themes on this computer, ShellX's own first (read once, then kept:
+/// Appearance is visited often and the scan reads the theme folders).
+final themeListProvider = FutureProvider<List<ThemeEntry>>(
   (ref) =>
       listThemes(ref.read(configPathsProvider), ref.read(configFsProvider)),
 );

@@ -51,7 +51,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         preview.clear();
-      } on Object {
+      } on StateError {
         // The provider scope was disposed first: nothing left to clear.
       }
     });

@@ -130,20 +130,25 @@ class SettingsStatus extends Notifier<SettingsWrite?> {
 /// What a write's result asks of the window besides the row's own error
 /// line: the toast of spec §4.1 and the footer line.
 void reportWrite(WidgetRef ref, SettingsWrite result) {
-  final tabs = ref.read(terminalTabsProvider.notifier);
+  final notice = writeNotice(result);
+  if (notice != null) {
+    ref.read(terminalTabsProvider.notifier).showNotice(notice);
+  }
   switch (result) {
     case Saved():
       ref.read(settingsStatusProvider.notifier).report(null);
     case Invalid():
       break;
-    case Changed():
-      tabs.showNotice(const SettingsFileChangedNotice());
-      ref.read(settingsStatusProvider.notifier).report(result);
-    case Refused(:final why) when why == ConfigWriteRefusal.damagedBlock:
-      tabs.showNotice(const SettingsFileDamagedNotice());
-      ref.read(settingsStatusProvider.notifier).report(result);
-    case Refused():
-      tabs.showNotice(const SettingsFileUnwritableNotice());
+    case Changed() || Refused():
       ref.read(settingsStatusProvider.notifier).report(result);
   }
 }
+
+/// The toast a write's result asks for, or null when it asks for none.
+TabNotice? writeNotice(SettingsWrite result) => switch (result) {
+  Saved() || Invalid() => null,
+  Changed() => const SettingsFileChangedNotice(),
+  Refused(:final why) when why == ConfigWriteRefusal.damagedBlock =>
+    const SettingsFileDamagedNotice(),
+  Refused() => const SettingsFileUnwritableNotice(),
+};
