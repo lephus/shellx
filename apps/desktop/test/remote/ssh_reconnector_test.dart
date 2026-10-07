@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/remote/ssh_reachability.dart';
 import 'package:shellx_desktop/src/remote/ssh_reconnector.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
@@ -18,6 +19,8 @@ void main() {
   late FakeLocalSessions local;
   late ProviderContainer container;
   late FakeAsync clock;
+  var reachable = true;
+  var probes = 0;
 
   void boot(FakeAsync async) {
     clock = async;
@@ -27,6 +30,10 @@ void main() {
         appL10nProvider.overrideWithValue(
           lookupAppLocalizations(const Locale('en')),
         ),
+        sshReachabilityProvider.overrideWithValue((_) async {
+          probes++;
+          return reachable;
+        }),
         reconnectClockProvider.overrideWithValue(
           () => DateTime(2026, 10, 7, 9).add(clock.elapsed),
         ),
@@ -52,7 +59,11 @@ void main() {
 
   Map<int, RetryInfo> retries() => container.read(sshReconnectorProvider);
 
-  setUp(() => local = FakeLocalSessions());
+  setUp(() {
+    local = FakeLocalSessions();
+    reachable = true;
+    probes = 0;
+  });
 
   test(
     'disconnected → 3 s, then 6 s after a failed attempt; connected clears (D20)',
@@ -346,5 +357,96 @@ void main() {
       async.elapse(const Duration(seconds: 10));
       expect(local.openLaunches.length, greaterThan(1));
     });
+  });
+
+  test(
+    'host down: back-off goes on for 30 min, no ssh, no needsSignIn (N1)',
+    () {
+      fakeAsync((async) {
+        add(1);
+        boot(async);
+        reachable = false;
+        lose(async, 1);
+        async.elapse(const Duration(minutes: 25));
+        expect(local.openLaunches, isEmpty);
+        expect(probes, greaterThan(10));
+        final info = retries()[1]!;
+        expect(info.needsSignIn, isFalse);
+        expect(info.stopped, isFalse);
+        reachable = true; // the server is back: the next step connects
+        async.elapse(const Duration(seconds: 61));
+        expect(local.openLaunches, hasLength(1));
+        async.elapse(const Duration(minutes: 10));
+        expect(local.openLaunches, hasLength(1)); // then it gave up on its own
+      });
+    },
+  );
+
+  test(
+    'host down then up: failures start counting only once reachable (N1)',
+    () {
+      fakeAsync((async) {
+        add(1);
+        boot(async);
+        reachable = false;
+        lose(async, 1);
+        async.elapse(const Duration(minutes: 3));
+        reachable = true;
+        async.elapse(const Duration(seconds: 60));
+        final first = local.nextId - 1;
+        lose(async, first);
+        expect(retries()[first]!.needsSignIn, isFalse); // one failure
+      });
+    },
+  );
+
+  test('closing the pane at the prompt is not a failure (N2)', () {
+    fakeAsync((async) {
+      addFive();
+      boot(async);
+      for (var id = 1; id <= 5; id++) {
+        lose(async, id);
+      }
+      async.elapse(const Duration(seconds: 3));
+      final tabs = container.read(terminalTabsProvider.notifier);
+      tabs.close(1); // the first attempt's tab closed at its prompt
+      async.flushMicrotasks();
+      expect(local.openLaunches, hasLength(2)); // the next one goes
+      expect(retries().values.any((i) => i.needsSignIn), isFalse);
+    });
+  });
+
+  test('after the stop a later loss starts with two fresh tries (N3)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      async.elapse(const Duration(seconds: 3));
+      lose(async, local.nextId - 1);
+      async.elapse(const Duration(seconds: 6));
+      final stopped = local.nextId - 1;
+      lose(async, stopped);
+      expect(retries()[stopped]!.needsSignIn, isTrue);
+      // The user signs in by hand, it drops later.
+      container.read(sshReconnectorProvider.notifier).reconnectNow(stopped);
+      async.flushMicrotasks();
+      connect(async, local.nextId - 1);
+      expect(retries(), isEmpty);
+      lose(async, local.nextId - 1);
+      async.elapse(const Duration(seconds: 3));
+      lose(async, local.nextId - 1); // one failure only
+      expect(retries().values.single.needsSignIn, isFalse);
+    });
+  });
+
+  test('parseSshG: resolved host and port; jump hosts are marked (N1)', () {
+    final plain = parseSshG(
+      'user me\nhostname 10.0.0.5\nport 2222\nproxyjump none\n',
+    );
+    expect(plain, (host: '10.0.0.5', port: 2222, proxied: false));
+    expect(parseSshG('hostname h\nproxyjump bastion\n')!.proxied, isTrue);
+    expect(parseSshG('hostname h\nproxycommand nc %h %p\n')!.proxied, isTrue);
+    expect(parseSshG('hostname h\n')!.port, 22);
+    expect(parseSshG('nothing'), isNull);
   });
 }

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import 'remote_state.dart';
+import 'ssh_reachability.dart';
 
 /// Where one lost pane stands in its retries (UI-A8 §3.3 strip).
 @immutable
@@ -75,6 +76,8 @@ final sshReconnectorProvider =
     NotifierProvider<SshReconnector, Map<int, RetryInfo>>(SshReconnector.new);
 
 /// One reconnect waiting for its host's turn.
+enum _Outcome { connected, ended, gone }
+
 final class _Turn {
   _Turn(this.id, {required this.manual, required this.withoutHook});
   final int id;
@@ -104,7 +107,7 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
 
   final _timers = <int, Timer>{};
   final _chains = <String, _Chain>{};
-  final _outcomes = <int, Completer<bool>>{};
+  final _outcomes = <int, Completer<_Outcome>>{};
 
   /// Ids whose reconnect is under way: the old pane still looks lost until
   /// the new session takes its place.
@@ -150,7 +153,7 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
     final pending = _outcomes.values.toList();
     _outcomes.clear();
     for (final c in pending) {
-      if (!c.isCompleted) c.complete(false);
+      if (!c.isCompleted) c.complete(_Outcome.gone);
     }
   }
 
@@ -287,6 +290,18 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
     _inFlight.add(turn.id);
     int? fresh;
     try {
+      // N1: a server this computer cannot reach is an outage, not a
+      // sign-in problem: no ssh, the normal back-off, nothing counted.
+      final target = pane.remote!.launch.host;
+      if (!turn.manual && target != null) {
+        final reachable = await ref.read(sshReachabilityProvider)(target);
+        if (_off) return false;
+        if (!reachable) {
+          _inFlight.remove(turn.id);
+          _failChain(chain, turn.id);
+          return false;
+        }
+      }
       fresh = await _tabs.reconnect(turn.id, withoutHook: turn.withoutHook);
     } finally {
       _inFlight.remove(turn.id);
@@ -297,12 +312,13 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
       _failChain(chain, turn.id, openFailed: true);
       return false;
     }
-    final connected = await _outcome(fresh);
+    final outcome = await _outcome(fresh);
     if (_off) return false;
-    if (connected) {
+    if (outcome == _Outcome.connected) {
       chain.failures = 0;
       return true;
     }
+    if (outcome == _Outcome.gone) return true; // closed at the prompt (N2)
     if (!turn.manual) chain.failures++;
     _failChain(chain, fresh);
     return false;
@@ -341,24 +357,28 @@ class SshReconnector extends Notifier<Map<int, RetryInfo>> {
         now,
       );
     }
+    if (chain.failures >= maxSignInFailures) chain.failures = 0; // N3
     state = next;
   }
 
   /// Whether pane [id]'s new session reached `connected` (true), ended
   /// (false), or is still deciding (null; a password prompt waits here).
-  bool? _peek(int id) => switch (_paneOf(id)?.remoteState) {
-    null => false,
-    RemoteState.connected => true,
-    RemoteState.disconnected ||
-    RemoteState.failed ||
-    RemoteState.exited => false,
-    RemoteState.connecting => null,
-  };
+  _Outcome? _peek(int id) {
+    final pane = _paneOf(id);
+    if (pane == null) return _Outcome.gone; // closed: not a failure
+    return switch (pane.remoteState) {
+      RemoteState.connected => _Outcome.connected,
+      RemoteState.disconnected ||
+      RemoteState.failed ||
+      RemoteState.exited => _Outcome.ended,
+      _ => null,
+    };
+  }
 
-  Future<bool> _outcome(int id) {
+  Future<_Outcome> _outcome(int id) {
     final now = _peek(id);
     if (now != null) return Future.value(now);
-    final c = Completer<bool>();
+    final c = Completer<_Outcome>();
     _outcomes[id] = c;
     return c.future;
   }
