@@ -501,6 +501,7 @@
   "dropHint": "Thả để chèn đường dẫn",
   "dropHintSsh": "Không thể thả tệp vào phiên SSH",
   "dropRefused": "Tên tệp có ký tự mà shell không nhận an toàn",
+  "dropTooMany": "Quá nhiều tệp: thả tối đa 100 tệp mỗi lần",
   "dropSsh": "Không thể thả tệp vào phiên SSH. Hãy dùng scp.",
   "findPlaceholder": "Tìm",
   "findLabel": "Tìm trong terminal",

@@ -2030,6 +2030,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get dropRefused => 'Tên tệp có ký tự mà shell không nhận an toàn';
 
   @override
+  String get dropTooMany => 'Quá nhiều tệp: thả tối đa 100 tệp mỗi lần';
+
+  @override
   String get dropSsh => 'Không thể thả tệp vào phiên SSH. Hãy dùng scp.';
 
   @override

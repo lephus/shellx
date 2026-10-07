@@ -107,6 +107,57 @@ void main() {
     });
   });
 
+  group('review fixes', () {
+    String ps(String s) => escapePath(s, ShellFamily.powershell);
+
+    test('powershell: only ASCII is bare, the rest is single-quoted', () {
+      expect(
+        ps('C:\\x\\a\u201c\$(calc)\u201d'),
+        "'C:\\x\\a\u201c\$(calc)\u201d'",
+      );
+      expect(ps('C:\\a\u00a0b'), "'C:\\a\u00a0b'");
+      expect(ps('C:\\a\u2003b'), "'C:\\a\u2003b'");
+      expect(ps('\u2013x'), "'\u2013x'");
+      expect(ps('\u2014x'), "'\u2014x'");
+      expect(ps('C:\\T\u1ec7p.txt'), "'C:\\T\u1ec7p.txt'");
+    });
+
+    test('cmd: non-ASCII names are quoted', () {
+      expect(
+        escapePath('C:\\T\u1ec7p.txt', ShellFamily.cmd),
+        '"C:\\T\u1ec7p.txt"',
+      );
+      expect(escapePath('C:\\a\u00a0b', ShellFamily.cmd), '"C:\\a\u00a0b"');
+    });
+
+    test('bidi controls and zero-width characters refuse the drop', () {
+      for (final c in [
+        '\u202a',
+        '\u202b',
+        '\u202c',
+        '\u202d',
+        '\u202e',
+        '\u2066',
+        '\u2067',
+        '\u2068',
+        '\u2069',
+        '\u200b',
+        '\ufeff',
+        '\u200e',
+        '\u200f',
+      ]) {
+        for (final f in ShellFamily.values) {
+          expect(() => escapePath('/a${c}b', f), throwsFormatException);
+        }
+      }
+    });
+
+    test('a tilde after = or : is escaped too', () {
+      expect(escapePath('/a=~b', ShellFamily.posix), r'/a=\~b');
+      expect(escapePath('/a:~b', ShellFamily.posix), r'/a:\~b');
+    });
+  });
+
   test('several paths end with a space, so typing can go on', () {
     expect(escapePaths(['/a b', '/c'], ShellFamily.posix), r'/a\ b /c ');
     expect(

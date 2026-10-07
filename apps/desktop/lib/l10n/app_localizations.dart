@@ -3114,6 +3114,12 @@ abstract class AppLocalizations {
   /// **'A file name has characters a shell can’t take safely'**
   String get dropRefused;
 
+  /// No description provided for @dropTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many files: drop up to 100 at a time'**
+  String get dropTooMany;
+
   /// No description provided for @dropSsh.
   ///
   /// In en, this message translates to:

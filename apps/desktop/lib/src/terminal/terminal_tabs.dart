@@ -110,6 +110,7 @@ final class LinkOpenFailedNotice extends TabNotice {
 enum InputNoticeKind {
   dropSsh,
   dropRefused,
+  dropTooMany,
   imageSsh,
   imageTooLarge,
   imageFailed,

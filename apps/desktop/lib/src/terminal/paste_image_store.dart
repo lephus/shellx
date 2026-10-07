@@ -40,7 +40,8 @@ String? imageExtension(Uint8List bytes) {
   return null;
 }
 
-/// A10 D15: keeps a pasted image as a file in a private temp folder so its
+/// A10 D15: keeps a pasted image as a file in a private folder (the app's
+/// support folder) so its
 /// path can be pasted. The folder is 0700 and the files 0600 (POSIX); files
 /// older than [kPasteImageMaxAge] and any beyond [kMaxPasteImageFiles] are
 /// deleted whenever a new one is saved. Nothing here logs a path or a size.
@@ -56,14 +57,14 @@ class PasteImageStore {
        _posix = posix ?? !Platform.isWindows,
        _chmod = chmod ?? _systemChmod;
 
-  /// The system temp folder (`path_provider`'s `getTemporaryDirectory`).
+  /// The app's private support folder (`getApplicationSupportDirectory`).
   final Directory base;
   final DateTime Function() _now;
   final Random _random;
   final bool _posix;
   final Future<bool> Function(String mode, List<String> paths) _chmod;
 
-  Directory get directory => Directory(p.join(base.path, 'shellx-paste'));
+  Directory get directory => Directory(p.join(base.path, 'paste-images'));
 
   /// Saves [bytes] and returns the file's path. Throws
   /// [PasteImageTooLarge], [PasteImageUnreadable] (empty, or not an image),
@@ -72,7 +73,11 @@ class PasteImageStore {
     if (bytes.length > kMaxPasteImageBytes) throw const PasteImageTooLarge();
     final ext = imageExtension(bytes);
     if (bytes.isEmpty || ext == null) throw const PasteImageUnreadable();
+    // A link in place of the folder (planted by another process) would send
+    // the image elsewhere: refuse.
+    _requirePlainDirectory(allowMissing: true);
     await directory.create(recursive: true);
+    _requirePlainDirectory(allowMissing: false);
     if (_posix && !await _chmod('700', [directory.path])) {
       throw const FileSystemException('chmod 700 failed');
     }
@@ -92,6 +97,13 @@ class PasteImageStore {
     }
     await file.writeAsBytes(bytes, flush: true);
     return file.path;
+  }
+
+  void _requirePlainDirectory({required bool allowMissing}) {
+    final type = FileSystemEntity.typeSync(directory.path, followLinks: false);
+    if (type == FileSystemEntityType.directory) return;
+    if (type == FileSystemEntityType.notFound && allowMissing) return;
+    throw const FileSystemException('the image folder is not a plain folder');
   }
 
   /// Deletes what is too old, then the oldest beyond the cap (room for the
@@ -124,7 +136,16 @@ class PasteImageStore {
   /// Quit: nothing a closed app needs is left.
   Future<void> deleteAll() async {
     try {
-      if (await directory.exists()) await directory.delete(recursive: true);
+      // Never through a link: that would empty somewhere else.
+      final type = FileSystemEntity.typeSync(
+        directory.path,
+        followLinks: false,
+      );
+      if (type == FileSystemEntityType.directory) {
+        await directory.delete(recursive: true);
+      } else if (type == FileSystemEntityType.link) {
+        await Link(directory.path).delete();
+      }
     } on FileSystemException {
       // Best effort.
     }

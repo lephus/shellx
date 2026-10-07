@@ -55,7 +55,9 @@ import 'src/restore/restore_persistence.dart';
 import 'src/restore/restore_store.dart';
 import 'src/startup.dart';
 import 'src/terminal/attention_announcer.dart';
+import 'src/terminal/clipboard_media.dart' show pasteImageStoreProvider;
 import 'src/terminal/local_sessions_provider.dart';
+import 'src/terminal/paste_image_store.dart' show PasteImageStore;
 import 'src/terminal/port_watch.dart';
 import 'src/terminal/tab_attention.dart';
 import 'src/terminal/terminal_tabs.dart';
@@ -276,6 +278,12 @@ Future<void> _start(
       timeout: _quitStepTimeout,
       label: 'removing the tray icon',
     );
+    // A10 D15: pasted images do not outlive the app (never longer than 1 s).
+    await runBounded(
+      () => container.read(pasteImageStoreProvider).deleteAll(),
+      timeout: const Duration(seconds: 1),
+      label: 'deleting pasted images',
+    );
     await runBounded(
       lock.release,
       timeout: _quitStepTimeout,
@@ -331,6 +339,9 @@ Future<void> _start(
       desktopServicesProvider.overrideWithValue(services),
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
+      pasteImageStoreProvider.overrideWithValue(
+        PasteImageStore(supportDirectory),
+      ),
       restoreStoreProvider.overrideWithValue(restoreFiles),
       if (daemonMode) ...[
         daemonModeProvider.overrideWithValue(true),

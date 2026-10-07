@@ -47,8 +47,9 @@ final clipboardMediaProvider = Provider<ClipboardMedia>(
   (ref) => const SystemClipboardMedia(),
 );
 
-/// Pasted images live in the system temp folder (A10 D15).
-final pasteImageStoreProvider = Provider<PasteImageStore>((ref) {
-  final store = PasteImageStore(Directory.systemTemp);
-  return store;
-});
+/// Pasted images live in the app's private support folder (A10 D15):
+/// `main` overrides this with `getApplicationSupportDirectory()`. The
+/// default (tests) is the system temp folder.
+final pasteImageStoreProvider = Provider<PasteImageStore>(
+  (ref) => PasteImageStore(Directory.systemTemp),
+);

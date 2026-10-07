@@ -114,4 +114,14 @@ void main() {
     await expectLater(failing.save(png()), throwsA(isA<FileSystemException>()));
     expect(failing.directory.listSync(), isEmpty);
   });
+
+  test('a planted symlink in place of the folder is refused', () async {
+    final target = await Directory.systemTemp.createTemp('paste_target');
+    addTearDown(() => target.delete(recursive: true));
+    await Link(store.directory.path).create(target.path);
+    await expectLater(store.save(png()), throwsA(isA<FileSystemException>()));
+    expect(target.listSync(), isEmpty);
+    await store.deleteAll();
+    expect(target.existsSync(), isTrue);
+  }, testOn: '!windows');
 }

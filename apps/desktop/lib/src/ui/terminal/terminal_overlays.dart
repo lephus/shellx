@@ -659,6 +659,7 @@ class _NoticeToastState extends State<NoticeToast> {
     InputNotice(:final kind) => switch (kind) {
       InputNoticeKind.dropSsh => l10n.dropSsh,
       InputNoticeKind.dropRefused => l10n.dropRefused,
+      InputNoticeKind.dropTooMany => l10n.dropTooMany,
       InputNoticeKind.imageSsh => l10n.pasteImageSsh,
       InputNoticeKind.imageTooLarge => l10n.pasteImageTooLarge,
       InputNoticeKind.imageFailed => l10n.pasteImageFailed,

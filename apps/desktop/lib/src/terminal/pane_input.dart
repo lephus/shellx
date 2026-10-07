@@ -7,11 +7,24 @@ import '../ui/window_focus.dart' show terminalFocusRequestProvider;
 import 'clipboard_media.dart';
 import 'pane_paste.dart';
 import 'paste_image_store.dart';
+import 'paste_sender.dart' show PasteOutcome;
 import 'shell_escape.dart';
 import 'terminal_tabs.dart';
 
 /// What happened to a drop or an image paste (A10 D15–D17).
-enum InputOutcome { sent, ssh, refusedName, imageTooLarge, imageFailed, gone }
+enum InputOutcome {
+  sent,
+  ssh,
+  refusedName,
+  tooMany,
+  tooLarge,
+  imageTooLarge,
+  imageFailed,
+  gone,
+}
+
+/// At most this many files go in with one drop or paste.
+const int kMaxDroppedFiles = 100;
 
 /// A10 D17: pane input that is not text. Every refusal is a toast.
 final paneInputProvider = Provider<PaneInput>((ref) => PaneInput(ref));
@@ -44,6 +57,10 @@ class PaneInput {
       _notice(InputNoticeKind.dropSsh);
       return InputOutcome.ssh;
     }
+    if (paths.length > kMaxDroppedFiles) {
+      _notice(InputNoticeKind.dropTooMany);
+      return InputOutcome.tooMany;
+    }
     final String text;
     try {
       text = escapePaths(
@@ -58,7 +75,7 @@ class PaneInput {
       _ref.read(terminalTabsProvider.notifier).focusPane(paneId);
       _ref.read(terminalFocusRequestProvider.notifier).request();
     }
-    await _ref
+    final outcome = await _ref
         .read(pasteSenderProvider)
         .send(
           paneId,
@@ -69,6 +86,12 @@ class PaneInput {
             pane.terminal,
           ),
         );
+    if (outcome == PasteOutcome.tooLarge) {
+      _ref
+          .read(terminalTabsProvider.notifier)
+          .showNotice(const PasteTooLargeNotice());
+      return InputOutcome.tooLarge;
+    }
     return InputOutcome.sent;
   }
 

@@ -2119,6 +2119,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'A file name has characters a shell can’t take safely';
 
   @override
+  String get dropTooMany => 'Too many files: drop up to 100 at a time';
+
+  @override
   String get dropSsh => 'Files can’t be dropped into an SSH session. Use scp.';
 
   @override

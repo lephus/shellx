@@ -6,7 +6,13 @@ enum ShellFamily { posix, powershell, cmd }
 
 /// The family of the shell a pane runs: [shell] is `PaneSession.shell` (the
 /// program's base name). Unknown shells are POSIX on macOS and PowerShell
-/// on Windows.
+/// on Windows (single quotes).
+///
+/// Known limitation: the family is that of the shell the pane was launched
+/// with. A different shell typed inside the pane (bash inside pwsh) reads
+/// the paths with the outer family's quoting. The text is always pasted
+/// (bracketed when the program asked) and never followed by Enter, so a
+/// mismatch shows on the line and cannot run anything.
 ShellFamily shellFamilyOf(String shell, {required bool windows}) {
   final name = shell.toLowerCase().replaceAll(RegExp(r'\.exe$'), '');
   if (name == 'cmd') return ShellFamily.cmd;
@@ -18,11 +24,18 @@ ShellFamily shellFamilyOf(String shell, {required bool windows}) {
 
 // C0, DEL, C1 (0x9B is CSI to some terminals) and the Unicode line/paragraph
 // separators: none can be written safely, so the whole drop is refused.
-final RegExp _control = RegExp(r'[\u0000-\u001f\u007f-\u009f\u2028\u2029]');
+// Also the bidi controls (a name can be made to read differently from what
+// it is), the zero-width characters and the byte-order mark.
+final RegExp _control = RegExp(
+  r'[\u0000-\u001f\u007f-\u009f\u200b\u200e\u200f\u2028\u2029'
+  r'\u202a-\u202e\u2066-\u2069\ufeff]',
+);
 final RegExp _posixSafe = RegExp(r'^[A-Za-z0-9_.,:/@%+=~\-\u00a0-\uFFFF]$');
-// Bare in PowerShell and cmd: no `,` (array), `@` (splat), `%` (cmd expands
-// it even inside quotes), `=`, `~`.
-final RegExp _winSafe = RegExp(r'^[A-Za-z0-9_.:/\\+\-\u00a0-\uFFFF]+$');
+// Bare in PowerShell and cmd: ASCII only (no `,` array, `@` splat, `%` that
+// cmd expands even inside quotes, `=`, `~`; and no Unicode: PowerShell reads
+// U+00A0, U+2000-series spaces and U+2013/2014 dashes as separators or
+// operators). Everything else is quoted.
+final RegExp _winSafe = RegExp(r'^[A-Za-z0-9_.:/\\+\-]+$');
 // PowerShell treats the typographic single quotes as quotes too.
 final RegExp _psQuote = RegExp('[\'\u2018\u2019\u201a\u201b]');
 
@@ -41,14 +54,16 @@ String escapePath(String path, ShellFamily family) {
       // A relative name that starts with `-` would be an option: `./` first.
       final word = path.startsWith('-') ? './$path' : path;
       final out = StringBuffer();
+      var previous = '';
       for (final unit in word.split('')) {
-        // `~` (home) and `=` (zsh `=cmd`) are only special at the start.
-        final atStart = out.isEmpty;
-        final plain =
-            _posixSafe.hasMatch(unit) &&
-            !(atStart && (unit == '~' || unit == '='));
-        if (!plain) out.write(r'\');
+        // `~` (home) and `=` (zsh `=cmd`) are special at the start of a
+        // word; `~` also after `=` or `:` (assignments, PATH-like lists).
+        final special =
+            (previous.isEmpty && (unit == '~' || unit == '=')) ||
+            (unit == '~' && (previous == '=' || previous == ':'));
+        if (!_posixSafe.hasMatch(unit) || special) out.write(r'\');
         out.write(unit);
+        previous = unit;
       }
       return out.toString();
     case ShellFamily.powershell:

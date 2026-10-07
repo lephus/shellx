@@ -881,6 +881,7 @@
   "dropHint": "Drop to insert the path",
   "dropHintSsh": "Files can’t be dropped into an SSH session",
   "dropRefused": "A file name has characters a shell can’t take safely",
+  "dropTooMany": "Too many files: drop up to 100 at a time",
   "dropSsh": "Files can’t be dropped into an SSH session. Use scp.",
   "findPlaceholder": "Find",
   "findLabel": "Find in terminal",

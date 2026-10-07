@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
+import 'package:shellx_desktop/src/terminal/pane_paste.dart';
 import 'package:shellx_desktop/src/terminal/paste_image_store.dart';
+import 'package:shellx_desktop/src/terminal/paste_sender.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -115,6 +117,43 @@ void main() {
     expect(
       (w.container.read(terminalTabsProvider).notice as InputNotice).kind,
       InputNoticeKind.dropRefused,
+    );
+    await t.pump(const Duration(seconds: 7));
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('more than 100 files refuse the whole drop with a toast', (
+    t,
+  ) async {
+    final w = await pumpConfiguredWorkspace(t);
+    final tab = w.container.read(terminalTabsProvider).selected!;
+    targetOf(t).onDragDone!(dropped([for (var i = 0; i < 101; i++) '/f$i']));
+    await t.pump();
+    await t.pump();
+    expect(w.local.views[tab.focusedPaneId]!.writes, isEmpty);
+    expect(
+      (w.container.read(terminalTabsProvider).notice as InputNotice).kind,
+      InputNoticeKind.dropTooMany,
+    );
+    await t.pump(const Duration(seconds: 7));
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('paths over the paste cap say so instead of vanishing', (
+    t,
+  ) async {
+    final w = await pumpConfiguredWorkspace(
+      t,
+      extra: [pasteSenderProvider.overrideWithValue(PasteSender(maxBytes: 10))],
+    );
+    final tab = w.container.read(terminalTabsProvider).selected!;
+    targetOf(t).onDragDone!(dropped(['/a/long/path/over/ten/bytes']));
+    await t.pump();
+    await t.pump();
+    expect(w.local.views[tab.focusedPaneId]!.writes, isEmpty);
+    expect(
+      w.container.read(terminalTabsProvider).notice,
+      isA<PasteTooLargeNotice>(),
     );
     await t.pump(const Duration(seconds: 7));
     await disposeWorkspace(t, w.container);
