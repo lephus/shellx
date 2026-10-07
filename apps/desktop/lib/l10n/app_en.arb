@@ -769,6 +769,7 @@
   "tmuxEmpty": "No tmux sessions yet",
   "tmuxUnavailable": "tmux isn’t installed on {where}",
   "@tmuxUnavailable": {"placeholders": {"where": {"type": "String"}}},
+  "tmuxUnavailableLocal": "tmux isn’t installed on this computer",
   "tmuxListFailed": "Couldn’t list sessions on {where}. Connect to it over SSH once (so no password is needed), then try again.",
   "@tmuxListFailed": {"placeholders": {"where": {"type": "String"}}},
   "tmuxRetry": "Try again",

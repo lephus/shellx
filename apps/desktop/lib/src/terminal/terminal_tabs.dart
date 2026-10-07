@@ -245,6 +245,7 @@ final class PaneSession {
   bool get hasContext => cwd != null || gitBranch != null || ports.isNotEmpty;
 
   PaneSession copyWith({
+    int? index,
     String? title,
     bool? phoneAttached,
     bool? runningCommand,
@@ -257,7 +258,7 @@ final class PaneSession {
     bool? everConnected,
   }) => PaneSession(
     id: id,
-    index: index,
+    index: index ?? this.index,
     shell: shell,
     title: title ?? this.title,
     origin: origin,
@@ -524,10 +525,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// (then nothing is refused or clamped beyond [clampRatio]).
   PaneMetrics? _metrics;
 
-  /// A9 D19: read at key time; a lazy field, as `build()` can run again.
   /// A8 D22: pane replacements and their forwarding table.
   final _remote = _RemoteBook();
 
+  /// A9 D19: read at key time; a lazy field, as `build()` can run again.
   late final TerminalInputHandler _inputHandler = desktopInputHandlerWith(
     () => ref.mounted
         ? ref.read(shellxConfigProvider).config.optionAsAlt
@@ -772,7 +773,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         updated = updated.withPane(
           id,
           (p) => p.copyWith(
-            title: s.title,
+            // A8 D22: a reconnected pane keeps its title until the new
+            // session sets one.
+            title: s.title.isEmpty && s.remote != null ? p.title : s.title,
             phoneAttached: s.phoneAttached,
             runningCommand: s.runningCommand,
             driver: s.driver,

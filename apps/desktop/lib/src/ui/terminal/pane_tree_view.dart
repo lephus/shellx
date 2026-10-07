@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
 import 'package:flutter/material.dart';
@@ -78,6 +79,25 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   GlobalKey _keyFor(int id) => _keys.putIfAbsent(id, GlobalKey.new);
 
   TerminalTabs get _tabs => ref.read(terminalTabsProvider.notifier);
+
+  StreamSubscription<PaneReplacement>? _replacements;
+
+  @override
+  void initState() {
+    super.initState();
+    // A8 D22: a reconnect gives the pane a new session id; its TerminalView
+    // is moved to it, not mounted again (scroll, IME and focus stay).
+    _replacements = _tabs.paneReplacements.listen((r) {
+      final key = _keys.remove(r.from);
+      if (key != null) _keys[r.to] = key;
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_replacements?.cancel());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

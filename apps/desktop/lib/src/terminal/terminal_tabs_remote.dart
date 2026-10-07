@@ -161,18 +161,28 @@ extension TerminalTabsRemote on TerminalTabs {
       throw const PaneGoneException();
     }
     final summary = _local.sessions.where((s) => s.id == id).firstOrNull;
-    if (summary == null) throw const PaneGoneException();
-    final next = _attach(
-      summary,
-      size: grid,
-      reuse: old.terminal,
-      preface: _reconnectedDivider(),
-    );
-    if (next == null) throw const PaneGoneException();
+    final next = summary == null
+        ? null
+        : _attach(
+            summary,
+            size: grid,
+            reuse: old.terminal,
+            preface: _reconnectedDivider(),
+          );
+    if (next == null) {
+      // Ended before it could be placed: the pane is still lost, and Enter
+      // must visibly do something (M1).
+      _writeLostLine(from, old.exitCode ?? 255, old.terminal);
+      throw const PaneGoneException();
+    }
     _swapPane(
       tab,
       from,
-      next.copyWith(everConnected: old.everConnected || next.everConnected),
+      next.copyWith(
+        index: old.index,
+        title: next.title.isEmpty ? old.title : null,
+        everConnected: old.everConnected || next.everConnected,
+      ),
     );
     _sync(own: id);
     return id;

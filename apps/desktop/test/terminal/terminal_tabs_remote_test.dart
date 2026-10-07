@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/remote/remote_state.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
@@ -120,12 +123,17 @@ void main() {
     expect(local.openCwds.last, isNull);
     await tabs().split(SplitAxis.column, local: true);
     expect(local.openLaunches.last, isNull);
+    // I2: the server's folder never reaches a local shell.
+    expect(local.openCwds.last, isNull);
     await tabs().openTab(launch: const TmuxLaunch('main'));
     expect(local.openLaunches.last, const TmuxLaunch('main'));
     await tabs().openTabFor(launch: SshLaunch(devbox));
     expect(local.openLaunches.last, SshLaunch(devbox));
     await tabs().splitPaneFor(1, SplitAxis.column, local: true);
     expect(local.openLaunches.last, isNull);
+    expect(local.openCwds.last, isNull);
+    await tabs().splitPaneFor(1, SplitAxis.column, local: true, cwd: '/srv');
+    expect(local.openCwds.last, isNull);
   });
 
   test('a lost connection keeps the pane with a dim line; Enter reconnects '
@@ -283,5 +291,72 @@ void main() {
     expect(tabs().resolveReplaced(current), current);
     // The oldest links fell out: 1 no longer leads all the way.
     expect(tabs().resolveReplaced(1), isNot(current));
+  });
+
+  test('a reconnect that ends before it is placed writes the line again '
+      '(M1)', () async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop, remote: ssh()));
+    boot();
+    await lose(1, 255);
+    final terminal = pane(1).terminal;
+    local.afterOpen = (id) => local.summaries.removeWhere((s) => s.id == id);
+    expect(await tabs().reconnect(1), isNull);
+    final lines = 'press Enter to reconnect'.allMatches(
+      terminal.buffer.getText(),
+    );
+    expect(lines, hasLength(2));
+    expect(pane(1).canReconnect, isTrue);
+    expect(state().opening, isFalse);
+  });
+
+  test('the new pane keeps the old index; its folder follows the new '
+      'session (M2, M5)', () async {
+    local.add(local.summary(2, origin: SessionOrigin.desktop));
+    local.add(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        remote: ssh(),
+        cwd: '/srv/app',
+      ),
+    );
+    boot();
+    final index = pane(1).index;
+    await lose(1, 255);
+    local.add(local.summary(3, origin: SessionOrigin.desktop));
+    final fresh = (await tabs().reconnect(1))!;
+    expect(pane(fresh).index, index);
+    expect(pane(fresh).automaticLabel, 'zsh $index');
+    expect(
+      pane(fresh).remote!.launch,
+      SshLaunch(devbox, remoteCwd: '/srv/app'),
+    );
+    local.setCwd(fresh, '/srv/other');
+    expect(pane(fresh).cwd, '/srv/other');
+  });
+
+  test('unread kept for the old pane id is dropped (M5, A4)', () async {
+    final c = ProviderContainer.test(
+      overrides: [
+        localSessionsProvider.overrideWithValue(local),
+        appL10nProvider.overrideWithValue(
+          lookupAppLocalizations(const Locale('en')),
+        ),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    container = c;
+    local.add(local.summary(1, origin: SessionOrigin.desktop, remote: ssh()));
+    c.read(terminalTabsProvider);
+    c.read(sidebarWorkspacesProvider);
+    c.read(tabAttentionProvider);
+    await tabs().split(SplitAxis.row); // pane 100 focused; pane 1 unfocused
+    local.notice(1, SessionNoticeKind.message, body: 'done');
+    await pumpEventQueue();
+    expect(c.read(tabAttentionProvider).unreadPanes(1), {1});
+    await lose(1, 255);
+    final fresh = (await tabs().reconnect(1))!;
+    expect(c.read(tabAttentionProvider).unreadPanes(1), isNot(contains(1)));
+    expect(state().tabOfSession(fresh), isNotNull);
   });
 }

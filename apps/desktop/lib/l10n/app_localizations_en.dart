@@ -1774,6 +1774,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get tmuxUnavailableLocal => 'tmux isn’t installed on this computer';
+
+  @override
   String tmuxListFailed(String where) {
     return 'Couldn’t list sessions on $where. Connect to it over SSH once (so no password is needed), then try again.';
   }

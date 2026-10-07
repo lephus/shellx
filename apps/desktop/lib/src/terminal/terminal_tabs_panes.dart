@@ -84,9 +84,10 @@ extension TerminalTabsPanes on TerminalTabs {
     if (_state.opening) throw const OpenBusyException();
     if (!_roomToSplit(tab, target, axis)) throw const PaneNoRoomException();
     final grid = _halfGrid(pane, axis);
-    // A8 D24: on a server the folder is the server's, never a local one.
+    // A8 D24: on a server the folder is the server's, never a local one —
+    // not even for a local split of that pane.
     final remote = pane.remote;
-    final onServer = !local && remote?.launch.host != null;
+    final onServer = remote?.launch.host != null;
     final launch = local ? null : remote?.launch.forSplit(cwd ?? pane.cwd);
     return _guardedOpen(
       () => _local.open(

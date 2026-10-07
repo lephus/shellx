@@ -2610,6 +2610,12 @@ abstract class AppLocalizations {
   /// **'tmux isn’t installed on {where}'**
   String tmuxUnavailable(String where);
 
+  /// No description provided for @tmuxUnavailableLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux isn’t installed on this computer'**
+  String get tmuxUnavailableLocal;
+
   /// No description provided for @tmuxListFailed.
   ///
   /// In en, this message translates to:

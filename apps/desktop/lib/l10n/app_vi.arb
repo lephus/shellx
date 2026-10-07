@@ -417,6 +417,7 @@
   "tmuxLoading": "Đang lấy danh sách phiên…",
   "tmuxEmpty": "Chưa có phiên tmux nào",
   "tmuxUnavailable": "tmux chưa được cài trên {where}",
+  "tmuxUnavailableLocal": "tmux chưa được cài trên máy này",
   "tmuxListFailed": "Không lấy được danh sách phiên trên {where}. Kết nối SSH tới máy này một lần (để không phải nhập mật khẩu) rồi thử lại.",
   "tmuxRetry": "Thử lại",
   "tmuxWindows": "{count} cửa sổ",

@@ -1719,6 +1719,9 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get tmuxUnavailableLocal => 'tmux chưa được cài trên máy này';
+
+  @override
   String tmuxListFailed(String where) {
     return 'Không lấy được danh sách phiên trên $where. Kết nối SSH tới máy này một lần (để không phải nhập mật khẩu) rồi thử lại.';
   }

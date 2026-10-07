@@ -661,7 +661,7 @@ class _NoticeToastState extends State<NoticeToast> {
       defaultTargetPlatform == TargetPlatform.windows
           ? l10n.sshUnavailableWindows
           : l10n.sshUnavailable,
-    TmuxUnavailableNotice() => l10n.tmuxUnavailable(l10n.tmuxSourceLocal),
+    TmuxUnavailableNotice() => l10n.tmuxUnavailableLocal,
     RemotePortForwardFailedNotice(:final port) => l10n.remotePortForwardFailed(
       port,
     ),
