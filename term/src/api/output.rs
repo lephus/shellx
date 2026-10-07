@@ -75,9 +75,20 @@ fn arr(v: Option<&Value>) -> &[Value] {
 }
 
 /// Text from the host or a page, for a terminal: control characters
-/// (C0, DEL, C1 — escape sequences, bells) are dropped (review M8).
+/// (C0, DEL, C1 — escape sequences, bells) and Unicode bidi controls (marks,
+/// embeddings, overrides, isolates, the Arabic letter mark) are dropped
+/// (review M8): a name must not reorder the text around it.
 pub fn plain(s: &str) -> String {
-    s.chars().filter(|c| !c.is_control()).collect()
+    s.chars()
+        .filter(|c| !c.is_control() && !is_bidi_control(*c))
+        .collect()
+}
+
+fn is_bidi_control(c: char) -> bool {
+    matches!(
+        c,
+        '\u{200E}' | '\u{200F}' | '\u{061C}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+    )
 }
 
 fn text(v: &Value, key: &str) -> String {
