@@ -51,8 +51,17 @@ sealed class SessionLaunch {
   /// D21: the same launch after a lost connection, in the last folder.
   SessionLaunch forReconnect(String? cwd);
 
+  static const _sshKeys = {'kind', 'target', 'cwd', 'hook'};
+  static const _tmuxKeys = {'kind', 'session', 'host', 'create', 'hook'};
+
   static SessionLaunch? fromJson(Object? json) {
     if (json is! Map) return null;
+    final allowed = switch (json['kind']) {
+      'ssh' => _sshKeys,
+      'tmux' => _tmuxKeys,
+      _ => null,
+    };
+    if (allowed == null || !json.keys.every(allowed.contains)) return null;
     final hook = json['hook'] ?? true;
     if (hook is! bool) return null;
     switch (json['kind']) {

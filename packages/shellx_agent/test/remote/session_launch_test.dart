@@ -36,6 +36,16 @@ void main() {
         <String, Object?>{'kind': 'tmux', 'session': 'x' * 65},
         <String, Object?>{'kind': 'tmux', 'session': 'main', 'host': 'a b'},
         <String, Object?>{'kind': 'tmux', 'session': 'main', 'create': 1},
+        <String, Object?>{'kind': 'ssh', 'target': 'devbox', 'extra': 1},
+        <String, Object?>{'kind': 'ssh', 'target': 'devbox', 'session': 'm'},
+        <String, Object?>{'kind': 'ssh', 'target': 'devbox', 'create': true},
+        <String, Object?>{'kind': 'tmux', 'session': 'main', 'extra': 1},
+        <String, Object?>{
+          'kind': 'tmux',
+          'session': 'main',
+          'target': 'devbox',
+        },
+        <String, Object?>{'kind': 'tmux', 'session': 'main', 'cwd': '/x'},
       ]) {
         expect(SessionLaunch.fromJson(bad), isNull, reason: '$bad');
       }
