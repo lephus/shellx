@@ -26,8 +26,60 @@ void main() {
     expect(out.startsWith(user), isTrue);
     expect(
       out.substring(user.length),
-      '$kManagedStart\r\nkeybind = ctrl+alt+n=new_tab\r\n$kManagedEnd\r\n',
+      '$kManagedStart\nkeybind = ctrl+alt+n=new_tab\n$kManagedEnd\n',
     );
+  });
+
+  test('a new block takes the line ending of the line before it', () {
+    final out = applyBindingEdits('a = 1\nb = 2\r\n', [
+      AddBinding(c('ctrl+alt+n'), const KeyAction('new_tab')),
+    ]);
+    expect(
+      out,
+      'a = 1\nb = 2\r\n$kManagedStart\r\nkeybind = ctrl+alt+n=new_tab\r\n$kManagedEnd\r\n',
+    );
+  });
+
+  test('an edited block takes the line ending of the line before it', () {
+    final text =
+        'a = 1\r\nb = 2\n$kManagedStart\nkeybind = super+j=new_tab\n$kManagedEnd\r\nc = 3\r\n';
+    final out = applyBindingEdits(text, [
+      AddBinding(c('super+y'), const KeyAction('new_tab')),
+    ]);
+    expect(
+      out,
+      'a = 1\r\nb = 2\n$kManagedStart\nkeybind = super+j=new_tab\nkeybind = super+y=new_tab\n$kManagedEnd\nc = 3\r\n',
+    );
+  });
+
+  test('a start marker without an end is refused, never appended to', () {
+    expect(
+      () => applyBindingEdits('a = 1\n$kManagedStart\nkeybind = x\n', [
+        AddBinding(c('super+y'), const KeyAction('new_tab')),
+      ]),
+      throwsA(
+        isA<ConfigWriteRefused>().having(
+          (e) => e.reason,
+          'reason',
+          ConfigWriteRefusal.damagedBlock,
+        ),
+      ),
+    );
+  });
+
+  test('an end marker without a start, or a second block, is refused', () {
+    final add = [AddBinding(c('super+y'), const KeyAction('new_tab'))];
+    for (final text in [
+      'a = 1\n$kManagedEnd\n',
+      '$kManagedStart\n$kManagedEnd\nx = 1\n$kManagedStart\n$kManagedEnd\n',
+      '$kManagedEnd\n$kManagedStart\n',
+    ]) {
+      expect(
+        () => applyBindingEdits(text, add),
+        throwsA(isA<ConfigWriteRefused>()),
+        reason: text,
+      );
+    }
   });
 
   test('a file without a final newline gets one before the block', () {
@@ -233,6 +285,45 @@ void main() {
       expect(fs.replaced, isEmpty);
     });
 
+    test('a no-op edit does not write', () async {
+      final fs = MemoryConfigFs()..write('/c/config', 'a = 1\n');
+      await ConfigFileWriter(fs).edit('/c/config', [
+        RemoveBinding(c('ctrl+alt+n'), isDefault: false),
+      ], template: '');
+      expect(fs.replaced, isEmpty);
+      final missing = MemoryConfigFs();
+      await ConfigFileWriter(missing).edit('/c/config', [
+        ResetAction(const KeyAction('new_tab'), const []),
+      ], template: '# t\n');
+      expect(missing.replaced, isEmpty);
+      expect(missing.files, isEmpty);
+    });
+
+    test('a damaged block is refused and the file untouched', () async {
+      final fs = MemoryConfigFs()..write('/c/config', '$kManagedStart\n');
+      await expectLater(
+        ConfigFileWriter(fs).edit('/c/config', add, template: ''),
+        throwsA(isA<ConfigWriteRefused>()),
+      );
+      expect(fs.replaced, isEmpty);
+    });
+
+    test('NUL bytes (UTF-16 without a BOM) are refused', () async {
+      final fs = MemoryConfigFs()
+        ..writeBytes('/c/config', [0x61, 0, 0x3D, 0, 0x31, 0, 0x0A, 0]);
+      await expectLater(
+        ConfigFileWriter(fs).edit('/c/config', add, template: ''),
+        throwsA(
+          isA<ConfigWriteRefused>().having(
+            (e) => e.reason,
+            'reason',
+            ConfigWriteRefusal.notText,
+          ),
+        ),
+      );
+      expect(fs.replaced, isEmpty);
+    });
+
     test('invalid UTF-8 is refused, not rewritten', () async {
       final fs = MemoryConfigFs()..writeBytes('/c/config', [0x61, 0xFF, 0x0A]);
       await expectLater(
@@ -296,6 +387,19 @@ void main() {
       expect(file.readAsStringSync(), contains('ctrl+alt+n=new_tab'));
       expect(names(dir), ['config']);
     }, skip: Platform.isWindows);
+
+    test(
+      'a read-only file (0444) is still replaced, mode kept',
+      () async {
+        final file = File('${dir.path}/config')..writeAsStringSync('a = 1\n');
+        Process.runSync('chmod', ['444', file.path]);
+        await writer.edit(file.path, add, template: '');
+        expect(file.statSync().mode & 0xFFF, 292); // 0444
+        expect(file.readAsStringSync(), contains('ctrl+alt+n=new_tab'));
+        expect(names(dir), ['config']);
+      },
+      skip: Platform.isWindows,
+    );
 
     test('creates the folder and the file when missing', () async {
       final path = '${dir.path}/a/b/config';

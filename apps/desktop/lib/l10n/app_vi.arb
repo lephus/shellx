@@ -387,6 +387,7 @@
   "shortcutsConflict": "{shortcut} đang dùng cho “{action}”.",
   "shortcutsReplace": "Thay thế",
   "shortcutsCancel": "Huỷ",
+  "shortcutsOverridden": "Một dòng sau trong {file}:{line} ghi đè phím này",
   "shortcutsFromFile": "Đặt trong file cấu hình, dòng {line}",
   "shortcutsAssigned": "Đã gán {shortcut} cho “{action}”",
   "shortcutsRemoved": "Đã bỏ {shortcut}",

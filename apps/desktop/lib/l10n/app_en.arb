@@ -730,6 +730,8 @@
   "@shortcutsReplace": {"description": "UI-A9 §4.1"},
   "shortcutsCancel": "Cancel",
   "@shortcutsCancel": {"description": "UI-A9 §4.1"},
+  "shortcutsOverridden": "A later line in {file}:{line} overrides this",
+  "@shortcutsOverridden": {"description": "UI-A9 §4.1", "placeholders": {"file": {"type": "String"}, "line": {"type": "int"}}},
   "shortcutsFromFile": "Set in the configuration file, line {line}",
   "@shortcutsFromFile": {"description": "UI-A9 §4.1", "placeholders": {"line": {"type": "int"}}},
   "shortcutsAssigned": "{shortcut} now runs “{action}”",

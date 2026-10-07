@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
@@ -293,8 +294,27 @@ class _ShortcutsSheetState extends ConsumerState<ShortcutsSheet> {
     if (!mounted) return;
     _showNote(note);
     _stopRecording();
-    await ref.read(shellxConfigProvider.notifier).load();
-    if (mounted) _announce(announcement);
+    // Our own save: the watcher must not load it a second time.
+    final loaded = await ref
+        .read(shellxConfigProvider.notifier)
+        .load(ownWrite: true);
+    if (!mounted) return;
+    _announce(announcement);
+    // A later line (or include) can still win over what was just written.
+    for (final edit in edits) {
+      if (edit is! AddBinding) continue;
+      final scope = kActionSpecs[edit.action.name]!.scope;
+      final now = loaded.bindings.find([edit.chord], scope);
+      final origin = now?.origin;
+      if (now != null && now.action != edit.action && origin != null) {
+        final l10n = AppLocalizations.of(context);
+        _showNote((
+          action: edit.action,
+          text: l10n.shortcutsOverridden(p.basename(origin.file), origin.line),
+        ));
+        break;
+      }
+    }
   }
 
   void _showNote(({KeyAction action, String text})? note) {
@@ -363,7 +383,11 @@ class _ShortcutsSheetState extends ConsumerState<ShortcutsSheet> {
       child: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): () {
-            if (_recording == null) widget.onClose();
+            if (_conflict != null) {
+              _stopRecording();
+            } else if (_recording == null) {
+              widget.onClose();
+            }
           },
         },
         child: FocusScope(

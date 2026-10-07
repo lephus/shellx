@@ -2433,6 +2433,12 @@ abstract class AppLocalizations {
   /// UI-A9 §4.1
   ///
   /// In en, this message translates to:
+  /// **'A later line in {file}:{line} overrides this'**
+  String shortcutsOverridden(String file, int line);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
   /// **'Set in the configuration file, line {line}'**
   String shortcutsFromFile(int line);
 

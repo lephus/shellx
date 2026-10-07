@@ -1660,6 +1660,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutsCancel => 'Cancel';
 
   @override
+  String shortcutsOverridden(String file, int line) {
+    return 'A later line in $file:$line overrides this';
+  }
+
+  @override
   String shortcutsFromFile(int line) {
     return 'Set in the configuration file, line $line';
   }

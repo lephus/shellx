@@ -1611,6 +1611,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get shortcutsCancel => 'Huỷ';
 
   @override
+  String shortcutsOverridden(String file, int line) {
+    return 'Một dòng sau trong $file:$line ghi đè phím này';
+  }
+
+  @override
   String shortcutsFromFile(int line) {
     return 'Đặt trong file cấu hình, dòng $line';
   }

@@ -69,31 +69,55 @@ List<_Span> _lines(String text) {
   return spans;
 }
 
-/// The block's marker lines (indexes): the first end marker and the
-/// nearest start marker before it. A marker quoted in a comment is not a
-/// marker (the whole line is the marker); a start with no end is not a
-/// block.
-({int start, int end})? _findBlock(List<_Span> lines) {
-  int? start;
+/// What the marker lines make of the file: no block, one block, or a
+/// damaged one (a marker alone, a second block, an end before its start).
+/// A marker quoted in a comment is not a marker (the whole line is).
+typedef _Scan = ({({int start, int end})? block, bool damaged});
+
+_Scan _scan(List<_Span> lines) {
+  final starts = <int>[];
+  final ends = <int>[];
   for (var i = 0; i < lines.length; i++) {
     final body = lines[i].body.trim();
-    if (body == kManagedStart) {
-      start = i;
-    } else if (body == kManagedEnd && start != null) {
-      return (start: start, end: i);
-    }
+    if (body == kManagedStart) starts.add(i);
+    if (body == kManagedEnd) ends.add(i);
   }
-  return null;
+  if (starts.isEmpty && ends.isEmpty) return (block: null, damaged: false);
+  if (starts.length == 1 && ends.length == 1 && starts.single < ends.single) {
+    return (block: (start: starts.single, end: ends.single), damaged: false);
+  }
+  return (block: null, damaged: true);
 }
 
 /// 1-based lines of the two markers, or null.
 ({int first, int last})? managedLineRange(String text) {
-  final block = _findBlock(_lines(text));
+  final block = _scan(_lines(text)).block;
   return block == null ? null : (first: block.start + 1, last: block.end + 1);
 }
 
 bool _sameChord(String trigger, KeyChord chord) =>
     parseKeyChord(trigger) == chord;
+
+/// The line ending of the line before [index] (the end of the text when
+/// the block is yet to be added); when that line has none, the first one
+/// the text has; else `\n`.
+String _eolBefore(String text, List<_Span> lines, int index) {
+  String? ending(_Span line) {
+    final raw = text.substring(line.start, line.end);
+    if (raw.endsWith('\r\n')) return '\r\n';
+    return raw.endsWith('\n') ? '\n' : null;
+  }
+
+  if (index > 0) {
+    final own = ending(lines[index - 1]);
+    if (own != null) return own;
+  }
+  for (final line in lines) {
+    final e = ending(line);
+    if (e != null) return e;
+  }
+  return '\n';
+}
 
 /// A line of the block: what it says (a `keybind`) or free text the user
 /// put there, kept as it was.
@@ -102,9 +126,13 @@ typedef _Item = ({String text, _Line? bind});
 /// D32: edits only the managed block (appended at the end when missing,
 /// removed when it ends up empty); every other byte stays.
 String applyBindingEdits(String text, List<BindingEdit> edits) {
-  final eol = text.contains('\r\n') ? '\r\n' : '\n';
   final lines = _lines(text);
-  final found = _findBlock(lines);
+  final scan = _scan(lines);
+  if (scan.damaged) {
+    throw const ConfigWriteRefused(ConfigWriteRefusal.damagedBlock);
+  }
+  final found = scan.block;
+  final eol = _eolBefore(text, lines, found?.start ?? lines.length);
   final String head;
   final String tail;
   final items = <_Item>[];
@@ -184,6 +212,13 @@ enum ConfigWriteRefusal {
 
   /// The file changed on disk since it was read.
   changed,
+
+  /// NUL bytes: UTF-16 without a byte-order mark, or not text at all.
+  notText,
+
+  /// The managed block's markers are damaged (a lone marker, two blocks):
+  /// the app edits nothing rather than guess.
+  damagedBlock,
 }
 
 final class ConfigWriteRefused implements Exception {
@@ -259,15 +294,16 @@ final class IoConfigFileStore implements ConfigFileStore {
     final temp = File('$target.shellx-tmp-$pid-${_tempCounter++}');
     try {
       await temp.create(exclusive: true);
+      await temp.writeAsBytes(bytes, flush: true);
       if (exists && !Platform.isWindows) {
-        // The owner's choice (0600 …) survives; set before any content.
+        // The owner's choice (0600, 0444 …) survives; set after the content,
+        // so a read-only source can still be replaced.
         final mode = (stat.mode & 0xFFF).toRadixString(8);
         final result = await Process.run('/bin/chmod', [mode, temp.path]);
         if (result.exitCode != 0) {
           throw FileSystemException('chmod failed', temp.path);
         }
       }
-      await temp.writeAsBytes(bytes, flush: true);
       // Last look before the swap: someone saved meanwhile → keep theirs.
       if (expected != null &&
           !listEquals(
@@ -325,15 +361,21 @@ final class ConfigFileWriter {
           bytes[0] == 0xEF &&
           bytes[1] == 0xBB &&
           bytes[2] == 0xBF;
+      if (bytes.contains(0)) {
+        throw const ConfigWriteRefused(ConfigWriteRefusal.notText);
+      }
       try {
         text = decodeConfigBytes(bytes);
       } on FormatException {
         throw const ConfigWriteRefused(ConfigWriteRefusal.notUtf8);
       }
     }
+    final edited = applyBindingEdits(text, edits);
+    // Nothing to change: no write (and no file made from the template).
+    if (edited == text) return;
     final next = Uint8List.fromList([
       if (bom) ...[0xEF, 0xBB, 0xBF],
-      ...utf8.encode(applyBindingEdits(text, edits)),
+      ...utf8.encode(edited),
     ]);
     if (next.length > kConfigMaxBytes) {
       throw const ConfigWriteRefused(ConfigWriteRefusal.tooLarge);

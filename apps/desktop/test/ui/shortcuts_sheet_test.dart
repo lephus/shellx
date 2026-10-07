@@ -332,7 +332,7 @@ void main() {
   });
 
   testWidgets(
-    'the watcher sees our own write: one more load, no problems toast, nothing lost',
+    'our own write loads once: the watcher poll skips it (minor 5)',
     variant: mac,
     (tester) async {
       final (:w) = await open(
@@ -346,18 +346,13 @@ void main() {
           .read(shellxConfigProvider.notifier)
           .startWatching(interval: const Duration(milliseconds: 200));
       await tester.pump(const Duration(seconds: 1));
+      final before = w.container.read(shellxConfigProvider).generation;
       await tester.tap(addButton('new_tab'));
       await tester.pumpAndSettle();
       await press(tester, [ctrl, alt], LogicalKeyboardKey.keyN);
-      final generation = w.container.read(shellxConfigProvider).generation;
-      // The poll notices the new stamp and loads again.
       await tester.pump(const Duration(seconds: 2));
-      expect(
-        w.container.read(shellxConfigProvider).generation,
-        greaterThan(generation),
-      );
+      expect(w.container.read(shellxConfigProvider).generation, before + 1);
       expect(w.container.read(terminalTabsProvider).notice, isNull);
-      // The save is in the file and in effect.
       expect(
         w.fs.text(testConfigPaths().shellx),
         startsWith('no-such-key = 1\nfont-size = 14\n'),
@@ -369,6 +364,48 @@ void main() {
             .triggersOf(const KeyAction('new_tab')),
         hasLength(2),
       );
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'a later line that overrides the new binding is said under the row',
+    variant: mac,
+    (tester) async {
+      final (:w) = await open(
+        tester,
+        config:
+            '# >>> shellx-managed keybinds >>>\n'
+            'keybind = ctrl+alt+k=close_tab\n'
+            '# <<< shellx-managed keybinds <<<\n'
+            'keybind = ctrl+alt+n=new_workspace\n',
+      );
+      await tester.tap(addButton('new_tab'));
+      await tester.pumpAndSettle();
+      await press(tester, [ctrl, alt], LogicalKeyboardKey.keyN);
+      await tester.tap(find.text('Replace'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('A later line in config:5 overrides this'),
+        findsOneWidget,
+      );
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'Esc during a conflict cancels the conflict, not the sheet',
+    variant: mac,
+    (tester) async {
+      final (:w) = await open(tester);
+      await tester.tap(addButton('new_tab'));
+      await tester.pumpAndSettle();
+      await press(tester, [cmd], LogicalKeyboardKey.keyD);
+      expect(find.text('⌘D is used by “Split right”.'), findsOneWidget);
+      await press(tester, const [], LogicalKeyboardKey.escape);
+      expect(find.text('⌘D is used by “Split right”.'), findsNothing);
+      expect(find.byType(ShortcutsSheet), findsOneWidget);
+      expect(w.fs.files.containsKey(testConfigPaths().shellx), isFalse);
       await disposeWorkspace(tester, w.container);
     },
   );

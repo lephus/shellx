@@ -37,12 +37,15 @@ final class ConfigWatcher {
   /// watched keeps the stamp this watcher last saw (taken when it noticed a
   /// change, before the load that change caused): a save made while that
   /// load ran still differs and is reported. A new file is stamped now.
-  Future<void> watch(Iterable<String> files) async {
+  ///
+  /// [restamp]: take every stamp now (our own write was loaded: it is not
+  /// a change to report).
+  Future<void> watch(Iterable<String> files, {bool restamp = false}) async {
     _stopped = false;
     final generation = ++_watchGeneration;
     final stamps = <String, FileStamp>{};
     for (final f in files.toSet()) {
-      stamps[f] = _stamps[f] ?? await fs.stamp(f);
+      stamps[f] = (restamp ? null : _stamps[f]) ?? await fs.stamp(f);
     }
     if (_stopped || generation != _watchGeneration) return;
     _stamps = stamps;

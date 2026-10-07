@@ -114,13 +114,16 @@ class ConfigController extends Notifier<ConfigState> {
   /// Reads every file and publishes the result. Never throws (D10); loads
   /// run one after another, in call order, each bounded by
   /// [kConfigLoadTimeout].
-  Future<ConfigState> load({bool manual = false}) {
+  ///
+  /// [ownWrite]: the app itself just saved a file; the watcher takes the
+  /// new stamps as seen, so that save loads once, not twice.
+  Future<ConfigState> load({bool manual = false, bool ownWrite = false}) {
     if (!ref.mounted) return Future.value(_last);
     final previous = _queue ?? Future<ConfigState>.value(_last);
     // _load never throws; the catch only keeps the chain alive if it did.
     final next = previous
         .catchError((Object _) => _last)
-        .then((_) => _load(manual));
+        .then((_) => _load(manual, ownWrite));
     _queue = next;
     return next;
   }
@@ -221,7 +224,7 @@ class ConfigController extends Notifier<ConfigState> {
   static bool _same(List<ConfigProblem> a, List<ConfigProblem> b) =>
       setEquals(a.toSet(), b.toSet());
 
-  Future<ConfigState> _load(bool manual) async {
+  Future<ConfigState> _load(bool manual, bool ownWrite) async {
     if (!ref.mounted) return _last;
     _Read read;
     try {
@@ -262,7 +265,9 @@ class ConfigController extends Notifier<ConfigState> {
       return _last;
     }
     final watcher = _watcher;
-    if (watcher != null) unawaited(watcher.watch(_last.files));
+    if (watcher != null) {
+      unawaited(watcher.watch(_last.files, restamp: ownWrite));
+    }
     return _last;
   }
 
