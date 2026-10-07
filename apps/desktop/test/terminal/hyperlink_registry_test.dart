@@ -67,13 +67,15 @@ void main() {
     expect(t.hyperlinks.at(1, 5)!.uri, t.hyperlinks.at(0, 5)!.uri);
   });
 
-  test('an unclosed link makes no range; a new open replaces it', () {
+  test('an unclosed link is ended by the next open (it is a range, not '
+      'dropped)', () {
     final t = term();
     t.write(
       '${_open}https://a.b/1${_st}one ${_open}https://a.b/2$_st'
       'two$_open$_st',
     );
-    expect(t.hyperlinks.length, 1);
+    expect(t.hyperlinks.length, 2);
+    expect(t.hyperlinks.at(0, 1)!.uri, 'https://a.b/1');
     expect(t.hyperlinks.at(0, 5)!.uri, 'https://a.b/2');
   });
 
@@ -163,5 +165,18 @@ void main() {
     t.hyperlinks.dispose();
     expect(t.hyperlinks.length, 0);
     expect(t.hyperlinks.at(0, 0), isNull);
+  });
+
+  test('a new open without a close ends the previous link where it starts '
+      '(OSC 8)', () {
+    final t = term();
+    t.write(
+      '${_open}https://a.example/x${_st}one '
+      '${_open}https://b.example/y${_st}two$_open$_st',
+    );
+    expect(t.hyperlinks.at(0, 1)!.uri, 'https://a.example/x');
+    expect(t.hyperlinks.at(0, 3), isNotNull, reason: 'the last cell of one');
+    expect(t.hyperlinks.at(0, 5)!.uri, 'https://b.example/y');
+    expect(t.hyperlinks.length, 2);
   });
 }

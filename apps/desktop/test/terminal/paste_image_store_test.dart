@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/paste_image_store.dart';
 
@@ -124,4 +125,69 @@ void main() {
     await store.deleteAll();
     expect(target.existsSync(), isTrue);
   }, testOn: '!windows');
+
+  group('A10 final review: lives as long as promised', () {
+    test('sweep removes what is older than 24 h or beyond 50 files, '
+        'without a save, and never creates the folder', () async {
+      await store.sweep();
+      expect(store.directory.existsSync(), isFalse);
+
+      final old = File(await store.save(png()));
+      now = now.add(const Duration(hours: 25));
+      old.setLastModifiedSync(DateTime(2026, 10, 7));
+      final fresh = File('${store.directory.path}/fresh.png')
+        ..writeAsBytesSync(png());
+      await store.sweep();
+      expect(old.existsSync(), isFalse);
+      expect(fresh.existsSync(), isTrue);
+
+      for (var i = 0; i < 55; i++) {
+        File('${store.directory.path}/f$i.png')
+          ..writeAsBytesSync(png())
+          ..setLastModifiedSync(now.subtract(Duration(minutes: 100 - i)));
+      }
+      await store.sweep();
+      expect(store.directory.listSync().length, lessThanOrEqualTo(50));
+    });
+
+    test(
+      'the folder is kept out of backups, once, when it is created',
+      () async {
+        final asked = <String>[];
+        final s = PasteImageStore(
+          base,
+          now: () => now,
+          excludeFromBackup: (path) async => asked.add(path),
+        );
+        await s.save(png());
+        await s.save(png(1));
+        expect(asked, [s.directory.path]);
+      },
+    );
+
+    test('a sweep runs at start and then every hour', () {
+      fakeAsync((async) {
+        final calls = <int>[];
+        final counting = _CountingStore(base, () => calls.add(1));
+        final timer = startPasteImageSweeps(counting);
+        expect(calls, hasLength(1), reason: 'at start');
+        async.elapse(const Duration(minutes: 59));
+        expect(calls, hasLength(1));
+        async.elapse(const Duration(minutes: 1));
+        expect(calls, hasLength(2));
+        async.elapse(const Duration(hours: 3));
+        expect(calls, hasLength(5));
+        timer.cancel();
+        async.elapse(const Duration(hours: 3));
+        expect(calls, hasLength(5));
+      });
+    });
+  });
+}
+
+class _CountingStore extends PasteImageStore {
+  _CountingStore(super.base, this.onSweep);
+  final void Function() onSweep;
+  @override
+  Future<void> sweep() async => onSweep();
 }

@@ -25,6 +25,7 @@ DesktopServices buildUiServices({
   required String deviceName,
   required TerminalSharingSetup? sharingSetup,
   required Future<void> Function() quitApp,
+  Future<void> Function()? deletePastedImages,
   void Function()? stopRemoteRetries,
   Future<void> Function()? shutdownRemote,
   DevicePlatform? platform,
@@ -50,6 +51,7 @@ DesktopServices buildUiServices({
   stopRemoteRetries: stopRemoteRetries,
   shutdownRemote: shutdownRemote,
   quitApp: quitApp,
+  deletePastedImages: deletePastedImages,
 );
 
 final class _InertKeepAwake implements KeepAwake {

@@ -99,4 +99,20 @@ void main() {
     expect(a, b);
     expect(a.hashCode, b.hashCode);
   });
+
+  test('OSC 8 hover reads a bounded text even for a 5000-row range', () {
+    final t = DesktopTerminal(maxLines: 10000)..resize(40, 6);
+    t.write('\x1b]8;;https://example.com\x1b\\');
+    for (var i = 0; i < 5000; i++) {
+      t.write('line $i of a very long link\r\n');
+    }
+    t.write('\x1b]8;;\x1b\\');
+    final sw = Stopwatch()..start();
+    final hit = findLinkAt(t, const CellOffset(2, 100), paths: false)!;
+    sw.stop();
+    expect(hit.source, LinkSource.hyperlink);
+    expect(hit.visible!.length, lessThanOrEqualTo(2048));
+    expect(hit.needsConfirm, isTrue, reason: 'cannot be verified, so it asks');
+    expect(sw.elapsedMilliseconds, lessThan(50));
+  });
 }

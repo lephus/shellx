@@ -388,6 +388,7 @@ void main() {
       expect(h.ptys.ptys.single.killed, isTrue);
       expect(h.keepAwake.last, isFalse);
       expect(h.quits, 1);
+      expect(h.imageDeletes, 1);
     });
 
     test('quit while signed out still asks about open tabs', () async {

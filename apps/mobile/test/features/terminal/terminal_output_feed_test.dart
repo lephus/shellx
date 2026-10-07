@@ -199,4 +199,62 @@ void main() {
       expect(writes.join(), [for (var i = 0; i < 500; i++) '${i.toString().padLeft(4, '0')}-'].join());
     });
   });
+
+  group('a trim never loses a screen mode', () {
+    String body(int n) => List.generate(n, (i) => 'row $i\n').join();
+
+    TerminalOutputFeed small(List<String> writes) => TerminalOutputFeed(writes.add, cap: 2000, keep: 500);
+
+    test('the alternate screen entered in the dropped part is re-entered first', () {
+      fakeAsync((async) {
+        final writes = <String>[];
+        final feed = small(writes)..isActive = false;
+        feed.add('\x1b[?1049h${body(400)}');
+        feed.add(body(400));
+        expect(feed.dropped, greaterThan(0));
+        async.elapse(const Duration(seconds: 5));
+        expect(writes.first, startsWith('\x1b[?1049h'));
+      });
+    });
+
+    test('bracketed paste turned off in the dropped part is turned off again', () {
+      fakeAsync((async) {
+        final writes = <String>[];
+        final feed = small(writes);
+        feed.add('\x1b[?2004h');
+        async.elapse(const Duration(milliseconds: 20));
+        feed.isActive = false;
+        feed.add('\x1b[?2004l${body(400)}');
+        feed.add(body(400));
+        expect(feed.dropped, greaterThan(0));
+        async.elapse(const Duration(seconds: 5));
+        expect(writes.skip(1).first, startsWith('\x1b[?2004l'));
+      });
+    });
+
+    test('a mode already in effect on screen is not repeated', () {
+      fakeAsync((async) {
+        final writes = <String>[];
+        final feed = small(writes);
+        feed.add('\x1b[?1049h');
+        async.elapse(const Duration(milliseconds: 20));
+        feed.isActive = false;
+        feed.add('\x1b[?1049h${body(400)}');
+        feed.add(body(400));
+        async.elapse(const Duration(seconds: 5));
+        expect(writes.skip(1).join(), isNot(contains('\x1b[?1049h')));
+      });
+    });
+
+    test('the last state wins when the dropped part switched back and forth', () {
+      fakeAsync((async) {
+        final writes = <String>[];
+        final feed = small(writes)..isActive = false;
+        feed.add('\x1b[?1049h${body(100)}\x1b[?1049l${body(300)}');
+        feed.add(body(400));
+        async.elapse(const Duration(seconds: 5));
+        expect(writes.join(), isNot(contains('\x1b[?1049h')));
+      });
+    });
+  });
 }

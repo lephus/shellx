@@ -25,6 +25,10 @@ final class TerminalOutputFeed {
   }) : _now = now ?? DateTime.now;
 
   final void Function(String text) _write;
+
+  // The two modes whose loss garbles a screen, as last written to xterm (A10 final review).
+  bool _writtenAlt = false;
+  bool _writtenBracketed = false;
   final int activeBudget;
   final Duration activeTick;
   final int idleBudget;
@@ -91,7 +95,7 @@ final class TerminalOutputFeed {
         _echoes.length < echoMaxPerSecond;
     if (echo) {
       _echoes.addLast(now);
-      _write(text);
+      _emit(text);
       return;
     }
     _pending.addLast(text);
@@ -114,7 +118,7 @@ final class TerminalOutputFeed {
     final text = _pending.join();
     _pending.clear();
     _pendingLength = 0;
-    _write(text);
+    _emit(text);
   }
 
   /// A screen reset: what waits belongs to the old screen.
@@ -157,7 +161,7 @@ final class TerminalOutputFeed {
       break;
     }
     _pendingLength -= taken;
-    if (taken > 0) _write(out.toString());
+    if (taken > 0) _emit(out.toString());
     if (_pendingLength > 0) _timer = Timer(_active ? activeTick : idleTick, _flush);
   }
 
@@ -165,12 +169,44 @@ final class TerminalOutputFeed {
     if (_pendingLength <= cap) return;
     final text = _pending.join();
     final start = _cutPoint(text, text.length - keep);
-    final kept = text.substring(start);
+    // What the dropped part switched (alternate screen, bracketed paste) is
+    // set again in front of what stays, unless the screen is already so.
+    final modes = _modesIn(text.substring(0, start));
+    final restore = StringBuffer();
+    if (modes.alt != null && modes.alt != _writtenAlt) restore.write(modes.alt! ? '\x1b[?1049h' : '\x1b[?1049l');
+    if (modes.bracketed != null && modes.bracketed != _writtenBracketed) {
+      restore.write(modes.bracketed! ? '\x1b[?2004h' : '\x1b[?2004l');
+    }
+    final kept = '$restore${text.substring(start)}';
     _pending
       ..clear()
       ..addLast(kept);
     _pendingLength = kept.length;
     dropped++;
+  }
+
+  void _emit(String text) {
+    final modes = _modesIn(text);
+    _writtenAlt = modes.alt ?? _writtenAlt;
+    _writtenBracketed = modes.bracketed ?? _writtenBracketed;
+    _write(text);
+  }
+
+  static final RegExp _modeSequence = RegExp(r'\x1b\[\?([0-9;]+)([hl])');
+
+  /// The last alternate-screen and bracketed-paste state [text] sets (null: it does not touch it).
+  static ({bool? alt, bool? bracketed}) _modesIn(String text) {
+    if (!text.contains('\x1b[?')) return (alt: null, bracketed: null);
+    bool? alt;
+    bool? bracketed;
+    for (final m in _modeSequence.allMatches(text)) {
+      final on = m.group(2) == 'h';
+      for (final param in m.group(1)!.split(';')) {
+        if (param == '1049' || param == '1047' || param == '47') alt = on;
+        if (param == '2004') bracketed = on;
+      }
+    }
+    return (alt: alt, bracketed: bracketed);
   }
 
   static int _cutPoint(String text, int from) {

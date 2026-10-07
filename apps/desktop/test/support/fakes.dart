@@ -493,6 +493,7 @@ final class TestHarness {
   /// The clock DesktopServices.now reads.
   DateTime now = DateTime(2026, 10, 5, 12);
   int quits = 0;
+  int imageDeletes = 0;
   final List<String> shutdownOrder = [];
   Future<void> Function() remoteShutdown = () async {};
 
@@ -562,6 +563,9 @@ final class TestHarness {
     quitApp: () async {
       shutdownOrder.add('quit');
       quits++;
+    },
+    deletePastedImages: () async {
+      imageDeletes++;
     },
     stopRemoteRetries: () => shutdownOrder.add('retries'),
     shutdownRemote: () async {
