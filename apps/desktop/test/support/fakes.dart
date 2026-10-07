@@ -474,6 +474,8 @@ final class TestHarness {
   /// The clock DesktopServices.now reads.
   DateTime now = DateTime(2026, 10, 5, 12);
   int quits = 0;
+  final List<String> shutdownOrder = [];
+  Future<void> Function() remoteShutdown = () async {};
 
   /// Calls of DesktopServices.awaitPtyKills.
   int ptyKillWaits = 0;
@@ -538,7 +540,14 @@ final class TestHarness {
     appVersion: appVersion,
     platform: platform,
     deviceName: 'Phus-MacBook-Pro',
-    quitApp: () async => quits++,
+    quitApp: () async {
+      shutdownOrder.add('quit');
+      quits++;
+    },
+    shutdownRemote: () async {
+      shutdownOrder.add('remote');
+      await remoteShutdown();
+    },
     shutdownTimeout: const Duration(milliseconds: 200),
     awaitPtyKills: () {
       ptyKillWaits++;

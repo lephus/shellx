@@ -15,6 +15,7 @@ import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
+import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
@@ -95,8 +96,11 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
     });
   }
 
+  StreamSubscription<PaneReplacement>? _replacements;
+
   @override
   void dispose() {
+    unawaited(_replacements?.cancel());
     for (final c in _scrolls.values) {
       c.dispose();
     }
@@ -113,6 +117,14 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
   @override
   void initState() {
     super.initState();
+    // A8 D22: the scrollback controller follows a reconnected pane.
+    _replacements = ref
+        .read(terminalTabsProvider.notifier)
+        .paneReplacements
+        .listen((r) {
+          final c = _scrolls.remove(r.from);
+          if (c != null) _scrolls[r.to] = c;
+        });
     // UI-A5 §4: polite, once, when a strip appears (also one shown before
     // this pane was built).
     ref.listenManual<RestoreStripState?>(restoreStripProvider, (_, next) {
@@ -294,7 +306,9 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           child: ColoredBox(
                             color: ShellxDesktopColors.bgTerminal,
                             child: EmptyTerminalState(
-                              onOpen: tabs.openTab,
+                              onOpen: () => unawaited(
+                                ref.read(sshActionsProvider).newTab(),
+                              ),
                               buttonFocus: widget.emptyFocus,
                             ),
                           ),

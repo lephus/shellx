@@ -64,8 +64,28 @@ void main() {
       cwd: '/w',
       gitBranch: 'main',
       ports: const [3000, 5173],
+      remote: SessionRemote(
+        launch: TmuxLaunch('main', host: SshTarget.parse('devbox')),
+        connected: true,
+        home: '/home/me',
+      ),
     );
     final back = summaryFromWire(summaryToWire(s));
+    expect(back.remote, s.remote);
+    expect(
+      summaryFromWire(
+        summaryToWire(
+          SessionSummary(
+            id: 1,
+            index: 1,
+            shell: 'zsh',
+            createdAt: DateTime.utc(2026),
+            attachedMobileId: null,
+          ),
+        ),
+      ).remote,
+      isNull,
+    );
     expect(
       [
         back.id,

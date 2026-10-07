@@ -28,13 +28,16 @@ const kPatternMaxBytes = 1024;
 /// `--cmd`. Never logs text sent or read.
 final class PaneIoCommands {
   PaneIoCommands(this._ref) {
-    _injector = CommandInjector(_probe, (pane, text) {
-      try {
-        _send(pane, text: text, enter: true);
-      } on CliFailure {
-        // The pane ended before its shell was ready: nothing to type into.
-      }
-    });
+    _injector = CommandInjector(_probe, typeNow);
+  }
+
+  /// Types [text] and Enter into [pane] now.
+  void typeNow(int pane, String text) {
+    try {
+      _send(pane, text: text, enter: true);
+    } on CliFailure {
+      // The pane ended before its shell was ready: nothing to type into.
+    }
   }
 
   final Ref _ref;
@@ -52,6 +55,10 @@ final class PaneIoCommands {
     }
   }
 
+  /// A8 D22: a pane id from before a reconnect names the new session.
+  int _forward(int id) =>
+      _ref.read(terminalTabsProvider.notifier).resolveReplaced(id);
+
   /// A terminal pane that exists (exited or not).
   PaneSession _pane(int id) =>
       _tabsState.tabOfSession(id)?.panes[id] ??
@@ -59,7 +66,7 @@ final class PaneIoCommands {
 
   /// D19: a browser pane (negative id, A6) is `bad_request`.
   int _paneArg(MuxMessage r) {
-    final target = parseTarget(r.fields['pane'], null);
+    final target = parseTarget(r.fields['pane'], null, forward: _forward);
     if (target is PaneRef && target.id < 0) {
       throw badRequest('p${target.id} is a browser pane; use shellx browser');
     }
@@ -167,7 +174,7 @@ final class PaneIoCommands {
     // A shell that already ended with 0 left no pane (A3 D7): `send exit`
     // then `wait --exit` still gets its code; a closed one says so (M2).
     if (r.fields['mode'] == 'exit') {
-      if (parseTarget(r.fields['pane'], null) case PaneRef(
+      if (parseTarget(r.fields['pane'], null, forward: _forward) case PaneRef(
         :final id,
       ) when _tabsState.tabOfSession(id) == null) {
         final end = _ref.read(terminalTabsProvider.notifier).paneEnd(id);

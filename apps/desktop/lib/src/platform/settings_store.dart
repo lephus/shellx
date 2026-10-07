@@ -56,6 +56,15 @@ abstract final class SettingKeys {
   /// A9 D4: "Đang dùng font và màu từ cấu hình Ghostty" was shown once.
   static const String configGhosttyNoticeShown = 'config_ghostty_notice_shown';
 
+  /// A8 D6: the last 10 servers connected to, newest first.
+  static const String sshRecentTargets = 'ssh_recent_targets';
+
+  /// A8 D11: servers that get no ShellX hook.
+  static const String sshPlainTargets = 'ssh_plain_targets';
+
+  /// A8 D11: tray "Install the ShellX hook on servers" (default on).
+  static const String sshRemoteHook = 'ssh_remote_hook';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -78,6 +87,9 @@ abstract final class SettingKeys {
     cliPathInstalled,
     cliAllowExternal,
     configGhosttyNoticeShown,
+    sshRecentTargets,
+    sshPlainTargets,
+    sshRemoteHook,
   };
 }
 

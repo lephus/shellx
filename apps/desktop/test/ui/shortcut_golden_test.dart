@@ -15,17 +15,20 @@ Set<String> signatures(Map<ShortcutActivator, Intent> map) => {
     '${describeActivator(e.key)} -> ${describeIntent(e.value)}',
 };
 
-/// Chords A9 adds on purpose (spec D24). No browser map: A6 is not merged.
+/// Chords A9 adds on purpose (spec D24), and A8's ⌘⇧K (D41). No browser map: A6 is not merged.
 Set<String> a9Additions(String map, String platform) => platform == 'mac'
     ? const {
         'shift+meta+2c norepeat -> ReloadConfigIntent',
         'meta+2c norepeat -> OpenConfigIntent',
         'shift+meta+70 norepeat -> CommandPaletteIntent',
+        // A8 D41: "Connect to a server".
+        'shift+meta+6b norepeat -> OpenSshConnectIntent',
       }
     : const {
         'ctrl+shift+2c norepeat -> ReloadConfigIntent',
         'ctrl+2c norepeat -> OpenConfigIntent',
         'ctrl+shift+70 norepeat -> CommandPaletteIntent',
+        'ctrl+shift+6b norepeat -> OpenSshConnectIntent',
       };
 
 void main() {

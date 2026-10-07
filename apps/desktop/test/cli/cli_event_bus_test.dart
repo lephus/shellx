@@ -287,4 +287,63 @@ void main() {
       expect(got, isEmpty);
     });
   });
+
+  test(
+    'a reconnect is one pane.replaced, not a close and an open (D22, D4)',
+    () async {
+      local.notifyOnOpen = true; // as the real manager
+      final c = cliContainer(local);
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab(launch: SshLaunch(SshTarget.parse('devbox')!)); // 100
+      final got = <Map<String, Object?>>[];
+      c.read(cliEventBusProvider).events.listen(got.add);
+      await pumpEventQueue();
+      local.summaries.removeWhere((s) => s.id == 100); // an ended session
+      local.views[100]!.end(255);
+      await pumpEventQueue();
+      final fresh = (await tabs.reconnect(100))!;
+      await settle();
+      final kinds = got.map((e) => e['kind']).toList();
+      expect(kinds, contains('pane.replaced'));
+      expect(kinds, isNot(contains('pane.closed')));
+      expect(kinds, isNot(contains('pane.opened')));
+      expect(kinds, isNot(contains('pane.focused')));
+      expect(kinds, isNot(contains('tab.closed')));
+      expect(kinds, isNot(contains('tab.opened')));
+      expect(got.where((e) => e['kind'] == 'pane.replaced').single, {
+        'kind': 'pane.replaced',
+        'old': 100,
+        'new': fresh,
+        'tab': 100,
+      });
+      // Ordinary closes and opens afterwards are reported as before.
+      got.clear();
+      await tabs.openTab(); // 101
+      await settle();
+      expect(got.map((e) => e['kind']), contains('tab.opened'));
+    },
+  );
+
+  test('two reconnects before one diff: still no pane.focused', () async {
+    local.notifyOnOpen = true;
+    final c = cliContainer(local);
+    final tabs = c.read(terminalTabsProvider.notifier);
+    await tabs.openTab(launch: SshLaunch(SshTarget.parse('devbox')!)); // 100
+    final got = <Map<String, Object?>>[];
+    c.read(cliEventBusProvider).events.listen(got.add);
+    await pumpEventQueue();
+    var current = 100;
+    for (var i = 0; i < 2; i++) {
+      local.summaries.removeWhere((s) => s.id == current);
+      local.views[current]!.end(255);
+      await pumpEventQueue();
+      current = (await tabs.reconnect(current))!;
+    }
+    await settle();
+    final kinds = got.map((e) => e['kind']).toList();
+    expect(kinds.where((k) => k == 'pane.replaced'), hasLength(2));
+    expect(kinds, isNot(contains('pane.focused')));
+    expect(kinds, isNot(contains('pane.closed')));
+    expect(kinds, isNot(contains('pane.opened')));
+  });
 }

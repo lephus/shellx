@@ -83,6 +83,29 @@ void main() {
     expect(b.labelOf(const KeyAction('new_split', 'right')), '⌘D');
   });
 
+  test('A8: ssh_connect is ⌘⇧K / Ctrl+Shift+K, tmux_attach has no chord; '
+      'a user line takes over (D27)', () {
+    var (b, problems) = resolve('');
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+shift+k'), isA<OpenSshConnectIntent>());
+    expect(b.labelOf(const KeyAction('ssh_connect')), '⌘⇧K');
+    expect(b.labelOf(const KeyAction('tmux_attach')), isNull);
+    (b, problems) = resolve('', platform: win);
+    expect(lookup(b, 'ctrl+shift+k'), isA<OpenSshConnectIntent>());
+    expect(b.labelOf(const KeyAction('ssh_connect')), 'Ctrl+Shift+K');
+    (b, problems) = resolve(
+      'keybind = super+shift+k=new_tab\nkeybind = super+alt+t=tmux_attach',
+    );
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+shift+k'), isA<NewTabIntent>());
+    expect(lookup(b, 'super+alt+t'), isA<OpenTmuxAttachIntent>());
+    expect(b.labelOf(const KeyAction('ssh_connect')), isNull);
+    (_, problems) = resolve('keybind = super+shift+k=ssh_connect:x');
+    expect(codes(problems), [
+      (1, ConfigProblemCode.badActionParam, ConfigSeverity.error),
+    ]);
+  });
+
   test('unbind, clear, ignore, empty value', () {
     var (b, _) = resolve('keybind = super+d=unbind');
     expect(lookup(b, 'super+d'), isNull);

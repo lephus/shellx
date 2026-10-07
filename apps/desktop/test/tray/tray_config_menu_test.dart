@@ -62,35 +62,42 @@ void main() {
   const signedIn = AgentViewState(phase: AuthPhase.signedIn, email: 'a@b.c');
 
   for (final state in [signedOut, signedIn]) {
-    test('"Cấu hình" right after "Dòng lệnh" (signed in: ${state.signedIn}), '
-        'no problems', () {
-      for (final l10n in [en, vi]) {
-        final items = menu(state, l10n);
-        final cli = items.indexWhere((i) => i.key == TrayKeys.commandLine);
-        expect(cli, greaterThanOrEqualTo(0));
-        expect(items[cli + 1].key, TrayKeys.config);
-        final sub = items[cli + 1];
-        expect(sub.label, l10n.trayConfig);
-        expect(sub.submenu!.items!.map((i) => i.key), [
-          TrayKeys.configOpen,
-          TrayKeys.configReload,
-          TrayKeys.configShortcuts,
-        ]);
-      }
-      final items = menu(state, en);
-      expect(find(items, TrayKeys.config)!.label, 'Configuration');
-      expect(
-        find(items, TrayKeys.configOpen)!.label,
-        'Open configuration file',
-      );
-      expect(find(items, TrayKeys.configReload)!.label, 'Reload configuration');
-      expect(
-        find(items, TrayKeys.configShortcuts)!.label,
-        'Keyboard shortcuts…',
-      );
-      expect(find(items, TrayKeys.configProblems), isNull);
-      expect(find(menu(state, vi), TrayKeys.config)!.label, 'Cấu hình');
-    });
+    test(
+      '"Cấu hình" after "Dòng lệnh" and "SSH" (signed in: ${state.signedIn}), '
+      'no problems',
+      () {
+        for (final l10n in [en, vi]) {
+          final items = menu(state, l10n);
+          final cli = items.indexWhere((i) => i.key == TrayKeys.commandLine);
+          expect(cli, greaterThanOrEqualTo(0));
+          expect(items[cli + 1].key, TrayKeys.ssh); // A8
+          expect(items[cli + 2].key, TrayKeys.config);
+          final sub = items[cli + 2];
+          expect(sub.label, l10n.trayConfig);
+          expect(sub.submenu!.items!.map((i) => i.key), [
+            TrayKeys.configOpen,
+            TrayKeys.configReload,
+            TrayKeys.configShortcuts,
+          ]);
+        }
+        final items = menu(state, en);
+        expect(find(items, TrayKeys.config)!.label, 'Configuration');
+        expect(
+          find(items, TrayKeys.configOpen)!.label,
+          'Open configuration file',
+        );
+        expect(
+          find(items, TrayKeys.configReload)!.label,
+          'Reload configuration',
+        );
+        expect(
+          find(items, TrayKeys.configShortcuts)!.label,
+          'Keyboard shortcuts…',
+        );
+        expect(find(items, TrayKeys.configProblems), isNull);
+        expect(find(menu(state, vi), TrayKeys.config)!.label, 'Cấu hình');
+      },
+    );
 
     test('with problems the last item, after a separator, counts them '
         '(signed in: ${state.signedIn})', () {

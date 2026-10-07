@@ -9,9 +9,11 @@ import '../pages/login_page.dart';
 import '../pages/onboarding_page.dart';
 import '../pages/pairing_page.dart';
 import '../terminal/shortcut_labels.dart';
+import '../terminal/ssh_connect_dialog.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
 import 'dialog_informational.dart';
+import 'dialog_layout.dart';
 
 /// UI §4 widths. The height follows the content (title → 8 → body → 24 →
 /// actions), up to the window's room ([RouteDialogHost]).
@@ -22,6 +24,7 @@ double dialogWidthFor(WindowState state) {
   }
   return switch (state.route) {
     OnboardingRoute() => ShellxSizes.dialogWidthOnboarding,
+    SshConnectRoute() => ShellxSizes.connectDialogWidth,
     LoginRoute() ||
     PairingRoute() ||
     ChangePasswordRoute() ||
@@ -117,6 +120,7 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
       OnboardingRoute() => l10n.onboardingTitle,
       PairingRoute() => l10n.pairingTitle,
       ChangePasswordRoute() => l10n.changePasswordTitle,
+      SshConnectRoute() => l10n.sshDialogTitle,
       null => '',
     };
   }
@@ -132,6 +136,11 @@ class _RouteDialogHostState extends ConsumerState<RouteDialogHost>
       OnboardingRoute() => const OnboardingPage(),
       PairingRoute() => const PairingPage(),
       ChangePasswordRoute() => const ChangePasswordPage(),
+      // A8 UI §4: the other forms' title, padding and scroll.
+      SshConnectRoute(:final tab) => DialogBody(
+        title: l10n.sshDialogTitle,
+        content: [SshConnectDialog(initialTab: tab, showTitle: false)],
+      ),
       null => const SizedBox.shrink(),
     };
     // A confirm over a route hides the route page but keeps it mounted, so

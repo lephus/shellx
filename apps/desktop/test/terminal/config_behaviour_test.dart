@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_syntax.dart';
@@ -64,6 +65,30 @@ void main() {
     local.setCwd(state().selected!.focused.id, '/repo'); // A2 OSC 7 in the fake
     await tabs().openTab();
     expect(local.openCwds.last, '/repo');
+  });
+
+  test('inherit never takes an SSH pane\'s folder (A8 D5)', () async {
+    await config('working-directory = inherit\n');
+    local.add(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        cwd: '/tmp',
+        remote: SessionRemote(
+          launch: SshLaunch(SshTarget.parse('devbox')!),
+          connected: true,
+        ),
+      ),
+    );
+    local.add(local.summary(2, origin: SessionOrigin.desktop));
+    await pumpEventQueue();
+    tabs().focusPane(1);
+    expect(tabs().newTabCwd(), isNull);
+    tabs().focusPane(2);
+    local.setCwd(2, '/repo');
+    expect(tabs().newTabCwd(), '/repo');
+    await tabs().openTab(launch: SshLaunch(SshTarget.parse('devbox')!));
+    expect(local.openCwds.last, isNull);
   });
 
   test(

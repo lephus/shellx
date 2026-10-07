@@ -9,16 +9,18 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
-import '../../agent/desktop_services.dart';
 import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../config/config_controller.dart';
+import '../../remote/remote_port_forwards.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
 import 'shellx_menu.dart';
+import 'sidebar_new_button.dart';
+import 'sidebar_remote.dart';
 import 'shortcut_labels.dart';
 import 'sidebar_drag.dart';
 import 'terminal_overlays.dart';
@@ -590,17 +592,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   // ---- ports, moves, menus (UI-A2 §2.4, §5, §8) -------------------------
 
-  Future<void> _openPort(int port) async {
-    try {
-      await ref.read(desktopServicesProvider).urlOpener.openLocalPort(port);
-    } catch (_) {
-      if (mounted) {
-        ref
-            .read(terminalTabsProvider.notifier)
-            .showNotice(const PortOpenFailedNotice());
-      }
-    }
-  }
+  /// A8 D19: an SSH tab's port goes through a forward. A tab's ports are
+  /// its focused pane's (`TerminalTab.ports`), so that pane owns the port.
+  Future<void> _openPort(TerminalTab tab, int port) =>
+      ref.read(remotePortForwardsProvider.notifier).open(tab.focused, port);
 
   /// "claude, tab 2 of 3 in Backend": where the tab is after a move.
   String? _whereIs(int id) {
@@ -702,17 +697,20 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         : ([...tab.ports]..sort()).take(5).toList();
     final portSubmenu = ports.length > 2;
     final attention = ref.read(tabAttentionProvider);
+    final remoteEntries = remoteRowEntries(l10n, tab);
     await _withMenuOpen(('row', tab.id), () async {
       final choice = await showShellxMenu<Object>(
         context: context,
         at: at,
         entries: [
+          ...remoteEntries,
           // UI-A4 §10.4 (D23): first, dimmed when there is nothing to read.
           ShellxMenuEntry(
             key: const Key('menu.markRead'),
             value: _RowAction.markRead,
             label: l10n.attentionMarkRead,
             enabled: attention.hasUnread(tab.id),
+            dividerBefore: remoteEntries.isNotEmpty,
           ),
           ShellxMenuEntry(
             key: const Key('menu.markAllRead'),
@@ -822,7 +820,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         case _RowAction.moveTo:
           await _moveToMenu(tab, at, fromList: fromList);
         case _RowAction.ports:
-          await _portMenu(ports, at);
+          await _portMenu(tab, ports, at);
         case _RowAction.moveUp:
           _moveUp(tab.id);
         case _RowAction.moveDown:
@@ -830,7 +828,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         case _RowAction.close:
           widget.onClose(tab);
         case final int port:
-          await _openPort(port);
+          await _openPort(tab, port);
+        case final RemoteMenuAction action:
+          await runRemoteMenuAction(ref, action, tab: tab);
       }
       return null;
     });
@@ -838,7 +838,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   /// V12: one entry per port ("Open http://localhost:3000"), at the same
   /// place as the row menu.
-  Future<void> _portMenu(List<int> ports, Offset at) async {
+  Future<void> _portMenu(TerminalTab tab, List<int> ports, Offset at) async {
     final l10n = AppLocalizations.of(context);
     final port = await showShellxMenu<int>(
       context: context,
@@ -852,7 +852,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ),
       ],
     );
-    if (port != null && mounted) await _openPort(port);
+    if (port != null && mounted) await _openPort(tab, port);
   }
 
   /// UI-A2 §5.3: every other workspace in sidebar order, then "New
@@ -958,7 +958,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         CustomSemanticsAction(label: l10n.tabMoveDown): () => _moveDown(tab.id),
       for (final port in tab.exited ? const <int>[] : tab.ports)
         CustomSemanticsAction(label: l10n.tabOpenPort(port)): () =>
-            unawaited(_openPort(port)),
+            unawaited(_openPort(tab, port)),
     };
   }
 
@@ -967,22 +967,31 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final l10n = AppLocalizations.of(context);
     // Shift+F10 / the Menu key: the list has the keyboard (UI-A2 §4).
     final fromList = widget.focusNode.hasFocus;
+    final remoteEntries = remoteHeaderEntries(
+      l10n,
+      w,
+      canReconnect: workspaceCanReconnect(ref, w.id),
+    );
     final choice = await _withMenuOpen(
       ('ws', w.id),
-      () => showShellxMenu<_HeaderAction>(
+      () => showShellxMenu<Object>(
         context: context,
         at: at,
         entries: [
-          ShellxMenuEntry(
-            key: const Key('menu.ws.newTab'),
-            value: _HeaderAction.newTab,
-            label: l10n.workspaceNewTab,
-          ),
+          ...remoteEntries,
+          // A server workspace's "New SSH tab on …" replaces this one.
+          if (w.ssh == null)
+            ShellxMenuEntry(
+              key: const Key('menu.ws.newTab'),
+              value: _HeaderAction.newTab,
+              label: l10n.workspaceNewTab,
+            ),
           ShellxMenuEntry(
             key: const Key('menu.ws.rename'),
             value: _HeaderAction.rename,
             label: l10n.workspaceRename,
             shortcut: renameShortcutLabel(),
+            dividerBefore: remoteEntries.isNotEmpty,
           ),
           ShellxMenuEntry(
             key: const Key('menu.ws.toggle'),
@@ -1013,6 +1022,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         workspaces.toggleCollapsed(w.id);
       case _HeaderAction.delete:
         workspaces.delete(w.id);
+      case final RemoteMenuAction action:
+        await runRemoteMenuAction(ref, action, workspaceId: w.id);
     }
   }
 
@@ -1291,6 +1302,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final state = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final home = ref.watch(homeDirectoryProvider);
+    // A8: rows' port tooltips say whether a server's port is forwarded.
+    ref.watch(remotePortForwardsProvider);
     registerRowActionOrder(l10n);
     // Only the unread map: history alone (a notice the user saw) does not
     // rebuild the sidebar.
@@ -1313,13 +1326,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     // Tooltips and menu hints follow a reload (A9 D29).
     ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final shortcut = newTabShortcutLabel();
-    final newTab = ShellxIconButton(
-      key: const Key('sidebar.newTab'),
-      icon: Icons.add,
+    final newTab = SidebarNewButton(
       semanticLabel: l10n.terminalNewTab,
       tooltip: shortcutTooltip(l10n.terminalNewTabTooltip, shortcut),
       busy: state.opening,
-      onPressed: () => ref.read(terminalTabsProvider.notifier).openTab(),
     );
     // UI-A4 §5.1: hollow at 0; filled with a 6 px dot when anything is
     // unread; `rowSelected` ("on") while the panel is open.
@@ -1422,6 +1432,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               collapsed: w.collapsed,
               containsSelected: item.containsSelected,
               hasUnread: item.hasUnread,
+              ssh: w.ssh,
               focused: !sticky && _showFocus && cursor == w.id,
               renaming: !sticky && sidebar.renaming == RenameWorkspace(w.id),
               dropTarget: _dropTarget == w.id,
@@ -1514,7 +1525,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           onStartRename: () => _startTabRename(tab.id, fromList: false),
           onRename: (text) => _commitTabName(tab.id, text),
           onCancelRename: () => _endRename(RenameTab(tab.id)),
-          onOpenPort: (port) => unawaited(_openPort(port)),
+          onOpenPort: (port) => unawaited(_openPort(tab, port)),
+          portTooltip: (port) => remotePortTooltipFor(ref, l10n, tab, port),
           onMenu: (at) => unawaited(_rowMenu(tab, at)),
           extraActions: _rowActions(l10n, tab),
           menuOpen: _menuFor == ('row', tab.id),

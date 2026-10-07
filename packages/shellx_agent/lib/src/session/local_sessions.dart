@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../remote/session_launch.dart';
 import 'session_manager.dart';
 import 'session_notice.dart';
 
@@ -25,6 +26,11 @@ abstract interface class LocalSessions {
   /// directory (A3 D17). Throws [SessionLimitException] or
   /// [SpawnFailedException].
   ///
+  /// With [launch] (A8 D2) it starts `ssh` or `tmux` instead and [cwd] is
+  /// ignored (a remote folder travels in the launch); the
+  /// [SpawnFailedException] message is then `ssh_unavailable`,
+  /// `tmux_unavailable`, `bad_launch` or `spawn_failed`.
+  ///
   /// [tabId] (A7 D29) is the tab the new pane joins; null means the session
   /// starts its own tab, whose id is its own (A3 D1). Exposed to the shell
   /// as `SHELLX_TAB_ID`.
@@ -33,6 +39,7 @@ abstract interface class LocalSessions {
     required int rows,
     String? cwd,
     int? tabId,
+    SessionLaunch? launch,
   });
 
   /// A7 D23: `shellx notify` for session [id]: the push to the phone and a

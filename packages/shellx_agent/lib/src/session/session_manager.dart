@@ -15,6 +15,12 @@ import '../pty/pty.dart';
 import '../pty/session_environment.dart';
 import '../pty/shell_integration.dart';
 import '../pty/shell_resolver.dart';
+import '../remote/command_runner.dart';
+import '../remote/remote_port_watcher.dart';
+import '../remote/remote_tools.dart';
+import '../remote/session_launch.dart';
+import '../remote/ssh_command.dart';
+import '../remote/ssh_target.dart';
 import '../term/osc_title.dart';
 import 'agent_sessions.dart';
 import 'local_sessions.dart';
@@ -41,6 +47,7 @@ final class SessionSummary {
     this.cwd,
     this.gitBranch,
     this.ports = const [],
+    this.remote,
   });
   final int id, index;
   final String shell;
@@ -67,6 +74,10 @@ final class SessionSummary {
   /// Listening TCP ports of the session's process tree, ascending (C3).
   final List<int> ports;
 
+  /// A8: how this session reaches a server or a tmux session; null for a
+  /// local shell.
+  final SessionRemote? remote;
+
   bool get phoneAttached => attachedMobileId != null;
 }
 
@@ -85,6 +96,19 @@ int _clampDimension(int value) => value.clamp(_minDimension, _maxDimension);
 bool _noPhoneReceivesDriver(String mobileId) => false;
 
 Duration? _noThreshold() => null;
+
+/// A8 D16, D17: what the server reported.
+final class _RemoteState {
+  _RemoteState(this.launch, {required this.connected});
+  final SessionLaunch launch;
+  bool connected;
+  int? pid;
+  String? home;
+  Timer? plainTimer;
+
+  /// D16: only a server's ssh that ran the ShellX hook may speak OSC 6973.
+  bool get hooked => launch.host != null && launch.usesHook;
+}
 
 final class _Session {
   _Session({
@@ -131,6 +155,9 @@ final class _Session {
   String? cwd;
   String? gitBranch;
   List<int> ports = const [];
+
+  /// A8: set for an SSH or tmux session, null for a local shell.
+  _RemoteState? remote;
 
   /// Bumped by every branch lookup: a late answer to an older one is
   /// dropped (the directory changed meanwhile).
@@ -232,8 +259,14 @@ final class SessionManager implements AgentSessions, LocalSessions {
     void Function(String message)? log,
     Duration? Function()? commandNoticeThreshold,
     Future<bool> Function(String path)? directoryExists,
+    RemoteTools? remoteTools,
+    Duration plainConnectedAfter = const Duration(seconds: 10),
+    Duration remotePortInterval = const Duration(seconds: 5),
   }) : _ptyFactory = ptyFactory,
        _gitHeads = gitHeads,
+       _remoteTools = remoteTools,
+       _plainConnectedAfter = plainConnectedAfter,
+       _remotePortInterval = remotePortInterval,
        _windowsPaths = windowsPaths,
        _localHostName = localHostName,
        _notifications = notifications,
@@ -260,9 +293,28 @@ final class SessionManager implements AgentSessions, LocalSessions {
         log: log,
       );
     }
+    if (remoteTools?.control case final control?) {
+      _remotePorts = RemotePortWatcher(
+        control: control,
+        shells: _remoteShells,
+        onPorts: _applyRemotePorts,
+        interval: _remotePortInterval,
+        log: log,
+      );
+    }
   }
 
   final PtyFactory _ptyFactory;
+
+  /// A8: ssh/tmux paths and the control helper; null = SSH unavailable.
+  final RemoteTools? _remoteTools;
+  final Duration _plainConnectedAfter;
+  final Duration _remotePortInterval;
+
+  /// D9, D29: opens to a server that have not registered a session yet,
+  /// by order of arrival (the first signs in, the rest wait for its master).
+  final _pendingConnects = <int, SshTarget>{};
+  int _nextConnect = 0;
 
   /// Never the text of a notice (A4 N9).
   final void Function(String message)? _log;
@@ -297,6 +349,17 @@ final class SessionManager implements AgentSessions, LocalSessions {
 
   /// Listening ports (A2 C3); null: no ports.
   PortWatcher? _portWatcher;
+
+  /// A8 D18; null without ssh. Not disposed by [closeAll] (the tray's
+  /// "Close all" is the same call): only a real shutdown would.
+  RemotePortWatcher? _remotePorts;
+
+  /// A8 D18, real shutdown only (tray Quit): stops the remote port probes
+  /// for good. [closeAll] does not.
+  void disposeRemotePorts() {
+    _remotePorts?.dispose();
+    _remotePorts = null;
+  }
 
   /// While one side typed less than this ago, a keystroke from the other
   /// side is written but does not take the driver (and the PTY size) away:
@@ -365,6 +428,13 @@ final class SessionManager implements AgentSessions, LocalSessions {
           cwd: s.cwd,
           gitBranch: s.gitBranch,
           ports: s.ports,
+          remote: s.remote == null
+              ? null
+              : SessionRemote(
+                  launch: s.remote!.launch,
+                  connected: s.remote!.connected,
+                  home: s.remote!.home,
+                ),
         ),
   ];
 
@@ -384,10 +454,18 @@ final class SessionManager implements AgentSessions, LocalSessions {
           shell: s.shell,
           createdAt: s.createdAt.millisecondsSinceEpoch,
           attached: s.attachedMobileId != null,
-          cwd: context ? s.cwd ?? '' : '',
+          cwd: context ? _phoneCwd(s) : '',
           branch: context ? s.gitBranch ?? '' : '',
         ),
   ];
+
+  /// D36: a phone sees a server's folder as `host:path`.
+  String _phoneCwd(_Session s) {
+    final cwd = s.cwd;
+    if (cwd == null) return '';
+    final host = s.remote?.launch.host;
+    return host == null ? cwd : '${host.key}:$cwd';
+  }
 
   /// Handles one decrypted message from phone [mobileId].
   @override
@@ -523,6 +601,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     if (session == null || session.closing) return;
     session.closing = true;
     session.killedOnRequest = true;
+    session.remote?.plainTimer?.cancel();
     final mobileId = session.attachedMobileId;
     if (mobileId != null) {
       _send(
@@ -556,7 +635,10 @@ final class SessionManager implements AgentSessions, LocalSessions {
   void close(int id) => closeSession(id);
 
   @override
-  void watchPorts(bool visible) => _portWatcher?.setVisible(visible);
+  void watchPorts(bool visible) {
+    _portWatcher?.setVisible(visible);
+    _remotePorts?.setVisible(visible);
+  }
 
   /// Session id → shell pid, for [PortWatcher] (D3: ptys without a pid
   /// have no ports). An exited shell is left out: its pid stays set but
@@ -565,7 +647,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
   Map<int, int> _shellPids() {
     final pids = <int, int>{};
     for (final s in _sessions.values) {
-      if (s.closing || s.exited) continue;
+      if (s.closing || s.exited || s.remote != null) continue;
       final pid = _pidOf(s);
       if (pid != null) pids[s.id] = pid;
     }
@@ -589,6 +671,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// once no session is left) and it leaves the watcher's snapshot.
   void _shellGone(_Session session) {
     _portWatcher?.sessionsChanged();
+    _remotePorts?.sessionsChanged();
     if (session.ports.isEmpty) return;
     session.ports = const [];
     if (!session.closing) _changes.add(null);
@@ -597,6 +680,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
   void _applyPorts(Map<int, List<int>> ports) {
     var changed = false;
     for (final s in _sessions.values) {
+      if (s.remote != null) continue;
       final next = ports[s.id] ?? const <int>[];
       if (_sameInts(next, s.ports)) continue;
       s.ports = List.unmodifiable(next);
@@ -645,6 +729,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     required int rows,
     String? cwd,
     int? tabId,
+    SessionLaunch? launch,
   }) async {
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
@@ -654,6 +739,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       origin: SessionOrigin.desktop,
       cwd: cwd,
       tabId: tabId,
+      launch: launch,
     );
     if (session == null) {
       throw const SpawnFailedException('ShellX is closing every session');
@@ -723,6 +809,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     required SessionOrigin origin,
     String? cwd,
     int? tabId,
+    SessionLaunch? launch,
   }) async {
     if (_sessions.length + _pendingOpens >= _maxSessions) {
       throw SessionLimitException(_maxSessions);
@@ -733,23 +820,49 @@ final class SessionManager implements AgentSessions, LocalSessions {
     // A7 D29: the id is known before the shell starts so it can be in its
     // environment. Ids are never reused, so a failed spawn only skips one.
     final id = _nextId();
+    // D9, D29: marked before the first await, so a concurrent open to the
+    // same server sees this one and waits for it (one sign-in).
+    final connect = launch?.host == null ? null : _nextConnect++;
+    if (connect != null) _pendingConnects[connect] = launch!.host!;
     final ShellCommand command;
     final Pty pty;
     try {
-      command = await _shellResolver.resolve();
-      final workingDirectory = await _workingDirectoryFor(cwd);
-      final launch = _launch(command, paneId: id, tabId: tabId ?? id);
+      final ShellLaunch started;
+      final String workingDirectory;
+      if (launch == null) {
+        command = await _shellResolver.resolve();
+        workingDirectory = await _workingDirectoryFor(cwd);
+        started = _launch(command, paneId: id, tabId: tabId ?? id);
+      } else {
+        // A8 D2: ssh or tmux, started in home. The environment carries the
+        // pane and tab ids but never the control-socket secrets: the local
+        // ssh process must not hold them.
+        command = await _remoteCommand(launch, connect);
+        workingDirectory = _homeDirectory;
+        started = ShellLaunch(
+          command,
+          buildSessionEnvironment(
+            helperEnvironment(_baseEnvironment),
+            paneId: id,
+            tabId: tabId ?? id,
+          ),
+        );
+      }
       pty = _ptyFactory.spawn(
-        launch.command,
+        started.command,
         workingDirectory: workingDirectory,
-        environment: launch.environment,
+        environment: started.environment,
         cols: cols,
         rows: rows,
       );
+    } on SpawnFailedException {
+      rethrow;
     } catch (error) {
-      throw SpawnFailedException('$error');
+      // An ssh command line (host, folder) must never reach an error text.
+      throw SpawnFailedException(launch == null ? '$error' : 'spawn_failed');
     } finally {
       _pendingOpens--;
+      if (connect != null) _pendingConnects.remove(connect);
     }
     final voided = origin == SessionOrigin.phone
         ? epoch != _epoch
@@ -784,10 +897,87 @@ final class SessionManager implements AgentSessions, LocalSessions {
       index: session.index,
     );
     _sessions[session.id] = session;
+    if (launch != null) _startRemote(session, launch);
     session.pidKnown = _pidOf(session) != null;
     _watch(session);
     _portWatcher?.sessionsChanged();
     return session;
+  }
+
+  /// A8 D2, D3, D9, D12, D13, D25: the command of an SSH or tmux launch.
+  Future<ShellCommand> _remoteCommand(
+    SessionLaunch launch,
+    int? connect,
+  ) async {
+    final tools = _remoteTools;
+    if (launch case TmuxLaunch(host: null)) {
+      final tmux = tools?.tmuxPath;
+      if (tmux == null) throw const SpawnFailedException('tmux_unavailable');
+      try {
+        if (!isValidTmuxName(launch.session)) throw ArgumentError('tmux name');
+        return buildLocalTmuxCommand(launch, tmux);
+      } on ArgumentError {
+        throw const SpawnFailedException('bad_launch');
+      }
+    }
+    final ssh = tools?.sshPath;
+    if (tools == null || ssh == null) {
+      throw const SpawnFailedException('ssh_unavailable');
+    }
+    final target = launch.host!;
+    final control = tools.control;
+    if (control != null && _connecting(target, before: connect)) {
+      await control.awaitMaster(
+        target,
+        stillWaiting: () => _connecting(target, before: connect),
+      );
+    }
+    final keepalive =
+        await (control?.keepaliveNeeded(target) ?? Future.value(true));
+    control?.noteMaster(target);
+    try {
+      return buildSshCommand(
+        launch,
+        SshCommandOptions(
+          sshPath: ssh,
+          controlPath: control?.controlPath,
+          keepalive: keepalive,
+        ),
+      );
+    } on ArgumentError {
+      throw const SpawnFailedException('bad_launch');
+    }
+  }
+
+  /// D9: a session to [target] has not reached it yet, or an earlier open
+  /// to it is still starting ([before]: this open's own number).
+  bool _connecting(SshTarget target, {int? before}) =>
+      _pendingConnects.entries.any(
+        (e) => e.value == target && (before == null || e.key < before),
+      ) ||
+      _sessions.values.any(
+        (s) =>
+            !s.closing &&
+            s.remote != null &&
+            !s.remote!.connected &&
+            s.remote!.launch.host == target,
+      );
+
+  void _startRemote(_Session target, SessionLaunch launch) {
+    final localTmux = launch is TmuxLaunch && launch.host == null;
+    final remote = _RemoteState(launch, connected: localTmux);
+    target.remote = remote;
+    if (launch case TmuxLaunch(:final session)) {
+      // D26: a stable automatic title; tmux's own titles are ignored.
+      target.title = 'tmux: $session';
+    }
+    if (!localTmux && !launch.usesHook) {
+      remote.plainTimer = Timer(_plainConnectedAfter, () {
+        if (target.closing || remote.connected) return;
+        remote.connected = true;
+        _changes.add(null);
+      });
+    }
   }
 
   /// D17: [cwd] when it is usable, else home. Never throws.
@@ -983,7 +1173,8 @@ final class SessionManager implements AgentSessions, LocalSessions {
     var changed = false;
     try {
       final title = session.titles.feed(data);
-      if (title != null && title != session.title) {
+      final tmux = session.remote?.launch is TmuxLaunch;
+      if (!tmux && title != null && title != session.title) {
         session.title = title;
         changed = true;
       }
@@ -1011,9 +1202,19 @@ final class SessionManager implements AgentSessions, LocalSessions {
           case BellRung():
             _notice(session, SessionNoticeKind.bell);
           case CwdReported(:final url):
-            if (_setCwd(session, url)) changed = true;
+            final moved = session.remote != null
+                ? _setRemoteCwd(session, url)
+                : _setCwd(session, url);
+            if (moved) changed = true;
+          case RemoteMetaReported(:final key, :final value):
+            if (session.remote?.hooked == true &&
+                _applyRemoteMeta(session, key, value)) {
+              changed = true;
+            }
           case CommandFinished():
-            _lookUpBranch(session, refresh: true); // git switch, git init…
+            if (session.remote == null) {
+              _lookUpBranch(session, refresh: true); // git switch, git init…
+            }
           default:
             break;
         }
@@ -1053,6 +1254,86 @@ final class SessionManager implements AgentSessions, LocalSessions {
     );
     return true;
   }
+
+  /// A8 D14: the server's own folder; true when the summary changed.
+  bool _setRemoteCwd(_Session session, String url) {
+    final path = parseRemoteCwdPath(url);
+    if (path == null || path == session.cwd) return false;
+    session.cwd = path;
+    return true;
+  }
+
+  /// A8 D16: hello / pid / home / branch from a remote session only. A
+  /// value that does not check out is dropped, never shown or logged.
+  /// True when the summary changed.
+  bool _applyRemoteMeta(_Session session, String key, String value) {
+    final remote = session.remote!;
+    switch (key) {
+      case 'hello':
+        if (value != '1' || remote.connected) return false;
+        remote.connected = true;
+        remote.plainTimer?.cancel();
+        _remoteHello(remote.launch.host);
+        return true;
+      case 'pid':
+        if (remote.pid != null || !RegExp(r'^[0-9]{1,10}$').hasMatch(value)) {
+          return false;
+        }
+        final pid = int.parse(value);
+        if (pid < 1 || pid > 0x7FFFFFFF) return false;
+        remote.pid = pid;
+        _remoteShellsChanged();
+        return false;
+      case 'home':
+        if (!value.startsWith('/') ||
+            value.length > 4096 ||
+            hasControlCharacter(value) ||
+            value == remote.home) {
+          return false;
+        }
+        remote.home = value;
+        return true;
+      case 'branch':
+        if (value.length > 200 || hasControlCharacter(value)) return false;
+        final branch = value.isEmpty ? null : value;
+        if (branch == session.gitBranch) return false;
+        session.gitBranch = branch;
+        return true;
+    }
+    return false;
+  }
+
+  /// D18: sessions that said hello and their pid, for [RemotePortWatcher].
+  Map<int, RemoteShell> _remoteShells() => {
+    for (final s in _sessions.values)
+      if (!s.closing &&
+          !s.exited &&
+          s.remote?.connected == true &&
+          s.remote?.pid != null &&
+          s.remote?.launch.host != null)
+        s.id: RemoteShell(target: s.remote!.launch.host!, pid: s.remote!.pid!),
+  };
+
+  /// A probe's result for one server: only its sessions (a partial update).
+  void _applyRemotePorts(Map<int, List<int>> ports) {
+    var changed = false;
+    for (final entry in ports.entries) {
+      final s = _sessions[entry.key];
+      if (s == null || s.remote == null || _sameInts(entry.value, s.ports)) {
+        continue;
+      }
+      s.ports = List.unmodifiable(entry.value);
+      changed = true;
+    }
+    if (changed) _changes.add(null);
+  }
+
+  void _remoteHello(SshTarget? target) {
+    if (target != null) _remotePorts?.resume(target);
+    _remotePorts?.sessionsChanged();
+  }
+
+  void _remoteShellsChanged() => _remotePorts?.sessionsChanged();
 
   /// A2 C1/D2. True when the summary changed.
   bool _setCwd(_Session session, String url) {
@@ -1139,9 +1420,11 @@ final class SessionManager implements AgentSessions, LocalSessions {
     session.drainTimer?.cancel();
     session.drainTimer = null;
     final recipient = session.attachedMobileId ?? session.exitRecipient;
+    session.remote?.plainTimer?.cancel();
     _sessions.remove(session.id);
     session.ports = const [];
     _portWatcher?.sessionsChanged();
+    _remotePorts?.sessionsChanged();
     session.output?.cancel();
     unawaited(session.local.close());
     unawaited(session.drivers.close());

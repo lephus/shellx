@@ -36,8 +36,14 @@ final _tabForm = RegExp(r'^t([1-9]\d{0,14})$');
 /// D12 on the wire: exactly one of [pane] and [tab], each an id, its
 /// written form (`p<id>`, `p-<n>`, `t<id>`) or `"@focused"`. A `pane`
 /// given as `t<id>` is that tab (final ruling M4: [resolvePane] gives its
-/// focused pane).
-CliTarget parseTarget(Object? pane, Object? tab) {
+/// focused pane). [forward] maps a pane id to the session that replaced it
+/// (A8 D22: `TerminalTabs.resolveReplaced`), so a script that kept `p41`
+/// across a reconnect still reaches the pane; tab ids never change.
+CliTarget parseTarget(
+  Object? pane,
+  Object? tab, {
+  int Function(int id)? forward,
+}) {
   if ((pane == null) == (tab == null)) {
     throw _bad('give exactly one pane or tab');
   }
@@ -58,7 +64,7 @@ CliTarget parseTarget(Object? pane, Object? tab) {
     },
     _ => throw _bad('a target is an id or @focused'),
   };
-  return pane != null ? PaneRef(id) : TabRef(id);
+  return pane != null ? PaneRef(forward?.call(id) ?? id) : TabRef(id);
 }
 
 CliFailure _noPane(int id) => CliFailure(MuxError.notFound, 'no pane p$id');

@@ -146,6 +146,26 @@ final class ShowConfigProblemsFromTray extends TrayAction {
   const ShowConfigProblemsFromTray();
 }
 
+/// A8 D41, UI-A8 §5.3: the "SSH" submenu. The first two bring the window
+/// to the front, then open "Connect to a server" on its SSH / tmux tab.
+final class OpenSshConnect extends TrayAction {
+  const OpenSshConnect();
+}
+
+final class OpenTmuxAttach extends TrayAction {
+  const OpenTmuxAttach();
+}
+
+/// A8 D11: "Cài hook ShellX trên máy chủ".
+final class ToggleSshHook extends TrayAction {
+  const ToggleSshHook();
+}
+
+/// A8 D6: "Xóa danh sách máy gần đây".
+final class ClearRecentServers extends TrayAction {
+  const ClearRecentServers();
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -186,6 +206,11 @@ abstract final class TrayKeys {
   static const String cliAllowExternal = 'cli_allow_external';
   static const String cliPath = 'cli_path';
   static const String cliSkills = 'cli_skills';
+  static const String ssh = 'ssh';
+  static const String sshConnect = 'ssh_connect';
+  static const String tmuxAttach = 'tmux_attach';
+  static const String sshHook = 'ssh_hook';
+  static const String sshClearRecent = 'ssh_clear_recent';
   static const String config = 'config';
   static const String configOpen = 'config_open';
   static const String configReload = 'config_reload';
@@ -250,6 +275,10 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.cliAllowExternal => const ToggleCliAllowExternal(),
     TrayKeys.cliPath => const ToggleCliPath(),
     TrayKeys.cliSkills => const CopySkillsCommand(),
+    TrayKeys.sshConnect => const OpenSshConnect(),
+    TrayKeys.tmuxAttach => const OpenTmuxAttach(),
+    TrayKeys.sshHook => const ToggleSshHook(),
+    TrayKeys.sshClearRecent => const ClearRecentServers(),
     TrayKeys.configOpen => const OpenConfigFile(),
     TrayKeys.configReload => const ReloadConfig(),
     TrayKeys.configShortcuts => const ShowShortcutsFromTray(),

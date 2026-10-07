@@ -171,6 +171,18 @@ class RestorePersistence extends Notifier<void> {
         .paneOutputs
         .listen(_dirty.add);
     ref.onDispose(() => unawaited(outputs.cancel()));
+    // A8 D22: a reconnected pane is the same saved pane. The tab list
+    // announces it before the state changes. A pane never keyed has
+    // nothing to move.
+    final replacements = ref
+        .read(terminalTabsProvider.notifier)
+        .paneReplacements
+        .listen((r) {
+          final key = _keys.remove(r.from);
+          if (key != null) _keys[r.to] = key;
+          _schedule();
+        });
+    ref.onDispose(() => unawaited(replacements.cancel()));
     ref.listen(terminalTabsProvider, (_, _) => _schedule());
     ref.listen(sidebarWorkspacesProvider, (_, _) => _schedule());
     _period = Timer.periodic(scrollbackPeriod, (_) => _tick());

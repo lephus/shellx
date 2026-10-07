@@ -45,19 +45,19 @@ extension TerminalTabsPanes on TerminalTabs {
 
   /// ⌘D / ⌘⇧D (D3): the selected tab's focused pane, in its directory
   /// (D17), at half its grid; the new pane is focused. Failures are toasts.
-  Future<void> split(SplitAxis axis) async {
+  /// A8 D24: a pane of an SSH server splits into another one on that
+  /// server, in its folder; with [local] it is a shell on this computer.
+  Future<void> split(SplitAxis axis, {bool local = false}) async {
     final tab = _state.selected;
     if (tab == null || _state.opening) return;
     try {
-      await splitPaneFor(tab.focusedPaneId, axis, focus: true);
+      await splitPaneFor(tab.focusedPaneId, axis, focus: true, local: local);
     } on PaneNoRoomException {
       if (_ref.mounted) _set(notice: const PaneNoRoomNotice());
     } on SessionLimitException catch (error) {
       if (_ref.mounted) _set(notice: SessionLimitNotice(error.max));
     } on SpawnFailedException catch (error) {
-      if (_ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
-      }
+      if (_ref.mounted) _set(notice: spawnNoticeFor(error));
     } on PaneGoneException {
       // The new shell ended before it could be placed: nothing to show.
     }
@@ -76,6 +76,7 @@ extension TerminalTabsPanes on TerminalTabs {
     SplitAxis axis, {
     String? cwd,
     bool focus = false,
+    bool local = false,
   }) async {
     final tab = _state.tabOfSession(target);
     final pane = tab?.panes[target];
@@ -83,12 +84,18 @@ extension TerminalTabsPanes on TerminalTabs {
     if (_state.opening) throw const OpenBusyException();
     if (!_roomToSplit(tab, target, axis)) throw const PaneNoRoomException();
     final grid = _halfGrid(pane, axis);
+    // A8 D24: on a server the folder is the server's, never a local one —
+    // not even for a local split of that pane.
+    final remote = pane.remote;
+    final onServer = remote?.launch.host != null;
+    final launch = local ? null : remote?.launch.forSplit(cwd ?? pane.cwd);
     return _guardedOpen(
       () => _local.open(
         cols: grid.cols,
         rows: grid.rows,
-        cwd: cwd ?? pane.cwd,
+        cwd: onServer ? null : cwd ?? pane.cwd,
         tabId: tab.id,
+        launch: launch,
       ),
       (id) {
         _adoptPane(

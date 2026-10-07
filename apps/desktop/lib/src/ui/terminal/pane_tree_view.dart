@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, kMiddleMouseButton;
 import 'package:flutter/material.dart';
@@ -10,6 +11,8 @@ import 'package:xterm/xterm.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
+import '../../remote/remote_state.dart';
+import '../../remote/ssh_reconnector.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_style.dart';
@@ -19,6 +22,8 @@ import '../theme/shellx_desktop_theme.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
+import 'remote_marks.dart';
+import 'remote_strip.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart' show DriverPill, ShellxScrollbar, kPhoneIcon;
@@ -78,6 +83,25 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   GlobalKey _keyFor(int id) => _keys.putIfAbsent(id, GlobalKey.new);
 
   TerminalTabs get _tabs => ref.read(terminalTabsProvider.notifier);
+
+  StreamSubscription<PaneReplacement>? _replacements;
+
+  @override
+  void initState() {
+    super.initState();
+    // A8 D22: a reconnect gives the pane a new session id; its TerminalView
+    // is moved to it, not mounted again (scroll, IME and focus stay).
+    _replacements = _tabs.paneReplacements.listen((r) {
+      final key = _keys.remove(r.from);
+      if (key != null) _keys[r.to] = key;
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_replacements?.cancel());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,8 +169,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
       label: split
           ? null
           : ringed
-          ? l10n.terminalPaneUnreadLabel(tab.label)
-          : l10n.terminalPaneLabel(tab.label),
+          ? l10n.terminalPaneUnreadLabel(tab.label) +
+                remoteSemantics(l10n, pane)
+          : l10n.terminalPaneLabel(tab.label) + remoteSemantics(l10n, pane),
       child: PaneTerminal(
         pane: pane,
         scrollController: widget.scrollFor(id),
@@ -234,6 +259,14 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               ),
             ),
           ),
+          // UI-A8 §3.2: over the terminal's bottom edge, no layout change.
+          if (pane.canReconnect)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: RemoteStrip(pane: pane),
+            ),
         ],
       ),
     );
@@ -248,19 +281,20 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           label: !split
               ? null
               : [
-                  ringed
-                      ? l10n.paneRegionUnreadLabel(
-                          number,
-                          tab.paneCount,
-                          pane.automaticLabel,
-                        )
-                      : l10n.paneRegionLabel(
-                          number,
-                          tab.paneCount,
-                          pane.automaticLabel,
-                        ),
-                  if (_agent(id)) l10n.agentChipTooltip,
-                ].join(', '),
+                      ringed
+                          ? l10n.paneRegionUnreadLabel(
+                              number,
+                              tab.paneCount,
+                              pane.automaticLabel,
+                            )
+                          : l10n.paneRegionLabel(
+                              number,
+                              tab.paneCount,
+                              pane.automaticLabel,
+                            ),
+                      if (_agent(id)) l10n.agentChipTooltip,
+                    ].join(', ') +
+                    remoteSemantics(l10n, pane),
           // UI-A3 §8: what the header's mouse targets do.
           customSemanticsActions: !split
               ? null
@@ -353,12 +387,21 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final l10n = AppLocalizations.of(context);
     final pane = widget.tab.panes[id];
     if (pane == null) return;
-    final intent = await showShellxMenu<Intent>(
+    final lost = pane.canReconnect;
+    final choice = await showShellxMenu<Object>(
       context: context,
       at: at,
       entries: [
-        ShellxMenuEntry(
+        // UI-A8 §3.2: first for a pane whose connection ended.
+        if (lost)
+          ShellxMenuEntry<Object>(
+            key: const Key('menu.reconnect'),
+            value: _RemotePaneAction.reconnect,
+            label: l10n.sshReconnectAction,
+          ),
+        ShellxMenuEntry<Object>(
           key: const Key('menu.copy'),
+          dividerBefore: lost,
           value: const CopySelectionIntent(),
           label: l10n.terminalCopy,
           shortcut: copyShortcutLabel(),
@@ -390,6 +433,13 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           label: l10n.paneSplitDown,
           shortcut: splitDownShortcutLabel(),
         ),
+        // A8 D24: a shell on this computer, next to the server's.
+        if (pane.remote != null)
+          ShellxMenuEntry<Object>(
+            key: const Key('menu.splitLocalRight'),
+            value: _RemotePaneAction.splitLocalRight,
+            label: l10n.paneSplitLocalRight,
+          ),
         if (widget.tab.isSplit) ...[
           ShellxMenuEntry(
             key: const Key('menu.zoomPane'),
@@ -417,11 +467,21 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         ],
       ],
     );
-    if (intent == null || !mounted) return;
-    Actions.maybeInvoke(context, intent);
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case _RemotePaneAction.reconnect:
+        unawaited(ref.read(sshReconnectorProvider.notifier).reconnectNow(id));
+      case _RemotePaneAction.splitLocalRight:
+        unawaited(_tabs.split(SplitAxis.row, local: true));
+      case final Intent intent:
+        Actions.maybeInvoke(context, intent);
+    }
     widget.terminalFocus.requestFocus();
   }
 }
+
+/// A8: the menu items that are not window actions.
+enum _RemotePaneAction { reconnect, splitLocalRight }
 
 /// UI-A3 §2.2: the 1 px line, a 6 px hit area centred on it. Laid out by
 /// [splitExtents], the function `TerminalTabs._clampForPixels` clamps
@@ -709,20 +769,29 @@ class _PaneHeaderState extends State<_PaneHeader> {
                           SizedBox(
                             width: 12,
                             child: Center(
-                              child: Container(
-                                width: ShellxSizes.paneHeaderDot,
-                                height: ShellxSizes.paneHeaderDot,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: pane.exited ? null : dot,
-                                  border: pane.exited
-                                      ? Border.all(color: dot, width: 1.5)
-                                      : null,
-                                ),
-                              ),
+                              child: pane.remoteState == RemoteState.connecting
+                                  ? const ConnectingDot(
+                                      box: ShellxSizes.paneHeaderDot,
+                                    )
+                                  : Container(
+                                      width: ShellxSizes.paneHeaderDot,
+                                      height: ShellxSizes.paneHeaderDot,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: pane.exited ? null : dot,
+                                        border: pane.exited
+                                            ? Border.all(color: dot, width: 1.5)
+                                            : null,
+                                      ),
+                                    ),
                             ),
                           ),
                           const SizedBox(width: ShellxSpace.s6),
+                          // UI-A8 §3.1: the SSH/tmux mark before the title.
+                          if (pane.remote != null) ...[
+                            RemoteMark(pane),
+                            const SizedBox(width: ShellxSpace.s4),
+                          ],
                           Expanded(
                             child: Text(
                               pane.automaticLabel,

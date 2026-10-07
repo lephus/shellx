@@ -300,6 +300,42 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         "set an input's value and fire input/change",
     ),
+    c(
+        &["ssh"],
+        &["SERVER"],
+        &[
+            v(
+                "workspace",
+                "W",
+                "workspace id or name (default: the server's SSH workspace)",
+            ),
+            v("cwd", "DIR", "folder on the server (/... or ~/...)"),
+            v("cmd", "COMMAND", "type COMMAND once the remote shell is ready"),
+            f("no-hook", "do not install the ShellX hook on the server"),
+            FOCUS,
+        ],
+        "open a tab on a server over SSH; prints its id",
+    ),
+    c(
+        &["tmux", "ls"],
+        &[],
+        &[v(
+            "host",
+            "SERVER",
+            "list on this server (default: this computer)",
+        )],
+        "list tmux sessions",
+    ),
+    c(
+        &["tmux", "attach"],
+        &["NAME"],
+        &[
+            v("host", "SERVER", "server (default: this computer)"),
+            f("create", "create the session when it does not exist"),
+            FOCUS,
+        ],
+        "attach a tmux session as a tab; prints its id",
+    ),
     CommandSpec {
         needs_ui: false,
         ..c(
@@ -423,7 +459,7 @@ fn find(words: &[String]) -> Option<(&'static CommandSpec, usize)> {
         .map(|c| (c, c.path.len()))
 }
 
-/// The group a first word names (`workspace`, `browser`, `skills`).
+/// The group a first word names (`workspace`, `browser`, `tmux`, `skills`).
 fn group(word: &str) -> Option<&'static str> {
     COMMANDS
         .iter()
@@ -613,7 +649,7 @@ fn words_after(prefix: &[&str]) -> Vec<&'static str> {
     out
 }
 
-const GROUPS: [&str; 4] = ["workspace", "browser", "skills", "config"];
+const GROUPS: [&str; 5] = ["workspace", "browser", "tmux", "skills", "config"];
 /// Positionals that name a pane, tab or workspace: completed from `shellx ls --ids`.
 const ID_POSITIONALS: [&str; 4] = ["TARGET", "PANE", "TAB", "WORKSPACE"];
 
@@ -905,6 +941,9 @@ mod tests {
             "browser query",
             "browser click",
             "browser fill",
+            "ssh",
+            "tmux ls",
+            "tmux attach",
             "skills install",
             "skills print",
             "config path",
@@ -915,6 +954,35 @@ mod tests {
         ] {
             assert!(names.contains(&want.to_string()), "{want}");
         }
+    }
+
+    #[test]
+    fn ssh_and_tmux_commands() {
+        let x = run(&[
+            "ssh",
+            "me@devbox:2222",
+            "--cwd",
+            "/srv",
+            "--cmd",
+            "make",
+            "--no-hook",
+            "--focus",
+        ]);
+        assert_eq!(x.spec.path, &["ssh"]);
+        assert_eq!(x.pos(0), Some("me@devbox:2222"));
+        assert_eq!(x.flag("cwd"), Some("/srv"));
+        assert!(x.has("no-hook"));
+        let l = run(&["tmux", "ls", "--host", "devbox", "--json"]);
+        assert_eq!(l.spec.path, &["tmux", "ls"]);
+        assert!(l.json);
+        let a = run(&["tmux", "attach", "main", "--create"]);
+        assert_eq!(a.pos(0), Some("main"));
+        assert!(a.has("create"));
+        assert!(help_text(None).contains("ssh"));
+        assert!(completion_script("zsh").unwrap().contains("attach"));
+        assert!(completion_script("bash").unwrap().contains("tmux)"));
+        assert!(p(&["ssh"]).is_err());
+        assert!(p(&["tmux", "kill"]).is_err());
     }
 
     #[test]

@@ -30,6 +30,11 @@ abstract final class CliType {
   static const uiConfigShow = 'ui.config.show';
   static const uiBrowserPrefix = 'ui.browser.';
 
+  /// A8 D22, D33.
+  static const uiSshOpen = 'ui.ssh.open';
+  static const uiTmuxList = 'ui.tmux.list';
+  static const uiTmuxAttach = 'ui.tmux.attach';
+
   /// D3: what a `cli` client may send. Everything else is `forbidden`.
   static bool allowedForCli(String t) =>
       t.startsWith('api.') ||
@@ -47,6 +52,11 @@ abstract final class CliError {
   static const runningCommand = 'running_command';
   static const noRoom = 'no_room';
   static const ambiguous = 'ambiguous';
+
+  /// A8 D3, D25: no ssh binary here / no tmux there / the listing failed.
+  static const sshUnavailable = 'ssh_unavailable';
+  static const tmuxUnavailable = 'tmux_unavailable';
+  static const tmuxFailed = 'tmux_failed';
 
   /// The asking client went away (a `wait`, an open waiting its turn):
   /// nobody reads this answer.
@@ -71,6 +81,8 @@ const List<String> kCliCaps = [
   CliType.uiWorkspaceRename,
   CliType.uiWorkspaceMove,
   'ui.config',
+  'ui.ssh',
+  'ui.tmux',
 ];
 
 MuxMessage cliResult(int? q, [Map<String, Object?> fields = const {}]) =>

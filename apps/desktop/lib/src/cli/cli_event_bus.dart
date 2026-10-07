@@ -37,12 +37,22 @@ final class CliEventBus {
           _notices = local.notices.listen(_notice);
         }, fireImmediately: true),
       );
+    // Announced before the tab changes, synchronously (A8 D22).
+    _replacements = _ref
+        .read(terminalTabsProvider.notifier)
+        .paneReplacements
+        .listen(_replaced);
   }
 
   final Ref _ref;
   late final StreamController<Map<String, Object?>> _out;
   final _subs = <ProviderSubscription<Object?>>[];
   StreamSubscription<SessionNotice>? _notices;
+  StreamSubscription<PaneReplacement>? _replacements;
+
+  /// A8 D22, D4: replaced panes the next tab diff has not seen yet, by
+  /// the old id. Their swap is `pane.replaced`, not a close and an open.
+  final _swapped = <int, PaneReplacement>{};
 
   /// D24 `pane.changed`: per pane, the values last sent (or seen before
   /// the first change), the latest values waiting, and the 250 ms timer.
@@ -84,9 +94,34 @@ final class CliEventBus {
     _lastSent.clear();
     _unplaced.clear();
     _deferred.clear();
+    _swapped.clear();
   }
 
   // ---- tabs and panes -----------------------------------------------------
+
+  void _replaced(PaneReplacement r) {
+    if (!_listened) return;
+    _swapped[r.from] = r;
+    _emitFor(r.tabId, {
+      'kind': 'pane.replaced',
+      'old': r.from,
+      'new': r.to,
+      'tab': r.tabId,
+    });
+  }
+
+  bool _isSwapTarget(int id) => _swapped.values.any((r) => r.to == id);
+
+  /// Where a pane id ended up after the swaps of this diff.
+  int _swappedEnd(int id) {
+    var current = id;
+    for (var i = 0; i < 64; i++) {
+      final next = _swapped[current];
+      if (next == null) break;
+      current = next.to;
+    }
+    return current;
+  }
 
   void _tabs(TerminalTabsState? before, TerminalTabsState after) {
     if (!_listened || before == null) return;
@@ -114,7 +149,9 @@ final class CliEventBus {
       for (final p in t.panes.values) {
         final op = o.panes[p.id];
         if (op == null) {
-          _emitFor(t.id, {'kind': 'pane.opened', 'pane': p.id, 'tab': t.id});
+          if (!_isSwapTarget(p.id)) {
+            _emitFor(t.id, {'kind': 'pane.opened', 'pane': p.id, 'tab': t.id});
+          }
           continue;
         }
         if (!op.exited && p.exited) {
@@ -131,10 +168,13 @@ final class CliEventBus {
       for (final op in o.panes.values) {
         if (!t.panes.containsKey(op.id)) {
           _exitedGone(tabs, op, t.id);
-          _emitFor(t.id, {'kind': 'pane.closed', 'pane': op.id, 'tab': t.id});
+          if (!_swapped.containsKey(op.id)) {
+            _emitFor(t.id, {'kind': 'pane.closed', 'pane': op.id, 'tab': t.id});
+          }
         }
       }
-      if (o.focusedPaneId != t.focusedPaneId) {
+      if (o.focusedPaneId != t.focusedPaneId &&
+          _swappedEnd(o.focusedPaneId) != t.focusedPaneId) {
         _emitFor(t.id, {
           'kind': 'pane.focused',
           'pane': t.focusedPaneId,
@@ -155,6 +195,7 @@ final class CliEventBus {
     if (reselected && !old.containsKey(selected)) {
       _emitFor(selected, {'kind': 'tab.selected', 'tab': selected});
     }
+    _swapped.clear(); // each swap is announced just before its own diff
   }
 
   /// `tab.opened` with its workspace; when the sidebar has not placed the
@@ -302,6 +343,7 @@ final class CliEventBus {
       s.close();
     }
     unawaited(_notices?.cancel());
+    unawaited(_replacements?.cancel());
     _forget();
     unawaited(_out.close());
   }

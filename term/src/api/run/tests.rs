@@ -52,6 +52,8 @@ const ALL: &[&str] = &[
     "ui.workspace.move",
     "ui.config",
     "ui.browser",
+    "ui.ssh",
+    "ui.tmux",
 ];
 
 struct Out {
@@ -1364,4 +1366,239 @@ fn config_needs_the_cap_and_maps_refusals() {
         PLAIN,
     );
     assert_eq!(f.code, 6);
+}
+
+#[test]
+fn ssh_prints_the_tab_and_maps_errors() {
+    let o = go(
+        &[
+            "ssh",
+            "me@devbox:2222",
+            "--cwd",
+            "~/app",
+            "--cmd",
+            "make test",
+        ],
+        &[],
+        vec![(
+            "ui.ssh.open",
+            ok(vec![("tab", Value::Int(41)), ("pane", Value::Int(41))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.out.as_str()), (0, "t41\n"));
+    let m = sent(&o, "ui.ssh.open");
+    assert_eq!(m.get("target"), Some(&Value::text("me@devbox:2222")));
+    // A server path is never made absolute against the local directory.
+    assert_eq!(m.get("cwd"), Some(&Value::text("~/app")));
+    assert_eq!(m.get("cmd"), Some(&Value::text("make test")));
+    assert_eq!(m.get("hook"), Some(&Value::Bool(true)));
+    assert_eq!(m.get("focus"), Some(&Value::Bool(false)));
+    assert_eq!(m.get("workspace"), None);
+    let j = go(
+        &["ssh", "devbox", "--json"],
+        &[],
+        vec![(
+            "ui.ssh.open",
+            ok(vec![("tab", Value::Int(41)), ("pane", Value::Int(41))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!(j.out, "{\"tab\":\"t41\",\"pane\":\"p41\"}\n");
+    assert_eq!(
+        sent(&j, "ui.ssh.open").get("hook"),
+        Some(&Value::Bool(true))
+    );
+    for code in ["ssh_unavailable", "tmux_unavailable", "tmux_failed"] {
+        let e = go(
+            &["ssh", "devbox"],
+            &[],
+            vec![("ui.ssh.open", remote(code, ""))],
+            "",
+            PLAIN,
+        );
+        assert_eq!(e.code, 1, "{code}");
+        assert!(
+            e.err.starts_with("shellx: ") && e.err.contains(&format!("({code})")),
+            "{}",
+            e.err
+        );
+    }
+    // A host without ui.ssh: exit 7 before any ui.ssh.open is sent.
+    let old = go_caps(&["ssh", "devbox"], &[], vec![], "", PLAIN, &["ui.ls"]);
+    assert_eq!(old.code, 7);
+    assert!(old.log.iter().all(|m| m.t != "ui.ssh.open"));
+    // A too long --cmd fails before connecting.
+    let long = "x".repeat(MAX_CMD + 1);
+    let big = go(&["ssh", "devbox", "--cmd", &long], &[], vec![], "", PLAIN);
+    assert_eq!((big.code, big.connected), (2, false));
+}
+
+#[test]
+fn tmux_ls_prints_a_table_or_json() {
+    let sessions = || {
+        ok(vec![(
+            "sessions",
+            Value::Array(vec![
+                Value::map(vec![
+                    ("name", Value::text("main")),
+                    ("windows", Value::Int(3)),
+                    ("attached", Value::Int(0)),
+                    ("activity", Value::Int(1_759_831_200)),
+                ]),
+                Value::map(vec![
+                    ("name", Value::text("a\u{1b}[2Jb")),
+                    ("windows", Value::Int(1)),
+                    ("attached", Value::Int(2)),
+                ]),
+            ]),
+        )])
+    };
+    let o = go(
+        &["tmux", "ls", "--host", "devbox"],
+        &[],
+        vec![("ui.tmux.list", sessions())],
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 0);
+    assert_eq!(o.out, "main\t3 windows\na[2Jb\t1 window\tattached\n");
+    assert_eq!(
+        sent(&o, "ui.tmux.list").get("host"),
+        Some(&Value::text("devbox"))
+    );
+    let j = go(
+        &["tmux", "ls", "--json"],
+        &[],
+        vec![("ui.tmux.list", sessions())],
+        "",
+        PLAIN,
+    );
+    assert!(
+        j.out
+            .starts_with("{\"sessions\":[{\"name\":\"main\",\"windows\":3"),
+        "{}",
+        j.out
+    );
+    assert_eq!(sent(&j, "ui.tmux.list").get("host"), None);
+    let empty = go(
+        &["tmux", "ls"],
+        &[],
+        vec![("ui.tmux.list", ok(vec![("sessions", Value::Array(vec![]))]))],
+        "",
+        PLAIN,
+    );
+    assert_eq!((empty.code, empty.out.as_str()), (0, ""));
+    let none = go(
+        &["tmux", "ls"],
+        &[],
+        vec![("ui.tmux.list", remote("tmux_unavailable", ""))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(none.code, 1);
+    // A host without ui.tmux: exit 7, nothing sent.
+    let old = go_caps(
+        &["tmux", "ls"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+        &["ui.ls", "ui.ssh"],
+    );
+    assert_eq!(old.code, 7);
+    assert!(old.log.iter().all(|m| m.t != "ui.tmux.list"));
+}
+
+#[test]
+fn tmux_attach_prints_the_tab() {
+    let o = go(
+        &[
+            "tmux", "attach", "main", "--host", "devbox", "--create", "--focus",
+        ],
+        &[],
+        vec![(
+            "ui.tmux.attach",
+            ok(vec![("tab", Value::Int(7)), ("pane", Value::Int(7))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.out.as_str()), (0, "t7\n"));
+    let m = sent(&o, "ui.tmux.attach");
+    assert_eq!(m.get("name"), Some(&Value::text("main")));
+    assert_eq!(m.get("host"), Some(&Value::text("devbox")));
+    assert_eq!(m.get("create"), Some(&Value::Bool(true)));
+    assert_eq!(m.get("focus"), Some(&Value::Bool(true)));
+}
+
+#[test]
+fn ls_shows_where_a_pane_is_remote() {
+    let evil = "dev\u{1b}]52;c;x\u{7}box";
+    let mut t = tree(Value::Null, Value::Null, Value::Null);
+    let Value::Array(ws) = &mut t else { panic!() };
+    let Value::Map(w) = &mut ws[0] else { panic!() };
+    let tabs = w.iter_mut().find(|(k, _)| k == "tabs").unwrap();
+    let Value::Array(ts) = &mut tabs.1 else {
+        panic!()
+    };
+    let Value::Map(tab) = &mut ts[0] else {
+        panic!()
+    };
+    let panes = tab.iter_mut().find(|(k, _)| k == "panes").unwrap();
+    let Value::Array(ps) = &mut panes.1 else {
+        panic!()
+    };
+    let Value::Map(pane) = &mut ps[0] else {
+        panic!()
+    };
+    pane.push((
+        "remote".into(),
+        Value::map(vec![
+            ("kind", Value::text("tmux")),
+            ("host", Value::text(evil)),
+            ("tmux", Value::text("main")),
+            ("state", Value::text("reconnecting")),
+        ]),
+    ));
+    let o = go(
+        &["ls"],
+        &[],
+        vec![("ui.ls", ok(vec![("workspaces", t)]))],
+        "",
+        PLAIN,
+    );
+    assert!(
+        o.out.contains("[tmux dev]52;c;xbox:main reconnecting]"),
+        "{}",
+        o.out
+    );
+    assert!(!o.out.chars().any(|c| c.is_control() && c != '\n'));
+}
+
+#[test]
+fn ssh_cmd_needs_the_hook() {
+    let o = go(
+        &["ssh", "devbox", "--no-hook", "--cmd", "make"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.connected), (2, false));
+    assert!(o.err.contains("--cmd needs the server hook"), "{}", o.err);
+    // The host's own refusal (the per-server setting) is exit 2 as well.
+    let h = go(
+        &["ssh", "devbox", "--cmd", "make"],
+        &[],
+        vec![(
+            "ui.ssh.open",
+            remote("bad_request", "--cmd needs the server hook"),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!(h.code, 2);
 }

@@ -67,6 +67,24 @@ abstract final class ShellxRadius {
 /// §4 dialogs.
 abstract final class ShellxSizes {
   static const double sidebarWidth = 220;
+
+  // A8 (UI-A8 §1.2).
+  static const double remoteMark = 12;
+  static const double remoteMarkGap = 2;
+  static const double connectingDot = 4;
+  static const double remoteStrip = 32;
+  static const double remoteStripPadH = 8;
+  static const double remoteStripButton = 24;
+  static const double connectDialogWidth = 520;
+  static const double connectTabBar = 32;
+  static const double suggestionRow = 28;
+  static const double tmuxRow = 40;
+  static const int suggestionListMax = 8;
+
+  /// UI-A8 §1.3: the strip grows with the text scale.
+  static double remoteStripFor(TextScaler scaler) =>
+      max(remoteStrip, scaler.scale(18) + 14);
+
   static const double row = 30;
   static const double rowGap = 2;
   static const double headerBandMac = 38;

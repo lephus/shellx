@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'inline_name_field.dart';
+import 'remote_marks.dart' show cleanServerText;
 import 'terminal_overlays.dart' show besideSidebar;
 
 /// UI-A2 §3: a workspace's header row — chevron, name, tab count, `+` on
@@ -33,6 +34,7 @@ class WorkspaceHeader extends StatefulWidget {
     this.workspaceId,
     this.menuOpen = false,
     this.hasUnread = false,
+    this.ssh,
   });
 
   final String name;
@@ -67,6 +69,9 @@ class WorkspaceHeader extends StatefulWidget {
   /// Collapsed and holding a tab with unread notifications: the 6 px
   /// accent dot left of the count (UI-A4 §3, D22).
   final bool hasUnread;
+
+  /// A8 D23: the server of an SSH workspace (its mark, "New SSH tab on …").
+  final String? ssh;
 
   /// UI-A2 §1.3: max(28, 16·s + 12).
   static double heightFor(TextScaler scaler) => max(
@@ -126,8 +131,15 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
     // it); V10: otherwise the count holds the slot until hover or focus.
     final showAdd =
         !renaming && (_hover || widget.focused || widget.count == 0);
+    final ssh = widget.ssh == null ? null : cleanServerText(widget.ssh!);
+    final newTabLabel = ssh == null
+        ? l10n.workspaceNewTab
+        : l10n.workspaceNewRemoteTab(ssh);
     final label = [
-      l10n.workspaceHeaderSemantics(widget.name, widget.count),
+      l10n.workspaceHeaderSemantics(
+        ssh == null ? widget.name : l10n.workspaceRemoteLabel(widget.name),
+        widget.count,
+      ),
       if (widget.containsSelected) l10n.workspaceContainsSelected,
       if (widget.hasUnread) l10n.workspaceHasUnread,
     ].join(', ');
@@ -170,6 +182,17 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
           ),
         ),
         const SizedBox(width: ShellxSpace.s4),
+        // UI-A8 §2.3: the server mark before the name; the label says it.
+        if (ssh != null) ...[
+          const ExcludeSemantics(
+            child: Icon(
+              Icons.dns_outlined,
+              size: ShellxSizes.remoteMark,
+              color: ShellxDesktopColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: ShellxSpace.s4),
+        ],
         Expanded(
           child: renaming
               ? InlineNameField(
@@ -261,7 +284,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
       customSemanticsActions: {
         CustomSemanticsAction(label: l10n.workspaceRename):
             widget.onStartRename,
-        CustomSemanticsAction(label: l10n.workspaceNewTab): widget.onNewTab,
+        CustomSemanticsAction(label: newTabLabel): widget.onNewTab,
         if (widget.deletable)
           CustomSemanticsAction(label: l10n.workspaceDelete): widget.onDelete,
       },
@@ -365,7 +388,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                       maintainAnimation: true,
                       maintainState: true,
                       child: _HeaderAdd(
-                        tooltip: l10n.workspaceNewTab,
+                        tooltip: newTabLabel,
                         onPressed: widget.onNewTab,
                       ),
                     ),

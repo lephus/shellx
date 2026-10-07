@@ -123,6 +123,8 @@ final Map<String, ActionSpec> kActionSpecs = {
     const ActionSpec('close_surface', ActionGroup.tabs),
     const ActionSpec('close_tab', ActionGroup.tabs),
     const ActionSpec('new_workspace', ActionGroup.tabs),
+    const ActionSpec('ssh_connect', ActionGroup.tabs),
+    const ActionSpec('tmux_attach', ActionGroup.tabs),
     const ActionSpec(
       'goto_tab',
       ActionGroup.tabs,
@@ -271,6 +273,8 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'close_surface' => const CloseTabIntent(),
   'close_tab' => const CloseWholeTabIntent(),
   'new_workspace' => const NewWorkspaceIntent(),
+  'ssh_connect' => const OpenSshConnectIntent(),
+  'tmux_attach' => const OpenTmuxAttachIntent(),
   'goto_tab' => SelectTabIntent(int.parse(a.param!)),
   'next_tab' => const NextTabIntent(),
   'previous_tab' => const PreviousTabIntent(),

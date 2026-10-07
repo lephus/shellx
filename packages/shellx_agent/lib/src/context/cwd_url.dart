@@ -67,6 +67,29 @@ ReportedCwd? parseCwdUrl(
   return isLocal ? LocalCwd(path) : const RemoteCwd();
 }
 
+/// A8 D14: an SSH session's OSC 7 — any host, the decoded path as the
+/// server sees it (no local check). Null when malformed, not absolute,
+/// over 4096 characters or holding a control character.
+String? parseRemoteCwdPath(String url) {
+  const scheme = 'file://';
+  if (url.length <= scheme.length ||
+      url.substring(0, scheme.length).toLowerCase() != scheme) {
+    return null;
+  }
+  final rest = url.substring(scheme.length);
+  final slash = rest.indexOf('/');
+  if (slash < 0) return null;
+  final path = _percentDecode(rest.substring(slash));
+  if (path == null || path.length > 4096 || hasControlCharacter(path)) {
+    return null;
+  }
+  return path;
+}
+
+/// C0, DEL and C1 characters.
+bool hasControlCharacter(String text) =>
+    text.runes.any((r) => r < 0x20 || r == 0x7F || (r >= 0x80 && r <= 0x9F));
+
 bool _isLocalHost(String host, String localHostName) {
   if (host.isEmpty) return true;
   final h = host.toLowerCase();

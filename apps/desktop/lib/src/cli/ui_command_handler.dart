@@ -14,6 +14,7 @@ import 'cli_fields.dart';
 import 'cli_targets.dart';
 import 'ui_config_commands.dart';
 import 'ui_pane_io.dart';
+import 'ui_ssh_commands.dart';
 
 /// How a request learns its client left: [Future] completes then; the
 /// function tells at once (A7 D21, D33).
@@ -35,9 +36,13 @@ const _runningCommand = CliFailure(
 ///
 /// Never logs request contents (cwd, commands, names, text sent or read).
 final class UiCommandHandler implements UiApi {
-  UiCommandHandler(this._ref, {this.openWait = const Duration(seconds: 10)})
-    : _io = PaneIoCommands(_ref),
-      _configCommands = ConfigCommands(_ref) {
+  UiCommandHandler(
+    this._ref, {
+    this.openWait = const Duration(seconds: 10),
+    Duration tmuxBound = kTmuxListBound,
+  }) : _tmuxBound = tmuxBound,
+       _io = PaneIoCommands(_ref),
+       _configCommands = ConfigCommands(_ref) {
     onCommand = _io.typeCommand;
   }
 
@@ -48,6 +53,10 @@ final class UiCommandHandler implements UiApi {
 
   /// A9 D39: `ui.config.*`.
   final ConfigCommands _configCommands;
+
+  /// A8 D22, D33: `ui.ssh.open` and `ui.tmux.*`.
+  late final SshCommands _ssh = SshCommands(_ref, _io, tmuxBound: _tmuxBound);
+  final Duration _tmuxBound;
 
   /// D33: how long a request waits for another open in flight.
   final Duration openWait;
@@ -89,6 +98,9 @@ final class UiCommandHandler implements UiApi {
       CliType.uiConfigCheck => _configCommands.check(),
       CliType.uiConfigReload => _configCommands.reload(),
       CliType.uiConfigShow => _configCommands.show(request),
+      CliType.uiSshOpen => _sshOpen(request, (cancelled, isGone)),
+      CliType.uiTmuxList => _ssh.list(request),
+      CliType.uiTmuxAttach => _tmuxAttach(request, (cancelled, isGone)),
       // D34: arms the daemon's forwarding of [events]; nothing to answer.
       CliType.uiEventsSubscribe => Future.value(const <String, Object?>{}),
       // ui.browser.*: pending A6.
@@ -173,6 +185,7 @@ final class UiCommandHandler implements UiApi {
       'phone': p.phoneAttached,
       'driver': p.driver.name,
       'agent': marks.paneActive(p.id, now),
+      'remote': ?remoteOf(p),
     };
 
     Map<String, Object?> tab(TerminalTab tab) => {
@@ -216,30 +229,59 @@ final class UiCommandHandler implements UiApi {
   /// wait is `not_found`, and nothing opens.
   Future<Map<String, Object?>> _tabNew(MuxMessage r, _Leaving leaving) async {
     final wsKey = stringField(r, 'workspace');
-    // A9 D21: without --cwd, where the configuration starts new tabs.
-    final cwd = stringField(r, 'cwd') ?? _tabs.newTabCwd();
+    final given = stringField(r, 'cwd');
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final select = flagField(r, 'focus');
-    final tab = await _opening(
-      () => _tabs.openTabFor(
-        cwd: cwd,
+    final tab = await _opening(() {
+      final workspace = wsKey == null
+          ? null
+          : resolveWorkspace(_sideState, wsKey, _side.displayName);
+      // A8 D33: a server's workspace opens that server; --cwd is then a
+      // folder there.
+      final launch = workspace == null ? null : _side.launchFor(workspace);
+      if (launch is SshLaunch) {
+        if (cmd != null && !launch.hook) throw badRequest(kCmdNeedsHook);
+        return _tabs.openTabFor(
+          launch: SshLaunch(
+            launch.target,
+            remoteCwd: _ssh.remoteCwd(r),
+            hook: launch.hook,
+          ),
+          select: select,
+          workspace: workspace,
+        );
+      }
+      return _tabs.openTabFor(
+        // A9 D21: without --cwd, where the configuration starts new tabs.
+        cwd: given ?? _tabs.newTabCwd(),
         select: select,
-        workspace: wsKey == null
-            ? null
-            : resolveWorkspace(_sideState, wsKey, _side.displayName),
-      ),
-      leaving,
-    );
+        workspace: workspace,
+      );
+    }, leaving);
     if (select) _side.reveal(tab);
     _marks.touch(tab: tab, pane: tab);
-    if (cmd != null) onCommand?.call(tab, cmd);
+    if (cmd != null) _typeCommand(tab, cmd);
     return {'tab': tab, 'pane': tab};
+  }
+
+  /// D16: `--cmd` for a new pane: a server pane waits for its hello
+  /// (A8), any other for its shell's first prompt.
+  void _typeCommand(int pane, String cmd) {
+    final remote = _tabsState.tabOfSession(pane)?.panes[pane]?.remote;
+    if (remote?.launch.host != null) {
+      _ssh.typeOnServer(pane, cmd);
+    } else {
+      onCommand?.call(pane, cmd);
+    }
   }
 
   /// D15: any pane of any tab; focus and selection stay unless `focus`,
   /// which then focuses the new pane and selects its tab (as `ui.focus`).
   Future<Map<String, Object?>> _split(MuxMessage r, _Leaving leaving) async {
-    final target = resolvePane(_tabsState, parseTarget(r.fields['pane'], null));
+    final target = resolvePane(
+      _tabsState,
+      parseTarget(r.fields['pane'], null, forward: _tabs.resolveReplaced),
+    );
     final axis = switch (r.fields['direction'] ?? 'right') {
       'right' => SplitAxis.row,
       'down' => SplitAxis.column,
@@ -248,6 +290,13 @@ final class UiCommandHandler implements UiApi {
     final cwd = stringField(r, 'cwd');
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final focus = flagField(r, 'focus');
+    // A8: a pane on a server must not get the command before its hello.
+    final server = _tabsState.tabOfSession(target)?.panes[target]?.remote;
+    if (cmd != null &&
+        server?.launch.host != null &&
+        !server!.launch.usesHook) {
+      throw badRequest(kCmdNeedsHook);
+    }
     final pane = await _opening(
       () => _tabs.splitPaneFor(target, axis, cwd: cwd, focus: focus),
       leaving,
@@ -258,14 +307,18 @@ final class UiCommandHandler implements UiApi {
       _side.reveal(tab);
     }
     _marks.touch(tab: tab, pane: pane);
-    if (cmd != null) onCommand?.call(pane, cmd);
+    if (cmd != null) _typeCommand(pane, cmd);
     return {'pane': pane, 'tab': tab};
   }
 
   /// D17: a tab is selected (its workspace expands); a pane also gets the
   /// focus. The window comes forward only with `raise`.
   Future<Map<String, Object?>> _focus(MuxMessage r) async {
-    final target = parseTarget(r.fields['pane'], r.fields['tab']);
+    final target = parseTarget(
+      r.fields['pane'],
+      r.fields['tab'],
+      forward: _tabs.resolveReplaced,
+    );
     final raise = flagField(r, 'raise');
     final s = _tabsState;
     final tab = resolveTab(s, target);
@@ -282,7 +335,11 @@ final class UiCommandHandler implements UiApi {
   /// The Agent mark goes on what is left: nothing for a closed tab, the
   /// tab for a closed pane (unless it was the last).
   Future<Map<String, Object?>> _close(MuxMessage r) async {
-    final target = parseTarget(r.fields['pane'], r.fields['tab']);
+    final target = parseTarget(
+      r.fields['pane'],
+      r.fields['tab'],
+      forward: _tabs.resolveReplaced,
+    );
     final force = flagField(r, 'force');
     final s = _tabsState;
     if (target is TabRef) {
@@ -305,6 +362,23 @@ final class UiCommandHandler implements UiApi {
     _tabs.rename(tab, stringField(r, 'name', max: 1024) ?? '');
     _marks.touch(tab: tab);
     return const {};
+  }
+
+  // ---- servers and tmux (A8 D22, D33) --------------------------------------
+
+  Future<Map<String, Object?>> _sshOpen(MuxMessage r, _Leaving leaving) async {
+    final opened = await _ssh.open(r, (open) => _opening(open, leaving));
+    _marks.touch(tab: opened['tab']! as int, pane: opened['pane']! as int);
+    return opened;
+  }
+
+  Future<Map<String, Object?>> _tmuxAttach(
+    MuxMessage r,
+    _Leaving leaving,
+  ) async {
+    final opened = await _ssh.attach(r, (open) => _opening(open, leaving));
+    _marks.touch(tab: opened['tab']! as int, pane: opened['pane']! as int);
+    return opened;
   }
 
   // ---- workspaces (D22) ---------------------------------------------------

@@ -1445,6 +1445,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get actionNewWorkspace => 'Workspace mới';
 
   @override
+  String get actionSshConnect => 'Kết nối SSH';
+
+  @override
+  String get actionTmuxAttach => 'Gắn phiên tmux';
+
+  @override
   String get actionToggleNotifications => 'Bảng thông báo';
 
   @override
@@ -1641,5 +1647,265 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String configWriteFailed(String path) {
     return 'Không lưu được phím tắt vào $path';
+  }
+
+  @override
+  String get sshConnectMenu => 'Kết nối SSH…';
+
+  @override
+  String get tmuxAttachMenu => 'Gắn phiên tmux…';
+
+  @override
+  String get sshDialogTitle => 'Kết nối tới máy chủ';
+
+  @override
+  String get sshDialogTabSsh => 'SSH';
+
+  @override
+  String get sshDialogTabTmux => 'tmux';
+
+  @override
+  String get sshHostLabel => 'Máy chủ';
+
+  @override
+  String get sshHostHint => 'devbox hoặc user@host:2222';
+
+  @override
+  String get sshHostInvalid => 'Không phải tên máy chủ hợp lệ';
+
+  @override
+  String get sshSuggestionsConfig => 'Trong ~/.ssh/config';
+
+  @override
+  String get sshSuggestionsRecent => 'Gần đây';
+
+  @override
+  String sshSuggestionsCount(int count) {
+    return '$count gợi ý';
+  }
+
+  @override
+  String get sshRemoteDirLabel => 'Thư mục trên máy chủ (không bắt buộc)';
+
+  @override
+  String get sshRemoteDirInvalid => 'Đường dẫn phải bắt đầu bằng / hoặc ~';
+
+  @override
+  String get sshNoHookLabel => 'Không cài hook ShellX trên máy này';
+
+  @override
+  String get sshNoHookHelp =>
+      'Hook cho ShellX biết thư mục, nhánh và cổng trên máy chủ. Tắt khi máy chủ không phải Unix.';
+
+  @override
+  String get sshConnectAction => 'Kết nối';
+
+  @override
+  String get sshUnavailable => 'Không tìm thấy lệnh ssh trên máy này';
+
+  @override
+  String get sshUnavailableWindows =>
+      'Không tìm thấy ssh. Bật “OpenSSH Client” trong Settings → Apps → Optional features.';
+
+  @override
+  String get tmuxSourceLabel => 'Phiên tmux trên';
+
+  @override
+  String get tmuxSourceLocal => 'Máy này';
+
+  @override
+  String get tmuxLoading => 'Đang lấy danh sách phiên…';
+
+  @override
+  String get tmuxEmpty => 'Chưa có phiên tmux nào';
+
+  @override
+  String tmuxUnavailable(String where) {
+    return 'tmux chưa được cài trên $where';
+  }
+
+  @override
+  String get tmuxUnavailableLocal => 'tmux chưa được cài trên máy này';
+
+  @override
+  String tmuxListFailed(String where) {
+    return 'Không lấy được danh sách phiên trên $where. Kết nối SSH tới máy này một lần (để không phải nhập mật khẩu) rồi thử lại.';
+  }
+
+  @override
+  String get tmuxRetry => 'Thử lại';
+
+  @override
+  String tmuxWindows(int count) {
+    return '$count cửa sổ';
+  }
+
+  @override
+  String get tmuxAttachedElsewhere => 'đang gắn ở nơi khác';
+
+  @override
+  String tmuxLastActive(String time) {
+    return 'hoạt động $time';
+  }
+
+  @override
+  String get tmuxAttachAction => 'Gắn';
+
+  @override
+  String get tmuxNewLabel => 'Tên phiên mới';
+
+  @override
+  String get tmuxNameInvalid =>
+      'Tên chỉ gồm tối đa 64 ký tự, không có “:” hay “.”';
+
+  @override
+  String get tmuxCreateAction => 'Tạo và gắn';
+
+  @override
+  String sidebarRemoteMark(String host) {
+    return 'SSH: $host';
+  }
+
+  @override
+  String sidebarTmuxMark(String name) {
+    return 'tmux: $name';
+  }
+
+  @override
+  String sidebarTmuxRemoteMark(String name, String host) {
+    return 'tmux: $name · $host';
+  }
+
+  @override
+  String sshStateConnecting(String host) {
+    return 'Đang kết nối tới $host';
+  }
+
+  @override
+  String sshStateDisconnected(String host) {
+    return 'Mất kết nối tới $host';
+  }
+
+  @override
+  String sshStateFailed(String host) {
+    return 'Không kết nối được tới $host';
+  }
+
+  @override
+  String sshRetryIn(int seconds) {
+    return 'Thử lại sau $seconds giây';
+  }
+
+  @override
+  String get sshRetrying => 'Đang kết nối lại…';
+
+  @override
+  String get sshNeedsSignIn => 'Cần đăng nhập';
+
+  @override
+  String get sshAutoRetryStopped => 'Đã ngừng tự kết nối lại';
+
+  @override
+  String get sshFailedHookHint => 'Máy chủ có thể không chạy được hook ShellX';
+
+  @override
+  String get sshReconnectAction => 'Kết nối lại';
+
+  @override
+  String get sshRetryAction => 'Thử lại';
+
+  @override
+  String get sshRetryPlainAction => 'Thử lại không dùng hook';
+
+  @override
+  String get sshClosePaneAction => 'Đóng pane';
+
+  @override
+  String get sshTmuxHint =>
+      'Chạy trong tmux để chương trình vẫn chạy khi mất kết nối';
+
+  @override
+  String sshDisconnectedLine(String host) {
+    return '[Mất kết nối tới $host] — Enter để kết nối lại';
+  }
+
+  @override
+  String sshFailedLine(String host) {
+    return '[Không kết nối được tới $host] — Enter để thử lại';
+  }
+
+  @override
+  String sshReconnectedDivider(String time) {
+    return '— Đã kết nối lại · $time —';
+  }
+
+  @override
+  String workspaceNewRemoteTab(String host) {
+    return 'Tab SSH mới tới $host';
+  }
+
+  @override
+  String get workspaceNewLocalTab => 'Tab cục bộ mới';
+
+  @override
+  String get workspaceReconnectAll => 'Kết nối lại mọi pane';
+
+  @override
+  String workspaceRemoteLabel(String host) {
+    return 'Workspace SSH $host';
+  }
+
+  @override
+  String get rowReconnect => 'Kết nối lại';
+
+  @override
+  String get paneSplitLocalRight => 'Chia cục bộ sang phải';
+
+  @override
+  String remotePortTooltip(int port, String host) {
+    return 'Mở cổng $port trên $host (chuyển tiếp qua SSH)';
+  }
+
+  @override
+  String remotePortForwarded(int local, String host, int port) {
+    return 'localhost:$local → $host:$port';
+  }
+
+  @override
+  String remotePortForwardFailed(int port) {
+    return 'Không chuyển tiếp được cổng $port';
+  }
+
+  @override
+  String get sshTrayMenu => 'SSH';
+
+  @override
+  String get sshTrayHook =>
+      'Cài hook ShellX trên máy chủ (thư mục, nhánh, cổng)';
+
+  @override
+  String get sshTrayClearRecent => 'Xóa danh sách máy gần đây';
+
+  @override
+  String get sshRecentCleared => 'Đã xóa danh sách máy gần đây';
+
+  @override
+  String sshAnnounceConnected(String host) {
+    return 'Đã kết nối tới $host';
+  }
+
+  @override
+  String sshAnnounceDisconnected(String host) {
+    return 'Mất kết nối tới $host';
+  }
+
+  @override
+  String sshAnnounceReconnected(String host) {
+    return 'Đã kết nối lại tới $host';
+  }
+
+  @override
+  String paneRemoteSuffix(String host) {
+    return ', trên $host';
   }
 }
