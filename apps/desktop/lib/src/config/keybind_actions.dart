@@ -161,6 +161,13 @@ final Map<String, ActionSpec> kActionSpecs = {
       param: _resizeDirection,
       paramHint: 'left, right, up, down',
     ),
+    // A11 D15: back / forward through the panes used.
+    ActionSpec(
+      'focus_history',
+      ActionGroup.panes,
+      param: (r) => _oneOf({'back', 'forward'}, r),
+      paramHint: 'back, forward',
+    ),
     const ActionSpec('toggle_split_zoom', ActionGroup.panes),
     const ActionSpec('equalize_splits', ActionGroup.panes),
     const ActionSpec('toggle_notifications', ActionGroup.notifications),
@@ -311,6 +318,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   ),
   'goto_split' => FocusPaneIntent(_dir(a.param!)),
   'resize_split' => ResizePaneIntent(_dir(a.param!)),
+  'focus_history' => FocusHistoryIntent(back: a.param != 'forward'),
   'toggle_split_zoom' => const TogglePaneZoomIntent(),
   'equalize_splits' => const EqualizePanesIntent(),
   'toggle_notifications' => const ToggleNotificationsPanelIntent(),
@@ -350,6 +358,8 @@ String describeIntent(Intent i) => switch (i) {
   SelectAllIntent(:final fromMenu) =>
     fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
   EditLineIntent(:final op) => 'EditLineIntent(${op.wire})',
+  FocusHistoryIntent(:final back) =>
+    'FocusHistoryIntent(${back ? 'back' : 'forward'})',
   NavigateSearchIntent(:final next) =>
     'NavigateSearchIntent(${next ? 'next' : 'previous'})',
   FontBiggerIntent(:final step) when step != 1 => 'FontBiggerIntent($step)',

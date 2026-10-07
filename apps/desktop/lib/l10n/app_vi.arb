@@ -536,5 +536,7 @@
   "copyModeCopied": "Đã chép",
   "actionReopenClosed": "Mở lại tab đã đóng",
   "reopenedTab": "Đã mở lại “{name}”",
-  "reopenNothing": "Không có gì để mở lại"
+  "reopenNothing": "Không có gì để mở lại",
+  "actionFocusBack": "Quay lại pane trước",
+  "actionFocusForward": "Tới pane kế"
 }

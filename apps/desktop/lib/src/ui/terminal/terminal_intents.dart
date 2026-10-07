@@ -204,3 +204,9 @@ class ToggleCopyModeIntent extends Intent {
 class ReopenClosedIntent extends Intent {
   const ReopenClosedIntent();
 }
+
+/// A11 D15 `focus_history:back|forward` (⌘⌃[ / ⌘⌃], Ctrl+Alt+[ / ]).
+class FocusHistoryIntent extends Intent {
+  const FocusHistoryIntent({required this.back});
+  final bool back;
+}

@@ -20,6 +20,7 @@ import '../../terminal/clipboard_media.dart';
 import '../../terminal/edit_line.dart';
 import '../../terminal/find_session.dart';
 import '../../terminal/find_sessions.dart';
+import '../../terminal/focus_history.dart';
 import '../../terminal/pane_input.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/pane_paste.dart';
@@ -440,6 +441,15 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
               );
         },
       ),
+      // A11 D15: always taken, so ⌘⌃[ never reaches the shell as Ctrl+[;
+      // at either end it does nothing.
+      FocusHistoryIntent: run<FocusHistoryIntent>((i) {
+        closePanel();
+        if (ref.read(focusHistoryProvider.notifier).go(back: i.back)) {
+          focusTerminal();
+          _announceFocusedPane();
+        }
+      }),
       // A11 D14: the newest closed tab or pane comes back.
       ReopenClosedIntent: run<ReopenClosedIntent>((_) {
         closePanel();
@@ -633,6 +643,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     super.initState();
     terminalFocus.addListener(_onTerminalFocus);
     ref.read(closedItemsRecorderProvider); // A11 D14: starts listening
+    ref.read(focusHistoryProvider); // A11 D15
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
     listenToConfig();
     listenToConfigUi();

@@ -2233,4 +2233,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reopenNothing => 'Nothing to reopen';
+
+  @override
+  String get actionFocusBack => 'Back to previous pane';
+
+  @override
+  String get actionFocusForward => 'Forward to next pane';
 }

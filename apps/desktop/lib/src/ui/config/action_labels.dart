@@ -126,6 +126,8 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
     'delete_word_forward' => l10n.actionEditLineDeleteWordForward,
     _ => l10n.actionEditLineStart,
   },
+  'focus_history' =>
+    a.param == 'forward' ? l10n.actionFocusForward : l10n.actionFocusBack,
   'reopen_closed' => l10n.actionReopenClosed,
   'toggle_copy_mode' => l10n.actionToggleCopyMode,
   'goto_tab' => l10n.actionGotoTab(a.param ?? ''),
@@ -159,6 +161,7 @@ List<String?> actionVariants(ActionSpec spec) => switch (spec.name) {
   'new_split' => ['right', 'down'],
   'goto_split' || 'resize_split' => ['left', 'right', 'up', 'down'],
   'navigate_search' => ['next', 'previous'],
+  'focus_history' => ['back', 'forward'],
   'edit_line' => [for (final op in EditLineOp.values) op.wire],
   'increase_font_size' || 'decrease_font_size' => ['1'],
   _ => [null],

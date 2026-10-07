@@ -931,5 +931,8 @@
   "@actionReopenClosed": {"description": "A11 D14"},
   "reopenedTab": "Reopened “{name}”",
   "@reopenedTab": {"placeholders": {"name": {"type": "String"}}},
-  "reopenNothing": "Nothing to reopen"
+  "reopenNothing": "Nothing to reopen",
+  "actionFocusBack": "Back to previous pane",
+  "@actionFocusBack": {"description": "A11 D15"},
+  "actionFocusForward": "Forward to next pane"
 }

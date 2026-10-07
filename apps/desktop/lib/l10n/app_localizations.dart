@@ -3329,6 +3329,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing to reopen'**
   String get reopenNothing;
+
+  /// A11 D15
+  ///
+  /// In en, this message translates to:
+  /// **'Back to previous pane'**
+  String get actionFocusBack;
+
+  /// No description provided for @actionFocusForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward to next pane'**
+  String get actionFocusForward;
 }
 
 class _AppLocalizationsDelegate

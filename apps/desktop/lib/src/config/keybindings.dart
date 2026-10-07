@@ -208,6 +208,19 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
         dir,
       ),
     ],
+    // A11 D15: Cmd+Ctrl+[ / ] on macOS; Ctrl+Alt+[ / ] on Windows (left
+    // Alt only).
+    for (final (key, which) in [
+      (LogicalKeyboardKey.bracketLeft, 'back'),
+      (LogicalKeyboardKey.bracketRight, 'forward'),
+    ])
+      b(
+        mac
+            ? KeyChord(key, meta: true, control: true)
+            : KeyChord(key, control: true, alt: true),
+        'focus_history',
+        which,
+      ),
     for (final enter in [
       LogicalKeyboardKey.enter,
       LogicalKeyboardKey.numpadEnter,

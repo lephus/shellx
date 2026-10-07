@@ -46,7 +46,7 @@ Set<String> a10Additions(String platform) => platform == 'mac'
 
 /// A11: D11 macOS line editing at the prompt (Windows binds none), D13
 /// copy mode (⌘⇧M / Ctrl+Shift+M), D14 reopen closed (⌘⇧T /
-/// Ctrl+Shift+Alt+T).
+/// Ctrl+Shift+Alt+T), D15 focus history (⌘⌃[ / ⌘⌃]; Ctrl+Alt+[ / ]).
 Set<String> a11Additions(String platform) => platform == 'mac'
     ? const {
         'meta+100000302 -> EditLineIntent(line_start)',
@@ -56,10 +56,14 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'alt+10000007f -> EditLineIntent(delete_word_forward)',
         'shift+meta+6d norepeat -> ToggleCopyModeIntent',
         'shift+meta+74 norepeat -> ReopenClosedIntent',
+        'ctrl+meta+5b norepeat -> FocusHistoryIntent(back)',
+        'ctrl+meta+5d norepeat -> FocusHistoryIntent(forward)',
       }
     : const {
         'ctrl+shift+6d norepeat -> ToggleCopyModeIntent',
         'ctrl+alt+shift+74 norepeat -> ReopenClosedIntent',
+        'ctrl+alt+5b norepeat -> FocusHistoryIntent(back)',
+        'ctrl+alt+5d norepeat -> FocusHistoryIntent(forward)',
       };
 
 void main() {

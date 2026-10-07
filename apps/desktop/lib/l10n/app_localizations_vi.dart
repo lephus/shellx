@@ -2144,4 +2144,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get reopenNothing => 'Không có gì để mở lại';
+
+  @override
+  String get actionFocusBack => 'Quay lại pane trước';
+
+  @override
+  String get actionFocusForward => 'Tới pane kế';
 }
