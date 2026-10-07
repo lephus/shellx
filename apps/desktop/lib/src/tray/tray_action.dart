@@ -71,6 +71,13 @@ final class Quit extends TrayAction {
   final bool confirm;
 }
 
+/// A5b D14 "Thoát hoàn toàn": every shell and the background service end.
+/// (`Quit` leaves them running.) Without the background service it is
+/// `Quit`.
+final class QuitAll extends TrayAction {
+  const QuitAll();
+}
+
 /// The terminal-sharing switch (spec §7.6, §10.1, §10.5).
 final class ToggleTerminalSharing extends TrayAction {
   const ToggleTerminalSharing();
@@ -196,6 +203,7 @@ abstract final class TrayKeys {
   static const String signOut = 'sign_out';
   static const String signIn = 'sign_in';
   static const String quit = 'quit';
+  static const String quitAll = 'quit_all';
   static const String terminalSharing = 'terminal_sharing';
   static const String terminalSharingSetup = 'terminal_sharing_setup';
   static const String desktopTerminals = 'desktop_terminals';
@@ -271,6 +279,7 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.downloadUpdate => const DownloadUpdate(),
     TrayKeys.reconnect => const Reconnect(),
     TrayKeys.quit => const Quit(),
+    TrayKeys.quitAll => const QuitAll(),
     TrayKeys.terminalSharing => const ToggleTerminalSharing(),
     TrayKeys.terminalSharingSetup => const SetUpTerminalSharing(),
     TrayKeys.desktopNotifications => const ToggleDesktopNotifications(),

@@ -39,6 +39,29 @@ class AppDelegate: FlutterAppDelegate {
     super.applicationDidFinishLaunching(notification)
   }
 
+  private var quitAllItem: NSMenuItem?
+
+  /// UI-A5 §6.1: a regular item (not an "alternate" hidden behind ⌥) right
+  /// after Quit in the app menu. Only a window that attaches to the
+  /// background service asks for it, so without one the menu is unchanged.
+  func installQuitAll(title: String) {
+    if let item = quitAllItem {
+      item.title = title
+      return
+    }
+    guard let menu = NSApp.mainMenu?.items.first?.submenu else { return }
+    let index = menu.items.firstIndex { $0.action == #selector(NSApplication.terminate(_:)) }
+    let item = NSMenuItem(title: title, action: #selector(quitAll(_:)), keyEquivalent: "q")
+    item.keyEquivalentModifierMask = [.command, .option]
+    item.target = self
+    menu.insertItem(item, at: (index ?? menu.items.count - 1) + 1)
+    quitAllItem = item
+  }
+
+  @objc private func quitAll(_ sender: Any?) {
+    AppChannel.quitAllRequested()
+  }
+
   @objc private func willPowerOff(_ notification: Notification) {
     poweringOff = true
     poweringOffReset?.cancel()
@@ -141,6 +164,12 @@ enum AppChannel {
           NSApp.activate(ignoringOtherApps: true)
         }
         result(nil)
+      case "setQuitAllTitle":
+        // A5b UI-A5 §6.1: "Thoát hoàn toàn ⌥⌘Q" right after Quit.
+        if let title = call.arguments as? String {
+          (NSApp.delegate as? AppDelegate)?.installQuitAll(title: title)
+        }
+        result(nil)
       case "activate":
         // In front of the app the user was in (a tray click, the Dock, a
         // second launch): window_manager's focus() does not ignore other apps.
@@ -155,6 +184,10 @@ enum AppChannel {
 
   static func reopen() {
     channel?.invokeMethod("reopen", arguments: nil)
+  }
+
+  static func quitAllRequested() {
+    channel?.invokeMethod("quitAllRequested", arguments: nil)
   }
 
   static func quitRequested() {

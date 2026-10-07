@@ -18,3 +18,19 @@ Future<void> shutdownRemote(
   // every master socket in it ends, the ones this instance never noted too.
   await control.exitAllMasters();
 }
+
+/// A5b "Thoát" (the window only): this window's own port forwards end; no
+/// master is told to exit, because the shells of the background service
+/// still use them ("Thoát hoàn toàn" ends them in the service). The caller
+/// bounds it.
+Future<void> cancelUiForwards(RemoteTools tools) async {
+  final control = tools.control;
+  if (control == null) return;
+  for (final target in control.mastersUsed.toList()) {
+    try {
+      await control.cancelForwards(target);
+    } on Object {
+      // The forward is gone or ssh is: nothing more to cancel.
+    }
+  }
+}

@@ -18,6 +18,9 @@ import 'src/agent/agent_controller.dart';
 import 'src/agent/agent_side.dart';
 import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
+import 'src/agent/remote_agent_controller.dart';
+import 'src/agent/ui_services.dart';
+import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
 import 'src/remote/ssh_reconnector.dart';
 import 'src/cli/agent_marks.dart';
@@ -28,7 +31,15 @@ import 'src/cli/ui_command_handler.dart';
 import 'src/config.dart';
 import 'src/config/config_controller.dart';
 import 'src/l10n/locale.dart';
+import 'src/mux/background_service_choice.dart';
+import 'src/mux/daemon_launcher.dart';
+import 'src/mux/daemon_spawn.dart';
+import 'src/mux/daemon_state.dart';
 import 'src/mux/launch_mode.dart';
+import 'src/mux/mux_lock.dart';
+import 'src/mux/mux_paths.dart';
+import 'src/mux/ui_mux_responder.dart';
+import 'src/mux/windows_pipe_transport.dart';
 import 'src/platform/app_reopen.dart';
 import 'src/platform/attention_badge.dart';
 import 'src/platform/desktop_notifications.dart';
@@ -202,8 +213,37 @@ Future<void> _start(
   // a shell is only told of a host that runs. The single-instance lock is
   // held; the host also takes `mux/mux.lock`. Requests wait for the window
   // (attach, below).
-  CliService? cliService;
+  // A5b ruling: the whole background service sits behind the "Giữ shell
+  // chạy khi đóng cửa sổ" switch (off by default). Off, this process owns
+  // the shells, the agent and the command-line host, exactly as before. On
+  // (or a service with sessions still running), the window attaches and the
+  // service hosts all of that: never two hosts (R3).
+  final responder = UiMuxResponder();
+  DaemonLauncher? launcher;
   if (cli != null) {
+    launcher = DaemonLauncher(
+      transport: Platform.isWindows
+          ? WindowsPipeTransport()
+          : UnixMuxTransport(),
+      endpoint: MuxEndpointFile(cli.mux.endpoint),
+      daemonLockFree: () => MuxLock.isFree(cli.mux),
+      spawn: () => spawnDaemon(version: info.version),
+      appVersion: info.version,
+      onRequest: responder.onRequest,
+    );
+  }
+  final daemonMode =
+      launcher != null &&
+      await attachThisLaunch(
+        enabled: settings.getBool(
+          SettingKeys.backgroundService,
+          defaultValue: false,
+        ),
+        findRunning: launcher.findRunning,
+        quit: (client) => _quitService(client, cli!.mux),
+      );
+  CliService? cliService;
+  if (cli != null && !daemonMode) {
     try {
       cliService = await CliService.listen(
         paths: cli.mux,
@@ -224,45 +264,69 @@ Future<void> _start(
       log: (message) => debugPrint('ShellX ssh: $message'),
     ),
   );
-  final side = buildAgentSide(
-    environment: environment,
-    home: home,
-    supportDirectory: supportDirectory.path,
-    settings: settings,
-    notifier: notifier,
-    ptyFactory: ptyFactory,
-    l10n: l10n,
-    appVersion: info.version,
-    relayBase: relayBase,
-    sharingSetup: sharingSetup,
-    deviceName: deviceName,
-    remoteTools: remoteTools,
-    cliPaths: cli?.paths,
-    cliSocket: cliService?.address,
-    cliToken: cli?.token,
-    // D20: the first step of Quit: no retry may start from here on.
-    stopRemoteRetries: () {
-      sshWake?.stop();
-      container.read(sshReconnectorProvider.notifier).stop();
-    },
-    // Runs after AgentController.shutdown(). Each step is bounded, so
-    // quitting always ends in exit(0).
-    quitApp: () async {
-      await runBounded(
-        trayHost.destroy,
-        timeout: _quitStepTimeout,
-        label: 'removing the tray icon',
-      );
-      await runBounded(
-        lock.release,
-        timeout: _quitStepTimeout,
-        label: 'releasing the lock',
-      );
-      exit(0);
-    },
-  );
-  final core = side.core;
-  final services = side.services;
+  // D20: the first step of Quit: no retry may start from here on.
+  void stopRemoteRetries() {
+    sshWake?.stop();
+    container.read(sshReconnectorProvider.notifier).stop();
+  }
+
+  // Runs after the shutdown. Each step is bounded, so quitting always ends
+  // in exit(0).
+  Future<void> quitApp() async {
+    await runBounded(
+      trayHost.destroy,
+      timeout: _quitStepTimeout,
+      label: 'removing the tray icon',
+    );
+    await runBounded(
+      lock.release,
+      timeout: _quitStepTimeout,
+      label: 'releasing the lock',
+    );
+    exit(0);
+  }
+
+  final AgentSide? side;
+  final DesktopServices services;
+  if (daemonMode) {
+    side = null;
+    services = buildUiServices(
+      settings: settings,
+      notifier: notifier,
+      l10n: l10n,
+      appVersion: info.version,
+      relayBase: relayBase,
+      deviceName: deviceName,
+      sharingSetup: sharingSetup,
+      windows: Platform.isWindows,
+      stopRemoteRetries: stopRemoteRetries,
+      // "Thoát": only this window's forwards end; the service keeps the
+      // masters ("Thoát hoàn toàn" ends them there).
+      shutdownRemote: () => cancelUiForwards(remoteTools),
+      quitApp: quitApp,
+    );
+  } else {
+    side = buildAgentSide(
+      environment: environment,
+      home: home,
+      supportDirectory: supportDirectory.path,
+      settings: settings,
+      notifier: notifier,
+      ptyFactory: ptyFactory,
+      l10n: l10n,
+      appVersion: info.version,
+      relayBase: relayBase,
+      sharingSetup: sharingSetup,
+      deviceName: deviceName,
+      remoteTools: remoteTools,
+      cliPaths: cli?.paths,
+      cliSocket: cliService?.address,
+      cliToken: cli?.token,
+      stopRemoteRetries: stopRemoteRetries,
+      quitApp: quitApp,
+    );
+    services = side.services;
+  }
 
   container = ProviderContainer(
     overrides: [
@@ -270,6 +334,16 @@ Future<void> _start(
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
       restoreStoreProvider.overrideWithValue(restoreFiles),
+      if (daemonMode) ...[
+        daemonModeProvider.overrideWithValue(true),
+        daemonConnectorProvider.overrideWithValue(launcher),
+        uiMuxResponderProvider.overrideWithValue(responder),
+        // The agent is the service's: each new connection rebuilds it.
+        agentControllerProvider.overrideWith(
+          () =>
+              RemoteAgentController(container.read(daemonLinkProvider)?.client),
+        ),
+      ],
       if (cli != null) ...[
         cliMuxPathsProvider.overrideWithValue(cli.mux),
         cliPathsProvider.overrideWithValue(cli.paths),
@@ -331,7 +405,11 @@ Future<void> _start(
     return load;
   }
 
-  _unawaitedLogged(restore.restoreAtStartup(loadForRestore()), 'restore');
+  // With the background service the restore waits for the connection (the
+  // snapshot is compared with the service instance), below.
+  if (!daemonMode) {
+    _unawaitedLogged(restore.restoreAtStartup(loadForRestore()), 'restore');
+  }
 
   final windowPresenter = WindowPresenter(windowHost);
   container.listen<WindowState>(
@@ -413,14 +491,19 @@ Future<void> _start(
     // Windows Restart Manager (D18 amended): saved; quit, nothing to ask.
     onQuitAfterSave: () =>
         unawaited(trayActions.handle(const Quit(confirm: false))),
+    // A5b UI-A5 §6.1: ⌥⌘Q in the app menu.
+    onQuitAllRequested: () => unawaited(trayActions.handle(const QuitAll())),
   );
+  if (daemonMode && Platform.isMacOS) {
+    _unawaitedLogged(setQuitAllTitle(l10n.appMenuQuitAll), 'app menu');
+  }
   listenForWindowTitle(
     container: container,
     host: windowHost,
     l10n: l10n,
     run: (call) => _unawaitedLogged(call, 'window title'),
   );
-  listenForPortWatch(container: container, sessions: core.sessions);
+  listenForPortWatch(container: container, sessions: side?.core.sessions);
 
   // A4: tab attention — system notifications (D14–D16), Dock/taskbar
   // badge (D18–D19), screen-reader announcements (D24). Reading the
@@ -514,6 +597,17 @@ Future<void> _start(
   // the host first, before the shells close (tray Quit, ruling M6: attach
   // registers it in cliHostControlProvider).
   cliService?.attach(container);
+  if (daemonMode && cli != null) {
+    // The command line is the service's; the `shellx` command's folder is
+    // still kept current from here.
+    unawaited(
+      CliBinaryInstaller(cli.paths).ensureCurrent().then(
+        (_) {},
+        onError: (Object e) =>
+            debugPrint('ShellX: cli binary install failed: ${e.runtimeType}'),
+      ),
+    );
+  }
 
   registerFontLicenses();
   runApp(
@@ -523,9 +617,31 @@ Future<void> _start(
     ),
   );
   container.read(windowRouterProvider.notifier).showTerminal();
-  // The only bootstrap() call. An unreadable keychain does not throw: the
-  // controller starts signed out and notifies.
-  await container.read(agentControllerProvider.notifier).bootstrap();
+  if (daemonMode) {
+    // UI-A5 §7.3, §7.4: the dialogs come over the window; leaving them is
+    // leaving the window (nothing was started here, nothing to save).
+    final link = await container
+        .read(daemonStateProvider.notifier)
+        .connectAtStartup();
+    if (link == null) {
+      await quitApp();
+      return;
+    }
+    try {
+      await container.read(agentControllerProvider.notifier).bootstrap();
+    } catch (error) {
+      debugPrint('ShellX: agent state not read: ${error.runtimeType}');
+    }
+    // A5b D14: the same service instance as the saved layout: reattach.
+    _unawaitedLogged(
+      restore.restoreAtStartup(loadForRestore(), daemonInstance: link.instance),
+      'restore',
+    );
+  } else {
+    // The only bootstrap() call. An unreadable keychain does not throw: the
+    // controller starts signed out and notifies.
+    await container.read(agentControllerProvider.notifier).bootstrap();
+  }
   // D11: every start opens the terminal window with a tab, sized to the
   // laid-out pane. After the bootstrap, so a signed-out strip is already
   // laid out and the new shell is not resized right after it starts.
@@ -534,6 +650,28 @@ Future<void> _start(
   // for it, so a restored window gets no extra tab.
   layoutReady.complete();
   await handleActivation(container);
+}
+
+/// The switch is off but a service with no sessions still runs from before:
+/// it exits (its shells are none), and the lock frees, so this launch is
+/// the one host (R3). Bounded; never throws.
+Future<void> _quitService(MuxClient client, MuxPaths paths) async {
+  try {
+    await client
+        .request(MuxType.daemonQuit)
+        .timeout(const Duration(seconds: 4));
+  } on Object {
+    // Gone, or it did not answer: the lock below tells.
+  }
+  try {
+    await client.close();
+  } on Object {
+    // Already closed.
+  }
+  final until = DateTime.now().add(const Duration(seconds: 5));
+  while (!await MuxLock.isFree(paths) && DateTime.now().isBefore(until)) {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
 }
 
 /// Exit code of `--terminal-sharing-cleanup`: 0, or 1 when something was
