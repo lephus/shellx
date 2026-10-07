@@ -114,4 +114,42 @@ void main() {
   test('toString never shows terminal text', () {
     expect(const SearchMatch(1, 2, 3, 4).toString(), isNot(contains('needle')));
   });
+
+  test('decomposed Vietnamese in the buffer finds the precomposed needle', () {
+    // "việt" typed as v i e + dot below + circumflex + t: the terminal
+    // stores each mark in a cell of its own.
+    final t = terminal('x vie\u0323\u0302t y');
+    for (final needle in ['việt', 'vie\u0323\u0302t', 'vie\u0302\u0323t']) {
+      final r = searchBuffer(t.buffer, needle);
+      expect(r.matches, hasLength(1), reason: needle.runes.join(','));
+      expect(r.matches.single.startCol, 2);
+    }
+    expect(searchBuffer(t.buffer, 'VIỆT').matches, hasLength(1));
+  });
+
+  test('precomposed text in the buffer finds a decomposed needle', () {
+    final t = terminal('x việt y');
+    expect(searchBuffer(t.buffer, 'vie\u0323\u0302t').matches, hasLength(1));
+  });
+
+  test(
+    'a sliced search never holds the thread; the result arrives',
+    () {
+      final t = Terminal(maxLines: 100000)..resize(200, 40);
+      final line = '${'abcdefghij' * 20}\r\n';
+      t.write(line * 100000);
+      final search = BufferSearch(t.buffer, 'no such text');
+      final slices = <int>[];
+      var done = false;
+      while (!done) {
+        final watch = Stopwatch()..start();
+        done = search.step(const Duration(milliseconds: 4));
+        slices.add(watch.elapsedMilliseconds);
+      }
+      expect(slices.length, greaterThan(1), reason: 'it was cut into slices');
+      expect(slices.reduce((a, b) => a > b ? a : b), lessThan(16));
+      expect(search.result.matches, isEmpty);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 }

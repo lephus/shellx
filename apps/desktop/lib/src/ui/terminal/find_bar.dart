@@ -16,7 +16,6 @@ class FindBar extends StatefulWidget {
     required this.session,
     required this.focusNode,
     required this.onClose,
-    this.seed,
   });
 
   final FindSession session;
@@ -24,9 +23,6 @@ class FindBar extends StatefulWidget {
   /// The input's node: focused when the bar opens or ⌘F is pressed again.
   final FocusNode focusNode;
   final VoidCallback onClose;
-
-  /// Text to start from (one selected line, A10 D3).
-  final String? seed;
 
   static const double width = 360;
   static const double height = 36;
@@ -37,18 +33,13 @@ class FindBar extends StatefulWidget {
 
 class _FindBarState extends State<FindBar> {
   late final TextEditingController _text = TextEditingController(
-    text: widget.session.query.isEmpty
-        ? widget.seed ?? ''
-        : widget.session.query,
+    text: widget.session.query,
   );
 
   @override
   void initState() {
     super.initState();
     widget.session.addListener(_changed);
-    if (_text.text != widget.session.query) {
-      widget.session.setQuery(_text.text);
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       widget.focusNode.requestFocus();
@@ -72,6 +63,12 @@ class _FindBarState extends State<FindBar> {
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    // An input method that is composing owns Esc and Enter (they cancel or
+    // commit the composition, they are not ours).
+    final composing = _text.value.composing;
+    if (composing.isValid && !composing.isCollapsed) {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;

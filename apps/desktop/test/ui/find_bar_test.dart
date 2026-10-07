@@ -29,7 +29,7 @@ class Rig {
   final focus = FocusNode();
   var closed = 0;
 
-  Future<void> pump(WidgetTester t, {String? seed}) async {
+  Future<void> pump(WidgetTester t) async {
     t.view.physicalSize = const Size(900, 400);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
@@ -46,7 +46,6 @@ class Rig {
             child: FindBar(
               session: session,
               focusNode: focus,
-              seed: seed,
               onClose: () => closed++,
             ),
           ),
@@ -103,7 +102,8 @@ void main() {
 
   testWidgets('a selected line seeds the field', (t) async {
     final r = Rig('find me here');
-    await r.pump(t, seed: 'me here');
+    r.session.setQuery('me here'); // what FindSessions.open does
+    await r.pump(t);
     expect(
       t.widget<TextField>(find.byKey(const Key('find.field'))).controller!.text,
       'me here',
@@ -140,6 +140,34 @@ void main() {
     final r = Rig('x');
     await r.pump(t);
     expect(t.getSize(find.byKey(const Key('find.bar'))), const Size(360, 36));
+    r.session.close();
+  });
+
+  testWidgets('Esc and Enter belong to the input method while it composes', (
+    t,
+  ) async {
+    final r = Rig('a\r\na');
+    await r.pump(t);
+    await t.showKeyboard(find.byKey(const Key('find.field')));
+    t.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'a',
+        selection: TextSelection.collapsed(offset: 1),
+        composing: TextRange(start: 0, end: 1),
+      ),
+    );
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    expect(r.closed, 0, reason: 'Esc cancels the composition, not the bar');
+    t.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'a',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    expect(r.closed, 1);
     r.session.close();
   });
 }

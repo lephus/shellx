@@ -138,4 +138,126 @@ void main() {
     expect(s.toString(), isNot(contains('secret')));
     s.close();
   });
+
+  test('a huge buffer is searched in slices; a new query cancels the old', () {
+    fakeAsync((async) {
+      final t = Terminal(maxLines: 1000)..resize(30, 5);
+      for (var i = 0; i < 300; i++) {
+        t.write('row $i ${i.isEven ? 'a' : 'b'}\r\n');
+      }
+      final c = TerminalController();
+      final s = FindSession(
+        terminal: t,
+        controller: c,
+        matchColor: _dim,
+        currentColor: _hot,
+        slice: Duration.zero, // one logical line per slice
+      );
+      s.setQuery('a');
+      expect(s.searching, isTrue);
+      expect(s.matches, isEmpty, reason: 'not published before it completes');
+      s.setQuery('b');
+      async.elapse(const Duration(milliseconds: 100));
+      expect(s.matches, isEmpty, reason: 'debounced');
+      async.elapse(const Duration(seconds: 2));
+      expect(s.searching, isFalse);
+      expect(s.matches, hasLength(150), reason: 'the stale "a" never lands');
+      expect(c.highlights, hasLength(150));
+      s.close();
+    });
+  });
+
+  test('output that changes nothing does not rebuild the highlights', () {
+    fakeAsync((async) {
+      final (t, c, s) = rig('err one\r\nerr two');
+      s.setQuery('err');
+      var rebuilt = 0;
+      c.addListener(() => rebuilt++);
+      for (var i = 0; i < 5; i++) {
+        t.write('\r\nnothing here $i');
+        async.elapse(const Duration(milliseconds: 600));
+      }
+      expect(s.matches, hasLength(2));
+      expect(rebuilt, 0);
+      s.close();
+    });
+  });
+
+  test('continuous output backs off to 500 ms, then relaxes', () {
+    fakeAsync((async) {
+      final (t, _, s) = rig('err 0');
+      s.setQuery('err');
+      t.write('\r\nerr 1');
+      async.elapse(const Duration(milliseconds: 151));
+      expect(s.matches, hasLength(2), reason: 'the first refresh is quick');
+      t.write('\r\nerr 2');
+      async.elapse(const Duration(milliseconds: 151));
+      expect(s.matches, hasLength(2), reason: 'streaming: not yet');
+      async.elapse(const Duration(milliseconds: 400));
+      expect(s.matches, hasLength(3));
+      async.elapse(const Duration(seconds: 2)); // output stopped
+      t.write('\r\nerr 3');
+      async.elapse(const Duration(milliseconds: 151));
+      expect(s.matches, hasLength(4), reason: 'quick again');
+      s.close();
+    });
+  });
+
+  test('scrollback trimming keeps the place and steps to the right line', () {
+    fakeAsync((async) {
+      final t = Terminal(maxLines: 30)..resize(30, 10);
+      t.write('e1\r\ne2\r\ne3\r\ne4\r\ne5\r\ne6');
+      final c = TerminalController();
+      final s = FindSession(
+        terminal: t,
+        controller: c,
+        matchColor: _dim,
+        currentColor: _hot,
+      );
+      s.setQuery('e');
+      expect(s.matches, hasLength(6));
+      s.previous(); // on e5
+      expect(s.current, 4);
+      final seen = <int>[];
+      s.reveal = (m) => seen.add(m.startRow);
+      t.write('\r\nx' * 26); // 32 lines in a 30-line buffer: e1 and e2 go
+      s.next(); // e6 moved up by two
+      expect(s.current, 5);
+      expect(seen.last, 3);
+      s.next(); // e1 and e2 are gone: the next live one is e3
+      expect(s.current, 2);
+      expect(seen.last, 0, reason: 'e3 moved up by the two trimmed lines');
+      async.elapse(const Duration(milliseconds: 151));
+      expect(s.matches, hasLength(4));
+      expect(s.current, 0, reason: 'still e3');
+      s.close();
+    });
+  });
+
+  test('recolouring keeps the anchors: no anchor is created or lost', () {
+    final (t, _, s) = rig('a a a');
+    s.setQuery('a');
+    int anchors() => t.buffer.lines[0].anchors.length;
+    final before = anchors();
+    s.next();
+    s.previous();
+    expect(anchors(), before);
+    s.close();
+    expect(anchors(), 0);
+  });
+
+  test(
+    'rebind moves the highlights to the new controller and keeps the query',
+    () {
+      final (t, c, s) = rig('a a');
+      s.setQuery('a');
+      final c2 = TerminalController();
+      s.rebind(t, c2);
+      expect(c.highlights, isEmpty);
+      expect(c2.highlights, hasLength(2));
+      expect(s.query, 'a');
+      s.close();
+      expect(c2.highlights, isEmpty);
+    },
+  );
 }

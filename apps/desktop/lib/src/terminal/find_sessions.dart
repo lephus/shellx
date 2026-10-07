@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxDesktopColors;
+import '../ui/window_focus.dart' show terminalFocusRequestProvider;
 import 'find_session.dart';
 import 'terminal_tabs.dart';
 
@@ -15,17 +18,35 @@ class FindSessions extends Notifier<Map<int, FindSession>> {
 
   @override
   Map<int, FindSession> build() {
+    // A8 D22: a reconnect gives the pane a new session id (and may give it
+    // a new highlight controller); its bar follows, query and all. The
+    // event comes before the tab state changes, so the terminal is
+    // rebound by the tabs listener below.
+    final replaced = ref
+        .read(terminalTabsProvider.notifier)
+        .paneReplacements
+        .listen((r) {
+          final session = _all.remove(r.from);
+          if (session == null) return;
+          _all[r.to] = session;
+          state = Map.of(_all);
+        });
     ref.onDispose(() {
+      unawaited(replaced.cancel());
       for (final s in _all.values) {
         s.close();
       }
       _all.clear();
     });
     ref.listen<TerminalTabsState>(terminalTabsProvider, (_, next) {
-      final live = {for (final t in next.tabs) ...t.panes.keys};
+      final live = {for (final t in next.tabs) ...t.panes};
+      for (final e in _all.entries) {
+        final pane = live[e.key];
+        if (pane != null) e.value.rebind(pane.terminal, pane.selection);
+      }
       final gone = [
         for (final id in _all.keys)
-          if (!live.contains(id)) id,
+          if (!live.containsKey(id)) id,
       ];
       for (final id in gone) {
         close(id);
@@ -64,7 +85,12 @@ class FindSessions extends Notifier<Map<int, FindSession>> {
   void close(int id) {
     final session = _all.remove(id);
     if (session == null) return;
+    // A bar that had the keyboard must not leave it on a widget that goes.
+    final hadFocus = session.focusNode.hasFocus;
     session.close();
+    if (hadFocus && ref.mounted) {
+      ref.read(terminalFocusRequestProvider.notifier).request();
+    }
     if (ref.mounted) state = Map.of(_all);
   }
 }

@@ -10,8 +10,20 @@ import 'terminal_search.dart';
 /// The longest search text (A10 D3).
 const int kMaxFindQuery = 200;
 
-/// One pane's find (A10 D3–D5): the query, its matches in the pane's whole
+/// The longest the search holds the UI thread at a time (A10 D3).
+const Duration kFindSlice = Duration(milliseconds: 4);
+
+/// One pane's find (A10 D3-D5): the query, its matches in the pane's whole
 /// buffer, the current one, and the highlights drawn for them.
+///
+/// A search runs in slices of [kFindSlice] so a huge scrollback never
+/// freezes the window: the first slice runs at once (a small buffer is
+/// finished before [setQuery] returns), the rest after [queryDebounce] and
+/// then one slice per event-loop turn; a new query cancels the old search.
+/// Output refreshes the matches after [refreshAfter], backing off to
+/// [busyRefreshAfter] while it keeps streaming, and leaves the highlights
+/// alone when nothing changed. The current match is followed through its
+/// highlight's anchors, so it survives scrollback being trimmed.
 final class FindSession extends ChangeNotifier {
   FindSession({
     required this.terminal,
@@ -19,15 +31,23 @@ final class FindSession extends ChangeNotifier {
     required this.matchColor,
     required this.currentColor,
     this.refreshAfter = const Duration(milliseconds: 150),
+    this.busyRefreshAfter = const Duration(milliseconds: 500),
+    this.queryDebounce = const Duration(milliseconds: 150),
+    this.slice = kFindSlice,
   }) {
     terminal.addListener(_onTerminal);
   }
 
-  final Terminal terminal;
-  final TerminalController controller;
+  Terminal terminal;
+  TerminalController controller;
   final Color matchColor;
   final Color currentColor;
   final Duration refreshAfter;
+  final Duration busyRefreshAfter;
+  final Duration queryDebounce;
+
+  /// How long one slice of a search may run.
+  final Duration slice;
 
   /// The bar's input: focused when the bar opens or ⌘F is pressed again.
   final FocusNode focusNode = FocusNode(debugLabel: 'find');
@@ -40,7 +60,15 @@ final class FindSession extends ChangeNotifier {
   SearchResult _result = const SearchResult([]);
   int _current = -1;
   final _highlights = <TerminalHighlight>[];
-  Timer? _timer;
+  BufferSearch? _search;
+  Timer? _work;
+  Timer? _refreshTimer;
+  Timer? _idle;
+  var _pickLast = true;
+  var _scroll = false;
+  var _dirty = false;
+  var _restarts = 0;
+  var _streak = 0;
   bool _closed = false;
 
   String get query => _query;
@@ -52,6 +80,9 @@ final class FindSession extends ChangeNotifier {
   int get current => _current;
   bool get hasQuery => _query.isNotEmpty;
 
+  /// A search is still running (a huge buffer).
+  bool get searching => _search != null;
+
   /// Never shows the query (A10 §5).
   @override
   String toString() => 'FindSession(…)';
@@ -61,46 +92,154 @@ final class FindSession extends ChangeNotifier {
     if (q.length > kMaxFindQuery) q = q.substring(0, kMaxFindQuery);
     if (q == _query) return;
     _query = q;
-    _search(pickLast: true, scroll: true);
+    _restarts = 0;
+    _begin(pickLast: true, scroll: true, debounce: true);
   }
 
   void toggleMatchCase() {
     _matchCase = !_matchCase;
-    _search(pickLast: true, scroll: true);
+    _restarts = 0;
+    _begin(pickLast: true, scroll: true, debounce: true);
+  }
+
+  /// The pane's terminal and highlight controller were replaced (a
+  /// reconnect); the bar and the query stay.
+  void rebind(Terminal newTerminal, TerminalController newController) {
+    if (_closed ||
+        (identical(newTerminal, terminal) &&
+            identical(newController, controller))) {
+      return;
+    }
+    _cancelWork();
+    terminal.removeListener(_onTerminal);
+    _clearHighlights();
+    terminal = newTerminal;
+    controller = newController;
+    terminal.addListener(_onTerminal);
+    _current = -1;
+    _restarts = 0;
+    _begin(pickLast: true, scroll: false, debounce: false);
   }
 
   void next() => _step(1);
   void previous() => _step(-1);
 
+  /// The match highlight [i] stands on now, wherever the buffer has moved
+  /// it; null when its line has been trimmed away.
+  SearchMatch? _liveOf(int i) {
+    final h = _highlights[i];
+    if (!h.p1.attached || !h.p2.attached) return null;
+    return SearchMatch(h.p1.y, h.p1.x, h.p2.y, h.p2.x);
+  }
+
   void _step(int delta) {
     final n = matches.length;
-    if (n == 0) return;
-    _setCurrent((_current + delta + n) % n, scroll: true);
+    if (n == 0 || _highlights.length != n) return;
+    // Skip matches whose line has scrolled out of the history.
+    for (var k = 1; k <= n; k++) {
+      final i = ((_current + delta * k) % n + n) % n;
+      final live = _liveOf(i);
+      if (live == null) continue;
+      _setCurrent(i, live);
+      return;
+    }
   }
 
   void _onTerminal() {
-    if (_closed || !hasQuery || _timer != null) return;
-    _timer = Timer(refreshAfter, () {
-      _timer = null;
-      if (!_closed) _search(pickLast: false, scroll: false);
+    if (_closed || !hasQuery) return;
+    if (_search != null) _dirty = true;
+    if (_refreshTimer != null) return;
+    _refreshTimer = Timer(_streak > 0 ? busyRefreshAfter : refreshAfter, () {
+      _refreshTimer = null;
+      if (_closed) return;
+      _streak++;
+      _idle?.cancel();
+      _idle = Timer(const Duration(seconds: 1), () => _streak = 0);
+      _begin(pickLast: false, scroll: false, debounce: false);
     });
   }
 
-  void _search({required bool pickLast, required bool scroll}) {
-    final before = _current >= 0 && _current < matches.length
-        ? matches[_current]
-        : null;
-    _result = hasQuery
-        ? searchBuffer(terminal.buffer, _query, matchCase: _matchCase)
-        : const SearchResult([]);
+  void _cancelWork() {
+    _work?.cancel();
+    _work = null;
+    _search = null;
+  }
+
+  void _begin({
+    required bool pickLast,
+    required bool scroll,
+    required bool debounce,
+  }) {
+    _cancelWork();
+    _pickLast = pickLast;
+    _scroll = scroll;
+    _dirty = false;
+    if (!hasQuery) {
+      _publish(const SearchResult([]));
+      return;
+    }
+    final search = BufferSearch(terminal.buffer, _query, matchCase: _matchCase);
+    _search = search;
+    if (search.step(slice)) {
+      _finish();
+      return;
+    }
+    _work = Timer(debounce ? queryDebounce : Duration.zero, _slice);
+  }
+
+  void _slice() {
+    _work = null;
+    final search = _search;
+    if (_closed || search == null) return;
+    if (search.step(slice)) {
+      _finish();
+    } else {
+      _work = Timer(Duration.zero, _slice);
+    }
+  }
+
+  void _finish() {
+    final search = _search!;
+    _search = null;
+    if (_dirty && _restarts < 2) {
+      // Output arrived while the buffer was being read: read it again.
+      _restarts++;
+      _begin(pickLast: _pickLast, scroll: _scroll, debounce: false);
+      return;
+    }
+    _restarts = 0;
+    _publish(search.result);
+  }
+
+  bool _sameAsHighlights(List<SearchMatch> found) {
+    if (found.length != _highlights.length) return false;
+    for (var i = 0; i < found.length; i++) {
+      if (_liveOf(i) != found[i]) return false;
+    }
+    return true;
+  }
+
+  void _publish(SearchResult found) {
+    final hadCurrent = _current >= 0 && _current < _highlights.length;
+    if (!_pickLast && hadCurrent && _sameAsHighlights(found.matches)) {
+      // Nothing moved: no highlight is rebuilt.
+      final cappedChanged = found.capped != _result.capped;
+      _result = found;
+      if (cappedChanged) notifyListeners();
+      return;
+    }
+    final before = hadCurrent ? _liveOf(_current) : null;
+    _result = found;
     _clearHighlights();
     if (matches.isEmpty) {
       _current = -1;
       notifyListeners();
       return;
     }
-    if (pickLast || before == null) {
+    if (_pickLast || !hadCurrent) {
       _current = matches.length - 1;
+    } else if (before == null) {
+      _current = 0; // the match the user was on has left the history
     } else {
       // Keep the match the user is on, if it is still there; else the one
       // that follows it.
@@ -108,16 +247,16 @@ final class FindSession extends ChangeNotifier {
       _current = same >= 0 ? same : firstMatchFrom(matches, before.startRow);
     }
     _paint();
-    if (scroll) reveal?.call(matches[_current]);
+    if (_scroll) reveal?.call(matches[_current]);
     notifyListeners();
   }
 
-  void _setCurrent(int i, {required bool scroll}) {
+  void _setCurrent(int i, SearchMatch live) {
     final old = _current;
     _current = i;
     if (old >= 0 && old < _highlights.length) _recolor(old, matchColor);
-    if (i < _highlights.length) _recolor(i, currentColor);
-    if (scroll) reveal?.call(matches[i]);
+    _recolor(i, currentColor);
+    reveal?.call(live);
     notifyListeners();
   }
 
@@ -138,14 +277,14 @@ final class FindSession extends ChangeNotifier {
     }
   }
 
+  /// Changes a highlight's colour; its anchors stay (they hold its place).
   void _recolor(int i, Color color) {
-    _dispose(_highlights[i]);
-    _highlights[i] = _highlightFor(matches[i], color);
+    final old = _highlights[i];
+    _disposeHighlight(old);
+    _highlights[i] = controller.highlight(p1: old.p1, p2: old.p2, color: color);
   }
 
-  void _dispose(TerminalHighlight h) {
-    h.p1.dispose();
-    h.p2.dispose();
+  void _disposeHighlight(TerminalHighlight h) {
     try {
       h.dispose();
     } on Object {
@@ -156,7 +295,9 @@ final class FindSession extends ChangeNotifier {
 
   void _clearHighlights() {
     for (final h in _highlights) {
-      _dispose(h);
+      h.p1.dispose();
+      h.p2.dispose();
+      _disposeHighlight(h);
     }
     _highlights.clear();
   }
@@ -168,7 +309,10 @@ final class FindSession extends ChangeNotifier {
   void dispose() {
     if (_closed) return;
     _closed = true;
-    _timer?.cancel();
+    _work?.cancel();
+    _refreshTimer?.cancel();
+    _idle?.cancel();
+    _search = null;
     terminal.removeListener(_onTerminal);
     _clearHighlights();
     focusNode.dispose();
