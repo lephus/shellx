@@ -15,6 +15,7 @@ import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../terminal/terminal_style.dart';
+import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
@@ -305,7 +306,9 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           child: ColoredBox(
                             color: ShellxDesktopColors.bgTerminal,
                             child: EmptyTerminalState(
-                              onOpen: tabs.openTab,
+                              onOpen: () => unawaited(
+                                ref.read(sshActionsProvider).newTab(),
+                              ),
                               buttonFocus: widget.emptyFocus,
                             ),
                           ),

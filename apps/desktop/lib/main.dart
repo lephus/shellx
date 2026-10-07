@@ -229,10 +229,12 @@ Future<void> _start(
     }
   }
   // A8: ssh and tmux resolved once; never a host in the log (D37).
-  final remoteTools = await resolveRemoteTools(
-    operatingSystem: Platform.operatingSystem,
-    environment: environment,
-    log: (message) => debugPrint('ShellX ssh: $message'),
+  final remoteTools = await resolveRemoteToolsSafe(
+    () => resolveRemoteTools(
+      operatingSystem: Platform.operatingSystem,
+      environment: environment,
+      log: (message) => debugPrint('ShellX ssh: $message'),
+    ),
   );
   // The app's one ShellxApi: the controller sets its token at sign-in.
   final api = ShellxApi(baseUri: relayBase);

@@ -7,6 +7,7 @@ import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/font_probe.dart';
+import 'package:shellx_desktop/src/remote/ssh_actions.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
@@ -270,6 +271,21 @@ void main() {
     expect(probe.probed, ['Nope', 'Menlo']);
     problems = container.read(shellxConfigProvider).problems;
     expect(problems, isEmpty);
+    await finish(tester);
+  });
+
+  testWidgets('the empty state\'s open button follows the current workspace: '
+      'a server\'s workspace opens that server (A8 I1)', (tester) async {
+    await pump(tester, MemoryConfigFs());
+    final devbox = SshTarget.parse('devbox')!;
+    await container.read(sshActionsProvider).connect(devbox);
+    for (final t in [...container.read(terminalTabsProvider).tabs]) {
+      container.read(terminalTabsProvider.notifier).close(t.id);
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pane.empty.open')));
+    await tester.pumpAndSettle();
+    expect(local.openLaunches.last, SshLaunch(devbox));
     await finish(tester);
   });
 }

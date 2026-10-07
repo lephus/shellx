@@ -28,4 +28,12 @@ void main() {
       expect([for (final t in recentTargets(s)) t.key], ['devbox', 'me@h:22']);
     },
   );
+
+  test('recent targets read at most kRecentTargets (M3)', () async {
+    final s = InMemorySettingsStore();
+    await s.setStrings(SettingKeys.sshRecentTargets, [
+      for (var i = 0; i < 30; i++) 'h$i',
+    ]);
+    expect(recentTargets(s), hasLength(kRecentTargets));
+  });
 }

@@ -181,4 +181,26 @@ void main() {
       expect(local.openLaunches.last, SshLaunch(devbox, hook: false));
     },
   );
+
+  test('concurrent connects to a new server make one workspace (M1)', () async {
+    final a = actions().connect(devbox);
+    final b = actions().connect(devbox, remoteCwd: '/srv');
+    await Future.wait([a, b]);
+    expect(side().workspaces.where((w) => w.ssh == 'devbox'), hasLength(1));
+    final id = container
+        .read(sidebarWorkspacesProvider.notifier)
+        .workspaceForHost('devbox')!;
+    expect(side().tabsOf(id), hasLength(2));
+  });
+
+  test('a local tmux attach never lands in a server workspace (M2)', () async {
+    await actions().connect(devbox); // current workspace is now the server's
+    expect(side().workspace(side().currentId)!.ssh, 'devbox');
+    await actions().attachTmux('main');
+    expect(local.openLaunches.last, const TmuxLaunch('main'));
+    final tab = local.nextId - 1;
+    expect(side().workspaceOf(tab), kDefaultWorkspaceId);
+    final cli = await actions().attachTmuxForCli('other');
+    expect(side().workspaceOf(cli), kDefaultWorkspaceId);
+  });
 }

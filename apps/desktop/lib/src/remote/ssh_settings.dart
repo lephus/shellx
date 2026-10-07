@@ -13,7 +13,7 @@ bool sshHookFor(SettingsStore settings, String key) =>
 List<SshTarget> recentTargets(SettingsStore settings) => [
   for (final key in settings.getStrings(SettingKeys.sshRecentTargets))
     ?SshTarget.parseKey(key),
-];
+].take(kRecentTargets).toList();
 
 /// Stores [SshTarget.key], never what the user typed.
 Future<void> rememberTarget(SettingsStore settings, SshTarget target) {
