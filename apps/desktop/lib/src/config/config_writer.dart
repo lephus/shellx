@@ -273,6 +273,14 @@ final class IoConfigFileStore implements ConfigFileStore {
     throw FileSystemException('too many symbolic links', path);
   }
 
+  static Future<void> _chmod(String path, String mode) async {
+    if (Platform.isWindows) return;
+    final result = await Process.run('/bin/chmod', [mode, path]);
+    if (result.exitCode != 0) {
+      throw FileSystemException('chmod failed', path);
+    }
+  }
+
   @override
   Future<void> replace(
     String path,
@@ -294,15 +302,14 @@ final class IoConfigFileStore implements ConfigFileStore {
     final temp = File('$target.shellx-tmp-$pid-${_tempCounter++}');
     try {
       await temp.create(exclusive: true);
+      // Private from the first byte: the file may hold commands and paths,
+      // so no moment where it is world-readable (the umask may allow that).
+      await _chmod(temp.path, '600');
       await temp.writeAsBytes(bytes, flush: true);
-      if (exists && !Platform.isWindows) {
+      if (exists) {
         // The owner's choice (0600, 0444 …) survives; set after the content,
         // so a read-only source can still be replaced.
-        final mode = (stat.mode & 0xFFF).toRadixString(8);
-        final result = await Process.run('/bin/chmod', [mode, temp.path]);
-        if (result.exitCode != 0) {
-          throw FileSystemException('chmod failed', temp.path);
-        }
+        await _chmod(temp.path, (stat.mode & 0xFFF).toRadixString(8));
       }
       // Last look before the swap: someone saved meanwhile → keep theirs.
       if (expected != null &&

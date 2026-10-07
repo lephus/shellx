@@ -75,6 +75,20 @@ void main() {
     }
   });
 
+  test('every problem code reads the same over the CLI (D39)', () async {
+    fs.write(
+      paths.shellx,
+      'font-size = to\nno-such = 1\nkeybind = super+q=new_tab\nbroken\n',
+    );
+    final problems = await c.read(shellxConfigProvider.notifier).check();
+    expect(problems, isNotEmpty);
+    final r = await call(CliType.uiConfigCheck);
+    final got = (r['problems']! as List).cast<Map>();
+    expect(got.map((p) => p['message']), [
+      for (final p in problems) configProblemEnglish(p),
+    ]);
+  });
+
   test('reload applies and answers with the new problems', () async {
     fs.write(paths.shellx, 'font-size = 16\n');
     final r = await call(CliType.uiConfigReload);
@@ -119,6 +133,28 @@ void main() {
     final r = await call(CliType.uiConfigShow);
     expect(r.toString(), isNot(contains('secret note')));
   });
+
+  test(
+    'show prints a command as its value only, nothing else of the file',
+    () async {
+      fs.write(
+        paths.shellx,
+        '# private remark\ncommand = Go = ssh me@host\nsnippet = Hi = echo hi\n',
+      );
+      await call(CliType.uiConfigReload);
+      final r = await call(CliType.uiConfigShow);
+      final values = (r['values']! as List).cast<Map>();
+      final cmd = values.firstWhere((v) => v['key'] == 'command');
+      expect(cmd['value'], 'Go = ssh me@host');
+      expect(cmd['source'], '${paths.shellx}:2');
+      expect(cmd.keys, unorderedEquals(['key', 'value', 'source']));
+      expect(
+        values.firstWhere((v) => v['key'] == 'snippet')['value'],
+        'Hi = echo hi',
+      );
+      expect(r.toString(), isNot(contains('private remark')));
+    },
+  );
 
   test('new-tab without --cwd follows working-directory (D21)', () async {
     fs.write(paths.shellx, 'working-directory = /tmp/w\n');

@@ -401,6 +401,13 @@ void main() {
       skip: Platform.isWindows,
     );
 
+    test('a new file is 0600, whatever the umask', () async {
+      final file = File('${dir.path}/new/config');
+      await writer.edit(file.path, add, template: '# t\n');
+      expect(file.statSync().mode & 0xFFF, 384); // 0600
+      expect(names(Directory('${dir.path}/new')), ['config']);
+    }, skip: Platform.isWindows);
+
     test('creates the folder and the file when missing', () async {
       final path = '${dir.path}/a/b/config';
       await writer.edit(path, add, template: '# t\n');
