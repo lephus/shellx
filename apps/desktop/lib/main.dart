@@ -130,6 +130,7 @@ Future<void> _start(
 
   final settings = await SharedPrefsSettingsStore.open();
   late final ProviderContainer container;
+  WakeDetector? sshWake;
   final windowHost = WindowManagerHost(
     // A1 D9: the close button hides the window; shells keep running.
     onCloseRequested: () =>
@@ -305,10 +306,15 @@ Future<void> _start(
     terminalSharing: sharingSetup,
     // A8 D40: after the clean flush, the CLI host stop and the sessions'
     // close (the tray's Quit), before quitApp.
-    shutdownRemote: () => shutdownRemote(
-      remoteTools,
-      disposeWatcher: core.sessions.disposeRemotePorts,
-    ),
+    shutdownRemote: () {
+      // D20: no retry may start while the sessions close.
+      sshWake?.stop();
+      container.read(sshReconnectorProvider.notifier).stop();
+      return shutdownRemote(
+        remoteTools,
+        disposeWatcher: core.sessions.disposeRemotePorts,
+      );
+    },
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
     quitApp: () async {
@@ -383,9 +389,9 @@ Future<void> _start(
   final restore = container.read(restorePersistenceProvider.notifier)..start();
   // A8 D20: lost SSH panes retry by themselves; a wake retries at once.
   container.read(sshReconnectorProvider);
-  WakeDetector(
+  sshWake = WakeDetector(
     onWake: () => container.read(sshReconnectorProvider.notifier).onWake(),
-  ).start();
+  )..start();
   final layoutReady = Completer<void>();
   Future<RestoreLoad> loadForRestore() async {
     final load = await restoreFiles.loadLayout();

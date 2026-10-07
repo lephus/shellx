@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:fake_async/fake_async.dart';
@@ -104,19 +105,22 @@ void main() {
     fakeAsync((async) {
       add(1);
       boot(async);
+      local.openError = const SpawnFailedException('ssh_unavailable');
       lose(async, 1);
-      var current = 1;
+      final waits = <int>[];
       for (var i = 0; i < 60; i++) {
-        final info = retries()[current];
+        final info = retries()[1];
         if (info == null || info.stopped) break;
-        async.elapse(
-          info.nextAt!.difference(DateTime(2026, 10, 7, 9).add(async.elapsed)),
+        final wait = info.nextAt!.difference(
+          DateTime(2026, 10, 7, 9).add(async.elapsed),
         );
-        current = local.nextId - 1;
-        lose(async, current);
+        waits.add(wait.inSeconds);
+        async.elapse(wait);
       }
-      final info = retries()[current]!;
-      expect(info.stopped, isTrue);
+      // D20: 3, 6, 12, 24, 48, then 60 s steps until 30 minutes passed.
+      expect(waits.take(8), [3, 6, 12, 24, 48, 60, 60, 60]);
+      expect(retries()[1]!.stopped, isTrue);
+      expect(retries()[1]!.needsSignIn, isFalse);
       expect(local.openLaunches.length, lessThanOrEqualTo(34));
       final n = local.openLaunches.length;
       async.elapse(const Duration(hours: 1));
@@ -177,4 +181,170 @@ void main() {
       });
     },
   );
+
+  void connect(FakeAsync async, int id) {
+    local.replace(
+      local.summary(
+        id,
+        origin: SessionOrigin.desktop,
+        remote: SessionRemote(launch: SshLaunch(devbox), connected: true),
+      ),
+    );
+    async.flushMicrotasks();
+  }
+
+  void addFive() {
+    for (var id = 1; id <= 5; id++) {
+      add(id);
+    }
+  }
+
+  test('five lost panes on one host: one ssh at a time (I1)', () {
+    fakeAsync((async) {
+      addFive();
+      boot(async);
+      for (var id = 1; id <= 5; id++) {
+        lose(async, id);
+      }
+      async.elapse(const Duration(seconds: 3));
+      expect(local.openLaunches, hasLength(1)); // the others wait
+      async.elapse(const Duration(minutes: 2));
+      expect(local.openLaunches, hasLength(1)); // still at the prompt
+      connect(async, local.nextId - 1); // signed in: the master is up
+      expect(local.openLaunches, hasLength(2));
+      connect(async, local.nextId - 1);
+      expect(local.openLaunches, hasLength(3));
+      connect(async, local.nextId - 1);
+      connect(async, local.nextId - 1);
+      connect(async, local.nextId - 1);
+      expect(local.openLaunches, hasLength(5));
+      expect(retries(), isEmpty);
+    });
+  });
+
+  test('the running attempt failed: the others reschedule together (I1)', () {
+    fakeAsync((async) {
+      addFive();
+      boot(async);
+      for (var id = 1; id <= 5; id++) {
+        lose(async, id);
+      }
+      async.elapse(const Duration(seconds: 3));
+      expect(local.openLaunches, hasLength(1));
+      lose(async, local.nextId - 1);
+      expect(local.openLaunches, hasLength(1)); // none started its own ssh
+      final waiting = retries().values.where((i) => i.nextAt != null);
+      expect(waiting, hasLength(5));
+      async.elapse(const Duration(seconds: 6));
+      expect(local.openLaunches, hasLength(2)); // one again, not five
+    });
+  });
+
+  test('wake with five lost panes starts one attempt first (I1)', () {
+    fakeAsync((async) {
+      addFive();
+      boot(async);
+      for (var id = 1; id <= 5; id++) {
+        lose(async, id);
+      }
+      container.read(sshReconnectorProvider.notifier).onWake();
+      async.flushMicrotasks();
+      expect(local.openLaunches, hasLength(1));
+    });
+  });
+
+  test('two sign-in failures in a row stop the host; Enter retries (I2)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      async.elapse(const Duration(seconds: 3));
+      lose(async, local.nextId - 1); // refused (255), never connected
+      async.elapse(const Duration(seconds: 6));
+      final second = local.nextId - 1;
+      lose(async, second);
+      final info = retries()[second]!;
+      expect(info.needsSignIn, isTrue);
+      expect(info.stopped, isTrue);
+      final n = local.openLaunches.length;
+      async.elapse(const Duration(minutes: 10));
+      expect(local.openLaunches.length, n);
+      container.read(sshReconnectorProvider.notifier).onWake();
+      async.flushMicrotasks();
+      expect(local.openLaunches.length, n); // wake does not retry it either
+      container.read(sshReconnectorProvider.notifier).reconnectNow(second);
+      async.flushMicrotasks();
+      expect(local.openLaunches.length, n + 1);
+    });
+  });
+
+  test('stop(): nothing retries, wake included (I3)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      final notifier = container.read(sshReconnectorProvider.notifier);
+      notifier.stop();
+      notifier.onWake();
+      async.elapse(const Duration(minutes: 5));
+      expect(local.openLaunches, isEmpty);
+    });
+  });
+
+  test('a second request while one is in flight does nothing (M1)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      final gate = Completer<void>();
+      local.openGate = gate;
+      final notifier = container.read(sshReconnectorProvider.notifier);
+      notifier.reconnectNow(1);
+      async.flushMicrotasks();
+      notifier.reconnectNow(1);
+      notifier.onWake();
+      async.flushMicrotasks();
+      expect(local.openLaunches, hasLength(1));
+      gate.complete();
+      async.flushMicrotasks();
+      expect(local.openLaunches, hasLength(1));
+    });
+  });
+
+  test('wake after give-up does nothing; disposing cancels timers (M2)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      local.openError = const SpawnFailedException('ssh_unavailable');
+      lose(async, 1);
+      async.elapse(const Duration(minutes: 31));
+      expect(retries()[1]!.stopped, isTrue);
+      final n = local.openLaunches.length;
+      container.read(sshReconnectorProvider.notifier).onWake();
+      async.flushMicrotasks();
+      expect(local.openLaunches.length, n);
+
+      add(2);
+      lose(async, 2);
+      container.dispose();
+      async.elapse(const Duration(minutes: 5));
+      expect(local.openLaunches.length, n);
+    });
+  });
+
+  test('Enter after a failed open keeps retrying on the back-off (M2)', () {
+    fakeAsync((async) {
+      add(1);
+      boot(async);
+      lose(async, 1);
+      local.openError = const SpawnFailedException('ssh_unavailable');
+      container.read(sshReconnectorProvider.notifier).reconnectNow(1);
+      async.flushMicrotasks();
+      expect(retries()[1]!.nextAt, isNotNull);
+      expect(retries()[1]!.retrying, isFalse);
+      local.openError = null;
+      async.elapse(const Duration(seconds: 10));
+      expect(local.openLaunches.length, greaterThan(1));
+    });
+  });
 }
