@@ -9,6 +9,12 @@ final class RecordingFiles implements RestoreFiles {
   final scrollbacks = <String, String>{};
   final deleted = <String>[];
   int clears = 0;
+
+  /// How often the older layout generations were dropped.
+  int generationsDropped = 0;
+
+  @override
+  Future<void> dropGenerations() async => generationsDropped++;
   Set<String>? keptOrphans;
 
   /// What [readScrollback] returns, by key.

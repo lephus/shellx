@@ -73,6 +73,11 @@ abstract interface class RestoreFiles {
   /// keeps the previous file, and the caller retries next time (§5).
   Future<bool> writeLayout(RestoreSnapshot snapshot);
 
+  /// A10 review: the user closed the last tab, so a later crash must not
+  /// bring the older layouts (`layout.json.1`, `.2`) back. Only then: an
+  /// empty layout after a restore that opened nothing keeps them.
+  Future<void> dropGenerations();
+
   /// False when the files could not be written (disk full): the caller
   /// keeps them pending. True too when scrollback is never written here
   /// (permissions, §5): retrying would not help.
@@ -96,6 +101,8 @@ final class NullRestoreFiles implements RestoreFiles {
   Future<RestoreLoad> loadLayout() async => const RestoreLoad();
   @override
   Future<bool> writeLayout(RestoreSnapshot snapshot) async => true;
+  @override
+  Future<void> dropGenerations() async {}
   @override
   Future<bool> writeScrollbacks(Map<String, String> textByKey) async => true;
   @override
@@ -299,25 +306,19 @@ final class RestoreStore implements RestoreFiles {
       return pending.done;
     }
     final slot = _pendingLayout = _LayoutSlot(snapshot);
-    slot.done = _serial(() async {
+    slot.done = _serial(() {
       if (identical(_pendingLayout, slot)) _pendingLayout = null;
-      final snapshot = slot.snapshot;
-      final written = await _atomic({
-        _layout: snapshot.encode(),
-      }, private: false);
-      // A10 review: the window being empty is the user's doing (a restore
-      // that finished writes nothing before it); a crash after it must not
-      // bring the closed tabs back, so the older generations end here.
-      // A damaged or absent layout (never written empty) still recovers.
-      if (written && snapshot.tabs.isEmpty) {
-        for (final n in const [1, 2]) {
-          await _deleteQuietly(File(_generation(n)));
-        }
-      }
-      return written;
+      return _atomic({_layout: slot.snapshot.encode()}, private: false);
     });
     return slot.done;
   }
+
+  @override
+  Future<void> dropGenerations() => _serial(() async {
+    for (final n in const [1, 2]) {
+      await _deleteQuietly(File(_generation(n)));
+    }
+  });
 
   @override
   Future<bool> writeScrollbacks(Map<String, String> textByKey) =>

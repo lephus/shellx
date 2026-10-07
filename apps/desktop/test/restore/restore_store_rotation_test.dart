@@ -124,12 +124,21 @@ void main() {
       );
     });
 
-    test('closing every tab and crashing does not bring them back', () async {
-      // The user emptied the window: the write of the empty layout (unclean:
-      // the window hid, or the service died) ends the old generations.
+    test('an empty layout alone keeps the generations (a restore that opened '
+        'nothing)', () async {
       await store.writeLayout(snap(k1));
       await store.loadLayout(); // generation 1 = k1
-      await store.writeLayout(snap(k1, empty: true)); // then kill -9
+      await store.writeLayout(snap(k1, empty: true));
+      final load = await store.loadLayout();
+      expect(load.recovered, isTrue);
+      expect(load.snapshot!.tabs.single.key, k1);
+    });
+
+    test('the user closing the last tab drops the generations', () async {
+      await store.writeLayout(snap(k1));
+      await store.loadLayout(); // generation 1 = k1
+      await store.writeLayout(snap(k1, empty: true));
+      await store.dropGenerations(); // what persistence does, then kill -9
       final load = await store.loadLayout();
       expect(load.recovered, isFalse);
       expect(load.snapshot!.tabs, isEmpty);
