@@ -1860,6 +1860,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sshRetrying => 'Reconnecting…';
 
   @override
+  String get sshNeedsSignIn => 'Sign in needed';
+
+  @override
   String get sshAutoRetryStopped => 'Stopped retrying';
 
   @override

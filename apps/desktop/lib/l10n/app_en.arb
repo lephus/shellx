@@ -797,6 +797,7 @@
   "sshRetryIn": "{seconds, plural, =1{Retrying in 1 second} other{Retrying in {seconds} seconds}}",
   "@sshRetryIn": {"placeholders": {"seconds": {"type": "int"}}},
   "sshRetrying": "Reconnecting…",
+  "sshNeedsSignIn": "Sign in needed",
   "sshAutoRetryStopped": "Stopped retrying",
   "sshFailedHookHint": "The server may not support the ShellX hook",
   "sshReconnectAction": "Reconnect",

@@ -1794,6 +1794,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get sshRetrying => 'Đang kết nối lại…';
 
   @override
+  String get sshNeedsSignIn => 'Cần đăng nhập';
+
+  @override
   String get sshAutoRetryStopped => 'Đã ngừng tự kết nối lại';
 
   @override

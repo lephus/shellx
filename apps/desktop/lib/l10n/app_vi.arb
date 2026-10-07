@@ -435,6 +435,7 @@
   "sshStateFailed": "Không kết nối được tới {host}",
   "sshRetryIn": "Thử lại sau {seconds} giây",
   "sshRetrying": "Đang kết nối lại…",
+  "sshNeedsSignIn": "Cần đăng nhập",
   "sshAutoRetryStopped": "Đã ngừng tự kết nối lại",
   "sshFailedHookHint": "Máy chủ có thể không chạy được hook ShellX",
   "sshReconnectAction": "Kết nối lại",

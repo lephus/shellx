@@ -2718,6 +2718,12 @@ abstract class AppLocalizations {
   /// **'Reconnecting…'**
   String get sshRetrying;
 
+  /// No description provided for @sshNeedsSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in needed'**
+  String get sshNeedsSignIn;
+
   /// No description provided for @sshAutoRetryStopped.
   ///
   /// In en, this message translates to:
