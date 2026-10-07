@@ -252,6 +252,15 @@ final class TrayActions {
           timeout: _services.shutdownTimeout,
           label: 'shutting down',
         );
+        // A8 D40: ssh forwards and masters end with the shells.
+        final remote = _services.shutdownRemote;
+        if (remote != null) {
+          await runBounded(
+            remote,
+            timeout: const Duration(seconds: 3),
+            label: 'closing ssh helpers',
+          );
+        }
         await _services.quitApp?.call();
     }
   }

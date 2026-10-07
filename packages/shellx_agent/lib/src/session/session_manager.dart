@@ -354,6 +354,13 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// "Close all" is the same call): only a real shutdown would.
   RemotePortWatcher? _remotePorts;
 
+  /// A8 D18, real shutdown only (tray Quit): stops the remote port probes
+  /// for good. [closeAll] does not.
+  void disposeRemotePorts() {
+    _remotePorts?.dispose();
+    _remotePorts = null;
+  }
+
   /// While one side typed less than this ago, a keystroke from the other
   /// side is written but does not take the driver (and the PTY size) away:
   /// two people typing at once must not resize the PTY on every key.

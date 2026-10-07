@@ -20,6 +20,8 @@ import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/agent/notify_threshold.dart';
 import 'src/agent/session_core.dart';
+import 'src/remote/remote_shutdown.dart';
+import 'src/remote/remote_tools_provider.dart';
 import 'src/cli/agent_marks.dart';
 import 'src/cli/cli_install.dart';
 import 'src/cli/cli_install_windows.dart';
@@ -226,6 +228,12 @@ Future<void> _start(
       debugPrint('ShellX: command-line host failed: ${error.runtimeType}');
     }
   }
+  // A8: ssh and tmux resolved once; never a host in the log (D37).
+  final remoteTools = await resolveRemoteTools(
+    operatingSystem: Platform.operatingSystem,
+    environment: environment,
+    log: (message) => debugPrint('ShellX ssh: $message'),
+  );
   // The app's one ShellxApi: the controller sets its token at sign-in.
   final api = ShellxApi(baseUri: relayBase);
   // A1 D7: the process's one SessionManager. It outlives every runtime, so
@@ -255,6 +263,7 @@ Future<void> _start(
     notifications: pushNotifications,
     gitHeads: GitHeadReader(),
     portProbe: Platform.isWindows ? WindowsPortProbe() : MacPortProbe(),
+    remoteTools: remoteTools,
   );
 
   // The process's one SecureKeyValueStore; DesktopServices builds the one
@@ -290,6 +299,12 @@ Future<void> _start(
     // Sign-out and quit wait (at most 3 s) for PTY tree kills in flight.
     awaitPtyKills: ptyFactory.killsSettled,
     terminalSharing: sharingSetup,
+    // A8 D40: after the clean flush, the CLI host stop and the sessions'
+    // close (the tray's Quit), before quitApp.
+    shutdownRemote: () => shutdownRemote(
+      remoteTools,
+      disposeWatcher: core.sessions.disposeRemotePorts,
+    ),
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
     quitApp: () async {
@@ -310,6 +325,7 @@ Future<void> _start(
   container = ProviderContainer(
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
+      remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
       restoreStoreProvider.overrideWithValue(restoreFiles),
       if (cli != null) ...[

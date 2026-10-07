@@ -116,4 +116,21 @@ void main() {
       expect(files.layouts.last.cleanExit, isTrue);
     }),
   );
+
+  test('Quit shuts down the SSH helpers after the sessions close and before '
+      'the process exits, and a hung helper cannot stop it (A8 D40)', () async {
+    h.ptyKills = () async => h.shutdownOrder.add('closed');
+    await c.read(trayActionsProvider).handle(const Quit());
+    expect(h.shutdownOrder, ['closed', 'remote', 'quit']);
+  });
+
+  test(
+    'a hung SSH helper shutdown is bounded: Quit still exits',
+    () async {
+      h.remoteShutdown = () => Completer<void>().future;
+      await c.read(trayActionsProvider).handle(const Quit());
+      expect(h.quits, 1);
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
 }

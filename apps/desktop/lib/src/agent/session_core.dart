@@ -27,6 +27,7 @@ final class SessionCore {
     int Function()? sessionIds,
     GitBranchLookup? gitHeads,
     PortProbe? portProbe,
+    RemoteTools? remoteTools,
   }) {
     final ids = sessionIds ?? sessionIdAllocator();
     // One AgentNotifications for both kinds of session: the 6-per-minute
@@ -57,6 +58,11 @@ final class SessionCore {
       commandNoticeThreshold: notifications?.threshold,
       gitHeads: gitHeads,
       portProbe: portProbe,
+      remoteTools: remoteTools,
+      // D18: the probe is slower where a connection costs more.
+      remotePortInterval: Platform.isWindows
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 5),
       windowsPaths: Platform.isWindows,
       localHostName: Platform.localHostname,
       log: (message) => debugPrint('ShellX sessions: $message'),

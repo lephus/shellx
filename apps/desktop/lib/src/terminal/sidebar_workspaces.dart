@@ -9,6 +9,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import '../../l10n/app_localizations.dart';
 import '../agent/desktop_services.dart';
 import '../platform/settings_store.dart';
+import '../remote/ssh_settings.dart';
 import '../restore/restore_snapshot.dart';
 import 'local_sessions_provider.dart';
 import 'terminal_tabs.dart';
@@ -23,7 +24,12 @@ String _clip(String text) => clipName(text, kWorkspaceNameMaxLength);
 /// A named group of tabs in the sidebar (spec C5).
 @immutable
 final class Workspace {
-  const Workspace({required this.id, this.name, this.collapsed = false});
+  const Workspace({
+    required this.id,
+    this.name,
+    this.collapsed = false,
+    this.ssh,
+  });
 
   final String id;
 
@@ -31,6 +37,10 @@ final class Workspace {
   /// localized "Mặc định"/"Default" (D11).
   final String? name;
   final bool collapsed;
+
+  /// A8 D23: the server this workspace opens tabs on ([SshTarget.key]);
+  /// null for a local workspace.
+  final String? ssh;
 
   bool get isDefault => id == kDefaultWorkspaceId;
 
@@ -41,12 +51,14 @@ final class Workspace {
     id: id,
     name: name ?? this.name,
     collapsed: collapsed ?? this.collapsed,
+    ssh: ssh,
   );
 
   String encode() => jsonEncode({
     'id': id,
     if (name != null) 'name': name,
     'collapsed': collapsed,
+    if (ssh != null) 'ssh': ssh,
   });
 
   /// Null for anything that is not a well-formed entry (Review Focus 5).
@@ -61,15 +73,21 @@ final class Workspace {
     final id = value['id'];
     final name = value['name'];
     final collapsed = value['collapsed'];
+    final rawSsh = value['ssh'];
     if (id is! String || id.isEmpty || id.length > 64) return null;
     if (name != null && name is! String) return null;
     if (collapsed != null && collapsed is! bool) return null;
     final clean = (name as String?)?.trim() ?? '';
     if (clean.isEmpty && id != kDefaultWorkspaceId) return null;
+    // A8 D23: only a canonical key; anything else leaves a local workspace.
+    final ssh = rawSsh is String && SshTarget.parseKey(rawSsh) != null
+        ? rawSsh
+        : null;
     return Workspace(
       id: id,
       name: clean.isEmpty ? null : _clip(clean),
       collapsed: collapsed as bool? ?? false,
+      ssh: id == kDefaultWorkspaceId ? null : ssh,
     );
   }
 
@@ -78,10 +96,11 @@ final class Workspace {
       other is Workspace &&
       other.id == id &&
       other.name == name &&
-      other.collapsed == collapsed;
+      other.collapsed == collapsed &&
+      other.ssh == ssh;
 
   @override
-  int get hashCode => Object.hash(id, name, collapsed);
+  int get hashCode => Object.hash(id, name, collapsed, ssh);
 }
 
 /// The stored list, without broken or duplicate entries, and always with
@@ -338,13 +357,49 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     _save();
   }
 
-  /// Header `+` (UI-A2 §3.1): a new tab in [id], which expands.
-  Future<void> openTabIn(String id) async {
+  /// A8 D23: the first workspace (sidebar order) for server [key].
+  String? workspaceForHost(String key) {
+    for (final w in state.workspaces) {
+      if (w.ssh == key) return w.id;
+    }
+    return null;
+  }
+
+  /// A8 D23: a workspace named after the server, at the end, no name
+  /// field; current unless the command line made it ([makeCurrent] false).
+  String createForHost(SshTarget target, {bool makeCurrent = true}) {
+    final id = _newId();
+    state = state.copyWith(
+      workspaces: [
+        ...state.workspaces,
+        Workspace(id: id, name: _clip(target.key), ssh: target.key),
+      ],
+      members: {...state.members, id: const <int>[]},
+      currentId: makeCurrent ? id : state.currentId,
+    );
+    _save();
+    return id;
+  }
+
+  /// A8 D23: what a new tab in [workspaceId] runs; null: a local shell.
+  SessionLaunch? launchFor(String workspaceId) {
+    final key = state.workspace(workspaceId)?.ssh;
+    final target = key == null ? null : SshTarget.parseKey(key);
+    if (target == null) return null;
+    return SshLaunch(
+      target,
+      hook: sshHookFor(ref.read(settingsStoreProvider), target.key),
+    );
+  }
+
+  /// Header `+` (UI-A2 §3.1): a new tab in [id], which expands; in a
+  /// server's workspace it opens that server ([launch] overrides).
+  Future<void> openTabIn(String id, {SessionLaunch? launch}) async {
     if (state.workspace(id) == null) return;
     _pendingTarget = id;
     setCollapsed(id, false);
     try {
-      await _tabs.openTab();
+      await _tabs.openTab(launch: launch ?? launchFor(id));
     } finally {
       _pendingTarget = null;
     }
@@ -357,9 +412,7 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     state = state.copyWith(
       workspaces: [
         for (final w in state.workspaces)
-          w.id == id
-              ? Workspace(id: w.id, name: _clip(clean), collapsed: w.collapsed)
-              : w,
+          w.id == id ? w.copyWith(name: _clip(clean)) : w,
       ],
     );
     _save();

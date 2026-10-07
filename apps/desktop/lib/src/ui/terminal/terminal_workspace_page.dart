@@ -17,6 +17,7 @@ import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
+import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart';
@@ -280,7 +281,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       // open; they close it first.
       NewTabIntent: run<NewTabIntent>((_) {
         closePanel();
-        unawaited(tabs.openTab());
+        unawaited(ref.read(sshActionsProvider).newTab());
         focusTerminal();
       }),
       CloseTabIntent: run<CloseTabIntent>((_) {

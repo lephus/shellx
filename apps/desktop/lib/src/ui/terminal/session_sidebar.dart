@@ -15,6 +15,7 @@ import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../config/config_controller.dart';
+import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
@@ -1319,7 +1320,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       semanticLabel: l10n.terminalNewTab,
       tooltip: shortcutTooltip(l10n.terminalNewTabTooltip, shortcut),
       busy: state.opening,
-      onPressed: () => ref.read(terminalTabsProvider.notifier).openTab(),
+      onPressed: () => ref.read(sshActionsProvider).newTab(),
     );
     // UI-A4 §5.1: hollow at 0; filled with a 6 px dot when anything is
     // unread; `rowSelected` ("on") while the panel is open.

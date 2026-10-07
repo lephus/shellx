@@ -465,4 +465,41 @@ void main() {
       expect(rig.manager.sessions.single.ports, [8000]);
     });
   });
+
+  test(
+    'disposeRemotePorts (real shutdown) stops the probes for good (D18)',
+    () {
+      fakeAsync((async) {
+        var probes = 0;
+        final remote = tools();
+        final probing = RemoteTools(
+          sshPath: remote.sshPath,
+          tmuxPath: remote.tmuxPath,
+          control: SshControl(
+            sshPath: '/usr/bin/ssh',
+            run: (exe, args, {timeout = const Duration(seconds: 5)}) async {
+              if (args.first == '-G') {
+                return const CommandResult(0, 'serveraliveinterval 0\n', '');
+              }
+              probes++;
+              return const CommandResult(0, '#ps\n#ss\n', '');
+            },
+          ),
+        );
+        final rig = SessionRig(remoteTools: probing);
+        unawaited(
+          rig.manager.open(cols: 80, rows: 24, launch: SshLaunch(devbox)),
+        );
+        async.flushMicrotasks();
+        rig.manager.watchPorts(true);
+        rig.pty(0).emit('${osc('6973;hello=1')}${osc('6973;pid=4242')}');
+        async.elapse(const Duration(seconds: 6));
+        expect(probes, greaterThan(0));
+        rig.manager.disposeRemotePorts();
+        final before = probes;
+        async.elapse(const Duration(minutes: 10));
+        expect(probes, before);
+      });
+    },
+  );
 }
