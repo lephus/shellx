@@ -263,6 +263,10 @@ void cliApiContract(
 
       for (final (t, f) in <(String, Map<String, Object?>)>[
         ('ui.pane.send', {'pane': 12, 'text': 'rm -rf ~'}),
+        // A8 D6: opening a server or a tmux session is as strong as typing.
+        ('ui.ssh.open', {'target': 'devbox', 'cmd': 'id'}),
+        ('ui.tmux.list', {'host': 'devbox'}),
+        ('ui.tmux.attach', {'name': 'main'}),
         ('cli.notify', {'pane': 12, 'body': 'x'}),
         ('cli.events.subscribe', {}),
         ('daemon.status', {}),

@@ -107,6 +107,25 @@ void main() {
     expect(kCliCaps.every(CliType.allowedForCli), isTrue);
   });
 
+  test('A8: ssh and tmux types, caps and error codes', () {
+    expect(
+      [CliType.uiSshOpen, CliType.uiTmuxList, CliType.uiTmuxAttach],
+      ['ui.ssh.open', 'ui.tmux.list', 'ui.tmux.attach'],
+    );
+    expect(kCliCaps, containsAll(['ui.ssh', 'ui.tmux']));
+    expect(
+      [CliError.sshUnavailable, CliError.tmuxUnavailable, CliError.tmuxFailed],
+      ['ssh_unavailable', 'tmux_unavailable', 'tmux_failed'],
+    );
+    for (final t in [
+      CliType.uiSshOpen,
+      CliType.uiTmuxList,
+      CliType.uiTmuxAttach,
+    ]) {
+      expect(CliType.allowedForCli(t), isTrue, reason: t);
+    }
+  });
+
   test('golden vectors match term/protocol/mux_vectors.txt', () {
     final lines = {
       for (final l in _vectorsFile.readAsLinesSync())
