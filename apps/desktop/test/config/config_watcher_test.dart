@@ -121,4 +121,45 @@ void main() {
       watcher.stop();
     });
   });
+
+  test('a change seen just before watch() is still reported once '
+      '(re-review)', () {
+    fakeAsync((async) {
+      final fs = MemoryConfigFs();
+      var changes = 0;
+      final watcher = ConfigWatcher(fs: fs, onChange: () => changes++);
+      watcher.watch(['/c/config']);
+      async.flushMicrotasks();
+      fs.write('/c/config', 'font-size = 14');
+      async.elapse(const Duration(milliseconds: 1100)); // seen at 1 s
+      watcher.watch(['/c/config']); // a load re-arms inside the 250 ms
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 3));
+      expect(changes, 1);
+      watcher.stop();
+    });
+  });
+
+  test('a settle check overlapping watch() still reports (re-review)', () {
+    fakeAsync((async) {
+      final fs = MemoryConfigFs();
+      var changes = 0;
+      final watcher = ConfigWatcher(fs: fs, onChange: () => changes++);
+      watcher.watch(['/c/config']);
+      async.flushMicrotasks();
+      fs.write('/c/config', 'font-size = 14');
+      async.elapse(const Duration(milliseconds: 1100)); // seen at 1 s
+      final slow = Completer<void>();
+      fs.stampGate = slow.future;
+      async.elapse(const Duration(milliseconds: 200)); // settle check hangs
+      fs.stampGate = null;
+      watcher.watch(['/c/config']);
+      async.flushMicrotasks();
+      slow.complete();
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 3));
+      expect(changes, 1);
+      watcher.stop();
+    });
+  });
 }

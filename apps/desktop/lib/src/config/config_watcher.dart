@@ -28,6 +28,11 @@ final class ConfigWatcher {
   /// The latest watch() call; an older one that finishes late is dropped.
   int _watchGeneration = 0;
 
+  /// A change was seen (the stamps already moved past it) and [onChange]
+  /// has not fired for it yet. Whatever replaces the stamps or drops a
+  /// check must re-arm the settle while this is set, or the change is lost.
+  bool _dirty = false;
+
   /// Watches [files] from now on and (re)starts polling. A file already
   /// watched keeps the stamp this watcher last saw (taken when it noticed a
   /// change, before the load that change caused): a save made while that
@@ -42,10 +47,9 @@ final class ConfigWatcher {
     if (_stopped || generation != _watchGeneration) return;
     _stamps = stamps;
     // A poll or settle check still running compared the old list: its
-    // result is dropped (see _restamp), and a pending report waits for
-    // the new list's polls instead.
-    _settle?.cancel();
-    _settle = null;
+    // result is dropped (see _restamp). A change already seen is still
+    // reported: the settle starts again against the new list.
+    if (_dirty) _armSettle();
     _poll ??= Timer.periodic(interval, (_) => unawaited(_tick()));
   }
 
@@ -71,6 +75,7 @@ final class ConfigWatcher {
       final result = await _restamp();
       if (result == null || !result.$2) return;
       _stamps = result.$1;
+      _dirty = true;
       _armSettle();
     } finally {
       _busy = false;
@@ -87,12 +92,18 @@ final class ConfigWatcher {
   Future<void> _settled() async {
     if (_stopped) return;
     final result = await _restamp();
-    if (result == null) return;
+    if (_stopped) return;
+    if (result == null) {
+      // watch() replaced the list meanwhile: check again against it.
+      if (_dirty) _armSettle();
+      return;
+    }
     if (result.$2) {
       _stamps = result.$1;
       _armSettle();
       return;
     }
+    _dirty = false;
     onChange();
   }
 
@@ -102,5 +113,6 @@ final class ConfigWatcher {
     _poll = null;
     _settle?.cancel();
     _settle = null;
+    _dirty = false;
   }
 }
