@@ -11,7 +11,9 @@
     "build": "node scripts/check-placeholders.mjs && astro build && node --test tests/site.test.mjs tests/placeholders.test.mjs",
     "preview": "astro preview",
     "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs",
-    "astro": "astro"
+    "astro": "astro",
+    "lighthouse": "node scripts/lighthouse.mjs",
+    "images": "node scripts/render-images.mjs"
   },
   "dependencies": {
     "astro": "^7.3.5"

@@ -191,17 +191,24 @@ test('every page has exactly one h1', () => {
 });
 
 test('self-hosted font files exist and are preloaded', () => {
-  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Regular.woff2')));
-  assert.ok(existsSync(join(dist, 'fonts/JetBrainsMono-Bold.woff2')));
-  assert.match(readPage('/'), /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
+  for (const f of ['JetBrainsMono-Regular', 'JetBrainsMono-Bold', 'SpaceGrotesk-Latin', 'SpaceGrotesk-Vietnamese']) {
+    assert.ok(existsSync(join(dist, `fonts/${f}.woff2`)), `missing fonts/${f}.woff2`);
+  }
+  const html = readPage('/');
+  assert.match(html, /rel="preload" as="font"[^>]*SpaceGrotesk-Latin\.woff2/);
+  assert.match(html, /rel="preload" as="font"[^>]*SpaceGrotesk-Vietnamese\.woff2/);
+  assert.match(html, /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
 });
 
-test('home is a terminal session: window chrome + command blocks', () => {
+test('home has the landing sections: hero, how it works, features, security, steps, FAQ, download', () => {
   for (const p of ['/', '/en/']) {
     const html = readPage(p);
-    assert.match(html, /shellx@pro/);
-    assert.ok((html.match(/data-term-block/g) ?? []).length >= 3, `${p}: too few term blocks`);
-    assert.match(html, /data-cmd/);
+    for (const id of ['how', 'features', 'security', 'start', 'faq', 'download']) {
+      assert.match(html, new RegExp(`<section[^>]*id="${id}"`), `${p}: missing section #${id}`);
+    }
+    assert.match(html, /data-demo/, `${p}: hero demo missing`);
+    assert.equal((html.match(/class="pillar /g) ?? []).length, 3, `${p}: need 3 pillars`);
+    assert.equal((html.match(/class="feature"/g) ?? []).length, 6, `${p}: need 6 feature cards`);
   }
 });
 
@@ -217,14 +224,27 @@ test('home carries the full marketing content statically (no JS needed)', () => 
   }
 });
 
-test('typing effect ships, is tiny, and respects reduced motion', () => {
+test('animations ship as a small inline script and respect reduced motion', () => {
   const html = readPage('/');
-  assert.match(html, /prefers-reduced-motion/);
-  const inline = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+  assert.match(html, /prefers-reduced-motion: reduce/);
+  const inline = [...html.matchAll(/<script(?![^>]*src)(?![^>]*ld\+json)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('');
   assert.ok(inline.length > 0, 'no inline script found');
   assert.ok(inline.length < 8192, `inline JS too big: ${inline.length} bytes`);
-  assert.ok(inline.includes('getBoundingClientRect'), 'typing effect must guard above-fold blocks');
+  assert.ok(inline.includes('IntersectionObserver'), 'reveals must be driven by IntersectionObserver');
+  assert.ok(!/<script[^>]+src=/.test(html), 'no script files: animations stay inline');
+});
+
+test('decorative animations are hidden from screen readers and have a text equivalent', () => {
+  for (const p of ['/', '/en/']) {
+    const html = readPage(p);
+    assert.match(html, /class="desk"[^>]*aria-hidden="true"/, `${p}: hero desktop must be aria-hidden`);
+    assert.match(html, /class="phone"[^>]*aria-hidden="true"/, `${p}: hero phone must be aria-hidden`);
+    assert.match(html, /<figcaption class="sr-only"/, `${p}: security diagram needs a caption`);
+    for (const img of html.match(/<img\b[^>]*>/g) ?? []) {
+      assert.match(img, /\balt="/, `${p}: img without alt: ${img}`);
+    }
+  }
 });
 
 test('robots.txt and sitemap.xml exist; sitemap lists exactly the 6 pages', () => {
@@ -257,4 +277,60 @@ test('home JSON-LD parses and declares the free app', () => {
     const app = scripts.map((m) => JSON.parse(m[1])).find((d) => d['@type'] === 'SoftwareApplication');
     assert.equal(app.offers.price, '0');
   }
+});
+
+const seoPages = [
+  { path: '/', lang: 'vi', pair: '/en/' },
+  { path: '/en/', lang: 'en', pair: '/' },
+  { path: '/privacy/', lang: 'vi', pair: '/en/privacy/' },
+  { path: '/en/privacy/', lang: 'en', pair: '/privacy/' },
+  { path: '/terms/', lang: 'vi', pair: '/en/terms/' },
+  { path: '/en/terms/', lang: 'en', pair: '/terms/' },
+];
+
+function unescapeHtml(s) {
+  return s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+}
+
+for (const page of seoPages) {
+  test(`SEO basics on ${page.path}: title, description, canonical, reciprocal hreflang, icons`, () => {
+    const html = readPage(page.path);
+    const title = unescapeHtml(html.match(/<title>([^<]*)<\/title>/)?.[1] ?? '');
+    const description = unescapeHtml(html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '');
+    assert.ok(title.length >= 20 && title.length <= 65, `${page.path}: title is ${title.length} chars: ${title}`);
+    assert.ok(description.length >= 70 && description.length <= 165,
+      `${page.path}: description is ${description.length} chars`);
+    assert.ok(html.includes(`<link rel="canonical" href="https://shellx.pro${page.path}">`), `${page.path}: canonical`);
+    const otherLang = page.lang === 'vi' ? 'en' : 'vi';
+    assert.ok(html.includes(`hreflang="${otherLang}" href="https://shellx.pro${page.pair}"`), `${page.path}: hreflang to ${page.pair}`);
+    assert.ok(readPage(page.pair).includes(`hreflang="${page.lang}" href="https://shellx.pro${page.path}"`),
+      `${page.pair} does not point back to ${page.path}`);
+    assert.match(html, /hreflang="x-default"/);
+    assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png"/);
+    assert.match(html, /rel="manifest" href="\/site\.webmanifest"/);
+    assert.ok(!/name="robots" content="[^"]*noindex/.test(html), `${page.path} is noindex`);
+  });
+}
+
+test('home JSON-LD has FAQPage matching the visible FAQ, Organization and download URLs', () => {
+  for (const p of ['/', '/en/']) {
+    const html = readPage(p);
+    const docs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+    const faq = docs.find((d) => d['@type'] === 'FAQPage');
+    assert.ok(faq, `${p}: FAQPage missing`);
+    assert.equal(faq.mainEntity.length, (html.match(/<details[\s>]/g) ?? []).length, `${p}: FAQPage and <details> differ`);
+    for (const q of faq.mainEntity) assert.ok(q.name && q.acceptedAnswer.text, `${p}: empty FAQ entry`);
+    const org = docs.find((d) => d['@type'] === 'Organization');
+    assert.ok(org?.logo && existsSync(join(dist, new URL(org.logo).pathname.slice(1))), `${p}: Organization logo`);
+    const app = docs.find((d) => d['@type'] === 'SoftwareApplication');
+    assert.deepEqual(app.downloadUrl, [macUrl, winUrl]);
+  }
+});
+
+test('manifest icons exist; sitemap carries lastmod and x-default for every page', () => {
+  const manifest = JSON.parse(readFileSync(join(dist, 'site.webmanifest'), 'utf8'));
+  for (const icon of manifest.icons) assert.ok(existsSync(join(dist, icon.src.slice(1))), `missing ${icon.src}`);
+  const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
+  assert.equal((xml.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) ?? []).length, 6);
+  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, 6);
 });

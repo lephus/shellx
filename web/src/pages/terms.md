@@ -3,7 +3,7 @@ layout: ../layouts/Legal.astro
 lang: vi
 page: terms
 title: Điều khoản sử dụng
-description: Điều khoản áp dụng khi bạn sử dụng ShellX.
+description: "Điều khoản áp dụng khi bạn sử dụng ShellX — app terminal cho máy tính và điện thoại: tài khoản, cách dùng được phép, trách nhiệm và thay đổi."
 updated: "2026-09-28"
 ---
 

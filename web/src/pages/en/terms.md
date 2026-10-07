@@ -3,7 +3,7 @@ layout: ../../layouts/Legal.astro
 lang: en
 page: terms
 title: Terms of Use
-description: The terms that apply when you use ShellX.
+description: "The terms that apply when you use ShellX, the terminal app for your computer and phone: accounts, acceptable use, liability and changes."
 updated: "2026-09-28"
 ---
 

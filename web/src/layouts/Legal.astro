@@ -22,7 +22,7 @@ const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang ==
 ---
 
 <Base lang={lang} page={page} title={`${title} — ShellX`} description={description}>
-  <article class="legal">
+  <article class="wrap legal">
     <h1>{title}</h1>
     <p class="updated">{ui[lang].lastUpdated}: <time datetime={updated}>{updatedLabel}</time></p>
     <slot />
@@ -30,7 +30,8 @@ const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang ==
 </Base>
 
 <style>
-  .legal { font-family: var(--sans); font-size: 1rem; }
+  .legal { max-width: 52rem; padding-top: 3rem; font-size: 1rem; }
+  .legal h1 { font-size: clamp(2rem, 5vw, 2.75rem); }
   .legal :global(code) { font-family: var(--mono); }
   .legal h1 {
     margin-bottom: 0.25rem;

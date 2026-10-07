@@ -10,16 +10,21 @@ const en = ui.en;
 ---
 
 <Base lang="vi" page={null} title={`${vi.notFoundTitle} — ShellX`} description={vi.notFoundBody}>
-  <Terminal title="shellx@pro — 404">
-    <TermBlock command="open …">
-      <p class="err" aria-hidden="true">zsh: command not found</p>
-      <h1>{vi.notFoundTitle}</h1>
-      <p>{vi.notFoundBody} <a href="/">{vi.backHome}</a></p>
-      <div lang="en">
-        <h2>{en.notFoundTitle}</h2>
-        <p>{en.notFoundBody} <a href="/en/">{en.backHome}</a></p>
-      </div>
-    </TermBlock>
-  </Terminal>
+  <div class="wrap nf">
+    <Terminal title="shellx@pro — 404">
+      <TermBlock command="open …">
+        <p class="err" aria-hidden="true">zsh: command not found</p>
+        <h1>{vi.notFoundTitle}</h1>
+        <p>{vi.notFoundBody} <a href="/">{vi.backHome}</a></p>
+        <div lang="en">
+          <h2>{en.notFoundTitle}</h2>
+          <p>{en.notFoundBody} <a href="/en/">{en.backHome}</a></p>
+        </div>
+      </TermBlock>
+    </Terminal>
+  </div>
 </Base>
-<style> .err { color: #f87171; margin: 0.25rem 0 0; } </style>
+<style>
+  .nf { max-width: 52rem; padding-top: 3rem; font-family: var(--mono); }
+  .err { color: #f87171; margin: 0.25rem 0 0; }
+</style>
