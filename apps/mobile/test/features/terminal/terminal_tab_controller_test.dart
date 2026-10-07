@@ -82,6 +82,70 @@ void main() {
     });
   });
 
+  test('A10 D22: the keyboard sliding up and down five times in 400 ms sends one size, the last', () {
+    fakeAsync((async) {
+      for (var i = 0; i < 5; i++) {
+        tab.terminal.value.resize(80, 24 - 6 * (i % 2)); // keyboard up, then down
+        async.elapse(const Duration(milliseconds: 40));
+      }
+      tab.terminal.value.resize(80, 18); // ends up
+      async.elapse(const Duration(seconds: 1));
+      expect(machine.resizes, [(id: handle.id, cols: 80, rows: 18)]);
+    });
+  });
+
+  test('A10 D29: output of a tab in the background is held back at most a quarter of a second', () {
+    fakeAsync((async) {
+      // Built inside the fake zone: a stream delivers events in the zone it was listened in, and
+      // the feed's timer must be the fake one (a tab built in `setUp` would use a real Timer).
+      late FakeTabHandle h;
+      machine.openSession(cols: 80, rows: 24).then((v) => h = v as FakeTabHandle);
+      async.flushMicrotasks();
+      final t = TerminalTabController(machine: machine, handle: h, modifiers: keys, cols: 80, rows: 24);
+      String text() => t.terminal.value.buffer.getText().trim();
+      t.setActive(false);
+      h.emit(const TabOutput('background output'));
+      expect(text(), isEmpty);
+      async.elapse(const Duration(milliseconds: 249));
+      expect(text(), isEmpty);
+      async.elapse(const Duration(milliseconds: 1));
+      expect(text(), 'background output');
+      t.dispose();
+    });
+  });
+
+  test('A10 D29: the echo of a key is written at once, in the front tab', () {
+    fakeAsync((async) {
+      tab.terminal.value.textInput('l');
+      expect(machine.inputs, hasLength(1));
+      handle.emit(const TabOutput('l'));
+      expect(screen(), 'l', reason: 'no wait for a tick');
+    });
+  });
+
+  test('A10 D29: the exit banner never comes before the last output', () {
+    fakeAsync((async) {
+      tab.setActive(false);
+      handle.emit(const TabOutput('last words'));
+      handle.emit(const TabExited(1));
+      expect(screen(), 'last words');
+      expect(tab.banner.value?.notice, TabNotice.exited);
+    });
+  });
+
+  test('A10 D29: a screen reset forgets output that was still waiting', () {
+    fakeAsync((async) {
+      tab.setActive(false);
+      handle.emit(const TabOutput('old screen'));
+      handle.emit(const TabReset());
+      async.elapse(const Duration(seconds: 1));
+      expect(screen(), isEmpty);
+      handle.emit(const TabOutput('new'));
+      tab.setActive(true);
+      expect(screen(), 'new');
+    });
+  });
+
   test('Review Focus 4: a zero-sized viewport is never sent', () {
     fakeAsync((async) {
       tab.terminal.value.onResize!(0, 0, 0, 0);

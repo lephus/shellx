@@ -118,8 +118,15 @@ class ShellxTerminal extends Terminal {
     return super.keyInput(key, shift: shift, alt: alt, ctrl: ctrl);
   }
 
+  /// An empty text (a keyboard repeating its reset state, or a text made only of stripped control
+  /// characters) sends nothing: no empty input message (A10 D30).
   @override
-  void textInput(String text) => super.textInput(modifiers.applyModifiers(normalizeTypedText(text)));
+  void textInput(String text) {
+    final normalized = normalizeTypedText(text);
+    // Before the modifiers: an empty reset must not consume a one-shot Ctrl/Alt.
+    if (normalized.isEmpty) return;
+    super.textInput(modifiers.applyModifiers(normalized));
+  }
 
   /// Spec §9.4: bracketed paste when the application enabled it. Pasted text
   /// never picks up sticky modifiers, and its control characters are stripped

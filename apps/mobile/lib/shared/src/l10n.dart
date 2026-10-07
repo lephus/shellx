@@ -28,7 +28,9 @@ class S {
   static const AppLocalizationDelegate delegate = AppLocalizationDelegate();
 
   static Future<S> load(Locale locale) {
-    final name = (locale.countryCode?.isEmpty ?? false) ? locale.languageCode : locale.toString();
+    final name = (locale.countryCode?.isEmpty ?? false)
+        ? locale.languageCode
+        : locale.toString();
     final localeName = Intl.canonicalizedLocale(name);
     return initializeMessages(localeName).then((_) {
       Intl.defaultLocale = localeName;
@@ -2160,6 +2162,86 @@ class S {
       desc: '',
       args: [],
     );
+  }
+
+  /// `View as text`
+  String get viewAsTextTooltip {
+    return Intl.message(
+      'View as text',
+      name: 'viewAsTextTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Terminal text`
+  String get viewAsTextTitle {
+    return Intl.message(
+      'Terminal text',
+      name: 'viewAsTextTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Copy all`
+  String get viewAsTextCopyAll {
+    return Intl.message(
+      'Copy all',
+      name: 'viewAsTextCopyAll',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Refresh`
+  String get viewAsTextRefresh {
+    return Intl.message(
+      'Refresh',
+      name: 'viewAsTextRefresh',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Nothing to show yet`
+  String get viewAsTextEmpty {
+    return Intl.message(
+      'Nothing to show yet',
+      name: 'viewAsTextEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Showing the last {lines} lines`
+  String viewAsTextTruncated(int lines) {
+    return Intl.message(
+      'Showing the last $lines lines',
+      name: 'viewAsTextTruncated',
+      desc: '',
+      args: [lines],
+    );
+  }
+
+  /// `Open link?`
+  String get linkSheetTitle {
+    return Intl.message(
+      'Open link?',
+      name: 'linkSheetTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open`
+  String get linkSheetOpen {
+    return Intl.message('Open', name: 'linkSheetOpen', desc: '', args: []);
+  }
+
+  /// `Copy link`
+  String get linkSheetCopy {
+    return Intl.message('Copy link', name: 'linkSheetCopy', desc: '', args: []);
   }
 }
 

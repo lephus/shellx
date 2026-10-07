@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/semantics.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
@@ -163,6 +164,17 @@ class _VoiceComposerState extends State<VoiceComposer> {
                     minLines: 1,
                     maxLines: 4,
                     textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.multiline,
+                    // A command, not prose (A10 D30): no autocorrect, learning, capital
+                    // after a full stop, and iOS Smart Punctuation (`--` → `—`, `'` → `’`) off.
+                    autocorrect: false,
+                    // Android keyboards (Gboard, Samsung: Telex/VNI) may stop composing with
+                    // NO_SUGGESTIONS, so the suggestion strip stays there; iOS has no such trap.
+                    enableSuggestions: defaultTargetPlatform == TargetPlatform.android,
+                    enableIMEPersonalizedLearning: false,
+                    smartDashesType: SmartDashesType.disabled,
+                    smartQuotesType: SmartQuotesType.disabled,
+                    textCapitalization: TextCapitalization.none,
                     // A command: `--` vs `—`, `'` vs `’` and `l` vs `1` must read as in the terminal.
                     style: TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 15, color: colors.keyboardInk),
                     decoration: InputDecoration(

@@ -60,6 +60,15 @@ class TerminalWorkspace extends Controller {
   void select(int index) {
     if (index < 0 || index >= _tabs.peek().length) return;
     _active.value = index;
+    _syncActive();
+  }
+
+  /// A10 D29: only the active tab's output is written at the foreground's pace.
+  void _syncActive() {
+    final active = _activeTab.peek();
+    for (final tab in _tabs.peek()) {
+      tab.setActive(identical(tab, active));
+    }
   }
 
   /// Runs the IK handshake when needed. Throws the [MachineFailed] state
@@ -165,6 +174,7 @@ class TerminalWorkspace extends Controller {
       _tabs.value = List.unmodifiable(tabs);
       _active.value = tabs.length - 1;
     });
+    _syncActive();
     return tab;
   }
 
@@ -192,6 +202,7 @@ class TerminalWorkspace extends Controller {
       }
     });
     tab.dispose();
+    _syncActive();
     if (!tab.hasSession) return;
     try {
       await machine.closeTab(tab.id);

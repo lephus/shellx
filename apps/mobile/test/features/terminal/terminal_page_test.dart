@@ -1184,6 +1184,115 @@ void main() {
     });
   });
 
+  group('A10 D12: a tap on a web address', () {
+    /// Where the middle of cell ([col], [row]) is on screen.
+    Offset cellCentre(WidgetTester tester, int col, int row) {
+      final render = tester.state<TerminalViewState>(find.byType(TerminalView)).renderTerminal;
+      return tester.getTopLeft(find.byType(TerminalView)) +
+          render.getOffset(CellOffset(col, row)) +
+          Offset(render.cellSize.width / 2, render.cellSize.height / 2);
+    }
+
+    testWidgets('offers the address; Open hands it to the platform', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('PR: https://github.com/a/b/pull/7.'));
+      await tester.pump();
+      await tester.tapAt(cellCentre(tester, 8, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Mở liên kết?'), findsOneWidget);
+      expect(
+        tester.widget<SelectableText>(find.byKey(const ValueKey('link-sheet-url'))).data,
+        'https://github.com/a/b/pull/7',
+      );
+      await tester.tap(find.byKey(const ValueKey('link-sheet-open')));
+      await tester.pumpAndSettle();
+      expect((getIt<ExternalLinks>() as FakeExternalLinks).opened.map((u) => u.toString()), [
+        'https://github.com/a/b/pull/7',
+      ]);
+    });
+
+    testWidgets('Copy link copies it and opens nothing', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('https://example.com/x'));
+      await tester.pump();
+      final copied = mockClipboard(tester);
+      await tester.tapAt(cellCentre(tester, 3, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('link-sheet-copy')));
+      await tester.pumpAndSettle();
+      expect(copied, ['https://example.com/x']);
+      expect((getIt<ExternalLinks>() as FakeExternalLinks).opened, isEmpty);
+    });
+
+    testWidgets('a tap elsewhere offers nothing', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('plain words https://example.com/x'));
+      await tester.pump();
+      await tester.tapAt(cellCentre(tester, 2, 0));
+      await tester.pump(const Duration(milliseconds: 400)); // xterm's double-tap timer
+      expect(find.byKey(const ValueKey('link-sheet-url')), findsNothing);
+    });
+
+    testWidgets('a file: or javascript: address is never offered', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('file:///etc/passwd javascript:alert(1)'));
+      await tester.pump();
+      await tester.tapAt(cellCentre(tester, 5, 0));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tapAt(cellCentre(tester, 25, 0));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const ValueKey('link-sheet-url')), findsNothing);
+    });
+  });
+
+  group('A10 D28: view as text', () {
+    Finder button() => find.byKey(const ValueKey('view-as-text'));
+
+    testWidgets('the sheet shows the recent text, selectable, and Copy all copies it', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(const TabOutput('git status\r\nXin chào  \r\n\r\n'));
+      await tester.pump();
+      final copied = mockClipboard(tester);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      final body = tester.widget<SelectableText>(find.byKey(const ValueKey('view-as-text-body')));
+      expect(body.data, 'git status\nXin chào');
+      await tester.tap(find.byKey(const ValueKey('view-as-text-copy')));
+      await tester.pumpAndSettle();
+      expect(copied, ['git status\nXin chào']);
+    });
+
+    testWidgets('Refresh takes a new snapshot; an empty terminal says so', (tester) async {
+      await open(tester);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('view-as-text-empty')), findsOneWidget);
+      expect(tester.widget<TextButton>(find.byKey(const ValueKey('view-as-text-copy'))).onPressed, isNull);
+      machine.handles.single.emit(const TabOutput('later output'));
+      await tester.tap(find.byKey(const ValueKey('view-as-text-refresh')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SelectableText>(find.byKey(const ValueKey('view-as-text-body'))).data, 'later output');
+    });
+
+    testWidgets('opening and closing the sheet never resizes the terminal on the computer', (tester) async {
+      await open(tester);
+      final before = machine.resizes.length;
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10)); // the barrier
+      await tester.pumpAndSettle();
+      expect(machine.resizes.length, before);
+    });
+
+    testWidgets('the button is in landscape too', (tester) async {
+      tester.view.physicalSize = const Size(2532, 1170);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await open(tester, portrait: false);
+      expect(button(), findsOneWidget);
+    });
+  });
+
   group('voice composer', () {
     Finder mic() => find.byKey(const ValueKey('voice-mic'));
 
@@ -1312,6 +1421,23 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('voice-locale-en')));
       await tester.pumpAndSettle();
       expect((segment('vi'), segment('en')), before);
+    });
+
+    testWidgets('A10 D30: the composer keeps a command literal: no autocorrect, smart dashes or capitals', (
+      tester,
+    ) async {
+      await openQuiet(tester);
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(find.byKey(const ValueKey('voice-text')));
+      expect(field.autocorrect, isFalse);
+      // Android keeps suggestions (Vietnamese Telex/VNI composing); iOS turns them off.
+      expect(field.enableSuggestions, defaultTargetPlatform == TargetPlatform.android);
+      expect(field.enableIMEPersonalizedLearning, isFalse);
+      expect(field.smartDashesType, SmartDashesType.disabled);
+      expect(field.smartQuotesType, SmartQuotesType.disabled);
+      expect(field.textCapitalization, TextCapitalization.none);
+      expect(field.keyboardType, TextInputType.multiline);
     });
 
     testWidgets('the command is in JetBrains Mono, the hint in Raleway; Send says Enter when empty', (tester) async {

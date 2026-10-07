@@ -236,5 +236,14 @@
   "settingsThemeDark": "Tối",
   "settingsTerms": "Điều khoản sử dụng",
   "settingsPrivacy": "Chính sách quyền riêng tư",
-  "settingsLicenses": "Giấy phép mã nguồn mở"
+  "settingsLicenses": "Giấy phép mã nguồn mở",
+  "viewAsTextTooltip": "Xem dạng văn bản",
+  "viewAsTextTitle": "Văn bản terminal",
+  "viewAsTextCopyAll": "Sao chép tất cả",
+  "viewAsTextRefresh": "Làm mới",
+  "viewAsTextEmpty": "Chưa có nội dung",
+  "viewAsTextTruncated": "Hiển thị {lines} dòng cuối",
+  "linkSheetTitle": "Mở liên kết?",
+  "linkSheetOpen": "Mở",
+  "linkSheetCopy": "Sao chép liên kết"
 }

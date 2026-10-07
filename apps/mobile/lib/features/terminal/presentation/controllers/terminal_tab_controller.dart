@@ -5,6 +5,7 @@ import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/terminal/domain/shellx_terminal.dart';
+import 'package:shellx_mobile/features/terminal/domain/terminal_output_feed.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
 import 'package:xterm/xterm.dart';
 
@@ -136,6 +137,12 @@ class TerminalTabController extends Controller {
 
   /// Sent a size since the computer last took it back: typing claims only once.
   bool _claimed = false;
+
+  /// A10 D29: output reaches xterm in budgeted pieces, the foreground tab first. Writes to whichever
+  /// terminal is current (a `session.reset` swaps it).
+  late final TerminalOutputFeed _feed = TerminalOutputFeed((text) {
+    if (!_disposed) _terminal.peek().write(text);
+  });
   TabHandle? _handle;
   StreamSubscription<TabEvent>? _events;
   Timer? _resizeTimer;
@@ -199,12 +206,14 @@ class TerminalTabController extends Controller {
   void _onEvent(TabEvent event) {
     switch (event) {
       case TabOutput(:final text):
-        _terminal.peek().write(text);
+        _feed.add(text);
       case TabReset():
+        _feed.clear();
         final current = _terminal.peek();
         _terminal.value = _createTerminal(current.viewWidth, current.viewHeight);
         selection.clearSelection();
       case TabExited(:final exitCode):
+        _feed.drain(); // the banner never comes before the last output
         // "Closed on the computer" says more than the exit code that follows it.
         if (_banner.peek()?.notice != TabNotice.closedByHost) {
           _banner.value = isDesktop
@@ -230,6 +239,7 @@ class TerminalTabController extends Controller {
 
   void _onUserInput(String data) {
     if (!_isLive.peek()) return;
+    _feed.noteInput();
     if (!_claimed) claimSize();
     _machine.input(id, utf8.encode(data));
   }
@@ -335,8 +345,12 @@ class TerminalTabController extends Controller {
     }
   }
 
+  /// The workspace tells which tab is in front (A10 D29).
+  void setActive(bool active) => _feed.isActive = active;
+
   void dispose() {
     _disposed = true;
+    _feed.dispose();
     _resizeTimer?.cancel();
     unawaited(_events?.cancel());
     selection.dispose();
