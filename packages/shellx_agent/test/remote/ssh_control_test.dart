@@ -246,6 +246,39 @@ void main() {
     },
   );
 
+  test('exitAllMasters exits every socket in the directory, also ones this '
+      'instance never noted (A5b D40)', () async {
+    final c = SshControl(
+      sshPath: '/usr/bin/ssh',
+      controlDirectory: '/tmp/shellx-ssh-501',
+      run: runner.call,
+      ports: ports,
+      listSockets: (dir) async => ['$dir/aaaa', '$dir/bbbb'],
+    );
+    await c.exitAllMasters();
+    final exits = runner.calls.where((a) => a.contains('exit')).toList();
+    expect(exits, hasLength(2));
+    expect(exits.map((a) => a[a.indexOf('-o') + 1]), [
+      'ControlPath=/tmp/shellx-ssh-501/aaaa',
+      'ControlPath=/tmp/shellx-ssh-501/bbbb',
+    ]);
+    // No multiplexing: nothing to exit.
+    runner.calls.clear();
+    await control(dir: null).exitAllMasters();
+    expect(runner.calls, isEmpty);
+  });
+
+  test('exitAllMasters survives an unreadable directory', () async {
+    final c = SshControl(
+      sshPath: '/usr/bin/ssh',
+      controlDirectory: '/tmp/gone',
+      run: runner.call,
+      listSockets: (_) => throw const FileSystemException('gone'),
+    );
+    await c.exitAllMasters();
+    expect(runner.calls, isEmpty);
+  });
+
   test(
     'every helper runs BatchMode or only talks to the socket (D38g)',
     () async {

@@ -14,4 +14,7 @@ Future<void> shutdownRemote(
   final control = tools.control;
   if (control == null) return;
   await control.exitMasters(control.mastersUsed.toList());
+  // A5b R2: a UI-side SshControl shares the directory, not `mastersUsed`:
+  // every master socket in it ends, the ones this instance never noted too.
+  await control.exitAllMasters();
 }
