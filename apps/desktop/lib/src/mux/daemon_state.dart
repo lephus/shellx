@@ -126,19 +126,29 @@ class DaemonStateNotifier extends Notifier<DaemonUiState> {
   /// The first connection (UI-A5 §7.3, §7.4: the dialogs over the window).
   /// Null: the user chose to leave; the caller quits the window.
   Future<DaemonLink?> connectAtStartup() async {
-    final attached = await _obtain(dialogs: true);
-    if (attached == null) return null;
-    return _adopt(attached);
+    DaemonConnection? first;
+    while (ref.mounted) {
+      final attached = await _obtain(dialogs: true, first: first);
+      if (attached == null) return null;
+      final link = await _adopt(attached);
+      if (link != null) return link;
+      // A service that answered but cannot be used is a failed start.
+      first = const StartFailed();
+    }
+    return null;
   }
 
   /// `connect()`, with the outdated-service and start-failed dialogs when
   /// [dialogs]. Null: gave up (no dialogs: start failed; dialogs: the user
   /// left, or a failed start with no dialog to ask).
-  Future<Attached?> _obtain({required bool dialogs}) async {
+  Future<Attached?> _obtain({
+    required bool dialogs,
+    DaemonConnection? first,
+  }) async {
     final l10n = ref.read(appL10nProvider);
     final version = ref.read(desktopServicesProvider).appVersion;
     final router = ref.read(windowRouterProvider.notifier);
-    var result = await _connector.connect();
+    var result = first ?? await _connector.connect();
     while (ref.mounted) {
       switch (result) {
         case final Attached a:

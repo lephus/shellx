@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/restore/restore_persistence.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/fakes.dart';
 import '../support/restore_fakes.dart';
@@ -172,4 +173,40 @@ void main() {
     await pumpEventQueue();
     expect(connector.connects, 1);
   });
+
+  test(
+    'a service that answers the handshake but never lists its sessions is '
+    'a failed start: the start-failed dialog, and Try Again can attach',
+    () async {
+      h = TestHarness();
+      files = RecordingFiles()..diskLayout = true;
+      connector = FakeConnector()..files = files;
+      final broken = FakeDaemon('a' * 32);
+      final fine = FakeDaemon('b' * 32, ids: [1]);
+      c = ProviderContainer.test(
+        overrides: [
+          daemonModeProvider.overrideWithValue(true),
+          desktopServicesProvider.overrideWithValue(h.services()),
+          restoreStoreProvider.overrideWithValue(files),
+          daemonConnectorProvider.overrideWithValue(connector),
+        ],
+      );
+      connector.queue
+        ..add(() async {
+          final attached = await broken.attach();
+          await broken.die(); // gone before the first list answer
+          return attached;
+        })
+        ..add(() async => fine.attach());
+      final started = c.read(daemonStateProvider.notifier).connectAtStartup();
+      await pumpEventQueue();
+      final dialog = c.read(windowRouterProvider).confirm!;
+      expect(dialog.title, "Couldn't start the background service");
+      expect(await dialog.onConfirm!(), isTrue);
+      dialog.complete(true);
+      final link = await started;
+      expect(link, isNotNull);
+      expect(link!.instance, 'b' * 32);
+    },
+  );
 }
