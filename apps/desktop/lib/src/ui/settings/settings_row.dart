@@ -10,6 +10,7 @@ import '../../agent/agent_controller.dart';
 import '../../agent/notify_threshold.dart';
 import '../../config/config_color.dart';
 import '../../config/config_controller.dart';
+import '../../config/config_problem.dart';
 import '../../config/settings_schema.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../tray/tray_action.dart';
@@ -25,8 +26,25 @@ import 'settings_writer.dart';
 const Duration kSettingWriteDebounce = Duration(milliseconds: 300);
 
 /// A hook the Appearance page uses to show a value in the sample before it
-/// is written (Task 10); null elsewhere.
+/// is written: [raw] is the value being tried, or null when a write has
+/// finished (written or not) and the sample goes back to the saved values.
 typedef SettingPreviewHook = void Function(SettingDef def, String? raw);
+
+/// What a page-specific control (the theme list) gets from its row: whether
+/// it may be used, the value the file has, and how to write one.
+class SettingControlApi {
+  const SettingControlApi({
+    required this.editable,
+    required this.current,
+    required this.commit,
+  });
+  final bool editable;
+  final String current;
+  final Future<void> Function(String raw) commit;
+}
+
+typedef SettingControlBuilder =
+    Widget Function(BuildContext context, SettingControlApi api);
 
 /// What every row of the window shares: where "Open configuration file" goes
 /// and which row a search jump lights up for a second.
@@ -63,6 +81,7 @@ class SettingRow extends ConsumerStatefulWidget {
     this.onJump,
     this.note,
     this.onPreview,
+    this.control,
     this.enabled = true,
   });
 
@@ -78,6 +97,10 @@ class SettingRow extends ConsumerStatefulWidget {
   /// A line under the control (`settingsScrollbackNote`).
   final String? note;
   final SettingPreviewHook? onPreview;
+
+  /// Replaces the standard control of a file row (Appearance: the theme
+  /// list); the row keeps everything around it.
+  final SettingControlBuilder? control;
 
   @override
   ConsumerState<SettingRow> createState() => _SettingRowState();
@@ -100,7 +123,8 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   /// loses the focus, which must not write the same thing a second time
   /// (nor retry one the file refused).
   String? _attempted;
-  late final SettingsWriter _writer = ref.read(settingsWriterProvider);
+  // Kept in a field: `ref` can't be read while the widget is taken apart.
+  late final SettingsWriter _writer;
 
   SettingDef get def => widget.def;
   bool get _isFile => def.owner == SettingOwner.file;
@@ -108,6 +132,7 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   @override
   void initState() {
     super.initState();
+    _writer = ref.read(settingsWriterProvider);
     _focus.addListener(_onFocus);
     if (_isFile) {
       _field.text = _currentText();
@@ -160,6 +185,7 @@ class _SettingRowState extends ConsumerState<SettingRow> {
     _pending = null;
     if (raw.trim() == _current) {
       _attempted = null;
+      widget.onPreview?.call(def, null); // nothing to show but the saved value
       if (_error != null) setState(() => _error = null);
       return;
     }
@@ -168,6 +194,8 @@ class _SettingRowState extends ConsumerState<SettingRow> {
     final result = await _writer.set(def, raw);
     if (!mounted) return;
     reportWrite(ref, result);
+    // Written or refused, the sample goes back to the saved configuration.
+    widget.onPreview?.call(def, null);
     setState(() {
       _error = result is Invalid
           ? problemText(AppLocalizations.of(context), result.problem)
@@ -204,6 +232,16 @@ class _SettingRowState extends ConsumerState<SettingRow> {
     } else {
       source = null;
     }
+    // What only the window can find (the font probe), after a load.
+    final warnings = _isFile
+        ? [
+            for (final p in ref.watch(
+              shellxConfigProvider.select((s) => s.runtimeProblems),
+            ))
+              if (p.key == def.fileKey && p.severity == ConfigSeverity.warning)
+                p,
+          ]
+        : const <ConfigProblem>[];
     final editable =
         widget.enabled &&
         source is! IncludeSource &&
@@ -252,6 +290,20 @@ class _SettingRowState extends ConsumerState<SettingRow> {
                   key: Key('setting.${def.id}.error'),
                   style: ShellxText.small.copyWith(
                     color: ShellxDesktopColors.err,
+                  ),
+                ),
+              ),
+            ),
+          for (final problem in warnings)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  problemText(l10n, problem),
+                  key: Key('setting.${def.id}.warning'),
+                  style: ShellxText.small.copyWith(
+                    color: ShellxDesktopColors.warn,
                   ),
                 ),
               ),
@@ -397,6 +449,21 @@ class _SettingRowState extends ConsumerState<SettingRow> {
 
   Widget _fileControl(AppLocalizations l10n, String label, bool editable) {
     final config = ref.watch(shellxConfigProvider).config;
+    final custom = widget.control;
+    if (custom != null) {
+      return custom(
+        context,
+        SettingControlApi(
+          editable: editable,
+          current: fileSettingText(
+            def,
+            config,
+            liveFontSize: ref.watch(terminalFontSizeProvider),
+          ),
+          commit: _commit,
+        ),
+      );
+    }
     final text = fileSettingText(
       def,
       config,

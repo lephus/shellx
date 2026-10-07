@@ -13,6 +13,7 @@ import 'package:shellx_desktop/src/ui/config/shortcuts_sheet.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_overlay.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_writer.dart';
 
+import '../support/appearance_scroll.dart';
 import '../support/config_harness.dart';
 import '../support/config_workspace.dart';
 import '../support/memory_config_fs.dart';
@@ -172,6 +173,7 @@ void main() {
   testWidgets('with no file, opening and browsing creates none', (t) async {
     final w = await openSettings(t);
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await goTo(t, 'advanced');
     expect(w.fs.replaced, isEmpty);
     expect(w.fs.files.containsKey(testConfigPaths().shellx), isFalse);
@@ -265,6 +267,7 @@ void main() {
       'changes', (t) async {
     final w = await openSettings(t, config: '# mine\r\ntheme = Dracula\r\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '15');
     expect(shellxText(w), startsWith('# mine\r\ntheme = Dracula\r\n'));
     expect(shellxText(w), contains('font-size = 15\r\n'));
@@ -276,6 +279,7 @@ void main() {
   testWidgets('a user line is edited in place, not duplicated', (t) async {
     final w = await openSettings(t, config: 'font-size=13\ntheme = X\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '16');
     expect(shellxText(w), 'font-size=16\ntheme = X\n');
     await disposeWorkspace(t, w.container);
@@ -284,11 +288,11 @@ void main() {
   testWidgets('leaving a field unchanged writes nothing', (t) async {
     final w = await openSettings(t, config: 'font-size = 13\n');
     await goTo(t, 'appearance');
-    await t.tap(find.byKey(const Key('setting.font-size.field')));
-    await t.pump();
-    await submit(t, 'setting.font-size.field', '13');
+    await revealOnAppearance(t, 'setting.font-family.field');
     await t.tap(find.byKey(const Key('setting.font-family.field')));
     await t.pump();
+    await revealOnAppearance(t, 'setting.font-size.field');
+    await submit(t, 'setting.font-size.field', '13');
     await goTo(t, 'terminal');
     expect(w.fs.replaced, isEmpty);
     await disposeWorkspace(t, w.container);
@@ -298,6 +302,7 @@ void main() {
       'nothing', (t) async {
     final w = await openSettings(t, config: 'font-size = 13\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', 'abc');
     final error = find.byKey(const Key('setting.font-size.error'));
     expect(error, findsOneWidget);
@@ -315,6 +320,7 @@ void main() {
   ) async {
     final w = await openSettings(t);
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '99');
     expect(find.byKey(const Key('setting.font-size.error')), findsOneWidget);
     expect(w.fs.replaced, isEmpty);
@@ -329,6 +335,7 @@ void main() {
     await loadConfig(w.container);
     await t.pumpAndSettle();
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     expect(
       t.widget<Text>(find.byKey(const Key('setting.font-size.source'))).data,
       'Set in extra, line 2',
@@ -351,6 +358,7 @@ void main() {
       'reloads', (t) async {
     final w = await openSettings(t, config: 'theme = X\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     w.fs.beforeReplace = (path) {
       w.fs.beforeReplace = null;
       w.fs.write(path, '${w.fs.text(path)}# edited\n');
@@ -377,6 +385,7 @@ void main() {
     );
     final before = shellxText(w);
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '15');
     expect(shellxText(w), before);
     expect(
@@ -392,6 +401,7 @@ void main() {
     final w = await openSettings(t, config: 'theme = X\n');
     w.fs.replaceError = const FileSystemException('locked');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '15');
     expect(
       w.container.read(terminalTabsProvider).notice,
@@ -405,6 +415,7 @@ void main() {
       'default', (t) async {
     final w = await openSettings(t, config: 'font-size = 18\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     expect(
       t
           .widget<TextField>(find.byKey(const Key('setting.font-size.field')))
@@ -430,6 +441,7 @@ void main() {
   ) async {
     final w = await openSettings(t, config: '# mine\ntheme = X\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '15');
     expect(shellxText(w), contains('shellx-managed settings'));
     await goTo(t, 'advanced');
@@ -489,7 +501,7 @@ void main() {
     await tabTo('appearance');
     await t.sendKeyEvent(LogicalKeyboardKey.enter);
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('setting.font-size')), findsOneWidget);
+    expect(find.byKey(const Key('preview.terminal')), findsOneWidget);
     // Shift+Tab goes back the way it came.
     await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await t.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -530,7 +542,8 @@ void main() {
     t.view.physicalSize = const Size(600, 700);
     await t.pumpAndSettle();
     await goTo(t, 'appearance');
-    expect(find.byKey(const Key('setting.font-size')), findsOneWidget);
+    await revealOnAppearance(t, 'setting.font-size');
+    expect(find.byKey(const Key('preview.terminal')), findsOneWidget);
     await disposeWorkspace(t, w.container);
   }, variant: mac);
 
@@ -550,6 +563,7 @@ void main() {
     debugPrint = (String? message, {int? wrapWidth}) => log.add(message ?? '');
     final w = await openSettings(t, config: 'font-size = 13\nfoo-bar = 1\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     await submit(t, 'setting.font-size.field', '15');
     await submit(t, 'setting.font-size.field', 'abc');
     w.fs.replaceError = const FileSystemException('x /home/me/secret');
@@ -566,6 +580,7 @@ void main() {
   testWidgets('a slider writes on release only', (t) async {
     final w = await openSettings(t, config: 'font-size = 13\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     final slider = find.byKey(const Key('setting.font-size.slider'));
     final gesture = await t.startGesture(t.getCenter(slider));
     await gesture.moveBy(const Offset(40, 0));
@@ -587,6 +602,7 @@ void main() {
     final handle = t.ensureSemantics();
     final w = await openSettings(t, config: 'font-size = 13\n');
     await goTo(t, 'appearance');
+    await revealOnAppearance(t, 'setting.font-size');
     final slider = find.byKey(const Key('setting.font-size.slider'));
     // ignore: deprecated_member_use
     final owner = t.binding.pipelineOwner.semanticsOwner!;

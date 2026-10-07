@@ -65,6 +65,22 @@ final class MemoryConfigFs implements ConfigFs, ConfigFileStore {
     return bytes;
   }
 
+  /// Folders [list] answers for without any file in them (A11 D8).
+  final Map<String, List<String>> dirs = {};
+
+  @override
+  Future<List<String>> list(String dir) async {
+    if (unreadable.contains(dir)) throw FileSystemException('denied', dir);
+    final prefix = dir.endsWith('/') ? dir : '$dir/';
+    return [
+      ...?dirs[dir],
+      for (final path in files.keys)
+        if (path.startsWith(prefix) &&
+            !path.substring(prefix.length).contains('/'))
+          path.substring(prefix.length),
+    ];
+  }
+
   @override
   Future<FileStamp> stamp(String path) async {
     final gate = stampGate;
