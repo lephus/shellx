@@ -310,7 +310,7 @@ pub static COMMANDS: &[CommandSpec] = &[
                     "claude",
                     "install for Claude Code (~/.claude/skills/shellx)",
                 ),
-                f("codex", "install for Codex (~/.agents/skills/shellx)"),
+                f("codex", "install for Codex (~/.agents/skills/shellx; ~/.codex/skills/shellx too when ~/.codex exists)"),
                 v("dir", "DIR", "install into DIR/shellx"),
                 f("force", "overwrite without asking"),
             ],

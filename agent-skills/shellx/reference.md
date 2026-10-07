@@ -278,7 +278,7 @@ Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or
 
 ## shellx skills install
 
-`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) into `~/.claude/skills/shellx/` (Claude Code), `~/.agents/skills/shellx/` (Codex) or `DIR/shellx/`. Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". A changed file you decline (or cannot be asked about) is kept and skipped; the other files are still installed and the command exits 6 at the end. `--json`: `{"installed":[…],"upToDate":[…],"skipped":[…]}` plus `"error"` when something was skipped. Never connects to ShellX. Exit codes: 0, 1, 6.
+`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) into `~/.claude/skills/shellx/` (Claude Code), `~/.agents/skills/shellx/` (Codex; also `~/.codex/skills/shellx/` when `~/.codex` exists, for Codex builds that read it) or `DIR/shellx/`. Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". A changed file you decline (or cannot be asked about) is kept and skipped; the other files are still installed and the command exits 6 at the end. `--json`: `{"installed":[…],"upToDate":[…],"skipped":[…]}` plus `"error"` when something was skipped. Never connects to ShellX. Exit codes: 0, 1, 6.
 
 ## shellx skills print
 

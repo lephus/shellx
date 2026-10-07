@@ -15,6 +15,9 @@ pub const CLAUDE_SKILLS_DIR: &str = ".claude/skills";
 /// Codex reads user skills from `$HOME/.agents/skills` (Codex docs,
 /// "Build skills", checked 2026-10-07; formerly `~/.codex/skills`).
 pub const CODEX_SKILLS_DIR: &str = ".agents/skills";
+/// Final ruling M7: Codex builds that still read `~/.codex/skills`; written
+/// too whenever `~/.codex` exists.
+pub const CODEX_OWN_SKILLS_DIR: &str = ".codex/skills";
 
 fn io(e: std::io::Error) -> ApiError {
     ApiError::Io(e.to_string())
@@ -87,8 +90,12 @@ fn targets(p: &Parsed, home: &Path) -> Vec<PathBuf> {
     if p.has("claude") {
         targets.push(home.join(CLAUDE_SKILLS_DIR));
     }
+    let codex_own = home.join(".codex").is_dir();
     if p.has("codex") {
         targets.push(home.join(CODEX_SKILLS_DIR));
+        if codex_own {
+            targets.push(home.join(CODEX_OWN_SKILLS_DIR));
+        }
     }
     if let Some(d) = p.flag("dir") {
         targets.push(PathBuf::from(d));
@@ -97,8 +104,11 @@ fn targets(p: &Parsed, home: &Path) -> Vec<PathBuf> {
         if home.join(".claude").is_dir() {
             targets.push(home.join(CLAUDE_SKILLS_DIR));
         }
-        if home.join(".codex").is_dir() || home.join(".agents").is_dir() {
+        if codex_own || home.join(".agents").is_dir() {
             targets.push(home.join(CODEX_SKILLS_DIR));
+        }
+        if codex_own {
+            targets.push(home.join(CODEX_OWN_SKILLS_DIR));
         }
     }
     targets
@@ -376,6 +386,36 @@ mod tests {
         std::fs::create_dir_all(other.join(".agents")).unwrap();
         assert_eq!(run_skills(&["skills", "install"], &other, "", false).0, 0);
         assert!(other.join(".agents/skills/shellx/reference.md").exists());
+        // Final ruling M7: no ~/.codex, no ~/.codex/skills.
+        assert!(!other.join(".codex").exists());
+    }
+
+    #[test]
+    fn an_existing_codex_dir_also_gets_its_own_skills_dir() {
+        // Final ruling M7: Codex builds that read ~/.codex/skills.
+        let home = temp_home("codex-own");
+        std::fs::create_dir_all(home.join(".codex")).unwrap();
+        assert_eq!(run_skills(&["skills", "install"], &home, "", false).0, 0);
+        for dir in [CODEX_SKILLS_DIR, CODEX_OWN_SKILLS_DIR] {
+            assert!(home.join(dir).join("shellx/SKILL.md").exists(), "{dir}");
+            assert!(home.join(dir).join("shellx/reference.md").exists(), "{dir}");
+        }
+        let flagged = temp_home("codex-flag");
+        std::fs::create_dir_all(flagged.join(".codex")).unwrap();
+        assert_eq!(
+            run_skills(&["skills", "install", "--codex"], &flagged, "", false).0,
+            0
+        );
+        assert!(flagged
+            .join(CODEX_OWN_SKILLS_DIR)
+            .join("shellx/SKILL.md")
+            .exists());
+        let without = temp_home("codex-flag-none");
+        assert_eq!(
+            run_skills(&["skills", "install", "--codex"], &without, "", false).0,
+            0
+        );
+        assert!(!without.join(".codex").exists());
     }
 
     #[test]
