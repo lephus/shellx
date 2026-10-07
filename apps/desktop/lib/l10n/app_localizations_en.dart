@@ -1691,4 +1691,275 @@ class AppLocalizationsEn extends AppLocalizations {
   String configWriteFailed(String path) {
     return 'Couldn\'t save the shortcut to $path';
   }
+
+  @override
+  String get sshConnectMenu => 'Connect over SSH…';
+
+  @override
+  String get tmuxAttachMenu => 'Attach tmux session…';
+
+  @override
+  String get sshDialogTitle => 'Connect to a server';
+
+  @override
+  String get sshDialogTabSsh => 'SSH';
+
+  @override
+  String get sshDialogTabTmux => 'tmux';
+
+  @override
+  String get sshHostLabel => 'Server';
+
+  @override
+  String get sshHostHint => 'devbox or user@host:2222';
+
+  @override
+  String get sshHostInvalid => 'Not a valid server name';
+
+  @override
+  String get sshSuggestionsConfig => 'In ~/.ssh/config';
+
+  @override
+  String get sshSuggestionsRecent => 'Recent';
+
+  @override
+  String sshSuggestionsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count suggestions',
+      one: '1 suggestion',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sshRemoteDirLabel => 'Folder on the server (optional)';
+
+  @override
+  String get sshRemoteDirInvalid => 'The path must start with / or ~';
+
+  @override
+  String get sshNoHookLabel => 'Don’t install the ShellX hook on this server';
+
+  @override
+  String get sshNoHookHelp =>
+      'The hook tells ShellX the folder, branch and ports on the server. Turn it off for servers that aren’t Unix.';
+
+  @override
+  String get sshConnectAction => 'Connect';
+
+  @override
+  String get sshUnavailable => 'Can’t find the ssh command on this computer';
+
+  @override
+  String get sshUnavailableWindows =>
+      'Can’t find ssh. Turn on “OpenSSH Client” in Settings → Apps → Optional features.';
+
+  @override
+  String get tmuxSourceLabel => 'tmux sessions on';
+
+  @override
+  String get tmuxSourceLocal => 'This computer';
+
+  @override
+  String get tmuxLoading => 'Loading sessions…';
+
+  @override
+  String get tmuxEmpty => 'No tmux sessions yet';
+
+  @override
+  String tmuxUnavailable(String where) {
+    return 'tmux isn’t installed on $where';
+  }
+
+  @override
+  String tmuxListFailed(String where) {
+    return 'Couldn’t list sessions on $where. Connect to it over SSH once (so no password is needed), then try again.';
+  }
+
+  @override
+  String get tmuxRetry => 'Try again';
+
+  @override
+  String tmuxWindows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count windows',
+      one: '1 window',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tmuxAttachedElsewhere => 'attached elsewhere';
+
+  @override
+  String tmuxLastActive(String time) {
+    return 'active $time';
+  }
+
+  @override
+  String get tmuxAttachAction => 'Attach';
+
+  @override
+  String get tmuxNewLabel => 'New session name';
+
+  @override
+  String get tmuxNameInvalid => 'Use up to 64 characters, without “:” or “.”';
+
+  @override
+  String get tmuxCreateAction => 'Create and attach';
+
+  @override
+  String sidebarRemoteMark(String host) {
+    return 'SSH: $host';
+  }
+
+  @override
+  String sidebarTmuxMark(String name) {
+    return 'tmux: $name';
+  }
+
+  @override
+  String sidebarTmuxRemoteMark(String name, String host) {
+    return 'tmux: $name · $host';
+  }
+
+  @override
+  String sshStateConnecting(String host) {
+    return 'Connecting to $host';
+  }
+
+  @override
+  String sshStateDisconnected(String host) {
+    return 'Lost connection to $host';
+  }
+
+  @override
+  String sshStateFailed(String host) {
+    return 'Couldn’t connect to $host';
+  }
+
+  @override
+  String sshRetryIn(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: 'Retrying in $seconds seconds',
+      one: 'Retrying in 1 second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sshRetrying => 'Reconnecting…';
+
+  @override
+  String get sshAutoRetryStopped => 'Stopped retrying';
+
+  @override
+  String get sshFailedHookHint => 'The server may not support the ShellX hook';
+
+  @override
+  String get sshReconnectAction => 'Reconnect';
+
+  @override
+  String get sshRetryAction => 'Try again';
+
+  @override
+  String get sshRetryPlainAction => 'Try without the hook';
+
+  @override
+  String get sshClosePaneAction => 'Close pane';
+
+  @override
+  String get sshTmuxHint =>
+      'Run inside tmux to keep programs running when the connection drops';
+
+  @override
+  String sshDisconnectedLine(String host) {
+    return '[Lost connection to $host] — press Enter to reconnect';
+  }
+
+  @override
+  String sshFailedLine(String host) {
+    return '[Couldn’t connect to $host] — press Enter to try again';
+  }
+
+  @override
+  String sshReconnectedDivider(String time) {
+    return '— Reconnected · $time —';
+  }
+
+  @override
+  String workspaceNewRemoteTab(String host) {
+    return 'New SSH tab on $host';
+  }
+
+  @override
+  String get workspaceNewLocalTab => 'New local tab';
+
+  @override
+  String get workspaceReconnectAll => 'Reconnect all panes';
+
+  @override
+  String workspaceRemoteLabel(String host) {
+    return 'SSH workspace $host';
+  }
+
+  @override
+  String get rowReconnect => 'Reconnect';
+
+  @override
+  String get paneSplitLocalRight => 'Split right on this computer';
+
+  @override
+  String remotePortTooltip(int port, String host) {
+    return 'Open port $port on $host (forwarded over SSH)';
+  }
+
+  @override
+  String remotePortForwarded(int local, String host, int port) {
+    return 'localhost:$local → $host:$port';
+  }
+
+  @override
+  String remotePortForwardFailed(int port) {
+    return 'Couldn’t forward port $port';
+  }
+
+  @override
+  String get sshTrayMenu => 'SSH';
+
+  @override
+  String get sshTrayHook =>
+      'Install the ShellX hook on servers (folder, branch, ports)';
+
+  @override
+  String get sshTrayClearRecent => 'Clear recent servers';
+
+  @override
+  String get sshRecentCleared => 'Recent servers cleared';
+
+  @override
+  String sshAnnounceConnected(String host) {
+    return 'Connected to $host';
+  }
+
+  @override
+  String sshAnnounceDisconnected(String host) {
+    return 'Lost connection to $host';
+  }
+
+  @override
+  String sshAnnounceReconnected(String host) {
+    return 'Reconnected to $host';
+  }
+
+  @override
+  String paneRemoteSuffix(String host) {
+    return ', on $host';
+  }
 }

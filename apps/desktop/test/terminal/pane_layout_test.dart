@@ -171,4 +171,33 @@ void main() {
       });
     });
   });
+
+  test('replaceLeaf swaps one leaf, keeps shape and ratios (A8 D22)', () {
+    const tree = PaneSplit(
+      axis: SplitAxis.row,
+      ratio: 0.3,
+      first: PaneLeaf(1),
+      second: PaneSplit(
+        axis: SplitAxis.column,
+        ratio: 0.6,
+        first: PaneLeaf(2),
+        second: PaneLeaf(3),
+      ),
+    );
+    expect(
+      replaceLeaf(tree, 2, 9),
+      const PaneSplit(
+        axis: SplitAxis.row,
+        ratio: 0.3,
+        first: PaneLeaf(1),
+        second: PaneSplit(
+          axis: SplitAxis.column,
+          ratio: 0.6,
+          first: PaneLeaf(9),
+          second: PaneLeaf(3),
+        ),
+      ),
+    );
+    expect(replaceLeaf(tree, 7, 9), tree);
+  });
 }

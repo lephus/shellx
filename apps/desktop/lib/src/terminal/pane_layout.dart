@@ -116,6 +116,15 @@ PaneNode? removePane(PaneNode node, int id) => switch (node) {
   ),
 };
 
+/// A8 D22: [node] with leaf [from] now holding [to]; unchanged when absent.
+PaneNode replaceLeaf(PaneNode node, int from, int to) => switch (node) {
+  PaneLeaf(:final sessionId) => sessionId == from ? PaneLeaf(to) : node,
+  final PaneSplit s => s.copyWith(
+    first: replaceLeaf(s.first, from, to),
+    second: replaceLeaf(s.second, from, to),
+  ),
+};
+
 PaneNode? _rejoin(PaneSplit s, PaneNode? first, PaneNode? second) {
   if (first == null) return second;
   if (second == null) return first;

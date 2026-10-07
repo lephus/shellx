@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -655,6 +657,14 @@ class _NoticeToastState extends State<NoticeToast> {
       hint.line,
     ),
     CliPathRemoveFailedNotice(:final path) => l10n.cliPathRemoveFailed(path),
+    SshUnavailableNotice() =>
+      defaultTargetPlatform == TargetPlatform.windows
+          ? l10n.sshUnavailableWindows
+          : l10n.sshUnavailable,
+    TmuxUnavailableNotice() => l10n.tmuxUnavailable(l10n.tmuxSourceLocal),
+    RemotePortForwardFailedNotice(:final port) => l10n.remotePortForwardFailed(
+      port,
+    ),
   };
 
   @override

@@ -13,6 +13,7 @@ import 'package:xterm/xterm.dart';
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;
+import '../remote/remote_state.dart';
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
@@ -24,6 +25,7 @@ import 'terminal_style.dart';
 
 part 'terminal_tabs_config.dart';
 part 'terminal_tabs_panes.dart';
+part 'terminal_tabs_remote.dart';
 part 'terminal_tabs_restore.dart';
 
 enum SpawnFailure { notFound, denied, other }
@@ -191,6 +193,8 @@ final class PaneSession {
     this.gitBranch,
     this.ports = const [],
     this.exitCode,
+    this.remote,
+    this.everConnected = false,
   });
 
   final int id;
@@ -214,7 +218,25 @@ final class PaneSession {
   /// Non-null once the shell exited with a non-zero code (D14).
   final int? exitCode;
 
+  /// A8: the session's remote launch and state; null for a local shell.
+  final SessionRemote? remote;
+
+  /// A8 D17: this pane reached its server at least once (kept across
+  /// reconnects, so a retry that fails is "disconnected", not "failed").
+  final bool everConnected;
+
   bool get exited => exitCode != null;
+
+  RemoteState? get remoteState => remoteStateOf(
+    remote: remote,
+    exitCode: exitCode,
+    everConnected: everConnected,
+  );
+
+  bool get canReconnect => switch (remoteState) {
+    RemoteState.disconnected || RemoteState.failed => true,
+    _ => false,
+  };
 
   /// OSC 0/2 title, else `<shell> <index>` (D13, UI §5 terminalDefaultTitle).
   String get automaticLabel => title.isNotEmpty ? title : '$shell $index';
@@ -231,6 +253,8 @@ final class PaneSession {
     Object? cwd = _unset,
     Object? gitBranch = _unset,
     List<int>? ports,
+    Object? remote = _unset,
+    bool? everConnected,
   }) => PaneSession(
     id: id,
     index: index,
@@ -248,6 +272,8 @@ final class PaneSession {
         : gitBranch as String?,
     ports: ports ?? this.ports,
     exitCode: exitCode ?? this.exitCode,
+    remote: identical(remote, _unset) ? this.remote : remote as SessionRemote?,
+    everConnected: everConnected ?? this.everConnected,
   );
 }
 
@@ -499,6 +525,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   PaneMetrics? _metrics;
 
   /// A9 D19: read at key time; a lazy field, as `build()` can run again.
+  /// A8 D22: pane replacements and their forwarding table.
+  final _remote = _RemoteBook();
+
   late final TerminalInputHandler _inputHandler = desktopInputHandlerWith(
     () => ref.mounted
         ? ref.read(shellxConfigProvider).config.optionAsAlt
@@ -516,17 +545,20 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   void reportGrid(TerminalGrid grid) => _grid = grid;
 
-  /// ⌘T, `+`: a selected tab; a failure is a toast.
-  Future<void> openTab() async {
+  /// ⌘T, `+`: a selected tab; a failure is a toast. With [launch] (A8) it
+  /// opens that SSH or tmux session, never a local folder.
+  Future<void> openTab({SessionLaunch? launch}) async {
     if (state.opening) return;
     try {
-      await openTabFor(cwd: newTabCwd(), select: true);
+      await openTabFor(
+        cwd: launch == null ? newTabCwd() : null,
+        launch: launch,
+        select: true,
+      );
     } on SessionLimitException catch (error) {
       if (ref.mounted) _set(notice: SessionLimitNotice(error.max));
     } on SpawnFailedException catch (error) {
-      if (ref.mounted) {
-        _set(notice: SpawnFailedNotice(spawnFailureOf(error.message)));
-      }
+      if (ref.mounted) _set(notice: spawnNoticeFor(error));
     } on PaneGoneException {
       // The new shell is already gone: the selection that exists stays.
     }
@@ -542,10 +574,16 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// [PaneGoneException] when the shell ended before it could be placed.
   Future<int> openTabFor({
     String? cwd,
+    SessionLaunch? launch,
     bool select = false,
     String? workspace,
   }) => _guardedOpen(
-    () => _local.open(cols: _grid.cols, rows: _grid.rows, cwd: cwd),
+    () => _local.open(
+      cols: _grid.cols,
+      rows: _grid.rows,
+      cwd: launch == null ? cwd : null,
+      launch: launch,
+    ),
     (id) {
       final placement = ref.read(restorePlacementProvider);
       // Before the tab appears: the sidebar takes it as it places the tab.
@@ -741,6 +779,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
             cwd: s.cwd,
             gitBranch: s.gitBranch,
             ports: s.ports,
+            remote: s.remote,
+            everConnected: p.everConnected || (s.remote?.connected ?? false),
           ),
         );
       }
@@ -759,18 +799,27 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     return next;
   }
 
-  PaneSession? _attach(SessionSummary s, {TerminalGrid? size}) {
+  /// [reuse]: the terminal of a pane that reconnects (A8 D22), which keeps
+  /// its text and size; [preface] is written into it before the backlog.
+  PaneSession? _attach(
+    SessionSummary s, {
+    TerminalGrid? size,
+    DesktopTerminal? reuse,
+    String? preface,
+  }) {
     final LocalSessionView view;
     try {
       view = _local.view(s.id);
     } on StateError {
       return null; // Ended between the listing and now.
     }
-    final terminal = DesktopTerminal(
-      platform: _platform(),
-      maxLines: ref.read(shellxConfigProvider).config.scrollbackLimit,
-      inputHandler: _inputHandler,
-    );
+    final terminal =
+        reuse ??
+        DesktopTerminal(
+          platform: _platform(),
+          maxLines: ref.read(shellxConfigProvider).config.scrollbackLimit,
+          inputHandler: _inputHandler,
+        );
     // A pane output event (A5a D4, A7 waits) fires once the text is in the
     // terminal; what [_attach] writes itself (saved text, backlog) is not
     // output.
@@ -784,11 +833,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     // Size first, without telling the session: the backlog is laid out at
     // the pane's width, and a phone keeps driving until the user acts.
     final grid = size ?? _grid;
-    terminal.resize(grid.cols, grid.rows);
+    if (reuse == null) terminal.resize(grid.cols, grid.rows);
     // A5a D8: the saved text sits above everything the new shell prints,
     // in this terminal only — never the PTY, never a phone.
     final restored = _restoreText.remove(s.id);
     if (restored != null) feed.add(utf8.encode(restored));
+    if (preface != null) feed.add(utf8.encode(preface));
     feed.add(view.backlog);
     feed.drain();
     live = true;
@@ -831,6 +881,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       cwd: s.cwd,
       gitBranch: s.gitBranch,
       ports: s.ports,
+      remote: s.remote,
+      everConnected: s.remote?.connected ?? false,
     );
   }
 
@@ -838,8 +890,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final pane = state.tabOfSession(id)?.panes[id];
     if (pane == null) return;
     if (pane.exited) {
-      // UI §2.6: Enter closes an exited pane (D7); other keys are ignored.
-      if (data.contains('\r')) _removePane(id);
+      // UI §2.6: Enter closes an exited pane (D7), or reconnects a lost
+      // one (UI-A8 §3.2); other keys are ignored.
+      if (data.contains('\r')) {
+        if (pane.canReconnect) {
+          unawaited(reconnect(id));
+        } else {
+          _removePane(id);
+        }
+      }
       return;
     }
     _links[id]?.view.write(utf8.encode(data));
@@ -856,6 +915,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     }
     link.feed.drain();
     final terminal = link.terminal;
+    if (_writeLostLine(id, code, terminal)) return;
     final line = ref.read(appL10nProvider).terminalExitedLine(code);
     final at = line.indexOf('$code');
     final newline = terminal.buffer.cursorX == 0 ? '' : '\r\n';
@@ -1038,7 +1098,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       } on Object {
         alive = false;
       }
-      if (!alive) unawaited(_paneOutputs.close());
+      if (!alive) {
+        unawaited(_paneOutputs.close());
+        unawaited(_remote.close());
+      }
     });
   }
 }

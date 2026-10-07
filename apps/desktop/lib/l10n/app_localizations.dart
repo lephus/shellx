@@ -2471,6 +2471,408 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save the shortcut to {path}'**
   String configWriteFailed(String path);
+
+  /// No description provided for @sshConnectMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect over SSH…'**
+  String get sshConnectMenu;
+
+  /// No description provided for @tmuxAttachMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach tmux session…'**
+  String get tmuxAttachMenu;
+
+  /// No description provided for @sshDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to a server'**
+  String get sshDialogTitle;
+
+  /// No description provided for @sshDialogTabSsh.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH'**
+  String get sshDialogTabSsh;
+
+  /// No description provided for @sshDialogTabTmux.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux'**
+  String get sshDialogTabTmux;
+
+  /// No description provided for @sshHostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get sshHostLabel;
+
+  /// No description provided for @sshHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'devbox or user@host:2222'**
+  String get sshHostHint;
+
+  /// No description provided for @sshHostInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a valid server name'**
+  String get sshHostInvalid;
+
+  /// No description provided for @sshSuggestionsConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'In ~/.ssh/config'**
+  String get sshSuggestionsConfig;
+
+  /// No description provided for @sshSuggestionsRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get sshSuggestionsRecent;
+
+  /// No description provided for @sshSuggestionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 suggestion} other{{count} suggestions}}'**
+  String sshSuggestionsCount(int count);
+
+  /// No description provided for @sshRemoteDirLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder on the server (optional)'**
+  String get sshRemoteDirLabel;
+
+  /// No description provided for @sshRemoteDirInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The path must start with / or ~'**
+  String get sshRemoteDirInvalid;
+
+  /// No description provided for @sshNoHookLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t install the ShellX hook on this server'**
+  String get sshNoHookLabel;
+
+  /// No description provided for @sshNoHookHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The hook tells ShellX the folder, branch and ports on the server. Turn it off for servers that aren’t Unix.'**
+  String get sshNoHookHelp;
+
+  /// No description provided for @sshConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get sshConnectAction;
+
+  /// No description provided for @sshUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find the ssh command on this computer'**
+  String get sshUnavailable;
+
+  /// No description provided for @sshUnavailableWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find ssh. Turn on “OpenSSH Client” in Settings → Apps → Optional features.'**
+  String get sshUnavailableWindows;
+
+  /// No description provided for @tmuxSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux sessions on'**
+  String get tmuxSourceLabel;
+
+  /// No description provided for @tmuxSourceLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'This computer'**
+  String get tmuxSourceLocal;
+
+  /// No description provided for @tmuxLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading sessions…'**
+  String get tmuxLoading;
+
+  /// No description provided for @tmuxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No tmux sessions yet'**
+  String get tmuxEmpty;
+
+  /// No description provided for @tmuxUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux isn’t installed on {where}'**
+  String tmuxUnavailable(String where);
+
+  /// No description provided for @tmuxListFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t list sessions on {where}. Connect to it over SSH once (so no password is needed), then try again.'**
+  String tmuxListFailed(String where);
+
+  /// No description provided for @tmuxRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get tmuxRetry;
+
+  /// No description provided for @tmuxWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 window} other{{count} windows}}'**
+  String tmuxWindows(int count);
+
+  /// No description provided for @tmuxAttachedElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'attached elsewhere'**
+  String get tmuxAttachedElsewhere;
+
+  /// No description provided for @tmuxLastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'active {time}'**
+  String tmuxLastActive(String time);
+
+  /// No description provided for @tmuxAttachAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach'**
+  String get tmuxAttachAction;
+
+  /// No description provided for @tmuxNewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New session name'**
+  String get tmuxNewLabel;
+
+  /// No description provided for @tmuxNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use up to 64 characters, without “:” or “.”'**
+  String get tmuxNameInvalid;
+
+  /// No description provided for @tmuxCreateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and attach'**
+  String get tmuxCreateAction;
+
+  /// No description provided for @sidebarRemoteMark.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH: {host}'**
+  String sidebarRemoteMark(String host);
+
+  /// No description provided for @sidebarTmuxMark.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux: {name}'**
+  String sidebarTmuxMark(String name);
+
+  /// No description provided for @sidebarTmuxRemoteMark.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux: {name} · {host}'**
+  String sidebarTmuxRemoteMark(String name, String host);
+
+  /// No description provided for @sshStateConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {host}'**
+  String sshStateConnecting(String host);
+
+  /// No description provided for @sshStateDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost connection to {host}'**
+  String sshStateDisconnected(String host);
+
+  /// No description provided for @sshStateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t connect to {host}'**
+  String sshStateFailed(String host);
+
+  /// No description provided for @sshRetryIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, =1{Retrying in 1 second} other{Retrying in {seconds} seconds}}'**
+  String sshRetryIn(int seconds);
+
+  /// No description provided for @sshRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting…'**
+  String get sshRetrying;
+
+  /// No description provided for @sshAutoRetryStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped retrying'**
+  String get sshAutoRetryStopped;
+
+  /// No description provided for @sshFailedHookHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The server may not support the ShellX hook'**
+  String get sshFailedHookHint;
+
+  /// No description provided for @sshReconnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get sshReconnectAction;
+
+  /// No description provided for @sshRetryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get sshRetryAction;
+
+  /// No description provided for @sshRetryPlainAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try without the hook'**
+  String get sshRetryPlainAction;
+
+  /// No description provided for @sshClosePaneAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane'**
+  String get sshClosePaneAction;
+
+  /// No description provided for @sshTmuxHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Run inside tmux to keep programs running when the connection drops'**
+  String get sshTmuxHint;
+
+  /// No description provided for @sshDisconnectedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'[Lost connection to {host}] — press Enter to reconnect'**
+  String sshDisconnectedLine(String host);
+
+  /// No description provided for @sshFailedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'[Couldn’t connect to {host}] — press Enter to try again'**
+  String sshFailedLine(String host);
+
+  /// No description provided for @sshReconnectedDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'— Reconnected · {time} —'**
+  String sshReconnectedDivider(String time);
+
+  /// No description provided for @workspaceNewRemoteTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New SSH tab on {host}'**
+  String workspaceNewRemoteTab(String host);
+
+  /// No description provided for @workspaceNewLocalTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New local tab'**
+  String get workspaceNewLocalTab;
+
+  /// No description provided for @workspaceReconnectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect all panes'**
+  String get workspaceReconnectAll;
+
+  /// No description provided for @workspaceRemoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH workspace {host}'**
+  String workspaceRemoteLabel(String host);
+
+  /// No description provided for @rowReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get rowReconnect;
+
+  /// No description provided for @paneSplitLocalRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Split right on this computer'**
+  String get paneSplitLocalRight;
+
+  /// No description provided for @remotePortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open port {port} on {host} (forwarded over SSH)'**
+  String remotePortTooltip(int port, String host);
+
+  /// No description provided for @remotePortForwarded.
+  ///
+  /// In en, this message translates to:
+  /// **'localhost:{local} → {host}:{port}'**
+  String remotePortForwarded(int local, String host, int port);
+
+  /// No description provided for @remotePortForwardFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t forward port {port}'**
+  String remotePortForwardFailed(int port);
+
+  /// No description provided for @sshTrayMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH'**
+  String get sshTrayMenu;
+
+  /// No description provided for @sshTrayHook.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the ShellX hook on servers (folder, branch, ports)'**
+  String get sshTrayHook;
+
+  /// No description provided for @sshTrayClearRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear recent servers'**
+  String get sshTrayClearRecent;
+
+  /// No description provided for @sshRecentCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent servers cleared'**
+  String get sshRecentCleared;
+
+  /// No description provided for @sshAnnounceConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to {host}'**
+  String sshAnnounceConnected(String host);
+
+  /// No description provided for @sshAnnounceDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost connection to {host}'**
+  String sshAnnounceDisconnected(String host);
+
+  /// No description provided for @sshAnnounceReconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnected to {host}'**
+  String sshAnnounceReconnected(String host);
+
+  /// No description provided for @paneRemoteSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **', on {host}'**
+  String paneRemoteSuffix(String host);
 }
 
 class _AppLocalizationsDelegate

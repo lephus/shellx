@@ -43,7 +43,11 @@ extension TerminalTabsConfig on TerminalTabs {
     return switch (wd.kind) {
       WorkingDirectoryKind.home => null,
       WorkingDirectoryKind.path => wd.path,
-      WorkingDirectoryKind.inherit => _state.selected?.focused.cwd,
+      // A8: a folder on a server means nothing on this computer.
+      WorkingDirectoryKind.inherit =>
+        _state.selected?.focused.remote?.launch.host != null
+            ? null
+            : _state.selected?.focused.cwd,
     };
   }
 }
