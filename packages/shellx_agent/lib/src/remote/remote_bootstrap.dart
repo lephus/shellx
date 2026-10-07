@@ -94,11 +94,9 @@ String _fnv64Hex(String text) {
     hash ^= byte;
     hash *= 0x100000001b3; // wraps at 64 bits on the VM
   }
-  return hash
-      .toUnsigned(64)
-      .toRadixString(16)
-      .padLeft(16, '0')
-      .substring(0, 12);
+  return BigInt.from(
+    hash,
+  ).toUnsigned(64).toRadixString(16).padLeft(16, '0').substring(0, 12);
 }
 
 final class RemoteBootstrap {
