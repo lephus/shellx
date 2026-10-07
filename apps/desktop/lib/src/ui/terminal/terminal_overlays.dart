@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
+import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'shortcut_labels.dart';
@@ -650,6 +651,7 @@ class _NoticeToastState extends State<NoticeToast> {
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
+    DaemonQuitFailedNotice() => l10n.daemonQuitFailed,
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
     CliPathInstalledNotice() => l10n.cliPathInstalled,
     CliPathFailedNotice(:final path) => l10n.cliPathFailed(path),
@@ -813,6 +815,8 @@ class EmptyTerminalState extends ConsumerWidget {
     ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final shortcut = newTabShortcutLabel();
     final l10n = AppLocalizations.of(context);
+    // A5b UI-A5 §7.4: no service yet, so nothing to open a tab in.
+    final waiting = ref.watch(daemonStateProvider.select((s) => s.waiting));
     return Center(
       key: const Key('pane.empty'),
       child: SingleChildScrollView(
@@ -844,21 +848,23 @@ class EmptyTerminalState extends ConsumerWidget {
               ),
               const SizedBox(height: ShellxSpace.s6),
               Text(
-                l10n.terminalEmptyBody,
+                waiting ? l10n.daemonUnavailableEmpty : l10n.terminalEmptyBody,
                 textAlign: TextAlign.center,
                 style: ShellxText.body.copyWith(
                   color: ShellxDesktopColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: ShellxSpace.s16),
-              ShellxPrimaryButton(
-                key: const Key('pane.empty.open'),
-                label: l10n.terminalEmptyAction,
-                onPressed: onOpen,
-                focusNode: buttonFocus,
-              ),
+              if (!waiting) ...[
+                const SizedBox(height: ShellxSpace.s16),
+                ShellxPrimaryButton(
+                  key: const Key('pane.empty.open'),
+                  label: l10n.terminalEmptyAction,
+                  onPressed: onOpen,
+                  focusNode: buttonFocus,
+                ),
+              ],
               const SizedBox(height: ShellxSpace.s8),
-              if (shortcut != null)
+              if (shortcut != null && !waiting)
                 ExcludeSemantics(
                   child: Text(
                     shortcut,

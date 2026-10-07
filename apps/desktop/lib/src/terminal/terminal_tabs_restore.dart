@@ -10,12 +10,26 @@ final class RestorePanesFailedNotice extends TabNotice {
   final int count;
 }
 
+/// A5b: "Thoát hoàn toàn" could not stop the background service; the
+/// window stays open (UI-A5 §7.2 follow-up).
+final class DaemonQuitFailedNotice extends TabNotice {
+  const DaemonQuitFailedNotice();
+}
+
 /// What restore needs: the checked snapshot and, per pane key, the saved
 /// text already followed by its divider (A5a D8).
 final class RestorePlan {
-  const RestorePlan({required this.snapshot, required this.textByKey});
+  const RestorePlan({
+    required this.snapshot,
+    required this.textByKey,
+    this.reattach = false,
+  });
   final RestoreSnapshot snapshot;
   final Map<String, String> textByKey;
+
+  /// A5b D14: the shells are alive in the background service the snapshot
+  /// was saved against: lay the tree over them, open nothing, no text.
+  final bool reattach;
 }
 
 final class RestoreOutcome {
@@ -77,6 +91,7 @@ extension _Restore on TerminalTabs {
     try {
       final plan = await pending;
       if (plan == null) return RestoreOutcome.none;
+      if (plan.reattach) return _layOver(plan.snapshot, local);
       final snapshot = plan.snapshot;
       final workspaceOf = {
         for (final w in snapshot.workspaces)
@@ -165,6 +180,79 @@ extension _Restore on TerminalTabs {
       _restoring = null;
       done.complete();
     }
+    return RestoreOutcome(
+      keyBySession: keyBySession,
+      tabIdByKey: tabIdByKey,
+      panesFailed: failed,
+    );
+  }
+
+  /// A5b D14: the saved tabs over the sessions that are alive (their panes
+  /// are the ones [TerminalTabs.build] attached already, with their
+  /// terminals and backlog). Panes whose session is gone are dropped; a
+  /// remote pane that is not connected is still a live session, so it
+  /// stays (A8). Sessions the snapshot never had keep the tab they got.
+  RestoreOutcome _layOver(RestoreSnapshot snapshot, LocalSessions local) {
+    final alive = <int, PaneSession>{
+      for (final tab in _state.tabs) ...tab.panes,
+    };
+    final keyBySession = <int, String>{};
+    final tabIdByKey = <String, int>{};
+    final claimed = <int>{};
+    final tabs = <TerminalTab>[];
+    var failed = 0;
+    for (final saved in _restoreOrder(snapshot)) {
+      final sessionByKey = <String, int>{};
+      for (final pane in savedLeaves(saved.layout)) {
+        final id = pane.session;
+        if (id == null || !alive.containsKey(id) || !claimed.add(id)) {
+          failed++;
+          continue;
+        }
+        sessionByKey[pane.key] = id;
+        keyBySession[id] = pane.key;
+      }
+      final layout = buildLayout(saved.layout, sessionByKey);
+      if (layout == null) continue;
+      final order = paneIds(layout);
+      final creator = sessionByKey[saved.key];
+      final focused = sessionByKey[saved.focused];
+      final zoomed = sessionByKey[saved.zoomed];
+      final focus = order.contains(focused) ? focused! : order.first;
+      final tab = TerminalTab(
+        id: order.contains(creator) ? creator! : order.first,
+        origin: SessionOrigin.desktop,
+        layout: layout,
+        panes: {for (final id in order) id: alive[id]!},
+        focusedPaneId: focus,
+        zoomedPaneId: order.length > 1 && order.contains(zoomed)
+            ? zoomed
+            : null,
+        paneHistory: [focus, ...order.where((id) => id != focus)],
+        customTitle: saved.name,
+      );
+      tabIdByKey[saved.key] = tab.id;
+      tabs.add(tab);
+    }
+    // Tabs nobody claimed (sessions opened while the window was away, by a
+    // phone or the command line) stay as the one-pane tabs they are.
+    // A live tab a saved tab only partly claimed keeps its other panes, one
+    // single-pane tab each (as [_merge] makes them): none is hidden.
+    final rest = <TerminalTab>[
+      for (final tab in _state.tabs)
+        if (!tab.panes.keys.any(claimed.contains))
+          tab
+        else
+          for (final pane in tab.panes.values)
+            if (!claimed.contains(pane.id)) TerminalTab.single(pane),
+    ];
+    final selected = snapshot.selectedTab == null
+        ? null
+        : tabIdByKey[snapshot.selectedTab];
+    _set(
+      tabs: [...tabs, ...rest],
+      selectedId: selected ?? tabs.firstOrNull?.id ?? _state.selectedId,
+    );
     return RestoreOutcome(
       keyBySession: keyBySession,
       tabIdByKey: tabIdByKey,

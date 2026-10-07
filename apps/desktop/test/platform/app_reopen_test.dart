@@ -159,4 +159,60 @@ void main() {
   test('the channel name matches AppDelegate.swift', () {
     expect(appChannel.name, 'pro.shellx.desktop/app');
   });
+
+  test('quitAllRequested (the app menu item, ⌥⌘Q) reaches its handler; '
+      'without one it is answered', () async {
+    var all = 0;
+    listenForAppChannel(
+      onReopen: () {},
+      onQuitRequested: () {},
+      onQuitAllRequested: () => all++,
+    );
+    await send('quitAllRequested');
+    expect(all, 1);
+    listenForAppChannel(onReopen: () {}, onQuitRequested: () {});
+    await send('quitAllRequested');
+  });
+
+  test(
+    'setQuitAllTitle sends the localised menu title once, to the app',
+    () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(appChannel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      await setQuitAllTitle('Thoát hoàn toàn');
+      expect(calls.single.method, 'setQuitAllTitle');
+      expect(calls.single.arguments, 'Thoát hoàn toàn');
+    },
+  );
+
+  test('AppDelegate.swift: ⌥⌘Q "Quit Completely" follows Quit in the app '
+      'menu, UI only, and goes to Dart', () {
+    final swift = File('macos/Runner/AppDelegate.swift').readAsStringSync();
+    expect(swift, contains('setQuitAllTitle'));
+    expect(swift, contains('.command, .option'));
+    expect(swift, contains('quitAllRequested'));
+    expect(swift, contains('#selector(NSApplication.terminate(_:))'));
+  });
+
+  test('AppDelegate.swift: the headless service declines a Dock or Apple Event '
+      'quit (shells survive); only a power-off ends it', () {
+    final swift = File('macos/Runner/AppDelegate.swift').readAsStringSync();
+    expect(
+      swift,
+      contains(
+        'if isDaemon { return (quitIsForPowerOff || poweringOff) ? .terminateNow : .terminateCancel }',
+      ),
+    );
+    final launch = swift.substring(
+      swift.indexOf('override func applicationDidFinishLaunching'),
+      swift.indexOf('@objc private func willPowerOff'),
+    );
+    final observer = launch.indexOf('willPowerOffNotification');
+    final daemonBranch = launch.indexOf('if isDaemon {');
+    expect(observer, greaterThanOrEqualTo(0));
+    expect(observer, lessThan(daemonBranch));
+  });
 }

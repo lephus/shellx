@@ -349,6 +349,29 @@ void main() {
     await host.stop();
   });
 
+  test('onClientsChanged fires when a cli client joins and leaves', () async {
+    final host = CliHost.adopted(
+      ui: FakeUiApi(),
+      enabled: () => true,
+      token: 'tok',
+      allowExternal: () => false,
+      appVersion: '1.6.0',
+      hostKind: () => 'daemon',
+      uiAttached: () => server.uiAttached,
+    );
+    final counts = <int>[];
+    host.onClientsChanged = () => counts.add(host.clientCount);
+    build();
+    server.cli = host;
+    final c = await attach(listener, role: 'cli', token: 'tok');
+    await request(c, req(CliType.apiVersion));
+    expect(counts, [1]);
+    await c.close();
+    await pumpEventQueue();
+    expect(counts, [1, 0]);
+    await host.stop();
+  });
+
   test('ui.* from a cli client goes to the attached ui and back; '
       'no ui is not_found', () async {
     final host = CliHost.adopted(
@@ -451,6 +474,31 @@ void main() {
     await pumpEventQueue();
     expect(quitCalls, 1);
     expect(answered, isFalse);
+    quitGate.complete();
+    expect((await quit).type, MuxType.result);
+  });
+
+  test('once quit starts nobody new attaches, the caller still gets its '
+      'result', () async {
+    quitGate = Completer<void>();
+    build();
+    final c = await attach(listener);
+    final quit = request(c, req(MuxType.daemonQuit));
+    await pumpEventQueue();
+    expect(quitCalls, 1);
+    // A second client during the shutdown: closed, never attached.
+    final (late, daemonSide) = MemoryMuxTransport.pair();
+    listener.push(daemonSide);
+    await expectLater(
+      clientHandshake(
+        late,
+        secret: secret,
+        app: '1.6.0',
+        role: 'ui',
+      ).timeout(const Duration(seconds: 1)),
+      throwsA(anything),
+    );
+    expect(server.uiAttached, isTrue); // only the quitting client's link
     quitGate.complete();
     expect((await quit).type, MuxType.result);
   });

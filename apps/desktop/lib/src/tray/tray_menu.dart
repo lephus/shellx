@@ -4,6 +4,7 @@ import 'package:tray_manager/tray_manager.dart';
 import '../../l10n/app_localizations.dart';
 import '../agent/agent_state.dart';
 import '../agent/notify_threshold.dart';
+import '../platform/settings_store.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import 'tray_action.dart';
 
@@ -54,6 +55,8 @@ final class TrayLocalState {
     this.configProblemCount = 0,
     this.sshHook = true,
     this.hasRecentServers = false,
+    this.backgroundService = SettingKeys.backgroundServiceDefault,
+    this.daemonMode = false,
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
@@ -70,6 +73,13 @@ final class TrayLocalState {
   final bool sshHook;
   final bool hasRecentServers;
 
+  /// A5b ruling: the stored "Giữ shell chạy khi đóng cửa sổ" switch.
+  final bool backgroundService;
+
+  /// This window is attached to the background service: "Thoát" leaves the
+  /// shells running and "Thoát hoàn toàn" is its own item (UI-A5 §6.2).
+  final bool daemonMode;
+
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
@@ -80,7 +90,9 @@ final class TrayLocalState {
       other.cliPathInstalled == cliPathInstalled &&
       other.configProblemCount == configProblemCount &&
       other.sshHook == sshHook &&
-      other.hasRecentServers == hasRecentServers;
+      other.hasRecentServers == hasRecentServers &&
+      other.backgroundService == backgroundService &&
+      other.daemonMode == daemonMode;
 
   @override
   int get hashCode => Object.hash(
@@ -92,6 +104,8 @@ final class TrayLocalState {
     configProblemCount,
     sshHook,
     hasRecentServers,
+    backgroundService,
+    daemonMode,
   );
 }
 
@@ -190,6 +204,12 @@ Menu buildTrayMenu(
       l10n.trayClearSavedScrollback,
       disabled: !local.hasSavedScrollback,
     ),
+    sep(),
+    check(
+      TrayKeys.backgroundService,
+      l10n.trayBackgroundService,
+      local.backgroundService,
+    ),
   ]);
 
   // A7 D26: right after "Thông báo" in both menus (A6's "Trình duyệt",
@@ -235,6 +255,14 @@ Menu buildTrayMenu(
     ],
   ]);
 
+  // UI-A5 §6.2: with the background service, two ends.
+  List<MenuItem> quitItems() => local.daemonMode
+      ? [
+          item(TrayKeys.quit, l10n.trayQuitUi),
+          item(TrayKeys.quitAll, l10n.trayQuitAll),
+        ]
+      : [item(TrayKeys.quit, l10n.trayQuit)];
+
   if (!state.signedIn) {
     return Menu(
       items: [
@@ -250,7 +278,7 @@ Menu buildTrayMenu(
         item(TrayKeys.status, '○ ${l10n.trayStatusSignedOut}', disabled: true),
         sep(),
         item(TrayKeys.signIn, l10n.traySignIn),
-        item(TrayKeys.quit, l10n.trayQuit),
+        ...quitItems(),
       ],
     );
   }
@@ -357,7 +385,7 @@ Menu buildTrayMenu(
       config(),
       item(TrayKeys.changePassword, l10n.trayChangePassword),
       item(TrayKeys.signOut, l10n.traySignOut),
-      item(TrayKeys.quit, l10n.trayQuit),
+      ...quitItems(),
     ],
   );
 }

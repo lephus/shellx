@@ -9,12 +9,16 @@ import '../cli/cli_install.dart';
 import '../cli/cli_service.dart';
 import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
+import '../mux/daemon_state.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
+import '../platform/settings_store.dart'
+    show SettingKeys, backgroundServiceEnabled;
 import '../config/config_opener.dart' show openShellxConfig;
 import '../remote/ssh_actions.dart';
 import '../remote/ssh_settings.dart';
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
+import '../terminal/local_sessions_provider.dart' show localSessionsProvider;
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
 import '../ui/activation.dart';
@@ -41,6 +45,10 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     cliPathInstalled: cli.pathInstalled,
     sshHook: ref.watch(agentControllerProvider.select((s) => s.sshRemoteHook)),
     hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
+    daemonMode: ref.watch(daemonModeProvider),
+    backgroundService: backgroundServiceEnabled(
+      ref.read(settingsStoreProvider),
+    ),
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -188,6 +196,21 @@ final class TrayActions {
           // Failed or not, the menu shows what is stored.
           _ref.invalidate(trayLocalStateProvider);
         }
+      // A5b ruling: UI-owned, applies at the next launch (says so).
+      case ToggleBackgroundService():
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setBool(
+            SettingKeys.backgroundService,
+            !backgroundServiceEnabled(settings),
+          );
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        await _services.notifier.show(
+          title: 'ShellX',
+          body: l10n.backgroundServiceNextLaunch,
+        );
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
       // A7 D26, amendment: at once, without asking; the host rechecks.
@@ -244,6 +267,13 @@ final class TrayActions {
         _ref
             .read(configUiRequestProvider.notifier)
             .request(ConfigUiRequest.problems);
+      case Quit(:final confirm) when _ref.read(daemonModeProvider):
+        await _quitUi(confirm: confirm);
+      case QuitAll() when _ref.read(daemonModeProvider):
+        await _quitAll();
+      // Without the background service there is one way to quit.
+      case QuitAll():
+        await _dispatch(const Quit());
       case Quit(:final confirm):
         if (_quitting) return;
         if (confirm && state.sessions.isNotEmpty) {
@@ -295,6 +325,117 @@ final class TrayActions {
         }
         await _services.quitApp?.call();
     }
+  }
+
+  /// A5b D14, UI-A5 §6, §7.1: "Thoát" / ⌘Q ends the window only; the
+  /// shells and the phones' connection stay with the background service.
+  /// The first time, with sessions, it says so (once).
+  Future<void> _quitUi({required bool confirm}) async {
+    if (_quitting) return;
+    final l10n = _services.l10n;
+    final settings = _ref.read(settingsStoreProvider);
+    final count = _ref.read(localSessionsProvider).sessions.length;
+    if (confirm &&
+        count > 0 &&
+        !settings.getBool(
+          SettingKeys.quitKeepsSessionsExplained,
+          defaultValue: false,
+        )) {
+      final request = ConfirmRequest(
+        title: l10n.quitUiExplainedTitle,
+        body: _services.platform == DevicePlatform.windows
+            ? l10n.quitUiExplainedBodyWindows(count)
+            : l10n.quitUiExplainedBody(count),
+        confirmLabel: l10n.quitUiAction,
+        secondaryLabel: l10n.quitAllAction,
+        destructive: false,
+      );
+      final ok = await _router.confirm(request);
+      // Either button counts as read; Esc does not (UI-A5 §7.1).
+      if (ok || request.secondaryChosen) {
+        await settings.setBool(SettingKeys.quitKeepsSessionsExplained, true);
+      }
+      if (request.secondaryChosen) {
+        await _quitAll();
+        return;
+      }
+      if (!ok || _quitting) return;
+    }
+    await _finishQuit(stopService: false);
+  }
+
+  /// A5b D14, UI-A5 §7.2: every shell and the background service end. The
+  /// A1 question, with "Thoát hoàn toàn" on its button, when sessions run.
+  Future<void> _quitAll() async {
+    if (_quitting) return;
+    final l10n = _services.l10n;
+    final count = _ref.read(localSessionsProvider).sessions.length;
+    if (count > 0) {
+      final ok = await _router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmQuitTitle,
+          body: l10n.confirmQuitBody(count),
+          confirmLabel: l10n.confirmQuitAllAction,
+        ),
+      );
+      if (!ok || _quitting) return;
+    }
+    await _finishQuit(stopService: true);
+  }
+
+  /// The steps of a window quit with the background service, each bounded
+  /// so the window always exits: no reconnect, the last clean save (with
+  /// the service instance), this window's own forwards, then either the
+  /// service's `daemon.quit` or just the end of the connection.
+  Future<void> _finishQuit({required bool stopService}) async {
+    _quitting = true;
+    try {
+      _services.stopRemoteRetries?.call();
+    } catch (_) {}
+    final daemon = _ref.read(daemonStateProvider.notifier);
+    // From here a closing connection is not a lost service.
+    daemon.markQuitting();
+    await runBounded(
+      () => _ref.read(restorePersistenceProvider.notifier).flushForQuit(),
+      timeout: const Duration(seconds: 2),
+      label: 'saving the session layout',
+    );
+    // This window's forwards go before the service (which closes the ssh
+    // masters of "Thoát hoàn toàn") stops.
+    final remote = _services.shutdownRemote;
+    if (remote != null) {
+      await runBounded(
+        remote,
+        timeout: const Duration(seconds: 3),
+        label: 'closing ssh helpers',
+      );
+    }
+    if (stopService) {
+      var stopped = false;
+      try {
+        stopped = await daemon.quitDaemon();
+      } on Object catch (error) {
+        debugPrint('ShellX: stopping the service failed: ${error.runtimeType}');
+      }
+      if (!stopped) {
+        // The service is still there with its shells: stay, say so, and let
+        // the user try again (the connection is intact, nothing was lost).
+        _quitting = false;
+        daemon.markQuitting(false);
+        _ref.read(restorePersistenceProvider.notifier).cancelQuit();
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const DaemonQuitFailedNotice());
+        return;
+      }
+    } else {
+      await runBounded(
+        daemon.disconnect,
+        timeout: const Duration(seconds: 5),
+        label: 'disconnecting',
+      );
+    }
+    await _services.quitApp?.call();
   }
 
   /// The tray's "Đóng" on one session: the same rules as ⌘W (D15: asks

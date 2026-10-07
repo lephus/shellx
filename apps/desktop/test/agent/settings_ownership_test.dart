@@ -52,6 +52,7 @@ const _expectedUi = {
   'ssh_recent_targets',
   'ssh_plain_targets',
   'quit_keeps_sessions_explained',
+  'background_service_enabled',
 };
 
 final class _Listener implements MuxListener {
@@ -76,11 +77,12 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(25));
+    expect(SettingKeys.all, hasLength(26));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',
     );
+    expect(SettingKeys.backgroundService, 'background_service_enabled');
   });
 
   test('the UI never writes or reads a daemon key', () {

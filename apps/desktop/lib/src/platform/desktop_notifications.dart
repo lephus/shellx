@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../agent/agent_controller_base.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/tab_attention.dart';
 import '../terminal/terminal_tabs.dart';
@@ -13,6 +14,20 @@ import 'settings_store.dart';
 
 /// Whether the user can see a tab now (D14): read at each decision.
 typedef AttentionView = ({bool windowFocused, bool tabSelected});
+
+/// The two notification switches (D14).
+typedef NotificationSwitches = ({bool enabled, bool onlyUnfocused});
+
+/// Service mode: these keys belong to the background service (D13), so the
+/// UI's own store may be stale; the agent state is what the service last
+/// sent.
+NotificationSwitches Function() agentStateSwitches(ProviderContainer c) => () {
+  final s = c.read(agentControllerProvider);
+  return (
+    enabled: s.desktopNotifications,
+    onlyUnfocused: s.desktopNotificationsOnlyUnfocused,
+  );
+};
 
 /// One tab's D15 coalescing window: what arrived after the first post.
 final class _Burst {
@@ -39,6 +54,7 @@ final class DesktopNotifications {
     required AppLocalizations l10n,
     required void Function(int tabId) onOpen,
     AttentionView Function(int tabId)? viewOf,
+    NotificationSwitches Function()? switches,
     DateTime Function()? now,
     this.coalesce = const Duration(seconds: 3),
     this.perTab = 6,
@@ -50,6 +66,7 @@ final class DesktopNotifications {
        _l10n = l10n,
        _onOpen = onOpen,
        _viewOf = viewOf ?? _unseen,
+       _switches = switches,
        _now = now ?? DateTime.now,
        _log = log ?? debugPrint;
 
@@ -65,6 +82,10 @@ final class DesktopNotifications {
   final AppLocalizations _l10n;
   final void Function(int tabId) _onOpen;
   final AttentionView Function(int tabId) _viewOf;
+
+  /// Null: both are read from [_settings] (the app owns them). Service mode
+  /// reads the agent state instead.
+  final NotificationSwitches Function()? _switches;
   final DateTime Function() _now;
   final void Function(String message) _log;
   final Duration coalesce;
@@ -122,15 +143,17 @@ final class DesktopNotifications {
     required bool windowFocused,
     required bool tabSelected,
   }) {
-    final enabled = _settings.getBool(
-      SettingKeys.desktopNotifications,
-      defaultValue: true,
-    );
+    final switches = _switches?.call();
+    final enabled =
+        switches?.enabled ??
+        _settings.getBool(SettingKeys.desktopNotifications, defaultValue: true);
     if (!enabled) return false;
-    final onlyUnfocused = _settings.getBool(
-      SettingKeys.desktopNotificationsOnlyUnfocused,
-      defaultValue: true,
-    );
+    final onlyUnfocused =
+        switches?.onlyUnfocused ??
+        _settings.getBool(
+          SettingKeys.desktopNotificationsOnlyUnfocused,
+          defaultValue: true,
+        );
     return bell
         ? !windowFocused
         : !windowFocused || (!onlyUnfocused && !tabSelected);

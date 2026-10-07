@@ -25,6 +25,10 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    // Also for the headless service: a log out must not be declined.
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self, selector: #selector(willPowerOff(_:)),
+      name: NSWorkspace.willPowerOffNotification, object: nil)
     if isDaemon {
       let engine = FlutterEngine(name: "shellx-mux", project: nil, allowHeadlessExecution: true)
       engine.run(withEntrypoint: "daemonMain")
@@ -33,10 +37,30 @@ class AppDelegate: FlutterAppDelegate {
       daemonEngine = engine
       return
     }
-    NSWorkspace.shared.notificationCenter.addObserver(
-      self, selector: #selector(willPowerOff(_:)),
-      name: NSWorkspace.willPowerOffNotification, object: nil)
     super.applicationDidFinishLaunching(notification)
+  }
+
+  private var quitAllItem: NSMenuItem?
+
+  /// UI-A5 §6.1: a regular item (not an "alternate" hidden behind ⌥) right
+  /// after Quit in the app menu. Only a window that attaches to the
+  /// background service asks for it, so without one the menu is unchanged.
+  func installQuitAll(title: String) {
+    if let item = quitAllItem {
+      item.title = title
+      return
+    }
+    guard let menu = NSApp.mainMenu?.items.first?.submenu else { return }
+    let index = menu.items.firstIndex { $0.action == #selector(NSApplication.terminate(_:)) }
+    let item = NSMenuItem(title: title, action: #selector(quitAll(_:)), keyEquivalent: "q")
+    item.keyEquivalentModifierMask = [.command, .option]
+    item.target = self
+    menu.insertItem(item, at: (index ?? menu.items.count - 1) + 1)
+    quitAllItem = item
+  }
+
+  @objc private func quitAll(_ sender: Any?) {
+    AppChannel.quitAllRequested()
   }
 
   @objc private func willPowerOff(_ notification: Notification) {
@@ -96,7 +120,10 @@ class AppDelegate: FlutterAppDelegate {
   // exit(0), which never comes back here. Log out / shut down is never held
   // up for more than 3 s: Dart saves the restore files first (A5a D18).
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if isDaemon { return .terminateNow }
+    // The service holds the user's shells: a Dock or Apple Event quit
+    // (same bundle id as the window) must not end it. It exits through
+    // `daemon.quit`, SIGTERM or the idle exit, all of which bypass this.
+    if isDaemon { return (quitIsForPowerOff || poweringOff) ? .terminateNow : .terminateCancel }
     if quitIsForPowerOff || poweringOff {
       guard AppChannel.isReady else { return .terminateNow }
       var replied = false
@@ -141,6 +168,12 @@ enum AppChannel {
           NSApp.activate(ignoringOtherApps: true)
         }
         result(nil)
+      case "setQuitAllTitle":
+        // A5b UI-A5 §6.1: "Thoát hoàn toàn ⌥⌘Q" right after Quit.
+        if let title = call.arguments as? String {
+          (NSApp.delegate as? AppDelegate)?.installQuitAll(title: title)
+        }
+        result(nil)
       case "activate":
         // In front of the app the user was in (a tray click, the Dock, a
         // second launch): window_manager's focus() does not ignore other apps.
@@ -155,6 +188,10 @@ enum AppChannel {
 
   static func reopen() {
     channel?.invokeMethod("reopen", arguments: nil)
+  }
+
+  static func quitAllRequested() {
+    channel?.invokeMethod("quitAllRequested", arguments: nil)
   }
 
   static func quitRequested() {

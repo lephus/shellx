@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
+import '../mux/mux_lock.dart';
 import '../mux/mux_paths.dart';
 import '../mux/windows_pipe_transport.dart';
 import '../platform/settings_store.dart';
@@ -48,9 +48,10 @@ final cliClipboardProvider = Provider<Future<void> Function(String text)>(
 /// Final ruling M1: it listens ([listen]) before the shells' environment
 /// is built, so only a running host's address and token reach them; the
 /// window comes later ([attach]) — requests that arrive before wait for it.
-// TODO(A5b Task 7): `cli_control_enabled` and `cli_allow_external` are
-// daemon-owned (D13); this host moves to the daemon, which reads them from
-// its own store. Until then this file is exempt from the ownership scan.
+// A5b D13: `cli_control_enabled` and `cli_allow_external` are daemon-owned.
+// This in-process host (removed with the daemon wiring, Task 8) still reads
+// them from the settings store it shares with the agent; the daemon's host
+// (`daemon_main.dart`) reads them from the daemon's own store.
 final class CliService {
   CliService._(
     this._host,
@@ -63,7 +64,7 @@ final class CliService {
   bool _stopped = false;
 
   final CliHost _host;
-  final _MuxLock _lock;
+  final MuxLock _lock;
   final _LateUi _ui;
   final SettingsStore _settingsStore;
   bool _attached = false;
@@ -93,7 +94,7 @@ final class CliService {
         debugPrint('ShellX: cli binary install failed: ${e.runtimeType}');
       }
     }
-    final lock = await _MuxLock.acquire(paths);
+    final lock = await MuxLock.acquire(paths);
     final ui = _LateUi();
     CliHost? host;
     try {
@@ -212,37 +213,4 @@ final class _LateUi implements UiApi {
   @override
   bool notifyPane(int pane, {String? title, required String body}) =>
       _bound?.notifyPane(pane, title: title, body: body) ?? false;
-}
-
-/// `mux/mux.lock`, exclusive, for the host's lifetime. The directory is
-/// made first (0700 on macOS: the socket and the endpoint live there).
-final class _MuxLock {
-  _MuxLock(this._handle);
-  final RandomAccessFile _handle;
-
-  static Future<_MuxLock> acquire(MuxPaths paths) async {
-    await Directory(paths.muxDirectory).create(recursive: true);
-    if (!paths.windows) {
-      final r = await Process.run('/bin/chmod', ['700', paths.muxDirectory]);
-      if (r.exitCode != 0) {
-        throw FileSystemException('chmod 700 failed', paths.muxDirectory);
-      }
-    }
-    final handle = await File(paths.lock).open(mode: FileMode.append);
-    try {
-      await handle.lock(FileLock.exclusive);
-    } on FileSystemException {
-      await handle.close();
-      throw StateError('another ShellX host holds the mux lock');
-    }
-    return _MuxLock(handle);
-  }
-
-  Future<void> release() async {
-    try {
-      await _handle.unlock();
-    } finally {
-      await _handle.close();
-    }
-  }
 }

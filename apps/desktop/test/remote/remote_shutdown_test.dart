@@ -31,4 +31,60 @@ void main() {
     await shutdownRemote(const RemoteTools(), disposeWatcher: () => disposed++);
     expect(disposed, 2);
   });
+
+  test(
+    'shutdown also ends masters this process never noted (A5b R2)',
+    () async {
+      final runs = <List<String>>[];
+      Future<CommandResult> run(
+        String exe,
+        List<String> args, {
+        Duration timeout = const Duration(seconds: 5),
+      }) async {
+        runs.add(args);
+        return const CommandResult(0, '', '');
+      }
+
+      final control = SshControl(
+        sshPath: '/usr/bin/ssh',
+        run: run,
+        controlDirectory: '/tmp/x',
+        listSockets: (dir) async => ['$dir/made-by-the-ui'],
+      );
+      await shutdownRemote(
+        RemoteTools(sshPath: '/usr/bin/ssh', control: control),
+        disposeWatcher: () {},
+      );
+      expect(
+        runs.single,
+        containsAllInOrder(['ControlPath=/tmp/x/made-by-the-ui', '-O', 'exit']),
+      );
+    },
+  );
+
+  test('"Thoát" (UI only) cancels this window\'s forwards and never tells a '
+      'master to exit (the service\'s shells keep their ssh)', () async {
+    final runs = <List<String>>[];
+    Future<CommandResult> run(
+      String exe,
+      List<String> args, {
+      Duration timeout = const Duration(seconds: 5),
+    }) async {
+      runs.add(args);
+      return const CommandResult(0, '', '');
+    }
+
+    final control = SshControl(
+      sshPath: '/usr/bin/ssh',
+      run: run,
+      controlDirectory: '/tmp/x',
+      listSockets: (dir) async => ['$dir/a-master'],
+    );
+    control.noteMaster(SshTarget.parse('devbox')!);
+    await cancelUiForwards(
+      RemoteTools(sshPath: '/usr/bin/ssh', control: control),
+    );
+    expect(runs.where((a) => a.contains('exit')), isEmpty);
+    await cancelUiForwards(const RemoteTools()); // no ssh: nothing, no throw
+  });
 }

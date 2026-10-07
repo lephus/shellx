@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
 import 'package:shellx_desktop/src/platform/desktop_notifications.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -17,6 +18,7 @@ import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../support/fake_local_sessions.dart';
 import '../support/fakes.dart';
+import '../support/state_only_agent.dart';
 
 void main() {
   late RecordingNotifier notifier;
@@ -400,6 +402,57 @@ void main() {
       async.flushMicrotasks();
       expect(notifier.shown, hasLength(20));
       expect(logs.single, isNot(contains('one')));
+    });
+  });
+
+  group('A5b final review: service mode follows the agent state', () {
+    test('both switches are read from the agent state at each decision, '
+        'not from the UI store (daemon-owned keys, D13)', () {
+      fakeAsync((async) {
+        boot();
+        final agent = StateOnlyAgent();
+        final c = ProviderContainer.test(
+          overrides: [agentControllerProvider.overrideWith(() => agent)],
+        )..read(agentControllerProvider);
+        final service = DesktopNotifications(
+          notifier: notifier,
+          // The UI store says "on": a stale copy of what the daemon owns.
+          settings: settings,
+          l10n: lookupAppLocalizations(const Locale('en')),
+          onOpen: opened.add,
+          viewOf: (_) => view,
+          now: () => now,
+          log: logs.add,
+          switches: agentStateSwitches(c),
+        );
+        agent.set((s) => s.copyWith(desktopNotifications: false));
+        service.arrived(
+          msg(1, 'a'),
+          title: 't',
+          windowFocused: false,
+          tabSelected: false,
+        );
+        expect(notifier.shown, isEmpty);
+
+        // The daemon's agent.state arrives: no relaunch needed.
+        agent.set((s) => s.copyWith(desktopNotifications: true));
+        service.arrived(
+          msg(2, 'b'),
+          title: 't',
+          windowFocused: true,
+          tabSelected: false,
+        );
+        expect(notifier.shown, isEmpty); // only-unfocused still on
+        agent.set((s) => s.copyWith(desktopNotificationsOnlyUnfocused: false));
+        service.arrived(
+          msg(3, 'c'),
+          title: 't',
+          windowFocused: true,
+          tabSelected: false,
+        );
+        expect(notifier.shown, hasLength(1));
+        service.dispose();
+      });
     });
   });
 

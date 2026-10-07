@@ -13,6 +13,7 @@ import 'package:xterm/xterm.dart';
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;
+import '../mux/daemon_state.dart' show daemonStateProvider;
 import '../remote/remote_state.dart';
 import '../restore/restore_snapshot.dart';
 import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
@@ -554,7 +555,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// ⌘T, `+`: a selected tab; a failure is a toast. With [launch] (A8) it
   /// opens that SSH or tmux session, never a local folder.
   Future<void> openTab({SessionLaunch? launch}) async {
-    if (state.opening) return;
+    // A5b: no background service yet — nothing to open a shell in.
+    if (state.opening || ref.read(daemonStateProvider).waiting) return;
     try {
       await openTabFor(
         cwd: launch == null ? newTabCwd() : null,

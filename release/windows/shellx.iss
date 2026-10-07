@@ -74,8 +74,10 @@ Name: "{autodesktop}\ShellX"; Filename: "{app}\{#AppExeName}"; Tasks: desktopico
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Stop the tray agent so its files can be deleted.
-Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
+; Stop the background service first (A5b D21: shellx-mux.exe and its shells, hence /T), then the
+; UI, so their files can be deleted.
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""shellx-mux.exe"""; Flags: runhidden; RunOnceId: "StopShellxMux"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM ""{#AppExeName}"""; Flags: runhidden; RunOnceId: "StopShellX"
 ; Terminal sharing (spec 10.6): remove the ShellX block from the PowerShell profiles and delete
 ; %LOCALAPPDATA%\ShellX\bin and \term. Works whether or not the agent still runs (it takes no lock
 ; and opens no window), so the order against the taskkill above does not matter.
@@ -141,9 +143,11 @@ begin
     else
       Log('quit signal could not be written');
   end;
-  { Fallback: stop an agent that is still running: it keeps its exe and DLLs locked. Its terminal
-    sessions end, exactly as when the agent quits (spec 7). }
-  if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM "{#AppExeName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  { Fallback: stop an agent that is still running: it keeps its exe and DLLs locked. Only the UI
+    is stopped, never with /T: the background service runs as shellx-mux.exe from its own copy in
+    %LOCALAPPDATA%\ShellX\mux\<version> (so the update never locks it) and keeps the shells alive
+    across the update (A5b D3/D21). Without the service the shells end with the agent (spec 7). }
+  if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM "{#AppExeName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     Log('taskkill could not be started');
   Result := '';
 end;

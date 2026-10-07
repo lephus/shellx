@@ -64,13 +64,36 @@ final class MuxServer {
   final MuxPeerInfo _self;
   final _links = <_UiLink>{};
   StreamSubscription<MuxConnection>? _accept;
+  MuxListener? _listener;
   int _handshaking = 0;
   _UiLink? _ui;
   Future<void>? _quit;
 
   /// `daemon.quit`: [onQuit] runs once; repeated and concurrent requests
   /// share its result.
-  Future<void> _quitOnce() => _quit ??= onQuit();
+  ///
+  /// From the first request on the server accepts nobody (the listener is
+  /// closed, a straggler is closed unanswered, and a connection that is
+  /// mid-handshake is refused): existing links stay, so the caller's reply
+  /// still goes out.
+  Future<void> _quitOnce() {
+    final running = _quit;
+    if (running != null) return running;
+    stopAccepting();
+    return _quit = onQuit();
+  }
+
+  bool _stopped = false;
+
+  /// Accepts nobody from now on (the listener is closed, a straggler and a
+  /// connection mid-handshake are refused). Existing links stay. Used by
+  /// every way the service quits, not only `daemon.quit`.
+  void stopAccepting() {
+    if (_stopped) return;
+    _stopped = true;
+    final listener = _listener;
+    if (listener != null) unawaited(listener.close().catchError((Object _) {}));
+  }
 
   /// `ui.*` requests of `cli` clients, forwarded to the attached UI (no UI
   /// → `not_found`, D22). Hand it to the [CliHost].
@@ -79,11 +102,12 @@ final class MuxServer {
   bool get uiAttached => _ui != null;
 
   void serve(MuxListener listener) {
+    _listener = listener;
     _accept = listener.connections.listen((c) => unawaited(_onConnection(c)));
   }
 
   Future<void> _onConnection(MuxConnection c) async {
-    if (_handshaking >= 4) {
+    if (_stopped || _handshaking >= 4) {
       await c.close(); // D23
       return;
     }
@@ -109,6 +133,10 @@ final class MuxServer {
       return;
     } finally {
       _handshaking--;
+    }
+    if (_stopped) {
+      _refuse(c, MuxError.busy); // quitting: nobody attaches any more
+      return;
     }
     // Synchronous from here to the link's listener: nothing read after the
     // handshake's last message may be lost.

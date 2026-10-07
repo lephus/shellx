@@ -70,6 +70,15 @@ abstract final class SettingKeys {
   static const String quitKeepsSessionsExplained =
       'quit_keeps_sessions_explained';
 
+  /// A5b D13 ruling: "Giữ shell chạy khi đóng cửa sổ". Off (default): the
+  /// app runs its shells itself, as before A5b. On: at the next launch the
+  /// UI attaches to the background service. UI-owned.
+  static const String backgroundService = 'background_service_enabled';
+
+  /// The one default of [backgroundService]: read it through
+  /// [backgroundServiceEnabled] (the launch decision and the tray menu).
+  static const bool backgroundServiceDefault = false;
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -96,6 +105,7 @@ abstract final class SettingKeys {
     sshPlainTargets,
     sshRemoteHook,
     quitKeepsSessionsExplained,
+    backgroundService,
   };
 }
 
@@ -143,6 +153,7 @@ abstract final class UiSettingKeys {
     SettingKeys.sshRecentTargets,
     SettingKeys.sshPlainTargets,
     SettingKeys.quitKeepsSessionsExplained,
+    SettingKeys.backgroundService,
   };
 }
 
@@ -238,3 +249,10 @@ final class InMemorySettingsStore implements SettingsStore {
     ints[key] = value;
   }
 }
+
+/// The stored "keep shells running when the window closes" switch, with its
+/// single default.
+bool backgroundServiceEnabled(SettingsStore settings) => settings.getBool(
+  SettingKeys.backgroundService,
+  defaultValue: SettingKeys.backgroundServiceDefault,
+);

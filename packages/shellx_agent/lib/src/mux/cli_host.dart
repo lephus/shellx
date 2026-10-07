@@ -130,6 +130,18 @@ final class CliHost {
 
   int get clientCount => _clients.length;
 
+  /// Called after a client was admitted and after one left (the daemon's
+  /// idle exit counts CLI clients, A5b D27). Never throws into the host.
+  void Function()? onClientsChanged;
+
+  void _clientsChanged() {
+    try {
+      onClientsChanged?.call();
+    } on Object {
+      // A listener's failure must not break the connection's bookkeeping.
+    }
+  }
+
   /// Applies the switch and "Allow other terminals" to open connections
   /// now, not at their next request or event (the tray calls this when
   /// either changes): with the switch off, subscriptions end with
@@ -251,10 +263,12 @@ final class CliHost {
       early: peer.early,
     );
     _clients.add(client);
+    _clientsChanged();
     unawaited(
       c.done.whenComplete(() {
         _clients.remove(client);
         client.dispose();
+        _clientsChanged();
       }),
     );
   }
