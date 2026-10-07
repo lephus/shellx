@@ -29,6 +29,7 @@ import 'shortcut_labels.dart';
 import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
 import 'terminal_workspace_config.dart';
+import 'terminal_workspace_notices.dart';
 
 /// Spec §3.2: `Row(Sidebar 220 px, VerticalDivider, TerminalPane)`.
 class TerminalWorkspacePage extends ConsumerStatefulWidget {
@@ -42,6 +43,7 @@ class TerminalWorkspacePage extends ConsumerStatefulWidget {
 class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     with
         WorkspaceConfig<TerminalWorkspacePage>,
+        WorkspaceConfigUi<TerminalWorkspacePage>,
         WorkspaceSequences<TerminalWorkspacePage> {
   @override
   final terminalFocus = FocusNode(debugLabel: 'terminal');
@@ -110,6 +112,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
 
   void _openPanel() {
     if (panelOpen) return;
+    closeConfigOverlay(restoreFocus: false); // one surface at a time
     _beforePanel = FocusManager.instance.primaryFocus;
     setState(() => panelOpen = true); // the panel takes the keyboard
   }
@@ -119,7 +122,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// runs next (F6) starts from where the user was.
   @override
   void closePanel({bool restoreFocus = true}) {
-    closeConfigOverlay(); // A9: any window shortcut dismisses it
+    closeConfigOverlay(restoreFocus: restoreFocus); // A9: any shortcut
     if (!panelOpen) return;
     final before = _beforePanel;
     _beforePanel = null;
@@ -442,6 +445,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     super.initState();
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
     listenToConfig();
+    listenToConfigUi();
     listenToSequences();
   }
 
@@ -512,7 +516,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
               children: [
                 // Modal for screen readers too while the panel is open.
                 Positioned.fill(
-                  child: ExcludeSemantics(excluding: panelOpen, child: _body()),
+                  child: ExcludeSemantics(
+                    excluding: panelOpen || overlay != null,
+                    child: _body(),
+                  ),
                 ),
                 // UI-A4 §5.3: a click outside closes the panel (and only that).
                 // macOS: it starts under the band, so the window still drags
@@ -564,6 +571,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
                         : const SizedBox.shrink(),
                   ),
                 ),
+                ?overlaySlot(),
               ],
             ),
           ),
@@ -599,6 +607,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           restoreStripFocus: restoreStripFocus,
           shortcuts: terminalShortcuts,
           onKeyEvent: sequenceKey,
+          onShowConfigProblems: () => openOverlay(A9Overlay.problems),
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);
             if (tab != null) unawaited(closePane(tab, id));

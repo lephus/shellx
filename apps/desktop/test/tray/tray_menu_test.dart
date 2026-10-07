@@ -67,6 +67,7 @@ void main() {
       'Thông báo',
       // A7 D26 (A6 absent: no "Trình duyệt" before it).
       'Dòng lệnh',
+      'Cấu hình',
       'Đổi mật khẩu…',
       'Đăng xuất',
       'Thoát',
@@ -195,6 +196,7 @@ void main() {
       'Terminal',
       'Thông báo',
       'Dòng lệnh',
+      'Cấu hình',
       '---',
       '○ Chưa đăng nhập',
       '---',

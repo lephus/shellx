@@ -7,6 +7,7 @@ import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_opener.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/config/config_problems_panel.dart';
 import 'package:shellx_desktop/src/ui/terminal/shortcut_labels.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_shortcuts.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
@@ -251,7 +252,7 @@ keybind = super+l=run_command:Lint
   );
 
   testWidgets(
-    'close_tab closes every pane of the tab; the palette intents stay off',
+    'close_tab closes every pane of the tab; the palette intent stays off',
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
     (tester) async {
       final w = await pumpConfiguredWorkspace(
@@ -264,7 +265,12 @@ keybind = super+l=run_command:Lint
         find.byType(TerminalWorkspacePage),
       );
       expect(page.invokeIntent(const CommandPaletteIntent()), isFalse);
-      expect(page.invokeIntent(const ShowConfigProblemsIntent()), isFalse);
+      // The problems panel exists since Task 10: the intent opens it.
+      expect(page.invokeIntent(const ShowConfigProblemsIntent()), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byType(ConfigProblemsPanel), findsOneWidget);
+      page.closePanel();
+      await tester.pumpAndSettle();
       await chord(tester, [cmd, shift], LogicalKeyboardKey.keyW);
       expect(w.container.read(terminalTabsProvider).tabs, isEmpty);
       await disposeWorkspace(tester, w.container);

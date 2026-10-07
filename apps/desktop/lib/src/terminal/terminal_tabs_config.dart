@@ -11,6 +11,23 @@ final class ConfigOpenFailedNotice extends TabNotice {
   final String path;
 }
 
+/// A9 D36: errors → error toast; warnings only → neutral.
+final class ConfigProblemsNotice extends TabNotice {
+  const ConfigProblemsNotice(this.count, {required this.hasErrors});
+  final int count;
+  final bool hasErrors;
+}
+
+/// A9 D9: a reload the user asked for found nothing wrong (neutral).
+final class ConfigReloadedNotice extends TabNotice {
+  const ConfigReloadedNotice();
+}
+
+/// A9 D4: the first time Ghostty's fonts/colours are used (neutral).
+final class ConfigGhosttyNotice extends TabNotice {
+  const ConfigGhosttyNotice();
+}
+
 // A9 D21: where a new tab's shell starts. Kept apart from the tab list.
 extension TerminalTabsConfig on TerminalTabs {
   /// Null = home. A path or `inherit`'s directory is checked by the agent

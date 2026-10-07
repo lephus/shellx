@@ -117,6 +117,17 @@ void main() {
     expect((await controller().load()).lastLoad!.problemsChanged, isTrue);
   });
 
+  test('a listener that acknowledges the notice while a load is being '
+      'announced leaves it acknowledged', () async {
+    fs.write(paths.ghostty[1], 'font-family = Fira Code\n');
+    container.listen(shellxConfigProvider, (_, next) {
+      if (next.ghosttyNoticePending) controller().ackGhosttyNotice();
+    });
+    await controller().load();
+    expect(state().ghosttyNoticePending, isFalse);
+    expect((await controller().load()).ghosttyNoticePending, isFalse);
+  });
+
   test(
     'Ghostty: read when enabled, a one-time notice, off with ghostty-config = false',
     () async {

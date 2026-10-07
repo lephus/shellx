@@ -11,9 +11,11 @@ import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
+import '../config/config_opener.dart' show openShellxConfig;
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
 import '../ui/activation.dart';
+import '../ui/config/config_ui_request.dart';
 import '../ui/terminal/close_tab.dart';
 import '../ui/window_router.dart';
 import 'tray_action.dart';
@@ -34,6 +36,9 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     cliControlEnabled: cli.controlEnabled,
     cliAllowExternal: cli.allowExternal,
     cliPathInstalled: cli.pathInstalled,
+    configProblemCount: ref.watch(
+      shellxConfigProvider.select((s) => s.visibleProblemCount),
+    ),
   );
 });
 
@@ -196,6 +201,22 @@ final class TrayActions {
         _ref
             .read(terminalTabsProvider.notifier)
             .showNotice(const CliSkillsCopiedNotice());
+      case OpenConfigFile():
+        await _showWindow();
+        await openShellxConfig(_ref.read);
+      case ReloadConfig():
+        await _showWindow();
+        await _ref.read(shellxConfigProvider.notifier).load(manual: true);
+      case ShowShortcutsFromTray():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.shortcuts);
+      case ShowConfigProblemsFromTray():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.problems);
       case Quit(:final confirm):
         if (_quitting) return;
         if (confirm && state.sessions.isNotEmpty) {
@@ -260,6 +281,12 @@ final class TrayActions {
   /// A7 D8: installs or removes `shellx` for other terminals. Never at
   /// startup. Stored only when it worked; a cancelled password prompt
   /// changes nothing and says nothing; the result shows in the window.
+  /// A1 D11: a window item brings the window forward first.
+  Future<void> _showWindow() => openTerminalWindow(
+    router: _router,
+    tabs: _ref.read(terminalTabsProvider.notifier),
+  );
+
   Future<void> _toggleCliPath() async {
     final installer = _ref.read(cliPathInstallerProvider);
     final paths = _ref.read(cliPathsProvider);

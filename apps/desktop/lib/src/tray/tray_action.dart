@@ -130,6 +130,23 @@ final class CopySkillsCommand extends TrayAction {
 }
 
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
+/// A9 D45: the "Cấu hình" submenu. Each brings the window to the front.
+final class OpenConfigFile extends TrayAction {
+  const OpenConfigFile();
+}
+
+final class ReloadConfig extends TrayAction {
+  const ReloadConfig();
+}
+
+final class ShowShortcutsFromTray extends TrayAction {
+  const ShowShortcutsFromTray();
+}
+
+final class ShowConfigProblemsFromTray extends TrayAction {
+  const ShowConfigProblemsFromTray();
+}
+
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
   final int id;
@@ -169,6 +186,11 @@ abstract final class TrayKeys {
   static const String cliAllowExternal = 'cli_allow_external';
   static const String cliPath = 'cli_path';
   static const String cliSkills = 'cli_skills';
+  static const String config = 'config';
+  static const String configOpen = 'config_open';
+  static const String configReload = 'config_reload';
+  static const String configShortcuts = 'config_shortcuts';
+  static const String configProblems = 'config_problems';
 
   static String session(int id) => 'session:$id';
   static String closeSession(int id) => 'session_close:$id';
@@ -228,6 +250,10 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.cliAllowExternal => const ToggleCliAllowExternal(),
     TrayKeys.cliPath => const ToggleCliPath(),
     TrayKeys.cliSkills => const CopySkillsCommand(),
+    TrayKeys.configOpen => const OpenConfigFile(),
+    TrayKeys.configReload => const ReloadConfig(),
+    TrayKeys.configShortcuts => const ShowShortcutsFromTray(),
+    TrayKeys.configProblems => const ShowConfigProblemsFromTray(),
     _ => null,
   };
 }

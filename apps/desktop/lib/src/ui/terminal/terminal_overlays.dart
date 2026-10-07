@@ -542,9 +542,13 @@ class NoticeToast extends StatefulWidget {
     required this.notice,
     required this.onDismiss,
     this.onReturnFocus,
+    this.onAction,
   });
   final TabNotice notice;
   final VoidCallback onDismiss;
+
+  /// The "Show" button of a problems notice (A9 UI §3.1); null: none.
+  final VoidCallback? onAction;
 
   /// Called after a dismissal while the close button had the keyboard, so
   /// the focus does not vanish with the toast.
@@ -572,10 +576,18 @@ class _NoticeToastState extends State<NoticeToast> {
     if (!identical(oldWidget.notice, widget.notice)) _start();
   }
 
+  bool get _warningsOnly {
+    final notice = widget.notice;
+    return notice is ConfigProblemsNotice && !notice.hasErrors;
+  }
+
   bool get _paused => _hovered || _closeFocus.hasFocus;
 
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
   bool get _neutral =>
+      widget.notice is ConfigReloadedNotice ||
+      widget.notice is ConfigGhosttyNotice ||
+      _warningsOnly ||
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
       widget.notice is NoTerminalForCommandNotice ||
@@ -629,6 +641,9 @@ class _NoticeToastState extends State<NoticeToast> {
     NoUnreadNotice() => l10n.noUnreadNotifications,
     NoTerminalForCommandNotice() => l10n.userCommandNoTerminal,
     ConfigOpenFailedNotice(:final path) => l10n.configOpenFailed(path),
+    ConfigProblemsNotice(:final count) => l10n.configProblemsToast(count),
+    ConfigReloadedNotice() => l10n.configReloaded,
+    ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
@@ -699,6 +714,17 @@ class _NoticeToastState extends State<NoticeToast> {
                 ),
               ),
               const SizedBox(width: ShellxSpace.s8),
+              if (widget.notice is ConfigProblemsNotice &&
+                  widget.onAction != null)
+                _ShowButton(
+                  label: l10n.configProblemsShow,
+                  neutral: _neutral,
+                  color: foreground,
+                  onPressed: () {
+                    widget.onAction!();
+                    _close();
+                  },
+                ),
               ShellxIconButton(
                 key: const Key('pane.toast.close'),
                 icon: Icons.close,
@@ -718,6 +744,46 @@ class _NoticeToastState extends State<NoticeToast> {
       ),
     );
   }
+}
+
+/// UI-A9 §3.1: the toast's text button (hit 28, padding 0/8); neutral →
+/// accent w600, error → the notice colour underlined.
+class _ShowButton extends StatelessWidget {
+  const _ShowButton({
+    required this.label,
+    required this.neutral,
+    required this.color,
+    required this.onPressed,
+  });
+  final String label;
+  final bool neutral;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    key: const Key('pane.toast.action'),
+    onPressed: onPressed,
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+      fixedSize: const WidgetStatePropertyAll(Size.fromHeight(28)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: ShellxSpace.s8),
+      ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: buttonShape(outsideRing: false),
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    child: Text(
+      label,
+      style: ShellxText.body.copyWith(
+        color: neutral ? ShellxDesktopColors.accent : color,
+        fontWeight: neutral ? FontWeight.w600 : null,
+        decoration: neutral ? null : TextDecoration.underline,
+        decorationColor: color,
+      ),
+    ),
+  );
 }
 
 /// UI §2.7: shown in the pane when there is no tab.

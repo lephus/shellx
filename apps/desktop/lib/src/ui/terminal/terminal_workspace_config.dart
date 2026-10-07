@@ -13,6 +13,7 @@ import '../../config/shellx_config.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../../terminal/user_commands.dart';
 import 'terminal_intents.dart';
+import 'terminal_workspace_notices.dart' show A9Overlay;
 
 /// A window shortcut's action; [enabled] lets a key fall through to the
 /// terminal when it does not apply.
@@ -53,11 +54,12 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   FocusNode get terminalFocus;
   Map<Type, Action<Intent>> get actionsMap;
 
-  /// Closes whichever A9 overlay (palette, shortcut editor, problems
-  /// panel) is open. `closePanel` calls it first, before its own early
-  /// return, so every window shortcut dismisses an open overlay (Tasks
-  /// 10-12 fill it in).
-  void closeConfigOverlay() {}
+  // From WorkspaceConfigUi: closes whichever A9 overlay is open (`closePanel`
+  // calls it first); opens one; forgets font problems the probe no longer
+  // finds.
+  void closeConfigOverlay({bool restoreFocus = true});
+  void openOverlay(A9Overlay overlay);
+  void forgetFixedRuntimeProblems();
 
   /// The actions of the A9 intents.
   Map<Type, Action<Intent>> configActions() {
@@ -91,7 +93,7 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         enabled: (_) => terminalFocus.hasFocus,
       ),
       IgnoreKeyIntent: run<IgnoreKeyIntent>((_) {}),
-      // Registered disabled: Tasks 10-12 turn them on. A disabled action
+      // Registered disabled: Tasks 11-12 turn them on. A disabled action
       // lets the key through, so a chord bound to one does nothing yet.
       CommandPaletteIntent: run<CommandPaletteIntent>(
         (_) {},
@@ -101,9 +103,10 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         (_) {},
         enabled: (_) => false,
       ),
+      // Always enabled: the palette lists it only when there are problems
+      // (D33), a bound key may ask any time.
       ShowConfigProblemsIntent: run<ShowConfigProblemsIntent>(
-        (_) {},
-        enabled: (_) => false,
+        (_) => openOverlay(A9Overlay.problems),
       ),
     };
   }
@@ -171,5 +174,6 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
           kFontProblemCodes,
           fontProblems(config, ref.read(fontProbeProvider)),
         );
+    forgetFixedRuntimeProblems();
   }
 }

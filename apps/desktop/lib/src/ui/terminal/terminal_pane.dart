@@ -37,6 +37,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     this.shortcuts,
     this.onKeyEvent,
     required this.onClosePane,
+    this.onShowConfigProblems,
   });
 
   /// The selected tab's TerminalView focus (UI §3.6 region 1).
@@ -62,6 +63,9 @@ class TerminalPane extends ConsumerStatefulWidget {
   /// A pane's ×, middle click (UI-A3 §2.1): the workspace asks first when
   /// a command runs there.
   final void Function(int sessionId) onClosePane;
+
+  /// The toast's "Show" for configuration problems (A9).
+  final VoidCallback? onShowConfigProblems;
 
   @override
   ConsumerState<TerminalPane> createState() => _TerminalPaneState();
@@ -363,6 +367,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                         notice: notice,
                                         onDismiss: () => _dismiss(notice),
                                         onReturnFocus: _returnFocus,
+                                        onAction: widget.onShowConfigProblems,
                                       ),
                               ),
                             ),

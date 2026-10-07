@@ -285,6 +285,21 @@ abstract final class ShellxSizes {
 
   /// UI-A9 §5: the pending-prefix pill.
   static const double sequenceIndicatorHeight = 28;
+
+  /// UI-A9 §1.2: the palette, the problems panel, the shortcut editor.
+  static const double paletteWidth = 560;
+  static const double paletteTop = 56;
+  static const double paletteMaxHeight = 420;
+  static const double paletteRow = 36;
+  static const double paletteField = 40;
+  static const double problemsWidth = 600;
+  static const double problemsMaxHeight = 480;
+  static const double problemRow = 52;
+  static const double shortcutsWidth = 720;
+  static const double shortcutsHeight = 600;
+  static const double shortcutsRow = 40;
+  static const double keycapHeight = 20;
+  static const double keycapGap = 4;
 }
 
 /// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).

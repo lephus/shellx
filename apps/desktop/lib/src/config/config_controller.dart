@@ -105,8 +105,10 @@ class ConfigController extends Notifier<ConfigState> {
   void _publish(ConfigState next) {
     // Before the state, so a widget rebuilt by it reads the new labels.
     labelBindings = _ownBindings = next.bindings;
-    state = next;
+    // Before the listeners run: one that writes back (the window's Ghostty
+    // acknowledgement, the font probe) builds on this state, not the last.
     _last = next;
+    state = next;
   }
 
   /// Reads every file and publishes the result. Never throws (D10); loads

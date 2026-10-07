@@ -1194,4 +1194,258 @@ class AppLocalizationsEn extends AppLocalizations {
   String sequencePendingAnnounce(String shortcut) {
     return '$shortcut pressed, waiting for the next key';
   }
+
+  @override
+  String configProblemsToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count problems in the configuration',
+      one: '1 problem in the configuration',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get configProblemsShow => 'Show';
+
+  @override
+  String get configReloaded => 'Configuration reloaded';
+
+  @override
+  String get configGhosttyNotice =>
+      'Using fonts and colours from your Ghostty config (turn off with ghostty-config = false)';
+
+  @override
+  String get configProblemsTitle => 'Configuration problems';
+
+  @override
+  String get configProblemsNone => 'No problems in the configuration.';
+
+  @override
+  String configProblemWhere(String file, int line) {
+    return '$file, line $line';
+  }
+
+  @override
+  String configProblemLine(int line) {
+    return 'line $line';
+  }
+
+  @override
+  String get configSeverityError => 'Error';
+
+  @override
+  String get configSeverityWarning => 'Warning';
+
+  @override
+  String get configSeverityInfo => 'Note';
+
+  @override
+  String get configOpenFile => 'Open configuration file';
+
+  @override
+  String get configReload => 'Reload configuration';
+
+  @override
+  String get configProblemSyntax => 'Line has no “=” (expected key = value)';
+
+  @override
+  String configProblemBadKey(String key) {
+    return '“$key” is not a valid key name';
+  }
+
+  @override
+  String configProblemUnknownKey(String key) {
+    return 'ShellX has no key “$key”';
+  }
+
+  @override
+  String configProblemBadValue(String key, String value, String hint) {
+    return '$key: “$value” is not valid (expected $hint)';
+  }
+
+  @override
+  String configProblemOutOfRange(
+    String key,
+    String value,
+    String hint,
+    String detail,
+  ) {
+    return '$key: $value is outside $hint, using $detail';
+  }
+
+  @override
+  String configProblemDuplicate(String key, String detail) {
+    return '$key: replaces line $detail';
+  }
+
+  @override
+  String configProblemIncludeMissing(String value) {
+    return 'File “$value” not found';
+  }
+
+  @override
+  String configProblemIncludeCycle(String value) {
+    return '“$value” is already loaded (config-file loop)';
+  }
+
+  @override
+  String get configProblemIncludeDepth =>
+      'config-file is nested more than 4 levels';
+
+  @override
+  String get configProblemIncludeLimit =>
+      'More than 64 config files — the rest are ignored';
+
+  @override
+  String get configProblemUnreadable =>
+      'Can\'t read the file — keeping the previous configuration';
+
+  @override
+  String get configProblemNotUtf8 =>
+      'The file isn\'t UTF-8 — keeping the previous configuration';
+
+  @override
+  String get configProblemTooLarge =>
+      'The file is larger than 256 KiB — keeping the previous configuration';
+
+  @override
+  String configProblemThemeNotFound(String value) {
+    return 'Theme “$value” not found';
+  }
+
+  @override
+  String configProblemFontNotFound(String value) {
+    return 'Font “$value” not found — using JetBrains Mono';
+  }
+
+  @override
+  String configProblemFontNotMonospace(String value) {
+    return 'Font “$value” isn\'t monospaced — columns may not line up';
+  }
+
+  @override
+  String configProblemLowContrast(String detail) {
+    return 'Low text/background contrast ($detail:1, aim for 4.5:1)';
+  }
+
+  @override
+  String configProblemUnsupportedValue(String key, String value, String hint) {
+    return '$key = $value isn\'t supported (using $hint)';
+  }
+
+  @override
+  String configProblemNotOnThisPlatform(String key) {
+    return '$key only has an effect on macOS';
+  }
+
+  @override
+  String configProblemBadTrigger(String value) {
+    return '“$value” is not a valid key combination';
+  }
+
+  @override
+  String configProblemUnknownAction(String value) {
+    return 'There\'s no action “$value”';
+  }
+
+  @override
+  String configProblemBadActionParam(String value, String hint) {
+    return '“$value” is not valid (expected $hint)';
+  }
+
+  @override
+  String configProblemReservedTrigger(String value) {
+    return '$value is reserved by the system';
+  }
+
+  @override
+  String configProblemPlainKeyTrigger(String value) {
+    return '$value is for typing — add Ctrl, Alt or ⌘';
+  }
+
+  @override
+  String get configProblemRegionTrigger =>
+      'F6 and Shift+F6 always move between regions';
+
+  @override
+  String configProblemShellKeyTrigger(String value) {
+    return '$value will no longer reach the shell';
+  }
+
+  @override
+  String configProblemOptionKeyTrigger(String value) {
+    return '$value will no longer type its Option character';
+  }
+
+  @override
+  String configProblemAltGrTrigger(String value) {
+    return '$value works with the left Alt only; AltGr still types characters';
+  }
+
+  @override
+  String configProblemMissionControlTrigger(String value) {
+    return 'Mission Control may take $value';
+  }
+
+  @override
+  String configProblemUnsupportedPrefix(String value) {
+    return 'The “$value” prefix isn\'t supported';
+  }
+
+  @override
+  String get configProblemSequenceTooLong =>
+      'Key sequences have at most 2 steps';
+
+  @override
+  String configProblemSequencePrefixShadows(String value) {
+    return '$value starts a key sequence, so it no longer works on its own';
+  }
+
+  @override
+  String configProblemSequenceRepeatsPrefix(String value) {
+    return 'This sequence can\'t fire: pressing $value twice sends it';
+  }
+
+  @override
+  String configProblemUnknownCommand(String value) {
+    return 'There\'s no command “$value”';
+  }
+
+  @override
+  String get configProblemCommandLimit =>
+      'More than 200 commands — the rest are ignored';
+
+  @override
+  String configProblemLimit(String detail) {
+    return '$detail problems — showing the first 100';
+  }
+
+  @override
+  String get configProblemInternal =>
+      'Unexpected error — keeping the previous configuration';
+
+  @override
+  String get trayConfig => 'Configuration';
+
+  @override
+  String get trayConfigOpen => 'Open configuration file';
+
+  @override
+  String get trayConfigReload => 'Reload configuration';
+
+  @override
+  String get trayConfigShortcuts => 'Keyboard shortcuts…';
+
+  @override
+  String trayConfigProblems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '⚠ $count configuration problems…',
+      one: '⚠ 1 configuration problem…',
+    );
+    return '$_temp0';
+  }
 }

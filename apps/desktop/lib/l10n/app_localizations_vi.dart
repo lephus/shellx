@@ -1151,4 +1151,253 @@ class AppLocalizationsVi extends AppLocalizations {
   String sequencePendingAnnounce(String shortcut) {
     return 'Đã bấm $shortcut, chờ phím tiếp theo';
   }
+
+  @override
+  String configProblemsToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cấu hình có $count vấn đề',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get configProblemsShow => 'Xem';
+
+  @override
+  String get configReloaded => 'Đã tải lại cấu hình';
+
+  @override
+  String get configGhosttyNotice =>
+      'Đang dùng font và màu từ cấu hình Ghostty (tắt bằng ghostty-config = false)';
+
+  @override
+  String get configProblemsTitle => 'Vấn đề trong cấu hình';
+
+  @override
+  String get configProblemsNone => 'Cấu hình không có vấn đề.';
+
+  @override
+  String configProblemWhere(String file, int line) {
+    return '$file, dòng $line';
+  }
+
+  @override
+  String configProblemLine(int line) {
+    return 'dòng $line';
+  }
+
+  @override
+  String get configSeverityError => 'Lỗi';
+
+  @override
+  String get configSeverityWarning => 'Cảnh báo';
+
+  @override
+  String get configSeverityInfo => 'Ghi chú';
+
+  @override
+  String get configOpenFile => 'Mở file cấu hình';
+
+  @override
+  String get configReload => 'Tải lại cấu hình';
+
+  @override
+  String get configProblemSyntax =>
+      'Dòng không có dấu “=” (dạng đúng: khoá = giá trị)';
+
+  @override
+  String configProblemBadKey(String key) {
+    return '“$key” không phải tên khoá hợp lệ';
+  }
+
+  @override
+  String configProblemUnknownKey(String key) {
+    return 'ShellX không có khoá “$key”';
+  }
+
+  @override
+  String configProblemBadValue(String key, String value, String hint) {
+    return '$key: “$value” không hợp lệ (cần $hint)';
+  }
+
+  @override
+  String configProblemOutOfRange(
+    String key,
+    String value,
+    String hint,
+    String detail,
+  ) {
+    return '$key: $value nằm ngoài $hint, đã dùng $detail';
+  }
+
+  @override
+  String configProblemDuplicate(String key, String detail) {
+    return '$key: thay cho dòng $detail';
+  }
+
+  @override
+  String configProblemIncludeMissing(String value) {
+    return 'Không tìm thấy file “$value”';
+  }
+
+  @override
+  String configProblemIncludeCycle(String value) {
+    return '“$value” đã được nạp (vòng lặp config-file)';
+  }
+
+  @override
+  String get configProblemIncludeDepth => 'config-file lồng quá 4 tầng';
+
+  @override
+  String get configProblemIncludeLimit => 'Quá 64 file cấu hình — bỏ phần sau';
+
+  @override
+  String get configProblemUnreadable =>
+      'Không đọc được file — đang giữ cấu hình trước';
+
+  @override
+  String get configProblemNotUtf8 =>
+      'File không phải UTF-8 — đang giữ cấu hình trước';
+
+  @override
+  String get configProblemTooLarge =>
+      'File lớn hơn 256 KiB — đang giữ cấu hình trước';
+
+  @override
+  String configProblemThemeNotFound(String value) {
+    return 'Không tìm thấy chủ đề “$value”';
+  }
+
+  @override
+  String configProblemFontNotFound(String value) {
+    return 'Không tìm thấy font “$value” — dùng JetBrains Mono';
+  }
+
+  @override
+  String configProblemFontNotMonospace(String value) {
+    return 'Font “$value” không đơn cách — cột có thể lệch';
+  }
+
+  @override
+  String configProblemLowContrast(String detail) {
+    return 'Chữ và nền tương phản thấp ($detail:1, nên từ 4,5:1)';
+  }
+
+  @override
+  String configProblemUnsupportedValue(String key, String value, String hint) {
+    return '$key = $value chưa được hỗ trợ (dùng $hint)';
+  }
+
+  @override
+  String configProblemNotOnThisPlatform(String key) {
+    return '$key chỉ có tác dụng trên macOS';
+  }
+
+  @override
+  String configProblemBadTrigger(String value) {
+    return '“$value” không phải tổ hợp phím hợp lệ';
+  }
+
+  @override
+  String configProblemUnknownAction(String value) {
+    return 'Không có action “$value”';
+  }
+
+  @override
+  String configProblemBadActionParam(String value, String hint) {
+    return '“$value” không hợp lệ (cần $hint)';
+  }
+
+  @override
+  String configProblemReservedTrigger(String value) {
+    return 'Hệ điều hành giữ $value';
+  }
+
+  @override
+  String configProblemPlainKeyTrigger(String value) {
+    return '$value dùng để gõ chữ — thêm Ctrl, Alt hoặc ⌘';
+  }
+
+  @override
+  String get configProblemRegionTrigger =>
+      'F6 và Shift+F6 luôn dùng để chuyển vùng';
+
+  @override
+  String configProblemShellKeyTrigger(String value) {
+    return '$value sẽ không còn tới shell';
+  }
+
+  @override
+  String configProblemOptionKeyTrigger(String value) {
+    return '$value sẽ không còn gõ ký tự Option';
+  }
+
+  @override
+  String configProblemAltGrTrigger(String value) {
+    return '$value chỉ chạy với Alt trái; AltGr vẫn gõ ký tự';
+  }
+
+  @override
+  String configProblemMissionControlTrigger(String value) {
+    return 'Mission Control có thể giữ $value';
+  }
+
+  @override
+  String configProblemUnsupportedPrefix(String value) {
+    return 'Tiền tố “$value” không được hỗ trợ';
+  }
+
+  @override
+  String get configProblemSequenceTooLong => 'Chuỗi phím tối đa 2 bước';
+
+  @override
+  String configProblemSequencePrefixShadows(String value) {
+    return '$value là đầu một chuỗi phím nên không còn chạy một mình';
+  }
+
+  @override
+  String configProblemSequenceRepeatsPrefix(String value) {
+    return 'Chuỗi này không chạy được: bấm $value hai lần là gửi chính nó';
+  }
+
+  @override
+  String configProblemUnknownCommand(String value) {
+    return 'Không có lệnh “$value”';
+  }
+
+  @override
+  String get configProblemCommandLimit => 'Quá 200 lệnh — bỏ phần sau';
+
+  @override
+  String configProblemLimit(String detail) {
+    return '$detail vấn đề — chỉ hiện 100 vấn đề đầu';
+  }
+
+  @override
+  String get configProblemInternal =>
+      'Lỗi không mong đợi — đang giữ cấu hình trước';
+
+  @override
+  String get trayConfig => 'Cấu hình';
+
+  @override
+  String get trayConfigOpen => 'Mở file cấu hình';
+
+  @override
+  String get trayConfigReload => 'Tải lại cấu hình';
+
+  @override
+  String get trayConfigShortcuts => 'Phím tắt…';
+
+  @override
+  String trayConfigProblems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '⚠ $count vấn đề cấu hình…',
+    );
+    return '$_temp0';
+  }
 }
