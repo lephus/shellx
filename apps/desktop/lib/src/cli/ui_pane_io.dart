@@ -28,13 +28,16 @@ const kPatternMaxBytes = 1024;
 /// `--cmd`. Never logs text sent or read.
 final class PaneIoCommands {
   PaneIoCommands(this._ref) {
-    _injector = CommandInjector(_probe, (pane, text) {
-      try {
-        _send(pane, text: text, enter: true);
-      } on CliFailure {
-        // The pane ended before its shell was ready: nothing to type into.
-      }
-    });
+    _injector = CommandInjector(_probe, typeNow);
+  }
+
+  /// Types [text] and Enter into [pane] now.
+  void typeNow(int pane, String text) {
+    try {
+      _send(pane, text: text, enter: true);
+    } on CliFailure {
+      // The pane ended before its shell was ready: nothing to type into.
+    }
   }
 
   final Ref _ref;

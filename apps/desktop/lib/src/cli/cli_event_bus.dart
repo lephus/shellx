@@ -112,6 +112,17 @@ final class CliEventBus {
 
   bool _isSwapTarget(int id) => _swapped.values.any((r) => r.to == id);
 
+  /// Where a pane id ended up after the swaps of this diff.
+  int _swappedEnd(int id) {
+    var current = id;
+    for (var i = 0; i < 64; i++) {
+      final next = _swapped[current];
+      if (next == null) break;
+      current = next.to;
+    }
+    return current;
+  }
+
   void _tabs(TerminalTabsState? before, TerminalTabsState after) {
     if (!_listened || before == null) return;
     final old = {for (final t in before.tabs) t.id: t};
@@ -163,7 +174,7 @@ final class CliEventBus {
         }
       }
       if (o.focusedPaneId != t.focusedPaneId &&
-          _swapped[o.focusedPaneId]?.to != t.focusedPaneId) {
+          _swappedEnd(o.focusedPaneId) != t.focusedPaneId) {
         _emitFor(t.id, {
           'kind': 'pane.focused',
           'pane': t.focusedPaneId,
@@ -184,9 +195,7 @@ final class CliEventBus {
     if (reselected && !old.containsKey(selected)) {
       _emitFor(selected, {'kind': 'tab.selected', 'tab': selected});
     }
-    _swapped.removeWhere(
-      (_, r) => now[r.tabId]?.panes.containsKey(r.to) ?? true,
-    );
+    _swapped.clear(); // each swap is announced just before its own diff
   }
 
   /// `tab.opened` with its workspace; when the sidebar has not placed the

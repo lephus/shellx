@@ -40,9 +40,9 @@ final class UiCommandHandler implements UiApi {
     this._ref, {
     this.openWait = const Duration(seconds: 10),
     Duration tmuxBound = kTmuxListBound,
-  }) : _io = PaneIoCommands(_ref),
-       _configCommands = ConfigCommands(_ref),
-       _ssh = SshCommands(_ref, tmuxBound: tmuxBound) {
+  }) : _tmuxBound = tmuxBound,
+       _io = PaneIoCommands(_ref),
+       _configCommands = ConfigCommands(_ref) {
     onCommand = _io.typeCommand;
   }
 
@@ -55,7 +55,8 @@ final class UiCommandHandler implements UiApi {
   final ConfigCommands _configCommands;
 
   /// A8 D22, D33: `ui.ssh.open` and `ui.tmux.*`.
-  final SshCommands _ssh;
+  late final SshCommands _ssh = SshCommands(_ref, _io, tmuxBound: _tmuxBound);
+  final Duration _tmuxBound;
 
   /// D33: how long a request waits for another open in flight.
   final Duration openWait;
@@ -239,6 +240,7 @@ final class UiCommandHandler implements UiApi {
       // folder there.
       final launch = workspace == null ? null : _side.launchFor(workspace);
       if (launch is SshLaunch) {
+        if (cmd != null && !launch.hook) throw badRequest(kCmdNeedsHook);
         return _tabs.openTabFor(
           launch: SshLaunch(
             launch.target,
@@ -258,8 +260,19 @@ final class UiCommandHandler implements UiApi {
     }, leaving);
     if (select) _side.reveal(tab);
     _marks.touch(tab: tab, pane: tab);
-    if (cmd != null) onCommand?.call(tab, cmd);
+    if (cmd != null) _typeCommand(tab, cmd);
     return {'tab': tab, 'pane': tab};
+  }
+
+  /// D16: `--cmd` for a new pane: a server pane waits for its hello
+  /// (A8), any other for its shell's first prompt.
+  void _typeCommand(int pane, String cmd) {
+    final remote = _tabsState.tabOfSession(pane)?.panes[pane]?.remote;
+    if (remote?.launch.host != null) {
+      _ssh.typeOnServer(pane, cmd);
+    } else {
+      onCommand?.call(pane, cmd);
+    }
   }
 
   /// D15: any pane of any tab; focus and selection stay unless `focus`,
@@ -277,6 +290,13 @@ final class UiCommandHandler implements UiApi {
     final cwd = stringField(r, 'cwd');
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final focus = flagField(r, 'focus');
+    // A8: a pane on a server must not get the command before its hello.
+    final server = _tabsState.tabOfSession(target)?.panes[target]?.remote;
+    if (cmd != null &&
+        server?.launch.host != null &&
+        !server!.launch.usesHook) {
+      throw badRequest(kCmdNeedsHook);
+    }
     final pane = await _opening(
       () => _tabs.splitPaneFor(target, axis, cwd: cwd, focus: focus),
       leaving,
@@ -287,7 +307,7 @@ final class UiCommandHandler implements UiApi {
       _side.reveal(tab);
     }
     _marks.touch(tab: tab, pane: pane);
-    if (cmd != null) onCommand?.call(pane, cmd);
+    if (cmd != null) _typeCommand(pane, cmd);
     return {'pane': pane, 'tab': tab};
   }
 
@@ -347,11 +367,7 @@ final class UiCommandHandler implements UiApi {
   // ---- servers and tmux (A8 D22, D33) --------------------------------------
 
   Future<Map<String, Object?>> _sshOpen(MuxMessage r, _Leaving leaving) async {
-    final opened = await _ssh.open(
-      r,
-      (open) => _opening(open, leaving),
-      onCommand,
-    );
+    final opened = await _ssh.open(r, (open) => _opening(open, leaving));
     _marks.touch(tab: opened['tab']! as int, pane: opened['pane']! as int);
     return opened;
   }

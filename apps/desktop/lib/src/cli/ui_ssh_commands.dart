@@ -9,7 +9,7 @@ import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import 'cli_fields.dart';
 import 'cli_targets.dart';
-import 'ui_pane_io.dart' show kCmdMaxBytes;
+import 'ui_pane_io.dart' show PaneIoCommands, kCmdMaxBytes;
 
 /// Opens a tab the way the handler's `_opening` does (D33: waits its turn,
 /// maps the tab list's failures to wire codes). [open] runs afresh on every
@@ -20,15 +20,58 @@ typedef CliOpening = Future<int> Function(Future<int> Function() open);
 /// that never answers must not hang the command line.
 const Duration kTmuxListBound = Duration(seconds: 8);
 
+/// Why `--cmd` needs the hook on a server.
+const String kCmdNeedsHook = '--cmd needs the server hook';
+
+/// How long a `--cmd` for a server pane waits for the server shell's hello.
+const Duration kHelloWait = Duration(seconds: 60);
+
+/// Types a command into a server pane only after its remote hook said
+/// hello (the shell is up; no sign-in prompt is waiting for a password or
+/// a host-key answer). No quiet or time fallbacks: a slow prompt must never
+/// receive the command. Drops it silently when the pane ends or is
+/// replaced, or when no hello comes within [wait]. [view] is null once the
+/// pane is gone.
+void typeWhenHello({
+  required Stream<void> changes,
+  required ({bool exited, bool connected})? Function() view,
+  required void Function() type,
+  Duration wait = kHelloWait,
+}) {
+  StreamSubscription<void>? sub;
+  Timer? timer;
+  var done = false;
+  void finish() {
+    done = true;
+    timer?.cancel();
+    unawaited(sub?.cancel());
+  }
+
+  void check() {
+    if (done) return;
+    final v = view();
+    if (v == null || v.exited) return finish();
+    if (v.connected) {
+      finish();
+      type();
+    }
+  }
+
+  sub = changes.listen((_) => check());
+  timer = Timer(wait, finish);
+  check();
+}
+
 /// A8 D22, D33: `ui.ssh.open`, `ui.tmux.list`, `ui.tmux.attach` on
 /// [SshActions]. Everything a script sends (server, folder, tmux name) is
 /// checked here before anything runs, and goes to ssh as argv only.
 ///
 /// Never logs request contents (servers, folders, commands, session names).
 final class SshCommands {
-  SshCommands(this._ref, {this.tmuxBound = kTmuxListBound});
+  SshCommands(this._ref, this._io, {this.tmuxBound = kTmuxListBound});
 
   final Ref _ref;
+  final PaneIoCommands _io;
   final Duration tmuxBound;
 
   SshActions get _ssh => _ref.read(sshActionsProvider);
@@ -56,13 +99,34 @@ final class SshCommands {
     return cwd;
   }
 
-  /// `{tab, pane}` of a new tab on a server. [typeCommand] is the window's
-  /// `--cmd` path (types once the remote shell is ready, D32).
-  Future<Map<String, Object?>> open(
-    MuxMessage r,
-    CliOpening opening,
-    void Function(int tab, String cmd)? typeCommand,
-  ) async {
+  /// Types [cmd] into server pane [pane] after the hello, once.
+  void typeOnServer(int pane, String cmd) {
+    final tabs = _ref.read(terminalTabsProvider);
+    if (tabs.tabOfSession(pane) == null) return;
+    late final StreamController<void> changes;
+    ProviderSubscription<TerminalTabsState>? sub;
+    changes = StreamController<void>(
+      sync: true,
+      onListen: () =>
+          sub = _ref.listen(terminalTabsProvider, (_, _) => changes.add(null)),
+      onCancel: () => sub?.close(),
+    );
+    typeWhenHello(
+      changes: changes.stream,
+      view: () {
+        final p = _ref
+            .read(terminalTabsProvider)
+            .tabOfSession(pane)
+            ?.panes[pane];
+        if (p == null) return null;
+        return (exited: p.exited, connected: p.remote?.connected ?? false);
+      },
+      type: () => _io.typeNow(pane, cmd),
+    );
+  }
+
+  /// `{tab, pane}` of a new tab on a server; `--cmd` waits for the hello.
+  Future<Map<String, Object?>> open(MuxMessage r, CliOpening opening) async {
     final target = _target(r, 'target');
     final cwd = remoteCwd(r);
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
@@ -72,6 +136,10 @@ final class SshCommands {
       throw badRequest('hook must be true or false');
     }
     final focus = flagField(r, 'focus');
+    // The setting may switch the hook off for this server too.
+    if (cmd != null && !(hook != false && _ssh.hookFor(target.key))) {
+      throw badRequest(kCmdNeedsHook);
+    }
     final tab = await opening(
       () => _remote(
         () => _ssh.connectForCli(
@@ -87,7 +155,7 @@ final class SshCommands {
       ),
     );
     if (focus) _side.reveal(tab);
-    if (cmd != null) typeCommand?.call(tab, cmd);
+    if (cmd != null) typeOnServer(tab, cmd);
     return {'tab': tab, 'pane': tab};
   }
 

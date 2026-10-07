@@ -1378,7 +1378,6 @@ fn ssh_prints_the_tab_and_maps_errors() {
             "~/app",
             "--cmd",
             "make test",
-            "--no-hook",
         ],
         &[],
         vec![(
@@ -1394,7 +1393,7 @@ fn ssh_prints_the_tab_and_maps_errors() {
     // A server path is never made absolute against the local directory.
     assert_eq!(m.get("cwd"), Some(&Value::text("~/app")));
     assert_eq!(m.get("cmd"), Some(&Value::text("make test")));
-    assert_eq!(m.get("hook"), Some(&Value::Bool(false)));
+    assert_eq!(m.get("hook"), Some(&Value::Bool(true)));
     assert_eq!(m.get("focus"), Some(&Value::Bool(false)));
     assert_eq!(m.get("workspace"), None);
     let j = go(
@@ -1577,4 +1576,29 @@ fn ls_shows_where_a_pane_is_remote() {
         o.out
     );
     assert!(!o.out.chars().any(|c| c.is_control() && c != '\n'));
+}
+
+#[test]
+fn ssh_cmd_needs_the_hook() {
+    let o = go(
+        &["ssh", "devbox", "--no-hook", "--cmd", "make"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+    );
+    assert_eq!((o.code, o.connected), (2, false));
+    assert!(o.err.contains("--cmd needs the server hook"), "{}", o.err);
+    // The host's own refusal (the per-server setting) is exit 2 as well.
+    let h = go(
+        &["ssh", "devbox", "--cmd", "make"],
+        &[],
+        vec![(
+            "ui.ssh.open",
+            remote("bad_request", "--cmd needs the server hook"),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!(h.code, 2);
 }

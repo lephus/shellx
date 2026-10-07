@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
+import 'package:shellx_desktop/src/cli/ui_ssh_commands.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/remote/remote_tools_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
@@ -69,8 +72,6 @@ void main() {
 
   test('ui.ssh.open: validates, lands in the SSH workspace, no focus, '
       '--cmd types once ready (D33)', () async {
-    final typed = <(int, String)>[];
-    h.onCommand = (pane, cmd) => typed.add((pane, cmd));
     final r = await call('ui.ssh.open', {
       'target': 'devbox',
       'cwd': '/srv',
@@ -85,7 +86,9 @@ void main() {
     );
     expect(tabs().selectedId, 100);
     expect(side().workspaceOf(r['tab']! as int), isNot(kDefaultWorkspaceId));
-    expect(typed, [(r['tab'], 'make')]);
+    final id = r['tab']! as int;
+    await pumpEventQueue();
+    expect(local.views[id]!.writes, isEmpty); // no hello yet
     final plain = await call('ui.ssh.open', {
       'target': 'devbox',
       'hook': false,
@@ -280,4 +283,145 @@ void main() {
       expect(local.openCwds.last, '/w');
     },
   );
+
+  group('--cmd on a server pane (review 1)', () {
+    void hello(int id, SshTarget target) => local.replace(
+      local.summary(
+        id,
+        origin: SessionOrigin.desktop,
+        remote: SessionRemote(launch: SshLaunch(target), connected: true),
+      ),
+    );
+
+    test('typed once, after the server shell said hello; never before, '
+        'however quiet the sign-in prompt is', () async {
+      final target = SshTarget.parse('devbox')!;
+      final r = await call('ui.ssh.open', {'target': 'devbox', 'cmd': 'make'});
+      final id = r['tab']! as int;
+      local.views[id]!.emit('devbox password: ');
+      await pumpEventQueue();
+      await Future<void>.delayed(const Duration(milliseconds: 1700));
+      expect(local.views[id]!.writes, isEmpty);
+      hello(id, target);
+      await pumpEventQueue();
+      expect(local.views[id]!.writes.join(), contains('make'));
+      hello(id, target); // another change: not typed twice
+      await pumpEventQueue();
+      expect('make'.allMatches(local.views[id]!.writes.join()), hasLength(1));
+    });
+
+    test('a pane that ends first gets nothing', () async {
+      final r = await call('ui.ssh.open', {'target': 'devbox', 'cmd': 'make'});
+      final id = r['tab']! as int;
+      local.summaries.removeWhere((s) => s.id == id);
+      local.views[id]!.end(255);
+      await pumpEventQueue();
+      expect(local.views[id]!.writes, isEmpty);
+    });
+
+    test('without the hook --cmd is refused up front, nothing opens', () async {
+      final before = local.openLaunches.length;
+      await expectLater(
+        call('ui.ssh.open', {'target': 'devbox', 'cmd': 'x', 'hook': false}),
+        throwsA(
+          isA<CliFailure>()
+              .having((e) => e.code, 'code', 'bad_request')
+              .having((e) => e.message, 'message', kCmdNeedsHook),
+        ),
+      );
+      expect(local.openLaunches, hasLength(before));
+      final ws = side().workspaces.where((w) => w.ssh != null).map((w) => w.id);
+      expect(ws, isEmpty);
+      // The same refusal for a tab made in a server's workspace.
+      await c
+          .read(settingsStoreProvider)
+          .setBool(SettingKeys.sshRemoteHook, false);
+      final first = await call('ui.ssh.open', {'target': 'devbox'});
+      final id = side().workspaceOf(first['tab']! as int)!;
+      await expectLater(
+        call('ui.tab.new', {'workspace': id, 'cmd': 'x'}),
+        fails('bad_request'),
+      );
+    });
+
+    test('new-tab in a server workspace waits for hello too', () async {
+      final first = await call('ui.ssh.open', {'target': 'devbox'});
+      final ws = side().workspaceOf(first['tab']! as int)!;
+      final r = await call('ui.tab.new', {'workspace': ws, 'cmd': 'ls'});
+      final id = r['tab']! as int;
+      await pumpEventQueue();
+      expect(local.views[id]!.writes, isEmpty);
+      hello(id, SshTarget.parse('devbox')!);
+      await pumpEventQueue();
+      expect(local.views[id]!.writes.join(), contains('ls'));
+    });
+
+    test('typeWhenHello: no typing at 1.5 s, 5 s or 10 s; 60 s drops it', () {
+      fakeAsync((async) {
+        final changes = StreamController<void>.broadcast(sync: true);
+        var connected = false;
+        var typed = 0;
+        typeWhenHello(
+          changes: changes.stream,
+          view: () => (exited: false, connected: connected),
+          type: () => typed++,
+        );
+        for (final s in [2, 4, 5]) {
+          async.elapse(Duration(seconds: s)); // 2, 6, 11 s
+          expect(typed, 0);
+        }
+        async.elapse(const Duration(seconds: 50)); // past 60 s
+        connected = true;
+        changes.add(null);
+        expect(typed, 0); // dropped, still not typed
+        changes.close();
+      });
+      fakeAsync((async) {
+        final changes = StreamController<void>.broadcast(sync: true);
+        var connected = false;
+        var typed = 0;
+        typeWhenHello(
+          changes: changes.stream,
+          view: () => (exited: false, connected: connected),
+          type: () => typed++,
+        );
+        async.elapse(const Duration(seconds: 30));
+        connected = true;
+        changes.add(null);
+        changes.add(null);
+        expect(typed, 1);
+        changes.close();
+      });
+      fakeAsync((async) {
+        final changes = StreamController<void>.broadcast(sync: true);
+        var exited = false;
+        var typed = 0;
+        typeWhenHello(
+          changes: changes.stream,
+          view: () => (exited: exited, connected: exited),
+          type: () => typed++,
+        );
+        exited = true;
+        changes.add(null);
+        expect(typed, 0);
+        changes.close();
+      });
+    });
+  });
+
+  test('a pane id two reconnects old still resolves (chain)', () async {
+    final opened = await call('ui.ssh.open', {'target': 'devbox'});
+    final first = opened['pane']! as int;
+    final notifier = c.read(terminalTabsProvider.notifier);
+    var current = first;
+    for (var i = 0; i < 2; i++) {
+      local.summaries.removeWhere((s) => s.id == current);
+      local.views[current]!.end(255);
+      await pumpEventQueue();
+      current = (await notifier.reconnect(current))!;
+    }
+    expect(current, isNot(first));
+    await call('ui.pane.send', {'pane': first, 'text': 'hop'});
+    expect(local.views[current]!.writes.join(), contains('hop'));
+  });
 }

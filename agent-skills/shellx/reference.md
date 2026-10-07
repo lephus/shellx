@@ -282,7 +282,7 @@ Open a server in a tab, or attach a tmux session, from a script. `shellx` itself
 
 ## shellx ssh
 
-`shellx ssh SERVER [--workspace W] [--cwd DIR] [--cmd COMMAND] [--no-hook] [--focus] [--json]` — open a tab on a server over SSH; prints its id (`t41`; `--json`: `{"tab":"t41","pane":"p41"}`). `SERVER` is an `~/.ssh/config` alias or `user@host[:port]`. `--cwd` is a folder on the server (`/...` or `~/...`; never made absolute locally). `--cmd` is typed once the remote shell is ready (at most 16 KiB). `--no-hook` skips installing the ShellX hook on the server. The tab opens in the server's SSH workspace unless `--workspace` is given, and the user's focus is left alone unless `--focus`. Exit codes: 0, 1 (`ssh_unavailable`: no ssh on this computer; `spawn_failed`, `session_limit`, `busy`), 2, 3, 6, 7.
+`shellx ssh SERVER [--workspace W] [--cwd DIR] [--cmd COMMAND] [--no-hook] [--focus] [--json]` — open a tab on a server over SSH; prints its id (`t41`; `--json`: `{"tab":"t41","pane":"p41"}`). `SERVER` is an `~/.ssh/config` alias or `user@host[:port]`. `--cwd` is a folder on the server (`/...` or `~/...`; never made absolute locally). `--cmd` is typed only after the server shell says hello (the ShellX hook runs there), never into a sign-in prompt; it needs the hook, so `--no-hook` with `--cmd` (or a server set to no hook) is refused (exit 2, `bad_request`: "--cmd needs the server hook"), and it is dropped when the pane ends or no hello comes within 60 s (at most 16 KiB). `--no-hook` skips installing the ShellX hook on the server. The tab opens in the server's SSH workspace unless `--workspace` is given, and the user's focus is left alone unless `--focus`. Exit codes: 0, 1 (`ssh_unavailable`: no ssh on this computer; `spawn_failed`, `session_limit`, `busy`), 2, 3, 6, 7.
 
 ## shellx tmux ls
 
@@ -297,7 +297,7 @@ Recipes:
 - Open a server tab next to the user and run tests: `t=$(shellx ssh devbox --cwd ~/app --cmd 'make test')`, then `shellx wait p${t#t} --match 'PASS|FAIL' --timeout 600`.
 - Attach the team's tmux session: `shellx tmux ls --host devbox --json`, then `shellx tmux attach main --host devbox`.
 
-A pane that is remote shows in `shellx ls` as `[ssh host]` or `[tmux host:name]` (plus its state while it is not connected); `--json` carries `"remote":{"kind","host"?,"tmux"?,"state"}`. When a lost connection is restored the pane gets a new id: the old id keeps working for later commands, and `shellx events` reports `pane.replaced` with `old` and `new`.
+A pane that is remote shows in `shellx ls` as `[ssh host]` or `[tmux host:name]` (plus its state while it is not connected); `--json` carries `"remote":{"kind","host"?,"tmux"?,"state"}`. When a lost connection is restored the pane gets a new id: the old id keeps working for later commands, and `shellx events` reports one `pane.replaced` with `{old, new, tab}` instead of a close and an open.
 
 ## shellx config path
 
