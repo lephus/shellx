@@ -140,4 +140,12 @@ void main() {
       expect(Directory('$home/.cache/shellx').existsSync(), isFalse);
     },
   );
+
+  test('a huge cwd runs: falls back to home (I2)', () async {
+    final r = await run(
+      RemoteBootstrap(cwd: '/${"'" * 4000}'),
+      fakeShell('zsh'),
+    );
+    expect(r.stdout, contains('PWD:$home\n'));
+  });
 }

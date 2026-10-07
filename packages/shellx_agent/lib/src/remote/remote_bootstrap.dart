@@ -6,6 +6,10 @@ import 'tmux_sessions.dart' show tmuxListFormat;
 /// A8 D39.
 const int kMaxBootstrapBytes = 24 * 1024;
 
+/// The encoded command stays under the Windows command line limit (32,767)
+/// with a margin.
+const int kMaxBootstrapCommandChars = 30767;
+
 /// One sh word holding exactly [value].
 String shQuote(String value) => "'${value.replaceAll("'", r"'\''")}'";
 
@@ -34,6 +38,8 @@ __shellx_remote_meta() {
       "ref: refs/heads/"*) b="${b#ref: refs/heads/}" ;;
       *) b="${b:0:7}" ;;
     esac
+    b="${b:0:200}"
+    case "$b" in *[![:print:]]*) b= ;; esac
   fi
   if [ -z "${__shellx_branch_set-}" ] || [ "$b" != "$__shellx_branch" ]; then
     __shellx_branch_set=1
@@ -164,7 +170,8 @@ esac
 
 const String _tmuxExec = r'''
 case "${s##*/}" in
-  bash|zsh|sh|dash|ksh|mksh|fish) exec "$s" -l -c 'exec tmux @TMUX@' ;;
+  sh|dash) exec "$s" -c 'exec tmux @TMUX@' ;;
+  bash|zsh|ksh|mksh|fish) exec "$s" -l -c 'exec tmux @TMUX@' ;;
   *) PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/local/bin"; export PATH; exec tmux @TMUX@ ;;
 esac
 ''';
@@ -172,6 +179,24 @@ esac
 /// D10: the POSIX sh text the server runs. Only [RemoteBootstrap.cwd] and
 /// [RemoteBootstrap.tmuxSession] come from the user, through [shQuote].
 String remoteBootstrapScript(RemoteBootstrap b) {
+  final script = _bootstrapScript(b);
+  if (b.cwd == null ||
+      (utf8.encode(script).length <= kMaxBootstrapBytes &&
+          remoteExecCommand(script).length <= kMaxBootstrapCommandChars)) {
+    return script;
+  }
+  // A huge or quote-heavy folder: start in home rather than not at all.
+  return _bootstrapScript(
+    RemoteBootstrap(
+      cwd: '~',
+      tmuxSession: b.tmuxSession,
+      tmuxCreate: b.tmuxCreate,
+      writeHooks: b.writeHooks,
+    ),
+  );
+}
+
+String _bootstrapScript(RemoteBootstrap b) {
   final out = StringBuffer(_prelude);
   if (b.writeHooks && b.tmuxSession == null) {
     out.write(
@@ -218,7 +243,8 @@ String remoteTmuxListScript() =>
     r'''
 s=${SHELL:-/bin/sh}
 case "${s##*/}" in
-  bash|zsh|sh|dash|ksh|mksh|fish) exec "$s" -l -c 'exec tmux list-sessions -F "$SHELLX_FMT"' ;;
+  sh|dash) exec "$s" -c 'exec tmux list-sessions -F "$SHELLX_FMT"' ;;
+  bash|zsh|ksh|mksh|fish) exec "$s" -l -c 'exec tmux list-sessions -F "$SHELLX_FMT"' ;;
   *) PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/local/bin"; export PATH; exec tmux list-sessions -F "$SHELLX_FMT" ;;
 esac
 ''';

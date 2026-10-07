@@ -107,4 +107,25 @@ void main() {
       expect(r.stdout, value);
     }
   }, testOn: 'mac-os || linux');
+
+  test('a huge quote-heavy cwd falls back to home, under both limits (I2)', () {
+    final script = remoteBootstrapScript(
+      RemoteBootstrap(cwd: '/${"'" * 4000}'),
+    );
+    expect(utf8.encode(script).length, lessThan(kMaxBootstrapBytes));
+    expect(script, isNot(contains('cd --')));
+    expect(script, contains('\ncd\n'));
+    expect(remoteExecCommand(script).length, lessThan(30767));
+  });
+
+  test('sh and dash get no -l for tmux and the list script (M3)', () {
+    final t = remoteBootstrapScript(
+      const RemoteBootstrap(tmuxSession: 'm', writeHooks: false),
+    );
+    expect(t, contains('sh|dash) exec "\$s" -c '));
+    expect(t, contains('bash|zsh|ksh|mksh|fish) exec "\$s" -l -c '));
+    final l = remoteTmuxListScript();
+    expect(l, contains('sh|dash) exec "\$s" -c '));
+    expect(l, contains('bash|zsh|ksh|mksh|fish) exec "\$s" -l -c '));
+  });
 }

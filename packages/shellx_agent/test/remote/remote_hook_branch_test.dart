@@ -81,6 +81,20 @@ void main() {
       await waitFor('\x1b]7;', from: mark);
       expect(text.toString().substring(mark), isNot(contains('6973;branch')));
       mark = text.length;
+      File(
+        '${repo.path}/HEAD',
+      ).writeAsStringSync('ref: refs/heads/a\x07\x1b]52;c;ZXZpbA==\x07\n');
+      view.write(utf8.encode('true\n'));
+      await waitFor('\x1b]6973;branch=\x07', from: mark);
+      expect(text.toString().substring(mark), isNot(contains(']52')));
+      mark = text.length;
+      File(
+        '${repo.path}/HEAD',
+      ).writeAsStringSync('ref: refs/heads/${'b' * 300}\n');
+      view.write(utf8.encode('true\n'));
+      await waitFor('\x1b]6973;branch=${'b' * 200}\x07', from: mark);
+      expect(text.toString().substring(mark), isNot(contains('b' * 201)));
+      mark = text.length;
       view.write(utf8.encode("cd '${wt.path}'\n"));
       await waitFor('\x1b]6973;branch=0123456\x07', from: mark);
     });
