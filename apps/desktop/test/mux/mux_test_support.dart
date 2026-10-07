@@ -13,7 +13,8 @@ final class TestListener implements MuxListener {
   @override
   String get address => 'test';
   @override
-  Future<void> close() async {}
+  Future<void> close() async => closed = true;
+  bool closed = false;
   void push(MuxConnection c) => _c.add(c);
 }
 

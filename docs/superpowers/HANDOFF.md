@@ -500,5 +500,6 @@ Ghi đạt/không đạt kèm ngày + máy vào ledger, mục "A5b (daemon) — 
 - [ ] **W6. Toast (D24):** thông báo của phiên nền hiện tên "ShellX" với biểu tượng (AUMID đã đăng ký) khi chỉ có phiên nền chạy.
 - [ ] **W7. Gỡ cài đặt:** còn shell đang chạy → Gỡ: không còn `shellx-mux.exe` hay `ShellX.exe`, thư mục `%LOCALAPPDATA%\ShellX\mux` và `\restore` bị xoá; không treo vì file bị khoá.
 - [ ] **W8. Khôi phục (Restart Manager):** Setup/Restart Manager khi giao diện chạy với phiên nền: giao diện lưu sạch rồi thoát, phiên nền ở lại.
+- [ ] **W9. Chế độ TẮT (mặc định):** Setup/Gỡ khi ShellX chạy không có phiên nền → không còn tiến trình shell/ssh mồ côi (`Get-Process pwsh,powershell,ssh`). Ghi chú: Setup bỏ `/T` với `ShellX.exe` cả ở chế độ TẮT, vì `taskkill /T` đi theo cây cha và sẽ giết luôn phiên nền tách rời; shell trong tiến trình cửa sổ tự đóng khi host chết (ConPTY).
 
 **Điều kiện đổi mặc định sang BẬT.** Chỉ khi toàn bộ mục 1–15 (macOS) đạt trên máy thật và, để phát hành Windows, W1–W8 đạt trên Windows 11; một mục thất bại thì sửa trên branch (có test nếu được) rồi chạy lại. Khi đó đổi `defaultValue: false` của `background_service_enabled` ở `apps/desktop/lib/main.dart` (khoảng dòng 239) và `lib/src/tray/tray_actions.dart` (khoảng dòng 50, 205) cùng các test mặc định, cập nhật mục này và ledger. Cho tới lúc đó tính năng là opt-in.

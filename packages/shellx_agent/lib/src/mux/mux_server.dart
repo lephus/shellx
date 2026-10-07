@@ -79,9 +79,20 @@ final class MuxServer {
   Future<void> _quitOnce() {
     final running = _quit;
     if (running != null) return running;
+    stopAccepting();
+    return _quit = onQuit();
+  }
+
+  bool _stopped = false;
+
+  /// Accepts nobody from now on (the listener is closed, a straggler and a
+  /// connection mid-handshake are refused). Existing links stay. Used by
+  /// every way the service quits, not only `daemon.quit`.
+  void stopAccepting() {
+    if (_stopped) return;
+    _stopped = true;
     final listener = _listener;
     if (listener != null) unawaited(listener.close().catchError((Object _) {}));
-    return _quit = onQuit();
   }
 
   /// `ui.*` requests of `cli` clients, forwarded to the attached UI (no UI
@@ -96,7 +107,7 @@ final class MuxServer {
   }
 
   Future<void> _onConnection(MuxConnection c) async {
-    if (_quit != null || _handshaking >= 4) {
+    if (_stopped || _handshaking >= 4) {
       await c.close(); // D23
       return;
     }
@@ -123,7 +134,7 @@ final class MuxServer {
     } finally {
       _handshaking--;
     }
-    if (_quit != null) {
+    if (_stopped) {
       _refuse(c, MuxError.busy); // quitting: nobody attaches any more
       return;
     }
