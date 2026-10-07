@@ -49,6 +49,11 @@ final class MuxServer {
 
   /// Takes the `cli` connections (A5b D22); null → `unsupported_role`.
   /// Assignable because the host needs [uiApi] and the server the host.
+  ///
+  /// `daemon.status` over a `cli` connection is answered by the host and
+  /// keeps the frozen A7 `{host, clients}` shape. Settings changes (tray
+  /// toggles) call `cli.recheck()` directly in the daemon; there is no
+  /// `daemon.cli.recheck` message.
   CliHost? cli;
 
   /// D11: stop streaming a view above this many unacked bytes; resume
@@ -61,6 +66,11 @@ final class MuxServer {
   StreamSubscription<MuxConnection>? _accept;
   int _handshaking = 0;
   _UiLink? _ui;
+  Future<void>? _quit;
+
+  /// `daemon.quit`: [onQuit] runs once; repeated and concurrent requests
+  /// share its result.
+  Future<void> _quitOnce() => _quit ??= onQuit();
 
   /// `ui.*` requests of `cli` clients, forwarded to the attached UI (no UI
   /// → `not_found`, D22). Hand it to the [CliHost].
@@ -346,7 +356,7 @@ final class _UiLink {
             'caps': self.caps,
           });
         case MuxType.daemonQuit:
-          await server.onQuit();
+          await server._quitOnce();
           _reply(q);
         case MuxType.sessionsList:
           _reply(q, {'sessions': _summaries()});
@@ -487,13 +497,13 @@ final class _UiLink {
     });
   }
 
-  void _sendOut(int id, _ViewLink link, Uint8List bytes) {
+  void _sendOut(int id, _ViewLink link, Uint8List bytes, {bool count = true}) {
     for (var i = 0; i < bytes.length; i += kTermMaxChunk) {
       final end = i + kTermMaxChunk < bytes.length
           ? i + kTermMaxChunk
           : bytes.length;
       final piece = Uint8List.sublistView(bytes, i, end);
-      link.unacked += piece.length;
+      if (count) link.unacked += piece.length;
       _send(MuxMessage(MuxType.viewOut, fields: {'id': id, 'data': piece}));
     }
   }
@@ -517,7 +527,9 @@ final class _UiLink {
         ..paused = false
         ..unacked = 0;
       _send(MuxMessage(MuxType.viewReset, fields: {'id': id}));
-      _sendOut(id, link, fresh.backlog);
+      // The re-sent backlog is not counted: it must not re-pause the view
+      // it just resumed (D11).
+      _sendOut(id, link, fresh.backlog, count: false);
       _listen(id, link);
     }
   }

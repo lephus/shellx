@@ -534,4 +534,107 @@ void main() {
     ui.send(const MuxMessage(MuxType.uiEvent, fields: {'kind': 'tab'}));
     expect((await event)['kind'], 'tab');
   });
+
+  test(
+    'daemon.quit runs onQuit once for repeated and concurrent calls',
+    () async {
+      quitGate = Completer<void>();
+      build();
+      final c = await attach(listener);
+      final a = request(c, req(MuxType.daemonQuit));
+      final b = request(c, req(MuxType.daemonQuit));
+      await pumpEventQueue();
+      quitGate.complete();
+      expect((await a).type, MuxType.result);
+      expect((await b).type, MuxType.result);
+      expect((await request(c, req(MuxType.daemonQuit))).type, MuxType.result);
+      expect(quitCalls, 1);
+    },
+  );
+
+  test('the reset backlog does not count as unacked (no re-pause)', () async {
+    final id = await rig.manager.open(cols: 80, rows: 24);
+    build(stopAbove: 1000, resumeBelow: 200);
+    final c = await attach(listener);
+    final got = <MuxMessage>[];
+    c.messages.listen(got.add);
+    await request(c, req(MuxType.viewOpen, {'id': id}));
+    for (final ch in ['a', 'b', 'c']) {
+      rig.pty(0).emit(ch * 600);
+      await pumpEventQueue();
+    }
+    c.send(MuxMessage(MuxType.viewAck, fields: {'id': id, 'bytes': 1500}));
+    await pumpEventQueue();
+    got.clear();
+    rig.pty(0).emit('live1');
+    await pumpEventQueue();
+    rig.pty(0).emit('live2');
+    await pumpEventQueue();
+    expect(
+      [for (final m in got) utf8.decode(m.get<Uint8List>('data')!)],
+      ['live1', 'live2'],
+    );
+  });
+
+  group('adopted cli connections keep the A7 rules', () {
+    var external = false;
+    late CliHost host;
+    setUp(() {
+      external = false;
+      host = CliHost.adopted(
+        ui: FakeUiApi(),
+        enabled: () => true,
+        token: 'tok',
+        allowExternal: () => external,
+        appVersion: '1.6.0',
+        hostKind: () => 'daemon',
+        uiAttached: () => server.uiAttached,
+        maxLimited: 1,
+      );
+      build();
+      server.cli = host;
+    });
+    tearDown(() => host.stop());
+
+    test(
+      'a token-less client is limited: version and pane-less notify only',
+      () async {
+        final c = await attach(listener, role: 'cli');
+        expect(
+          (await request(c, req(CliType.apiVersion))).type,
+          MuxType.result,
+        );
+        expect(
+          (await request(c, req(CliType.cliNotify, {'body': 'x'}))).type,
+          MuxType.result,
+        );
+        final r = await request(c, req(CliType.uiLs));
+        expect(r.get<String>('code'), CliError.forbidden);
+        await c.done;
+      },
+    );
+
+    test('allowExternal off then recheck() closes a token-less client that '
+        'used the full API', () async {
+      external = true;
+      final c = await attach(listener, role: 'cli');
+      expect((await request(c, req(CliType.uiLs))).type, MuxType.result);
+      final closed = c.done;
+      external = false;
+      host.recheck();
+      await closed.timeout(const Duration(seconds: 2));
+    });
+
+    test('the limited cap applies to adopted connections', () async {
+      final first = await attach(listener, role: 'cli');
+      await request(first, req(CliType.apiVersion));
+      final second = await attach(listener, role: 'cli');
+      expect((await firstError(second)).get<String>('code'), MuxError.busy);
+      final withToken = await attach(listener, role: 'cli', token: 'tok');
+      expect(
+        (await request(withToken, req(CliType.apiVersion))).type,
+        MuxType.result,
+      );
+    });
+  });
 }
