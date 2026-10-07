@@ -145,6 +145,7 @@ extension _Restore on TerminalTabs {
     } finally {
       if (live()) {
         _restoreHeld.clear();
+        _restoreRemote.clear();
         _sync(); // anything opened elsewhere meanwhile becomes its own tab
       }
       // Cancelled (A5a m1): no selection taken, no toast.
@@ -243,7 +244,7 @@ extension _Restore on TerminalTabs {
       if (identical(_local, local)) {
         _restoreHeld.add(id);
         if (text != null) _restoreText[id] = text;
-        if (launch != null) {
+        if (launch != null && launch.host != null) {
           _restoreRemote[id] =
               local.sessions.where((s) => s.id == id).firstOrNull ??
               SessionSummary(
@@ -333,7 +334,10 @@ extension _Restore on TerminalTabs {
   /// A pane for a server session that ended before it could be attached:
   /// the saved text, then the "couldn't connect" line; Enter reconnects
   /// (UI-A8 §3.2). Nothing to write to: there is no session behind it.
-  PaneSession _lostRemotePane(SessionSummary s, TerminalGrid? size) {
+  PaneSession? _lostRemotePane(SessionSummary s, TerminalGrid? size) {
+    // A local tmux client has no server to name: dropped as any local pane.
+    final host = s.remote?.hostKey;
+    if (host == null) return null;
     final terminal = DesktopTerminal(
       platform: _platform(),
       maxLines: _ref.read(shellxConfigProvider).config.scrollbackLimit,
@@ -343,7 +347,6 @@ extension _Restore on TerminalTabs {
     terminal.resize(grid.cols, grid.rows);
     final restored = _restoreText.remove(s.id);
     if (restored != null) terminal.write(restored);
-    final host = s.remote!.hostKey!;
     final newline = terminal.buffer.cursorX == 0 ? '' : '\r\n';
     final line = _ref.read(appL10nProvider).sshFailedLine(host);
     terminal.write('$newline\x1b[2m$line\x1b[0m\x1b[?25l');

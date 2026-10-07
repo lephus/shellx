@@ -328,4 +328,32 @@ void main() {
     expect(local.openLaunches.last, SshLaunch(devbox, remoteCwd: '/srv/app'));
     expect(state().tabs.single.panes[fresh]!.remote, isNotNull);
   });
+
+  test('a local tmux pane that ends before its tab is built is dropped; the '
+      'restore goes on with the rest', () async {
+    boot();
+    local.afterOpen = (id) {
+      final launch = local.openLaunches.last;
+      if (launch is TmuxLaunch) {
+        local.summaries.removeWhere((s) => s.id == id);
+        local.views.remove(id);
+      }
+    };
+    final out = await tabs().restore(
+      RestorePlan(
+        snapshot: snap(
+          SavedSplit(
+            axis: SplitAxis.row,
+            ratio: 0.5,
+            first: SavedPane(key: k1, launch: TmuxLaunch('main')),
+            second: SavedPane(key: k2, cwd: '/Users/me'),
+          ),
+        ),
+        textByKey: const {},
+      ),
+    );
+    expect(out.panesFailed, 1);
+    expect(state().tabs.single.paneCount, 1);
+    expect(out.tabsRestored, 1);
+  });
 }
