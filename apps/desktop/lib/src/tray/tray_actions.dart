@@ -323,8 +323,21 @@ final class TrayActions {
             label: 'closing ssh helpers',
           );
         }
+        await _deleteImages();
         await _services.quitApp?.call();
     }
+  }
+
+  /// A10 D15: only where the shells end with the app (never when the
+  /// background service keeps them).
+  Future<void> _deleteImages() async {
+    final delete = _services.deletePastedImages;
+    if (delete == null) return;
+    await runBounded(
+      delete,
+      timeout: const Duration(seconds: 1),
+      label: 'deleting pasted images',
+    );
   }
 
   /// A5b D14, UI-A5 §6, §7.1: "Thoát" / ⌘Q ends the window only; the
@@ -428,6 +441,7 @@ final class TrayActions {
             .showNotice(const DaemonQuitFailedNotice());
         return;
       }
+      await _deleteImages();
     } else {
       await runBounded(
         daemon.disconnect,

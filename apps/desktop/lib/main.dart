@@ -53,11 +53,13 @@ import 'src/platform/wake_detector.dart';
 import 'src/restore/restore_paths.dart';
 import 'src/restore/restore_persistence.dart';
 import 'src/restore/restore_store.dart';
+import 'src/platform/backup_exclusion.dart';
 import 'src/startup.dart';
 import 'src/terminal/attention_announcer.dart';
 import 'src/terminal/clipboard_media.dart' show pasteImageStoreProvider;
 import 'src/terminal/local_sessions_provider.dart';
-import 'src/terminal/paste_image_store.dart' show PasteImageStore;
+import 'src/terminal/paste_image_store.dart'
+    show PasteImageStore, startPasteImageSweeps;
 import 'src/terminal/port_watch.dart';
 import 'src/terminal/tab_attention.dart';
 import 'src/terminal/terminal_tabs.dart';
@@ -171,11 +173,7 @@ Future<void> _start(
           appSupportPath: supportDirectory.path,
         ),
       ),
-      excludeFromBackup: Platform.isMacOS
-          ? (path) async {
-              await Process.run('/usr/bin/tmutil', ['addexclusion', path]);
-            }
-          : null,
+      excludeFromBackup: Platform.isMacOS ? excludeFromBackupMacOS : null,
       log: debugPrint,
     );
   } on StateError catch (error) {
@@ -278,12 +276,6 @@ Future<void> _start(
       timeout: _quitStepTimeout,
       label: 'removing the tray icon',
     );
-    // A10 D15: pasted images do not outlive the app (never longer than 1 s).
-    await runBounded(
-      () => container.read(pasteImageStoreProvider).deleteAll(),
-      timeout: const Duration(seconds: 1),
-      label: 'deleting pasted images',
-    );
     await runBounded(
       lock.release,
       timeout: _quitStepTimeout,
@@ -291,6 +283,11 @@ Future<void> _start(
     );
     exit(0);
   }
+
+  // A10 D15: pasted images go with the shells (in-process quit, "Quit
+  // completely"), never when the background service keeps them.
+  Future<void> deletePastedImages() =>
+      container.read(pasteImageStoreProvider).deleteAll();
 
   final AgentSide? side;
   final DesktopServices services;
@@ -310,6 +307,7 @@ Future<void> _start(
       // masters ("Thoát hoàn toàn" ends them there).
       shutdownRemote: () => cancelUiForwards(remoteTools),
       quitApp: quitApp,
+      deletePastedImages: deletePastedImages,
     );
   } else {
     side = buildAgentSide(
@@ -330,18 +328,24 @@ Future<void> _start(
       cliToken: cli?.token,
       stopRemoteRetries: stopRemoteRetries,
       quitApp: quitApp,
+      deletePastedImages: deletePastedImages,
     );
     services = side.services;
   }
+
+  // A10 D15: pasted images live 24 h at most: swept now and every hour.
+  final pasteImages = PasteImageStore(
+    supportDirectory,
+    excludeFromBackup: Platform.isMacOS ? excludeFromBackupMacOS : null,
+  );
+  startPasteImageSweeps(pasteImages);
 
   container = ProviderContainer(
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
-      pasteImageStoreProvider.overrideWithValue(
-        PasteImageStore(supportDirectory),
-      ),
+      pasteImageStoreProvider.overrideWithValue(pasteImages),
       restoreStoreProvider.overrideWithValue(restoreFiles),
       if (daemonMode) ...[
         daemonModeProvider.overrideWithValue(true),

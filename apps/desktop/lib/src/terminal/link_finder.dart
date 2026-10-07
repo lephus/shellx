@@ -4,6 +4,10 @@ import 'package:xterm/core.dart';
 import 'desktop_terminal.dart';
 import 'terminal_buffer_text.dart';
 
+/// How much of an OSC 8 link's text is read on hover: 8 rows, 2048 characters.
+const int kMaxHoverRows = 8;
+const int kMaxHoverText = 2048;
+
 /// Where a link came from.
 enum LinkSource { detected, hyperlink }
 
@@ -65,7 +69,20 @@ LinkHit? findLinkAt(
   if (osc != null) {
     final begin = osc.begin.offset;
     final end = osc.end.offset;
-    final visible = buffer.getText(BufferRangeLine(begin, end));
+    // A program can put one link over thousands of rows: only the start is
+    // read (hover runs this on every pointer move), and a link whose text
+    // was cut cannot be verified, so it asks first.
+    final tooLong = end.y - begin.y >= kMaxHoverRows;
+    var visible = buffer.getText(
+      BufferRangeLine(
+        begin,
+        tooLong ? CellOffset(0, begin.y + kMaxHoverRows) : end,
+      ),
+    );
+    final cut = tooLong || visible.length > kMaxHoverText;
+    if (visible.length > kMaxHoverText) {
+      visible = visible.substring(0, kMaxHoverText);
+    }
     return LinkHit(
       source: LinkSource.hyperlink,
       kind: TerminalLinkKind.url,
@@ -73,7 +90,7 @@ LinkHit? findLinkAt(
       begin: begin,
       end: end,
       visible: visible,
-      needsConfirm: !hyperlinkTextMatches(visible, osc.uri),
+      needsConfirm: cut || !hyperlinkTextMatches(visible, osc.uri),
     );
   }
   final line = logicalLineAt(buffer, cell.y);

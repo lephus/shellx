@@ -48,6 +48,7 @@ AgentSide buildAgentSide({
   required String deviceName,
   required RemoteTools remoteTools,
   required Future<void> Function() quitApp,
+  Future<void> Function()? deletePastedImages,
   CliPaths? cliPaths,
   String? cliSocket,
   String? cliToken,
@@ -137,6 +138,7 @@ AgentSide buildAgentSide({
       );
     },
     quitApp: quitApp,
+    deletePastedImages: deletePastedImages,
   );
   return (core: core, services: services);
 }
