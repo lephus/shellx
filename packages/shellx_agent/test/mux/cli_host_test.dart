@@ -264,6 +264,50 @@ void main() {
     },
   );
 
+  test('final M5: limited clients (token-less, not allowed) get at most 2 '
+      'of the 8 slots; ShellX shells still get the rest', () async {
+    final h = await InUiHost.start(FakeUiApi(), () => true, dir);
+    final limited = [await h.connect(), await h.connect(token: 'old')];
+    final third = await h._transport.connect('mem');
+    final refusal = third.messages.firstWhere((m) => m.type == 'error');
+    await clientHandshake(third, secret: h.secret, app: 't', role: 'cli');
+    expect(
+      (await refusal.timeout(const Duration(seconds: 1))).get<String>('code'),
+      'busy',
+    );
+    await third.done.timeout(const Duration(seconds: 1));
+    final shells = [
+      for (var i = 0; i < 6; i++) await h.connect(token: h.token),
+    ];
+    expect(h._host.clientCount, 8);
+    await limited.first.close();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final again = await h.connect();
+    final ok = again.messages.firstWhere((m) => m.q == 1);
+    again.send(const MuxMessage('api.version', q: 1));
+    expect((await ok).type, 'result');
+    expect(shells, hasLength(6));
+    await h.close();
+  });
+
+  test('final M5: with "Allow other terminals" ticked, token-less clients '
+      'are not limited', () async {
+    final h = await InUiHost.start(
+      FakeUiApi(),
+      () => true,
+      dir,
+      allowExternal: () => true,
+    );
+    for (var i = 0; i < 3; i++) {
+      final c = await h.connect();
+      final ok = c.messages.firstWhere((m) => m.q == 1);
+      c.send(const MuxMessage('ui.ls', q: 1));
+      expect((await ok).type, 'result');
+    }
+    expect(h._host.clientCount, 3);
+    await h.close();
+  });
+
   test('a client closing mid-request does not throw into the host', () async {
     final ui = FakeUiApi()..gate = Completer<void>();
     final h = await InUiHost.start(ui, () => true, dir);

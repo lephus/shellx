@@ -22,11 +22,12 @@ import 'ui_api.dart';
 /// `allowExternal()` ("Allow other terminals") is on, gets
 /// the full API. Any other client is *limited*: it may send `api.version`
 /// and a pane-less `cli.notify`; anything else is `forbidden` and closes
-/// the connection. `allowExternal()` is read per request and per event:
+/// the connection (final ruling M1: a client with a token that is not this
+/// launch's is told it comes from an earlier launch). `allowExternal()` is read per request and per event:
 /// unticking it applies to open connections at once.
 ///
-/// D32: at most [maxClients] authenticated clients and four handshakes at
-/// once; one connection's requests run in order, at most 64 waiting
+/// D32: at most [maxClients] authenticated clients (final ruling M5: of
+/// them at most [maxLimited] limited ones) and four handshakes at once; one connection's requests run in order, at most 64 waiting
 /// (`busy` beyond); [maxListeners] event subscribers. Back-pressure from
 /// the transport (`pendingBytes`/`drained`): while a client leaves over
 /// 256 KiB of answers unread, its requests wait and its input is paused;
@@ -46,6 +47,7 @@ final class CliHost {
     required bool Function() allowExternal,
     required this.appVersion,
     this.maxClients = 8,
+    this.maxLimited = 2,
     this.maxListeners = 4,
     void Function(String message)? log,
   }) : _transport = transport,
@@ -59,6 +61,10 @@ final class CliHost {
   final String address;
   final String appVersion;
   final int maxClients;
+
+  /// Final ruling M5: limited clients (no token of this launch, "Allow
+  /// other terminals" off) take at most this many of [maxClients].
+  final int maxLimited;
   final int maxListeners;
   final MuxTransport _transport;
   final MuxEndpointFile _file;
@@ -74,6 +80,11 @@ final class CliHost {
   static const _notAShellXShell =
       'This terminal is not a ShellX shell. Allow it in the ShellX tray: '
       'Command line → Allow other terminals';
+
+  /// Final ruling M1: a token, but not this launch's (a shell that outlived
+  /// an earlier ShellX, e.g. under tmux).
+  static const _earlierLaunch =
+      'This shell belongs to an earlier ShellX launch; open a new tab';
 
   MuxListener? _listener;
   StreamSubscription<MuxConnection>? _accept;
@@ -172,14 +183,19 @@ final class CliHost {
       unawaited(_refuse(c, cliErrorMessage(null, MuxError.unsupportedRole)));
       return;
     }
-    if (_clients.length >= maxClients) {
+    final tokenOk = _isShellXShell(peer.token);
+    final limited = !tokenOk && !_externalAllowed();
+    if (_clients.length >= maxClients ||
+        (limited && _clients.where((k) => k.limited).length >= maxLimited)) {
       unawaited(_refuse(c, cliErrorMessage(null, MuxError.busy)));
       return;
     }
     final client = _Client(
       this,
       c,
-      tokenOk: _isShellXShell(peer.token),
+      tokenOk: tokenOk,
+      limited: limited,
+      staleToken: !tokenOk && (peer.token?.isNotEmpty ?? false),
       early: peer.early,
     );
     _clients.add(client);
@@ -351,6 +367,8 @@ final class _Client {
     this.host,
     this.connection, {
     required this.tokenOk,
+    required this.limited,
+    required this.staleToken,
     required List<MuxMessage> early,
   }) : _base = connection.pendingBytes {
     // Read with `auth`, before this listener: first, in order.
@@ -375,6 +393,13 @@ final class _Client {
 
   /// Carried this launch's `SHELLX_CLI_TOKEN`.
   final bool tokenOk;
+
+  /// Came in limited (no token, "Allow other terminals" off): counts
+  /// against [CliHost.maxLimited] for as long as it stays.
+  final bool limited;
+
+  /// Carried a token that is not this launch's (final ruling M1).
+  final bool staleToken;
   late final StreamSubscription<MuxMessage> _sub;
   Future<void> _chain = Future.value();
   StreamSubscription<Map<String, Object?>>? events;
@@ -440,7 +465,11 @@ final class _Client {
     unawaited(
       host._refuse(
         connection,
-        cliErrorMessage(q, CliError.forbidden, CliHost._notAShellXShell),
+        cliErrorMessage(
+          q,
+          CliError.forbidden,
+          staleToken ? CliHost._earlierLaunch : CliHost._notAShellXShell,
+        ),
       ),
     );
   }

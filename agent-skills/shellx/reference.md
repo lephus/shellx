@@ -26,6 +26,8 @@ Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` t
 
 - Shells that ShellX opened carry `$SHELLX_CLI_TOKEN`; their `shellx` may use every command.
 - Any other terminal (Terminal.app, iTerm, a cron job…) gets exit 6 `forbidden` for everything except `notify` without a pane, until the user ticks **"Allow other terminals"** in the ShellX tray menu (Command line). Ask the user to do it; never try to work around it.
+- A shell left from an earlier ShellX launch (for example inside tmux) carries an old token: it gets exit 6 "This shell belongs to an earlier ShellX launch; open a new tab". Open a new ShellX tab.
+- At most two such terminals (outside ShellX, not allowed) may be connected at once; more exit 1 `busy`.
 - When the user unticks **"Allow controlling ShellX from the command line"**, every command except `notify` exits 6 `cli_disabled`.
 
 ## Limits

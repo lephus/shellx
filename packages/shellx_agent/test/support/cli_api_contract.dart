@@ -21,6 +21,10 @@ const _notAShellXShell =
     'This terminal is not a ShellX shell. Allow it in the ShellX tray: '
     'Command line → Allow other terminals';
 
+/// Final ruling M1: a token, but not this launch's.
+const _earlierLaunch =
+    'This shell belongs to an earlier ShellX launch; open a new tab';
+
 /// A7 D37a: one suite, every host.
 void cliApiContract(
   String name,
@@ -227,11 +231,12 @@ void cliApiContract(
         MuxConnection c,
         String t, [
         Map<String, Object?> f = const {},
+        String message = _notAShellXShell,
       ]) async {
         final r = await ask(c, t, f);
         expect(
           [r.type, r.q, r.get<String>('code'), r.get<String>('message')],
-          ['error', 77, 'forbidden', _notAShellXShell],
+          ['error', 77, 'forbidden', message],
           reason: t,
         );
         await c.done.timeout(const Duration(seconds: 2));
@@ -276,10 +281,11 @@ void cliApiContract(
         );
       }
 
-      test('a wrong token is the same as none', () async {
+      test('a wrong token is the same as none, but says it is from an '
+          'earlier launch (final M1)', () async {
         final c = await host.connect(token: '${host.token}x');
         expect((await ask(c, 'api.version')).type, 'result');
-        await refusedAndClosed(c, 'ui.ls');
+        await refusedAndClosed(c, 'ui.ls', const {}, _earlierLaunch);
         final d = await host.connect(token: '');
         await refusedAndClosed(d, 'ui.ls');
         expect(ui.requests, isEmpty);
