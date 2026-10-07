@@ -478,6 +478,31 @@ void main() {
     expect((await quit).type, MuxType.result);
   });
 
+  test('once quit starts nobody new attaches, the caller still gets its '
+      'result', () async {
+    quitGate = Completer<void>();
+    build();
+    final c = await attach(listener);
+    final quit = request(c, req(MuxType.daemonQuit));
+    await pumpEventQueue();
+    expect(quitCalls, 1);
+    // A second client during the shutdown: closed, never attached.
+    final (late, daemonSide) = MemoryMuxTransport.pair();
+    listener.push(daemonSide);
+    await expectLater(
+      clientHandshake(
+        late,
+        secret: secret,
+        app: '1.6.0',
+        role: 'ui',
+      ).timeout(const Duration(seconds: 1)),
+      throwsA(anything),
+    );
+    expect(server.uiAttached, isTrue); // only the quitting client's link
+    quitGate.complete();
+    expect((await quit).type, MuxType.result);
+  });
+
   test('agent.get / agent.state / agent.call', () async {
     build();
     final c = await attach(listener);
