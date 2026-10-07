@@ -170,6 +170,44 @@ void main() {
     await sub.cancel();
   });
 
+  test('a replay arriving while the feed timer is pending is still written '
+      'held: no pane output, no reply (A5b D11)', () async {
+    local.add(local.summary(1));
+    boot();
+    final seen = <int>[];
+    final sub = tabs().paneOutputs.listen(seen.add);
+    final terminal = state().tabs.single.terminal;
+    local.views[1]!.emit('a'); // written at once, arms the feed timer
+    await pumpEventQueue();
+    expect(seen, [1]);
+    local.views[1]!.replaying = true;
+    local.views[1]!.emit('replayed\x1b[6n');
+    await pumpEventQueue();
+    local.views[1]!.replaying = false;
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    expect(terminal.buffer.getText(), contains('replayed'));
+    expect(seen, [1]);
+    expect(local.views[1]!.replies, isEmpty);
+    await sub.cancel();
+  });
+
+  test('a replay larger than the feed budget is written held too', () async {
+    local.add(local.summary(1));
+    boot();
+    final seen = <int>[];
+    final sub = tabs().paneOutputs.listen(seen.add);
+    final terminal = state().tabs.single.terminal;
+    local.views[1]!.replaying = true;
+    local.views[1]!.emit('\x1b[6n${'z\r\n' * 120000}end');
+    await pumpEventQueue();
+    local.views[1]!.replaying = false;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(seen, isEmpty);
+    expect(local.views[1]!.replies, isEmpty);
+    expect(terminal.buffer.getText(), contains('end'));
+    await sub.cancel();
+  });
+
   test('layout size goes to resize', () {
     local.add(local.summary(1));
     boot();

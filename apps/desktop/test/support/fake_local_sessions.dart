@@ -277,7 +277,11 @@ final class FakeSessionView implements LocalSessionView {
   @override
   void write(Uint8List data) => writes.add(utf8.decode(data));
   @override
-  void reply(Uint8List data) => replies.add(utf8.decode(data));
+  void reply(Uint8List data) {
+    // Like RemoteSessionView: no reply while a replay is being written.
+    if (!replaying) replies.add(utf8.decode(data));
+  }
+
   @override
   void resize(int cols, int rows) => resizes.add((cols, rows));
   @override

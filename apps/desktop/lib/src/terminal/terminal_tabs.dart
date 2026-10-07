@@ -823,7 +823,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     try {
       view = _local.view(s.id);
     } on StateError {
-      return null; // Ended between the listing and now.
+      // Ended between the listing and now. The old link (if any) is already
+      // disposed: its session is gone too.
+      return null;
     }
     final terminal =
         reuse ??
@@ -837,7 +839,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     // output.
     var live = false;
     // A reset replay (A5b D11) is text, not output: it is shown, and no
-    // CLI wait fires on it. Set around `feed.add`, which writes at once.
+    // CLI wait fires on it. [replay] holds while it is written, and the
+    // view drops replies meanwhile: both need the text written inside the
+    // listener, so the feed is drained around a replay chunk (its timer
+    // and 256 KiB budget would defer the write).
     var replay = false;
     final feed = TerminalFeed((text) {
       terminal.write(text);
@@ -895,9 +900,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     link.subscriptions
       ..add(
         view.output.listen((data) {
-          replay = view.replaying;
-          feed.add(data);
-          replay = false;
+          if (view.replaying) {
+            feed.drain(); // earlier live text is written as live
+            replay = true;
+            feed.add(data);
+            feed.drain();
+            replay = false;
+          } else {
+            feed.add(data);
+          }
         }),
       )
       ..add(
