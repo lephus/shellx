@@ -105,7 +105,9 @@ final class SshControl {
     LocalPorts? ports,
     DateTime Function()? now,
     Future<void> Function(Duration)? sleep,
+    Future<List<String>> Function(String directory)? listSockets,
   }) : _run = run ?? runCommand,
+       _listSockets = listSockets ?? _socketsIn,
        _start = startForward ?? _startForward,
        _ports = ports ?? const _SocketPorts(),
        _now = now ?? DateTime.now,
@@ -121,6 +123,7 @@ final class SshControl {
   final LocalPorts _ports;
   final DateTime Function() _now;
   final Future<void> Function(Duration) _sleep;
+  final Future<List<String>> Function(String directory) _listSockets;
 
   final _keepalive = <String, ({DateTime at, bool needed})>{};
   final _forwards = <String, _Forward>{};
@@ -333,7 +336,45 @@ final class SshControl {
         ], timeout: const Duration(seconds: 2)),
     ]);
   }
+
+  /// A5b D40 for the daemon: "Quit completely" also ends masters this
+  /// instance never noted (a UI-side [SshControl] shares the directory but
+  /// not [mastersUsed]). Every forward process is killed and every master
+  /// socket in [controlDirectory] is told to exit, by its own path, in
+  /// parallel, ≤ 2 s each.
+  Future<void> exitAllMasters() async {
+    for (final f in _forwards.values) {
+      f.process?.kill();
+    }
+    _forwards.clear();
+    final directory = controlDirectory;
+    if (directory == null) return;
+    final List<String> sockets;
+    try {
+      sockets = await _listSockets(directory);
+    } on FileSystemException {
+      return;
+    }
+    await Future.wait([
+      for (final socket in sockets.take(64))
+        _run(sshPath, [
+          '-o',
+          'ControlPath=$socket',
+          '-O',
+          'exit',
+          // The path is literal, so no host is looked up: any name will do.
+          'shellx-master',
+        ], timeout: const Duration(seconds: 2)),
+    ]);
+  }
 }
+
+Future<List<String>> _socketsIn(String directory) async => [
+  await for (final entity in Directory(directory).list(followLinks: false))
+    if (await FileSystemEntity.type(entity.path, followLinks: false) ==
+        FileSystemEntityType.unixDomainSock)
+      entity.path,
+];
 
 /// D8 (macOS): `<base>/shellx-ssh-<uid>`, owned by us, 0700, a real
 /// directory — else null (no multiplexing). `ControlPath` plus ssh's

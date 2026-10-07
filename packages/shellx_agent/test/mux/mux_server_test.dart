@@ -349,6 +349,29 @@ void main() {
     await host.stop();
   });
 
+  test('onClientsChanged fires when a cli client joins and leaves', () async {
+    final host = CliHost.adopted(
+      ui: FakeUiApi(),
+      enabled: () => true,
+      token: 'tok',
+      allowExternal: () => false,
+      appVersion: '1.6.0',
+      hostKind: () => 'daemon',
+      uiAttached: () => server.uiAttached,
+    );
+    final counts = <int>[];
+    host.onClientsChanged = () => counts.add(host.clientCount);
+    build();
+    server.cli = host;
+    final c = await attach(listener, role: 'cli', token: 'tok');
+    await request(c, req(CliType.apiVersion));
+    expect(counts, [1]);
+    await c.close();
+    await pumpEventQueue();
+    expect(counts, [1, 0]);
+    await host.stop();
+  });
+
   test('ui.* from a cli client goes to the attached ui and back; '
       'no ui is not_found', () async {
     final host = CliHost.adopted(
