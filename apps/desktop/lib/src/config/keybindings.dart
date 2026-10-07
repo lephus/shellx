@@ -217,6 +217,34 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
             ),
       'equalize_splits',
     ),
+    // A11 D11: Terminal.app / iTerm line editing; macOS only.
+    if (mac) ...[
+      b(
+        const KeyChord(LogicalKeyboardKey.arrowLeft, meta: true),
+        'edit_line',
+        'line_start',
+      ),
+      b(
+        const KeyChord(LogicalKeyboardKey.arrowRight, meta: true),
+        'edit_line',
+        'line_end',
+      ),
+      b(
+        const KeyChord(LogicalKeyboardKey.backspace, meta: true),
+        'edit_line',
+        'delete_line',
+      ),
+      b(
+        const KeyChord(LogicalKeyboardKey.backspace, alt: true),
+        'edit_line',
+        'delete_word',
+      ),
+      b(
+        const KeyChord(LogicalKeyboardKey.delete, alt: true),
+        'edit_line',
+        'delete_word_forward',
+      ),
+    ],
     b(font(LogicalKeyboardKey.equal), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.equal, shift: true), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.add), 'increase_font_size', '1'),

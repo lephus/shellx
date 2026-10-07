@@ -67,8 +67,8 @@ final class RouterMachineNavigator implements MachineNavigator {
 }
 
 /// A tapped notification (push spec §6): opens the machine `agent_id`, and switches to the tab of
-/// `session_id` when that tab is open. A machine that is not paired on this phone (another
-/// account's, or unpaired since) and a signed-out app open nothing.
+/// `session_id` when that tab is open, or as soon as it opens (within 30 s). A machine that is not paired on
+/// this phone (another account's, or unpaired since) and a signed-out app open nothing.
 @lazySingleton
 class NotificationOpener {
   NotificationOpener(this._session, this._registry, this._navigator);
@@ -90,11 +90,8 @@ class NotificationOpener {
       if (!pinned.any((machine) => machine.agentId == agentId)) return;
       if (!identical(_session.backend.peek(), backend)) return;
       final sessionId = message.sessionId;
-      if (sessionId != null) {
-        final workspace = _registry.forMachine(agentId);
-        final index = workspace.tabs.peek().indexWhere((tab) => tab.id == sessionId);
-        if (index >= 0) workspace.select(index);
-      }
+      // Selects now when the tab is open; else when it appears (the phone may still be reconnecting).
+      if (sessionId != null) _registry.forMachine(agentId).pendingSelect(sessionId);
       if (_navigator.isShowing(agentId)) return;
       final name = await _machineName(backend, agentId, message);
       if (!identical(_session.backend.peek(), backend)) return;

@@ -44,6 +44,17 @@ Set<String> a10Additions(String platform) => platform == 'mac'
         'ctrl+alt+shift+67 -> NavigateSearchIntent(previous)',
       };
 
+/// A11 D11: macOS line editing at the prompt; Windows binds none.
+Set<String> a11Additions(String platform) => platform == 'mac'
+    ? const {
+        'meta+100000302 -> EditLineIntent(line_start)',
+        'meta+100000303 -> EditLineIntent(line_end)',
+        'meta+100000008 -> EditLineIntent(delete_line)',
+        'alt+100000008 -> EditLineIntent(delete_word)',
+        'alt+10000007f -> EditLineIntent(delete_word_forward)',
+      }
+    : const {};
+
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").
   final maps =
@@ -70,7 +81,10 @@ void main() {
             .toSet();
         expect(
           actual.toSet(),
-          expected.union(a9Additions(map, name)).union(a10Additions(name)),
+          expected
+              .union(a9Additions(map, name))
+              .union(a10Additions(name))
+              .union(a11Additions(name)),
         );
       });
     }

@@ -2076,6 +2076,21 @@ class AppLocalizationsVi extends AppLocalizations {
   String get actionSearchNext => 'Tìm kết quả sau';
 
   @override
+  String get actionEditLineStart => 'Về đầu dòng';
+
+  @override
+  String get actionEditLineEnd => 'Về cuối dòng';
+
+  @override
+  String get actionEditLineDeleteLine => 'Xóa đến đầu dòng';
+
+  @override
+  String get actionEditLineDeleteWord => 'Xóa từ phía trước';
+
+  @override
+  String get actionEditLineDeleteWordForward => 'Xóa từ phía sau';
+
+  @override
   String get actionSearchPrevious => 'Tìm kết quả trước';
 
   @override

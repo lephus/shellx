@@ -57,10 +57,51 @@ class TerminalWorkspace extends Controller {
   ReadonlySignal<int> get activeIndex => _active;
   ReadonlySignal<TerminalTabController?> get activeTab => _activeTab;
 
+  /// The user picks a tab: a notification's pending selection no longer applies.
   void select(int index) {
+    clearPendingSelect();
+    _select(index);
+  }
+
+  void _select(int index) {
     if (index < 0 || index >= _tabs.peek().length) return;
     _active.value = index;
     _syncActive();
+  }
+
+  int? _pendingSelectId;
+  Timer? _pendingTimer;
+
+  bool get hasPendingSelect => _pendingSelectId != null;
+
+  /// A11 D27: a notification named [sessionId] before its tab exists (the phone is still reconnecting).
+  /// The tab is selected when it appears and stays selected while tabs keep arriving (each new tab takes
+  /// the focus, then this one gets it back); the user picking or opening a tab, or [ttl], drops the
+  /// request. When the tab is already open it is selected at once.
+  void pendingSelect(int sessionId, {Duration ttl = const Duration(seconds: 30)}) {
+    if (_disposed) return;
+    final index = _tabs.peek().indexWhere((tab) => tab.id == sessionId);
+    if (index >= 0) {
+      select(index);
+      return;
+    }
+    _pendingSelectId = sessionId;
+    _pendingTimer?.cancel();
+    _pendingTimer = Timer(ttl, clearPendingSelect);
+  }
+
+  void clearPendingSelect() {
+    _pendingSelectId = null;
+    _pendingTimer?.cancel();
+    _pendingTimer = null;
+  }
+
+  /// Re-asserts the pending tab after the list changed; the request stays until [ttl] or a user pick.
+  void _applyPending() {
+    final id = _pendingSelectId;
+    if (id == null) return;
+    final index = _tabs.peek().indexWhere((tab) => tab.id == id);
+    if (index >= 0) _select(index);
   }
 
   /// A10 D29: only the active tab's output is written at the foreground's pace.
@@ -113,6 +154,7 @@ class TerminalWorkspace extends Controller {
   /// [TerminalTabController.failed] tab. Throws any other [AppErrorException] (`session_limit`,
   /// shown as the floating notice) and connection failures.
   Future<TerminalTabController> openNew(TerminalGrid grid) async {
+    clearPendingSelect(); // the user asked for a new session: it wins
     await ensureConnected();
     final TabHandle handle;
     try {
@@ -140,7 +182,9 @@ class TerminalWorkspace extends Controller {
     final tabs = _tabs.peek();
     final existing = tabs.indexWhere((tab) => tab.id == session.id);
     if (existing >= 0) {
-      select(existing);
+      // A reconnect re-attaching an open tab is not the user's choice.
+      _select(existing);
+      _applyPending();
       return tabs[existing];
     }
     await ensureConnected();
@@ -175,6 +219,7 @@ class TerminalWorkspace extends Controller {
       _active.value = tabs.length - 1;
     });
     _syncActive();
+    _applyPending();
     return tab;
   }
 
@@ -213,6 +258,7 @@ class TerminalWorkspace extends Controller {
 
   void dispose() {
     _disposed = true;
+    clearPendingSelect();
     for (final tab in _tabs.peek()) {
       tab.dispose();
     }

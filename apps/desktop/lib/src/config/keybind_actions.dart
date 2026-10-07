@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import '../terminal/edit_line.dart';
 import '../terminal/pane_layout.dart';
 import '../ui/terminal/terminal_intents.dart';
 import 'config_problem.dart';
@@ -98,6 +99,9 @@ String? _fontStep(String? raw) {
   return _num(v);
 }
 
+String? _editLine(String? raw) =>
+    EditLineOp.fromWire(raw?.trim()) == null ? null : raw!.trim();
+
 String? _tabNumber(String? raw) {
   final n = int.tryParse(raw?.trim() ?? '');
   return n != null && n >= 1 && n <= 9 ? '$n' : null;
@@ -176,6 +180,15 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint: 'next, previous',
     ),
     const ActionSpec('end_search', ActionGroup.editing),
+    // A11 D11: macOS line editing at the prompt.
+    ActionSpec(
+      'edit_line',
+      ActionGroup.editing,
+      repeats: true,
+      param: _editLine,
+      paramHint:
+          'line_start, line_end, delete_line, delete_word, delete_word_forward',
+    ),
     const ActionSpec(
       'increase_font_size',
       ActionGroup.font,
@@ -303,6 +316,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'start_search' => const StartSearchIntent(),
   'navigate_search' => NavigateSearchIntent(next: a.param != 'previous'),
   'end_search' => const EndSearchIntent(),
+  'edit_line' => EditLineIntent(EditLineOp.fromWire(a.param)!),
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),
   'decrease_font_size' => FontSmallerIntent(step: double.parse(a.param ?? '1')),
   'reset_font_size' => const FontResetIntent(),
@@ -329,6 +343,7 @@ String describeIntent(Intent i) => switch (i) {
   ResizePaneIntent(:final direction) => 'ResizePaneIntent(${direction.name})',
   SelectAllIntent(:final fromMenu) =>
     fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
+  EditLineIntent(:final op) => 'EditLineIntent(${op.wire})',
   NavigateSearchIntent(:final next) =>
     'NavigateSearchIntent(${next ? 'next' : 'previous'})',
   FontBiggerIntent(:final step) when step != 1 => 'FontBiggerIntent($step)',

@@ -3198,6 +3198,36 @@ abstract class AppLocalizations {
   /// **'Find next'**
   String get actionSearchNext;
 
+  /// A11 D11
+  ///
+  /// In en, this message translates to:
+  /// **'Go to start of line'**
+  String get actionEditLineStart;
+
+  /// A11 D11
+  ///
+  /// In en, this message translates to:
+  /// **'Go to end of line'**
+  String get actionEditLineEnd;
+
+  /// A11 D11
+  ///
+  /// In en, this message translates to:
+  /// **'Delete to start of line'**
+  String get actionEditLineDeleteLine;
+
+  /// A11 D11
+  ///
+  /// In en, this message translates to:
+  /// **'Delete previous word'**
+  String get actionEditLineDeleteWord;
+
+  /// A11 D11
+  ///
+  /// In en, this message translates to:
+  /// **'Delete next word'**
+  String get actionEditLineDeleteWordForward;
+
   /// A10 D4
   ///
   /// In en, this message translates to:

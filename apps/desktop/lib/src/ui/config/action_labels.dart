@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import '../../../l10n/app_localizations.dart';
 import '../../config/config_problem.dart';
 import '../../config/keybind_actions.dart';
+import '../../terminal/edit_line.dart';
 
 /// UI-A9 §7.2: the localized message of [problem] (en = the CLI's text).
 /// Only what the problem carries (key names, values, hints) is shown, never
@@ -118,6 +119,13 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'navigate_search' =>
     a.param == 'previous' ? l10n.actionSearchPrevious : l10n.actionSearchNext,
   'end_search' => l10n.actionEndSearch,
+  'edit_line' => switch (a.param) {
+    'line_end' => l10n.actionEditLineEnd,
+    'delete_line' => l10n.actionEditLineDeleteLine,
+    'delete_word' => l10n.actionEditLineDeleteWord,
+    'delete_word_forward' => l10n.actionEditLineDeleteWordForward,
+    _ => l10n.actionEditLineStart,
+  },
   'goto_tab' => l10n.actionGotoTab(a.param ?? ''),
   'next_tab' => l10n.actionNextTab,
   'previous_tab' => l10n.actionPreviousTab,
@@ -149,6 +157,7 @@ List<String?> actionVariants(ActionSpec spec) => switch (spec.name) {
   'new_split' => ['right', 'down'],
   'goto_split' || 'resize_split' => ['left', 'right', 'up', 'down'],
   'navigate_search' => ['next', 'previous'],
+  'edit_line' => [for (final op in EditLineOp.values) op.wire],
   'increase_font_size' || 'decrease_font_size' => ['1'],
   _ => [null],
 };
