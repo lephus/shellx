@@ -5,29 +5,55 @@ import Pillars from './Pillars.astro';
 import SecurityFlow from './SecurityFlow.astro';
 import Downloads from './Downloads.astro';
 import { ui, type Lang, pathFor } from '../i18n/ui';
-import { desktopVersion, macDownloadUrl, supportEmail, windowsDownloadUrl } from '../lib/site';
+import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, supportEmail, windowsDownloadUrl } from '../lib/site';
+import { appId, author, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = ui[lang];
-const site = 'https://shellx.pro';
+const site = siteUrl;
 const url = `${site}${pathFor(lang, 'home')}`;
 const faq = [
-  [t.faqQ1, t.faqA1], [t.faqQ2, t.faqA2], [t.faqQ3, t.faqA3],
+  [t.faqQ1, t.faqA1], [t.faqQ2, t.faqA2], [t.faqQ3, t.faqA3], [t.faqQ7, t.faqA7], [t.faqQ8, t.faqA8],
+  [t.faqQ9, t.faqA9], [t.faqQ10, t.faqA10], [t.faqQ11, t.faqA11],
   [t.faqQ4, t.faqA4], [t.faqQ5, t.faqA5], [t.faqQ6, t.faqA6],
 ];
+const useCases = [
+  { title: t.useCase1Title, body: t.useCase1Body, href: guidePath(lang, 'claude-code-on-phone') },
+  { title: t.useCase2Title, body: t.useCase2Body, href: guidePath(lang, 'ssh-from-phone') },
+  { title: t.useCase3Title, body: t.useCase3Body, href: guidePath(lang, 'remote-terminal-without-vpn') },
+  { title: t.useCase4Title, body: t.useCase4Body, href: pathFor(lang, 'guides') },
+];
+// Store listings only once they exist (site.config.json), so no structured data points at nothing.
+const mobileApps = [
+  { url: appStoreUrl, os: 'iOS 15+' },
+  { url: googlePlayUrl, os: 'Android 8.0+' },
+].filter((s) => s.url).map((s) => ({
+  '@context': 'https://schema.org', '@type': 'MobileApplication',
+  name: 'ShellX', operatingSystem: s.os, applicationCategory: 'DeveloperApplication',
+  url: s.url, installUrl: s.url, isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  isPartOf: { '@id': appId },
+}));
 const ld = [
   {
-    '@context': 'https://schema.org', '@type': 'SoftwareApplication',
-    name: 'ShellX', applicationCategory: 'DeveloperApplication',
+    '@context': 'https://schema.org', '@type': 'SoftwareApplication', '@id': appId,
+    name: 'ShellX', alternateName: ['ShellX Terminal', 'shellx.pro'],
+    applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Remote terminal',
     operatingSystem: 'macOS 12+, Windows 10+, iOS 15+, Android 8+',
     softwareVersion: desktopVersion,
+    softwareRequirements: lang === 'vi'
+      ? 'App cho máy tính: macOS 12+ hoặc Windows 10 (1809)+. App điện thoại: iOS 15+ hoặc Android 8.0+.'
+      : 'Desktop app: macOS 12+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
     downloadUrl: [macDownloadUrl(), windowsDownloadUrl()],
     description: t.homeDescription, url, inLanguage: lang,
-    image: `${site}/og/og-${lang}.png`,
+    image: `${site}/og/og-${lang}.png`, screenshot: `${site}/og/og-${lang}.png`,
+    featureList: featureList[lang], keywords: keywords[lang].join(', '),
+    isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-    publisher: { '@type': 'Organization', name: 'ShellX', url: site },
+    author: { '@id': author['@id'] }, publisher: { '@id': organization['@id'] },
   },
+  ...mobileApps,
   {
     '@context': 'https://schema.org', '@type': 'FAQPage', inLanguage: lang,
     mainEntity: faq.map(([q, a]) => ({
@@ -35,10 +61,18 @@ const ld = [
     })),
   },
   {
-    '@context': 'https://schema.org', '@type': 'Organization',
-    name: 'ShellX', url: site, logo: `${site}/apple-touch-icon.png`, email: supportEmail,
+    '@context': 'https://schema.org', '@type': 'HowTo', inLanguage: lang, name: t.stepsHeading,
+    totalTime: 'PT5M', tool: [{ '@type': 'HowToTool', name: 'ShellX' }],
+    step: [t.step1, t.step2, t.step3].map((text, i) => ({
+      '@type': 'HowToStep', position: i + 1, text, url: `${url}#start`,
+    })),
   },
-  { '@context': 'https://schema.org', '@type': 'WebSite', name: 'ShellX', url: site, inLanguage: lang },
+  { '@context': 'https://schema.org', ...organization, email: supportEmail },
+  { '@context': 'https://schema.org', ...author },
+  {
+    '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${site}/#website`,
+    name: 'ShellX', url: site, inLanguage: lang, publisher: { '@id': organization['@id'] },
+  },
 ];
 
 // Feature icons: 24×24 stroke paths.
@@ -54,6 +88,7 @@ const steps = [t.step1, t.step2, t.step3];
 ---
 <Base lang={lang} page="home" title={t.homeTitle} description={t.homeDescription}>
   <Fragment slot="head">
+    <meta name="keywords" content={keywords[lang].join(', ')} />
     {ld.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
   </Fragment>
 
@@ -88,6 +123,25 @@ const steps = [t.step1, t.step2, t.step3];
       <p class="muted">{t.howLead}</p>
     </header>
     <Pillars lang={lang} />
+  </section>
+
+  <section class="wrap section" id="use-cases" aria-labelledby="use-cases-h">
+    <header class="sec-head" data-reveal>
+      <p class="eyebrow">{t.useCasesEyebrow}</p>
+      <h2 id="use-cases-h">{t.useCasesHeading}</h2>
+      <p class="muted">{t.useCasesLead}</p>
+    </header>
+    <ul class="uses">
+      {useCases.map((u, i) => (
+        <li data-reveal style={`--i:${i % 2}`}>
+          <a href={u.href}>
+            <h3>{u.title}</h3>
+            <p>{u.body}</p>
+            <span class="more">{t.readGuide} →</span>
+          </a>
+        </li>
+      ))}
+    </ul>
   </section>
 
   <section class="wrap section" id="features" aria-labelledby="features-h">
@@ -262,6 +316,18 @@ const steps = [t.step1, t.step2, t.step3];
   .sec-head h2 { font-size: clamp(1.9rem, 4vw, 2.75rem); }
   .sec-head .eyebrow { margin-bottom: 0.9rem; }
   .sec-head .muted { font-size: 1.08rem; margin: 0; }
+
+  .uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 44rem) { .uses { grid-template-columns: 1fr; } }
+  .uses a {
+    display: flex; flex-direction: column; height: 100%; padding: 1.6rem; border-radius: 18px; text-decoration: none;
+    color: var(--fg); border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(21, 16, 38, 0.9) 60%);
+  }
+  .uses a:hover { border-color: rgba(167, 139, 250, 0.6); }
+  .uses h3 { font-size: 1.25rem; margin-bottom: 0.4rem; }
+  .uses p { color: var(--muted); margin: 0 0 1rem; flex: 1; }
+  .uses .more { color: var(--purple-l); font-weight: 600; font-size: 0.95rem; }
 
   .features { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(3, 1fr); }
   @media (max-width: 56rem) { .features { grid-template-columns: repeat(2, 1fr); } }

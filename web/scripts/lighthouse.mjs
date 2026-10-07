@@ -13,7 +13,9 @@ const dist = join(root, 'dist');
 if (!existsSync(dist)) throw new Error('dist/ missing — run npm run build first');
 
 const minimum = { seo: 100, performance: 95, accessibility: 95, 'best-practices': 95 };
-const pages = ['/', '/en/', '/privacy/', '/en/privacy/', '/terms/', '/en/terms/'];
+// Every page in the built sitemap (home, guides, legal), in both languages.
+const pages = [...readFileSync(join(dist, 'sitemap.xml'), 'utf8').matchAll(/<loc>https:\/\/shellx\.pro([^<]+)<\/loc>/g)]
+  .map((m) => m[1]);
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.woff2': 'font/woff2', '.xml': 'application/xml', '.txt': 'text/plain',

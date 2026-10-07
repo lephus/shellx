@@ -17,6 +17,11 @@ const homePages = [
   { path: '/en/', lang: 'en', other: '/', privacy: '/en/privacy/', terms: '/en/terms/' },
 ];
 
+const guideSlugs = ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn', 'shellx-vs-termius', 'shellx-vs-tailscale'];
+const guidePages = ['/guides/', '/en/guides/', ...guideSlugs.flatMap((s) => [`/guides/${s}/`, `/en/guides/${s}/`])];
+const indexablePages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', ...guidePages];
+const everyPage = [...indexablePages, '/404.html'];
+
 function fileFor(pathname) {
   return pathname.endsWith('/') ? join(dist, pathname, 'index.html') : join(dist, pathname);
 }
@@ -147,7 +152,7 @@ test('no external scripts, styles, fonts or media on any page', () => {
   htmlOriginPattern.lastIndex = 0;
   assert.ok(!htmlOriginPattern.test(goodSample), 'Pattern should allow shellx.pro domains');
 
-  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+  const allPages = everyPage;
 
   // Check HTML tags for external resources on all pages
   for (const p of allPages) {
@@ -183,7 +188,7 @@ test('no external scripts, styles, fonts or media on any page', () => {
 });
 
 test('every page has exactly one h1', () => {
-  const allPages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', '/404.html'];
+  const allPages = everyPage;
   for (const p of allPages) {
     const count = (readPage(p).match(/<h1[\s>]/g) ?? []).length;
     assert.equal(count, 1, `${p} has ${count} h1`);
@@ -247,14 +252,16 @@ test('decorative animations are hidden from screen readers and have a text equiv
   }
 });
 
-test('robots.txt and sitemap.xml exist; sitemap lists exactly the 6 pages', () => {
-  assert.match(readFileSync(join(dist, 'robots.txt'), 'utf8'), /Sitemap: https:\/\/shellx\.pro\/sitemap\.xml/);
+test('robots.txt welcomes search and AI crawlers; sitemap lists exactly the indexable pages', () => {
+  const robots = readFileSync(join(dist, 'robots.txt'), 'utf8');
+  assert.match(robots, /Sitemap: https:\/\/shellx\.pro\/sitemap\.xml/);
+  assert.ok(!/Disallow:\s*\//.test(robots), 'robots.txt must not disallow anything');
+  for (const bot of ['OAI-SearchBot', 'GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended', 'Bingbot']) {
+    assert.ok(robots.includes(`User-agent: ${bot}\nAllow: /`), `robots.txt: ${bot}`);
+  }
   const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
   const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
-  assert.deepEqual(locs, [
-    'https://shellx.pro/', 'https://shellx.pro/en/', 'https://shellx.pro/en/privacy/',
-    'https://shellx.pro/en/terms/', 'https://shellx.pro/privacy/', 'https://shellx.pro/terms/',
-  ]);
+  assert.deepEqual(locs, indexablePages.map((p) => `https://shellx.pro${p}`).sort());
 });
 
 test('OG/Twitter meta and per-language OG image on every page', () => {
@@ -279,14 +286,10 @@ test('home JSON-LD parses and declares the free app', () => {
   }
 });
 
-const seoPages = [
-  { path: '/', lang: 'vi', pair: '/en/' },
-  { path: '/en/', lang: 'en', pair: '/' },
-  { path: '/privacy/', lang: 'vi', pair: '/en/privacy/' },
-  { path: '/en/privacy/', lang: 'en', pair: '/privacy/' },
-  { path: '/terms/', lang: 'vi', pair: '/en/terms/' },
-  { path: '/en/terms/', lang: 'en', pair: '/terms/' },
-];
+const seoPages = indexablePages.map((path) => {
+  const lang = path.startsWith('/en/') ? 'en' : 'vi';
+  return { path, lang, pair: lang === 'en' ? path.slice(3) : `/en${path}` };
+});
 
 function unescapeHtml(s) {
   return s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
@@ -331,6 +334,89 @@ test('manifest icons exist; sitemap carries lastmod and x-default for every page
   const manifest = JSON.parse(readFileSync(join(dist, 'site.webmanifest'), 'utf8'));
   for (const icon of manifest.icons) assert.ok(existsSync(join(dist, icon.src.slice(1))), `missing ${icon.src}`);
   const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
-  assert.equal((xml.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) ?? []).length, 6);
-  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, 6);
+  assert.equal((xml.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) ?? []).length, indexablePages.length);
+  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, indexablePages.length);
+});
+
+test('404 is noindex; every indexable page is index, follow', () => {
+  assert.match(readPage('/404.html'), /<meta name="robots" content="noindex"/);
+  for (const p of indexablePages) assert.match(readPage(p), /<meta name="robots" content="index, follow/, p);
+});
+
+test('home links to the guides; every guide links back to downloads and to other guides', () => {
+  for (const [home, prefix] of [['/', '/guides/'], ['/en/', '/en/guides/']]) {
+    const links = hrefs(readPage(home));
+    assert.ok(links.includes(prefix), `${home}: no link to ${prefix}`);
+    for (const s of ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn']) {
+      assert.ok(links.includes(`${prefix}${s}/`), `${home}: no link to guide ${s}`);
+    }
+    const index = hrefs(readPage(prefix));
+    for (const s of guideSlugs) assert.ok(index.includes(`${prefix}${s}/`), `${prefix}: missing ${s}`);
+  }
+  for (const s of guideSlugs) {
+    for (const [p, home] of [[`/guides/${s}/`, '/'], [`/en/guides/${s}/`, '/en/']]) {
+      const links = hrefs(readPage(p));
+      assert.ok(links.includes(`${home}#download`), `${p}: no download link`);
+      const others = new Set(links.filter((l) => /\/guides\/[a-z-]+\/$/.test(l) && l !== p));
+      assert.ok(others.size >= 4, `${p}: only ${others.size} related guides`);
+    }
+  }
+});
+
+test('guides carry TechArticle and BreadcrumbList JSON-LD with author and dates', () => {
+  for (const s of guideSlugs) {
+    for (const p of [`/guides/${s}/`, `/en/guides/${s}/`]) {
+      const html = readPage(p);
+      const docs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+      const art = docs.find((d) => d['@type'] === 'TechArticle');
+      assert.ok(art, `${p}: TechArticle missing`);
+      assert.match(art.datePublished, /^\d{4}-\d{2}-\d{2}$/);
+      assert.ok(art.author?.sameAs?.includes('https://github.com/lephus'), `${p}: author sameAs`);
+      assert.equal(art.mainEntityOfPage, `https://shellx.pro${p}`);
+      const crumbs = docs.find((d) => d['@type'] === 'BreadcrumbList');
+      assert.equal(crumbs?.itemListElement.at(-1).item, `https://shellx.pro${p}`, `${p}: breadcrumb`);
+      assert.match(html, /property="og:type" content="article"/);
+      const article = html.match(/<article[\s\S]*?<\/article>/)[0].replace(/<[^>]+>/g, ' ');
+      assert.ok(article.split(/\s+/).length > 450, `${p}: guide too short`);
+    }
+  }
+});
+
+test('home JSON-LD: app with features and keywords, HowTo, founder with sameAs', () => {
+  for (const p of ['/', '/en/']) {
+    const docs = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+    const app = docs.find((d) => d['@type'] === 'SoftwareApplication');
+    assert.ok(app.featureList.length >= 5 && app.keywords && app.isAccessibleForFree === true);
+    const howto = docs.find((d) => d['@type'] === 'HowTo');
+    assert.equal(howto?.step.length, 3);
+    const person = docs.find((d) => d['@type'] === 'Person');
+    assert.deepEqual(person?.sameAs, [
+      'https://huuphule.coregenaihub.com', 'https://www.linkedin.com/in/lehuuphu',
+      'https://github.com/lephus', 'https://medium.com/@phule9225',
+    ]);
+    if (!config.appStoreUrl && !config.googlePlayUrl) assert.ok(!docs.some((d) => d['@type'] === 'MobileApplication'));
+  }
+});
+
+test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries FAQ and guide text', () => {
+  const txt = readFileSync(join(dist, 'llms.txt'), 'utf8');
+  assert.match(txt, /^# ShellX\n\n> /, 'llms.txt must start with an H1 and a blockquote summary');
+  for (const s of guideSlugs) {
+    assert.ok(txt.includes(`https://shellx.pro/en/guides/${s}/`), `llms.txt: missing en guide ${s}`);
+    assert.ok(txt.includes(`https://shellx.pro/guides/${s}/`), `llms.txt: missing vi guide ${s}`);
+  }
+  assert.ok(txt.includes(macUrl) && txt.includes(winUrl), 'llms.txt: download links');
+  if (!config.appStoreUrl) assert.match(txt, /App Store: coming soon/);
+  const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
+  for (const needle of ['Is ShellX an SSH client?', 'ShellX có phải là SSH client không?', 'shellx skills install --claude', 'ShellX vs Termius']) {
+    assert.ok(full.includes(needle), `llms-full.txt: missing "${needle}"`);
+  }
+  assert.ok(!full.includes('layout:'), 'llms-full.txt: front matter leaked');
+  assert.match(readPage('/'), /rel="alternate" type="text\/plain"[^>]*href="\/llms\.txt"/);
+});
+
+test('IndexNow key file is served at /<key>.txt and holds exactly the key', () => {
+  const file = readdirSync(dist).find((f) => /^[0-9a-f]{32}\.txt$/.test(f));
+  assert.ok(file, 'IndexNow key file missing');
+  assert.equal(readFileSync(join(dist, file), 'utf8'), file.slice(0, -4));
 });

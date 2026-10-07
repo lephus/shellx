@@ -7,4 +7,6 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   site: 'https://shellx.pro',
   build: { format: 'directory' },
+  // github-dark's comment grey (#6a737d) fails WCAG AA on the guide code blocks; -default passes.
+  markdown: { shikiConfig: { theme: 'github-dark-default' } },
 });

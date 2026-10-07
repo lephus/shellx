@@ -1,6 +1,7 @@
 ---
 import Base from './Base.astro';
-import { ui, type Lang, type Page } from '../i18n/ui';
+import { pathFor, ui, type Lang, type Page } from '../i18n/ui';
+import { breadcrumbs } from '../lib/seo';
 
 interface Props {
   frontmatter: {
@@ -19,9 +20,14 @@ const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang ==
   day: 'numeric',
   timeZone: 'UTC',
 });
+const crumbs = breadcrumbs([
+  { name: ui[lang].breadcrumbHome, path: pathFor(lang, 'home') },
+  { name: title, path: pathFor(lang, page) },
+]);
 ---
 
 <Base lang={lang} page={page} title={`${title} — ShellX`} description={description}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(crumbs)} />
   <article class="wrap legal">
     <h1>{title}</h1>
     <p class="updated">{ui[lang].lastUpdated}: <time datetime={updated}>{updatedLabel}</time></p>
