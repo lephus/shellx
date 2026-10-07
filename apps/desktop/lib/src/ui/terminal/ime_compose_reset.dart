@@ -9,7 +9,9 @@ import 'package:xterm/src/ui/custom_text_edit.dart';
 
 /// How long a key may leave a composition untouched before the input method
 /// is taken to have ignored it.
-const Duration kImeStaleAfter = Duration(milliseconds: 80);
+// Long enough that a busy machine never commits a word the IME is still
+// composing (a Telex word split in two can no longer combine).
+const Duration kImeStaleAfter = Duration(milliseconds: 250);
 
 /// Ends an input-method composition xterm 4.0.0 would otherwise keep
 /// forever.

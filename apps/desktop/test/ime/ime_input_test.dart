@@ -172,10 +172,10 @@ void main() {
       await tester.pump();
       await tester.sendKeyEvent(key);
       expect(out.toString(), '', reason: 'not before the watchdog: $key');
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(kImeStaleAfter + const Duration(milliseconds: 20));
       expect(out.toString(), 'việ', reason: '$key');
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(kImeStaleAfter + const Duration(milliseconds: 20));
       expect(out.toString(), 'việ\r', reason: '$key');
     }
   });
