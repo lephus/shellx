@@ -21,6 +21,12 @@ abstract final class MuxType {
   static const sessionsClose = 'sessions.close';
   static const sessionsNotice = 'sessions.notice';
   static const sessionsWatchPorts = 'sessions.watchPorts';
+
+  /// A5b Task 4 (additive): `shellx notify` for one session.
+  static const sessionsNotify = 'sessions.notify';
+
+  /// A5b Task 4 (additive): an event the UI emits for `cli` subscribers.
+  static const uiEvent = 'ui.event';
   static const viewOpen = 'view.open', viewOut = 'view.out';
   static const viewDriver = 'view.driver', viewExit = 'view.exit';
   static const viewWrite = 'view.write', viewReply = 'view.reply';

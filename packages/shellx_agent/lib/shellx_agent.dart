@@ -9,6 +9,7 @@ export 'src/mux/cli_wire.dart';
 export 'src/mux/mux_endpoint.dart';
 export 'src/mux/mux_handshake.dart';
 export 'src/mux/mux_messages.dart';
+export 'src/mux/mux_server.dart';
 export 'src/mux/mux_transport.dart';
 export 'src/mux/ui_api.dart';
 export 'src/notify/agent_notifications.dart';
