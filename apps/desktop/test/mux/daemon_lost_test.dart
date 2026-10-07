@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/agent/remote_agent_controller.dart';
 import 'package:shellx_desktop/src/mux/daemon_launcher.dart';
 import 'package:shellx_desktop/src/mux/daemon_state.dart';
 import 'package:shellx_desktop/src/restore/restore_persistence.dart';
@@ -209,4 +211,38 @@ void main() {
       expect(link!.instance, 'b' * 32);
     },
   );
+
+  test('the agent is the service\'s: read after attaching, and again from the '
+      'new service after a restart', () async {
+    h = TestHarness();
+    files = RecordingFiles()..diskLayout = true;
+    connector = FakeConnector()..files = files;
+    final one = FakeDaemon('a' * 32, ids: [1], email: 'one@x.test');
+    final two = FakeDaemon('b' * 32, email: 'two@x.test');
+    c = ProviderContainer.test(
+      overrides: [
+        daemonModeProvider.overrideWithValue(true),
+        desktopServicesProvider.overrideWithValue(h.services()),
+        restoreStoreProvider.overrideWithValue(files),
+        daemonConnectorProvider.overrideWithValue(connector),
+        agentControllerProvider.overrideWith(
+          () => RemoteAgentController.lazy(
+            () => c.read(daemonLinkProvider)?.client,
+          ),
+        ),
+      ],
+    );
+    c.read(sidebarWorkspacesProvider);
+    c.read(restorePersistenceProvider.notifier).start();
+    connector.queue
+      ..add(() async => one.attach())
+      ..add(() async => two.attach());
+    await c.read(daemonStateProvider.notifier).connectAtStartup();
+    await pumpEventQueue();
+    expect(c.read(agentControllerProvider).email, 'one@x.test');
+    await one.die();
+    await pumpEventQueue();
+    await pumpEventQueue();
+    expect(c.read(agentControllerProvider).email, 'two@x.test');
+  });
 }

@@ -340,8 +340,9 @@ Future<void> _start(
         uiMuxResponderProvider.overrideWithValue(responder),
         // The agent is the service's: each new connection rebuilds it.
         agentControllerProvider.overrideWith(
-          () =>
-              RemoteAgentController(container.read(daemonLinkProvider)?.client),
+          () => RemoteAgentController.lazy(
+            () => container.read(daemonLinkProvider)?.client,
+          ),
         ),
       ],
       if (cli != null) ...[

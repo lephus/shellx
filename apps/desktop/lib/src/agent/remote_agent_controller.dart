@@ -20,15 +20,25 @@ import 'agent_state_codec.dart';
 /// Never logs arguments or results (they carry passwords and pairing
 /// secrets).
 final class RemoteAgentController extends AgentControllerBase {
-  /// [client] is null before the window attached to the service: nothing is
-  /// read and every command fails as a lost link.
-  RemoteAgentController(this._client);
+  RemoteAgentController(MuxClient client) : _clientOf = (() => client);
 
-  final MuxClient? _client;
+  /// A window that (re)attaches to the service: [clientOf] is asked each
+  /// time the controller is built, so a provider rebuild after a new
+  /// connection reads the new service. Null (not attached yet): nothing is
+  /// read and every command fails as a lost link.
+  RemoteAgentController.lazy(MuxClient? Function() clientOf)
+    : _clientOf = clientOf;
+
+  final MuxClient? Function() _clientOf;
+  MuxClient? _client;
   Future<void>? _first;
 
   @override
   AgentViewState build() {
+    // A rebuilt notifier is the same object: what the last connection read
+    // is forgotten.
+    _client = _clientOf();
+    _first = null;
     final sub = _client?.events.listen((m) {
       if (m.type != MuxType.agentState) return;
       _apply(m.get<Object?>('state'));
@@ -37,10 +47,10 @@ final class RemoteAgentController extends AgentControllerBase {
     return const AgentViewState();
   }
 
-  /// False when [wire] is not a state this app can read.
   MuxClient get _link =>
       _client ?? (throw const MuxRemoteException('disconnected'));
 
+  /// False when [wire] is not a state this app can read.
   bool _apply(Object? wire) {
     if (!ref.mounted) return true;
     if (wire is! Map<Object?, Object?>) return false;
