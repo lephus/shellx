@@ -29,6 +29,7 @@ import '../window_focus.dart' show terminalFocusRequestProvider;
 import '../window_router.dart' show windowRouterProvider;
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
+import 'click_select.dart';
 import 'device_pixel_lines.dart';
 import 'find_bar.dart';
 import 'ime_compose_reset.dart';
@@ -1136,27 +1137,32 @@ class PaneTerminal extends StatelessWidget {
         pane: pane,
         viewKey: viewKey,
         scrollController: scrollController,
-        builder: (context, cursor) => ImeComposeReset(
-          child: TerminalView(
-            pane.terminal,
-            key: viewKey,
-            controller: pane.selection,
-            scrollController: scrollController,
-            focusNode: focusNode,
-            autofocus: focusNode != null,
-            theme: theme,
-            textStyle: style,
-            cursorType: cursorType,
-            padding: padding,
-            shortcuts: shortcuts,
-            mouseCursor: cursor,
-            onKeyEvent: onKeyEvent == null
-                ? null
-                : (_, event) => onKeyEvent!(event),
-            // Only when the program did not take the mouse (xterm reports
-            // the click to it first): vim or htop with mouse mode keep it.
-            onSecondaryTapUp: (details, cell) =>
-                onMenu(details.globalPosition, cell),
+        builder: (context, cursor) => ClickSelectLayer(
+          terminal: pane.terminal,
+          controller: pane.selection,
+          viewKey: viewKey,
+          child: ImeComposeReset(
+            child: TerminalView(
+              pane.terminal,
+              key: viewKey,
+              controller: pane.selection,
+              scrollController: scrollController,
+              focusNode: focusNode,
+              autofocus: focusNode != null,
+              theme: theme,
+              textStyle: style,
+              cursorType: cursorType,
+              padding: padding,
+              shortcuts: shortcuts,
+              mouseCursor: cursor,
+              onKeyEvent: onKeyEvent == null
+                  ? null
+                  : (_, event) => onKeyEvent!(event),
+              // Only when the program did not take the mouse (xterm reports
+              // the click to it first): vim or htop with mouse mode keep it.
+              onSecondaryTapUp: (details, cell) =>
+                  onMenu(details.globalPosition, cell),
+            ),
           ),
         ),
       ),
