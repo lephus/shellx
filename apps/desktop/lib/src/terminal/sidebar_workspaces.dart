@@ -405,6 +405,19 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     }
   }
 
+  /// A8 UI-A8 §2.3 "New local tab" in a server's workspace: a shell on this
+  /// computer, placed in [id] (expanded) like [openTabIn].
+  Future<void> openLocalTabIn(String id) async {
+    if (state.workspace(id) == null) return;
+    _pendingTarget = id;
+    setCollapsed(id, false);
+    try {
+      await _tabs.openTab();
+    } finally {
+      _pendingTarget = null;
+    }
+  }
+
   /// Blank keeps the old name (UI-A2 §4).
   void rename(String id, String name) {
     final clean = name.trim();

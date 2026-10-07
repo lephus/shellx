@@ -8,6 +8,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../remote/remote_state.dart';
 import '../../terminal/context_line.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
@@ -16,6 +17,7 @@ import '../theme/shellx_desktop_theme.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart';
 import 'inline_name_field.dart';
+import 'remote_marks.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart';
@@ -70,6 +72,7 @@ class SessionTabRow extends StatefulWidget {
     this.unread,
     this.onMarkRead,
     this.agent = false,
+    this.portTooltip,
   });
 
   final TerminalTab tab;
@@ -122,6 +125,10 @@ class SessionTabRow extends StatefulWidget {
 
   /// A7 D27: the command line acted on this tab in the last 10 s.
   final bool agent;
+
+  /// A8: the tooltip of a port link, when it differs from "Open http://…"
+  /// (a server's port is forwarded over SSH).
+  final String Function(int port)? portTooltip;
 
   /// UI-A1 §1.3, UI-A2 §1.3, UI-A4 §1.3: the title line, then an optional
   /// notification line and an optional context line, each 14·s plus a
@@ -191,9 +198,12 @@ class SessionTabRowState extends State<SessionTabRow> {
   /// [origin] · [viewing/driving] · position.
   String _semanticsLabel(AppLocalizations l10n) {
     final tab = widget.tab;
-    final windows = defaultTargetPlatform == TargetPlatform.windows;
+    final remote = tab.focused.remote;
+    final windows =
+        remote == null && defaultTargetPlatform == TargetPlatform.windows;
+    final home = remote == null ? widget.home : (remote.home ?? '');
     final parts = <String>[
-      tab.label,
+      '${tab.label}${remoteSemantics(l10n, tab.focused)}',
       if (tab.isSplit) l10n.sidebarPaneCount(tab.paneCount),
       if (tab.exited)
         l10n.sidebarStatusExited(tab.exitCode!)
@@ -205,10 +215,15 @@ class SessionTabRowState extends State<SessionTabRow> {
       if (widget.unread case final u?)
         l10n.attentionRowSemantics(u.count, u.text(l10n)),
       if (widget.agent) l10n.agentChipTooltip,
-      if (tab.gitBranch case final branch?) l10n.sidebarBranch(branch),
+      if (tab.gitBranch case final branch?)
+        l10n.sidebarBranch(remote == null ? branch : cleanServerText(branch)),
       if (tab.cwd case final cwd?)
         l10n.sidebarFolder(
-          displayPath(cwd, home: widget.home, windows: windows),
+          displayPath(
+            remote == null ? cwd : cleanServerText(cwd),
+            home: home,
+            windows: windows,
+          ),
         ),
       if (tab.ports.isNotEmpty)
         l10n.sidebarPorts(tab.ports.length, _sortedPorts(tab).join(', ')),
@@ -419,6 +434,11 @@ class SessionTabRowState extends State<SessionTabRow> {
                           ],
                         ),
                       ),
+                    ],
+                    // UI-A8 §2.1: badge → pane count → SSH/tmux → 📱.
+                    if (tab.focused.remote != null) ...[
+                      const SizedBox(width: ShellxSpace.s4),
+                      RemoteMark(tab.focused),
                     ],
                     // A7 D27: after the pane count, before 📱.
                     if (widget.agent) ...[
@@ -631,6 +651,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                               tab: tab,
                               home: widget.home,
                               onOpenPort: widget.onOpenPort,
+                              portTooltip: widget.portTooltip,
                             ),
                           ),
                         ),
@@ -813,6 +834,9 @@ class TabStatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (tab.focused.remoteState == RemoteState.connecting) {
+      return const ConnectingDot();
+    }
     if (tab.exited) {
       return Container(
         key: const Key('dot.exited'),
@@ -868,25 +892,37 @@ class _ContextLine extends StatelessWidget {
     required this.tab,
     required this.home,
     required this.onOpenPort,
+    this.portTooltip,
   });
 
   final TerminalTab tab;
   final String home;
   final void Function(int port)? onOpenPort;
+  final String Function(int port)? portTooltip;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final windows = defaultTargetPlatform == TargetPlatform.windows;
+    final remote = tab.focused.remote;
+    final windows =
+        remote == null && defaultTargetPlatform == TargetPlatform.windows;
     final style = ShellxText.caption.copyWith(
       color: ShellxDesktopColors.textSecondary,
     );
     final full = DefaultTextStyle.of(context).style.merge(style);
     final scaler = MediaQuery.textScalerOf(context);
     final direction = Directionality.of(context);
+    // A8: a server's `~`, its text without control characters.
+    final branchText = remote == null || tab.gitBranch == null
+        ? tab.gitBranch
+        : cleanServerText(tab.gitBranch!);
     final path = tab.cwd == null
         ? null
-        : displayPath(tab.cwd!, home: home, windows: windows);
+        : displayPath(
+            remote == null ? tab.cwd! : cleanServerText(tab.cwd!),
+            home: remote == null ? home : (remote.home ?? ''),
+            windows: windows,
+          );
     return LayoutBuilder(
       key: const Key('row.contextLine'),
       builder: (context, constraints) {
@@ -905,7 +941,7 @@ class _ContextLine extends StatelessWidget {
         final ports = _sortedPorts(tab);
         final glyph = scaler.scale(ShellxSizes.branchGlyph);
         final layout = layoutContextLine(
-          branch: tab.gitBranch,
+          branch: branchText,
           path: path,
           ports: ports,
           width: constraints.maxWidth,
@@ -947,6 +983,7 @@ class _ContextLine extends StatelessWidget {
               _PortLink(
                 port: port,
                 live: !tab.exited && onOpenPort != null,
+                tooltip: portTooltip?.call(port),
                 onOpen: onOpenPort,
               ),
             );
@@ -973,12 +1010,12 @@ class _ContextLine extends StatelessWidget {
         );
         if (layout.truncated) {
           final whole = [
-            ?tab.gitBranch,
+            ?branchText,
             ?path,
             if (ports.isNotEmpty) ports.map((p) => ':$p').join(' '),
           ].join(' · ');
           line = Tooltip(
-            message: whole,
+            message: remote == null ? whole : '${remote.hostKey}:$whole',
             excludeFromSemantics: true,
             positionDelegate: besideSidebar,
             waitDuration: ShellxMotion.tooltipWait,
@@ -998,8 +1035,14 @@ class _ContextLine extends StatelessWidget {
 /// `rowPressed` fill (`r4`) and the click cursor; pressed: the fill. Plain
 /// `textSecondary`, without any of that, once the tab exited.
 class _PortLink extends StatefulWidget {
-  const _PortLink({required this.port, required this.live, this.onOpen});
+  const _PortLink({
+    required this.port,
+    required this.live,
+    this.onOpen,
+    this.tooltip,
+  });
   final int port;
+  final String? tooltip;
   final bool live;
   final void Function(int port)? onOpen;
 
@@ -1043,7 +1086,9 @@ class _PortLinkState extends State<_PortLink> {
     );
     if (!live) return box;
     return Tooltip(
-      message: AppLocalizations.of(context).portOpenTooltip(widget.port),
+      message:
+          widget.tooltip ??
+          AppLocalizations.of(context).portOpenTooltip(widget.port),
       excludeFromSemantics: true,
       positionDelegate: besideSidebar,
       child: MouseRegion(

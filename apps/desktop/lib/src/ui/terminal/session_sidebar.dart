@@ -20,6 +20,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
 import 'shellx_menu.dart';
+import 'sidebar_remote.dart';
 import 'shortcut_labels.dart';
 import 'sidebar_drag.dart';
 import 'terminal_overlays.dart';
@@ -696,17 +697,20 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         : ([...tab.ports]..sort()).take(5).toList();
     final portSubmenu = ports.length > 2;
     final attention = ref.read(tabAttentionProvider);
+    final remoteEntries = remoteRowEntries(l10n, tab);
     await _withMenuOpen(('row', tab.id), () async {
       final choice = await showShellxMenu<Object>(
         context: context,
         at: at,
         entries: [
+          ...remoteEntries,
           // UI-A4 §10.4 (D23): first, dimmed when there is nothing to read.
           ShellxMenuEntry(
             key: const Key('menu.markRead'),
             value: _RowAction.markRead,
             label: l10n.attentionMarkRead,
             enabled: attention.hasUnread(tab.id),
+            dividerBefore: remoteEntries.isNotEmpty,
           ),
           ShellxMenuEntry(
             key: const Key('menu.markAllRead'),
@@ -825,6 +829,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           widget.onClose(tab);
         case final int port:
           await _openPort(tab, port);
+        case final RemoteMenuAction action:
+          await runRemoteMenuAction(ref, action, tab: tab);
       }
       return null;
     });
@@ -961,16 +967,23 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final l10n = AppLocalizations.of(context);
     // Shift+F10 / the Menu key: the list has the keyboard (UI-A2 §4).
     final fromList = widget.focusNode.hasFocus;
+    final remoteEntries = remoteHeaderEntries(
+      l10n,
+      w,
+      canReconnect: workspaceCanReconnect(ref, w.id),
+    );
     final choice = await _withMenuOpen(
       ('ws', w.id),
-      () => showShellxMenu<_HeaderAction>(
+      () => showShellxMenu<Object>(
         context: context,
         at: at,
         entries: [
+          ...remoteEntries,
           ShellxMenuEntry(
             key: const Key('menu.ws.newTab'),
             value: _HeaderAction.newTab,
             label: l10n.workspaceNewTab,
+            dividerBefore: remoteEntries.isNotEmpty,
           ),
           ShellxMenuEntry(
             key: const Key('menu.ws.rename'),
@@ -1007,6 +1020,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         workspaces.toggleCollapsed(w.id);
       case _HeaderAction.delete:
         workspaces.delete(w.id);
+      case final RemoteMenuAction action:
+        await runRemoteMenuAction(ref, action, workspaceId: w.id);
     }
   }
 
@@ -1285,6 +1300,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final state = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final home = ref.watch(homeDirectoryProvider);
+    // A8: rows' port tooltips say whether a server's port is forwarded.
+    ref.watch(remotePortForwardsProvider);
     registerRowActionOrder(l10n);
     // Only the unread map: history alone (a notice the user saw) does not
     // rebuild the sidebar.
@@ -1416,6 +1433,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               collapsed: w.collapsed,
               containsSelected: item.containsSelected,
               hasUnread: item.hasUnread,
+              ssh: w.ssh,
               focused: !sticky && _showFocus && cursor == w.id,
               renaming: !sticky && sidebar.renaming == RenameWorkspace(w.id),
               dropTarget: _dropTarget == w.id,
@@ -1509,6 +1527,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           onRename: (text) => _commitTabName(tab.id, text),
           onCancelRename: () => _endRename(RenameTab(tab.id)),
           onOpenPort: (port) => unawaited(_openPort(tab, port)),
+          portTooltip: (port) => remotePortTooltipFor(ref, l10n, tab, port),
           onMenu: (at) => unawaited(_rowMenu(tab, at)),
           extraActions: _rowActions(l10n, tab),
           menuOpen: _menuFor == ('row', tab.id),

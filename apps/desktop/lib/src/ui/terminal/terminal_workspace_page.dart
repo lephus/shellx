@@ -25,6 +25,7 @@ import '../window_router.dart';
 import 'close_tab.dart';
 import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
+import 'remote_marks.dart' show remoteAnnouncementBetween;
 import 'session_sidebar.dart';
 import 'shortcut_labels.dart';
 import 'terminal_pane.dart';
@@ -481,6 +482,16 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         }
       },
     );
+    // A8 (UI-A8 §8): the shown pane's connection changed — said once.
+    ref.listen<TerminalTabsState>(terminalTabsProvider, (before, after) {
+      final text = remoteAnnouncementBetween(
+        AppLocalizations.of(context),
+        before,
+        after,
+        ref.read(terminalTabsProvider.notifier).resolveReplaced,
+      );
+      if (text != null) _announce(text);
+    });
     // The last tab closed: the keyboard goes to "Open new tab" instead of
     // vanishing with the terminal (after the frame that builds the button).
     ref.listen(terminalTabsProvider.select((s) => s.tabs.isEmpty), (
