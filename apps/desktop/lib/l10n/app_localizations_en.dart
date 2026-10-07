@@ -2098,4 +2098,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pasteTooLarge =>
       'The clipboard is too large to paste (over 16 MB)';
+
+  @override
+  String get findPlaceholder => 'Find';
+
+  @override
+  String get findLabel => 'Find in terminal';
+
+  @override
+  String findCount(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String findCountCapped(int current, int total) {
+    return '$current of $total+';
+  }
+
+  @override
+  String get findNoMatches => 'No matches';
+
+  @override
+  String get findPrevious => 'Previous match';
+
+  @override
+  String get findNext => 'Next match';
+
+  @override
+  String get findMatchCase => 'Match case';
+
+  @override
+  String get findClose => 'Close find';
+
+  @override
+  String get findMenuItem => 'Find…';
+
+  @override
+  String get actionStartSearch => 'Find in terminal';
+
+  @override
+  String get actionSearchNext => 'Find next';
+
+  @override
+  String get actionSearchPrevious => 'Find previous';
+
+  @override
+  String get actionEndSearch => 'Close find';
 }

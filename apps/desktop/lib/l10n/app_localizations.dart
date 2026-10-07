@@ -3077,6 +3077,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The clipboard is too large to paste (over 16 MB)'**
   String get pasteTooLarge;
+
+  /// No description provided for @findPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Find'**
+  String get findPlaceholder;
+
+  /// No description provided for @findLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in terminal'**
+  String get findLabel;
+
+  /// No description provided for @findCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String findCount(int current, int total);
+
+  /// No description provided for @findCountCapped.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}+'**
+  String findCountCapped(int current, int total);
+
+  /// No description provided for @findNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get findNoMatches;
+
+  /// No description provided for @findPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get findPrevious;
+
+  /// No description provided for @findNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get findNext;
+
+  /// No description provided for @findMatchCase.
+  ///
+  /// In en, this message translates to:
+  /// **'Match case'**
+  String get findMatchCase;
+
+  /// No description provided for @findClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close find'**
+  String get findClose;
+
+  /// No description provided for @findMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Find…'**
+  String get findMenuItem;
+
+  /// A10 D4
+  ///
+  /// In en, this message translates to:
+  /// **'Find in terminal'**
+  String get actionStartSearch;
+
+  /// A10 D4
+  ///
+  /// In en, this message translates to:
+  /// **'Find next'**
+  String get actionSearchNext;
+
+  /// A10 D4
+  ///
+  /// In en, this message translates to:
+  /// **'Find previous'**
+  String get actionSearchPrevious;
+
+  /// A10 D4
+  ///
+  /// In en, this message translates to:
+  /// **'Close find'**
+  String get actionEndSearch;
 }
 
 class _AppLocalizationsDelegate

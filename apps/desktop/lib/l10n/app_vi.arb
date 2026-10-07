@@ -494,5 +494,19 @@
   "pasteLargeTitle": "Dán {size}?",
   "pasteLargeBody": "Đây là lượng văn bản lớn. Chữ được gửi từng phần và không thể hoàn tác.",
   "pasteLargeAction": "Dán",
-  "pasteTooLarge": "Nội dung clipboard quá lớn để dán (hơn 16 MB)"
+  "pasteTooLarge": "Nội dung clipboard quá lớn để dán (hơn 16 MB)",
+  "findPlaceholder": "Tìm",
+  "findLabel": "Tìm trong terminal",
+  "findCount": "{current}/{total}",
+  "findCountCapped": "{current}/{total}+",
+  "findNoMatches": "Không có kết quả",
+  "findPrevious": "Kết quả trước",
+  "findNext": "Kết quả sau",
+  "findMatchCase": "Phân biệt hoa thường",
+  "findClose": "Đóng tìm kiếm",
+  "findMenuItem": "Tìm…",
+  "actionStartSearch": "Tìm trong terminal",
+  "actionSearchNext": "Tìm kết quả sau",
+  "actionSearchPrevious": "Tìm kết quả trước",
+  "actionEndSearch": "Đóng tìm kiếm"
 }

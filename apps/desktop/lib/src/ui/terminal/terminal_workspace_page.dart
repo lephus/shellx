@@ -15,6 +15,8 @@ import '../../config/keybindings.dart';
 import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/byte_size.dart';
+import '../../terminal/find_session.dart';
+import '../../terminal/find_sessions.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/pane_paste.dart';
 import '../../terminal/paste_sender.dart';
@@ -387,6 +389,32 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
             ref.read(terminalTabsProvider).selected != null &&
             (intent.fromMenu || terminalFocus.hasFocus),
       ),
+      // A10 D4: ⌘F opens the focused pane's bar (or refocuses it); ⌘G and
+      // ⌘⇧G step through its matches. With no bar open ⌘G is the shell's.
+      StartSearchIntent: run<StartSearchIntent>((_) {
+        closePanel();
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        ref.read(findSessionsProvider.notifier).open(tab.focusedPaneId);
+        WidgetsBinding.instance
+          ..addPostFrameCallback(
+            (_) => ref
+                .read(findSessionsProvider)[tab.focusedPaneId]
+                ?.focusNode
+                .requestFocus(),
+          )
+          ..ensureVisualUpdate();
+      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      NavigateSearchIntent: run<NavigateSearchIntent>((intent) {
+        final bar = _focusedFind();
+        intent.next ? bar?.next() : bar?.previous();
+      }, enabled: (_) => _focusedFind() != null),
+      EndSearchIntent: run<EndSearchIntent>((_) {
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        ref.read(findSessionsProvider.notifier).close(tab.focusedPaneId);
+        focusTerminal();
+      }, enabled: (_) => _focusedFind() != null),
       FontBiggerIntent: run<FontBiggerIntent>(
         (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
@@ -419,6 +447,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       ),
     );
     tab.selection.clearSelection();
+  }
+
+  /// A10 D4: the find bar of the selected tab's focused pane, if open.
+  FindSession? _focusedFind() {
+    final tab = ref.read(terminalTabsProvider).selected;
+    return tab == null
+        ? null
+        : ref.read(findSessionsProvider)[tab.focusedPaneId];
   }
 
   /// ⌘A / Ctrl+Shift+A / the menu: every line, scrollback included.

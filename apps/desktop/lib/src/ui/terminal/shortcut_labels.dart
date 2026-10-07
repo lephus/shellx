@@ -24,6 +24,9 @@ String? copyShortcutLabel() =>
     actionShortcutLabel(const KeyAction('copy_to_clipboard'));
 String? pasteShortcutLabel() =>
     actionShortcutLabel(const KeyAction('paste_from_clipboard'));
+String? findShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('start_search'));
+
 String? selectAllShortcutLabel() =>
     actionShortcutLabel(const KeyAction('select_all'));
 String? newWorkspaceShortcutLabel() =>

@@ -126,6 +126,28 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     b(primary(LogicalKeyboardKey.keyC), 'copy_to_clipboard'),
     b(primary(LogicalKeyboardKey.keyV), 'paste_from_clipboard'),
     b(primary(LogicalKeyboardKey.keyA), 'select_all'),
+    // A10 D4: Cmd+F/G on macOS; Ctrl+Shift+F/G (Alt for previous) on
+    // Windows — never a bare F3, which htop and mc use.
+    b(primary(LogicalKeyboardKey.keyF), 'start_search'),
+    b(
+      mac
+          ? const KeyChord(LogicalKeyboardKey.keyG, meta: true)
+          : const KeyChord(LogicalKeyboardKey.keyG, control: true, shift: true),
+      'navigate_search',
+      'next',
+    ),
+    b(
+      mac
+          ? const KeyChord(LogicalKeyboardKey.keyG, meta: true, shift: true)
+          : const KeyChord(
+              LogicalKeyboardKey.keyG,
+              control: true,
+              shift: true,
+              alt: true,
+            ),
+      'navigate_search',
+      'previous',
+    ),
     for (var i = 0; i < _digitKeys.length; i++)
       b(
         mac
