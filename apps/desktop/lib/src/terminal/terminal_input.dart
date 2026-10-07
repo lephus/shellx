@@ -88,7 +88,9 @@ String? _optionCharacter(TerminalKey key, {required bool shift}) {
 /// A9 D19: macOS Option as Meta (`ESC` + the base character, US layout
 /// shifts). Runs after [CursorKeysInputHandler], so Option+←/→ keep moving
 /// by word, and before xterm's defaults. [mode] is read at key time, so a
-/// reload applies at once.
+/// reload applies at once. With Cmd held the key is a Cmd chord, never
+/// Meta text. In `left` / `right` mode with both Option keys held, Option
+/// counts as Alt (either key is the configured one).
 final class OptionAsAltInputHandler implements TerminalInputHandler {
   OptionAsAltInputHandler(
     this.mode, {
@@ -106,13 +108,20 @@ final class OptionAsAltInputHandler implements TerminalInputHandler {
         event.ctrl) {
       return null;
     }
-    switch (mode()) {
+    final setting = mode();
+    if (setting == OptionAsAlt.off) return null;
+    final held = _pressed();
+    if (held.contains(LogicalKeyboardKey.metaLeft) ||
+        held.contains(LogicalKeyboardKey.metaRight)) {
+      return null;
+    }
+    switch (setting) {
       case OptionAsAlt.off:
         return null;
       case OptionAsAlt.left:
-        if (!_pressed().contains(LogicalKeyboardKey.altLeft)) return null;
+        if (!held.contains(LogicalKeyboardKey.altLeft)) return null;
       case OptionAsAlt.right:
-        if (!_pressed().contains(LogicalKeyboardKey.altRight)) return null;
+        if (!held.contains(LogicalKeyboardKey.altRight)) return null;
       case OptionAsAlt.both:
         break;
     }

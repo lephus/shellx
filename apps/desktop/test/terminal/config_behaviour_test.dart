@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
@@ -7,6 +8,7 @@ import 'package:shellx_desktop/src/config/shellx_config.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/terminal/user_commands.dart';
+import 'package:xterm/core.dart' show TerminalKey;
 
 import '../support/config_harness.dart';
 import '../support/fake_local_sessions.dart';
@@ -14,6 +16,7 @@ import '../support/fakes.dart';
 import '../support/memory_config_fs.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MemoryConfigFs fs;
   late FakeLocalSessions local;
   late ProviderContainer c;
@@ -114,6 +117,22 @@ void main() {
     expect(sendTextToFocused(state(), '\x1b[A'), CommandRun.ran);
     expect(local.views[id]!.writes.join(), '\x1b[A');
   });
+
+  test(
+    'a created terminal sends Option+F as ESC f only after a reload',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tabs().openTab();
+      final tab = state().selected!;
+      final writes = local.views[tab.focused.id]!.writes;
+      tab.terminal.keyInput(TerminalKey.keyF, alt: true);
+      expect(writes, isEmpty);
+      await config('macos-option-as-alt = true\n');
+      tab.terminal.keyInput(TerminalKey.keyF, alt: true);
+      expect(writes.join(), '\x1bf');
+    },
+  );
 
   test('Option as Alt is read at key time (live)', () async {
     await tabs().openTab();

@@ -22,6 +22,7 @@ TerminalKeyboardEvent key(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('off (default): Option keys are left to the IME, as today', () {
     final h = OptionAsAltInputHandler(() => OptionAsAlt.off);
     expect(h(key(TerminalKey.keyF)), isNull);
@@ -64,5 +65,32 @@ void main() {
     final cascade = desktopInputHandlerWith(() => OptionAsAlt.both);
     expect(cascade(key(TerminalKey.arrowLeft)), '\x1bb');
     expect(cascade(key(TerminalKey.keyX)), '\x1bx');
+  });
+
+  test('a held Cmd makes it a Cmd chord: never Meta text', () {
+    final h = OptionAsAltInputHandler(
+      () => OptionAsAlt.both,
+      pressed: () => {LogicalKeyboardKey.metaLeft},
+    );
+    expect(h(key(TerminalKey.keyF)), isNull);
+    final right = OptionAsAltInputHandler(
+      () => OptionAsAlt.both,
+      pressed: () => {LogicalKeyboardKey.metaRight},
+    );
+    expect(right(key(TerminalKey.keyF)), isNull);
+  });
+
+  test('left / right with both Option keys held: either counts as Alt', () {
+    final both = {LogicalKeyboardKey.altLeft, LogicalKeyboardKey.altRight};
+    final left = OptionAsAltInputHandler(
+      () => OptionAsAlt.left,
+      pressed: () => both,
+    );
+    final right = OptionAsAltInputHandler(
+      () => OptionAsAlt.right,
+      pressed: () => both,
+    );
+    expect(left(key(TerminalKey.keyB)), '\x1bb');
+    expect(right(key(TerminalKey.keyB)), '\x1bb');
   });
 }
