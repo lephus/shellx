@@ -4,6 +4,7 @@ import 'dart:typed_data' show BytesBuilder;
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'config_paths.dart';
 import 'config_problem.dart';
 import 'config_syntax.dart';
 
@@ -147,6 +148,10 @@ final class ConfigChain {
 p.Context _context(bool windows) => windows ? p.windows : p.posix;
 
 /// D6: `~` / `~/…` from [home]; relative to [baseDir]; normalised.
+/// Absolute means [isAbsoluteConfigPath]: on Windows a root-relative
+/// (`\x`, `/x`), drive-relative (`C:x`) or device (`\\.\`, `\\?\`) path
+/// is a [FormatException]; `~` with an empty or relative [home] is an
+/// [ArgumentError].
 String expandConfigPath(
   String value, {
   required String baseDir,
@@ -159,16 +164,23 @@ String expandConfigPath(
       path == '~' ||
       path.startsWith('~/') ||
       (windows && path.startsWith(r'~\'));
-  if (tilde && home.isEmpty) {
-    throw ArgumentError.value(home, 'home', 'is empty');
+  if (tilde && !isAbsoluteConfigPath(home, windows: windows)) {
+    throw ArgumentError.value(home, 'home', 'is not an absolute path');
   }
   if (path == '~') {
     path = home;
   } else if (tilde) {
     path = ctx.join(home, path.substring(2));
   }
-  return ctx.normalize(ctx.isAbsolute(path) ? path : ctx.join(baseDir, path));
+  if (isAbsoluteConfigPath(path, windows: windows)) return ctx.normalize(path);
+  if (windows &&
+      (ctx.rootPrefix(path).isNotEmpty || _driveLetter.hasMatch(path))) {
+    throw FormatException('not an absolute path', path);
+  }
+  return ctx.normalize(ctx.join(baseDir, path));
 }
+
+final RegExp _driveLetter = RegExp(r'^[A-Za-z]:');
 
 /// Reads [path] and its `config-file` includes (D5, D6). [quiet] is the
 /// Ghostty layer (D4): its syntax and include problems are not ShellX's to
