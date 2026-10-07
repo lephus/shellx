@@ -34,6 +34,7 @@ Future<void> chord(
 const cmd = LogicalKeyboardKey.metaLeft;
 const shift = LogicalKeyboardKey.shiftLeft;
 const ctrl = LogicalKeyboardKey.controlLeft;
+const alt = LogicalKeyboardKey.altLeft;
 
 final class RecordingOpener implements ConfigFileOpener {
   RecordingOpener({this.succeed = true});
@@ -137,7 +138,7 @@ keybind = super+l=run_command:Lint
   );
 
   testWidgets(
-    '⌘, opens the ShellX file (D37)',
+    '⌘⌥, opens the ShellX file (A11 D10; it was ⌘, in A9 D37)',
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
     (tester) async {
       final opener = RecordingOpener();
@@ -145,6 +146,9 @@ keybind = super+l=run_command:Lint
         tester,
         extra: [configFileOpenerProvider.overrideWithValue(opener)],
       );
+      await chord(tester, [cmd, alt], LogicalKeyboardKey.comma);
+      expect(opener.opened, [testConfigPaths().shellx]);
+      // ⌘, alone is Settings now and opens no file.
       await chord(tester, [cmd], LogicalKeyboardKey.comma);
       expect(opener.opened, [testConfigPaths().shellx]);
       await disposeWorkspace(tester, w.container);
@@ -402,7 +406,7 @@ keybind = super+l=run_command:Lint
           ),
         ],
       );
-      await chord(tester, [cmd], LogicalKeyboardKey.comma);
+      await chord(tester, [cmd, alt], LogicalKeyboardKey.comma);
       expect(
         w.container.read(terminalTabsProvider).notice,
         isA<ConfigOpenFailedNotice>(),

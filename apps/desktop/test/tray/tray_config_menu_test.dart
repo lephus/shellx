@@ -75,6 +75,7 @@ void main() {
           final sub = items[cli + 2];
           expect(sub.label, l10n.trayConfig);
           expect(sub.submenu!.items!.map((i) => i.key), [
+            TrayKeys.configSettings,
             TrayKeys.configOpen,
             TrayKeys.configReload,
             TrayKeys.configShortcuts,
@@ -82,6 +83,11 @@ void main() {
         }
         final items = menu(state, en);
         expect(find(items, TrayKeys.config)!.label, 'Configuration');
+        expect(find(items, TrayKeys.configSettings)!.label, 'Settings…');
+        expect(
+          find(menu(state, vi), TrayKeys.configSettings)!.label,
+          'Cài đặt…',
+        );
         expect(
           find(items, TrayKeys.configOpen)!.label,
           'Open configuration file',
@@ -104,13 +110,14 @@ void main() {
       final sub = find(menu(state, en, problems: 2), TrayKeys.config)!;
       final items = sub.submenu!.items!;
       expect(items.map((i) => i.key), [
+        TrayKeys.configSettings,
         TrayKeys.configOpen,
         TrayKeys.configReload,
         TrayKeys.configShortcuts,
         null,
         TrayKeys.configProblems,
       ]);
-      expect(items[3].type, 'separator');
+      expect(items[4].type, 'separator');
       expect(items.last.label, '⚠ 2 configuration problems…');
       expect(
         find(menu(state, en, problems: 1), TrayKeys.configProblems)!.label,
@@ -124,6 +131,7 @@ void main() {
   }
 
   test('keys map to actions', () {
+    expect(trayActionForKey(TrayKeys.configSettings), isA<OpenSettings>());
     expect(trayActionForKey(TrayKeys.configOpen), isA<OpenConfigFile>());
     expect(trayActionForKey(TrayKeys.configReload), isA<ReloadConfig>());
     expect(
@@ -172,6 +180,12 @@ void main() {
       final after = c.read(shellxConfigProvider);
       expect(after.generation, before + 1);
       expect(after.lastLoad!.manual, isTrue);
+      expect(c.read(windowRouterProvider).visible, isTrue);
+    });
+
+    test('Settings: the window, then a request', () async {
+      await tap(const OpenSettings());
+      expect(c.read(configUiRequestProvider)!.$1, ConfigUiRequest.settings);
       expect(c.read(windowRouterProvider).visible, isTrue);
     });
 

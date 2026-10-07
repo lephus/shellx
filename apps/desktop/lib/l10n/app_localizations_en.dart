@@ -2335,4 +2335,171 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSelectionColor => 'Selection color';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsSearch => 'Search settings';
+
+  @override
+  String settingsNoMatch(String query) {
+    return 'No setting matches “$query”';
+  }
+
+  @override
+  String get settingsNoMatchHint => 'Not here? Open the configuration file.';
+
+  @override
+  String get settingsOpenFile => 'Open configuration file';
+
+  @override
+  String get settingsReload => 'Reload';
+
+  @override
+  String settingsSavedInFile(String key) {
+    return 'Saved in the configuration file · $key';
+  }
+
+  @override
+  String settingsSetIn(String file, int line) {
+    return 'Set in $file, line $line';
+  }
+
+  @override
+  String get settingsFromGhostty =>
+      'From your Ghostty configuration. Changing it here overrides it for ShellX.';
+
+  @override
+  String get settingsMultiLine => 'Set on several lines. Edit it in the file.';
+
+  @override
+  String get settingsReset => 'Reset to default';
+
+  @override
+  String get settingsResetAll => 'Undo everything changed here';
+
+  @override
+  String get settingsResetAllConfirm =>
+      'Remove the settings ShellX wrote to your configuration file? Lines you wrote yourself stay.';
+
+  @override
+  String get settingsFileChanged =>
+      'The file changed while you were editing. Reloaded, try again.';
+
+  @override
+  String get settingsFileDamaged =>
+      'The managed block in the file is damaged. Open the file to fix it.';
+
+  @override
+  String get settingsFileUnwritable => 'Couldn’t save the file';
+
+  @override
+  String get settingsPreviewLabel => 'Preview';
+
+  @override
+  String get settingsPreviewNote =>
+      'The preview doesn’t include this workspace’s own zoom.';
+
+  @override
+  String get settingsFontFamilyHint => 'A font installed on this computer';
+
+  @override
+  String get settingsScrollbackNote => 'Applies to panes opened from now on.';
+
+  @override
+  String get settingsWorkingDirHome => 'Home folder';
+
+  @override
+  String get settingsWorkingDirInherit => 'The current pane’s folder';
+
+  @override
+  String get settingsWorkingDirPath => 'A folder…';
+
+  @override
+  String get settingsGlobalHotkey => 'Show or hide ShellX from anywhere';
+
+  @override
+  String get settingsGlobalHotkeyNone => 'Not set';
+
+  @override
+  String get settingsGlobalHotkeyRecord => 'Press the keys…';
+
+  @override
+  String get settingsGlobalHotkeyTaken =>
+      'That shortcut is used by another app';
+
+  @override
+  String get settingsOpenTour => 'Show the tour again';
+
+  @override
+  String settingsVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String settingsProblems(int n) {
+    return '$n configuration problems';
+  }
+
+  @override
+  String get settingsLoginNeeded => 'Sign in to manage the phone connection';
+
+  @override
+  String get settingsCommandsNote =>
+      'Your commands and snippets are edited in the file.';
+
+  @override
+  String get settingsConfigPath => 'Configuration file';
+
+  @override
+  String get settingsProblemsShow => 'Show';
+
+  @override
+  String get settingsCopyPath => 'Copy path';
+
+  @override
+  String settingsResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count settings found',
+      one: '1 setting found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionOpenSettings => 'Settings';
+
+  @override
+  String get trayConfigSettings => 'Settings…';
+
+  @override
+  String get settingsPageNavLabel => 'Settings pages';
+
+  @override
+  String get settingsThemeSearch => 'Search themes';
+
+  @override
+  String get settingsThemeNotFound =>
+      'A theme file couldn’t be read. Showing the ShellX colors.';
+
+  @override
+  String get settingsOptionAsAltOff => 'Off';
+
+  @override
+  String get settingsOptionAsAltLeft => 'Left Option';
+
+  @override
+  String get settingsOptionAsAltRight => 'Right Option';
+
+  @override
+  String get settingsOptionAsAltBoth => 'Both Option keys';
+
+  @override
+  String get settingsDefaultValue => 'Default';
+
+  @override
+  String get settingsHexHint => '#RRGGBB';
 }

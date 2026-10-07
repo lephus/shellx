@@ -2246,4 +2246,171 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsSelectionColor => 'Màu vùng chọn';
+
+  @override
+  String get settingsTitle => 'Cài đặt';
+
+  @override
+  String get settingsSearch => 'Tìm cài đặt';
+
+  @override
+  String settingsNoMatch(String query) {
+    return 'Không có cài đặt nào khớp “$query”';
+  }
+
+  @override
+  String get settingsNoMatchHint => 'Không thấy? Mở tệp cấu hình.';
+
+  @override
+  String get settingsOpenFile => 'Mở tệp cấu hình';
+
+  @override
+  String get settingsReload => 'Tải lại';
+
+  @override
+  String settingsSavedInFile(String key) {
+    return 'Lưu trong tệp cấu hình · $key';
+  }
+
+  @override
+  String settingsSetIn(String file, int line) {
+    return 'Đặt trong $file, dòng $line';
+  }
+
+  @override
+  String get settingsFromGhostty =>
+      'Lấy từ cấu hình Ghostty của bạn. Đổi ở đây sẽ ghi đè cho ShellX.';
+
+  @override
+  String get settingsMultiLine => 'Được đặt ở nhiều dòng. Hãy sửa trong tệp.';
+
+  @override
+  String get settingsReset => 'Về mặc định';
+
+  @override
+  String get settingsResetAll => 'Hoàn tác mọi thay đổi đã làm ở đây';
+
+  @override
+  String get settingsResetAllConfirm =>
+      'Xoá các cài đặt ShellX đã ghi vào tệp cấu hình? Dòng bạn tự viết được giữ nguyên.';
+
+  @override
+  String get settingsFileChanged =>
+      'Tệp đã đổi trong lúc bạn chỉnh. Đã nạp lại, hãy thử lại.';
+
+  @override
+  String get settingsFileDamaged =>
+      'Khối do ShellX quản lý trong tệp bị hỏng. Hãy mở tệp để sửa.';
+
+  @override
+  String get settingsFileUnwritable => 'Không lưu được tệp';
+
+  @override
+  String get settingsPreviewLabel => 'Xem trước';
+
+  @override
+  String get settingsPreviewNote =>
+      'Bản xem trước không gồm cỡ chữ riêng của workspace này.';
+
+  @override
+  String get settingsFontFamilyHint => 'Một font đã cài trên máy';
+
+  @override
+  String get settingsScrollbackNote => 'Áp dụng cho pane mở từ bây giờ.';
+
+  @override
+  String get settingsWorkingDirHome => 'Thư mục chính';
+
+  @override
+  String get settingsWorkingDirInherit => 'Thư mục của pane hiện tại';
+
+  @override
+  String get settingsWorkingDirPath => 'Một thư mục…';
+
+  @override
+  String get settingsGlobalHotkey => 'Ẩn/hiện ShellX từ mọi nơi';
+
+  @override
+  String get settingsGlobalHotkeyNone => 'Chưa đặt';
+
+  @override
+  String get settingsGlobalHotkeyRecord => 'Nhấn tổ hợp phím…';
+
+  @override
+  String get settingsGlobalHotkeyTaken =>
+      'Tổ hợp này đang được ứng dụng khác dùng';
+
+  @override
+  String get settingsOpenTour => 'Xem lại phần hướng dẫn';
+
+  @override
+  String settingsVersion(String version) {
+    return 'Phiên bản $version';
+  }
+
+  @override
+  String settingsProblems(int n) {
+    return '$n vấn đề cấu hình';
+  }
+
+  @override
+  String get settingsLoginNeeded => 'Đăng nhập để quản lý kết nối điện thoại';
+
+  @override
+  String get settingsCommandsNote =>
+      'Lệnh và đoạn chữ của bạn được sửa trong tệp.';
+
+  @override
+  String get settingsConfigPath => 'Tệp cấu hình';
+
+  @override
+  String get settingsProblemsShow => 'Xem';
+
+  @override
+  String get settingsCopyPath => 'Sao chép đường dẫn';
+
+  @override
+  String settingsResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Tìm thấy $count cài đặt',
+      one: 'Tìm thấy 1 cài đặt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionOpenSettings => 'Cài đặt';
+
+  @override
+  String get trayConfigSettings => 'Cài đặt…';
+
+  @override
+  String get settingsPageNavLabel => 'Các trang cài đặt';
+
+  @override
+  String get settingsThemeSearch => 'Tìm chủ đề';
+
+  @override
+  String get settingsThemeNotFound =>
+      'Không đọc được tệp chủ đề. Đang dùng màu của ShellX.';
+
+  @override
+  String get settingsOptionAsAltOff => 'Tắt';
+
+  @override
+  String get settingsOptionAsAltLeft => 'Option trái';
+
+  @override
+  String get settingsOptionAsAltRight => 'Option phải';
+
+  @override
+  String get settingsOptionAsAltBoth => 'Cả hai phím Option';
+
+  @override
+  String get settingsDefaultValue => 'Mặc định';
+
+  @override
+  String get settingsHexHint => '#RRGGBB';
 }

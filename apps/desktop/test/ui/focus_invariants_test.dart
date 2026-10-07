@@ -220,7 +220,11 @@ void main() {
     await disposeWorkspace(t, w.container);
   }, variant: mac);
 
-  for (final kind in [ConfigUiRequest.shortcuts, ConfigUiRequest.problems]) {
+  for (final kind in [
+    ConfigUiRequest.shortcuts,
+    ConfigUiRequest.problems,
+    ConfigUiRequest.settings,
+  ]) {
     testWidgets('F3: coming back leaves the ${kind.name} sheet alone', (
       t,
     ) async {

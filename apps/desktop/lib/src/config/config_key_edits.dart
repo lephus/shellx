@@ -204,3 +204,13 @@ String _dropEmptyBlock(String text) {
     return null;
   }
 }
+
+/// "Undo everything changed here" (A11 D9): the settings block goes, markers
+/// and lines; every other byte stays, the keybind block included. Throws
+/// [ConfigWriteRefused] (damagedBlock) when a marker is lone or doubled.
+String removeSettingsBlock(String text) {
+  final lines = splitConfigLines(text);
+  final mine = _blocks(lines).mine;
+  if (mine == null) return text;
+  return text.replaceRange(lines[mine.start].start, lines[mine.end].end, '');
+}
