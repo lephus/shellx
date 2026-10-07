@@ -591,7 +591,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   // ---- ports, moves, menus (UI-A2 §2.4, §5, §8) -------------------------
 
-  /// A8 D19: an SSH tab's port goes through a forward.
+  /// A8 D19: an SSH tab's port goes through a forward. A tab's ports are
+  /// its focused pane's (`TerminalTab.ports`), so that pane owns the port.
   Future<void> _openPort(TerminalTab tab, int port) =>
       ref.read(remotePortForwardsProvider.notifier).open(tab.focused, port);
 
