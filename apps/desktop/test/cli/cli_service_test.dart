@@ -12,7 +12,9 @@ import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart'
     show settingsStoreProvider;
 
+import '../support/config_harness.dart';
 import '../support/fake_local_sessions.dart';
+import '../support/memory_config_fs.dart';
 import 'support/cli_container.dart';
 
 void main() {
@@ -202,6 +204,43 @@ void main() {
     expect(await _lockFromAnotherProcess(paths.lock), isFalse);
     await svc.stop();
     expect(await _lockFromAnotherProcess(paths.lock), isTrue);
+  });
+
+  test('A9 D39: ui.config.* need the token and cli_control_enabled', () async {
+    final c = cliContainer(
+      FakeLocalSessions(),
+      overrides: [
+        cliMuxPathsProvider.overrideWithValue(paths),
+        ...configOverrides(MemoryConfigFs()),
+      ],
+    );
+    final svc = await CliService.start(
+      c,
+      appVersion: '1.7.0',
+      token: token,
+      installBinary: false,
+    );
+    addTearDown(svc.stop);
+    final inside = await connect(token: token);
+    for (final t in const ['check', 'reload', 'show']) {
+      final r = await ask(inside, 'ui.config.$t', 1);
+      expect(r.type, isNot('error'), reason: t);
+    }
+    // A terminal without the token is limited: forbidden, then closed.
+    final outside = await connect();
+    final refused = await ask(outside, 'ui.config.show', 1);
+    expect(refused.get<String>('code'), 'forbidden');
+    await outside.done.timeout(const Duration(seconds: 2));
+    // The master switch off: every one of them is cli_disabled.
+    await c
+        .read(settingsStoreProvider)
+        .setBool(SettingKeys.cliControlEnabled, false);
+    var q = 10;
+    for (final t in const ['check', 'reload', 'show']) {
+      final r = await ask(inside, 'ui.config.$t', q++);
+      expect(r.get<String>('code'), 'cli_disabled', reason: t);
+    }
+    await inside.close();
   });
 }
 

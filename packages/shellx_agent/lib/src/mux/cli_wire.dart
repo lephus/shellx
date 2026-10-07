@@ -23,6 +23,11 @@ abstract final class CliType {
   static const uiWorkspaceMove = 'ui.workspace.move';
   static const uiNotify = 'ui.notify';
   static const uiEventsSubscribe = 'ui.events.subscribe';
+
+  /// A9 D39.
+  static const uiConfigCheck = 'ui.config.check';
+  static const uiConfigReload = 'ui.config.reload';
+  static const uiConfigShow = 'ui.config.show';
   static const uiBrowserPrefix = 'ui.browser.';
 
   /// D3: what a `cli` client may send. Everything else is `forbidden`.
@@ -65,6 +70,7 @@ const List<String> kCliCaps = [
   CliType.uiWorkspaceNew,
   CliType.uiWorkspaceRename,
   CliType.uiWorkspaceMove,
+  'ui.config',
 ];
 
 MuxMessage cliResult(int? q, [Map<String, Object?> fields = const {}]) =>

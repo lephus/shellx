@@ -99,6 +99,7 @@ void main() {
   test('caps: what this host serves; no ui.browser while A6 is absent', () {
     expect(kCliApi, 1);
     expect(kCliCaps, isNot(contains('ui.browser')));
+    expect(kCliCaps, contains('ui.config')); // A9 D39
     expect(
       kCliCaps,
       containsAll([CliType.cliNotify, CliType.uiLs, CliType.uiPaneRead]),

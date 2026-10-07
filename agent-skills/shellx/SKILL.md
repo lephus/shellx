@@ -16,6 +16,7 @@ You are inside ShellX when `$SHELLX` is `1`. `$SHELLX_PANE_ID` is your pane, `$S
 - Exit 3 means ShellX is not running. Do not start it yourself; tell the user.
 - Exit 6 with `cli_disabled`: tell the user to tick "Allow controlling ShellX from the command line" in the ShellX tray menu (Command line).
 - Exit 6 with `forbidden` when you run outside a ShellX pane (no `$SHELLX_CLI_TOKEN`): only shells ShellX opened may control it. Ask the user to tick "Allow other terminals" in the ShellX tray menu (Command line), or run the command from a ShellX pane.
+- To change ShellX itself (shortcuts, fonts, themes, palette commands) use the shellx-config skill.
 - `shellx browser …` needs a ShellX with browser panes; exit 7 means browser panes are not available in this ShellX.
 
 ## Recipes

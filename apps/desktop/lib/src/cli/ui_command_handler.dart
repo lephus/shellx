@@ -12,6 +12,7 @@ import 'agent_marks.dart';
 import 'cli_event_bus.dart';
 import 'cli_fields.dart';
 import 'cli_targets.dart';
+import 'ui_config_commands.dart';
 import 'ui_pane_io.dart';
 
 /// How a request learns its client left: [Future] completes then; the
@@ -35,7 +36,8 @@ const _runningCommand = CliFailure(
 /// Never logs request contents (cwd, commands, names, text sent or read).
 final class UiCommandHandler implements UiApi {
   UiCommandHandler(this._ref, {this.openWait = const Duration(seconds: 10)})
-    : _io = PaneIoCommands(_ref) {
+    : _io = PaneIoCommands(_ref),
+      _configCommands = ConfigCommands(_ref) {
     onCommand = _io.typeCommand;
   }
 
@@ -43,6 +45,9 @@ final class UiCommandHandler implements UiApi {
 
   /// D16, D19-D21: send, read, wait and `--cmd`.
   final PaneIoCommands _io;
+
+  /// A9 D39: `ui.config.*`.
+  final ConfigCommands _configCommands;
 
   /// D33: how long a request waits for another open in flight.
   final Duration openWait;
@@ -81,6 +86,9 @@ final class UiCommandHandler implements UiApi {
       CliType.uiPaneRead => _io.read(request),
       CliType.uiPaneWait => _io.wait(request, cancelled),
       CliType.uiNotify => _uiNotify(request),
+      CliType.uiConfigCheck => _configCommands.check(),
+      CliType.uiConfigReload => _configCommands.reload(),
+      CliType.uiConfigShow => _configCommands.show(request),
       // D34: arms the daemon's forwarding of [events]; nothing to answer.
       CliType.uiEventsSubscribe => Future.value(const <String, Object?>{}),
       // ui.browser.*: pending A6.
@@ -208,7 +216,8 @@ final class UiCommandHandler implements UiApi {
   /// wait is `not_found`, and nothing opens.
   Future<Map<String, Object?>> _tabNew(MuxMessage r, _Leaving leaving) async {
     final wsKey = stringField(r, 'workspace');
-    final cwd = stringField(r, 'cwd');
+    // A9 D21: without --cwd, where the configuration starts new tabs.
+    final cwd = stringField(r, 'cwd') ?? _tabs.newTabCwd();
     final cmd = textField(r, 'cmd', maxBytes: kCmdMaxBytes, limit: '16 KiB');
     final select = flagField(r, 'focus');
     final tab = await _opening(
@@ -314,7 +323,11 @@ final class UiCommandHandler implements UiApi {
     final int tab;
     try {
       tab = await _opening(
-        () => _tabs.openTabFor(select: focus, workspace: ws),
+        () => _tabs.openTabFor(
+          cwd: _tabs.newTabCwd(),
+          select: focus,
+          workspace: ws,
+        ),
         leaving,
       );
     } on Object {

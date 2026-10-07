@@ -11,6 +11,18 @@ use std::path::{Path, PathBuf};
 
 pub const SKILL: &str = include_str!("../../../agent-skills/shellx/SKILL.md");
 pub const REFERENCE: &str = include_str!("../../../agent-skills/shellx/reference.md");
+pub const CONFIG_SKILL: &str = include_str!("../../../agent-skills/shellx-config/SKILL.md");
+
+/// A9 D34: every skill `install` writes (one installer, A7 D35): folder
+/// name and its files.
+pub const SKILLS: &[(&str, &[(&str, &str)])] = &[
+    (
+        "shellx",
+        &[("SKILL.md", SKILL), ("reference.md", REFERENCE)],
+    ),
+    ("shellx-config", &[("SKILL.md", CONFIG_SKILL)]),
+];
+
 pub const CLAUDE_SKILLS_DIR: &str = ".claude/skills";
 /// Codex reads user skills from `$HOME/.agents/skills` (Codex docs,
 /// "Build skills", checked 2026-10-07; formerly `~/.codex/skills`).
@@ -30,14 +42,15 @@ fn refused(message: String) -> ApiError {
     }
 }
 
-/// `skills print [SKILL.md | reference]`; `--json`: `{"files":[{name, text}]}`.
+/// `skills print [SKILL.md | reference | config]`; `--json`: `{"files":[{name, text}]}`.
 pub fn print(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     let (name, text) = match p.pos(0) {
         None | Some("SKILL.md") | Some("skill") => ("SKILL.md", SKILL),
         Some("reference") | Some("reference.md") => ("reference.md", REFERENCE),
+        Some("config") | Some("shellx-config") => ("SKILL.md", CONFIG_SKILL),
         Some(other) => {
             return Err(ApiError::Usage(format!(
-                "no skill file '{other}' (SKILL.md or reference)"
+                "no skill file '{other}' (SKILL.md, reference or config)"
             )))
         }
     };
@@ -143,42 +156,44 @@ pub fn install(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     }
     let (mut installed, mut up_to_date, mut skipped) = (vec![], vec![], vec![]);
     for base in targets {
-        let dir = base.join("shellx");
-        for (name, text) in [("SKILL.md", SKILL), ("reference.md", REFERENCE)] {
-            let path = dir.join(name);
-            match std::fs::read(&path) {
-                Ok(old) if old == text.as_bytes() => {
-                    if !p.json {
-                        writeln!(ctx.out, "{} is up to date", path.display()).ok();
-                    }
-                    up_to_date.push(path);
-                    continue;
-                }
-                Ok(_) if !p.has("force") => {
-                    let yes = ctx.stdin_is_tty && {
-                        write!(ctx.err, "Overwrite {}? [y/N] ", path.display()).ok();
-                        ctx.err.flush().ok();
-                        matches!(
-                            answer(ctx.stdin).as_str(),
-                            "y" | "Y" | "yes" | "YES" | "Yes"
-                        )
-                    };
-                    if !yes {
+        for (skill, files) in SKILLS {
+            let dir = base.join(skill);
+            for (name, text) in files.iter() {
+                let path = dir.join(name);
+                match std::fs::read(&path) {
+                    Ok(old) if old == text.as_bytes() => {
                         if !p.json {
-                            writeln!(ctx.err, "kept your changed {}", path.display()).ok();
+                            writeln!(ctx.out, "{} is up to date", path.display()).ok();
                         }
-                        skipped.push(path);
+                        up_to_date.push(path);
                         continue;
                     }
+                    Ok(_) if !p.has("force") => {
+                        let yes = ctx.stdin_is_tty && {
+                            write!(ctx.err, "Overwrite {}? [y/N] ", path.display()).ok();
+                            ctx.err.flush().ok();
+                            matches!(
+                                answer(ctx.stdin).as_str(),
+                                "y" | "Y" | "yes" | "YES" | "Yes"
+                            )
+                        };
+                        if !yes {
+                            if !p.json {
+                                writeln!(ctx.err, "kept your changed {}", path.display()).ok();
+                            }
+                            skipped.push(path);
+                            continue;
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
+                std::fs::create_dir_all(&dir).map_err(io)?;
+                write_file(&path, text)?;
+                if !p.json {
+                    writeln!(ctx.out, "installed {}", path.display()).ok();
+                }
+                installed.push(path);
             }
-            std::fs::create_dir_all(&dir).map_err(io)?;
-            write_file(&path, text)?;
-            if !p.json {
-                writeln!(ctx.out, "installed {}", path.display()).ok();
-            }
-            installed.push(path);
         }
     }
     let refusal = (!skipped.is_empty()).then(|| {
@@ -283,6 +298,61 @@ mod tests {
         );
         assert!(SKILL.contains("browser panes") && REFERENCE.contains("no browser panes yet"));
         assert!(REFERENCE.contains("pattern is too slow"));
+    }
+
+    #[test]
+    fn installs_both_skills_and_prints_config() {
+        let home = temp_home("both");
+        assert_eq!(
+            run_skills(&["skills", "install", "--claude"], &home, "", false).0,
+            0
+        );
+        assert!(home.join(".claude/skills/shellx/SKILL.md").exists());
+        assert!(home.join(".claude/skills/shellx/reference.md").exists());
+        assert!(home.join(".claude/skills/shellx-config/SKILL.md").exists());
+        let (code, out, _) = run_skills(&["skills", "print", "config"], &home, "", false);
+        assert_eq!(code, 0);
+        assert!(out.starts_with("---\nname: shellx-config"));
+        assert_eq!(out, CONFIG_SKILL);
+    }
+
+    #[test]
+    fn config_skill_installs_to_codex_own_folder_too() {
+        let home = temp_home("codex-config");
+        std::fs::create_dir_all(home.join(".codex")).unwrap();
+        assert_eq!(
+            run_skills(&["skills", "install", "--codex"], &home, "", false).0,
+            0
+        );
+        for base in [".agents/skills", ".codex/skills"] {
+            assert!(
+                home.join(base).join("shellx-config/SKILL.md").exists(),
+                "{base}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_config_skill_names_every_command_and_the_managed_block() {
+        assert!(CONFIG_SKILL.starts_with("---\nname: shellx-config\n"));
+        for w in [
+            "config path",
+            "config check",
+            "config reload",
+            "config show",
+        ] {
+            assert!(REFERENCE.contains(&format!("shellx {w}")), "{w}");
+            assert!(CONFIG_SKILL.contains(&format!("shellx {w}")), "{w}");
+        }
+        assert!(CONFIG_SKILL.contains("# >>> shellx-managed keybinds >>>"));
+        assert!(CONFIG_SKILL.contains("Allow other terminals"));
+        assert!(!CONFIG_SKILL.contains("browser"));
+        assert!(SKILL.contains("shellx-config skill"));
+        for (name, files) in SKILLS {
+            for (file, text) in files.iter() {
+                assert!(!text.is_empty(), "{name}/{file}");
+            }
+        }
     }
 
     #[test]
@@ -486,7 +556,11 @@ mod tests {
         let home = temp_home("json");
         let dir = home.join("j");
         let d = dir.to_str().unwrap();
-        let (skill, reference) = (dir.join("shellx/SKILL.md"), dir.join("shellx/reference.md"));
+        let (skill, reference, config) = (
+            dir.join("shellx/SKILL.md"),
+            dir.join("shellx/reference.md"),
+            dir.join("shellx-config/SKILL.md"),
+        );
         let (code, out, err) = run_skills(
             &["skills", "install", "--dir", d, "--json"],
             &home,
@@ -504,7 +578,7 @@ mod tests {
             out,
             format!(
                 "{{\"installed\":[{}],\"upToDate\":[],\"skipped\":[]}}\n",
-                list(&[&skill, &reference])
+                list(&[&skill, &reference, &config])
             )
         );
         std::fs::write(&skill, "a").unwrap();
@@ -516,7 +590,7 @@ mod tests {
         );
         assert_eq!((code, err.as_str()), (6, ""));
         assert_eq!(out.lines().count(), 1, "{out}");
-        assert!(out.starts_with(&format!("{{\"installed\":[],\"upToDate\":[{}],\"skipped\":[{}],\"error\":{{\"code\":\"forbidden\"", list(&[&reference]), list(&[&skill]))), "{out}");
+        assert!(out.starts_with(&format!("{{\"installed\":[],\"upToDate\":[{}],\"skipped\":[{}],\"error\":{{\"code\":\"forbidden\"", list(&[&reference, &config]), list(&[&skill]))), "{out}");
         let (code, out, _) = run_skills(
             &["skills", "print", "reference", "--json"],
             &home,

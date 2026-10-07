@@ -4,6 +4,7 @@
 
 use super::args::Parsed;
 use super::client::{ApiError, Session};
+use super::config_path;
 use super::output;
 use super::skills;
 use super::value::{to_json, Value};
@@ -12,12 +13,14 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+mod config;
 mod notify;
 mod prepare;
 mod targets;
 #[cfg(test)]
 mod tests;
 
+use config::config_remote;
 use notify::notify;
 use prepare::{prepare, timeout_ms, Prepared};
 
@@ -138,6 +141,8 @@ impl Api {
     fn call(&mut self, t: &str, fields: Vec<(&str, Option<Value>)>) -> Result<Message, ApiError> {
         let cap = if t.starts_with("ui.browser.") {
             "ui.browser"
+        } else if t.starts_with("ui.config.") {
+            "ui.config"
         } else {
             t
         };
@@ -200,6 +205,8 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
         "skills install" => return skills::install(p, ctx),
         "skills print" => return skills::print(p, ctx),
         "notify" => return notify(p, ctx),
+        "config path" => return config_path::print_path(p, ctx),
+        "config check" | "config reload" | "config show" => return config_remote(p, ctx, &path),
         _ => {}
     }
     let prepared = prepare(p, ctx, &path)?;
