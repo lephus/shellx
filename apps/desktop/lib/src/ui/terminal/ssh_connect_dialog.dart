@@ -235,6 +235,8 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     return KeyEventResult.ignored;
   }
 
+  void _forgetTap() => _lastTapRow = null;
+
   /// A first click selects at once; a second on the same row within the
   /// double-click time attaches it.
   void _tapRow(int i, List<TmuxSessionInfo> sessions) {
@@ -261,6 +263,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
       return;
     }
     final generation = ++_tmuxGeneration;
+    _forgetTap();
     _sourceSuggest = false;
     if (host == null && _noLocalTmux) {
       setState(() {
@@ -289,11 +292,13 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
       result = const TmuxListFailed(TmuxListFailure.timeout);
     }
     if (mounted && generation == _tmuxGeneration) {
+      _forgetTap();
       setState(() => _tmux = result);
     }
   }
 
   Future<void> _attach(String name, {bool create = false}) async {
+    _forgetTap();
     final l10n = AppLocalizations.of(context);
     final (host, valid) = _tmuxSource;
     if (!valid) {

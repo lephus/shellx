@@ -402,4 +402,19 @@ void main() {
     await settle(tester);
     expect(local.openLaunches.single, const TmuxLaunch('build'));
   });
+
+  testWidgets('a reloaded tmux list forgets the last tap: the next click only '
+      'selects', (tester) async {
+    await pump(tester, tab: SshDialogTab.tmux);
+    await tester.tap(find.byKey(const Key('tmux.row.main')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('tmux.source')));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('tmux.row.main')));
+    await tester.pump();
+    expect(local.openLaunches, isEmpty);
+    await settle(tester);
+  });
 }
