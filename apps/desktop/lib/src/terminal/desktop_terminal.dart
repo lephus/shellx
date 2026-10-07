@@ -1,5 +1,6 @@
 import 'package:xterm/xterm.dart';
 
+import 'hyperlink_registry.dart';
 import 'terminal_input.dart';
 
 /// xterm [Terminal] for a desktop tab. xterm reports both what the user
@@ -15,7 +16,14 @@ final class DesktopTerminal extends Terminal {
     TerminalInputHandler? inputHandler,
   }) : super(inputHandler: inputHandler ?? desktopInputHandler) {
     onOutput = _route;
+    // A10 D11: OSC 8 hyperlinks (xterm hands them over, stores nothing).
+    onPrivateOSC = (code, args) {
+      if (code == '8') hyperlinks.handle(buffer, args);
+    };
   }
+
+  /// A10 D11: where the program put OSC 8 links.
+  final hyperlinks = HyperlinkRegistry();
 
   /// A9 D31: bytes from the user's own key binding (`text:`, `csi:`,
   /// `esc:`), sent as typed input (the desktop takes the driver, A1 D6)
