@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'ssh_target.dart';
 
@@ -33,6 +34,7 @@ SshConfigFile parseSshConfig(String text) {
     switch (match[1]!.toLowerCase()) {
       case 'host':
         for (final value in values) {
+          if (value.startsWith('#')) break;
           if (_pattern.hasMatch(value)) continue;
           if (SshTarget.parse(value) != null) hosts.add(value);
         }
@@ -148,9 +150,15 @@ Future<List<String>> _expand(
 
 Future<String?> _readSmallFile(String path) async {
   try {
-    final file = File(path);
-    if (await file.length() > _maxConfigBytes) return null;
-    return await file.readAsString();
+    if (FileSystemEntity.typeSync(path) != FileSystemEntityType.file) {
+      return null;
+    }
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in File(path).openRead(0, _maxConfigBytes + 1)) {
+      bytes.add(chunk);
+    }
+    if (bytes.length > _maxConfigBytes) return null;
+    return utf8.decode(bytes.takeBytes(), allowMalformed: true);
   } on Object {
     return null;
   }

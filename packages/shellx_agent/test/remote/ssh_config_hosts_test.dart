@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
 
@@ -10,6 +12,7 @@ Host devbox dev-db *.corp !bastion
   User me
 host=staging
 HOST "quoted name" plain
+Host #comment-like
 Include config.d/*
   Include ~/.ssh/extra "other file"
 Host -oProxyCommand=x
@@ -67,5 +70,19 @@ Host -oProxyCommand=x
       list: (_) async => const [],
     );
     expect(hosts, ['winbox']);
+  });
+
+  test('only regular files, bounded (no /dev/zero include) (L8)', () async {
+    final dir = Directory.systemTemp.createTempSync('sshcfg');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    Directory('${dir.path}/.ssh').createSync();
+    File(
+      '${dir.path}/.ssh/config',
+    ).writeAsStringSync('Host a\nInclude /dev/zero\nInclude big\nHost b\n');
+    File(
+      '${dir.path}/.ssh/big',
+    ).writeAsStringSync('Host huge\n${" " * 1100000}');
+    final hosts = await readSshConfigHosts(home: dir.path);
+    expect(hosts, ['a', 'b']);
   });
 }
