@@ -1,42 +1,32 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/src/config/keybind_actions.dart';
+import 'package:shellx_desktop/src/config/keybind_trigger.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_shortcuts.dart';
 
 /// Spec D24 / criterion 1: the default tables after A9 are today's tables
-/// (plus A9's three new chords, Step 5). The fixtures are written once,
-/// from the code as it was before A9 (`WRITE_GOLDEN=1`).
-String _activator(ShortcutActivator a) {
-  final s = a as SingleActivator;
-  return [
-        if (s.control) 'ctrl',
-        if (s.alt) 'alt',
-        if (s.shift) 'shift',
-        if (s.meta) 'meta',
-        s.trigger.keyId.toRadixString(16),
-      ].join('+') +
-      (s.includeRepeats ? '' : ' norepeat');
-}
-
-String _describe(Intent i) => switch (i) {
-  SelectTabIntent(:final position) => 'SelectTabIntent($position)',
-  SplitPaneIntent(:final axis) => 'SplitPaneIntent(${axis.name})',
-  FocusPaneIntent(:final direction) => 'FocusPaneIntent(${direction.name})',
-  ResizePaneIntent(:final direction) => 'ResizePaneIntent(${direction.name})',
-  SelectAllIntent(:final fromMenu) =>
-    fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
-  _ => i.runtimeType.toString(),
-};
-
+/// plus A9's three new chords. The fixtures were written once, from the
+/// code as it was before A9 (`WRITE_GOLDEN=1`, commit d5bdf16); they are
+/// never regenerated.
 Set<String> signatures(Map<ShortcutActivator, Intent> map) => {
-  for (final e in map.entries) '${_activator(e.key)} -> ${_describe(e.value)}',
+  for (final e in map.entries)
+    '${describeActivator(e.key)} -> ${describeIntent(e.value)}',
 };
 
-/// Chords A9 adds on purpose (spec D24); empty until Step 5.
-Set<String> a9Additions(String map, String platform) => const {};
+/// Chords A9 adds on purpose (spec D24). No browser map: A6 is not merged.
+Set<String> a9Additions(String map, String platform) => platform == 'mac'
+    ? const {
+        'shift+meta+2c norepeat -> ReloadConfigIntent',
+        'meta+2c norepeat -> OpenConfigIntent',
+        'shift+meta+70 norepeat -> CommandPaletteIntent',
+      }
+    : const {
+        'ctrl+shift+2c norepeat -> ReloadConfigIntent',
+        'ctrl+2c norepeat -> OpenConfigIntent',
+        'ctrl+shift+70 norepeat -> CommandPaletteIntent',
+      };
 
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").
