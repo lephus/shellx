@@ -323,13 +323,13 @@ Riêng tư: `restore/` (macOS `~/Library/Application Support/pro.shellx.desktop/
 
 ## 16. Dòng lệnh shellx — A7 (2026-10-07)
 
-Spec `specs/2026-10-07-desktop-cli-a7-design.md`, plan `plans/2026-10-07-desktop-cli-a7.md`. Lệnh `shellx` (bản chép của `shellx-term`) ở macOS `~/Library/Application Support/ShellX/cli/shellx`, Windows `%LOCALAPPDATA%\ShellX\cli\shellx.exe`; mỗi shell ShellX mở có nó đầu `PATH` cùng `SHELLX_SOCKET` và `SHELLX_CLI_TOKEN` (token mỗi lần chạy, không bao giờ ghi log). Host trong tiến trình cửa sổ: macOS `~/Library/Application Support/pro.shellx.desktop/mux/` (`endpoint`, `mux.sock`, `mux.lock`), Windows `%LOCALAPPDATA%\ShellX\mux\` + pipe. Tray → **Dòng lệnh** (sau "Thông báo"): ☑ điều khiển bằng dòng lệnh, ☐ "Cho phép terminal khác", cài/gỡ lệnh cho mọi terminal, sao chép lệnh cài skill.
+Spec `specs/2026-10-07-desktop-cli-a7-design.md`, plan `plans/2026-10-07-desktop-cli-a7.md`. Lệnh `shellx` (bản chép của `shellx-term`) ở macOS `~/Library/Application Support/ShellX/cli/shellx`, Windows `%LOCALAPPDATA%\ShellX\cli\shellx.exe`; mỗi shell ShellX mở có nó đầu `PATH` cùng `SHELLX_SOCKET` và `SHELLX_CLI_TOKEN` (token mỗi lần chạy, không bao giờ ghi log; hai biến này chỉ có khi host đã chạy — host khởi động trước khi có phiên shell nào, và biến thừa hưởng từ một ShellX khác bị bỏ). Host trong tiến trình cửa sổ: macOS `~/Library/Application Support/pro.shellx.desktop/mux/` (`endpoint`, `mux.sock`, `mux.lock`), Windows `%LOCALAPPDATA%\ShellX\mux\` + pipe. Tray → **Dòng lệnh** (sau "Thông báo"): ☑ điều khiển bằng dòng lệnh, ☐ "Cho phép terminal khác", cài/gỡ lệnh cho mọi terminal, sao chép lệnh cài skill.
 
 Mặc định chỉ shell ShellX điều khiển được (có `SHELLX_CLI_TOKEN`); terminal khác chỉ được `notify` không kèm pane (và `api.version`) cho tới khi tick "Cho phép terminal khác" — đây là rào chặn nhầm lẫn, không phải ranh giới bảo mật với mã độc cùng tài khoản (đọc được secret của endpoint). Lệnh trình duyệt (`shellx browser …`) chờ A6: hiện thoát 7 "this ShellX has no browser panes yet". Daemon A5b chưa có: host chạy trong tiến trình cửa sổ; khi A5b vào, mục này đổi số và daemon nhận token, `mux.lock` và đường `role: cli` (xem ledger "A5b obligation").
 
 Test tự động: `packages/shellx_e2e/test/cli_e2e_test.dart` (binary `shellx` thật ↔ `CliHost` thật qua Unix socket, cửa sổ giả lập vì `UiCommandHandler` cần Flutter; `notify` từ một shell thật tới `SessionManager` thật), `apps/desktop/test/cli/cli_binary_test.dart` (binary thật ↔ `CliService` với `UiCommandHandler` thật; cần `shellx-term` đã build, không có thì bỏ qua và nói lý do). Đo (D40, đo không chặn): từ `apps/desktop`, `flutter test --run-skipped --tags benchmark test/cli/cli_benchmark_test.dart`. Apple M4, 2026-10-07: `ui.ls` 32 tab trung vị ~0,36 ms (≤ 5 ms); `ui.pane.read` 10.000 dòng (6 trang) ~20 ms (≤ 100 ms); cả lệnh `shellx ls` (bản debug, gồm khởi động tiến trình) ~3 ms; `shellx read --lines 10000` trọn vẹn ~70 ms.
 
-Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào ledger (`ledgers/a1-desktop-terminal.md`, mục A7 — execution). Nhánh chỉ merge khi mọi dòng đã đạt.
+Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào ledger (`ledgers/a1-desktop-terminal.md`, mục A7 — execution). **Danh sách này chặn phát hành (release), không chặn merge** (ruling cuối A7, như A1–A5a): A7 merge sau đợt sửa cuối và review lại; không phát hành bản nào có A7 khi còn dòng chưa đạt. **Các dòng Windows là chặn phát hành** (Windows chưa từng chạy).
 
 ### Thử tay — macOS (Task 9)
 - [ ] `flutter run -d macos`, trong một tab ShellX: `command -v shellx` → `…/ShellX/cli/shellx`; `echo $SHELLX_PANE_ID $SHELLX_TAB_ID $SHELLX_SOCKET` có giá trị; `echo ${#SHELLX_CLI_TOKEN}` → 64
@@ -342,7 +342,7 @@ Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào 
 - [ ] `shellx-term uninstall` xoá `ShellX/cli` và link `/usr/local/bin/shellx` nếu nó trỏ vào đó (cần quyền root → in lệnh `sudo rm …`)
 - [ ] Chip "Agent" trên dòng tab và đầu pane đích 10 s sau mỗi lệnh; VoiceOver đọc "An agent is controlling …" tối đa một lần mỗi phút
 
-### Thử tay — Windows (Task 9)
+### Thử tay — Windows (Task 9) — chặn phát hành
 - [ ] `where shellx` trong tab ShellX; Tray → "Cài…" rồi một cửa sổ Windows Terminal **mới** tìm thấy `shellx` (`HKCU\Environment\Path` có `%LOCALAPPDATA%\ShellX\cli` đúng một lần, kiểu `REG_EXPAND_SZ`); "Gỡ…" bỏ nó
 - [ ] Gỡ cài đặt xoá `cli\` và mục Path đó
 
@@ -350,22 +350,23 @@ Mỗi dòng ⚠ dưới đây ghi đạt/không đạt kèm ngày và máy vào 
 - [ ] Tiêu chí 1–8 và 10 nguyên văn trong một tab ShellX: `command -v shellx`, `echo $SHELLX_PANE_ID $SHELLX_TAB_ID`, `shellx --version` ≤ 50 ms; `shellx ls` / `shellx ls --json | jq .`; `p=$(shellx split --right --cmd "python3 -m http.server 8000")` → hai pane trong ≤ 1 s, bàn phím vẫn ở pane cũ, `shellx wait $p --match 'Serving HTTP' --timeout 10` thoát 0, `shellx read $p --lines 20` in log (phần `browser` của tiêu chí 3 chờ A6); `shellx send $p --text $'echo a\necho b' --enter` chạy như dán, chữ có `ESC[201~` không thoát chế độ dán; `wait --idle` (zsh có hook), `wait --exit` in mã thoát, hết giờ → 5; `shellx events --follow` in một dòng JSON mỗi lần mở/đóng tab, chia/đóng pane, đổi tiêu đề/cwd, thông báo, Ctrl+C dừng sạch; tắt công tắc → `shellx send` thoát 6, `shellx notify` vẫn chạy; `shellx help`, `shellx help <lệnh>`
 - [ ] `shellx notify "Build xong"` trong pane → badge/dòng thông báo A4 của tab đó **và** push điện thoại; trong Terminal.app (không chia sẻ) → thông báo hệ thống ShellX + mục "Dòng lệnh" trong bảng thông báo (không cần tick "Cho phép terminal khác")
 - [ ] Chip "Agent" 10 s; VoiceOver đọc "An agent is controlling …" đúng một lần
+- [ ] Shell sống sót từ lần chạy ShellX trước (ví dụ `tmux` mở trong tab ShellX, thoát rồi mở lại ShellX, `tmux attach`): `shellx ls` → thoát 6 "This shell belongs to an earlier ShellX launch; open a new tab"; quá hai terminal ngoài (chưa tick) kết nối cùng lúc → cái thứ ba thoát 1 `busy`
 - [ ] Quyền: tài khoản macOS khác `shellx ls` (với `SHELLX_ENDPOINT` trỏ vào endpoint của bạn hoặc `--socket`) → thoát 3
 - [ ] `shellx events --follow > /dev/null` chạy tiếp (không tự thoát) tới khi ShellX đóng luồng (thoát 3); `shellx events --follow | head -1` thoát ≤ ~1 s sau dòng đầu dù không còn sự kiện
 - [ ] Hiệu năng (D40): `time shellx ls` ≤ 50 ms với ShellX đang rảnh (bản release trong app); `shellx read p… --lines 10000` nhanh (thời gian phía cửa sổ ≤ 100 ms — benchmark ở trên)
 
-### ⚠ Thử tay — Windows (Task 11; Windows chưa từng chạy, chỉ biên dịch/clippy chéo)
+### ⚠ Thử tay — Windows (Task 11; Windows chưa từng chạy, chỉ biên dịch/clippy chéo) — chặn phát hành
 - [ ] Các lệnh trên trong PowerShell và cmd ở một tab ShellX (`where shellx`); Setup đè lên ShellX đang chạy thay được `shellx.exe` (bản cũ đổi tên `.old-<n>`); Narrator đọc dấu Agent
 - [ ] Pipe: `apps/desktop/test/mux/windows_pipe_transport_test.dart` (testOn windows: khứ hồi, listen lần hai thất bại, connect tới không ai nghe thất bại nhanh, DACL đúng một ACE của bạn) chạy xanh; `[System.IO.Directory]::GetAccessControl('\\.\pipe\shellx-mux-…')` chỉ có tài khoản của bạn
 - [ ] Client Rust: mở pipe với SQOS mức identification, thử lại khi `PIPE_BUSY`, bắt tay trên luồng phụ (hết giờ → thoát 3; luồng phụ kẹt trong `ReadFile` tới khi CLI thoát — residual chấp nhận); listener chết / đóng có thứ tự
-- [ ] Residual back-pressure: pipe không báo `pendingBytes` nên giới hạn D24 (1000 sự kiện) và D32 (256 KiB chưa đọc, 64 yêu cầu chờ) **không** có hiệu lực trên Windows — thử `shellx events --follow` đọc chậm (ví dụ `| more` để yên) xem ShellX không phình bộ nhớ quá mức; ghi số
+- [ ] Back-pressure (ruling cuối W1): isolate ghi của pipe báo từng khối đã ghi xong, nên `pendingBytes`/`drained` và giới hạn D24 (1000 sự kiện), D32 (256 KiB chưa đọc, 64 yêu cầu chờ) có hiệu lực trên Windows — chạy test "A7 final W1" trong `windows_pipe_transport_test.dart` (client thô không đọc → `pendingBytes` > 64 KiB; đóng nó → `drained`); thử `shellx events --follow` đọc chậm (ví dụ `| more` để yên) → ShellX không phình bộ nhớ, có `overflow{dropped}` khi đọc lại; ghi số
 - [ ] `shellx events --follow | Select-Object -First 1` chỉ kết thúc ở sự kiện kế tiếp (Windows không theo dõi stdout — residual)
 - [ ] Đăng ký PATH (`HKCU\Environment\Path` `REG_EXPAND_SZ`, `WM_SETTINGCHANGE`) và Pascal của Inno (`RemoveCliFromUserPath`, `ChangesEnvironment`) — mới chỉ phân tích tĩnh trên macOS
 
 ### ⚠ Thử tay — completion và agent thật
 - [ ] zsh thật: `source <(shellx completions zsh)` (hoặc `~/.zfunc/_shellx`), Tab gợi ý lệnh, cờ và id pane sống (`p…`/`t…`); bash `source <(shellx completions bash)`; pwsh `shellx completions pwsh | Out-String | Invoke-Expression` (pwsh chưa từng chạy, chỉ sinh script)
 - [ ] Claude Code: `shellx skills install --claude`, khởi động lại Claude Code, nhờ nó "chạy dev server trong một pane ShellX cạnh bạn, chờ nó sẵn sàng, đọc log rồi báo tôi" → dùng `shellx split --cmd`, `wait --match`, `read`, `notify`, không cướp focus (phần trình duyệt chờ A6); chạy lại install sau khi sửa `SKILL.md` → hỏi trước khi ghi đè
-- [ ] Codex: `shellx skills install --codex` ghi vào `~/.agents/skills/shellx/` (theo tài liệu Codex 2026-10-07); Codex thấy skill
+- [ ] Codex: `shellx skills install --codex` ghi vào `~/.agents/skills/shellx/` (theo tài liệu Codex 2026-10-07) và cả `~/.codex/skills/shellx/` khi có `~/.codex` (ruling cuối M7); Codex thấy skill
 
 ### ⚠ Linux (chưa thử: không có máy/target Linux)
 - [ ] `controlling_tty` qua `/proc/self/stat` (D23 đường 2 khi `$SHELLX_TERM` là terminal này) và đường POLLERR khi người đọc stdout bỏ đi (`events --follow | head -1`) mới chỉ viết, chưa biên dịch cho Linux. ShellX desktop chưa phát hành Linux; ghi lại nếu có máy để thử

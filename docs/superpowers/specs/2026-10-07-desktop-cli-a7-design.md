@@ -206,3 +206,13 @@ shellx events --follow ─► cli.events.subscribe ─► CliEventBus ─► eve
 
 ## Sửa đổi (quyết định của controller, 2026-10-07)
 Mặc định chỉ shell do ShellX mở mới điều khiển được: host chỉ nhận client CLI có token theo lần chạy, truyền qua biến môi trường `SHELLX_CLI_TOKEN` cho shell do ShellX mở. Đường HMAC qua endpoint file (mọi tiến trình cùng user) tắt cho đến khi bật "Cho phép terminal khác" trong menu khay "Dòng lệnh". `notify` và `api.version` vẫn theo luật cũ. Quyết định này thay mặc định bảo mật tương ứng ở trên.
+
+## Sửa đổi (quyết định của controller sau review toàn nhánh, 2026-10-07)
+- **Cổng phát hành (thay D39 "không merge"):** "chỉ merge khi mọi dòng ⚠ đã đạt" đổi thành "chỉ **phát hành** khi mọi dòng ⚠ đã đạt", nhất quán với A1–A5a. A7 merge sau đợt sửa cuối và review lại; HANDOFF §16 vẫn là cổng phát hành, các dòng Windows là chặn phát hành.
+- **Host trước phiên (D2, D8):** host CLI lắng nghe trước khi `SessionManager` tồn tại; `SHELLX_SOCKET`/`SHELLX_CLI_TOKEN` chỉ vào môi trường shell khi host đã chạy (biến thừa hưởng bị bỏ). Yêu cầu tới trước khi cửa sổ sẵn sàng thì chờ. Token có mà sai → `forbidden` "This shell belongs to an earlier ShellX launch; open a new tab" (tiếng Anh như D11). Khởi động hỏng sau khi đã nghe → dừng host, nhả khoá.
+- **`wait --match` (D21):** `match` và `line` mỗi thứ tối đa 4096 đơn vị UTF-16, cắt không tách cặp surrogate; dòng dài thành cửa sổ quanh chỗ khớp; có cắt thì thêm `clipped: true`.
+- **`wait --exit` (D21):** pane bị đóng (người dùng, `shellx close`) trước khi shell kết thúc → `{exitCode: null, closed: true}`, CLI in `closed`, không bao giờ in `null` trơn.
+- **Đích (D12):** lệnh cần pane nhận `t<id>` = pane đang focus của tab đó (host phân giải); `notify --pane` vẫn chỉ nhận id pane hoặc `@self`.
+- **Giới hạn (D32):** client bị giới hạn (không token, chưa tick "Cho phép terminal khác") chiếm tối đa 2 trong 8 chỗ.
+- **Skill Codex (D26):** `skills install` ghi thêm `~/.codex/skills` khi có `~/.codex` (ngoài `~/.agents/skills`).
+- **Windows back-pressure:** isolate ghi của pipe báo số byte đã ghi, nên `pendingBytes`/`drained` (D24, D32) có hiệu lực trên Windows; ⚠ MANUAL.
