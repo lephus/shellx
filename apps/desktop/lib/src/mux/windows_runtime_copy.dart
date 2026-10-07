@@ -22,6 +22,13 @@ abstract interface class FileOps {
 
   /// Throws when something in it is in use.
   Future<void> deleteDirectory(String path);
+
+  /// Throws when the file is in use (a running exe); a missing file is not
+  /// an error.
+  Future<void> deleteFile(String path);
+
+  /// Null when [path] is missing.
+  Future<DateTime?> modified(String path);
 }
 
 final class RealFileOps implements FileOps {
@@ -64,6 +71,21 @@ final class RealFileOps implements FileOps {
   @override
   Future<void> deleteDirectory(String path) =>
       Directory(path).delete(recursive: true);
+
+  @override
+  Future<void> deleteFile(String path) async {
+    final file = File(path);
+    if (await file.exists()) await file.delete();
+  }
+
+  @override
+  Future<DateTime?> modified(String path) async {
+    try {
+      return (await Directory(path).stat()).modified;
+    } on FileSystemException {
+      return null;
+    }
+  }
 }
 
 const _sep = r'\';
@@ -73,6 +95,18 @@ String _runtimesDirectory(String localAppData) =>
 
 /// A version directory (`1.6.0`) or a half-copied one (`1.6.0.tmp-…`).
 final _runtimeName = RegExp(r'^\d+\.\d+\.\d+');
+
+/// A half-copied directory this old is nobody's work in progress.
+const _staleTemp = Duration(minutes: 5);
+
+final _safeVersion = RegExp(r'^[\w.+-]+$');
+
+/// A version goes into a path: nothing that could leave the directory.
+void _checkVersion(String version) {
+  if (!_safeVersion.hasMatch(version) || version.startsWith('.')) {
+    throw ArgumentError.value(version, 'version');
+  }
+}
 
 /// A5b D3 (Windows): Windows locks a running exe and its dlls, so the
 /// daemon runs from a copy: `ShellX.exe` as `shellx-mux.exe`, every `.dll`
@@ -90,6 +124,7 @@ Future<String> prepareWindowsRuntime({
   FileOps ops = const RealFileOps(),
   Random? random,
 }) async {
+  _checkVersion(version);
   final root = _runtimesDirectory(localAppData);
   final target = '$root$_sep$version';
   final exe = '$target${_sep}shellx-mux.exe';
@@ -150,18 +185,29 @@ Future<String> prepareWindowsRuntime({
 }
 
 /// A5b D3: at its start the daemon removes every runtime directory but its
-/// own. A directory in use (an older daemon still running) is skipped, not
-/// an error.
+/// own. A version directory whose `shellx-mux.exe` cannot be deleted (a
+/// daemon still runs from it) is skipped whole, so it is never left without
+/// its exe; a `.tmp-` directory goes only when older than five minutes (a
+/// start may be copying into it).
 Future<void> cleanupOldRuntimes({
   required String localAppData,
   required String keep,
   FileOps ops = const RealFileOps(),
+  DateTime Function()? now,
 }) async {
+  _checkVersion(keep);
+  final clock = now ?? DateTime.now;
   final root = _runtimesDirectory(localAppData);
   for (final path in await ops.subdirectories(root)) {
     final name = path.substring(path.lastIndexOf(_sep) + 1);
     if (name == keep || !_runtimeName.hasMatch(name)) continue;
     try {
+      if (name.contains('.tmp-')) {
+        final at = await ops.modified(path);
+        if (at == null || clock().difference(at) < _staleTemp) continue;
+      } else {
+        await ops.deleteFile('$path${_sep}shellx-mux.exe');
+      }
       await ops.deleteDirectory(path);
     } on Object {
       // In use, or already gone.

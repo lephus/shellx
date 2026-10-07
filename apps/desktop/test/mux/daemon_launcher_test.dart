@@ -21,7 +21,7 @@ final class FakeDaemonTransport implements MuxTransport {
   final FakeClock clock;
   bool up = false;
   int protocol;
-  int sessions;
+  int? sessions;
   Uint8List secret = testSecret;
   int attempts = 0;
   int upAfterAttempts = 0;
@@ -296,6 +296,79 @@ void main() {
       expect(spawns, 0);
     },
   );
+
+  test('an unknown session count is never replaced silently', () async {
+    transport
+      ..up = true
+      ..protocol = 2
+      ..sessions = null;
+    await writeEndpoint();
+    final r = await launcher().connect();
+    expect(r, isA<Incompatible>());
+    expect(transport.quits, 0);
+    expect(spawns, 0);
+  });
+
+  test('replace waits for the old daemon\'s lock before it spawns', () async {
+    transport
+      ..up = true
+      ..protocol = 2
+      ..sessions = 3;
+    await writeEndpoint();
+    final l = launcher();
+    final old = await l.connect() as Incompatible;
+    var sleeps = 0;
+    final waiting = DaemonLauncher(
+      transport: transport,
+      endpoint: endpoint,
+      daemonLockFree: () async => sleeps >= 5,
+      spawn: () async {
+        expect(sleeps, greaterThanOrEqualTo(5), reason: 'lock was held');
+        spawns++;
+        transport
+          ..protocol = kMuxProtocol
+          ..sessions = 0
+          ..up = true;
+        await writeEndpoint();
+      },
+      appVersion: '1.6.0',
+      quitWait: const Duration(milliseconds: 200),
+      now: () => clock.now,
+      sleep: (d) async {
+        sleeps++;
+        await clock.sleep(d);
+      },
+    );
+    final r = await waiting.replaceIncompatible(old);
+    expect(r, isA<Attached>());
+    expect(spawns, 1);
+  });
+
+  test('replace gives up waiting after 12 s of a held lock', () async {
+    transport
+      ..up = true
+      ..protocol = 2
+      ..sessions = 3;
+    await writeEndpoint();
+    final old = await launcher().connect() as Incompatible;
+    final start = clock.now;
+    final held = DaemonLauncher(
+      transport: transport,
+      endpoint: endpoint,
+      daemonLockFree: () async => false,
+      spawn: () async => spawns++,
+      appVersion: '1.6.0',
+      quitWait: const Duration(milliseconds: 200),
+      now: () => clock.now,
+      sleep: clock.sleep,
+    );
+    final r = await held.replaceIncompatible(old);
+    expect(r, isA<StartFailed>());
+    expect(
+      clock.now.difference(start),
+      greaterThanOrEqualTo(const Duration(seconds: 17)),
+    );
+  });
 
   test('7. nothing ever answers: StartFailed after 5 s', () async {
     final start = clock.now;

@@ -60,6 +60,7 @@ void main() {
       exit: exits.add,
       idle: idle,
       shutdownTimeout: shutdownTimeout,
+      exitDelay: const Duration(milliseconds: 30),
       log: (_) {},
     );
     return host;
@@ -76,7 +77,11 @@ void main() {
     shutdownTime = Duration.zero;
     exits.clear();
   });
-  tearDown(() => directory.deleteSync(recursive: true));
+  tearDown(() async {
+    // A quit's exit timer must not leak into the next test.
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    directory.deleteSync(recursive: true);
+  });
 
   group('idle exit (D27)', () {
     test('exits after 10 s with no UI, no sessions, no phones', () {
@@ -144,7 +149,7 @@ void main() {
       await ui.close();
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(shutdowns, 0);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       expect(shutdowns, 1);
       expect(exits, [0]);
     });
@@ -193,6 +198,8 @@ void main() {
       await h.quit();
       expect(shutdowns, 1);
       expect(File(endpoint.path).existsSync(), isFalse);
+      expect(exits, isEmpty, reason: 'the exit comes a tick after quit');
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(exits, [0]);
     });
 
@@ -200,11 +207,13 @@ void main() {
       final h = build();
       await h.start(listener);
       final ui = await attachClient(listener, secret: info.secret);
-      // The daemon closes the link as it quits: the caller sees the
-      // connection end (the reply may not get out first).
-      await ui.request(MuxType.daemonQuit).then<void>((_) {}, onError: (_) {});
-      await ui.done;
+      // The reply goes out before the process exits (a link that drops
+      // without a quit of its own means the daemon died).
+      final reply = await ui.request(MuxType.daemonQuit);
+      expect(reply.type, MuxType.result);
       expect(shutdowns, 1);
+      expect(exits, isEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(exits, [0]);
       await h.quit();
     });
@@ -232,8 +241,17 @@ void main() {
       final watch = Stopwatch()..start();
       await h.quit();
       expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(exits, [0]);
       expect(File(endpoint.path).existsSync(), isFalse);
     });
+  });
+
+  test('the host\'s bound covers every inner shutdown step', () {
+    const steps = kDaemonShutdownSteps;
+    expect(
+      kDaemonShutdownBudget,
+      greaterThanOrEqualTo(steps.cli + steps.agent + steps.remote),
+    );
   });
 }

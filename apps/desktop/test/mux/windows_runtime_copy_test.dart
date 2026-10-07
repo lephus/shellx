@@ -74,6 +74,19 @@ final class MemoryFileOps implements FileOps {
     files_.removeWhere((k, _) => k.startsWith('$path\\'));
     dirs.removeWhere((d) => d == path || d.startsWith('$path\\'));
   }
+
+  final ages = <String, DateTime>{};
+  final now = DateTime(2026, 10, 7, 12);
+
+  @override
+  Future<void> deleteFile(String path) async {
+    if (inUse.contains(path)) throw StateError('in use');
+    files_.remove(path);
+  }
+
+  @override
+  Future<DateTime?> modified(String path) async =>
+      ages[path] ?? (await directoryExists(path) ? now : null);
 }
 
 const _install = r'C:\Program Files\ShellX';
@@ -247,6 +260,56 @@ void main() {
       await cleanupOldRuntimes(localAppData: _local, keep: '1.6.0', ops: ops);
       expect(await ops.directoryExists('$root\\1.4.0'), isTrue);
       expect(await ops.directoryExists('$root\\1.5.0'), isFalse);
+    });
+
+    test('a running daemon\'s directory keeps all its files', () async {
+      final ops = MemoryFileOps()
+        ..files_.addAll({
+          '$root\\1.4.0\\shellx-mux.exe': 1,
+          '$root\\1.4.0\\flutter_windows.dll': 1,
+        })
+        ..inUse.add('$root\\1.4.0\\shellx-mux.exe');
+      await cleanupOldRuntimes(localAppData: _local, keep: '1.6.0', ops: ops);
+      expect(ops.files_.keys, hasLength(2));
+    });
+
+    test('a fresh .tmp- directory (a start is copying) stays', () async {
+      final ops = MemoryFileOps()
+        ..files_['$root\\1.7.0.tmp-ab12\\shellx-mux.exe'] = 1;
+      ops.ages['$root\\1.7.0.tmp-ab12'] = ops.now.subtract(
+        const Duration(minutes: 4),
+      );
+      await cleanupOldRuntimes(
+        localAppData: _local,
+        keep: '1.6.0',
+        ops: ops,
+        now: () => ops.now,
+      );
+      expect(await ops.directoryExists('$root\\1.7.0.tmp-ab12'), isTrue);
+    });
+
+    test('a version that could leave the directory is refused', () async {
+      for (final bad in ['..\\x', '1.6.0\\..', 'a/b', '', '.hidden', 'a b']) {
+        await expectLater(
+          prepareWindowsRuntime(
+            installDir: _install,
+            localAppData: _local,
+            version: bad,
+            ops: installed(),
+          ),
+          throwsArgumentError,
+          reason: bad,
+        );
+        await expectLater(
+          cleanupOldRuntimes(
+            localAppData: _local,
+            keep: bad,
+            ops: MemoryFileOps(),
+          ),
+          throwsArgumentError,
+          reason: bad,
+        );
+      }
     });
 
     test('nothing there is not an error', () async {

@@ -225,19 +225,19 @@ Future<void> _shutdown(
 ) async {
   await runBounded(
     cli.stop,
-    timeout: const Duration(seconds: 2),
+    timeout: kDaemonShutdownSteps.cli,
     label: 'stopping the command-line host',
   );
   await runBounded(
     container.read(agentControllerProvider.notifier).shutdown,
-    timeout: const Duration(seconds: 8),
+    timeout: kDaemonShutdownSteps.agent,
     label: 'stopping the agent',
   );
   final remote = side.services.shutdownRemote;
   if (remote != null) {
     await runBounded(
       remote,
-      timeout: const Duration(seconds: 3),
+      timeout: kDaemonShutdownSteps.remote,
       label: 'closing the ssh masters',
     );
   }

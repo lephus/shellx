@@ -6,6 +6,15 @@ import 'package:shellx_agent/shellx_agent.dart';
 
 import '../startup.dart';
 
+/// The bounds of the daemon's quit steps (CLI host stop, agent shutdown with
+/// the PTY kill wait, ssh masters), and the host's bound around all of them.
+const kDaemonShutdownSteps = (
+  cli: Duration(seconds: 2),
+  agent: Duration(seconds: 5),
+  remote: Duration(seconds: 3),
+);
+const kDaemonShutdownBudget = Duration(seconds: 12);
+
 /// What a daemon process is called on the wire: a fresh secret and instance
 /// id for every start (A5b D5).
 ({Uint8List secret, String instance}) newDaemonIdentity([Random? random]) {
@@ -38,7 +47,8 @@ final class DaemonHost {
     required this.shutdown,
     required this.exit,
     this.idle = const Duration(seconds: 10),
-    this.shutdownTimeout = const Duration(seconds: 10),
+    this.shutdownTimeout = kDaemonShutdownBudget,
+    this.exitDelay = const Duration(milliseconds: 100),
     this.log,
   });
 
@@ -54,8 +64,11 @@ final class DaemonHost {
   final void Function(int code) exit;
   final Duration idle;
 
-  /// The PTY kill wait alone is up to 3 s (A1), so the bound is above it.
+  /// At least the sum of [kDaemonShutdownSteps], so no step is cut off.
   final Duration shutdownTimeout;
+
+  /// How long the process lives after [quit] returns, for the reply.
+  final Duration exitDelay;
 
   /// Error types only (the default is `debugPrint`).
   final void Function(String message)? log;
@@ -105,12 +118,9 @@ final class DaemonHost {
     );
     final written = _written;
     if (written != null) await endpoint.deleteIfOwned(written);
-    await runBounded(
-      server.close,
-      timeout: const Duration(seconds: 1),
-      label: 'closing the mux server',
-      log: log,
-    );
-    exit(0);
+    // The `daemon.quit` reply goes out first (the server answers once this
+    // returns): a UI that sees the link drop without having asked for the
+    // quit knows the daemon died. Exiting closes every link.
+    Timer(exitDelay, () => exit(0));
   }
 }

@@ -49,6 +49,7 @@ final class DaemonLauncher {
     this.retryEvery = const Duration(milliseconds: 100),
     this.retryFor = const Duration(seconds: 5),
     this.quitWait = const Duration(seconds: 4),
+    this.replaceWait = const Duration(seconds: 12),
     DateTime Function()? now,
     Future<void> Function(Duration)? sleep,
   }) : _now = now ?? DateTime.now,
@@ -63,7 +64,7 @@ final class DaemonLauncher {
   /// Starts a detached daemon.
   final Future<void> Function() spawn;
   final String appVersion;
-  final Duration attempt, retryEvery, retryFor, quitWait;
+  final Duration attempt, retryEvery, retryFor, quitWait, replaceWait;
   final DateTime Function() _now;
   final Future<void> Function(Duration) _sleep;
 
@@ -105,12 +106,18 @@ final class DaemonLauncher {
     try {
       await old.client.done.timeout(quitWait);
     } on Object {
-      // Still there: the retries below find out.
+      // Still there: the wait below finds out.
     }
     try {
       await old.client.close();
     } on Object {
       // Already closed.
+    }
+    // The link is down before the process is: a new daemon may start only
+    // once the old one let go of `mux.lock` (it closes its shells first).
+    final deadline = _now().add(replaceWait);
+    while (!await daemonLockFree() && _now().isBefore(deadline)) {
+      await _sleep(retryEvery);
     }
     return _connect(replaceEmpty: false);
   }
@@ -151,7 +158,8 @@ final class DaemonLauncher {
       return Attached(client: client, info: info, started: started);
     }
     final old = Incompatible(client: client, info: info);
-    if (replaceEmpty && (info.sessions ?? 0) == 0) {
+    // An unknown count is never taken for "none": the UI asks.
+    if (replaceEmpty && info.sessions == 0) {
       return replaceIncompatible(old);
     }
     return old;
