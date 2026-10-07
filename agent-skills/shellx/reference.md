@@ -204,7 +204,7 @@ Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 
 Ids are written as `p…`, `t…`, `w:…`. At most 4 listeners at once.
 
-Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or the reader of its output went away, e.g. `| head -1` — it ends at the next event), 1 (output cannot be written), 3 (ShellX closed the stream), 6, 7.
+Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or the reader of its output went away, e.g. `| head -1` — it notices within about a second, even when no event comes; on Windows only at its next event), 1 (output cannot be written), 3 (ShellX closed the stream), 6, 7.
 
 ## Browser panes
 

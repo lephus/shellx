@@ -345,3 +345,92 @@ fn events_follow_ends_when_its_reader_goes_away() {
     assert_eq!(status.code(), Some(0));
     assert!(host.join().unwrap(), "the connection was not closed");
 }
+
+#[test]
+fn events_follow_ends_soon_after_its_reader_goes_away_even_without_events() {
+    // `shellx events --follow --kinds pane.exited | head -1` where no other
+    // event ever comes: the CLI notices the closed pipe by itself.
+    use std::io::{BufRead, Read};
+    let dir = temp_dir("quiet");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let host = std::thread::spawn(move || {
+        let mut s = accept_within(&listener);
+        accept(&mut s);
+        let caps = Value::Array(vec![Value::text("cli.events.subscribe")]);
+        answer(&mut s, vec![("api", Value::Int(1)), ("caps", caps)]);
+        answer(&mut s, vec![]);
+        let event = Message::new("event", vec![("kind", Value::text("pane.exited"))]);
+        send(&mut s, &event).unwrap();
+        // Nothing more is sent; the CLI must hang up on its own.
+        s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut rest = Vec::new();
+        s.read_to_end(&mut rest).is_ok()
+    });
+    let mut child = Command::new(shellx_link())
+        .args(["events", "--follow", "--kinds", "pane.exited"])
+        .env("SHELLX_ENDPOINT", &ep)
+        .env("SHELLX_CLI_TOKEN", TOKEN)
+        .env_remove("SHELLX_SOCKET")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut out = std::io::BufReader::new(child.stdout.take().unwrap());
+    let mut first = String::new();
+    out.read_line(&mut first).unwrap();
+    assert_eq!(first, "{\"kind\":\"pane.exited\"}\n");
+    drop(out);
+    let started = Instant::now();
+    let status = loop {
+        if let Some(s) = child.try_wait().unwrap() {
+            break s;
+        }
+        if started.elapsed() > Duration::from_millis(2500) {
+            let _ = child.kill();
+            panic!("shellx events kept running after its reader left");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(status.code(), Some(0));
+    assert!(host.join().unwrap(), "the connection was not closed");
+}
+
+#[test]
+fn events_into_a_file_keep_going() {
+    // A stdout that is a regular file never looks "gone".
+    let dir = temp_dir("file");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let host = std::thread::spawn(move || {
+        let mut s = accept_within(&listener);
+        accept(&mut s);
+        let caps = Value::Array(vec![Value::text("cli.events.subscribe")]);
+        answer(&mut s, vec![("api", Value::Int(1)), ("caps", caps)]);
+        answer(&mut s, vec![]);
+        let event = Message::new("event", vec![("kind", Value::text("tab.opened"))]);
+        send(&mut s, &event).unwrap();
+        std::thread::sleep(Duration::from_millis(2500));
+        send(&mut s, &event).unwrap();
+        // Then ShellX closes the stream.
+    });
+    let out_path = dir.join("events.jsonl");
+    let out = std::fs::File::create(&out_path).unwrap();
+    let status = Command::new(shellx_link())
+        .args(["events", "--follow"])
+        .env("SHELLX_ENDPOINT", &ep)
+        .env("SHELLX_CLI_TOKEN", TOKEN)
+        .env_remove("SHELLX_SOCKET")
+        .stdout(out)
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    host.join().unwrap();
+    assert_eq!(status.code(), Some(3));
+    assert_eq!(
+        std::fs::read_to_string(&out_path).unwrap().lines().count(),
+        2
+    );
+}

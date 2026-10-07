@@ -133,10 +133,42 @@ fn run_real(parsed: &args::Parsed) -> i32 {
         tty: tty_file.as_mut().map(|f| f as &mut dyn Write),
         shared_terminal: shared_terminal(&get),
         connect: &connect,
+        stdout_gone: STDOUT_GONE,
     };
     let code = run::run(parsed, &mut ctx);
     let _ = ctx.out.flush();
     code
+}
+
+/// Review I1: `events --follow | head -1` must end once `head` has gone,
+/// even when no event ever comes to fail a write.
+#[cfg(unix)]
+const STDOUT_GONE: Option<fn(std::time::Duration) -> bool> = Some(stdout_gone);
+/// Windows: not watched (recorded residual); a failed write still ends it.
+#[cfg(windows)]
+const STDOUT_GONE: Option<fn(std::time::Duration) -> bool> = None;
+
+/// Waits about `wait` for stdout to report an error or hang-up: a pipe
+/// whose reader closed reports POLLHUP (macOS, checked) or POLLERR
+/// (Linux), a closed terminal POLLHUP. macOS reports these only when
+/// POLLOUT is asked for, so it is, and a stdout that is simply writable
+/// (the usual case) waits out the rest of `wait` instead of spinning.
+#[cfg(unix)]
+fn stdout_gone(wait: std::time::Duration) -> bool {
+    let started = std::time::Instant::now();
+    let mut fd = libc::pollfd {
+        fd: libc::STDOUT_FILENO,
+        events: libc::POLLOUT,
+        revents: 0,
+    };
+    let ms = wait.as_millis().min(i32::MAX as u128) as libc::c_int;
+    // SAFETY: one valid pollfd, count 1.
+    let n = unsafe { libc::poll(&mut fd, 1, ms) };
+    if n > 0 && fd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
+        return true;
+    }
+    std::thread::sleep(wait.saturating_sub(started.elapsed()));
+    false
 }
 
 /// D23 (2): `$SHELLX_TERM` names this terminal — the window is shared with

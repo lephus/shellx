@@ -126,6 +126,7 @@ fn go_caps(
             },
             shared_terminal: opts.1,
             connect: &connect,
+            stdout_gone: None,
         };
         run(&p, &mut ctx)
     };
@@ -847,6 +848,7 @@ fn events_print_json_lines_until_closed() {
         tty: None,
         shared_terminal: false,
         connect: &connect,
+        stdout_gone: None,
     };
     assert_eq!(run(&p, &mut ctx), 3); // ShellX closed the stream
     assert_eq!(
@@ -954,6 +956,7 @@ fn follow_into(kind: std::io::ErrorKind) -> (i32, usize, bool) {
         tty: None,
         shared_terminal: false,
         connect: &connect,
+        stdout_gone: None,
     };
     let code = run(&p, &mut ctx);
     let pulled = *pulled.borrow();

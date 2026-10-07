@@ -38,6 +38,9 @@ pub struct Ctx<'a> {
     pub shared_terminal: bool,
     /// Connects and authenticates; the argument is `--socket`.
     pub connect: &'a Connect<'a>,
+    /// Waits up to the given time; true once nobody can read stdout any
+    /// more (review I1). `None`: not watched (tests, Windows).
+    pub stdout_gone: Option<fn(std::time::Duration) -> bool>,
 }
 
 /// D32: a text field of a request.
@@ -303,6 +306,18 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
                 }
                 None if !p.has("follow") => return Ok(()),
                 None => {}
+            }
+            // While we wait for events (maybe forever), check at least once
+            // a second that someone still reads; if not, end like EPIPE:
+            // exit 0, the connection closes with the process.
+            if let Some(gone) = ctx.stdout_gone {
+                let w = writing.clone();
+                std::thread::spawn(move || loop {
+                    if gone(std::time::Duration::from_secs(1)) {
+                        let _held = w.lock();
+                        std::process::exit(0);
+                    }
+                });
             }
             loop {
                 let e = api.s.next_event()?;

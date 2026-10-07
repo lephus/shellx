@@ -239,6 +239,7 @@ mod tests {
                 tty: None,
                 shared_terminal: false,
                 connect: &connect,
+                stdout_gone: None,
             };
             crate::api::run::run(&p, &mut ctx)
         };
