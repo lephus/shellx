@@ -397,6 +397,7 @@ snippet = Lint = b
 $many
 ''');
       expect(c.commands.where((x) => x.name == 'Lint').single.text, 'b');
+      expect(c.commands.first.name, 'Lint'); // replaced in place
       expect(c.commands, hasLength(200));
       expect(
         [for (final p in problems) p.code],
@@ -411,10 +412,57 @@ $many
       expect(problems[3].detail, '4');
     });
 
+    test('a duplicate name replaces in place; one namespace', () {
+      final (c, _) = build(
+        'command = A = 1\nsnippet = B = 2\nsnippet = A = 3\n',
+      );
+      expect(
+        [for (final x in c.commands) (x.name, x.text, x.enter)],
+        [('A', '3', false), ('B', '2', false)],
+      );
+    });
+
+    test('command text is bounded in UTF-8 bytes', () {
+      final fits = 'a' * 16384;
+      final cjk = '漢' * 5462; // 16386 bytes, 5462 chars
+      final emoji = '😀' * 4097; // 16388 bytes
+      final (c, problems) = build(
+        'command = Ok = $fits\ncommand = Cjk = $cjk\ncommand = Em = $emoji\n',
+      );
+      expect([for (final x in c.commands) x.name], ['Ok']);
+      expect(problems.map((p) => p.code), [
+        ConfigProblemCode.badValue,
+        ConfigProblemCode.badValue,
+      ]);
+    });
+
     test('an empty command line clears commands, not snippets', () {
       final (c, _) = build('command = A = a\nsnippet = B = b\ncommand =\n');
       expect([for (final x in c.commands) x.name], ['B']);
     });
+  });
+
+  test('numbers are decimal only; a pair reports once per line', () {
+    final (c, problems) = build(
+      'scrollback-limit = 0x2000\nscrollback-limit = +5000\n'
+      'palette = 0x1=#ff0000\npalette = +1=#ff0000\nfont-size = 0x10\n'
+      'window-padding-x = 99,99\nwindow-padding-y = 5,zz\n',
+    );
+    expect(c.scrollbackLimit, 10000);
+    expect(c.palette, isEmpty);
+    expect(c.fontSize, isNull);
+    expect(
+      [for (final p in problems) (p.line, p.code)],
+      [
+        (1, ConfigProblemCode.badValue),
+        (2, ConfigProblemCode.badValue),
+        (3, ConfigProblemCode.badValue),
+        (4, ConfigProblemCode.badValue),
+        (5, ConfigProblemCode.badValue),
+        (6, ConfigProblemCode.outOfRange),
+        (7, ConfigProblemCode.badValue),
+      ],
+    );
   });
 
   test('keybind lines are kept in order for the resolver (Task 4)', () {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
@@ -174,6 +176,9 @@ ShellxConfig buildShellxConfig({
   return b.build();
 }
 
+final RegExp _digits = RegExp(r'^\d+$');
+final RegExp _decimal = RegExp(r'^-?(\d+\.?\d*|\.\d+)$');
+
 String _num(double v) =>
     v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
@@ -244,7 +249,9 @@ final class _Builder {
     bool g, {
     bool integer = false,
   }) {
-    final v = integer ? int.tryParse(raw)?.toDouble() : double.tryParse(raw);
+    final v = integer
+        ? (_digits.hasMatch(raw) ? int.tryParse(raw)?.toDouble() : null)
+        : (_decimal.hasMatch(raw) ? double.tryParse(raw) : null);
     final hint = '${_num(min)}–${_num(max)}';
     if (v == null || v.isNaN) {
       _badValue(e, g, hint);
@@ -271,12 +278,23 @@ final class _Builder {
       return null;
     }
     final values = <double>[];
+    final first = problems.length;
+    (double, double)? result;
     for (final part in parts) {
       final v = _ranged(e, part.trim(), 0, kPaddingMax, g);
-      if (v == null) return null;
+      if (v == null) {
+        result = null;
+        values.clear();
+        break;
+      }
       values.add(v);
     }
-    return (values.first, values.last);
+    if (values.isNotEmpty) result = (values.first, values.last);
+    // One problem per line: the first failure wins.
+    if (problems.length > first + 1) {
+      problems.removeRange(first + 1, problems.length);
+    }
+    return result;
   }
 
   void apply(ConfigEntry e, {required bool fromGhostty}) {
@@ -331,7 +349,10 @@ final class _Builder {
           palette.clear();
         } else {
           final eq = v.indexOf('=');
-          final index = eq < 0 ? null : int.tryParse(v.substring(0, eq).trim());
+          final indexText = eq < 0 ? '' : v.substring(0, eq).trim();
+          final index = _digits.hasMatch(indexText)
+              ? int.tryParse(indexText)
+              : null;
           final color = eq < 0 ? null : parseConfigColor(v.substring(eq + 1));
           if (index == null || color == null || index < 0 || index > 255) {
             return _badValue(e, g, 'N=#RRGGBB');
@@ -498,7 +519,7 @@ final class _Builder {
     if (name.isEmpty ||
         name.length > kMaxCommandName ||
         text.isEmpty ||
-        text.length > kMaxCommandText) {
+        utf8.encode(text).length > kMaxCommandText) {
       return _badValue(e, false, '$hint, name ≤ 64, text ≤ 16 KiB');
     }
     final previous = commands.indexWhere((c) => c.name == name);
@@ -509,7 +530,15 @@ final class _Builder {
         ConfigProblemCode.duplicate,
         detail: '${commands[previous].origin.line}',
       );
-      commands.removeAt(previous);
+      // The later entry replaces the earlier one in place (file position
+      // kept); commands and snippets share one namespace.
+      commands[previous] = UserCommand(
+        name: name,
+        text: text,
+        enter: enter,
+        origin: e,
+      );
+      return;
     } else if (commands.length >= kMaxUserCommands) {
       if (!commandLimitReported) {
         commandLimitReported = true;
