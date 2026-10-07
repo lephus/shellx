@@ -12,7 +12,8 @@ import '../restore/restore_persistence.dart';
 import '../mux/daemon_state.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
-import '../platform/settings_store.dart' show SettingKeys;
+import '../platform/settings_store.dart'
+    show SettingKeys, backgroundServiceEnabled;
 import '../config/config_opener.dart' show openShellxConfig;
 import '../remote/ssh_actions.dart';
 import '../remote/ssh_settings.dart';
@@ -45,9 +46,9 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     sshHook: ref.watch(agentControllerProvider.select((s) => s.sshRemoteHook)),
     hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
     daemonMode: ref.watch(daemonModeProvider),
-    backgroundService: ref
-        .read(settingsStoreProvider)
-        .getBool(SettingKeys.backgroundService, defaultValue: false),
+    backgroundService: backgroundServiceEnabled(
+      ref.read(settingsStoreProvider),
+    ),
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -201,10 +202,7 @@ final class TrayActions {
         try {
           await settings.setBool(
             SettingKeys.backgroundService,
-            !settings.getBool(
-              SettingKeys.backgroundService,
-              defaultValue: false,
-            ),
+            !backgroundServiceEnabled(settings),
           );
         } finally {
           _ref.invalidate(trayLocalStateProvider);

@@ -235,10 +235,7 @@ Future<void> _start(
   final daemonMode =
       launcher != null &&
       await attachThisLaunch(
-        enabled: settings.getBool(
-          SettingKeys.backgroundService,
-          defaultValue: false,
-        ),
+        enabled: backgroundServiceEnabled(settings),
         daemonLockFree: () => MuxLock.isFree(cli!.mux),
         findRunning: launcher.findRunning,
         quit: (client) => _quitService(client, cli!.mux),
@@ -523,6 +520,8 @@ Future<void> _start(
           : null,
     ),
     viewOf: (id) => attentionView(container, id),
+    // Service mode: the service owns these two switches (D13).
+    switches: daemonMode ? agentStateSwitches(container) : null,
   );
   listenForDesktopNotifications(
     container: container,

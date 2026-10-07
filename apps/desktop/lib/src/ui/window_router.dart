@@ -212,7 +212,14 @@ class WindowRouter extends Notifier<WindowState> {
     if (current is OnboardingRoute &&
         next is! OnboardingRoute &&
         !ref.read(agentControllerProvider).onboardingDone) {
-      unawaited(agent.completeOnboarding()); // Never throws.
+      // A lost background service must not surface as an unhandled error.
+      unawaited(
+        agent.completeOnboarding().catchError((Object error) {
+          debugPrint(
+            'ShellX: completing onboarding failed: ${error.runtimeType}',
+          );
+        }),
+      );
     }
   }
 }

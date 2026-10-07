@@ -110,6 +110,9 @@ final class DaemonHost {
   Future<void> _quitNow() async {
     _idle?.cancel();
     _idle = null;
+    // Idle exit and SIGTERM come here without `daemon.quit`: no new
+    // connection may attach to a service that is going away.
+    server.stopAccepting();
     try {
       await runBounded(
         shutdown,

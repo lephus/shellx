@@ -4,6 +4,7 @@ import 'package:tray_manager/tray_manager.dart';
 import '../../l10n/app_localizations.dart';
 import '../agent/agent_state.dart';
 import '../agent/notify_threshold.dart';
+import '../platform/settings_store.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import 'tray_action.dart';
 
@@ -54,7 +55,7 @@ final class TrayLocalState {
     this.configProblemCount = 0,
     this.sshHook = true,
     this.hasRecentServers = false,
-    this.backgroundService = false,
+    this.backgroundService = SettingKeys.backgroundServiceDefault,
     this.daemonMode = false,
   });
   final bool restoreScrollback;

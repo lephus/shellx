@@ -87,6 +87,30 @@ void main() {
     directory.deleteSync(recursive: true);
   });
 
+  group('a quitting service accepts nobody (A5b final review)', () {
+    test(
+      'the idle exit closes the listener and refuses a late connection',
+      () async {
+        build(idle: const Duration(milliseconds: 20));
+        await host.start(listener);
+        host.onStateChanged();
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(shutdowns, 1);
+        expect(listener.closed, isTrue);
+        await expectLater(attachClient(listener), throwsA(anything));
+      },
+    );
+
+    test('quit() (SIGTERM) does the same', () async {
+      build();
+      await host.start(listener);
+      unawaited(host.quit());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(listener.closed, isTrue);
+      await expectLater(attachClient(listener), throwsA(anything));
+    });
+  });
+
   group('idle exit (D27)', () {
     test('exits after 10 s with no UI, no sessions, no phones', () {
       fakeAsync((async) {

@@ -38,8 +38,8 @@ test('AppId is fixed so upgrades replace the existing install', () => {
 });
 
 test('a running agent is stopped before files are replaced and before uninstall', () => {
-  assert.match(iss, /function PrepareToInstall[\s\S]*?taskkill\.exe[\s\S]*?\/F \/T \/IM/);
-  assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe[^[]*\/F \/T \/IM/);
+  assert.match(iss, /function PrepareToInstall[\s\S]*?taskkill\.exe[\s\S]*?\/F \/IM/);
+  assert.match(iss, /\[UninstallRun\][^[]*taskkill\.exe[^[]*\/F \/IM ""\{#AppExeName\}""/);
 });
 
 test('uninstall removes the agent\'s per-user data folder (device key, trusted-phone list, settings)', () => {
@@ -114,4 +114,15 @@ test('uninstall removes the shellx command (A7 D7, D8): the cli folder and our H
 
 test('uninstall deletes the command-line host folder (A5b D5 / A7 D30)', () => {
   assert.match(iss, /\[UninstallDelete\][^[]*Type: filesandordirs; Name: "\{localappdata\}\\ShellX\\mux"/);
+});
+
+test('install stops only the UI, without /T (A5b D21)', () => {
+  assert.match(iss, /taskkill\.exe'\), '\/F \/IM "\{#AppExeName\}"'/);
+  assert.doesNotMatch(iss, /\/F \/T \/IM "\{#AppExeName\}"/);
+});
+
+test('uninstall stops shellx-mux first, then the UI without /T (A5b D21)', () => {
+  assert.match(iss, /Parameters: "\/F \/T \/IM ""shellx-mux\.exe"""/);
+  assert.match(iss, /Parameters: "\/F \/T \/IM ""shellx-mux\.exe"""[^\n]*\n[^\n]*Parameters: "\/F \/IM ""\{#AppExeName\}"""/);
+  assert.match(iss, /\[UninstallDelete\][^[]*Name: "\{localappdata\}\\ShellX\\restore"/);
 });

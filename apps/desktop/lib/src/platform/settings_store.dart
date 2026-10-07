@@ -75,6 +75,10 @@ abstract final class SettingKeys {
   /// UI attaches to the background service. UI-owned.
   static const String backgroundService = 'background_service_enabled';
 
+  /// The one default of [backgroundService]: read it through
+  /// [backgroundServiceEnabled] (the launch decision and the tray menu).
+  static const bool backgroundServiceDefault = false;
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -245,3 +249,10 @@ final class InMemorySettingsStore implements SettingsStore {
     ints[key] = value;
   }
 }
+
+/// The stored "keep shells running when the window closes" switch, with its
+/// single default.
+bool backgroundServiceEnabled(SettingsStore settings) => settings.getBool(
+  SettingKeys.backgroundService,
+  defaultValue: SettingKeys.backgroundServiceDefault,
+);
