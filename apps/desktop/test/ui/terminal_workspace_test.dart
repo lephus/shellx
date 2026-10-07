@@ -39,6 +39,8 @@ Future<void> pumpWorkspace(
     overrides: [
       desktopServicesProvider.overrideWithValue(h.services()),
       localSessionsProvider.overrideWithValue(local),
+      // A10 D20: these tests check layout, not settling: sizes go at once.
+      resizeSettleProvider.overrideWithValue(Duration.zero),
     ],
   );
   if (signedIn) await h.seedSignedIn();

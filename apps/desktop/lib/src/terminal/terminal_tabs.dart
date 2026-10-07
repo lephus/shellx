@@ -20,6 +20,7 @@ import '../ui/theme/shellx_desktop_theme.dart' show ShellxSizes;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
+import 'resize_settler.dart';
 import 'terminal_feed.dart';
 import 'terminal_input.dart' show desktopInputHandlerWith;
 import 'terminal_style.dart';
@@ -28,6 +29,12 @@ part 'terminal_tabs_config.dart';
 part 'terminal_tabs_panes.dart';
 part 'terminal_tabs_remote.dart';
 part 'terminal_tabs_restore.dart';
+
+/// A10 D20: how long a pane's size must stay the same before its session
+/// is told. Zero tells at once (tests that do not care).
+final resizeSettleProvider = Provider<Duration>(
+  (ref) => const Duration(milliseconds: 80),
+);
 
 enum SpawnFailure { notFound, denied, other }
 
@@ -471,6 +478,17 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   final _links = <int, _Link>{};
   StreamSubscription<void>? _changes;
 
+  /// A10 D20: sizes reach a session only once they settle.
+  late ResizeSettler _settler;
+  bool _settlerInitialized = false;
+
+  /// A10 D20: tells every session its settled size now (a test, a quit).
+  void flushResizes() {
+    if (_settlerInitialized) {
+      _settler.flushAll();
+    }
+  }
+
   /// The pane's grid, so a new shell starts at the size it will be shown.
   TerminalGrid _grid = (cols: 80, rows: 24);
 
@@ -544,6 +562,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   @override
   TerminalTabsState build() {
     _local = ref.watch(localSessionsProvider);
+    // A10 D20: dispose the previous settler if this is a rebuild.
+    if (_settlerInitialized) {
+      _settler.dispose();
+    }
+    _settler = ResizeSettler(settle: ref.read(resizeSettleProvider));
+    _settlerInitialized = true;
     _changes = _local.changes.listen((_) => _sync());
     ref.onDispose(_dispose);
     final tabs = _merge(const []);
@@ -897,7 +921,13 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       if (state.tabOfSession(s.id)?.isSplit == false) {
         _grid = (cols: cols, rows: rows);
       }
-      view.resize(cols, rows);
+      // A10 D20: the grid is right on screen at once; the session hears
+      // it when it stops changing (a drag is one resize, not one per frame).
+      _settler.request(s.id, cols, rows, (c, r) {
+        if (identical(_links[s.id], link) && _reportsSize(s.id)) {
+          view.resize(c, r);
+        }
+      });
     };
     link.subscriptions
       ..add(
@@ -953,6 +983,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       }
       return;
     }
+    // A10 D20: a key must reach a PTY that already has the size on screen.
+    _settler.flush(id);
     _links[id]?.view.write(utf8.encode(data));
   }
 
@@ -1102,6 +1134,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       if (!tab.isSplit) {
         _grid = (cols: terminal.viewWidth, rows: terminal.viewHeight);
       }
+      // A10 D20: laid out while hidden, so the size is already final: sent
+      // now, and the size waiting from before is dropped.
+      _settler.cancel(id);
       link.view.resize(terminal.viewWidth, terminal.viewHeight);
     }
   }
@@ -1133,6 +1168,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   };
 
   void _dispose() {
+    _settler.dispose();
     unawaited(_changes?.cancel());
     for (final link in _links.values) {
       link.dispose();

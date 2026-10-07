@@ -27,6 +27,8 @@ void main() {
     container = ProviderContainer.test(
       overrides: [
         localSessionsProvider.overrideWithValue(local),
+        // A10 D20: these tests check layout, not settling: sizes go at once.
+        resizeSettleProvider.overrideWithValue(Duration.zero),
         appL10nProvider.overrideWithValue(
           l10n ?? lookupAppLocalizations(const Locale('en')),
         ),
