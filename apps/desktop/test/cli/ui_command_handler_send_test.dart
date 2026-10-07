@@ -6,6 +6,9 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/agent_marks.dart';
 import 'package:shellx_desktop/src/cli/pane_text.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
+import 'package:shellx_desktop/src/terminal/desktop_terminal.dart';
+import 'package:shellx_desktop/src/terminal/pane_paste.dart';
+import 'package:shellx_desktop/src/terminal/paste_sender.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -38,6 +41,55 @@ void main() {
       });
       expect(written(100), 'echo a\recho [201~b\r');
       expect(c.read(agentMarksProvider).panes.keys, contains(100));
+    });
+
+    test('a 48 KiB send (the CLI limit) arrives whole', () async {
+      final text = 'abcdefgh' * 6144;
+      await call('ui.pane.send', {'pane': 100, 'text': text});
+      expect(written(100), text);
+    });
+
+    test('a send during a running paste queues after it, in order', () async {
+      final tab = c.read(terminalTabsProvider).selected!;
+      final sink = PanePasteSink(
+        () => c.read(terminalTabsProvider),
+        100,
+        tab.focused.terminal,
+      );
+      final big = 'k' * 400000;
+      final first = c.read(pasteSenderProvider).send(100, big, sink);
+      await call('ui.pane.send', {'pane': 100, 'text': 'tail', 'enter': true});
+      expect(await first, PasteOutcome.sent);
+      expect(written(100), '${big}tail\r');
+    });
+
+    test('keys alone also wait for a running paste', () async {
+      final tab = c.read(terminalTabsProvider).selected!;
+      final sink = PanePasteSink(
+        () => c.read(terminalTabsProvider),
+        100,
+        tab.focused.terminal,
+      );
+      final big = 'k' * 400000;
+      unawaited(c.read(pasteSenderProvider).send(100, big, sink));
+      await call('ui.pane.send', {
+        'pane': 100,
+        'keys': ['enter'],
+      });
+      expect(written(100), '$big\r');
+    });
+
+    test('PanePasteSink is not alive for a replaced terminal or an exited '
+        'pane', () async {
+      final tab = c.read(terminalTabsProvider).selected!;
+      final terminal = tab.focused.terminal;
+      PanePasteSink sink(DesktopTerminal t) =>
+          PanePasteSink(() => c.read(terminalTabsProvider), 100, t);
+      expect(sink(terminal).alive, isTrue);
+      expect(sink(DesktopTerminal()).alive, isFalse);
+      local.views[100]!.end(0);
+      await pumpFeed();
+      expect(sink(terminal).alive, isFalse);
     });
 
     test('final M4: a tab (t<id>) means its focused pane', () async {
@@ -435,6 +487,7 @@ void main() {
       local.replace(
         local.summary(id, origin: SessionOrigin.desktop, cwd: '/w'),
       );
+      await pumpEventQueue();
       expect(written(id), 'npm run dev\rx\r');
     });
 
@@ -446,6 +499,7 @@ void main() {
         local.replace(
           local.summary(id, origin: SessionOrigin.desktop, cwd: '/w'),
         );
+        await pumpEventQueue();
         expect(written(id), 'ls\r');
         await expectLater(
           call('ui.tab.new', {'cmd': 'é' * 8193}),

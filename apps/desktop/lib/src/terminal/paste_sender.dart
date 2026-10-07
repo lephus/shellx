@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'terminal_input.dart' show normalizePastedText;
 
 /// What [PasteSender] writes to: one pane's terminal (A10 D13). The sink is
@@ -49,10 +51,20 @@ final class PasteSender {
   /// Stops pane [key]'s running and queued pastes after the piece being
   /// written; a bracketed one is closed first so the program leaves paste
   /// mode.
-  void cancel(int key) => _cancelled.add(key);
+  ///
+  /// Nothing pending for [key]: nothing to cancel, and no stale mark is left
+  /// to cancel the next paste.
+  void cancel(int key) {
+    if (_tails.containsKey(key)) _cancelled.add(key);
+  }
+
+  /// Completes when every paste queued for pane [key] so far has ended; a
+  /// caller that types after a paste (keys, Enter) waits for it.
+  Future<void> whenIdle(int key) => _tails[key] ?? Future<void>.value();
 
   /// Pastes [text] into [sink] for pane [key]. [confirm] is asked (with the
-  /// size in bytes) above [confirmAbove]. Never throws for a gone pane.
+  /// size in bytes) above [confirmAbove]. Never throws: a failing write ends the paste as
+  /// [PasteOutcome.cancelled].
   Future<PasteOutcome> send(
     int key,
     String text,
@@ -64,8 +76,10 @@ final class PasteSender {
     final run = previous.then((_) async {
       try {
         done.complete(await _run(key, text, sink, confirm));
-      } on Object catch (error, stack) {
-        done.completeError(error, stack);
+      } on Object catch (error) {
+        // A write or the confirmation failed: the paste ends, quietly.
+        debugPrint('paste: failed (${error.runtimeType})');
+        done.complete(PasteOutcome.cancelled);
       }
     });
     _tails[key] = run.whenComplete(() {
@@ -102,27 +116,64 @@ final class PasteSender {
       return PasteOutcome.sent;
     }
     final bracketed = sink.bracketed;
-    if (bracketed) sink.send(_start);
-    var at = 0;
-    while (at < text.length) {
-      if (!sink.alive) return PasteOutcome.cancelled;
-      if (_cancelled.contains(key)) {
-        if (bracketed) sink.send(_end);
-        return PasteOutcome.cancelled;
+    var opened = false;
+    try {
+      if (bracketed) {
+        sink.send(_start);
+        opened = true;
       }
-      var end = at + piece;
-      if (end >= text.length) {
-        end = text.length;
-      } else {
-        final unit = text.codeUnitAt(end - 1);
-        // Never split a surrogate pair between two writes.
-        if (unit >= 0xD800 && unit <= 0xDBFF) end--;
+      var at = 0;
+      while (at < text.length) {
+        if (!sink.alive) return PasteOutcome.cancelled;
+        if (_cancelled.contains(key)) {
+          if (bracketed) sink.send(_end);
+          return PasteOutcome.cancelled;
+        }
+        final end = _pieceEnd(text, at);
+        sink.send(text.substring(at, end));
+        at = end;
+        if (at < text.length) await Future<void>.delayed(gap);
       }
-      sink.send(text.substring(at, end));
-      at = end;
-      if (at < text.length) await Future<void>.delayed(gap);
+      if (bracketed) sink.send(_end);
+      return PasteOutcome.sent;
+    } on Object catch (error) {
+      // A write failed (the pane's session went away): close the bracket
+      // if we can so the program is not left in paste mode. Never logs text.
+      debugPrint('paste: write failed (${error.runtimeType})');
+      if (opened) {
+        try {
+          sink.send(_end);
+        } on Object {
+          // Nothing more to do for a pane that cannot be written to.
+        }
+      }
+      return PasteOutcome.cancelled;
     }
-    if (bracketed) sink.send(_end);
-    return PasteOutcome.sent;
+  }
+
+  /// The end of the piece starting at [from]: at most [piece] UTF-8 bytes,
+  /// never between the two halves of a code point.
+  int _pieceEnd(String text, int from) {
+    var at = from;
+    var bytes = 0;
+    while (at < text.length) {
+      final unit = text.codeUnitAt(at);
+      final isPair =
+          unit >= 0xD800 &&
+          unit <= 0xDBFF &&
+          at + 1 < text.length &&
+          (text.codeUnitAt(at + 1) & 0xFC00) == 0xDC00;
+      final width = isPair
+          ? 4
+          : unit < 0x80
+          ? 1
+          : unit < 0x800
+          ? 2
+          : 3;
+      if (bytes + width > piece && at > from) break;
+      bytes += width;
+      at += isPair ? 2 : 1;
+    }
+    return at;
   }
 }

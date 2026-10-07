@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/paste_sender.dart';
@@ -171,4 +173,97 @@ void main() {
     expect(out, PasteOutcome.cancelled);
     expect(sink.sent, isEmpty);
   });
+
+  test('a write that throws ends the paste cleanly and closes the bracket', () {
+    fakeAsync((async) {
+      final sink = _ThrowingSink(failAfter: 3);
+      PasteOutcome? outcome;
+      Object? error;
+      PasteSender()
+          .send(1, 'w' * 400000, sink)
+          .then((o) => outcome = o, onError: (Object e) => error = e);
+      async.elapse(const Duration(seconds: 2));
+      expect(error, isNull);
+      expect(outcome, PasteOutcome.cancelled);
+      expect(sink.sent.last, '\x1b[201~');
+    });
+  });
+
+  test('a small paste that throws is cancelled, not an error', () async {
+    final sink = _ThrowingSink(failAfter: 0);
+    expect(await PasteSender().send(1, 'abc', sink), PasteOutcome.cancelled);
+  });
+
+  test('cancel on an idle pane does not cancel the next paste', () {
+    fakeAsync((async) {
+      final sender = PasteSender()..cancel(1);
+      final sink = FakeSink();
+      PasteOutcome? outcome;
+      sender.send(1, 'n' * 100000, sink).then((o) => outcome = o);
+      async.elapse(const Duration(seconds: 2));
+      expect(outcome, PasteOutcome.sent);
+      expect(sink.all, 'n' * 100000);
+    });
+  });
+
+  test('pieces are 32 KiB of UTF-8, never splitting a code point', () {
+    fakeAsync((async) {
+      for (final unit in ['日', 'ệ', '😀', 'é']) {
+        final sink = FakeSink();
+        final text = unit * 60000;
+        PasteSender().send(1, text, sink);
+        async.elapse(const Duration(seconds: 2));
+        expect(sink.all, text);
+        for (final p in sink.sent) {
+          expect(utf8.encode(p).length, lessThanOrEqualTo(32 * 1024));
+          expect(p.runes.every((r) => r != 0xFFFD), isTrue);
+        }
+        expect(sink.sent.length, greaterThan(1));
+      }
+    });
+  });
+
+  test('the threshold counts UTF-8 bytes: 400 000 × 日 asks', () async {
+    final sink = FakeSink();
+    int? asked;
+    final out = await PasteSender().send(
+      1,
+      '日' * 400000,
+      sink,
+      confirm: (bytes) async {
+        asked = bytes;
+        return false;
+      },
+    );
+    expect(out, PasteOutcome.declined);
+    expect(asked, 1200000);
+  });
+
+  test('whenIdle waits for the pastes queued so far', () {
+    fakeAsync((async) {
+      final sender = PasteSender();
+      final sink = FakeSink();
+      sender.send(1, 'a' * 200000, sink);
+      var idle = false;
+      sender.whenIdle(1).then((_) => idle = true);
+      async.elapse(const Duration(milliseconds: 5));
+      expect(idle, isFalse);
+      async.elapse(const Duration(seconds: 2));
+      expect(idle, isTrue);
+    });
+  });
+}
+
+final class _ThrowingSink extends FakeSink {
+  _ThrowingSink({required this.failAfter}) : super(bracketed: true);
+  final int failAfter;
+  int _n = 0;
+  @override
+  void send(String data) {
+    if (++_n > failAfter && data != '\x1b[201~') throw StateError('gone');
+    super.send(data);
+  }
+
+  @override
+  void paste(String text) => throw StateError('gone');
 }

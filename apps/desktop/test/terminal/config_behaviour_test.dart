@@ -7,6 +7,7 @@ import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_syntax.dart';
 import 'package:shellx_desktop/src/config/shellx_config.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
+import 'package:shellx_desktop/src/terminal/pane_paste.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/terminal/user_commands.dart';
 import 'package:xterm/core.dart' show TerminalKey;
@@ -106,9 +107,12 @@ void main() {
             enter: true,
             origin: entry,
           ),
+          sender: c.read(pasteSenderProvider),
+          tabs: state,
         ),
         CommandRun.ran,
       );
+      await pumpEventQueue();
       expect(local.views[id]!.writes.join(), 'npm run lint\r');
       local.views[id]!.writes.clear();
       runUserCommand(
@@ -119,10 +123,32 @@ void main() {
           enter: false,
           origin: entry,
         ),
+        sender: c.read(pasteSenderProvider),
+        tabs: state,
       );
+      await pumpEventQueue();
       expect(local.views[id]!.writes.join(), 'git status\r');
     },
   );
+
+  test('a command waits for a paste already running in the pane', () async {
+    await tabs().openTab();
+    final pane = state().selected!.focused;
+    final id = pane.id;
+    final sink = PanePasteSink(state, id, pane.terminal);
+    final big = 'k' * 400000;
+    final first = c.read(pasteSenderProvider).send(id, big, sink);
+    final entry = ConfigEntry(file: '/c', line: 1, key: 'command', value: '');
+    runUserCommand(
+      state(),
+      UserCommand(name: 'L', text: 'ls', enter: true, origin: entry),
+      sender: c.read(pasteSenderProvider),
+      tabs: state,
+    );
+    await first;
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(local.views[id]!.writes.join(), '${big}ls\r');
+  });
 
   test('no live terminal: noTerminal', () async {
     final entry = ConfigEntry(file: '/c', line: 1, key: 'command', value: '');
@@ -130,6 +156,8 @@ void main() {
       runUserCommand(
         state(),
         UserCommand(name: 'L', text: 'x', enter: true, origin: entry),
+        sender: c.read(pasteSenderProvider),
+        tabs: state,
       ),
       CommandRun.noTerminal,
     );

@@ -456,25 +456,31 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     // An exited pane closes on Enter (UI §2.6): a paste must not do that.
     if (!sink.alive) return;
     final l10n = AppLocalizations.of(context);
+    var asked = false;
     final outcome = await ref
         .read(pasteSenderProvider)
         .send(
           paneId,
           text,
           sink,
-          confirm: (bytes) => ref
-              .read(windowRouterProvider.notifier)
-              .confirm(
-                ConfirmRequest(
-                  title: l10n.pasteLargeTitle(
-                    formatByteSize(bytes, locale: l10n.localeName),
+          confirm: (bytes) {
+            asked = true;
+            return ref
+                .read(windowRouterProvider.notifier)
+                .confirm(
+                  ConfirmRequest(
+                    title: l10n.pasteLargeTitle(
+                      formatByteSize(bytes, locale: l10n.localeName),
+                    ),
+                    body: l10n.pasteLargeBody,
+                    confirmLabel: l10n.pasteLargeAction,
+                    destructive: false,
                   ),
-                  body: l10n.pasteLargeBody,
-                  confirmLabel: l10n.pasteLargeAction,
-                  destructive: false,
-                ),
-              ),
+                );
+          },
         );
+    // The dialog took the keyboard: give it back to the terminal.
+    if (asked && mounted) focusTerminal();
     if (outcome == PasteOutcome.tooLarge && mounted) {
       ref
           .read(terminalTabsProvider.notifier)
