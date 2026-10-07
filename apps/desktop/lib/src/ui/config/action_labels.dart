@@ -126,6 +126,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
     'delete_word_forward' => l10n.actionEditLineDeleteWordForward,
     _ => l10n.actionEditLineStart,
   },
+  'toggle_copy_mode' => l10n.actionToggleCopyMode,
   'goto_tab' => l10n.actionGotoTab(a.param ?? ''),
   'next_tab' => l10n.actionNextTab,
   'previous_tab' => l10n.actionPreviousTab,

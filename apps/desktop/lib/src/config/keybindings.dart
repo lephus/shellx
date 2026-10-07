@@ -245,6 +245,8 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
         'delete_word_forward',
       ),
     ],
+    // A11 D13: Cmd+Shift+M / Ctrl+Shift+M.
+    b(shifted(LogicalKeyboardKey.keyM), 'toggle_copy_mode'),
     b(font(LogicalKeyboardKey.equal), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.equal, shift: true), 'increase_font_size', '1'),
     b(font(LogicalKeyboardKey.add), 'increase_font_size', '1'),

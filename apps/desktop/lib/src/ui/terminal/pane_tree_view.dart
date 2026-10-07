@@ -30,6 +30,7 @@ import '../window_router.dart' show windowRouterProvider;
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'click_select.dart';
+import 'copy_mode_controller.dart';
 import 'device_pixel_lines.dart';
 import 'find_bar.dart';
 import 'ime_compose_reset.dart';
@@ -113,6 +114,27 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final view = scroll.position.viewportDimension;
     if (y >= 0 && y + line <= view) return;
     final target = scroll.position.pixels + y - (view - line) / 2;
+    scroll.jumpTo(
+      target.clamp(
+        scroll.position.minScrollExtent,
+        scroll.position.maxScrollExtent,
+      ),
+    );
+  }
+
+  /// A11 D13: copy mode's cursor row inside the view, scrolling as little
+  /// as it takes.
+  void _revealRow(int id, int row) {
+    final render = _viewKeys[id]?.currentState?.renderTerminal;
+    final scroll = widget.scrollFor(id);
+    if (render == null || !scroll.hasClients) return;
+    final y = render.getOffset(CellOffset(0, row)).dy;
+    final line = render.lineHeight;
+    final view = scroll.position.viewportDimension;
+    if (y >= 0 && y + line <= view) return;
+    final target = y < 0
+        ? scroll.position.pixels + y
+        : scroll.position.pixels + y + line - view;
     scroll.jumpTo(
       target.clamp(
         scroll.position.minScrollExtent,
@@ -211,6 +233,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     // A10 D3: this pane's find bar, when open.
     final find = ref.watch(findSessionsProvider.select((m) => m[id]));
     if (find != null) find.reveal = (m) => _reveal(id, m);
+    // A11 D13: this pane's copy mode, when active.
+    final copy = ref.watch(copyModeProvider.select((m) => m[id]));
+    if (copy != null) copy.reveal = (row) => _revealRow(id, row);
     // One widget shape for one pane and for many (only properties
     // differ), so the first split and the close back to one pane keep
     // this pane's TerminalView: same state, no remount, no resize.
@@ -337,6 +362,13 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               right: 0,
               bottom: 0,
               child: RemoteStrip(pane: pane),
+            ),
+          // A11 D13: not clickable, over the terminal's bottom-right.
+          if (copy != null)
+            Positioned(
+              right: ShellxSpace.s8,
+              bottom: ShellxSpace.s8,
+              child: IgnorePointer(child: CopyModeChip()),
             ),
           // A10 D3: over the terminal, never changing its grid.
           if (find != null)
@@ -1286,5 +1318,42 @@ class _RenderSizeReport extends RenderProxyBox {
     if (size == _reported) return;
     final now = _reported = size;
     WidgetsBinding.instance.addPostFrameCallback((_) => onSize(now));
+  }
+}
+
+/// A11 D13 (UI §4.3): says the keys are the copy mode's now.
+class CopyModeChip extends StatelessWidget {
+  const CopyModeChip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final label = '${l10n.copyModeChip} · ${l10n.copyModeHint}';
+    return Semantics(
+      liveRegion: true,
+      label: label,
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          key: const Key('copymode.chip'),
+          decoration: BoxDecoration(
+            color: ShellxDesktopColors.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(ShellxRadius.r6),
+            border: Border.all(color: ShellxDesktopColors.accent),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ShellxSpace.s8,
+              vertical: ShellxSpace.s4,
+            ),
+            child: Text(
+              label,
+              style: ShellxText.caption.copyWith(
+                color: ShellxDesktopColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

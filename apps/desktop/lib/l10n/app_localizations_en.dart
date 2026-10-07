@@ -2210,4 +2210,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuRevealFileWin => 'Show in Explorer';
+
+  @override
+  String get actionToggleCopyMode => 'Copy mode';
+
+  @override
+  String get copyModeChip => 'COPY MODE';
+
+  @override
+  String get copyModeHint => 'y copy · v select · Esc exit';
+
+  @override
+  String get copyModeCopied => 'Copied';
 }

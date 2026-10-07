@@ -89,6 +89,11 @@ final class NoUnreadNotice extends TabNotice {
   const NoUnreadNotice();
 }
 
+/// A11 D13: copy mode copied the selection (neutral toast).
+final class CopyModeCopiedNotice extends TabNotice {
+  const CopyModeCopiedNotice();
+}
+
 /// D4: the focused pane is too small to hold two (neutral toast).
 final class PaneNoRoomNotice extends TabNotice {
   const PaneNoRoomNotice();

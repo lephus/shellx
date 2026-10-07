@@ -194,3 +194,8 @@ class OpenSshConnectIntent extends Intent {
 class OpenTmuxAttachIntent extends Intent {
   const OpenTmuxAttachIntent();
 }
+
+/// A11 D13 `toggle_copy_mode` (⌘⇧M / Ctrl+Shift+M).
+class ToggleCopyModeIntent extends Intent {
+  const ToggleCopyModeIntent();
+}

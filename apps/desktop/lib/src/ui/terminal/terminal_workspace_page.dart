@@ -33,6 +33,7 @@ import '../window_focus.dart';
 import '../window_router.dart';
 import 'click_select.dart' show selectionText;
 import 'close_tab.dart';
+import 'copy_mode_controller.dart';
 import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
 import 'remote_marks.dart' show remoteAnnouncementBetween;
@@ -438,6 +439,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
               );
         },
       ),
+      // A11 D13: the focused pane's vim-style copy mode.
+      ToggleCopyModeIntent: run<ToggleCopyModeIntent>((_) {
+        closePanel();
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        ref.read(copyModeProvider.notifier).toggle(tab.focusedPaneId);
+        focusTerminal();
+      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
       FontBiggerIntent: run<FontBiggerIntent>(
         (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
@@ -568,9 +577,54 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     }
   }
 
+  /// A11 D13: copy mode ends when the keyboard leaves the terminal.
+  void _onTerminalFocus() {
+    if (!terminalFocus.hasFocus) {
+      ref.read(copyModeProvider.notifier).exitAll();
+    }
+  }
+
+  /// A window chord keeps working in copy mode (⌘W, the toggle itself),
+  /// except the ones that would write to the program or fight the mode's
+  /// own selection. Plain keys are always the mode's.
+  bool _copyModeWindowChord(KeyEvent event) {
+    final hw = HardwareKeyboard.instance;
+    final chord =
+        hw.isMetaPressed ||
+        (hw.isControlPressed && (hw.isShiftPressed || hw.isAltPressed));
+    final map = terminalShortcuts;
+    if (!chord || map == null) return false;
+    for (final e in map.entries) {
+      if (!e.key.accepts(event, hw)) continue;
+      final i = e.value;
+      return !(i is PasteClipboardIntent ||
+          i is SendTextIntent ||
+          i is EditLineIntent ||
+          i is RunUserCommandIntent ||
+          i is SelectAllIntent ||
+          i is CopySelectionIntent);
+    }
+    return false;
+  }
+
+  /// The terminals' key hook: copy mode first (it swallows every key),
+  /// then the key sequences.
+  KeyEventResult _terminalKey(KeyEvent event) {
+    final tab = ref.read(terminalTabsProvider).selected;
+    final mode = tab == null
+        ? null
+        : ref.read(copyModeProvider)[tab.focusedPaneId];
+    if (mode != null) {
+      final r = mode.handleKey(event, windowChord: _copyModeWindowChord);
+      if (r != KeyEventResult.ignored) return r;
+    }
+    return sequenceKey(event);
+  }
+
   @override
   void initState() {
     super.initState();
+    terminalFocus.addListener(_onTerminalFocus);
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
     listenToConfig();
     listenToConfigUi();
@@ -581,6 +635,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   void dispose() {
     disposeSequences();
     disposeConfigUi();
+    terminalFocus.removeListener(_onTerminalFocus);
     terminalFocus.dispose();
     sidebarFocus.dispose();
     emptyFocus.dispose();
@@ -766,7 +821,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           shortcuts: overlay == A9Overlay.shortcuts
               ? const {}
               : terminalShortcuts,
-          onKeyEvent: sequenceKey,
+          onKeyEvent: _terminalKey,
           onShowConfigProblems: () => openOverlay(A9Overlay.problems),
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);

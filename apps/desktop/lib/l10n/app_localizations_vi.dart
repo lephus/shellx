@@ -2121,4 +2121,16 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get menuRevealFileWin => 'Hiện trong Explorer';
+
+  @override
+  String get actionToggleCopyMode => 'Chế độ copy';
+
+  @override
+  String get copyModeChip => 'CHẾ ĐỘ COPY';
+
+  @override
+  String get copyModeHint => 'y chép · v chọn · Esc thoát';
+
+  @override
+  String get copyModeCopied => 'Đã chép';
 }

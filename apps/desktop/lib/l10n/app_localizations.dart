@@ -3287,6 +3287,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show in Explorer'**
   String get menuRevealFileWin;
+
+  /// A11 D13
+  ///
+  /// In en, this message translates to:
+  /// **'Copy mode'**
+  String get actionToggleCopyMode;
+
+  /// No description provided for @copyModeChip.
+  ///
+  /// In en, this message translates to:
+  /// **'COPY MODE'**
+  String get copyModeChip;
+
+  /// No description provided for @copyModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'y copy · v select · Esc exit'**
+  String get copyModeHint;
+
+  /// No description provided for @copyModeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copyModeCopied;
 }
 
 class _AppLocalizationsDelegate
