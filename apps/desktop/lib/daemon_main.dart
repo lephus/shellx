@@ -19,9 +19,13 @@ Future<void> daemonMain() async {
     ),
   );
   await directory.create(recursive: true);
+  // The mux dir is owner-only (A5b D5); the default umask may leave 0755.
+  if (!Platform.isWindows) {
+    await Process.run('chmod', ['700', directory.path]);
+  }
   final beat = File('${directory.path}${Platform.pathSeparator}heartbeat');
-  void write() =>
-      beat.writeAsStringSync('$pid ${DateTime.now().toIso8601String()}');
+  // Only the pid; the file's mtime is the liveness signal.
+  void write() => beat.writeAsStringSync('$pid');
   write();
   Timer.periodic(const Duration(seconds: 2), (_) => write());
 }
