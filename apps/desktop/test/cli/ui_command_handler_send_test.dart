@@ -329,6 +329,26 @@ void main() {
       expect(c.read(terminalTabsProvider.notifier).lastExitCode(100), 0);
     });
 
+    test('final M2: a pane closed while waited on (or before) answers '
+        'closed, never a bare null', () async {
+      await c.read(terminalTabsProvider.notifier).openTab(); // 101
+      final r = call('ui.pane.wait', {'pane': 101, 'mode': 'exit'});
+      await pumpFeed();
+      await call('ui.close', {'pane': 101, 'force': true});
+      expect(await r, {'exitCode': null, 'closed': true});
+      expect(await call('ui.pane.wait', {'pane': 101, 'mode': 'exit'}), {
+        'exitCode': null,
+        'closed': true,
+      });
+      // The tab's close (every pane) too.
+      await c.read(terminalTabsProvider.notifier).openTab(); // 102
+      c.read(terminalTabsProvider.notifier).close(102);
+      expect(await call('ui.pane.wait', {'pane': 102, 'mode': 'exit'}), {
+        'exitCode': null,
+        'closed': true,
+      });
+    });
+
     test('an exited pane answers at once with its code', () async {
       local.views[100]!.end(4);
       await pumpFeed();

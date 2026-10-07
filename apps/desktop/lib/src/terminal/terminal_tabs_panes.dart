@@ -12,21 +12,32 @@ extension TerminalTabsPanes on TerminalTabs {
   void closePane(int sessionId) {
     final pane = _state.tabOfSession(sessionId)?.panes[sessionId];
     if (pane == null) return;
-    if (!pane.exited) _local.close(sessionId);
+    if (!pane.exited) {
+      _local.close(sessionId);
+      _recordClose(sessionId);
+    }
     _removePane(sessionId);
   }
 
-  /// A7 D21: how session [id] ended, while it is one of the last 64 that
-  /// ended here; null otherwise.
-  int? lastExitCode(int id) => _lastExitCodes[id];
+  /// A7 D21: session [id]'s exit code, while it is one of the last 64 that
+  /// ended here; null otherwise (or when it was closed, [paneEnd]).
+  int? lastExitCode(int id) => _paneEnds[id]?.exitCode;
 
-  void _recordExit(int id, int code) {
-    _lastExitCodes
+  /// A7 D21, final ruling M2: how session [id] ended, while it is one of
+  /// the last 64 that ended here; null otherwise.
+  PaneEnd? paneEnd(int id) => _paneEnds[id];
+
+  void _recordExit(int id, int code) =>
+      _recordEnd(id, (exitCode: code, closed: false));
+
+  /// Closed before it ended: its code, if any, never reaches this list.
+  void _recordClose(int id) => _recordEnd(id, (exitCode: null, closed: true));
+
+  void _recordEnd(int id, PaneEnd end) {
+    _paneEnds
       ..remove(id)
-      ..[id] = code;
-    if (_lastExitCodes.length > 64) {
-      _lastExitCodes.remove(_lastExitCodes.keys.first);
-    }
+      ..[id] = end;
+    if (_paneEnds.length > 64) _paneEnds.remove(_paneEnds.keys.first);
   }
 
   /// Stores the size for later decisions only: safe during layout.

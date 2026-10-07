@@ -266,11 +266,13 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             if p.json {
                 print_json(ctx, &output::result_json(&r));
             } else if mode == "exit" {
+                // Final ruling M2: closed before its shell ended → no code.
+                let closed = matches!(r.get("closed"), Some(Value::Bool(true)));
                 let code = r
                     .get("exitCode")
                     .and_then(Value::as_i64)
                     .map(|c| c.to_string())
-                    .unwrap_or_else(|| "null".into());
+                    .unwrap_or_else(|| if closed { "closed" } else { "null" }.into());
                 writeln!(ctx.out, "{code}").ok();
             } else if mode == "match" {
                 let line = r.get("line").and_then(Value::as_str).unwrap_or("");

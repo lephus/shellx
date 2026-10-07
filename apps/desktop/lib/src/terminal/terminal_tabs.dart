@@ -163,6 +163,11 @@ String clipName(String text, int max) =>
 
 const Object _unset = Object();
 
+/// A7 D21, final ruling M2: how a session ended — its exit code, or
+/// [closed] when the user (or `shellx close`) closed it before it ended
+/// (no code then).
+typedef PaneEnd = ({int? exitCode, bool closed});
+
 /// One pane of a tab: one session's view (A3 D2). These are the fields the
 /// A1/A2 tab record had; the tab now holds one per pane.
 @immutable
@@ -467,9 +472,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// A5a D4: the session whose pane just received output.
   Stream<int> get paneOutputs => _paneOutputs.stream;
 
-  /// A7 D21: the exit codes of the last 64 sessions that ended here (exit
-  /// 0 removes the pane; `wait --exit` still reports it).
-  final _lastExitCodes = <int, int>{};
+  /// A7 D21: how the last 64 sessions that ended here ended (exit 0
+  /// removes the pane; `wait --exit` still reports it).
+  final _paneEnds = <int, PaneEnd>{};
 
   /// A5a D16: a restore is reopening saved panes.
   bool get restoring => _restoring != null;
@@ -655,7 +660,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final tab = _tab(id);
     if (tab == null) return;
     for (final pane in tab.panes.values) {
-      if (!pane.exited) _local.close(pane.id);
+      if (!pane.exited) {
+        _local.close(pane.id);
+        _recordClose(pane.id);
+      }
     }
     _removeTab(id);
   }

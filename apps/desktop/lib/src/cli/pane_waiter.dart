@@ -16,6 +16,10 @@ abstract interface class PaneProbe {
   bool get exited;
   int? get exitCode;
 
+  /// Final ruling M2: closed by the user or `shellx close` before its shell
+  /// ended (then [exitCode] is null).
+  bool get closed;
+
   /// Fires after the pane's terminal received output.
   Stream<void> get output;
 
@@ -120,14 +124,17 @@ Future<Map<String, Object?>> waitIdle(
   };
 });
 
-/// D21 exit: `{exitCode}` once the session ended.
+/// D21 exit: `{exitCode}` once the session ended; `{exitCode: null,
+/// closed: true}` when it was closed instead (final ruling M2).
 Future<Map<String, Object?>> waitExit(
   PaneProbe p, {
   required Duration timeout,
   Future<void>? cancelled,
 }) => _race(timeout, cancelled, (done) {
   void check() {
-    if (!done.isCompleted && p.exited) done.complete({'exitCode': p.exitCode});
+    if (!done.isCompleted && p.exited) {
+      done.complete({'exitCode': p.exitCode, if (p.closed) 'closed': true});
+    }
   }
 
   final subs = [p.changes.listen((_) => check())];

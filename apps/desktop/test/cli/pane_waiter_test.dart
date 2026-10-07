@@ -18,6 +18,8 @@ final class FakeProbe implements PaneProbe {
   bool exited = false;
   @override
   int? exitCode;
+  @override
+  bool closed = false;
   final out = StreamController<void>.broadcast(sync: true);
   final ch = StreamController<void>.broadcast(sync: true);
   @override

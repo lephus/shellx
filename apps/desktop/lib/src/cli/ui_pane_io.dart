@@ -165,13 +165,15 @@ final class PaneIoCommands {
       throw badRequest('timeout is 1 ms–3600 s');
     }
     // A shell that already ended with 0 left no pane (A3 D7): `send exit`
-    // then `wait --exit` still gets its code.
+    // then `wait --exit` still gets its code; a closed one says so (M2).
     if (r.fields['mode'] == 'exit') {
       if (parseTarget(r.fields['pane'], null) case PaneRef(
         :final id,
       ) when _tabsState.tabOfSession(id) == null) {
-        final code = _ref.read(terminalTabsProvider.notifier).lastExitCode(id);
-        if (code != null) return {'exitCode': code};
+        final end = _ref.read(terminalTabsProvider.notifier).paneEnd(id);
+        if (end != null) {
+          return {'exitCode': end.exitCode, if (end.closed) 'closed': true};
+        }
       }
     }
     final pane = _paneArg(r);
@@ -249,6 +251,11 @@ final class _LivePane implements PaneProbe {
   @override
   int? get exitCode =>
       _p?.exitCode ?? _ref.read(terminalTabsProvider.notifier).lastExitCode(id);
+
+  @override
+  bool get closed =>
+      _p == null &&
+      (_ref.read(terminalTabsProvider.notifier).paneEnd(id)?.closed ?? false);
 
   @override
   Stream<void> get output => _ref

@@ -310,6 +310,18 @@ fn wait_modes_and_timeouts() {
         PLAIN,
     );
     assert_eq!((e.code, e.out.as_str()), (0, "3\n"));
+    // Final ruling M2: a pane closed before its shell ended has no code.
+    let closed = go(
+        &["wait", "p1", "--exit"],
+        &[],
+        vec![(
+            "ui.pane.wait",
+            ok(vec![("exitCode", Value::Null), ("closed", Value::Bool(true))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!((closed.code, closed.out.as_str()), (0, "closed\n"));
     let m = go(
         &[
             "wait",
