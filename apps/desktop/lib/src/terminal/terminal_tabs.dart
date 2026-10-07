@@ -106,6 +106,23 @@ final class LinkOpenFailedNotice extends TabNotice {
   const LinkOpenFailedNotice();
 }
 
+/// A10 D15–D17: why a drop or an image paste did nothing.
+enum InputNoticeKind {
+  dropSsh,
+  dropRefused,
+  dropTooMany,
+  imageSsh,
+  imageTooLarge,
+  imageFailed,
+}
+
+/// A10: a file drop or an image paste was refused or failed. The two SSH
+/// kinds are neutral (information); the others are errors.
+final class InputNotice extends TabNotice {
+  const InputNotice(this.kind);
+  final InputNoticeKind kind;
+}
+
 /// A7 D26: the skill install command is on the clipboard. Neutral toast.
 final class CliSkillsCopiedNotice extends TabNotice {
   const CliSkillsCopiedNotice();

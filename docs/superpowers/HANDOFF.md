@@ -503,3 +503,9 @@ Ghi đạt/không đạt kèm ngày + máy vào ledger, mục "A5b (daemon) — 
 - [ ] **W9. Chế độ TẮT (mặc định):** Setup/Gỡ khi ShellX chạy không có phiên nền → không còn tiến trình shell/ssh mồ côi (`Get-Process pwsh,powershell,ssh`). Ghi chú: Setup bỏ `/T` với `ShellX.exe` cả ở chế độ TẮT, vì `taskkill /T` đi theo cây cha và sẽ giết luôn phiên nền tách rời; shell trong tiến trình cửa sổ tự đóng khi host chết (ConPTY).
 
 **Điều kiện đổi mặc định sang BẬT.** Chỉ khi toàn bộ mục 1–15 (macOS) đạt trên máy thật và, để phát hành Windows, W1–W8 đạt trên Windows 11; một mục thất bại thì sửa trên branch (có test nếu được) rồi chạy lại. Khi đó đổi `defaultValue: false` của `background_service_enabled` ở `apps/desktop/lib/main.dart` (khoảng dòng 239) và `lib/src/tray/tray_actions.dart` (khoảng dòng 50, 205) cùng các test mặc định, cập nhật mục này và ledger. Cho tới lúc đó tính năng là opt-in.
+
+## 20. Thả tệp và dán ảnh — A10 (2026-10-07)
+
+- Đường dẫn thả/dán được escape theo **shell mà pane được khởi chạy** (POSIX / PowerShell / cmd). Giới hạn đã biết: gõ một shell khác bên trong pane (bash trong pwsh) thì dùng quy tắc quote của shell ngoài. Văn bản luôn được dán (bracketed nếu chương trình yêu cầu) và **không bao giờ kèm Enter**, nên sai lệch chỉ hiện trên dòng lệnh, không chạy gì. Shell lạ trên Windows dùng single quote kiểu PowerShell.
+- Tên tệp có ký tự điều khiển, bidi, zero-width hoặc xuống dòng: từ chối cả lần thả. Tối đa 100 tệp mỗi lần. Pane SSH từ chối thả/dán ảnh (không có scp).
+- Ảnh dán nằm ở `<Application Support>/paste-images` (0700/0600, từ chối nếu là symlink), tối đa 20 MiB, 50 tệp, 24 giờ; xoá khi thoát ứng dụng (tối đa 1 giây).

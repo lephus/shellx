@@ -15,8 +15,10 @@ import '../../config/keybindings.dart';
 import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/byte_size.dart';
+import '../../terminal/clipboard_media.dart';
 import '../../terminal/find_session.dart';
 import '../../terminal/find_sessions.dart';
+import '../../terminal/pane_input.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/pane_paste.dart';
 import '../../terminal/paste_sender.dart';
@@ -481,9 +483,24 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     if (tab == null) return;
     final paneId = tab.focusedPaneId;
     final terminal = tab.focused.terminal;
+    final media = ref.read(clipboardMediaProvider);
+    final input = ref.read(paneInputProvider);
+    // A10 D15: files copied in Finder / Explorer first (their name is also
+    // on the clipboard as text), then text, then an image.
+    final files = await media.files();
+    if (!mounted) return;
+    if (files.isNotEmpty) {
+      await input.insertPaths(paneId, files);
+      return;
+    }
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text;
-    if (!mounted || text == null || text.isEmpty) return;
+    if (!mounted) return;
+    if (text == null || text.isEmpty) {
+      final image = await media.image();
+      if (image != null && mounted) await input.pasteImage(paneId, image);
+      return;
+    }
     final sink = PanePasteSink(
       () => ref.read(terminalTabsProvider),
       paneId,

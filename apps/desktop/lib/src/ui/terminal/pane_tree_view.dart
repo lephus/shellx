@@ -17,6 +17,7 @@ import '../../remote/remote_state.dart';
 import '../../remote/ssh_reconnector.dart';
 import '../../terminal/find_sessions.dart';
 import '../../terminal/link_finder.dart';
+import '../../terminal/pane_input.dart' show PaneInput;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_search.dart' show SearchMatch;
@@ -25,12 +26,14 @@ import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart' show terminalFocusRequestProvider;
+import '../window_router.dart' show windowRouterProvider;
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'device_pixel_lines.dart';
 import 'find_bar.dart';
 import 'ime_compose_reset.dart';
 import 'link_layer.dart';
+import 'pane_drop_target.dart';
 import 'remote_marks.dart';
 import 'remote_strip.dart';
 import 'shellx_menu.dart';
@@ -243,7 +246,22 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               children: [
                 if (split) _header(id, pane, focused: focused, ringed: ringed),
                 // Keyed: the header coming or going never rebuilds it.
-                Expanded(key: const ValueKey('pane.terminal'), child: terminal),
+                Expanded(
+                  key: const ValueKey('pane.terminal'),
+                  // A10 D16: files dropped here become paths.
+                  child: PaneDropTarget(
+                    paneId: id,
+                    enabled:
+                        widget.selected &&
+                        !pane.exited &&
+                        (tab.zoomedPaneId == null || tab.zoomedPaneId == id) &&
+                        !ref.watch(
+                          windowRouterProvider.select((w) => w.dialogOpen),
+                        ),
+                    remote: PaneInput.isRemote(pane),
+                    child: terminal,
+                  ),
+                ),
               ],
             ),
           ),

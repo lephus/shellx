@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_controller.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
@@ -27,6 +28,7 @@ pumpConfiguredWorkspace(
   TargetPlatform? platform,
   List<Override> extra = const [],
   Locale locale = const Locale('en'),
+  ClipboardMedia clipboard = const EmptyClipboardMedia(),
 }) async {
   final fs = MemoryConfigFs();
   if (config.isNotEmpty) fs.write(testConfigPaths().shellx, config);
@@ -36,6 +38,7 @@ pumpConfiguredWorkspace(
     overrides: [
       desktopServicesProvider.overrideWithValue(h.services()),
       localSessionsProvider.overrideWithValue(local),
+      clipboardMediaProvider.overrideWithValue(clipboard),
       // A10 D20: these tests check layout, not settling: sizes go at once.
       resizeSettleProvider.overrideWithValue(Duration.zero),
       ...configOverrides(fs, platform: platform ?? defaultTargetPlatform),

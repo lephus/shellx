@@ -595,6 +595,11 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is NoUnreadNotice ||
       widget.notice is NoTerminalForCommandNotice ||
       widget.notice is PaneNoRoomNotice ||
+      (widget.notice is InputNotice &&
+          const {
+            InputNoticeKind.dropSsh,
+            InputNoticeKind.imageSsh,
+          }.contains((widget.notice as InputNotice).kind)) ||
       widget.notice is RestorePanesFailedNotice ||
       widget.notice is CliSkillsCopiedNotice ||
       widget.notice is CliPathInstalledNotice ||
@@ -651,6 +656,14 @@ class _NoticeToastState extends State<NoticeToast> {
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     PasteTooLargeNotice() => l10n.pasteTooLarge,
+    InputNotice(:final kind) => switch (kind) {
+      InputNoticeKind.dropSsh => l10n.dropSsh,
+      InputNoticeKind.dropRefused => l10n.dropRefused,
+      InputNoticeKind.dropTooMany => l10n.dropTooMany,
+      InputNoticeKind.imageSsh => l10n.pasteImageSsh,
+      InputNoticeKind.imageTooLarge => l10n.pasteImageTooLarge,
+      InputNoticeKind.imageFailed => l10n.pasteImageFailed,
+    },
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
     DaemonQuitFailedNotice() => l10n.daemonQuitFailed,
     LinkOpenFailedNotice() => l10n.linkOpenFailed,

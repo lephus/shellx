@@ -2012,6 +2012,30 @@ class AppLocalizationsVi extends AppLocalizations {
   String get pasteTooLarge => 'Nội dung clipboard quá lớn để dán (hơn 16 MB)';
 
   @override
+  String get pasteImageTooLarge => 'Ảnh lớn hơn 20 MB';
+
+  @override
+  String get pasteImageFailed => 'Không đọc được ảnh từ clipboard';
+
+  @override
+  String get pasteImageSsh => 'Không thể dán ảnh vào phiên SSH';
+
+  @override
+  String get dropHint => 'Thả để chèn đường dẫn';
+
+  @override
+  String get dropHintSsh => 'Không thể thả tệp vào phiên SSH';
+
+  @override
+  String get dropRefused => 'Tên tệp có ký tự mà shell không nhận an toàn';
+
+  @override
+  String get dropTooMany => 'Quá nhiều tệp: thả tối đa 100 tệp mỗi lần';
+
+  @override
+  String get dropSsh => 'Không thể thả tệp vào phiên SSH. Hãy dùng scp.';
+
+  @override
   String get findPlaceholder => 'Tìm';
 
   @override

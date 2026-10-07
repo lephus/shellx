@@ -3078,6 +3078,54 @@ abstract class AppLocalizations {
   /// **'The clipboard is too large to paste (over 16 MB)'**
   String get pasteTooLarge;
 
+  /// No description provided for @pasteImageTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The image is larger than 20 MB'**
+  String get pasteImageTooLarge;
+
+  /// No description provided for @pasteImageFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t read the image from the clipboard'**
+  String get pasteImageFailed;
+
+  /// No description provided for @pasteImageSsh.
+  ///
+  /// In en, this message translates to:
+  /// **'Images can’t be pasted into an SSH session'**
+  String get pasteImageSsh;
+
+  /// No description provided for @dropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to insert the path'**
+  String get dropHint;
+
+  /// No description provided for @dropHintSsh.
+  ///
+  /// In en, this message translates to:
+  /// **'Files can’t be dropped into an SSH session'**
+  String get dropHintSsh;
+
+  /// No description provided for @dropRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'A file name has characters a shell can’t take safely'**
+  String get dropRefused;
+
+  /// No description provided for @dropTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many files: drop up to 100 at a time'**
+  String get dropTooMany;
+
+  /// No description provided for @dropSsh.
+  ///
+  /// In en, this message translates to:
+  /// **'Files can’t be dropped into an SSH session. Use scp.'**
+  String get dropSsh;
+
   /// No description provided for @findPlaceholder.
   ///
   /// In en, this message translates to:
