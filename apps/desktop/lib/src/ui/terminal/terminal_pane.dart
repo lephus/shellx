@@ -278,10 +278,16 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                   return Stack(
                     children: [
                       if (state.tabs.isEmpty)
+                        // The empty state uses ShellX's own (dark) text
+                        // tokens, so it keeps ShellX's background even under
+                        // a light theme (D15).
                         Positioned.fill(
-                          child: EmptyTerminalState(
-                            onOpen: tabs.openTab,
-                            buttonFocus: widget.emptyFocus,
+                          child: ColoredBox(
+                            color: ShellxDesktopColors.bgTerminal,
+                            child: EmptyTerminalState(
+                              onOpen: tabs.openTab,
+                              buttonFocus: widget.emptyFocus,
+                            ),
                           ),
                         )
                       else

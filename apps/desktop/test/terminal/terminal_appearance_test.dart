@@ -12,6 +12,7 @@ import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/device_pixel_lines.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_overlays.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:shellx_desktop/src/ui/theme/terminal_colors.dart';
@@ -228,6 +229,25 @@ void main() {
     }
     expect(outline().color, ShellxDesktopColors.bgTerminal);
     expect(area(tester), const Color(0xFFFDF6E3));
+    await finish(tester);
+  });
+
+  testWidgets('the empty state keeps ShellX\'s background under a light '
+      'theme, so its text stays readable (D15)', (tester) async {
+    final fs = MemoryConfigFs();
+    await pump(tester, fs);
+    await reload(tester, fs, 'background = #fdf6e3\n');
+    final tabs = container.read(terminalTabsProvider);
+    for (final t in [...tabs.tabs]) {
+      container.read(terminalTabsProvider.notifier).close(t.id);
+    }
+    await tester.pumpAndSettle();
+    final empty = find.byType(EmptyTerminalState);
+    expect(empty, findsOneWidget);
+    final box = tester.widget<ColoredBox>(
+      find.ancestor(of: empty, matching: find.byType(ColoredBox)).first,
+    );
+    expect(box.color, ShellxDesktopColors.bgTerminal);
     await finish(tester);
   });
 

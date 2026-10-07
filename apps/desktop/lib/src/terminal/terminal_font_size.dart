@@ -38,7 +38,12 @@ class TerminalFontSize extends Notifier<double> {
   void reset() => _set(_configured ?? kTerminalFontSizeDefault);
 
   void _set(double value) {
-    final next = _clamp(value);
+    // With no `font-size` in the file the size is saved as a whole point
+    // (A1's int setting), so it is kept whole live too: the next launch
+    // shows the same size.
+    final next = _configured == null
+        ? _clamp(value.roundToDouble())
+        : _clamp(value);
     if (next == state) return;
     state = next;
     if (_configured != null) return; // D12: the file owns the size

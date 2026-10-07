@@ -65,6 +65,19 @@ void main() {
     },
   );
 
+  test(
+    'with no font-size, a fractional step stays a whole point, as saved',
+    () async {
+      h.settings.ints[SettingKeys.terminalFontSize] = 13;
+      await start();
+      notifier().decrease(0.5);
+      expect(size(), 13); // 12.5 rounds back to 13: nothing changes
+      notifier().decrease(0.6);
+      expect(size(), 12);
+      expect(h.settings.ints[SettingKeys.terminalFontSize], 12);
+    },
+  );
+
   test('another edit keeps ⌘+; a new font-size replaces it', () async {
     fs.write(testConfigPaths().shellx, 'font-size = 15\n');
     await start();
