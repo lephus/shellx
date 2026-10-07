@@ -2,15 +2,27 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:shellx_desktop/src/config/config_files.dart';
+import 'package:shellx_desktop/src/config/config_writer.dart';
 
 /// A9: an in-memory [ConfigFs]; every write bumps a fake modification time.
-final class MemoryConfigFs implements ConfigFs {
+final class MemoryConfigFs implements ConfigFs, ConfigFileStore {
   final Map<String, Uint8List> files = {};
   final Map<String, int> _modified = {};
   final Set<String> unreadable = {};
   int _clock = 0;
   int reads = 0;
+
+  /// Every [replace] that was made, in order (path only).
+  final List<String> replaced = [];
+
+  /// Runs inside [replace] after the writer read the file and before the
+  /// check: a test changes the file there, like another process would.
+  void Function(String path)? beforeReplace;
+
+  /// When set, [replace] throws it (a disk that refuses the write).
+  Object? replaceError;
 
   /// When set, [read] throws it (a bug in the platform layer, D10).
   Object? readError;
@@ -65,5 +77,24 @@ final class MemoryConfigFs implements ConfigFs {
             size: bytes.length,
             modifiedMs: _modified[path]!,
           );
+  }
+
+  @override
+  Future<void> replace(
+    String path,
+    Uint8List bytes, {
+    Uint8List? expected,
+    bool mustNotExist = false,
+  }) async {
+    beforeReplace?.call(path);
+    final error = replaceError;
+    if (error != null) throw error;
+    final now = files[path];
+    final unchanged = mustNotExist
+        ? now == null
+        : expected == null || (now != null && listEquals(now, expected));
+    if (!unchanged) throw const ConfigWriteRefused(ConfigWriteRefusal.changed);
+    replaced.add(path);
+    writeBytes(path, bytes);
   }
 }

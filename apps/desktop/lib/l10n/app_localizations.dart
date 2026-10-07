@@ -2345,6 +2345,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ignore key'**
   String get actionIgnore;
+
+  /// UI-A9 §4
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get shortcutsTitle;
+
+  /// UI-A9 §4
+  ///
+  /// In en, this message translates to:
+  /// **'Search shortcuts'**
+  String get shortcutsSearchLabel;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'{group, select, tabs{Tabs} panes{Panes} notifications{Notifications} editing{Editing} font{Text size} browser{Browser} window{Window} config{Configuration} other{Your commands}}'**
+  String shortcutsGroup(String group);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Add shortcut'**
+  String get shortcutsAdd;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Add a shortcut for “{action}”'**
+  String shortcutsAddFor(String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get shortcutsReset;
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Reset “{action}”'**
+  String shortcutsResetFor(String action);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {shortcut}'**
+  String shortcutsRemove(String shortcut);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get shortcutsNone;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Press a key combination… (Esc to cancel)'**
+  String get shortcutsRecording;
+
+  /// UI-A9 §4.1: the modifiers held so far while recording
+  ///
+  /// In en, this message translates to:
+  /// **'{keys}…'**
+  String shortcutsHeld(String keys);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} is used by “{action}”.'**
+  String shortcutsConflict(String shortcut, String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get shortcutsReplace;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get shortcutsCancel;
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Set in the configuration file, line {line}'**
+  String shortcutsFromFile(int line);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} now runs “{action}”'**
+  String shortcutsAssigned(String shortcut, String action);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'Removed {shortcut}'**
+  String shortcutsRemoved(String shortcut);
+
+  /// UI-A9 §8
+  ///
+  /// In en, this message translates to:
+  /// **'“{action}” reset'**
+  String shortcutsResetDone(String action);
+
+  /// UI-A9 §4.1
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts written in the file are kept.'**
+  String get shortcutsFooter;
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the shortcut to {path}'**
+  String configWriteFailed(String path);
 }
 
 class _AppLocalizationsDelegate

@@ -100,11 +100,8 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
             ? closeConfigOverlay()
             : openOverlay(A9Overlay.palette),
       ),
-      // Registered disabled: Task 12 turns it on. A disabled action lets
-      // the key through, so a chord bound to it does nothing yet.
       ShowShortcutsIntent: run<ShowShortcutsIntent>(
-        (_) {},
-        enabled: (_) => false,
+        (_) => openOverlay(A9Overlay.shortcuts),
       ),
       // Always enabled: the palette lists it only when there are problems
       // (D33), a bound key may ask any time.

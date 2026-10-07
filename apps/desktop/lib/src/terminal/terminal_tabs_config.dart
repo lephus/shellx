@@ -11,6 +11,12 @@ final class ConfigOpenFailedNotice extends TabNotice {
   final String path;
 }
 
+/// A9 D32: a shortcut could not be saved (error): the file is as it was.
+final class ConfigWriteFailedNotice extends TabNotice {
+  const ConfigWriteFailedNotice(this.path);
+  final String path;
+}
+
 /// A9 D36: errors → error toast; warnings only → neutral.
 final class ConfigProblemsNotice extends TabNotice {
   const ConfigProblemsNotice(this.count, {required this.hasErrors});

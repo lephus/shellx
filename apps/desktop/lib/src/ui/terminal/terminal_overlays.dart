@@ -641,6 +641,7 @@ class _NoticeToastState extends State<NoticeToast> {
     NoUnreadNotice() => l10n.noUnreadNotifications,
     NoTerminalForCommandNotice() => l10n.userCommandNoTerminal,
     ConfigOpenFailedNotice(:final path) => l10n.configOpenFailed(path),
+    ConfigWriteFailedNotice(:final path) => l10n.configWriteFailed(path),
     ConfigProblemsNotice(:final count) => l10n.configProblemsToast(count),
     ConfigReloadedNotice() => l10n.configReloaded,
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,

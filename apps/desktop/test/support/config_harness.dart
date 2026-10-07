@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_paths.dart';
+import 'package:shellx_desktop/src/config/config_writer.dart';
 
 import 'memory_config_fs.dart';
 
@@ -18,6 +19,7 @@ List<Override> configOverrides(
   TargetPlatform platform = TargetPlatform.macOS,
 }) => [
   configFsProvider.overrideWithValue(fs),
+  configFileStoreProvider.overrideWithValue(fs),
   configPathsProvider.overrideWithValue(testConfigPaths()),
   configPlatformProvider.overrideWithValue(platform),
 ];

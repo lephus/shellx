@@ -1593,4 +1593,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionIgnore => 'Ignore key';
+
+  @override
+  String get shortcutsTitle => 'Keyboard shortcuts';
+
+  @override
+  String get shortcutsSearchLabel => 'Search shortcuts';
+
+  @override
+  String shortcutsGroup(String group) {
+    String _temp0 = intl.Intl.selectLogic(group, {
+      'tabs': 'Tabs',
+      'panes': 'Panes',
+      'notifications': 'Notifications',
+      'editing': 'Editing',
+      'font': 'Text size',
+      'browser': 'Browser',
+      'window': 'Window',
+      'config': 'Configuration',
+      'other': 'Your commands',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get shortcutsAdd => 'Add shortcut';
+
+  @override
+  String shortcutsAddFor(String action) {
+    return 'Add a shortcut for “$action”';
+  }
+
+  @override
+  String get shortcutsReset => 'Reset';
+
+  @override
+  String shortcutsResetFor(String action) {
+    return 'Reset “$action”';
+  }
+
+  @override
+  String shortcutsRemove(String shortcut) {
+    return 'Remove $shortcut';
+  }
+
+  @override
+  String get shortcutsNone => 'Not set';
+
+  @override
+  String get shortcutsRecording => 'Press a key combination… (Esc to cancel)';
+
+  @override
+  String shortcutsHeld(String keys) {
+    return '$keys…';
+  }
+
+  @override
+  String shortcutsConflict(String shortcut, String action) {
+    return '$shortcut is used by “$action”.';
+  }
+
+  @override
+  String get shortcutsReplace => 'Replace';
+
+  @override
+  String get shortcutsCancel => 'Cancel';
+
+  @override
+  String shortcutsFromFile(int line) {
+    return 'Set in the configuration file, line $line';
+  }
+
+  @override
+  String shortcutsAssigned(String shortcut, String action) {
+    return '$shortcut now runs “$action”';
+  }
+
+  @override
+  String shortcutsRemoved(String shortcut) {
+    return 'Removed $shortcut';
+  }
+
+  @override
+  String shortcutsResetDone(String action) {
+    return '“$action” reset';
+  }
+
+  @override
+  String get shortcutsFooter => 'Shortcuts written in the file are kept.';
+
+  @override
+  String configWriteFailed(String path) {
+    return 'Couldn\'t save the shortcut to $path';
+  }
 }

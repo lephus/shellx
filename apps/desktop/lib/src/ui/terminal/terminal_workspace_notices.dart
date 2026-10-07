@@ -12,6 +12,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
+import '../config/shortcuts_sheet.dart';
 import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'key_sequence.dart';
@@ -52,10 +53,6 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
 
   A9Overlay? overlay;
   FocusNode? _beforeOverlay;
-
-  // The overlays that exist so far (the shortcut editor arrives with its
-  // own task).
-  static const _built = {A9Overlay.problems, A9Overlay.palette};
 
   /// D33: the entries are fixed when the palette opens, before the focus
   /// moves into it (whether copy applies depends on where the keyboard
@@ -123,7 +120,6 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   }
 
   void openOverlay(A9Overlay next) {
-    if (!_built.contains(next)) return;
     // Before closing whatever is open, which clears it.
     final before = _beforeOverlay ?? FocusManager.instance.primaryFocus;
     if (next == A9Overlay.palette) _paletteEntries = _buildPaletteEntries();
@@ -173,6 +169,32 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
               onClose: closeOverlay,
             ),
           ),
+        ),
+      );
+    }
+    if (overlay == A9Overlay.shortcuts) {
+      // The sheet blocks the window (UI-A9 §4.2): a scrim behind it, and
+      // the workspace shortcuts are off meanwhile (the page empties them).
+      return Positioned.fill(
+        key: const ValueKey('a9.shortcuts'),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: ModalBarrier(
+                color: ShellxDesktopColors.scrim,
+                dismissible: false,
+              ),
+            ),
+            Center(
+              child: ShortcutsSheet(
+                onClose: closeOverlay,
+                onOpenFile: () {
+                  closeOverlay();
+                  unawaited(openShellxConfig(ref.read));
+                },
+              ),
+            ),
+          ],
         ),
       );
     }

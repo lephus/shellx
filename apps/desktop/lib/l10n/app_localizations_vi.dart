@@ -1544,4 +1544,97 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get actionIgnore => 'Bỏ qua phím';
+
+  @override
+  String get shortcutsTitle => 'Phím tắt';
+
+  @override
+  String get shortcutsSearchLabel => 'Tìm phím tắt';
+
+  @override
+  String shortcutsGroup(String group) {
+    String _temp0 = intl.Intl.selectLogic(group, {
+      'tabs': 'Tab',
+      'panes': 'Pane',
+      'notifications': 'Thông báo',
+      'editing': 'Chỉnh sửa',
+      'font': 'Cỡ chữ',
+      'browser': 'Trình duyệt',
+      'window': 'Cửa sổ',
+      'config': 'Cấu hình',
+      'other': 'Lệnh của bạn',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get shortcutsAdd => 'Thêm phím';
+
+  @override
+  String shortcutsAddFor(String action) {
+    return 'Thêm phím cho “$action”';
+  }
+
+  @override
+  String get shortcutsReset => 'Đặt lại';
+
+  @override
+  String shortcutsResetFor(String action) {
+    return 'Đặt lại “$action”';
+  }
+
+  @override
+  String shortcutsRemove(String shortcut) {
+    return 'Bỏ $shortcut';
+  }
+
+  @override
+  String get shortcutsNone => 'Chưa gán';
+
+  @override
+  String get shortcutsRecording => 'Bấm tổ hợp phím… (Esc để huỷ)';
+
+  @override
+  String shortcutsHeld(String keys) {
+    return '$keys…';
+  }
+
+  @override
+  String shortcutsConflict(String shortcut, String action) {
+    return '$shortcut đang dùng cho “$action”.';
+  }
+
+  @override
+  String get shortcutsReplace => 'Thay thế';
+
+  @override
+  String get shortcutsCancel => 'Huỷ';
+
+  @override
+  String shortcutsFromFile(int line) {
+    return 'Đặt trong file cấu hình, dòng $line';
+  }
+
+  @override
+  String shortcutsAssigned(String shortcut, String action) {
+    return 'Đã gán $shortcut cho “$action”';
+  }
+
+  @override
+  String shortcutsRemoved(String shortcut) {
+    return 'Đã bỏ $shortcut';
+  }
+
+  @override
+  String shortcutsResetDone(String action) {
+    return 'Đã đặt lại “$action”';
+  }
+
+  @override
+  String get shortcutsFooter => 'Phím viết tay trong file vẫn được giữ.';
+
+  @override
+  String configWriteFailed(String path) {
+    return 'Không lưu được phím tắt vào $path';
+  }
 }
