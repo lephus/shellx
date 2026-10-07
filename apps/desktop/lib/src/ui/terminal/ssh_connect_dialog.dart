@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,6 +51,10 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
   final _listFocus = FocusNode(debugLabel: 'tmux list');
   SshSuggestions _suggestions = const SshSuggestions(config: [], recent: []);
   int? _cursor;
+  int? _sourceCursor;
+  bool _sourceSuggest = false;
+  int? _lastTapRow;
+  DateTime _lastTapAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _noHook = false;
   String? _hostError;
   String? _dirError;
@@ -100,12 +105,13 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
   void _sourceChanged() {
     if (_source.text == _sourceText) return;
     _sourceText = _source.text;
-    if (_tmux == null && _sourceError == null) return;
     setState(() {
-      _tmuxGeneration++;
+      _tmuxGeneration++; // a listing in flight is for another source now
       _tmux = null;
       _tmuxSlow = false;
       _sourceError = null;
+      _sourceCursor = null;
+      _sourceSuggest = true;
     });
   }
 
@@ -124,15 +130,21 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     super.dispose();
   }
 
-  /// D42: substring, case-insensitive; config group first.
-  List<(String, bool)> _filtered() {
-    final q = _host.text.trim().toLowerCase();
+  /// D42: substring, case-insensitive; config group first. The tmux source
+  /// pins "This computer" above them (not on Windows).
+  List<(String, _Group)> _filtered(
+    TextEditingController field, {
+    bool pinLocal = false,
+  }) {
+    final q = field.text.trim().toLowerCase();
     bool keep(String s) => q.isEmpty || s.toLowerCase().contains(q);
+    final local = AppLocalizations.of(context).tmuxSourceLocal;
     return [
+      if (pinLocal && !_noLocalTmux && keep(local)) (local, _Group.local),
       for (final s in _suggestions.config)
-        if (keep(s)) (s, true),
+        if (keep(s)) (s, _Group.config),
       for (final s in _suggestions.recent)
-        if (keep(s)) (s, false),
+        if (keep(s)) (s, _Group.recent),
     ];
   }
 
@@ -140,7 +152,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
 
   Future<void> _connect() async {
     final l10n = AppLocalizations.of(context);
-    final rows = _filtered();
+    final rows = _filtered(_host);
     final text = _cursor != null && _cursor! < rows.length
         ? rows[_cursor!].$1
         : _host.text;
@@ -180,6 +192,65 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     return (host, host != null);
   }
 
+  void _pickSource(String text) {
+    _source.text = text;
+    setState(() => _sourceCursor = null);
+    unawaited(_listTmux());
+  }
+
+  /// ↓ opens the source's suggestions, ↑/↓ move, Enter picks (UI-A8 §4.2).
+  KeyEventResult _sourceKeys(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final rows = _filtered(_source, pinLocal: true);
+    if (rows.isEmpty) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _sourceCursor = !_sourceSuggest || _sourceCursor == null
+            ? 0
+            : (_sourceCursor! + 1).clamp(0, rows.length - 1);
+        _sourceSuggest = true;
+      });
+      return KeyEventResult.handled;
+    }
+    if (_sourceSuggest && key == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _sourceCursor = _sourceCursor == null
+            ? null
+            : (_sourceCursor! - 1).clamp(0, rows.length - 1);
+      });
+      return KeyEventResult.handled;
+    }
+    final at = _sourceCursor;
+    if (_sourceSuggest &&
+        at != null &&
+        at < rows.length &&
+        (key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter)) {
+      _pickSource(rows[at].$1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// A first click selects at once; a second on the same row within the
+  /// double-click time attaches it.
+  void _tapRow(int i, List<TmuxSessionInfo> sessions) {
+    _listFocus.requestFocus();
+    final now = DateTime.now();
+    final second =
+        _lastTapRow == i && now.difference(_lastTapAt) <= kDoubleTapTimeout;
+    _lastTapRow = i;
+    _lastTapAt = now;
+    if (second) {
+      unawaited(_attach(sessions[i].name));
+    } else {
+      setState(() => _tmuxCursor = i);
+    }
+  }
+
   Future<void> _listTmux() async {
     final (host, valid) = _tmuxSource;
     if (!valid) {
@@ -190,6 +261,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
       return;
     }
     final generation = ++_tmuxGeneration;
+    _sourceSuggest = false;
     if (host == null && _noLocalTmux) {
       setState(() {
         _sourceError = null;
@@ -249,7 +321,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
-    final rows = _filtered();
+    final rows = _filtered(_host);
     if (rows.isEmpty) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -337,7 +409,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
   }
 
   List<Widget> _sshBody(AppLocalizations l10n) {
-    final rows = _filtered();
+    final rows = _filtered(_host);
     return [
       Text(l10n.sshHostLabel, style: ShellxText.label),
       const SizedBox(height: ShellxSizes.labelGap),
@@ -404,6 +476,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     final sessions = result is TmuxSessions
         ? result.sessions
         : const <TmuxSessionInfo>[];
+    final sourceRows = _filtered(_source, pinLocal: true);
     final (host, _) = _tmuxSource;
     final where = cleanServerText(host?.key ?? l10n.tmuxSourceLocal);
     final cursor = _tmuxCursor.clamp(
@@ -413,16 +486,41 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
     return [
       Text(l10n.tmuxSourceLabel, style: ShellxText.label),
       const SizedBox(height: ShellxSizes.labelGap),
-      TextField(
-        key: const Key('tmux.source'),
-        controller: _source,
-        autofocus: widget.initialTab == SshDialogTab.tmux,
-        decoration: InputDecoration(
-          hintText: l10n.tmuxSourceLocal,
-          errorText: _sourceError,
+      Focus(
+        onKeyEvent: _sourceKeys,
+        canRequestFocus: false,
+        skipTraversal: true,
+        child: Semantics(
+          hint: l10n.sshSuggestionsCount(sourceRows.length),
+          child: TextField(
+            key: const Key('tmux.source'),
+            controller: _source,
+            autofocus: widget.initialTab == SshDialogTab.tmux,
+            decoration: InputDecoration(
+              hintText: l10n.tmuxSourceLocal,
+              errorText: _sourceError,
+            ),
+            onTap: () => setState(() => _sourceSuggest = true),
+            onSubmitted: (_) {
+              final rows = _filtered(_source, pinLocal: true);
+              final at = _sourceCursor;
+              if (_sourceSuggest && at != null && at < rows.length) {
+                _pickSource(rows[at].$1);
+              } else {
+                unawaited(_listTmux());
+              }
+            },
+          ),
         ),
-        onSubmitted: (_) => unawaited(_listTmux()),
       ),
+      if (_sourceSuggest && sourceRows.isNotEmpty)
+        _SuggestionList(
+          rows: sourceRows,
+          cursor: _sourceCursor,
+          query: _source.text,
+          keyPrefix: 'tmux.suggest',
+          onPick: _pickSource,
+        ),
       const SizedBox(height: ShellxSpace.s8),
       // One announcement per change: the list's state as it settles.
       Semantics(
@@ -463,11 +561,7 @@ class _SshConnectDialogState extends ConsumerState<SshConnectDialog> {
                       key: Key('tmux.row.${s.name}'),
                       info: s,
                       selected: i == cursor,
-                      onTap: () {
-                        _listFocus.requestFocus();
-                        setState(() => _tmuxCursor = i);
-                      },
-                      onDoubleTap: () => unawaited(_attach(s.name)),
+                      onTapDown: () => _tapRow(i, sessions),
                     ),
                 ],
               ),

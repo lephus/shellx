@@ -310,4 +310,96 @@ void main() {
       handle.dispose();
     },
   );
+
+  testWidgets('tmux: a listing for A never lands once the source is B', (
+    tester,
+  ) async {
+    final first = Completer<CommandResult>();
+    var calls = 0;
+    tmuxAnswer = (_) => calls++ == 0
+        ? first.future
+        : tmux('SXTMUX\tremote\t1\t0\t1759831200\n');
+    await pump(tester, tab: SshDialogTab.tmux); // lists this computer: pending
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'devbox');
+    await tester.pump();
+    first.complete(tmux('SXTMUX\tmain\t3\t0\t1759831200\n'));
+    await settle(tester);
+    expect(find.text('main'), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('tmux.attach')))
+          .onPressed,
+      isNull,
+    );
+    // Editing a settled list empties it too.
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'devbox');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(find.text('remote'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'devbo');
+    await tester.pump();
+    expect(find.text('remote'), findsNothing);
+  });
+
+  testWidgets('tmux source: "This computer" first, then known servers; '
+      'filter, ↓ Enter lists that server', (tester) async {
+    await pump(tester, tab: SshDialogTab.tmux);
+    await tester.tap(find.byKey(const Key('tmux.source')));
+    await tester.pump();
+    Text row(int i) => tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(Key('tmux.suggest.$i')),
+        matching: find.byType(Text),
+      ),
+    );
+    expect(row(0).textSpan!.toPlainText(), 'This computer');
+    expect(row(1).textSpan!.toPlainText(), 'devbox');
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'dev');
+    await tester.pump();
+    expect(find.byKey(const Key('tmux.suggest.2')), findsNothing);
+    ran.clear();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown); // dev-db
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(ran.single.join(' '), contains('dev-db'));
+    expect(find.text('main'), findsOneWidget);
+  });
+
+  testWidgets('tmux source: picking "This computer" lists it; free typing '
+      'still validated', (tester) async {
+    await pump(tester, tab: SshDialogTab.tmux);
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'x y');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(find.text('Not a valid server name'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('tmux.source')), 'This');
+    await tester.pump();
+    ran.clear();
+    await tester.tap(find.byKey(const Key('tmux.suggest.0')));
+    await settle(tester);
+    expect(ran, hasLength(1));
+    expect(find.text('main'), findsOneWidget);
+  });
+
+  testWidgets('tmux rows select at once; a second click attaches', (
+    tester,
+  ) async {
+    await pump(tester, tab: SshDialogTab.tmux);
+    await tester.tap(find.byKey(const Key('tmux.row.build')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tmux.attach')));
+    await settle(tester);
+    expect(local.openLaunches.single, const TmuxLaunch('build'));
+  });
+
+  testWidgets('double-click on a tmux row attaches it', (tester) async {
+    await pump(tester, tab: SshDialogTab.tmux);
+    await tester.tap(find.byKey(const Key('tmux.row.build')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('tmux.row.build')));
+    await settle(tester);
+    expect(local.openLaunches.single, const TmuxLaunch('build'));
+  });
 }

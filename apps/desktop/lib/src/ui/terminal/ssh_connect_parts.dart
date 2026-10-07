@@ -77,15 +77,20 @@ class _SwitchIntent extends Intent {
   final SshDialogTab tab;
 }
 
-/// UI-A8 §4.1: grouped suggestions, the cursor row highlighted.
+enum _Group { local, config, recent }
+
+/// UI-A8 §4.1: grouped suggestions, the cursor row highlighted. The local
+/// row ("This computer", tmux source only) has no group label.
 class _SuggestionList extends StatelessWidget {
   const _SuggestionList({
     required this.rows,
     required this.cursor,
     required this.query,
     required this.onPick,
+    this.keyPrefix = 'ssh.suggest',
   });
-  final List<(String, bool)> rows; // (text, fromConfig)
+  final List<(String, _Group)> rows;
+  final String keyPrefix;
   final int? cursor;
   final String query;
   final void Function(String) onPick;
@@ -94,29 +99,33 @@ class _SuggestionList extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final children = <Widget>[];
-    bool? group;
-    for (final (i, (text, config)) in rows.indexed) {
-      if (group != config) {
-        group = config;
-        children.add(
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              ShellxSpace.s8,
-              ShellxSpace.s6,
-              ShellxSpace.s8,
-              ShellxSpace.s2,
-            ),
-            child: ExcludeSemantics(
-              child: Text(
-                (config ? l10n.sshSuggestionsConfig : l10n.sshSuggestionsRecent)
-                    .toUpperCase(),
-                style: ShellxText.caption.copyWith(
-                  color: ShellxDesktopColors.textSecondary,
+    _Group? group;
+    for (final (i, (text, kind)) in rows.indexed) {
+      if (group != kind) {
+        group = kind;
+        if (kind != _Group.local) {
+          children.add(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ShellxSpace.s8,
+                ShellxSpace.s6,
+                ShellxSpace.s8,
+                ShellxSpace.s2,
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  (kind == _Group.config
+                          ? l10n.sshSuggestionsConfig
+                          : l10n.sshSuggestionsRecent)
+                      .toUpperCase(),
+                  style: ShellxText.caption.copyWith(
+                    color: ShellxDesktopColors.textSecondary,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
+          );
+        }
       }
       final on = i == cursor;
       children.add(
@@ -124,6 +133,7 @@ class _SuggestionList extends StatelessWidget {
           selected: on,
           button: true,
           child: InkWell(
+            key: Key('$keyPrefix.$i'),
             onTap: () => onPick(text),
             child: Container(
               height: ShellxSizes.suggestionRow,
@@ -192,13 +202,14 @@ class _TmuxRow extends StatelessWidget {
     super.key,
     required this.info,
     required this.selected,
-    required this.onTap,
-    required this.onDoubleTap,
+    required this.onTapDown,
   });
   final TmuxSessionInfo info;
   final bool selected;
-  final VoidCallback onTap;
-  final VoidCallback onDoubleTap;
+
+  /// Selection is immediate (no double-tap wait); the dialog tells a second
+  /// click from a first.
+  final VoidCallback onTapDown;
 
   @override
   Widget build(BuildContext context) {
@@ -211,8 +222,8 @@ class _TmuxRow extends StatelessWidget {
       selected: selected,
       button: true,
       child: GestureDetector(
-        onTap: onTap,
-        onDoubleTap: onDoubleTap,
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => onTapDown(),
         child: Container(
           height: ShellxSizes.tmuxRow,
           padding: const EdgeInsets.symmetric(horizontal: ShellxSpace.s8),

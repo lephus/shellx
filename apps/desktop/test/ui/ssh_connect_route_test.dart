@@ -8,7 +8,9 @@ import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/app.dart';
+import 'package:shellx_desktop/src/ui/config/config_ui_request.dart';
 import 'package:shellx_desktop/src/ui/dialogs/route_dialog.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/terminal/ssh_connect_dialog.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -154,5 +156,48 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('menu.new.ssh')), findsOneWidget);
+  });
+
+  bool terminalHasFocus(WidgetTester tester) => tester
+      .state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage))
+      .terminalFocus
+      .hasFocus;
+
+  testApp('after Cancel / Esc and after Connect the terminal has the '
+      'keyboard (UI §3.6)', (tester) async {
+    await chord(tester, LogicalKeyboardKey.keyK);
+    expect(terminalHasFocus(tester), isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(terminalHasFocus(tester), isTrue);
+    await chord(tester, LogicalKeyboardKey.keyK);
+    await tester.enterText(find.byKey(const Key('ssh.host')), 'devbox');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.byType(SshConnectDialog), findsNothing);
+    expect(terminalHasFocus(tester), isTrue);
+  });
+
+  testApp('the shortcut sheet and the palette list both actions', (
+    tester,
+  ) async {
+    container
+        .read(configUiRequestProvider.notifier)
+        .request(ConfigUiRequest.shortcuts);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('shortcuts.row.ssh_connect')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('shortcuts.row.tmux_attach')),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    await chord(tester, LogicalKeyboardKey.keyP);
+    await tester.enterText(find.byType(TextField), 'ssh');
+    await tester.pumpAndSettle();
+    expect(find.text('Connect over SSH'), findsOneWidget);
   });
 }
