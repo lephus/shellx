@@ -157,8 +157,10 @@ pub fn print_path(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn text<'a>(v: &'a Value, key: &str) -> &'a str {
-    v.get(key).and_then(Value::as_str).unwrap_or("")
+/// A field for human output: never carries terminal control characters
+/// (A7: config values and command text are user or agent written).
+fn text(v: &Value, key: &str) -> String {
+    crate::api::output::plain(v.get(key).and_then(Value::as_str).unwrap_or(""))
 }
 
 /// The stdout text and exit code of `config check|reload|show` for a
@@ -198,7 +200,7 @@ pub fn render(path: &str, json: bool, result: &Value) -> (String, i32) {
         let place = if line > 0 {
             format!("{}:{line}", text(p, "file"))
         } else {
-            text(p, "file").to_string()
+            text(p, "file")
         };
         out.push_str(&format!(
             "{place}: {}: {}\n",
@@ -460,5 +462,34 @@ mod tests {
         );
         let t = Value::map(vec![("template", Value::text("# hi\n"))]);
         assert_eq!(render("config show", false, &t), ("# hi\n".to_string(), 0));
+    }
+
+    #[test]
+    fn human_output_never_carries_control_characters() {
+        let evil = "a\u{1b}]52;c;aGk=\u{7}b\u{9b}31mc\u{1b}[2J";
+        let show = Value::map(vec![(
+            "values",
+            Value::Array(vec![Value::map(vec![
+                ("key", Value::text("command")),
+                ("value", Value::text(evil)),
+                ("source", Value::text(evil)),
+            ])]),
+        )]);
+        let (out, _) = render("config show", false, &show);
+        assert!(!out.chars().any(|c| c.is_control() && c != '\n'), "{out:?}");
+        let check = Value::map(vec![(
+            "problems",
+            Value::Array(vec![Value::map(vec![
+                ("file", Value::text(evil)),
+                ("line", Value::Int(1)),
+                ("severity", Value::text("error")),
+                ("message", Value::text(evil)),
+            ])]),
+        )]);
+        let (out, _) = render("config check", false, &check);
+        assert!(!out.chars().any(|c| c.is_control() && c != '\n'), "{out:?}");
+        // --json keeps the text exactly (JSON escapes it).
+        let (json, _) = render("config show", true, &show);
+        assert!(json.contains("\\u001b"));
     }
 }
