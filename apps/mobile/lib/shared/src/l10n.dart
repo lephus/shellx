@@ -2223,6 +2223,26 @@ class S {
       args: [lines],
     );
   }
+
+  /// `Open link?`
+  String get linkSheetTitle {
+    return Intl.message(
+      'Open link?',
+      name: 'linkSheetTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open`
+  String get linkSheetOpen {
+    return Intl.message('Open', name: 'linkSheetOpen', desc: '', args: []);
+  }
+
+  /// `Copy link`
+  String get linkSheetCopy {
+    return Intl.message('Copy link', name: 'linkSheetCopy', desc: '', args: []);
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

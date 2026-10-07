@@ -231,6 +231,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "lastSeenToday": m7,
     "lastSeenUnknown": MessageLookupByLibrary.simpleMessage("unknown"),
     "lastSeenYesterday": m8,
+    "linkSheetCopy": MessageLookupByLibrary.simpleMessage("Copy link"),
+    "linkSheetOpen": MessageLookupByLibrary.simpleMessage("Open"),
+    "linkSheetTitle": MessageLookupByLibrary.simpleMessage("Open link?"),
     "loadMoreFailPleaseTryAgain": MessageLookupByLibrary.simpleMessage(
       "Load more failed\nPlease try again",
     ),

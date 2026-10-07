@@ -437,5 +437,8 @@
   "viewAsTextRefresh": "Refresh",
   "viewAsTextEmpty": "Nothing to show yet",
   "viewAsTextTruncated": "Showing the last {lines} lines",
-  "@viewAsTextTruncated": {"placeholders": {"lines": {"type": "int"}}}
+  "@viewAsTextTruncated": {"placeholders": {"lines": {"type": "int"}}},
+  "linkSheetTitle": "Open link?",
+  "linkSheetOpen": "Open",
+  "linkSheetCopy": "Copy link"
 }

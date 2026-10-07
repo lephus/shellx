@@ -7,12 +7,14 @@ import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
+import 'package:shellx_mobile/features/terminal/domain/terminal_links.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_shortcuts.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
+import 'package:shellx_mobile/features/terminal/presentation/widgets/link_sheet.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/session_picker.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/view_as_text_sheet.dart';
@@ -869,6 +871,10 @@ class _TerminalPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = S.of(context);
+    // A10 D12: a tap on a web address finds its cell through the view's state. One key per tab
+    // (never one shared by every tab: a key that moves to another tab's view carries the old
+    // view's state with it).
+    final viewKey = GlobalObjectKey<TerminalViewState>(tab);
     return Watch((context) {
       if (closing.value) return const SizedBox.expand();
       final banner = tab.banner.value;
@@ -878,7 +884,13 @@ class _TerminalPane extends StatelessWidget {
             // Terminal sharing §9.2: a tap on the terminal takes the size back from the computer;
             // scrolling, long-press selection and pinch do not.
             child: _TapListener(
-              onTap: tab.claimSize,
+              onTap: (position) {
+                tab.claimSize();
+                // A10 D12: a tap on a web address offers it.
+                final cell = viewKey.currentState?.renderTerminal.getCellOffset(position);
+                final url = cell == null ? null : urlAt(tab.terminal.peek(), cell);
+                if (url != null) unawaited(showLinkSheet(context, url));
+              },
               child: PinchToZoom(
                 fontSize: fontSize,
                 onFontSize: onFontSize,
@@ -909,6 +921,7 @@ class _TerminalPane extends StatelessWidget {
                     removeBottom: true,
                     child: TerminalView(
                       tab.terminal.value,
+                      key: viewKey,
                       controller: tab.selection,
                       focusNode: focusNode,
                       theme: TerminalColors.theme,
@@ -1062,7 +1075,8 @@ class _EndedCard extends StatelessWidget {
 class _TapListener extends StatefulWidget {
   const _TapListener({required this.onTap, required this.child});
 
-  final VoidCallback onTap;
+  /// Called with the tap's position, local to this widget.
+  final ValueChanged<Offset> onTap;
   final Widget child;
 
   @override
@@ -1110,7 +1124,7 @@ class _TapListenerState extends State<_TapListener> {
     if (candidate == null || candidate.pointer != event.pointer) return;
     _candidate = null;
     _longPress?.cancel();
-    if ((event.position - candidate.position).distance < kTouchSlop) widget.onTap();
+    if ((event.position - candidate.position).distance < kTouchSlop) widget.onTap(event.localPosition);
   }
 
   void _onCancel(PointerCancelEvent event) {

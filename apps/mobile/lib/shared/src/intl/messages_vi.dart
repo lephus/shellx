@@ -225,6 +225,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "lastSeenToday": m7,
     "lastSeenUnknown": MessageLookupByLibrary.simpleMessage("không rõ"),
     "lastSeenYesterday": m8,
+    "linkSheetCopy": MessageLookupByLibrary.simpleMessage("Sao chép liên kết"),
+    "linkSheetOpen": MessageLookupByLibrary.simpleMessage("Mở"),
+    "linkSheetTitle": MessageLookupByLibrary.simpleMessage("Mở liên kết?"),
     "loadMoreFailPleaseTryAgain": MessageLookupByLibrary.simpleMessage(
       "Tải thêm thất bại\nHãy thử lại",
     ),
