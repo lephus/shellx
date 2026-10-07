@@ -1445,6 +1445,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get actionNewWorkspace => 'Workspace mới';
 
   @override
+  String get actionSshConnect => 'Kết nối SSH';
+
+  @override
+  String get actionTmuxAttach => 'Gắn phiên tmux';
+
+  @override
   String get actionToggleNotifications => 'Bảng thông báo';
 
   @override

@@ -160,3 +160,14 @@ class SendTextIntent extends Intent {
 class IgnoreKeyIntent extends Intent {
   const IgnoreKeyIntent();
 }
+
+/// A8 D41 `ssh_connect` (⌘⇧K / Ctrl+Shift+K): "Connect to a server", SSH
+/// tab.
+class OpenSshConnectIntent extends Intent {
+  const OpenSshConnectIntent();
+}
+
+/// A8 D41 `tmux_attach` (no default chord): the same dialog, tmux tab.
+class OpenTmuxAttachIntent extends Intent {
+  const OpenTmuxAttachIntent();
+}

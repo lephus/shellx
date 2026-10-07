@@ -28,6 +28,10 @@ String? selectAllShortcutLabel() =>
     actionShortcutLabel(const KeyAction('select_all'));
 String? newWorkspaceShortcutLabel() =>
     actionShortcutLabel(const KeyAction('new_workspace'));
+String? sshConnectShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('ssh_connect'));
+String? tmuxAttachShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('tmux_attach'));
 String? notificationsShortcutLabel() =>
     actionShortcutLabel(const KeyAction('toggle_notifications'));
 String? nextUnreadShortcutLabel() =>

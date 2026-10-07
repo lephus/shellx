@@ -25,6 +25,15 @@ final class ChangePasswordRoute extends WindowRoute {
   const ChangePasswordRoute();
 }
 
+/// The tabs of "Connect to a server" (A8 D42).
+enum SshDialogTab { ssh, tmux }
+
+/// A8 D41, D42: the "Connect to a server" dialog, on [tab].
+final class SshConnectRoute extends WindowRoute {
+  const SshConnectRoute([this.tab = SshDialogTab.ssh]);
+  final SshDialogTab tab;
+}
+
 /// A yes/no question shown as a dialog on top of whatever route is open.
 final class ConfirmRequest {
   ConfirmRequest({

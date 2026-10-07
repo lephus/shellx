@@ -2184,6 +2184,18 @@ abstract class AppLocalizations {
   /// **'New workspace'**
   String get actionNewWorkspace;
 
+  /// UI-A9 §7.3; A8 D41
+  ///
+  /// In en, this message translates to:
+  /// **'Connect over SSH'**
+  String get actionSshConnect;
+
+  /// UI-A9 §7.3; A8 D41
+  ///
+  /// In en, this message translates to:
+  /// **'Attach tmux session'**
+  String get actionTmuxAttach;
+
   /// UI-A9 §7.3
   ///
   /// In en, this message translates to:

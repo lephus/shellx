@@ -346,6 +346,8 @@
   "actionCloseSurface": "Đóng pane hoặc tab",
   "actionCloseTab": "Đóng cả tab",
   "actionNewWorkspace": "Workspace mới",
+  "actionSshConnect": "Kết nối SSH",
+  "actionTmuxAttach": "Gắn phiên tmux",
   "actionToggleNotifications": "Bảng thông báo",
   "actionJumpToUnread": "Tới thông báo chưa đọc",
   "actionCopy": "Sao chép",

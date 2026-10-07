@@ -688,4 +688,35 @@ void main() {
       }
     }
   });
+
+  test('⌘⇧K / Ctrl+Shift+K open "Connect to a server", without key repeat '
+      '(A8 D41), also from the terminal; nothing else moved', () {
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
+      final mac = platform == TargetPlatform.macOS;
+      final key = SingleActivator(
+        LogicalKeyboardKey.keyK,
+        meta: mac,
+        control: !mac,
+        shift: true,
+        includeRepeats: false,
+      );
+      for (final table in [
+        desktopShortcuts(platform),
+        terminalViewShortcuts(platform),
+      ]) {
+        expect(lookup(table, key), isA<OpenSshConnectIntent>());
+        final bound = table.keys.whereType<SingleActivator>().singleWhere(
+          (k) =>
+              k.trigger == key.trigger &&
+              k.control == key.control &&
+              k.shift == key.shift &&
+              k.alt == key.alt &&
+              k.meta == key.meta,
+        );
+        expect(bound.includeRepeats, isFalse);
+        // "Attach tmux session" has no default chord.
+        expect(table.values.whereType<OpenTmuxAttachIntent>(), isEmpty);
+      }
+    }
+  });
 }

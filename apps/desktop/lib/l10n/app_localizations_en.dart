@@ -1494,6 +1494,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionNewWorkspace => 'New workspace';
 
   @override
+  String get actionSshConnect => 'Connect over SSH';
+
+  @override
+  String get actionTmuxAttach => 'Attach tmux session';
+
+  @override
   String get actionToggleNotifications => 'Notifications';
 
   @override

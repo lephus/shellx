@@ -32,6 +32,7 @@ import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
 import 'terminal_workspace_config.dart';
 import 'terminal_workspace_notices.dart';
+import 'terminal_workspace_ssh.dart';
 
 /// Spec §3.2: `Row(Sidebar 220 px, VerticalDivider, TerminalPane)`.
 class TerminalWorkspacePage extends ConsumerStatefulWidget {
@@ -397,6 +398,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         _cycleRegion(-1);
       }),
       ...configActions(),
+      ...sshWindowActions(ref, closePanel: closePanel),
     };
   }
 

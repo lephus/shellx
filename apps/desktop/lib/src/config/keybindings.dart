@@ -120,6 +120,7 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     b(primary(LogicalKeyboardKey.keyT), 'new_tab'),
     b(primary(LogicalKeyboardKey.keyW), 'close_surface'),
     b(shifted(LogicalKeyboardKey.keyN), 'new_workspace'),
+    b(shifted(LogicalKeyboardKey.keyK), 'ssh_connect'),
     b(shifted(LogicalKeyboardKey.keyI), 'toggle_notifications'),
     b(shifted(LogicalKeyboardKey.keyU), 'jump_to_unread'),
     b(primary(LogicalKeyboardKey.keyC), 'copy_to_clipboard'),
