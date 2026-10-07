@@ -1,5 +1,16 @@
 part of 'terminal_tabs.dart';
 
+/// A9 D35: a command with no live terminal to run in (neutral).
+final class NoTerminalForCommandNotice extends TabNotice {
+  const NoTerminalForCommandNotice();
+}
+
+/// A9 D37: the configuration file could not be opened (error).
+final class ConfigOpenFailedNotice extends TabNotice {
+  const ConfigOpenFailedNotice(this.path);
+  final String path;
+}
+
 // A9 D21: where a new tab's shell starts. Kept apart from the tab list.
 extension TerminalTabsConfig on TerminalTabs {
   /// Null = home. A path or `inherit`'s directory is checked by the agent

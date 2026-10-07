@@ -1752,6 +1752,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to {file}: {line}'**
   String cliPathNotOnPath(String file, String line);
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'There\'s no terminal to run this in'**
+  String get userCommandNoTerminal;
+
+  /// UI-A9 §7.1
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open {path}'**
+  String configOpenFailed(String path);
 }
 
 class _AppLocalizationsDelegate

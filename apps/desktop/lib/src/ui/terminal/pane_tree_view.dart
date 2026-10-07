@@ -13,6 +13,7 @@ import '../../cli/agent_marks.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_style.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'agent_chip.dart';
@@ -76,6 +77,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
   @override
   Widget build(BuildContext context) {
+    // The pane headers' tooltips follow a reload (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final tab = widget.tab;
     _keys.removeWhere((id, _) => !tab.panes.containsKey(id));
     if (!tab.isSplit) return _pane(tab.focusedPaneId);
@@ -310,7 +313,10 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
           ? l10n.paneZoomedIndicator(tab.paneNumber(id), tab.paneCount)
           : null,
       hiddenUnread: zoomed && widget.hiddenUnread,
-      closeTooltip: l10n.paneCloseTooltip(closePaneShortcutLabel()),
+      closeTooltip: withShortcut(
+        l10n.paneCloseTooltip,
+        closePaneShortcutLabel(),
+      ),
       agent: _agent(id),
       onClose: () => widget.onClosePane(id),
       onToggleZoom: () => _toggleZoom(id),

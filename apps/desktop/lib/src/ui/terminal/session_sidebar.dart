@@ -14,6 +14,7 @@ import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'session_tab_row.dart';
@@ -1309,12 +1310,14 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
     });
     final mac = isMacDesktop;
+    // Tooltips and menu hints follow a reload (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final shortcut = newTabShortcutLabel();
     final newTab = ShellxIconButton(
       key: const Key('sidebar.newTab'),
       icon: Icons.add,
       semanticLabel: l10n.terminalNewTab,
-      tooltip: shortcutTooltip(l10n.terminalNewTabTooltip(shortcut), shortcut),
+      tooltip: shortcutTooltip(l10n.terminalNewTabTooltip, shortcut),
       busy: state.opening,
       onPressed: () => ref.read(terminalTabsProvider.notifier).openTab(),
     );
@@ -1333,7 +1336,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                     '${l10n.attentionUnreadCount(total)}'
               : l10n.notificationsPanelTitle,
           tooltip: shortcutTooltip(
-            l10n.notificationsPanelTooltip(bellShortcut),
+            l10n.notificationsPanelTooltip,
             bellShortcut,
           ),
           selected: widget.panelOpen,

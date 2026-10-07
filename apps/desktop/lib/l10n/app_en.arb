@@ -515,5 +515,9 @@
   "cliAnnounceAgent": "An agent is controlling {tab}",
   "@cliAnnounceAgent": {"placeholders": {"tab": {"type": "String"}}},
   "cliPathNotOnPath": "Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to {file}: {line}",
-  "@cliPathNotOnPath": {"description": "A7 ruling M10: after a macOS install, /usr/local/bin is missing from the login shell's PATH", "placeholders": {"file": {"type": "String"}, "line": {"type": "String"}}}
+  "@cliPathNotOnPath": {"description": "A7 ruling M10: after a macOS install, /usr/local/bin is missing from the login shell's PATH", "placeholders": {"file": {"type": "String"}, "line": {"type": "String"}}},
+  "userCommandNoTerminal": "There's no terminal to run this in",
+  "@userCommandNoTerminal": {"description": "UI-A9 §7.1"},
+  "configOpenFailed": "Couldn't open {path}",
+  "@configOpenFailed": {"description": "UI-A9 §7.1", "placeholders": {"path": {"type": "String"}}}
 }

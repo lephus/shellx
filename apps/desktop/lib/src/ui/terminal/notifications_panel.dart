@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'shortcut_labels.dart';
@@ -227,6 +228,9 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // The footer hint follows a reload; no hint when unbound (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
+    final nextUnread = nextUnreadShortcutLabel();
     final attention = ref.watch(tabAttentionProvider);
     final tabs = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
@@ -441,7 +445,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
                   child: body,
                 ),
               ),
-              if (items.isNotEmpty)
+              if (items.isNotEmpty && nextUnread != null)
                 SizedBox(
                   height: ShellxSizes.panelFooter,
                   child: Padding(
@@ -449,9 +453,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        l10n.notificationsPanelNextHint(
-                          nextUnreadShortcutLabel(),
-                        ),
+                        l10n.notificationsPanelNextHint(nextUnread),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ShellxText.caption.copyWith(

@@ -3,8 +3,10 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'shortcut_labels.dart';
@@ -215,9 +217,15 @@ class _ShellxIconButtonState extends State<ShellxIconButton> {
 }
 
 /// UI §3.5: "label  shortcut" with the shortcut part in `caption`
-/// `textSecondary`. [full] is the translated string that contains
-/// [shortcut] (e.g. `terminalNewTabTooltip`).
-InlineSpan shortcutTooltip(String full, String shortcut) {
+/// `textSecondary`. [message] is the translated string builder that places
+/// the shortcut (e.g. `l10n.terminalNewTabTooltip`); an unbound action
+/// ([shortcut] null) shows the label alone (A9 D29).
+InlineSpan shortcutTooltip(
+  String Function(String shortcut) message,
+  String? shortcut,
+) {
+  final full = withShortcut(message, shortcut);
+  if (shortcut == null) return TextSpan(text: full);
   final at = full.lastIndexOf(shortcut);
   if (at < 0) return TextSpan(text: full);
   return TextSpan(
@@ -570,6 +578,7 @@ class _NoticeToastState extends State<NoticeToast> {
   bool get _neutral =>
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
+      widget.notice is NoTerminalForCommandNotice ||
       widget.notice is PaneNoRoomNotice ||
       widget.notice is RestorePanesFailedNotice ||
       widget.notice is CliSkillsCopiedNotice ||
@@ -618,6 +627,8 @@ class _NoticeToastState extends State<NoticeToast> {
       l10n.workspaceDeleted(name, movedTo),
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
+    NoTerminalForCommandNotice() => l10n.userCommandNoTerminal,
+    ConfigOpenFailedNotice(:final path) => l10n.configOpenFailed(path),
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     RestorePanesFailedNotice(:final count) => l10n.restorePanesFailed(count),
     CliSkillsCopiedNotice() => l10n.cliSkillsCopied,
@@ -710,7 +721,7 @@ class _NoticeToastState extends State<NoticeToast> {
 }
 
 /// UI §2.7: shown in the pane when there is no tab.
-class EmptyTerminalState extends StatelessWidget {
+class EmptyTerminalState extends ConsumerWidget {
   const EmptyTerminalState({super.key, required this.onOpen, this.buttonFocus});
   final VoidCallback onOpen;
 
@@ -718,7 +729,10 @@ class EmptyTerminalState extends StatelessWidget {
   final FocusNode? buttonFocus;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The caption follows a reload (A9 D29).
+    ref.watch(shellxConfigProvider.select((s) => s.bindings));
+    final shortcut = newTabShortcutLabel();
     final l10n = AppLocalizations.of(context);
     return Center(
       key: const Key('pane.empty'),
@@ -765,14 +779,15 @@ class EmptyTerminalState extends StatelessWidget {
                 focusNode: buttonFocus,
               ),
               const SizedBox(height: ShellxSpace.s8),
-              ExcludeSemantics(
-                child: Text(
-                  newTabShortcutLabel(),
-                  style: ShellxText.caption.copyWith(
-                    color: ShellxDesktopColors.textSecondary,
+              if (shortcut != null)
+                ExcludeSemantics(
+                  child: Text(
+                    shortcut,
+                    style: ShellxText.caption.copyWith(
+                      color: ShellxDesktopColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

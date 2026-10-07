@@ -97,9 +97,10 @@ class ConfigController extends Notifier<ConfigState> {
   }
 
   void _publish(ConfigState next) {
+    // Before the state, so a widget rebuilt by it reads the new labels.
+    labelBindings = next.bindings;
     state = next;
     _last = next;
-    labelBindings = next.bindings;
   }
 
   /// Reads every file and publishes the result. Never throws (D10); loads

@@ -1133,4 +1133,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String cliPathNotOnPath(String file, String line) {
     return 'Đã cài lệnh shellx vào /usr/local/bin nhưng shell của bạn không tìm ở đó. Hãy thêm dòng này vào $file: $line';
   }
+
+  @override
+  String get userCommandNoTerminal => 'Không có terminal để chạy lệnh này';
+
+  @override
+  String configOpenFailed(String path) {
+    return 'Không mở được $path';
+  }
 }

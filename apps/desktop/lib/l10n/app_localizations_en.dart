@@ -1176,4 +1176,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String cliPathNotOnPath(String file, String line) {
     return 'Installed the shellx command in /usr/local/bin, but your shell doesn’t look there. Add this line to $file: $line';
   }
+
+  @override
+  String get userCommandNoTerminal => 'There\'s no terminal to run this in';
+
+  @override
+  String configOpenFailed(String path) {
+    return 'Couldn\'t open $path';
+  }
 }

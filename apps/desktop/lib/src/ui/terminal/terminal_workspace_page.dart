@@ -11,8 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
 import '../../config/config_controller.dart';
-import '../../config/font_probe.dart';
-import '../../config/shellx_config.dart';
+import '../../config/keybindings.dart';
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
@@ -28,6 +27,7 @@ import 'session_sidebar.dart';
 import 'shortcut_labels.dart';
 import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
+import 'terminal_workspace_config.dart';
 
 /// Spec §3.2: `Row(Sidebar 220 px, VerticalDivider, TerminalPane)`.
 class TerminalWorkspacePage extends ConsumerStatefulWidget {
@@ -38,7 +38,9 @@ class TerminalWorkspacePage extends ConsumerStatefulWidget {
       TerminalWorkspacePageState();
 }
 
-class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
+class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
+    with WorkspaceConfig<TerminalWorkspacePage> {
+  @override
   final terminalFocus = FocusNode(debugLabel: 'terminal');
   final sidebarFocus = FocusNode(debugLabel: 'sidebar');
 
@@ -66,12 +68,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   Map<ShortcutActivator, Intent>? terminalShortcuts;
   Map<ShortcutActivator, Intent>? _workspaceShortcuts;
   TargetPlatform? _shortcutsPlatform;
+  KeyBindings? _shortcutsFor;
 
-  void _buildShortcuts(TargetPlatform platform) {
-    if (_shortcutsPlatform == platform && terminalShortcuts != null) return;
+  /// Rebuilt only when the platform or the effective bindings change
+  /// (A9 D24): a reload applies at once, a rebuild costs nothing.
+  void _buildShortcuts(TargetPlatform platform, KeyBindings bindings) {
+    if (_shortcutsPlatform == platform &&
+        identical(_shortcutsFor, bindings) &&
+        terminalShortcuts != null) {
+      return;
+    }
     _shortcutsPlatform = platform;
-    terminalShortcuts = terminalViewShortcuts(platform);
-    _workspaceShortcuts = desktopShortcuts(platform);
+    _shortcutsFor = bindings;
+    terminalShortcuts = terminalViewShortcuts(platform, bindings: bindings);
+    _workspaceShortcuts = desktopShortcuts(platform, bindings: bindings);
   }
 
   /// After the frame, so a TerminalView that just got [terminalFocus] (a
@@ -81,6 +91,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   /// A post-frame callback alone waits for a frame something else asks
   /// for (Esc in the sidebar changes nothing on screen), hence the
   /// explicit request.
+  @override
   void focusTerminal() {
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
@@ -103,7 +114,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   /// Esc, a click outside, a jump, or another window shortcut. With
   /// [restoreFocus] the keyboard goes back at once, so a shortcut that
   /// runs next (F6) starts from where the user was.
+  @override
   void closePanel({bool restoreFocus = true}) {
+    closeConfigOverlay(); // A9: any window shortcut dismisses it
     if (!panelOpen) return;
     final before = _beforePanel;
     _beforePanel = null;
@@ -135,6 +148,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     );
   }
 
+  @override
   Future<void> closeTab(TerminalTab tab) => closeTabWithConfirm(
     tabs: ref.read(terminalTabsProvider.notifier),
     router: ref.read(windowRouterProvider.notifier),
@@ -171,23 +185,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     focusTerminal();
   }
 
-  /// D20 / A1: on Windows AltGr arrives as Ctrl+Alt; with the right Alt
-  /// held, a chord stays the shell's (AltGr+digit, AltGr+Shift+D and
-  /// AltGr+arrows type characters on German or Polish layouts).
-  static bool _leftAltOnly(Intent _) =>
-      defaultTargetPlatform != TargetPlatform.windows ||
-      !HardwareKeyboard.instance.logicalKeysPressed.contains(
-        LogicalKeyboardKey.altRight,
-      );
-
-  bool _split(Intent intent) =>
-      _leftAltOnly(intent) && ref.read(terminalTabsProvider).selected != null;
+  // AltGr (Windows: Ctrl + right Alt) is handled once, for every window
+  // shortcut, by [WindowAction] (A9 D26).
+  bool _split(Intent intent) => ref.read(terminalTabsProvider).selected != null;
 
   /// The pane chords apply only to a split tab; otherwise the key reaches
   /// the shell, like ⌘C without a selection.
   bool _isSplit(Intent intent) =>
-      _leftAltOnly(intent) &&
-      (ref.read(terminalTabsProvider).selected?.isSplit ?? false);
+      ref.read(terminalTabsProvider).selected?.isSplit ?? false;
 
   /// D22: polite, once.
   void _announce(String message) => unawaited(
@@ -254,7 +259,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   }
 
   /// Built once; every action reads the providers when it runs.
-  late final _actionsMap = _actions();
+  @override
+  late final actionsMap = _actions();
 
   Map<Type, Action<Intent>> _actions() {
     final tabs = ref.read(terminalTabsProvider.notifier);
@@ -262,7 +268,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
     Action<T> run<T extends Intent>(
       void Function(T intent) body, {
       bool Function(T intent)? enabled,
-    }) => _WindowAction<T>(body, enabled);
+    }) => WindowAction<T>(body, enabled);
     return <Type, Action<Intent>>{
       // UI-A4 §5.3: the other window shortcuts still run with the panel
       // open; they close it first.
@@ -289,15 +295,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
           unawaited(closeTab(selected));
         }
       }),
-      SelectTabIntent: run<SelectTabIntent>(
-        (intent) {
-          closePanel();
-          workspaces.selectVisible(intent.position);
-          focusTerminal();
-        },
-        // AltGr+digit types `{ [ ] }` on many layouts (German, Polish…).
-        enabled: _leftAltOnly,
-      ),
+      SelectTabIntent: run<SelectTabIntent>((intent) {
+        closePanel();
+        workspaces.selectVisible(intent.position);
+        focusTerminal();
+      }),
       // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell; like the
       // other window shortcuts they close the panel first (UI-A4 §5.3).
       SplitPaneIntent: run<SplitPaneIntent>((intent) {
@@ -386,6 +388,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         closePanel();
         _cycleRegion(-1);
       }),
+      ...configActions(),
     };
   }
 
@@ -435,38 +438,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
   void initState() {
     super.initState();
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
-    // A9 D11: probe the configured families once per load (it needs the
-    // engine's fonts, so it runs here, not in the controller). Manual: a
-    // rebuild never re-runs it. The immediate call (the startup load ran
-    // before this page) writes after the frame (Riverpod 3: no provider
-    // writes while the tree builds; preflight D4).
-    ref.listenManual(
-      shellxConfigProvider.select((s) => (s.generation, s.config)),
-      (previous, next) {
-        if (previous == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _probeFonts(next.$1, next.$2);
-          });
-        } else {
-          _probeFonts(next.$1, next.$2);
-        }
-      },
-      fireImmediately: true,
-    );
-  }
-
-  /// `reportRuntimeProblems` changes neither the generation nor the
-  /// configuration, so the listener above does not fire again; it also
-  /// ignores a report for a generation that a newer load replaced.
-  void _probeFonts(int generation, ShellxConfig config) {
-    if (generation == 0) return;
-    ref
-        .read(shellxConfigProvider.notifier)
-        .reportRuntimeProblems(
-          generation,
-          kFontProblemCodes,
-          fontProblems(config, ref.read(fontProbeProvider)),
-        );
+    listenToConfig();
   }
 
   @override
@@ -516,11 +488,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
       closePanel(restoreFocus: false);
       focusTerminal();
     });
-    _buildShortcuts(defaultTargetPlatform);
+    _buildShortcuts(
+      defaultTargetPlatform,
+      ref.watch(shellxConfigProvider.select((s) => s.bindings)),
+    );
     return Shortcuts(
       shortcuts: _workspaceShortcuts!,
       child: Actions(
-        actions: _actionsMap,
+        actions: actionsMap,
         // Every focus in the window sits inside this scope, so the
         // shortcuts work from any region and even when the focused node
         // goes away (it falls back to the scope itself, never above it).
@@ -651,21 +626,4 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage> {
         },
         child: child,
       );
-}
-
-/// A window shortcut's action; [enabled] lets a key fall through to the
-/// terminal when it does not apply.
-class _WindowAction<T extends Intent> extends Action<T> {
-  _WindowAction(this._body, this._enabled);
-  final void Function(T intent) _body;
-  final bool Function(T intent)? _enabled;
-
-  @override
-  bool isEnabled(T intent) => _enabled?.call(intent) ?? true;
-
-  @override
-  Object? invoke(T intent) {
-    _body(intent);
-    return null;
-  }
 }

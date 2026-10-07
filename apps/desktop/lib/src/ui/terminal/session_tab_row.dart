@@ -466,10 +466,7 @@ class SessionTabRowState extends State<SessionTabRow> {
             // D6: ⌘W closes a pane of a split tab, so no hint there.
             tooltip: tab.isSplit
                 ? TextSpan(text: l10n.terminalCloseTabAllPanes)
-                : shortcutTooltip(
-                    l10n.terminalCloseTabTooltip(shortcut),
-                    shortcut,
-                  ),
+                : shortcutTooltip(l10n.terminalCloseTabTooltip, shortcut),
             onPressed: widget.onClose,
           ),
         ),
