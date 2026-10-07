@@ -37,6 +37,7 @@ final class DesktopServices {
     required this.deviceName,
     this.updateInterval = const Duration(hours: 24),
     this.quitApp,
+    this.deletePastedImages,
     this.stopRemoteRetries,
     this.shutdownRemote,
     this.shutdownTimeout = const Duration(seconds: 10),
@@ -99,6 +100,12 @@ final class DesktopServices {
   /// releases the single-instance lock (each bounded, so quitting cannot
   /// hang), then exits the process, which closes the window.
   final Future<void> Function()? quitApp;
+
+  /// A10 D15: deletes the pasted images. Run only where the shells really
+  /// end (an in-process quit, "Quit completely"): while the background
+  /// service keeps them, an image path may still be waiting in a prompt
+  /// (the 24 h sweep removes old ones).
+  final Future<void> Function()? deletePastedImages;
 
   /// A8 D20/D40: the first step of Quit, before the command-line host stops
   /// and before the sessions close: the reconnector and the wake detector

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -52,10 +53,12 @@ class PasteImageStore {
     Random? random,
     bool? posix,
     Future<bool> Function(String mode, List<String> paths)? chmod,
+    Future<void> Function(String path)? excludeFromBackup,
   }) : _now = now ?? DateTime.now,
        _random = random ?? Random.secure(),
        _posix = posix ?? !Platform.isWindows,
-       _chmod = chmod ?? _systemChmod;
+       _chmod = chmod ?? _systemChmod,
+       _exclude = excludeFromBackup;
 
   /// The app's private support folder (`getApplicationSupportDirectory`).
   final Directory base;
@@ -63,6 +66,7 @@ class PasteImageStore {
   final Random _random;
   final bool _posix;
   final Future<bool> Function(String mode, List<String> paths) _chmod;
+  final Future<void> Function(String path)? _exclude;
 
   Directory get directory => Directory(p.join(base.path, 'paste-images'));
 
@@ -76,11 +80,13 @@ class PasteImageStore {
     // A link in place of the folder (planted by another process) would send
     // the image elsewhere: refuse.
     _requirePlainDirectory(allowMissing: true);
+    final existed = directory.existsSync();
     await directory.create(recursive: true);
     _requirePlainDirectory(allowMissing: false);
     if (_posix && !await _chmod('700', [directory.path])) {
       throw const FileSystemException('chmod 700 failed');
     }
+    if (!existed) unawaited(_excludeFromBackup());
     await _clean();
     final at = _now();
     String two(int n) => n.toString().padLeft(2, '0');
@@ -99,6 +105,31 @@ class PasteImageStore {
     return file.path;
   }
 
+  /// Time Machine keeps no copy of the images (they live 24 h). In the
+  /// background and bounded; a failure only means a backup may hold them.
+  Future<void> _excludeFromBackup() async {
+    try {
+      await _exclude?.call(directory.path).timeout(const Duration(seconds: 5));
+    } on Object {
+      // Nothing more to do; never log the path.
+    }
+  }
+
+  /// Deletes what is too old or beyond the cap, without saving anything and
+  /// without creating the folder (A10 final review: the 24 h promise must
+  /// hold even when nothing is pasted again).
+  Future<void> sweep() async {
+    try {
+      if (FileSystemEntity.typeSync(directory.path, followLinks: false) !=
+          FileSystemEntityType.directory) {
+        return;
+      }
+      await _clean(room: 0);
+    } on Object {
+      // Best effort.
+    }
+  }
+
   void _requirePlainDirectory({required bool allowMissing}) {
     final type = FileSystemEntity.typeSync(directory.path, followLinks: false);
     if (type == FileSystemEntityType.directory) return;
@@ -108,7 +139,7 @@ class PasteImageStore {
 
   /// Deletes what is too old, then the oldest beyond the cap (room for the
   /// one about to be saved).
-  Future<void> _clean() async {
+  Future<void> _clean({int room = 1}) async {
     final files = <(File, DateTime)>[];
     try {
       await for (final entity in directory.list(followLinks: false)) {
@@ -128,7 +159,7 @@ class PasteImageStore {
       }
     }
     keep.sort((a, b) => a.$2.compareTo(b.$2));
-    while (keep.length >= kMaxPasteImageFiles) {
+    while (keep.length > kMaxPasteImageFiles - room) {
       await _delete(keep.removeAt(0).$1);
     }
   }
@@ -167,4 +198,14 @@ class PasteImageStore {
       return false;
     }
   }
+}
+
+/// A10 final review: sweeps now (app start) and then every [every] while the
+/// app runs. Cheap: one directory listing of at most 50 files.
+Timer startPasteImageSweeps(
+  PasteImageStore store, {
+  Duration every = const Duration(hours: 1),
+}) {
+  unawaited(store.sweep());
+  return Timer.periodic(every, (_) => unawaited(store.sweep()));
 }

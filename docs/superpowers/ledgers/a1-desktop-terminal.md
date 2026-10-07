@@ -159,3 +159,21 @@ Pending manual (human; checklist in HANDOFF §19, steps there are concrete):
 - macOS GUI: items 1-15 as a real run, notably: dialogs/strips on screen, tray item "Giữ shell chạy khi đóng cửa sổ" and ⌥⌘Q, "Thoát hoàn toàn" end to end, Finder/Dock/Spotlight reopen, Dock/AppleEvent quit declined while log out/restart is not blocked, `top` + phone stays online, `yes` + SIGSTOP RSS (< 4 MiB/view), login-item start, app replace with live shells, ssh pane `top` after ⌘Q, daemon notifications (D24), Vietnamese copy review, VoiceOver.
 - Windows (all pending manual - Windows): `--daemon` headless + heartbeat, `shellx-mux.exe` spawn from the runtime copy, pipe transport and ACL (owner-only DACL, first-instance flag), `CREATE_BREAKAWAY_FROM_JOB` / kill-on-close job object, `WM_CLOSE` ignored but `WM_QUERYENDSESSION` honoured in `daemon_runner.cpp`, Setup update with live sessions (D21), `taskkill /IM ShellX.exe` leaves `shellx-mux.exe`, AUMID toast for daemon notifications, uninstall removes `shellx-mux.exe`, `mux`, `restore`, Restart Manager with the service running.
 - Flip the default to ON only after macOS 1-15 pass on a real machine (and W1-W8 for a Windows release); see HANDOFF §19 for the exact files.
+
+## A10 (quality P0) — execution
+
+Plan: docs/superpowers/plans/2026-10-07-quality-p0-a10.md. Branch feat/desktop-a10; tasks merged to main one by one after review.
+
+Test counts: baseline before Task 1 - core 304 (Task 1 report), desktop not recorded (about 2022 at the A5b Task 8 merge), mobile 683. Final - core 308, desktop 2258 (+9 skipped) at the T10-12 merge, mobile 730 at the T13-16 merge.
+
+Findings of the plan header: (1) the PTY write queue dropped input past 1 MiB (a 1 MiB paste lost bytes) - fixed by the paste sender (Task 3: pieces of 32 KiB every 8 ms, confirm above 1 MiB, refuse above 16 MiB, CLI send/--cmd/user commands routed through it); (2) xterm 4.0.0 `TerminalView.onTapUp` is dead, so link clicks use a `Listener` in both apps; (3) a shared `GlobalKey` for the mobile terminal view gave 86 failures - now `GlobalObjectKey(tab)`. F3 fix (Task 10): the window coming back puts the keyboard in the terminal (windowFocusProvider listener, skipped when a panel/overlay/dialog is open). `textInput('')` fix (Task 13): an empty keyboard reset no longer sends a duplicate word or consumes a sticky modifier.
+
+Review-found fixes: quadratic link trim (perf DoS) and per-build settler (T1-2); unguarded sink.send and CLI paste bypass (T3); find perf (sliced search, debounce), stale matches, reconnect (T4-5); macOS reveal of .app bundles, dead-mount stat, hover rebuilds (T6-7); HIGH PowerShell injection through typographic quotes, shared tmp image store (T8-9); closed tabs resurrected by generations, F3 stealing focus from overlays, damaged .1 rotating over good .2 (T10-12); sticky modifier, echo bypass bound (T13-16).
+
+Pending manual: Task 3's `integration_test` (real PTY, 792 KB paste) and every item of HANDOFF section 20 (Tasks 2, 3, 5, 7, 9, 10, 11, 12, 13, 14, 15, 16) are "pending manual" - nothing was run on a Mac, a Windows PC or a phone. Windows native build of desktop_drop and pasteboard is unverified. Rerun pane_find_test and focus_invariants_test after fix/desktop-font-ime merges.
+
+Rulings (copied from the A10 progress ledger):
+- Ruling (user merge-each + away mode): D40 merge-gate superseded — each task merges to main after review; the §9 manual list gates release (uniform with A8/A9) — cost: unverified-on-device UI reaches main, reversible.
+- Ruling (T8-9): the shell family for drops comes from the launched shell; document the limitation — bracketed, no Enter — cost: wrong quoting when another shell runs inside.
+- Ruling (T10-12): never recover over a user-emptied layout (track userEmptied) — cost: one snapshot field.
+- Ruling (T13-16): Android composer keeps enableSuggestions true (Vietnamese Telex/VNI composing on Gboard/Samsung) — cost: suggestion strip visible on Android.

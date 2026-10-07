@@ -51,6 +51,8 @@ final class HyperlinkRegistry {
   }
 
   void _open(Buffer buffer, String uri) {
+    // OSC 8: a new link ends the one still open, right here.
+    if (_openAt != null) _close(buffer);
     _openAt?.dispose();
     _openAt = null;
     _openUri = null;

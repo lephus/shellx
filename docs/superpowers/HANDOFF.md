@@ -504,8 +504,69 @@ Ghi đạt/không đạt kèm ngày + máy vào ledger, mục "A5b (daemon) — 
 
 **Điều kiện đổi mặc định sang BẬT.** Chỉ khi toàn bộ mục 1–15 (macOS) đạt trên máy thật và, để phát hành Windows, W1–W8 đạt trên Windows 11; một mục thất bại thì sửa trên branch (có test nếu được) rồi chạy lại. Khi đó đổi `defaultValue: false` của `background_service_enabled` ở `apps/desktop/lib/main.dart` (khoảng dòng 239) và `lib/src/tray/tray_actions.dart` (khoảng dòng 50, 205) cùng các test mặc định, cập nhật mục này và ledger. Cho tới lúc đó tính năng là opt-in.
 
-## 20. Thả tệp và dán ảnh — A10 (2026-10-07)
+## 20. A10 — chất lượng P0 (2026-10-07)
 
 - Đường dẫn thả/dán được escape theo **shell mà pane được khởi chạy** (POSIX / PowerShell / cmd). Giới hạn đã biết: gõ một shell khác bên trong pane (bash trong pwsh) thì dùng quy tắc quote của shell ngoài. Văn bản luôn được dán (bracketed nếu chương trình yêu cầu) và **không bao giờ kèm Enter**, nên sai lệch chỉ hiện trên dòng lệnh, không chạy gì. Shell lạ trên Windows dùng single quote kiểu PowerShell.
 - Tên tệp có ký tự điều khiển, bidi, zero-width hoặc xuống dòng: từ chối cả lần thả. Tối đa 100 tệp mỗi lần. Pane SSH từ chối thả/dán ảnh (không có scp).
-- Ảnh dán nằm ở `<Application Support>/paste-images` (0700/0600, từ chối nếu là symlink), tối đa 20 MiB, 50 tệp, 24 giờ; xoá khi thoát ứng dụng (tối đa 1 giây).
+- Ảnh dán nằm ở `<Application Support>/paste-images` (0700/0600, từ chối nếu là symlink), tối đa 20 MiB, 50 tệp, 24 giờ. Dọn khi khởi động và mỗi giờ; xoá hết chỉ khi shell cũng kết thúc (thoát khi tắt phiên nền, hoặc "Thoát hoàn toàn"), không xoá khi cửa sổ thoát mà phiên nền còn giữ shell. Thư mục được loại khỏi Time Machine.
+
+**Ghi chú cho người điều phối**
+- Shell của đường dẫn thả/dán lấy từ shell được khởi chạy (xem trên), không dò shell con. Văn bản không bao giờ kèm Enter.
+- Android: ô soạn của giọng nói giữ `enableSuggestions: true` để gõ Telex/VNI tiếng Việt trên Gboard/Samsung vẫn ghép dấu được (đổi lại: thanh gợi ý hiện ra). iOS vẫn tắt autocorrect/smart quotes/smart dashes.
+- xterm 4.0.0 không có RIS (`ESC c`) nên các vùng OSC 8 bị xoá khi đổi màn hình chính/phụ (không phải khi reset); tối đa 2 000 vùng mỗi pane.
+- Layout generations: `layout.json.1`, `.2` là bản sao. Bị bỏ khi người dùng chủ động đóng hết tab (layout rỗng được ghi xoá các generation, để tab đã đóng không sống lại), và `.1` hỏng bị xoá chứ không đè lên `.2` tốt. Sau thoát sạch, layout rỗng được tôn trọng; sau crash, nhường cho lần chạy trước. Phiên nền (A5b): chỉ gắn lại khi `daemon instance` của bản khôi phục trùng với dịch vụ đang chạy.
+- Quyết định cần người dùng, gom vào **A10.1**: tải lên SSH (scp) cho thả/dán ảnh vào pane SSH; tìm bằng regex; mở `path:line` trong trình soạn thảo; OSC 8 trên mobile; thả tệp quá 16 MiB hiện bị bỏ im lặng (nên có thông báo).
+
+**⚠ Danh sách kiểm tra thủ công (chưa ai chạy trên máy thật; branch chỉ nên phát hành khi tất cả đạt)**
+
+Task 2 — đổi cỡ PTY (Mac)
+- [ ] Kéo cạnh cửa sổ chậm rồi nhanh trong `vim`, `htop`, `claude`: thả chuột xong không còn màn hình vẽ dở. Kéo thanh chia pane tương tự.
+- [ ] Đổi cỡ rồi gõ ngay một phím: chương trình thấy cỡ mới trước. Ghi kết quả vào ledger.
+
+Task 3 — dán chắc chắn (Mac)
+- [ ] Chạy `integration_test/pty_test.dart` (dán 792 KB vào PTY thật; chưa chạy vì không có màn hình).
+- [ ] Dán 800 KB, 5 MB (hỏi trước), 20 MB (từ chối) vào `cat > /tmp/x`, `vim` (bracketed), `claude`; `wc -c` khớp.
+
+Task 5 — Tìm trong terminal (Mac rồi Windows)
+- [ ] `seq 1 20000`, `⌘F`/`Ctrl+F` gõ `19999`: thanh hiện ngay, đếm `1/1`, kết quả ở giữa; `⌘G`/`⌘⇧G` quay vòng; `Esc` trả bàn phím (gõ một chữ vào terminal).
+- [ ] Màu highlight đọc được trên cả hai theme A9; VoiceOver đọc số kết quả; pane chia có thanh riêng.
+- [ ] Gõ tiếng Việt (Telex) trong thanh tìm cho dấu đúng; chạy lại sau khi `fix/desktop-font-ime` merge, cùng `pane_find_test` và `focus_invariants_test`.
+
+Task 7 — liên kết (Mac, Windows)
+- [ ] `⌘`/`Ctrl`-click URL: mở trình duyệt mặc định, không dính dấu chấm cuối. Click đường dẫn có thật: Finder/Explorer chọn tệp; đường dẫn không tồn tại không gạch chân.
+- [ ] Gạch chân khi rê chuột đúng chỗ ở 100% và khi `⌘+`/`⌘-` đổi cỡ chữ, Retina và không Retina.
+- [ ] OSC 8 thật: `ls --hyperlink=auto`, `gh pr create`; OSC 8 có chữ khác địa chỉ thì hỏi trước.
+- [ ] Pane SSH: URL mở được, `/etc/hosts` không.
+- [ ] Windows: `C:\Users\...` mở bằng `explorer /select,`, thử đường dẫn có dấu cách.
+
+Task 9 — thả tệp và dán ảnh
+- [ ] Mac: kéo một/nhiều tệp và thư mục từ Finder, Desktop vào pane zsh, bash, fish (tên có dấu cách, tiếng Việt, emoji, ngoặc): dòng lệnh có đường dẫn đã escape và một dấu cách cuối, không Enter.
+- [ ] Mac: kéo ảnh từ Safari; `⌘⌃⇧4` rồi `⌘V` dán ra đường dẫn `paste-images/...png` mở được; "Copy Image" của Safari rồi `⌘V`; `⌘C` tệp trong Finder rồi `⌘V`; pane `claude` nhận đường dẫn ảnh.
+- [ ] Mac: pane SSH hiện gợi ý từ chối khi rê, toast khi thả/dán ảnh, dán văn bản vẫn chạy; gợi ý biến mất khi `⌘Tab` giữa lúc kéo; macOS 15+: ghi lại `pasteboard` có gây hộp thoại "Paste from Other Apps" không.
+- [ ] Windows: thả từ Explorer vào PowerShell và cmd (tên có dấu cách, tiếng Việt); `Win+Shift+S` rồi `Ctrl+Shift+V` (đuôi png/bmp khớp nội dung); `Ctrl+C` tệp trong Explorer rồi dán. Nếu `pasteboard` không đọc được ảnh trên Windows thì ghi lại (tính năng lùi về dán văn bản). Build native của `desktop_drop` và `pasteboard` trên Windows chưa kiểm.
+
+Task 10 — focus (Mac, Windows)
+- [ ] `⌘Tab` ra và vào, Mission Control, khoá/mở màn hình, Stage Manager: sau mỗi việc, gõ một chữ vào terminal thì chữ đó tới terminal.
+- [ ] Mở và đóng palette, hộp thoại kết nối, hộp xác nhận, bảng thông báo bằng chuột và bàn phím: như trên.
+
+Task 11 — khôi phục (Mac)
+- [ ] Chạy với 4 tab, `kill -9`, mở lại (thấy dải khôi phục), `kill -9` ngay khi cửa sổ vừa hiện, mở lại: đủ 4 tab.
+- [ ] Đóng hết tab, `kill -9`, mở lại: 4 tab trở lại (có dải). Đóng hết tab rồi `⌘Q` (thoát sạch): mở lại thấy màn hình rỗng.
+- [ ] `~/Library/Application Support/pro.shellx.desktop/restore/`: `layout.json.1`, `.2` có quyền 0600.
+
+Task 12 — khung cửa sổ (Mac, Windows)
+- [ ] Lưu cửa sổ trên màn ngoài, thoát, rút màn, mở lại: nằm trong màn chính. Hạ độ phân giải dưới cỡ cửa sổ đã lưu: vừa màn. Kéo cửa sổ nửa ra ngoài mép, thoát, mở lại: vào lại trong màn.
+
+Task 13 — ô soạn và gõ trên điện thoại (iPhone, Android)
+- [ ] Bàn phím mềm tiếng Việt (Telex, VNI) và Gboard gõ thẳng vào terminal: mỗi ký tự một lần; bàn phím Bluetooth có dấu.
+- [ ] Ô soạn giọng nói: gõ `--help` (iOS giữ `--help`, không thành `—help`), `'x'` (không dấu nháy cong), câu kết thúc bằng dấu chấm rồi một từ (không tự viết hoa); Android không có gạch đỏ chính tả. Đóng mục HANDOFF §3 "IME tiếng Việt / phím cứng gửi trùng" cho điện thoại.
+
+Task 14 — "Xem dạng văn bản" (iPhone, Android)
+- [ ] Mở trong `claude` với câu trả lời dài: kéo tay cầm chọn qua một đoạn, sao chép, dán sang nơi khác; "Sao chép tất cả"; VoiceOver/TalkBack đọc được; xoay ngang; bàn phím mở; 2 000 dòng cuộn mượt; terminal trên máy tính không đổi cỡ.
+
+Task 15 — chạm vào URL (iPhone, Android)
+- [ ] `git push` / `gh pr create` trong phiên, chạm URL in ra: hiện bảng Mở / Sao chép; Mở bật trình duyệt; Sao chép hiện toast; chạm chỗ khác không làm gì; URL xuống dòng hoạt động trên cả hai dòng; cuộn, chọn bằng giữ lâu và pinch vẫn đúng.
+
+Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
+- [ ] Trên máy tính chạy `yes | head -c 50M` ở tab A, sang tab B trên điện thoại và gõ: echo tức thì; quay lại A không đứng lâu; Performance overlay: khung hình p95 <= 32 ms trong lúc xả.
+- [ ] Mở 4 tab bận, xem pin/nhiệt trong một phút.

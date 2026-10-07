@@ -88,6 +88,7 @@ void main() {
       expect(files.layouts.last.daemon, 'a' * 32);
       expect(daemon.quits, 0);
       expect(h.quits, 1);
+      expect(h.imageDeletes, 0, reason: 'the service keeps the shells');
       expect(h.shutdownOrder, ['retries', 'remote', 'quit']);
     });
 
@@ -168,6 +169,7 @@ void main() {
       expect(files.layouts.last.cleanExit, isTrue);
       expect(daemon.quits, 1);
       expect(h.quits, 1);
+      expect(h.imageDeletes, 1, reason: 'the shells really end');
       expect(h.shutdownOrder.first, 'retries');
       expect(h.shutdownOrder.last, 'quit');
     });
@@ -198,6 +200,7 @@ void main() {
       await answer(primary: true);
       await done;
       expect(h.quits, 0);
+      expect(h.imageDeletes, 0, reason: 'the shells still run');
       expect(
         c.read(terminalTabsProvider).notice,
         isA<DaemonQuitFailedNotice>(),
@@ -259,5 +262,6 @@ void main() {
     confirm.complete(true);
     await done;
     expect(h.quits, 1);
+    expect(h.imageDeletes, 1, reason: 'in-process: the shells end with it');
   });
 }
