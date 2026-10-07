@@ -13,6 +13,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:win32/win32.dart' as win32;
 import 'package:window_manager/window_manager.dart';
 
+import 'daemon_main.dart' as daemon;
 import 'l10n/app_localizations.dart';
 import 'src/agent/agent_controller.dart';
 import 'src/agent/agent_runtime.dart';
@@ -31,6 +32,7 @@ import 'src/cli/ui_command_handler.dart';
 import 'src/config.dart';
 import 'src/config/config_controller.dart';
 import 'src/l10n/locale.dart';
+import 'src/mux/launch_mode.dart';
 import 'src/mux/mux_paths.dart';
 import 'src/mux/windows_pipe_transport.dart';
 import 'src/platform/app_reopen.dart';
@@ -73,12 +75,18 @@ import 'src/ui/window_focus.dart';
 import 'src/ui/window_host.dart';
 import 'src/ui/window_router.dart';
 
+// The headless `shellx-mux` entry point (A5b D2/D3). The native runners start
+// the engine with entrypoint `daemonMain`, which the engine only looks up in
+// this root library (an `export` is not found), so it forwards from here.
+@pragma('vm:entry-point')
+Future<void> daemonMain() => daemon.daemonMain();
+
 Future<void> main(List<String> args) async {
   // Spec §10.6: the Windows uninstaller runs `ShellX.exe
   // --terminal-sharing-cleanup` before deleting the files. No window, no
   // tray, no single-instance lock: remove the blocks, `bin` and `term`,
   // then exit.
-  if (args.contains('--terminal-sharing-cleanup')) {
+  if (parseLaunchMode(args) == LaunchMode.terminalSharingCleanup) {
     exit(await _terminalSharingCleanup());
   }
   WidgetsFlutterBinding.ensureInitialized();
