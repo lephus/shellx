@@ -54,6 +54,7 @@ final class TrayLocalState {
     this.configProblemCount = 0,
     this.sshHook = true,
     this.hasRecentServers = false,
+    this.backgroundService = false,
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
@@ -70,6 +71,9 @@ final class TrayLocalState {
   final bool sshHook;
   final bool hasRecentServers;
 
+  /// A5b ruling: the stored "Giữ shell chạy khi đóng cửa sổ" switch.
+  final bool backgroundService;
+
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
@@ -80,7 +84,8 @@ final class TrayLocalState {
       other.cliPathInstalled == cliPathInstalled &&
       other.configProblemCount == configProblemCount &&
       other.sshHook == sshHook &&
-      other.hasRecentServers == hasRecentServers;
+      other.hasRecentServers == hasRecentServers &&
+      other.backgroundService == backgroundService;
 
   @override
   int get hashCode => Object.hash(
@@ -92,6 +97,7 @@ final class TrayLocalState {
     configProblemCount,
     sshHook,
     hasRecentServers,
+    backgroundService,
   );
 }
 
@@ -189,6 +195,12 @@ Menu buildTrayMenu(
       TrayKeys.clearSavedScrollback,
       l10n.trayClearSavedScrollback,
       disabled: !local.hasSavedScrollback,
+    ),
+    sep(),
+    check(
+      TrayKeys.backgroundService,
+      l10n.trayBackgroundService,
+      local.backgroundService,
     ),
   ]);
 

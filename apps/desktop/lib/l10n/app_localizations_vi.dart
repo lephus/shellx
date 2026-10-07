@@ -1914,4 +1914,79 @@ class AppLocalizationsVi extends AppLocalizations {
   String paneRemoteSuffix(String host) {
     return ', trên $host';
   }
+
+  @override
+  String get trayQuitUi => 'Thoát';
+
+  @override
+  String get trayQuitAll => 'Thoát hoàn toàn';
+
+  @override
+  String get appMenuQuitAll => 'Thoát hoàn toàn';
+
+  @override
+  String get quitUiExplainedTitle => 'Shell vẫn chạy sau khi thoát';
+
+  @override
+  String quitUiExplainedBody(int count) {
+    return '$count tab vẫn chạy nền và điện thoại vẫn kết nối được. Mở lại ShellX để quay về đúng chỗ. Muốn dừng mọi shell, chọn Thoát hoàn toàn (⌥⌘Q).';
+  }
+
+  @override
+  String quitUiExplainedBodyWindows(int count) {
+    return '$count tab vẫn chạy nền và điện thoại vẫn kết nối được. Mở lại ShellX để quay về đúng chỗ. Muốn dừng mọi shell, chọn Thoát hoàn toàn trong menu khay hệ thống.';
+  }
+
+  @override
+  String get quitUiAction => 'Thoát';
+
+  @override
+  String get quitAllAction => 'Thoát hoàn toàn';
+
+  @override
+  String get confirmQuitAllAction => 'Thoát hoàn toàn';
+
+  @override
+  String get daemonOldTitle => 'Phiên nền đang chạy bản cũ';
+
+  @override
+  String daemonOldBody(String app, String old, int count) {
+    return 'ShellX $app cần khởi động lại phiên nền (bản $old) đang giữ $count phiên. Khởi động lại sẽ dừng các shell đó; tab, pane, thư mục và nội dung gần nhất được mở lại. Để sau thì ShellX đóng lại, shell và điện thoại vẫn chạy với bản cũ.';
+  }
+
+  @override
+  String get daemonOldRestart => 'Khởi động lại phiên nền';
+
+  @override
+  String get daemonOldLater => 'Để sau';
+
+  @override
+  String get daemonStartFailedTitle => 'Không khởi động được phiên nền';
+
+  @override
+  String get daemonStartFailedBody =>
+      'ShellX cần phiên nền để chạy shell. Thử lại; nếu vẫn lỗi, khởi động lại máy hoặc cài lại ShellX.';
+
+  @override
+  String get daemonRetry => 'Thử lại';
+
+  @override
+  String get daemonRetryLabel => 'Thử khởi động lại phiên nền';
+
+  @override
+  String get daemonUnavailableEmpty => 'Đang chờ phiên nền…';
+
+  @override
+  String get daemonRestartedStrip =>
+      'Phiên nền đã dừng bất ngờ và đã được khởi động lại. Các shell được mở lại ở thư mục cũ.';
+
+  @override
+  String get daemonLostStrip => 'Phiên nền đã dừng. Các shell không còn chạy.';
+
+  @override
+  String get trayBackgroundService => 'Giữ shell chạy khi đóng cửa sổ';
+
+  @override
+  String get backgroundServiceNextLaunch =>
+      'Có hiệu lực ở lần mở ShellX kế tiếp.';
 }

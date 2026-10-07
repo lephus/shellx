@@ -103,6 +103,12 @@ final class ToggleRestoreScrollback extends TrayAction {
   const ToggleRestoreScrollback();
 }
 
+/// A5b ruling: "Giữ shell chạy khi đóng cửa sổ" (applies at the next
+/// launch).
+final class ToggleBackgroundService extends TrayAction {
+  const ToggleBackgroundService();
+}
+
 /// A5a D13: "Xóa nội dung đã lưu".
 final class ClearSavedScrollback extends TrayAction {
   const ClearSavedScrollback();
@@ -200,6 +206,7 @@ abstract final class TrayKeys {
       'desktop_notifications_only_unfocused';
   static const String terminal = 'terminal';
   static const String restoreScrollback = 'restore_scrollback';
+  static const String backgroundService = 'background_service';
   static const String clearSavedScrollback = 'clear_saved_scrollback';
   static const String commandLine = 'command_line';
   static const String cliControl = 'cli_control';
@@ -270,6 +277,7 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.desktopNotificationsOnlyUnfocused =>
       const ToggleDesktopNotificationsOnlyUnfocused(),
     TrayKeys.restoreScrollback => const ToggleRestoreScrollback(),
+    TrayKeys.backgroundService => const ToggleBackgroundService(),
     TrayKeys.clearSavedScrollback => const ClearSavedScrollback(),
     TrayKeys.cliControl => const ToggleCliControl(),
     TrayKeys.cliAllowExternal => const ToggleCliAllowExternal(),

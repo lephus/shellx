@@ -1980,4 +1980,99 @@ class AppLocalizationsEn extends AppLocalizations {
   String paneRemoteSuffix(String host) {
     return ', on $host';
   }
+
+  @override
+  String get trayQuitUi => 'Quit';
+
+  @override
+  String get trayQuitAll => 'Quit Completely';
+
+  @override
+  String get appMenuQuitAll => 'Quit Completely';
+
+  @override
+  String get quitUiExplainedTitle => 'Your shells keep running';
+
+  @override
+  String quitUiExplainedBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs keep',
+      one: '1 tab keeps',
+    );
+    return '$_temp0 running in the background and your phones stay connected. Open ShellX again to pick up where you left off. To stop every shell, choose Quit Completely (⌥⌘Q).';
+  }
+
+  @override
+  String quitUiExplainedBodyWindows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs keep',
+      one: '1 tab keeps',
+    );
+    return '$_temp0 running in the background and your phones stay connected. Open ShellX again to pick up where you left off. To stop every shell, choose Quit Completely in the tray menu.';
+  }
+
+  @override
+  String get quitUiAction => 'Quit';
+
+  @override
+  String get quitAllAction => 'Quit Completely';
+
+  @override
+  String get confirmQuitAllAction => 'Quit Completely';
+
+  @override
+  String get daemonOldTitle => 'The background service is out of date';
+
+  @override
+  String daemonOldBody(String app, String old, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions',
+      one: '1 session',
+    );
+    return 'ShellX $app needs to restart the background service (version $old), which holds $_temp0. Restarting stops those shells; tabs, panes, folders and recent contents are reopened. Choose Later to close ShellX and keep the shells and phones running on the old version.';
+  }
+
+  @override
+  String get daemonOldRestart => 'Restart Service';
+
+  @override
+  String get daemonOldLater => 'Later';
+
+  @override
+  String get daemonStartFailedTitle => 'Couldn\'t start the background service';
+
+  @override
+  String get daemonStartFailedBody =>
+      'ShellX needs its background service to run shells. Try again; if it still fails, restart the computer or reinstall ShellX.';
+
+  @override
+  String get daemonRetry => 'Try Again';
+
+  @override
+  String get daemonRetryLabel => 'Try restarting the background service';
+
+  @override
+  String get daemonUnavailableEmpty => 'Waiting for the background service…';
+
+  @override
+  String get daemonRestartedStrip =>
+      'The background service stopped unexpectedly and was restarted. Shells were reopened in their folders.';
+
+  @override
+  String get daemonLostStrip =>
+      'The background service stopped. Shells are no longer running.';
+
+  @override
+  String get trayBackgroundService =>
+      'Keep shells running when the window closes';
+
+  @override
+  String get backgroundServiceNextLaunch =>
+      'Applies the next time ShellX starts.';
 }

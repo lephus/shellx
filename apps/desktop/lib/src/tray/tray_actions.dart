@@ -11,6 +11,7 @@ import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
+import '../platform/settings_store.dart' show SettingKeys;
 import '../config/config_opener.dart' show openShellxConfig;
 import '../remote/ssh_actions.dart';
 import '../remote/ssh_settings.dart';
@@ -41,6 +42,9 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     cliPathInstalled: cli.pathInstalled,
     sshHook: ref.watch(agentControllerProvider.select((s) => s.sshRemoteHook)),
     hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
+    backgroundService: ref
+        .read(settingsStoreProvider)
+        .getBool(SettingKeys.backgroundService, defaultValue: false),
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -188,6 +192,24 @@ final class TrayActions {
           // Failed or not, the menu shows what is stored.
           _ref.invalidate(trayLocalStateProvider);
         }
+      // A5b ruling: UI-owned, applies at the next launch (says so).
+      case ToggleBackgroundService():
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setBool(
+            SettingKeys.backgroundService,
+            !settings.getBool(
+              SettingKeys.backgroundService,
+              defaultValue: false,
+            ),
+          );
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        await _services.notifier.show(
+          title: 'ShellX',
+          body: l10n.backgroundServiceNextLaunch,
+        );
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
       // A7 D26, amendment: at once, without asking; the host rechecks.
