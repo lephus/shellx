@@ -19,6 +19,20 @@ abstract interface class CopyModeBuffer {
   bool isWrapped(int row);
 }
 
+/// Optional: a buffer whose text units are not one per cell (wide
+/// characters, emoji, combining marks) says where its units sit, so a block
+/// selection follows what is painted.
+abstract interface class CopyModeCells {
+  /// The first cell of [unit] in [row].
+  int cellOfUnit(int row, int unit);
+
+  /// The cell after the character that starts at [unit].
+  int cellEndOfUnit(int row, int unit);
+
+  /// The unit that covers [cell].
+  int unitOfCell(int row, int cell);
+}
+
 enum SelectKind { none, char, line, block }
 
 /// Where the cursor is and what is selected. Rows/columns index
@@ -148,8 +162,30 @@ int _class(String c) => c == ' ' || c == '\t' || c.isEmpty
     : 2;
 
 /// The text of [row] without its trailing blanks.
+final RegExp _trailingBlanks = RegExp(r'[ \u0000\t]+$');
+
 String _text(CopyModeBuffer b, int row) =>
-    b.rowText(row).replaceFirst(RegExp(r'[ \u0000\t]+$'), '');
+    b.rowText(row).replaceFirst(_trailingBlanks, '');
+
+bool _isHigh(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
+bool _isLow(int unit) => unit >= 0xDC00 && unit <= 0xDFFF;
+
+/// [col] moved off the second half of an emoji onto its first.
+int _snap(CopyModeBuffer b, int row, int col) {
+  if (col <= 0) return col;
+  final t = b.rowText(row);
+  return col < t.length &&
+          _isLow(t.codeUnitAt(col)) &&
+          _isHigh(t.codeUnitAt(col - 1))
+      ? col - 1
+      : col;
+}
+
+/// How many units the character at [col] takes (2 for an emoji).
+int _width(CopyModeBuffer b, int row, int col) {
+  final t = b.rowText(row);
+  return col >= 0 && col + 1 < t.length && _isHigh(t.codeUnitAt(col)) ? 2 : 1;
+}
 
 int _len(CopyModeBuffer b, int row) => _text(b, row).length;
 
@@ -240,11 +276,11 @@ int _clampCol(CopyModeBuffer b, int row, int col) =>
 
 CopyModeState _toRow(CopyModeBuffer b, CopyModeState s, int row) {
   final r = math.min(math.max(row, 0), math.max(b.rowCount - 1, 0));
-  return s.moved(r, _clampCol(b, r, s.col));
+  return s.moved(r, _snap(b, r, _clampCol(b, r, s.col)));
 }
 
 CopyModeState _toPos(CopyModeBuffer b, CopyModeState s, _Pos p) =>
-    s.moved(p.$1, math.max(p.$2, 0));
+    s.moved(p.$1, _snap(b, p.$1, math.max(p.$2, 0)));
 
 CopyModeState _select(CopyModeState s, SelectKind kind) {
   if (s.kind == kind) {
@@ -292,13 +328,16 @@ CopyResult applyCopyKey(
 
   final p = (st.row, st.col);
   if (key == LogicalKeyboardKey.keyH || key == LogicalKeyboardKey.arrowLeft) {
-    return stay(st.moved(st.row, math.max(st.col - 1, 0)));
+    return stay(st.moved(st.row, _snap(b, st.row, math.max(st.col - 1, 0))));
   }
   if (key == LogicalKeyboardKey.keyL || key == LogicalKeyboardKey.arrowRight) {
     return stay(
       st.moved(
         st.row,
-        math.min(st.col + 1, math.max(_lastCol(b, st.row), st.col)),
+        math.min(
+          st.col + _width(b, st.row, st.col),
+          math.max(_lastCol(b, st.row), st.col),
+        ),
       ),
     );
   }
@@ -358,8 +397,10 @@ CopyResult applyCopyKey(
 /// selected). Trailing blanks of each row are dropped; rows the terminal
 /// wrapped are joined without a break.
 String selectedText(CopyModeBuffer b, CopyModeState s) {
-  String slice(int row, int from, int to) {
-    final t = _text(b, row);
+  // [keepBlanks]: the row is followed by its own continuation, so its
+  // trailing spaces are real text.
+  String slice(int row, int from, int to, {bool keepBlanks = false}) {
+    final t = keepBlanks ? b.rowText(row) : _text(b, row);
     if (from >= t.length) return '';
     return t.substring(from, math.min(to, t.length));
   }
@@ -368,11 +409,33 @@ String selectedText(CopyModeBuffer b, CopyModeState s) {
   final ac = s.anchorCol ?? s.col;
   switch (s.kind) {
     case SelectKind.none:
-      return slice(s.row, s.col, s.col + 1);
+      return slice(s.row, s.col, s.col + _width(b, s.row, s.col));
     case SelectKind.block:
       final r0 = math.min(ar, s.row), r1 = math.max(ar, s.row);
-      final c0 = math.min(ac, s.col), c1 = math.max(ac, s.col);
-      return [for (var r = r0; r <= r1; r++) slice(r, c0, c1 + 1)].join('\n');
+      final cells = b is CopyModeCells ? b as CopyModeCells : null;
+      if (cells == null) {
+        final c0 = math.min(ac, s.col), c1 = math.max(ac, s.col);
+        return [
+          for (var r = r0; r <= r1; r++) slice(r, c0, c1 + _width(b, r, c1)),
+        ].join('\n');
+      }
+      // The rectangle the user sees: whole cells, whatever the units.
+      final lo = math.min(
+        cells.cellOfUnit(ar, ac),
+        cells.cellOfUnit(s.row, s.col),
+      );
+      final hi = math.max(
+        cells.cellEndOfUnit(ar, ac),
+        cells.cellEndOfUnit(s.row, s.col),
+      );
+      return [
+        for (var r = r0; r <= r1; r++)
+          () {
+            final from = cells.unitOfCell(r, lo);
+            final last = cells.unitOfCell(r, math.max(hi - 1, lo));
+            return slice(r, from, last + _width(b, r, last));
+          }(),
+      ].join('\n');
     case SelectKind.line:
     case SelectKind.char:
       final before = ar < s.row || (ar == s.row && ac <= s.col);
@@ -380,9 +443,15 @@ String selectedText(CopyModeBuffer b, CopyModeState s) {
       final (r1, c1) = before ? (s.row, s.col) : (ar, ac);
       final out = StringBuffer();
       for (var r = r0; r <= r1; r++) {
+        final keep = r < r1 && b.isWrapped(r + 1);
         final line = s.kind == SelectKind.line
-            ? slice(r, 0, 1 << 30)
-            : slice(r, r == r0 ? c0 : 0, r == r1 ? c1 + 1 : 1 << 30);
+            ? slice(r, 0, 1 << 30, keepBlanks: keep)
+            : slice(
+                r,
+                r == r0 ? c0 : 0,
+                r == r1 ? c1 + _width(b, r, c1) : 1 << 30,
+                keepBlanks: keep,
+              );
         if (r > r0 && !b.isWrapped(r)) out.write('\n');
         out.write(line);
       }

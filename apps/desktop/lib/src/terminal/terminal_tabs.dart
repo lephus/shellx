@@ -10,6 +10,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../agent/desktop_services.dart' show clockProvider;
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;

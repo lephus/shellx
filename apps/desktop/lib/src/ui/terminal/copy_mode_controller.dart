@@ -13,18 +13,37 @@ import '../theme/shellx_desktop_theme.dart';
 
 /// The xterm [Buffer] as copy mode reads it (rows are buffer rows,
 /// scrollback included; the alternate screen is just its own buffer).
-final class XtermCopyBuffer implements CopyModeBuffer {
+final class XtermCopyBuffer implements CopyModeBuffer, CopyModeCells {
   XtermCopyBuffer(this.buffer);
   final Buffer buffer;
+
+  // One key press reads the same row many times: the last one is kept
+  // (an adapter lives for one key press, so it never goes stale).
+  int _row = -1;
+  RowCells? _cells;
+
+  RowCells _of(int row) {
+    if (row != _row || _cells == null) {
+      _row = row;
+      _cells = bufferRowCells(buffer, row);
+    }
+    return _cells!;
+  }
 
   @override
   int get rowCount => buffer.height;
   @override
   int get columns => buffer.viewWidth;
   @override
-  String rowText(int row) => bufferRowText(buffer, row);
+  String rowText(int row) => _of(row).text;
   @override
   bool isWrapped(int row) => buffer.lines[row].isWrapped;
+  @override
+  int cellOfUnit(int row, int unit) => _of(row).cellOfUnit(unit);
+  @override
+  int cellEndOfUnit(int row, int unit) => _of(row).cellEndOfUnit(unit);
+  @override
+  int unitOfCell(int row, int cell) => _of(row).unitOfCell(cell);
 }
 
 // The keys copy mode knows, by the physical key's meaning (A11 D13): a
@@ -194,7 +213,7 @@ final class CopyModeController extends ChangeNotifier {
     final x = here.cellOfUnit(s.col);
     _cursor = selection.highlight(
       p1: b.createAnchor(x, s.row),
-      p2: b.createAnchor(here.cellOfUnit(s.col + 1), s.row),
+      p2: b.createAnchor(here.cellEndOfUnit(s.col), s.row),
       color: ShellxDesktopColors.accent.withValues(alpha: 0.55),
     );
     final ar = s.anchorRow;
@@ -203,7 +222,10 @@ final class CopyModeController extends ChangeNotifier {
       selection.clearSelection();
     } else {
       _anchor = b.createAnchor(bufferRowCells(b, ar).cellOfUnit(ac), ar);
-      final ax = bufferRowCells(b, ar).cellOfUnit(ac);
+      final there = bufferRowCells(b, ar);
+      final ax = there.cellOfUnit(ac);
+      final axe = there.cellEndOfUnit(ac);
+      final xe = here.cellEndOfUnit(s.col);
       final r0 = ar < s.row ? ar : s.row;
       final r1 = ar < s.row ? s.row : ar;
       final forward = ar < s.row || (ar == s.row && ac <= s.col);
@@ -215,19 +237,19 @@ final class CopyModeController extends ChangeNotifier {
             mode: SelectionMode.line,
           );
         case SelectKind.char:
-          final (c0, c1) = forward ? (ax, x) : (x, ax);
+          final (c0, c1) = forward ? (ax, xe) : (x, axe);
           final (rr0, rr1) = forward ? (ar, s.row) : (s.row, ar);
           selection.setSelection(
             b.createAnchor(c0, rr0),
-            b.createAnchor(c1 + 1, rr1),
+            b.createAnchor(c1, rr1),
             mode: SelectionMode.line,
           );
         case SelectKind.block:
           final lo = ax < x ? ax : x;
-          final hi = ax < x ? x : ax;
+          final hi = axe > xe ? axe : xe;
           selection.setSelection(
             b.createAnchor(lo, r0),
-            b.createAnchor(hi + 1, r1),
+            b.createAnchor(hi, r1),
             mode: SelectionMode.block,
           );
         case SelectKind.none:
@@ -267,10 +289,16 @@ final class CopyModeController extends ChangeNotifier {
     if (windowChord != null && windowChord(e)) return KeyEventResult.ignored;
     if (_modifiers.contains(e.logicalKey)) return KeyEventResult.handled;
     final hw = HardwareKeyboard.instance;
-    final key = copyLogicalKey(e);
-    if (key == null || hw.isMetaPressed || hw.isAltPressed) {
-      return KeyEventResult.handled;
-    }
+    if (hw.isMetaPressed || hw.isAltPressed) return KeyEventResult.handled;
+    // `^` and `$` are the character the layout made, wherever its key is;
+    // every other key is the physical one (copyLogicalKey).
+    final byChar = switch (e.character) {
+      r'$' => LogicalKeyboardKey.digit4,
+      '^' => LogicalKeyboardKey.digit6,
+      _ => null,
+    };
+    final key = byChar ?? copyLogicalKey(e);
+    if (key == null) return KeyEventResult.handled;
     final live = _live();
     if (live == null) {
       exit();
@@ -279,7 +307,11 @@ final class CopyModeController extends ChangeNotifier {
     final result = applyCopyKey(
       XtermCopyBuffer(terminal.buffer),
       live,
-      CopyKey(key, ctrl: hw.isControlPressed, shift: hw.isShiftPressed),
+      CopyKey(
+        key,
+        ctrl: hw.isControlPressed,
+        shift: byChar != null || hw.isShiftPressed,
+      ),
       pageRows: terminal.viewHeight,
     );
     switch (result) {

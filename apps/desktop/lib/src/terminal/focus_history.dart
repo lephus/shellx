@@ -45,6 +45,15 @@ class FocusHistory {
 
   /// The nearest earlier place that is still [alive]; null when none (the
   /// position then stays).
+  /// A reconnect gave a pane a new session id: the places it was keep
+  /// pointing at it.
+  void remap(int from, int to) {
+    for (var k = 0; k < _s.length; k++) {
+      final e = _s[k];
+      if (e.paneId == from) _s[k] = FocusEntry(e.tabId, to);
+    }
+  }
+
   FocusEntry? back(bool Function(FocusEntry) alive) => _go(-1, alive);
 
   FocusEntry? forward(bool Function(FocusEntry) alive) => _go(1, alive);
@@ -80,6 +89,12 @@ class FocusHistoryNotifier extends Notifier<FocusHistory> {
     final first = _place(ref.read(terminalTabsProvider));
     if (first != null) history.visit(first);
     ref.listen<TerminalTabsState>(terminalTabsProvider, _onTabs);
+    // The event comes before the state change (A8 D22).
+    final replaced = ref
+        .read(terminalTabsProvider.notifier)
+        .paneReplacements
+        .listen((r) => history.remap(r.from, r.to));
+    ref.onDispose(replaced.cancel);
     return history;
   }
 

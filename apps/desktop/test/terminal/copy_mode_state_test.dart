@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/copy_mode.dart';
 
 class ListBuffer implements CopyModeBuffer {
-  ListBuffer(this.rows, {this.columns = 20});
+  ListBuffer(this.rows, {this.columns = 20, this.wrapped = const {}});
   final List<String> rows;
+  final Set<int> wrapped;
   @override
   final int columns;
   @override
@@ -12,7 +13,39 @@ class ListBuffer implements CopyModeBuffer {
   @override
   String rowText(int row) => rows[row];
   @override
-  bool isWrapped(int row) => false;
+  bool isWrapped(int row) => wrapped.contains(row);
+}
+
+/// Rows of cells: each entry is one character and how many cells it takes.
+class CellBuffer extends ListBuffer implements CopyModeCells {
+  CellBuffer(super.rows, this.widths);
+  final List<List<int>> widths;
+
+  @override
+  int cellOfUnit(int row, int unit) {
+    var cell = 0;
+    for (var i = 0; i < unit && i < widths[row].length; i++) {
+      cell += widths[row][i];
+    }
+    return unit < widths[row].length
+        ? cell
+        : cell + (unit - widths[row].length);
+  }
+
+  @override
+  int cellEndOfUnit(int row, int unit) =>
+      cellOfUnit(row, unit) +
+      (unit < widths[row].length ? widths[row][unit] : 1);
+
+  @override
+  int unitOfCell(int row, int cell) {
+    var c = 0;
+    for (var i = 0; i < widths[row].length; i++) {
+      c += widths[row][i];
+      if (c > cell) return i;
+    }
+    return widths[row].length + (cell - c);
+  }
 }
 
 CopyKey k(LogicalKeyboardKey key, {bool ctrl = false, bool shift = false}) =>
@@ -267,5 +300,76 @@ void main() {
   test('toString never shows text', () {
     expect(at(1, 2).toString(), contains('…'));
     expect(k(LogicalKeyboardKey.keyH).toString(), contains('…'));
+  });
+
+  group('review fixes', () {
+    final emoji = ListBuffer(['a😀b', 'abcd']);
+
+    test('the cursor steps over an emoji as one character', () {
+      var s = at(0, 0);
+      s = stay(applyCopyKey(emoji, s, k(LogicalKeyboardKey.keyL), pageRows: 4));
+      expect(s.col, 1);
+      s = stay(applyCopyKey(emoji, s, k(LogicalKeyboardKey.keyL), pageRows: 4));
+      expect(s.col, 3, reason: 'not onto the low surrogate');
+      s = stay(applyCopyKey(emoji, s, k(LogicalKeyboardKey.keyH), pageRows: 4));
+      expect(s.col, 1);
+    });
+
+    test('a vertical move never lands inside an emoji', () {
+      final s = stay(
+        applyCopyKey(emoji, at(1, 2), k(LogicalKeyboardKey.keyK), pageRows: 4),
+      );
+      expect((s.row, s.col), (0, 1));
+    });
+
+    test('yanking an emoji takes both halves, also as the selection end', () {
+      var s = at(0, 0);
+      s = stay(applyCopyKey(emoji, s, k(LogicalKeyboardKey.keyV), pageRows: 4));
+      s = stay(applyCopyKey(emoji, s, k(LogicalKeyboardKey.keyL), pageRows: 4));
+      expect(selectedText(emoji, s), 'a😀');
+      final one = stay(
+        applyCopyKey(emoji, at(0, 1), k(LogicalKeyboardKey.keyV), pageRows: 4),
+      );
+      expect(selectedText(emoji, one), '😀');
+    });
+
+    test('a wrapped row keeps its real trailing space', () {
+      final b = ListBuffer(['foo ', 'bar'], wrapped: {1});
+      const s = CopyModeState(
+        row: 1,
+        col: 2,
+        anchorRow: 0,
+        anchorCol: 0,
+        kind: SelectKind.char,
+      );
+      expect(selectedText(b, s), 'foo bar');
+      const l = CopyModeState(
+        row: 1,
+        col: 0,
+        anchorRow: 0,
+        anchorCol: 0,
+        kind: SelectKind.line,
+      );
+      expect(selectedText(b, l), 'foo bar');
+    });
+
+    test('a block follows the cells, not the text units (CJK)', () {
+      final b = CellBuffer(
+        ['你好ab', 'abcdef'],
+        [
+          [2, 2, 1, 1],
+          [1, 1, 1, 1, 1, 1],
+        ],
+      );
+      const s = CopyModeState(
+        row: 1,
+        col: 3,
+        anchorRow: 0,
+        anchorCol: 1,
+        kind: SelectKind.block,
+      );
+      // 好 covers cells 2-3, "d" is cell 3: the rectangle is cells 2-3.
+      expect(selectedText(b, s), '好\ncd');
+    });
   });
 }

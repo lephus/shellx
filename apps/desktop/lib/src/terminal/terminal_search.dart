@@ -147,6 +147,12 @@ final class RowCells {
     return _lastEnd + (unit - text.length);
   }
 
+  /// The cell after the character that starts at [unit].
+  int cellEndOfUnit(int unit) {
+    if (unit < text.length) return _ends?[unit] ?? unit + 1;
+    return cellOfUnit(unit) + 1;
+  }
+
   /// The unit that covers [cell]; past the text, one unit per cell.
   int unitOfCell(int cell) {
     final ends = _ends;

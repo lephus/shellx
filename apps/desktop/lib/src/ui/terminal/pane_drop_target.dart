@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../terminal/pane_input.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'copy_mode_controller.dart';
 import '../window_focus.dart';
 
 /// A10 D16: files dropped on a pane become their paths on its command line
@@ -56,6 +57,8 @@ class _PaneDropTargetState extends ConsumerState<PaneDropTarget> {
         if (f.path.isNotEmpty) f.path,
     ];
     if (paths.isEmpty) return;
+    // A11 D13: a drop is for the program, not for copy mode.
+    ref.read(copyModeProvider.notifier).exit(widget.paneId);
     unawaited(
       ref
           .read(paneInputProvider)

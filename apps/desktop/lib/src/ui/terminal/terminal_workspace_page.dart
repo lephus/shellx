@@ -535,6 +535,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     final tab = ref.read(terminalTabsProvider).selected;
     if (tab == null) return;
     final paneId = tab.focusedPaneId;
+    // A11 D13: a paste (the menu's too) is for the program, not for copy
+    // mode: the mode ends first.
+    ref.read(copyModeProvider.notifier).exit(paneId);
     final terminal = tab.focused.terminal;
     final media = ref.read(clipboardMediaProvider);
     final input = ref.read(paneInputProvider);

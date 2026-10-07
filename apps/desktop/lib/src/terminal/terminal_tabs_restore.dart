@@ -96,7 +96,7 @@ extension TerminalTabsReopen on TerminalTabs {
         ? saved
         : placement.currentWorkspace?.call() ?? saved ?? 'default';
     final snapshot = RestoreSnapshot(
-      savedAt: DateTime.now(),
+      savedAt: _ref.read(clockProvider)(),
       cleanExit: false,
       selectedTab: c.tab.key,
       workspaces: [

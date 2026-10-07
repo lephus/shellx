@@ -1,4 +1,8 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart' show Key, Offset;
+import 'package:xterm/xterm.dart' show TerminalView;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/find_sessions.dart';
@@ -225,6 +229,115 @@ void main() {
     debugPrint = original;
     expect(copied, ['secret']);
     expect(logs.join().contains('secret'), isFalse);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('^ and \$ go by the character first, the physical key second', (
+    t,
+  ) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final tab = c.read(terminalTabsProvider).selected!;
+    tab.terminal.write('  abcdef');
+    await pressMetaShift(t, LogicalKeyboardKey.keyM);
+    await key(t, LogicalKeyboardKey.digit0);
+    // A layout that makes "$" on another key: the character decides.
+    await simulateKeyDownEvent(
+      LogicalKeyboardKey.dollar,
+      physicalKey: PhysicalKeyboardKey.keyJ,
+      character: r'$',
+    );
+    await simulateKeyUpEvent(
+      LogicalKeyboardKey.dollar,
+      physicalKey: PhysicalKeyboardKey.keyJ,
+    );
+    await t.pump();
+    expect(c.read(copyModeProvider).values.single.state.col, 7);
+    await simulateKeyDownEvent(
+      LogicalKeyboardKey.caret,
+      physicalKey: PhysicalKeyboardKey.keyJ,
+      character: '^',
+    );
+    await simulateKeyUpEvent(
+      LogicalKeyboardKey.caret,
+      physicalKey: PhysicalKeyboardKey.keyJ,
+    );
+    await t.pump();
+    expect(c.read(copyModeProvider).values.single.state.col, 2);
+    // US layout: Shift+4 is still "$".
+    await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.digit4);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await t.pump();
+    expect(c.read(copyModeProvider).values.single.state.col, 7);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('a paste from the menu ends copy mode first, then pastes', (
+    t,
+  ) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final tab = c.read(terminalTabsProvider).selected!;
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async =>
+          call.method == 'Clipboard.getData' ? {'text': 'echo hi'} : null,
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await pressMetaShift(t, LogicalKeyboardKey.keyM);
+    expect(c.read(copyModeProvider), hasLength(1));
+    await t.tapAt(
+      t.getCenter(find.byType(TerminalView)),
+      buttons: kSecondaryMouseButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('menu.paste')));
+    await t.pumpAndSettle();
+    expect(c.read(copyModeProvider), isEmpty);
+    expect(rig.local.views[tab.focusedPaneId]!.writes.join(), 'echo hi');
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('a file drop ends copy mode first, then arrives', (t) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final tab = c.read(terminalTabsProvider).selected!;
+    await pressMetaShift(t, LogicalKeyboardKey.keyM);
+    t.widgetList<DropTarget>(find.byType(DropTarget)).first.onDragDone!(
+      DropDoneDetails(
+        files: [DropItemFile('/tmp/a')],
+        localPosition: Offset.zero,
+        globalPosition: Offset.zero,
+      ),
+    );
+    await t.pump();
+    await t.pump();
+    expect(c.read(copyModeProvider), isEmpty);
+    expect(rig.local.views[tab.focusedPaneId]!.writes.join(), '/tmp/a ');
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('the cursor covers a whole emoji and yanks it', (t) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final copied = mockClipboard(t);
+    final tab = c.read(terminalTabsProvider).selected!;
+    tab.terminal.write('a😀b');
+    await pressMetaShift(t, LogicalKeyboardKey.keyM);
+    await key(t, LogicalKeyboardKey.digit0);
+    await key(t, LogicalKeyboardKey.keyL);
+    final h = tab.selection.highlights.single;
+    expect((h.p1.x, h.p2.x), (1, 3), reason: 'both cells of the emoji');
+    await key(t, LogicalKeyboardKey.keyV);
+    await key(t, LogicalKeyboardKey.keyY);
+    expect(copied, ['😀']);
     await disposeWorkspace(t, c);
   }, variant: mac);
 }
