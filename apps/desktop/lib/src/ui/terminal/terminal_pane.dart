@@ -327,40 +327,47 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                           ),
                         ),
                       // UI §2.8: one toast, bottom centre of the whole area.
+                      // UI-A9 §5: the sequence pill is bottom right of the area,
+                      // over every pane; above a toast, never under it.
                       Positioned(
                         bottom: ShellxSpace.s16,
-                        left: ShellxSpace.s16,
-                        right: ShellxSpace.s16,
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration: ShellxMotion.of(
-                              context,
-                              ShellxMotion.toastIn,
-                            ),
-                            reverseDuration: ShellxMotion.of(
-                              context,
-                              ShellxMotion.exit,
-                            ),
-                            switchInCurve: ShellxMotion.baseCurve,
-                            switchOutCurve: ShellxMotion.exitCurve,
-                            transitionBuilder: _toastTransition,
-                            child: notice == null
-                                ? const SizedBox.shrink()
-                                : NoticeToast(
-                                    key: ObjectKey(notice),
-                                    notice: notice,
-                                    onDismiss: () => _dismiss(notice),
-                                    onReturnFocus: _returnFocus,
-                                  ),
-                          ),
-                        ),
-                      ),
-                      // UI-A9 §5: bottom right of the terminal area, over
-                      // every pane.
-                      const Positioned(
+                        left: ShellxSpace.s12,
                         right: ShellxSpace.s12,
-                        bottom: ShellxSpace.s12,
-                        child: SequenceIndicator(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: SequenceIndicator(),
+                            ),
+                            if (notice != null)
+                              const SizedBox(height: ShellxSpace.s8),
+                            Center(
+                              child: AnimatedSwitcher(
+                                duration: ShellxMotion.of(
+                                  context,
+                                  ShellxMotion.toastIn,
+                                ),
+                                reverseDuration: ShellxMotion.of(
+                                  context,
+                                  ShellxMotion.exit,
+                                ),
+                                switchInCurve: ShellxMotion.baseCurve,
+                                switchOutCurve: ShellxMotion.exitCurve,
+                                transitionBuilder: _toastTransition,
+                                child: notice == null
+                                    ? const SizedBox.shrink()
+                                    : NoticeToast(
+                                        key: ObjectKey(notice),
+                                        notice: notice,
+                                        onDismiss: () => _dismiss(notice),
+                                        onReturnFocus: _returnFocus,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   );

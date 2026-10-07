@@ -37,6 +37,7 @@ enum ConfigProblemCode {
   unsupportedPrefix,
   sequenceTooLong,
   sequencePrefixShadows,
+  sequenceRepeatsPrefix,
   unknownCommand,
   commandLimit,
   problemLimit,
@@ -150,6 +151,8 @@ String configProblemEnglish(ConfigProblem p) {
     ConfigProblemCode.sequenceTooLong => 'Key sequences have at most 2 steps',
     ConfigProblemCode.sequencePrefixShadows =>
       '$value starts a key sequence, so it no longer works on its own',
+    ConfigProblemCode.sequenceRepeatsPrefix =>
+      "This sequence can't fire: pressing $value twice sends it",
     ConfigProblemCode.unknownCommand => "There's no command “$value”",
     ConfigProblemCode.commandLimit =>
       'More than 200 commands — the rest are ignored',

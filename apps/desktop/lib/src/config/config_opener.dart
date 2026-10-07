@@ -42,22 +42,38 @@ class ConfigFileOpener {
     }
   }
 
-  /// Created with exclusive semantics: whoever loses a race (a second
-  /// open, another process) finds the file there and keeps it, so an
-  /// existing file is never replaced. The template is built only now.
+  /// Created without ever replacing a file: whoever loses a race (a second
+  /// open, another process) finds the file there and keeps it. The template
+  /// is built only now. POSIX: written whole to a unique temp file, then
+  /// hard-linked into place (`ln` fails when the target exists), so nobody
+  /// reads a half-written config. Windows: exclusive create, then write.
   Future<void> _create(File file, String Function() template) async {
     await file.parent.create(recursive: true);
-    try {
-      await file.create(exclusive: true);
-    } on FileSystemException {
-      if (await file.exists()) return;
-      rethrow;
+    if (windows) {
+      try {
+        await file.create(exclusive: true);
+      } on FileSystemException {
+        if (await file.exists()) return;
+        rethrow;
+      }
+      try {
+        await file.writeAsString(template(), flush: true);
+      } catch (_) {
+        if (await file.exists()) await file.delete();
+        rethrow;
+      }
+      return;
     }
+    final tmp = await file.parent.createTemp('.config-');
     try {
-      await file.writeAsString(template(), flush: true);
-    } catch (_) {
-      if (await file.exists()) await file.delete();
-      rethrow;
+      final staged = File('${tmp.path}/new');
+      await staged.writeAsString(template(), flush: true);
+      final linked = await Process.run('/bin/ln', [staged.path, file.path]);
+      if (linked.exitCode != 0 && !await file.exists()) {
+        throw FileSystemException('link failed', file.path);
+      }
+    } finally {
+      await tmp.delete(recursive: true);
     }
   }
 }

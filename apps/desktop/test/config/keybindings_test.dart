@@ -209,6 +209,20 @@ keybind = ctrl+a>b>c=new_tab
     expect(problems.last.value, '⌃A');
   });
 
+  test('a sequence repeating its prefix gets a note (it cannot fire)', () {
+    final (b, problems) = resolve('keybind = ctrl+a>ctrl+a=new_tab\n');
+    expect(b.sequences, hasLength(1));
+    expect(
+      problems.where((p) => p.code == ConfigProblemCode.sequenceRepeatsPrefix),
+      [
+        isA<ConfigProblem>()
+            .having((p) => p.line, 'line', 1)
+            .having((p) => p.severity, 'severity', ConfigSeverity.info)
+            .having((p) => p.value, 'value', '⌃A'),
+      ],
+    );
+  });
+
   test('run_command, text, csi, esc, resize amount, font step', () {
     final (b, problems) = resolve(
       r'''

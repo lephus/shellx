@@ -19,10 +19,16 @@ mixin WorkspaceSequences<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   bool invokeIntent(Intent intent);
 
   FocusNode? _lastFocus;
+  AppLifecycleListener? _lifecycle;
 
   void listenToSequences() {
     _lastFocus = FocusManager.instance.primaryFocus;
     FocusManager.instance.addListener(_cancelOnFocusChange);
+    // Switching to another app ends the wait, like a click elsewhere.
+    _lifecycle = AppLifecycleListener(
+      onInactive: _cancelPending,
+      onHide: _cancelPending,
+    );
     ref.listenManual(keySequenceProvider, (_, pending) {
       if (pending == null) return;
       unawaited(
@@ -37,8 +43,15 @@ mixin WorkspaceSequences<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     });
   }
 
-  void disposeSequences() =>
-      FocusManager.instance.removeListener(_cancelOnFocusChange);
+  void disposeSequences() {
+    FocusManager.instance.removeListener(_cancelOnFocusChange);
+    _lifecycle?.dispose();
+    _lifecycle = null;
+  }
+
+  void _cancelPending() {
+    if (mounted) ref.read(keySequenceProvider.notifier).cancel();
+  }
 
   void _cancelOnFocusChange() {
     final now = FocusManager.instance.primaryFocus;

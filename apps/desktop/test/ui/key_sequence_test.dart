@@ -1,11 +1,12 @@
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show EditableText, KeyEventResult;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/config_problem.dart';
 import 'package:shellx_desktop/src/config/keybind_trigger.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/key_sequence.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 
 import '../support/config_harness.dart';
 import '../support/config_workspace.dart';
@@ -230,14 +231,17 @@ void main() {
   );
 
   testWidgets(
-    'an input method key neither swallows nor ends nothing: the '
-    'composition goes on',
+    'an input method key is left to the composition (ignored) and ends '
+    'the wait',
     variant: windows,
     (tester) async {
       final w = await pumpConfiguredWorkspace(tester, config: cfg);
       await ctrlA(tester);
       expect(w.container.read(keySequenceProvider), isNotNull);
-      // The test keyboard cannot make the key itself: hand the handler one.
+      // xterm itself skips its key handlers while a composition is open
+      // (custom_text_edit.dart: onKeyEvent only when composing.isCollapsed),
+      // so only this guard covers the process key. The test keyboard cannot
+      // make the key itself: hand the handler one.
       final handled = w.container
           .read(keySequenceProvider.notifier)
           .handle(
@@ -281,21 +285,108 @@ void main() {
     await disposeWorkspace(tester, w.container);
   });
 
-  testWidgets('a click cancels', variant: mac, (tester) async {
+  testWidgets(
+    'a click cancels (focus unchanged: the pointer alone)',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester, config: cfg);
+      await ctrlA(tester);
+      final before = FocusManager.instance.primaryFocus;
+      // The workspace header: it does not take the focus.
+      await tester.tapAt(const Offset(600, 8));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(FocusManager.instance.primaryFocus, same(before));
+      expect(w.container.read(keySequenceProvider), isNull);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets('a focus change cancels (no key involved)', variant: mac, (
+    tester,
+  ) async {
     final w = await pumpConfiguredWorkspace(tester, config: cfg);
     await ctrlA(tester);
-    await tester.tapAt(const Offset(600, 300));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    expect(w.container.read(keySequenceProvider), isNotNull);
+    tester
+        .state<TerminalWorkspacePageState>(find.byType(TerminalWorkspacePage))
+        .sidebarFocus
+        .requestFocus();
+    await tester.pump();
     expect(w.container.read(keySequenceProvider), isNull);
     await disposeWorkspace(tester, w.container);
   });
 
-  testWidgets('a focus change cancels', variant: mac, (tester) async {
+  testWidgets('the app losing the focus cancels', variant: mac, (tester) async {
     final w = await pumpConfiguredWorkspace(tester, config: cfg);
+    final binding = tester.binding;
     await ctrlA(tester);
-    await ctrlKey(tester, LogicalKeyboardKey.f6); // terminal → sidebar
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(w.container.read(keySequenceProvider), isNull, reason: 'inactive');
+    // The framework walks resumed → inactive → hidden: both end the wait.
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    expect(w.container.read(keySequenceProvider), isNull, reason: 'hidden');
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await disposeWorkspace(tester, w.container);
+  });
+
+  testWidgets('selecting another tab cancels', variant: mac, (tester) async {
+    final w = await pumpConfiguredWorkspace(tester, config: cfg);
+    final tabs = w.container.read(terminalTabsProvider.notifier);
+    await tabs.openTab();
+    await tester.pumpAndSettle();
+    await ctrlA(tester);
+    tabs.select(w.container.read(terminalTabsProvider).tabs.first.id);
     await tester.pump();
     expect(w.container.read(keySequenceProvider), isNull);
+    await disposeWorkspace(tester, w.container);
+  });
+
+  testWidgets(
+    'a matched step is consumed even when its action cannot run',
+    variant: mac,
+    (tester) async {
+      // The window reports "cannot run now" through invoke.
+      final w = await pumpConfiguredWorkspace(tester, config: cfg);
+      await ctrlA(tester);
+      final notifier = w.container.read(keySequenceProvider.notifier);
+      final result = notifier.handle(
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.keyC,
+          logicalKey: LogicalKeyboardKey.keyC,
+          timeStamp: Duration(seconds: 1),
+        ),
+        invoke: (_) => false,
+        sendPrefix: (_) {},
+      );
+      expect(result, KeyEventResult.handled);
+      expect(w.container.read(keySequenceProvider), isNull);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets('the pill rides above a toast', variant: mac, (tester) async {
+    final w = await pumpConfiguredWorkspace(tester, config: cfg);
+    await ctrlA(tester);
+    final alone = tester.getRect(find.text('⌃A …')).bottom;
+    w.container
+        .read(terminalTabsProvider.notifier)
+        .showNotice(const PaneNoRoomNotice());
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pane.toast')), findsOneWidget);
+    final pill = tester.getRect(find.text('⌃A …'));
+    debugPrint(
+      'TOAST ${tester.getRect(find.byKey(const Key('pane.toast')))} PILL $pill',
+    );
+    expect(pill.bottom, lessThan(alone));
+    expect(
+      pill.bottom,
+      lessThanOrEqualTo(
+        tester.getRect(find.byKey(const Key('pane.toast'))).top,
+      ),
+    );
     await disposeWorkspace(tester, w.container);
   });
 

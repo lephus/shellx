@@ -86,4 +86,37 @@ void main() {
     await opener.open(path, template: () => fail('built for an existing file'));
     expect(File(path).readAsStringSync(), 'x\n');
   });
+
+  test('a failing template leaves neither a file nor a temp file', () async {
+    final opener = ConfigFileOpener(windows: false, start: (_, _) async {});
+    final path = '${dir.path}/shellx/config';
+    expect(
+      await opener.open(path, template: () => throw StateError('x')),
+      isFalse,
+    );
+    expect(File(path).existsSync(), isFalse);
+    expect(Directory('${dir.path}/shellx').listSync(), isEmpty);
+  });
+
+  test('an existing file wins a lost race and no temp file stays', () async {
+    final opener = ConfigFileOpener(windows: false, start: (_, _) async {});
+    final path = '${dir.path}/shellx/config';
+    Directory('${dir.path}/shellx').createSync();
+    var built = 0;
+    // Another process creates the file while the template is being built.
+    final ok = await opener.open(
+      path,
+      template: () {
+        built++;
+        File(path).writeAsStringSync('theirs\n');
+        return 'ours\n';
+      },
+    );
+    expect(ok, isTrue);
+    expect(built, 1);
+    expect(File(path).readAsStringSync(), 'theirs\n');
+    expect(Directory('${dir.path}/shellx').listSync().map((e) => e.path), [
+      path,
+    ]);
+  });
 }

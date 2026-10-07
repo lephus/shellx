@@ -224,6 +224,7 @@ void main() {
       ConfigProblemCode.missionControlTrigger: 'v',
       ConfigProblemCode.unsupportedPrefix: 'v',
       ConfigProblemCode.sequencePrefixShadows: 'v',
+      ConfigProblemCode.sequenceRepeatsPrefix: 'v',
       ConfigProblemCode.unknownCommand: 'v',
     };
     const tokens = {'k': 'KEYX', 'v': 'VALX', 'h': 'HINTX', 'd': 'DETX'};

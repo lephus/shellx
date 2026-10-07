@@ -465,6 +465,14 @@ KeyBindings resolveKeyBindings({
     for (final note in rule.notes) {
       report(at, ConfigSeverity.info, note, value: label);
     }
+    if (sequence.length == 2 && sequence[0] == sequence[1]) {
+      report(
+        at,
+        ConfigSeverity.info,
+        ConfigProblemCode.sequenceRepeatsPrefix,
+        value: chordLabel(sequence[0], mac: mac),
+      );
+    }
     if (action.name == 'resize_split' && split.action.contains(',')) {
       report(
         at,

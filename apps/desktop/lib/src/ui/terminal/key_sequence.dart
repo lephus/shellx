@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
 import '../../config/keybind_actions.dart';
 import '../../config/keybind_trigger.dart';
+import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'shortcut_labels.dart';
 
@@ -32,6 +33,10 @@ class KeySequence extends Notifier<KeyChord?> {
       shellxConfigProvider.select((s) => s.bindings),
       (_, _) => cancel(),
     );
+    // Another tab is another terminal: the wait does not follow.
+    ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, _) {
+      cancel();
+    });
     return null;
   }
 
@@ -90,10 +95,13 @@ class KeySequence extends Notifier<KeyChord?> {
     final match = sequences
         .where((b) => b.sequence.first == pending && b.sequence[1] == chord)
         .firstOrNull;
-    if (match != null && invoke(intentForAction(match.action))) {
+    if (match != null) {
+      // A matched step is consumed even when its action cannot run now
+      // (like tmux): half a sequence never types into the shell.
+      invoke(intentForAction(match.action));
       return KeyEventResult.handled;
     }
-    // Not a second step (or its action does not apply now): the key goes on.
+    // Not a second step: the key goes on.
     return KeyEventResult.ignored;
   }
 }
