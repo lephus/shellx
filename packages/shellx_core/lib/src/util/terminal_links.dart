@@ -52,41 +52,59 @@ final RegExp _relPath = RegExp(
 final RegExp _winPath = RegExp(
   r'(?<![A-Za-z0-9])[A-Za-z]:\\(?:[^\s:*?"<>|\\]+\\)*[^\s:*?"<>|\\]*' + _suffix,
 );
+final RegExp _controlCharacters = RegExp(
+  r'[\u0000-\u001f\u007f\u0080-\u009f\s]',
+);
 
-const String _trailingPunctuation = '.,;:!?\'"*';
+const String _trailingPunctuation = '.,;:!?\'"*“”‘’。';
 
-/// [raw] without the punctuation a sentence adds after a URL: `.,;:!?'"*`,
+/// [raw] without the punctuation a sentence adds after a URL: `.,;:!?'"*"''""。`,
 /// and a closing `)`, `]` or `}` with no opening one inside the URL (so a
-/// Wikipedia address ending in `)` keeps it).
+/// Wikipedia address ending in `)` keeps it). Linear time: count brackets once.
 String trimLinkEnd(String raw) {
-  var s = raw;
-  while (s.isNotEmpty) {
-    final last = s[s.length - 1];
+  var end = raw.length;
+  var openParens = 0;
+  var closedParens = 0;
+  var openBrackets = 0;
+  var closedBrackets = 0;
+  var openBraces = 0;
+  var closedBraces = 0;
+
+  // Count brackets in the whole string (linear pass).
+  for (var i = 0; i < raw.length; i++) {
+    final c = raw[i];
+    if (c == '(') openParens++;
+    if (c == ')') closedParens++;
+    if (c == '[') openBrackets++;
+    if (c == ']') closedBrackets++;
+    if (c == '{') openBraces++;
+    if (c == '}') closedBraces++;
+  }
+
+  // Trim from the end (one more linear pass).
+  while (end > 0) {
+    final last = raw[end - 1];
     if (_trailingPunctuation.contains(last)) {
-      s = s.substring(0, s.length - 1);
+      end--;
       continue;
     }
-    final open = switch (last) {
-      ')' => '(',
-      ']' => '[',
-      '}' => '{',
-      _ => null,
+    final shouldTrimBracket = switch (last) {
+      ')' => closedParens > openParens,
+      ']' => closedBrackets > openBrackets,
+      '}' => closedBraces > openBraces,
+      _ => false,
     };
-    if (open != null && _count(s, last) > _count(s, open)) {
-      s = s.substring(0, s.length - 1);
+    if (shouldTrimBracket) {
+      // Remove the bracket from the end and update counts.
+      if (last == ')') closedParens--;
+      if (last == ']') closedBrackets--;
+      if (last == '}') closedBraces--;
+      end--;
       continue;
     }
     break;
   }
-  return s;
-}
-
-int _count(String s, String c) {
-  var n = 0;
-  for (var i = 0; i < s.length; i++) {
-    if (s[i] == c) n++;
-  }
-  return n;
+  return raw.substring(0, end);
 }
 
 /// [raw] as a web address that may be opened: absolute `http`/`https` with a
@@ -94,7 +112,7 @@ int _count(String s, String c) {
 /// (A10 D6: nothing else ever opens).
 Uri? webUriOf(String raw) {
   if (raw.isEmpty || raw.length > kMaxLinkLength) return null;
-  if (RegExp(r'[\u0000-\u001f\u007f\u0080-\u009f\s]').hasMatch(raw)) {
+  if (_controlCharacters.hasMatch(raw)) {
     return null;
   }
   final uri = Uri.tryParse(raw);
@@ -127,7 +145,13 @@ bool hyperlinkTextMatches(String visible, String uri) {
 List<TerminalLink> findLinks(String text, {bool paths = false}) {
   final links = <TerminalLink>[];
   for (final m in _urlPattern.allMatches(text)) {
-    final trimmed = trimLinkEnd(m.group(0)!);
+    final raw = m.group(0)!;
+    // Trim trailing punctuation. For very long matches, cap at 2 * kMaxLinkLength
+    // to avoid O(n) trimming on hostile input, then trim normally.
+    final toTrim = raw.length > 2 * kMaxLinkLength
+        ? raw.substring(0, 2 * kMaxLinkLength)
+        : raw;
+    final trimmed = trimLinkEnd(toTrim);
     if (webUriOf(trimmed) == null) continue;
     links.add(
       TerminalLink(
@@ -185,11 +209,11 @@ int _suffixLength(RegExpMatch m, String whole) {
 }
 
 String _trimPathEnd(String s) {
-  var t = s;
-  while (t.length > 1 && '.,;:!?'.contains(t[t.length - 1])) {
-    t = t.substring(0, t.length - 1);
+  var end = s.length;
+  while (end > 1 && '.,;:!?'.contains(s[end - 1])) {
+    end--;
   }
-  return t;
+  return s.substring(0, end);
 }
 
 /// The link under character [index] of [text], or null.

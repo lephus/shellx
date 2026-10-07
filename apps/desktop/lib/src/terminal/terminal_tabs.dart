@@ -480,9 +480,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// A10 D20: sizes reach a session only once they settle.
   late ResizeSettler _settler;
+  bool _settlerInitialized = false;
 
   /// A10 D20: tells every session its settled size now (a test, a quit).
-  void flushResizes() => _settler.flushAll();
+  void flushResizes() {
+    if (_settlerInitialized) {
+      _settler.flushAll();
+    }
+  }
 
   /// The pane's grid, so a new shell starts at the size it will be shown.
   TerminalGrid _grid = (cols: 80, rows: 24);
@@ -557,7 +562,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   @override
   TerminalTabsState build() {
     _local = ref.watch(localSessionsProvider);
+    // A10 D20: dispose the previous settler if this is a rebuild.
+    if (_settlerInitialized) {
+      _settler.dispose();
+    }
     _settler = ResizeSettler(settle: ref.read(resizeSettleProvider));
+    _settlerInitialized = true;
     _changes = _local.changes.listen((_) => _sync());
     ref.onDispose(_dispose);
     final tabs = _merge(const []);

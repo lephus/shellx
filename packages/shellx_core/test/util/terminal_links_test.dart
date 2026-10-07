@@ -129,5 +129,45 @@ void main() {
         );
       },
     );
+
+    test(
+      'curly quotes and CJK full stop are trimmed like other punctuation',
+      () {
+        expect(urls('see https://example.com/a”'), ['https://example.com/a']);
+        expect(urls('see https://example.com/a‘'), ['https://example.com/a']);
+        expect(urls('see https://example.com/a’'), ['https://example.com/a']);
+        expect(urls('see https://example.com/a“'), ['https://example.com/a']);
+        expect(urls('see https://example.com/a。'), ['https://example.com/a']);
+      },
+    );
+
+    test('200k-char hostile input finishes in reasonable time (< 50 ms)', () {
+      final stopwatch = Stopwatch()..start();
+      final huge = 'https://a.b/${'x' * 2000})))))))))))))))))))))))))))))))))';
+      final result = findLinks(huge);
+      stopwatch.stop();
+      expect(result, isNotEmpty);
+      expect(stopwatch.elapsedMilliseconds, lessThan(50));
+    });
+
+    test('200k closing parens finishes in reasonable time', () {
+      final stopwatch = Stopwatch()..start();
+      final text = 'https://example.com${')' * 200000}';
+      final result = findLinks(text);
+      stopwatch.stop();
+      expect(result, isNotEmpty);
+      expect(stopwatch.elapsedMilliseconds, lessThan(50));
+    });
+  });
+
+  group('path performance', () {
+    test('200k-char path finishes in reasonable time', () {
+      final stopwatch = Stopwatch()..start();
+      final text = '/a${'.' * 200000}';
+      findLinks(text, paths: true);
+      stopwatch.stop();
+      // Should either find one link or none, but not hang
+      expect(stopwatch.elapsedMilliseconds, lessThan(50));
+    });
   });
 }
