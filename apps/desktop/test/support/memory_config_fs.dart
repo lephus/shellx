@@ -15,6 +15,10 @@ final class MemoryConfigFs implements ConfigFs {
   /// When set, [read] throws it (a bug in the platform layer, D10).
   Object? readError;
 
+  /// When set, [read] takes the file's bytes, then waits for it (a slow
+  /// disk): tests use it to see what runs while a read is in flight.
+  Future<void>? readGate;
+
   void write(String path, String text) => writeBytes(path, utf8.encode(text));
 
   void writeBytes(String path, List<int> bytes) {
@@ -38,6 +42,8 @@ final class MemoryConfigFs implements ConfigFs {
       throw FileSystemException('denied', path);
     }
     final bytes = files[path];
+    final gate = readGate;
+    if (gate != null) await gate;
     if (bytes != null && bytes.length > kConfigMaxBytes) {
       throw const ConfigTooLarge();
     }

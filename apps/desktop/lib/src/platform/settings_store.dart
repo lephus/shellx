@@ -53,6 +53,9 @@ abstract final class SettingKeys {
   /// per-launch `SHELLX_CLI_TOKEN` get full access (default off).
   static const String cliAllowExternal = 'cli_allow_external';
 
+  /// A9 D4: "Đang dùng font và màu từ cấu hình Ghostty" was shown once.
+  static const String configGhosttyNoticeShown = 'config_ghostty_notice_shown';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -74,6 +77,7 @@ abstract final class SettingKeys {
     cliControlEnabled,
     cliPathInstalled,
     cliAllowExternal,
+    configGhosttyNoticeShown,
   };
 }
 
