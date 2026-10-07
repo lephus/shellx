@@ -20,22 +20,27 @@ import 'agent_state_codec.dart';
 /// Never logs arguments or results (they carry passwords and pairing
 /// secrets).
 final class RemoteAgentController extends AgentControllerBase {
+  /// [client] is null before the window attached to the service: nothing is
+  /// read and every command fails as a lost link.
   RemoteAgentController(this._client);
 
-  final MuxClient _client;
+  final MuxClient? _client;
   Future<void>? _first;
 
   @override
   AgentViewState build() {
-    final sub = _client.events.listen((m) {
+    final sub = _client?.events.listen((m) {
       if (m.type != MuxType.agentState) return;
       _apply(m.get<Object?>('state'));
     });
-    ref.onDispose(sub.cancel);
+    ref.onDispose(() => sub?.cancel());
     return const AgentViewState();
   }
 
   /// False when [wire] is not a state this app can read.
+  MuxClient get _link =>
+      _client ?? (throw const MuxRemoteException('disconnected'));
+
   bool _apply(Object? wire) {
     if (!ref.mounted) return true;
     if (wire is! Map<Object?, Object?>) return false;
@@ -60,7 +65,7 @@ final class RemoteAgentController extends AgentControllerBase {
       });
 
   Future<void> _load() async {
-    final reply = await _client.request(MuxType.agentGet);
+    final reply = await _link.request(MuxType.agentGet);
     // The first state must be readable: a silent signed-out default would
     // show a wrong tray and ask for a sign-in the daemon already has.
     if (!_apply(reply.get<Object?>('state'))) {
@@ -72,7 +77,7 @@ final class RemoteAgentController extends AgentControllerBase {
     String name, [
     Map<String, Object?> args = const {},
   ]) async {
-    final reply = await _client.request(MuxType.agentCall, {
+    final reply = await _link.request(MuxType.agentCall, {
       'm': name,
       'a': args,
     });

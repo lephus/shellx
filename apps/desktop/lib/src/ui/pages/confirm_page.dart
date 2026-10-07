@@ -10,27 +10,68 @@ import '../window_router.dart';
 /// tall as its text, and a long body scrolls under pinned actions. macOS `[Cancel] [Action]`, Windows `[Action] [Cancel]`, so the
 /// Tab order matches what is seen. A destructive confirm starts on Cancel;
 /// any other starts on its action (Enter confirms).
-class ConfirmPage extends StatelessWidget {
+class ConfirmPage extends StatefulWidget {
   const ConfirmPage({super.key, required this.request});
 
   final ConfirmRequest request;
 
   @override
+  State<ConfirmPage> createState() => _ConfirmPageState();
+}
+
+class _ConfirmPageState extends State<ConfirmPage> {
+  /// The confirm's own work is running (A5b): spinner, buttons locked.
+  bool _busy = false;
+
+  ConfirmRequest get _request => widget.request;
+
+  Future<void> _confirm() async {
+    final work = _request.onConfirm;
+    if (work == null) {
+      _request.complete(true);
+      return;
+    }
+    setState(() => _busy = true);
+    var done = false;
+    try {
+      done = await work();
+    } on Object {
+      done = false;
+    }
+    if (done) {
+      _request.complete(true);
+    } else if (mounted) {
+      setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final request = _request;
+    final secondary = request.secondaryLabel;
     final cancel = OutlinedButton(
       key: const Key('confirm.cancel'),
       autofocus: request.destructive,
-      onPressed: () => request.complete(false),
-      child: Text(l10n.actionCancel),
+      onPressed: _busy
+          ? null
+          : secondary != null
+          ? request.completeSecondary
+          : () => request.complete(false),
+      child: Text(secondary ?? request.cancelLabel ?? l10n.actionCancel),
     );
     final ok = FilledButton(
       key: const Key('confirm.ok'),
       autofocus: !request.destructive,
       style: request.destructive ? destructiveButtonStyle() : null,
-      onPressed: () => request.complete(true),
-      child: Text(request.confirmLabel),
+      onPressed: _busy ? null : _confirm,
+      child: _busy
+          ? const SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(request.confirmLabel),
     );
     const gap = SizedBox(width: ShellxSpace.s8);
     return DialogBody(

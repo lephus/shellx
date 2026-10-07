@@ -42,11 +42,41 @@ final class ConfirmRequest {
     required this.confirmLabel,
     this.long = false,
     this.destructive = true,
+    this.cancelLabel,
+    this.secondaryLabel,
+    this.escapeCloses = true,
+    this.onConfirm,
   });
 
   final String title;
   final String body;
   final String confirmLabel;
+
+  /// The secondary button's text; null: "Cancel" (A5b UI-A5 §7.3 "Để
+  /// sau", §7.4 "Thoát").
+  final String? cancelLabel;
+
+  /// A second way out besides cancelling (A5b UI-A5 §7.1 "Thoát hoàn
+  /// toàn"): the secondary button takes its place, the answer is false and
+  /// [secondaryChosen] is true. Escape still answers false without it.
+  final String? secondaryLabel;
+
+  /// False for a dialog with no valid "stay" state (UI-A5 §7.4): Escape
+  /// and the close button do nothing.
+  final bool escapeCloses;
+
+  /// Work the confirm button starts (UI-A5 §7.3 restarting the service,
+  /// §7.4 trying again): the button shows a spinner and both buttons lock
+  /// until it ends. True answers the request; false leaves the dialog
+  /// open.
+  final Future<bool> Function()? onConfirm;
+
+  bool _secondaryChosen = false;
+  bool get secondaryChosen => _secondaryChosen;
+  void completeSecondary() {
+    _secondaryChosen = true;
+    complete(false);
+  }
 
   /// A body of several paragraphs (a list of files): a wider dialog whose
   /// body scrolls (UI §4).

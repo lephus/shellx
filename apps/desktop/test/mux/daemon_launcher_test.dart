@@ -377,4 +377,48 @@ void main() {
     expect(spawns, 1);
     expect(clock.now.difference(start), const Duration(seconds: 5));
   });
+
+  test('8. findRunning never spawns: none running is null', () async {
+    final r = await launcher().findRunning();
+    expect(r, isNull);
+    expect(spawns, 0);
+    expect(transport.attempts, 0); // no endpoint, nothing to try
+  });
+
+  test(
+    '9. findRunning attaches to a running daemon, replaces nothing',
+    () async {
+      transport
+        ..up = true
+        ..protocol = kMuxProtocol + 1
+        ..sessions = 0;
+      await writeEndpoint();
+      final r = await launcher().findRunning();
+      // Another protocol is reported as is (the caller decides), never
+      // replaced here.
+      expect(r, isA<Incompatible>());
+      expect(transport.quits, 0);
+    },
+  );
+
+  test(
+    '10. the UI\'s request handler is the client\'s (ui.* from the daemon)',
+    () async {
+      transport.up = true;
+      await writeEndpoint();
+      Future<Map<String, Object?>> handler(MuxMessage m) async => {};
+      final withHandler = DaemonLauncher(
+        transport: transport,
+        endpoint: endpoint,
+        daemonLockFree: () async => lockFree,
+        spawn: () async => spawns++,
+        appVersion: '1.6.0',
+        onRequest: handler,
+        now: () => clock.now,
+        sleep: clock.sleep,
+      );
+      final r = await withHandler.connect() as Attached;
+      expect(r.client.onRequest, same(handler));
+    },
+  );
 }

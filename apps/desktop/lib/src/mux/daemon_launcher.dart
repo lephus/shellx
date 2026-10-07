@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:shellx_agent/shellx_agent.dart';
 
+import 'daemon_state.dart' show DaemonConnector;
+
 /// What [DaemonLauncher.connect] found (A5b D16, D19).
 sealed class DaemonConnection {
   const DaemonConnection();
@@ -38,13 +40,14 @@ final class StartFailed extends DaemonConnection {
 /// start one when none does, and never attach across protocols. Never
 /// sends a message on a connection whose peer has not proven the secret,
 /// and never logs.
-final class DaemonLauncher {
+final class DaemonLauncher implements DaemonConnector {
   DaemonLauncher({
     required this.transport,
     required this.endpoint,
     required this.daemonLockFree,
     required this.spawn,
     required this.appVersion,
+    this.onRequest,
     this.attempt = const Duration(seconds: 1),
     this.retryEvery = const Duration(milliseconds: 100),
     this.retryFor = const Duration(seconds: 5),
@@ -64,11 +67,25 @@ final class DaemonLauncher {
   /// Starts a detached daemon.
   final Future<void> Function() spawn;
   final String appVersion;
+
+  /// What answers the daemon's own requests (`ui.*`, D22) on the clients
+  /// this launcher makes.
+  final Future<Map<String, Object?>> Function(MuxMessage request)? onRequest;
   final Duration attempt, retryEvery, retryFor, quitWait, replaceWait;
   final DateTime Function() _now;
   final Future<void> Function(Duration) _sleep;
 
+  @override
   Future<DaemonConnection> connect() => _connect(replaceEmpty: true);
+
+  /// The daemon that runs now, if any: never starts one and never replaces
+  /// one (null: none answered). A daemon of another protocol is reported as
+  /// [Incompatible] whatever it holds.
+  Future<DaemonConnection?> findRunning() async {
+    final found = await _tryAttach();
+    if (found == null) return null;
+    return _classify(found, started: false, replaceEmpty: false);
+  }
 
   /// [replaceEmpty]: a daemon of another protocol with no sessions is
   /// stopped without asking, at most once per [connect] (a daemon that will
@@ -97,6 +114,7 @@ final class DaemonLauncher {
   }
 
   /// D19: stop the old daemon (it closes its shells) and start ours.
+  @override
   Future<DaemonConnection> replaceIncompatible(Incompatible old) async {
     try {
       await old.client.request(MuxType.daemonQuit).timeout(quitWait);
@@ -137,7 +155,7 @@ final class DaemonLauncher {
         role: 'ui',
         timeout: attempt,
       );
-      return (MuxClient(c, early: info.early), info);
+      return (MuxClient(c, early: info.early, onRequest: onRequest), info);
     } on Object {
       try {
         await c?.close();
