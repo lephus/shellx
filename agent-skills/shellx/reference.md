@@ -4,6 +4,7 @@ Every command: `shellx <command> [args] [--json] [--socket ADDRESS] [--help]`.
 
 - `--json` prints exactly one JSON object on stdout (events: one object per line). Errors with `--json` are also printed on **stdout** as `{"error":{"code":"…","message":"…"}}`; without `--json` they go to stderr as `shellx: <message> (<code>)`.
 - Commands that create something print only the new id (for `$(…)`); other commands print nothing on success unless they read something.
+- Text that comes from ShellX or a page (titles, names, console lines, error messages) is printed without control characters; `read` prints the terminal's text as it is.
 - `--socket ADDRESS` overrides `$SHELLX_SOCKET` and the endpoint file's address (tests only).
 
 ## Targets
@@ -164,7 +165,7 @@ JSON: `{}`. Exit codes: 0, 2, 3, 4, 6, 7.
 2. No pane, but this terminal window is shared with the phone (`$SHELLX_TERM` is this terminal): written as an OSC 777 notification to the terminal (push).
 3. Otherwise: a ShellX system notification and a "Command line" entry in the notification panel (no push). This works from any terminal, even without "Allow other terminals".
 
-If ShellX is not running but you are in a ShellX pane with a terminal, it falls back to OSC 777 and exits 0. Body at most 1024 characters, title 128; control characters are removed.
+If ShellX is not running but you are in a ShellX pane (`$SHELLX_PANE_ID` set) with a terminal, it falls back to OSC 777 and exits 0. `--pane` takes a pane id (`p<id>`) or `@self`; `@focused` is refused (exit 2). Body at most 1024 characters, title 128; control characters are removed.
 
 JSON: `{}`. Exit codes: 0, 2, 3, 4 (no such pane), 6, 7.
 
@@ -203,7 +204,7 @@ Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 
 Ids are written as `p…`, `t…`, `w:…`. At most 4 listeners at once.
 
-Exit codes: 3 (stream closed), 6, 7.
+Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or the reader of its output went away, e.g. `| head -1` — it ends at the next event), 1 (output cannot be written), 3 (ShellX closed the stream), 6, 7.
 
 ## Browser panes
 
@@ -247,7 +248,7 @@ Exit codes: 3 (stream closed), 6, 7.
 
 ## shellx browser eval
 
-`shellx browser eval PANE (--script JS | --file FILE | --file -) [--timeout SECONDS]` — run an async function body in the page; `return` a JSON value. Prints the JSON result (e.g. `"Directory listing for /"`). At most 32 KiB, timeout ≤ 30 s. A script error exits 1 `eval_error`. Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
+`shellx browser eval PANE (--script JS | --file FILE | --file -) [--timeout SECONDS]` — run an async function body in the page; `return` a JSON value. Prints the JSON result (e.g. `"Directory listing for /"`); with `--json`: `{"json":<result>}`. At most 32 KiB, timeout ≤ 30 s. A script error exits 1 `eval_error`. Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 
 ## shellx browser screenshot
 
@@ -267,7 +268,7 @@ Exit codes: 3 (stream closed), 6, 7.
 
 ## shellx browser click
 
-`shellx browser click PANE SELECTOR` — scroll the first match into view and click it; no match exits 1 `eval_error`. Exit codes: as `eval`.
+`shellx browser click PANE SELECTOR` — scroll the first match into view and click it; no match exits 1 `eval_error`. Prints nothing (`--json`: `{"json":true}`). Exit codes: as `eval`.
 
 ## shellx browser fill
 
@@ -275,11 +276,11 @@ Exit codes: 3 (stream closed), 6, 7.
 
 ## shellx skills install
 
-`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) into `~/.claude/skills/shellx/` (Claude Code), `~/.agents/skills/shellx/` (Codex) or `DIR/shellx/`. Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". Never connects to ShellX. Exit codes: 0, 1, 6.
+`shellx skills install [--claude] [--codex] [--dir DIR] [--force]` — install this skill (`SKILL.md`, `reference.md`) into `~/.claude/skills/shellx/` (Claude Code), `~/.agents/skills/shellx/` (Codex) or `DIR/shellx/`. Without flags: every agent whose folder exists (`~/.claude`; `~/.codex` or `~/.agents`). A file you changed is not overwritten without asking ("Overwrite …? [y/N]"); without a terminal to ask, it exits 6 unless `--force`. An identical file is "up to date". A changed file you decline (or cannot be asked about) is kept and skipped; the other files are still installed and the command exits 6 at the end. `--json`: `{"installed":[…],"upToDate":[…],"skipped":[…]}` plus `"error"` when something was skipped. Never connects to ShellX. Exit codes: 0, 1, 6.
 
 ## shellx skills print
 
-`shellx skills print [SKILL.md | reference]` — print the embedded skill file. Exit codes: 0, 2.
+`shellx skills print [SKILL.md | reference]` — print the embedded skill file (`--json`: `{"files":[{"name":"reference.md","text":"…"}]}`). Exit codes: 0, 2.
 
 ## shellx help
 
