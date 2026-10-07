@@ -50,4 +50,19 @@ void main() {
     expect(remoteProbeScript, contains('ss -ltnp'));
     expect(remoteProbeScript, contains('lsof -nP -iTCP -sTCP:LISTEN -F pn'));
   });
+
+  test('hostile numbers never throw (overflow pid, bad ports, negative pid)', () {
+    final ports = parseRemoteProbe(
+      '#ps\n100 1\n-5 100\n#ss\n'
+      'LISTEN 0 1 0.0.0.0:8000 0.0.0.0:* users:(("a",pid=99999999999999999999,fd=1),("a",pid=100,fd=1))\n'
+      'LISTEN 0 1 0.0.0.0:0 0.0.0.0:* users:(("a",pid=100,fd=1))\n'
+      'LISTEN 0 1 0.0.0.0:70000 0.0.0.0:* users:(("a",pid=100,fd=1))\n'
+      'LISTEN 0 1 0.0.0.0:99999999999999999999 0.0.0.0:* users:(("a",pid=100,fd=1))\n'
+      'LISTEN 0 1 0.0.0.0:9 0.0.0.0:* users:(("a",pid=-5,fd=1))\n',
+      [100],
+    );
+    expect(ports, {
+      100: [8000],
+    });
+  });
 }

@@ -1,9 +1,10 @@
 import 'command_runner.dart';
 import 'session_launch.dart' show isValidTmuxName;
 
-/// A8 D25: one line per session, tab-separated.
+/// A8 D25: one line per session, tab-separated. The sentinel keeps a name
+/// (or a login banner) from spoofing a row.
 const String tmuxListFormat =
-    '#{session_name}\t#{session_windows}\t#{session_attached}\t'
+    'SXTMUX\t#{session_name}\t#{session_windows}\t#{session_attached}\t'
     '#{session_activity}';
 
 final class TmuxSessionInfo {
@@ -39,22 +40,35 @@ final class TmuxSessionInfo {
 }
 
 /// Lines of [tmuxListFormat]; anything else (a login banner) is skipped.
-List<TmuxSessionInfo> parseTmuxSessions(String stdout) => [
-  for (final line in stdout.split('\n')) ?_parse(line.replaceAll('\r', '')),
-];
+List<TmuxSessionInfo> parseTmuxSessions(String stdout) {
+  final result = <TmuxSessionInfo>[];
+  for (final line in stdout.split('\n')) {
+    final session = _parse(line.replaceAll('\r', ''));
+    if (session == null) continue;
+    result.add(session);
+    if (result.length >= _maxSessions) break;
+  }
+  return result;
+}
+
+const int _maxSessions = 512;
+const int _maxCount = 100000;
+const int _maxEpochSeconds = 253402300799; // year 9999
 
 TmuxSessionInfo? _parse(String line) {
   final parts = line.split('\t');
-  if (parts.length != 4 || !isValidTmuxName(parts[0])) return null;
-  final windows = int.tryParse(parts[1]);
-  final attached = int.tryParse(parts[2]);
-  final activity = int.tryParse(parts[3]);
-  if (windows == null || attached == null) return null;
+  if (parts.length != 5 || parts[0] != 'SXTMUX') return null;
+  if (!isValidTmuxName(parts[1])) return null;
+  final windows = int.tryParse(parts[2]);
+  final attached = int.tryParse(parts[3]);
+  final activity = int.tryParse(parts[4]);
+  if (windows == null || windows < 0 || windows > _maxCount) return null;
+  if (attached == null || attached < 0 || attached > _maxCount) return null;
   return TmuxSessionInfo(
-    name: parts[0],
+    name: parts[1],
     windows: windows,
     attached: attached,
-    activity: activity == null
+    activity: activity == null || activity < 0 || activity > _maxEpochSeconds
         ? null
         : DateTime.fromMillisecondsSinceEpoch(activity * 1000),
   );

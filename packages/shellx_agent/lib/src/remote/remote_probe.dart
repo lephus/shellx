@@ -49,7 +49,8 @@ Map<int, List<int>> parseRemoteProbe(String output, Iterable<int> shellPids) {
         final port = _portOf(cols[3]);
         if (port == null) continue;
         for (final m in _pid.allMatches(line)) {
-          (listening[int.parse(m[1]!)] ??= {}).add(port);
+          final pid = int.tryParse(m[1]!);
+          if (pid != null) (listening[pid] ??= {}).add(port);
         }
       case '#lsof':
         if (line.startsWith('p')) {

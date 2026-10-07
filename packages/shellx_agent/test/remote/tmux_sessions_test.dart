@@ -5,10 +5,10 @@ void main() {
   test('parses tab-separated sessions and skips noise (D25)', () {
     final sessions = parseTmuxSessions(
       'Welcome to the server\n'
-      'main\t3\t0\t1759831200\n'
-      'my build\t1\t2\t1759744800\n'
-      'bad:name\t1\t0\t1\n'
-      'short\t1\n',
+      'SXTMUX\tmain\t3\t0\t1759831200\n'
+      'SXTMUX\tmy build\t1\t2\t1759744800\n'
+      'SXTMUX\tbad:name\t1\t0\t1\n'
+      'SXTMUX\tshort\t1\n',
     );
     expect(sessions.map((s) => s.name), ['main', 'my build']);
     expect(sessions.first.windows, 3);
@@ -23,7 +23,7 @@ void main() {
   test('classifies results', () {
     expect(
       classifyTmuxList(
-        const CommandResult(0, 'a\t1\t0\t1\n', ''),
+        const CommandResult(0, 'SXTMUX\ta\t1\t0\t1\n', ''),
         remote: false,
       ),
       isA<TmuxSessions>().having((r) => r.sessions.length, 'n', 1),
@@ -90,5 +90,36 @@ void main() {
         TmuxListFailure.other,
       ),
     );
+  });
+
+  test('rows need the sentinel; a name cannot spoof a row (L5)', () {
+    expect(tmuxListFormat, startsWith('SXTMUX\t'));
+    final sessions = parseTmuxSessions(
+      'main\t1\t0\t1\n'
+      'SXTMUX\tok\t1\t0\t1\n',
+    );
+    expect(sessions.map((s) => s.name), ['ok']);
+  });
+
+  test('hostile numbers never throw and are bounded (M2)', () {
+    final sessions = parseTmuxSessions(
+      'SXTMUX\ta\t1\t0\t99999999999999999\n'
+      'SXTMUX\tb\t1\t0\t-5\n'
+      'SXTMUX\tc\t-1\t0\t1\n'
+      'SXTMUX\td\t1\t100001\t1\n'
+      'SXTMUX\te\t99999999999999999999\t0\t1\n'
+      'SXTMUX\tf\t2\t1\t253402300799\n',
+    );
+    expect(sessions.map((s) => s.name), ['a', 'b', 'f']);
+    expect(sessions[0].activity, isNull);
+    expect(sessions[1].activity, isNull);
+    expect(sessions[2].activity, isNotNull);
+  });
+
+  test('at most 512 sessions (L4)', () {
+    final text = [
+      for (var i = 0; i < 600; i++) 'SXTMUX\ts$i\t1\t0\t1',
+    ].join('\n');
+    expect(parseTmuxSessions(text), hasLength(512));
   });
 }
