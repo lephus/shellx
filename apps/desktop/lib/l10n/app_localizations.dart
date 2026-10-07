@@ -3053,6 +3053,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stopping the background service…'**
   String get daemonStoppingStrip;
+
+  /// No description provided for @pasteLargeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste {size}?'**
+  String pasteLargeTitle(String size);
+
+  /// No description provided for @pasteLargeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a lot of text. It is sent a piece at a time and can’t be undone.'**
+  String get pasteLargeBody;
+
+  /// No description provided for @pasteLargeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get pasteLargeAction;
+
+  /// No description provided for @pasteTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The clipboard is too large to paste (over 16 MB)'**
+  String get pasteTooLarge;
 }
 
 class _AppLocalizationsDelegate

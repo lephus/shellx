@@ -14,7 +14,10 @@ import '../../config/config_controller.dart';
 import '../../config/keybindings.dart';
 import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
+import '../../terminal/byte_size.dart';
 import '../../terminal/pane_layout.dart';
+import '../../terminal/pane_paste.dart';
+import '../../terminal/paste_sender.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
@@ -430,22 +433,53 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     );
   }
 
-  /// ⌘V / Ctrl+Shift+V into the selected tab, sanitised (and bracketed when
-  /// the program asked for it) by DesktopTerminal.paste.
+  /// ⌘V / Ctrl+Shift+V / the menu into the **focused pane of the selected
+  /// tab at the moment of the key** — chosen before the clipboard is read,
+  /// so a tab switch while it is read cannot send the text elsewhere (A10
+  /// D13). Sanitised and bracketed by [DesktopTerminal.paste]; a large text
+  /// is asked about, then sent in pieces ([PasteSender]). The sink writes
+  /// through the pane's terminal, so in-process, background-service and SSH
+  /// panes behave alike.
   Future<void> _paste() async {
-    final id = ref.read(terminalTabsProvider).selectedId;
-    if (id == null) return;
+    final tab = ref.read(terminalTabsProvider).selected;
+    if (tab == null) return;
+    final paneId = tab.focusedPaneId;
+    final terminal = tab.focused.terminal;
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text;
     if (!mounted || text == null || text.isEmpty) return;
-    final tab = ref
-        .read(terminalTabsProvider)
-        .tabs
-        .where((t) => t.id == id)
-        .firstOrNull;
-    // An exited tab closes on Enter (UI §2.6): a paste must not do that.
-    if (tab == null || tab.exited) return;
-    tab.terminal.paste(text);
+    final sink = PanePasteSink(
+      () => ref.read(terminalTabsProvider),
+      paneId,
+      terminal,
+    );
+    // An exited pane closes on Enter (UI §2.6): a paste must not do that.
+    if (!sink.alive) return;
+    final l10n = AppLocalizations.of(context);
+    final outcome = await ref
+        .read(pasteSenderProvider)
+        .send(
+          paneId,
+          text,
+          sink,
+          confirm: (bytes) => ref
+              .read(windowRouterProvider.notifier)
+              .confirm(
+                ConfirmRequest(
+                  title: l10n.pasteLargeTitle(
+                    formatByteSize(bytes, locale: l10n.localeName),
+                  ),
+                  body: l10n.pasteLargeBody,
+                  confirmLabel: l10n.pasteLargeAction,
+                  destructive: false,
+                ),
+              ),
+        );
+    if (outcome == PasteOutcome.tooLarge && mounted) {
+      ref
+          .read(terminalTabsProvider.notifier)
+          .showNotice(const PasteTooLargeNotice());
+    }
   }
 
   @override

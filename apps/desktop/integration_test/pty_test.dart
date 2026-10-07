@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/platform/pty/flutter_pty_factory.dart';
+import 'package:shellx_desktop/src/terminal/paste_sender.dart';
 
 final RegExp _ansi = RegExp(
   r'\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1B]*(?:\x07|\x1B\\)|[@-Z\\-_])',
@@ -809,4 +810,43 @@ void main() {
     },
     skip: !File(vim).existsSync(),
   );
+
+  // A10 D13: a large paste goes in paced pieces, so the 1 MiB write queue
+  // never overflows.
+  testWidgets('a 792 KB paste through PasteSender arrives whole', (
+    tester,
+  ) async {
+    final dir = await Directory.systemTemp.createTemp('shellx-paste-');
+    addTearDown(() => dir.delete(recursive: true));
+    final (pty, transcript) = open(shell);
+    _type(pty, 'cat > ${dir.path}/pasted.txt');
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final sink = _PtySink(pty);
+    // Lines, not one long line: the terminal's line discipline cuts an
+    // unbroken 800 KB.
+    final text = List.generate(8000, (i) => '${'x' * 98}\n').join();
+    final outcome = await PasteSender().send(1, text, sink);
+    expect(outcome, PasteOutcome.sent);
+    // End of file: the text ended with a newline.
+    pty.write(Uint8List.fromList([4]));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    _type(pty, 'echo size-\$(wc -c < ${dir.path}/pasted.txt | tr -d " ")');
+    await transcript.waitForLine((line) => line == 'size-792000');
+    pty.kill();
+    await pty.exitCode.timeout(const Duration(seconds: 15));
+  }, skip: Platform.isWindows);
+}
+
+/// A pane's PTY as [PasteSender] writes to it (normal mode: no brackets).
+final class _PtySink implements PasteSink {
+  _PtySink(this._pty);
+  final Pty _pty;
+  @override
+  bool get alive => true;
+  @override
+  bool get bracketed => false;
+  @override
+  void paste(String text) => _pty.write(Uint8List.fromList(utf8.encode(text)));
+  @override
+  void send(String data) => _pty.write(Uint8List.fromList(utf8.encode(data)));
 }

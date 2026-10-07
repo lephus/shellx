@@ -2082,4 +2082,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get daemonStoppingStrip => 'Stopping the background service…';
+
+  @override
+  String pasteLargeTitle(String size) {
+    return 'Paste $size?';
+  }
+
+  @override
+  String get pasteLargeBody =>
+      'This is a lot of text. It is sent a piece at a time and can’t be undone.';
+
+  @override
+  String get pasteLargeAction => 'Paste';
+
+  @override
+  String get pasteTooLarge =>
+      'The clipboard is too large to paste (over 16 MB)';
 }

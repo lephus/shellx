@@ -490,5 +490,9 @@
   "trayBackgroundService": "Giữ shell chạy khi đóng cửa sổ",
   "backgroundServiceNextLaunch": "Có hiệu lực ở lần mở ShellX kế tiếp.",
   "daemonQuitFailed": "Phiên nền chưa dừng được. Hãy thử lại.",
-  "daemonStoppingStrip": "Đang dừng phiên nền…"
+  "daemonStoppingStrip": "Đang dừng phiên nền…",
+  "pasteLargeTitle": "Dán {size}?",
+  "pasteLargeBody": "Đây là lượng văn bản lớn. Chữ được gửi từng phần và không thể hoàn tác.",
+  "pasteLargeAction": "Dán",
+  "pasteTooLarge": "Nội dung clipboard quá lớn để dán (hơn 16 MB)"
 }
