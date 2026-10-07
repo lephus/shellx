@@ -67,6 +67,7 @@ void main() {
       'Thông báo',
       // A7 D26 (A6 absent: no "Trình duyệt" before it).
       'Dòng lệnh',
+      'SSH', // A8 UI §5.3
       'Cấu hình',
       'Đổi mật khẩu…',
       'Đăng xuất',
@@ -196,6 +197,7 @@ void main() {
       'Terminal',
       'Thông báo',
       'Dòng lệnh',
+      'SSH', // A8 UI §5.3
       'Cấu hình',
       '---',
       '○ Chưa đăng nhập',

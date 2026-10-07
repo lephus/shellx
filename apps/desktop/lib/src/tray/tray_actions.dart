@@ -12,6 +12,10 @@ import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/config_opener.dart' show openShellxConfig;
+import '../platform/settings_store.dart' show SettingKeys;
+import '../remote/ssh_actions.dart';
+import '../remote/ssh_settings.dart';
+import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 import '../terminal/terminal_tabs.dart';
 import '../terminal_sharing/confirm_text.dart';
 import '../ui/activation.dart';
@@ -36,6 +40,8 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     cliControlEnabled: cli.controlEnabled,
     cliAllowExternal: cli.allowExternal,
     cliPathInstalled: cli.pathInstalled,
+    sshHook: sshHookEnabled(ref.read(settingsStoreProvider)),
+    hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -201,6 +207,33 @@ final class TrayActions {
         _ref
             .read(terminalTabsProvider.notifier)
             .showNotice(const CliSkillsCopiedNotice());
+      // A8 UI §5.3: the window first, then the dialog on its tab.
+      case OpenSshConnect():
+        await _showWindow();
+        _router.open(const SshConnectRoute());
+      case OpenTmuxAttach():
+        await _showWindow();
+        _router.open(const SshConnectRoute(SshDialogTab.tmux));
+      // At once, without asking; only for opens from now on.
+      case ToggleSshHook():
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setBool(
+            SettingKeys.sshRemoteHook,
+            !sshHookEnabled(settings),
+          );
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+      case ClearRecentServers():
+        try {
+          await _ref.read(sshActionsProvider).clearRecent();
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const SshRecentClearedNotice());
       case OpenConfigFile():
         await _showWindow();
         await openShellxConfig(_ref.read);

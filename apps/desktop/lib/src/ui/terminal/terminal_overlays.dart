@@ -596,7 +596,8 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is PaneNoRoomNotice ||
       widget.notice is RestorePanesFailedNotice ||
       widget.notice is CliSkillsCopiedNotice ||
-      widget.notice is CliPathInstalledNotice;
+      widget.notice is CliPathInstalledNotice ||
+      widget.notice is SshRecentClearedNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -662,6 +663,7 @@ class _NoticeToastState extends State<NoticeToast> {
           ? l10n.sshUnavailableWindows
           : l10n.sshUnavailable,
     TmuxUnavailableNotice() => l10n.tmuxUnavailableLocal,
+    SshRecentClearedNotice() => l10n.sshRecentCleared,
     RemotePortForwardFailedNotice(:final port) => l10n.remotePortForwardFailed(
       port,
     ),

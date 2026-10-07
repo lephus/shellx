@@ -4,9 +4,13 @@ import '../platform/settings_store.dart';
 
 const int kRecentTargets = 10;
 
+/// D11: the global switch (on unless turned off).
+bool sshHookEnabled(SettingsStore settings) =>
+    settings.getBool(SettingKeys.sshRemoteHook, defaultValue: true);
+
 /// D11: the global switch and the per-server list.
 bool sshHookFor(SettingsStore settings, String key) =>
-    settings.getBool(SettingKeys.sshRemoteHook, defaultValue: true) &&
+    sshHookEnabled(settings) &&
     !settings.getStrings(SettingKeys.sshPlainTargets).contains(key);
 
 /// D6: stored keys that still parse canonically (the file is user-editable).

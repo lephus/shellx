@@ -20,6 +20,11 @@ final class RemotePortForwardFailedNotice extends TabNotice {
   final int port;
 }
 
+/// A8 D6: the tray emptied the recent servers. Neutral toast.
+final class SshRecentClearedNotice extends TabNotice {
+  const SshRecentClearedNotice();
+}
+
 /// The toast for a failed open: the named A8 ones, else A1's wording.
 TabNotice spawnNoticeFor(SpawnFailedException error) => switch (error.message) {
   'ssh_unavailable' => const SshUnavailableNotice(),
