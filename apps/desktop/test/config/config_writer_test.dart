@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/config/config_files.dart';
+import 'package:shellx_desktop/src/config/config_key_edits.dart';
 import 'package:shellx_desktop/src/config/config_writer.dart';
 import 'package:shellx_desktop/src/config/keybind_actions.dart';
 import 'package:shellx_desktop/src/config/keybind_trigger.dart';
@@ -332,6 +333,142 @@ void main() {
       );
       expect(fs.replaced, isEmpty);
     });
+  });
+
+  group('editText (A11 D5: the settings\' key edits)', () {
+    const path = '/c/config';
+    String bump(String t) =>
+        applyKeyEdits(t, [const SetKey('font-size', '15')]);
+
+    test('keeps the BOM and the CRLFs, changes only the line', () async {
+      final fs = MemoryConfigFs()
+        ..writeBytes(path, [
+          0xEF, 0xBB, 0xBF, //
+          ...utf8.encode('# mine\r\nfont-size = 13\r\ntheme = X\r\n'),
+        ]);
+      await ConfigFileWriter(fs).editText(path, bump, template: '');
+      expect(fs.files[path]!.sublist(0, 3), [0xEF, 0xBB, 0xBF]);
+      expect(
+        utf8.decode(fs.files[path]!.sublist(3)),
+        '# mine\r\nfont-size = 15\r\ntheme = X\r\n',
+      );
+    });
+
+    test('UTF-16 files are refused and left alone', () async {
+      final fs = MemoryConfigFs()
+        ..writeBytes(path, [0xFF, 0xFE, 0x61, 0x00, 0x0A, 0x00]);
+      await expectLater(
+        ConfigFileWriter(fs).editText(path, bump, template: ''),
+        throwsA(
+          isA<ConfigWriteRefused>().having(
+            (e) => e.reason,
+            'reason',
+            ConfigWriteRefusal.utf16,
+          ),
+        ),
+      );
+      expect(fs.replaced, isEmpty);
+    });
+
+    test('a file changed after the read is refused (expected bytes)', () async {
+      final fs = MemoryConfigFs()..write(path, 'font-size = 13\n');
+      fs.beforeReplace = (p) => fs.write(p, 'font-size = 99\n');
+      await expectLater(
+        ConfigFileWriter(fs).editText(path, bump, template: ''),
+        throwsA(
+          isA<ConfigWriteRefused>().having(
+            (e) => e.reason,
+            'reason',
+            ConfigWriteRefusal.changed,
+          ),
+        ),
+      );
+      expect(fs.text(path), 'font-size = 99\n');
+    });
+
+    test('a missing file is made from the template, with the edit', () async {
+      final fs = MemoryConfigFs();
+      await ConfigFileWriter(fs).editText(path, bump, template: '# t\n');
+      expect(fs.text(path), startsWith('# t\n'));
+      expect(fs.text(path), contains('font-size = 15'));
+    });
+
+    test('a transform that changes nothing writes nothing', () async {
+      final fs = MemoryConfigFs();
+      await ConfigFileWriter(fs).editText(path, (t) => t, template: '# t\n');
+      expect(fs.files, isEmpty);
+      fs.write(path, 'a = 1\n');
+      await ConfigFileWriter(fs).editText(
+        path,
+        (t) => applyKeyEdits(t, [const ResetKey('font-size')]),
+        template: '',
+      );
+      expect(fs.replaced, isEmpty);
+    });
+
+    test('a damaged block surfaces as a refusal and the file stays', () async {
+      final fs = MemoryConfigFs()..write(path, '$kSettingsStart\na = 1\n');
+      await expectLater(
+        ConfigFileWriter(fs).editText(path, bump, template: ''),
+        throwsA(
+          isA<ConfigWriteRefused>().having(
+            (e) => e.reason,
+            'reason',
+            ConfigWriteRefusal.damagedBlock,
+          ),
+        ),
+      );
+      expect(fs.replaced, isEmpty);
+    });
+
+    test('a result over the size limit is refused', () async {
+      final fs = MemoryConfigFs()..write(path, '# x\n');
+      await expectLater(
+        ConfigFileWriter(fs).editText(
+          path,
+          (t) => '$t${'#' * (kConfigMaxBytes + 1)}',
+          template: '',
+        ),
+        throwsA(isA<ConfigWriteRefused>()),
+      );
+    });
+
+    test('edit still goes through editText (same refusals)', () async {
+      final fs = MemoryConfigFs()..write(path, 'a = 1\n$kManagedStart\n');
+      await expectLater(
+        ConfigFileWriter(fs).edit(path, [
+          AddBinding(c('ctrl+alt+n'), const KeyAction('new_tab')),
+        ], template: ''),
+        throwsA(isA<ConfigWriteRefused>()),
+      );
+    });
+
+    test(
+      'real file: mode and symlink kept, no temporary file left',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('shellx-keyedit-');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final file = File('${dir.path}/config')
+          ..writeAsBytesSync([
+            0xEF,
+            0xBB,
+            0xBF,
+            ...utf8.encode('font-size = 13\r\n'),
+          ]);
+        Process.runSync('chmod', ['600', file.path]);
+        await ConfigFileWriter(
+          const IoConfigFileStore(),
+        ).editText(file.path, bump, template: '');
+        expect(file.statSync().mode & 0xFFF, 384);
+        expect(file.readAsBytesSync().sublist(0, 3), [0xEF, 0xBB, 0xBF]);
+        expect(
+          utf8.decode(file.readAsBytesSync().sublist(3)),
+          'font-size = 15\r\n',
+        );
+        expect(dir.listSync(), hasLength(1));
+      },
+      skip: Platform.isWindows,
+    );
   });
 
   group('IoConfigFileStore (real files)', () {

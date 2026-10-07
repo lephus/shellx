@@ -3341,6 +3341,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Forward to next pane'**
   String get actionFocusForward;
+
+  /// No description provided for @settingsPageGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get settingsPageGeneral;
+
+  /// No description provided for @settingsPageAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsPageAppearance;
+
+  /// No description provided for @settingsPageTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get settingsPageTerminal;
+
+  /// No description provided for @settingsPageKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get settingsPageKeys;
+
+  /// No description provided for @settingsPageAgents.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get settingsPageAgents;
+
+  /// No description provided for @settingsPagePhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get settingsPagePhone;
+
+  /// No description provided for @settingsPageAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsPageAdvanced;
+
+  /// No description provided for @settingsTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// No description provided for @settingsFontFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Font'**
+  String get settingsFontFamily;
+
+  /// No description provided for @settingsFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get settingsFontSize;
+
+  /// No description provided for @settingsFontWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Text weight'**
+  String get settingsFontWeight;
+
+  /// No description provided for @settingsFontWeightLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsFontWeightLight;
+
+  /// No description provided for @settingsFontWeightRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular'**
+  String get settingsFontWeightRegular;
+
+  /// No description provided for @settingsCellHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Line height'**
+  String get settingsCellHeight;
+
+  /// No description provided for @settingsPadding.
+  ///
+  /// In en, this message translates to:
+  /// **'Padding'**
+  String get settingsPadding;
+
+  /// No description provided for @settingsCursorStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor'**
+  String get settingsCursorStyle;
+
+  /// No description provided for @settingsCursorBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get settingsCursorBlock;
+
+  /// No description provided for @settingsCursorBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Bar'**
+  String get settingsCursorBar;
+
+  /// No description provided for @settingsCursorUnderline.
+  ///
+  /// In en, this message translates to:
+  /// **'Underline'**
+  String get settingsCursorUnderline;
+
+  /// No description provided for @settingsCursorBlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Blinking cursor'**
+  String get settingsCursorBlink;
+
+  /// No description provided for @settingsScrollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrollback lines'**
+  String get settingsScrollback;
+
+  /// No description provided for @settingsWorkingDir.
+  ///
+  /// In en, this message translates to:
+  /// **'New tabs start in'**
+  String get settingsWorkingDir;
+
+  /// No description provided for @settingsOptionAsAlt.
+  ///
+  /// In en, this message translates to:
+  /// **'Option key as Alt'**
+  String get settingsOptionAsAlt;
+
+  /// No description provided for @settingsConfirmClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask before closing'**
+  String get settingsConfirmClose;
+
+  /// No description provided for @settingsConfirmCloseRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'When a command is running'**
+  String get settingsConfirmCloseRunning;
+
+  /// No description provided for @settingsConfirmCloseNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get settingsConfirmCloseNever;
+
+  /// No description provided for @settingsConfirmCloseAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get settingsConfirmCloseAlways;
+
+  /// No description provided for @settingsGhosttyConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Read fonts and colors from Ghostty'**
+  String get settingsGhosttyConfig;
+
+  /// No description provided for @settingsBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Background color'**
+  String get settingsBackground;
+
+  /// No description provided for @settingsForeground.
+  ///
+  /// In en, this message translates to:
+  /// **'Text color'**
+  String get settingsForeground;
+
+  /// No description provided for @settingsCursorColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor color'**
+  String get settingsCursorColor;
+
+  /// No description provided for @settingsSelectionColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection color'**
+  String get settingsSelectionColor;
 }
 
 class _AppLocalizationsDelegate

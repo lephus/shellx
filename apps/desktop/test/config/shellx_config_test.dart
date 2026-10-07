@@ -244,7 +244,7 @@ palette =
       expect(c.palette, isEmpty);
     });
 
-    test('notes: block_hollow, blink, palette 16+, option-as-alt on Windows', () {
+    test('notes: block_hollow, palette 16+, option-as-alt on Windows', () {
       final (c, problems) = build(
         'cursor-style = block_hollow\ncursor-style-blink = true\npalette = 20=#000000\nmacos-option-as-alt = true\n',
         macos: false,
@@ -254,7 +254,6 @@ palette =
       expect(
         [for (final p in problems) (p.code, p.severity)],
         [
-          (ConfigProblemCode.unsupportedValue, ConfigSeverity.info),
           (ConfigProblemCode.unsupportedValue, ConfigSeverity.info),
           (ConfigProblemCode.unsupportedValue, ConfigSeverity.info),
           (ConfigProblemCode.notOnThisPlatform, ConfigSeverity.info),

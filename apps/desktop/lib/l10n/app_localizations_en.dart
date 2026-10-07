@@ -2239,4 +2239,100 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionFocusForward => 'Forward to next pane';
+
+  @override
+  String get settingsPageGeneral => 'General';
+
+  @override
+  String get settingsPageAppearance => 'Appearance';
+
+  @override
+  String get settingsPageTerminal => 'Terminal';
+
+  @override
+  String get settingsPageKeys => 'Keyboard shortcuts';
+
+  @override
+  String get settingsPageAgents => 'Agents';
+
+  @override
+  String get settingsPagePhone => 'Phone';
+
+  @override
+  String get settingsPageAdvanced => 'Advanced';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsFontFamily => 'Font';
+
+  @override
+  String get settingsFontSize => 'Font size';
+
+  @override
+  String get settingsFontWeight => 'Text weight';
+
+  @override
+  String get settingsFontWeightLight => 'Light';
+
+  @override
+  String get settingsFontWeightRegular => 'Regular';
+
+  @override
+  String get settingsCellHeight => 'Line height';
+
+  @override
+  String get settingsPadding => 'Padding';
+
+  @override
+  String get settingsCursorStyle => 'Cursor';
+
+  @override
+  String get settingsCursorBlock => 'Block';
+
+  @override
+  String get settingsCursorBar => 'Bar';
+
+  @override
+  String get settingsCursorUnderline => 'Underline';
+
+  @override
+  String get settingsCursorBlink => 'Blinking cursor';
+
+  @override
+  String get settingsScrollback => 'Scrollback lines';
+
+  @override
+  String get settingsWorkingDir => 'New tabs start in';
+
+  @override
+  String get settingsOptionAsAlt => 'Option key as Alt';
+
+  @override
+  String get settingsConfirmClose => 'Ask before closing';
+
+  @override
+  String get settingsConfirmCloseRunning => 'When a command is running';
+
+  @override
+  String get settingsConfirmCloseNever => 'Never';
+
+  @override
+  String get settingsConfirmCloseAlways => 'Always';
+
+  @override
+  String get settingsGhosttyConfig => 'Read fonts and colors from Ghostty';
+
+  @override
+  String get settingsBackground => 'Background color';
+
+  @override
+  String get settingsForeground => 'Text color';
+
+  @override
+  String get settingsCursorColor => 'Cursor color';
+
+  @override
+  String get settingsSelectionColor => 'Selection color';
 }

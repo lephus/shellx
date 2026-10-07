@@ -19,15 +19,18 @@ const double kTerminalFontSizeMax = 28;
 /// JetBrains Mono, then xterm's own fallbacks. [regular] (`font-weight =
 /// regular`) picks the bundled Regular face; otherwise it is Light. It only reaches the
 /// bundled font: a named family is drawn as the system has it.
+/// [cellHeightPercent] (`adjust-cell-height`) stretches the line height.
 TerminalStyle desktopTerminalStyle(
   double fontSize, {
   List<String> families = const [],
   bool regular = false,
+  double cellHeightPercent = 0,
 }) {
   final bundled = regular ? kTerminalFontFamily : kTerminalFontFamilyLight;
   return TerminalStyle(
     fontSize: fontSize,
-    height: 1.2,
+    // Measurement and painting both read this height (no grid drift).
+    height: 1.2 * (1 + cellHeightPercent / 100),
     fontFamily: families.isEmpty ? bundled : families.first,
     fontFamilyFallback: families.isEmpty
         ? const TerminalStyle().fontFamilyFallback

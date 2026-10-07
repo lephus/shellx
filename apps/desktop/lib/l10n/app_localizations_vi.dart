@@ -2150,4 +2150,100 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get actionFocusForward => 'Tới pane kế';
+
+  @override
+  String get settingsPageGeneral => 'Chung';
+
+  @override
+  String get settingsPageAppearance => 'Giao diện';
+
+  @override
+  String get settingsPageTerminal => 'Terminal';
+
+  @override
+  String get settingsPageKeys => 'Phím tắt';
+
+  @override
+  String get settingsPageAgents => 'Agent';
+
+  @override
+  String get settingsPagePhone => 'Điện thoại';
+
+  @override
+  String get settingsPageAdvanced => 'Nâng cao';
+
+  @override
+  String get settingsTheme => 'Chủ đề';
+
+  @override
+  String get settingsFontFamily => 'Font';
+
+  @override
+  String get settingsFontSize => 'Cỡ chữ';
+
+  @override
+  String get settingsFontWeight => 'Độ đậm chữ';
+
+  @override
+  String get settingsFontWeightLight => 'Nhẹ';
+
+  @override
+  String get settingsFontWeightRegular => 'Thường';
+
+  @override
+  String get settingsCellHeight => 'Chiều cao dòng';
+
+  @override
+  String get settingsPadding => 'Lề';
+
+  @override
+  String get settingsCursorStyle => 'Con trỏ';
+
+  @override
+  String get settingsCursorBlock => 'Khối';
+
+  @override
+  String get settingsCursorBar => 'Thanh';
+
+  @override
+  String get settingsCursorUnderline => 'Gạch chân';
+
+  @override
+  String get settingsCursorBlink => 'Con trỏ nhấp nháy';
+
+  @override
+  String get settingsScrollback => 'Số dòng cuộn lại';
+
+  @override
+  String get settingsWorkingDir => 'Tab mới bắt đầu ở';
+
+  @override
+  String get settingsOptionAsAlt => 'Phím Option làm Alt';
+
+  @override
+  String get settingsConfirmClose => 'Hỏi trước khi đóng';
+
+  @override
+  String get settingsConfirmCloseRunning => 'Khi có lệnh đang chạy';
+
+  @override
+  String get settingsConfirmCloseNever => 'Không bao giờ';
+
+  @override
+  String get settingsConfirmCloseAlways => 'Luôn luôn';
+
+  @override
+  String get settingsGhosttyConfig => 'Đọc font và màu từ Ghostty';
+
+  @override
+  String get settingsBackground => 'Màu nền';
+
+  @override
+  String get settingsForeground => 'Màu chữ';
+
+  @override
+  String get settingsCursorColor => 'Màu con trỏ';
+
+  @override
+  String get settingsSelectionColor => 'Màu vùng chọn';
 }

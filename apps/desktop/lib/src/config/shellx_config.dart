@@ -16,6 +16,8 @@ const int kScrollbackMax = 100000;
 const double kFontSizeMin = 9;
 const double kFontSizeMax = 28;
 const double kPaddingMax = 64;
+const double kCellHeightMin = -10;
+const double kCellHeightMax = 50;
 const int kMaxUserCommands = 200;
 const int kMaxCommandName = 64;
 const int kMaxCommandText = 16384;
@@ -100,6 +102,8 @@ final class ShellxConfig {
     this.palette = const {},
     this.cursorShape = CursorShape.block,
     this.scrollbackLimit = kScrollbackDefault,
+    this.cellHeightPercent = 0,
+    this.cursorBlink = false,
     this.padding = kDefaultTerminalPadding,
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
@@ -129,6 +133,12 @@ final class ShellxConfig {
   final Map<int, Color> palette;
   final CursorShape cursorShape;
   final int scrollbackLimit;
+
+  /// `adjust-cell-height`: percent added to the line height (−10…50).
+  final double cellHeightPercent;
+
+  /// `cursor-style-blink` (ShellX file only, A11 D16).
+  final bool cursorBlink;
   final EdgeInsets padding;
   final OptionAsAlt optionAsAlt;
   final ConfirmClose confirmClose;
@@ -214,6 +224,8 @@ final class _Builder {
   final palette = <int, Color>{};
   var cursorShape = CursorShape.block;
   var scrollback = kScrollbackDefault;
+  var cellHeight = 0.0;
+  var cursorBlink = false;
   var padX = (kDefaultTerminalPadding.left, kDefaultTerminalPadding.right);
   var padY = (kDefaultTerminalPadding.top, kDefaultTerminalPadding.bottom);
   var optionAsAlt = OptionAsAlt.off;
@@ -406,14 +418,25 @@ final class _Builder {
       case 'cursor-style-blink':
         final blink = v.isEmpty ? false : _bool(v);
         if (blink == null) return _badValue(e, g, 'true, false');
-        if (blink) {
-          _problem(
-            e,
-            ConfigSeverity.info,
-            ConfigProblemCode.unsupportedValue,
-            hint: 'false',
-          );
+        cursorBlink = blink;
+      case 'adjust-cell-height':
+        if (v.isEmpty) {
+          cellHeight = 0;
+        } else {
+          final raw = v.endsWith('%') ? v.substring(0, v.length - 1).trim() : v;
+          final n = _ranged(e, raw, kCellHeightMin, kCellHeightMax, g);
+          if (n == null) return;
+          cellHeight = n;
         }
+      case 'font-feature':
+        // ShellX draws no ligatures: accepted so a shared file stays valid.
+        _problem(
+          e,
+          ConfigSeverity.info,
+          ConfigProblemCode.unsupportedValue,
+          hint: 'no ligatures',
+        );
+        return;
       case 'scrollback-limit':
         if (v.isEmpty) {
           scrollback = kScrollbackDefault;
@@ -594,6 +617,8 @@ final class _Builder {
     palette: Map.unmodifiable(palette),
     cursorShape: cursorShape,
     scrollbackLimit: scrollback,
+    cellHeightPercent: cellHeight,
+    cursorBlink: cursorBlink,
     padding: EdgeInsets.fromLTRB(padX.$1, padY.$1, padX.$2, padY.$2),
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,

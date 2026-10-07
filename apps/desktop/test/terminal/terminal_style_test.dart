@@ -3,6 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 
 void main() {
+  test('adjust-cell-height scales the line height', () {
+    expect(
+      desktopTerminalStyle(13, cellHeightPercent: 15).height,
+      closeTo(1.2 * 1.15, 1e-9),
+    );
+    expect(desktopTerminalStyle(13).height, 1.2);
+  });
+
   test('JetBrains Mono 13, line height 1.2 (UI §1.3)', () {
     final style = desktopTerminalStyle(kTerminalFontSizeDefault);
     // font-weight defaults to light: the light face (see
