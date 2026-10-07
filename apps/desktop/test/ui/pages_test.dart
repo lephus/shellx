@@ -20,7 +20,7 @@ late ProviderContainer container;
 DateTime now = DateTime(2026, 9, 25, 12);
 
 WindowRouter router() => container.read(windowRouterProvider.notifier);
-AgentController agent() => container.read(agentControllerProvider.notifier);
+AgentControllerBase agent() => container.read(agentControllerProvider.notifier);
 AgentViewState agentState() => container.read(agentControllerProvider);
 
 Future<void> pumpApp(

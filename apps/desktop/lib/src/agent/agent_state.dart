@@ -69,6 +69,9 @@ final class AgentViewState {
     this.notifyThresholdSeconds = kDefaultNotifyThresholdSeconds,
     this.desktopNotifications = true,
     this.desktopNotificationsOnlyUnfocused = true,
+    this.cliControlEnabled = true,
+    this.cliAllowExternal = false,
+    this.sshRemoteHook = true,
   });
 
   final AuthPhase phase;
@@ -99,6 +102,17 @@ final class AgentViewState {
   final bool desktopNotifications;
   final bool desktopNotificationsOnlyUnfocused;
 
+  /// A5b D13 (Task 6 ruling): daemon-owned, toggled through the agent, read
+  /// from here by the tray. A7 D26 "Cho phép điều khiển ShellX bằng dòng
+  /// lệnh" (default on).
+  final bool cliControlEnabled;
+
+  /// A7 amendment "Cho phép terminal khác" (default off).
+  final bool cliAllowExternal;
+
+  /// A8 D11 "Cài hook ShellX trên máy chủ" (default on).
+  final bool sshRemoteHook;
+
   bool get signedIn => phase == AuthPhase.signedIn;
 
   AgentViewState copyWith({
@@ -119,6 +133,9 @@ final class AgentViewState {
     int? notifyThresholdSeconds,
     bool? desktopNotifications,
     bool? desktopNotificationsOnlyUnfocused,
+    bool? cliControlEnabled,
+    bool? cliAllowExternal,
+    bool? sshRemoteHook,
   }) {
     return AgentViewState(
       phase: phase ?? this.phase,
@@ -143,6 +160,9 @@ final class AgentViewState {
       desktopNotificationsOnlyUnfocused:
           desktopNotificationsOnlyUnfocused ??
           this.desktopNotificationsOnlyUnfocused,
+      cliControlEnabled: cliControlEnabled ?? this.cliControlEnabled,
+      cliAllowExternal: cliAllowExternal ?? this.cliAllowExternal,
+      sshRemoteHook: sshRemoteHook ?? this.sshRemoteHook,
     );
   }
 }

@@ -6,10 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
 import 'package:shellx_desktop/src/cli/ui_ssh_commands.dart';
-import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/remote/remote_tools_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
+import '../support/state_only_agent.dart';
 
 import '../support/fake_local_sessions.dart';
 import 'support/cli_container.dart';
@@ -332,9 +333,9 @@ void main() {
       expect(local.openLaunches, hasLength(before));
       // The per-server setting switches the hook off too, and so does a
       // tab made in such a server's workspace.
-      await c
-          .read(settingsStoreProvider)
-          .setBool(SettingKeys.sshRemoteHook, false);
+      (c.read(agentControllerProvider.notifier) as StateOnlyAgent).set(
+        (s) => s.copyWith(sshRemoteHook: false),
+      );
       await expectLater(
         call('ui.ssh.open', {'target': 'devbox', 'cwd': '/srv'}),
         fails('bad_request'),
@@ -361,9 +362,9 @@ void main() {
       final ws = side().workspaces.where((w) => w.ssh != null).map((w) => w.id);
       expect(ws, isEmpty);
       // The same refusal for a tab made in a server's workspace.
-      await c
-          .read(settingsStoreProvider)
-          .setBool(SettingKeys.sshRemoteHook, false);
+      (c.read(agentControllerProvider.notifier) as StateOnlyAgent).set(
+        (s) => s.copyWith(sshRemoteHook: false),
+      );
       final first = await call('ui.ssh.open', {'target': 'devbox'});
       final id = side().workspaceOf(first['tab']! as int)!;
       await expectLater(

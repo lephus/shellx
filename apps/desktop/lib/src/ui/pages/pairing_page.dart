@@ -68,9 +68,12 @@ class _PairingPageState extends ConsumerState<PairingPage> {
                         const SizedBox(height: ShellxSpace.s12),
                         FilledButton(
                           key: const Key('pairing.new'),
-                          onPressed: () => ref
-                              .read(agentControllerProvider.notifier)
-                              .startPairing(),
+                          onPressed: () => unawaited(
+                            ref
+                                .read(agentControllerProvider.notifier)
+                                .startPairing()
+                                .then<void>((_) {}, onError: (Object _) {}),
+                          ),
                           child: Text(l10n.pairingNewCode),
                         ),
                       ],

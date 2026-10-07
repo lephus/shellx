@@ -1,14 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
+import '../cli/cli_host_control.dart';
 import '../platform/settings_store.dart';
 import '../platform/wake_detector.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import '../terminal_sharing/terminal_sharing_setup.dart';
+import 'agent_controller_base.dart';
 import 'agent_runtime.dart';
 import 'agent_state.dart';
 import 'desktop_services.dart';
@@ -16,14 +17,13 @@ import 'notify_threshold.dart';
 import 'storage_keys.dart';
 import 'update_check.dart';
 
+export 'agent_controller_base.dart';
+
 typedef _SavedSignIn = ({
   AgentCredentials? credentials,
   String? email,
   NoiseKeyPair? identity,
 });
-
-final agentControllerProvider =
-    NotifierProvider<AgentController, AgentViewState>(AgentController.new);
 
 /// Owns the signed-in lifecycle: credentials, the [AgentRuntime], settings
 /// switches, update checks. The tray and the windows only call its methods.
@@ -31,7 +31,7 @@ final agentControllerProvider =
 /// Never awaits `StreamSubscription.cancel()`: it may return a root-zone
 /// future (hangs FakeAsync tests), and the 4002 handling runs inside the
 /// very relay listener it cancels.
-class AgentController extends Notifier<AgentViewState> {
+class AgentController extends AgentControllerBase {
   late DesktopServices _s;
   AgentRuntime? _runtime;
 
@@ -80,7 +80,22 @@ class AgentController extends Notifier<AgentViewState> {
       if (ref.mounted) state = state.copyWith(sessions: _s.sessions.sessions);
     });
     ref.onDispose(_dispose);
-    return AgentViewState(sessions: _s.sessions.sessions);
+    final settings = _s.settings;
+    return AgentViewState(
+      sessions: _s.sessions.sessions,
+      cliControlEnabled: settings.getBool(
+        SettingKeys.cliControlEnabled,
+        defaultValue: true,
+      ),
+      cliAllowExternal: settings.getBool(
+        SettingKeys.cliAllowExternal,
+        defaultValue: false,
+      ),
+      sshRemoteHook: settings.getBool(
+        SettingKeys.sshRemoteHook,
+        defaultValue: true,
+      ),
+    );
   }
 
   /// Visible for tests.
@@ -99,6 +114,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// that completes while the keychain is still being read (the tray offers
   /// "Sign in…" while loading) is kept: what the read returns is then
   /// ignored.
+  @override
   Future<void> bootstrap({bool watchForWake = true}) =>
       _bootstrap ??= _runBootstrap(watchForWake: watchForWake);
 
@@ -219,6 +235,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// (and whatever the keychain throws). A call while one is in flight
   /// joins it (same future, its arguments ignored): two concurrent logins
   /// would each null the shared token and race each other's credentials.
+  @override
   Future<void> signIn({
     required String email,
     required String password,
@@ -295,6 +312,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// (a tab closed just before, at most `ptyKillTimeout`), usually none.
   /// The future completes once the stop, that wait and the logout (at most
   /// 10 s) are done. Never throws.
+  @override
   Future<void> signOut() async {
     final token = _credentials?.token;
     _credentials = null;
@@ -318,6 +336,7 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Throws [ApiException] (`weak_password`, `agent_only`, network, 429).
   /// A 401 also signs out, like a 4002.
+  @override
   Future<void> changePassword(String newPassword) async {
     try {
       await _s.api.changePassword(newPassword);
@@ -329,6 +348,7 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Spec §8.3 as amended by A1 D7: off disconnects from the relay and
   /// every phone; the shells keep running. Remembered across restarts.
+  @override
   Future<void> setRemoteAccess(bool enabled) async {
     await _s.settings.setBool(SettingKeys.remoteAccess, enabled);
     if (!ref.mounted) return;
@@ -343,6 +363,7 @@ class AgentController extends Notifier<AgentViewState> {
 
   /// Push spec §7: stored, and read by the agent when the next command
   /// ends (no restart). Only [kNotifyThresholdChoices] are accepted.
+  @override
   Future<void> setNotifyThreshold(int seconds) async {
     if (!kNotifyThresholdChoices.contains(seconds)) return;
     await _s.settings.setInt(SettingKeys.notifyThreshold, seconds);
@@ -351,12 +372,14 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// A4 D20: read by DesktopNotifications on every notice (no restart).
+  @override
   Future<void> setDesktopNotifications(bool enabled) async {
     await _s.settings.setBool(SettingKeys.desktopNotifications, enabled);
     if (!ref.mounted) return;
     state = state.copyWith(desktopNotifications: enabled);
   }
 
+  @override
   Future<void> setDesktopNotificationsOnlyUnfocused(bool enabled) async {
     await _s.settings.setBool(
       SettingKeys.desktopNotificationsOnlyUnfocused,
@@ -366,6 +389,7 @@ class AgentController extends Notifier<AgentViewState> {
     state = state.copyWith(desktopNotificationsOnlyUnfocused: enabled);
   }
 
+  @override
   Future<void> setKeepAwake(bool enabled) async {
     await _s.settings.setBool(SettingKeys.keepAwake, enabled);
     if (!ref.mounted) return;
@@ -373,11 +397,56 @@ class AgentController extends Notifier<AgentViewState> {
     await _applyKeepAwake();
   }
 
+  /// A5b D13: daemon-owned; the tray (in whichever process) toggles it
+  /// through here. The write may fail (the caller hears of it), the CLI host
+  /// still rechecks: it reads what is stored.
+  @override
+  Future<void> setCliControlEnabled(bool enabled) => _setCliSwitch(
+    SettingKeys.cliControlEnabled,
+    enabled,
+    (v) => state.copyWith(cliControlEnabled: v),
+  );
+
+  @override
+  Future<void> setCliAllowExternal(bool enabled) => _setCliSwitch(
+    SettingKeys.cliAllowExternal,
+    enabled,
+    (v) => state.copyWith(cliAllowExternal: v),
+  );
+
+  Future<void> _setCliSwitch(
+    String key,
+    bool enabled,
+    AgentViewState Function(bool) apply,
+  ) async {
+    try {
+      await _s.settings.setBool(key, enabled);
+      if (ref.mounted) state = apply(enabled);
+    } finally {
+      // Never throws into the caller's error: a host that is not running
+      // has nothing to recheck.
+      try {
+        if (ref.mounted) ref.read(cliHostControlProvider).recheck?.call();
+      } catch (error) {
+        debugPrint('ShellX: cli recheck failed: ${error.runtimeType}');
+      }
+    }
+  }
+
+  /// A8 D11: the global hook switch; only opens from now on use it.
+  @override
+  Future<void> setSshRemoteHook(bool enabled) async {
+    await _s.settings.setBool(SettingKeys.sshRemoteHook, enabled);
+    if (!ref.mounted) return;
+    state = state.copyWith(sshRemoteHook: enabled);
+  }
+
   /// Applies the switch to the OS first; persists it only if that worked.
   /// Never throws (the onboarding page and the window router call it
   /// without a handler): the OS refusing reverts the switch; a failed
   /// settings write keeps what the OS applied (which [bootstrap] reads back
   /// once onboarding is done) and says so.
+  @override
   Future<void> setLaunchAtStartup(bool enabled) async {
     try {
       await _s.launchAtLogin.setEnabled(enabled);
@@ -393,6 +462,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// Never throws: if the settings cannot be saved, onboarding is still
   /// done for this run (and shows again at the next start), with a
   /// notification.
+  @override
   Future<void> completeOnboarding() async {
     await setLaunchAtStartup(state.launchAtStartup);
     await _saveSetting(SettingKeys.onboardingDone, true);
@@ -411,7 +481,8 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Null when there is no runtime (signed out or remote access off).
-  PairingView? startPairing() {
+  @override
+  Future<PairingView?> startPairing() async {
     final runtime = _runtime;
     if (runtime == null) return null;
     final view = runtime.startPairing();
@@ -420,13 +491,15 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Closing the QR window invalidates the code (spec §5.3).
-  void cancelPairing() {
+  @override
+  Future<void> cancelPairing() async {
     _runtime?.cancelPairing();
     state = state.copyWith(pairing: null);
   }
 
   /// Spec §5.5: local trust is removed first and takes effect immediately;
   /// the DELETE /v1/pairings call is best effort (the record is display-only).
+  @override
   Future<void> revoke(String mobileId) async {
     final runtime = _runtime;
     if (runtime != null) {
@@ -438,10 +511,12 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Tray: ends shells; works without a runtime.
-  void closeSession(int id) => _s.sessions.closeSession(id);
+  @override
+  Future<void> closeSession(int id) async => _s.sessions.closeSession(id);
 
   /// What turning terminal sharing on would change (the confirmation);
   /// null where the switch is not offered.
+  @override
   Future<SharingPlan?> prepareTerminalSharing() async =>
       _s.terminalSharing?.prepare();
 
@@ -449,6 +524,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// the local server when a runtime runs. Any failure undoes what was done,
   /// leaves the switch off and notifies. Never throws; false when it did
   /// not turn on.
+  @override
   Future<bool> enableTerminalSharing(SharingPlan plan) async {
     final setup = _s.terminalSharing;
     if (setup == null || state.terminalSharing.busy) return false;
@@ -506,6 +582,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// Spec §10.5: removes the blocks, stops the local server (phones on
   /// desktop terminals get `closed_by_host`; the windows keep running),
   /// deletes `bin`. Never throws; a file it could not clean is notified.
+  @override
   Future<void> disableTerminalSharing() async {
     final setup = _s.terminalSharing;
     if (setup == null || state.terminalSharing.busy) return;
@@ -539,10 +616,13 @@ class AgentController extends Notifier<AgentViewState> {
   }
 
   /// Tray "Disconnect phone" on a desktop terminal (spec §7.6).
-  void disconnectDesktopPhone(int id) => _runtime?.disconnectDesktopPhone(id);
+  @override
+  Future<void> disconnectDesktopPhone(int id) async =>
+      _runtime?.disconnectDesktopPhone(id);
 
   /// Tray: ends shells; works without a runtime.
-  void closeAllSessions() => _s.sessions.closeAll();
+  @override
+  Future<void> closeAllSessions() async => _s.sessions.closeAll();
 
   /// Called by [WakeDetector] after the computer slept: retry now instead of
   /// after the backoff — only while `disconnected`. After a 4001 (`replaced`)
@@ -559,10 +639,12 @@ class AgentController extends Notifier<AgentViewState> {
   /// 4001 (`replaced`) close, since spec §12 forbids the relay from
   /// reconnecting on its own then. A no-op without a runtime (signed out or
   /// remote access off) or outside `disconnected`/`replaced`.
-  void reconnect() => _runtime?.reconnectNow();
+  @override
+  Future<void> reconnect() async => _runtime?.reconnectNow();
 
   /// Spec §14 / §12. Never throws: a failure is retried when the relay next
   /// connects.
+  @override
   Future<void> checkForUpdate() async {
     final VersionInfo info;
     try {
@@ -599,6 +681,7 @@ class AgentController extends Notifier<AgentViewState> {
   /// quitting always goes on. The shells are told to die before the relay
   /// stop is awaited: that stop can outlast Quit's `shutdownTimeout`, and
   /// the process must not exit with them still running.
+  @override
   Future<void> shutdown() async {
     _updateTimer?.cancel();
     _updateTimer = null;

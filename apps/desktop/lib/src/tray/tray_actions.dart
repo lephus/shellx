@@ -12,7 +12,6 @@ import '../restore/restore_persistence.dart';
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/config_opener.dart' show openShellxConfig;
-import '../platform/settings_store.dart' show SettingKeys;
 import '../remote/ssh_actions.dart';
 import '../remote/ssh_settings.dart';
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
@@ -40,7 +39,7 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     cliControlEnabled: cli.controlEnabled,
     cliAllowExternal: cli.allowExternal,
     cliPathInstalled: cli.pathInstalled,
-    sshHook: sshHookEnabled(ref.read(settingsStoreProvider)),
+    sshHook: ref.watch(agentControllerProvider.select((s) => s.sshRemoteHook)),
     hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
@@ -65,7 +64,7 @@ final class TrayActions {
   /// Ruling M3: an install or removal (maybe a password prompt) in flight.
   bool _cliPathBusy = false;
 
-  AgentController get _agent => _ref.read(agentControllerProvider.notifier);
+  AgentControllerBase get _agent => _ref.read(agentControllerProvider.notifier);
   AgentViewState get _state => _ref.read(agentControllerProvider);
   WindowRouter get _router => _ref.read(windowRouterProvider.notifier);
   DesktopServices get _services => _ref.read(desktopServicesProvider);
@@ -119,9 +118,11 @@ final class TrayActions {
           ),
         );
         if (!ok) return;
-        _agent.closeAllSessions();
+        await _agent.closeAllSessions();
       case PairPhone():
-        if (_agent.startPairing() != null) _router.open(const PairingRoute());
+        if (await _agent.startPairing() != null) {
+          _router.open(const PairingRoute());
+        }
       case RevokeDevice(:final mobileId):
         final matches = state.trusted.where((d) => d.mobileId == mobileId);
         final name = matches.isEmpty ? mobileId : matches.first.name;
@@ -167,7 +168,7 @@ final class TrayActions {
         // Binding ruling (Task 8): the only way back after a 4001
         // (`replaced`) close, since spec §12 forbids the relay from
         // reconnecting on its own then. No confirmation needed.
-        _agent.reconnect();
+        await _agent.reconnect();
       case ToggleTerminalSharing():
         if (state.terminalSharing.enabled) {
           await _agent.disableTerminalSharing();
@@ -177,7 +178,7 @@ final class TrayActions {
       case SetUpTerminalSharing():
         await _setUpTerminalSharing();
       case DisconnectDesktopPhone(:final id):
-        _agent.disconnectDesktopPhone(id);
+        await _agent.disconnectDesktopPhone(id);
       // UI-A5 §3: both apply at once, without asking.
       case ToggleRestoreScrollback():
         final restore = _ref.read(restorePersistenceProvider.notifier);
@@ -214,17 +215,10 @@ final class TrayActions {
       case OpenTmuxAttach():
         await _showWindow();
         _router.open(const SshConnectRoute(SshDialogTab.tmux));
-      // At once, without asking; only for opens from now on.
+      // At once, without asking; only for opens from now on. The switch is
+      // the agent's (A5b D13): the menu follows its state.
       case ToggleSshHook():
-        final settings = _ref.read(settingsStoreProvider);
-        try {
-          await settings.setBool(
-            SettingKeys.sshRemoteHook,
-            !sshHookEnabled(settings),
-          );
-        } finally {
-          _ref.invalidate(trayLocalStateProvider);
-        }
+        await _agent.setSshRemoteHook(!state.sshRemoteHook);
       case ClearRecentServers():
         try {
           await _ref.read(sshActionsProvider).clearRecent();
@@ -312,7 +306,7 @@ final class TrayActions {
     final tabs = _ref.read(terminalTabsProvider.notifier);
     final tab = _ref.read(terminalTabsProvider).tabOfSession(id);
     if (tab == null) {
-      _agent.closeSession(id);
+      await _agent.closeSession(id);
       return;
     }
     await closePaneWithConfirm(

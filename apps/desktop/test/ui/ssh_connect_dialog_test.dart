@@ -13,6 +13,8 @@ import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/ui/terminal/ssh_connect_dialog.dart';
 import 'package:shellx_desktop/src/ui/theme/shellx_desktop_theme.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
+import '../support/state_only_agent.dart';
 
 import '../support/fake_local_sessions.dart';
 
@@ -41,6 +43,7 @@ Future<ProviderContainer> pump(
 
   final container = ProviderContainer(
     overrides: [
+      agentControllerProvider.overrideWith(StateOnlyAgent.new),
       localSessionsProvider.overrideWithValue(local),
       settingsStoreProvider.overrideWithValue(settings),
       commandRunnerProvider.overrideWithValue(run),

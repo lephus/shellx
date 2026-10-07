@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_desktop/src/agent/agent_controller.dart';
+import 'package:shellx_desktop/src/agent/desktop_services.dart';
 import 'package:shellx_desktop/src/cli/cli_service.dart';
 import 'package:shellx_desktop/src/cli/cli_settings.dart';
 import 'package:shellx_desktop/src/mux/mux_paths.dart';
@@ -14,6 +16,7 @@ import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart'
 
 import '../support/config_harness.dart';
 import '../support/fake_local_sessions.dart';
+import '../support/fakes.dart';
 import '../support/memory_config_fs.dart';
 import 'support/cli_container.dart';
 
@@ -89,9 +92,17 @@ void main() {
 
   test('amendment: without the token, a terminal is refused until "Allow '
       'other terminals" is ticked; unticking refuses it at once', () async {
+    // The switch is the agent's (D13): a real one, over the store the host
+    // reads, so the toggle writes it and rechecks the open connections.
+    final h = TestHarness();
     final c = cliContainer(
       FakeLocalSessions(),
-      overrides: [cliMuxPathsProvider.overrideWithValue(paths)],
+      overrides: [
+        cliMuxPathsProvider.overrideWithValue(paths),
+        desktopServicesProvider.overrideWithValue(h.services()),
+      ],
+      settings: h.settings,
+      agent: agentControllerProvider.overrideWith(AgentController.new),
     );
     final svc = await CliService.start(
       c,

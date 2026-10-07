@@ -4,6 +4,8 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/agent/agent_controller_base.dart';
+import '../support/state_only_agent.dart';
 
 import '../support/fake_local_sessions.dart';
 
@@ -31,6 +33,7 @@ void main() {
       final settings = InMemorySettingsStore();
       final container = ProviderContainer.test(
         overrides: [
+          agentControllerProvider.overrideWith(StateOnlyAgent.new),
           localSessionsProvider.overrideWithValue(local),
           settingsStoreProvider.overrideWithValue(settings),
         ],

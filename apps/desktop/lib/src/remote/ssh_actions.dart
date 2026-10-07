@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
+import '../agent/agent_controller_base.dart';
 import '../platform/settings_store.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
@@ -43,7 +44,12 @@ final class SshActions {
     return result;
   }
 
-  bool hookFor(String key) => sshHookFor(_settings, key);
+  /// The global switch is the agent's (A5b D13); the per-server list ours.
+  bool hookFor(String key) => sshHookFor(
+    _settings,
+    key,
+    globalOn: _ref.read(agentControllerProvider).sshRemoteHook,
+  );
 
   /// Opens [launch] in [host]'s workspace (made on first use); a workspace
   /// made now whose tab never came (a toast says why) is taken back.
