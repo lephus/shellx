@@ -51,6 +51,9 @@ void main() {
         "host'",
         r'host$(id)',
         'ho\u0085st',
+        'ho\u0000st',
+        'ho\nst',
+        'ho\x7fst',
       ]) {
         expect(SshTarget.parse(bad), isNull, reason: bad);
       }

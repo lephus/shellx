@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:shellx_agent/shellx_agent.dart' show SessionLaunch;
+
 import '../terminal/pane_layout.dart';
 
 // Pure model of `restore/layout.json`: imports only the A3 pane tree, so
@@ -47,9 +49,16 @@ sealed class SavedPaneNode {
 }
 
 final class SavedPane extends SavedPaneNode {
-  const SavedPane({required this.key, this.cwd, this.session});
+  const SavedPane({required this.key, this.cwd, this.session, this.launch});
   final String key;
+
+  /// The folder of a local pane; null for a remote one (its folder travels
+  /// in [launch]).
   final String? cwd;
+
+  /// A8 D29: how an SSH or tmux pane is reopened; null for a local shell.
+
+  final SessionLaunch? launch;
 
   /// D21: written for A5b, ignored by A5a on load.
   final int? session;
@@ -252,10 +261,11 @@ final class RestoreSnapshot {
 }
 
 Object _nodeToJson(SavedPaneNode node) => switch (node) {
-  SavedPane(:final key, :final cwd, :final session) => {
+  SavedPane(:final key, :final cwd, :final session, :final launch) => {
     'pane': key,
     'cwd': cwd,
     'session': session,
+    if (launch != null) 'launch': launch.toJson(),
   },
   SavedSplit(:final axis, :final ratio, :final first, :final second) => {
     'split': axis.name,
@@ -281,7 +291,13 @@ SavedPaneNode _nodeFromJson(Object? raw, Set<String> seen, int depth) {
     if (session != null && session <= 0) {
       throw const FormatException('session');
     }
-    return SavedPane(key: key, cwd: cwd, session: session);
+    final rawLaunch = m['launch'];
+    final launch = rawLaunch == null ? null : SessionLaunch.fromJson(rawLaunch);
+    if (rawLaunch != null && launch == null) {
+      // Never carries the value: it names a host.
+      throw const FormatException('launch');
+    }
+    return SavedPane(key: key, cwd: cwd, session: session, launch: launch);
   }
   final axis = SplitAxis.values.byName(m['split']! as String);
   final ratio = (m['ratio']! as num).toDouble();

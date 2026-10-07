@@ -64,13 +64,18 @@ SavedPaneNode? _save(
   String Function(int) keyOf,
 ) => switch (node) {
   PaneLeaf(:final sessionId) => switch (tab.panes[sessionId]) {
-    final pane? when !pane.exited => SavedPane(
+    // A8 D29: a remote pane that lost its connection can reconnect, so it
+    // is saved; an exited local one (or a remote one that ended for good)
+    // is not.
+    final pane? when !pane.exited || pane.canReconnect => SavedPane(
       key: keyOf(sessionId),
+      // A remote pane's folder is the server's: it travels in the launch.
       cwd: switch (pane.cwd) {
-        final cwd? when isRestorableCwd(cwd) => cwd,
+        final cwd? when pane.remote == null && isRestorableCwd(cwd) => cwd,
         _ => null,
       },
       session: sessionId,
+      launch: pane.remote?.launch.forReconnect(pane.cwd),
     ),
     _ => null,
   },

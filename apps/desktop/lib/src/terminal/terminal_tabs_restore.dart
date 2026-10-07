@@ -100,6 +100,7 @@ extension _Restore on TerminalTabs {
             pane.cwd,
             grids[pane.key]!,
             plan.textByKey[pane.key],
+            launch: pane.launch,
             tabId: tabId,
           );
           if (id == null) {
@@ -224,6 +225,7 @@ extension _Restore on TerminalTabs {
     String? cwd,
     TerminalGrid grid,
     String? text, {
+    SessionLaunch? launch,
     int? tabId,
   }) async {
     _awaitingOpens++;
@@ -231,8 +233,10 @@ extension _Restore on TerminalTabs {
       final id = await local.open(
         cols: grid.cols,
         rows: grid.rows,
-        cwd: cwd,
+        // A remote pane's folder is in its launch, never a local cwd.
+        cwd: launch == null ? cwd : null,
         tabId: tabId,
+        launch: launch,
       );
       // Held before the count drops: a change event of this open must
       // never make the session a tab of its own.
