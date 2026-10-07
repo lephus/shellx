@@ -51,3 +51,5 @@ export 'src/term/terminal_sharing.dart';
 export 'src/trust/trusted_store.dart';
 export 'src/remote/remote_bootstrap.dart';
 export 'src/remote/ssh_command.dart';
+export 'src/remote/remote_tools.dart';
+export 'src/remote/ssh_control.dart';
