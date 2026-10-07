@@ -114,6 +114,37 @@ fn context(v: &Value, home: Option<&Path>) -> String {
     parts.join("  ")
 }
 
+/// `[ssh host]`, `[tmux host:name state]`: where a pane really runs.
+fn remote_label(p: &Value) -> String {
+    let Some(r) = p.get("remote") else {
+        return String::new();
+    };
+    let kind = text(r, "kind");
+    let host = text(r, "host");
+    let tmux = text(r, "tmux");
+    let target = match (host.is_empty(), tmux.is_empty()) {
+        (false, false) => format!("{host}:{tmux}"),
+        (false, true) => host,
+        (true, false) => tmux,
+        (true, true) => String::new(),
+    };
+    let state = text(r, "state");
+    let inner = [
+        kind,
+        target,
+        if state == "connected" {
+            String::new()
+        } else {
+            state
+        },
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ");
+    format!("[{inner}]")
+}
+
 fn line(parts: &[String]) -> String {
     let mut s = parts
         .iter()
@@ -187,6 +218,7 @@ pub fn ls_human(m: &Message, home: Option<&Path>) -> String {
                     },
                     text(p, "title"),
                     context(p, home),
+                    remote_label(p),
                     if focused {
                         "(focused)".into()
                     } else {

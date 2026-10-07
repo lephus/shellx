@@ -143,6 +143,10 @@ impl Api {
             "ui.browser"
         } else if t.starts_with("ui.config.") {
             "ui.config"
+        } else if t.starts_with("ui.ssh.") {
+            "ui.ssh"
+        } else if t.starts_with("ui.tmux.") {
+            "ui.tmux"
         } else {
             t
         };
@@ -422,6 +426,22 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
                 let t = x.get("tab").and_then(Value::as_i64).unwrap_or(0);
                 let s = |k: &str| output::plain(x.get(k).and_then(Value::as_str).unwrap_or(""));
                 writeln!(ctx.out, "p{id}  t{t}  {}  {}", s("title"), s("url")).ok();
+            }
+            Ok(())
+        }
+        Prepared::TmuxList { host } => {
+            let r = api.call("ui.tmux.list", vec![("host", host)])?;
+            if p.json {
+                print_json(ctx, &output::result_json(&r));
+                return Ok(());
+            }
+            for x in r.get("sessions").and_then(Value::as_array).unwrap_or(&[]) {
+                let name = output::plain(x.get("name").and_then(Value::as_str).unwrap_or(""));
+                let windows = x.get("windows").and_then(Value::as_i64).unwrap_or(0);
+                let attached = x.get("attached").and_then(Value::as_i64).unwrap_or(0);
+                let noun = if windows == 1 { "window" } else { "windows" };
+                let tail = if attached > 0 { "\tattached" } else { "" };
+                writeln!(ctx.out, "{name}\t{windows} {noun}{tail}").ok();
             }
             Ok(())
         }

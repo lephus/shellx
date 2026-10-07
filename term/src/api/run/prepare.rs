@@ -94,6 +94,9 @@ pub(super) enum Prepared {
         fields: Fields,
     },
     BrowserList,
+    TmuxList {
+        host: Option<Value>,
+    },
 }
 
 pub(super) fn simple(t: &'static str, fields: Fields) -> Prepared {
@@ -282,6 +285,34 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
                 seconds,
             }
         }
+        "ssh" => Prepared::Simple {
+            t: "ui.ssh.open",
+            fields: vec![
+                ("target", Some(Value::text(pos(0)))),
+                ("workspace", text(p.flag("workspace"))),
+                // A server path: never made absolute against the local directory.
+                ("cwd", text(p.flag("cwd"))),
+                ("cmd", cmd(p)?),
+                ("hook", Some(Value::Bool(!p.has("no-hook")))),
+                ("focus", flag(p, "focus")),
+            ],
+            id_key: Some("tab"),
+            prefix: "t",
+        },
+        "tmux attach" => Prepared::Simple {
+            t: "ui.tmux.attach",
+            fields: vec![
+                ("name", Some(Value::text(pos(0)))),
+                ("host", text(p.flag("host"))),
+                ("create", flag(p, "create")),
+                ("focus", flag(p, "focus")),
+            ],
+            id_key: Some("tab"),
+            prefix: "t",
+        },
+        "tmux ls" => Prepared::TmuxList {
+            host: text(p.flag("host")),
+        },
         "browser ls" => Prepared::BrowserList,
         "browser open" => {
             let (k, v) = match (p.flag("tab"), p.flag("pane")) {

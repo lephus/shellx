@@ -42,7 +42,7 @@ Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` t
 | Code | Meaning | Error codes |
 |---|---|---|
 | 0 | ok | |
-| 1 | other error | `exited`, `no_room`, `session_limit`, `spawn_failed`, `busy`, `eval_error`, `load_failed`, `internal`, `not_installed`, `io`, `config_errors` (`config check` or `reload` found errors) |
+| 1 | other error | `exited`, `no_room`, `session_limit`, `spawn_failed`, `busy`, `eval_error`, `load_failed`, `internal`, `not_installed`, `io`, `ssh_unavailable`, `tmux_unavailable`, `tmux_failed`, `config_errors` (`config check` or `reload` found errors) |
 | 2 | usage | `usage`, `bad_request` (also an invalid or too slow `--match` pattern) |
 | 3 | ShellX is not running (no endpoint, stale endpoint, connection or handshake failed) | `not_running` |
 | 4 | not found | `not_found`, `ambiguous` |
@@ -275,6 +275,29 @@ Exit codes: 0 (subscribed without `--follow`/`--for`, the `--for` time is up, or
 ## shellx browser fill
 
 `shellx browser fill PANE SELECTOR TEXT...` — set the first match's value and fire `input` and `change`. Frameworks that track values through their own setters (React) may not notice; use `eval` then. Exit codes: as `eval`.
+
+## SSH and tmux
+
+Open a server in a tab, or attach a tmux session, from a script. `shellx` itself does not exist on the server; a ShellX SSH pane has `shellx notify` as a shell function there, so notifications from the server still work. Sign-in (password, key passphrase, host key question) happens in the pane: ShellX never sees or stores it.
+
+## shellx ssh
+
+`shellx ssh SERVER [--workspace W] [--cwd DIR] [--cmd COMMAND] [--no-hook] [--focus] [--json]` — open a tab on a server over SSH; prints its id (`t41`; `--json`: `{"tab":"t41","pane":"p41"}`). `SERVER` is an `~/.ssh/config` alias or `user@host[:port]`. `--cwd` is a folder on the server (`/...` or `~/...`; never made absolute locally). `--cmd` is typed once the remote shell is ready (at most 16 KiB). `--no-hook` skips installing the ShellX hook on the server. The tab opens in the server's SSH workspace unless `--workspace` is given, and the user's focus is left alone unless `--focus`. Exit codes: 0, 1 (`ssh_unavailable`: no ssh on this computer; `spawn_failed`, `session_limit`, `busy`), 2, 3, 6, 7.
+
+## shellx tmux ls
+
+`shellx tmux ls [--host SERVER] [--json]` — list tmux sessions on this computer or on `--host`. Text: `name<TAB>N windows` plus `<TAB>attached` when a client is attached; nothing for no sessions. `--json`: `{"sessions":[{"name","windows","attached","activity"?}]}` (`activity` in Unix seconds). A server that needs a password is not listed: connect once with `shellx ssh`. Exit codes: 0, 1 (`tmux_unavailable`, `tmux_failed`), 2, 3, 6, 7.
+
+## shellx tmux attach
+
+`shellx tmux attach NAME [--host SERVER] [--create] [--focus] [--json]` — attach a tmux session as a tab; prints its id like `shellx ssh`. `--create` makes the session when it does not exist. A tmux session name has no `:` or `.` and is at most 64 characters. Exit codes: 0, 1 (`tmux_unavailable`, `tmux_failed`, `spawn_failed`), 2, 3, 6, 7.
+
+Recipes:
+
+- Open a server tab next to the user and run tests: `t=$(shellx ssh devbox --cwd ~/app --cmd 'make test')`, then `shellx wait p${t#t} --match 'PASS|FAIL' --timeout 600`.
+- Attach the team's tmux session: `shellx tmux ls --host devbox --json`, then `shellx tmux attach main --host devbox`.
+
+A pane that is remote shows in `shellx ls` as `[ssh host]` or `[tmux host:name]` (plus its state while it is not connected); `--json` carries `"remote":{"kind","host"?,"tmux"?,"state"}`. When a lost connection is restored the pane gets a new id: the old id keeps working for later commands, and `shellx events` reports `pane.replaced` with `old` and `new`.
 
 ## shellx config path
 
