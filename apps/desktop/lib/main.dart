@@ -9,19 +9,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shellx_agent/shellx_agent.dart';
-import 'package:shellx_core/shellx_core.dart';
 import 'package:win32/win32.dart' as win32;
 import 'package:window_manager/window_manager.dart';
 
 import 'daemon_main.dart' as daemon;
 import 'l10n/app_localizations.dart';
 import 'src/agent/agent_controller.dart';
-import 'src/agent/agent_runtime.dart';
+import 'src/agent/agent_side.dart';
 import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
-import 'src/agent/notify_threshold.dart';
-import 'src/agent/session_core.dart';
-import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
 import 'src/remote/ssh_reconnector.dart';
 import 'src/cli/agent_marks.dart';
@@ -33,21 +29,15 @@ import 'src/config.dart';
 import 'src/config/config_controller.dart';
 import 'src/l10n/locale.dart';
 import 'src/mux/launch_mode.dart';
-import 'src/mux/mux_paths.dart';
-import 'src/mux/windows_pipe_transport.dart';
 import 'src/platform/app_reopen.dart';
 import 'src/platform/attention_badge.dart';
 import 'src/platform/desktop_notifications.dart';
-import 'src/platform/keep_awake.dart';
-import 'src/platform/launch_at_login.dart';
 import 'src/platform/notifier.dart';
 import 'src/platform/pty/flutter_pty_factory.dart';
-import 'src/platform/secure_key_value_store.dart';
 import 'src/platform/settings_store.dart';
 import 'src/platform/single_instance.dart';
 import 'src/platform/system_info.dart';
 import 'src/platform/terminal_problem_notifier.dart';
-import 'src/platform/url_opener.dart';
 import 'src/platform/wake_detector.dart';
 import 'src/restore/restore_paths.dart';
 import 'src/restore/restore_persistence.dart';
@@ -58,10 +48,6 @@ import 'src/terminal/local_sessions_provider.dart';
 import 'src/terminal/port_watch.dart';
 import 'src/terminal/tab_attention.dart';
 import 'src/terminal/terminal_tabs.dart';
-import 'src/terminal_sharing/attach_throttle.dart';
-import 'src/terminal_sharing/powershell.dart';
-import 'src/terminal_sharing/sharing_paths.dart';
-import 'src/terminal_sharing/terminal_sharing_setup.dart';
 import 'src/ui/theme/font_licenses.dart';
 import 'src/tray/tray_action.dart';
 import 'src/tray/tray_actions.dart';
@@ -197,7 +183,7 @@ Future<void> _start(
     onProblem: terminalProblems.report,
   );
   late final TrayManagerHost trayHost;
-  final sharingSetup = _terminalSharingSetup(
+  final sharingSetup = terminalSharingSetupFor(
     environment,
     storedEnabled: settings.getBool(
       SettingKeys.terminalSharing,
@@ -206,21 +192,12 @@ Future<void> _start(
   );
 
   final deviceName = deviceNameFromHostname(Platform.localHostname);
-  // Push spec §7: the threshold is read from the settings whenever a command
-  // ends, so the tray choice applies at once; titles start with the name the
-  // relay knows this computer by.
-  final pushNotifications = PushNotificationsSetup(
-    threshold: () => notifyThreshold(settings),
-    machineName: () => deviceName,
-    locale: () => Platform.localeName,
-    hooksDirectory: '${supportDirectory.path}${Platform.pathSeparator}hooks',
-  );
   // A7: the command line. Its folder, and — once its host listens — the
   // host's address and this launch's token go into every ShellX shell's
   // environment (D8, D29, amendment), so they are known before the first
   // shell. Without them (no HOME / LOCALAPPDATA) the app runs without the
   // command line.
-  final cli = _cliSetup(environment);
+  final cli = cliSetup(environment);
   // A7 C1, final ruling M1: the host listens before the sessions exist, so
   // a shell is only told of a host that runs. The single-instance lock is
   // held; the host also takes `mux/mux.lock`. Requests wait for the window
@@ -247,83 +224,26 @@ Future<void> _start(
       log: (message) => debugPrint('ShellX ssh: $message'),
     ),
   );
-  // The app's one ShellxApi: the controller sets its token at sign-in.
-  final api = ShellxApi(baseUri: relayBase);
-  // A1 D7: the process's one SessionManager. It outlives every runtime, so
-  // signing out or losing the relay never ends a shell; Quit does.
-  final core = SessionCore(
-    ptyFactory: ptyFactory,
-    shellResolver: PlatformShellResolver(
-      operatingSystem: Platform.operatingSystem,
-      environment: environment,
-    ),
-    homeDirectory: home,
-    // Only the shells' environment gains the command line (not the shell
-    // resolver's, nor the paths derived from `environment` above).
-    // An address or token inherited from another ShellX never goes on.
-    baseEnvironment: cli == null
-        ? (Map.of(environment)
-            ..remove('SHELLX_SOCKET')
-            ..remove('SHELLX_CLI_TOKEN'))
-        : cliSessionEnvironment(
-            environment,
-            cliDir: cli.paths.dir,
-            socket: cliService?.address,
-            token: cliService == null ? null : cli.token,
-            windows: Platform.isWindows,
-          ),
-    api: api,
-    notifications: pushNotifications,
-    gitHeads: GitHeadReader(),
-    portProbe: Platform.isWindows ? WindowsPortProbe() : MacPortProbe(),
-    remoteTools: remoteTools,
-  );
-
-  // The process's one SecureKeyValueStore; DesktopServices builds the one
-  // TrustedStore over it.
-  final services = DesktopServices(
-    secureStore: SecureKeyValueStore(),
+  final side = buildAgentSide(
+    environment: environment,
+    home: home,
+    supportDirectory: supportDirectory.path,
     settings: settings,
-    api: api,
-    createApi: () => ShellxApi(baseUri: relayBase),
-    runtimeFactory: (params) => CoreAgentRuntime(
-      params,
-      core: core,
-      relayBaseUri: relayBase,
-      appVersion: info.version,
-      termEndpointPath: sharingSetup == null
-          ? null
-          : termEndpointPath(
-              environment: environment,
-              windows: Platform.isWindows,
-            ),
-    ),
-    sessions: core.sessions,
-    keepAwake: Platform.isWindows ? WindowsKeepAwake() : CaffeinateKeepAwake(),
-    launchAtLogin: PackageLaunchAtLogin(),
     notifier: notifier,
-    urlOpener: SystemUrlOpener(),
+    ptyFactory: ptyFactory,
     l10n: l10n,
     appVersion: info.version,
-    platform: Platform.isWindows
-        ? DevicePlatform.windows
-        : DevicePlatform.macos,
+    relayBase: relayBase,
+    sharingSetup: sharingSetup,
     deviceName: deviceName,
-    // Sign-out and quit wait (at most 3 s) for PTY tree kills in flight.
-    awaitPtyKills: ptyFactory.killsSettled,
-    terminalSharing: sharingSetup,
-    // A8 D40: after the clean flush, the CLI host stop and the sessions'
-    // close (the tray's Quit), before quitApp.
+    remoteTools: remoteTools,
+    cliPaths: cli?.paths,
+    cliSocket: cliService?.address,
+    cliToken: cli?.token,
     // D20: the first step of Quit: no retry may start from here on.
     stopRemoteRetries: () {
       sshWake?.stop();
       container.read(sshReconnectorProvider.notifier).stop();
-    },
-    shutdownRemote: () {
-      return shutdownRemote(
-        remoteTools,
-        disposeWatcher: core.sessions.disposeRemotePorts,
-      );
     },
     // Runs after AgentController.shutdown(). Each step is bounded, so
     // quitting always ends in exit(0).
@@ -341,6 +261,8 @@ Future<void> _start(
       exit(0);
     },
   );
+  final core = side.core;
+  final services = side.services;
 
   container = ProviderContainer(
     overrides: [
@@ -614,85 +536,11 @@ Future<void> _start(
   await handleActivation(container);
 }
 
-/// A7: what the command line needs before the first shell starts.
-typedef _CliSetup = ({MuxPaths mux, CliPaths paths, String token});
-
-/// Null when the environment lacks what the paths need.
-_CliSetup? _cliSetup(Map<String, String> environment) {
-  try {
-    final windows = Platform.isWindows;
-    final paths = CliPaths.forPlatform(
-      windows: windows,
-      environment: environment,
-      executable: Platform.resolvedExecutable,
-    );
-    if (paths == null) return null;
-    final mux = MuxPaths(
-      muxDirectory: muxDirectoryPath(
-        windows: windows,
-        environment: environment,
-      ),
-      tmpDirectory: environment['TMPDIR'] ?? '/tmp',
-      uid: windows ? 0 : _uid(),
-      windows: windows,
-      pipeName: windows ? pipeNameForUser(currentUserSid()) : null,
-    );
-    return (mux: mux, paths: paths, token: generateCliToken());
-  } catch (error) {
-    debugPrint('ShellX: no command line: ${error.runtimeType}');
-    return null;
-  }
-}
-
-/// macOS: the user id for the socket's TMPDIR fallback name.
-int _uid() {
-  final r = Process.runSync('/usr/bin/id', ['-u']);
-  final uid = r.exitCode == 0 ? int.tryParse('${r.stdout}'.trim()) : null;
-  if (uid == null) throw StateError('id -u failed');
-  return uid;
-}
-
-/// Spec §7.6, §12: the switch is offered on macOS, and on Windows only with
-/// `SHELLX_EXPERIMENTAL=terminal-sharing`. Null otherwise (or without the
-/// environment variables the paths need).
-TerminalSharingSetup? _terminalSharingSetup(
-  Map<String, String> environment, {
-  required bool storedEnabled,
-}) {
-  final available = terminalSharingAvailable(
-    macos: Platform.isMacOS,
-    windows: Platform.isWindows,
-    environment: environment,
-    storedEnabled: storedEnabled,
-  );
-  if (!available) return null;
-  return _anyTerminalSharingSetup(environment);
-}
-
-/// Regardless of the experimental flag (the uninstaller must always clean
-/// up).
-TerminalSharingSetup? _anyTerminalSharingSetup(
-  Map<String, String> environment,
-) {
-  final paths = SharingPaths.forPlatform(
-    windows: Platform.isWindows,
-    environment: environment,
-    executable: Platform.resolvedExecutable,
-  );
-  if (paths == null) return null;
-  return TerminalSharingSetup(
-    paths: paths,
-    powerShell: Platform.isWindows
-        ? PowerShellProbe(environment: environment)
-        : null,
-  );
-}
-
 /// Exit code of `--terminal-sharing-cleanup`: 0, or 1 when something was
 /// left behind (the uninstaller goes on either way).
 Future<int> _terminalSharingCleanup() async {
   try {
-    final setup = _anyTerminalSharingSetup(Platform.environment);
+    final setup = anyTerminalSharingSetup(Platform.environment);
     if (setup == null) return 1;
     // The profiles an enable remembered, in case PowerShell no longer
     // reports one (best effort: the settings need the plugin channel).
