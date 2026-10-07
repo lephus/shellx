@@ -25,23 +25,33 @@ final class ConfigWatcher {
   bool _busy = false;
   bool _stopped = false;
 
+  /// The latest watch() call; an older one that finishes late is dropped.
+  int _watchGeneration = 0;
+
   /// Watches [files] from now on and (re)starts polling. A file already
   /// watched keeps the stamp this watcher last saw (taken when it noticed a
   /// change, before the load that change caused): a save made while that
   /// load ran still differs and is reported. A new file is stamped now.
   Future<void> watch(Iterable<String> files) async {
     _stopped = false;
+    final generation = ++_watchGeneration;
     final stamps = <String, FileStamp>{};
     for (final f in files.toSet()) {
       stamps[f] = _stamps[f] ?? await fs.stamp(f);
     }
-    if (_stopped) return;
+    if (_stopped || generation != _watchGeneration) return;
     _stamps = stamps;
+    // A poll or settle check still running compared the old list: its
+    // result is dropped (see _restamp), and a pending report waits for
+    // the new list's polls instead.
+    _settle?.cancel();
+    _settle = null;
     _poll ??= Timer.periodic(interval, (_) => unawaited(_tick()));
   }
 
-  /// The current stamps, and whether any differs from what was seen.
-  Future<(Map<String, FileStamp>, bool)> _restamp() async {
+  /// The current stamps and whether any differs from what was seen; null
+  /// when watch() replaced the list meanwhile (the result is stale).
+  Future<(Map<String, FileStamp>, bool)?> _restamp() async {
     final watched = _stamps;
     final now = <String, FileStamp>{};
     var changed = false;
@@ -50,6 +60,7 @@ final class ConfigWatcher {
       now[path] = stamp;
       if (stamp != before) changed = true;
     }
+    if (_stopped || !identical(watched, _stamps)) return null;
     return (now, changed);
   }
 
@@ -57,9 +68,9 @@ final class ConfigWatcher {
     if (_busy || _stopped) return;
     _busy = true;
     try {
-      final (now, changed) = await _restamp();
-      if (!changed || _stopped) return;
-      _stamps = now;
+      final result = await _restamp();
+      if (result == null || !result.$2) return;
+      _stamps = result.$1;
       _armSettle();
     } finally {
       _busy = false;
@@ -75,10 +86,10 @@ final class ConfigWatcher {
   /// a file still being written waits another [settle].
   Future<void> _settled() async {
     if (_stopped) return;
-    final (now, changed) = await _restamp();
-    if (_stopped) return;
-    if (changed) {
-      _stamps = now;
+    final result = await _restamp();
+    if (result == null) return;
+    if (result.$2) {
+      _stamps = result.$1;
       _armSettle();
       return;
     }

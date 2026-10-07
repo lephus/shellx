@@ -19,6 +19,9 @@ final class MemoryConfigFs implements ConfigFs {
   /// disk): tests use it to see what runs while a read is in flight.
   Future<void>? readGate;
 
+  /// Like [readGate], for [stamp] (a slow `stat`).
+  Future<void>? stampGate;
+
   void write(String path, String text) => writeBytes(path, utf8.encode(text));
 
   void writeBytes(String path, List<int> bytes) {
@@ -52,6 +55,8 @@ final class MemoryConfigFs implements ConfigFs {
 
   @override
   Future<FileStamp> stamp(String path) async {
+    final gate = stampGate;
+    if (gate != null) await gate;
     final bytes = files[path];
     return bytes == null
         ? const FileStamp.missing()

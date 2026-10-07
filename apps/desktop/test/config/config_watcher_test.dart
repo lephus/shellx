@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/config/config_watcher.dart';
@@ -68,6 +70,54 @@ void main() {
       async.flushMicrotasks();
       async.elapse(const Duration(milliseconds: 1000));
       expect(changes, 2);
+      watcher.stop();
+    });
+  });
+
+  test('a slow, older watch() never overwrites a newer one (M5)', () {
+    fakeAsync((async) {
+      final fs = MemoryConfigFs();
+      var changes = 0;
+      final watcher = ConfigWatcher(fs: fs, onChange: () => changes++);
+      final slow = Completer<void>();
+      fs.stampGate = slow.future;
+      watcher.watch(['/c/old']); // its stat hangs
+      fs.stampGate = null;
+      watcher.watch(['/c/new']);
+      async.flushMicrotasks();
+      slow.complete();
+      async.flushMicrotasks();
+      fs.write('/c/old', 'x = 1');
+      async.elapse(const Duration(milliseconds: 1300));
+      expect(changes, 0); // /c/old is no longer watched
+      fs.write('/c/new', 'x = 1');
+      async.elapse(const Duration(milliseconds: 1300));
+      expect(changes, 1);
+      watcher.stop();
+    });
+  });
+
+  test('a poll that overlaps watch() keeps the newer file list (M5)', () {
+    fakeAsync((async) {
+      final fs = MemoryConfigFs();
+      var changes = 0;
+      final watcher = ConfigWatcher(fs: fs, onChange: () => changes++);
+      watcher.watch(['/c/a']);
+      async.flushMicrotasks();
+      fs.write('/c/a', 'x = 1');
+      final slow = Completer<void>();
+      fs.stampGate = slow.future;
+      async.elapse(const Duration(seconds: 1)); // the poll's stat hangs
+      fs.stampGate = null;
+      watcher.watch(['/c/b']);
+      async.flushMicrotasks();
+      slow.complete();
+      async.flushMicrotasks();
+      async.elapse(const Duration(milliseconds: 300));
+      expect(changes, 0); // the stale poll neither reports nor re-arms
+      fs.write('/c/b', 'x = 1');
+      async.elapse(const Duration(milliseconds: 1300));
+      expect(changes, 1);
       watcher.stop();
     });
   });
