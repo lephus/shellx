@@ -9,12 +9,12 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
-import '../../agent/desktop_services.dart';
 import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../config/config_controller.dart';
+import '../../remote/remote_port_forwards.dart';
 import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -591,17 +591,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   // ---- ports, moves, menus (UI-A2 §2.4, §5, §8) -------------------------
 
-  Future<void> _openPort(int port) async {
-    try {
-      await ref.read(desktopServicesProvider).urlOpener.openLocalPort(port);
-    } catch (_) {
-      if (mounted) {
-        ref
-            .read(terminalTabsProvider.notifier)
-            .showNotice(const PortOpenFailedNotice());
-      }
-    }
-  }
+  /// A8 D19: an SSH tab's port goes through a forward.
+  Future<void> _openPort(TerminalTab tab, int port) =>
+      ref.read(remotePortForwardsProvider.notifier).open(tab.focused, port);
 
   /// "claude, tab 2 of 3 in Backend": where the tab is after a move.
   String? _whereIs(int id) {
@@ -823,7 +815,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         case _RowAction.moveTo:
           await _moveToMenu(tab, at, fromList: fromList);
         case _RowAction.ports:
-          await _portMenu(ports, at);
+          await _portMenu(tab, ports, at);
         case _RowAction.moveUp:
           _moveUp(tab.id);
         case _RowAction.moveDown:
@@ -831,7 +823,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         case _RowAction.close:
           widget.onClose(tab);
         case final int port:
-          await _openPort(port);
+          await _openPort(tab, port);
       }
       return null;
     });
@@ -839,7 +831,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   /// V12: one entry per port ("Open http://localhost:3000"), at the same
   /// place as the row menu.
-  Future<void> _portMenu(List<int> ports, Offset at) async {
+  Future<void> _portMenu(TerminalTab tab, List<int> ports, Offset at) async {
     final l10n = AppLocalizations.of(context);
     final port = await showShellxMenu<int>(
       context: context,
@@ -853,7 +845,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ),
       ],
     );
-    if (port != null && mounted) await _openPort(port);
+    if (port != null && mounted) await _openPort(tab, port);
   }
 
   /// UI-A2 §5.3: every other workspace in sidebar order, then "New
@@ -959,7 +951,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         CustomSemanticsAction(label: l10n.tabMoveDown): () => _moveDown(tab.id),
       for (final port in tab.exited ? const <int>[] : tab.ports)
         CustomSemanticsAction(label: l10n.tabOpenPort(port)): () =>
-            unawaited(_openPort(port)),
+            unawaited(_openPort(tab, port)),
     };
   }
 
@@ -1515,7 +1507,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           onStartRename: () => _startTabRename(tab.id, fromList: false),
           onRename: (text) => _commitTabName(tab.id, text),
           onCancelRename: () => _endRename(RenameTab(tab.id)),
-          onOpenPort: (port) => unawaited(_openPort(port)),
+          onOpenPort: (port) => unawaited(_openPort(tab, port)),
           onMenu: (at) => unawaited(_rowMenu(tab, at)),
           extraActions: _rowActions(l10n, tab),
           menuOpen: _menuFor == ('row', tab.id),
