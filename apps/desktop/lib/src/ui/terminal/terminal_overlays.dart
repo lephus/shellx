@@ -594,6 +594,8 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is WorkspaceDeletedNotice ||
       widget.notice is NoUnreadNotice ||
       widget.notice is CopyModeCopiedNotice ||
+      widget.notice is ReopenNothingNotice ||
+      widget.notice is ReopenedNotice ||
       widget.notice is NoTerminalForCommandNotice ||
       widget.notice is PaneNoRoomNotice ||
       (widget.notice is InputNotice &&
@@ -650,6 +652,8 @@ class _NoticeToastState extends State<NoticeToast> {
     PortOpenFailedNotice() => l10n.portOpenFailed,
     NoUnreadNotice() => l10n.noUnreadNotifications,
     CopyModeCopiedNotice() => l10n.copyModeCopied,
+    ReopenNothingNotice() => l10n.reopenNothing,
+    ReopenedNotice(:final name) => l10n.reopenedTab(name),
     NoTerminalForCommandNotice() => l10n.userCommandNoTerminal,
     ConfigOpenFailedNotice(:final path) => l10n.configOpenFailed(path),
     ConfigWriteFailedNotice(:final path) => l10n.configWriteFailed(path),

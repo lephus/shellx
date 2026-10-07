@@ -7,6 +7,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/remote/remote_state.dart';
+import 'package:shellx_desktop/src/terminal/closed_items.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -133,6 +134,41 @@ void main() {
     expect(local.openLaunches.last, isNull);
     expect(local.openCwds.last, isNull);
     await tabs().splitPaneFor(1, SplitAxis.column, local: true, cwd: '/srv');
+    expect(local.openCwds.last, isNull);
+  });
+
+  test('A11 D14: a closed local pane reopens beside a server pane as a local '
+      'shell in its own folder; a closed server pane on its server', () async {
+    local.add(
+      local.summary(
+        1,
+        origin: SessionOrigin.desktop,
+        remote: ssh(),
+        cwd: '/srv/app',
+      ),
+    );
+    boot();
+    await tabs().reopenClosedPane(
+      ClosedPane(
+        tabId: 1,
+        cwd: '/Users/me/proj',
+        launch: null,
+        text: '',
+        label: 'x',
+      ),
+    );
+    expect(local.openLaunches.last, isNull);
+    expect(local.openCwds.last, '/Users/me/proj');
+    await tabs().reopenClosedPane(
+      ClosedPane(
+        tabId: 1,
+        cwd: null,
+        launch: SshLaunch(devbox, remoteCwd: '/srv/other'),
+        text: '',
+        label: 'x',
+      ),
+    );
+    expect(local.openLaunches.last, SshLaunch(devbox, remoteCwd: '/srv/other'));
     expect(local.openCwds.last, isNull);
   });
 

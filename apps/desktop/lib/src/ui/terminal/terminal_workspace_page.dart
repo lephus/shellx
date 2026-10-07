@@ -15,6 +15,7 @@ import '../../config/keybindings.dart';
 import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../restore/restore_persistence.dart' show restoreStripProvider;
 import '../../terminal/byte_size.dart';
+import '../../terminal/closed_items.dart';
 import '../../terminal/clipboard_media.dart';
 import '../../terminal/edit_line.dart';
 import '../../terminal/find_session.dart';
@@ -439,6 +440,12 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
               );
         },
       ),
+      // A11 D14: the newest closed tab or pane comes back.
+      ReopenClosedIntent: run<ReopenClosedIntent>((_) {
+        closePanel();
+        unawaited(ref.read(closedItemsProvider.notifier).reopenNewest());
+        focusTerminal();
+      }),
       // A11 D13: the focused pane's vim-style copy mode.
       ToggleCopyModeIntent: run<ToggleCopyModeIntent>((_) {
         closePanel();
@@ -625,6 +632,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   void initState() {
     super.initState();
     terminalFocus.addListener(_onTerminalFocus);
+    ref.read(closedItemsRecorderProvider); // A11 D14: starts listening
     focusTerminal(); // UI §3.6: the terminal has the initial focus.
     listenToConfig();
     listenToConfigUi();

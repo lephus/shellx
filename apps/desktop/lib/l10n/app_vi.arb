@@ -533,5 +533,8 @@
   "actionToggleCopyMode": "Chế độ copy",
   "copyModeChip": "CHẾ ĐỘ COPY",
   "copyModeHint": "y chép · v chọn · Esc thoát",
-  "copyModeCopied": "Đã chép"
+  "copyModeCopied": "Đã chép",
+  "actionReopenClosed": "Mở lại tab đã đóng",
+  "reopenedTab": "Đã mở lại “{name}”",
+  "reopenNothing": "Không có gì để mở lại"
 }

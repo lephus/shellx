@@ -926,5 +926,10 @@
   "@actionToggleCopyMode": {"description": "A11 D13"},
   "copyModeChip": "COPY MODE",
   "copyModeHint": "y copy · v select · Esc exit",
-  "copyModeCopied": "Copied"
+  "copyModeCopied": "Copied",
+  "actionReopenClosed": "Reopen closed tab",
+  "@actionReopenClosed": {"description": "A11 D14"},
+  "reopenedTab": "Reopened “{name}”",
+  "@reopenedTab": {"placeholders": {"name": {"type": "String"}}},
+  "reopenNothing": "Nothing to reopen"
 }

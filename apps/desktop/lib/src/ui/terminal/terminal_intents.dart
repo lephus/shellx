@@ -199,3 +199,8 @@ class OpenTmuxAttachIntent extends Intent {
 class ToggleCopyModeIntent extends Intent {
   const ToggleCopyModeIntent();
 }
+
+/// A11 D14 `reopen_closed` (⌘⇧T / Ctrl+Shift+Alt+T).
+class ReopenClosedIntent extends Intent {
+  const ReopenClosedIntent();
+}

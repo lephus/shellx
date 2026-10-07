@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/terminal/closed_items.dart';
 import 'package:shellx_desktop/src/restore/restore_snapshot.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
@@ -618,5 +619,157 @@ void main() {
       await restoring;
       expect(state().tabs.map((t) => t.id), contains(id));
     });
+  });
+
+  group('A11 D14: reopening what was closed', () {
+    ClosedTab closedTab({String? workspace = 'w2', int index = 0}) => ClosedTab(
+      tab: SavedTab(
+        key: k1,
+        name: 'server',
+        focused: k2,
+        layout: SavedSplit(
+          axis: SplitAxis.row,
+          ratio: 0.4,
+          first: SavedPane(key: k1, cwd: '/w/api'),
+          second: SavedPane(key: k2, cwd: '/w/web'),
+        ),
+      ),
+      textByKey: {k1: 'old api\r\n'},
+      workspaceId: workspace,
+      index: index,
+      label: 'server',
+    );
+
+    String textOf(PaneSession pane) => [
+      for (var i = 0; i < pane.terminal.mainBuffer.lines.length; i++)
+        pane.terminal.mainBuffer.lines[i].getText().trimRight(),
+    ].join('\n');
+
+    const stored = [
+      '{"id":"default","collapsed":false}',
+      '{"id":"w2","name":"API","collapsed":false}',
+    ];
+
+    test('the tab goes to its old workspace, selected, with its text and a '
+        'divider; the shells are new and receive nothing', () async {
+      boot(workspaces: stored);
+      final out = await tabs().reopenClosed(
+        closedTab(),
+        dividerFor: (_) => '-- again --\r\n',
+      );
+      expect(out.tabsRestored, 1);
+      final id = out.tabIdByKey[k1]!;
+      expect(sidebar().workspaceOf(id), 'w2');
+      expect(state().selectedId, id);
+      expect(local.openCwds, ['/w/api', '/w/web']);
+      final tab = state().selected!;
+      expect(tab.customTitle, 'server');
+      expect(textOf(tab.panes[sessionOf(out, k1)]!), contains('old api'));
+      expect(textOf(tab.panes[sessionOf(out, k1)]!), contains('-- again --'));
+      expect(textOf(tab.panes[sessionOf(out, k2)]!), isNot(contains('old')));
+      for (final view in local.views.values) {
+        expect(view.writes, isEmpty, reason: 'nothing is replayed');
+      }
+    });
+
+    test('a workspace that is gone: the current one', () async {
+      boot(workspaces: stored);
+      final out = await tabs().reopenClosed(
+        closedTab(workspace: 'deleted'),
+        dividerFor: (_) => '',
+      );
+      expect(sidebar().workspaceOf(out.tabIdByKey[k1]!), sidebar().currentId);
+    });
+
+    test('while a restore runs nothing is reopened', () async {
+      boot();
+      final gate = local.cwdGates['/w/x'] = Completer<void>();
+      final running = restore();
+      await pumpEventQueue();
+      final out = await tabs().reopenClosed(closedTab(), dividerFor: (_) => '');
+      expect(out.tabsRestored, 0);
+      gate.complete();
+      await running;
+    });
+
+    test('a pane returns beside the focused pane of its tab, with its '
+        'folder and its text', () async {
+      boot();
+      final out = await restore();
+      final tab = state().tabs.firstWhere((t) => t.id == out.tabIdByKey[k1]);
+      final before = tab.paneOrder.length;
+      final id = await tabs().reopenClosedPane(
+        ClosedPane(
+          tabId: tab.id,
+          cwd: '/w/back',
+          launch: null,
+          text: 'was here\r\n',
+          label: 'x',
+        ),
+        divider: '-- again --\r\n',
+      );
+      expect(id, isNotNull);
+      expect(local.openCwds.last, '/w/back');
+      final after = state().tabs.firstWhere((t) => t.id == tab.id);
+      expect(after.paneOrder.length, before + 1);
+      expect(after.focusedPaneId, id);
+      expect(state().selectedId, tab.id);
+      expect(textOf(after.panes[id]!), contains('was here'));
+      expect(textOf(after.panes[id]!), contains('-- again --'));
+      expect(local.views[id]!.writes, isEmpty);
+    });
+
+    test('a pane whose tab is gone becomes a tab of its own', () async {
+      boot();
+      await restore();
+      final id = await tabs().reopenClosedPane(
+        ClosedPane(
+          tabId: 999999,
+          cwd: '/w/solo',
+          launch: null,
+          text: 'solo\r\n',
+          label: 'x',
+        ),
+      );
+      expect(id, isNotNull);
+      expect(state().selected!.id, id);
+      expect(textOf(state().selected!.focused), contains('solo'));
+    });
+
+    test('an SSH pane reopens through its launch, on its server', () async {
+      boot();
+      final out = await restore();
+      final tab = state().tabs.firstWhere((t) => t.id == out.tabIdByKey[k1]);
+      final launch = SshLaunch(
+        SshTarget.parse('devbox')!,
+        remoteCwd: '/srv/app',
+      );
+      final id = await tabs().reopenClosedPane(
+        ClosedPane(
+          tabId: tab.id,
+          cwd: null,
+          launch: launch,
+          text: '',
+          label: 'x',
+        ),
+      );
+      expect(id, isNotNull);
+      expect(local.openLaunches.last, isA<SshLaunch>());
+      expect(local.openCwds.last, isNull);
+    });
+
+    test(
+      'a refused reopen (session limit) returns null and tells why',
+      () async {
+        boot();
+        await restore();
+        local.openError = const SessionLimitException(2);
+        final id = await tabs().reopenClosedPane(
+          ClosedPane(tabId: 1, cwd: '/w/x', launch: null, text: '', label: 'x'),
+        );
+        expect(id, isNull);
+        expect(state().notice, isA<SessionLimitNotice>());
+      },
+    );
   });
 }

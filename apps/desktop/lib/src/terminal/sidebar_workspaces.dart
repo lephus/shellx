@@ -283,9 +283,17 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     }
 
     placement.isShown = isShown;
+    bool hasWorkspace(String id) => state.workspace(id) != null;
+    String currentWorkspace() => state.currentId;
+    placement.hasWorkspace = hasWorkspace;
+    placement.currentWorkspace = currentWorkspace;
     ref.onDispose(() {
       if (successor.choose == choose) successor.choose = null;
       if (placement.isShown == isShown) placement.isShown = null;
+      if (placement.hasWorkspace == hasWorkspace) placement.hasWorkspace = null;
+      if (placement.currentWorkspace == currentWorkspace) {
+        placement.currentWorkspace = null;
+      }
     });
     return _reconcile(
       SidebarState(workspaces: loadWorkspaces(stored), members: const {}),

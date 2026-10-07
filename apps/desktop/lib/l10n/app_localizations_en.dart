@@ -2222,4 +2222,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get copyModeCopied => 'Copied';
+
+  @override
+  String get actionReopenClosed => 'Reopen closed tab';
+
+  @override
+  String reopenedTab(String name) {
+    return 'Reopened “$name”';
+  }
+
+  @override
+  String get reopenNothing => 'Nothing to reopen';
 }

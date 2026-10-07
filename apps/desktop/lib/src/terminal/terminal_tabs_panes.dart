@@ -77,6 +77,9 @@ extension TerminalTabsPanes on TerminalTabs {
     String? cwd,
     bool focus = false,
     bool local = false,
+    SessionLaunch? launchOverride,
+    bool ownFolder = false,
+    String? restoreText,
   }) async {
     final tab = _state.tabOfSession(target);
     final pane = tab?.panes[target];
@@ -88,16 +91,29 @@ extension TerminalTabsPanes on TerminalTabs {
     // not even for a local split of that pane.
     final remote = pane.remote;
     final onServer = remote?.launch.host != null;
-    final launch = local ? null : remote?.launch.forSplit(cwd ?? pane.cwd);
+    // A11 D14: a reopened pane brings its own launch (an SSH pane reopens
+    // on its server) and, with [ownFolder], the local folder it had — never
+    // the target's (a server's) one.
+    final launch =
+        launchOverride ??
+        (local ? null : remote?.launch.forSplit(cwd ?? pane.cwd));
+    final openCwd = launch?.host != null
+        ? null
+        : ownFolder
+        ? cwd
+        : onServer
+        ? null
+        : cwd ?? pane.cwd;
     return _guardedOpen(
       () => _local.open(
         cols: grid.cols,
         rows: grid.rows,
-        cwd: onServer ? null : cwd ?? pane.cwd,
+        cwd: openCwd,
         tabId: tab.id,
         launch: launch,
       ),
       (id) {
+        if (restoreText != null) _restoreText[id] = restoreText;
         _adoptPane(
           id,
           tabId: tab.id,
@@ -106,6 +122,7 @@ extension TerminalTabsPanes on TerminalTabs {
           size: grid,
           focus: focus,
         );
+        _restoreText.remove(id); // the attach took it, or never happened
         if (_state.tabOfSession(id) == null) throw const PaneGoneException();
         return id;
       },

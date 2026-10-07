@@ -2133,4 +2133,15 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get copyModeCopied => 'Đã chép';
+
+  @override
+  String get actionReopenClosed => 'Mở lại tab đã đóng';
+
+  @override
+  String reopenedTab(String name) {
+    return 'Đã mở lại “$name”';
+  }
+
+  @override
+  String get reopenNothing => 'Không có gì để mở lại';
 }

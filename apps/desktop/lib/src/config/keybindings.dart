@@ -119,6 +119,18 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
   return [
     b(primary(LogicalKeyboardKey.keyT), 'new_tab'),
     b(primary(LogicalKeyboardKey.keyW), 'close_surface'),
+    // A11 D14: Cmd+Shift+T; Ctrl+Shift+T is new_tab on Windows, so Alt too.
+    b(
+      mac
+          ? shifted(LogicalKeyboardKey.keyT)
+          : const KeyChord(
+              LogicalKeyboardKey.keyT,
+              control: true,
+              shift: true,
+              alt: true,
+            ),
+      'reopen_closed',
+    ),
     b(shifted(LogicalKeyboardKey.keyN), 'new_workspace'),
     b(shifted(LogicalKeyboardKey.keyK), 'ssh_connect'),
     b(shifted(LogicalKeyboardKey.keyI), 'toggle_notifications'),

@@ -3311,6 +3311,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied'**
   String get copyModeCopied;
+
+  /// A11 D14
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen closed tab'**
+  String get actionReopenClosed;
+
+  /// No description provided for @reopenedTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopened “{name}”'**
+  String reopenedTab(String name);
+
+  /// No description provided for @reopenNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to reopen'**
+  String get reopenNothing;
 }
 
 class _AppLocalizationsDelegate
