@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/config/command_palette.dart';
 
+import 'package:shellx_desktop/src/config/config_controller.dart';
+import '../support/config_harness.dart';
 import '../support/config_workspace.dart';
 
 const cmd = LogicalKeyboardKey.metaLeft;
@@ -34,17 +36,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'split d');
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<Text>(
-              find
-                  .descendant(
-                    of: find.byKey(const ValueKey('palette.row.0')),
-                    matching: find.byType(Text),
-                  )
-                  .first,
-            )
-            .data,
-        'Split down',
+        tester.getSemantics(find.byKey(const ValueKey('palette.row.0'))).label,
+        startsWith('Split down'),
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
@@ -259,6 +252,232 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pumpAndSettle();
       expect(find.byType(CommandPalette), findsNothing);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'Tab and Shift+Tab keep the keyboard in the field',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      await openPalette(tester);
+      bool inField() =>
+          tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus;
+      expect(inField(), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(inField(), isTrue);
+      await tester.sendKeyDownEvent(shift);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(shift);
+      await tester.pumpAndSettle();
+      expect(inField(), isTrue);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'Esc while an input method composes keeps the palette open',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      await openPalette(tester);
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'tab',
+          composing: TextRange(start: 0, end: 3),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(CommandPalette), findsOneWidget);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets('composing Enter writes nothing to the terminal', variant: mac, (
+    tester,
+  ) async {
+    final w = await pumpConfiguredWorkspace(
+      tester,
+      config: 'command = Lint = npm run lint\n',
+    );
+    await openPalette(tester);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'lint',
+        composing: TextRange(start: 0, end: 4),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byType(CommandPalette), findsOneWidget);
+    final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+    expect(w.local.views[id]!.writes, isEmpty);
+    await disposeWorkspace(tester, w.container);
+  });
+
+  testWidgets(
+    'Ctrl+Shift+V pastes into the field on Windows',
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async => switch (call.method) {
+          'Clipboard.getData' => <String, dynamic>{'text': 'hello'},
+          'Clipboard.hasStrings' => <String, dynamic>{'value': true},
+          _ => null,
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(shift);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
+      await tester.sendKeyUpEvent(shift);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(CommandPalette), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(shift);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(shift);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'hello',
+      );
+      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      expect(w.local.views[id]!.writes, isEmpty);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'Paste is listed with a tab and hidden without one',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      await openPalette(tester);
+      await tester.enterText(find.byType(TextField), 'paste');
+      await tester.pumpAndSettle();
+      expect(find.text('Paste'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      w.container
+          .read(terminalTabsProvider.notifier)
+          .close(w.container.read(terminalTabsProvider).selectedId!);
+      await tester.pumpAndSettle();
+      await openPalette(tester);
+      await tester.enterText(find.byType(TextField), 'paste');
+      await tester.pumpAndSettle();
+      expect(find.byType(CommandPalette), findsOneWidget);
+      expect(find.text('Paste'), findsNothing);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'the matched letters are highlighted, marks and all',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(
+        tester,
+        locale: const Locale('vi'),
+      );
+      await openPalette(tester);
+      await tester.enterText(find.byType(TextField), 'chia');
+      await tester.pumpAndSettle();
+      final text = tester.widget<Text>(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('palette.row.0')),
+              matching: find.byType(Text),
+            )
+            .first,
+      );
+      final spans = text.textSpan!.toPlainText();
+      expect(spans, startsWith('Chia'));
+      final bold = <String>[];
+      text.textSpan!.visitChildren((s) {
+        if (s is TextSpan && s.style?.fontWeight == FontWeight.w600) {
+          bold.add(s.text!);
+        }
+        return true;
+      });
+      expect(bold.join(), 'Chia');
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets(
+    'a reload that removes a command while open removes its row',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(
+        tester,
+        config: 'command = Lint = npm run lint\n',
+      );
+      await openPalette(tester);
+      await tester.enterText(find.byType(TextField), 'lint');
+      await tester.pumpAndSettle();
+      expect(find.text('Lint'), findsOneWidget);
+      w.fs.write(testConfigPaths().shellx, '');
+      await w.container.read(shellxConfigProvider.notifier).load(manual: true);
+      await tester.pumpAndSettle();
+      expect(find.text('Lint'), findsNothing);
+      expect(find.byType(CommandPalette), findsOneWidget);
+      await disposeWorkspace(tester, w.container);
+    },
+  );
+
+  testWidgets('arrows with a modifier do not move the list', variant: mac, (
+    tester,
+  ) async {
+    final w = await pumpConfiguredWorkspace(tester);
+    await openPalette(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+    final first = tester.getSemantics(
+      find.byKey(const ValueKey('palette.row.0')),
+    );
+    expect(first.flagsCollection.isSelected, ui.Tristate.isTrue);
+    await disposeWorkspace(tester, w.container);
+  });
+
+  testWidgets(
+    'the result count is read once after typing settles',
+    variant: mac,
+    (tester) async {
+      final w = await pumpConfiguredWorkspace(tester);
+      final handle = tester.ensureSemantics();
+      await openPalette(tester);
+      tester.takeAnnouncements();
+      await tester.enterText(find.byType(TextField), 't');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.enterText(find.byType(TextField), 'ta');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.enterText(find.byType(TextField), 'tab');
+      await tester.pump(const Duration(milliseconds: 700));
+      final counts = tester
+          .takeAnnouncements()
+          .map((a) => a.message)
+          .where((m) => m.endsWith('commands') || m.endsWith('command'));
+      expect(counts, hasLength(1));
+      handle.dispose();
       await disposeWorkspace(tester, w.container);
     },
   );

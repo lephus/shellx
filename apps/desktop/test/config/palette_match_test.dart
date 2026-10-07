@@ -53,4 +53,30 @@ void main() {
       expect(filterPalette(entries, 'npm', const []).single.id, 'lint');
     },
   );
+
+  test('chia and chìa rank alike; the highlight covers the mark', () {
+    expect(matchScore('chia', 'Chìa khoá'), matchScore('chia', 'Chia khoa'));
+    expect(matchScore('chia', 'Chìa khoá'), 4000);
+    expect(matchRanges('chia', 'Chìa khoá'), [(0, 4)]);
+    // Decomposed: the combining mark stays inside the range.
+    expect(matchRanges('chia', 'Chi\u0300a khoa'), [(0, 5)]);
+    expect(matchRanges('khoa', 'Chìa khoá'), [(5, 9)]);
+    expect(matchRanges('csp', 'Chia sang phải'), [(0, 1), (5, 6), (10, 11)]);
+  });
+
+  test('word start: any boundary, later occurrences too', () {
+    expect(matchScore('b', 'aab b'), greaterThan(matchScore('b', 'aab')!));
+    expect(
+      matchScore('run', 'npm-run'),
+      greaterThan(matchScore('un', 'npm-run')!),
+    );
+    expect(matchScore('x', 'a/b_x'), greaterThan(matchScore('x', 'abx')!));
+  });
+
+  test('a command text matches as text, never as scattered letters', () {
+    final entries = [e('lint', 'Lint', subtitle: 'run the linter now')];
+    expect(filterPalette(entries, 'npm', const []), isEmpty);
+    expect(filterPalette(entries, 'rnl', const []), isEmpty);
+    expect(filterPalette(entries, 'linter', const []).single.id, 'lint');
+  });
 }

@@ -26,41 +26,119 @@ final Map<String, String> _fold = {
     for (final c in chars.split('')) c: base,
 };
 
-/// D33: lower case, Vietnamese marks removed (precomposed or combining).
-String foldForSearch(String s) {
+/// [folded] is the search form of the text; [spans] holds, for each of its
+/// characters, the start and end (UTF-16 units) of what it came from in the
+/// original, a combining mark that follows included.
+typedef _Folded = ({String folded, List<(int, int)> spans});
+
+_Folded _foldWithSpans(String s) {
   final out = StringBuffer();
-  for (final rune in s.toLowerCase().runes) {
-    if (rune >= 0x300 && rune <= 0x36F) continue; // combining marks
-    final c = String.fromCharCode(rune);
-    out.write(_fold[c] ?? c);
+  final spans = <(int, int)>[];
+  var offset = 0;
+  for (final rune in s.runes) {
+    final length = rune > 0xFFFF ? 2 : 1;
+    if (rune >= 0x300 && rune <= 0x36F) {
+      // A combining mark: part of the letter before it.
+      if (spans.isNotEmpty) {
+        spans[spans.length - 1] = (spans.last.$1, offset + length);
+      }
+    } else {
+      for (final lower in String.fromCharCode(rune).toLowerCase().runes) {
+        final c = String.fromCharCode(lower);
+        if (lower >= 0x300 && lower <= 0x36F) continue;
+        out.write(_fold[c] ?? c);
+        // One output character per source character (a lower-case form
+        // longer than one character maps all of them to the same source).
+        for (var k = 0; k < (_fold[c] ?? c).length; k++) {
+          spans.add((offset, offset + length));
+        }
+      }
+    }
+    offset += length;
   }
-  return out.toString();
+  return (folded: out.toString(), spans: spans);
 }
 
-/// Higher is better; null = no match. Tiers, best first: prefix, word
-/// start, inside, subsequence. The tier alone decides (a longer title is
-/// not worse); within a tier an earlier match is better, so a tie in the
-/// palette falls through to recency and then to the original order (D33).
-int? matchScore(String query, String text) {
+/// D33: lower case, Vietnamese marks removed (precomposed or combining).
+String foldForSearch(String s) => _foldWithSpans(s).folded;
+
+const _boundaries = ' -/_.';
+
+/// Where [query] matches [text], as positions in the folded text; null for
+/// no match. Tiers, best first: prefix, word start (after a space, `-`,
+/// `/`, `_` or `.`; every occurrence is looked at), inside, then (only when
+/// [subsequence]) scattered letters.
+({int score, List<int> at})? _match(
+  String query,
+  String folded, {
+  required bool subsequence,
+}) {
   final q = foldForSearch(query.trim());
-  if (q.isEmpty) return 0;
-  final t = foldForSearch(text);
-  if (t.startsWith(q)) return 4000;
-  final at = t.indexOf(q);
-  if (at > 0 && t[at - 1] == ' ') return 3000 - math.min(at, 999);
-  if (at >= 0) return 2000 - math.min(at, 999);
+  if (q.isEmpty) return (score: 0, at: const []);
+  List<int> run(int from) => [for (var i = 0; i < q.length; i++) from + i];
+  if (folded.startsWith(q)) return (score: 4000, at: run(0));
+  var first = -1;
   var from = 0;
+  while (true) {
+    final i = folded.indexOf(q, from);
+    if (i < 0) break;
+    if (first < 0) first = i;
+    if (i > 0 && _boundaries.contains(folded[i - 1])) {
+      return (score: 3000 - math.min(i, 999), at: run(i));
+    }
+    from = i + 1;
+  }
+  if (first >= 0) return (score: 2000 - math.min(first, 999), at: run(first));
+  if (!subsequence) return null;
+  var pos = 0;
   var last = -1;
   var gaps = 0;
+  final at = <int>[];
   for (final ch in q.split('')) {
     if (ch == ' ') continue;
-    final found = t.indexOf(ch, from);
+    final found = folded.indexOf(ch, pos);
     if (found < 0) return null;
     if (last >= 0) gaps += found - last - 1;
     last = found;
-    from = found + 1;
+    pos = found + 1;
+    at.add(found);
   }
-  return 1000 - math.min(gaps, 999);
+  return (score: 1000 - math.min(gaps, 999), at: at);
+}
+
+/// Higher is better; null = no match. The tier alone decides (a longer
+/// title is not worse); within a tier an earlier match is better, so a tie
+/// in the palette falls through to recency and then to the original order
+/// (D33). [subsequence] false: the text must contain the query as written
+/// (the text of a command is long; scattered letters would match anything).
+int? matchScore(String query, String text, {bool subsequence = true}) =>
+    _match(query, foldForSearch(text), subsequence: subsequence)?.score;
+
+/// The matched stretches of [text] as (start, end) in its own UTF-16 units,
+/// neighbours merged: what the palette draws in the accent colour. The
+/// match is found in the folded text and mapped back, so "chia" marks all
+/// of "Chìa", a combining mark included.
+List<(int, int)> matchRanges(
+  String query,
+  String text, {
+  bool subsequence = true,
+}) {
+  final f = _foldWithSpans(text);
+  final m = _match(query, f.folded, subsequence: subsequence);
+  if (m == null) return const [];
+  final ranges = <(int, int)>[];
+  for (final i in m.at) {
+    final (start, end) = f.spans[i];
+    if (ranges.isNotEmpty && ranges.last.$2 >= start) {
+      ranges[ranges.length - 1] = (
+        ranges.last.$1,
+        math.max(end, ranges.last.$2),
+      );
+    } else {
+      ranges.add((start, end));
+    }
+  }
+  return ranges;
 }
 
 enum PaletteKind { action, command, snippet, config }
@@ -160,7 +238,9 @@ List<PaletteEntry> filterPalette(
   for (var i = 0; i < entries.length; i++) {
     final e = entries[i];
     final title = matchScore(query, e.title);
-    final sub = e.subtitle == null ? null : matchScore(query, e.subtitle!);
+    final sub = e.subtitle == null
+        ? null
+        : matchScore(query, e.subtitle!, subsequence: false);
     final score = [
       ?title,
       if (sub != null) sub - 500,
@@ -216,6 +296,24 @@ class _CommandPaletteState extends State<CommandPalette> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _field.requestFocus();
     });
+  }
+
+  /// The entries changed under an open palette (a reload): filter again
+  /// with the same query; the cursor stays on the same entry when it is
+  /// still listed, else it stays at its place (clamped).
+  @override
+  void didUpdateWidget(CommandPalette old) {
+    super.didUpdateWidget(old);
+    if (identical(old.entries, widget.entries)) return;
+    final id = _results.isEmpty ? null : _results[_cursor].id;
+    final results = filterPalette(widget.entries, _query.text, widget.recent);
+    final at = results.indexWhere((e) => e.id == id);
+    _results = results;
+    _cursor = at >= 0
+        ? at
+        : results.isEmpty
+        ? 0
+        : _cursor.clamp(0, results.length - 1);
   }
 
   @override
@@ -311,10 +409,15 @@ class _CommandPaletteState extends State<CommandPalette> {
         !keys.isShiftPressed &&
         !keys.isAltPressed &&
         !keys.isMetaPressed;
-    if (k == LogicalKeyboardKey.arrowDown ||
+    final bare =
+        !keys.isControlPressed &&
+        !keys.isShiftPressed &&
+        !keys.isAltPressed &&
+        !keys.isMetaPressed;
+    if ((bare && k == LogicalKeyboardKey.arrowDown) ||
         (ctrlOnly && k == LogicalKeyboardKey.keyN)) {
       _move(1);
-    } else if (k == LogicalKeyboardKey.arrowUp ||
+    } else if ((bare && k == LogicalKeyboardKey.arrowUp) ||
         (ctrlOnly && k == LogicalKeyboardKey.keyP)) {
       _move(-1);
     } else if (k == LogicalKeyboardKey.pageDown) {
@@ -444,6 +547,29 @@ class _CommandPaletteState extends State<CommandPalette> {
     );
   }
 
+  /// UI-A9 §2.1: the letters the query matched, accent and semi-bold.
+  TextSpan _highlighted(
+    String text,
+    TextStyle style, {
+    bool subsequence = true,
+  }) {
+    final ranges = matchRanges(_query.text, text, subsequence: subsequence);
+    if (ranges.isEmpty) return TextSpan(text: text, style: style);
+    final marked = style.copyWith(
+      color: ShellxDesktopColors.accent,
+      fontWeight: FontWeight.w600,
+    );
+    final spans = <TextSpan>[];
+    var at = 0;
+    for (final (start, end) in ranges) {
+      if (start > at) spans.add(TextSpan(text: text.substring(at, start)));
+      spans.add(TextSpan(text: text.substring(start, end), style: marked));
+      at = end;
+    }
+    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
+    return TextSpan(style: style, children: spans);
+  }
+
   Widget _row(AppLocalizations l10n, int i) {
     final e = _results[i];
     final selected = i == _cursor;
@@ -472,22 +598,27 @@ class _CommandPaletteState extends State<CommandPalette> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      e.title,
+                    Text.rich(
+                      _highlighted(
+                        e.title,
+                        ShellxText.body.copyWith(
+                          color: ShellxDesktopColors.textPrimary,
+                        ),
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ShellxText.body.copyWith(
-                        color: ShellxDesktopColors.textPrimary,
-                      ),
                     ),
                     if (e.subtitle != null)
-                      Text(
-                        e.subtitle!,
+                      Text.rich(
+                        _highlighted(
+                          e.subtitle!,
+                          ShellxText.small.copyWith(
+                            color: ShellxDesktopColors.textSecondary,
+                          ),
+                          subsequence: false,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: ShellxText.small.copyWith(
-                          color: ShellxDesktopColors.textSecondary,
-                        ),
                       ),
                   ],
                 ),

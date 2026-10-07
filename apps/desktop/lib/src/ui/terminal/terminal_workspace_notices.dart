@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
 import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
+import '../../config/keybind_actions.dart' show describeIntent;
 import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
@@ -62,10 +63,36 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   List<PaletteEntry> _paletteEntries = const [];
   final List<String> _recent = [];
 
+  /// What applied when the palette opened (by intent), so that a reload
+  /// under the open palette does not re-ask questions that depend on where
+  /// the keyboard was: the field has it now.
+  Set<String> _openIntents = const {};
+
+  /// A reload while the palette is open: the entries follow the new
+  /// configuration (a removed command is gone, a rebound key shows its new
+  /// label); the palette keeps its query and its cursor.
+  void _refreshPalette() {
+    if (overlay != A9Overlay.palette) return;
+    final state = ref.read(shellxConfigProvider);
+    setState(() {
+      _paletteEntries = paletteEntries(
+        l10n: AppLocalizations.of(context),
+        config: state,
+        enabled: (intent) {
+          if (intent is ShowConfigProblemsIntent) {
+            return state.visibleProblemCount > 0;
+          }
+          if (intent is RunUserCommandIntent) return true;
+          return _openIntents.contains(describeIntent(intent));
+        },
+      );
+    });
+  }
+
   List<PaletteEntry> _buildPaletteEntries() {
     final state = ref.read(shellxConfigProvider);
     final hasTab = ref.read(terminalTabsProvider).selected != null;
-    return paletteEntries(
+    final entries = paletteEntries(
       l10n: AppLocalizations.of(context),
       config: state,
       enabled: (intent) {
@@ -80,6 +107,8 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         return action != null && action.isEnabled(intent);
       },
     );
+    _openIntents = {for (final e in entries) describeIntent(e.intent)};
+    return entries;
   }
 
   /// Enter or a click: close first (the keyboard goes back where it was),
@@ -193,6 +222,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   /// tree builds (preflight D4).
   void listenToConfigUi() {
     ref.listenManual(shellxConfigProvider, _onConfig);
+    ref.listenManual(shellxConfigProvider, (_, _) => _refreshPalette());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _onConfig(null, ref.read(shellxConfigProvider));
     });
