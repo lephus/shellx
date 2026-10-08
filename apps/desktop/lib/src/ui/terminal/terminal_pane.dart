@@ -372,7 +372,12 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                   // Only stores the size for the next open: safe during layout.
                   if (grid != null) tabs.reportGrid(grid);
                   final scaler = MediaQuery.textScalerOf(context);
-                  final cell = measureTerminalCell(style, scaler);
+                  // The selected tab's own size (A11 D19): its panes are the
+                  // ones being laid out.
+                  final cell = measureTerminalCell(
+                    styleFor(selected?.id ?? -1),
+                    scaler,
+                  );
                   // D4: 20 × 5 cells + padding + the pane header.
                   tabs.reportPaneMetrics(
                     PaneMetrics(

@@ -74,6 +74,11 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'alt+meta+3d -> WorkspaceFontIntent(1.0)',
         'alt+meta+2d -> WorkspaceFontIntent(-1.0)',
         'alt+meta+30 -> WorkspaceFontIntent(reset)',
+        'alt+shift+meta+3d -> WorkspaceFontIntent(1.0)',
+        'alt+meta+2b -> WorkspaceFontIntent(1.0)',
+        'alt+meta+20000022b -> WorkspaceFontIntent(1.0)',
+        'alt+meta+20000022d -> WorkspaceFontIntent(-1.0)',
+        'alt+meta+200000230 -> WorkspaceFontIntent(reset)',
       }
     : const {
         'ctrl+shift+6d norepeat -> ToggleCopyModeIntent',
@@ -83,6 +88,9 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'ctrl+alt+5d norepeat -> FocusHistoryIntent(forward)',
         'ctrl+alt+3d -> WorkspaceFontIntent(1.0)',
         'ctrl+alt+2d -> WorkspaceFontIntent(-1.0)',
+        'ctrl+alt+2b -> WorkspaceFontIntent(1.0)',
+        'ctrl+alt+20000022b -> WorkspaceFontIntent(1.0)',
+        'ctrl+alt+20000022d -> WorkspaceFontIntent(-1.0)',
       };
 
 void main() {

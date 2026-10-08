@@ -85,7 +85,8 @@ void main() {
       },
     );
 
-    test('the step is bounded −6…+10 and reset returns to 0', () {
+    test('the step is bounded −6…+10 (and by 9–28 at the global size) and '
+        'reset returns to 0', () {
       final id = c.read(sidebarWorkspacesProvider).workspaces.last.id;
       for (var i = 0; i < 30; i++) {
         sidebar().zoom(id, 1);
@@ -94,9 +95,74 @@ void main() {
       for (var i = 0; i < 40; i++) {
         sidebar().zoom(id, -1);
       }
-      expect(c.read(sidebarWorkspacesProvider).workspace(id)!.fontStep, -6);
+      // Global 13: 13 - 4 = 9 is as small as the text goes.
+      expect(c.read(sidebarWorkspacesProvider).workspace(id)!.fontStep, -4);
       sidebar().resetZoom(id);
       expect(c.read(sidebarWorkspacesProvider).workspace(id)!.fontStep, 0);
+    });
+
+    test('a press never hides build-up: global + step stays within 9-28', () {
+      final id = c.read(sidebarWorkspacesProvider).workspaces.last.id;
+      c.read(terminalFontSizeProvider.notifier); // global 13
+      // 13 + 10 = 23 is inside; the bound that bites is the global one.
+      for (var i = 0; i < 12; i++) {
+        sidebar().zoom(id, 1);
+      }
+      expect(c.read(sidebarWorkspacesProvider).workspace(id)!.fontStep, 10);
+    });
+
+    test('with the global size at 27 the step stops at +1; at 10 at -1', () {
+      final hi = ProviderContainer.test(
+        overrides: [
+          localSessionsProvider.overrideWithValue(FakeLocalSessions()),
+          appL10nProvider.overrideWithValue(
+            lookupAppLocalizations(const Locale('en')),
+          ),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+          terminalFontSizeProvider.overrideWith(() => _Fixed(27)),
+        ],
+      );
+      final s = hi.read(sidebarWorkspacesProvider.notifier);
+      for (var i = 0; i < 5; i++) {
+        s.zoom(kDefaultWorkspaceId, 1);
+      }
+      expect(
+        hi
+            .read(sidebarWorkspacesProvider)
+            .workspace(kDefaultWorkspaceId)!
+            .fontStep,
+        1,
+      );
+      // Back at the bound after the global size moved up behind its back.
+      s.zoom(kDefaultWorkspaceId, -1);
+      expect(
+        hi
+            .read(sidebarWorkspacesProvider)
+            .workspace(kDefaultWorkspaceId)!
+            .fontStep,
+        0,
+      );
+      final lo = ProviderContainer.test(
+        overrides: [
+          localSessionsProvider.overrideWithValue(FakeLocalSessions()),
+          appL10nProvider.overrideWithValue(
+            lookupAppLocalizations(const Locale('en')),
+          ),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+          terminalFontSizeProvider.overrideWith(() => _Fixed(10)),
+        ],
+      );
+      final l = lo.read(sidebarWorkspacesProvider.notifier);
+      for (var i = 0; i < 5; i++) {
+        l.zoom(kDefaultWorkspaceId, -1);
+      }
+      expect(
+        lo
+            .read(sidebarWorkspacesProvider)
+            .workspace(kDefaultWorkspaceId)!
+            .fontStep,
+        -1,
+      );
     });
 
     test('the step is saved with the workspace list and read back', () async {

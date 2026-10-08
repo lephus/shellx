@@ -110,7 +110,6 @@ final class SshActions {
   Future<int> connectForCli(
     SshTarget target, {
     String? workspaceId,
-    String? callerWorkspace,
     String? remoteCwd,
     bool hook = true,
     bool select = false,
@@ -119,7 +118,6 @@ final class SshActions {
     () => _connectForCliNow(
       target,
       workspaceId: workspaceId,
-      callerWorkspace: callerWorkspace,
       remoteCwd: remoteCwd,
       hook: hook,
       select: select,
@@ -129,13 +127,11 @@ final class SshActions {
   Future<int> _connectForCliNow(
     SshTarget target, {
     String? workspaceId,
-    String? callerWorkspace,
     String? remoteCwd,
     bool hook = true,
     bool select = false,
   }) async {
-    final existing =
-        workspaceId ?? _side.workspaceForHost(target.key) ?? callerWorkspace;
+    final existing = workspaceId ?? _side.workspaceForHost(target.key);
     final workspace =
         existing ?? _side.createForHost(target, makeCurrent: select);
     final int tab;

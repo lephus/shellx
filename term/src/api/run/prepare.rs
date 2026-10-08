@@ -325,10 +325,7 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
                 ("cmd", cmd(p)?),
                 ("hook", Some(Value::Bool(!p.has("no-hook")))),
                 ("focus", flag(p, "focus")),
-            ]
-            .into_iter()
-            .chain(caller(p, ctx))
-            .collect(),
+            ],
             id_key: Some("tab"),
             prefix: "t",
         },

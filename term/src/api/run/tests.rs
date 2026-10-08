@@ -1742,7 +1742,7 @@ fn outside_a_shellx_pane_nothing_changes() {
 }
 
 #[test]
-fn ssh_opens_where_the_caller_lives_too() {
+fn ssh_keeps_its_server_workspace_and_sends_no_caller() {
     let o = go(
         &["ssh", "devbox"],
         &[("SHELLX_TAB_ID", "100"), ("SHELLX_PANE_ID", "100")],
@@ -1754,16 +1754,7 @@ fn ssh_opens_where_the_caller_lives_too() {
         PLAIN,
     );
     let m = sent(&o, "ui.ssh.open");
-    assert_eq!(m.get("fromTab"), Some(&Value::Int(100)));
-    assert_eq!(m.get("fromPane"), Some(&Value::Int(100)));
-    let w = go(
-        &["ssh", "devbox", "--workspace", "Ops"],
-        &[("SHELLX_TAB_ID", "100")],
-        vec![],
-        "",
-        PLAIN,
-    );
-    assert_eq!(sent(&w, "ui.ssh.open").get("fromTab"), None);
+    assert_eq!((m.get("fromTab"), m.get("fromPane")), (None, None));
 }
 
 #[test]

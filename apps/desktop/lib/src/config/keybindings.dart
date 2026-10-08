@@ -293,26 +293,27 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     b(font(LogicalKeyboardKey.numpadSubtract), 'decrease_font_size', '1'),
     b(font(LogicalKeyboardKey.digit0), 'reset_font_size'),
     b(font(LogicalKeyboardKey.numpad0), 'reset_font_size'),
-    // A11 D19: Cmd+Opt+= / - / 0; Windows Ctrl+Alt+= and Ctrl+Alt+- (left
-    // Alt only), no key for the reset.
-    b(
-      mac
-          ? const KeyChord(LogicalKeyboardKey.equal, meta: true, alt: true)
-          : const KeyChord(LogicalKeyboardKey.equal, control: true, alt: true),
-      'increase_workspace_font_size',
-      '1',
-    ),
-    b(
-      mac
-          ? const KeyChord(LogicalKeyboardKey.minus, meta: true, alt: true)
-          : const KeyChord(LogicalKeyboardKey.minus, control: true, alt: true),
-      'decrease_workspace_font_size',
-      '1',
-    ),
-    if (mac)
+    // A11 D19: the global font chords with Option (Alt on Windows, left
+    // only) added, key for key; no reset chord on Windows.
+    for (final (key, shift, name) in [
+      (LogicalKeyboardKey.equal, false, 'increase_workspace_font_size'),
+      // Ctrl+Shift+Alt+= is equalize_splits on Windows.
+      if (mac) (LogicalKeyboardKey.equal, true, 'increase_workspace_font_size'),
+      (LogicalKeyboardKey.add, false, 'increase_workspace_font_size'),
+      (LogicalKeyboardKey.numpadAdd, false, 'increase_workspace_font_size'),
+      (LogicalKeyboardKey.minus, false, 'decrease_workspace_font_size'),
+      (
+        LogicalKeyboardKey.numpadSubtract,
+        false,
+        'decrease_workspace_font_size',
+      ),
+      if (mac) (LogicalKeyboardKey.digit0, false, 'reset_workspace_font_size'),
+      if (mac) (LogicalKeyboardKey.numpad0, false, 'reset_workspace_font_size'),
+    ])
       b(
-        const KeyChord(LogicalKeyboardKey.digit0, meta: true, alt: true),
-        'reset_workspace_font_size',
+        KeyChord(key, meta: mac, control: !mac, alt: true, shift: shift),
+        name,
+        name.startsWith('reset') ? null : '1',
       ),
     b(const KeyChord(LogicalKeyboardKey.f6, control: true), 'next_region'),
     b(

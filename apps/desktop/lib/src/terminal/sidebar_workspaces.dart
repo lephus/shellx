@@ -14,6 +14,8 @@ import '../remote/ssh_settings.dart';
 import '../restore/restore_snapshot.dart';
 import 'local_sessions_provider.dart';
 import 'tab_meta.dart';
+import 'terminal_font_size.dart';
+import 'terminal_style.dart' show kTerminalFontSizeMax, kTerminalFontSizeMin;
 import 'terminal_tabs.dart';
 
 const String kDefaultWorkspaceId = 'default';
@@ -507,8 +509,14 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
   }
 
   void _setFontStep(Workspace w, double step) {
+    // A press never builds up a hidden step: global + step stays within
+    // the 9-28 the text can be drawn at.
+    final global = ref.read(terminalFontSizeProvider);
     final next = step
-        .clamp(kWorkspaceFontStepMin, kWorkspaceFontStepMax)
+        .clamp(
+          max(kWorkspaceFontStepMin, kTerminalFontSizeMin - global),
+          min(kWorkspaceFontStepMax, kTerminalFontSizeMax - global),
+        )
         .toDouble();
     if (next == w.fontStep) return;
     state = state.copyWith(

@@ -71,40 +71,22 @@ void main() {
     await c.read(terminalTabsProvider.notifier).openTab(); // user's tab 100
   });
 
-  test('ui.ssh.open from a pane: the server\'s own workspace wins, else the '
-      'caller\'s workspace, an explicit one over both (A11 D26)', () async {
+  test('ui.ssh.open from a pane in a local workspace: the server still gets '
+      'its own workspace, the caller\'s is untouched (A8 D23)', () async {
     final api = c
         .read(sidebarWorkspacesProvider.notifier)
         .createFor(name: 'api');
     await call('ui.tab.new', {'workspace': 'api'}); // tab 101 in `api`
-    final first = await call('ui.ssh.open', {
+    final before = side().tabsOf(api).toList();
+    final r = await call('ui.ssh.open', {
       'target': 'devbox',
       'fromPane': 101,
       'fromTab': 101,
     });
-    expect(
-      side().workspaceOf(first['tab']! as int),
-      api,
-      reason: 'no workspace of that server yet: the caller\'s, not a new one',
-    );
-    expect(side().workspaces.where((w) => w.ssh == 'devbox'), isEmpty);
-    expect(tabs().selectedId, 100, reason: 'focus stays');
-    // Without a caller the A8 rule is unchanged.
-    final plain = await call('ui.ssh.open', {'target': 'devbox'});
-    final home = side().workspaceOf(plain['tab']! as int)!;
+    final home = side().workspaceOf(r['tab']! as int)!;
     expect(side().workspace(home)!.ssh, 'devbox');
-    // Now the server has a workspace: it wins over the caller's.
-    final again = await call('ui.ssh.open', {
-      'target': 'devbox',
-      'fromTab': 101,
-    });
-    expect(side().workspaceOf(again['tab']! as int), home);
-    final explicit = await call('ui.ssh.open', {
-      'target': 'devbox',
-      'workspace': 'Default',
-      'fromTab': 101,
-    });
-    expect(side().workspaceOf(explicit['tab']! as int), kDefaultWorkspaceId);
+    expect(home, isNot(api));
+    expect(side().tabsOf(api), before);
   });
 
   test('ui.ssh.open: validates, lands in the SSH workspace, no focus, '
