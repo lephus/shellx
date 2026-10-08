@@ -1106,5 +1106,21 @@
   "emptyHintSettings": "{shortcut} Settings",
   "@emptyHintSettings": {"placeholders": {"shortcut": {"type": "String"}}},
   "notificationsEmptyTitle": "No notifications yet",
-  "notificationsEmptyBody": "A glowing ring appears on a pane when an agent needs you."
+  "notificationsEmptyBody": "A glowing ring appears on a pane when an agent needs you.",
+  "agentStateRunning": "Running",
+  "agentStateNeedsInput": "Needs input",
+  "agentStateIdle": "Idle",
+  "agentStateDone": "Done",
+  "agentStatusTooltip": "{agent}: {state}",
+  "@agentStatusTooltip": {"placeholders": {"agent": {"type": "String"}, "state": {"type": "String"}}},
+  "agentStatusAnnounce": "{agent} needs your input",
+  "@agentStatusAnnounce": {"placeholders": {"agent": {"type": "String"}}},
+  "agentNotifyNeedsInput": "{agent} needs your input",
+  "@agentNotifyNeedsInput": {"placeholders": {"agent": {"type": "String"}}},
+  "agentNotifyDone": "{agent} finished",
+  "@agentNotifyDone": {"placeholders": {"agent": {"type": "String"}}},
+  "agentNamesClaude": "Claude Code",
+  "agentNamesCodex": "Codex",
+  "agentNamesGemini": "Gemini CLI",
+  "agentNamesOpencode": "OpenCode"
 }

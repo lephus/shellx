@@ -3,8 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:shellx_agent/shellx_agent.dart'
+    show SessionNotice, SessionNoticeKind;
+
+import '../agent/notify_threshold.dart';
 import '../ui/window_focus.dart';
+import 'agent_names.dart';
+import 'agent_notify_policy.dart';
 import 'agent_status.dart';
+import 'local_sessions_provider.dart';
+import 'sidebar_workspaces.dart' show settingsStoreProvider;
 import 'terminal_tabs.dart';
 
 /// The clock of the agent status (tests set it).
@@ -20,9 +28,26 @@ final agentStatusProvider =
       AgentStatusNotifier.new,
     );
 
-/// What a tab shows: the most urgent state of its panes' agents; null when
-/// none shows.
-final agentTabStateProvider = Provider.family<AgentState?, int>((ref, tabId) {
+/// What a badge shows: the state and whose it is.
+typedef AgentBadgeInfo = ({AgentState state, AgentKind agent});
+
+AgentBadgeInfo? _badgeOf(AgentPane? r) =>
+    r != null && agentStateVisible(r.state)
+    ? (state: r.state, agent: r.agent)
+    : null;
+
+/// What a pane's header shows; null when it shows nothing.
+final agentPaneBadgeProvider = Provider.family<AgentBadgeInfo?, int>(
+  (ref, pane) =>
+      _badgeOf(ref.watch(agentStatusProvider.select((m) => m[pane]))),
+);
+
+/// What a tab's row shows: the most urgent of its panes' agents (ties go
+/// to the first pane); null when none shows.
+final agentTabBadgeProvider = Provider.family<AgentBadgeInfo?, int>((
+  ref,
+  tabId,
+) {
   final tab = ref
       .watch(terminalTabsProvider)
       .tabs
@@ -30,12 +55,22 @@ final agentTabStateProvider = Provider.family<AgentState?, int>((ref, tabId) {
       .firstOrNull;
   if (tab == null) return null;
   final records = ref.watch(agentStatusProvider);
-  final states = [
-    for (final id in tab.panes.keys)
-      if (records[id] case final r? when agentStateVisible(r.state)) r.state,
-  ];
-  return states.isEmpty ? null : aggregate(states);
+  AgentBadgeInfo? best;
+  for (final id in tab.paneOrder) {
+    final b = _badgeOf(records[id]);
+    if (b == null) continue;
+    if (best == null || aggregate([best.state, b.state]) != best.state) {
+      best = b;
+    }
+  }
+  return best;
 });
+
+/// What a tab shows: the most urgent state of its panes' agents; null when
+/// none shows.
+final agentTabStateProvider = Provider.family<AgentState?, int>(
+  (ref, tabId) => ref.watch(agentTabBadgeProvider(tabId))?.state,
+);
 
 /// A visible change of one pane's agent (what `agent.status` reports);
 /// [state] null = the record is gone. Shows nothing in [toString].
@@ -65,6 +100,15 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
   final _quiet = <int, Timer>{};
   final _lastOutput = <int, DateTime>{};
   final _recent = <int, List<DateTime>>{};
+
+  /// D10: when each pane last had a hook event (the OSC merge), and when
+  /// it last got a hook notification (the 5 s gap, by event time).
+  final _hookAt = <int, DateTime>{};
+  final _noticeAt = <int, DateTime>{};
+
+  /// D10: the notifications made here, to tell them from a program's own
+  /// when they come back on the notice stream.
+  final _own = <int, List<({String title, String body, DateTime at})>>{};
 
   /// Visible changes, for the event bus. Open as long as the notifier.
   Stream<AgentStatusChange> get changes => _changes.stream;
@@ -123,14 +167,72 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     if (recent.length >= kAgentEventsPerSecond) return false;
     recent.add(now);
     final before = state[e.pane];
-    final after = reduceAgent(before, e, paneVisible: paneVisible(e.pane));
+    final visible = paneVisible(e.pane);
+    final after = reduceAgent(before, e, paneVisible: visible);
     if (e.kind == AgentEventKind.running ||
         (after?.state == AgentState.running &&
             before?.state != AgentState.running)) {
       _lastOutput[e.pane] = now;
     }
+    _hookAt[e.pane] = now;
     _store(e.pane, after);
+    // An event that came late changed nothing and tells nothing.
+    if (before == null || !e.at.isBefore(before.lastEventAt)) {
+      _tell(e, before, visible);
+    }
     return true;
+  }
+
+  /// D10: a notification through the same entry as `shellx notify --pane`,
+  /// so the ring, the focused-pane rule, the 20 a minute and the phone
+  /// push are the ones of A4.
+  void _tell(AgentEvent e, AgentPane? before, bool visible) {
+    final decision = AgentNotifyPolicy.decide(
+      e,
+      before,
+      paneVisible: visible,
+      threshold: notifyThreshold(ref.read(settingsStoreProvider)),
+      lastNoticeAt: _noticeAt[e.pane],
+    );
+    final kind = decision.text;
+    if (kind == null) return;
+    final l10n = ref.read(appL10nProvider);
+    final name = agentDisplayName(l10n, e.agent);
+    final body = switch (kind) {
+      AgentNoticeText.needsInput =>
+        decision.message ?? l10n.agentNotifyNeedsInput(name),
+      AgentNoticeText.done => l10n.agentNotifyDone(name),
+      AgentNoticeText.message => decision.message!,
+    };
+    _noticeAt[e.pane] = e.at;
+    final now = _now;
+    final own = _own.putIfAbsent(e.pane, () => [])
+      ..removeWhere((o) => now.difference(o.at) >= kAgentNoticeGap)
+      ..add((title: name, body: body, at: now));
+    if (!ref
+        .read(localSessionsProvider)
+        .notify(e.pane, title: name, body: body)) {
+      own.removeLast(); // nobody will send it back
+    }
+  }
+
+  /// D10: whether [n], a notice from the pane's own program (OSC 9 / 99 /
+  /// 777 or the bell), is the news a hook event gave in the last
+  /// [kAgentOscMerge]. The notice made by [_tell] itself is let through.
+  bool swallowNotice(SessionNotice n) {
+    if (n.kind == SessionNoticeKind.command) return false;
+    final now = _now;
+    final own = _own[n.sessionId];
+    if (own != null && n.kind == SessionNoticeKind.message) {
+      own.removeWhere((o) => now.difference(o.at) >= kAgentNoticeGap);
+      final i = own.indexWhere((o) => o.title == n.title && o.body == n.body);
+      if (i >= 0) {
+        own.removeAt(i);
+        return false;
+      }
+    }
+    final hook = _hookAt[n.sessionId];
+    return hook != null && now.difference(hook) < kAgentOscMerge;
   }
 
   /// The human typed into [pane] (not a script's `send`): a question

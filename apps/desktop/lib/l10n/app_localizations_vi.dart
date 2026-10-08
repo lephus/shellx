@@ -2663,4 +2663,48 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get notificationsEmptyBody =>
       'Một vòng sáng hiện ở pane khi agent cần bạn.';
+
+  @override
+  String get agentStateRunning => 'Đang chạy';
+
+  @override
+  String get agentStateNeedsInput => 'Cần bạn trả lời';
+
+  @override
+  String get agentStateIdle => 'Đang chờ';
+
+  @override
+  String get agentStateDone => 'Xong';
+
+  @override
+  String agentStatusTooltip(String agent, String state) {
+    return '$agent: $state';
+  }
+
+  @override
+  String agentStatusAnnounce(String agent) {
+    return '$agent cần bạn trả lời';
+  }
+
+  @override
+  String agentNotifyNeedsInput(String agent) {
+    return '$agent cần bạn trả lời';
+  }
+
+  @override
+  String agentNotifyDone(String agent) {
+    return '$agent đã xong';
+  }
+
+  @override
+  String get agentNamesClaude => 'Claude Code';
+
+  @override
+  String get agentNamesCodex => 'Codex';
+
+  @override
+  String get agentNamesGemini => 'Gemini CLI';
+
+  @override
+  String get agentNamesOpencode => 'OpenCode';
 }

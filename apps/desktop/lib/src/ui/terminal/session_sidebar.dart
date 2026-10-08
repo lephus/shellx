@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
+import '../../terminal/agent_status_notifier.dart' show agentTabBadgeProvider;
 import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
@@ -1618,6 +1619,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           unread: unread[tab.id],
           onMarkRead: () =>
               ref.read(tabAttentionProvider.notifier).markRead(tab.id),
+          agentStatus: rowRef.watch(agentTabBadgeProvider(tab.id)),
           agent: rowRef.watch(
             agentMarksProvider.select(
               (m) =>

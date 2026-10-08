@@ -4211,6 +4211,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A glowing ring appears on a pane when an agent needs you.'**
   String get notificationsEmptyBody;
+
+  /// No description provided for @agentStateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get agentStateRunning;
+
+  /// No description provided for @agentStateNeedsInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs input'**
+  String get agentStateNeedsInput;
+
+  /// No description provided for @agentStateIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle'**
+  String get agentStateIdle;
+
+  /// No description provided for @agentStateDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get agentStateDone;
+
+  /// No description provided for @agentStatusTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent}: {state}'**
+  String agentStatusTooltip(String agent, String state);
+
+  /// No description provided for @agentStatusAnnounce.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} needs your input'**
+  String agentStatusAnnounce(String agent);
+
+  /// No description provided for @agentNotifyNeedsInput.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} needs your input'**
+  String agentNotifyNeedsInput(String agent);
+
+  /// No description provided for @agentNotifyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} finished'**
+  String agentNotifyDone(String agent);
+
+  /// No description provided for @agentNamesClaude.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Code'**
+  String get agentNamesClaude;
+
+  /// No description provided for @agentNamesCodex.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex'**
+  String get agentNamesCodex;
+
+  /// No description provided for @agentNamesGemini.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini CLI'**
+  String get agentNamesGemini;
+
+  /// No description provided for @agentNamesOpencode.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode'**
+  String get agentNamesOpencode;
 }
 
 class _AppLocalizationsDelegate
