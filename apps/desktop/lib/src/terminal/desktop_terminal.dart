@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
@@ -30,7 +32,63 @@ final class DesktopTerminal extends Terminal {
   /// uses (`CSI > 4;2 m` underlined every line, 22 left bold on): the
   /// filter rewrites them first (shellx_core SgrFilter has the list).
   @override
-  void write(String data) => super.write(_sgr.filter(data));
+  void write(String data) {
+    final filtered = _sgr.filter(data);
+    final opens = _opensSync(filtered);
+    // Before the parse: it notifies the views when it is done.
+    if (opens == true) _beginSync();
+    super.write(filtered);
+    if (opens == false) _endSync();
+  }
+
+  /// Longest a synchronized-output frame (`CSI ? 2026 h`) may stay unshown
+  /// when its `l` never comes (the spec's own fallback is of this order).
+  static const Duration syncOutputTimeout = Duration(milliseconds: 150);
+
+  bool _syncOpen = false;
+  bool _syncPending = false;
+  Timer? _syncTimer;
+
+  /// Synchronized output (`CSI ? 2026 h` ... `l`, which Claude Code wraps
+  /// every frame in): xterm 4.0.0 ignores the mode and notifies its views
+  /// after every pty read, and a frame spans several reads. Each of those
+  /// notifications makes the terminal view send the input method a new caret
+  /// rectangle (`TextInput.setCaretRect`/`setEditableSizeAndTransform`) at
+  /// whatever row the half-drawn frame has the cursor on; on macOS every one
+  /// reaches IMKit while a Vietnamese word is composed. Holding the
+  /// notification until the frame is complete sends one, for where the
+  /// frame ended. Also what the mode is for: no half-drawn frames on screen.
+  /// true: the chunk leaves a frame open; false: it ends one; null: neither.
+  bool? _opensSync(String data) {
+    final h = data.lastIndexOf('\x1b[?2026h');
+    final l = data.lastIndexOf('\x1b[?2026l');
+    if (h < 0 && l < 0) return null;
+    return h > l;
+  }
+
+  void _beginSync() {
+    _syncOpen = true;
+    _syncTimer ??= Timer(syncOutputTimeout, _endSync);
+  }
+
+  void _endSync() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _syncOpen = false;
+    if (_syncPending) {
+      _syncPending = false;
+      super.notifyListeners();
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (_syncOpen) {
+      _syncPending = true;
+      return;
+    }
+    super.notifyListeners();
+  }
 
   /// A10 D11: where the program put OSC 8 links.
   final hyperlinks = HyperlinkRegistry();
