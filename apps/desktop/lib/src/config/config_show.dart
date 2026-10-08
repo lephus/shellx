@@ -1,12 +1,16 @@
 import 'dart:ui' show Color;
 
 import 'config_controller.dart';
+import 'keybind_trigger.dart' show KeyChord, chordConfigText;
 import 'shellx_config.dart';
 
 String _n(double v) => v == v.roundToDouble() ? v.toInt().toString() : '$v';
 
 String _hex(Color c) =>
     '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+/// `global-hotkey`: the chord in config spelling, `off` when not set.
+String _hotkey(KeyChord? c) => c == null ? 'off' : chordConfigText(c) ?? 'off';
 
 String _pair(double a, double b) => a == b ? _n(a) : '${_n(a)},${_n(b)}';
 
@@ -77,6 +81,7 @@ List<Map<String, String>> configShowValues(ConfigState s) {
       WorkingDirectoryKind.path => c.workingDirectory.path!,
     }),
     v('ghostty-config', '${c.ghosttyConfig}'),
+    v('global-hotkey', _hotkey(c.globalHotkey)),
     for (final k in c.keybinds)
       {'key': 'keybind', 'value': k.value, 'source': at(k.origin)},
     for (final u in c.commands)

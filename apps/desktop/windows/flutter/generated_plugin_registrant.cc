@@ -8,6 +8,7 @@
 
 #include <desktop_drop/desktop_drop_plugin.h>
 #include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
+#include <hotkey_manager_windows/hotkey_manager_windows_plugin_c_api.h>
 #include <local_notifier/local_notifier_plugin.h>
 #include <pasteboard/pasteboard_plugin.h>
 #include <screen_retriever_windows/screen_retriever_windows_plugin_c_api.h>
@@ -19,6 +20,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("DesktopDropPlugin"));
   FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
+  HotkeyManagerWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("HotkeyManagerWindowsPluginCApi"));
   LocalNotifierPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("LocalNotifierPlugin"));
   PasteboardPluginRegisterWithRegistrar(

@@ -19,6 +19,7 @@ import '../../tray/tray_actions.dart';
 import '../../tray/tray_menu.dart' show notifyThresholdLabel;
 import '../config/action_labels.dart' show problemText;
 import '../theme/shellx_desktop_theme.dart';
+import 'hotkey_control.dart';
 import 'settings_values.dart';
 import 'settings_writer.dart';
 
@@ -259,7 +260,10 @@ class _SettingRowState extends ConsumerState<SettingRow> {
             for (final p in ref.watch(
               shellxConfigProvider.select((s) => s.runtimeProblems),
             ))
-              if (p.key == def.fileKey && p.severity == ConfigSeverity.warning)
+              // The hotkey control says its own (one line, not two).
+              if (p.key == def.fileKey &&
+                  p.severity == ConfigSeverity.warning &&
+                  def.control != SettingControl.hotkey)
                 p,
           ]
         : const <ConfigProblem>[];
@@ -515,6 +519,13 @@ class _SettingRowState extends ConsumerState<SettingRow> {
         );
       case SettingControl.path:
         return _workingDir(l10n, label, text, editable);
+      case SettingControl.hotkey:
+        return HotkeyControl(
+          label: label,
+          current: text,
+          editable: editable,
+          onCommit: _commit,
+        );
       default:
         return _textField(
           l10n,

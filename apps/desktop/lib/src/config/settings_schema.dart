@@ -371,6 +371,28 @@ final List<SettingDef> kSettings = List.unmodifiable([
       SettingSample('true', 'true'),
     ],
   ),
+  SettingDef(
+    id: 'global-hotkey',
+    owner: SettingOwner.file,
+    page: SettingPage.terminal,
+    control: SettingControl.hotkey,
+    fileKey: 'global-hotkey',
+    label: (l) => l.settingsGlobalHotkey,
+    keywords: const [
+      'shortcut',
+      'show',
+      'hide',
+      'toggle',
+      'quake',
+      'phím tắt',
+      'ẩn',
+      'hiện',
+    ],
+    sampleValues: const [
+      SettingSample('ctrl+alt+j', 'ctrl+alt+j'),
+      SettingSample('ctrl+alt+shift+f5', 'ctrl+alt+shift+f5'),
+    ],
+  ),
   // Advanced
   SettingDef(
     id: 'ghostty-config',

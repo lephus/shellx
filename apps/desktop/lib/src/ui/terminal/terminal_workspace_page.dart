@@ -805,10 +805,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       ref.watch(shellxConfigProvider.select((s) => s.bindings)),
     );
     return Shortcuts(
-      shortcuts:
-          (overlay == A9Overlay.shortcuts || overlay == A9Overlay.settings)
-          ? const {}
-          : _workspaceShortcuts!,
+      shortcuts: overlayBlocksShortcuts ? const {} : _workspaceShortcuts!,
       child: Actions(
         actions: actionsMap,
         // Every focus in the window sits inside this scope, so the
@@ -912,10 +909,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           stripFocus: stripFocus,
           restoreStripFocus: restoreStripFocus,
           daemonStripFocus: daemonStripFocus,
-          shortcuts:
-              (overlay == A9Overlay.shortcuts || overlay == A9Overlay.settings)
-              ? const {}
-              : terminalShortcuts,
+          shortcuts: overlayBlocksShortcuts ? const {} : terminalShortcuts,
           onKeyEvent: _terminalKey,
           onShowConfigProblems: () => openOverlay(A9Overlay.problems),
           onClosePane: (id) {

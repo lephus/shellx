@@ -272,6 +272,9 @@ final Map<String, ActionSpec> kActionSpecs = {
     const ActionSpec('open_config', ActionGroup.config),
     const ActionSpec('show_shortcuts', ActionGroup.config),
     const ActionSpec('show_config_problems', ActionGroup.config),
+    // A11 D24, D23: no default chord.
+    const ActionSpec('show_tour', ActionGroup.config),
+    const ActionSpec('show_whats_new', ActionGroup.config),
     const ActionSpec(
       'run_command',
       ActionGroup.commands,
@@ -400,6 +403,8 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'open_config' => const OpenConfigIntent(),
   'show_shortcuts' => const ShowShortcutsIntent(),
   'show_config_problems' => const ShowConfigProblemsIntent(),
+  'show_tour' => const ShowTourIntent(),
+  'show_whats_new' => const ShowWhatsNewIntent(),
   'run_command' => RunUserCommandIntent(a.param!),
   'text' => SendTextIntent(decodeZigString(a.param!)!),
   'csi' => SendTextIntent('\x1b[${decodeZigString(a.param!)!}'),

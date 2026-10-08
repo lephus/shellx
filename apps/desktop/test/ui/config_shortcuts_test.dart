@@ -247,11 +247,11 @@ keybind = super+l=run_command:Lint
           .close(w.container.read(terminalTabsProvider).selectedId!);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('pane.empty')), findsOneWidget);
-      expect(find.text('⌘T'), findsNothing);
+      expect(find.text('⌘T New tab'), findsNothing);
       w.fs.write(testConfigPaths().shellx, 'keybind = super+t=new_tab\n');
       await w.container.read(shellxConfigProvider.notifier).load();
       await tester.pumpAndSettle();
-      expect(find.text('⌘T'), findsOneWidget);
+      expect(find.text('⌘T New tab'), findsOneWidget);
       await disposeWorkspace(tester, w.container);
     },
   );

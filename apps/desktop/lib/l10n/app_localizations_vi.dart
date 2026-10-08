@@ -841,13 +841,6 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get notificationsPanelEmptyTitle => 'Chưa có thông báo nào';
-
-  @override
-  String get notificationsPanelEmptyBody =>
-      'Chương trình trong tab gửi thông báo bằng OSC 9, 99, 777 hoặc lệnh shellx notify.';
-
-  @override
   String notificationsPanelNextHint(String shortcut) {
     return 'Chưa đọc tiếp theo  $shortcut';
   }
@@ -2337,6 +2330,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsGlobalHotkeyRecord => 'Nhấn tổ hợp phím…';
 
   @override
+  String get settingsGlobalHotkeyUndetected =>
+      'Một số xung đột với app khác không phát hiện được.';
+
+  @override
   String get settingsGlobalHotkeyTaken =>
       'Tổ hợp này đang được ứng dụng khác dùng';
 
@@ -2575,4 +2572,95 @@ class AppLocalizationsVi extends AppLocalizations {
   String workspaceZoomTip(String step) {
     return 'Cỡ chữ $step';
   }
+
+  @override
+  String get actionShowTour => 'Xem hướng dẫn';
+
+  @override
+  String get actionShowWhatsNew => 'Có gì mới';
+
+  @override
+  String get tourSkip => 'Bỏ qua';
+
+  @override
+  String get tourNext => 'Tiếp';
+
+  @override
+  String get tourBack => 'Quay lại';
+
+  @override
+  String get tourDone => 'Xong';
+
+  @override
+  String tourStep(int n, int total) {
+    return '$n/$total';
+  }
+
+  @override
+  String get tourLabel => 'Hướng dẫn ShellX';
+
+  @override
+  String get tourTabsTitle => 'Tab và pane';
+
+  @override
+  String tourTabsBody(String newTab, String splitRight, String splitDown) {
+    return 'Mở tab bằng $newTab. Chia pane bằng $splitRight hoặc $splitDown.';
+  }
+
+  @override
+  String get tourNotifyTitle => 'Biết khi nào agent cần bạn';
+
+  @override
+  String tourNotifyBody(String jumpUnread) {
+    return 'Một vòng sáng hiện ở pane. Nhảy tới đó bằng $jumpUnread.';
+  }
+
+  @override
+  String get tourFindTitle => 'Tìm đường nhanh';
+
+  @override
+  String tourFindBody(String find, String searchAll, String palette) {
+    return 'Tìm chữ bằng $find, trong mọi terminal bằng $searchAll, và chạy mọi lệnh từ $palette.';
+  }
+
+  @override
+  String get tourSettingsTitle => 'Chỉnh theo ý bạn';
+
+  @override
+  String tourSettingsBody(String settings) {
+    return 'Mở Cài đặt bằng $settings. Mọi thứ cũng nằm trong một tệp văn bản thường.';
+  }
+
+  @override
+  String whatsNewTitle(String version) {
+    return 'Có gì mới ở bản $version';
+  }
+
+  @override
+  String get whatsNewDone => 'Đã hiểu';
+
+  @override
+  String get whatsNewMore => 'Xem mọi thay đổi';
+
+  @override
+  String emptyHintNewTab(String shortcut) {
+    return '$shortcut Tab mới';
+  }
+
+  @override
+  String emptyHintPalette(String shortcut) {
+    return '$shortcut Bảng lệnh';
+  }
+
+  @override
+  String emptyHintSettings(String shortcut) {
+    return '$shortcut Cài đặt';
+  }
+
+  @override
+  String get notificationsEmptyTitle => 'Chưa có thông báo';
+
+  @override
+  String get notificationsEmptyBody =>
+      'Một vòng sáng hiện ở pane khi agent cần bạn.';
 }

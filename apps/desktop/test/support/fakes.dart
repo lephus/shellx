@@ -469,7 +469,11 @@ final class TestHarness {
     this.appVersion = '1.0.0',
     this.platform = DevicePlatform.macos,
     this.sharingSetup,
-  }) : settings = InMemorySettingsStore(settings),
+  }) : settings = InMemorySettingsStore({
+         // A11 D24: the first-run tour is its own tests' business.
+         SettingKeys.tourDone: true,
+         ...?settings,
+       }),
        l10n = lookupAppLocalizations(locale);
 
   final FlakyKeyValueStore secureStore = FlakyKeyValueStore();

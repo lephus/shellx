@@ -38,6 +38,9 @@ String problemText(AppLocalizations l10n, ConfigProblem problem) {
       value,
     ),
     ConfigProblemCode.lowContrast => l10n.configProblemLowContrast(detail),
+    // A11 D22: the global shortcut could not be registered.
+    ConfigProblemCode.unsupportedValue when key == 'global-hotkey' =>
+      l10n.settingsGlobalHotkeyTaken,
     ConfigProblemCode.unsupportedValue => l10n.configProblemUnsupportedValue(
       key,
       value,
@@ -158,6 +161,8 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'toggle_command_palette' => l10n.actionCommandPalette,
   'show_shortcuts' => l10n.actionShowShortcuts,
   'show_config_problems' => l10n.actionShowConfigProblems,
+  'show_tour' => l10n.actionShowTour,
+  'show_whats_new' => l10n.actionShowWhatsNew,
   'run_command' => l10n.actionRunCommand(a.param ?? ''),
   'text' || 'csi' || 'esc' => l10n.actionSendText,
   'ignore' => l10n.actionIgnore,
