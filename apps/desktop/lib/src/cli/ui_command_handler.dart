@@ -237,6 +237,9 @@ final class UiCommandHandler implements UiApi {
       final workspace = wsKey == null
           ? null
           : resolveWorkspace(_sideState, wsKey, _side.displayName);
+      // A11 D26: without --workspace, the caller's own workspace (a local
+      // shell there, whatever kind of workspace it is).
+      final home = wsKey == null ? _callerWorkspace(r) : null;
       // A8 D33: a server's workspace opens that server; --cwd is then a
       // folder there.
       final launch = workspace == null ? null : _side.launchFor(workspace);
@@ -261,7 +264,7 @@ final class UiCommandHandler implements UiApi {
         // A9 D21: without --cwd, where the configuration starts new tabs.
         cwd: given ?? _tabs.newTabCwd(),
         select: select,
-        workspace: workspace,
+        workspace: workspace ?? home,
       );
     }, leaving);
     if (select) _side.reveal(tab);
@@ -269,6 +272,14 @@ final class UiCommandHandler implements UiApi {
     if (cmd != null) _typeCommand(tab, cmd, server: onServer);
     return {'tab': tab, 'pane': tab};
   }
+
+  /// A11 D26 (c): where the caller lives, from `fromPane` / `fromTab`.
+  String? _callerWorkspace(MuxMessage r) => resolveCallerWorkspace(
+    _tabsState,
+    _sideState,
+    fromPane: r.fields['fromPane'],
+    fromTab: r.fields['fromTab'],
+  );
 
   /// D16: `--cmd` for a new pane: a server pane waits for its hello
   /// (A8), any other for its shell's first prompt. [server] is decided by

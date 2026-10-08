@@ -378,6 +378,12 @@ pub static COMMANDS: &[CommandSpec] = &[
         "check the configuration files; exit 1 on errors",
     ),
     c(
+        &["config", "validate"],
+        &[],
+        &[],
+        "check the configuration files; same as 'config check'",
+    ),
+    c(
         &["config", "reload"],
         &[],
         &[],
@@ -392,6 +398,15 @@ pub static COMMANDS: &[CommandSpec] = &[
         )],
         "print the configuration in effect and where each value comes from",
     ),
+    CommandSpec {
+        needs_ui: false,
+        ..c(
+            &["doctor"],
+            &[],
+            &[],
+            "check that ShellX and the command line are set up",
+        )
+    },
     CommandSpec {
         needs_ui: false,
         ..c(
@@ -948,8 +963,10 @@ mod tests {
             "skills print",
             "config path",
             "config check",
+            "config validate",
             "config reload",
             "config show",
+            "doctor",
             "completions",
         ] {
             assert!(names.contains(&want.to_string()), "{want}");
@@ -1100,13 +1117,16 @@ mod tests {
         assert_eq!(y.spec.path, &["config", "show"]);
         assert!(y.has("defaults") && y.json);
         assert!(run(&["config", "check"]).spec.needs_ui);
+        assert!(run(&["config", "validate"]).spec.needs_ui);
         assert!(run(&["config", "reload"]).spec.needs_ui);
         let all = help_text(None);
         for w in [
             "config path",
             "config check",
+            "config validate",
             "config reload",
             "config show",
+            "doctor",
         ] {
             assert!(all.contains(w), "{w}");
         }
@@ -1122,10 +1142,29 @@ mod tests {
             let s = completion_script(sh).unwrap();
             assert!(s.contains("config"), "{sh}");
             assert!(
-                s.contains("path") && s.contains("check") && s.contains("show"),
+                s.contains("path")
+                    && s.contains("check")
+                    && s.contains("validate")
+                    && s.contains("show"),
                 "{sh}"
             );
+            assert!(s.contains("doctor"), "{sh}");
         }
+    }
+
+    #[test]
+    fn doctor_and_validate() {
+        let d = run(&["doctor", "--json"]);
+        assert_eq!(d.spec.path, &["doctor"]);
+        assert!(d.json && !d.spec.needs_ui);
+        assert_eq!(
+            run(&["config", "validate"]).spec.path,
+            &["config", "validate"]
+        );
+        // No positionals, no unknown flags.
+        assert!(p(&["doctor", "x"]).is_err());
+        assert!(p(&["doctor", "--fix"]).is_err());
+        assert!(p(&["config", "validate", "x"]).is_err());
     }
 
     #[test]

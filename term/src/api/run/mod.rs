@@ -5,6 +5,7 @@
 use super::args::Parsed;
 use super::client::{ApiError, Session};
 use super::config_path;
+use super::doctor;
 use super::output;
 use super::skills;
 use super::value::{to_json, Value};
@@ -44,6 +45,8 @@ pub struct Ctx<'a> {
     /// Waits up to the given time; true once nobody can read stdout any
     /// more (review I1). `None`: not watched (tests, Windows).
     pub stdout_gone: Option<fn(std::time::Duration) -> bool>,
+    /// This executable (`doctor` checks that its folder is in `PATH`).
+    pub exe: Option<PathBuf>,
 }
 
 /// D32: a text field of a request.
@@ -110,13 +113,15 @@ fn describe(e: &ApiError) -> (String, String) {
 }
 
 /// A connection that asked `api.version` (D4).
-struct Api {
+pub(crate) struct Api {
     s: Box<dyn Session>,
     caps: Vec<String>,
+    /// The app's own version, when it says it (`api.version` › `app`).
+    pub(crate) app: Option<String>,
 }
 
 impl Api {
-    fn open(p: &Parsed, ctx: &mut Ctx) -> Result<Api, ApiError> {
+    pub(crate) fn open(p: &Parsed, ctx: &mut Ctx) -> Result<Api, ApiError> {
         let mut s = (ctx.connect)(p.socket.as_deref())?;
         let v = s.request("api.version", vec![])?;
         if v.get("api").and_then(Value::as_i64) != Some(1) {
@@ -133,12 +138,17 @@ impl Api {
                     .collect()
             })
             .unwrap_or_default();
-        Ok(Api { s, caps })
+        let app = v.get("app").and_then(Value::as_str).map(String::from);
+        Ok(Api { s, caps, app })
     }
 
     /// Sends only what the host serves (D4: a missing cap → exit 7). Fields
     /// that are `None` are left out.
-    fn call(&mut self, t: &str, fields: Vec<(&str, Option<Value>)>) -> Result<Message, ApiError> {
+    pub(crate) fn call(
+        &mut self,
+        t: &str,
+        fields: Vec<(&str, Option<Value>)>,
+    ) -> Result<Message, ApiError> {
         let cap = if t.starts_with("ui.browser.") {
             "ui.browser"
         } else if t.starts_with("ui.config.") {
@@ -210,7 +220,10 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
         "skills print" => return skills::print(p, ctx),
         "notify" => return notify(p, ctx),
         "config path" => return config_path::print_path(p, ctx),
-        "config check" | "config reload" | "config show" => return config_remote(p, ctx, &path),
+        "config check" | "config validate" | "config reload" | "config show" => {
+            return config_remote(p, ctx, &path)
+        }
+        "doctor" => return doctor::run(p, ctx),
         _ => {}
     }
     let prepared = prepare(p, ctx, &path)?;

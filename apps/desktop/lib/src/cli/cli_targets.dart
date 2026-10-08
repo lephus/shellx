@@ -111,3 +111,27 @@ String resolveWorkspace(
     '${hits.length} workspaces are named "$key"; use w:<id> (shellx ls)',
   );
 }
+
+/// A11 D26 (c): the workspace the caller lives in, for a tab opened without
+/// `--workspace`. The pane (`fromPane`, the CLI's `$SHELLX_PANE_ID`) is
+/// looked up *now*, so a pane that moved to another tab, or a tab dragged to
+/// another workspace, counts where it is; a pane that is gone falls back to
+/// `fromTab` (`$SHELLX_TAB_ID`); null when neither is alive, and the caller
+/// then uses the current workspace as before. Anything that is not an
+/// integer is ignored: a stale or odd environment never fails a command.
+String? resolveCallerWorkspace(
+  TerminalTabsState tabs,
+  SidebarState side, {
+  Object? fromPane,
+  Object? fromTab,
+}) {
+  if (fromPane is int) {
+    final tab = tabs.tabOfSession(fromPane);
+    final ws = tab == null ? null : side.workspaceOf(tab.id);
+    if (ws != null) return ws;
+  }
+  if (fromTab is int && _tabById(tabs, fromTab) != null) {
+    return side.workspaceOf(fromTab);
+  }
+  return null;
+}

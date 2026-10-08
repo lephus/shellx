@@ -7,6 +7,7 @@ pub mod args;
 pub mod browser_js;
 pub mod client;
 pub mod config_path;
+pub mod doctor;
 pub mod endpoint;
 pub mod output;
 pub mod run;
@@ -135,6 +136,7 @@ fn run_real(parsed: &args::Parsed) -> i32 {
         shared_terminal: shared_terminal(&get),
         connect: &connect,
         stdout_gone: STDOUT_GONE,
+        exe: std::env::current_exe().ok(),
     };
     let code = run::run(parsed, &mut ctx);
     let _ = ctx.out.flush();

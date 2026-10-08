@@ -152,6 +152,16 @@ final class SshCommands {
           workspaceId: key == null
               ? null
               : resolveWorkspace(_sideState, key, _side.displayName),
+          // A11 D26: no --workspace and no workspace of that server yet: the
+          // caller's own, instead of a new one.
+          callerWorkspace: key == null
+              ? resolveCallerWorkspace(
+                  _ref.read(terminalTabsProvider),
+                  _sideState,
+                  fromPane: r.fields['fromPane'],
+                  fromTab: r.fields['fromTab'],
+                )
+              : null,
           remoteCwd: cwd,
           hook: hook != false,
           select: focus,

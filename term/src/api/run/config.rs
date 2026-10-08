@@ -10,6 +10,12 @@ use crate::api::config_path;
 use crate::api::output;
 
 pub(super) fn config_remote(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<(), ApiError> {
+    // A11 D26: `validate` is `check` under another name.
+    let path = if path == "config validate" {
+        "config check"
+    } else {
+        path
+    };
     let mut api = Api::open(p, ctx)?;
     let (t, fields) = match path {
         "config check" => ("ui.config.check", vec![]),
