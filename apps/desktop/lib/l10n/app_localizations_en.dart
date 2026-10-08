@@ -2546,4 +2546,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String searchAllLine(int n) {
     return 'Line $n';
   }
+
+  @override
+  String actionSwapSplit(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Swap pane with the one on the left',
+      'right': 'Swap pane with the one on the right',
+      'up': 'Swap pane with the one above',
+      'other': 'Swap pane with the one below',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionBreakPane => 'Move pane to its own tab';
+
+  @override
+  String actionJoinPane(String n) {
+    return 'Move pane to tab $n';
+  }
+
+  @override
+  String moveTabToWorkspace(String workspace) {
+    return 'Move tab to $workspace';
+  }
+
+  @override
+  String movePaneToTab(String tab) {
+    return 'Move pane to tab $tab';
+  }
+
+  @override
+  String get paneMoveToTabMenu => 'Move pane to tab ▸';
+
+  @override
+  String get paneMoveToTabTitle => 'Move pane to';
+
+  @override
+  String get paneSwapMenu => 'Swap with neighbour ▸';
+
+  @override
+  String get paneSwapTitle => 'Swap with';
+
+  @override
+  String get paneSwapLeft => 'Pane on the left';
+
+  @override
+  String get paneSwapRight => 'Pane on the right';
+
+  @override
+  String get paneSwapUp => 'Pane above';
+
+  @override
+  String get paneSwapDown => 'Pane below';
 }

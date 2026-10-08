@@ -1034,5 +1034,22 @@
   "searchAllPane": "Pane {n}",
   "@searchAllPane": {"placeholders": {"n": {"type": "int"}}},
   "searchAllLine": "Line {n}",
-  "@searchAllLine": {"placeholders": {"n": {"type": "int"}}}
+  "@searchAllLine": {"placeholders": {"n": {"type": "int"}}},
+  "actionSwapSplit": "{direction, select, left{Swap pane with the one on the left} right{Swap pane with the one on the right} up{Swap pane with the one above} other{Swap pane with the one below}}",
+  "@actionSwapSplit": {"description": "A11 D20", "placeholders": {"direction": {"type": "String"}}},
+  "actionBreakPane": "Move pane to its own tab",
+  "actionJoinPane": "Move pane to tab {n}",
+  "@actionJoinPane": {"placeholders": {"n": {"type": "String"}}},
+  "moveTabToWorkspace": "Move tab to {workspace}",
+  "@moveTabToWorkspace": {"placeholders": {"workspace": {"type": "String"}}},
+  "movePaneToTab": "Move pane to tab {tab}",
+  "@movePaneToTab": {"placeholders": {"tab": {"type": "String"}}},
+  "paneMoveToTabMenu": "Move pane to tab ▸",
+  "paneMoveToTabTitle": "Move pane to",
+  "paneSwapMenu": "Swap with neighbour ▸",
+  "paneSwapTitle": "Swap with",
+  "paneSwapLeft": "Pane on the left",
+  "paneSwapRight": "Pane on the right",
+  "paneSwapUp": "Pane above",
+  "paneSwapDown": "Pane below"
 }

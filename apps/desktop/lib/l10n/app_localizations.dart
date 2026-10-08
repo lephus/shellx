@@ -3875,6 +3875,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Line {n}'**
   String searchAllLine(int n);
+
+  /// A11 D20
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Swap pane with the one on the left} right{Swap pane with the one on the right} up{Swap pane with the one above} other{Swap pane with the one below}}'**
+  String actionSwapSplit(String direction);
+
+  /// No description provided for @actionBreakPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to its own tab'**
+  String get actionBreakPane;
+
+  /// No description provided for @actionJoinPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab {n}'**
+  String actionJoinPane(String n);
+
+  /// No description provided for @moveTabToWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Move tab to {workspace}'**
+  String moveTabToWorkspace(String workspace);
+
+  /// No description provided for @movePaneToTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab {tab}'**
+  String movePaneToTab(String tab);
+
+  /// No description provided for @paneMoveToTabMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab ▸'**
+  String get paneMoveToTabMenu;
+
+  /// No description provided for @paneMoveToTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to'**
+  String get paneMoveToTabTitle;
+
+  /// No description provided for @paneSwapMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap with neighbour ▸'**
+  String get paneSwapMenu;
+
+  /// No description provided for @paneSwapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap with'**
+  String get paneSwapTitle;
+
+  /// No description provided for @paneSwapLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane on the left'**
+  String get paneSwapLeft;
+
+  /// No description provided for @paneSwapRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane on the right'**
+  String get paneSwapRight;
+
+  /// No description provided for @paneSwapUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane above'**
+  String get paneSwapUp;
+
+  /// No description provided for @paneSwapDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane below'**
+  String get paneSwapDown;
 }
 
 class _AppLocalizationsDelegate

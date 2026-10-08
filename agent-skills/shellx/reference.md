@@ -198,6 +198,7 @@ Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 | `pane.opened` | `pane`, `tab` | a split |
 | `pane.exited` | `pane`, `tab`, `exitCode` | the shell ended; comes **before** `pane.closed`. A pane closed from the phone or by its session may report a signal code (e.g. -15); a close from the window or `shellx close` reports only `pane.closed` |
 | `pane.closed` | `pane`, `tab` | |
+| `pane.moved` | `pane`, `from`, `to` | a pane moved to another tab (menu or palette); its shell keeps running, its id stays; `$SHELLX_TAB_ID` in that shell still names the old tab |
 | `pane.focused` | `pane`, `tab` | |
 | `pane.changed` | `pane`, `tab`, `title`, `cwd`, `branch`, `ports`, `running` | at most one per pane per 250 ms, only when something changed |
 | `workspace.created` / `workspace.renamed` / `workspace.deleted` | `workspace` (+ `name`) | |

@@ -627,5 +627,18 @@
   "searchAllCapped": "Hiện {count} kết quả đầu tiên",
   "searchAllCount": "{count, plural, other{{count} kết quả}}",
   "searchAllPane": "Pane {n}",
-  "searchAllLine": "Dòng {n}"
+  "searchAllLine": "Dòng {n}",
+  "actionSwapSplit": "{direction, select, left{Đổi chỗ với pane bên trái} right{Đổi chỗ với pane bên phải} up{Đổi chỗ với pane phía trên} other{Đổi chỗ với pane phía dưới}}",
+  "actionBreakPane": "Chuyển pane sang tab riêng",
+  "actionJoinPane": "Chuyển pane tới tab {n}",
+  "moveTabToWorkspace": "Chuyển tab tới {workspace}",
+  "movePaneToTab": "Chuyển pane tới tab {tab}",
+  "paneMoveToTabMenu": "Chuyển pane tới tab ▸",
+  "paneMoveToTabTitle": "Chuyển pane tới",
+  "paneSwapMenu": "Đổi chỗ với pane bên cạnh ▸",
+  "paneSwapTitle": "Đổi chỗ với",
+  "paneSwapLeft": "Pane bên trái",
+  "paneSwapRight": "Pane bên phải",
+  "paneSwapUp": "Pane phía trên",
+  "paneSwapDown": "Pane phía dưới"
 }

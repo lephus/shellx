@@ -4,9 +4,129 @@ part of 'terminal_tabs.dart';
 // apart from the tab list's own bookkeeping; uses the same internals
 // ([_guardedOpen], [_attach], [_sync], [_set]).
 
+/// A11 D20: pane [pane] now sits in tab [toTab] (it was in [fromTab]); the
+/// session itself is untouched.
+@immutable
+final class PaneMove {
+  const PaneMove({
+    required this.pane,
+    required this.fromTab,
+    required this.toTab,
+  });
+  final int pane;
+  final int fromTab;
+  final int toTab;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaneMove &&
+      other.pane == pane &&
+      other.fromTab == fromTab &&
+      other.toTab == toTab;
+
+  @override
+  int get hashCode => Object.hash(pane, fromTab, toTab);
+}
+
+/// Tab ids for a pane broken out of a tab whose creating pane it is: far
+/// above any session id (the daemon counts from 1), below 2^31.
+const int kSyntheticTabIdBase = 2000000000;
+
 /// Uses [TerminalTabs._ref] and [TerminalTabs._state]: an extension may
 /// not touch the notifier's protected `ref` and `state` itself.
 extension TerminalTabsPanes on TerminalTabs {
+  /// A11 D20: emitted before the tabs change, so listeners can move what
+  /// they keep for the pane first (focus history, the command-line events).
+  Stream<PaneMove> get paneMoves => _paneMoves.stream;
+
+  /// A11 D20 `swap_split`: the selected tab's focused pane trades places
+  /// with its neighbour in [direction] (the geometry decides, D9). The focus
+  /// stays on the same session, which has moved. False when there is none.
+  bool swapFocusedPane(PaneDirection direction) {
+    final tab = _state.selected;
+    if (tab == null || !tab.isSplit) return false;
+    final layout = moves.swapInDirection(
+      tab.layout,
+      tab.focusedPaneId,
+      direction,
+      mru: tab.paneHistory,
+    );
+    if (layout == null) return false;
+    _replaceTab(tab.copyWith(layout: layout));
+    return true;
+  }
+
+  /// Whether [swapFocusedPane] would find a neighbour (palette, menus).
+  bool canSwapFocusedPane(PaneDirection direction) {
+    final tab = _state.selected;
+    return tab != null &&
+        tab.isSplit &&
+        neighbourPane(
+              tab.layout,
+              tab.focusedPaneId,
+              direction,
+              mru: tab.paneHistory,
+            ) !=
+            null;
+  }
+
+  /// A11 D20 `break_pane`: pane [sessionId] becomes a tab of its own, in
+  /// the workspace the user is in, and is selected. The session keeps
+  /// running; nothing is closed. False when its tab has only that pane.
+  bool breakPane(int sessionId) {
+    final tab = _state.tabOfSession(sessionId);
+    if (tab == null || !tab.isSplit) return false;
+    // A tab id is the id of the session that created it (A3 D1): when the
+    // pane is the one that created this tab, the tab still has that id.
+    final taken = _state.tabs.any((t) => t.id == sessionId);
+    final detachedId = taken
+        ? kSyntheticTabIdBase + _syntheticTabIds++
+        : sessionId;
+    final r = moves.breakPane(tab, sessionId, detachedId: detachedId);
+    if (r == null) return false;
+    _paneMoves.add(
+      PaneMove(pane: sessionId, fromTab: tab.id, toTab: r.detached.id),
+    );
+    final placement = _ref.read(restorePlacementProvider);
+    final workspace = placement.currentWorkspace?.call();
+    if (workspace != null) placement.pending[r.detached.id] = workspace;
+    _restoreMaySelect = false;
+    _set(
+      tabs: [
+        for (final t in _state.tabs) t.id == tab.id ? r.from : t,
+        r.detached,
+      ],
+      selectedId: r.detached.id,
+    );
+    return true;
+  }
+
+  /// A11 D20 `join_pane`: pane [sessionId] leaves its tab and splits the
+  /// focused pane of tab [toTabId] (to its right, or below with [axis]); the
+  /// destination is selected. A tab left without panes goes; its session
+  /// does not. Throws [PaneNoRoomException] when the destination has no room
+  /// for two minimum panes (D4). False when nothing can be moved.
+  bool joinPane(int sessionId, int toTabId, {SplitAxis axis = SplitAxis.row}) {
+    final from = _state.tabOfSession(sessionId);
+    final to = _tab(toTabId);
+    if (from == null || to == null || from.id == to.id) return false;
+    if (!_roomToSplit(to, to.focusedPaneId, axis)) {
+      throw const PaneNoRoomException();
+    }
+    final r = moves.joinPane(from, to, sessionId, axis: axis);
+    if (r == null) return false;
+    _paneMoves.add(PaneMove(pane: sessionId, fromTab: from.id, toTab: to.id));
+    _restoreMaySelect = false;
+    _set(
+      tabs: [
+        for (final t in _state.tabs)
+          if (t.id == to.id) r.to else if (t.id == from.id) ?r.from else t,
+      ],
+      selectedId: to.id,
+    );
+    return true;
+  }
+
   /// ⌘W on a split tab, the pane ×, "Đóng pane" (D6): the last pane closes
   /// the tab.
   void closePane(int sessionId) {

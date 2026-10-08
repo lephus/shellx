@@ -22,6 +22,7 @@ import '../../terminal/find_sessions.dart';
 import '../../terminal/link_finder.dart';
 import '../../terminal/pane_input.dart' show PaneInput;
 import '../../terminal/pane_layout.dart';
+import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_search.dart' show SearchMatch;
 import '../../terminal/terminal_style.dart';
@@ -570,6 +571,13 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
       if (found == null) link = null;
     }
     if (!mounted) return;
+    // A11 D20: the other tabs this pane can move to, in sidebar order.
+    final state = ref.read(terminalTabsProvider);
+    final labels = {for (final t in state.tabs) t.id: t.label};
+    final moveTargets = [
+      for (final tabId in ref.read(sidebarWorkspacesProvider).orderedTabIds)
+        if (tabId != widget.tab.id && labels.containsKey(tabId)) tabId,
+    ].take(20).toList();
     final choice = await showShellxMenu<Object>(
       context: context,
       at: at,
@@ -661,6 +669,29 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             label: l10n.paneEqualize,
             shortcut: equalizePanesShortcutLabel(),
           ),
+        ],
+        // A11 D20: swap, break and move; the session is never touched.
+        if (widget.tab.isSplit) ...[
+          ShellxMenuEntry(
+            key: const Key('menu.breakPane'),
+            value: const BreakPaneIntent(),
+            label: l10n.actionBreakPane,
+            dividerBefore: true,
+          ),
+          ShellxMenuEntry<Object>(
+            key: const Key('menu.swapPane'),
+            value: _PaneMove.swap,
+            label: l10n.paneSwapMenu,
+          ),
+        ],
+        if (moveTargets.isNotEmpty)
+          ShellxMenuEntry<Object>(
+            key: const Key('menu.moveToTab'),
+            dividerBefore: !widget.tab.isSplit,
+            value: _PaneMove.join,
+            label: l10n.paneMoveToTabMenu,
+          ),
+        if (widget.tab.isSplit)
           ShellxMenuEntry(
             key: const Key('menu.closePane'),
             // ⌘W's action closes the focused pane of a split tab; the menu
@@ -670,7 +701,6 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             shortcut: closePaneShortcutLabel(),
             dividerBefore: true,
           ),
-        ],
       ],
     );
     if (choice == null || !mounted) return;
@@ -685,6 +715,56 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         if (link != null) {
           unawaited(Clipboard.setData(ClipboardData(text: link.target)));
         }
+      case _PaneMove.swap:
+        final dir = await showShellxMenu<PaneDirection>(
+          context: context,
+          at: at,
+          entries: [
+            ShellxMenuEntry(
+              key: const Key('menu.swap.title'),
+              value: PaneDirection.left,
+              label: l10n.paneSwapTitle,
+              heading: true,
+            ),
+            for (final d in PaneDirection.values)
+              ShellxMenuEntry(
+                key: Key('menu.swap.${d.name}'),
+                value: d,
+                label: switch (d) {
+                  PaneDirection.left => l10n.paneSwapLeft,
+                  PaneDirection.right => l10n.paneSwapRight,
+                  PaneDirection.up => l10n.paneSwapUp,
+                  PaneDirection.down => l10n.paneSwapDown,
+                },
+                enabled: _tabs.canSwapFocusedPane(d),
+              ),
+          ],
+        );
+        if (dir != null && mounted) {
+          Actions.maybeInvoke(context, SwapPaneIntent(dir));
+        }
+      case _PaneMove.join:
+        final target = await showShellxMenu<int>(
+          context: context,
+          at: at,
+          entries: [
+            ShellxMenuEntry(
+              key: const Key('menu.moveToTab.title'),
+              value: -1,
+              label: l10n.paneMoveToTabTitle,
+              heading: true,
+            ),
+            for (final tabId in moveTargets)
+              ShellxMenuEntry(
+                key: Key('menu.moveToTab.$tabId'),
+                value: tabId,
+                label: labels[tabId]!,
+              ),
+          ],
+        );
+        if (target != null && target >= 0 && mounted) {
+          Actions.maybeInvoke(context, JoinPaneIntent(tabId: target));
+        }
       case final Intent intent:
         Actions.maybeInvoke(context, intent);
     }
@@ -694,6 +774,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
 
 /// A8: the menu items that are not window actions.
 enum _RemotePaneAction { reconnect, splitLocalRight }
+
+/// A11 D20: the menu entries that open a second menu.
+enum _PaneMove { swap, join }
 
 /// A10 D8: the entries a link under the pointer adds.
 enum _LinkAction { open, copy }

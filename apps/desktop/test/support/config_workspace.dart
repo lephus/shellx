@@ -29,6 +29,7 @@ pumpConfiguredWorkspace(
   List<Override> extra = const [],
   Locale locale = const Locale('en'),
   ClipboardMedia clipboard = const EmptyClipboardMedia(),
+  Duration settle = Duration.zero,
 }) async {
   final fs = MemoryConfigFs();
   if (config.isNotEmpty) fs.write(testConfigPaths().shellx, config);
@@ -40,7 +41,7 @@ pumpConfiguredWorkspace(
       localSessionsProvider.overrideWithValue(local),
       clipboardMediaProvider.overrideWithValue(clipboard),
       // A10 D20: these tests check layout, not settling: sizes go at once.
-      resizeSettleProvider.overrideWithValue(Duration.zero),
+      resizeSettleProvider.overrideWithValue(settle),
       ...configOverrides(fs, platform: platform ?? defaultTargetPlatform),
       ...extra,
     ],

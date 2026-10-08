@@ -22,6 +22,7 @@ import 'closed_items.dart' show ClosedPane, ClosedTab;
 import 'desktop_terminal.dart';
 import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
+import 'pane_moves.dart' as moves;
 import 'resize_settler.dart';
 import 'terminal_feed.dart';
 import 'terminal_input.dart' show desktopInputHandlerWith;
@@ -575,6 +576,14 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
 
   /// A5a D4: the session whose pane just received output.
   Stream<int> get paneOutputs => _paneOutputs.stream;
+
+  /// A11 D20: a pane moved to another tab, announced just before the state
+  /// changes. Never closed on a rebuild, as [_paneOutputs].
+  final _paneMoves = StreamController<PaneMove>.broadcast(sync: true);
+
+  /// A11 D20: tab ids handed out when a broken-out pane's own id is already
+  /// a tab's (see [kSyntheticTabIdBase]).
+  int _syntheticTabIds = 0;
 
   /// A7 D21: how the last 64 sessions that ended here ended (exit 0
   /// removes the pane; `wait --exit` still reports it).
@@ -1242,6 +1251,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       }
       if (!alive) {
         unawaited(_paneOutputs.close());
+        unawaited(_paneMoves.close());
         unawaited(_remote.close());
       }
     });

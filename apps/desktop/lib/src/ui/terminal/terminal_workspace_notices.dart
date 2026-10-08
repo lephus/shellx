@@ -77,19 +77,61 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   void _refreshPalette() {
     if (overlay != A9Overlay.palette) return;
     final state = ref.read(shellxConfigProvider);
+    final l10n = AppLocalizations.of(context);
     setState(() {
-      _paletteEntries = paletteEntries(
-        l10n: AppLocalizations.of(context),
-        config: state,
-        enabled: (intent) {
-          if (intent is ShowConfigProblemsIntent) {
-            return state.visibleProblemCount > 0;
-          }
-          if (intent is RunUserCommandIntent) return true;
-          return _openIntents.contains(describeIntent(intent));
-        },
-      );
+      _paletteEntries = [
+        ...paletteEntries(
+          l10n: l10n,
+          config: state,
+          enabled: (intent) {
+            if (intent is ShowConfigProblemsIntent) {
+              return state.visibleProblemCount > 0;
+            }
+            if (intent is RunUserCommandIntent) return true;
+            return _openIntents.contains(describeIntent(intent));
+          },
+        ),
+        ..._moveEntries(l10n),
+      ];
     });
+  }
+
+  /// A11 D20: "Move tab to {workspace}" for each other workspace and "Move
+  /// pane to tab {label}" for up to 20 other tabs, in sidebar order; they
+  /// stand for the selected tab and its focused pane.
+  List<PaletteEntry> _moveEntries(AppLocalizations l10n) {
+    final tabs = ref.read(terminalTabsProvider);
+    final selected = tabs.selected;
+    if (selected == null) return const [];
+    final side = ref.read(sidebarWorkspacesProvider);
+    final here = side.workspaceOf(selected.id);
+    PaletteEntry entry(String id, String title, Intent intent) => PaletteEntry(
+      id: id,
+      title: title,
+      subtitle: null,
+      kind: PaletteKind.action,
+      shortcut: null,
+      intent: intent,
+    );
+    return [
+      for (final w in side.workspaces)
+        if (w.id != here)
+          entry(
+            'move-tab:${w.id}',
+            l10n.moveTabToWorkspace(w.displayName(l10n)),
+            MoveTabToWorkspaceIntent(w.id),
+          ),
+      for (final id
+          in side.orderedTabIds
+              .where((id) => id != selected.id)
+              .where((id) => tabs.tabs.any((t) => t.id == id))
+              .take(20))
+        entry(
+          'join-pane:$id',
+          l10n.movePaneToTab(tabs.tabs.firstWhere((t) => t.id == id).label),
+          JoinPaneIntent(tabId: id),
+        ),
+    ];
   }
 
   List<PaletteEntry> _buildPaletteEntries() {
@@ -116,7 +158,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       },
     );
     _openIntents = {for (final e in entries) describeIntent(e.intent)};
-    return entries;
+    return [...entries, ..._moveEntries(AppLocalizations.of(context))];
   }
 
   /// Enter or a click: close first (the keyboard goes back where it was),

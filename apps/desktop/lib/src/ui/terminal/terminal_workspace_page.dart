@@ -217,6 +217,28 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   bool _isSplit(Intent intent) =>
       ref.read(terminalTabsProvider).selected?.isSplit ?? false;
 
+  /// A11 D20: the tab the selected tab's focused pane would join for
+  /// [intent] (a tab id, or a 1-based place in the sidebar); null when there
+  /// is no such other tab.
+  int? _joinTarget(JoinPaneIntent intent) {
+    final state = ref.read(terminalTabsProvider);
+    final selected = state.selected;
+    if (selected == null) return null;
+    final id =
+        intent.tabId ??
+        switch (intent.position) {
+          final n? =>
+            ref
+                .read(sidebarWorkspacesProvider)
+                .orderedTabIds
+                .skip(n - 1)
+                .firstOrNull,
+          null => null,
+        };
+    if (id == null || id == selected.id) return null;
+    return state.tabs.any((t) => t.id == id) ? id : null;
+  }
+
   /// D22: polite, once.
   void _announce(String message) => unawaited(
     SemanticsService.sendAnnouncement(
@@ -356,6 +378,38 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         closePanel();
         tabs.resizeFocused(intent.direction);
       }, enabled: _isSplit),
+      // A11 D20: swap, break and move panes. No default keys; the pane
+      // menu, the palette and `keybind` reach them.
+      SwapPaneIntent: run<SwapPaneIntent>((intent) {
+        closePanel();
+        if (tabs.swapFocusedPane(intent.direction)) {
+          focusTerminal();
+          _announceFocusedPane();
+        }
+      }, enabled: (intent) => tabs.canSwapFocusedPane(intent.direction)),
+      BreakPaneIntent: run<BreakPaneIntent>((_) {
+        closePanel();
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab != null && tabs.breakPane(tab.focusedPaneId)) focusTerminal();
+      }, enabled: _isSplit),
+      JoinPaneIntent: run<JoinPaneIntent>((intent) {
+        closePanel();
+        final tab = ref.read(terminalTabsProvider).selected;
+        final target = _joinTarget(intent);
+        if (tab == null || target == null) return;
+        try {
+          if (tabs.joinPane(tab.focusedPaneId, target)) focusTerminal();
+        } on PaneNoRoomException {
+          tabs.showNotice(const PaneNoRoomNotice());
+        }
+      }, enabled: (intent) => _joinTarget(intent) != null),
+      MoveTabToWorkspaceIntent: run<MoveTabToWorkspaceIntent>((intent) {
+        closePanel();
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        workspaces.moveTab(tab.id, intent.workspaceId);
+        focusTerminal();
+      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
       NextTabIntent: run<NextTabIntent>((_) {
         closePanel();
         workspaces.step(1);

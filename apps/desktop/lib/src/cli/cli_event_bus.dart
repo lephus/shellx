@@ -42,6 +42,11 @@ final class CliEventBus {
         .read(terminalTabsProvider.notifier)
         .paneReplacements
         .listen(_replaced);
+    // A11 D20: likewise, a pane that changed tab.
+    _movements = _ref
+        .read(terminalTabsProvider.notifier)
+        .paneMoves
+        .listen(_movedPane);
   }
 
   final Ref _ref;
@@ -49,6 +54,12 @@ final class CliEventBus {
   final _subs = <ProviderSubscription<Object?>>[];
   StreamSubscription<SessionNotice>? _notices;
   StreamSubscription<PaneReplacement>? _replacements;
+  StreamSubscription<PaneMove>? _movements;
+
+  /// A11 D20: panes moved to another tab that the next tab diff has not
+  /// seen yet, by pane id. The move is `pane.moved`, not a close and an
+  /// open: the pane (and its shell) never went away.
+  final _moved = <int, PaneMove>{};
 
   /// A8 D22, D4: replaced panes the next tab diff has not seen yet, by
   /// the old id. Their swap is `pane.replaced`, not a close and an open.
@@ -95,6 +106,7 @@ final class CliEventBus {
     _unplaced.clear();
     _deferred.clear();
     _swapped.clear();
+    _moved.clear();
   }
 
   // ---- tabs and panes -----------------------------------------------------
@@ -114,6 +126,17 @@ final class CliEventBus {
       'new': r.to,
       'tab': r.tabId,
     });
+  }
+
+  void _movedPane(PaneMove m) {
+    if (!_listened) return;
+    _moved[m.pane] = m;
+    // The pane's `pane.changed` state travels with it: a new tab alone is
+    // not a change.
+    final sent = _lastSent[m.pane];
+    if (sent != null) _lastSent[m.pane] = {...sent, 'tab': m.toTab};
+    _timers.remove(m.pane)?.cancel();
+    _waiting.remove(m.pane);
   }
 
   bool _isSwapTarget(int id) => _swapped.values.any((r) => r.to == id);
@@ -155,7 +178,7 @@ final class CliEventBus {
       for (final p in t.panes.values) {
         final op = o.panes[p.id];
         if (op == null) {
-          if (!_isSwapTarget(p.id)) {
+          if (!_isSwapTarget(p.id) && !_moved.containsKey(p.id)) {
             _emitFor(t.id, {'kind': 'pane.opened', 'pane': p.id, 'tab': t.id});
           }
           continue;
@@ -173,6 +196,7 @@ final class CliEventBus {
       }
       for (final op in o.panes.values) {
         if (!t.panes.containsKey(op.id)) {
+          if (_moved.containsKey(op.id)) continue; // alive, in another tab
           _exitedGone(tabs, op, t.id);
           if (!_swapped.containsKey(op.id)) {
             _emitFor(t.id, {'kind': 'pane.closed', 'pane': op.id, 'tab': t.id});
@@ -194,6 +218,7 @@ final class CliEventBus {
       final silent = _unplaced.remove(o.id);
       _deferred.remove(o.id);
       for (final op in o.panes.values) {
+        if (_moved.containsKey(op.id)) continue; // alive, in another tab
         _exitedGone(tabs, op, o.id, silent: silent);
       }
       if (!silent) _emit({'kind': 'tab.closed', 'tab': o.id});
@@ -201,6 +226,16 @@ final class CliEventBus {
     if (reselected && !old.containsKey(selected)) {
       _emitFor(selected, {'kind': 'tab.selected', 'tab': selected});
     }
+    for (final m in _moved.values) {
+      if (!now.containsKey(m.toTab)) continue;
+      _emitFor(m.toTab, {
+        'kind': 'pane.moved',
+        'pane': m.pane,
+        'from': m.fromTab,
+        'to': m.toTab,
+      });
+    }
+    _moved.clear(); // each move is announced just before its own diff
     _swapped.clear(); // each swap is announced just before its own diff
   }
 
@@ -350,6 +385,7 @@ final class CliEventBus {
     }
     unawaited(_notices?.cancel());
     unawaited(_replacements?.cancel());
+    unawaited(_movements?.cancel());
     _forget();
     unawaited(_out.close());
   }

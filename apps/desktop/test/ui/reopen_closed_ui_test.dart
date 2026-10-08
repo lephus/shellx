@@ -229,4 +229,24 @@ void main() {
     expect(c.read(terminalTabsProvider).tabs, hasLength(2));
     await disposeWorkspace(t, c);
   }, variant: mac);
+
+  testWidgets('moving a pane between tabs closes nothing: ⌘⇧T has nothing to '
+      'reopen (A11 D20)', (t) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final tabs = c.read(terminalTabsProvider.notifier);
+    final first = c.read(terminalTabsProvider).tabs.first;
+    await tabs.split(SplitAxis.row);
+    await t.pumpAndSettle();
+    final moved = c.read(terminalTabsProvider).selected!.focusedPaneId;
+    expect(tabs.breakPane(moved), isTrue);
+    await t.pumpAndSettle();
+    expect(tabs.joinPane(moved, first.id), isTrue); // the new tab empties
+    await t.pumpAndSettle();
+    expect(c.read(closedItemsProvider).length, 0);
+    await reopenChord(t);
+    expect(c.read(terminalTabsProvider).notice, isA<ReopenNothingNotice>());
+    expect(c.read(terminalTabsProvider).tabs, hasLength(1));
+    await disposeWorkspace(t, c);
+  }, variant: mac);
 }
