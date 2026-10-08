@@ -1533,6 +1533,39 @@ void main() {
       await tester.pump(const Duration(milliseconds: 150));
     });
 
+    testWidgets('A11 D29: each tab keeps its own draft; closing a tab drops its draft', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      speech.emit(const SpeechListening(true));
+      speech.emit(const SpeechListening(false));
+      await tester.pump();
+      String field() => tester.widget<TextField>(find.byKey(const ValueKey('voice-text'))).controller!.text;
+      await tester.enterText(find.byKey(const ValueKey('voice-text')), 'ls -la');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(field(), '', reason: 'the other tab starts empty');
+      await tester.enterText(find.byKey(const ValueKey('voice-text')), 'git status');
+      await tester.tap(find.byKey(const ValueKey('tab-102')));
+      await tester.pumpAndSettle();
+      expect(field(), 'ls -la');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(field(), 'git status');
+      final tabs = registry.forMachine(agentA).tabs.value;
+      expect([for (final tab in tabs) tab.draft.value], ['git status', 'ls -la']);
+      await tester.tap(
+        find.descendant(of: find.byKey(const ValueKey('tab-101')), matching: find.byTooltip('Đóng phiên')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đóng phiên'));
+      await tester.pumpAndSettle();
+      expect(field(), 'ls -la', reason: 'the closed tab took its draft with it');
+      await tester.pump(const Duration(milliseconds: 150));
+    });
+
     testWidgets('a session taken by another device says to reattach', (tester) async {
       await openQuiet(tester);
       await tester.tap(mic());

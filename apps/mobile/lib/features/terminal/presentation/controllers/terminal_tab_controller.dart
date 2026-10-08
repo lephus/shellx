@@ -36,6 +36,15 @@ final class TabBanner {
   final String? detail;
 }
 
+/// The text typed in the voice composer for one terminal (A11 D29). In memory only, never written to disk
+/// or logged: it may hold a password.
+final class DraftHolder {
+  String value = '';
+
+  @override
+  String toString() => '…';
+}
+
 /// Binds one [TabHandle] to an xterm terminal: output → screen, keys → input,
 /// size → resize, lifecycle events → [banner].
 class TerminalTabController extends Controller {
@@ -103,6 +112,9 @@ class TerminalTabController extends Controller {
   }
 
   final int id;
+
+  /// What the composer holds for this terminal; dropped with the tab.
+  final DraftHolder draft = DraftHolder();
 
   /// False for a [TerminalTabController.failed] tab: there is no session on the machine to close,
   /// and its title is left to the UI (empty [title]).

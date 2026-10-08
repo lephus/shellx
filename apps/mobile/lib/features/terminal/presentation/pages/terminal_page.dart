@@ -49,6 +49,9 @@ class _TerminalPageState extends State<TerminalPage> {
   late final VoiceComposerController _voice;
   late final AppLifecycleListener _lifecycle;
   late final void Function() _stopVoicePhase;
+
+  /// A11 D29: the composer shows the draft of whichever tab is active.
+  late final void Function() _stopDraft;
   final FocusNode _terminalFocus = FocusNode();
   TerminalGrid _grid = fallbackGrid;
   bool _leaving = false;
@@ -73,6 +76,9 @@ class _TerminalPageState extends State<TerminalPage> {
       if (!open && wasOpen && mounted) _terminalFocus.requestFocus();
       wasOpen = open;
     });
+    _stopDraft = _controller.hasWorkspace
+        ? _controller.workspace.activeTab.subscribe((tab) => _voice.useDraft(tab?.draft))
+        : () {};
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
@@ -93,6 +99,7 @@ class _TerminalPageState extends State<TerminalPage> {
     _stopExit();
     // Leaving the page cancels the listen and drops the text (spec §5).
     _stopVoicePhase();
+    _stopDraft();
     _lifecycle.dispose();
     _voice.dispose();
     _terminalFocus.dispose();

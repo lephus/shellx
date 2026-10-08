@@ -103,6 +103,9 @@ class TerminalPageController extends Controller {
 
   /// The machine's tabs. Throws [StateError] when the machine was not pinned (or nobody was signed
   /// in) when the page opened ([closing] is then true from the start).
+  /// False when the machine is not pinned (the page then exits as untrusted): [workspace] throws.
+  bool get hasWorkspace => _workspace != null;
+
   TerminalWorkspace get workspace => _workspace ?? (throw StateError('The machine is not pinned'));
 
   /// Font size of this page (pinch or "Aa"); the default comes from Settings (spec §9.2 #5).
