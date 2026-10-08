@@ -19,7 +19,36 @@
   <circle cx="1080" cy="560" r="380" fill="url(#k)"/>
   <circle cx="1000" cy="60" r="300" fill="url(#b)"/>
 
-  <text x="80" y="120" class="m" font-size="34" fill="#ece9f6"><tspan fill="#a78bfa">~/</tspan>shellx</text>
+  <svg x="80" y="78" width="56" height="56" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="logo-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C1438"/>
+      <stop offset="1" stop-color="#0B0716"/>
+    </linearGradient>
+    <radialGradient id="logo-glow" cx="0.42" cy="0.46" r="0.42">
+      <stop offset="0" stop-color="#4AF2A1" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#4AF2A1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo-mint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7DF7BE"/>
+      <stop offset="1" stop-color="#2FD98A"/>
+    </linearGradient>
+    <linearGradient id="logo-lilac" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CFC8EE"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#logo-bg)"/>
+  <rect width="512" height="512" rx="114" fill="url(#logo-glow)"/>
+  <rect x="2" y="2" width="508" height="508" rx="112" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="3"/>
+  <!-- "<" : the phone side -->
+  <polyline points="384,122 290,234 384,346" fill="none" stroke="url(#logo-lilac)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- ">" : the computer side / prompt -->
+  <polyline points="128,122 222,234 128,346" fill="none" stroke="url(#logo-mint)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- cursor -->
+  <rect x="300" y="398" width="84" height="26" rx="8" fill="url(#logo-mint)"/>
+  </svg>
+  <text x="152" y="120" class="m" font-size="34" fill="#ece9f6">shellx</text>
   <text x="80" y="268" class="h" font-size="84" fill="#ece9f6">Terminal của bạn.</text>
   <text x="80" y="362" class="h" font-size="84" fill="url(#t)">Ở mọi nơi.</text>
   <text x="80" y="432" class="h" font-size="28" font-weight="400" fill="#a69fc0">Điều khiển terminal Mac hoặc PC từ điện thoại.</text>
