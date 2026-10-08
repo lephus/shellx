@@ -1132,5 +1132,14 @@
   "settingAgentResume": "Offer to resume agent sessions",
   "settingAgentResumeDesc": "After a restart, show a button to continue the agent you were using. Nothing runs until you click.",
   "settingAgentResumeAsk": "Ask",
-  "settingAgentResumeOff": "Off"
+  "settingAgentResumeOff": "Off",
+  "settingsAgentIntegrations": "Agent integrations",
+  "settingsAgentIntegrationsHint": "Hooks let ShellX show whether an agent is running or waiting for you. Setup shows every change and asks first.",
+  "integrationInstalled": "Installed",
+  "integrationNotInstalled": "Not installed",
+  "integrationNotFound": "{agent} not found on this computer",
+  "@integrationNotFound": {"placeholders": {"agent": {"type": "String"}}},
+  "integrationSetUp": "Set up in a terminal",
+  "integrationRemove": "Remove in a terminal",
+  "integrationLimit": "Codex reports when a turn ends; it does not report “running”."
 }

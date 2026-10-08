@@ -4331,6 +4331,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get settingAgentResumeOff;
+
+  /// No description provided for @settingsAgentIntegrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent integrations'**
+  String get settingsAgentIntegrations;
+
+  /// No description provided for @settingsAgentIntegrationsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hooks let ShellX show whether an agent is running or waiting for you. Setup shows every change and asks first.'**
+  String get settingsAgentIntegrationsHint;
+
+  /// No description provided for @integrationInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get integrationInstalled;
+
+  /// No description provided for @integrationNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get integrationNotInstalled;
+
+  /// No description provided for @integrationNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} not found on this computer'**
+  String integrationNotFound(String agent);
+
+  /// No description provided for @integrationSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up in a terminal'**
+  String get integrationSetUp;
+
+  /// No description provided for @integrationRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove in a terminal'**
+  String get integrationRemove;
+
+  /// No description provided for @integrationLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex reports when a turn ends; it does not report “running”.'**
+  String get integrationLimit;
 }
 
 class _AppLocalizationsDelegate

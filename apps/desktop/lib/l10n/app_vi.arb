@@ -703,5 +703,13 @@
   "settingAgentResume": "Đề nghị tiếp tục phiên agent",
   "settingAgentResumeDesc": "Sau khi khởi động lại, hiện nút để tiếp tục agent bạn đang dùng. Không có gì chạy cho tới khi bạn bấm.",
   "settingAgentResumeAsk": "Hỏi",
-  "settingAgentResumeOff": "Tắt"
+  "settingAgentResumeOff": "Tắt",
+  "settingsAgentIntegrations": "Tích hợp agent",
+  "settingsAgentIntegrationsHint": "Hook giúp ShellX biết agent đang chạy hay đang chờ bạn. Cài đặt luôn hiện từng thay đổi và hỏi trước.",
+  "integrationInstalled": "Đã cài",
+  "integrationNotInstalled": "Chưa cài",
+  "integrationNotFound": "Không thấy {agent} trên máy này",
+  "integrationSetUp": "Cài đặt trong terminal",
+  "integrationRemove": "Gỡ trong terminal",
+  "integrationLimit": "Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”."
 }

@@ -2736,4 +2736,32 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingAgentResumeOff => 'Tắt';
+
+  @override
+  String get settingsAgentIntegrations => 'Tích hợp agent';
+
+  @override
+  String get settingsAgentIntegrationsHint =>
+      'Hook giúp ShellX biết agent đang chạy hay đang chờ bạn. Cài đặt luôn hiện từng thay đổi và hỏi trước.';
+
+  @override
+  String get integrationInstalled => 'Đã cài';
+
+  @override
+  String get integrationNotInstalled => 'Chưa cài';
+
+  @override
+  String integrationNotFound(String agent) {
+    return 'Không thấy $agent trên máy này';
+  }
+
+  @override
+  String get integrationSetUp => 'Cài đặt trong terminal';
+
+  @override
+  String get integrationRemove => 'Gỡ trong terminal';
+
+  @override
+  String get integrationLimit =>
+      'Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”.';
 }

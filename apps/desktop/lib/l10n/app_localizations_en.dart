@@ -2828,4 +2828,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingAgentResumeOff => 'Off';
+
+  @override
+  String get settingsAgentIntegrations => 'Agent integrations';
+
+  @override
+  String get settingsAgentIntegrationsHint =>
+      'Hooks let ShellX show whether an agent is running or waiting for you. Setup shows every change and asks first.';
+
+  @override
+  String get integrationInstalled => 'Installed';
+
+  @override
+  String get integrationNotInstalled => 'Not installed';
+
+  @override
+  String integrationNotFound(String agent) {
+    return '$agent not found on this computer';
+  }
+
+  @override
+  String get integrationSetUp => 'Set up in a terminal';
+
+  @override
+  String get integrationRemove => 'Remove in a terminal';
+
+  @override
+  String get integrationLimit =>
+      'Codex reports when a turn ends; it does not report “running”.';
 }

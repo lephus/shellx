@@ -54,10 +54,15 @@ class SettingsScope extends InheritedWidget {
   const SettingsScope({
     super.key,
     required this.onOpenFile,
+    required this.onClose,
     required this.highlightId,
     required super.child,
   });
   final VoidCallback onOpenFile;
+
+  /// Closes Settings (a page that sends the user elsewhere, e.g. to a new
+  /// terminal tab).
+  final VoidCallback onClose;
   final String? highlightId;
 
   static SettingsScope of(BuildContext context) =>
