@@ -23,6 +23,8 @@ use std::io::Read;
 pub const MAX_STDIN: usize = 64 * 1024;
 /// D26: the whole command, connect included.
 pub const BUDGET: std::time::Duration = std::time::Duration::from_secs(2);
+/// D5: how long the hook's stdin is waited for.
+pub const STDIN_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
 const MAX_SESSION: usize = 128;
 const MAX_MESSAGE: usize = 1024;
 
@@ -96,10 +98,20 @@ fn session_ok(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b':' | b'-'))
 }
 
-/// Controls become spaces, at most [`MAX_MESSAGE`] characters; blank is none.
+/// Direction marks and embeds/isolates, and the line and paragraph
+/// separators: text that can reorder or break what a notice shows.
+fn is_bidi_or_separator(c: char) -> bool {
+    matches!(c,
+        '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'
+        | '\u{2028}' | '\u{2029}')
+}
+
+/// Controls become spaces, bidi marks and separators go, at most
+/// [`MAX_MESSAGE`] characters; blank is none.
 fn clean_message(s: &str) -> Option<String> {
     let t: String = s
         .chars()
+        .filter(|c| !is_bidi_or_separator(*c))
         .map(|c| if c.is_control() { ' ' } else { c })
         .take(MAX_MESSAGE)
         .collect();
@@ -109,7 +121,10 @@ fn clean_message(s: &str) -> Option<String> {
 
 fn notification(payload: &Payload) -> &'static str {
     match payload.get("notification_type") {
-        Some("permission_prompt" | "elicitation_dialog") => return "needs_input",
+        // Claude Code's types, and Gemini CLI's only one.
+        Some("permission_prompt" | "elicitation_dialog" | "ToolPermission") => {
+            return "needs_input"
+        }
         Some("idle_prompt") => return "idle",
         _ => {}
     }
@@ -185,6 +200,68 @@ pub fn normalize(
         ok: true,
         at: now_ms,
     })
+}
+
+/// D5: a hook's stdin is waited for at most `timeout` in all (the 2 s
+/// watchdog is the whole command's). The blocking read happens on a thread
+/// that is started by the first `read` and left behind when the time is
+/// up (the process exits right after); what arrived in time is kept.
+pub struct TimedRead {
+    source: Option<Box<dyn Read + Send>>,
+    chunks: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
+    deadline: Option<std::time::Instant>,
+    timeout: std::time::Duration,
+    pending: Vec<u8>,
+    at: usize,
+}
+
+impl TimedRead {
+    pub fn new(source: Box<dyn Read + Send>, timeout: std::time::Duration) -> TimedRead {
+        TimedRead {
+            source: Some(source),
+            chunks: None,
+            deadline: None,
+            timeout,
+            pending: Vec::new(),
+            at: 0,
+        }
+    }
+}
+
+impl Read for TimedRead {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        if let Some(mut source) = self.source.take() {
+            let (tx, rx) = std::sync::mpsc::channel();
+            self.chunks = Some(rx);
+            self.deadline = Some(std::time::Instant::now() + self.timeout);
+            std::thread::spawn(move || {
+                let mut buf = [0u8; 4096];
+                while let Ok(n @ 1..) = source.read(&mut buf) {
+                    if tx.send(buf[..n].to_vec()).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        if self.at >= self.pending.len() {
+            let (Some(rx), Some(deadline)) = (&self.chunks, self.deadline) else {
+                return Ok(0);
+            };
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            match rx.recv_timeout(left) {
+                Ok(chunk) => {
+                    self.pending = chunk;
+                    self.at = 0;
+                }
+                // End of input, or out of time: both end the read.
+                Err(_) => return Ok(0),
+            }
+        }
+        let n = out.len().min(self.pending.len() - self.at);
+        out[..n].copy_from_slice(&self.pending[self.at..self.at + n]);
+        self.at += n;
+        Ok(n)
+    }
 }
 
 fn read_bounded(input: &mut dyn Read) -> String {
@@ -427,6 +504,85 @@ mod tests {
             norm("claude", "notification", &blank).unwrap().message,
             None
         );
+    }
+
+    #[test]
+    fn gemini_payloads_give_the_session_and_a_tool_permission_needs_input() {
+        let n = payload(&fx("gemini_notification_tool_permission"));
+        let w = norm("gemini", "notification", &n).unwrap();
+        assert_eq!(
+            (w.event, w.session.as_deref()),
+            ("needs_input", Some("g-5e2f"))
+        );
+        assert_eq!(w.message.as_deref(), Some("Please confirm the tool call"));
+        // AfterAgent is installed as `stop`; its prompt and response are never taken.
+        let after = payload(&fx("gemini_after_agent"));
+        let w = norm("gemini", "stop", &after).unwrap();
+        assert_eq!(
+            (w.event, w.session.as_deref(), w.message),
+            ("idle", Some("g-5e2f"), None)
+        );
+        let w = norm("gemini", "prompt-submit", &after).unwrap();
+        assert_eq!(w.event, "running");
+    }
+
+    #[test]
+    fn bidi_marks_and_line_separators_are_dropped_from_the_message() {
+        let evil = "a\u{200e}b\u{200f}c\u{202a}d\u{202e}e\u{2066}f\u{2069}g\u{2028}h\u{2029}i";
+        let p = Payload::from_pairs(&[("message", evil)]);
+        let m = norm("claude", "notification", &p).unwrap().message.unwrap();
+        assert_eq!(m, "abcdefghi");
+        let only = Payload::from_pairs(&[("message", "\u{202e}\u{200f}")]);
+        assert_eq!(norm("claude", "notification", &only).unwrap().message, None);
+    }
+
+    #[test]
+    fn a_message_over_the_read_limit_is_clipped_not_dropped() {
+        let long = "é".repeat(5000); // 10000 bytes
+        let json = format!(
+            r#"{{"session_id":"s","notification_type":"permission_prompt","message":"{long}"}}"#
+        );
+        let w = norm("claude", "notification", &payload(&json)).unwrap();
+        assert_eq!(w.event, "needs_input");
+        assert_eq!(w.message.unwrap().chars().count(), 1024);
+        // Other long strings are still dropped.
+        let other = format!(r#"{{"session_id":"{}"}}"#, "x".repeat(5000));
+        assert_eq!(
+            norm("claude", "stop", &payload(&other)).unwrap().session,
+            None
+        );
+    }
+
+    #[test]
+    fn a_stdin_that_never_closes_is_given_up_on_after_the_timeout() {
+        struct Stuck(std::sync::mpsc::Receiver<()>, bool);
+        impl Read for Stuck {
+            fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> {
+                if !self.1 {
+                    self.1 = true;
+                    b[..3].copy_from_slice(b"{ }");
+                    return Ok(3);
+                }
+                let _ = self.0.recv(); // blocks until the sender is dropped
+                Ok(0)
+            }
+        }
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let mut timed = TimedRead::new(
+            Box::new(Stuck(rx, false)),
+            std::time::Duration::from_millis(300),
+        );
+        let started = std::time::Instant::now();
+        let got = read_bounded(&mut timed);
+        assert_eq!(got, "{ }", "what arrived in time is kept");
+        assert!(started.elapsed() < std::time::Duration::from_millis(1500));
+        drop(tx);
+        // A reader that ends normally is read to its end.
+        let mut done = TimedRead::new(
+            Box::new(std::io::Cursor::new(b"abc".to_vec())),
+            std::time::Duration::from_secs(1),
+        );
+        assert_eq!(read_bounded(&mut done), "abc");
     }
 
     #[test]

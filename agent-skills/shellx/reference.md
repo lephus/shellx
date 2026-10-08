@@ -175,6 +175,16 @@ JSON: `{}`. Exit codes: 0, 2, 3, 4 (no such pane), 6, 7.
 
 `shellx agent-event AGENT EVENT [PAYLOAD] [--session ID] [--message TEXT]` — used by agent hooks (Claude Code, Codex, Gemini CLI, OpenCode), not by agents themselves: it tells ShellX that an agent in this pane started, is running, needs input, is idle or ended. It always exits 0, prints nothing (one line on stderr when run from a terminal) and does nothing outside a ShellX pane or when ShellX is not running or too old. It reads at most 64 KiB of hook JSON from stdin and sends only the event, the session id and a notification's text.
 
+## shellx integrations
+
+For the person, not for agents: do not run `install` or `uninstall` on your own. They edit an AI agent's own configuration file so that its hooks tell ShellX what the agent is doing (see `shellx agent-event`). Agents: `claude`, `codex`, `gemini`, `opencode`.
+
+- `shellx integrations status [AGENT]` — one line per agent: installed, not installed, or its program is not on `PATH`. `--json`: `{"agents":[{"agent","installed","path","found"}]}`.
+- `shellx integrations install AGENT [--yes] [--dry-run] [--print]` — prints the exact change (values of keys that look like secrets are hidden), asks `[y/N]` on the terminal and writes only after `y` or `--yes`. Without a terminal `--yes` is required (exit 2). `--dry-run` prints the change and writes nothing; `--print` prints what to add by hand. The old file is copied once to `<file>.shellx-bak`; the write is atomic, keeps the file's permissions and follows a symlink to its target. A file that changed while waiting is not written. Installing twice changes nothing. A file with comments, invalid JSON or an unexpected shape is refused (exit 1); Codex's `config.toml` is refused when it already sets its own `notify` (Codex allows only one; use `--print` and call `shellx agent-event codex turn-complete` from your own script). `--json`: `{"changed":bool,"backup":bool}`, no file content.
+- `shellx integrations uninstall AGENT [--yes] [--dry-run]` — removes only the entries ShellX added (the ones running `shellx agent-event`); a file ShellX created and that is empty afterwards is deleted. OpenCode's plugin (`plugins/shellx-agent.js`) is a file ShellX owns outright: install refuses to replace a plugin file of the same name that is not ShellX's, and uninstall refuses (even with `--yes`) to delete one that was edited.
+
+Exit codes: 0 (also "No changes made." and "Already installed."), 1 (refused, or the write failed), 2.
+
 ## shellx wait
 
 `shellx wait PANE (--idle [--quiet MS] | --exit | --match REGEX [--from-now]) [--timeout SECONDS]` — block until the pane reaches a state. Exactly one mode. Default timeout 30 s, at most 3600 s; timing out exits 5.
