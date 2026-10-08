@@ -739,5 +739,10 @@
   "agentCommandNotApproved": "Đã đặt lệnh sự kiện agent nhưng chưa được cho phép.",
   "agentCommandReview": "Xem",
   "agentCommandFailed": "Lệnh sự kiện agent không chạy được.",
-  "configProblemAgentCommandMainOnly": "agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính"
+  "configProblemAgentCommandMainOnly": "agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính",
+  "settingLanguage": "Ngôn ngữ",
+  "settingLanguageSystem": "Theo hệ thống",
+  "settingLanguageEn": "English",
+  "settingLanguageVi": "Tiếng Việt",
+  "settingLanguageRestart": "Có hiệu lực sau khi bạn khởi động lại ShellX."
 }

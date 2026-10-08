@@ -23,6 +23,7 @@ class GeneralPage extends ConsumerWidget {
     }
     return PageFrame(
       children: [
+        settingWidget(settingById('app-language')),
         settingWidget(settingById('launch-at-startup')),
         settingWidget(settingById('keep-awake')),
         settingWidget(settingById('background-service')),

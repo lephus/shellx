@@ -4547,6 +4547,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'agent-event-command is only read from the main ShellX config file'**
   String get configProblemAgentCommandMainOnly;
+
+  /// No description provided for @settingLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingLanguage;
+
+  /// No description provided for @settingLanguageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get settingLanguageSystem;
+
+  /// No description provided for @settingLanguageEn.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingLanguageEn;
+
+  /// No description provided for @settingLanguageVi.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiếng Việt'**
+  String get settingLanguageVi;
+
+  /// No description provided for @settingLanguageRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes effect after you restart ShellX.'**
+  String get settingLanguageRestart;
 }
 
 class _AppLocalizationsDelegate

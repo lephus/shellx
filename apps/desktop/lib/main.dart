@@ -105,7 +105,7 @@ Future<void> main(List<String> args) async {
   // the single-instance lock (every later launch would exit silently).
   final startup = _Startup();
   await runGuardedStartup(
-    start: () => _start(startup, locale, l10n),
+    start: () => _start(startup),
     releaseLock: () async {
       await startup.lock?.release();
     },
@@ -124,11 +124,7 @@ final class _Startup {
   SystemNotifier? notifier;
 }
 
-Future<void> _start(
-  _Startup startup,
-  Locale locale,
-  AppLocalizations l10n,
-) async {
+Future<void> _start(_Startup startup) async {
   // Spec §8.2: only one agent at a time.
   final supportDirectory = await getApplicationSupportDirectory();
   final lock = SingleInstanceLock(supportDirectory);
@@ -139,6 +135,14 @@ Future<void> _start(
   startup.lock = lock;
 
   final settings = await SharedPrefsSettingsStore.open();
+  // A12 D19: from here on, the language the user chose (the dialogs above
+  // and the startup-failure ones keep the system language: the choice is
+  // not readable yet, or something failed before it could be used).
+  final locale = resolveAppLocale(
+    PlatformDispatcher.instance.locales,
+    override: appLanguageOverride(settings),
+  );
+  final l10n = lookupAppLocalizations(locale);
   late final ProviderContainer container;
   WakeDetector? sshWake;
   final windowHost = WindowManagerHost(

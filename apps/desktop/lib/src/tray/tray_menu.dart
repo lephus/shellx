@@ -57,6 +57,7 @@ final class TrayLocalState {
     this.hasRecentServers = false,
     this.backgroundService = SettingKeys.backgroundServiceDefault,
     this.daemonMode = false,
+    this.appLanguage = 'system',
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
@@ -80,6 +81,9 @@ final class TrayLocalState {
   /// shells running and "Thoát hoàn toàn" is its own item (UI-A5 §6.2).
   final bool daemonMode;
 
+  /// A12 D19: the stored app language choice (`system`, `en`, `vi`).
+  final String appLanguage;
+
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
@@ -92,7 +96,8 @@ final class TrayLocalState {
       other.sshHook == sshHook &&
       other.hasRecentServers == hasRecentServers &&
       other.backgroundService == backgroundService &&
-      other.daemonMode == daemonMode;
+      other.daemonMode == daemonMode &&
+      other.appLanguage == appLanguage;
 
   @override
   int get hashCode => Object.hash(
@@ -106,6 +111,7 @@ final class TrayLocalState {
     hasRecentServers,
     backgroundService,
     daemonMode,
+    appLanguage,
   );
 }
 

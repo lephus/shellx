@@ -2858,4 +2858,20 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get configProblemAgentCommandMainOnly =>
       'agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính';
+
+  @override
+  String get settingLanguage => 'Ngôn ngữ';
+
+  @override
+  String get settingLanguageSystem => 'Theo hệ thống';
+
+  @override
+  String get settingLanguageEn => 'English';
+
+  @override
+  String get settingLanguageVi => 'Tiếng Việt';
+
+  @override
+  String get settingLanguageRestart =>
+      'Có hiệu lực sau khi bạn khởi động lại ShellX.';
 }

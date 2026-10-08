@@ -10,6 +10,7 @@ import '../cli/cli_service.dart';
 import '../cli/cli_settings.dart';
 import '../restore/restore_persistence.dart';
 import '../mux/daemon_state.dart';
+import '../l10n/locale.dart' show appLanguageChoice, kAppLanguageChoices;
 import '../startup.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../platform/settings_store.dart'
@@ -49,6 +50,7 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
     backgroundService: backgroundServiceEnabled(
       ref.read(settingsStoreProvider),
     ),
+    appLanguage: appLanguageChoice(ref.read(settingsStoreProvider)),
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -211,6 +213,16 @@ class TrayActions {
           title: 'ShellX',
           body: l10n.backgroundServiceNextLaunch,
         );
+      // A12 D19: UI-owned; read once at the next start (the row says so).
+      case SetAppLanguage(:final code):
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setStrings(SettingKeys.appLanguage, [
+            kAppLanguageChoices.contains(code) ? code : 'system',
+          ]);
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
       // A7 D26, amendment: at once, without asking; the host rechecks.

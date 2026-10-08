@@ -90,6 +90,11 @@ abstract final class SettingKeys {
   /// user allowed, newest last, at most 20. Never the string. UI-owned.
   static const String agentCommandApproved = 'agent_command_approved';
 
+  /// A12 D19: the app language, a one-element string list: `system`, `en`
+  /// or `vi` (missing or anything else: `system`). Read once at start, so a
+  /// change shows after a restart. UI-owned.
+  static const String appLanguage = 'app_language';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -120,6 +125,7 @@ abstract final class SettingKeys {
     tourDone,
     lastSeenVersion,
     agentCommandApproved,
+    appLanguage,
   };
 }
 
@@ -171,6 +177,7 @@ abstract final class UiSettingKeys {
     SettingKeys.tourDone,
     SettingKeys.lastSeenVersion,
     SettingKeys.agentCommandApproved,
+    SettingKeys.appLanguage,
   };
 }
 

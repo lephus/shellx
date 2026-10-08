@@ -2950,4 +2950,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get configProblemAgentCommandMainOnly =>
       'agent-event-command is only read from the main ShellX config file';
+
+  @override
+  String get settingLanguage => 'Language';
+
+  @override
+  String get settingLanguageSystem => 'System default';
+
+  @override
+  String get settingLanguageEn => 'English';
+
+  @override
+  String get settingLanguageVi => 'Tiếng Việt';
+
+  @override
+  String get settingLanguageRestart => 'Takes effect after you restart ShellX.';
 }

@@ -170,6 +170,7 @@ void main() {
       ToggleCliPath,
       ToggleSshHook,
       SetNotifyThreshold,
+      SetAppLanguage,
     };
     final used = [
       for (final d in kSettings)
