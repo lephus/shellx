@@ -171,11 +171,11 @@ fn a_new_file_is_marked_and_uninstall_removes_it_and_the_folder() {
 fn status_json_has_no_file_content_and_claude_config_dir_is_followed() {
     let h = home("status");
     seed(&h);
-    let out = run(&h, &["status", "--json"], true);
+    let out = run(&h, &["status", "claude", "--json"], true);
     let j = text(&out.stdout);
     assert_eq!(
         j,
-        "{\"agents\":[{\"agent\":\"claude\",\"installed\":false,\"path\":\"~/.claude/settings.json\",\"found\":false},{\"agent\":\"gemini\",\"installed\":false,\"path\":\"~/.gemini/settings.json\",\"found\":false}]}\n"
+        "{\"agents\":[{\"agent\":\"claude\",\"installed\":false,\"path\":\"~/.claude/settings.json\",\"found\":false}]}\n"
     );
     let mut c = Command::new(bin());
     c.args(["cli", "integrations", "install", "claude", "--yes"])

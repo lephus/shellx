@@ -974,14 +974,14 @@ mod tests {
         );
         assert_eq!(r.out, "{\"changed\":false,\"backup\":false}\n");
         let r = go(
-            &["status", "--json"],
+            &["status", "claude", "--json"],
             &fs,
             &mut FakePrompt::no_tty(),
             &["/bin"],
         );
         assert_eq!(
             r.out,
-            "{\"agents\":[{\"agent\":\"claude\",\"installed\":true,\"path\":\"~/.claude/settings.json\",\"found\":false},{\"agent\":\"gemini\",\"installed\":false,\"path\":\"~/.gemini/settings.json\",\"found\":false}]}\n"
+            "{\"agents\":[{\"agent\":\"claude\",\"installed\":true,\"path\":\"~/.claude/settings.json\",\"found\":false}]}\n"
         );
         // Without --yes there is nobody to ask and nothing to show: refused.
         let fs = with_settings(ORIGINAL);
@@ -1002,7 +1002,7 @@ mod tests {
         let r = go(&["status"], &fs, &mut FakePrompt::no_tty(), &["/bin"]);
         assert_eq!(
             r.out,
-            "✗ claude    not installed\n- gemini    not found on PATH\n"
+            "✗ claude    not installed\n- codex     not found on PATH\n- gemini    not found on PATH\n"
         );
         let r = go(
             &["status", "claude"],
@@ -1045,6 +1045,103 @@ mod tests {
             &["/opt/shellx"],
         );
         assert!(!r.out.contains("Warning"), "{}", r.out);
+    }
+
+    const CODEX: &str = "/h/.codex/config.toml";
+
+    #[test]
+    fn codex_install_is_a_two_line_diff_and_uninstall_returns_the_bytes() {
+        let original = "# my config\nmodel = \"o3\"\n\n[tui]\nx = 1\n";
+        let fs = FakeFs::default();
+        fs.put(CODEX, original, 0o600);
+        let r = go(
+            &["install", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(r.out.contains("--- ~/.codex/config.toml\n"), "{}", r.out);
+        assert!(r
+            .out
+            .contains("+notify = [\"shellx\", \"agent-event\", \"codex\", \"turn-complete\"]\n"));
+        assert!(
+            r.out.contains("Restart running Codex sessions"),
+            "{}",
+            r.out
+        );
+        assert_eq!(
+            fs.text("/h/.codex/config.toml.shellx-bak").as_deref(),
+            Some(original)
+        );
+        let again = go(
+            &["install", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert!(again.out.contains("Already installed."));
+        let r = go(
+            &["uninstall", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert_eq!(fs.text(CODEX).as_deref(), Some(original));
+    }
+
+    #[test]
+    fn a_users_notify_is_refused_with_the_fixed_sentence_and_print_helps() {
+        let fs = FakeFs::default();
+        fs.put(CODEX, "notify = [\"my-script\"]\n", 0o600);
+        let r = go(
+            &["install", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 1);
+        assert!(
+            r.err.contains("refusing: \"notify\" is already set in config.toml (shellx will not replace it; see --print)"),
+            "{}",
+            r.err
+        );
+        assert!(!r.err.contains("my-script") && !r.out.contains("my-script"));
+        assert_eq!(fs.writes(), 0);
+        let r = go(
+            &["install", "codex", "--print"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0);
+        assert!(
+            r.out.contains("agent-event") && !r.out.contains("my-script"),
+            "{}",
+            r.out
+        );
+    }
+
+    #[test]
+    fn a_codex_file_we_created_is_removed_with_its_folder() {
+        let fs = FakeFs::default();
+        go(
+            &["install", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert!(fs.text(CODEX).unwrap().starts_with("# shellx:"));
+        let r = go(
+            &["uninstall", "codex", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(fs.text(CODEX).is_none() && !fs.is_dir("/h/.codex"));
+        assert!(r.out.contains("Removed ~/.codex/config.toml."), "{}", r.out);
     }
 
     #[test]

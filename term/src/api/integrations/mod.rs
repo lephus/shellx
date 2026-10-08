@@ -8,6 +8,7 @@
 //! and refuse (never guess) on anything they do not understand.
 
 pub mod cli;
+pub mod codex_toml;
 pub mod diff;
 pub mod gemini;
 pub mod json;
@@ -21,16 +22,18 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Agent {
     Claude,
+    Codex,
     Gemini,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 2] = [Agent::Claude, Agent::Gemini];
+    pub const ALL: [Agent; 3] = [Agent::Claude, Agent::Codex, Agent::Gemini];
 
     /// The name used on the command line and in `agent-event`.
     pub fn name(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
+            Agent::Codex => "codex",
             Agent::Gemini => "gemini",
         }
     }
@@ -43,6 +46,7 @@ impl Agent {
     pub fn product(self) -> &'static str {
         match self {
             Agent::Claude => "Claude Code",
+            Agent::Codex => "Codex",
             Agent::Gemini => "Gemini CLI",
         }
     }
@@ -51,15 +55,16 @@ impl Agent {
     pub fn binary(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
+            Agent::Codex => "codex",
             Agent::Gemini => "gemini",
         }
     }
 
-    /// The hook shape this agent reads, for the JSON agents.
+    /// The hook shape of the JSON agents (Codex has none).
     fn nested(self) -> &'static nested_json::NestedSpec {
         match self {
-            Agent::Claude => &nested_json::CLAUDE,
             Agent::Gemini => &gemini::GEMINI,
+            Agent::Claude | Agent::Codex => &nested_json::CLAUDE,
         }
     }
 }
@@ -84,7 +89,11 @@ pub fn refusal_message(a: Agent, r: Refusal) -> String {
     match r {
         Refusal::Invalid | Refusal::WrongType => match a {
             Agent::Claude | Agent::Gemini => "refusing: the file has comments, is not valid JSON or does not have the expected shape (use --print to see what to add)".into(),
+            Agent::Codex => "refusing: config.toml could not be read safely (use --print to see what to add)".into(),
         },
+        Refusal::Foreign("notify") => {
+            "refusing: \"notify\" is already set in config.toml (shellx will not replace it; see --print)".into()
+        }
         Refusal::Foreign(what) => {
             format!("refusing: a {what} of yours is already there (shellx will not replace it; see --print)")
         }
@@ -106,6 +115,7 @@ pub struct Plan {
 pub fn plan_install(a: Agent, current: Option<&str>) -> Result<Plan, Refusal> {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::install(a.nested(), current),
+        Agent::Codex => codex_toml::install(current),
     }
 }
 
@@ -113,6 +123,7 @@ pub fn plan_install(a: Agent, current: Option<&str>) -> Result<Plan, Refusal> {
 pub fn plan_uninstall(a: Agent, current: &str) -> Result<Plan, Refusal> {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::uninstall(a.nested(), current),
+        Agent::Codex => codex_toml::uninstall(current),
     }
 }
 
@@ -120,6 +131,7 @@ pub fn plan_uninstall(a: Agent, current: &str) -> Result<Plan, Refusal> {
 pub fn installed(a: Agent, current: Option<&str>) -> bool {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::installed(a.nested(), current),
+        Agent::Codex => codex_toml::installed(current),
     }
 }
 
@@ -128,13 +140,14 @@ pub fn installed(a: Agent, current: Option<&str>) -> bool {
 pub fn leaves_nothing(a: Agent, after: &str) -> bool {
     match a {
         Agent::Claude | Agent::Gemini => after.trim_start_matches('\u{feff}').trim() == "{}",
+        Agent::Codex => after.trim_start_matches('\u{feff}').trim().is_empty(),
     }
 }
 
 /// The agent's file is wholly ShellX's: uninstall deletes it.
 pub fn owns_file(a: Agent) -> bool {
     match a {
-        Agent::Claude | Agent::Gemini => false,
+        Agent::Claude | Agent::Codex | Agent::Gemini => false,
     }
 }
 
@@ -142,6 +155,7 @@ pub fn owns_file(a: Agent) -> bool {
 pub fn snippet(a: Agent) -> String {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::snippet(a.nested()),
+        Agent::Codex => codex_toml::snippet(),
     }
 }
 
@@ -152,6 +166,9 @@ pub fn config_path(a: Agent, env: &dyn Fn(&str) -> Option<String>, home: &Path) 
         Agent::Claude => var("CLAUDE_CONFIG_DIR")
             .map_or_else(|| home.join(".claude"), PathBuf::from)
             .join("settings.json"),
+        Agent::Codex => var("CODEX_HOME")
+            .map_or_else(|| home.join(".codex"), PathBuf::from)
+            .join("config.toml"),
         Agent::Gemini => home.join(".gemini").join("settings.json"),
     }
 }
@@ -534,6 +551,50 @@ mod tests {
         assert_eq!(Agent::from_name("gemini"), Some(Agent::Gemini));
         assert_eq!(Agent::Gemini.product(), "Gemini CLI");
         assert!(snippet(Agent::Gemini).contains("shellx agent-event gemini session-end"));
+    }
+
+    #[test]
+    fn codex_goes_through_the_toml_planner_and_has_its_own_path_and_words() {
+        let plan = plan_install(Agent::Codex, None).unwrap();
+        assert!(plan
+            .after
+            .contains("notify = [\"shellx\", \"agent-event\", \"codex\", \"turn-complete\"]"));
+        assert!(installed(Agent::Codex, Some(&plan.after)));
+        assert!(!installed(Agent::Claude, Some(&plan.after)));
+        assert_eq!(plan_uninstall(Agent::Codex, &plan.after).unwrap().after, "");
+        assert!(leaves_nothing(Agent::Codex, ""));
+        assert!(leaves_nothing(Agent::Codex, " \n"));
+        assert!(!leaves_nothing(Agent::Codex, "model = 1\n"));
+        assert!(!owns_file(Agent::Codex));
+        assert_eq!(
+            plan_install(Agent::Codex, Some("notify = [\"x\"]\n")).unwrap_err(),
+            Refusal::Foreign("notify")
+        );
+        assert_eq!(
+            refusal_message(Agent::Codex, Refusal::Foreign("notify")),
+            "refusing: \"notify\" is already set in config.toml (shellx will not replace it; see --print)"
+        );
+        assert!(refusal_message(Agent::Codex, Refusal::Invalid).contains("config.toml"));
+        assert!(!refusal_message(Agent::Codex, Refusal::Invalid).contains("JSON"));
+        let none = |_: &str| None;
+        assert_eq!(
+            config_path(Agent::Codex, &none, Path::new("/h")),
+            PathBuf::from("/h/.codex/config.toml")
+        );
+        let set = |k: &str| (k == "CODEX_HOME").then(|| "/cx".to_string());
+        assert_eq!(
+            config_path(Agent::Codex, &set, Path::new("/h")),
+            PathBuf::from("/cx/config.toml")
+        );
+        assert_eq!(
+            (
+                Agent::Codex.name(),
+                Agent::Codex.product(),
+                Agent::Codex.binary()
+            ),
+            ("codex", "Codex", "codex")
+        );
+        assert!(snippet(Agent::Codex).contains("turn-complete"));
     }
 
     #[test]
