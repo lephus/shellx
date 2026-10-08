@@ -133,6 +133,13 @@ abstract final class ShellxSizes {
   static const double agentChipRowPadH = 6;
   static const double agentChipPanePadH = 8;
 
+  // A12 D12: the agent status badge (a row's, a pane header's).
+  static const double agentBadgeRowIcon = 12;
+  static const double agentBadgePaneIcon = 14;
+
+  /// A row narrower than this shows the badge's icon only.
+  static const double agentBadgeCompactBelow = 160;
+
   /// UI-A3 §1.3.
   static double paneHeaderFor(TextScaler scaler) =>
       max(paneHeader, scaler.scale(16) + 6);

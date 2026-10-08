@@ -9,12 +9,15 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../remote/remote_state.dart';
+import '../../terminal/agent_names.dart';
+import '../../terminal/agent_status_notifier.dart' show AgentBadgeInfo;
 import '../../terminal/context_line.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/tab_meta.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'agent_badge.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart';
 import 'inline_name_field.dart';
@@ -73,6 +76,8 @@ class SessionTabRow extends StatefulWidget {
     this.unread,
     this.onMarkRead,
     this.agent = false,
+    this.agentStatus,
+    this.agentLive = false,
     this.portTooltip,
     this.editingDescription = false,
     this.onDescription,
@@ -129,6 +134,14 @@ class SessionTabRow extends StatefulWidget {
 
   /// A7 D27: the command line acted on this tab in the last 10 s.
   final bool agent;
+
+  /// A12 D12: what an agent in this tab reports (the most urgent of its
+  /// panes); null: nothing, and the row is as before A12.
+  final AgentBadgeInfo? agentStatus;
+
+  /// A12 D12: the row speaks its question now (at most once a minute per
+  /// tab, decided by the status model).
+  final bool agentLive;
 
   /// A8: the tooltip of a port link, when it differs from "Open http://…"
   /// (a server's port is forwarded over SSH).
@@ -242,6 +255,8 @@ class SessionTabRowState extends State<SessionTabRow> {
       if (widget.unread case final u?)
         l10n.attentionRowSemantics(u.count, u.text(l10n)),
       if (widget.agent) l10n.agentChipTooltip,
+      if (widget.agentStatus case final a?)
+        agentStatusLabel(l10n, a.agent, a.state),
       if (tab.gitBranch case final branch?)
         l10n.sidebarBranch(remote == null ? branch : cleanServerText(branch)),
       if (tab.cwd case final cwd?)
@@ -422,7 +437,7 @@ class SessionTabRowState extends State<SessionTabRow> {
         ? ShellxSizes.rowCloseHit - (ShellxSpace.s8 - rowPadding.right)
         : 0.0;
 
-    final titleRow = Row(
+    Widget titleRowFor(bool compact) => Row(
       children: [
         SizedBox(
           width: ShellxSizes.dotSlot,
@@ -460,6 +475,17 @@ class SessionTabRowState extends State<SessionTabRow> {
                         size: ShellxSizes.pinIcon,
                         color: ShellxDesktopColors.textSecondary,
                         semanticLabel: l10n.tabPinned,
+                      ),
+                    ],
+                    // A12 D12: the agent's state follows the title; narrow
+                    // rows keep the icon only.
+                    if (widget.agentStatus case final a?) ...[
+                      const SizedBox(width: ShellxSpace.s4),
+                      AgentBadge(
+                        key: Key('tab.agent.${tab.id}'),
+                        state: a.state,
+                        agent: a.agent,
+                        compact: compact,
                       ),
                     ],
                     if (unread != null) ...[
@@ -560,6 +586,8 @@ class SessionTabRowState extends State<SessionTabRow> {
       button: !renaming,
       selected: widget.selected,
       label: _semanticsLabel(l10n),
+      // A12 D12: a question is read when it appears.
+      liveRegion: widget.agentLive ? true : null,
       onTap: renaming ? null : widget.onSelect,
       // The row menu's order (UI-A4 §10.4): mark as read first, close
       // last.
@@ -675,7 +703,23 @@ class SessionTabRowState extends State<SessionTabRow> {
                         // tall as the 24 px ×.
                         top: withLines ? titleTop : (height - titleBox) / 2,
                         height: titleBox,
-                        child: Padding(padding: rowPadding, child: titleRow),
+                        child: LayoutBuilder(
+                          builder: (context, box) => Padding(
+                            padding: rowPadding,
+                            // "Words drop first": a narrow row, or one that
+                            // also carries a badge, a pane count, a server
+                            // mark or a pin, keeps the icon only.
+                            child: titleRowFor(
+                              box.maxWidth <
+                                      ShellxSizes.agentBadgeCompactBelow ||
+                                  unread != null ||
+                                  tab.isSplit ||
+                                  tab.meta.pinned ||
+                                  tab.focused.remote != null ||
+                                  widget.agent,
+                            ),
+                          ),
+                        ),
                       ),
                       if (withDescription)
                         Positioned(

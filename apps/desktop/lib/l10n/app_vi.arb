@@ -683,5 +683,17 @@
   "emptyHintPalette": "{shortcut} Bảng lệnh",
   "emptyHintSettings": "{shortcut} Cài đặt",
   "notificationsEmptyTitle": "Chưa có thông báo",
-  "notificationsEmptyBody": "Một vòng sáng hiện ở pane khi agent cần bạn."
+  "notificationsEmptyBody": "Một vòng sáng hiện ở pane khi agent cần bạn.",
+  "agentStateRunning": "Đang chạy",
+  "agentStateNeedsInput": "Cần bạn trả lời",
+  "agentStateIdle": "Đang chờ",
+  "agentStateDone": "Xong",
+  "agentStatusTooltip": "{agent}: {state}",
+  "agentStatusAnnounce": "{agent} cần bạn trả lời",
+  "agentNotifyNeedsInput": "{agent} cần bạn trả lời",
+  "agentNotifyDone": "{agent} đã xong",
+  "agentNamesClaude": "Claude Code",
+  "agentNamesCodex": "Codex",
+  "agentNamesGemini": "Gemini CLI",
+  "agentNamesOpencode": "OpenCode"
 }

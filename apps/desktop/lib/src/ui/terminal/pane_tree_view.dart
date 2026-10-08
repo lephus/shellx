@@ -16,6 +16,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../cli/agent_marks.dart';
 import '../../remote/remote_state.dart';
 import '../../remote/ssh_reconnector.dart';
+import '../../terminal/agent_names.dart' show agentStatusLabel;
+import '../../terminal/agent_status_notifier.dart'
+    show AgentBadgeInfo, agentPaneBadgeProvider;
 import '../../terminal/cursor_blinker.dart';
 import '../../terminal/desktop_terminal.dart';
 import '../../terminal/find_sessions.dart';
@@ -32,6 +35,7 @@ import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart'
     show terminalFocusRequestProvider, windowActiveProvider;
 import '../window_router.dart' show windowRouterProvider;
+import 'agent_badge.dart';
 import 'agent_chip.dart';
 import 'attention_marks.dart' show AttentionRing;
 import 'click_select.dart';
@@ -474,6 +478,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                               pane.automaticLabel,
                             ),
                       if (_agent(id)) l10n.agentChipTooltip,
+                      if (ref.watch(agentPaneBadgeProvider(id)) case final a?)
+                        agentStatusLabel(l10n, a.agent, a.state),
                     ].join(', ') +
                     remoteSemantics(l10n, pane),
           // UI-A3 §8: what the header's mouse targets do.
@@ -538,6 +544,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         closePaneShortcutLabel(),
       ),
       agent: _agent(id),
+      agentStatus: ref.watch(agentPaneBadgeProvider(id)),
       onClose: () => widget.onClosePane(id),
       onToggleZoom: () => _toggleZoom(id),
     );
@@ -1000,6 +1007,7 @@ class _PaneHeader extends StatefulWidget {
     required this.hiddenUnread,
     required this.closeTooltip,
     required this.agent,
+    this.agentStatus,
     required this.onClose,
     required this.onToggleZoom,
   });
@@ -1015,6 +1023,9 @@ class _PaneHeader extends StatefulWidget {
 
   /// A7 D27: the "Agent" chip, before ×.
   final bool agent;
+
+  /// A12 D12: what the agent in this pane reports; null: nothing.
+  final AgentBadgeInfo? agentStatus;
   final VoidCallback onClose;
   final VoidCallback onToggleZoom;
 
@@ -1183,6 +1194,15 @@ class _PaneHeaderState extends State<_PaneHeader> {
                         ),
                       ),
                     ),
+                  ),
+                ],
+                if (widget.agentStatus case final a?) ...[
+                  const SizedBox(width: ShellxSpace.s4),
+                  AgentBadge(
+                    key: Key('pane.agent.${pane.id}'),
+                    state: a.state,
+                    agent: a.agent,
+                    large: true,
                   ),
                 ],
                 if (widget.agent) ...[

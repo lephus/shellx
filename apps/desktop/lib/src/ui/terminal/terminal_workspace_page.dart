@@ -661,6 +661,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         );
     // The dialog took the keyboard: give it back to the terminal.
     if (asked && mounted) focusTerminal();
+    // A12 D9: pasting an answer is answering.
+    if (outcome == PasteOutcome.sent && mounted) {
+      ref.read(terminalTabsProvider.notifier).noteUserInput(paneId);
+    }
     if (outcome == PasteOutcome.tooLarge && mounted) {
       ref
           .read(terminalTabsProvider.notifier)

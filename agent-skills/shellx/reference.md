@@ -69,7 +69,7 @@ Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` t
  "selectedTab":"t1712","focusedPane":"p1712"}
 ```
 
-`cwd`, `branch` and `exitCode` may be `null` (unknown / still running); `selectedTab` and `focusedPane` are `null` when no tab is open. Browser panes (when available) have `"kind":"browser"` and `url`.
+A pane whose agent reported through its hooks (`shellx integrations`) also has `"agent_name"` (`claude`, `codex`, `gemini`, `opencode`) and `"agent_status"` (`running`, `needs_input`, `idle`, `done`); `"agent"` stays the "a command-line client just acted here" flag. `cwd`, `branch` and `exitCode` may be `null` (unknown / still running); `selectedTab` and `focusedPane` are `null` when no tab is open. Browser panes (when available) have `"kind":"browser"` and `url`.
 
 Exit codes: 0, 3, 6, 7.
 
@@ -173,7 +173,7 @@ JSON: `{}`. Exit codes: 0, 2, 3, 4 (no such pane), 6, 7.
 
 ## shellx agent-event
 
-`shellx agent-event AGENT EVENT [PAYLOAD] [--session ID] [--message TEXT]` — used by agent hooks (Claude Code, Codex, Gemini CLI, OpenCode), not by agents themselves: it tells ShellX that an agent in this pane started, is running, needs input, is idle or ended. It always exits 0, prints nothing (one line on stderr when run from a terminal) and does nothing outside a ShellX pane or when ShellX is not running or too old. It reads at most 64 KiB of hook JSON from stdin and sends only the event, the session id and a notification's text.
+`shellx agent-event AGENT EVENT [PAYLOAD] [--session ID] [--message TEXT]` — used by agent hooks (Claude Code, Codex, Gemini CLI, OpenCode), not by agents themselves: it tells ShellX that an agent in this pane started, is running, needs input, is idle or ended. It always exits 0, prints nothing (one line on stderr when run from a terminal) and does nothing outside a ShellX pane or when ShellX is not running or too old. The `ok` flag it may send (a failed turn) is accepted but not used for anything yet. It reads at most 64 KiB of hook JSON from stdin and sends only the event, the session id and a notification's text.
 
 ## shellx integrations
 
@@ -217,6 +217,7 @@ Exit codes: 0, 1, 2, 3, 4, 5, 6, 7.
 | `pane.changed` | `pane`, `tab`, `title`, `cwd`, `branch`, `ports`, `running` | at most one per pane per 250 ms, only when something changed |
 | `workspace.created` / `workspace.renamed` / `workspace.deleted` | `workspace` (+ `name`) | |
 | `notice` | `pane`, `tab`, `type`, `title?`, `body?` | a notification; `type` is the notice kind (`kind` is the event kind) |
+| `agent.status` | `pane`, `tab`, `agent`, `status` | what an agent shows in this pane changed (one event per pane, not per tab): `status` is `running`, `needs_input`, `idle`, `done`, or `none` (the agent ended or its pane went) |
 | `overflow` | `dropped` | you read too slowly and `dropped` events were lost — call `shellx ls` to resync |
 
 Ids are written as `p…`, `t…`, `w:…`. At most 4 listeners at once.

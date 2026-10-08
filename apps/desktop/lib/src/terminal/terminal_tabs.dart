@@ -585,6 +585,17 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// A5a D4: the session whose pane just received output.
   Stream<int> get paneOutputs => _paneOutputs.stream;
 
+  /// A12 D9: the session whose pane the user just typed into (their own
+  /// keys and key bindings; never a reply of the terminal or a CLI `send`).
+  final _userInputs = StreamController<int>.broadcast(sync: true);
+  Stream<int> get userInputs => _userInputs.stream;
+
+  /// A12 D9: the user answered pane [id] in a way that skips the keyboard
+  /// path (a paste from the window).
+  void noteUserInput(int id) {
+    if (!_userInputs.isClosed) _userInputs.add(id);
+  }
+
   /// A11 D20: a pane moved to another tab, announced just before the state
   /// changes. Never closed on a rebuild, as [_paneOutputs].
   final _paneMoves = StreamController<PaneMove>.broadcast(sync: true);
@@ -1027,9 +1038,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         }),
       )
       ..add(
-        view.driver.listen(
-          (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),
-        ),
+        view.driver.listen((side) {
+          // A12 D9: the phone took the driver back from the desktop on a
+          // pane it was already attached to: it typed (a fresh attach
+          // drives too, but is not an answer).
+          final was = state.tabOfSession(s.id)?.panes[s.id];
+          if (side == DriverSide.phone &&
+              was != null &&
+              was.phoneAttached &&
+              was.driver != DriverSide.phone) {
+            noteUserInput(s.id);
+          }
+          _updatePane(s.id, (p) => p.copyWith(driver: side));
+        }),
       );
     unawaited(view.exitCode.then((code) => _exited(s.id, code)));
     return PaneSession(
@@ -1066,6 +1087,8 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       }
       return;
     }
+    // A12 D9: the human answered (a script's `send` does not come here).
+    if (!_userInputs.isClosed) _userInputs.add(id);
     // A10 D20: a key must reach a PTY that already has the size on screen.
     _settler.flush(id);
     _links[id]?.view.write(utf8.encode(data));
@@ -1272,6 +1295,7 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       }
       if (!alive) {
         unawaited(_paneOutputs.close());
+        unawaited(_userInputs.close());
         unawaited(_paneMoves.close());
         unawaited(_remote.close());
       }

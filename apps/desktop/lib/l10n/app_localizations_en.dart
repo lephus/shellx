@@ -2755,4 +2755,48 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationsEmptyBody =>
       'A glowing ring appears on a pane when an agent needs you.';
+
+  @override
+  String get agentStateRunning => 'Running';
+
+  @override
+  String get agentStateNeedsInput => 'Needs input';
+
+  @override
+  String get agentStateIdle => 'Idle';
+
+  @override
+  String get agentStateDone => 'Done';
+
+  @override
+  String agentStatusTooltip(String agent, String state) {
+    return '$agent: $state';
+  }
+
+  @override
+  String agentStatusAnnounce(String agent) {
+    return '$agent needs your input';
+  }
+
+  @override
+  String agentNotifyNeedsInput(String agent) {
+    return '$agent needs your input';
+  }
+
+  @override
+  String agentNotifyDone(String agent) {
+    return '$agent finished';
+  }
+
+  @override
+  String get agentNamesClaude => 'Claude Code';
+
+  @override
+  String get agentNamesCodex => 'Codex';
+
+  @override
+  String get agentNamesGemini => 'Gemini CLI';
+
+  @override
+  String get agentNamesOpencode => 'OpenCode';
 }

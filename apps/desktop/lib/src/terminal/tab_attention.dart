@@ -7,6 +7,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import '../../l10n/app_localizations.dart';
 import '../ui/window_focus.dart';
 import '../ui/window_router.dart';
+import 'agent_status_notifier.dart';
 import 'local_sessions_provider.dart';
 import 'sidebar_workspaces.dart';
 import 'terminal_tabs.dart';
@@ -435,6 +436,9 @@ class TabAttention extends Notifier<AttentionState> {
     final tabs = ref.read(terminalTabsProvider);
     final tab = tabs.tabOfSession(notice.sessionId);
     if (tab == null) return; // not (or no longer) a pane of this window
+    // A12 D10: what a hook event already told (an OSC / bell right after
+    // it) is not told twice.
+    if (ref.read(agentStatusProvider.notifier).swallowNotice(notice)) return;
     final pane = notice.sessionId;
     // A3 D18: only the focused pane of the selected tab is in view.
     final seen =
