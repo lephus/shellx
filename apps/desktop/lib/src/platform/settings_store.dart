@@ -79,6 +79,13 @@ abstract final class SettingKeys {
   /// [backgroundServiceEnabled] (the launch decision and the tray menu).
   static const bool backgroundServiceDefault = false;
 
+  /// A11 D24: the first-run tour was finished or skipped. UI-owned.
+  static const String tourDone = 'tour_done';
+
+  /// A11 D23: the release (without the build number) the window last
+  /// started on, a one-element string list. UI-owned.
+  static const String lastSeenVersion = 'last_seen_version';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -106,6 +113,8 @@ abstract final class SettingKeys {
     sshRemoteHook,
     quitKeepsSessionsExplained,
     backgroundService,
+    tourDone,
+    lastSeenVersion,
   };
 }
 
@@ -154,6 +163,8 @@ abstract final class UiSettingKeys {
     SettingKeys.sshPlainTargets,
     SettingKeys.quitKeepsSessionsExplained,
     SettingKeys.backgroundService,
+    SettingKeys.tourDone,
+    SettingKeys.lastSeenVersion,
   };
 }
 

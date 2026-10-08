@@ -355,7 +355,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
             ),
             const SizedBox(height: ShellxSpace.s8),
             Text(
-              l10n.notificationsPanelEmptyTitle,
+              l10n.notificationsEmptyTitle,
               textAlign: TextAlign.center,
               style: ShellxText.body.copyWith(
                 color: ShellxDesktopColors.textPrimary,
@@ -363,7 +363,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
             ),
             const SizedBox(height: ShellxSpace.s4),
             Text(
-              l10n.notificationsPanelEmptyBody,
+              l10n.notificationsEmptyBody,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

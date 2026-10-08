@@ -4,6 +4,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../agent/desktop_services.dart' show desktopServicesProvider;
+import '../../agent/tour_state.dart';
+import '../../agent/whats_new.dart' show releaseOf;
 import '../../config/config_controller.dart';
 import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
@@ -11,13 +14,16 @@ import '../../config/keybind_actions.dart' show describeIntent;
 import '../../terminal/closed_items.dart' show closedItemsProvider;
 import '../../terminal/find_sessions.dart';
 import '../../terminal/global_search.dart' show GlobalHit;
-import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
+import '../../terminal/sidebar_workspaces.dart'
+    show settingsStoreProvider, sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
 import '../config/search_all_overlay.dart';
 import '../config/shortcuts_sheet.dart';
+import '../onboarding/tour_overlay.dart';
+import '../onboarding/whats_new_card.dart';
 import '../settings/settings_overlay.dart';
 import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -26,7 +32,18 @@ import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
 
 /// A9's overlays over the workspace (UI-A9 §2-4).
-enum A9Overlay { palette, problems, shortcuts, settings, searchAll }
+enum A9Overlay {
+  palette,
+  problems,
+  shortcuts,
+  settings,
+  searchAll,
+  tour,
+  whatsNew,
+}
+
+/// Where "See all changes" goes (an https page the app builds itself).
+final Uri kReleaseNotesUrl = Uri.parse('https://shellx.pro/');
 
 /// One problem for the toast's "already told" check: where and what, never
 /// the text (D36: a problem that stays is not announced on every reload).
@@ -59,6 +76,14 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
 
   A9Overlay? overlay;
   FocusNode? _beforeOverlay;
+
+  /// The overlays that block the window: the workspace shortcuts are off
+  /// meanwhile.
+  bool get overlayBlocksShortcuts =>
+      overlay == A9Overlay.shortcuts ||
+      overlay == A9Overlay.settings ||
+      overlay == A9Overlay.tour ||
+      overlay == A9Overlay.whatsNew;
 
   /// D33: the entries are fixed when the palette opens, before the focus
   /// moves into it (whether copy applies depends on where the keyboard
@@ -206,6 +231,108 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       ..ensureVisualUpdate();
   }
 
+  // A11 D23, D24: the first-run tour and "What's new".
+  String _whatsNewVersion = '';
+  List<String>? _whatsNewNotes;
+  FirstRunStep _firstRunPending = FirstRunStep.none;
+
+  String _languageCode() => Localizations.localeOf(context).languageCode;
+
+  /// Read once, in initState, before this window writes anything itself:
+  /// then the decision runs after the first frame (the tabs and the config
+  /// are loaded by then; restore and attach never wait for it).
+  void startFirstRun() {
+    final store = ref.read(settingsStoreProvider);
+    final existingUser = hasUsedAppBefore(store);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_decideFirstRun(existingUser));
+    });
+    ref.listenManual(windowRouterProvider.select((s) => s.visible), (_, _) {
+      _showFirstRunIfDue();
+    });
+  }
+
+  Future<void> _decideFirstRun(bool existingUser) async {
+    final current = ref.read(currentVersionProvider);
+    if (current == null) return;
+    final state = ref.read(tourStateProvider);
+    final seen = state.lastSeenVersion;
+    final needsNotes =
+        (seen != null && seen != releaseOf(current)) ||
+        (seen == null && !state.tourDone && existingUser);
+    List<String>? notes;
+    if (needsNotes) {
+      final whats = await ref.read(whatsNewProvider.future);
+      if (!mounted) return;
+      notes = whats.notes(current, _languageCode());
+    }
+    final step = decideFirstRun(
+      tourDone: state.tourDone,
+      lastSeen: seen,
+      current: current,
+      hasNotesFor: notes != null,
+      existingUser: existingUser,
+    );
+    // Remembered now, whatever is shown: the tour and the card are once per
+    // install and per release (the tour stays in Settings).
+    await state.setLastSeenVersion(current);
+    if (!mounted) return;
+    _whatsNewVersion = releaseOf(current);
+    _whatsNewNotes = notes;
+    _firstRunPending = step;
+    _showFirstRunIfDue();
+  }
+
+  /// Shown when someone can see it and nothing else is open.
+  void _showFirstRunIfDue() {
+    if (_firstRunPending == FirstRunStep.none || !mounted) return;
+    if (!ref.read(windowRouterProvider).visible || overlay != null) return;
+    final step = _firstRunPending;
+    _firstRunPending = FirstRunStep.none;
+    openOverlay(
+      step == FirstRunStep.tour ? A9Overlay.tour : A9Overlay.whatsNew,
+    );
+  }
+
+  /// The `show_whats_new` action: the running version's notes, now.
+  void openWhatsNew() {
+    final current = ref.read(currentVersionProvider);
+    if (current == null) return;
+    unawaited(() async {
+      final whats = await ref.read(whatsNewProvider.future);
+      if (!mounted) return;
+      _whatsNewVersion = releaseOf(current);
+      _whatsNewNotes = whats.notes(current, _languageCode());
+      openOverlay(A9Overlay.whatsNew);
+    }());
+  }
+
+  Future<void> _finishTour() async {
+    closeOverlay();
+    final state = ref.read(tourStateProvider);
+    await state.markTourDone();
+    final current = ref.read(currentVersionProvider);
+    if (current != null) await state.setLastSeenVersion(current);
+  }
+
+  Future<void> _finishWhatsNew({bool more = false}) async {
+    closeOverlay();
+    final current = ref.read(currentVersionProvider);
+    if (current != null) {
+      await ref.read(tourStateProvider).setLastSeenVersion(current);
+    }
+    if (more) {
+      try {
+        await ref
+            .read(desktopServicesProvider)
+            .urlOpener
+            .open(kReleaseNotesUrl);
+      } catch (e) {
+        debugPrint('whats new: open failed (${e.runtimeType})');
+      }
+    }
+  }
+
   void openOverlay(A9Overlay next) {
     // Before closing whatever is open, which clears it.
     final before = _beforeOverlay ?? FocusManager.instance.primaryFocus;
@@ -331,6 +458,33 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ),
       );
     }
+    if (overlay == A9Overlay.tour || overlay == A9Overlay.whatsNew) {
+      // Blocks the window like Settings: a scrim, and the workspace
+      // shortcuts are off meanwhile (the page empties them).
+      return Positioned.fill(
+        key: ValueKey(overlay == A9Overlay.tour ? 'a11.tour' : 'a11.whatsnew'),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: ModalBarrier(
+                color: ShellxDesktopColors.scrim,
+                dismissible: false,
+              ),
+            ),
+            Center(
+              child: overlay == A9Overlay.tour
+                  ? TourOverlay(onFinish: () => unawaited(_finishTour()))
+                  : WhatsNewCard(
+                      version: _whatsNewVersion,
+                      notes: _whatsNewNotes,
+                      onDone: () => unawaited(_finishWhatsNew()),
+                      onMore: () => unawaited(_finishWhatsNew(more: true)),
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
     if (overlay != A9Overlay.problems) return null;
     return Positioned(
       key: const ValueKey('a9.problems'),
@@ -376,6 +530,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   /// before this page, and Riverpod 3 forbids provider writes while the
   /// tree builds (preflight D4).
   void listenToConfigUi() {
+    startFirstRun();
     ref.listenManual(shellxConfigProvider, _onConfig);
     ref.listenManual(shellxConfigProvider, (_, _) => _refreshPalette());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -396,6 +551,8 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ConfigUiRequest.shortcuts => A9Overlay.shortcuts,
         ConfigUiRequest.settings => A9Overlay.settings,
         ConfigUiRequest.searchAll => A9Overlay.searchAll,
+        ConfigUiRequest.tour => A9Overlay.tour,
+        ConfigUiRequest.whatsNew => A9Overlay.whatsNew,
       });
     });
   }

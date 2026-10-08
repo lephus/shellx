@@ -60,6 +60,7 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   // finds.
   void closeConfigOverlay({bool restoreFocus = true});
   void openOverlay(A9Overlay overlay);
+  void openWhatsNew();
   A9Overlay? get overlay;
   void forgetFixedRuntimeProblems();
 
@@ -114,6 +115,8 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       ShowShortcutsIntent: run<ShowShortcutsIntent>(
         (_) => openOverlay(A9Overlay.shortcuts),
       ),
+      ShowTourIntent: run<ShowTourIntent>((_) => openOverlay(A9Overlay.tour)),
+      ShowWhatsNewIntent: run<ShowWhatsNewIntent>((_) => openWhatsNew()),
       // Always enabled: the palette lists it only when there are problems
       // (D33), a bound key may ask any time.
       ShowConfigProblemsIntent: run<ShowConfigProblemsIntent>(

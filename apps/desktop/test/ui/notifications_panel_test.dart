@@ -243,10 +243,7 @@ void main() {
     await openPanel(tester);
     expect(find.text('No notifications yet'), findsOneWidget);
     expect(
-      find.text(
-        'Programs in your tabs send notifications with OSC 9, 99, 777 or '
-        'the shellx notify command.',
-      ),
+      find.text('A glowing ring appears on a pane when an agent needs you.'),
       findsOneWidget,
     );
     expect(find.textContaining('Next unread'), findsNothing);

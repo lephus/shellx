@@ -246,7 +246,7 @@ void main() {
         daemonEnd.send(MuxMessage(MuxType.result, q: m.q));
       }
     });
-    final store = InMemorySettingsStore();
+    final store = InMemorySettingsStore({SettingKeys.tourDone: true});
     final w = await pumpConfiguredWorkspace(
       t,
       extra: [

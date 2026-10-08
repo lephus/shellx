@@ -1,6 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum ConfigUiRequest { palette, problems, shortcuts, settings, searchAll }
+enum ConfigUiRequest {
+  palette,
+  problems,
+  shortcuts,
+  settings,
+  searchAll,
+  tour,
+  whatsNew,
+}
 
 /// The tray (and the CLI, later) asks the window to open an A9 surface;
 /// the counter makes two equal requests distinct.

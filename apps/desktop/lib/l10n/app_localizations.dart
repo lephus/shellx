@@ -1358,18 +1358,6 @@ abstract class AppLocalizations {
   /// **'Notifications  {shortcut}'**
   String notificationsPanelTooltip(String shortcut);
 
-  /// No description provided for @notificationsPanelEmptyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'No notifications yet'**
-  String get notificationsPanelEmptyTitle;
-
-  /// No description provided for @notificationsPanelEmptyBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Programs in your tabs send notifications with OSC 9, 99, 777 or the shellx notify command.'**
-  String get notificationsPanelEmptyBody;
-
   /// No description provided for @notificationsPanelNextHint.
   ///
   /// In en, this message translates to:
@@ -4073,6 +4061,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text size {step}'**
   String workspaceZoomTip(String step);
+
+  /// No description provided for @actionShowTour.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the tour'**
+  String get actionShowTour;
+
+  /// No description provided for @actionShowWhatsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'What’s new'**
+  String get actionShowWhatsNew;
+
+  /// No description provided for @tourSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get tourSkip;
+
+  /// No description provided for @tourNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get tourNext;
+
+  /// No description provided for @tourBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get tourBack;
+
+  /// No description provided for @tourDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tourDone;
+
+  /// No description provided for @tourStep.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} of {total}'**
+  String tourStep(int n, int total);
+
+  /// No description provided for @tourLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX tour'**
+  String get tourLabel;
+
+  /// No description provided for @tourTabsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabs and panes'**
+  String get tourTabsTitle;
+
+  /// No description provided for @tourTabsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a tab with {newTab}. Split the pane with {splitRight} or {splitDown}.'**
+  String tourTabsBody(String newTab, String splitRight, String splitDown);
+
+  /// No description provided for @tourNotifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Know when an agent needs you'**
+  String get tourNotifyTitle;
+
+  /// No description provided for @tourNotifyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A glowing ring appears on the pane. Jump to it with {jumpUnread}.'**
+  String tourNotifyBody(String jumpUnread);
+
+  /// No description provided for @tourFindTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your way'**
+  String get tourFindTitle;
+
+  /// No description provided for @tourFindBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Find text with {find}, everywhere with {searchAll}, and run any command from {palette}.'**
+  String tourFindBody(String find, String searchAll, String palette);
+
+  /// No description provided for @tourSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it yours'**
+  String get tourSettingsTitle;
+
+  /// No description provided for @tourSettingsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings with {settings}. Everything is also in a plain text file.'**
+  String tourSettingsBody(String settings);
+
+  /// No description provided for @whatsNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What’s new in {version}'**
+  String whatsNewTitle(String version);
+
+  /// No description provided for @whatsNewDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get whatsNewDone;
+
+  /// No description provided for @whatsNewMore.
+  ///
+  /// In en, this message translates to:
+  /// **'See all changes'**
+  String get whatsNewMore;
+
+  /// No description provided for @emptyHintNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} New tab'**
+  String emptyHintNewTab(String shortcut);
+
+  /// No description provided for @emptyHintPalette.
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} Command palette'**
+  String emptyHintPalette(String shortcut);
+
+  /// No description provided for @emptyHintSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'{shortcut} Settings'**
+  String emptyHintSettings(String shortcut);
+
+  /// No description provided for @notificationsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet'**
+  String get notificationsEmptyTitle;
+
+  /// No description provided for @notificationsEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A glowing ring appears on a pane when an agent needs you.'**
+  String get notificationsEmptyBody;
 }
 
 class _AppLocalizationsDelegate

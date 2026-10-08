@@ -167,6 +167,16 @@ class ShowShortcutsIntent extends Intent {
   const ShowShortcutsIntent();
 }
 
+/// A11 D24: the first-run tour again (no default chord).
+class ShowTourIntent extends Intent {
+  const ShowTourIntent();
+}
+
+/// A11 D23: "What's new" for the running version (no default chord).
+class ShowWhatsNewIntent extends Intent {
+  const ShowWhatsNewIntent();
+}
+
 /// A9 D36: the problems panel (no default chord).
 class ShowConfigProblemsIntent extends Intent {
   const ShowConfigProblemsIntent();

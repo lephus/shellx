@@ -855,13 +855,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get notificationsPanelEmptyTitle => 'No notifications yet';
-
-  @override
-  String get notificationsPanelEmptyBody =>
-      'Programs in your tabs send notifications with OSC 9, 99, 777 or the shellx notify command.';
-
-  @override
   String notificationsPanelNextHint(String shortcut) {
     return 'Next unread  $shortcut';
   }
@@ -2667,4 +2660,95 @@ class AppLocalizationsEn extends AppLocalizations {
   String workspaceZoomTip(String step) {
     return 'Text size $step';
   }
+
+  @override
+  String get actionShowTour => 'Show the tour';
+
+  @override
+  String get actionShowWhatsNew => 'What’s new';
+
+  @override
+  String get tourSkip => 'Skip';
+
+  @override
+  String get tourNext => 'Next';
+
+  @override
+  String get tourBack => 'Back';
+
+  @override
+  String get tourDone => 'Done';
+
+  @override
+  String tourStep(int n, int total) {
+    return '$n of $total';
+  }
+
+  @override
+  String get tourLabel => 'ShellX tour';
+
+  @override
+  String get tourTabsTitle => 'Tabs and panes';
+
+  @override
+  String tourTabsBody(String newTab, String splitRight, String splitDown) {
+    return 'Open a tab with $newTab. Split the pane with $splitRight or $splitDown.';
+  }
+
+  @override
+  String get tourNotifyTitle => 'Know when an agent needs you';
+
+  @override
+  String tourNotifyBody(String jumpUnread) {
+    return 'A glowing ring appears on the pane. Jump to it with $jumpUnread.';
+  }
+
+  @override
+  String get tourFindTitle => 'Find your way';
+
+  @override
+  String tourFindBody(String find, String searchAll, String palette) {
+    return 'Find text with $find, everywhere with $searchAll, and run any command from $palette.';
+  }
+
+  @override
+  String get tourSettingsTitle => 'Make it yours';
+
+  @override
+  String tourSettingsBody(String settings) {
+    return 'Open Settings with $settings. Everything is also in a plain text file.';
+  }
+
+  @override
+  String whatsNewTitle(String version) {
+    return 'What’s new in $version';
+  }
+
+  @override
+  String get whatsNewDone => 'Got it';
+
+  @override
+  String get whatsNewMore => 'See all changes';
+
+  @override
+  String emptyHintNewTab(String shortcut) {
+    return '$shortcut New tab';
+  }
+
+  @override
+  String emptyHintPalette(String shortcut) {
+    return '$shortcut Command palette';
+  }
+
+  @override
+  String emptyHintSettings(String shortcut) {
+    return '$shortcut Settings';
+  }
+
+  @override
+  String get notificationsEmptyTitle => 'No notifications yet';
+
+  @override
+  String get notificationsEmptyBody =>
+      'A glowing ring appears on a pane when an agent needs you.';
 }

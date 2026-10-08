@@ -580,3 +580,5 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - `$SHELLX_TAB_ID` trong shell của pane đã chuyển vẫn là tab cũ (`$SHELLX_PANE_ID` vẫn đúng); CLI `@tab` theo biến cũ trỏ tab cũ. Sự kiện mới `pane.moved {pane, from, to}`.
 - Tab mà pane tạo ra nó đã chuyển đi lưu bằng khoá riêng (khoá của `-tab.id`) trong `layout.json`; pane tách ra từ pane tạo tab nhận id tab tổng hợp từ 2000000000.
 
+
+**Checklist phát hành (Task 16).** Trước khi đóng bản mới, điền `apps/desktop/assets/whats_new.json` cho phiên bản đó (`{"1.2.0":{"en":[…],"vi":[…]}}`, tối đa 5 dòng mỗi ngôn ngữ, không có `+build`); thiếu phiên bản thì thẻ "Có gì mới" không hiện. Tour hiện một lần cho bản cài mới (`tour_done`), thẻ "Có gì mới" một lần mỗi phiên bản (`last_seen_version`). Nút "Xem mọi thay đổi" hiện mở `https://shellx.pro/` (chưa có trang ghi chú phát hành: đổi `kReleaseNotesUrl` khi có).

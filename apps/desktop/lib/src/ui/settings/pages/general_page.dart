@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../agent/desktop_services.dart';
+import '../../config/config_ui_request.dart';
 import '../../theme/shellx_desktop_theme.dart';
 import 'page_parts.dart';
 
@@ -25,6 +26,20 @@ class GeneralPage extends ConsumerWidget {
         settingWidget(settingById('launch-at-startup')),
         settingWidget(settingById('keep-awake')),
         settingWidget(settingById('background-service')),
+        // A11 D9 -> D24: the tour again. The window swaps Settings for it.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+            child: TextButton(
+              key: const Key('settings.tour'),
+              onPressed: () => ref
+                  .read(configUiRequestProvider.notifier)
+                  .request(ConfigUiRequest.tour),
+              child: Text(l10n.settingsOpenTour),
+            ),
+          ),
+        ),
         if (version != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),

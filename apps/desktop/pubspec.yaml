@@ -62,6 +62,7 @@ flutter:
   assets:
     - assets/tray/
     - assets/licenses/
+    - assets/whats_new.json
   fonts:
     # Terminal font (A1 D16), SIL OFL 1.1: assets/licenses/JetBrainsMono-OFL.txt
     - family: JetBrainsMono

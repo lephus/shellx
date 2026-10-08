@@ -53,6 +53,9 @@ const _expectedUi = {
   'ssh_plain_targets',
   'quit_keeps_sessions_explained',
   'background_service_enabled',
+  // A11 D23, D24.
+  'tour_done',
+  'last_seen_version',
 };
 
 final class _Listener implements MuxListener {
@@ -77,7 +80,7 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(26));
+    expect(SettingKeys.all, hasLength(28));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',

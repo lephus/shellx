@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../config/config_controller.dart';
+import '../../config/keybind_actions.dart' show KeyAction;
 import '../../mux/daemon_state.dart' show daemonStateProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -889,15 +890,36 @@ class EmptyTerminalState extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: ShellxSpace.s8),
-              if (shortcut != null && !waiting)
-                ExcludeSemantics(
-                  child: Text(
-                    shortcut,
-                    style: ShellxText.caption.copyWith(
-                      color: ShellxDesktopColors.textSecondary,
+              // A11 D24: the keys as they are bound now; an unbound action
+              // has no hint.
+              if (!waiting)
+                for (final (key, hint) in <(String, String?)>[
+                  ('new-tab', emptyHint(l10n.emptyHintNewTab, shortcut)),
+                  (
+                    'palette',
+                    emptyHint(
+                      l10n.emptyHintPalette,
+                      actionShortcutLabel(
+                        const KeyAction('toggle_command_palette'),
+                      ),
                     ),
                   ),
-                ),
+                  (
+                    'settings',
+                    emptyHint(
+                      l10n.emptyHintSettings,
+                      actionShortcutLabel(const KeyAction('open_settings')),
+                    ),
+                  ),
+                ])
+                  if (hint != null)
+                    Text(
+                      hint,
+                      key: Key('pane.empty.hint.$key'),
+                      style: ShellxText.caption.copyWith(
+                        color: ShellxDesktopColors.textSecondary,
+                      ),
+                    ),
             ],
           ),
         ),
@@ -905,6 +927,10 @@ class EmptyTerminalState extends ConsumerWidget {
     );
   }
 }
+
+/// One empty-state hint; null when its action has no key.
+String? emptyHint(String Function(String shortcut) message, String? shortcut) =>
+    shortcut == null ? null : message(shortcut);
 
 /// Right of the sidebar ([ShellxSizes.sidebarWidth] + 6), vertically
 /// centred on the row, kept inside the window.
