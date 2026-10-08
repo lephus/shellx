@@ -117,11 +117,15 @@ void main() {
     expect(r.fake.unregisters, greaterThanOrEqualTo(1));
   });
 
-  test('off by default: nothing is registered', () async {
-    final r = await rigWith();
-    expect(r.fake.registers, 0);
-    expect(r.fake.chord, isNull);
-  });
+  test(
+    'off by default: nothing is registered and nothing is unregistered',
+    () async {
+      final r = await rigWith();
+      expect(r.fake.registers, 0);
+      expect(r.fake.unregisters, 0);
+      expect(r.fake.chord, isNull);
+    },
+  );
 
   test('an unrelated reload does not register again', () async {
     final r = await rigWith(config: 'global-hotkey = ctrl+alt+j');

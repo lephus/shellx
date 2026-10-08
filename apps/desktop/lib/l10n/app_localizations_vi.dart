@@ -2330,6 +2330,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsGlobalHotkeyRecord => 'Nhấn tổ hợp phím…';
 
   @override
+  String get settingsGlobalHotkeyUndetected =>
+      'Một số xung đột với app khác không phát hiện được.';
+
+  @override
   String get settingsGlobalHotkeyTaken =>
       'Tổ hợp này đang được ứng dụng khác dùng';
 

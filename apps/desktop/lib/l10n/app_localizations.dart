@@ -3678,6 +3678,12 @@ abstract class AppLocalizations {
   /// **'Press the keys…'**
   String get settingsGlobalHotkeyRecord;
 
+  /// No description provided for @settingsGlobalHotkeyUndetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Some conflicts with other apps can\'t be detected.'**
+  String get settingsGlobalHotkeyUndetected;
+
   /// No description provided for @settingsGlobalHotkeyTaken.
   ///
   /// In en, this message translates to:

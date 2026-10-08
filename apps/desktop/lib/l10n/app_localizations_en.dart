@@ -2419,6 +2419,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGlobalHotkeyRecord => 'Press the keys…';
 
   @override
+  String get settingsGlobalHotkeyUndetected =>
+      'Some conflicts with other apps can\'t be detected.';
+
+  @override
   String get settingsGlobalHotkeyTaken =>
       'That shortcut is used by another app';
 

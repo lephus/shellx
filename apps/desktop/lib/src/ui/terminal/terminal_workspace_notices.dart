@@ -348,13 +348,16 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     final before = _beforeOverlay;
     _beforeOverlay = null;
     setState(() => overlay = null);
-    if (!restoreFocus) return;
-    if (before != null && before.context != null && before.canRequestFocus) {
-      before.requestFocus();
-      FocusManager.instance.applyFocusChangesIfNeeded();
-    } else {
-      focusTerminal();
+    if (restoreFocus) {
+      if (before != null && before.context != null && before.canRequestFocus) {
+        before.requestFocus();
+        FocusManager.instance.applyFocusChangesIfNeeded();
+      } else {
+        focusTerminal();
+      }
     }
+    // A tour or card that came due while this was open is shown now.
+    _showFirstRunIfDue();
   }
 
   /// `closePanel` calls it first, before its own early return, so every

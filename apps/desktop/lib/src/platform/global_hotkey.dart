@@ -199,6 +199,9 @@ final class GlobalHotkeyBinder {
   DateTime? _lastPress;
   bool _released = false;
 
+  /// Something was handed to the plugin (so there is something to remove).
+  bool _registered = false;
+
   /// Presses closer than this are one hold: Windows sends WM_HOTKEY again
   /// while the keys stay down.
   static const Duration repeatGuard = Duration(milliseconds: 300);
@@ -229,11 +232,15 @@ final class GlobalHotkeyBinder {
     if (_released) return;
     if (chord == null) {
       _failed = null;
-      await _hotkey.unregister();
+      if (_registered) {
+        _registered = false;
+        await _hotkey.unregister();
+      }
       _report(failed: false);
       return;
     }
     bool ok;
+    _registered = true;
     try {
       ok = await _hotkey.register(chord, _onPressed);
     } catch (error) {
@@ -299,12 +306,12 @@ final class GlobalHotkeyBinder {
   Future<void> dispose() async {
     _released = true;
     await _chain;
-    await _hotkey.unregister();
+    if (_registered) await _hotkey.unregister();
   }
 
   /// Without waiting: the provider's own dispose.
   void release() {
     _released = true;
-    unawaited(_hotkey.unregister());
+    if (_registered) unawaited(_hotkey.unregister());
   }
 }

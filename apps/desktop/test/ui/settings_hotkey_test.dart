@@ -208,4 +208,13 @@ void main() {
     );
     await disposeWorkspace(t, w.container);
   }, variant: mac);
+
+  testWidgets('the row says some conflicts cannot be detected', (t) async {
+    final w = await openTerminalPage(t);
+    expect(
+      find.text("Some conflicts with other apps can't be detected."),
+      findsOneWidget,
+    );
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
 }

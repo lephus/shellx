@@ -208,6 +208,16 @@ class _HotkeyControlState extends ConsumerState<HotkeyControl> {
               child: Text(shown),
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            l10n.settingsGlobalHotkeyUndetected,
+            key: const Key('setting.global-hotkey.hint'),
+            style: ShellxText.small.copyWith(
+              color: ShellxDesktopColors.textSecondary,
+            ),
+          ),
+        ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),

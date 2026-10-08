@@ -994,6 +994,7 @@
   "settingsGlobalHotkey": "Show or hide ShellX from anywhere",
   "settingsGlobalHotkeyNone": "Not set",
   "settingsGlobalHotkeyRecord": "Press the keys…",
+  "settingsGlobalHotkeyUndetected": "Some conflicts with other apps can't be detected.",
   "settingsGlobalHotkeyTaken": "That shortcut is used by another app",
   "settingsOpenTour": "Show the tour again",
   "settingsVersion": "Version {version}",

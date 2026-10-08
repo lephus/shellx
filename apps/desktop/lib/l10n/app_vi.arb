@@ -595,6 +595,7 @@
   "settingsGlobalHotkey": "Ẩn/hiện ShellX từ mọi nơi",
   "settingsGlobalHotkeyNone": "Chưa đặt",
   "settingsGlobalHotkeyRecord": "Nhấn tổ hợp phím…",
+  "settingsGlobalHotkeyUndetected": "Một số xung đột với app khác không phát hiện được.",
   "settingsGlobalHotkeyTaken": "Tổ hợp này đang được ứng dụng khác dùng",
   "settingsOpenTour": "Xem lại phần hướng dẫn",
   "settingsVersion": "Phiên bản {version}",

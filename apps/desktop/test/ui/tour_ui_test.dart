@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -328,4 +330,32 @@ void main() {
       await disposeWorkspace(t, r.container);
     }, variant: mac);
   });
+
+  testWidgets('a card that is due while the palette is open waits and shows '
+      'when it closes', (t) async {
+    final gate = Completer<String>();
+    final store = InMemorySettingsStore({SettingKeys.tourDone: true})
+      ..strings[SettingKeys.lastSeenVersion] = ['1.1.0'];
+    final w = await pumpConfiguredWorkspace(
+      t,
+      extra: [
+        settingsStoreProvider.overrideWithValue(store),
+        currentVersionProvider.overrideWithValue('1.2.0'),
+        whatsNewSourceProvider.overrideWithValue(() => gate.future),
+      ],
+    );
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyP);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('a9.palette')), findsOneWidget);
+    gate.complete(_notes);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('whatsnew.card')), findsNothing);
+    await key(t, LogicalKeyboardKey.escape);
+    expect(find.byKey(const Key('whatsnew.card')), findsOneWidget);
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
 }
