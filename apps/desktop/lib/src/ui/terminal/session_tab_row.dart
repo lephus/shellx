@@ -10,7 +10,6 @@ import 'package:shellx_core/shellx_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../remote/remote_state.dart';
 import '../../terminal/agent_names.dart';
-import '../../terminal/agent_status.dart';
 import '../../terminal/agent_status_notifier.dart' show AgentBadgeInfo;
 import '../../terminal/context_line.dart';
 import '../../terminal/pane_layout.dart';
@@ -78,6 +77,7 @@ class SessionTabRow extends StatefulWidget {
     this.onMarkRead,
     this.agent = false,
     this.agentStatus,
+    this.agentLive = false,
     this.portTooltip,
     this.editingDescription = false,
     this.onDescription,
@@ -138,6 +138,10 @@ class SessionTabRow extends StatefulWidget {
   /// A12 D12: what an agent in this tab reports (the most urgent of its
   /// panes); null: nothing, and the row is as before A12.
   final AgentBadgeInfo? agentStatus;
+
+  /// A12 D12: the row speaks its question now (at most once a minute per
+  /// tab, decided by the status model).
+  final bool agentLive;
 
   /// A8: the tooltip of a port link, when it differs from "Open http://…"
   /// (a server's port is forwarded over SSH).
@@ -583,9 +587,7 @@ class SessionTabRowState extends State<SessionTabRow> {
       selected: widget.selected,
       label: _semanticsLabel(l10n),
       // A12 D12: a question is read when it appears.
-      liveRegion: widget.agentStatus?.state == AgentState.needsInput
-          ? true
-          : null,
+      liveRegion: widget.agentLive ? true : null,
       onTap: renaming ? null : widget.onSelect,
       // The row menu's order (UI-A4 §10.4): mark as read first, close
       // last.

@@ -113,24 +113,15 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a live region only for a question', (t) async {
+  testWidgets('the badge is never a live region; it reads its label', (
+    t,
+  ) async {
     final semantics = t.ensureSemantics();
-    for (final s in [AgentState.running, AgentState.idle, AgentState.done]) {
+    for (final s in AgentState.values.where((s) => s != AgentState.unknown)) {
       await t.pumpWidget(wrap(AgentBadge(state: s, agent: AgentKind.claude)));
-      final node = t.getSemantics(
-        find.bySemanticsLabel(RegExp('Claude Code: ')),
-      );
+      final node = t.getSemantics(find.bySemanticsLabel(RegExp('Claude Code')));
       expect(node.flagsCollection.isLiveRegion, isFalse, reason: '$s');
     }
-    await t.pumpWidget(
-      wrap(
-        const AgentBadge(state: AgentState.needsInput, agent: AgentKind.claude),
-      ),
-    );
-    final node = t.getSemantics(
-      find.bySemanticsLabel('Claude Code needs your input'),
-    );
-    expect(node.flagsCollection.isLiveRegion, isTrue);
     await t.pumpWidget(
       wrap(
         const AgentBadge(state: AgentState.needsInput, agent: AgentKind.claude),
@@ -138,11 +129,8 @@ void main() {
       ),
     );
     expect(
-      t
-          .getSemantics(find.bySemanticsLabel('Claude Code cần bạn trả lời'))
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
+      find.bySemanticsLabel('Claude Code cần bạn trả lời'),
+      findsOneWidget,
     );
     semantics.dispose();
   });

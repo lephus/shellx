@@ -590,6 +590,12 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   final _userInputs = StreamController<int>.broadcast(sync: true);
   Stream<int> get userInputs => _userInputs.stream;
 
+  /// A12 D9: the user answered pane [id] in a way that skips the keyboard
+  /// path (a paste from the window).
+  void noteUserInput(int id) {
+    if (!_userInputs.isClosed) _userInputs.add(id);
+  }
+
   /// A11 D20: a pane moved to another tab, announced just before the state
   /// changes. Never closed on a rebuild, as [_paneOutputs].
   final _paneMoves = StreamController<PaneMove>.broadcast(sync: true);
@@ -1032,9 +1038,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
         }),
       )
       ..add(
-        view.driver.listen(
-          (side) => _updatePane(s.id, (p) => p.copyWith(driver: side)),
-        ),
+        view.driver.listen((side) {
+          // A12 D9: the phone took the driver back from the desktop on a
+          // pane it was already attached to: it typed (a fresh attach
+          // drives too, but is not an answer).
+          final was = state.tabOfSession(s.id)?.panes[s.id];
+          if (side == DriverSide.phone &&
+              was != null &&
+              was.phoneAttached &&
+              was.driver != DriverSide.phone) {
+            noteUserInput(s.id);
+          }
+          _updatePane(s.id, (p) => p.copyWith(driver: side));
+        }),
       );
     unawaited(view.exitCode.then((code) => _exited(s.id, code)));
     return PaneSession(

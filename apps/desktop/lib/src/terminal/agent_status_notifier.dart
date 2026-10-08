@@ -23,6 +23,12 @@ final agentStatusClockProvider = Provider<DateTime Function()>(
 /// A12 D9: the agent in each pane, by pane (session) id. Records whose
 /// state is [AgentState.unknown] (restored, Task 9) are kept but never
 /// shown ([agentStateVisible]).
+/// D12: a tab speaks a question at most this often.
+const Duration kAgentAnnounceGap = Duration(seconds: 60);
+
+/// A reordered event older than an `end` is ignored for this long.
+const Duration kAgentEndedMemory = Duration(seconds: 5);
+
 final agentStatusProvider =
     NotifierProvider<AgentStatusNotifier, Map<int, AgentPane>>(
       AgentStatusNotifier.new,
@@ -72,6 +78,23 @@ final agentTabStateProvider = Provider.family<AgentState?, int>(
   (ref, tabId) => ref.watch(agentTabBadgeProvider(tabId))?.state,
 );
 
+/// A12 D12: tabs whose row may speak a question now (a live region). A
+/// tab speaks at most once per [kAgentAnnounceGap]; the flag stays while a
+/// pane of the tab still waits for the answer.
+final agentLiveTabsProvider = NotifierProvider<AgentLiveTabs, Set<int>>(
+  AgentLiveTabs.new,
+);
+
+class AgentLiveTabs extends Notifier<Set<int>> {
+  @override
+  Set<int> build() => const {};
+
+  void set(int tab, bool live) {
+    if (state.contains(tab) == live) return;
+    state = live ? {...state, tab} : ({...state}..remove(tab));
+  }
+}
+
 /// A visible change of one pane's agent (what `agent.status` reports);
 /// [state] null = the record is gone. Shows nothing in [toString].
 @immutable
@@ -109,6 +132,31 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
   /// D10: the notifications made here, to tell them from a program's own
   /// when they come back on the notice stream.
   final _own = <int, List<({String title, String body, DateTime at})>>{};
+
+  /// D10: when a pane's own program last sent an OSC / bell notice (the
+  /// merge when it comes before the hook event).
+  final _oscAt = <int, DateTime>{};
+
+  /// A pane's last `end`: a reordered older event must not bring it back.
+  final _ended = <int, DateTime>{};
+  final _endedEventAt = <int, DateTime>{};
+
+  /// D12: when each tab last spoke a question.
+  final _spoke = <int, DateTime>{};
+
+  /// Panes with any bookkeeping left (tests: nothing outlives its pane).
+  @visibleForTesting
+  Set<int> get trackedPanes => {
+    ...state.keys,
+    ..._recent.keys,
+    ..._hookAt.keys,
+    ..._noticeAt.keys,
+    ..._own.keys,
+    ..._oscAt.keys,
+    ..._ended.keys,
+    ..._lastOutput.keys,
+    ..._quiet.keys,
+  };
 
   /// Visible changes, for the event bus. Open as long as the notifier.
   Stream<AgentStatusChange> get changes => _changes.stream;
@@ -166,6 +214,15 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       ..removeWhere((t) => now.difference(t) >= const Duration(seconds: 1));
     if (recent.length >= kAgentEventsPerSecond) return false;
     recent.add(now);
+    final ended = _ended[e.pane];
+    if (ended != null) {
+      if (now.difference(ended) >= kAgentEndedMemory) {
+        _ended.remove(e.pane);
+      } else if (e.kind != AgentEventKind.start &&
+          e.at.isBefore(_endedEventAt[e.pane]!)) {
+        return true; // a straggler of the session that ended
+      }
+    }
     final before = state[e.pane];
     final visible = paneVisible(e.pane);
     final after = reduceAgent(before, e, paneVisible: visible);
@@ -175,6 +232,13 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       _lastOutput[e.pane] = now;
     }
     _hookAt[e.pane] = now;
+    if (e.kind == AgentEventKind.end && after == null) {
+      _ended[e.pane] = now;
+      _endedEventAt[e.pane] = e.at;
+    } else if (e.kind == AgentEventKind.start) {
+      _ended.remove(e.pane);
+      _endedEventAt.remove(e.pane);
+    }
     _store(e.pane, after);
     // An event that came late changed nothing and tells nothing.
     if (before == null || !e.at.isBefore(before.lastEventAt)) {
@@ -196,6 +260,9 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     );
     final kind = decision.text;
     if (kind == null) return;
+    // The program's own OSC / bell a moment ago already told it.
+    final osc = _oscAt[e.pane];
+    if (osc != null && _now.difference(osc) < kAgentOscMerge) return;
     final l10n = ref.read(appL10nProvider);
     final name = agentDisplayName(l10n, e.agent);
     final body = switch (kind) {
@@ -231,6 +298,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
         return false;
       }
     }
+    _oscAt[n.sessionId] = now;
     final hook = _hookAt[n.sessionId];
     return hook != null && now.difference(hook) < kAgentOscMerge;
   }
@@ -259,6 +327,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       state = {...state, id: next};
     }
     _armQuiet(id, next);
+    _updateLive(id, before, next);
     final was = _shown(before);
     final now = _shown(next);
     if (was != now || (now != null && before?.agent != next?.agent)) {
@@ -271,6 +340,27 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
           state: now,
         ),
       );
+    }
+  }
+
+  /// D12: a question is spoken by its tab's row, at most once a minute.
+  void _updateLive(int id, AgentPane? before, AgentPane? next) {
+    final tab = ref.read(terminalTabsProvider).tabOfSession(id);
+    if (tab == null) return;
+    final live = ref.read(agentLiveTabsProvider.notifier);
+    final asks = next?.state == AgentState.needsInput;
+    if (asks && before?.state != AgentState.needsInput) {
+      final now = _now;
+      final last = _spoke[tab.id];
+      if (last == null || now.difference(last) >= kAgentAnnounceGap) {
+        _spoke[tab.id] = now;
+        live.set(tab.id, true);
+      }
+    } else if (!asks) {
+      final others = tab.panes.keys.any(
+        (p) => p != id && state[p]?.state == AgentState.needsInput,
+      );
+      if (!others) live.set(tab.id, false);
     }
   }
 
@@ -311,7 +401,13 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
   /// changes.
   void _moveRecord(int from, int to) {
     final p = state[from];
-    _recent.remove(from);
+    _moveBook(_recent, from, to);
+    _moveBook(_hookAt, from, to);
+    _moveBook(_noticeAt, from, to);
+    _moveBook(_own, from, to);
+    _moveBook(_oscAt, from, to);
+    _moveBook(_ended, from, to);
+    _moveBook(_endedEventAt, from, to);
     if (p == null) return;
     _quiet.remove(from)?.cancel();
     final out = _lastOutput.remove(from);
@@ -324,18 +420,46 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     _armQuiet(to, p);
   }
 
+  static void _moveBook<T>(Map<int, T> book, int from, int to) {
+    final v = book.remove(from);
+    if (v != null) book[to] = v;
+  }
+
+  void _forget(int id) {
+    if (state.containsKey(id)) _store(id, null);
+    _quiet.remove(id)?.cancel();
+    _lastOutput.remove(id);
+    _recent.remove(id);
+    _hookAt.remove(id);
+    _noticeAt.remove(id);
+    _own.remove(id);
+    _oscAt.remove(id);
+    _ended.remove(id);
+    _endedEventAt.remove(id);
+  }
+
   /// Panes that went (or whose shell ended) lose their record; a finished
   /// agent in a pane now in view is read.
   void _review() {
-    if (!ref.mounted || state.isEmpty) return;
+    if (!ref.mounted) return;
     final tabs = ref.read(terminalTabsProvider);
+    // Bookkeeping lives as long as its pane (a lost server pane included).
+    for (final id in trackedPanes) {
+      if (tabs.tabOfSession(id) == null) _forget(id);
+    }
+    for (final id in _spoke.keys.toList()) {
+      if (!tabs.tabs.any((t) => t.id == id)) {
+        _spoke.remove(id);
+        ref.read(agentLiveTabsProvider.notifier).set(id, false);
+      }
+    }
     for (final id in state.keys.toList()) {
       final pane = tabs.tabOfSession(id)?.panes[id];
       // A lost server pane keeps its record: a reconnect gives it a new id
       // and the record follows (A8 D22).
       if (pane == null || (pane.exited && !pane.canReconnect)) {
         _store(id, null);
-        _recent.remove(id);
+        _forget(id);
         continue;
       }
       final p = state[id];

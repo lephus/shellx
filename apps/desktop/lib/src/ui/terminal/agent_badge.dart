@@ -25,8 +25,8 @@ import '../theme/shellx_desktop_theme.dart';
 
 /// The state of an agent in a tab row ([large] = false) or a pane header
 /// ([large]): icon and word; [compact] keeps the icon only. Its name and
-/// state are in the tooltip and in the screen-reader label; only a
-/// question is a live region (read once when it appears).
+/// state are in the tooltip and in the screen-reader label. The badge is
+/// never a live region: the tab row speaks a question (once a minute).
 class AgentBadge extends StatelessWidget {
   const AgentBadge({
     super.key,
@@ -55,7 +55,6 @@ class AgentBadge extends StatelessWidget {
         excludeFromSemantics: true,
         child: Semantics(
           label: label,
-          liveRegion: state == AgentState.needsInput ? true : null,
           excludeSemantics: true,
           child: Row(
             mainAxisSize: MainAxisSize.min,
