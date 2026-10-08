@@ -103,6 +103,8 @@ final class UiCommandHandler implements UiApi {
       CliType.uiTmuxAttach => _tmuxAttach(request, (cancelled, isGone)),
       // D34: arms the daemon's forwarding of [events]; nothing to answer.
       CliType.uiEventsSubscribe => Future.value(const <String, Object?>{}),
+      // A12 D4: answered `{}` until the status model reads it (Task 7).
+      CliType.uiAgentEvent => Future.value(const <String, Object?>{}),
       // ui.browser.*: pending A6.
       _ => throw CliFailure(MuxError.unknownType, 'unknown request $t'),
     };

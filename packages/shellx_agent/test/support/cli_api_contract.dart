@@ -69,7 +69,7 @@ void cliApiContract(
       expect(r.get<int>('api'), 1);
       expect(
         r.get<List<Object?>>('caps'),
-        containsAll(['ui.ls', 'ui.pane.send', 'cli.notify']),
+        containsAll(['ui.ls', 'ui.pane.send', 'cli.notify', 'ui.agent']),
       );
       expect(r.get<String>('host'), anyOf('ui', 'daemon'));
     });
@@ -267,6 +267,8 @@ void cliApiContract(
         ('ui.ssh.open', {'target': 'devbox', 'cmd': 'id'}),
         ('ui.tmux.list', {'host': 'devbox'}),
         ('ui.tmux.attach', {'name': 'main'}),
+        // A12 D4: a hook event moves the UI's agent status: full token only.
+        ('ui.agent.event', {'pane': 12, 'agent': 'claude', 'event': 'idle'}),
         ('cli.notify', {'pane': 12, 'body': 'x'}),
         ('cli.events.subscribe', {}),
         ('daemon.status', {}),

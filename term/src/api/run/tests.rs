@@ -62,6 +62,7 @@ const ALL: &[&str] = &[
     "ui.browser",
     "ui.ssh",
     "ui.tmux",
+    "ui.agent",
 ];
 
 struct Out {
@@ -71,6 +72,8 @@ struct Out {
     log: Vec<Message>,
     tty: String,
     connected: bool,
+    /// Bytes of stdin nobody read.
+    stdin_left: usize,
 }
 
 fn ok(fields: Vec<(&str, Value)>) -> Result<Message, ApiError> {
@@ -92,6 +95,19 @@ fn go_caps(
     stdin: &str,
     opts: Opts,
     caps: &[&'static str],
+) -> Out {
+    go_full(args, env, answers, stdin, opts, caps, (false, false))
+}
+
+/// [go_caps] with (stdin is a terminal, stdout is a terminal).
+fn go_full(
+    args: &[&str],
+    env: &[(&str, &str)],
+    answers: Vec<(&'static str, Result<Message, ApiError>)>,
+    stdin: &str,
+    opts: Opts,
+    caps: &[&'static str],
+    ttys: (bool, bool),
 ) -> Out {
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     let Ok(Invocation::Run(p)) = parse(&args) else {
@@ -121,13 +137,14 @@ fn go_caps(
     };
     let (mut out, mut errb, mut tty) = (Vec::new(), Vec::new(), Vec::new());
     let mut input = stdin.as_bytes();
+    let clock = || 1_700_000_000_123i64;
     let code = {
         let mut ctx = Ctx {
             env: &get,
             out: &mut out,
             err: &mut errb,
             stdin: &mut input,
-            stdin_is_tty: false,
+            stdin_is_tty: ttys.0,
             cwd: PathBuf::from("/work"),
             home: Some(PathBuf::from("/Users/me")),
             tty: if opts.0 {
@@ -139,6 +156,8 @@ fn go_caps(
             connect: &connect,
             stdout_gone: None,
             exe: Some(PathBuf::from("/opt/x/bin/shellx")),
+            now_ms: &clock,
+            stdout_is_tty: ttys.1,
         };
         run(&p, &mut ctx)
     };
@@ -151,6 +170,7 @@ fn go_caps(
         log,
         tty: String::from_utf8(tty).unwrap(),
         connected,
+        stdin_left: input.len(),
     }
 }
 
@@ -888,6 +908,7 @@ fn events_print_json_lines_until_closed() {
         }))
     };
     let get = |_: &str| None;
+    let clock = || 0i64;
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let mut input: &[u8] = b"";
     let mut ctx = Ctx {
@@ -903,6 +924,8 @@ fn events_print_json_lines_until_closed() {
         connect: &connect,
         stdout_gone: None,
         exe: None,
+        now_ms: &clock,
+        stdout_is_tty: false,
     };
     assert_eq!(run(&p, &mut ctx), 3); // ShellX closed the stream
     assert_eq!(
@@ -996,6 +1019,7 @@ fn follow_into(kind: std::io::ErrorKind) -> (i32, usize, bool) {
         }))
     };
     let get = |_: &str| None;
+    let clock = || 0i64;
     let mut out = Broken(kind);
     let mut err = Vec::new();
     let mut input: &[u8] = b"";
@@ -1012,6 +1036,8 @@ fn follow_into(kind: std::io::ErrorKind) -> (i32, usize, bool) {
         connect: &connect,
         stdout_gone: None,
         exe: None,
+        now_ms: &clock,
+        stdout_is_tty: false,
     };
     let code = run(&p, &mut ctx);
     let pulled = *pulled.borrow();
@@ -1940,4 +1966,264 @@ fn doctor_compares_the_cli_and_app_versions() {
         "{}",
         none.out
     );
+}
+
+// ---- agent-event (A12 D5) ----
+
+const HOOK_ENV: &[(&str, &str)] = &[
+    ("SHELLX_PANE_ID", "12"),
+    ("SHELLX_SOCKET", "/tmp/s"),
+    ("SHELLX_CLI_TOKEN", "tok"),
+];
+const STOP: &str = r#"{"session_id":"7a1c","cwd":"/home/u/p"}"#;
+
+fn hook(args: &[&str], env: &[(&str, &str)], stdin: &str, opts: Opts, ttys: (bool, bool)) -> Out {
+    go_full(args, env, vec![], stdin, opts, ALL, ttys)
+}
+
+#[test]
+fn agent_event_sends_one_request_with_the_pane_and_the_clock() {
+    let o = hook(
+        &["agent-event", "claude", "stop"],
+        HOOK_ENV,
+        STOP,
+        PLAIN,
+        (false, false),
+    );
+    assert_eq!((o.code, o.out.as_str(), o.err.as_str()), (0, "", ""));
+    let m = sent(&o, "ui.agent.event");
+    assert_eq!(m.get("pane"), Some(&Value::Int(12)));
+    assert_eq!(m.get("agent"), Some(&Value::text("claude")));
+    assert_eq!(m.get("event"), Some(&Value::text("idle")));
+    assert_eq!(m.get("at"), Some(&Value::Int(1_700_000_000_123)));
+    assert_eq!(m.get("session"), Some(&Value::text("7a1c")));
+    assert_eq!(m.get("message"), None);
+    assert_eq!(m.get("ok"), None);
+    assert_eq!(o.log.iter().filter(|m| m.t == "ui.agent.event").count(), 1);
+}
+
+#[test]
+fn agent_event_flags_override_the_payload() {
+    let body = r#"{"session_id":"from-payload","message":"from payload"}"#;
+    let o = hook(
+        &[
+            "agent-event",
+            "claude",
+            "notification",
+            "--session",
+            "flag-id",
+            "--message",
+            "flag text",
+        ],
+        HOOK_ENV,
+        body,
+        PLAIN,
+        (false, false),
+    );
+    let m = sent(&o, "ui.agent.event");
+    assert_eq!(m.get("session"), Some(&Value::text("flag-id")));
+    assert_eq!(m.get("message"), Some(&Value::text("flag text")));
+    assert_eq!(m.get("event"), Some(&Value::text("notice")));
+}
+
+#[test]
+fn agent_event_codex_reads_argv_and_never_stdin() {
+    let json = r#"{"type":"agent-turn-complete","thread-id":"abc-1","last-assistant-message":"secret text"}"#;
+    let o = hook(
+        &["agent-event", "codex", "turn-complete", json],
+        HOOK_ENV,
+        "stdin",
+        PLAIN,
+        (false, false),
+    );
+    let m = sent(&o, "ui.agent.event");
+    assert_eq!(m.get("session"), Some(&Value::text("abc-1")));
+    assert_eq!(m.get("message"), None);
+    assert_eq!(o.stdin_left, 5);
+}
+
+#[test]
+fn agent_event_outside_a_shellx_pane_does_nothing() {
+    let none: &[(&str, &str)] = &[];
+    let no_pane = &HOOK_ENV[1..];
+    let no_socket = [HOOK_ENV[0], HOOK_ENV[2]];
+    let no_token = [HOOK_ENV[0], HOOK_ENV[1]];
+    let bad_pane = [("SHELLX_PANE_ID", "x1"), HOOK_ENV[1], HOOK_ENV[2]];
+    for env in [none, no_pane, &no_socket[..], &no_token[..], &bad_pane[..]] {
+        let o = hook(
+            &["agent-event", "claude", "stop"],
+            env,
+            STOP,
+            PLAIN,
+            (false, true),
+        );
+        assert_eq!((o.code, o.connected), (0, false), "{env:?}");
+        assert_eq!((o.out.as_str(), o.err.as_str()), ("", ""), "{env:?}");
+        assert_eq!(o.stdin_left, STOP.len(), "{env:?}");
+    }
+}
+
+#[test]
+fn agent_event_unknown_agent_or_event_connects_to_nothing() {
+    for args in [
+        &["agent-event", "cursor", "stop"][..],
+        &["agent-event", "claude", "subagent-stop"],
+        &["agent-event", "codex", "stop"],
+    ] {
+        let o = hook(args, HOOK_ENV, STOP, PLAIN, (false, true));
+        assert_eq!((o.code, o.connected, o.err.as_str()), (0, false, ""));
+        assert_eq!(o.stdin_left, STOP.len());
+    }
+}
+
+#[test]
+fn agent_event_swallows_every_failure_silently_without_a_terminal() {
+    let errs = [
+        ApiError::NotRunning("ShellX is not running".into()),
+        ApiError::Incompatible("old".into()),
+        ApiError::Io("boom".into()),
+        ApiError::Remote {
+            code: "forbidden".into(),
+            message: "m".into(),
+        },
+        ApiError::Remote {
+            code: "cli_disabled".into(),
+            message: "m".into(),
+        },
+        ApiError::Remote {
+            code: "no_ui".into(),
+            message: "m".into(),
+        },
+        ApiError::Remote {
+            code: "timeout".into(),
+            message: "m".into(),
+        },
+    ];
+    for e in errs {
+        let o = hook(
+            &["agent-event", "claude", "stop"],
+            HOOK_ENV,
+            STOP,
+            (false, false, Some(e.clone())),
+            (false, false),
+        );
+        assert_eq!(
+            (o.code, o.out.as_str(), o.err.as_str()),
+            (0, "", ""),
+            "{e:?}"
+        );
+        let host_says = go_full(
+            &["agent-event", "claude", "stop"],
+            HOOK_ENV,
+            vec![("ui.agent.event", Err(e.clone()))],
+            STOP,
+            PLAIN,
+            ALL,
+            (false, false),
+        );
+        assert_eq!(
+            (
+                host_says.code,
+                host_says.out.as_str(),
+                host_says.err.as_str()
+            ),
+            (0, "", ""),
+            "{e:?}"
+        );
+    }
+    // The host lacks the cap (app older than the CLI): exit 0 as well.
+    let o = go_caps(
+        &["agent-event", "claude", "stop"],
+        HOOK_ENV,
+        vec![],
+        STOP,
+        PLAIN,
+        &["ui.ls"],
+    );
+    assert_eq!((o.code, o.out.as_str(), o.err.as_str()), (0, "", ""));
+    assert!(o.log.iter().all(|m| m.t != "ui.agent.event"));
+    // --json changes nothing either.
+    let o = hook(
+        &["agent-event", "claude", "stop", "--json"],
+        HOOK_ENV,
+        STOP,
+        (false, false, Some(ApiError::NotRunning("x".into()))),
+        (false, false),
+    );
+    assert_eq!((o.code, o.out.as_str()), (0, ""));
+}
+
+#[test]
+fn agent_event_on_a_terminal_says_one_fixed_line_and_still_exits_0() {
+    let o = hook(
+        &["agent-event", "claude", "stop"],
+        HOOK_ENV,
+        STOP,
+        (
+            false,
+            false,
+            Some(ApiError::NotRunning(
+                "ShellX is not running (secret path /x)".into(),
+            )),
+        ),
+        (false, true),
+    );
+    assert_eq!(o.code, 0);
+    assert_eq!(o.out, "");
+    assert_eq!(o.err, "shellx: agent-event: ShellX is not running\n");
+}
+
+#[test]
+fn agent_event_reads_at_most_64_kib_and_never_a_terminal() {
+    let big = "x".repeat(1 << 20);
+    let o = hook(
+        &["agent-event", "claude", "stop"],
+        HOOK_ENV,
+        &big,
+        PLAIN,
+        (false, false),
+    );
+    assert_eq!(o.code, 0);
+    assert_eq!(big.len() - o.stdin_left, 64 * 1024);
+    // The truncated text is no JSON: the event still goes, without a session.
+    let m = sent(&o, "ui.agent.event");
+    assert_eq!(m.get("event"), Some(&Value::text("idle")));
+    assert_eq!(m.get("session"), None);
+    let t = hook(
+        &["agent-event", "claude", "stop"],
+        HOOK_ENV,
+        STOP,
+        PLAIN,
+        (true, false),
+    );
+    assert_eq!(t.stdin_left, STOP.len());
+    assert!(t.log.iter().any(|m| m.t == "ui.agent.event"));
+}
+
+#[test]
+fn agent_event_hostile_session_ids_never_reach_the_wire() {
+    for bad in ["-rf", "a;rm -rf ~", "$(x)", "a b"] {
+        let body = format!(r#"{{"session_id":"{bad}"}}"#);
+        let o = hook(
+            &["agent-event", "claude", "stop"],
+            HOOK_ENV,
+            &body,
+            PLAIN,
+            (false, false),
+        );
+        let m = sent(&o, "ui.agent.event");
+        assert_eq!(m.get("session"), None, "{bad}");
+        assert_eq!(m.get("event"), Some(&Value::text("idle")));
+    }
+}
+
+#[test]
+fn agent_event_usage_errors_are_a_run_error_only_outside_the_hook_entry_point() {
+    // `api::main` turns a parse failure of agent-event into exit 0; here
+    // the parser itself is still strict.
+    let args: Vec<String> = ["agent-event", "claude"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    assert!(parse(&args).is_err());
 }

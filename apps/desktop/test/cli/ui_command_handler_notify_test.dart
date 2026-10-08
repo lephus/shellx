@@ -78,6 +78,22 @@ void main() {
     expect(got.map((e) => e['kind']), contains('tab.opened'));
   });
 
+  test(
+    'ui.agent.event is answered {} until the status model exists (A12)',
+    () async {
+      final c = cliContainer(local);
+      final h = c.read(uiCommandHandlerProvider);
+      final r = await h.handle(
+        const MuxMessage(
+          'ui.agent.event',
+          q: 1,
+          fields: {'pane': 12, 'agent': 'claude', 'event': 'idle'},
+        ),
+      );
+      expect(r, isEmpty);
+    },
+  );
+
   test('a command-line flood goes through the app limit (A4 D15)', () async {
     final c = cliContainer(local);
     final h = c.read(uiCommandHandlerProvider);

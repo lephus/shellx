@@ -247,6 +247,7 @@ mod tests {
             panic!()
         };
         let get = |_: &str| None;
+        let clock = || 0i64;
         let connect = |_: Option<&str>| -> Result<Box<dyn Session>, ApiError> {
             panic!("skills never connect")
         };
@@ -266,6 +267,8 @@ mod tests {
                 connect: &connect,
                 stdout_gone: None,
                 exe: None,
+                now_ms: &clock,
+                stdout_is_tty: false,
             };
             crate::api::run::run(&p, &mut ctx)
         };

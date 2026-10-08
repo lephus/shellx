@@ -171,6 +171,10 @@ If ShellX is not running but you are in a ShellX pane (`$SHELLX_PANE_ID` set) wi
 
 JSON: `{}`. Exit codes: 0, 2, 3, 4 (no such pane), 6, 7.
 
+## shellx agent-event
+
+`shellx agent-event AGENT EVENT [PAYLOAD] [--session ID] [--message TEXT]` — used by agent hooks (Claude Code, Codex, Gemini CLI, OpenCode), not by agents themselves: it tells ShellX that an agent in this pane started, is running, needs input, is idle or ended. It always exits 0, prints nothing (one line on stderr when run from a terminal) and does nothing outside a ShellX pane or when ShellX is not running or too old. It reads at most 64 KiB of hook JSON from stdin and sends only the event, the session id and a notification's text.
+
 ## shellx wait
 
 `shellx wait PANE (--idle [--quiet MS] | --exit | --match REGEX [--from-now]) [--timeout SECONDS]` — block until the pane reaches a state. Exactly one mode. Default timeout 30 s, at most 3600 s; timing out exits 5.

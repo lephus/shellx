@@ -472,3 +472,117 @@ fn events_into_dev_null_keep_going() {
     );
     assert_eq!(status.code(), Some(3));
 }
+
+// ---- agent-event (A12 D5): the hook never sees a failure ----
+
+fn hook_cmd(endpoint: &Path, socket: &Path, args: &[&str]) -> Command {
+    let mut c = Command::new(shellx_link());
+    c.args(args)
+        .env("SHELLX_ENDPOINT", endpoint)
+        .env("SHELLX_SOCKET", socket)
+        .env("SHELLX_CLI_TOKEN", TOKEN)
+        .env("SHELLX_PANE_ID", "7")
+        .env_remove("SHELLX_TERM");
+    c
+}
+
+#[test]
+fn agent_event_reaches_the_host_with_the_token_and_prints_nothing() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let dir = temp_dir("agev");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let host = std::thread::spawn(move || {
+        let mut s = accept_within(&listener);
+        let token = accept(&mut s);
+        let caps = Value::Array(vec![Value::text("ui.agent")]);
+        let r = answer(&mut s, vec![("api", Value::Int(1)), ("caps", caps)]);
+        assert_eq!(r.t, "api.version");
+        let r = answer(&mut s, vec![]);
+        (token, r)
+    });
+    let mut child = hook_cmd(&ep, &sock, &["agent-event", "claude", "notification"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(br#"{"session_id":"7a1c","message":"needs your permission","notification_type":"permission_prompt","cwd":"/secret/path"}"#)
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    let (token, req) = host.join().unwrap();
+    assert_eq!(token.as_deref(), Some(TOKEN));
+    assert_eq!(req.t, "ui.agent.event");
+    assert_eq!(req.get("pane").and_then(Value::as_i64), Some(7));
+    assert_eq!(
+        req.get("event").and_then(Value::as_str),
+        Some("needs_input")
+    );
+    assert_eq!(req.get("session").and_then(Value::as_str), Some("7a1c"));
+    assert_eq!(req.get("cwd"), None, "paths are never sent");
+    assert!(req.get("at").and_then(Value::as_i64).unwrap() > 1_600_000_000_000);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(out.stdout.is_empty() && out.stderr.is_empty());
+}
+
+#[test]
+fn agent_event_exits_0_for_usage_errors_and_a_missing_app() {
+    let dir = temp_dir("agev0");
+    let nowhere = dir.join("none");
+    for args in [
+        &["agent-event"][..],
+        &["agent-event", "claude"],
+        &["agent-event", "claude", "stop", "--bogus"],
+        &["agent-event", "claude", "stop", "a", "b"],
+    ] {
+        let out = hook_cmd(&dir.join("endpoint"), &nowhere, args)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        assert!(out.stdout.is_empty() && out.stderr.is_empty(), "{args:?}");
+    }
+    // Not a ShellX pane: nothing happens, whatever else is set.
+    let out = Command::new(shellx_link())
+        .args(["agent-event", "claude", "stop"])
+        .env("SHELLX_ENDPOINT", dir.join("endpoint"))
+        .env_remove("SHELLX_PANE_ID")
+        .env_remove("SHELLX_SOCKET")
+        .env_remove("SHELLX_CLI_TOKEN")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(out.stdout.is_empty() && out.stderr.is_empty());
+}
+
+#[test]
+fn agent_event_ends_with_0_in_2_seconds_when_stdin_never_closes() {
+    use std::process::Stdio;
+    let dir = temp_dir("agevhang");
+    let sock = dir.join("s");
+    let listener = UnixListener::bind(&sock).unwrap();
+    let ep = endpoint_file(&dir, &sock);
+    let started = Instant::now();
+    let mut child = hook_cmd(&ep, &sock, &["agent-event", "claude", "stop"])
+        .stdin(Stdio::piped()) // open, never written, never closed
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let held = child.stdin.take();
+    let out = child.wait_with_output().unwrap();
+    drop(held);
+    drop(listener);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(out.stdout.is_empty() && out.stderr.is_empty());
+    let took = started.elapsed();
+    assert!(took >= Duration::from_millis(1500), "{took:?}");
+    assert!(took < Duration::from_secs(4), "{took:?}");
+}
