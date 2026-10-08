@@ -16,10 +16,11 @@ RestoreSnapshot captureSnapshot({
   required DateTime now,
   required bool cleanExit,
   String? daemon,
+  SavedAgent? Function(int sessionId)? agentOf,
 }) {
   final saved = <int, SavedTab>{};
   for (final tab in tabs.tabs) {
-    final layout = savePaneTree(tab.layout, tab, keyOf);
+    final layout = savePaneTree(tab.layout, tab, keyOf, agentOf: agentOf);
     if (layout == null) continue;
     final leaves = savedLeaves(layout);
     final keys = {for (final p in leaves) p.key};
@@ -68,11 +69,13 @@ RestoreSnapshot captureSnapshot({
 /// [tab]'s pane tree as saved panes (A5a D9, public for A11 D14's closed
 /// tabs). With [includeExited] a pane whose shell ended is kept too: a
 /// closed tab's text is worth reopening even when its shell is gone.
+/// [agentOf] gives the agent session a local pane ran (A12 D13).
 SavedPaneNode? savePaneTree(
   PaneNode node,
   TerminalTab tab,
   String Function(int) keyOf, {
   bool includeExited = false,
+  SavedAgent? Function(int sessionId)? agentOf,
 }) => switch (node) {
   PaneLeaf(:final sessionId) => switch (tab.panes[sessionId]) {
     // A8 D29: a remote pane that lost its connection can reconnect, so it
@@ -88,12 +91,26 @@ SavedPaneNode? savePaneTree(
         },
         session: sessionId,
         launch: pane.remote?.launch.forReconnect(pane.cwd),
+        // A remote pane's agent would resume on the wrong machine.
+        agent: pane.remote == null ? agentOf?.call(sessionId) : null,
       ),
     _ => null,
   },
   PaneSplit(:final axis, :final ratio, :final first, :final second) => switch ((
-    savePaneTree(first, tab, keyOf, includeExited: includeExited),
-    savePaneTree(second, tab, keyOf, includeExited: includeExited),
+    savePaneTree(
+      first,
+      tab,
+      keyOf,
+      includeExited: includeExited,
+      agentOf: agentOf,
+    ),
+    savePaneTree(
+      second,
+      tab,
+      keyOf,
+      includeExited: includeExited,
+      agentOf: agentOf,
+    ),
   )) {
     (null, final b) => b,
     (final a, null) => a,

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:shellx_agent/shellx_agent.dart' show SessionLaunch;
 
+import '../terminal/agent_status.dart' show AgentKind, isValidSessionId;
 import '../terminal/pane_layout.dart';
 import '../terminal/tab_meta.dart';
 
@@ -49,9 +50,36 @@ sealed class SavedPaneNode {
   const SavedPaneNode();
 }
 
+/// A12 D13: the agent that was running in a pane and its session, so a
+/// restart can offer to resume it. [session] already matched
+/// `kSessionId`.
+typedef SavedAgent = ({AgentKind kind, String session});
+
+/// The `agent` object of a saved pane: null for anything that is not a
+/// known agent with a valid id (the pane still loads without it). Extra
+/// keys are ignored.
+SavedAgent? _agentFromJson(Object? raw) {
+  if (raw is! Map<String, Object?>) return null;
+  final k = raw['k'], s = raw['s'];
+  if (k is! String || s is! String || !isValidSessionId(s)) return null;
+  final kind = AgentKind.values.where((a) => a.name == k).firstOrNull;
+  return kind == null ? null : (kind: kind, session: s);
+}
+
 final class SavedPane extends SavedPaneNode {
-  const SavedPane({required this.key, this.cwd, this.session, this.launch});
+  const SavedPane({
+    required this.key,
+    this.cwd,
+    this.session,
+    this.launch,
+    this.agent,
+  });
   final String key;
+
+  /// A12 D13, optional JSON key `agent`: written only when set and valid,
+  /// so a plain layout is byte-identical to before and an older build
+  /// ignores the key.
+  final SavedAgent? agent;
 
   /// The folder of a local pane; null for a remote one (its folder travels
   /// in [launch]).
@@ -286,12 +314,21 @@ final class RestoreSnapshot {
 }
 
 Object _nodeToJson(SavedPaneNode node) => switch (node) {
-  SavedPane(:final key, :final cwd, :final session, :final launch) => {
-    'pane': key,
-    'cwd': cwd,
-    'session': session,
-    if (launch != null) 'launch': launch.toJson(),
-  },
+  SavedPane(
+    :final key,
+    :final cwd,
+    :final session,
+    :final launch,
+    :final agent,
+  ) =>
+    {
+      'pane': key,
+      'cwd': cwd,
+      'session': session,
+      if (launch != null) 'launch': launch.toJson(),
+      if (agent != null && isValidSessionId(agent.session))
+        'agent': {'k': agent.kind.name, 's': agent.session},
+    },
   SavedSplit(:final axis, :final ratio, :final first, :final second) => {
     'split': axis.name,
     'ratio': ratio,
@@ -322,7 +359,14 @@ SavedPaneNode _nodeFromJson(Object? raw, Set<String> seen, int depth) {
       // Never carries the value: it names a host.
       throw const FormatException('launch');
     }
-    return SavedPane(key: key, cwd: cwd, session: session, launch: launch);
+    return SavedPane(
+      key: key,
+      cwd: cwd,
+      session: session,
+      launch: launch,
+      // Repaired, never fatal: a damaged agent must not lose a layout.
+      agent: _agentFromJson(m['agent']),
+    );
   }
   final axis = SplitAxis.values.byName(m['split']! as String);
   final ratio = (m['ratio']! as num).toDouble();

@@ -303,6 +303,33 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     return hook != null && now.difference(hook) < kAgentOscMerge;
   }
 
+  /// A12 D13–D14: the record of a session saved before a restart: state
+  /// [AgentState.unknown] (never shown), so a later snapshot saves the id
+  /// again and the next event of the real agent replaces it. Nothing when
+  /// the pane has a record already or is not a live pane of this window.
+  void seedRestored(int pane, AgentKind agent, String session) {
+    if (!ref.mounted || state.containsKey(pane)) return;
+    final p = ref.read(terminalTabsProvider).tabOfSession(pane)?.panes[pane];
+    if (p == null || p.exited || !isValidSessionId(session)) return;
+    _store(
+      pane,
+      AgentPane(
+        agent: agent,
+        state: AgentState.unknown,
+        since: _now,
+        // Older than any event: the first one applies.
+        lastEventAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        session: session,
+      ),
+    );
+  }
+
+  /// The user declined the offer: forgets a restored record, never a real
+  /// one.
+  void dropRestored(int pane) {
+    if (state[pane]?.state == AgentState.unknown) _store(pane, null);
+  }
+
   /// The human typed into [pane] (not a script's `send`): a question
   /// answered.
   void _userInput(int pane) {

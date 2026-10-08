@@ -695,5 +695,13 @@
   "agentNamesClaude": "Claude Code",
   "agentNamesCodex": "Codex",
   "agentNamesGemini": "Gemini CLI",
-  "agentNamesOpencode": "OpenCode"
+  "agentNamesOpencode": "OpenCode",
+  "resumeBannerText": "{agent} đang chạy ở đây trước khi ShellX khởi động lại.",
+  "resumeBannerResume": "Tiếp tục phiên",
+  "resumeBannerDismiss": "Bỏ qua",
+  "resumeBannerTooltip": "Gõ “{command}” vào terminal này rồi nhấn Enter.",
+  "settingAgentResume": "Đề nghị tiếp tục phiên agent",
+  "settingAgentResumeDesc": "Sau khi khởi động lại, hiện nút để tiếp tục agent bạn đang dùng. Không có gì chạy cho tới khi bạn bấm.",
+  "settingAgentResumeAsk": "Hỏi",
+  "settingAgentResumeOff": "Tắt"
 }

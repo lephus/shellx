@@ -66,6 +66,7 @@ String fileSettingText(
     ConfirmClose.always => 'always',
   },
   'ghostty-config' => '${c.ghosttyConfig}',
+  'agent-resume' => c.agentResume.name,
   'global-hotkey' =>
     c.globalHotkey == null ? '' : chordConfigText(c.globalHotkey!) ?? '',
   _ => '',

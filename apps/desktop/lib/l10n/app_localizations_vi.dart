@@ -2707,4 +2707,33 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get agentNamesOpencode => 'OpenCode';
+
+  @override
+  String resumeBannerText(String agent) {
+    return '$agent đang chạy ở đây trước khi ShellX khởi động lại.';
+  }
+
+  @override
+  String get resumeBannerResume => 'Tiếp tục phiên';
+
+  @override
+  String get resumeBannerDismiss => 'Bỏ qua';
+
+  @override
+  String resumeBannerTooltip(String command) {
+    return 'Gõ “$command” vào terminal này rồi nhấn Enter.';
+  }
+
+  @override
+  String get settingAgentResume => 'Đề nghị tiếp tục phiên agent';
+
+  @override
+  String get settingAgentResumeDesc =>
+      'Sau khi khởi động lại, hiện nút để tiếp tục agent bạn đang dùng. Không có gì chạy cho tới khi bạn bấm.';
+
+  @override
+  String get settingAgentResumeAsk => 'Hỏi';
+
+  @override
+  String get settingAgentResumeOff => 'Tắt';
 }

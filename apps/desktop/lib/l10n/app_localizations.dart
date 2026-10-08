@@ -4283,6 +4283,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OpenCode'**
   String get agentNamesOpencode;
+
+  /// A12 D13 banner over a restored pane
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} was running here before ShellX restarted.'**
+  String resumeBannerText(String agent);
+
+  /// No description provided for @resumeBannerResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume session'**
+  String get resumeBannerResume;
+
+  /// No description provided for @resumeBannerDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get resumeBannerDismiss;
+
+  /// No description provided for @resumeBannerTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Types “{command}” into this terminal and presses Enter.'**
+  String resumeBannerTooltip(String command);
+
+  /// No description provided for @settingAgentResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer to resume agent sessions'**
+  String get settingAgentResume;
+
+  /// No description provided for @settingAgentResumeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After a restart, show a button to continue the agent you were using. Nothing runs until you click.'**
+  String get settingAgentResumeDesc;
+
+  /// No description provided for @settingAgentResumeAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get settingAgentResumeAsk;
+
+  /// No description provided for @settingAgentResumeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingAgentResumeOff;
 }
 
 class _AppLocalizationsDelegate

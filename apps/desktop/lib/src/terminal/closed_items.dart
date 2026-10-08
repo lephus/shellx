@@ -8,7 +8,9 @@ import 'package:shellx_agent/shellx_agent.dart' show SessionLaunch;
 import '../restore/restore_capture.dart' show savePaneTree;
 import '../restore/restore_snapshot.dart';
 import '../restore/scrollback_codec.dart';
+import 'agent_status_notifier.dart' show agentStatusProvider;
 import 'local_sessions_provider.dart' show appL10nProvider;
+import 'resume_offers.dart' show restoreAgentSessions, savedAgents;
 import 'sidebar_workspaces.dart';
 import 'terminal_tabs.dart';
 import '../agent/desktop_services.dart' show clockProvider;
@@ -224,6 +226,13 @@ class ClosedItemsNotifier extends Notifier<ClosedItemsState> {
           push(item);
           return;
         }
+        // A12 D13 (A11 D14): the agent the tab ran is offered again.
+        restoreAgentSessions(
+          ref,
+          panes: savedLeaves(item.tab.layout),
+          keyBySession: outcome.keyBySession,
+          reattach: false,
+        );
         final sidebar = ref.read(sidebarWorkspacesProvider.notifier);
         final ws = item.workspaceId;
         if (ws != null &&
@@ -261,6 +270,12 @@ class ClosedItemsRecorder extends Notifier<void> {
   /// Sessions a reconnect replaced (A8 D22): their pane lives on.
   final _replaced = <int>{};
 
+  /// A12 D13: the agent session of each pane, as of its last record. Kept
+  /// while the pane closes (its record goes with it, maybe before this
+  /// hears of the close) and dropped once the tab is kept or the pane is
+  /// not a pane any more.
+  var _agents = const <int, SavedAgent>{};
+
   @override
   void build() {
     final tabs = ref.read(terminalTabsProvider.notifier);
@@ -272,6 +287,17 @@ class ClosedItemsRecorder extends Notifier<void> {
     _remember(ref.read(sidebarWorkspacesProvider));
     ref.listen<SidebarState>(sidebarWorkspacesProvider, (_, s) => _remember(s));
     ref.listen<TerminalTabsState>(terminalTabsProvider, _onTabs);
+    ref.listen(agentStatusProvider, (_, records) {
+      final live = ref.read(terminalTabsProvider);
+      final next = savedAgents(records);
+      _agents = {
+        // A record that went while its pane lives on: the agent ended.
+        for (final e in _agents.entries)
+          if (!next.containsKey(e.key) && live.tabOfSession(e.key) == null)
+            e.key: e.value,
+        ...next,
+      };
+    });
   }
 
   void _remember(SidebarState s) {
@@ -317,6 +343,10 @@ class ClosedItemsRecorder extends Notifier<void> {
           );
         }
       }
+      _agents = {
+        for (final e in _agents.entries)
+          if (alive.contains(e.key)) e.key: e.value,
+      };
     } on Object catch (e) {
       // Only the kind of error: the rest could be what the terminal showed.
       debugPrint('closed items: capture failed (${e.runtimeType})');
@@ -326,7 +356,13 @@ class ClosedItemsRecorder extends Notifier<void> {
   void _captureTab(TerminalTab t, DateTime now) {
     final keys = <int, String>{};
     String keyOf(int id) => keys.putIfAbsent(id, newPaneKey);
-    final layout = savePaneTree(t.layout, t, keyOf, includeExited: true);
+    final layout = savePaneTree(
+      t.layout,
+      t,
+      keyOf,
+      includeExited: true,
+      agentOf: (id) => _agents[id],
+    );
     if (layout == null) return;
     final leaves = savedLeaves(layout);
     final inLayout = {for (final p in leaves) p.key};
