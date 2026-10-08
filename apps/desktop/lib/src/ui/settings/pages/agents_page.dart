@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../integrations/integration_probe.dart';
+import '../../../config/config_controller.dart' show shellxConfigProvider;
 import '../../../integrations/integration_status.dart';
+import '../../../integrations/pr_status.dart' show ghFoundProvider;
 import '../../../terminal/agent_names.dart';
 import '../../../terminal/agent_status.dart';
 import '../../../tray/tray_action.dart';
@@ -45,7 +47,23 @@ class AgentsPage extends ConsumerWidget {
         settingWidget(settingById('ssh-hook')),
         const _IntegrationsSection(),
         settingWidget(settingById('agent-resume')),
+        _PrStatusRow(),
       ],
+    );
+  }
+}
+
+/// A12 D16: the pull request switch; when it is on and `gh` cannot be
+/// found, the row says so.
+class _PrStatusRow extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final on = ref.watch(shellxConfigProvider.select((s) => s.config.prStatus));
+    final found = on ? ref.watch(ghFoundProvider).value : null;
+    return settingWidget(
+      settingById('pr-status'),
+      note: found == false ? l10n.settingPrStatusNoGh : null,
     );
   }
 }

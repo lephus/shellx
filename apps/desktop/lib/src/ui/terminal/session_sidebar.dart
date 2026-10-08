@@ -8,7 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../agent/desktop_services.dart' show desktopServicesProvider;
 import '../../cli/agent_marks.dart';
+import '../../integrations/pr_status.dart';
+import '../../integrations/pr_status_parse.dart' show PrInfo;
 import '../../terminal/agent_status_notifier.dart'
     show agentLiveTabsProvider, agentTabBadgeProvider;
 import '../../terminal/local_sessions_provider.dart';
@@ -648,6 +651,18 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
 
   /// A8 D19: an SSH tab's port goes through a forward. A tab's ports are
   /// its focused pane's (`TerminalTab.ports`), so that pane owns the port.
+  /// A12 D16: the pull request's page, in the browser. The address was
+  /// checked when it was read (https, no user information); the opener
+  /// checks again.
+  Future<void> _openPr(PrInfo pr) async {
+    try {
+      final uri = Uri.parse(pr.url);
+      await ref.read(desktopServicesProvider).urlOpener.open(uri);
+    } on Object catch (e) {
+      debugPrint('ShellX: pull request not opened: ${e.runtimeType}');
+    }
+  }
+
   Future<void> _openPort(TerminalTab tab, int port) =>
       ref.read(remotePortForwardsProvider.notifier).open(tab.focused, port);
 
@@ -1007,8 +1022,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// port.
   Map<CustomSemanticsAction, VoidCallback> _rowActions(
     AppLocalizations l10n,
-    TerminalTab tab,
-  ) {
+    TerminalTab tab, [
+    PrInfo? pr,
+  ]) {
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     final anyUnread = ref.read(tabAttentionProvider).totalUnread > 0;
     return {
@@ -1042,6 +1058,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       for (final port in tab.exited ? const <int>[] : tab.ports)
         CustomSemanticsAction(label: l10n.tabOpenPort(port)): () =>
             unawaited(_openPort(tab, port)),
+      if (pr != null)
+        CustomSemanticsAction(label: l10n.tabOpenPr(pr.number)): () =>
+            unawaited(_openPr(pr)),
     };
   }
 
@@ -1585,52 +1604,66 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       // command rebuilds that row, not the sidebar. The marks prune
       // themselves at expiry, so the chip goes on time.
       final row = Consumer(
-        builder: (context, rowRef, _) => SessionTabRow(
-          key: _rows.putIfAbsent(tab.id, GlobalKey.new),
-          tab: tab,
-          selected: tab.id == state.selectedId,
-          focused: tab.id == state.selectedId && _showFocus && cursor == null,
-          position: positions[tab.id]!,
-          count: rows.length,
-          positionLabel: sidebar.showHeaders
-              ? l10n.sidebarPositionInWorkspace(
-                  item.index + 1,
-                  item.count,
-                  item.workspace.displayName(l10n),
-                )
-              : null,
-          home: home,
-          renaming: sidebar.renaming == RenameTab(tab.id),
-          onSelect: () {
-            setState(() => _headerCursor = null);
-            widget.onSelected(tab.id);
-          },
-          onClose: () => widget.onClose(tab),
-          onStartRename: () => _startTabRename(tab.id, fromList: false),
-          onRename: (text) => _commitTabName(tab.id, text),
-          onCancelRename: () => _endRename(RenameTab(tab.id)),
-          editingDescription: sidebar.renaming == EditDescription(tab.id),
-          onDescription: (text) => _commitDescription(tab.id, text),
-          onCancelDescription: () => _endRename(EditDescription(tab.id)),
-          onOpenPort: (port) => unawaited(_openPort(tab, port)),
-          portTooltip: (port) => remotePortTooltipFor(ref, l10n, tab, port),
-          onMenu: (at) => unawaited(_rowMenu(tab, at)),
-          extraActions: _rowActions(l10n, tab),
-          menuOpen: _menuFor == ('row', tab.id),
-          unread: unread[tab.id],
-          onMarkRead: () =>
-              ref.read(tabAttentionProvider.notifier).markRead(tab.id),
-          agentStatus: rowRef.watch(agentTabBadgeProvider(tab.id)),
-          agentLive: rowRef.watch(
-            agentLiveTabsProvider.select((s) => s.contains(tab.id)),
-          ),
-          agent: rowRef.watch(
-            agentMarksProvider.select(
-              (m) =>
-                  m.tabActive(tab.id, rowRef.read(agentMarksClockProvider)()),
+        builder: (context, rowRef, _) {
+          // A12 D16: the pull request of the branch; only the tab in view
+          // asks for a lookup.
+          final pr = rowRef.watch(
+            prChipProvider((
+              cwd: tab.cwd,
+              branch: tab.gitBranch,
+              remote: tab.focused.remote != null,
+              visible: tab.id == state.selectedId,
+            )),
+          );
+          return SessionTabRow(
+            key: _rows.putIfAbsent(tab.id, GlobalKey.new),
+            tab: tab,
+            selected: tab.id == state.selectedId,
+            focused: tab.id == state.selectedId && _showFocus && cursor == null,
+            position: positions[tab.id]!,
+            count: rows.length,
+            positionLabel: sidebar.showHeaders
+                ? l10n.sidebarPositionInWorkspace(
+                    item.index + 1,
+                    item.count,
+                    item.workspace.displayName(l10n),
+                  )
+                : null,
+            home: home,
+            renaming: sidebar.renaming == RenameTab(tab.id),
+            onSelect: () {
+              setState(() => _headerCursor = null);
+              widget.onSelected(tab.id);
+            },
+            onClose: () => widget.onClose(tab),
+            onStartRename: () => _startTabRename(tab.id, fromList: false),
+            onRename: (text) => _commitTabName(tab.id, text),
+            onCancelRename: () => _endRename(RenameTab(tab.id)),
+            editingDescription: sidebar.renaming == EditDescription(tab.id),
+            onDescription: (text) => _commitDescription(tab.id, text),
+            onCancelDescription: () => _endRename(EditDescription(tab.id)),
+            onOpenPort: (port) => unawaited(_openPort(tab, port)),
+            portTooltip: (port) => remotePortTooltipFor(ref, l10n, tab, port),
+            onMenu: (at) => unawaited(_rowMenu(tab, at)),
+            extraActions: _rowActions(l10n, tab, pr),
+            menuOpen: _menuFor == ('row', tab.id),
+            unread: unread[tab.id],
+            onMarkRead: () =>
+                ref.read(tabAttentionProvider.notifier).markRead(tab.id),
+            pr: pr,
+            onOpenPr: (info) => unawaited(_openPr(info)),
+            agentStatus: rowRef.watch(agentTabBadgeProvider(tab.id)),
+            agentLive: rowRef.watch(
+              agentLiveTabsProvider.select((s) => s.contains(tab.id)),
             ),
-          ),
-        ),
+            agent: rowRef.watch(
+              agentMarksProvider.select(
+                (m) =>
+                    m.tabActive(tab.id, rowRef.read(agentMarksClockProvider)()),
+              ),
+            ),
+          );
+        },
       );
       // V9: under a header, rows sit 8 px in. The padding is always
       // there (0 without headers): the row's subtree never changes shape.

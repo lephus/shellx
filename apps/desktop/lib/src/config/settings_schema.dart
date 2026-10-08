@@ -488,6 +488,20 @@ final List<SettingDef> kSettings = List.unmodifiable([
     ],
   ),
   SettingDef(
+    id: 'pr-status',
+    owner: SettingOwner.file,
+    page: SettingPage.agents,
+    control: SettingControl.toggle,
+    fileKey: 'pr-status',
+    label: (l) => l.settingPrStatus,
+    description: (l) => l.settingPrStatusDesc,
+    keywords: const ['github', 'gh', 'pull request', 'ci', 'checks'],
+    sampleValues: const [
+      SettingSample('true', 'true'),
+      SettingSample('false', 'false'),
+    ],
+  ),
+  SettingDef(
     id: 'notify-threshold',
     owner: SettingOwner.app,
     page: SettingPage.agents,

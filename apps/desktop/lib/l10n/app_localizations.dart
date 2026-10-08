@@ -4391,6 +4391,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the shellx command first (Settings › Command line)'**
   String get integrationNeedsCli;
+
+  /// No description provided for @settingPrStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Show pull request status'**
+  String get settingPrStatus;
+
+  /// No description provided for @settingPrStatusDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the GitHub CLI (gh) already signed in on this computer. ShellX never reads your token.'**
+  String get settingPrStatusDesc;
+
+  /// No description provided for @settingPrStatusNoGh.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub CLI (gh) was not found.'**
+  String get settingPrStatusNoGh;
+
+  /// No description provided for @prOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'open'**
+  String get prOpen;
+
+  /// No description provided for @prDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'draft'**
+  String get prDraft;
+
+  /// No description provided for @prMerged.
+  ///
+  /// In en, this message translates to:
+  /// **'merged'**
+  String get prMerged;
+
+  /// No description provided for @prClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'closed'**
+  String get prClosed;
+
+  /// No description provided for @prChecksPassing.
+  ///
+  /// In en, this message translates to:
+  /// **'checks passing'**
+  String get prChecksPassing;
+
+  /// No description provided for @prChecksFailing.
+  ///
+  /// In en, this message translates to:
+  /// **'checks failing'**
+  String get prChecksFailing;
+
+  /// No description provided for @prChecksPending.
+  ///
+  /// In en, this message translates to:
+  /// **'checks running'**
+  String get prChecksPending;
+
+  /// No description provided for @prChecksNone.
+  ///
+  /// In en, this message translates to:
+  /// **'no checks'**
+  String get prChecksNone;
+
+  /// No description provided for @prReviewApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'approved'**
+  String get prReviewApproved;
+
+  /// No description provided for @prReviewChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'changes requested'**
+  String get prReviewChanges;
+
+  /// No description provided for @prTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull request #{number}: {state}, {checks}'**
+  String prTooltip(int number, String state, String checks);
+
+  /// No description provided for @prOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get prOpenInBrowser;
+
+  /// No description provided for @tabOpenPr.
+  ///
+  /// In en, this message translates to:
+  /// **'Open pull request #{number}'**
+  String tabOpenPr(int number);
 }
 
 class _AppLocalizationsDelegate

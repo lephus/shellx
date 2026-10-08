@@ -2771,4 +2771,57 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get integrationNeedsCli =>
       'Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)';
+
+  @override
+  String get settingPrStatus => 'Hiện trạng thái pull request';
+
+  @override
+  String get settingPrStatusDesc =>
+      'Dùng GitHub CLI (gh) đã đăng nhập sẵn trên máy. ShellX không bao giờ đọc token của bạn.';
+
+  @override
+  String get settingPrStatusNoGh => 'Không tìm thấy GitHub CLI (gh).';
+
+  @override
+  String get prOpen => 'đang mở';
+
+  @override
+  String get prDraft => 'nháp';
+
+  @override
+  String get prMerged => 'đã merge';
+
+  @override
+  String get prClosed => 'đã đóng';
+
+  @override
+  String get prChecksPassing => 'CI đạt';
+
+  @override
+  String get prChecksFailing => 'CI lỗi';
+
+  @override
+  String get prChecksPending => 'CI đang chạy';
+
+  @override
+  String get prChecksNone => 'không có CI';
+
+  @override
+  String get prReviewApproved => 'đã duyệt';
+
+  @override
+  String get prReviewChanges => 'cần sửa';
+
+  @override
+  String prTooltip(int number, String state, String checks) {
+    return 'Pull request #$number: $state, $checks';
+  }
+
+  @override
+  String get prOpenInBrowser => 'Mở trong trình duyệt';
+
+  @override
+  String tabOpenPr(int number) {
+    return 'Mở pull request #$number';
+  }
 }

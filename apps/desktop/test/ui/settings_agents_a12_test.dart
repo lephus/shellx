@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/integrations/integration_probe.dart';
 import 'package:shellx_desktop/src/integrations/integration_status.dart';
+import 'package:shellx_desktop/src/integrations/pr_status.dart';
+import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/terminal/agent_status.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_overlay.dart';
@@ -26,16 +29,20 @@ Future<Rig> openAgents(
   Locale locale = const Locale('en'),
   FakeFs? fs,
   String? binary = '/cli/shellx',
+  String config = '',
+  List<Override> extra = const [],
 }) async {
   final files = fs ?? FakeFs();
   final w = await pumpConfiguredWorkspace(
     t,
     locale: locale,
+    config: config,
     extra: [
       integrationProbeProvider.overrideWithValue(
         IntegrationProbe(fs: files, env: const {}, home: '/h', windows: false),
       ),
       shellxBinaryProvider.overrideWithValue(() async => binary),
+      ...extra,
     ],
   );
   await t.sendKeyDownEvent(cmd);
@@ -258,6 +265,42 @@ void main() {
       r.config.text(testConfigPaths().shellx),
       contains('agent-resume = off'),
     );
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
+  testWidgets('the pull request switch is off by default and writes the key', (
+    t,
+  ) async {
+    final r = await openAgents(t);
+    final row = find.byKey(const Key('setting.pr-status'));
+    await reveal(t, row);
+    expect(find.text('Show pull request status'), findsOneWidget);
+    expect(find.textContaining('never reads your token'), findsOneWidget);
+    expect(r.container.read(shellxConfigProvider).config.prStatus, isFalse);
+    await t.tap(find.byKey(const Key('setting.pr-status.switch')));
+    await t.pumpAndSettle();
+    expect(
+      r.config.text(testConfigPaths().shellx),
+      contains('pr-status = true'),
+    );
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
+  testWidgets('on, without gh: the row says gh was not found', (t) async {
+    final r = await openAgents(
+      t,
+      config: 'pr-status = true\n',
+      extra: [ghFinderProvider.overrideWithValue(() async => null)],
+    );
+    await reveal(t, find.byKey(const Key('setting.pr-status')));
+    expect(find.text('GitHub CLI (gh) was not found.'), findsOneWidget);
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
+  testWidgets('Vietnamese: the pull request row', (t) async {
+    final r = await openAgents(t, locale: const Locale('vi'));
+    await reveal(t, find.byKey(const Key('setting.pr-status')));
+    expect(find.text('Hiện trạng thái pull request'), findsOneWidget);
     await disposeWorkspace(t, r.container);
   }, variant: mac);
 

@@ -142,6 +142,7 @@ void main() {
       'ghostty-config',
       'global-hotkey',
       'agent-resume',
+      'pr-status',
     };
     final have = {
       for (final d in kSettings)

@@ -60,4 +60,24 @@ void main() {
       );
     });
   });
+
+  group('pr-status (A12 D16)', () {
+    test('off by default; true turns it on; a Ghostty file never sets it', () {
+      expect(build({}).config.prStatus, isFalse);
+      expect(build({'pr-status': 'true'}).config.prStatus, isTrue);
+      expect(build({'pr-status': 'false'}).config.prStatus, isFalse);
+      expect(build({'pr-status': ''}).config.prStatus, isFalse);
+      expect(kGhosttyKeys.contains('pr-status'), isFalse);
+      expect(
+        build({'pr-status': 'true'}, ghostty: true).config.prStatus,
+        isFalse,
+      );
+    });
+
+    test('anything else is a bad value and keeps the default', () {
+      final r = build({'pr-status': 'yes'});
+      expect(r.config.prStatus, isFalse);
+      expect(r.problems.single.code, ConfigProblemCode.badValue);
+    });
+  });
 }

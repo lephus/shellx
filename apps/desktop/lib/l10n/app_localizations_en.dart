@@ -2863,4 +2863,57 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get integrationNeedsCli =>
       'Install the shellx command first (Settings › Command line)';
+
+  @override
+  String get settingPrStatus => 'Show pull request status';
+
+  @override
+  String get settingPrStatusDesc =>
+      'Uses the GitHub CLI (gh) already signed in on this computer. ShellX never reads your token.';
+
+  @override
+  String get settingPrStatusNoGh => 'GitHub CLI (gh) was not found.';
+
+  @override
+  String get prOpen => 'open';
+
+  @override
+  String get prDraft => 'draft';
+
+  @override
+  String get prMerged => 'merged';
+
+  @override
+  String get prClosed => 'closed';
+
+  @override
+  String get prChecksPassing => 'checks passing';
+
+  @override
+  String get prChecksFailing => 'checks failing';
+
+  @override
+  String get prChecksPending => 'checks running';
+
+  @override
+  String get prChecksNone => 'no checks';
+
+  @override
+  String get prReviewApproved => 'approved';
+
+  @override
+  String get prReviewChanges => 'changes requested';
+
+  @override
+  String prTooltip(int number, String state, String checks) {
+    return 'Pull request #$number: $state, $checks';
+  }
+
+  @override
+  String get prOpenInBrowser => 'Open in browser';
+
+  @override
+  String tabOpenPr(int number) {
+    return 'Open pull request #$number';
+  }
 }

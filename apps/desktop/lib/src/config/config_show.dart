@@ -83,6 +83,7 @@ List<Map<String, String>> configShowValues(ConfigState s) {
     v('ghostty-config', '${c.ghosttyConfig}'),
     v('global-hotkey', _hotkey(c.globalHotkey)),
     v('agent-resume', c.agentResume.name),
+    v('pr-status', '${c.prStatus}'),
     for (final k in c.keybinds)
       {'key': 'keybind', 'value': k.value, 'source': at(k.origin)},
     for (final u in c.commands)

@@ -115,6 +115,7 @@ final class ShellxConfig {
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
     this.agentResume = AgentResume.ask,
+    this.prStatus = false,
     this.workingDirectory = const WorkingDirectory.home(),
     this.keybinds = const [],
     this.commands = const [],
@@ -154,6 +155,9 @@ final class ShellxConfig {
 
   /// `agent-resume` (ShellX file only, A12 D13).
   final AgentResume agentResume;
+
+  /// `pr-status` (ShellX file only, A12 D16): off by default.
+  final bool prStatus;
   final WorkingDirectory workingDirectory;
   final List<KeybindEntry> keybinds;
   final List<UserCommand> commands;
@@ -247,6 +251,7 @@ final class _Builder {
   var optionAsAlt = OptionAsAlt.off;
   var confirmClose = ConfirmClose.whenRunning;
   var agentResume = AgentResume.ask;
+  var prStatus = false;
   WorkingDirectory workingDirectory = const WorkingDirectory.home();
   final keybinds = <KeybindEntry>[];
   final commands = <UserCommand>[];
@@ -531,6 +536,10 @@ final class _Builder {
         };
         if (mode == null) return _badValue(e, g, 'ask, off');
         agentResume = mode;
+      case 'pr-status':
+        final on = v.isEmpty ? false : _bool(v);
+        if (on == null) return _badValue(e, g, 'true, false');
+        prStatus = on;
       case 'working-directory':
         if (v.isEmpty || v == 'home') {
           workingDirectory = const WorkingDirectory.home();
@@ -675,6 +684,7 @@ final class _Builder {
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,
     agentResume: agentResume,
+    prStatus: prStatus,
     workingDirectory: workingDirectory,
     keybinds: List.unmodifiable(keybinds),
     commands: List.unmodifiable(commands),

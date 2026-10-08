@@ -713,5 +713,21 @@
   "integrationRemove": "Gỡ trong terminal",
   "integrationLimit": "Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”.",
   "resumeBannerBusy": "Đang chờ shell…",
-  "integrationNeedsCli": "Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)"
+  "integrationNeedsCli": "Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)",
+  "settingPrStatus": "Hiện trạng thái pull request",
+  "settingPrStatusDesc": "Dùng GitHub CLI (gh) đã đăng nhập sẵn trên máy. ShellX không bao giờ đọc token của bạn.",
+  "settingPrStatusNoGh": "Không tìm thấy GitHub CLI (gh).",
+  "prOpen": "đang mở",
+  "prDraft": "nháp",
+  "prMerged": "đã merge",
+  "prClosed": "đã đóng",
+  "prChecksPassing": "CI đạt",
+  "prChecksFailing": "CI lỗi",
+  "prChecksPending": "CI đang chạy",
+  "prChecksNone": "không có CI",
+  "prReviewApproved": "đã duyệt",
+  "prReviewChanges": "cần sửa",
+  "prTooltip": "Pull request #{number}: {state}, {checks}",
+  "prOpenInBrowser": "Mở trong trình duyệt",
+  "tabOpenPr": "Mở pull request #{number}"
 }
