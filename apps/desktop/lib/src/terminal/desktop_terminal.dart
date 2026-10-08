@@ -1,3 +1,4 @@
+import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
 import 'hyperlink_registry.dart';
@@ -21,6 +22,15 @@ final class DesktopTerminal extends Terminal {
       if (code == '8') hyperlinks.handle(buffer, args);
     };
   }
+
+  final _sgr = SgrFilter();
+
+  /// Every byte any program, local, A5b or SSH, sends to this tab goes
+  /// through here, and xterm 4.0.0 misreads some SGR forms Claude Code
+  /// uses (`CSI > 4;2 m` underlined every line, 22 left bold on): the
+  /// filter rewrites them first (shellx_core SgrFilter has the list).
+  @override
+  void write(String data) => super.write(_sgr.filter(data));
 
   /// A10 D11: where the program put OSC 8 links.
   final hyperlinks = HyperlinkRegistry();

@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey;
+import 'package:shellx_core/shellx_core.dart' show SgrFilter;
 import 'package:shellx_mobile/features/terminal/domain/terminal_input.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
 import 'package:xterm/core.dart';
@@ -90,6 +91,14 @@ class ShellxTerminal extends Terminal {
   ShellxTerminal({required this.modifiers, super.maxLines = 2000}) : super(inputHandler: shellxInputHandler);
 
   final ModifierSource modifiers;
+
+  final _sgr = SgrFilter();
+
+  /// xterm 4.0.0 misreads some SGR forms (Claude Code's `CSI > 4;2 m`
+  /// underlined every line, 22 left bold on): the shared filter rewrites
+  /// them before every write.
+  @override
+  void write(String data) => super.write(_sgr.filter(data));
 
   @override
   bool keyInput(TerminalKey key, {bool shift = false, bool alt = false, bool ctrl = false}) {
