@@ -9,6 +9,7 @@ pub mod client;
 pub mod config_path;
 pub mod doctor;
 pub mod endpoint;
+pub mod integrations;
 pub mod output;
 pub mod run;
 pub mod skills;
