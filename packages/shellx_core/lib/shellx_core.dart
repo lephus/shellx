@@ -4,6 +4,7 @@ library;
 
 export 'src/util/bytes.dart';
 export 'src/util/cbor_values.dart';
+export 'src/util/sgr_filter.dart';
 export 'src/util/terminal_links.dart';
 export 'src/relay/channel_id.dart';
 export 'src/relay/frames.dart';

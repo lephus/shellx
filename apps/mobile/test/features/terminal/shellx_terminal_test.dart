@@ -21,6 +21,20 @@ void main() {
 
   tearDown(() => keys.dispose());
 
+  test('SGR xterm misreads is rewritten: modifyOtherKeys is not underline, 22 ends bold', () {
+    terminal.write('\x1b[>4;2mu\x1b[1mb\x1b[22mn');
+    CellData cell(int x) {
+      final c = CellData.empty();
+      terminal.buffer.lines[0].getCellData(x, c);
+      return c;
+    }
+
+    expect(cell(0).flags & CellFlags.underline, 0);
+    expect(cell(0).flags & CellFlags.faint, 0);
+    expect(cell(1).flags & CellFlags.bold, isNot(0));
+    expect(cell(2).flags & CellFlags.bold, 0);
+  });
+
   /// What TerminalView does with a soft-keyboard character.
   void typeOnSoftKeyboard(String char, TerminalKey key) {
     if (!terminal.keyInput(key)) terminal.textInput(char);
