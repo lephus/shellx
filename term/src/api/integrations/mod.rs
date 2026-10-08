@@ -9,6 +9,7 @@
 
 pub mod cli;
 pub mod diff;
+pub mod gemini;
 pub mod json;
 pub mod nested_json;
 pub mod real;
@@ -20,15 +21,17 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Agent {
     Claude,
+    Gemini,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 1] = [Agent::Claude];
+    pub const ALL: [Agent; 2] = [Agent::Claude, Agent::Gemini];
 
     /// The name used on the command line and in `agent-event`.
     pub fn name(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
+            Agent::Gemini => "gemini",
         }
     }
 
@@ -40,6 +43,7 @@ impl Agent {
     pub fn product(self) -> &'static str {
         match self {
             Agent::Claude => "Claude Code",
+            Agent::Gemini => "Gemini CLI",
         }
     }
 
@@ -47,6 +51,15 @@ impl Agent {
     pub fn binary(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
+            Agent::Gemini => "gemini",
+        }
+    }
+
+    /// The hook shape this agent reads, for the JSON agents.
+    fn nested(self) -> &'static nested_json::NestedSpec {
+        match self {
+            Agent::Claude => &nested_json::CLAUDE,
+            Agent::Gemini => &gemini::GEMINI,
         }
     }
 }
@@ -70,7 +83,7 @@ pub enum Refusal {
 pub fn refusal_message(a: Agent, r: Refusal) -> String {
     match r {
         Refusal::Invalid | Refusal::WrongType => match a {
-            Agent::Claude => "refusing: the file has comments, is not valid JSON or does not have the expected shape (use --print to see what to add)".into(),
+            Agent::Claude | Agent::Gemini => "refusing: the file has comments, is not valid JSON or does not have the expected shape (use --print to see what to add)".into(),
         },
         Refusal::Foreign(what) => {
             format!("refusing: a {what} of yours is already there (shellx will not replace it; see --print)")
@@ -92,21 +105,21 @@ pub struct Plan {
 
 pub fn plan_install(a: Agent, current: Option<&str>) -> Result<Plan, Refusal> {
     match a {
-        Agent::Claude => nested_json::install(&nested_json::CLAUDE, current),
+        Agent::Claude | Agent::Gemini => nested_json::install(a.nested(), current),
     }
 }
 
 /// Removes only ShellX's entries from `current`.
 pub fn plan_uninstall(a: Agent, current: &str) -> Result<Plan, Refusal> {
     match a {
-        Agent::Claude => nested_json::uninstall(&nested_json::CLAUDE, current),
+        Agent::Claude | Agent::Gemini => nested_json::uninstall(a.nested(), current),
     }
 }
 
 /// Every one of ShellX's entries is present.
 pub fn installed(a: Agent, current: Option<&str>) -> bool {
     match a {
-        Agent::Claude => nested_json::installed(&nested_json::CLAUDE, current),
+        Agent::Claude | Agent::Gemini => nested_json::installed(a.nested(), current),
     }
 }
 
@@ -114,21 +127,21 @@ pub fn installed(a: Agent, current: Option<&str>) -> bool {
 /// a file ShellX created can go.
 pub fn leaves_nothing(a: Agent, after: &str) -> bool {
     match a {
-        Agent::Claude => after.trim_start_matches('\u{feff}').trim() == "{}",
+        Agent::Claude | Agent::Gemini => after.trim_start_matches('\u{feff}').trim() == "{}",
     }
 }
 
 /// The agent's file is wholly ShellX's: uninstall deletes it.
 pub fn owns_file(a: Agent) -> bool {
     match a {
-        Agent::Claude => false,
+        Agent::Claude | Agent::Gemini => false,
     }
 }
 
 /// What `--print` shows: the part to add by hand.
 pub fn snippet(a: Agent) -> String {
     match a {
-        Agent::Claude => nested_json::snippet(&nested_json::CLAUDE),
+        Agent::Claude | Agent::Gemini => nested_json::snippet(a.nested()),
     }
 }
 
@@ -139,6 +152,7 @@ pub fn config_path(a: Agent, env: &dyn Fn(&str) -> Option<String>, home: &Path) 
         Agent::Claude => var("CLAUDE_CONFIG_DIR")
             .map_or_else(|| home.join(".claude"), PathBuf::from)
             .join("settings.json"),
+        Agent::Gemini => home.join(".gemini").join("settings.json"),
     }
 }
 
@@ -428,6 +442,98 @@ mod tests {
         let s = snippet(Agent::Claude);
         assert!(parse(&s).is_ok());
         assert!(s.contains("shellx agent-event claude session-end"));
+    }
+
+    const GEMINI_EVENTS: [(&str, &str); 5] = [
+        ("SessionStart", "session-start"),
+        ("BeforeAgent", "prompt-submit"),
+        ("AfterAgent", "stop"),
+        ("Notification", "notification"),
+        ("SessionEnd", "session-end"),
+    ];
+
+    #[test]
+    fn gemini_fresh_install_has_five_groups_with_a_millisecond_timeout() {
+        let plan = plan_install(Agent::Gemini, None).unwrap();
+        for (event, sub) in GEMINI_EVENTS {
+            assert_eq!(
+                commands(&plan.after, event),
+                vec![format!("shellx agent-event gemini {sub}")],
+                "{event}"
+            );
+        }
+        assert!(plan.after.contains("\"timeout\": 5000"), "{}", plan.after);
+        assert!(!plan.after.contains("claude"));
+        assert!(installed(Agent::Gemini, Some(&plan.after)));
+        assert!(!installed(Agent::Claude, Some(&plan.after)));
+    }
+
+    #[test]
+    fn gemini_keeps_the_users_hooks_and_is_the_identity_through_a_round_trip() {
+        let mine = r#"{
+  "general": { "vimMode": true },
+  "hooks": {
+    "AfterAgent": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "my-after-script", "timeout": 1000 } ] }
+    ]
+  },
+  "mcpServers": { "x": { "command": "node", "env": { "API_TOKEN": "FAKE" } } }
+}
+"#;
+        let out = plan_install(Agent::Gemini, Some(mine)).unwrap();
+        assert!(out.after.contains("\"command\": \"my-after-script\""));
+        assert_eq!(
+            commands(&out.after, "AfterAgent"),
+            vec![
+                "my-after-script".to_string(),
+                "shellx agent-event gemini stop".to_string()
+            ]
+        );
+        assert_eq!(
+            plan_uninstall(Agent::Gemini, &out.after).unwrap().after,
+            mine
+        );
+        for name in FIXTURES {
+            let original = fx(name);
+            let out = plan_install(Agent::Gemini, Some(&original)).unwrap();
+            let again = plan_install(Agent::Gemini, Some(&out.after)).unwrap();
+            assert!(!again.changed, "{name}");
+            assert_eq!(
+                plan_uninstall(Agent::Gemini, &out.after).unwrap().after,
+                original,
+                "{name}"
+            );
+        }
+        // Claude's entries are not Gemini's: each agent removes only its own.
+        let both = plan_install(Agent::Claude, Some(&out.after)).unwrap().after;
+        let only_claude_gone = plan_uninstall(Agent::Claude, &both).unwrap().after;
+        assert_eq!(only_claude_gone, out.after);
+    }
+
+    #[test]
+    fn gemini_refuses_what_claude_refuses_and_lives_in_dot_gemini() {
+        assert_eq!(
+            plan_install(Agent::Gemini, Some("{ // c\n}")).unwrap_err(),
+            Refusal::Invalid
+        );
+        assert_eq!(
+            plan_install(Agent::Gemini, Some(r#"{"hooks": []}"#)).unwrap_err(),
+            Refusal::WrongType
+        );
+        let none = |_: &str| None;
+        assert_eq!(
+            config_path(Agent::Gemini, &none, Path::new("/h")),
+            PathBuf::from("/h/.gemini/settings.json")
+        );
+        // CLAUDE_CONFIG_DIR does not move Gemini's file.
+        let set = |_: &str| Some("/cfg".to_string());
+        assert_eq!(
+            config_path(Agent::Gemini, &set, Path::new("/h")),
+            PathBuf::from("/h/.gemini/settings.json")
+        );
+        assert_eq!(Agent::from_name("gemini"), Some(Agent::Gemini));
+        assert_eq!(Agent::Gemini.product(), "Gemini CLI");
+        assert!(snippet(Agent::Gemini).contains("shellx agent-event gemini session-end"));
     }
 
     #[test]

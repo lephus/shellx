@@ -121,7 +121,10 @@ fn clean_message(s: &str) -> Option<String> {
 
 fn notification(payload: &Payload) -> &'static str {
     match payload.get("notification_type") {
-        Some("permission_prompt" | "elicitation_dialog") => return "needs_input",
+        // Claude Code's types, and Gemini CLI's only one.
+        Some("permission_prompt" | "elicitation_dialog" | "ToolPermission") => {
+            return "needs_input"
+        }
         Some("idle_prompt") => return "idle",
         _ => {}
     }
@@ -501,6 +504,26 @@ mod tests {
             norm("claude", "notification", &blank).unwrap().message,
             None
         );
+    }
+
+    #[test]
+    fn gemini_payloads_give_the_session_and_a_tool_permission_needs_input() {
+        let n = payload(&fx("gemini_notification_tool_permission"));
+        let w = norm("gemini", "notification", &n).unwrap();
+        assert_eq!(
+            (w.event, w.session.as_deref()),
+            ("needs_input", Some("g-5e2f"))
+        );
+        assert_eq!(w.message.as_deref(), Some("Please confirm the tool call"));
+        // AfterAgent is installed as `stop`; its prompt and response are never taken.
+        let after = payload(&fx("gemini_after_agent"));
+        let w = norm("gemini", "stop", &after).unwrap();
+        assert_eq!(
+            (w.event, w.session.as_deref(), w.message),
+            ("idle", Some("g-5e2f"), None)
+        );
+        let w = norm("gemini", "prompt-submit", &after).unwrap();
+        assert_eq!(w.event, "running");
     }
 
     #[test]

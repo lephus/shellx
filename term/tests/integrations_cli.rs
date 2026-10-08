@@ -175,7 +175,7 @@ fn status_json_has_no_file_content_and_claude_config_dir_is_followed() {
     let j = text(&out.stdout);
     assert_eq!(
         j,
-        "{\"agents\":[{\"agent\":\"claude\",\"installed\":false,\"path\":\"~/.claude/settings.json\",\"found\":false}]}\n"
+        "{\"agents\":[{\"agent\":\"claude\",\"installed\":false,\"path\":\"~/.claude/settings.json\",\"found\":false},{\"agent\":\"gemini\",\"installed\":false,\"path\":\"~/.gemini/settings.json\",\"found\":false}]}\n"
     );
     let mut c = Command::new(bin());
     c.args(["cli", "integrations", "install", "claude", "--yes"])

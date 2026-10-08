@@ -1,0 +1,1 @@
+{"session_id":"g-5e2f","transcript_path":"/home/u/.gemini/tmp/x/chats/session.json","cwd":"/home/u/proj","hook_event_name":"Notification","timestamp":"2026-10-08T01:02:03.000Z","notification_type":"ToolPermission","message":"Please confirm the tool call","details":{"type":"exec","title":"Confirm Shell Command"}}

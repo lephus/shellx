@@ -981,7 +981,7 @@ mod tests {
         );
         assert_eq!(
             r.out,
-            "{\"agents\":[{\"agent\":\"claude\",\"installed\":true,\"path\":\"~/.claude/settings.json\",\"found\":false}]}\n"
+            "{\"agents\":[{\"agent\":\"claude\",\"installed\":true,\"path\":\"~/.claude/settings.json\",\"found\":false},{\"agent\":\"gemini\",\"installed\":false,\"path\":\"~/.gemini/settings.json\",\"found\":false}]}\n"
         );
         // Without --yes there is nobody to ask and nothing to show: refused.
         let fs = with_settings(ORIGINAL);
@@ -1000,8 +1000,16 @@ mod tests {
         let fs = FakeFs::default();
         fs.put("/bin/claude", "", 0o755);
         let r = go(&["status"], &fs, &mut FakePrompt::no_tty(), &["/bin"]);
-        assert_eq!(r.out, "✗ claude    not installed\n");
-        let r = go(&["status"], &fs, &mut FakePrompt::no_tty(), &["/nowhere"]);
+        assert_eq!(
+            r.out,
+            "✗ claude    not installed\n- gemini    not found on PATH\n"
+        );
+        let r = go(
+            &["status", "claude"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &["/nowhere"],
+        );
         assert_eq!(r.out, "- claude    not found on PATH\n");
         go(
             &["install", "claude", "--yes"],

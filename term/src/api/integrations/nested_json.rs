@@ -33,11 +33,13 @@ pub const CLAUDE: NestedSpec = NestedSpec {
     ],
 };
 
-/// What marks a hook command as ShellX's.
-const OURS: &str = "shellx agent-event ";
+/// What marks a hook command as ShellX's for this agent.
+fn prefix(spec: &NestedSpec) -> String {
+    format!("shellx agent-event {} ", spec.agent)
+}
 
 fn command(spec: &NestedSpec, sub: &str) -> String {
-    format!("{OURS}{} {sub}", spec.agent)
+    format!("{}{sub}", prefix(spec))
 }
 
 fn group(spec: &NestedSpec, sub: &str) -> Json {
@@ -67,13 +69,13 @@ fn read(text: &str) -> Result<Node, Refusal> {
 }
 
 /// The `command` string node of a hook entry, when it is ShellX's.
-fn ours(entry: &Node) -> Option<(&Node, &str)> {
+fn ours<'a>(entry: &'a Node, prefix: &str) -> Option<(&'a Node, &'a str)> {
     match get(entry, "command") {
         Some(
             n @ Node {
                 kind: Kind::Str(c), ..
             },
-        ) if c.starts_with(OURS) => Some((n, c)),
+        ) if c.starts_with(prefix) => Some((n, c)),
         _ => None,
     }
 }
@@ -126,6 +128,7 @@ pub fn install(spec: &NestedSpec, current: Option<&str>) -> Result<Plan, Refusal
         return Ok(done(None, format!("{}{}", render(&root, 0, &st), st.eol)));
     };
     let mut text = text.to_string();
+    let own = prefix(spec);
     let root = read(&text)?;
     let Some(hooks) = get(&root, "hooks") else {
         let events = spec
@@ -155,8 +158,11 @@ pub fn install(spec: &NestedSpec, current: Option<&str>) -> Result<Plan, Refusal
                 text = insert_member(&text, hooks, 1, event, &value, &st);
             }
             Some(groups) => {
-                let mine: Vec<(&Node, &str)> =
-                    groups.iter().flat_map(entries).filter_map(ours).collect();
+                let mine: Vec<(&Node, &str)> = groups
+                    .iter()
+                    .flat_map(entries)
+                    .filter_map(|e| ours(e, &own))
+                    .collect();
                 if mine.is_empty() {
                     let arr = get(hooks, event).ok_or(Refusal::Invalid)?;
                     let value = render(&group(spec, sub), 3, &st);
@@ -173,7 +179,7 @@ pub fn install(spec: &NestedSpec, current: Option<&str>) -> Result<Plan, Refusal
 
 /// The first entry of ShellX's, as the nodes to cut: the highest ancestor
 /// that would be left empty (the entry's group, the event, `hooks`).
-fn first_ours(root: &Node) -> Option<Cut<'_>> {
+fn first_ours<'a>(root: &'a Node, own: &str) -> Option<Cut<'a>> {
     let hooks = get(root, "hooks")?;
     let Kind::Obj(events) = &hooks.kind else {
         return None;
@@ -184,7 +190,7 @@ fn first_ours(root: &Node) -> Option<Cut<'_>> {
         };
         for (gi, g) in groups.iter().enumerate() {
             let es = entries(g);
-            let Some(ei) = es.iter().position(|e| ours(e).is_some()) else {
+            let Some(ei) = es.iter().position(|e| ours(e, own).is_some()) else {
                 continue;
             };
             let Some(inner) = get(g, "hooks") else {
@@ -211,12 +217,14 @@ enum Cut<'a> {
 }
 
 pub fn uninstall(spec: &NestedSpec, current: &str) -> Result<Plan, Refusal> {
-    let _ = spec;
+    let own = prefix(spec);
     let mut text = current.to_string();
     // Each pass removes one of ours, so the count of entries bounds it.
-    for _ in 0..=text.matches(OURS).count() {
+    for _ in 0..=text.matches(own.as_str()).count() {
         let root = read(&text)?;
-        let Some(cut) = first_ours(&root) else { break };
+        let Some(cut) = first_ours(&root, &own) else {
+            break;
+        };
         text = match cut {
             Cut::Element(arr, i) => remove_element(&text, arr, i),
             Cut::Member(obj, key) => remove_member(&text, obj, key),
@@ -234,10 +242,11 @@ pub fn installed(spec: &NestedSpec, current: Option<&str>) -> bool {
     let Some(hooks) = get(&root, "hooks") else {
         return false;
     };
+    let own = prefix(spec);
     spec.events.iter().all(|(event, sub)| {
         let want = command(spec, sub);
         matches!(event_groups(hooks, event), Ok(Some(groups))
-            if groups.iter().flat_map(entries).filter_map(ours).any(|(_, c)| c == want))
+            if groups.iter().flat_map(entries).filter_map(|e| ours(e, &own)).any(|(_, c)| c == want))
     })
 }
 
