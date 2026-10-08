@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
+import '../terminal/agent_status.dart';
+import '../terminal/agent_status_notifier.dart';
 import '../terminal/local_sessions_provider.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
@@ -47,6 +49,11 @@ final class CliEventBus {
         .read(terminalTabsProvider.notifier)
         .paneMoves
         .listen(_movedPane);
+    // A12 D11: only when what shows changes.
+    _agents = _ref
+        .read(agentStatusProvider.notifier)
+        .changes
+        .listen(_agentChanged);
   }
 
   final Ref _ref;
@@ -55,6 +62,7 @@ final class CliEventBus {
   StreamSubscription<SessionNotice>? _notices;
   StreamSubscription<PaneReplacement>? _replacements;
   StreamSubscription<PaneMove>? _movements;
+  StreamSubscription<AgentStatusChange>? _agents;
 
   /// A11 D20: panes moved to another tab that the next tab diff has not
   /// seen yet, by pane id. The move is `pane.moved`, not a close and an
@@ -379,7 +387,24 @@ final class CliEventBus {
     });
   }
 
+  // ---- agents (A12 D11) -----------------------------------------------------
+
+  void _agentChanged(AgentStatusChange c) {
+    if (!_listened) return;
+    final tab = c.tab;
+    final e = <String, Object?>{
+      'kind': 'agent.status',
+      'pane': c.pane,
+      'tab': ?tab,
+      'agent': c.agent.name,
+      // `none`: the agent ended or its pane went.
+      'status': c.state == null ? 'none' : agentStateWire(c.state!),
+    };
+    tab == null ? _emit(e) : _emitFor(tab, e);
+  }
+
   void _dispose() {
+    unawaited(_agents?.cancel());
     for (final s in _subs) {
       s.close();
     }

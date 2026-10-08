@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
+import '../terminal/agent_status.dart';
+import '../terminal/agent_status_notifier.dart';
 import '../terminal/local_sessions_provider.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/sidebar_workspaces.dart';
@@ -12,6 +14,7 @@ import 'agent_marks.dart';
 import 'cli_event_bus.dart';
 import 'cli_fields.dart';
 import 'cli_targets.dart';
+import 'ui_agent_commands.dart';
 import 'ui_config_commands.dart';
 import 'ui_pane_io.dart';
 import 'ui_ssh_commands.dart';
@@ -42,7 +45,8 @@ final class UiCommandHandler implements UiApi {
     Duration tmuxBound = kTmuxListBound,
   }) : _tmuxBound = tmuxBound,
        _io = PaneIoCommands(_ref),
-       _configCommands = ConfigCommands(_ref) {
+       _configCommands = ConfigCommands(_ref),
+       _agentCommands = AgentCommands(_ref) {
     onCommand = _io.typeCommand;
   }
 
@@ -53,6 +57,9 @@ final class UiCommandHandler implements UiApi {
 
   /// A9 D39: `ui.config.*`.
   final ConfigCommands _configCommands;
+
+  /// A12 D4: `ui.agent.event`.
+  final AgentCommands _agentCommands;
 
   /// A8 D22, D33: `ui.ssh.open` and `ui.tmux.*`.
   late final SshCommands _ssh = SshCommands(_ref, _io, tmuxBound: _tmuxBound);
@@ -103,8 +110,7 @@ final class UiCommandHandler implements UiApi {
       CliType.uiTmuxAttach => _tmuxAttach(request, (cancelled, isGone)),
       // D34: arms the daemon's forwarding of [events]; nothing to answer.
       CliType.uiEventsSubscribe => Future.value(const <String, Object?>{}),
-      // A12 D4: answered `{}` until the status model reads it (Task 7).
-      CliType.uiAgentEvent => Future.value(const <String, Object?>{}),
+      CliType.uiAgentEvent => _agentCommands.event(request),
       // ui.browser.*: pending A6.
       _ => throw CliFailure(MuxError.unknownType, 'unknown request $t'),
     };
@@ -171,6 +177,7 @@ final class UiCommandHandler implements UiApi {
     final marks = _ref.read(agentMarksProvider);
     final now = _ref.read(agentMarksClockProvider)();
     final byId = {for (final t in tabs.tabs) t.id: t};
+    final agents = _ref.read(agentStatusProvider);
 
     Map<String, Object?> pane(TerminalTab tab, PaneSession p) => {
       'id': p.id,
@@ -187,6 +194,11 @@ final class UiCommandHandler implements UiApi {
       'phone': p.phoneAttached,
       'driver': p.driver.name,
       'agent': marks.paneActive(p.id, now),
+      // A12 D11: the hook-reported agent, only while it shows.
+      if (agents[p.id] case final a? when agentStateVisible(a.state)) ...{
+        'agent_name': a.agent.name,
+        'agent_status': agentStateWire(a.state),
+      },
       'remote': ?remoteOf(p),
     };
 
