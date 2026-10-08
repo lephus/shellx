@@ -134,6 +134,8 @@ final Map<String, ActionSpec> kActionSpecs = {
     // A11 D14: the newest closed tab or pane, with its scrollback.
     const ActionSpec('reopen_closed', ActionGroup.tabs),
     const ActionSpec('new_workspace', ActionGroup.tabs),
+    // A11 D18: no default key.
+    const ActionSpec('toggle_pin_tab', ActionGroup.tabs),
     const ActionSpec('ssh_connect', ActionGroup.tabs),
     const ActionSpec('tmux_attach', ActionGroup.tabs),
     const ActionSpec(
@@ -238,6 +240,26 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint: '0.5–8',
     ),
     const ActionSpec('reset_font_size', ActionGroup.font, repeats: true),
+    // A11 D19: the text size of the selected tab's workspace.
+    const ActionSpec(
+      'increase_workspace_font_size',
+      ActionGroup.font,
+      repeats: true,
+      param: _fontStep,
+      paramHint: '0.5–8',
+    ),
+    const ActionSpec(
+      'decrease_workspace_font_size',
+      ActionGroup.font,
+      repeats: true,
+      param: _fontStep,
+      paramHint: '0.5–8',
+    ),
+    const ActionSpec(
+      'reset_workspace_font_size',
+      ActionGroup.font,
+      repeats: true,
+    ),
     const ActionSpec('next_region', ActionGroup.window, repeats: true),
     const ActionSpec('previous_region', ActionGroup.window, repeats: true),
     const ActionSpec(
@@ -332,6 +354,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'close_tab' => const CloseWholeTabIntent(),
   'reopen_closed' => const ReopenClosedIntent(),
   'new_workspace' => const NewWorkspaceIntent(),
+  'toggle_pin_tab' => const TogglePinTabIntent(),
   'ssh_connect' => const OpenSshConnectIntent(),
   'tmux_attach' => const OpenTmuxAttachIntent(),
   'goto_tab' => SelectTabIntent(int.parse(a.param!)),
@@ -362,6 +385,13 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),
   'decrease_font_size' => FontSmallerIntent(step: double.parse(a.param ?? '1')),
   'reset_font_size' => const FontResetIntent(),
+  'increase_workspace_font_size' => WorkspaceFontIntent(
+    double.parse(a.param ?? '1'),
+  ),
+  'decrease_workspace_font_size' => WorkspaceFontIntent(
+    -double.parse(a.param ?? '1'),
+  ),
+  'reset_workspace_font_size' => const WorkspaceFontIntent(0, reset: true),
   'next_region' => const NextRegionIntent(),
   'previous_region' => const PreviousRegionIntent(),
   'toggle_command_palette' => const CommandPaletteIntent(),
@@ -398,6 +428,8 @@ String describeIntent(Intent i) => switch (i) {
     'NavigateSearchIntent(${next ? 'next' : 'previous'})',
   FontBiggerIntent(:final step) when step != 1 => 'FontBiggerIntent($step)',
   FontSmallerIntent(:final step) when step != 1 => 'FontSmallerIntent($step)',
+  WorkspaceFontIntent(:final step, :final reset) =>
+    reset ? 'WorkspaceFontIntent(reset)' : 'WorkspaceFontIntent($step)',
   RunUserCommandIntent(:final name) => 'RunUserCommandIntent($name)',
   _ => i.runtimeType.toString(),
 };

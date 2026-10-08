@@ -387,6 +387,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           _announceFocusedPane();
         }
       }, enabled: (intent) => tabs.canSwapFocusedPane(intent.direction)),
+      TogglePinTabIntent: run<TogglePinTabIntent>((_) {
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        tabs.setMeta(tab.id, (m) => m.copyWith(pinned: !m.pinned));
+      }),
       BreakPaneIntent: run<BreakPaneIntent>((_) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
@@ -527,6 +532,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       FontResetIntent: run<FontResetIntent>(
         (_) => ref.read(terminalFontSizeProvider.notifier).reset(),
       ),
+      WorkspaceFontIntent: run<WorkspaceFontIntent>((i) {
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
+        final id = ref.read(sidebarWorkspacesProvider).workspaceOf(tab.id);
+        if (id == null) return;
+        if (i.reset) {
+          workspaces.resetZoom(id);
+        } else {
+          workspaces.zoom(id, i.step);
+        }
+      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
       NextRegionIntent: run<NextRegionIntent>((_) {
         closePanel();
         _cycleRegion(1);

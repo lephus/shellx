@@ -17,6 +17,7 @@ class WorkspaceHeader extends StatefulWidget {
   const WorkspaceHeader({
     super.key,
     required this.name,
+    this.fontStep = 0,
     required this.count,
     required this.collapsed,
     required this.containsSelected,
@@ -38,6 +39,9 @@ class WorkspaceHeader extends StatefulWidget {
   });
 
   final String name;
+
+  /// A11 D19: the workspace's text size step; shown in the tooltip when not 0.
+  final double fontStep;
   final int count;
   final bool collapsed;
 
@@ -135,6 +139,7 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
     final newTabLabel = ssh == null
         ? l10n.workspaceNewTab
         : l10n.workspaceNewRemoteTab(ssh);
+    final zoomTip = l10n.workspaceZoomTip(workspaceZoomText(widget.fontStep));
     final label = [
       l10n.workspaceHeaderSemantics(
         ssh == null ? widget.name : l10n.workspaceRemoteLabel(widget.name),
@@ -142,8 +147,15 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
       ),
       if (widget.containsSelected) l10n.workspaceContainsSelected,
       if (widget.hasUnread) l10n.workspaceHasUnread,
+      if (widget.fontStep != 0) zoomTip,
     ].join(', ');
 
+    final nameText = Text(
+      widget.name,
+      style: nameStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
     final countText = '${widget.count}';
     final countStyle = ShellxText.caption.copyWith(
       color: ShellxDesktopColors.textSecondary,
@@ -212,12 +224,13 @@ class WorkspaceHeaderState extends State<WorkspaceHeader> {
                   alignment: AlignmentDirectional.centerStart,
                   child: GestureDetector(
                     onDoubleTap: widget.onStartRename,
-                    child: Text(
-                      widget.name,
-                      style: nameStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: widget.fontStep == 0
+                        ? nameText
+                        : Tooltip(
+                            message: '${widget.name} · $zoomTip',
+                            excludeFromSemantics: true,
+                            child: nameText,
+                          ),
                   ),
                 ),
         ),
@@ -460,4 +473,12 @@ class _HeaderAddState extends State<_HeaderAdd> {
       ),
     ),
   );
+}
+
+/// `+2`, `-1`, `+1.5`: a workspace's text size step as the user reads it.
+String workspaceZoomText(double step) {
+  final text = step == step.roundToDouble()
+      ? step.toInt().toString()
+      : step.toString();
+  return step > 0 ? '+$text' : text;
 }

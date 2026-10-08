@@ -13,6 +13,7 @@ You are inside ShellX when `$SHELLX` is `1`. `$SHELLX_PANE_ID` is your pane, `$S
 - Never close panes or tabs you did not create. Keep the ids you create and close only those.
 - Use `--json` whenever you parse output. Ids look like `p123` (pane), `t123` (tab), `w:abc` (workspace), `p-2` (browser pane).
 - `send` types like a paste. Prefer `--cmd` on `split`/`new-tab` to start a program.
+- Tabs you open with `new-tab` (without `--workspace`) land in your own workspace, the one your pane is in. When something does not work, `shellx doctor` checks the setup (is ShellX running, is `shellx` in the PATH, are the skills installed, is the configuration valid).
 - Exit 3 means ShellX is not running. Do not start it yourself; tell the user.
 - Exit 6 with `cli_disabled`: tell the user to tick "Allow controlling ShellX from the command line" in the ShellX tray menu (Command line).
 - Exit 6 with `forbidden` when you run outside a ShellX pane (no `$SHELLX_CLI_TOKEN`): only shells ShellX opened may control it. Ask the user to tick "Allow other terminals" in the ShellX tray menu (Command line), or run the command from a ShellX pane.

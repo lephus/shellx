@@ -223,6 +223,8 @@ void main() {
       'Move to workspace…',
       'Move up',
       'Close tab',
+      'Pin tab', // A11 D18 (ids follow first use)
+      'Set description…',
     ]);
   });
 

@@ -12,6 +12,7 @@ import '../../remote/remote_state.dart';
 import '../../terminal/context_line.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/tab_attention.dart';
+import '../../terminal/tab_meta.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'agent_chip.dart';
@@ -73,6 +74,9 @@ class SessionTabRow extends StatefulWidget {
     this.onMarkRead,
     this.agent = false,
     this.portTooltip,
+    this.editingDescription = false,
+    this.onDescription,
+    this.onCancelDescription,
   });
 
   final TerminalTab tab;
@@ -130,6 +134,11 @@ class SessionTabRow extends StatefulWidget {
   /// (a server's port is forwarded over SSH).
   final String Function(int port)? portTooltip;
 
+  /// A11 D18: the description field replaces the description line.
+  final bool editingDescription;
+  final void Function(String text)? onDescription;
+  final VoidCallback? onCancelDescription;
+
   /// UI-A1 §1.3, UI-A2 §1.3, UI-A4 §1.3: the title line, then an optional
   /// notification line and an optional context line, each 14·s plus a
   /// 2 px gap: max(30, 18·s + 12); one extra line max(46, 18·s + 14·s +
@@ -139,26 +148,40 @@ class SessionTabRow extends StatefulWidget {
     TextScaler textScaler, {
     bool context = false,
     bool notification = false,
+    bool description = false,
+    bool editingDescription = false,
   }) {
-    final lines = (context ? 1 : 0) + (notification ? 1 : 0);
+    final lines =
+        (context ? 1 : 0) +
+        (notification ? 1 : 0) +
+        (description || editingDescription ? 1 : 0);
     if (lines == 0) {
       return max(
         ShellxSizes.row,
         textScaler.scale(ShellxSizes.rowTextLine) + ShellxSizes.rowTextPadding,
       );
     }
+    // The open description field is the 22 px rename field.
+    final extra = editingDescription
+        ? max(
+                ShellxSizes.renameField,
+                textScaler.scale(ShellxSizes.contextLine),
+              ) -
+              textScaler.scale(ShellxSizes.contextLine)
+        : 0.0;
     return max(
-      lines == 2
-          ? ShellxSizes.rowWithNotificationAndContext
-          : context
-          ? ShellxSizes.rowWithContext
-          : ShellxSizes.rowWithNotification,
-      textScaler.scale(ShellxSizes.rowTextLine) +
-          lines *
-              (textScaler.scale(ShellxSizes.contextLine) +
-                  ShellxSizes.contextGap) +
-          2 * ShellxSizes.rowContextPadding,
-    );
+          switch (lines) {
+            3 => ShellxSizes.rowWithThreeLines,
+            2 => ShellxSizes.rowWithNotificationAndContext,
+            _ => ShellxSizes.rowWithContext,
+          },
+          textScaler.scale(ShellxSizes.rowTextLine) +
+              lines *
+                  (textScaler.scale(ShellxSizes.contextLine) +
+                      ShellxSizes.contextGap) +
+              2 * ShellxSizes.rowContextPadding,
+        ) +
+        extra;
   }
 
   @override
@@ -204,6 +227,10 @@ class SessionTabRowState extends State<SessionTabRow> {
     final home = remote == null ? widget.home : (remote.home ?? '');
     final parts = <String>[
       '${tab.label}${remoteSemantics(l10n, tab.focused)}',
+      if (tab.meta.pinned) l10n.tabPinned,
+      if (tab.meta.status != TabStatus.none)
+        l10n.tabStatusLabel(tabStatusText(l10n, tab.meta.status)),
+      if (tab.meta.description.isNotEmpty) cleanDescription(tab.meta),
       if (tab.isSplit) l10n.sidebarPaneCount(tab.paneCount),
       if (tab.exited)
         l10n.sidebarStatusExited(tab.exitCode!)
@@ -305,6 +332,9 @@ class SessionTabRowState extends State<SessionTabRow> {
     final renaming = widget.renaming;
     final scaler = MediaQuery.textScalerOf(context);
     final withContext = tab.hasContext;
+    final editingDescription = widget.editingDescription;
+    final description = cleanDescription(tab.meta);
+    final withDescription = description.isNotEmpty || editingDescription;
     // UI-A4 §2.2: the notification line also shows while renaming (only
     // the badge hides).
     final unread = widget.unread;
@@ -313,8 +343,10 @@ class SessionTabRowState extends State<SessionTabRow> {
       scaler,
       context: withContext,
       notification: withNotification,
+      description: withDescription,
+      editingDescription: editingDescription,
     );
-    final withLines = withContext || withNotification;
+    final withLines = withContext || withNotification || withDescription;
     final background = _pressed || (widget.menuOpen && !widget.selected)
         ? ShellxDesktopColors.rowPressed
         : widget.selected
@@ -355,13 +387,28 @@ class SessionTabRowState extends State<SessionTabRow> {
     final titleTop =
         ShellxSizes.rowContextPadding + titleLine / 2 - titleBox / 2;
     final notificationLine = scaler.scale(ShellxSizes.notificationLine);
+    // A11 D18: title → description → notification → context. The open
+    // description field is the 22 px rename field.
+    final descriptionTop =
+        ShellxSizes.rowContextPadding + titleLine + ShellxSizes.contextGap;
+    final descriptionBox = editingDescription
+        ? max(ShellxSizes.renameField, contextLine)
+        : contextLine;
+    final descriptionShift = withDescription
+        ? descriptionBox + ShellxSizes.contextGap
+        : 0.0;
     final notificationTop =
-        ShellxSizes.rowContextPadding + titleLine + ShellxSizes.notificationGap;
+        ShellxSizes.rowContextPadding +
+        titleLine +
+        ShellxSizes.notificationGap +
+        descriptionShift;
     // UI-A4 §2.1: title → notification → context; the notification line
     // pushes the context line (and its port hit boxes) down.
-    final shift = withNotification
-        ? notificationLine + ShellxSizes.notificationGap
-        : 0.0;
+    final shift =
+        descriptionShift +
+        (withNotification
+            ? notificationLine + ShellxSizes.notificationGap
+            : 0.0);
     final contextTop =
         ShellxSizes.rowContextPadding +
         titleLine +
@@ -398,7 +445,23 @@ class SessionTabRowState extends State<SessionTabRow> {
               // no badge and no kept slot. Hidden while renaming (§2.2).
               : Row(
                   children: [
+                    // A11 D18: the status dot leads the title; its label
+                    // is the status text.
+                    if (tab.meta.status != TabStatus.none) ...[
+                      _MetaStatusDot(tab),
+                      const SizedBox(width: ShellxSpace.s4 + 2),
+                    ],
                     Flexible(child: _Title(tab.label, titleStyle)),
+                    if (tab.meta.pinned) ...[
+                      const SizedBox(width: ShellxSpace.s4),
+                      Icon(
+                        Icons.push_pin,
+                        key: Key('tab.pin.${tab.id}'),
+                        size: ShellxSizes.pinIcon,
+                        color: ShellxDesktopColors.textSecondary,
+                        semanticLabel: l10n.tabPinned,
+                      ),
+                    ],
                     if (unread != null) ...[
                       const SizedBox(width: ShellxSizes.badgeGap),
                       UnreadBadge(count: unread.count),
@@ -614,6 +677,42 @@ class SessionTabRowState extends State<SessionTabRow> {
                         height: titleBox,
                         child: Padding(padding: rowPadding, child: titleRow),
                       ),
+                      if (withDescription)
+                        Positioned(
+                          key: const ValueKey('row.descriptionBox'),
+                          left: ShellxSizes.contextInset,
+                          right: ShellxSpace.s8,
+                          top: descriptionTop,
+                          height: descriptionBox,
+                          child: editingDescription
+                              ? InlineNameField(
+                                  initial: tab.meta.description,
+                                  style: ShellxText.small,
+                                  label: l10n.tabDescriptionPlaceholder,
+                                  identity: ('tabDescription', tab.id),
+                                  maxLength: kTabDescriptionMaxLength,
+                                  onCommit: (text) =>
+                                      widget.onDescription?.call(text),
+                                  onCancel: () =>
+                                      widget.onCancelDescription?.call(),
+                                )
+                              : _HitBand(
+                                  cornerWidth: closeColumn,
+                                  cornerHeight: max(
+                                    0.0,
+                                    titleTop + titleBox - descriptionTop,
+                                  ),
+                                  child: Text(
+                                    description,
+                                    key: Key('tab.desc.${tab.id}'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: ShellxText.small.copyWith(
+                                      color: ShellxDesktopColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                        ),
                       if (unread != null)
                         Positioned(
                           key: const ValueKey('row.notificationBox'),
@@ -1113,3 +1212,52 @@ class _PortLinkState extends State<_PortLink> {
 
 /// One order everywhere (line, tooltips, semantics): the smallest first.
 List<int> _sortedPorts(TerminalTab tab) => [...tab.ports]..sort();
+
+/// The description as shown: the stored text is already clean, but a
+/// restored or hand-edited file is not trusted (A11 D18).
+String cleanDescription(TabMeta meta) =>
+    TabMeta.cleanDescription(meta.description);
+
+/// The words for a status (the dot has no other label).
+String tabStatusText(AppLocalizations l10n, TabStatus status) =>
+    switch (status) {
+      TabStatus.none => l10n.tabStatusNone,
+      TabStatus.inProgress => l10n.tabStatusInProgress,
+      TabStatus.review => l10n.tabStatusReview,
+      TabStatus.blocked => l10n.tabStatusBlocked,
+      TabStatus.done => l10n.tabStatusDone,
+    };
+
+/// The colour of a status dot (A11 D18: grey, blue, yellow, red, green).
+Color tabStatusColor(TabStatus status) => switch (status) {
+  TabStatus.none => ShellxDesktopColors.dim,
+  TabStatus.inProgress => ShellxDesktopColors.statusInProgress,
+  TabStatus.review => ShellxDesktopColors.warn,
+  TabStatus.blocked => ShellxDesktopColors.err,
+  TabStatus.done => ShellxDesktopColors.ok,
+};
+
+class _MetaStatusDot extends StatelessWidget {
+  const _MetaStatusDot(this.tab);
+  final TerminalTab tab;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final status = tab.meta.status;
+    return Semantics(
+      label: l10n.tabStatusLabel(tabStatusText(l10n, status)),
+      child: ExcludeSemantics(
+        child: Container(
+          key: Key('tab.status.${tab.id}'),
+          width: ShellxSizes.tabStatusDot,
+          height: ShellxSizes.tabStatusDot,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: tabStatusColor(status),
+          ),
+        ),
+      ),
+    );
+  }
+}

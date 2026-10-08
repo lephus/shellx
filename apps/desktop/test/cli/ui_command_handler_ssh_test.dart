@@ -71,6 +71,24 @@ void main() {
     await c.read(terminalTabsProvider.notifier).openTab(); // user's tab 100
   });
 
+  test('ui.ssh.open from a pane in a local workspace: the server still gets '
+      'its own workspace, the caller\'s is untouched (A8 D23)', () async {
+    final api = c
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'api');
+    await call('ui.tab.new', {'workspace': 'api'}); // tab 101 in `api`
+    final before = side().tabsOf(api).toList();
+    final r = await call('ui.ssh.open', {
+      'target': 'devbox',
+      'fromPane': 101,
+      'fromTab': 101,
+    });
+    final home = side().workspaceOf(r['tab']! as int)!;
+    expect(side().workspace(home)!.ssh, 'devbox');
+    expect(home, isNot(api));
+    expect(side().tabsOf(api), before);
+  });
+
   test('ui.ssh.open: validates, lands in the SSH workspace, no focus, '
       '--cmd types once ready (D33)', () async {
     final r = await call('ui.ssh.open', {

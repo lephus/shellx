@@ -18,10 +18,18 @@ impl Session for Fake {
         self.log.borrow_mut().push(Message::new(t, fields));
         if t == "api.version" {
             let caps = self.caps.iter().map(|c| Value::text(*c)).collect();
-            return Ok(Message::new(
-                "result",
-                vec![("api", Value::Int(1)), ("caps", Value::Array(caps))],
-            ));
+            let mut fields = vec![("api", Value::Int(1)), ("caps", Value::Array(caps))];
+            // A test may add what the host also says (`app`).
+            if let Some(i) = self.answers.iter().position(|(n, _)| *n == t) {
+                if let Ok(extra) = self.answers.remove(i).unwrap().1 {
+                    for k in ["app", "host"] {
+                        if let Some(v) = extra.get(k) {
+                            fields.push((k, v.clone()));
+                        }
+                    }
+                }
+            }
+            return Ok(Message::new("result", fields));
         }
         match self.answers.iter().position(|(n, _)| *n == t) {
             Some(i) => self.answers.remove(i).unwrap().1,
@@ -130,6 +138,7 @@ fn go_caps(
             shared_terminal: opts.1,
             connect: &connect,
             stdout_gone: None,
+            exe: Some(PathBuf::from("/opt/x/bin/shellx")),
         };
         run(&p, &mut ctx)
     };
@@ -893,6 +902,7 @@ fn events_print_json_lines_until_closed() {
         shared_terminal: false,
         connect: &connect,
         stdout_gone: None,
+        exe: None,
     };
     assert_eq!(run(&p, &mut ctx), 3); // ShellX closed the stream
     assert_eq!(
@@ -1001,6 +1011,7 @@ fn follow_into(kind: std::io::ErrorKind) -> (i32, usize, bool) {
         shared_terminal: false,
         connect: &connect,
         stdout_gone: None,
+        exe: None,
     };
     let code = run(&p, &mut ctx);
     let pulled = *pulled.borrow();
@@ -1628,4 +1639,305 @@ fn plain_drops_controls_and_bidi_controls() {
     );
     assert_eq!(plain("a\u{2066}b\u{2067}c\u{2068}d\u{2069}e"), "abcde");
     assert_eq!(plain("máy-chủ"), "máy-chủ");
+}
+
+// ---- A11 D26: tabs open where the caller lives; config validate; doctor ----
+
+fn tab_new_answer() -> Vec<(&'static str, Result<Message, ApiError>)> {
+    vec![(
+        "ui.tab.new",
+        ok(vec![("tab", Value::Int(101)), ("pane", Value::Int(101))]),
+    )]
+}
+
+#[test]
+fn new_tab_sends_the_callers_pane_and_tab_when_no_workspace_is_given() {
+    let o = go(
+        &["new-tab"],
+        &[("SHELLX_TAB_ID", "100"), ("SHELLX_PANE_ID", "100")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    let m = sent(&o, "ui.tab.new");
+    assert_eq!(m.get("fromPane"), Some(&Value::Int(100)));
+    assert_eq!(m.get("fromTab"), Some(&Value::Int(100)));
+    assert_eq!(m.get("workspace"), None);
+    assert_eq!(
+        m.get("focus"),
+        Some(&Value::Bool(false)),
+        "still no focus stealing"
+    );
+}
+
+#[test]
+fn a_pane_that_moved_is_found_by_its_pane_id_not_the_stale_tab() {
+    // The shell was started in tab 100 and its pane now lives in another
+    // tab: both ids go out, the host resolves the pane first.
+    let o = go(
+        &["new-tab"],
+        &[("SHELLX_TAB_ID", "100"), ("SHELLX_PANE_ID", "205")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    let m = sent(&o, "ui.tab.new");
+    assert_eq!(m.get("fromPane"), Some(&Value::Int(205)));
+    assert_eq!(m.get("fromTab"), Some(&Value::Int(100)));
+}
+
+#[test]
+fn only_the_pane_id_is_enough_and_only_the_tab_id_too() {
+    let p = go(
+        &["new-tab"],
+        &[("SHELLX_PANE_ID", "7")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    assert_eq!(sent(&p, "ui.tab.new").get("fromPane"), Some(&Value::Int(7)));
+    assert_eq!(sent(&p, "ui.tab.new").get("fromTab"), None);
+    let t = go(
+        &["new-tab"],
+        &[("SHELLX_TAB_ID", "8")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    assert_eq!(sent(&t, "ui.tab.new").get("fromTab"), Some(&Value::Int(8)));
+    assert_eq!(sent(&t, "ui.tab.new").get("fromPane"), None);
+}
+
+#[test]
+fn an_explicit_workspace_wins_over_the_callers() {
+    let o = go(
+        &["new-tab", "--workspace", "Build"],
+        &[("SHELLX_TAB_ID", "100"), ("SHELLX_PANE_ID", "100")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    let m = sent(&o, "ui.tab.new");
+    assert_eq!(m.get("workspace"), Some(&Value::text("Build")));
+    assert_eq!(m.get("fromTab"), None);
+    assert_eq!(m.get("fromPane"), None);
+}
+
+#[test]
+fn outside_a_shellx_pane_nothing_changes() {
+    let o = go(&["new-tab"], &[], tab_new_answer(), "", PLAIN);
+    let m = sent(&o, "ui.tab.new");
+    assert_eq!(m.get("fromTab"), None);
+    assert_eq!(m.get("fromPane"), None);
+    // An id that is not canonical is ignored, never forwarded.
+    let bad = go(
+        &["new-tab"],
+        &[("SHELLX_TAB_ID", "007"), ("SHELLX_PANE_ID", "x1")],
+        tab_new_answer(),
+        "",
+        PLAIN,
+    );
+    let m = sent(&bad, "ui.tab.new");
+    assert_eq!((m.get("fromTab"), m.get("fromPane")), (None, None));
+}
+
+#[test]
+fn ssh_keeps_its_server_workspace_and_sends_no_caller() {
+    let o = go(
+        &["ssh", "devbox"],
+        &[("SHELLX_TAB_ID", "100"), ("SHELLX_PANE_ID", "100")],
+        vec![(
+            "ui.ssh.open",
+            ok(vec![("tab", Value::Int(101)), ("pane", Value::Int(101))]),
+        )],
+        "",
+        PLAIN,
+    );
+    let m = sent(&o, "ui.ssh.open");
+    assert_eq!((m.get("fromTab"), m.get("fromPane")), (None, None));
+}
+
+#[test]
+fn config_validate_is_config_check() {
+    let o = go(
+        &["config", "validate"],
+        &[],
+        vec![(
+            "ui.config.check",
+            ok(vec![
+                ("problems", Value::Array(vec![])),
+                ("generation", Value::Int(3)),
+            ]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 0);
+    assert_eq!(o.out, "no problems\n");
+    assert!(o.log.iter().any(|m| m.t == "ui.config.check"));
+    let e = go(
+        &["config", "validate"],
+        &[],
+        problem_answer("error"),
+        "",
+        PLAIN,
+    );
+    assert_eq!(e.code, 1);
+    assert!(e.out.contains("error: font-size"), "{}", e.out);
+    let j = go(
+        &["config", "validate", "--json"],
+        &[],
+        problem_answer("warning"),
+        "",
+        PLAIN,
+    );
+    assert_eq!((j.code, j.out.lines().count()), (0, 1));
+}
+
+fn config_answer(errors: usize, warnings: usize) -> Vec<(&'static str, Result<Message, ApiError>)> {
+    let one = |severity: &str| {
+        Value::map(vec![
+            (
+                "file",
+                Value::text("/Users/secret-name/.config/shellx/config"),
+            ),
+            ("line", Value::Int(3)),
+            ("severity", Value::text(severity)),
+            ("code", Value::text("badValue")),
+            ("message", Value::text("password = hunter2 is not valid")),
+        ])
+    };
+    let mut problems = vec![];
+    problems.extend((0..errors).map(|_| one("error")));
+    problems.extend((0..warnings).map(|_| one("warning")));
+    vec![(
+        "ui.config.check",
+        ok(vec![("problems", Value::Array(problems))]),
+    )]
+}
+
+#[test]
+fn doctor_reports_the_config_errors_and_exits_1_without_printing_them() {
+    let o = go(
+        &["doctor"],
+        &[("PATH", "/opt/x/bin:/usr/bin")],
+        config_answer(1, 0),
+        "",
+        PLAIN,
+    );
+    assert_eq!(o.code, 1);
+    assert!(o.out.contains("✓ ShellX is running\n"), "{}", o.out);
+    assert!(
+        o.out.contains("✗ Configuration: 1 error, 0 warnings\n"),
+        "{}",
+        o.out
+    );
+    assert!(
+        o.out.ends_with("problem found.\n") || o.out.contains("problem"),
+        "{}",
+        o.out
+    );
+    // The problem texts and the user's paths are never echoed.
+    assert!(!o.out.contains("hunter2") && !o.out.contains("secret-name"));
+    assert!(!o.err.contains("hunter2"));
+}
+
+#[test]
+fn doctor_passes_with_warnings_only() {
+    let o = go(
+        &["doctor"],
+        &[("PATH", "/opt/x/bin")],
+        config_answer(0, 2),
+        "",
+        PLAIN,
+    );
+    assert!(
+        o.out.contains("✓ Configuration: 0 errors, 2 warnings\n"),
+        "{}",
+        o.out
+    );
+    assert!(o.out.contains("✓ shellx is in your PATH\n"), "{}", o.out);
+}
+
+#[test]
+fn doctor_without_the_app_says_so_and_skips_the_config_line() {
+    let o = go(
+        &["doctor"],
+        &[("PATH", "/nonexistent/bin")],
+        vec![],
+        "",
+        (
+            false,
+            false,
+            Some(ApiError::NotRunning("ShellX is not running".into())),
+        ),
+    );
+    assert_eq!(o.code, 1);
+    assert!(o.out.contains("✗ ShellX is not running"), "{}", o.out);
+    assert!(!o.out.contains("Configuration"), "{}", o.out);
+    assert!(o.out.contains("✗ shellx is not in your PATH"), "{}", o.out);
+    assert_eq!(o.err, "", "the verdict is on stdout, not an error");
+}
+
+#[test]
+fn doctor_json_is_one_object_and_a_missing_cap_is_a_failed_check() {
+    let o = go_caps(
+        &["doctor", "--json"],
+        &[("PATH", "/opt/x/bin")],
+        vec![],
+        "",
+        PLAIN,
+        &["ui.ls"],
+    );
+    assert_eq!(o.out.lines().count(), 1, "{}", o.out);
+    assert!(o.out.starts_with("{\"checks\":["), "{}", o.out);
+    assert!(
+        o.out.contains("\"id\":\"config\",\"ok\":false"),
+        "{}",
+        o.out
+    );
+    assert_eq!(o.code, 1);
+}
+
+#[test]
+fn doctor_compares_the_cli_and_app_versions() {
+    let ver = env!("CARGO_PKG_VERSION");
+    let same = go(
+        &["doctor"],
+        &[("PATH", "/opt/x/bin")],
+        vec![(
+            "api.version",
+            ok(vec![("app", Value::text(format!("{ver}+7")))]),
+        )],
+        "",
+        PLAIN,
+    );
+    assert!(
+        same.out
+            .contains(&format!("✓ shellx and ShellX are both {ver}\n")),
+        "build metadata after + is ignored: {}",
+        same.out
+    );
+    let other = go(
+        &["doctor"],
+        &[("PATH", "/opt/x/bin")],
+        vec![("api.version", ok(vec![("app", Value::text("99.1.0"))]))],
+        "",
+        PLAIN,
+    );
+    assert_eq!(other.code, 1);
+    assert!(
+        other
+            .out
+            .contains(&format!("✗ shellx {ver} and ShellX 99.1.0 differ")),
+        "{}",
+        other.out
+    );
+    // An app that does not say its version: nothing to compare.
+    let none = go(&["doctor"], &[("PATH", "/opt/x/bin")], vec![], "", PLAIN);
+    assert!(
+        !none.out.contains("differ") && !none.out.contains("both"),
+        "{}",
+        none.out
+    );
 }

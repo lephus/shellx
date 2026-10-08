@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:xterm/xterm.dart' show TerminalStyle;
 
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
@@ -12,6 +14,7 @@ import '../../agent/desktop_services.dart' show clockProvider;
 import '../../mux/daemon_state.dart';
 import '../../restore/restore_persistence.dart';
 import '../../restore/scrollback_codec.dart' show formatRestoreTime;
+import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_font_size.dart';
@@ -271,6 +274,20 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
       regular: appearance.regular,
       cellHeightPercent: appearance.cellHeightPercent,
     );
+    // A11 D19: a tab draws at the global size plus its workspace's step.
+    // Only the steps are watched, so a sidebar change that moves none
+    // rebuilds nothing here.
+    final steps = ref.watch(sidebarWorkspacesProvider.select(_tabSteps));
+    final styles = <double, TerminalStyle>{0: style};
+    TerminalStyle styleFor(int tabId) => styles.putIfAbsent(
+      steps.of(tabId),
+      () => desktopTerminalStyle(
+        effectiveFontSize(fontSize, steps.of(tabId)),
+        families: appearance.families,
+        regular: appearance.regular,
+        cellHeightPercent: appearance.cellHeightPercent,
+      ),
+    );
     final tabs = ref.read(terminalTabsProvider.notifier);
     final selectedIndex = selected == null ? 0 : state.tabs.indexOf(selected);
     _dropClosed(state.tabs);
@@ -355,7 +372,12 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                   // Only stores the size for the next open: safe during layout.
                   if (grid != null) tabs.reportGrid(grid);
                   final scaler = MediaQuery.textScalerOf(context);
-                  final cell = measureTerminalCell(style, scaler);
+                  // The selected tab's own size (A11 D19): its panes are the
+                  // ones being laid out.
+                  final cell = measureTerminalCell(
+                    styleFor(selected?.id ?? -1),
+                    scaler,
+                  );
                   // D4: 20 × 5 cells + padding + the pane header.
                   tabs.reportPaneMetrics(
                     PaneMetrics(
@@ -402,7 +424,7 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                   tab: tab,
                                   selected: tab.id == selected?.id,
                                   terminalFocus: widget.terminalFocus,
-                                  style: style,
+                                  style: styleFor(tab.id),
                                   shortcuts: widget.shortcuts,
                                   onKeyEvent: widget.onKeyEvent,
                                   scrollFor: _scrollFor,
@@ -508,3 +530,28 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
         ),
       );
 }
+
+/// A11 D19: the text size step of every tab whose workspace has one, with
+/// value equality so `select` only fires when a step really changes.
+@immutable
+final class _TabSteps {
+  const _TabSteps(this._byTab);
+  final Map<int, double> _byTab;
+
+  double of(int tabId) => _byTab[tabId] ?? 0;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _TabSteps && mapEquals(other._byTab, _byTab);
+
+  @override
+  int get hashCode => Object.hashAllUnordered([
+    for (final e in _byTab.entries) Object.hash(e.key, e.value),
+  ]);
+}
+
+_TabSteps _tabSteps(SidebarState s) => _TabSteps({
+  for (final w in s.workspaces)
+    if (w.fontStep != 0)
+      for (final id in s.tabsOf(w.id)) id: w.fontStep,
+});

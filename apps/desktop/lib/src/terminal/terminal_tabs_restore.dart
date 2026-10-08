@@ -313,6 +313,7 @@ extension _Restore on TerminalTabs {
             : null,
         paneHistory: [focus, ...order.where((id) => id != focus)],
         customTitle: saved.name,
+        meta: saved.meta,
       );
       tabIdByKey[saved.key] = tab.id;
       tabs.add(tab);
@@ -496,6 +497,7 @@ extension _Restore on TerminalTabs {
           : null,
       paneHistory: [focus, ...order.where((id) => id != focus)],
       customTitle: saved.name,
+      meta: saved.meta,
     );
     _ref.read(restorePlacementProvider).pending[tab.id] = workspaceId;
     _set(tabs: [..._state.tabs, tab]);

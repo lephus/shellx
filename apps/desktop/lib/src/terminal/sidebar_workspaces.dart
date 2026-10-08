@@ -13,10 +13,18 @@ import '../platform/settings_store.dart';
 import '../remote/ssh_settings.dart';
 import '../restore/restore_snapshot.dart';
 import 'local_sessions_provider.dart';
+import 'tab_meta.dart';
+import 'terminal_font_size.dart';
+import 'terminal_style.dart' show kTerminalFontSizeMax, kTerminalFontSizeMin;
 import 'terminal_tabs.dart';
 
 const String kDefaultWorkspaceId = 'default';
 const int kWorkspaceNameMaxLength = 64;
+
+/// A11 D19: how far a workspace's text size may sit from the global one,
+/// in points.
+const double kWorkspaceFontStepMin = -6;
+const double kWorkspaceFontStepMax = 10;
 
 /// At most [kWorkspaceNameMaxLength] user-perceived characters (a cut
 /// never splits an accent from its letter), trimmed after the cut.
@@ -30,6 +38,7 @@ final class Workspace {
     this.name,
     this.collapsed = false,
     this.ssh,
+    this.fontStep = 0,
   });
 
   final String id;
@@ -43,23 +52,30 @@ final class Workspace {
   /// null for a local workspace.
   final String? ssh;
 
+  /// A11 D19: points added to the global text size for every tab here
+  /// (JSON key `zoom`; −6…+10; 0 when missing or odd).
+  final double fontStep;
+
   bool get isDefault => id == kDefaultWorkspaceId;
 
   String displayName(AppLocalizations l10n) =>
       name ?? l10n.workspaceDefaultName;
 
-  Workspace copyWith({String? name, bool? collapsed}) => Workspace(
-    id: id,
-    name: name ?? this.name,
-    collapsed: collapsed ?? this.collapsed,
-    ssh: ssh,
-  );
+  Workspace copyWith({String? name, bool? collapsed, double? fontStep}) =>
+      Workspace(
+        id: id,
+        name: name ?? this.name,
+        collapsed: collapsed ?? this.collapsed,
+        ssh: ssh,
+        fontStep: fontStep ?? this.fontStep,
+      );
 
   String encode() => jsonEncode({
     'id': id,
     if (name != null) 'name': name,
     'collapsed': collapsed,
     if (ssh != null) 'ssh': ssh,
+    if (fontStep != 0) 'zoom': fontStep,
   });
 
   /// Null for anything that is not a well-formed entry (Review Focus 5).
@@ -75,6 +91,7 @@ final class Workspace {
     final name = value['name'];
     final collapsed = value['collapsed'];
     final rawSsh = value['ssh'];
+    final rawZoom = value['zoom'];
     if (id is! String || id.isEmpty || id.length > 64) return null;
     if (name != null && name is! String) return null;
     if (collapsed != null && collapsed is! bool) return null;
@@ -89,6 +106,14 @@ final class Workspace {
       name: clean.isEmpty ? null : _clip(clean),
       collapsed: collapsed as bool? ?? false,
       ssh: id == kDefaultWorkspaceId ? null : ssh,
+      // A11 D19: anything but a finite number is no zoom; a number is cut
+      // to the allowed range.
+      fontStep: rawZoom is num && rawZoom.isFinite
+          ? rawZoom
+                .toDouble()
+                .clamp(kWorkspaceFontStepMin, kWorkspaceFontStepMax)
+                .toDouble()
+          : 0,
     );
   }
 
@@ -98,10 +123,11 @@ final class Workspace {
       other.id == id &&
       other.name == name &&
       other.collapsed == collapsed &&
-      other.ssh == ssh;
+      other.ssh == ssh &&
+      other.fontStep == fontStep;
 
   @override
-  int get hashCode => Object.hash(id, name, collapsed, ssh);
+  int get hashCode => Object.hash(id, name, collapsed, ssh, fontStep);
 }
 
 /// The stored list, without broken or duplicate entries, and always with
@@ -132,6 +158,16 @@ final class RenameTab extends RenameTarget {
   bool operator ==(Object other) => other is RenameTab && other.id == id;
   @override
   int get hashCode => id.hashCode;
+}
+
+/// A11 D18: the tab whose one-line description field is open.
+final class EditDescription extends RenameTarget {
+  const EditDescription(this.id);
+  final int id;
+  @override
+  bool operator ==(Object other) => other is EditDescription && other.id == id;
+  @override
+  int get hashCode => Object.hash('desc', id);
 }
 
 final class RenameWorkspace extends RenameTarget {
@@ -182,6 +218,13 @@ final class SidebarState {
       if (tabs.contains(tabId)) return id;
     }
     return null;
+  }
+
+  /// A11 D19: the text size step of the workspace holding [tabId]; 0 for
+  /// a tab not placed yet.
+  double fontStepOf(int tabId) {
+    final id = workspaceOf(tabId);
+    return id == null ? 0 : workspace(id)?.fontStep ?? 0;
   }
 
   List<int> get orderedTabIds => [for (final w in workspaces) ...tabsOf(w.id)];
@@ -244,6 +287,14 @@ final class SidebarState {
         : renaming as RenameTarget?,
   );
 }
+
+/// A11 D19: the step of the workspace of the selected tab (0 with none);
+/// Settings says its preview does not include it.
+final selectedWorkspaceFontStepProvider = Provider<double>((ref) {
+  final selected = ref.watch(terminalTabsProvider.select((s) => s.selectedId));
+  final sidebar = ref.watch(sidebarWorkspacesProvider);
+  return selected == null ? 0 : sidebar.fontStepOf(selected);
+});
 
 final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => ref.watch(desktopServicesProvider).settings,
@@ -444,6 +495,39 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     _save();
   }
 
+  /// A11 D19: [delta] points more (or fewer) for every tab of workspace
+  /// [id], kept within −6…+10 and saved with the workspace.
+  void zoom(String id, double delta) {
+    final w = state.workspace(id);
+    if (w == null) return;
+    _setFontStep(w, w.fontStep + delta);
+  }
+
+  void resetZoom(String id) {
+    final w = state.workspace(id);
+    if (w != null) _setFontStep(w, 0);
+  }
+
+  void _setFontStep(Workspace w, double step) {
+    // A press never builds up a hidden step: global + step stays within
+    // the 9-28 the text can be drawn at.
+    final global = ref.read(terminalFontSizeProvider);
+    final next = step
+        .clamp(
+          max(kWorkspaceFontStepMin, kTerminalFontSizeMin - global),
+          min(kWorkspaceFontStepMax, kTerminalFontSizeMax - global),
+        )
+        .toDouble();
+    if (next == w.fontStep) return;
+    state = state.copyWith(
+      workspaces: [
+        for (final x in state.workspaces)
+          x.id == w.id ? x.copyWith(fontStep: next) : x,
+      ],
+    );
+    _save();
+  }
+
   void toggleCollapsed(String id) {
     final w = state.workspace(id);
     if (w != null) setCollapsed(id, !w.collapsed);
@@ -513,7 +597,15 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
         ],
     };
     final target = members[workspaceId]!;
-    target.insert(at.clamp(0, target.length), tabId);
+    // A11 D18: pinned tabs are the first of a workspace, others after.
+    final pinnedCount = target.where(_isPinned).length;
+    final isPinned = _isPinned(tabId);
+    target.insert(
+      isPinned
+          ? at.clamp(0, pinnedCount)
+          : at.clamp(pinnedCount, target.length),
+      tabId,
+    );
     final selected = ref.read(terminalTabsProvider).selectedId == tabId;
     state = state.copyWith(
       members: members,
@@ -541,6 +633,8 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     final list = state.tabsOf(from);
     final next = list.indexOf(tabId) + step;
     if (next >= 0 && next < list.length) {
+      // A11 D18: one step never crosses between the pinned and the rest.
+      if (_isPinned(list[next]) != _isPinned(tabId)) return null;
       return (from, step > 0 ? next + 1 : next);
     }
     if (!state.showHeaders) return null;
@@ -604,6 +698,9 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
         state.tabsOf(w.id).where((id) => !moved.contains(id)),
       );
     }
+    for (final w in members.keys) {
+      members[w] = sortPinnedFirst(members[w]!, _isPinned);
+    }
     final selectedIn = selectedTabId == null
         ? null
         : members.entries
@@ -615,6 +712,16 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       currentId: selectedIn ?? state.currentId,
     );
   }
+
+  bool _isPinned(int tabId) =>
+      ref
+          .read(terminalTabsProvider)
+          .tabs
+          .where((t) => t.id == tabId)
+          .firstOrNull
+          ?.meta
+          .pinned ??
+      false;
 
   void startRename(RenameTarget target) =>
       state = state.copyWith(renaming: target);
@@ -661,6 +768,13 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       members[target]!.add(tab.id);
       expand.add(target); // a tab opened here is never born hidden
     }
+    // A11 D18: pinned tabs lead their workspace, whatever changed.
+    for (final w in members.keys.toList()) {
+      members[w] = sortPinnedFirst(
+        members[w]!,
+        (id) => live[id]?.meta.pinned ?? false,
+      );
+    }
     var current = s.currentId;
     final selected = tabs.selectedId;
     if (selected != null) {
@@ -671,6 +785,7 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     if (!members.containsKey(current)) current = kDefaultWorkspaceId;
     final renaming = switch (s.renaming) {
       RenameTab(:final id) when !live.containsKey(id) => null,
+      EditDescription(:final id) when !live.containsKey(id) => null,
       final other => other,
     };
     final workspaces = expand.isEmpty

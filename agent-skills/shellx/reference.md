@@ -77,7 +77,7 @@ Exit codes: 0, 3, 6, 7.
 
 `shellx new-tab [--workspace W] [--cwd DIR] [--cmd COMMAND] [--focus]` — open a tab; prints `t<id>`.
 
-- `--workspace`: workspace id (`w:<id>`) or name; default the current workspace.
+- `--workspace`: workspace id (`w:<id>`) or name. Without it, a command run inside a ShellX pane opens the tab in the workspace that pane is in *now* (a tab you dragged to another workspace counts; the pane is looked up by `$SHELLX_PANE_ID`, so it follows a pane moved to another tab), else that of `$SHELLX_TAB_ID`; from a script outside ShellX: the user's current workspace.
 - `--cwd`: relative paths are made absolute from your directory; a missing directory falls back to home.
 - `--cmd`: see "The `--cmd` rule".
 - `--focus`: select the new tab (default: the user's selection stays).
@@ -283,7 +283,7 @@ Open a server in a tab, or attach a tmux session, from a script. `shellx` itself
 
 ## shellx ssh
 
-`shellx ssh SERVER [--workspace W] [--cwd DIR] [--cmd COMMAND] [--no-hook] [--focus] [--json]` — open a tab on a server over SSH; prints its id (`t41`; `--json`: `{"tab":"t41","pane":"p41"}`). `SERVER` is an `~/.ssh/config` alias or `user@host[:port]`. `--cwd` is a folder on the server (`/...` or `~/...`; never made absolute locally). `--cmd` is typed only after the server shell says hello (the ShellX hook runs there), never into a sign-in prompt; it needs the hook, so `--no-hook` with `--cmd` (or a server set to no hook) is refused (exit 2, `bad_request`: "--cmd needs the server hook"), and it is dropped when the pane ends or no hello comes within 60 s (at most 16 KiB). `--no-hook` skips installing the ShellX hook on the server. The tab opens in the server's SSH workspace unless `--workspace` is given, and the user's focus is left alone unless `--focus`. Exit codes: 0, 1 (`ssh_unavailable`: no ssh on this computer; `spawn_failed`, `session_limit`, `busy`), 2, 3, 6, 7.
+`shellx ssh SERVER [--workspace W] [--cwd DIR] [--cmd COMMAND] [--no-hook] [--focus] [--json]` — open a tab on a server over SSH; prints its id (`t41`; `--json`: `{"tab":"t41","pane":"p41"}`). `SERVER` is an `~/.ssh/config` alias or `user@host[:port]`. `--cwd` is a folder on the server (`/...` or `~/...`; never made absolute locally). `--cmd` is typed only after the server shell says hello (the ShellX hook runs there), never into a sign-in prompt; it needs the hook, so `--no-hook` with `--cmd` (or a server set to no hook) is refused (exit 2, `bad_request`: "--cmd needs the server hook"), and it is dropped when the pane ends or no hello comes within 60 s (at most 16 KiB). `--no-hook` skips installing the ShellX hook on the server. The tab opens in the server's SSH workspace (made on first use) unless `--workspace` is given, and the user's focus is left alone unless `--focus`. Exit codes: 0, 1 (`ssh_unavailable`: no ssh on this computer; `spawn_failed`, `session_limit`, `busy`), 2, 3, 6, 7.
 
 ## shellx tmux ls
 
@@ -308,6 +308,10 @@ A pane that is remote shows in `shellx ls` as `[ssh host]` or `[tmux host:name]`
 
 `shellx config check` — check the configuration files as they are now, without applying anything. Prints `file:line: severity: message` per problem (`file: severity: message` when it concerns the whole file), or `no problems`. Exit 1 when there are errors (warnings alone exit 0). `--json`: `{"problems":[{"file","line","severity","code","key"?,"message"}],"generation"}`. Exit codes: 0, 1, 3, 6, 7, 8.
 
+## shellx config validate
+
+`shellx config validate` — the same as `shellx config check`: same request, same output, same exit codes (0, 1, 3, 6, 7, 8).
+
 ## shellx config reload
 
 `shellx config reload` — reload now, as Cmd/Ctrl+Shift+, does. Silent when there are no errors; otherwise the problems as in `check`, exit 1. `--json`: the same object as `check`. Exit codes: 0, 1, 3, 6, 7, 8.
@@ -315,6 +319,10 @@ A pane that is remote shows in `shellx ls` as `[ssh host]` or `[tmux host:name]`
 ## shellx config show
 
 `shellx config show [--defaults]` — every key in effect, as `key = value  # file:line` (`# default` when no line sets it). `--defaults`: a commented file with every key at its default. `--json`: `{"values":[{"key","value","source"}],"files":{"shellx","ghostty":["…"]}}` or `{"template":"…"}`. Exit codes: 0, 3, 6, 7, 8 (7 also on a ShellX older than this command).
+
+## shellx doctor
+
+`shellx doctor [--json]` — check the setup, one line per check: `✓ …` or `✗ …`. ShellX is running; `shellx` and ShellX are the same version (only when ShellX says its version); `shellx` is in your PATH; the agent skills are installed (`~/.claude/skills/shellx`, or the Codex folders); and, when ShellX runs, `Configuration: N errors, M warnings` (warnings alone pass). A failed check ends with `N problem(s) found.` and exit 1. It never prints file contents, problem texts or folders. `--json`: `{"checks":[{"id","ok","message"}],"ok":bool}` with ids `app`, `version`, `path`, `skills`, `config`. A failed check is the answer, not an error: nothing goes to stderr. Exit codes: 0, 1.
 
 ## shellx skills install
 

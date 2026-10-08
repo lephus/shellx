@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/cli/agent_marks.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
+import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
@@ -454,6 +455,75 @@ void main() {
       expect(tabs().selectedId, r['tab']);
       expect(side().workspaceOf(r['tab']! as int), ws);
       expect(side().currentId, ws);
+    });
+  });
+
+  group('A11 D26: a new tab opens where the caller lives', () {
+    late String w2;
+
+    setUp(() async {
+      w2 = c.read(sidebarWorkspacesProvider.notifier).createFor(name: 'api');
+      // Tab 101 sits in `api`; the user's selected tab 100 stays in Default.
+      await call('ui.tab.new', {'workspace': 'api'});
+      expect(side().workspaceOf(101), w2);
+      expect(tabs().selectedId, 100);
+    });
+
+    test('fromTab: the new tab goes to that tab\'s workspace and nothing is '
+        'selected', () async {
+      final r = await call('ui.tab.new', {'fromTab': 101});
+      expect(side().workspaceOf(r['tab']! as int), w2);
+      expect(tabs().selectedId, 100, reason: 'focus false by default');
+      expect(side().currentId, kDefaultWorkspaceId);
+    });
+
+    test('fromPane wins over a stale fromTab: the pane moved to another '
+        'tab', () async {
+      final notifier = c.read(terminalTabsProvider.notifier);
+      notifier.select(101);
+      await notifier.split(SplitAxis.row); // pane 102 in tab 101
+      expect(notifier.joinPane(102, 100), isTrue); // now in tab 100 (Default)
+      expect(tabs().tabOfSession(102)!.id, 100);
+      notifier.select(100);
+      final r = await call('ui.tab.new', {'fromPane': 102, 'fromTab': 101});
+      expect(
+        side().workspaceOf(r['tab']! as int),
+        kDefaultWorkspaceId,
+        reason: 'the pane lives in Default now, whatever the old env says',
+      );
+    });
+
+    test('a pane that is gone falls back to fromTab, then to the current '
+        'workspace', () async {
+      final a = await call('ui.tab.new', {'fromPane': 999, 'fromTab': 101});
+      expect(side().workspaceOf(a['tab']! as int), w2);
+      final b = await call('ui.tab.new', {'fromPane': 999, 'fromTab': 888});
+      expect(side().workspaceOf(b['tab']! as int), kDefaultWorkspaceId);
+      final closed = await call('ui.tab.new', {'fromTab': 101});
+      c.read(terminalTabsProvider.notifier).close(closed['tab']! as int);
+      final d = await call('ui.tab.new', {'fromTab': closed['tab']});
+      expect(side().workspaceOf(d['tab']! as int), kDefaultWorkspaceId);
+    });
+
+    test('an explicit workspace wins over fromTab and fromPane', () async {
+      final r = await call('ui.tab.new', {
+        'workspace': 'Default',
+        'fromTab': 101,
+        'fromPane': 101,
+      });
+      expect(side().workspaceOf(r['tab']! as int), kDefaultWorkspaceId);
+    });
+
+    test('odd values are ignored, never an error', () async {
+      final r = await call('ui.tab.new', {'fromTab': 'x', 'fromPane': 1.5});
+      expect(side().workspaceOf(r['tab']! as int), kDefaultWorkspaceId);
+    });
+
+    test('the caller\'s workspace stays collapsed and unselected', () async {
+      c.read(sidebarWorkspacesProvider.notifier).setCollapsed(w2, true);
+      final r = await call('ui.tab.new', {'fromTab': 101, 'focus': false});
+      expect(side().workspaceOf(r['tab']! as int), w2);
+      expect(tabs().selectedId, 100);
     });
   });
 }

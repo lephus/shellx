@@ -10,6 +10,7 @@ import 'package:shellx_desktop/src/restore/restore_snapshot.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/tab_meta.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -181,5 +182,35 @@ void main() {
     final s = capture({1: k1, 100: k2, kSyntheticTabIdBase: k3, -1: kt});
     expect(RestoreSnapshot.tryParse(s.encode()), isNotNull);
     expect(s.tabs.map((t) => t.key).toSet(), hasLength(2));
+  });
+
+  test('captureSnapshot: pin, description and status are saved and survive '
+      'a pane move that renames the tab key (A11 D18)', () async {
+    local
+      ..add(local.summary(1, origin: SessionOrigin.desktop))
+      ..add(local.summary(2, origin: SessionOrigin.desktop));
+    boot();
+    final tabs = container.read(terminalTabsProvider.notifier);
+    tabs.select(1);
+    await tabs.split(SplitAxis.row); // tab 1: 1 | 100
+    tabs.setMeta(
+      1,
+      (m) => m.copyWith(
+        pinned: true,
+        description: 'deploy\nstaging',
+        status: TabStatus.blocked,
+      ),
+    );
+    expect(tabs.joinPane(1, 2), isTrue); // tab 1's creator moves to tab 2
+    final kt = 'd' * 32;
+    final s = capture({1: k1, 2: k2, 100: k3, -1: kt});
+    final loaded = RestoreSnapshot.tryParse(s.encode())!;
+    final first = loaded.tabs.firstWhere((t) => t.key == kt);
+    expect(first.pinned, isTrue);
+    expect(first.description, 'deploy staging');
+    expect(first.status, TabStatus.blocked);
+    final second = loaded.tabs.firstWhere((t) => t.key == k2);
+    expect(second.pinned, isFalse);
+    expect(second.status, TabStatus.none);
   });
 }

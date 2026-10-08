@@ -1,7 +1,7 @@
 //! Turns a parsed command into its request; everything that can fail
 //! locally fails here, before connecting.
 
-use super::targets::{pane, tab, target, Want};
+use super::targets::{canonical, pane, tab, target, Want};
 use super::{read_all, usage, Ctx, MAX_CMD, MAX_PATTERN, MAX_SCRIPT, MAX_TEXT};
 use crate::api::args::Parsed;
 use crate::api::browser_js;
@@ -18,6 +18,27 @@ pub(super) fn flag(p: &Parsed, name: &str) -> Option<Value> {
 }
 
 /// D14: a relative `--cwd` is taken from the CLI's directory.
+/// A11 D26: where the caller lives. Without `--workspace`, a command run
+/// inside a ShellX pane sends that pane (`fromPane`, from
+/// `SHELLX_PANE_ID`) and its original tab (`fromTab`); the window looks the
+/// pane up *now* (a pane may have moved to another tab), then the tab, then
+/// falls back to its current workspace. Ids that are not canonical are
+/// dropped, never forwarded.
+pub(super) fn caller(p: &Parsed, ctx: &Ctx) -> Fields {
+    if p.flag("workspace").is_some() {
+        return vec![];
+    }
+    let id = |var: &str, tab: bool| {
+        (ctx.env)(var)
+            .and_then(|v| canonical(&v, tab))
+            .map(Value::Int)
+    };
+    vec![
+        ("fromPane", id("SHELLX_PANE_ID", false)),
+        ("fromTab", id("SHELLX_TAB_ID", true)),
+    ]
+}
+
 pub(super) fn abs_dir(d: Option<&str>, ctx: &Ctx) -> Option<Value> {
     d.map(|d| {
         let path = PathBuf::from(d);
@@ -120,7 +141,10 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
                 ("cwd", abs_dir(p.flag("cwd"), ctx)),
                 ("cmd", cmd(p)?),
                 ("focus", flag(p, "focus")),
-            ],
+            ]
+            .into_iter()
+            .chain(caller(p, ctx))
+            .collect(),
             id_key: Some("tab"),
             prefix: "t",
         },

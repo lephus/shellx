@@ -205,9 +205,23 @@ class ToggleCopyModeIntent extends Intent {
   const ToggleCopyModeIntent();
 }
 
+/// A11 D19 `increase_workspace_font_size[:N]`, `decrease_…`,
+/// `reset_workspace_font_size`: [step] points more (negative: fewer) for the
+/// workspace of the selected tab, or back to the global size with [reset].
+class WorkspaceFontIntent extends Intent {
+  const WorkspaceFontIntent(this.step, {this.reset = false});
+  final double step;
+  final bool reset;
+}
+
 /// A11 D14 `reopen_closed` (⌘⇧T / Ctrl+Shift+Alt+T).
 class ReopenClosedIntent extends Intent {
   const ReopenClosedIntent();
+}
+
+/// A11 D18 `toggle_pin_tab` (no default key): pins or unpins the selected tab.
+class TogglePinTabIntent extends Intent {
+  const TogglePinTabIntent();
 }
 
 /// A11 D20 `swap_split:<dir>` (no default key).

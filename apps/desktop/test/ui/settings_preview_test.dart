@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/config/config_controller.dart';
 import 'package:shellx_desktop/src/config/font_probe.dart';
 import 'package:shellx_desktop/src/config/shellx_config.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_appearance.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/terminal/terminal_style.dart';
 import 'package:shellx_desktop/src/ui/settings/preview_terminal.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_overlay.dart';
@@ -217,6 +219,22 @@ void main() {
     await t.tap(find.byKey(const Key('settings.page.general')));
     await t.pumpAndSettle();
     expect(w.container.read(settingsPreviewProvider), isNull);
+    await disposeWorkspace(t, w.container);
+  }, variant: mac);
+
+  testWidgets('a note says the sample leaves out a workspace\'s own zoom '
+      '(A11 D19)', (t) async {
+    final w = await openAppearance(t);
+    expect(find.byKey(const Key('preview.note')), findsNothing);
+    final id = w.container.read(terminalTabsProvider).selected!.id;
+    final ws = w.container.read(sidebarWorkspacesProvider).workspaceOf(id)!;
+    w.container.read(sidebarWorkspacesProvider.notifier).zoom(ws, 2);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('preview.note')), findsOneWidget);
+    expect(sample(t).textStyle.fontSize, 13, reason: 'the sample stays global');
+    w.container.read(sidebarWorkspacesProvider.notifier).resetZoom(ws);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('preview.note')), findsNothing);
     await disposeWorkspace(t, w.container);
   }, variant: mac);
 

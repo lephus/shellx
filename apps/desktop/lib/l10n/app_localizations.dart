@@ -3959,6 +3959,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scrolled out of history'**
   String get searchAllGone;
+
+  /// No description provided for @actionTogglePinTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin or unpin tab'**
+  String get actionTogglePinTab;
+
+  /// No description provided for @tabPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin tab'**
+  String get tabPin;
+
+  /// No description provided for @tabUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin tab'**
+  String get tabUnpin;
+
+  /// No description provided for @tabPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get tabPinned;
+
+  /// No description provided for @tabSetDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set description…'**
+  String get tabSetDescription;
+
+  /// No description provided for @tabDescriptionPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab description'**
+  String get tabDescriptionPlaceholder;
+
+  /// No description provided for @tabStatusMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get tabStatusMenu;
+
+  /// No description provided for @tabStatusNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No status'**
+  String get tabStatusNone;
+
+  /// No description provided for @tabStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get tabStatusInProgress;
+
+  /// No description provided for @tabStatusReview.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get tabStatusReview;
+
+  /// No description provided for @tabStatusBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get tabStatusBlocked;
+
+  /// No description provided for @tabStatusDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tabStatusDone;
+
+  /// No description provided for @tabStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: {status}'**
+  String tabStatusLabel(String status);
+
+  /// No description provided for @tabPinnedCloseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pinned tab?'**
+  String get tabPinnedCloseTitle;
+
+  /// No description provided for @tabPinnedCloseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” is pinned.'**
+  String tabPinnedCloseBody(String name);
+
+  /// No description provided for @actionWorkspaceFontBigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase text size in this workspace'**
+  String get actionWorkspaceFontBigger;
+
+  /// No description provided for @actionWorkspaceFontSmaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease text size in this workspace'**
+  String get actionWorkspaceFontSmaller;
+
+  /// No description provided for @actionWorkspaceFontReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset text size in this workspace'**
+  String get actionWorkspaceFontReset;
+
+  /// No description provided for @workspaceZoomTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size {step}'**
+  String workspaceZoomTip(String step);
 }
 
 class _AppLocalizationsDelegate
