@@ -358,6 +358,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "Xóa tài khoản",
     ),
     "settingsEmail": MessageLookupByLibrary.simpleMessage("Email"),
+    "settingsFixedHeight": MessageLookupByLibrary.simpleMessage(
+      "Giữ cỡ terminal khi mở bàn phím",
+    ),
+    "settingsFixedHeightHint": MessageLookupByLibrary.simpleMessage(
+      "Bàn phím che lên terminal thay vì làm nó co lại.",
+    ),
     "settingsFontSize": MessageLookupByLibrary.simpleMessage("Cỡ chữ mặc định"),
     "settingsLicenses": MessageLookupByLibrary.simpleMessage(
       "Giấy phép mã nguồn mở",

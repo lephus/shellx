@@ -369,6 +369,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "Delete account",
     ),
     "settingsEmail": MessageLookupByLibrary.simpleMessage("Email"),
+    "settingsFixedHeight": MessageLookupByLibrary.simpleMessage(
+      "Keep terminal size when the keyboard opens",
+    ),
+    "settingsFixedHeightHint": MessageLookupByLibrary.simpleMessage(
+      "The keyboard covers the terminal instead of shrinking it.",
+    ),
     "settingsFontSize": MessageLookupByLibrary.simpleMessage(
       "Default font size",
     ),

@@ -99,4 +99,20 @@ void main() {
     expect(reloaded.lastMachineId.value, 'agent-b');
     expect(await store.read(AppSettings.lastMachineKey), 'agent-b');
   });
+
+  test('A11 D31: keeping the terminal size when the keyboard opens is off by default and persists', () async {
+    final store = InMemoryKeyValueStore();
+    final settings = AppSettings(store);
+    await settings.load();
+    expect(settings.fixedTerminalHeight.value, isFalse);
+    await settings.setFixedTerminalHeight(true);
+    expect(settings.fixedTerminalHeight.value, isTrue);
+    final reloaded = AppSettings(store);
+    await reloaded.load();
+    expect(reloaded.fixedTerminalHeight.value, isTrue);
+    await settings.setFixedTerminalHeight(false);
+    final again = AppSettings(store);
+    await again.load();
+    expect(again.fixedTerminalHeight.value, isFalse);
+  });
 }

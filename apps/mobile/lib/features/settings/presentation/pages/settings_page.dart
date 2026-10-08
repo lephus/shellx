@@ -115,6 +115,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   ],
                 );
               }),
+              Divider(height: 1, color: colors.divider),
+              Watch(
+                (context) => SwitchListTile(
+                  key: const Key('settings.fixedHeight'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+                  title: Text(strings.settingsFixedHeight, style: context.typo.subHeader15),
+                  subtitle: Text(
+                    strings.settingsFixedHeightHint,
+                    style: context.typo.metadata12.copyWith(color: colors.secondaryText),
+                  ),
+                  value: settings.fixedTerminalHeight.value,
+                  onChanged: _controller.setFixedTerminalHeight,
+                ),
+              ),
             ],
           ),
           _Group(

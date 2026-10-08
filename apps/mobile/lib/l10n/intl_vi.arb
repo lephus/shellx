@@ -258,5 +258,7 @@
   "machinesErrorTitle": "Không tải được danh sách máy",
   "machinesRetry": "Thử lại",
   "machinesCheckConnection": "Hãy kiểm tra kết nối mạng.",
-  "machinesReload": "Tải lại"
+  "machinesReload": "Tải lại",
+  "settingsFixedHeight": "Giữ cỡ terminal khi mở bàn phím",
+  "settingsFixedHeightHint": "Bàn phím che lên terminal thay vì làm nó co lại."
 }

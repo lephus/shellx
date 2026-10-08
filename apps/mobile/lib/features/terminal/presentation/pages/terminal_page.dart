@@ -16,6 +16,7 @@ import 'package:shellx_mobile/features/terminal/presentation/terminal_shortcuts.
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/link_sheet.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.dart';
+import 'package:shellx_mobile/features/terminal/presentation/widgets/keyboard_cover.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/session_picker.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/view_as_text_sheet.dart';
 import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart';
@@ -101,8 +102,10 @@ class _TerminalPageState extends State<TerminalPage> {
     super.didChangeDependencies();
     final orientation = MediaQuery.orientationOf(context);
     final inset = MediaQuery.viewInsetsOf(context).bottom;
+    // A11 D31: with the size kept, the keyboard is not the user changing the phone's size.
     final changed =
-        (_orientation != null && orientation != _orientation) || (_keyboardInset != null && inset != _keyboardInset);
+        (_orientation != null && orientation != _orientation) ||
+        (!_controller.fixedHeight && _keyboardInset != null && inset != _keyboardInset);
     _orientation = orientation;
     _keyboardInset = inset;
     if (changed) _controller.noteSizeIntent();
@@ -303,12 +306,47 @@ class _TerminalPageState extends State<TerminalPage> {
     ),
   );
 
+  /// The voice composer (when open) and the extra keys, under the terminal.
+  List<Widget> _bars(BuildContext context, TerminalWorkspace workspace) => [
+    Watch((context) {
+      if (_voice.phase.value == VoicePhase.closed) return const SizedBox.shrink();
+      final tab = workspace.activeTab.value;
+      return VoiceComposer(
+        controller: _voice,
+        target: tab == null ? null : '${tab.title.value} · ${widget.machineName}',
+        blocked: _sendBlock(tab),
+        onOpenSettings: () => unawaited(getIt<ExternalLinks>().openAppSettingsOrToast()),
+      );
+    }),
+    Container(
+      color: context.colors.keyboardBackground,
+      child: SafeArea(
+        top: false,
+        child: ExtraKeysBar(
+          controller: workspace.extraKeys,
+          onKey: _controller.sendKey,
+          onPaste: _paste,
+          // Always there, disabled while the tab cannot take a line: the keys never shift.
+          leading: Watch(
+            (context) => MicButton(
+              controller: _voice,
+              enabled: workspace.activeTab.value?.isLive.value ?? false,
+              onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: TerminalColors.chrome,
+        // A11 D31: the keyboard covers the page; the bars follow it up ([KeyboardAnchored]).
+        resizeToAvoidBottomInset: !_controller.fixedHeight,
         // Once the page is leaving, the workspace may already be disposed; nothing below
         // reads it again. Every Watch that does is inside [_body], replaced here in the next frame
         // (a parent rebuilds before its children), and the controller writes none of the signals
@@ -411,6 +449,7 @@ class _TerminalPageState extends State<TerminalPage> {
         ),
         Expanded(
           child: ColoredBox(
+            key: const Key('terminal.area'),
             color: TerminalColors.background,
             // Landscape: keep the cells clear of the notch; top and bottom belong to the bars.
             child: SafeArea(
@@ -432,7 +471,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       fallbackGrid;
                   final active = workspace.activeTab.value;
                   final notice = _controller.notice.value;
-                  return Stack(
+                  final area = Stack(
                     children: [
                       Positioned.fill(
                         child: active == null
@@ -461,40 +500,34 @@ class _TerminalPageState extends State<TerminalPage> {
                         ),
                     ],
                   );
+                  // A11 D31: the keyboard covers the area instead of shrinking it; the cursor row is kept in view.
+                  if (!_controller.fixedHeight || active == null) return area;
+                  return CursorShiftArea(
+                    tab: active,
+                    cellHeight: terminalCellSize(
+                      shellxTerminalStyle(fontSize),
+                      MediaQuery.textScalerOf(context),
+                    ).height,
+                    topPadding: _terminalPadding.top,
+                    height: constraints.maxHeight,
+                    child: area,
+                  );
                 }),
               ),
             ),
           ),
         ),
-        Watch((context) {
-          if (_voice.phase.value == VoicePhase.closed) return const SizedBox.shrink();
-          final tab = workspace.activeTab.value;
-          return VoiceComposer(
-            controller: _voice,
-            target: tab == null ? null : '${tab.title.value} · ${widget.machineName}',
-            blocked: _sendBlock(tab),
-            onOpenSettings: () => unawaited(getIt<ExternalLinks>().openAppSettingsOrToast()),
-          );
-        }),
-        Container(
-          color: context.colors.keyboardBackground,
-          child: SafeArea(
-            top: false,
-            child: ExtraKeysBar(
-              controller: workspace.extraKeys,
-              onKey: _controller.sendKey,
-              onPaste: _paste,
-              // Always there, disabled while the tab cannot take a line: the keys never shift.
-              leading: Watch(
-                (context) => MicButton(
-                  controller: _voice,
-                  enabled: workspace.activeTab.value?.isLive.value ?? false,
-                  onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
-                ),
-              ),
+        // A11 D31: with the size kept, the bars follow the keyboard up instead of the page shrinking.
+        if (_controller.fixedHeight)
+          KeyboardAnchored(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _bars(context, workspace),
             ),
-          ),
-        ),
+          )
+        else
+          ..._bars(context, workspace),
       ],
     );
   }

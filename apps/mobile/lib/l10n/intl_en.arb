@@ -453,5 +453,7 @@
   "machinesErrorTitle": "Couldn’t load your computers",
   "machinesRetry": "Try again",
   "machinesCheckConnection": "Check your internet connection.",
-  "machinesReload": "Reload"
+  "machinesReload": "Reload",
+  "settingsFixedHeight": "Keep terminal size when the keyboard opens",
+  "settingsFixedHeightHint": "The keyboard covers the terminal instead of shrinking it."
 }

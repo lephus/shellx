@@ -31,7 +31,8 @@ enum TerminalExit {
 class TerminalPageController extends Controller {
   TerminalPageController(@factoryParam this.agentId, this._registry, this._session, AppSettings settings)
     : _backend = _session.backend.peek(),
-      _fontSize = signal(settings.fontSize.peek()) {
+      _fontSize = signal(settings.fontSize.peek()),
+      fixedHeight = settings.fixedTerminalHeight.peek() {
     final backend = _backend;
     _relayState = signal(backend?.relayState ?? RelayConnectionState.stopped);
     _relayStates = backend?.relayStates.listen(_onRelayState);
@@ -73,6 +74,10 @@ class TerminalPageController extends Controller {
   static const Duration noticeDuration = Duration(seconds: 4);
 
   final String agentId;
+
+  /// A11 D31: the keyboard covers the terminal instead of shrinking it. Read when the page opens: the
+  /// switch is in Settings, which cannot be reached from here.
+  final bool fixedHeight;
   final WorkspaceRegistry _registry;
   final SessionHolder _session;
 

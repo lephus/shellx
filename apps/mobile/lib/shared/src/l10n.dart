@@ -2333,6 +2333,26 @@ class S {
   String get machinesReload {
     return Intl.message('Reload', name: 'machinesReload', desc: '', args: []);
   }
+
+  /// `Keep terminal size when the keyboard opens`
+  String get settingsFixedHeight {
+    return Intl.message(
+      'Keep terminal size when the keyboard opens',
+      name: 'settingsFixedHeight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The keyboard covers the terminal instead of shrinking it.`
+  String get settingsFixedHeightHint {
+    return Intl.message(
+      'The keyboard covers the terminal instead of shrinking it.',
+      name: 'settingsFixedHeightHint',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {
