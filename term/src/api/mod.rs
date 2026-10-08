@@ -133,10 +133,18 @@ fn run_real(parsed: &args::Parsed) -> i32 {
     let stdout = std::io::stdout();
     let stderr = std::io::stderr();
     let (mut out, mut err) = (stdout.lock(), stderr.lock());
-    let stdin = std::io::stdin();
-    let stdin_is_tty = stdin.is_terminal();
-    let mut input = stdin.lock();
+    let stdin_is_tty = std::io::stdin().is_terminal();
     let hook = parsed.spec.path == ["agent-event"];
+    // D5: a hook's stdin is waited for 1 s at most (the reader is a thread,
+    // so it takes no lock here); other commands read it directly.
+    let mut input: Box<dyn std::io::Read> = if hook {
+        Box::new(agent_event::TimedRead::new(
+            Box::new(std::io::stdin()),
+            agent_event::STDIN_WAIT,
+        ))
+    } else {
+        Box::new(std::io::stdin().lock())
+    };
     if hook {
         guard_hook();
     }
@@ -149,7 +157,7 @@ fn run_real(parsed: &args::Parsed) -> i32 {
         env: &get,
         out: &mut out,
         err: &mut err,
-        stdin: &mut input,
+        stdin: &mut *input,
         stdin_is_tty,
         cwd: std::env::current_dir().unwrap_or_default(),
         home: get(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(Into::into),

@@ -21,8 +21,10 @@ use std::collections::HashSet;
 pub const MAX_BYTES: usize = 1 << 20;
 /// Deepest nesting [`parse`] reads (the recursion bound).
 pub const MAX_DEPTH: usize = 64;
-/// Longest string member [`top_level_strings`] returns.
+/// Longest string member [`top_level_strings`] returns whole.
 const MAX_PAYLOAD_STRING: usize = 4096;
+/// A `message` over that is clipped to this many characters, not dropped.
+const MAX_CLIPPED_MESSAGE: usize = 1024;
 
 /// Byte offsets into the parsed text; `end` is exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -576,7 +578,9 @@ pub fn remove_member(text: &str, obj: &Node, key: &str) -> String {
 }
 
 /// Hook payloads: the string members of the root object, in order, each
-/// at most 4096 bytes. Anything that is not one valid object gives none.
+/// at most 4096 bytes (a longer `message` is clipped to 1024 characters at
+/// a character boundary; any other longer string is left out). Anything
+/// that is not one valid object gives none.
 pub fn top_level_strings(text: &str) -> Vec<(String, String)> {
     let Ok(root) = parse(text) else {
         return Vec::new();
@@ -587,6 +591,9 @@ pub fn top_level_strings(text: &str) -> Vec<(String, String)> {
     ms.into_iter()
         .filter_map(|m| match m.value.kind {
             Kind::Str(s) if s.len() <= MAX_PAYLOAD_STRING => Some((m.key, s)),
+            Kind::Str(s) if m.key == "message" => {
+                Some((m.key, s.chars().take(MAX_CLIPPED_MESSAGE).collect()))
+            }
             _ => None,
         })
         .collect()
@@ -661,46 +668,50 @@ mod tests {
         assert!(parse(&format!("{}{}", "[".repeat(64), "]".repeat(64))).is_ok());
     }
 
+    /// Values RFC 8259 accepts / refuses (also swept by `no_prefix_panics`).
+    const STRICT_OK: &[&str] = &[
+        "0",
+        "-0",
+        "1.5e+3",
+        "-12E-2",
+        "\"\"",
+        "null",
+        "true",
+        "[]",
+        "{}",
+        " \t\r\n1 ",
+        r#""é😀\/\b\f\n\r\t\"\\""#,
+    ];
+    const STRICT_BAD: &[&str] = &[
+        "01",
+        "+1",
+        ".5",
+        "1.",
+        "1e",
+        "0x10",
+        "NaN",
+        "Infinity",
+        "tru",
+        "'a'",
+        "\"a\nb\"",
+        r#""\x""#,
+        r#""\u12""#,
+        r#""\ud800""#,
+        r#""\udc00""#,
+        r#""\ud800A""#,
+        "{\"a\" 1}",
+        "{1:2}",
+        "[1 2]",
+        "\u{a0}1",
+        "\u{feff}[\u{feff}]",
+    ];
+
     #[test]
     fn strict_rfc8259_values() {
-        for ok in [
-            "0",
-            "-0",
-            "1.5e+3",
-            "-12E-2",
-            "\"\"",
-            "null",
-            "true",
-            "[]",
-            "{}",
-            " \t\r\n1 ",
-            r#""é😀\/\b\f\n\r\t\"\\""#,
-        ] {
+        for ok in STRICT_OK {
             assert!(parse(ok).is_ok(), "{ok}");
         }
-        for bad in [
-            "01",
-            "+1",
-            ".5",
-            "1.",
-            "1e",
-            "0x10",
-            "NaN",
-            "Infinity",
-            "tru",
-            "'a'",
-            "\"a\nb\"",
-            r#""\x""#,
-            r#""\u12""#,
-            r#""\ud800""#,
-            r#""\udc00""#,
-            r#""\ud800A""#,
-            "{\"a\" 1}",
-            "{1:2}",
-            "[1 2]",
-            "\u{a0}1",
-            "\u{feff}[\u{feff}]",
-        ] {
+        for bad in STRICT_BAD {
             assert!(parse(bad).is_err(), "{bad:?}");
         }
         // A leading BOM is skipped; spans still index the original text.
@@ -899,8 +910,9 @@ mod tests {
 
     #[test]
     fn no_prefix_panics() {
-        for t in fixtures() {
-            for i in 0..t.len() {
+        let hostile = STRICT_OK.iter().chain(STRICT_BAD).map(|s| s.to_string());
+        for t in fixtures().into_iter().chain(hostile) {
+            for i in 0..=t.len() {
                 if t.is_char_boundary(i) {
                     let _ = parse(&t[..i]);
                     let _ = top_level_strings(&t[..i]);
@@ -937,6 +949,9 @@ mod tests {
         );
         let long = format!(r#"{{"a":"{}","b":"ok"}}"#, "x".repeat(4097));
         assert_eq!(top_level_strings(&long), vec![("b".into(), "ok".into())]);
+        let long_message = format!(r#"{{"message":"{}"}}"#, "é".repeat(3000));
+        let got = top_level_strings(&long_message);
+        assert_eq!(got[0].1.chars().count(), 1024);
         let at_limit = format!(r#"{{"a":"{}"}}"#, "x".repeat(4096));
         assert_eq!(top_level_strings(&at_limit).len(), 1);
         assert!(top_level_strings("[\"a\"]").is_empty());
