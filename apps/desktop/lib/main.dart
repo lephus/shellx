@@ -43,6 +43,7 @@ import 'src/mux/windows_pipe_transport.dart';
 import 'src/platform/app_reopen.dart';
 import 'src/platform/attention_badge.dart';
 import 'src/platform/desktop_notifications.dart';
+import 'src/platform/global_hotkey.dart';
 import 'src/platform/notifier.dart';
 import 'src/platform/pty/flutter_pty_factory.dart';
 import 'src/platform/settings_store.dart';
@@ -271,6 +272,13 @@ Future<void> _start(
   // Runs after the shutdown. Each step is bounded, so quitting always ends
   // in exit(0).
   Future<void> quitApp() async {
+    // A11 D22: the global shortcut goes first, so nothing toggles a window
+    // that is being torn down. The system drops it with the process anyway.
+    await runBounded(
+      () => container.read(globalHotkeyBinderProvider).dispose(),
+      timeout: _quitStepTimeout,
+      label: 'removing the global shortcut',
+    );
     await runBounded(
       trayHost.destroy,
       timeout: _quitStepTimeout,
@@ -392,6 +400,10 @@ Future<void> _start(
     label: 'reading the configuration',
   );
   container.read(shellxConfigProvider.notifier).startWatching();
+  // A11 D22: the optional global show/hide shortcut, from the configuration
+  // just loaded; off unless `global-hotkey` is set. Only this (UI) process
+  // registers it, never the background service.
+  container.read(globalHotkeyBinderProvider);
 
   // A4 D25: the focus the window has now; events keep it current.
   try {

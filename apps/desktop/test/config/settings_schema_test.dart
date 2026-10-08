@@ -140,6 +140,7 @@ void main() {
       'working-directory',
       'adjust-cell-height',
       'ghostty-config',
+      'global-hotkey',
     };
     final have = {
       for (final d in kSettings)

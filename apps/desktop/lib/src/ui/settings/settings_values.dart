@@ -7,6 +7,7 @@ import '../../config/config_controller.dart';
 import '../../config/config_syntax.dart' show decodeConfigBytes;
 import '../../config/config_key_edits.dart' show settingsBlockLines;
 import '../../config/config_writer.dart';
+import '../../config/keybind_trigger.dart' show chordConfigText;
 import '../../config/settings_schema.dart';
 import '../../config/shellx_config.dart';
 import '../../terminal/terminal_tabs.dart';
@@ -65,6 +66,8 @@ String fileSettingText(
     ConfirmClose.always => 'always',
   },
   'ghostty-config' => '${c.ghosttyConfig}',
+  'global-hotkey' =>
+    c.globalHotkey == null ? '' : chordConfigText(c.globalHotkey!) ?? '',
   _ => '',
 };
 

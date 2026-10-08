@@ -8,6 +8,9 @@ import 'config_files.dart';
 import 'config_paths.dart';
 import 'config_problem.dart';
 import 'config_syntax.dart';
+import 'keybind_actions.dart' show KeyAction;
+import 'keybind_trigger.dart' show KeyChord, parseKeyChord;
+import 'keybindings.dart' show checkTrigger;
 
 const EdgeInsets kDefaultTerminalPadding = EdgeInsets.fromLTRB(10, 6, 10, 6);
 const int kScrollbackDefault = 10000;
@@ -111,6 +114,7 @@ final class ShellxConfig {
     this.keybinds = const [],
     this.commands = const [],
     this.ghosttyConfig = true,
+    this.globalHotkey,
     this.origins = const {},
   });
 
@@ -146,6 +150,10 @@ final class ShellxConfig {
   final List<KeybindEntry> keybinds;
   final List<UserCommand> commands;
   final bool ghosttyConfig;
+
+  /// `global-hotkey` (ShellX file only, A11 D22): one chord with a modifier
+  /// that shows or hides the window from any app; null: off (the default).
+  final KeyChord? globalHotkey;
 
   /// Key → the line that set its effective value (`shellx config show`).
   final Map<String, ConfigEntry> origins;
@@ -235,6 +243,7 @@ final class _Builder {
   final commands = <UserCommand>[];
   var commandLimitReported = false;
   var ghosttyConfig = true;
+  KeyChord? globalHotkey;
   final origins = <String, ConfigEntry>{};
 
   ConfigSeverity _bad(bool fromGhostty) =>
@@ -542,6 +551,32 @@ final class _Builder {
           _problem(e, ConfigSeverity.info, ConfigProblemCode.unsupportedValue);
         }
         return;
+      case 'global-hotkey':
+        if (v.isEmpty) {
+          globalHotkey = null;
+          break;
+        }
+        const hint = 'ctrl+alt+j';
+        // One chord only: a sequence (`>`) is a keybind's.
+        final chord = v.contains('>') ? null : parseKeyChord(v);
+        if (chord == null) return _badValue(e, g, hint);
+        final rule = checkTrigger(
+          [chord],
+          const KeyAction('open_settings'),
+          mac: macos,
+          optionAsAlt: OptionAsAlt.off,
+        );
+        // A global key needs a real modifier: Shift alone and a bare
+        // function key would fire in every other app's typing.
+        final code =
+            rule.error ??
+            (chord.hasCommandModifier
+                ? null
+                : ConfigProblemCode.plainKeyTrigger);
+        if (code != null) {
+          return _problem(e, _bad(g), code, hint: hint);
+        }
+        globalHotkey = chord;
       case 'ghostty-config':
         final on = v.isEmpty ? true : _bool(v);
         if (on == null) return _badValue(e, g, 'true, false');
@@ -626,6 +661,7 @@ final class _Builder {
     keybinds: List.unmodifiable(keybinds),
     commands: List.unmodifiable(commands),
     ghosttyConfig: ghosttyConfig,
+    globalHotkey: globalHotkey,
     origins: Map.unmodifiable(origins),
   );
 }

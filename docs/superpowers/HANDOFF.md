@@ -582,3 +582,8 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 
 
 **Checklist phát hành (Task 16).** Trước khi đóng bản mới, điền `apps/desktop/assets/whats_new.json` cho phiên bản đó (`{"1.2.0":{"en":[…],"vi":[…]}}`, tối đa 5 dòng mỗi ngôn ngữ, không có `+build`); thiếu phiên bản thì thẻ "Có gì mới" không hiện. Tour hiện một lần cho bản cài mới (`tour_done`), thẻ "Có gì mới" một lần mỗi phiên bản (`last_seen_version`). Nút "Xem mọi thay đổi" hiện mở `https://shellx.pro/` (chưa có trang ghi chú phát hành: đổi `kReleaseNotesUrl` khi có).
+
+**Ghi chú đã biết (Task 17).**
+- Phím toàn cục (`global-hotkey`, mặc định tắt) dùng `hotkey_manager` 0.2.3 (ghim chính xác): macOS dùng Carbon `RegisterEventHotKey` qua pod HotKey (không cần quyền Trợ năng), Windows dùng `RegisterHotKey` trên cửa sổ gốc. **Cả hai phía native của plugin luôn trả `true`**, nên tổ hợp đang bị app khác giữ **không** được báo: phím chỉ không bao giờ chạy. "Đăng ký thất bại" (vấn đề cấu hình `unsupportedValue` + dòng "Tổ hợp này đang được ứng dụng khác dùng") chỉ xảy ra khi plugin ném lỗi hoặc phím không có trong bảng. Muốn báo đúng: viết `ChannelHotkey` (`GlobalHotkey` giữ nguyên, chỉ thay `HotkeyManagerHotkey`).
+- Windows gửi lại WM_HOTKEY khi giữ phím: binder bỏ qua lần bấm cách lần trước dưới 300 ms.
+- Bấm khi cửa sổ đang hiện và có focus: ẩn về khay (như nút đóng, đóng luôn hộp thoại đang mở). Khi ẩn / thu nhỏ / ở sau app khác: hiện ra trước, mở tab nếu chưa có (như "Mở cửa sổ terminal" của khay).
