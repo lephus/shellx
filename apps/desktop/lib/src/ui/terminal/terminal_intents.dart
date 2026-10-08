@@ -147,7 +147,12 @@ class ReloadConfigIntent extends Intent {
   const ReloadConfigIntent();
 }
 
-/// A9 D37 ⌘, / Ctrl+,.
+/// A11 D10 ⌘, / Ctrl+,: the Settings window.
+class OpenSettingsIntent extends Intent {
+  const OpenSettingsIntent();
+}
+
+/// A9 D37, moved by A11 D10 to ⌘⌥, / Ctrl+Shift+Alt+,: the file itself.
 class OpenConfigIntent extends Intent {
   const OpenConfigIntent();
 }

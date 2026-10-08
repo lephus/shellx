@@ -19,14 +19,12 @@ Set<String> signatures(Map<ShortcutActivator, Intent> map) => {
 Set<String> a9Additions(String map, String platform) => platform == 'mac'
     ? const {
         'shift+meta+2c norepeat -> ReloadConfigIntent',
-        'meta+2c norepeat -> OpenConfigIntent',
         'shift+meta+70 norepeat -> CommandPaletteIntent',
         // A8 D41: "Connect to a server".
         'shift+meta+6b norepeat -> OpenSshConnectIntent',
       }
     : const {
         'ctrl+shift+2c norepeat -> ReloadConfigIntent',
-        'ctrl+2c norepeat -> OpenConfigIntent',
         'ctrl+shift+70 norepeat -> CommandPaletteIntent',
         'ctrl+shift+6b norepeat -> OpenSshConnectIntent',
       };
@@ -42,6 +40,19 @@ Set<String> a10Additions(String platform) => platform == 'mac'
         'ctrl+shift+66 norepeat -> StartSearchIntent',
         'ctrl+shift+67 -> NavigateSearchIntent(next)',
         'ctrl+alt+shift+67 -> NavigateSearchIntent(previous)',
+      };
+
+/// A11 D10, a deliberate change of A9 D37: ⌘, / Ctrl+, now opens Settings and
+/// the configuration file moved to ⌘⌥, / Ctrl+Shift+Alt+, (Windows: left Alt
+/// only). A9's `OpenConfigIntent` line on ⌘, / Ctrl+, is replaced.
+Set<String> a11Changes(String platform) => platform == 'mac'
+    ? const {
+        'meta+2c norepeat -> OpenSettingsIntent',
+        'alt+meta+2c norepeat -> OpenConfigIntent',
+      }
+    : const {
+        'ctrl+2c norepeat -> OpenSettingsIntent',
+        'ctrl+alt+shift+2c norepeat -> OpenConfigIntent',
       };
 
 /// A11: D11 macOS line editing at the prompt (Windows binds none), D13
@@ -95,7 +106,8 @@ void main() {
           expected
               .union(a9Additions(map, name))
               .union(a10Additions(name))
-              .union(a11Additions(name)),
+              .union(a11Additions(name))
+              .union(a11Changes(name)),
         );
       });
     }

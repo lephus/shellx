@@ -151,6 +151,11 @@ final class ReloadConfig extends TrayAction {
   const ReloadConfig();
 }
 
+/// A11 D3: the Settings window.
+final class OpenSettings extends TrayAction {
+  const OpenSettings();
+}
+
 final class ShowShortcutsFromTray extends TrayAction {
   const ShowShortcutsFromTray();
 }
@@ -227,6 +232,7 @@ abstract final class TrayKeys {
   static const String sshHook = 'ssh_hook';
   static const String sshClearRecent = 'ssh_clear_recent';
   static const String config = 'config';
+  static const String configSettings = 'config_settings';
   static const String configOpen = 'config_open';
   static const String configReload = 'config_reload';
   static const String configShortcuts = 'config_shortcuts';
@@ -296,6 +302,7 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.tmuxAttach => const OpenTmuxAttach(),
     TrayKeys.sshHook => const ToggleSshHook(),
     TrayKeys.sshClearRecent => const ClearRecentServers(),
+    TrayKeys.configSettings => const OpenSettings(),
     TrayKeys.configOpen => const OpenConfigFile(),
     TrayKeys.configReload => const ReloadConfig(),
     TrayKeys.configShortcuts => const ShowShortcutsFromTray(),

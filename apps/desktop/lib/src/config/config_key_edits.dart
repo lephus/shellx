@@ -33,6 +33,9 @@ final class ResetKey extends KeyEdit {
   final bool explicitDefault;
 }
 
+/// Keys that are not scalar settings: their own blocks and the include list.
+const _notEdited = {'keybind', 'config-file'};
+
 final RegExp _validKey = RegExp(r'^[a-z0-9][a-z0-9-]*$');
 final RegExp _loneCr = RegExp(r'\r(?!\n)');
 
@@ -46,7 +49,9 @@ final RegExp _loneCr = RegExp(r'\r(?!\n)');
 String applyKeyEdits(String text, List<KeyEdit> edits) {
   if (edits.isEmpty) return text;
   for (final e in edits) {
-    if (!_validKey.hasMatch(e.key)) throw ArgumentError.value('…', 'key');
+    if (!_validKey.hasMatch(e.key) || _notEdited.contains(e.key)) {
+      throw ArgumentError.value('…', 'key');
+    }
     if (e is SetKey && e.value.contains(RegExp(r'[\r\n]'))) {
       throw ArgumentError.value('…', 'value');
     }
@@ -198,4 +203,14 @@ String _dropEmptyBlock(String text) {
   } on ConfigWriteRefused {
     return null;
   }
+}
+
+/// "Undo everything changed here" (A11 D9): the settings block goes, markers
+/// and lines; every other byte stays, the keybind block included. Throws
+/// [ConfigWriteRefused] (damagedBlock) when a marker is lone or doubled.
+String removeSettingsBlock(String text) {
+  final lines = splitConfigLines(text);
+  final mine = _blocks(lines).mine;
+  if (mine == null) return text;
+  return text.replaceRange(lines[mine.start].start, lines[mine.end].end, '');
 }

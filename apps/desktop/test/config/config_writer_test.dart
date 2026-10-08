@@ -568,6 +568,32 @@ void main() {
       expect(names(dir), ['config']); // no temp file left behind
     });
 
+    test(
+      'a file created between the read and the rename is not replaced',
+      () async {
+        final path = '${dir.path}/config';
+        final store = IoConfigFileStore(
+          beforeSwap: () async => File(path).writeAsStringSync('theirs = 1\n'),
+        );
+        await expectLater(
+          store.replace(
+            path,
+            Uint8List.fromList(utf8.encode('x\n')),
+            mustNotExist: true,
+          ),
+          throwsA(
+            isA<ConfigWriteRefused>().having(
+              (e) => e.reason,
+              'reason',
+              ConfigWriteRefusal.changed,
+            ),
+          ),
+        );
+        expect(File(path).readAsStringSync(), 'theirs = 1\n');
+        expect(names(dir), ['config']); // no temp file left behind
+      },
+    );
+
     test('an existing file is not created over', () async {
       final file = File('${dir.path}/config')..writeAsStringSync('a = 1\n');
       await expectLater(

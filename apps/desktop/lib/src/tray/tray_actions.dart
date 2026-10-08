@@ -60,7 +60,7 @@ const kSkillsInstallCommand = 'shellx skills install';
 
 /// Executes tray menu actions, asking for confirmation where an action is
 /// destructive or disconnects a phone.
-final class TrayActions {
+class TrayActions {
   TrayActions(this._ref);
 
   final Ref _ref;
@@ -257,6 +257,11 @@ final class TrayActions {
       case ReloadConfig():
         await _showWindow();
         await _ref.read(shellxConfigProvider.notifier).load(manual: true);
+      case OpenSettings():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.settings);
       case ShowShortcutsFromTray():
         await _showWindow();
         _ref

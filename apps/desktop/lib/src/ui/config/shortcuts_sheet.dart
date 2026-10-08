@@ -25,10 +25,9 @@ import 'command_palette.dart' show Keycaps, matchScore;
 /// How long a D25 note stays under its row.
 const Duration kShortcutNoteVisible = Duration(seconds: 4);
 
-/// UI-A9 §4: every action, its chords, add / remove / reset. The only
-/// writes are the user's own clicks and keys here (never on load), and
-/// they touch the managed block of the ShellX file only (D32).
-class ShortcutsSheet extends ConsumerStatefulWidget {
+/// UI-A9 §4: the dialog around [ShortcutsEditor]: title, close, the focus
+/// scope and Esc.
+class ShortcutsSheet extends StatelessWidget {
   const ShortcutsSheet({
     super.key,
     required this.onClose,
@@ -38,10 +37,86 @@ class ShortcutsSheet extends ConsumerStatefulWidget {
   final VoidCallback onOpenFile;
 
   @override
-  ConsumerState<ShortcutsSheet> createState() => _ShortcutsSheetState();
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final size = MediaQuery.sizeOf(context);
+    return Semantics(
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: l10n.shortcutsTitle,
+      child: CallbackShortcuts(
+        // The editor keeps the Esc of a recording or a conflict to itself;
+        // any other Esc reaches here.
+        bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
+        child: FocusScope(
+          autofocus: true,
+          child: Container(
+            width: math.min(ShellxSizes.shortcutsWidth, size.width - 48),
+            height: math.min(ShellxSizes.shortcutsHeight, size.height - 64),
+            decoration: BoxDecoration(
+              color: ShellxDesktopColors.surface,
+              borderRadius: BorderRadius.circular(ShellxRadius.r8),
+              border: Border.all(color: ShellxDesktopColors.border),
+              boxShadow: ShellxShadows.e1,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.shortcutsTitle,
+                            style: ShellxText.bodyStrong.copyWith(
+                              color: ShellxDesktopColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).closeButtonTooltip,
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: onClose,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(child: ShortcutsEditor(onOpenFile: onOpenFile)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _ShortcutsSheetState extends ConsumerState<ShortcutsSheet> {
+/// The body of the shortcut editor: search, every action with its chords
+/// (add / remove / reset), and, unless [embedded] (inside Settings), the
+/// footer with "Open configuration file". The only writes are the user's own
+/// clicks and keys here (never on load), and they touch the managed block of
+/// the ShellX file only (D32).
+class ShortcutsEditor extends ConsumerStatefulWidget {
+  const ShortcutsEditor({
+    super.key,
+    required this.onOpenFile,
+    this.embedded = false,
+  });
+  final VoidCallback onOpenFile;
+  final bool embedded;
+
+  @override
+  ConsumerState<ShortcutsEditor> createState() => _ShortcutsEditorState();
+}
+
+class _ShortcutsEditorState extends ConsumerState<ShortcutsEditor> {
   final _search = TextEditingController();
   final _recorder = FocusNode(debugLabel: 'shortcut recorder');
   final _addFocus = FocusNode(debugLabel: 'shortcut add');
@@ -344,7 +419,6 @@ class _ShortcutsSheetState extends ConsumerState<ShortcutsSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(shellxConfigProvider);
-    final size = MediaQuery.sizeOf(context);
     final rows = [
       for (final (group, action) in _rows(state))
         if (_query.isEmpty ||
@@ -375,101 +449,66 @@ class _ShortcutsSheetState extends ConsumerState<ShortcutsSheet> {
       }
       children.add(_row(l10n, state, action, shellx));
     }
-    return Semantics(
-      scopesRoute: true,
-      namesRoute: true,
-      explicitChildNodes: true,
-      label: l10n.shortcutsTitle,
-      child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () {
-            if (_conflict != null) {
-              _stopRecording();
-            } else if (_recording == null) {
-              widget.onClose();
-            }
-          },
-        },
-        child: FocusScope(
-          autofocus: true,
-          child: Container(
-            width: math.min(ShellxSizes.shortcutsWidth, size.width - 48),
-            height: math.min(ShellxSizes.shortcutsHeight, size.height - 64),
-            decoration: BoxDecoration(
-              color: ShellxDesktopColors.surface,
-              borderRadius: BorderRadius.circular(ShellxRadius.r8),
-              border: Border.all(color: ShellxDesktopColors.border),
-              boxShadow: ShellxShadows.e1,
-            ),
-            child: Material(
-              type: MaterialType.transparency,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.shortcutsTitle,
-                            style: ShellxText.bodyStrong.copyWith(
-                              color: ShellxDesktopColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: MaterialLocalizations.of(
-                            context,
-                          ).closeButtonTooltip,
-                          icon: const Icon(Icons.close, size: 16),
-                          onPressed: widget.onClose,
-                        ),
-                      ],
-                    ),
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        // Esc leaves a conflict or a recording; it never closes the window
+        // from there.
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape &&
+            (_conflict != null || _recording != null)) {
+          if (_conflict != null) _stopRecording();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Semantics(
+                textField: true,
+                label: l10n.shortcutsSearchLabel,
+                child: TextField(
+                  controller: _search,
+                  autofocus: !widget.embedded,
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: l10n.shortcutsSearchLabel,
+                    prefixIcon: const Icon(Icons.search, size: 16),
+                    isDense: true,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Semantics(
-                      textField: true,
-                      label: l10n.shortcutsSearchLabel,
-                      child: TextField(
-                        controller: _search,
-                        autofocus: true,
-                        onChanged: (v) => setState(() => _query = v),
-                        decoration: InputDecoration(
-                          hintText: l10n.shortcutsSearchLabel,
-                          prefixIcon: const Icon(Icons.search, size: 16),
-                          isDense: true,
+                ),
+              ),
+            ),
+            Expanded(child: ListView(children: children)),
+            if (!widget.embedded) ...[
+              const Divider(height: 1, color: ShellxDesktopColors.line),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.shortcutsFooter,
+                        style: ShellxText.small.copyWith(
+                          color: ShellxDesktopColors.textSecondary,
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(child: ListView(children: children)),
-                  const Divider(height: 1, color: ShellxDesktopColors.line),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.shortcutsFooter,
-                            style: ShellxText.small.copyWith(
-                              color: ShellxDesktopColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                        FilledButton(
-                          onPressed: widget.onOpenFile,
-                          child: Text(l10n.configOpenFile),
-                        ),
-                      ],
+                    FilledButton(
+                      onPressed: widget.onOpenFile,
+                      child: Text(l10n.configOpenFile),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ),
+            ],
+          ],
         ),
       ),
     );

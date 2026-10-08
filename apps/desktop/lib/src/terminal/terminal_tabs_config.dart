@@ -17,6 +17,22 @@ final class ConfigWriteFailedNotice extends TabNotice {
   final String path;
 }
 
+/// A11 D5: the file changed under Settings (a hand edit); it was reloaded
+/// and nothing was written (neutral).
+final class SettingsFileChangedNotice extends TabNotice {
+  const SettingsFileChangedNotice();
+}
+
+/// A11 D5: the managed block is damaged; Settings writes nothing (error).
+final class SettingsFileDamagedNotice extends TabNotice {
+  const SettingsFileDamagedNotice();
+}
+
+/// A11 D5: the file could not be written (locked, read-only, too large …).
+final class SettingsFileUnwritableNotice extends TabNotice {
+  const SettingsFileUnwritableNotice();
+}
+
 /// A9 D36: errors → error toast; warnings only → neutral.
 final class ConfigProblemsNotice extends TabNotice {
   const ConfigProblemsNotice(this.count, {required this.hasErrors});

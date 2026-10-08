@@ -14,6 +14,24 @@ import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/tray/tray_action.dart';
 
 void main() {
+  group('search folds Vietnamese accents', () {
+    final vi = AppLocalizationsVi();
+    Set<String> ids(String q) => {for (final d in searchSettings(q, vi)) d.id};
+
+    test('a label typed without its accents is found', () {
+      expect(ids('chu de'), contains('theme'));
+      expect(ids('do dam chu'), contains('font-weight'));
+      expect(ids('chieu cao dong'), contains('adjust-cell-height'));
+      expect(ids('con tro nhap nhay'), contains('cursor-style-blink'));
+      expect(ids('mau nen'), contains('background'));
+    });
+
+    test('a keyword typed without its accents is found', () {
+      expect(ids('giao dien'), contains('theme'));
+      expect(ids('mau'), contains('theme'));
+    });
+  });
+
   final en = AppLocalizationsEn();
   final vi = AppLocalizationsVi();
 

@@ -80,6 +80,9 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         closePanel();
         unawaited(ref.read(shellxConfigProvider.notifier).load(manual: true));
       }),
+      OpenSettingsIntent: run<OpenSettingsIntent>(
+        (_) => openOverlay(A9Overlay.settings),
+      ),
       OpenConfigIntent: run<OpenConfigIntent>((_) {
         closePanel();
         unawaited(openShellxConfig(ref.read));

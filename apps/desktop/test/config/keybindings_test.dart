@@ -63,11 +63,14 @@ void main() {
     expect(b.all, hasLength(defaultKeyBindings(mac).length));
     expect(lookup(b, 'super+t'), isA<NewTabIntent>());
     expect(lookup(b, 'super+shift+p'), isA<CommandPaletteIntent>());
-    expect(lookup(b, 'super+,'), isA<OpenConfigIntent>());
+    // A11 D10: ⌘, is Settings; the file is ⌘⌥,.
+    expect(lookup(b, 'super+,'), isA<OpenSettingsIntent>());
+    expect(lookup(b, 'super+alt+,'), isA<OpenConfigIntent>());
     expect(lookup(b, 'super+shift+,'), isA<ReloadConfigIntent>());
     final (w, _) = resolve('', platform: win);
     expect(lookup(w, 'ctrl+shift+p'), isA<CommandPaletteIntent>());
-    expect(lookup(w, 'ctrl+,'), isA<OpenConfigIntent>());
+    expect(lookup(w, 'ctrl+,'), isA<OpenSettingsIntent>());
+    expect(lookup(w, 'ctrl+shift+alt+,'), isA<OpenConfigIntent>());
   });
 
   test('a new chord adds; the default stays (criterion 5)', () {

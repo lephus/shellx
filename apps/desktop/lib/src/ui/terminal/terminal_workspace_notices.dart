@@ -14,6 +14,7 @@ import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
 import '../config/shortcuts_sheet.dart';
+import '../settings/settings_overlay.dart';
 import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'key_sequence.dart';
@@ -21,7 +22,7 @@ import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
 
 /// A9's overlays over the workspace (UI-A9 §2-4).
-enum A9Overlay { palette, problems, shortcuts }
+enum A9Overlay { palette, problems, shortcuts, settings }
 
 /// One problem for the toast's "already told" check: where and what, never
 /// the text (D36: a problem that stays is not announced on every reload).
@@ -204,6 +205,32 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ),
       );
     }
+    if (overlay == A9Overlay.settings) {
+      // Blocks the window like the shortcut sheet: a scrim, and the
+      // workspace shortcuts are off meanwhile (the page empties them).
+      return Positioned.fill(
+        key: const ValueKey('a9.settings'),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: ModalBarrier(
+                color: ShellxDesktopColors.scrim,
+                dismissible: false,
+              ),
+            ),
+            Center(
+              child: SettingsOverlay(
+                onClose: closeOverlay,
+                onOpenFile: () {
+                  closeOverlay();
+                  unawaited(openShellxConfig(ref.read));
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (overlay != A9Overlay.problems) return null;
     return Positioned(
       key: const ValueKey('a9.problems'),
@@ -267,6 +294,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ConfigUiRequest.palette => A9Overlay.palette,
         ConfigUiRequest.problems => A9Overlay.problems,
         ConfigUiRequest.shortcuts => A9Overlay.shortcuts,
+        ConfigUiRequest.settings => A9Overlay.settings,
       });
     });
   }

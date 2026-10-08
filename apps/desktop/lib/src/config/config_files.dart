@@ -57,7 +57,15 @@ abstract interface class ConfigFs {
 
   /// Never throws: a path that can't be stat'ed is missing.
   Future<FileStamp> stamp(String path);
+
+  /// The names (not paths) of the files in [dir]: regular files and links
+  /// to files, not folders, at most [kConfigListMax]. A folder that is
+  /// missing or can't be read gives none (A11 D8: the theme list).
+  Future<List<String>> list(String dir);
 }
+
+/// Entries [ConfigFs.list] reads at most.
+const int kConfigListMax = 2000;
 
 final class IoConfigFs implements ConfigFs {
   const IoConfigFs();
@@ -111,6 +119,24 @@ final class IoConfigFs implements ConfigFs {
       rethrow;
     }
     throw FileSystemException('not a regular file', path);
+  }
+
+  @override
+  Future<List<String>> list(String dir) async {
+    if (dir.contains('\x00')) return const [];
+    final names = <String>[];
+    try {
+      await for (final entity in Directory(dir).list(followLinks: false)) {
+        if (names.length >= kConfigListMax) break;
+        final file =
+            entity is File ||
+            (entity is Link && FileSystemEntity.isFileSync(entity.path));
+        if (file) names.add(p.basename(entity.path));
+      }
+    } on Object {
+      // Missing, denied, vanished meanwhile: what was read is what there is.
+    }
+    return names;
   }
 
   @override

@@ -290,6 +290,15 @@ void main() {
     expect(kept, equals(text.split('\n')..remove('font-size = 13')));
   });
 
+  group('keys the Settings never edits', () {
+    test('keybind and config-file are refused', () {
+      for (final key in ['keybind', 'config-file']) {
+        expect(() => set('a = 1\n', key, 'x'), throwsArgumentError);
+        expect(() => reset('a = 1\n', key), throwsArgumentError);
+      }
+    });
+  });
+
   group('hostile files', () {
     test('an include line and a Ghostty-style file are left alone', () {
       const before = 'config-file = ?extra\ntheme = X\n';

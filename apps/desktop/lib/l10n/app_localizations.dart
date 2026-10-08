@@ -3533,6 +3533,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Selection color'**
   String get settingsSelectionColor;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get settingsSearch;
+
+  /// No description provided for @settingsNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No setting matches “{query}”'**
+  String settingsNoMatch(String query);
+
+  /// No description provided for @settingsNoMatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not here? Open the configuration file.'**
+  String get settingsNoMatchHint;
+
+  /// No description provided for @settingsOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open configuration file'**
+  String get settingsOpenFile;
+
+  /// No description provided for @settingsReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get settingsReload;
+
+  /// No description provided for @settingsSavedInFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved in the configuration file · {key}'**
+  String settingsSavedInFile(String key);
+
+  /// No description provided for @settingsSetIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Set in {file}, line {line}'**
+  String settingsSetIn(String file, int line);
+
+  /// No description provided for @settingsFromGhostty.
+  ///
+  /// In en, this message translates to:
+  /// **'From your Ghostty configuration. Changing it here overrides it for ShellX.'**
+  String get settingsFromGhostty;
+
+  /// No description provided for @settingsMultiLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Set on several lines. Edit it in the file.'**
+  String get settingsMultiLine;
+
+  /// No description provided for @settingsReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get settingsReset;
+
+  /// No description provided for @settingsResetAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo everything changed here'**
+  String get settingsResetAll;
+
+  /// No description provided for @settingsResetAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the settings ShellX wrote to your configuration file? Lines you wrote yourself stay.'**
+  String get settingsResetAllConfirm;
+
+  /// No description provided for @settingsFileChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The file changed while you were editing. Reloaded, try again.'**
+  String get settingsFileChanged;
+
+  /// No description provided for @settingsFileDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'The managed block in the file is damaged. Open the file to fix it.'**
+  String get settingsFileDamaged;
+
+  /// No description provided for @settingsFileUnwritable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save the file'**
+  String get settingsFileUnwritable;
+
+  /// No description provided for @settingsPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get settingsPreviewLabel;
+
+  /// No description provided for @settingsPreviewNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The preview doesn’t include this workspace’s own zoom.'**
+  String get settingsPreviewNote;
+
+  /// No description provided for @settingsFontFamilyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A font installed on this computer'**
+  String get settingsFontFamilyHint;
+
+  /// No description provided for @settingsScrollbackNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to panes opened from now on.'**
+  String get settingsScrollbackNote;
+
+  /// No description provided for @settingsWorkingDirHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home folder'**
+  String get settingsWorkingDirHome;
+
+  /// No description provided for @settingsWorkingDirInherit.
+  ///
+  /// In en, this message translates to:
+  /// **'The current pane’s folder'**
+  String get settingsWorkingDirInherit;
+
+  /// No description provided for @settingsWorkingDirPath.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder…'**
+  String get settingsWorkingDirPath;
+
+  /// No description provided for @settingsGlobalHotkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide ShellX from anywhere'**
+  String get settingsGlobalHotkey;
+
+  /// No description provided for @settingsGlobalHotkeyNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get settingsGlobalHotkeyNone;
+
+  /// No description provided for @settingsGlobalHotkeyRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Press the keys…'**
+  String get settingsGlobalHotkeyRecord;
+
+  /// No description provided for @settingsGlobalHotkeyTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'That shortcut is used by another app'**
+  String get settingsGlobalHotkeyTaken;
+
+  /// No description provided for @settingsOpenTour.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the tour again'**
+  String get settingsOpenTour;
+
+  /// No description provided for @settingsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String settingsVersion(String version);
+
+  /// No description provided for @settingsProblems.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} configuration problems'**
+  String settingsProblems(int n);
+
+  /// No description provided for @settingsLoginNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to manage the phone connection'**
+  String get settingsLoginNeeded;
+
+  /// No description provided for @settingsCommandsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your commands and snippets are edited in the file.'**
+  String get settingsCommandsNote;
+
+  /// No description provided for @settingsConfigPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration file'**
+  String get settingsConfigPath;
+
+  /// No description provided for @settingsProblemsShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get settingsProblemsShow;
+
+  /// No description provided for @settingsCopyPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get settingsCopyPath;
+
+  /// No description provided for @settingsResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 setting found} other{{count} settings found}}'**
+  String settingsResultCount(int count);
+
+  /// No description provided for @actionOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get actionOpenSettings;
+
+  /// No description provided for @trayConfigSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings…'**
+  String get trayConfigSettings;
+
+  /// No description provided for @settingsPageNavLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings pages'**
+  String get settingsPageNavLabel;
+
+  /// No description provided for @settingsThemeSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search themes'**
+  String get settingsThemeSearch;
+
+  /// No description provided for @settingsThemeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'A theme file couldn’t be read. Showing the ShellX colors.'**
+  String get settingsThemeNotFound;
+
+  /// No description provided for @settingsOptionAsAltOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingsOptionAsAltOff;
+
+  /// No description provided for @settingsOptionAsAltLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left Option'**
+  String get settingsOptionAsAltLeft;
+
+  /// No description provided for @settingsOptionAsAltRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right Option'**
+  String get settingsOptionAsAltRight;
+
+  /// No description provided for @settingsOptionAsAltBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both Option keys'**
+  String get settingsOptionAsAltBoth;
+
+  /// No description provided for @settingsDefaultValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get settingsDefaultValue;
+
+  /// No description provided for @settingsHexHint.
+  ///
+  /// In en, this message translates to:
+  /// **'#RRGGBB'**
+  String get settingsHexHint;
 }
 
 class _AppLocalizationsDelegate

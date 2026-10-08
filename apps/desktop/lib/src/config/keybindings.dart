@@ -296,10 +296,23 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
             ),
       'reload_config',
     ),
+    // A11 D10 (a deliberate change of A9 D37): ⌘, / Ctrl+, opens Settings;
+    // the file moves to ⌘⌥, / Ctrl+Shift+Alt+, (Windows: left Alt only).
     b(
       mac
           ? const KeyChord(LogicalKeyboardKey.comma, meta: true)
           : const KeyChord(LogicalKeyboardKey.comma, control: true),
+      'open_settings',
+    ),
+    b(
+      mac
+          ? const KeyChord(LogicalKeyboardKey.comma, meta: true, alt: true)
+          : const KeyChord(
+              LogicalKeyboardKey.comma,
+              control: true,
+              shift: true,
+              alt: true,
+            ),
       'open_config',
     ),
     b(shifted(LogicalKeyboardKey.keyP), 'toggle_command_palette'),

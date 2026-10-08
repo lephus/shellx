@@ -243,6 +243,7 @@ Menu buildTrayMenu(
 
   // A9 D45, UI-A9 §6: after "SSH" in both menus.
   MenuItem config() => sub(TrayKeys.config, l10n.trayConfig, [
+    item(TrayKeys.configSettings, l10n.trayConfigSettings),
     item(TrayKeys.configOpen, l10n.trayConfigOpen),
     item(TrayKeys.configReload, l10n.trayConfigReload),
     item(TrayKeys.configShortcuts, l10n.trayConfigShortcuts),

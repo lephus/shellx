@@ -589,6 +589,7 @@ class _NoticeToastState extends State<NoticeToast> {
   /// UI-A1 §2.8: the neutral variant (reserved in A1) for information.
   bool get _neutral =>
       widget.notice is ConfigReloadedNotice ||
+      widget.notice is SettingsFileChangedNotice ||
       widget.notice is ConfigGhosttyNotice ||
       _warningsOnly ||
       widget.notice is WorkspaceDeletedNotice ||
@@ -659,6 +660,9 @@ class _NoticeToastState extends State<NoticeToast> {
     ConfigWriteFailedNotice(:final path) => l10n.configWriteFailed(path),
     ConfigProblemsNotice(:final count) => l10n.configProblemsToast(count),
     ConfigReloadedNotice() => l10n.configReloaded,
+    SettingsFileChangedNotice() => l10n.settingsFileChanged,
+    SettingsFileDamagedNotice() => l10n.settingsFileDamaged,
+    SettingsFileUnwritableNotice() => l10n.settingsFileUnwritable,
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     PasteTooLargeNotice() => l10n.pasteTooLarge,

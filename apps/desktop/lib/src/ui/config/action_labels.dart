@@ -145,6 +145,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'next_region' => l10n.actionNextRegion,
   'previous_region' => l10n.actionPreviousRegion,
   'reload_config' => l10n.actionReloadConfig,
+  'open_settings' => l10n.actionOpenSettings,
   'open_config' => l10n.actionOpenConfig,
   'toggle_command_palette' => l10n.actionCommandPalette,
   'show_shortcuts' => l10n.actionShowShortcuts,
