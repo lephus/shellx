@@ -138,6 +138,40 @@ void main() {
       expect(shiftOf(tester), 0);
     });
 
+    testWidgets('switching tab: the shift follows the new tab\'s cursor', (tester) async {
+      await open(tester);
+      await cursorAtBottom(tester);
+      await keyboard(tester, 300);
+      expect(shiftOf(tester), greaterThan(0));
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      expect(shiftOf(tester), 0, reason: 'the new tab\'s cursor is on its first row');
+      machine.handles.last.emit(TabOutput('\r\n' * 80));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(shiftOf(tester), greaterThan(0), reason: 'its cursor moves the view');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(shiftOf(tester), greaterThan(0));
+    });
+
+    testWidgets('scrolled up in the history, the view is not shifted', (tester) async {
+      await open(tester);
+      machine.handles.single.emit(TabOutput('line\r\n' * 200));
+      await tester.pump(const Duration(milliseconds: 50));
+      await keyboard(tester, 300);
+      expect(shiftOf(tester), greaterThan(0));
+      final scroll = registry.forMachine(agentA).activeTab.value!.scroll;
+      scroll.jumpTo(0);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(shiftOf(tester), 0, reason: 'the cursor is not on screen');
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(shiftOf(tester), greaterThan(0));
+    });
+
     testWidgets('closing the keyboard brings the view back', (tester) async {
       await open(tester);
       await cursorAtBottom(tester);

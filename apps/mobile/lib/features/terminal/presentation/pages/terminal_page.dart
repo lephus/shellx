@@ -78,7 +78,10 @@ class _TerminalPageState extends State<TerminalPage> {
         _voice.pause();
         _controller.setViewing(false);
       },
-      onResume: () => _controller.setViewing(true),
+      // Another page on top (an app that came back over a dialog or a sheet) means it is not being looked at.
+      onResume: () {
+        if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) _controller.setViewing(true);
+      },
     );
     // Spec §3.1: while the composer is open the keyboard types into it, not into the terminal.
     var wasOpen = false;
@@ -503,6 +506,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   // A11 D31: the keyboard covers the area instead of shrinking it; the cursor row is kept in view.
                   if (!_controller.fixedHeight || active == null) return area;
                   return CursorShiftArea(
+                    key: ValueKey(active.id),
                     tab: active,
                     cellHeight: terminalCellSize(
                       shellxTerminalStyle(fontSize),
@@ -978,6 +982,7 @@ class _TerminalPane extends StatelessWidget {
                       tab.terminal.value,
                       key: viewKey,
                       controller: tab.selection,
+                      scrollController: tab.scroll,
                       focusNode: focusNode,
                       theme: TerminalColors.theme,
                       textStyle: shellxTerminalStyle(fontSize),

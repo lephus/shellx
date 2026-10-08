@@ -133,6 +133,9 @@ class TerminalTabController extends Controller {
 
   /// Selection state for long-press copy (spec §9.4).
   final TerminalController selection = TerminalController();
+
+  /// The terminal view's scroll position, so the keyboard cover knows when the view is scrolled up (A11 D31).
+  final ScrollController scroll = ScrollController();
   late final Signal<ShellxTerminal> _terminal;
   final Signal<TabBanner?> _banner = signal(null);
   final Signal<bool> _bound = signal(false);
@@ -381,6 +384,7 @@ class TerminalTabController extends Controller {
     _resizeTimer?.cancel();
     unawaited(_events?.cancel());
     selection.dispose();
+    scroll.dispose();
     _showDriverBanner.dispose();
     _isLive.dispose();
     _title.dispose();

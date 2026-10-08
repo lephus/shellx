@@ -119,6 +119,7 @@ class _CursorShiftAreaState extends State<CursorShiftArea> {
     super.initState();
     // `session.reset` swaps the terminal: follow the new one.
     _stopTerminal = widget.tab.terminal.subscribe(_follow);
+    widget.tab.scroll.addListener(_onScroll);
   }
 
   void _follow(Terminal terminal) {
@@ -136,8 +137,35 @@ class _CursorShiftAreaState extends State<CursorShiftArea> {
   }
 
   @override
+  void didUpdateWidget(CursorShiftArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.tab, widget.tab)) return;
+    // Another tab in front: follow its terminal and its scroll, not the old one's.
+    _stopTerminal();
+    oldWidget.tab.scroll.removeListener(_onScroll);
+    _terminal?.removeListener(_onTerminal);
+    _terminal = null;
+    _cursorRow = 0;
+    _stopTerminal = widget.tab.terminal.subscribe(_follow);
+    widget.tab.scroll.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_covered && mounted) setState(() {});
+  }
+
+  /// Scrolled up in the history, the cursor is not on screen: nothing to keep in view.
+  bool get _atBottom {
+    final scroll = widget.tab.scroll;
+    if (!scroll.hasClients) return true;
+    final position = scroll.position;
+    return position.pixels >= position.maxScrollExtent - 1;
+  }
+
+  @override
   void dispose() {
     _stopTerminal();
+    widget.tab.scroll.removeListener(_onScroll);
     _terminal?.removeListener(_onTerminal);
     super.dispose();
   }
@@ -147,7 +175,7 @@ class _CursorShiftAreaState extends State<CursorShiftArea> {
     final media = MediaQuery.of(context);
     final lift = keyboardLift(media);
     _covered = lift > 0;
-    final shift = lift <= 0
+    final shift = lift <= 0 || !_atBottom
         ? 0.0
         : cursorShift(
             cursorBottom: widget.topPadding + (_cursorRow + 1) * widget.cellHeight,

@@ -455,5 +455,6 @@
   "machinesCheckConnection": "Check your internet connection.",
   "machinesReload": "Reload",
   "settingsFixedHeight": "Keep terminal size when the keyboard opens",
-  "settingsFixedHeightHint": "The keyboard covers the terminal instead of shrinking it."
+  "settingsFixedHeightHint": "The keyboard covers the terminal instead of shrinking it.",
+  "voiceDraftSaved": "Draft saved"
 }

@@ -521,6 +521,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
     ),
+    "voiceDraftSaved": MessageLookupByLibrary.simpleMessage("Có bản nháp"),
     "voiceEnded": MessageLookupByLibrary.simpleMessage(
       "Phiên đã kết thúc — mở phiên mới để gửi",
     ),

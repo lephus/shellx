@@ -134,4 +134,70 @@ void main() {
     expect(keys, [ExtraKey.up, ExtraKey.down, ExtraKey.left, ExtraKey.right]);
     handle.dispose();
   });
+
+  testWidgets('jitter around the threshold does not send extra keys or change the direction', (t) async {
+    await pump(t);
+    final g = await t.startGesture(t.getCenter(find.byType(ArrowPadKey)));
+    await g.moveBy(const Offset(30, 0));
+    await t.pump();
+    expect(keys, [ExtraKey.right]);
+    // A shaky finger: a few dp up and down, in and out of the 28 dp step.
+    for (final dy in [4.0, -4.0, 5.0, -5.0, 4.0]) {
+      await g.moveBy(Offset(-3, dy));
+      await g.moveBy(Offset(3, -dy));
+    }
+    await g.moveBy(const Offset(-2, 0));
+    await g.moveBy(const Offset(2, 0));
+    await t.pump();
+    expect(keys, [ExtraKey.right], reason: 'no immediate extra key');
+    await t.pump(const Duration(milliseconds: 150));
+    expect(keys.toSet(), {ExtraKey.right});
+    await g.up();
+  });
+
+  testWidgets('a finger hovering just inside 14 dp keeps the arrow it has (dead band)', (t) async {
+    await pump(t);
+    final g = await t.startGesture(t.getCenter(find.byType(ArrowPadKey)));
+    await g.moveBy(const Offset(15, 0));
+    await t.pump();
+    await g.moveBy(const Offset(-3, 0)); // 12 dp: inside the dead band
+    await t.pump(const Duration(milliseconds: 600));
+    expect(keys.length, greaterThan(1), reason: 'still repeating');
+    await g.moveBy(const Offset(-5, 0)); // 7 dp: released
+    await t.pump();
+    final n = keys.length;
+    await t.pump(const Duration(seconds: 1));
+    expect(keys.length, n);
+    await g.up();
+  });
+
+  testWidgets('a diagonal keeps the current direction; a clear turn changes it', (t) async {
+    await pump(t);
+    final g = await t.startGesture(t.getCenter(find.byType(ArrowPadKey)));
+    await g.moveBy(const Offset(30, 0));
+    await t.pump();
+    await g.moveBy(const Offset(0, 33)); // (30, 33): nearly a tie
+    await t.pump();
+    expect(keys, [ExtraKey.right]);
+    await g.moveBy(const Offset(0, 9)); // (30, 42): clearly down
+    await t.pump();
+    expect(keys.last, ExtraKey.down);
+    await g.up();
+  });
+
+  testWidgets('the repeat stops when the app leaves the foreground', (t) async {
+    await pump(t);
+    final g = await t.startGesture(t.getCenter(find.byType(ArrowPadKey)));
+    await g.moveBy(const Offset(30, 0));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 250));
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    final n = keys.length;
+    await t.pump(const Duration(seconds: 1));
+    expect(keys.length, n);
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await t.pump(const Duration(seconds: 1));
+    expect(keys.length, n, reason: 'it does not restart by itself');
+    await g.up();
+  });
 }

@@ -10,7 +10,36 @@ enum PadDirection { up, down, left, right }
 
 /// A11 D30: which way a drag of [delta] from where the finger went down points; null while the finger is
 /// within [threshold] dp of the start. The dominant axis wins, a tie goes to the horizontal one.
-PadDirection? padDirection(Offset delta, {double threshold = 14}) {
+///
+/// With a [current] direction (the finger is already steering) the answer settles: the arrow is kept
+/// until the finger comes back within [release] dp (a dead band under [threshold]), and the other axis
+/// takes over only when it passes [threshold] and leads by [switchMargin] dp, so a diagonal or a shaky
+/// finger keeps the arrow it has.
+PadDirection? padDirection(
+  Offset delta, {
+  double threshold = 14,
+  PadDirection? current,
+  double release = 10,
+  double switchMargin = 6,
+}) {
+  if (current != null) {
+    final horizontal = current == PadDirection.left || current == PadDirection.right;
+    final along = switch (current) {
+      PadDirection.right => delta.dx,
+      PadDirection.left => -delta.dx,
+      PadDirection.down => delta.dy,
+      PadDirection.up => -delta.dy,
+    };
+    if (along >= release) {
+      final across = horizontal ? delta.dy : delta.dx;
+      if (across.abs() >= threshold && across.abs() >= along + switchMargin) {
+        return horizontal
+            ? (across > 0 ? PadDirection.down : PadDirection.up)
+            : (across > 0 ? PadDirection.right : PadDirection.left);
+      }
+      return current;
+    }
+  }
   final dx = delta.dx.abs();
   final dy = delta.dy.abs();
   if (dx < threshold && dy < threshold) return null;
@@ -93,7 +122,7 @@ class ArrowPadKey extends StatefulWidget {
   State<ArrowPadKey> createState() => _ArrowPadKeyState();
 }
 
-class _ArrowPadKeyState extends State<ArrowPadKey> {
+class _ArrowPadKeyState extends State<ArrowPadKey> with WidgetsBindingObserver {
   Offset _origin = Offset.zero;
   Timer? _timer;
   PadDirection? _direction;
@@ -106,13 +135,30 @@ class _ArrowPadKeyState extends State<ArrowPadKey> {
     _interval = null;
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// A call, the lock screen or the app switcher: nothing keeps repeating behind the user's back.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _stop();
+  }
+
   void _move(Offset position) {
     final delta = position - _origin;
-    final direction = padDirection(delta);
-    final interval = padInterval(delta.distance);
-    if (direction == null || interval == null) {
+    final direction = padDirection(delta, current: _direction);
+    if (direction == null) {
       _stop();
       return;
+    }
+    // Held in the dead band the arrow repeats at the slowest rate; near a speed step the current rate stays.
+    final distance = delta.distance;
+    var interval = padInterval(distance) ?? const Duration(milliseconds: 250);
+    if (_interval != null && interval != _interval && padInterval(distance - 3) != padInterval(distance + 3)) {
+      interval = _interval!;
     }
     if (direction == _direction && interval == _interval) return;
     final changed = direction != _direction;
@@ -125,6 +171,7 @@ class _ArrowPadKeyState extends State<ArrowPadKey> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stop();
     super.dispose();
   }

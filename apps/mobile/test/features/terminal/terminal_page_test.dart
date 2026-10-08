@@ -378,6 +378,32 @@ void main() {
       expect(workspace.unseenCount, 0);
     });
 
+    testWidgets('resuming the app with another page on top does not mark the terminal as viewed', (tester) async {
+      await open(tester);
+      final workspace = registry.forMachine(agentA);
+      final context = tester.element(find.byType(Scaffold).first);
+      unawaited(
+        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('on top')))),
+      );
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      machine.handles.first.emit(const TabOutput('while covered'));
+      expect(workspace.unseenCount, 1);
+    });
+
+    testWidgets('resuming the app on the terminal page marks it as viewed again', (tester) async {
+      await open(tester);
+      final workspace = registry.forMachine(agentA);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      machine.handles.first.emit(const TabOutput('x'));
+      expect(workspace.unseenCount, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(workspace.unseenCount, 0);
+      machine.handles.first.emit(const TabOutput('y'));
+      expect(workspace.unseenCount, 0);
+    });
+
     testWidgets('a notification\'s pending tab wins over the first unseen one', (tester) async {
       await open(tester);
       await tester.tap(find.byTooltip('Mở phiên mới'));
@@ -1594,6 +1620,27 @@ void main() {
       await tester.pump();
       expect(speech.stops, 1);
       await tester.pump(const Duration(milliseconds: 150));
+    });
+
+    testWidgets('A11 D29: a tab with a draft shows it on the mic while the composer is closed', (tester) async {
+      await openQuiet(tester);
+      final dot = find.byKey(const ValueKey('voice-draft'));
+      expect(dot, findsNothing);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final tabs = registry.forMachine(agentA).tabs.value;
+      tabs.first.draft.value = 'git push';
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(dot, findsOneWidget);
+      expect(find.byKey(const ValueKey('voice-text')), findsNothing, reason: 'not opened by itself');
+      expect(
+        find.byWidgetPredicate((w) => w is Semantics && w.properties.value == 'Có bản nháp'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('tab-102')));
+      await tester.pumpAndSettle();
+      expect(dot, findsNothing);
     });
 
     testWidgets('A11 D29: each tab keeps its own draft; closing a tab drops its draft', (tester) async {

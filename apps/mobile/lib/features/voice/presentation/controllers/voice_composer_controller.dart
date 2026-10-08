@@ -73,7 +73,15 @@ class VoiceComposerController extends Controller {
     text.text = holder?.value ?? '';
   }
 
-  void _saveDraft() => _draft?.value = text.text;
+  void _saveDraft() {
+    _draft?.value = text.text;
+    _hasDraft.value = text.text.isNotEmpty;
+  }
+
+  final Signal<bool> _hasDraft = signal(false);
+
+  /// The composer holds text (this terminal's draft); with the composer closed the mic says so.
+  ReadonlySignal<bool> get hasDraft => _hasDraft;
 
   /// [canSend]: the active tab is live. [onSubmit]: sends one line with Enter.
   void attach({required bool Function() canSend, required void Function(String line) onSubmit}) {
@@ -284,5 +292,6 @@ class VoiceComposerController extends Controller {
     _issue.dispose();
     _locale.dispose();
     _unavailable.dispose();
+    _hasDraft.dispose();
   }
 }

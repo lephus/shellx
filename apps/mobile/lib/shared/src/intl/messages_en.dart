@@ -526,6 +526,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
     ),
+    "voiceDraftSaved": MessageLookupByLibrary.simpleMessage("Draft saved"),
     "voiceEnded": MessageLookupByLibrary.simpleMessage(
       "Session ended — open a new session to send",
     ),

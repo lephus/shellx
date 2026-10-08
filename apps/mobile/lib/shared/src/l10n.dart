@@ -2353,6 +2353,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Draft saved`
+  String get voiceDraftSaved {
+    return Intl.message(
+      'Draft saved',
+      name: 'voiceDraftSaved',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {
