@@ -8,8 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 const String _macIcons = 'macos/Runner/Assets.xcassets/AppIcon.appiconset';
 const String _windowsIcon = 'windows/runner/resources/app_icon.ico';
 
-/// The ShellX tile colour (#16181D), shared with the mobile icons.
-const List<int> _tile = [0x16, 0x18, 0x1D];
+/// The ShellX tile is a dark gradient (#1C1438 to #0B0716, with a faint mint
+/// glow): every channel stays this dark, so it is told apart from the Flutter default.
+const int _tileMax = 0x40;
 
 Future<({int width, int height, ByteData rgba})> _decode(String path) async {
   final codec = await ui.instantiateImageCodec(File(path).readAsBytesSync());
@@ -36,18 +37,14 @@ void main() {
           reason: 'corner of $size is transparent',
         );
         if (size < 128) continue;
-        // Just inside the tile's left edge, level with the top dots: the flat tile colour.
+        // Just inside the tile's left edge, level with the top dots: the dark tile.
         final inside = _pixel(
           image,
           (size * 0.2).round(),
           (size * 0.2).round(),
         );
         for (var i = 0; i < 3; i++) {
-          expect(
-            (inside[i] - _tile[i]).abs(),
-            lessThanOrEqualTo(6),
-            reason: '$size channel $i',
-          );
+          expect(inside[i], lessThan(_tileMax), reason: '$size channel $i');
         }
         expect(inside[3], 255, reason: '$size');
       }
@@ -84,10 +81,10 @@ void main() {
         File(path).writeAsBytesSync(png);
         final image = await _decode(path);
         expect(_pixel(image, 0, 0)[3], 0);
-        // Left of the prompt, half way down: the flat tile colour.
+        // Left of the prompt, half way down: the dark tile.
         final inside = _pixel(image, 30, 128);
         for (var c = 0; c < 3; c++) {
-          expect((inside[c] - _tile[c]).abs(), lessThanOrEqualTo(6));
+          expect(inside[c], lessThan(_tileMax));
         }
         return;
       }
