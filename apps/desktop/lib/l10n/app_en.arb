@@ -1019,5 +1019,20 @@
   "settingsOptionAsAltRight": "Right Option",
   "settingsOptionAsAltBoth": "Both Option keys",
   "settingsDefaultValue": "Default",
-  "settingsHexHint": "#RRGGBB"
+  "settingsHexHint": "#RRGGBB",
+  "actionSearchAll": "Find in all terminals",
+  "@actionSearchAll": {"description": "A11 D21"},
+  "searchAllTitle": "Find in all terminals",
+  "searchAllFieldLabel": "Search every terminal",
+  "searchAllHint": "Search every terminal…",
+  "searchAllNeedTwo": "Type at least 2 characters",
+  "searchAllNone": "No matches in any terminal",
+  "searchAllCapped": "Showing the first {count} matches",
+  "@searchAllCapped": {"placeholders": {"count": {"type": "int"}}},
+  "searchAllCount": "{count, plural, =1{1 match} other{{count} matches}}",
+  "@searchAllCount": {"placeholders": {"count": {"type": "int"}}},
+  "searchAllPane": "Pane {n}",
+  "@searchAllPane": {"placeholders": {"n": {"type": "int"}}},
+  "searchAllLine": "Line {n}",
+  "@searchAllLine": {"placeholders": {"n": {"type": "int"}}}
 }

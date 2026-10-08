@@ -9,10 +9,14 @@ import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
 import '../../config/keybind_actions.dart' show describeIntent;
 import '../../terminal/closed_items.dart' show closedItemsProvider;
+import '../../terminal/find_sessions.dart';
+import '../../terminal/global_search.dart' show GlobalHit;
+import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
+import '../config/search_all_overlay.dart';
 import '../config/shortcuts_sheet.dart';
 import '../settings/settings_overlay.dart';
 import '../window_router.dart';
@@ -22,7 +26,7 @@ import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
 
 /// A9's overlays over the workspace (UI-A9 §2-4).
-enum A9Overlay { palette, problems, shortcuts, settings }
+enum A9Overlay { palette, problems, shortcuts, settings, searchAll }
 
 /// One problem for the toast's "already told" check: where and what, never
 /// the text (D36: a problem that stays is not announced on every reload).
@@ -126,6 +130,39 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     invokeIntent(entry.intent);
   }
 
+  /// A11 D21: a chosen match — its tab is selected, its pane focused and
+  /// its find bar opened on [query], standing on the match. The bar's
+  /// reveal exists only once the pane has built it, so the jump is made
+  /// again after that frame.
+  void _openSearchHit(GlobalHit hit, String query) {
+    closeOverlay(restoreFocus: false);
+    final tab = ref.read(terminalTabsProvider).tabOfSession(hit.paneId);
+    if (tab == null) {
+      focusTerminal(); // the pane closed meanwhile
+      return;
+    }
+    ref.read(sidebarWorkspacesProvider.notifier).reveal(tab.id);
+    ref.read(terminalTabsProvider.notifier).focusPane(hit.paneId);
+    final find = ref.read(findSessionsProvider.notifier).open(hit.paneId);
+    if (find == null) {
+      focusTerminal();
+      return;
+    }
+    if (find.matchCase) find.toggleMatchCase();
+    find.setQuery(query);
+    final row = hit.liveRow ?? 0;
+    find.goToMatchAtOrAfter(row);
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (!mounted) return;
+        final live = ref.read(findSessionsProvider)[hit.paneId];
+        if (live == null) return;
+        live.goToMatchAtOrAfter(row);
+        live.focusNode.requestFocus();
+      })
+      ..ensureVisualUpdate();
+  }
+
   void openOverlay(A9Overlay next) {
     // Before closing whatever is open, which clears it.
     final before = _beforeOverlay ?? FocusManager.instance.primaryFocus;
@@ -173,6 +210,26 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
               entries: _paletteEntries,
               recent: _recent,
               onRun: _runPalette,
+              onClose: closeOverlay,
+            ),
+          ),
+        ),
+      );
+    }
+    if (overlay == A9Overlay.searchAll) {
+      return Positioned(
+        key: const ValueKey('a9.searchall'),
+        left: ShellxSizes.sidebarWidth + 1,
+        right: 0,
+        top:
+            (isMacDesktop ? ShellxSizes.paneHeaderMac : 0) +
+            ShellxSizes.paletteTop,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: TapRegion(
+            onTapOutside: (_) => closeOverlay(),
+            child: SearchAllOverlay(
+              onOpen: _openSearchHit,
               onClose: closeOverlay,
             ),
           ),
@@ -295,6 +352,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ConfigUiRequest.problems => A9Overlay.problems,
         ConfigUiRequest.shortcuts => A9Overlay.shortcuts,
         ConfigUiRequest.settings => A9Overlay.settings,
+        ConfigUiRequest.searchAll => A9Overlay.searchAll,
       });
     });
   }

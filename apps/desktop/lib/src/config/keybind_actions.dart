@@ -198,6 +198,8 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint:
           'line_start, line_end, delete_line, delete_word, delete_word_forward',
     ),
+    // A11 D21: the overlay that searches every pane's scrollback.
+    const ActionSpec('search_all', ActionGroup.editing),
     // A11 D13: vim-style keys over the buffer, no mouse.
     const ActionSpec('toggle_copy_mode', ActionGroup.editing),
     const ActionSpec(
@@ -330,6 +332,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'start_search' => const StartSearchIntent(),
   'navigate_search' => NavigateSearchIntent(next: a.param != 'previous'),
   'end_search' => const EndSearchIntent(),
+  'search_all' => const SearchAllIntent(),
   'edit_line' => EditLineIntent(EditLineOp.fromWire(a.param)!),
   'toggle_copy_mode' => const ToggleCopyModeIntent(),
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),

@@ -2502,4 +2502,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsHexHint => '#RRGGBB';
+
+  @override
+  String get actionSearchAll => 'Find in all terminals';
+
+  @override
+  String get searchAllTitle => 'Find in all terminals';
+
+  @override
+  String get searchAllFieldLabel => 'Search every terminal';
+
+  @override
+  String get searchAllHint => 'Search every terminal…';
+
+  @override
+  String get searchAllNeedTwo => 'Type at least 2 characters';
+
+  @override
+  String get searchAllNone => 'No matches in any terminal';
+
+  @override
+  String searchAllCapped(int count) {
+    return 'Showing the first $count matches';
+  }
+
+  @override
+  String searchAllCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchAllPane(int n) {
+    return 'Pane $n';
+  }
+
+  @override
+  String searchAllLine(int n) {
+    return 'Line $n';
+  }
 }

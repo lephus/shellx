@@ -3815,6 +3815,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'#RRGGBB'**
   String get settingsHexHint;
+
+  /// A11 D21
+  ///
+  /// In en, this message translates to:
+  /// **'Find in all terminals'**
+  String get actionSearchAll;
+
+  /// No description provided for @searchAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in all terminals'**
+  String get searchAllTitle;
+
+  /// No description provided for @searchAllFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search every terminal'**
+  String get searchAllFieldLabel;
+
+  /// No description provided for @searchAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search every terminal…'**
+  String get searchAllHint;
+
+  /// No description provided for @searchAllNeedTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 characters'**
+  String get searchAllNeedTwo;
+
+  /// No description provided for @searchAllNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches in any terminal'**
+  String get searchAllNone;
+
+  /// No description provided for @searchAllCapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the first {count} matches'**
+  String searchAllCapped(int count);
+
+  /// No description provided for @searchAllCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 match} other{{count} matches}}'**
+  String searchAllCount(int count);
+
+  /// No description provided for @searchAllPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane {n}'**
+  String searchAllPane(int n);
+
+  /// No description provided for @searchAllLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line {n}'**
+  String searchAllLine(int n);
 }
 
 class _AppLocalizationsDelegate

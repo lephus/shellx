@@ -210,6 +210,11 @@ class ReopenClosedIntent extends Intent {
   const ReopenClosedIntent();
 }
 
+/// A11 D21 `search_all` (⌘⇧F / Ctrl+Shift+Alt+F).
+class SearchAllIntent extends Intent {
+  const SearchAllIntent();
+}
+
 /// A11 D15 `focus_history:back|forward` (⌘⌃[ / ⌘⌃], Ctrl+Alt+[ / ]).
 class FocusHistoryIntent extends Intent {
   const FocusHistoryIntent({required this.back});

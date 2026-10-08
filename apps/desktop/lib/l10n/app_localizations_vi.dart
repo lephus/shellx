@@ -2413,4 +2413,47 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsHexHint => '#RRGGBB';
+
+  @override
+  String get actionSearchAll => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllTitle => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllFieldLabel => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllHint => 'Tìm trong mọi terminal…';
+
+  @override
+  String get searchAllNeedTwo => 'Nhập ít nhất 2 ký tự';
+
+  @override
+  String get searchAllNone => 'Không có kết quả trong terminal nào';
+
+  @override
+  String searchAllCapped(int count) {
+    return 'Hiện $count kết quả đầu tiên';
+  }
+
+  @override
+  String searchAllCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kết quả',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchAllPane(int n) {
+    return 'Pane $n';
+  }
+
+  @override
+  String searchAllLine(int n) {
+    return 'Dòng $n';
+  }
 }

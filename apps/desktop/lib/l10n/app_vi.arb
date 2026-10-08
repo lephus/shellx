@@ -617,5 +617,15 @@
   "settingsOptionAsAltRight": "Option phải",
   "settingsOptionAsAltBoth": "Cả hai phím Option",
   "settingsDefaultValue": "Mặc định",
-  "settingsHexHint": "#RRGGBB"
+  "settingsHexHint": "#RRGGBB",
+  "actionSearchAll": "Tìm trong mọi terminal",
+  "searchAllTitle": "Tìm trong mọi terminal",
+  "searchAllFieldLabel": "Tìm trong mọi terminal",
+  "searchAllHint": "Tìm trong mọi terminal…",
+  "searchAllNeedTwo": "Nhập ít nhất 2 ký tự",
+  "searchAllNone": "Không có kết quả trong terminal nào",
+  "searchAllCapped": "Hiện {count} kết quả đầu tiên",
+  "searchAllCount": "{count, plural, other{{count} kết quả}}",
+  "searchAllPane": "Pane {n}",
+  "searchAllLine": "Dòng {n}"
 }

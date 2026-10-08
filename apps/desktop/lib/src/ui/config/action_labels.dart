@@ -119,6 +119,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'navigate_search' =>
     a.param == 'previous' ? l10n.actionSearchPrevious : l10n.actionSearchNext,
   'end_search' => l10n.actionEndSearch,
+  'search_all' => l10n.actionSearchAll,
   'edit_line' => switch (a.param) {
     'line_end' => l10n.actionEditLineEnd,
     'delete_line' => l10n.actionEditLineDeleteLine,
