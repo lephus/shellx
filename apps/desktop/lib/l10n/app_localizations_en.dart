@@ -2916,4 +2916,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String tabOpenPr(int number) {
     return 'Open pull request #$number';
   }
+
+  @override
+  String get settingAgentCommand => 'Run a command on agent events';
+
+  @override
+  String get settingAgentCommandDesc =>
+      'Set agent-event-command in the config file. ShellX asks before running a new command.';
+
+  @override
+  String get agentCommandApproveTitle => 'Allow this command?';
+
+  @override
+  String get agentCommandApproveBody =>
+      'ShellX will run it when an agent starts, needs input or finishes. It gets no access to your ShellX session.';
+
+  @override
+  String get agentCommandApproveAllow => 'Allow';
+
+  @override
+  String get agentCommandApproveCancel => 'Cancel';
+
+  @override
+  String get agentCommandNotApproved =>
+      'An agent-event command is set but not allowed yet.';
+
+  @override
+  String get agentCommandReview => 'Review';
+
+  @override
+  String get agentCommandFailed => 'The agent-event command could not run.';
+
+  @override
+  String get configProblemAgentCommandMainOnly =>
+      'agent-event-command is only read from the main ShellX config file';
 }

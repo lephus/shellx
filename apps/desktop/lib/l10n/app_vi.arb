@@ -729,5 +729,15 @@
   "prReviewChanges": "cần sửa",
   "prTooltip": "Pull request #{number}: {state}, {checks}",
   "prOpenInBrowser": "Mở trong trình duyệt",
-  "tabOpenPr": "Mở pull request #{number}"
+  "tabOpenPr": "Mở pull request #{number}",
+  "settingAgentCommand": "Chạy lệnh khi agent có sự kiện",
+  "settingAgentCommandDesc": "Đặt agent-event-command trong tệp cấu hình. ShellX hỏi trước khi chạy một lệnh mới.",
+  "agentCommandApproveTitle": "Cho phép lệnh này?",
+  "agentCommandApproveBody": "ShellX sẽ chạy lệnh này khi agent bắt đầu, cần nhập hoặc xong. Lệnh không có quyền gì với phiên ShellX của bạn.",
+  "agentCommandApproveAllow": "Cho phép",
+  "agentCommandApproveCancel": "Huỷ",
+  "agentCommandNotApproved": "Đã đặt lệnh sự kiện agent nhưng chưa được cho phép.",
+  "agentCommandReview": "Xem",
+  "agentCommandFailed": "Lệnh sự kiện agent không chạy được.",
+  "configProblemAgentCommandMainOnly": "agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính"
 }

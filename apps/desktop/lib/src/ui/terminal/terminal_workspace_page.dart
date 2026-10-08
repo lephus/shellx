@@ -31,6 +31,7 @@ import '../../terminal/terminal_font_size.dart';
 import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../config/agent_command_approval.dart';
 import '../window_focus.dart';
 import '../window_router.dart';
 import 'click_select.dart' show selectionText;
@@ -916,6 +917,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           shortcuts: overlayBlocksShortcuts ? const {} : terminalShortcuts,
           onKeyEvent: _terminalKey,
           onShowConfigProblems: () => openOverlay(A9Overlay.problems),
+          onReviewAgentCommand: (command) => unawaited(
+            reviewAgentCommand(ref, AppLocalizations.of(context), command),
+          ),
           onClosePane: (id) {
             final tab = ref.read(terminalTabsProvider).tabOfSession(id);
             if (tab != null) unawaited(closePane(tab, id));

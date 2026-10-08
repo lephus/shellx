@@ -2824,4 +2824,38 @@ class AppLocalizationsVi extends AppLocalizations {
   String tabOpenPr(int number) {
     return 'Mở pull request #$number';
   }
+
+  @override
+  String get settingAgentCommand => 'Chạy lệnh khi agent có sự kiện';
+
+  @override
+  String get settingAgentCommandDesc =>
+      'Đặt agent-event-command trong tệp cấu hình. ShellX hỏi trước khi chạy một lệnh mới.';
+
+  @override
+  String get agentCommandApproveTitle => 'Cho phép lệnh này?';
+
+  @override
+  String get agentCommandApproveBody =>
+      'ShellX sẽ chạy lệnh này khi agent bắt đầu, cần nhập hoặc xong. Lệnh không có quyền gì với phiên ShellX của bạn.';
+
+  @override
+  String get agentCommandApproveAllow => 'Cho phép';
+
+  @override
+  String get agentCommandApproveCancel => 'Huỷ';
+
+  @override
+  String get agentCommandNotApproved =>
+      'Đã đặt lệnh sự kiện agent nhưng chưa được cho phép.';
+
+  @override
+  String get agentCommandReview => 'Xem';
+
+  @override
+  String get agentCommandFailed => 'Lệnh sự kiện agent không chạy được.';
+
+  @override
+  String get configProblemAgentCommandMainOnly =>
+      'agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính';
 }

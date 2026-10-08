@@ -365,6 +365,7 @@ class ConfigController extends Notifier<ConfigState> {
       macos: platform == TargetPlatform.macOS,
       home: paths.home,
       windows: paths.windows,
+      mainFile: paths.shellx,
     );
     final theme = await resolveTheme(config, paths, fs: fs, problems: problems);
     files.addAll(theme.files);

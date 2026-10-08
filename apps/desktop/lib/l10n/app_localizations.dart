@@ -4487,6 +4487,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open pull request #{number}'**
   String tabOpenPr(int number);
+
+  /// No description provided for @settingAgentCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a command on agent events'**
+  String get settingAgentCommand;
+
+  /// No description provided for @settingAgentCommandDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Set agent-event-command in the config file. ShellX asks before running a new command.'**
+  String get settingAgentCommandDesc;
+
+  /// No description provided for @agentCommandApproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this command?'**
+  String get agentCommandApproveTitle;
+
+  /// No description provided for @agentCommandApproveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX will run it when an agent starts, needs input or finishes. It gets no access to your ShellX session.'**
+  String get agentCommandApproveBody;
+
+  /// No description provided for @agentCommandApproveAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get agentCommandApproveAllow;
+
+  /// No description provided for @agentCommandApproveCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get agentCommandApproveCancel;
+
+  /// No description provided for @agentCommandNotApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent-event command is set but not allowed yet.'**
+  String get agentCommandNotApproved;
+
+  /// No description provided for @agentCommandReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get agentCommandReview;
+
+  /// No description provided for @agentCommandFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent-event command could not run.'**
+  String get agentCommandFailed;
+
+  /// No description provided for @configProblemAgentCommandMainOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'agent-event-command is only read from the main ShellX config file'**
+  String get configProblemAgentCommandMainOnly;
 }
 
 class _AppLocalizationsDelegate

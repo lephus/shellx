@@ -7,6 +7,8 @@ import 'package:shellx_agent/shellx_agent.dart'
     show SessionNotice, SessionNoticeKind;
 
 import '../agent/notify_threshold.dart';
+import '../config/config_controller.dart' show shellxConfigProvider;
+import '../integrations/agent_command_runner.dart';
 import '../ui/window_focus.dart';
 import 'agent_names.dart';
 import 'agent_notify_policy.dart';
@@ -239,7 +241,12 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       _ended.remove(e.pane);
       _endedEventAt.remove(e.pane);
     }
-    _store(e.pane, after);
+    _cause = e;
+    try {
+      _store(e.pane, after);
+    } finally {
+      _cause = null;
+    }
     // An event that came late changed nothing and tells nothing.
     if (before == null || !e.at.isBefore(before.lastEventAt)) {
       _tell(e, before, visible);
@@ -359,15 +366,44 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     final now = _shown(next);
     if (was != now || (now != null && before?.agent != next?.agent)) {
       final record = next ?? before!;
+      final tab = ref.read(terminalTabsProvider).tabOfSession(id)?.id;
       _changes.add(
-        AgentStatusChange(
-          pane: id,
-          tab: ref.read(terminalTabsProvider).tabOfSession(id)?.id,
-          agent: record.agent,
-          state: now,
-        ),
+        AgentStatusChange(pane: id, tab: tab, agent: record.agent, state: now),
       );
+      _runUserCommand(id, tab, record.agent, now);
     }
+  }
+
+  /// The event being applied (its words go to the user's command).
+  AgentEvent? _cause;
+
+  /// A12 D17: the user's `agent-event-command`, on a visible change. The
+  /// runner checks the approval, the limits and the environment; nothing
+  /// here reads the command's text.
+  void _runUserCommand(int pane, int? tab, AgentKind agent, AgentState? state) {
+    if (!ref.mounted) return;
+    if (ref.read(shellxConfigProvider).config.agentEventCommand.isEmpty) return;
+    final event = switch (state) {
+      null => 'end',
+      AgentState.running => 'running',
+      AgentState.needsInput => 'needs_input',
+      AgentState.idle => 'idle',
+      AgentState.done => 'done',
+      AgentState.unknown => null,
+    };
+    if (event == null) return;
+    ref
+        .read(agentCommandRunnerProvider)
+        .emit(
+          AgentCommandEvent(
+            event: event,
+            agent: agent.name,
+            pane: pane,
+            tab: tab,
+            status: state == null ? 'none' : event,
+            message: _cause?.message,
+          ),
+        );
   }
 
   /// D12: a question is spoken by its tab's row, at most once a minute.

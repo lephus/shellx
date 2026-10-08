@@ -44,6 +44,7 @@ class TerminalPane extends ConsumerStatefulWidget {
     this.onKeyEvent,
     required this.onClosePane,
     this.onShowConfigProblems,
+    this.onReviewAgentCommand,
   });
 
   /// The selected tab's TerminalView focus (UI §3.6 region 1).
@@ -76,6 +77,9 @@ class TerminalPane extends ConsumerStatefulWidget {
 
   /// The toast's "Show" for configuration problems (A9).
   final VoidCallback? onShowConfigProblems;
+
+  /// A12 D17: the toast's button for a command that is not allowed yet.
+  final void Function(String command)? onReviewAgentCommand;
 
   @override
   ConsumerState<TerminalPane> createState() => _TerminalPaneState();
@@ -480,7 +484,12 @@ class _TerminalPaneState extends ConsumerState<TerminalPane> {
                                         notice: notice,
                                         onDismiss: () => _dismiss(notice),
                                         onReturnFocus: _returnFocus,
-                                        onAction: widget.onShowConfigProblems,
+                                        onAction:
+                                            notice
+                                                is AgentCommandNotApprovedNotice
+                                            ? () => widget.onReviewAgentCommand
+                                                  ?.call(notice.command)
+                                            : widget.onShowConfigProblems,
                                       ),
                               ),
                             ),

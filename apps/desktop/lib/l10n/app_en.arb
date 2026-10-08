@@ -1161,5 +1161,15 @@
   "@prTooltip": {"placeholders": {"number": {"type": "int"}, "state": {"type": "String"}, "checks": {"type": "String"}}},
   "prOpenInBrowser": "Open in browser",
   "tabOpenPr": "Open pull request #{number}",
-  "@tabOpenPr": {"placeholders": {"number": {"type": "int"}}}
+  "@tabOpenPr": {"placeholders": {"number": {"type": "int"}}},
+  "settingAgentCommand": "Run a command on agent events",
+  "settingAgentCommandDesc": "Set agent-event-command in the config file. ShellX asks before running a new command.",
+  "agentCommandApproveTitle": "Allow this command?",
+  "agentCommandApproveBody": "ShellX will run it when an agent starts, needs input or finishes. It gets no access to your ShellX session.",
+  "agentCommandApproveAllow": "Allow",
+  "agentCommandApproveCancel": "Cancel",
+  "agentCommandNotApproved": "An agent-event command is set but not allowed yet.",
+  "agentCommandReview": "Review",
+  "agentCommandFailed": "The agent-event command could not run.",
+  "configProblemAgentCommandMainOnly": "agent-event-command is only read from the main ShellX config file"
 }

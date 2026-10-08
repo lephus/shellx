@@ -86,6 +86,10 @@ abstract final class SettingKeys {
   /// started on, a one-element string list. UI-owned.
   static const String lastSeenVersion = 'last_seen_version';
 
+  /// A12 D17: the SHA-256 (hex) of each `agent-event-command` string the
+  /// user allowed, newest last, at most 20. Never the string. UI-owned.
+  static const String agentCommandApproved = 'agent_command_approved';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -115,6 +119,7 @@ abstract final class SettingKeys {
     backgroundService,
     tourDone,
     lastSeenVersion,
+    agentCommandApproved,
   };
 }
 
@@ -165,6 +170,7 @@ abstract final class UiSettingKeys {
     SettingKeys.backgroundService,
     SettingKeys.tourDone,
     SettingKeys.lastSeenVersion,
+    SettingKeys.agentCommandApproved,
   };
 }
 

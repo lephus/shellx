@@ -41,6 +41,8 @@ String problemText(AppLocalizations l10n, ConfigProblem problem) {
     // A11 D22: the global shortcut could not be registered.
     ConfigProblemCode.unsupportedValue when key == 'global-hotkey' =>
       l10n.settingsGlobalHotkeyTaken,
+    ConfigProblemCode.unsupportedValue when key == 'agent-event-command' =>
+      l10n.configProblemAgentCommandMainOnly,
     ConfigProblemCode.unsupportedValue => l10n.configProblemUnsupportedValue(
       key,
       value,

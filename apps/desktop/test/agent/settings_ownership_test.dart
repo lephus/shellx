@@ -56,6 +56,9 @@ const _expectedUi = {
   // A11 D23, D24.
   'tour_done',
   'last_seen_version',
+  // A12 D17: the hash of each allowed agent-event-command (the window runs
+  // it; the service never does).
+  'agent_command_approved',
 };
 
 final class _Listener implements MuxListener {
@@ -80,7 +83,7 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(28));
+    expect(SettingKeys.all, hasLength(29));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',

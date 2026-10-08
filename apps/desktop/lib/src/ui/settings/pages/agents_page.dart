@@ -48,6 +48,7 @@ class AgentsPage extends ConsumerWidget {
         const _IntegrationsSection(),
         settingWidget(settingById('agent-resume')),
         _PrStatusRow(),
+        const _AgentCommandRow(),
       ],
     );
   }
@@ -64,6 +65,39 @@ class _PrStatusRow extends ConsumerWidget {
     return settingWidget(
       settingById('pr-status'),
       note: found == false ? l10n.settingPrStatusNoGh : null,
+    );
+  }
+}
+
+/// A12 D17: what `agent-event-command` is for. It is set in the file (an
+/// edit here would put a command line in front of the user without the
+/// approval dialog), so this row only says so.
+class _AgentCommandRow extends StatelessWidget {
+  const _AgentCommandRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      key: const Key('setting.agent-event-command'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.settingAgentCommand,
+            style: ShellxText.body.copyWith(
+              color: ShellxDesktopColors.textPrimary,
+            ),
+          ),
+          Text(
+            l10n.settingAgentCommandDesc,
+            style: ShellxText.small.copyWith(
+              color: ShellxDesktopColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

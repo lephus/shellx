@@ -664,6 +664,8 @@ class _NoticeToastState extends State<NoticeToast> {
     SettingsFileChangedNotice() => l10n.settingsFileChanged,
     SettingsFileDamagedNotice() => l10n.settingsFileDamaged,
     SettingsFileUnwritableNotice() => l10n.settingsFileUnwritable,
+    AgentCommandNotApprovedNotice() => l10n.agentCommandNotApproved,
+    AgentCommandFailedNotice() => l10n.agentCommandFailed,
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
     PasteTooLargeNotice() => l10n.pasteTooLarge,
@@ -755,10 +757,13 @@ class _NoticeToastState extends State<NoticeToast> {
                 ),
               ),
               const SizedBox(width: ShellxSpace.s8),
-              if (widget.notice is ConfigProblemsNotice &&
+              if ((widget.notice is ConfigProblemsNotice ||
+                      widget.notice is AgentCommandNotApprovedNotice) &&
                   widget.onAction != null)
                 _ShowButton(
-                  label: l10n.configProblemsShow,
+                  label: widget.notice is AgentCommandNotApprovedNotice
+                      ? l10n.agentCommandReview
+                      : l10n.configProblemsShow,
                   neutral: _neutral,
                   color: foreground,
                   onPressed: () {

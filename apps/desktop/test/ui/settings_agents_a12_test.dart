@@ -304,6 +304,17 @@ void main() {
     await disposeWorkspace(t, r.container);
   }, variant: mac);
 
+  testWidgets('the agent-event command row says where it is set', (t) async {
+    final r = await openAgents(t);
+    await reveal(t, find.byKey(const Key('setting.agent-event-command')));
+    expect(find.text('Run a command on agent events'), findsOneWidget);
+    expect(
+      find.textContaining('Set agent-event-command in the config file'),
+      findsOneWidget,
+    );
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
   testWidgets('the shellx command is typed by its absolute path, quoted for '
       'the shell', (t) async {
     final r = await openAgents(

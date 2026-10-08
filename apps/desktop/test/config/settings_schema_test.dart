@@ -120,6 +120,8 @@ void main() {
       'config-file',
       'font-feature',
       'cursor-color-text',
+      // A12 D17: set in the file only (the approval dialog is its editor).
+      'agent-event-command',
     };
     const loaderScalarKeys = {
       'font-family',
