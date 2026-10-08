@@ -2874,4 +2874,30 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get settingLanguageRestart =>
       'Có hiệu lực sau khi bạn khởi động lại ShellX.';
+
+  @override
+  String get updateCheck => 'Kiểm tra cập nhật';
+
+  @override
+  String get updateChecking => 'Đang kiểm tra…';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'Bạn đang dùng bản mới nhất ($version).';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return 'Đã có bản $version.';
+  }
+
+  @override
+  String get updateDownload => 'Tải xuống';
+
+  @override
+  String get updateRequired =>
+      'Bản này đã quá cũ. Hãy cập nhật để tiếp tục dùng truy cập từ điện thoại.';
+
+  @override
+  String get updateFailed => 'Không kiểm tra được lúc này.';
 }

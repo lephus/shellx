@@ -8,6 +8,7 @@ import 'agent_controller_base.dart';
 import 'agent_runtime.dart';
 import 'agent_state.dart';
 import 'agent_state_codec.dart';
+import 'update_check.dart';
 
 /// A5b D12: the agent of a UI that attaches to the background service.
 ///
@@ -195,6 +196,19 @@ final class RemoteAgentController extends AgentControllerBase {
 
   @override
   Future<void> checkForUpdate() => _call('checkForUpdate');
+
+  @override
+  Future<UpdateCheckResult> checkForUpdateNow() async {
+    try {
+      return updateCheckFromWire(
+        await _call(
+          'checkForUpdateNow',
+        ).timeout(kUpdateCheckTimeout + const Duration(seconds: 5)),
+      );
+    } on Object {
+      return const Failed();
+    }
+  }
 
   /// Not an `agent.call`: ending the UI must not stop the daemon's relay
   /// link (only `daemon.quit` stops the service, A5b D14).

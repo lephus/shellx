@@ -2965,4 +2965,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingLanguageRestart => 'Takes effect after you restart ShellX.';
+
+  @override
+  String get updateCheck => 'Check for updates';
+
+  @override
+  String get updateChecking => 'Checking…';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'You’re up to date ($version).';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return 'Version $version is available.';
+  }
+
+  @override
+  String get updateDownload => 'Download';
+
+  @override
+  String get updateRequired =>
+      'This version is too old. Update to keep using phone access.';
+
+  @override
+  String get updateFailed => 'Couldn’t check right now.';
 }

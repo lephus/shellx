@@ -165,6 +165,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'show_config_problems' => l10n.actionShowConfigProblems,
   'show_tour' => l10n.actionShowTour,
   'show_whats_new' => l10n.actionShowWhatsNew,
+  'check_for_updates' => l10n.updateCheck,
   'run_command' => l10n.actionRunCommand(a.param ?? ''),
   'text' || 'csi' || 'esc' => l10n.actionSendText,
   'ignore' => l10n.actionIgnore,

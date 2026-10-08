@@ -4577,6 +4577,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Takes effect after you restart ShellX.'**
   String get settingLanguageRestart;
+
+  /// No description provided for @updateCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheck;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get updateChecking;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re up to date ({version}).'**
+  String updateUpToDate(String version);
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available.'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
+
+  /// No description provided for @updateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This version is too old. Update to keep using phone access.'**
+  String get updateRequired;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t check right now.'**
+  String get updateFailed;
 }
 
 class _AppLocalizationsDelegate

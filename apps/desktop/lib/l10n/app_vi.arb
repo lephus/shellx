@@ -744,5 +744,12 @@
   "settingLanguageSystem": "Theo hệ thống",
   "settingLanguageEn": "English",
   "settingLanguageVi": "Tiếng Việt",
-  "settingLanguageRestart": "Có hiệu lực sau khi bạn khởi động lại ShellX."
+  "settingLanguageRestart": "Có hiệu lực sau khi bạn khởi động lại ShellX.",
+  "updateCheck": "Kiểm tra cập nhật",
+  "updateChecking": "Đang kiểm tra…",
+  "updateUpToDate": "Bạn đang dùng bản mới nhất ({version}).",
+  "updateAvailable": "Đã có bản {version}.",
+  "updateDownload": "Tải xuống",
+  "updateRequired": "Bản này đã quá cũ. Hãy cập nhật để tiếp tục dùng truy cập từ điện thoại.",
+  "updateFailed": "Không kiểm tra được lúc này."
 }

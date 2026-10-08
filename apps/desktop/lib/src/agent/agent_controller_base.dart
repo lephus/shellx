@@ -4,6 +4,7 @@ import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_controller.dart';
 import 'agent_runtime.dart';
 import 'agent_state.dart';
+import 'update_check.dart';
 
 /// The agent the tray and the windows talk to (A5b D12): [AgentController]
 /// in the process that runs the relay and the sessions (the app today, the
@@ -42,6 +43,7 @@ abstract class AgentControllerBase extends Notifier<AgentViewState> {
     'closeAllSessions',
     'reconnect',
     'checkForUpdate',
+    'checkForUpdateNow',
   };
 
   Future<void> bootstrap({bool watchForWake = true});
@@ -80,6 +82,11 @@ abstract class AgentControllerBase extends Notifier<AgentViewState> {
   Future<void> closeAllSessions();
   Future<void> reconnect();
   Future<void> checkForUpdate();
+
+  /// A12 D20: the "Check for updates" button. Asks the relay now and says
+  /// what it found; never throws, never notifies, installs nothing. The
+  /// only state it touches is [AgentViewState.update].
+  Future<UpdateCheckResult> checkForUpdateNow();
   Future<void> shutdown();
 }
 

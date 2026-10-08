@@ -5,6 +5,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 
 import 'agent_controller_base.dart';
 import 'agent_state_codec.dart';
+import 'update_check.dart';
 
 /// A5b D12: the daemon's [AgentBridge]: `agent.get` reads [current],
 /// `agent.state` events follow [states] (a change is sent at most once per
@@ -123,6 +124,8 @@ final class ControllerAgentBridge implements AgentBridge {
         await a.reconnect();
       case 'checkForUpdate':
         await a.checkForUpdate();
+      case 'checkForUpdateNow':
+        return updateCheckToWire(await a.checkForUpdateNow());
       default:
         throw ArgumentError.value(method, 'method', 'unknown');
     }

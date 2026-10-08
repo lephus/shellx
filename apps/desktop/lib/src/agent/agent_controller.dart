@@ -675,6 +675,27 @@ class AgentController extends AgentControllerBase {
     );
   }
 
+  /// A12 D20: the button. The same relay call and the same rules as
+  /// [checkForUpdate], answered to the caller instead of notified.
+  @override
+  Future<UpdateCheckResult> checkForUpdateNow() async {
+    final result = await runUpdateCheck(
+      _s.api.version,
+      appVersion: _s.appVersion,
+      platform: _s.platform,
+    );
+    if (!ref.mounted) return result;
+    switch (result) {
+      case Available(:final notice):
+        state = state.copyWith(update: notice);
+      case UpToDate():
+        state = state.copyWith(update: null);
+      case Failed():
+        break; // what the tray knew stays
+    }
+    return result;
+  }
+
   /// Before quitting (the caller then runs `quitApp`): disconnect, close
   /// every session (A1 D7: the only path that ends shells), wait (bounded)
   /// for the PTY tree kills, release the sleep assertion. Never throws, so

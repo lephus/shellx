@@ -168,6 +168,7 @@ void main() {
         'closeAllSessions': ((c) => c.closeAllSessions(), {}),
         'reconnect': ((c) => c.reconnect(), {}),
         'checkForUpdate': ((c) => c.checkForUpdate(), {}),
+        'checkForUpdateNow': ((c) => c.checkForUpdateNow(), {}),
       };
 
   for (final MapEntry(key: name, value: (call, args)) in table.entries) {

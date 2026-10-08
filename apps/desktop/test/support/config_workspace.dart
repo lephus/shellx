@@ -30,11 +30,12 @@ pumpConfiguredWorkspace(
   Locale locale = const Locale('en'),
   ClipboardMedia clipboard = const EmptyClipboardMedia(),
   Duration settle = Duration.zero,
+  TestHarness? harness,
 }) async {
   final fs = MemoryConfigFs();
   if (config.isNotEmpty) fs.write(testConfigPaths().shellx, config);
   final local = FakeLocalSessions();
-  final h = TestHarness(settings: {'onboarding_done': true});
+  final h = harness ?? TestHarness(settings: {'onboarding_done': true});
   final container = ProviderContainer(
     overrides: [
       desktopServicesProvider.overrideWithValue(h.services()),
