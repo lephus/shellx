@@ -380,6 +380,7 @@ class TerminalTabController extends Controller {
 
   void dispose() {
     _disposed = true;
+    draft.value = ''; // a closed tab keeps nothing the composer may have held (a password)
     _feed.dispose();
     _resizeTimer?.cancel();
     unawaited(_events?.cancel());

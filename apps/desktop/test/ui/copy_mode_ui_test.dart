@@ -305,6 +305,22 @@ void main() {
     await disposeWorkspace(t, c);
   }, variant: mac);
 
+  testWidgets('a click in the pane ends copy mode (the mouse selects, y has '
+      'no stale range)', (t) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    await pressMetaShift(t, LogicalKeyboardKey.keyM);
+    expect(c.read(copyModeProvider), hasLength(1));
+    await t.tapAt(
+      t.getCenter(find.byType(TerminalView).first),
+      kind: PointerDeviceKind.mouse,
+    );
+    await t.pump(const Duration(milliseconds: 400));
+    expect(c.read(copyModeProvider), isEmpty);
+    expect(find.byKey(const Key('copymode.chip')), findsNothing);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
   testWidgets('a file drop ends copy mode first, then arrives', (t) async {
     final rig = await pumpConfiguredWorkspace(t);
     final c = rig.container;

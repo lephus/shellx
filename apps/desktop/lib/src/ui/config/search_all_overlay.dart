@@ -58,6 +58,19 @@ class SearchAllOverlay extends ConsumerStatefulWidget {
   ConsumerState<SearchAllOverlay> createState() => _SearchAllOverlayState();
 }
 
+/// A slice of the search repaints the list only when it found something new
+/// or the search is over (A11 final review): a long scan is not 120 rebuilds
+/// a second.
+bool searchAllNeedsRepaint({
+  required int shownHits,
+  required int hits,
+  required bool done,
+}) => done || hits != shownHits;
+
+/// Counts the repaints the slices asked for (tests).
+@visibleForTesting
+int searchAllRepaints = 0;
+
 class _SearchAllOverlayState extends ConsumerState<SearchAllOverlay> {
   final _query = TextEditingController();
   final _field = FocusNode(debugLabel: 'searchall field');
@@ -68,6 +81,7 @@ class _SearchAllOverlayState extends ConsumerState<SearchAllOverlay> {
   Timer? _work;
   Timer? _announce;
   int _cursor = 0;
+  int _shownHits = 0;
   String _text = '';
 
   static const double _rowHeight = 48;
@@ -100,6 +114,7 @@ class _SearchAllOverlayState extends ConsumerState<SearchAllOverlay> {
     _search?.dispose();
     setState(() {
       _search = null;
+      _shownHits = 0;
       _text = text;
       _cursor = 0;
     });
@@ -125,7 +140,15 @@ class _SearchAllOverlayState extends ConsumerState<SearchAllOverlay> {
     final search = _search;
     if (!mounted || search == null) return;
     final done = search.step();
-    setState(() {});
+    if (searchAllNeedsRepaint(
+      shownHits: _shownHits,
+      hits: search.hits.length,
+      done: done,
+    )) {
+      _shownHits = search.hits.length;
+      searchAllRepaints++;
+      setState(() {});
+    }
     if (done) {
       _announceCount();
     } else {

@@ -30,6 +30,15 @@ void main() {
     keys.dispose();
   });
 
+  test('closing a tab empties its draft at once (it may hold a password)', () async {
+    final h = await machine.openSession(cols: 80, rows: 24) as FakeTabHandle;
+    final t = TerminalTabController(machine: machine, handle: h, modifiers: keys, cols: 80, rows: 24);
+    final holder = t.draft;
+    holder.value = 'hunter2';
+    t.dispose();
+    expect(holder.value, '');
+  });
+
   test('output is written to the terminal, keys become input messages', () {
     handle.emit(const TabOutput('xin chào'));
     expect(screen(), 'xin chào');

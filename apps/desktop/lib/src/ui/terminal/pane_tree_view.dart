@@ -343,7 +343,15 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                           windowRouterProvider.select((w) => w.dialogOpen),
                         ),
                     remote: PaneInput.isRemote(pane),
-                    child: terminal,
+                    // A11 final review: a click is the pointer's, not copy
+                    // mode's (its range would be stale for `y`).
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: copy == null
+                          ? null
+                          : (_) => ref.read(copyModeProvider.notifier).exit(id),
+                      child: terminal,
+                    ),
                   ),
                 ),
               ],
