@@ -2764,4 +2764,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get integrationLimit =>
       'Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”.';
+
+  @override
+  String get resumeBannerBusy => 'Đang chờ shell…';
+
+  @override
+  String get integrationNeedsCli =>
+      'Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)';
 }

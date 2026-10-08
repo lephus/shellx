@@ -34,6 +34,12 @@ final class DiskIntegrationFs implements IntegrationFs {
   @override
   Future<String?> readText(String path) async {
     try {
+      // Regular files only (links followed): a FIFO or a device would
+      // block the read, a folder is not a config.
+      if (await FileSystemEntity.type(path, followLinks: true) !=
+          FileSystemEntityType.file) {
+        return null;
+      }
       final file = File(path);
       if (await file.length() > kIntegrationFileMax) return null;
       final bytes = await file.readAsBytes();
@@ -93,8 +99,13 @@ const _openCodeMarker = '// shellx-agent-integration';
 /// The words `shellx integrations install|uninstall <agent>` takes: fixed
 /// words and a name from the closed set, never user text. Consent happens in
 /// the CLI (no `--yes`).
-String integrationCommand(AgentKind agent, {required bool remove}) =>
-    'shellx integrations ${remove ? 'uninstall' : 'install'} ${agent.name}';
+/// [program] is how the shell is told to run the CLI (default `shellx`; an
+/// absolute path already quoted for the target shell).
+String integrationCommand(
+  AgentKind agent, {
+  required bool remove,
+  String program = 'shellx',
+}) => '$program integrations ${remove ? 'uninstall' : 'install'} ${agent.name}';
 
 final class IntegrationProbe {
   IntegrationProbe({
@@ -142,8 +153,16 @@ final class IntegrationProbe {
     if (text == null) return false;
     switch (a) {
       case AgentKind.claude || AgentKind.gemini:
+        // A commented-out line (// or #) is not a hook.
+        final code = text
+            .split('\n')
+            .where((l) {
+              final t = l.trimLeft();
+              return !t.startsWith('//') && !t.startsWith('#');
+            })
+            .join('\n');
         return _hookEvents.every(
-          (e) => text.contains('shellx agent-event ${a.name} $e'),
+          (e) => code.contains('shellx agent-event ${a.name} $e'),
         );
       case AgentKind.codex:
         return text.split('\n').any((l) => l.trim() == _codexNotify);

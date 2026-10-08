@@ -1,12 +1,14 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart'
     show SessionLimitException, SpawnFailedException;
 
+import '../cli/cli_service.dart' show cliPathsProvider;
 import '../cli/ui_command_handler.dart' show uiCommandHandlerProvider;
+import '../terminal/shell_escape.dart';
 import '../terminal/agent_status.dart' show AgentKind;
 import '../terminal/terminal_tabs.dart';
 import 'integration_probe.dart';
@@ -21,6 +23,31 @@ final integrationProbeProvider = Provider<IntegrationProbe>((ref) {
     windows: Platform.isWindows,
   );
 });
+
+/// Where the app's `shellx` command is, if the app installed it (A7 CLI
+/// installer); null when it is not there. Tests replace it.
+final shellxBinaryProvider = Provider<Future<String?> Function()>((ref) {
+  return () async {
+    final path = ref.read(cliPathsProvider)?.binary;
+    if (path == null) return null;
+    try {
+      return await File(path).exists() ? path : null;
+    } on Object {
+      return null;
+    }
+  };
+});
+
+/// Whether the `shellx` command is installed: null until looked at.
+final shellxCliFoundProvider = NotifierProvider<ShellxCliFound, bool?>(
+  ShellxCliFound.new,
+);
+
+class ShellxCliFound extends Notifier<bool?> {
+  @override
+  bool? build() => null;
+  void set(bool? found) => state = found;
+}
 
 /// What Settings › Agents shows: null until the first look.
 final integrationStatusProvider =
@@ -57,6 +84,10 @@ class IntegrationStatusNotifier
     final mine = ++_look;
     Map<AgentKind, IntegrationStatus> found;
     try {
+      final binary = await ref.read(shellxBinaryProvider)();
+      if (ref.mounted) {
+        ref.read(shellxCliFoundProvider.notifier).set(binary != null);
+      }
       found = await ref.read(integrationProbeProvider).probe();
     } on Object catch (error) {
       // Only the kind of error: the rest could be a path.
@@ -70,6 +101,10 @@ class IntegrationStatusNotifier
   /// `uninstall`) for [agent], without `--yes`. False when no tab opened.
   Future<bool> runInTerminal(AgentKind agent, {required bool remove}) async {
     final tabs = ref.read(terminalTabsProvider.notifier);
+    // The shell's own PATH may not have it (a development build): the
+    // installed copy is named by its absolute path.
+    final binary = await ref.read(shellxBinaryProvider)();
+    if (binary == null || !ref.mounted) return false;
     final int id;
     try {
       id = await tabs.openTabFor(cwd: tabs.newTabCwd(), select: true);
@@ -86,11 +121,25 @@ class IntegrationStatusNotifier
     }
     if (!ref.mounted) return false;
     _watching.add(id);
+    final shell = ref.read(terminalTabsProvider).tabOfSession(id)?.panes[id];
+    final family = shellFamilyOf(
+      shell?.shell ?? '',
+      windows: Platform.isWindows,
+    );
+    final quoted = hasUnsafeCharacters(binary)
+        ? null
+        : escapePath(binary, family);
+    // PowerShell runs a quoted path only after `&`.
+    final program = quoted == null
+        ? 'shellx'
+        : family == ShellFamily.powershell
+        ? '& $quoted'
+        : quoted;
     // The same path as `shellx new-tab --cmd`: waits for the shell.
     ref
         .read(uiCommandHandlerProvider)
         .onCommand
-        ?.call(id, integrationCommand(agent, remove: remove));
+        ?.call(id, integrationCommand(agent, remove: remove, program: program));
     return true;
   }
 }

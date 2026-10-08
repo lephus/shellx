@@ -23,10 +23,13 @@ void main() {
     Locale locale = const Locale('en'),
     AgentKind kind = AgentKind.claude,
     String session = 'abc',
+    bool idle = true,
   }) async {
     final rig = await pumpConfiguredWorkspace(t, locale: locale);
     final c = rig.container;
     final pane = c.read(terminalTabsProvider).selected!.focusedPaneId;
+    // At an idle prompt: the shell reported its folder, no command runs.
+    if (idle) rig.local.replace(rig.local.summary(pane, cwd: '/w'));
     c.read(resumeOffersProvider.notifier).add(pane, ResumeOffer(kind, session));
     await t.pumpAndSettle();
     return (pane, rig.local, c);
@@ -222,6 +225,41 @@ void main() {
     expect(offer?.kind, AgentKind.gemini);
     expect(offer?.session, 'g-1');
     expect(rig.local.views[reopened.focusedPaneId]!.writes, isEmpty);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('the button waits for an idle prompt: disabled with a reason '
+      'until the shell is ready, and a press then types nothing', (t) async {
+    final (pane, local, c) = await boot(t, idle: false);
+    final button = t.widget<TextButton>(resumeButton(pane));
+    expect(button.onPressed, isNull);
+    expect(find.text('Waiting for the shell…'), findsOneWidget);
+    await t.tap(resumeButton(pane), warnIfMissed: false);
+    await t.pump(const Duration(seconds: 10));
+    expect(local.views[pane]!.writes, isEmpty, reason: 'no quiet fallback');
+    expect(c.read(resumeOffersProvider), isNotEmpty);
+    // The prompt appears: enabled, and the press types.
+    local.replace(local.summary(pane, cwd: '/w'));
+    await t.pumpAndSettle();
+    expect(t.widget<TextButton>(resumeButton(pane)).onPressed, isNotNull);
+    expect(find.text('Waiting for the shell…'), findsNothing);
+    await t.tap(resumeButton(pane));
+    await t.pump();
+    expect(local.views[pane]!.writes.join(), contains('claude --resume abc'));
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('a command running in the pane keeps it disabled; Vietnamese '
+      'reason', (t) async {
+    final (pane, local, c) = await boot(t, locale: const Locale('vi'));
+    local.replace(local.summary(pane, cwd: '/w', runningCommand: true));
+    await t.pumpAndSettle();
+    expect(t.widget<TextButton>(resumeButton(pane)).onPressed, isNull);
+    expect(find.text('Đang chờ shell…'), findsOneWidget);
+    c.read(resumeOffersProvider.notifier).resume(pane);
+    await t.pump(const Duration(seconds: 10));
+    expect(local.views[pane]!.writes, isEmpty);
+    expect(c.read(resumeOffersProvider), isNotEmpty);
     await disposeWorkspace(t, c);
   }, variant: mac);
 }

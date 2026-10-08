@@ -25,6 +25,7 @@ Future<Rig> openAgents(
   WidgetTester t, {
   Locale locale = const Locale('en'),
   FakeFs? fs,
+  String? binary = '/cli/shellx',
 }) async {
   final files = fs ?? FakeFs();
   final w = await pumpConfiguredWorkspace(
@@ -34,6 +35,7 @@ Future<Rig> openAgents(
       integrationProbeProvider.overrideWithValue(
         IntegrationProbe(fs: files, env: const {}, home: '/h', windows: false),
       ),
+      shellxBinaryProvider.overrideWithValue(() async => binary),
     ],
   );
   await t.sendKeyDownEvent(cmd);
@@ -167,7 +169,7 @@ void main() {
     await t.pump(const Duration(seconds: 10));
     final typed = r.local.views[tab.focusedPaneId]!.writes.join();
     expect(
-      'shellx integrations install claude'.allMatches(typed),
+      '/cli/shellx integrations install claude'.allMatches(typed),
       hasLength(1),
     );
     expect(typed, isNot(contains('--yes')));
@@ -196,7 +198,7 @@ void main() {
     await t.pump(const Duration(seconds: 10));
     expect(
       r.local.views[tab.focusedPaneId]!.writes.join(),
-      contains('shellx integrations uninstall gemini'),
+      contains('/cli/shellx integrations uninstall gemini'),
     );
     await disposeWorkspace(t, r.container);
   }, variant: mac);
@@ -256,6 +258,53 @@ void main() {
       r.config.text(testConfigPaths().shellx),
       contains('agent-resume = off'),
     );
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
+  testWidgets('the shellx command is typed by its absolute path, quoted for '
+      'the shell', (t) async {
+    final r = await openAgents(
+      t,
+      binary: '/Users/me/Library/App Support/cli/shellx',
+    );
+    final button = find.byKey(const Key('integration.setup.claude'));
+    await reveal(t, button);
+    await t.tap(button);
+    await t.pumpAndSettle();
+    final tab = r.container.read(terminalTabsProvider).selected!;
+    await t.pump(const Duration(seconds: 10));
+    expect(
+      r.local.views[tab.focusedPaneId]!.writes.join(),
+      contains(
+        "/Users/me/Library/App\\ Support/cli/shellx integrations install claude",
+      ),
+    );
+    await disposeWorkspace(t, r.container);
+  }, variant: mac);
+
+  testWidgets('without the shellx command, Set up is disabled and says '
+      'where to install it', (t) async {
+    final r = await openAgents(t, binary: null);
+    final before = r.container.read(terminalTabsProvider).tabs.length;
+    await reveal(t, find.byKey(const Key('integration.setup.claude')));
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.byKey(const Key('integration.setup.claude')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      find.text('Install the shellx command first (Settings › Command line)'),
+      findsWidgets,
+    );
+    await t.tap(
+      find.byKey(const Key('integration.setup.claude')),
+      warnIfMissed: false,
+    );
+    await t.pumpAndSettle();
+    expect(r.container.read(terminalTabsProvider).tabs.length, before);
     await disposeWorkspace(t, r.container);
   }, variant: mac);
 }

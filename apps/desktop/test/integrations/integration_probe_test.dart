@@ -223,6 +223,14 @@ void main() {
       integrationCommand(AgentKind.opencode, remove: true),
       'shellx integrations uninstall opencode',
     );
+    expect(
+      integrationCommand(
+        AgentKind.claude,
+        remove: false,
+        program: "'/a b/shellx'",
+      ),
+      "'/a b/shellx' integrations install claude",
+    );
     for (final a in AgentKind.values) {
       expect(
         integrationCommand(a, remove: false),

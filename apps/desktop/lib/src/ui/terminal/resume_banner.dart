@@ -49,12 +49,14 @@ class _ResumeBannerState extends ConsumerState<ResumeBanner> {
     if (command == null) return const SizedBox.shrink();
     final scaler = MediaQuery.textScalerOf(context);
     final height = max(36.0, scaler.scale(18) + 16);
+    final ready = ref.watch(resumeReadyProvider(widget.pane));
     final resume = TextButton(
       key: Key('resume.go.${widget.pane}'),
       focusNode: _resumeFocus,
       style: _buttonStyle(primary: true),
-      onPressed: () =>
-          ref.read(resumeOffersProvider.notifier).resume(widget.pane),
+      onPressed: ready
+          ? () => ref.read(resumeOffersProvider.notifier).resume(widget.pane)
+          : null,
       child: Text(l10n.resumeBannerResume),
     );
     final dismiss = TextButton(
@@ -66,7 +68,9 @@ class _ResumeBannerState extends ConsumerState<ResumeBanner> {
     );
     final windows = Theme.of(context).platform == TargetPlatform.windows;
     final resumeWithTip = Tooltip(
-      message: l10n.resumeBannerTooltip(command),
+      message: ready
+          ? l10n.resumeBannerTooltip(command)
+          : l10n.resumeBannerBusy,
       child: resume,
     );
     // A1 §4: the primary button is on the right on macOS.
@@ -121,6 +125,19 @@ class _ResumeBannerState extends ConsumerState<ResumeBanner> {
                   ),
                 ),
               ),
+              if (!ready) ...[
+                const SizedBox(width: ShellxSpace.s6),
+                Flexible(
+                  child: Text(
+                    l10n.resumeBannerBusy,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ShellxText.small.copyWith(
+                      color: ShellxDesktopColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
               for (final b in buttons) ...[
                 const SizedBox(width: ShellxSpace.s6),
                 b,

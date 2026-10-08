@@ -711,5 +711,7 @@
   "integrationNotFound": "Không thấy {agent} trên máy này",
   "integrationSetUp": "Cài đặt trong terminal",
   "integrationRemove": "Gỡ trong terminal",
-  "integrationLimit": "Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”."
+  "integrationLimit": "Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”.",
+  "resumeBannerBusy": "Đang chờ shell…",
+  "integrationNeedsCli": "Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)"
 }

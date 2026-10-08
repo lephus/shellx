@@ -23,6 +23,10 @@ import 'terminal_tabs.dart';
 /// it, so no quoting is needed and the line reads the same in zsh, bash,
 /// fish, PowerShell and cmd. Null for any other id.
 ///
+/// Gemini CLI: its hooks may not hand over a session id ShellX can use; then
+/// no offer is made at all (an id is only ever saved from a valid hook
+/// event), and `gemini --resume` itself is unverified (spec D6).
+///
 /// The words are those of spec D6. ⚠ Manual: confirm each against the real
 /// agent (Claude Code `--resume`, Codex `resume`, Gemini CLI `--resume`,
 /// OpenCode `--session`); a wrong word only makes the agent print an error.
@@ -47,6 +51,17 @@ final class ResumeOffer {
   @override
   String toString() => '…';
 }
+
+/// Whether pane [pane] is at an idle prompt: its shell reported itself (a
+/// folder is known) and no command runs. Resume types only then; there is no
+/// quiet-window fallback, because a line typed into a running program would
+/// go to that program.
+final resumeReadyProvider = Provider.family<bool, int>((ref, pane) {
+  final p = ref.watch(
+    terminalTabsProvider.select((s) => s.tabOfSession(pane)?.panes[pane]),
+  );
+  return p != null && !p.exited && p.cwd != null && !p.runningCommand;
+});
 
 /// The offers on screen, by pane (session) id.
 final resumeOffersProvider =
@@ -121,7 +136,7 @@ class ResumeOffers extends Notifier<Map<int, ResumeOffer>> {
   /// first, so a second press cannot type it again.
   void resume(int pane) {
     final offer = state[pane];
-    if (offer == null) return;
+    if (offer == null || !ref.read(resumeReadyProvider(pane))) return;
     remove(pane);
     final command = resumeCommand(offer.kind, offer.session);
     if (command == null) return;

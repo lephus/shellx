@@ -1141,5 +1141,7 @@
   "@integrationNotFound": {"placeholders": {"agent": {"type": "String"}}},
   "integrationSetUp": "Set up in a terminal",
   "integrationRemove": "Remove in a terminal",
-  "integrationLimit": "Codex reports when a turn ends; it does not report “running”."
+  "integrationLimit": "Codex reports when a turn ends; it does not report “running”.",
+  "resumeBannerBusy": "Waiting for the shell…",
+  "integrationNeedsCli": "Install the shellx command first (Settings › Command line)"
 }

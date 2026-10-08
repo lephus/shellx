@@ -85,6 +85,7 @@ class _IntegrationsSectionState extends ConsumerState<_IntegrationsSection> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final status = ref.watch(integrationStatusProvider);
+    final cli = ref.watch(shellxCliFoundProvider) ?? true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -102,6 +103,7 @@ class _IntegrationsSectionState extends ConsumerState<_IntegrationsSection> {
           _IntegrationRow(
             agent: agent,
             status: status?[agent],
+            cliFound: cli,
             onRun: (remove) => unawaited(_run(agent, remove: remove)),
           ),
       ],
@@ -113,8 +115,10 @@ class _IntegrationRow extends StatelessWidget {
   const _IntegrationRow({
     required this.agent,
     required this.status,
+    required this.cliFound,
     required this.onRun,
   });
+  final bool cliFound;
   final AgentKind agent;
 
   /// Null until the first look.
@@ -134,6 +138,7 @@ class _IntegrationRow extends StatelessWidget {
     final captions = [
       if (agent == AgentKind.codex) l10n.integrationLimit,
       if (status?.notFound ?? false) l10n.integrationNotFound(name),
+      if (!cliFound && status != null) l10n.integrationNeedsCli,
     ];
     return Semantics(
       container: true,
@@ -191,12 +196,12 @@ class _IntegrationRow extends StatelessWidget {
                   installed
                       ? OutlinedButton(
                           key: Key('integration.remove.${agent.name}'),
-                          onPressed: () => onRun(true),
+                          onPressed: cliFound ? () => onRun(true) : null,
                           child: Text(l10n.integrationRemove),
                         )
                       : OutlinedButton(
                           key: Key('integration.setup.${agent.name}'),
-                          onPressed: () => onRun(false),
+                          onPressed: cliFound ? () => onRun(false) : null,
                           child: Text(l10n.integrationSetUp),
                         ),
               ],

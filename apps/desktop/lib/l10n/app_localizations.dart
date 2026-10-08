@@ -4379,6 +4379,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Codex reports when a turn ends; it does not report “running”.'**
   String get integrationLimit;
+
+  /// No description provided for @resumeBannerBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the shell…'**
+  String get resumeBannerBusy;
+
+  /// No description provided for @integrationNeedsCli.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the shellx command first (Settings › Command line)'**
+  String get integrationNeedsCli;
 }
 
 class _AppLocalizationsDelegate

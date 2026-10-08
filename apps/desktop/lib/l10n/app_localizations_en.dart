@@ -2856,4 +2856,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get integrationLimit =>
       'Codex reports when a turn ends; it does not report “running”.';
+
+  @override
+  String get resumeBannerBusy => 'Waiting for the shell…';
+
+  @override
+  String get integrationNeedsCli =>
+      'Install the shellx command first (Settings › Command line)';
 }
