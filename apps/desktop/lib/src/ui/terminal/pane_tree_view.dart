@@ -25,6 +25,7 @@ import '../../terminal/find_sessions.dart';
 import '../../terminal/link_finder.dart';
 import '../../terminal/pane_input.dart' show PaneInput;
 import '../../terminal/pane_layout.dart';
+import '../../terminal/resume_offers.dart' show resumeOffersProvider;
 import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
 import '../../terminal/terminal_appearance.dart';
 import '../../terminal/terminal_search.dart' show SearchMatch;
@@ -47,6 +48,7 @@ import 'link_layer.dart';
 import 'pane_drop_target.dart';
 import 'remote_marks.dart';
 import 'remote_strip.dart';
+import 'resume_banner.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
 import 'terminal_overlays.dart' show DriverPill, ShellxScrollbar, kPhoneIcon;
@@ -432,6 +434,20 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
               right: 0,
               bottom: 0,
               child: RemoteStrip(pane: pane),
+            ),
+          // A12 D13: offers to resume the agent that ran here before the
+          // restart; over the terminal's top edge, never taking its focus.
+          if (ref.watch(resumeOffersProvider.select((m) => m[id]))
+              case final offer?)
+            Positioned(
+              top: headerHeight,
+              left: 0,
+              right: 0,
+              child: ResumeBanner(
+                key: ValueKey('resume.$id'),
+                pane: id,
+                offer: offer,
+              ),
             ),
           // A11 D13: not clickable, over the terminal's bottom-right.
           if (copy != null)

@@ -2707,4 +2707,68 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get agentNamesOpencode => 'OpenCode';
+
+  @override
+  String resumeBannerText(String agent) {
+    return '$agent đang chạy ở đây trước khi ShellX khởi động lại.';
+  }
+
+  @override
+  String get resumeBannerResume => 'Tiếp tục phiên';
+
+  @override
+  String get resumeBannerDismiss => 'Bỏ qua';
+
+  @override
+  String resumeBannerTooltip(String command) {
+    return 'Gõ “$command” vào terminal này rồi nhấn Enter.';
+  }
+
+  @override
+  String get settingAgentResume => 'Đề nghị tiếp tục phiên agent';
+
+  @override
+  String get settingAgentResumeDesc =>
+      'Sau khi khởi động lại, hiện nút để tiếp tục agent bạn đang dùng. Không có gì chạy cho tới khi bạn bấm.';
+
+  @override
+  String get settingAgentResumeAsk => 'Hỏi';
+
+  @override
+  String get settingAgentResumeOff => 'Tắt';
+
+  @override
+  String get settingsAgentIntegrations => 'Tích hợp agent';
+
+  @override
+  String get settingsAgentIntegrationsHint =>
+      'Hook giúp ShellX biết agent đang chạy hay đang chờ bạn. Cài đặt luôn hiện từng thay đổi và hỏi trước.';
+
+  @override
+  String get integrationInstalled => 'Đã cài';
+
+  @override
+  String get integrationNotInstalled => 'Chưa cài';
+
+  @override
+  String integrationNotFound(String agent) {
+    return 'Không thấy $agent trên máy này';
+  }
+
+  @override
+  String get integrationSetUp => 'Cài đặt trong terminal';
+
+  @override
+  String get integrationRemove => 'Gỡ trong terminal';
+
+  @override
+  String get integrationLimit =>
+      'Codex chỉ báo khi một lượt kết thúc, không báo “đang chạy”.';
+
+  @override
+  String get resumeBannerBusy => 'Đang chờ shell…';
+
+  @override
+  String get integrationNeedsCli =>
+      'Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)';
 }

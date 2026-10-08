@@ -169,6 +169,7 @@ class _SettingsOverlayState extends ConsumerState<SettingsOverlay> {
     final mac = _mac;
     return SettingsScope(
       onOpenFile: widget.onOpenFile,
+      onClose: widget.onClose,
       highlightId: _highlight,
       child: Semantics(
         scopesRoute: true,

@@ -33,6 +33,10 @@ enum OptionAsAlt { off, both, left, right }
 /// D20. `whenRunning` = Ghostty's `true`.
 enum ConfirmClose { whenRunning, never, always }
 
+/// A12 D13 `agent-resume`: after a restart, `ask` shows a button to
+/// resume the agent that was running; `off` shows nothing.
+enum AgentResume { ask, off }
+
 /// `font-weight`: the bundled terminal font's face for normal text.
 enum TerminalFontWeight { light, regular }
 
@@ -110,6 +114,7 @@ final class ShellxConfig {
     this.padding = kDefaultTerminalPadding,
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
+    this.agentResume = AgentResume.ask,
     this.workingDirectory = const WorkingDirectory.home(),
     this.keybinds = const [],
     this.commands = const [],
@@ -146,6 +151,9 @@ final class ShellxConfig {
   final EdgeInsets padding;
   final OptionAsAlt optionAsAlt;
   final ConfirmClose confirmClose;
+
+  /// `agent-resume` (ShellX file only, A12 D13).
+  final AgentResume agentResume;
   final WorkingDirectory workingDirectory;
   final List<KeybindEntry> keybinds;
   final List<UserCommand> commands;
@@ -238,6 +246,7 @@ final class _Builder {
   var padY = (kDefaultTerminalPadding.top, kDefaultTerminalPadding.bottom);
   var optionAsAlt = OptionAsAlt.off;
   var confirmClose = ConfirmClose.whenRunning;
+  var agentResume = AgentResume.ask;
   WorkingDirectory workingDirectory = const WorkingDirectory.home();
   final keybinds = <KeybindEntry>[];
   final commands = <UserCommand>[];
@@ -514,6 +523,14 @@ final class _Builder {
         };
         if (mode == null) return _badValue(e, g, 'true, false, always');
         confirmClose = mode;
+      case 'agent-resume':
+        final mode = switch (v) {
+          '' || 'ask' => AgentResume.ask,
+          'off' => AgentResume.off,
+          _ => null,
+        };
+        if (mode == null) return _badValue(e, g, 'ask, off');
+        agentResume = mode;
       case 'working-directory':
         if (v.isEmpty || v == 'home') {
           workingDirectory = const WorkingDirectory.home();
@@ -657,6 +674,7 @@ final class _Builder {
     padding: EdgeInsets.fromLTRB(padX.$1, padY.$1, padX.$2, padY.$2),
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,
+    agentResume: agentResume,
     workingDirectory: workingDirectory,
     keybinds: List.unmodifiable(keybinds),
     commands: List.unmodifiable(commands),

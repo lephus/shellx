@@ -470,6 +470,24 @@ final List<SettingDef> kSettings = List.unmodifiable([
     keywords: const ['notify', 'background', 'thông báo', 'nền'],
   ),
   SettingDef(
+    id: 'agent-resume',
+    owner: SettingOwner.file,
+    page: SettingPage.agents,
+    control: SettingControl.segmented,
+    fileKey: 'agent-resume',
+    label: (l) => l.settingAgentResume,
+    description: (l) => l.settingAgentResumeDesc,
+    keywords: const ['restart', 'session', 'claude', 'tiếp tục', 'phiên'],
+    choices: [
+      SettingChoice('ask', (l) => l.settingAgentResumeAsk),
+      SettingChoice('off', (l) => l.settingAgentResumeOff),
+    ],
+    sampleValues: const [
+      SettingSample('off', 'off'),
+      SettingSample('ask', 'ask'),
+    ],
+  ),
+  SettingDef(
     id: 'notify-threshold',
     owner: SettingOwner.app,
     page: SettingPage.agents,

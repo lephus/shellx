@@ -47,6 +47,7 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
     '# confirm-close-surface = true  (false, always)',
     '# working-directory = home  (inherit, or an absolute path)',
     '# global-hotkey = ctrl+alt+j  (show or hide ShellX from any app; off by default)',
+    '# agent-resume = ask  (off: never offer to resume an agent after a restart)',
     '',
     '# --- Keys (Ghostty keybind syntax; later lines win) ---',
     '# keybind = $split=new_split:down',

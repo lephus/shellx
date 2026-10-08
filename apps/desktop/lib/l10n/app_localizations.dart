@@ -4283,6 +4283,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OpenCode'**
   String get agentNamesOpencode;
+
+  /// A12 D13 banner over a restored pane
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} was running here before ShellX restarted.'**
+  String resumeBannerText(String agent);
+
+  /// No description provided for @resumeBannerResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume session'**
+  String get resumeBannerResume;
+
+  /// No description provided for @resumeBannerDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get resumeBannerDismiss;
+
+  /// No description provided for @resumeBannerTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Types “{command}” into this terminal and presses Enter.'**
+  String resumeBannerTooltip(String command);
+
+  /// No description provided for @settingAgentResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer to resume agent sessions'**
+  String get settingAgentResume;
+
+  /// No description provided for @settingAgentResumeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After a restart, show a button to continue the agent you were using. Nothing runs until you click.'**
+  String get settingAgentResumeDesc;
+
+  /// No description provided for @settingAgentResumeAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get settingAgentResumeAsk;
+
+  /// No description provided for @settingAgentResumeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingAgentResumeOff;
+
+  /// No description provided for @settingsAgentIntegrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent integrations'**
+  String get settingsAgentIntegrations;
+
+  /// No description provided for @settingsAgentIntegrationsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hooks let ShellX show whether an agent is running or waiting for you. Setup shows every change and asks first.'**
+  String get settingsAgentIntegrationsHint;
+
+  /// No description provided for @integrationInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get integrationInstalled;
+
+  /// No description provided for @integrationNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get integrationNotInstalled;
+
+  /// No description provided for @integrationNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} not found on this computer'**
+  String integrationNotFound(String agent);
+
+  /// No description provided for @integrationSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up in a terminal'**
+  String get integrationSetUp;
+
+  /// No description provided for @integrationRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove in a terminal'**
+  String get integrationRemove;
+
+  /// No description provided for @integrationLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex reports when a turn ends; it does not report “running”.'**
+  String get integrationLimit;
+
+  /// No description provided for @resumeBannerBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the shell…'**
+  String get resumeBannerBusy;
+
+  /// No description provided for @integrationNeedsCli.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the shellx command first (Settings › Command line)'**
+  String get integrationNeedsCli;
 }
 
 class _AppLocalizationsDelegate

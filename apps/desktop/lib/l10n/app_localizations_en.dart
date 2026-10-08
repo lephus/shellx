@@ -2799,4 +2799,68 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get agentNamesOpencode => 'OpenCode';
+
+  @override
+  String resumeBannerText(String agent) {
+    return '$agent was running here before ShellX restarted.';
+  }
+
+  @override
+  String get resumeBannerResume => 'Resume session';
+
+  @override
+  String get resumeBannerDismiss => 'Dismiss';
+
+  @override
+  String resumeBannerTooltip(String command) {
+    return 'Types “$command” into this terminal and presses Enter.';
+  }
+
+  @override
+  String get settingAgentResume => 'Offer to resume agent sessions';
+
+  @override
+  String get settingAgentResumeDesc =>
+      'After a restart, show a button to continue the agent you were using. Nothing runs until you click.';
+
+  @override
+  String get settingAgentResumeAsk => 'Ask';
+
+  @override
+  String get settingAgentResumeOff => 'Off';
+
+  @override
+  String get settingsAgentIntegrations => 'Agent integrations';
+
+  @override
+  String get settingsAgentIntegrationsHint =>
+      'Hooks let ShellX show whether an agent is running or waiting for you. Setup shows every change and asks first.';
+
+  @override
+  String get integrationInstalled => 'Installed';
+
+  @override
+  String get integrationNotInstalled => 'Not installed';
+
+  @override
+  String integrationNotFound(String agent) {
+    return '$agent not found on this computer';
+  }
+
+  @override
+  String get integrationSetUp => 'Set up in a terminal';
+
+  @override
+  String get integrationRemove => 'Remove in a terminal';
+
+  @override
+  String get integrationLimit =>
+      'Codex reports when a turn ends; it does not report “running”.';
+
+  @override
+  String get resumeBannerBusy => 'Waiting for the shell…';
+
+  @override
+  String get integrationNeedsCli =>
+      'Install the shellx command first (Settings › Command line)';
 }

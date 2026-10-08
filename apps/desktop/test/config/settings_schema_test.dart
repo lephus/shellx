@@ -141,6 +141,7 @@ void main() {
       'adjust-cell-height',
       'ghostty-config',
       'global-hotkey',
+      'agent-resume',
     };
     final have = {
       for (final d in kSettings)

@@ -1,11 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, mapEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agent/desktop_services.dart' show clockProvider;
 import '../platform/settings_store.dart';
+import '../terminal/agent_status.dart' show isValidSessionId;
+import '../terminal/agent_status_notifier.dart';
 import '../terminal/local_sessions_provider.dart';
+import '../terminal/resume_offers.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import 'restore_capture.dart';
@@ -193,6 +196,13 @@ class RestorePersistence extends Notifier<void> {
     ref.onDispose(() => unawaited(replacements.cancel()));
     ref.listen(terminalTabsProvider, (_, _) => _schedule());
     ref.listen(sidebarWorkspacesProvider, (_, _) => _schedule());
+    // A12 D13: a pane's agent session changing is a layout change; a state
+    // change alone is not.
+    ref.listen(agentStatusProvider, (prev, next) {
+      if (!mapEquals(savedAgents(prev ?? const {}), savedAgents(next))) {
+        _schedule();
+      }
+    });
     _period = Timer.periodic(scrollbackPeriod, (_) => _tick());
   }
 
@@ -276,6 +286,13 @@ class RestorePersistence extends Notifier<void> {
         return;
       }
       final snapshot = plan.snapshot;
+      // A12 D13–D14: the agents that were running, offered back (never run).
+      restoreAgentSessions(
+        ref,
+        panes: [for (final t in snapshot.tabs) ...savedLeaves(t.layout)],
+        keyBySession: outcome.keyBySession,
+        reattach: plan.reattach,
+      );
       ref
           .read(sidebarWorkspacesProvider.notifier)
           .adopt(
@@ -504,6 +521,7 @@ class RestorePersistence extends Notifier<void> {
       now: ref.read(clockProvider)(),
       cleanExit: cleanExit,
       daemon: currentDaemon,
+      agentOf: _agentOf,
     );
     final previous = _written;
     if (!force && previous != null && previous.sameLayoutAs(next)) return;
@@ -544,6 +562,15 @@ class RestorePersistence extends Notifier<void> {
       await files.deleteScrollback(key);
     }
     if (doomed.isNotEmpty) _savedChanged();
+  }
+
+  /// A12 D13: the agent session a local pane ran, if it has a record.
+  SavedAgent? _agentOf(int session) {
+    final r = ref.read(agentStatusProvider)[session];
+    final id = r?.session;
+    return r == null || id == null || !isValidSessionId(id)
+        ? null
+        : (kind: r.agent, session: id);
   }
 
   /// One save at a time, in call order (MINOR 7: [flushAll] returns after
