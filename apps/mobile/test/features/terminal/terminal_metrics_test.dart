@@ -4,6 +4,20 @@ import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
 
 void main() {
+  test('terminalCellSize measures once per style and text scale', () {
+    final a = shellxTerminalStyle(13.5), b = shellxTerminalStyle(15.5);
+    terminalCellSize(a, TextScaler.noScaling);
+    final before = terminalCellMeasures;
+    for (var i = 0; i < 20; i++) {
+      expect(terminalCellSize(a, TextScaler.noScaling), terminalCellSize(a, TextScaler.noScaling));
+    }
+    expect(terminalCellMeasures, before, reason: 'same style and scale: the cached size');
+    terminalCellSize(b, TextScaler.noScaling);
+    expect(terminalCellMeasures, before + 1, reason: 'another size is measured');
+    terminalCellSize(b, const TextScaler.linear(1.5));
+    expect(terminalCellMeasures, before + 2, reason: 'another text scale is measured');
+  });
+
   group('measureTerminalGrid', () {
     // flutter_test renders every glyph as a square 1em wide.
     final style = shellxTerminalStyle(10);

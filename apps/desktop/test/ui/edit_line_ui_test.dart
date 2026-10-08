@@ -71,7 +71,11 @@ void main() {
       await t.pump();
       writes.clear();
       await chord(t, LogicalKeyboardKey.backspace, alt: true);
-      expect(writes.join().contains('\x1b\x7f'), isFalse);
+      await chord(t, LogicalKeyboardKey.delete, alt: true);
+      await chord(t, LogicalKeyboardKey.backspace, meta: true);
+      await chord(t, LogicalKeyboardKey.arrowLeft, meta: true);
+      await chord(t, LogicalKeyboardKey.arrowRight, meta: true);
+      expect(writes.join(), isEmpty);
       await disposeWorkspace(t, c);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),

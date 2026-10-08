@@ -5,6 +5,7 @@ import 'package:shellx_desktop/src/terminal/find_sessions.dart';
 import 'package:shellx_desktop/src/terminal/global_search.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/ui/config/search_all_overlay.dart';
 
 import '../support/config_workspace.dart';
 
@@ -41,6 +42,30 @@ void main() {
     tab.terminal.write('nothing here\r\nanother ERROR two');
     return (rig: rig, first: first.id, second: second);
   }
+
+  test('a slice repaints only for a new hit count or the end', () {
+    expect(searchAllNeedsRepaint(shownHits: 0, hits: 0, done: false), isFalse);
+    expect(searchAllNeedsRepaint(shownHits: 2, hits: 2, done: false), isFalse);
+    expect(searchAllNeedsRepaint(shownHits: 2, hits: 3, done: false), isTrue);
+    expect(searchAllNeedsRepaint(shownHits: 2, hits: 2, done: true), isTrue);
+  });
+
+  testWidgets('a long scan does not rebuild the list on every slice', (
+    t,
+  ) async {
+    final rig = await pumpConfiguredWorkspace(t);
+    final c = rig.container;
+    final tab = c.read(terminalTabsProvider).tabs.first;
+    tab.terminal.write(
+      [for (var i = 0; i < 4000; i++) 'filler line number $i'].join('\r\n'),
+    );
+    await searchAllChord(t);
+    searchAllRepaints = 0;
+    await type(t, 'zzqq');
+    // No hit at all: only the end of the search repaints.
+    expect(searchAllRepaints, lessThanOrEqualTo(1));
+    await disposeWorkspace(t, c);
+  }, variant: mac);
 
   testWidgets('⌘⇧F opens the overlay with the field focused', (t) async {
     final rig = await pumpConfiguredWorkspace(t);

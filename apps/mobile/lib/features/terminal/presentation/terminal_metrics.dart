@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/painting.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 import 'package:xterm/xterm.dart';
@@ -27,12 +28,25 @@ TerminalGrid? measureTerminalGrid(Size size, TerminalStyle style, TextScaler tex
 /// One cell of [style], measured the way xterm's RenderTerminal does (width of "mmmmmmmmmm" / 10, line
 /// height).
 Size terminalCellSize(TerminalStyle style, TextScaler textScaler) {
+  final textStyle = style.toTextStyle();
+  final cached = _cellCache;
+  if (cached != null && cached.style == textStyle && cached.scaler == textScaler) return cached.size;
+  terminalCellMeasures++;
   final painter = TextPainter(
-    text: TextSpan(text: 'mmmmmmmmmm', style: style.toTextStyle()),
+    text: TextSpan(text: 'mmmmmmmmmm', style: textStyle),
     textDirection: TextDirection.ltr,
     textScaler: textScaler,
   )..layout();
   final size = Size(painter.width / 10, painter.height);
   painter.dispose();
+  _cellCache = (style: textStyle, scaler: textScaler, size: size);
   return size;
 }
+
+/// The last measurement (A11 final review): a page asks on every build, the answer only changes with the font
+/// size, the font or the text scale.
+({TextStyle style, TextScaler scaler, Size size})? _cellCache;
+
+/// How many times a cell was really measured (tests).
+@visibleForTesting
+int terminalCellMeasures = 0;
