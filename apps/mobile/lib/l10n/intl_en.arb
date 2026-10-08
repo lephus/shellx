@@ -440,5 +440,10 @@
   "@viewAsTextTruncated": {"placeholders": {"lines": {"type": "int"}}},
   "linkSheetTitle": "Open link?",
   "linkSheetOpen": "Open",
-  "linkSheetCopy": "Copy link"
+  "linkSheetCopy": "Copy link",
+  "arrowPadLabel": "Arrow pad. Drag to move the cursor.",
+  "arrowPadUp": "Up",
+  "arrowPadDown": "Down",
+  "arrowPadLeft": "Left",
+  "arrowPadRight": "Right"
 }

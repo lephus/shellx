@@ -313,6 +313,12 @@ void main() {
     addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     await open(tester);
 
+    // The arrow pad and the mic come first: bring the arrow keys into view.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('extra-key-up')).hitTestable(),
+      100,
+      scrollable: find.descendant(of: find.byType(ExtraKeysBar), matching: find.byType(Scrollable)),
+    );
     await tester.tap(find.byKey(const ValueKey('extra-key-up')));
     expect(lastInput(), '\x1b[A');
 

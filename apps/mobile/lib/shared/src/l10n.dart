@@ -2243,6 +2243,36 @@ class S {
   String get linkSheetCopy {
     return Intl.message('Copy link', name: 'linkSheetCopy', desc: '', args: []);
   }
+
+  /// `Arrow pad. Drag to move the cursor.`
+  String get arrowPadLabel {
+    return Intl.message(
+      'Arrow pad. Drag to move the cursor.',
+      name: 'arrowPadLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Up`
+  String get arrowPadUp {
+    return Intl.message('Up', name: 'arrowPadUp', desc: '', args: []);
+  }
+
+  /// `Down`
+  String get arrowPadDown {
+    return Intl.message('Down', name: 'arrowPadDown', desc: '', args: []);
+  }
+
+  /// `Left`
+  String get arrowPadLeft {
+    return Intl.message('Left', name: 'arrowPadLeft', desc: '', args: []);
+  }
+
+  /// `Right`
+  String get arrowPadRight {
+    return Intl.message('Right', name: 'arrowPadRight', desc: '', args: []);
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

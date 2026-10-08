@@ -245,5 +245,10 @@
   "viewAsTextTruncated": "Hiển thị {lines} dòng cuối",
   "linkSheetTitle": "Mở liên kết?",
   "linkSheetOpen": "Mở",
-  "linkSheetCopy": "Sao chép liên kết"
+  "linkSheetCopy": "Sao chép liên kết",
+  "arrowPadLabel": "Bàn xoay mũi tên. Kéo để di chuyển con trỏ.",
+  "arrowPadUp": "Lên",
+  "arrowPadDown": "Xuống",
+  "arrowPadLeft": "Trái",
+  "arrowPadRight": "Phải"
 }

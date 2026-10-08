@@ -38,6 +38,31 @@ void main() {
 
   tearDown(() => keys.dispose());
 
+  testWidgets('A11 D30: the arrow pad sits before Esc, the four arrow keys stay, and a drag sends an arrow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(bar());
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('extra-key-pad'))).dx,
+      lessThan(tester.getTopLeft(find.text('Esc')).dx),
+    );
+    for (final key in [ExtraKey.up, ExtraKey.down, ExtraKey.left, ExtraKey.right]) {
+      expect(keyCap(key), findsOneWidget);
+    }
+    // The terminal's own mode decides the bytes: application cursor keys (DECCKM) → ESC O A.
+    final gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('extra-key-pad'))));
+    await gesture.moveBy(const Offset(0, -20));
+    await tester.pump();
+    expect(out.last, '\x1b[A');
+    await gesture.up();
+    terminal.write('\x1b[?1h');
+    final again = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('extra-key-pad'))));
+    await again.moveBy(const Offset(0, -20));
+    await tester.pump();
+    expect(out.last, '\x1bOA');
+    await again.up();
+  });
+
   testWidgets('a leading widget sits before Esc', (tester) async {
     await tester.pumpWidget(
       localized(

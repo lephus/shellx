@@ -1,5 +1,6 @@
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
+import 'package:shellx_mobile/features/terminal/presentation/widgets/arrow_pad.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// The horizontally scrolling extra keys row right above the keyboard (spec §9.3), styled like
@@ -67,6 +68,8 @@ class ExtraKeysBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 3),
         children: [
           ?leading,
+          // A11 D30: drag to send an arrow and hold to repeat it; the four arrow keys stay.
+          ArrowPadKey(key: const ValueKey('extra-key-pad'), onKey: onKey),
           for (final key in ExtraKey.values)
             Watch(
               key: ValueKey('extra-key-${key.name}'),

@@ -97,6 +97,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "actionLater": MessageLookupByLibrary.simpleMessage("Later"),
     "actionScanCode": MessageLookupByLibrary.simpleMessage("Scan code"),
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),
+    "arrowPadDown": MessageLookupByLibrary.simpleMessage("Down"),
+    "arrowPadLabel": MessageLookupByLibrary.simpleMessage(
+      "Arrow pad. Drag to move the cursor.",
+    ),
+    "arrowPadLeft": MessageLookupByLibrary.simpleMessage("Left"),
+    "arrowPadRight": MessageLookupByLibrary.simpleMessage("Right"),
+    "arrowPadUp": MessageLookupByLibrary.simpleMessage("Up"),
     "backToMachines": MessageLookupByLibrary.simpleMessage("Back to computers"),
     "bannerReconnectButton": MessageLookupByLibrary.simpleMessage("Reconnect"),
     "bannerReconnecting": MessageLookupByLibrary.simpleMessage(

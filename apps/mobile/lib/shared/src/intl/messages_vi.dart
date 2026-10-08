@@ -93,6 +93,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "actionLater": MessageLookupByLibrary.simpleMessage("Để sau"),
     "actionScanCode": MessageLookupByLibrary.simpleMessage("Quét mã"),
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),
+    "arrowPadDown": MessageLookupByLibrary.simpleMessage("Xuống"),
+    "arrowPadLabel": MessageLookupByLibrary.simpleMessage(
+      "Bàn xoay mũi tên. Kéo để di chuyển con trỏ.",
+    ),
+    "arrowPadLeft": MessageLookupByLibrary.simpleMessage("Trái"),
+    "arrowPadRight": MessageLookupByLibrary.simpleMessage("Phải"),
+    "arrowPadUp": MessageLookupByLibrary.simpleMessage("Lên"),
     "backToMachines": MessageLookupByLibrary.simpleMessage("Về danh sách máy"),
     "bannerReconnectButton": MessageLookupByLibrary.simpleMessage(
       "Kết nối lại",
