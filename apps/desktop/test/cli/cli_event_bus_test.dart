@@ -374,4 +374,65 @@ void main() {
       expect(changes.single['cwd'], isNull);
     },
   );
+
+  test('a pane that moves tab is one pane.moved, not a close and an open '
+      '(A11 D20)', () async {
+    final c = cliContainer(local);
+    final tabs = c.read(terminalTabsProvider.notifier);
+    await tabs.openTab(); // 100
+    await tabs.split(SplitAxis.row); // 101
+    await tabs.openTab(); // 102
+    final got = <Map<String, Object?>>[];
+    c.read(cliEventBusProvider).events.listen(got.add);
+    await pumpEventQueue();
+    expect(tabs.joinPane(101, 102), isTrue);
+    await settle();
+    final kinds = got.map((e) => e['kind']).toList();
+    expect(kinds, contains('pane.moved'));
+    expect(kinds, isNot(contains('pane.closed')));
+    expect(kinds, isNot(contains('pane.opened')));
+    expect(kinds, isNot(contains('pane.exited')));
+    expect(kinds, isNot(contains('tab.closed')));
+    expect(got.where((e) => e['kind'] == 'pane.moved').single, {
+      'kind': 'pane.moved',
+      'pane': 101,
+      'from': 100,
+      'to': 102,
+    });
+  });
+
+  test('breaking a pane out is tab.opened then pane.moved; the pane keeps '
+      'its state (no spurious pane.changed)', () async {
+    final c = cliContainer(local);
+    final tabs = c.read(terminalTabsProvider.notifier);
+    await tabs.openTab(); // 100
+    await tabs.split(SplitAxis.row); // 101
+    final got = <Map<String, Object?>>[];
+    c.read(cliEventBusProvider).events.listen(got.add);
+    await pumpEventQueue();
+    expect(tabs.breakPane(101), isTrue);
+    await settle();
+    final kinds = got.map((e) => e['kind']).toList();
+    expect(kinds, containsAllInOrder(['tab.opened', 'pane.moved']));
+    expect(kinds, isNot(contains('pane.closed')));
+    expect(kinds, isNot(contains('pane.changed')));
+    expect(kinds, isNot(contains('tab.closed')));
+  });
+
+  test('a joined-away tab that empties is tab.closed, its shell is not '
+      'reported as exited (A11 D20)', () async {
+    final c = cliContainer(local);
+    final tabs = c.read(terminalTabsProvider.notifier);
+    await tabs.openTab(); // 100
+    await tabs.openTab(); // 101
+    final got = <Map<String, Object?>>[];
+    c.read(cliEventBusProvider).events.listen(got.add);
+    await pumpEventQueue();
+    expect(tabs.joinPane(101, 100), isTrue);
+    await settle();
+    final kinds = got.map((e) => e['kind']).toList();
+    expect(kinds, containsAll(['tab.closed', 'pane.moved']));
+    expect(kinds, isNot(contains('pane.exited')));
+    expect(kinds, isNot(contains('pane.closed')));
+  });
 }

@@ -9,10 +9,14 @@ import '../../config/config_opener.dart';
 import '../../config/config_problem.dart';
 import '../../config/keybind_actions.dart' show describeIntent;
 import '../../terminal/closed_items.dart' show closedItemsProvider;
+import '../../terminal/find_sessions.dart';
+import '../../terminal/global_search.dart' show GlobalHit;
+import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
+import '../config/search_all_overlay.dart';
 import '../config/shortcuts_sheet.dart';
 import '../settings/settings_overlay.dart';
 import '../window_router.dart';
@@ -22,7 +26,7 @@ import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
 
 /// A9's overlays over the workspace (UI-A9 §2-4).
-enum A9Overlay { palette, problems, shortcuts, settings }
+enum A9Overlay { palette, problems, shortcuts, settings, searchAll }
 
 /// One problem for the toast's "already told" check: where and what, never
 /// the text (D36: a problem that stays is not announced on every reload).
@@ -73,19 +77,61 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   void _refreshPalette() {
     if (overlay != A9Overlay.palette) return;
     final state = ref.read(shellxConfigProvider);
+    final l10n = AppLocalizations.of(context);
     setState(() {
-      _paletteEntries = paletteEntries(
-        l10n: AppLocalizations.of(context),
-        config: state,
-        enabled: (intent) {
-          if (intent is ShowConfigProblemsIntent) {
-            return state.visibleProblemCount > 0;
-          }
-          if (intent is RunUserCommandIntent) return true;
-          return _openIntents.contains(describeIntent(intent));
-        },
-      );
+      _paletteEntries = [
+        ...paletteEntries(
+          l10n: l10n,
+          config: state,
+          enabled: (intent) {
+            if (intent is ShowConfigProblemsIntent) {
+              return state.visibleProblemCount > 0;
+            }
+            if (intent is RunUserCommandIntent) return true;
+            return _openIntents.contains(describeIntent(intent));
+          },
+        ),
+        ..._moveEntries(l10n),
+      ];
     });
+  }
+
+  /// A11 D20: "Move tab to {workspace}" for each other workspace and "Move
+  /// pane to tab {label}" for up to 20 other tabs, in sidebar order; they
+  /// stand for the selected tab and its focused pane.
+  List<PaletteEntry> _moveEntries(AppLocalizations l10n) {
+    final tabs = ref.read(terminalTabsProvider);
+    final selected = tabs.selected;
+    if (selected == null) return const [];
+    final side = ref.read(sidebarWorkspacesProvider);
+    final here = side.workspaceOf(selected.id);
+    PaletteEntry entry(String id, String title, Intent intent) => PaletteEntry(
+      id: id,
+      title: title,
+      subtitle: null,
+      kind: PaletteKind.action,
+      shortcut: null,
+      intent: intent,
+    );
+    return [
+      for (final w in side.workspaces)
+        if (w.id != here)
+          entry(
+            'move-tab:${w.id}',
+            l10n.moveTabToWorkspace(w.displayName(l10n)),
+            MoveTabToWorkspaceIntent(w.id),
+          ),
+      for (final id
+          in side.orderedTabIds
+              .where((id) => id != selected.id)
+              .where((id) => tabs.tabs.any((t) => t.id == id))
+              .take(20))
+        entry(
+          'join-pane:$id',
+          l10n.movePaneToTab(tabs.tabs.firstWhere((t) => t.id == id).label),
+          JoinPaneIntent(tabId: id),
+        ),
+    ];
   }
 
   List<PaletteEntry> _buildPaletteEntries() {
@@ -112,7 +158,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       },
     );
     _openIntents = {for (final e in entries) describeIntent(e.intent)};
-    return entries;
+    return [...entries, ..._moveEntries(AppLocalizations.of(context))];
   }
 
   /// Enter or a click: close first (the keyboard goes back where it was),
@@ -124,6 +170,40 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       ..insert(0, entry.id);
     if (_recent.length > 8) _recent.removeLast();
     invokeIntent(entry.intent);
+  }
+
+  /// A11 D21: a chosen match — its tab is selected, its pane focused and
+  /// its find bar opened on [query], standing on the match. The bar's
+  /// reveal exists only once the pane has built it, so the jump is made
+  /// again after that frame.
+  void _openSearchHit(GlobalHit hit, String query) {
+    closeOverlay(restoreFocus: false);
+    final tab = ref.read(terminalTabsProvider).tabOfSession(hit.paneId);
+    if (tab == null) {
+      focusTerminal(); // the pane closed meanwhile
+      return;
+    }
+    ref.read(sidebarWorkspacesProvider.notifier).reveal(tab.id);
+    ref.read(terminalTabsProvider.notifier).focusPane(hit.paneId);
+    final find = ref.read(findSessionsProvider.notifier).open(hit.paneId);
+    if (find == null) {
+      focusTerminal();
+      return;
+    }
+    if (find.matchCase) find.toggleMatchCase();
+    find.setQuery(query);
+    // A line that left the history: the first match of the pane.
+    final row = hit.liveRow ?? 0;
+    find.goToMatchAtOrAfter(row);
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (!mounted) return;
+        final live = ref.read(findSessionsProvider)[hit.paneId];
+        if (live == null) return;
+        live.goToMatchAtOrAfter(row);
+        live.focusNode.requestFocus();
+      })
+      ..ensureVisualUpdate();
   }
 
   void openOverlay(A9Overlay next) {
@@ -173,6 +253,26 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
               entries: _paletteEntries,
               recent: _recent,
               onRun: _runPalette,
+              onClose: closeOverlay,
+            ),
+          ),
+        ),
+      );
+    }
+    if (overlay == A9Overlay.searchAll) {
+      return Positioned(
+        key: const ValueKey('a9.searchall'),
+        left: ShellxSizes.sidebarWidth + 1,
+        right: 0,
+        top:
+            (isMacDesktop ? ShellxSizes.paneHeaderMac : 0) +
+            ShellxSizes.paletteTop,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: TapRegion(
+            onTapOutside: (_) => closeOverlay(),
+            child: SearchAllOverlay(
+              onOpen: _openSearchHit,
               onClose: closeOverlay,
             ),
           ),
@@ -295,6 +395,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         ConfigUiRequest.problems => A9Overlay.problems,
         ConfigUiRequest.shortcuts => A9Overlay.shortcuts,
         ConfigUiRequest.settings => A9Overlay.settings,
+        ConfigUiRequest.searchAll => A9Overlay.searchAll,
       });
     });
   }

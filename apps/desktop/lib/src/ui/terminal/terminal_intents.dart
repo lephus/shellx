@@ -210,6 +210,38 @@ class ReopenClosedIntent extends Intent {
   const ReopenClosedIntent();
 }
 
+/// A11 D20 `swap_split:<dir>` (no default key).
+class SwapPaneIntent extends Intent {
+  const SwapPaneIntent(this.direction);
+  final PaneDirection direction;
+}
+
+/// A11 D20 `break_pane` (no default key): the focused pane becomes a tab.
+class BreakPaneIntent extends Intent {
+  const BreakPaneIntent();
+}
+
+/// A11 D20 `join_pane:<n>` (no default key) and the menu / palette entries
+/// "Move pane to tab": the focused pane joins tab [tabId], or the [position]-th
+/// tab of the sidebar (1-based).
+class JoinPaneIntent extends Intent {
+  const JoinPaneIntent({this.tabId, this.position});
+  final int? tabId;
+  final int? position;
+}
+
+/// A11 D20 (palette "Move tab to {workspace}"): the selected tab goes to
+/// workspace [workspaceId].
+class MoveTabToWorkspaceIntent extends Intent {
+  const MoveTabToWorkspaceIntent(this.workspaceId);
+  final String workspaceId;
+}
+
+/// A11 D21 `search_all` (⌘⇧F / Ctrl+Shift+Alt+F).
+class SearchAllIntent extends Intent {
+  const SearchAllIntent();
+}
+
 /// A11 D15 `focus_history:back|forward` (⌘⌃[ / ⌘⌃], Ctrl+Alt+[ / ]).
 class FocusHistoryIntent extends Intent {
   const FocusHistoryIntent({required this.back});

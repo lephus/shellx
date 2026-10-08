@@ -141,6 +141,19 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     // A10 D4: Cmd+F/G on macOS; Ctrl+Shift+F/G (Alt for previous) on
     // Windows — never a bare F3, which htop and mc use.
     b(primary(LogicalKeyboardKey.keyF), 'start_search'),
+    // A11 D21: Cmd+Shift+F; Ctrl+Shift+F is start_search on Windows, so
+    // Alt too.
+    b(
+      mac
+          ? shifted(LogicalKeyboardKey.keyF)
+          : const KeyChord(
+              LogicalKeyboardKey.keyF,
+              control: true,
+              shift: true,
+              alt: true,
+            ),
+      'search_all',
+    ),
     b(
       mac
           ? const KeyChord(LogicalKeyboardKey.keyG, meta: true)

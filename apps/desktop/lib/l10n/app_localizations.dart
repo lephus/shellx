@@ -3815,6 +3815,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'#RRGGBB'**
   String get settingsHexHint;
+
+  /// A11 D21
+  ///
+  /// In en, this message translates to:
+  /// **'Find in all terminals'**
+  String get actionSearchAll;
+
+  /// No description provided for @searchAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in all terminals'**
+  String get searchAllTitle;
+
+  /// No description provided for @searchAllFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search every terminal'**
+  String get searchAllFieldLabel;
+
+  /// No description provided for @searchAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search every terminal…'**
+  String get searchAllHint;
+
+  /// No description provided for @searchAllNeedTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 characters'**
+  String get searchAllNeedTwo;
+
+  /// No description provided for @searchAllNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches in any terminal'**
+  String get searchAllNone;
+
+  /// No description provided for @searchAllCapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the first {count} matches'**
+  String searchAllCapped(int count);
+
+  /// No description provided for @searchAllCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 match} other{{count} matches}}'**
+  String searchAllCount(int count);
+
+  /// No description provided for @searchAllPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane {n}'**
+  String searchAllPane(int n);
+
+  /// No description provided for @searchAllLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line {n}'**
+  String searchAllLine(int n);
+
+  /// A11 D20
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Swap pane with the one on the left} right{Swap pane with the one on the right} up{Swap pane with the one above} other{Swap pane with the one below}}'**
+  String actionSwapSplit(String direction);
+
+  /// No description provided for @actionBreakPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to its own tab'**
+  String get actionBreakPane;
+
+  /// No description provided for @actionJoinPane.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab {n}'**
+  String actionJoinPane(String n);
+
+  /// No description provided for @moveTabToWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Move tab to {workspace}'**
+  String moveTabToWorkspace(String workspace);
+
+  /// No description provided for @movePaneToTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab {tab}'**
+  String movePaneToTab(String tab);
+
+  /// No description provided for @paneMoveToTabMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to tab ▸'**
+  String get paneMoveToTabMenu;
+
+  /// No description provided for @paneMoveToTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move pane to'**
+  String get paneMoveToTabTitle;
+
+  /// No description provided for @paneSwapMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap with neighbour ▸'**
+  String get paneSwapMenu;
+
+  /// No description provided for @paneSwapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap with'**
+  String get paneSwapTitle;
+
+  /// No description provided for @paneSwapLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane on the left'**
+  String get paneSwapLeft;
+
+  /// No description provided for @paneSwapRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane on the right'**
+  String get paneSwapRight;
+
+  /// No description provided for @paneSwapUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane above'**
+  String get paneSwapUp;
+
+  /// No description provided for @paneSwapDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Pane below'**
+  String get paneSwapDown;
+
+  /// No description provided for @searchAllGone.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrolled out of history'**
+  String get searchAllGone;
 }
 
 class _AppLocalizationsDelegate

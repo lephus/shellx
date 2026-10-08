@@ -107,6 +107,11 @@ String? _tabNumber(String? raw) {
   return n != null && n >= 1 && n <= 9 ? '$n' : null;
 }
 
+String? _tabPosition(String? raw) {
+  final n = int.tryParse(raw?.trim() ?? '');
+  return n != null && n >= 1 && n <= 999 ? '$n' : null;
+}
+
 String? _name(String? raw) =>
     raw == null || raw.trim().isEmpty ? null : raw.trim();
 
@@ -168,6 +173,22 @@ final Map<String, ActionSpec> kActionSpecs = {
       param: (r) => _oneOf({'back', 'forward'}, r),
       paramHint: 'back, forward',
     ),
+    // A11 D20: no default keys.
+    ActionSpec(
+      'swap_split',
+      ActionGroup.panes,
+      param: _direction,
+      paramHint: 'left, right, up, down',
+    ),
+    const ActionSpec('break_pane', ActionGroup.panes),
+    // The palette lists one entry per tab instead (the window builds them).
+    const ActionSpec(
+      'join_pane',
+      ActionGroup.panes,
+      param: _tabPosition,
+      paramHint: 'a tab number',
+      inPalette: false,
+    ),
     const ActionSpec('toggle_split_zoom', ActionGroup.panes),
     const ActionSpec('equalize_splits', ActionGroup.panes),
     const ActionSpec('toggle_notifications', ActionGroup.notifications),
@@ -198,6 +219,8 @@ final Map<String, ActionSpec> kActionSpecs = {
       paramHint:
           'line_start, line_end, delete_line, delete_word, delete_word_forward',
     ),
+    // A11 D21: the overlay that searches every pane's scrollback.
+    const ActionSpec('search_all', ActionGroup.editing),
     // A11 D13: vim-style keys over the buffer, no mouse.
     const ActionSpec('toggle_copy_mode', ActionGroup.editing),
     const ActionSpec(
@@ -320,6 +343,9 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'goto_split' => FocusPaneIntent(_dir(a.param!)),
   'resize_split' => ResizePaneIntent(_dir(a.param!)),
   'focus_history' => FocusHistoryIntent(back: a.param != 'forward'),
+  'swap_split' => SwapPaneIntent(_dir(a.param!)),
+  'break_pane' => const BreakPaneIntent(),
+  'join_pane' => JoinPaneIntent(position: int.parse(a.param!)),
   'toggle_split_zoom' => const TogglePaneZoomIntent(),
   'equalize_splits' => const EqualizePanesIntent(),
   'toggle_notifications' => const ToggleNotificationsPanelIntent(),
@@ -330,6 +356,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'start_search' => const StartSearchIntent(),
   'navigate_search' => NavigateSearchIntent(next: a.param != 'previous'),
   'end_search' => const EndSearchIntent(),
+  'search_all' => const SearchAllIntent(),
   'edit_line' => EditLineIntent(EditLineOp.fromWire(a.param)!),
   'toggle_copy_mode' => const ToggleCopyModeIntent(),
   'increase_font_size' => FontBiggerIntent(step: double.parse(a.param ?? '1')),
@@ -359,6 +386,11 @@ String describeIntent(Intent i) => switch (i) {
   ResizePaneIntent(:final direction) => 'ResizePaneIntent(${direction.name})',
   SelectAllIntent(:final fromMenu) =>
     fromMenu ? 'SelectAllIntent(menu)' : 'SelectAllIntent',
+  SwapPaneIntent(:final direction) => 'SwapPaneIntent(${direction.name})',
+  JoinPaneIntent(:final tabId, :final position) =>
+    'JoinPaneIntent(${tabId != null ? 't$tabId' : position})',
+  MoveTabToWorkspaceIntent(:final workspaceId) =>
+    'MoveTabToWorkspaceIntent($workspaceId)',
   EditLineIntent(:final op) => 'EditLineIntent(${op.wire})',
   FocusHistoryIntent(:final back) =>
     'FocusHistoryIntent(${back ? 'back' : 'forward'})',

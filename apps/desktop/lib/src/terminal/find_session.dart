@@ -65,6 +65,7 @@ final class FindSession extends ChangeNotifier {
   Timer? _refreshTimer;
   Timer? _idle;
   var _pickLast = true;
+  int? _goToRow;
   var _scroll = false;
   var _dirty = false;
   var _restarts = 0;
@@ -121,6 +122,27 @@ final class FindSession extends ChangeNotifier {
     _begin(pickLast: true, scroll: false, debounce: false);
   }
 
+  /// A11 D21: stands on the first match whose row is at or after [row]
+  /// (wrapping to the first) and shows it. While a search is still running
+  /// it is done once the search has its matches.
+  void goToMatchAtOrAfter(int row) {
+    if (_closed) return;
+    if (_search != null || _refreshTimer != null) {
+      _goToRow = row;
+      return;
+    }
+    _goTo(row);
+  }
+
+  bool _goTo(int row) {
+    final i = firstMatchFrom(matches, row);
+    if (i < 0 || _highlights.length != matches.length) return false;
+    final live = _liveOf(i);
+    if (live == null) return false;
+    _setCurrent(i, live);
+    return true;
+  }
+
   void next() => _step(1);
   void previous() => _step(-1);
 
@@ -175,6 +197,7 @@ final class FindSession extends ChangeNotifier {
     _scroll = scroll;
     _dirty = false;
     if (!hasQuery) {
+      _goToRow = null;
       _publish(const SearchResult([]));
       return;
     }
@@ -220,6 +243,15 @@ final class FindSession extends ChangeNotifier {
   }
 
   void _publish(SearchResult found) {
+    _publishFound(found);
+    final goTo = _goToRow;
+    if (goTo != null) {
+      _goToRow = null;
+      _goTo(goTo);
+    }
+  }
+
+  void _publishFound(SearchResult found) {
     final hadCurrent = _current >= 0 && _current < _highlights.length;
     if (!_pickLast && hadCurrent && _sameAsHighlights(found.matches)) {
       // Nothing moved: no highlight is rebuilt.

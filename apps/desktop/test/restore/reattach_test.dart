@@ -238,4 +238,44 @@ void main() {
     expect(tabsState().tabs.map((t) => t.id), [5, 6]);
     expect(tabsState().tabs.every((t) => t.panes.length == 1), isTrue);
   });
+
+  test('a tab whose creating pane moved away is laid back over the live '
+      'sessions (A11 review C1)', () async {
+    final kt = 'a' * 32;
+    final moved = RestoreSnapshot(
+      savedAt: DateTime(2026, 10, 7, 14, 31),
+      cleanExit: true,
+      daemon: 'i1',
+      selectedTab: k5,
+      workspaces: [
+        SavedWorkspace(id: 'default', tabs: [kt, k5]),
+      ],
+      tabs: [
+        SavedTab(
+          key: kt,
+          focused: k6,
+          layout: SavedPane(key: k6, cwd: '/w', session: 6),
+        ),
+        SavedTab(
+          key: k5,
+          focused: k5,
+          layout: SavedPane(key: k5, cwd: '/w', session: 5),
+        ),
+      ],
+    );
+    expect(RestoreSnapshot.tryParse(moved.encode()), isNotNull);
+    boot();
+    await c
+        .read(restorePersistenceProvider.notifier)
+        .restoreAtStartup(RestoreLoad(snapshot: moved), daemonInstance: 'i1');
+    expect(
+      tabsState().tabs.map((t) => paneIds(t.layout)).toList(),
+      unorderedEquals([
+        [6],
+        [5],
+      ]),
+    );
+    expect(local.openCwds, isEmpty);
+    expect(tabsState().selected!.id, 5);
+  });
 }

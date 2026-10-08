@@ -104,6 +104,13 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
             ? closeConfigOverlay()
             : openOverlay(A9Overlay.palette),
       ),
+      // A11 D21: ⌘⇧F opens the all-terminals search, and closes it when
+      // it is open.
+      SearchAllIntent: run<SearchAllIntent>(
+        (_) => overlay == A9Overlay.searchAll
+            ? closeConfigOverlay()
+            : openOverlay(A9Overlay.searchAll),
+      ),
       ShowShortcutsIntent: run<ShowShortcutsIntent>(
         (_) => openOverlay(A9Overlay.shortcuts),
       ),

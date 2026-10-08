@@ -119,6 +119,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'navigate_search' =>
     a.param == 'previous' ? l10n.actionSearchPrevious : l10n.actionSearchNext,
   'end_search' => l10n.actionEndSearch,
+  'search_all' => l10n.actionSearchAll,
   'edit_line' => switch (a.param) {
     'line_end' => l10n.actionEditLineEnd,
     'delete_line' => l10n.actionEditLineDeleteLine,
@@ -137,6 +138,9 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
     a.param == 'down' ? l10n.actionSplitDown : l10n.actionSplitRight,
   'goto_split' => l10n.actionFocusPane(a.param ?? 'down'),
   'resize_split' => l10n.actionResizePane(a.param ?? 'down'),
+  'swap_split' => l10n.actionSwapSplit(a.param ?? 'down'),
+  'break_pane' => l10n.actionBreakPane,
+  'join_pane' => l10n.actionJoinPane(a.param ?? ''),
   'toggle_split_zoom' => l10n.actionToggleZoom,
   'equalize_splits' => l10n.actionEqualize,
   'increase_font_size' => l10n.actionFontBigger,
@@ -160,7 +164,9 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
 List<String?> actionVariants(ActionSpec spec) => switch (spec.name) {
   'goto_tab' => [for (var i = 1; i <= 9; i++) '$i'],
   'new_split' => ['right', 'down'],
-  'goto_split' || 'resize_split' => ['left', 'right', 'up', 'down'],
+  'goto_split' ||
+  'resize_split' ||
+  'swap_split' => ['left', 'right', 'up', 'down'],
   'navigate_search' => ['next', 'previous'],
   'focus_history' => ['back', 'forward'],
   'edit_line' => [for (final op in EditLineOp.values) op.wire],

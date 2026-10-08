@@ -2502,4 +2502,104 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsHexHint => '#RRGGBB';
+
+  @override
+  String get actionSearchAll => 'Find in all terminals';
+
+  @override
+  String get searchAllTitle => 'Find in all terminals';
+
+  @override
+  String get searchAllFieldLabel => 'Search every terminal';
+
+  @override
+  String get searchAllHint => 'Search every terminal…';
+
+  @override
+  String get searchAllNeedTwo => 'Type at least 2 characters';
+
+  @override
+  String get searchAllNone => 'No matches in any terminal';
+
+  @override
+  String searchAllCapped(int count) {
+    return 'Showing the first $count matches';
+  }
+
+  @override
+  String searchAllCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchAllPane(int n) {
+    return 'Pane $n';
+  }
+
+  @override
+  String searchAllLine(int n) {
+    return 'Line $n';
+  }
+
+  @override
+  String actionSwapSplit(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Swap pane with the one on the left',
+      'right': 'Swap pane with the one on the right',
+      'up': 'Swap pane with the one above',
+      'other': 'Swap pane with the one below',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionBreakPane => 'Move pane to its own tab';
+
+  @override
+  String actionJoinPane(String n) {
+    return 'Move pane to tab $n';
+  }
+
+  @override
+  String moveTabToWorkspace(String workspace) {
+    return 'Move tab to $workspace';
+  }
+
+  @override
+  String movePaneToTab(String tab) {
+    return 'Move pane to tab $tab';
+  }
+
+  @override
+  String get paneMoveToTabMenu => 'Move pane to tab ▸';
+
+  @override
+  String get paneMoveToTabTitle => 'Move pane to';
+
+  @override
+  String get paneSwapMenu => 'Swap with neighbour ▸';
+
+  @override
+  String get paneSwapTitle => 'Swap with';
+
+  @override
+  String get paneSwapLeft => 'Pane on the left';
+
+  @override
+  String get paneSwapRight => 'Pane on the right';
+
+  @override
+  String get paneSwapUp => 'Pane above';
+
+  @override
+  String get paneSwapDown => 'Pane below';
+
+  @override
+  String get searchAllGone => 'Scrolled out of history';
 }

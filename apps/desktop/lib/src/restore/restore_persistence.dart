@@ -512,8 +512,11 @@ class RestorePersistence extends Notifier<void> {
     _filed.removeAll(gone);
     _doomed.addAll(gone);
     _keys.removeWhere(
-      (id, _) =>
-          tabs.tabOfSession(id) == null && !tabs.tabs.any((t) => t.id == id),
+      // A negative id stands for a tab whose creating pane moved away
+      // (A11 D20): its key lives as long as the tab.
+      (id, _) => id < 0
+          ? !tabs.tabs.any((t) => t.id == -id)
+          : tabs.tabOfSession(id) == null && !tabs.tabs.any((t) => t.id == id),
     );
     bool ok;
     try {

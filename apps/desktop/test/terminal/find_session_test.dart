@@ -260,4 +260,43 @@ void main() {
       expect(c2.highlights, isEmpty);
     },
   );
+
+  test(
+    'goToMatchAtOrAfter picks the first match at or after the row (A11 D21)',
+    () {
+      final (_, c, s) = rig('zz 1\r\nzz 2\r\nzz 3\r\nzz 4');
+      s.setQuery('zz');
+      expect(s.current, 3, reason: 'a new search stands on the last match');
+      final seen = <int>[];
+      s.reveal = (m) => seen.add(m.startRow);
+      s.goToMatchAtOrAfter(1);
+      expect(s.current, 1);
+      expect(seen.last, 1);
+      expect(c.highlights.where((h) => h.color == _hot), hasLength(1));
+      s.goToMatchAtOrAfter(99); // past the last: wraps to the first
+      expect(s.current, 0);
+      s.close();
+    },
+  );
+
+  test('goToMatchAtOrAfter waits for a search that is still running', () {
+    fakeAsync((async) {
+      final t = Terminal(maxLines: 5000)..resize(30, 5);
+      t.write([for (var i = 0; i < 3000; i++) 'e $i'].join('\r\n'));
+      final s = FindSession(
+        terminal: t,
+        controller: TerminalController(),
+        matchColor: _dim,
+        currentColor: _hot,
+        slice: Duration.zero,
+      );
+      s.setQuery('e');
+      expect(s.searching, isTrue);
+      s.goToMatchAtOrAfter(10);
+      async.elapse(const Duration(seconds: 5));
+      expect(s.searching, isFalse);
+      expect(s.matches[s.current].startRow, 10);
+      s.close();
+    });
+  });
 }

@@ -54,6 +54,14 @@ class FocusHistory {
     }
   }
 
+  /// A pane moved to tab [toTab] (A11 D20): the places it was follow it.
+  void moved(int pane, int toTab) {
+    for (var k = 0; k < _s.length; k++) {
+      final e = _s[k];
+      if (e.paneId == pane) _s[k] = FocusEntry(toTab, pane);
+    }
+  }
+
   FocusEntry? back(bool Function(FocusEntry) alive) => _go(-1, alive);
 
   FocusEntry? forward(bool Function(FocusEntry) alive) => _go(1, alive);
@@ -94,7 +102,13 @@ class FocusHistoryNotifier extends Notifier<FocusHistory> {
         .read(terminalTabsProvider.notifier)
         .paneReplacements
         .listen((r) => history.remap(r.from, r.to));
+    // A11 D20: so does a pane that changed tab.
+    final moved = ref
+        .read(terminalTabsProvider.notifier)
+        .paneMoves
+        .listen((m) => history.moved(m.pane, m.toTab));
     ref.onDispose(replaced.cancel);
+    ref.onDispose(moved.cancel);
     return history;
   }
 

@@ -2413,4 +2413,103 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsHexHint => '#RRGGBB';
+
+  @override
+  String get actionSearchAll => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllTitle => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllFieldLabel => 'Tìm trong mọi terminal';
+
+  @override
+  String get searchAllHint => 'Tìm trong mọi terminal…';
+
+  @override
+  String get searchAllNeedTwo => 'Nhập ít nhất 2 ký tự';
+
+  @override
+  String get searchAllNone => 'Không có kết quả trong terminal nào';
+
+  @override
+  String searchAllCapped(int count) {
+    return 'Hiện $count kết quả đầu tiên';
+  }
+
+  @override
+  String searchAllCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kết quả',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchAllPane(int n) {
+    return 'Pane $n';
+  }
+
+  @override
+  String searchAllLine(int n) {
+    return 'Dòng $n';
+  }
+
+  @override
+  String actionSwapSplit(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Đổi chỗ với pane bên trái',
+      'right': 'Đổi chỗ với pane bên phải',
+      'up': 'Đổi chỗ với pane phía trên',
+      'other': 'Đổi chỗ với pane phía dưới',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get actionBreakPane => 'Chuyển pane sang tab riêng';
+
+  @override
+  String actionJoinPane(String n) {
+    return 'Chuyển pane tới tab $n';
+  }
+
+  @override
+  String moveTabToWorkspace(String workspace) {
+    return 'Chuyển tab tới $workspace';
+  }
+
+  @override
+  String movePaneToTab(String tab) {
+    return 'Chuyển pane tới tab $tab';
+  }
+
+  @override
+  String get paneMoveToTabMenu => 'Chuyển pane tới tab ▸';
+
+  @override
+  String get paneMoveToTabTitle => 'Chuyển pane tới';
+
+  @override
+  String get paneSwapMenu => 'Đổi chỗ với pane bên cạnh ▸';
+
+  @override
+  String get paneSwapTitle => 'Đổi chỗ với';
+
+  @override
+  String get paneSwapLeft => 'Pane bên trái';
+
+  @override
+  String get paneSwapRight => 'Pane bên phải';
+
+  @override
+  String get paneSwapUp => 'Pane phía trên';
+
+  @override
+  String get paneSwapDown => 'Pane phía dưới';
+
+  @override
+  String get searchAllGone => 'Đã trôi khỏi lịch sử cuộn';
 }
