@@ -2602,4 +2602,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchAllGone => 'Scrolled out of history';
+
+  @override
+  String get actionTogglePinTab => 'Pin or unpin tab';
+
+  @override
+  String get tabPin => 'Pin tab';
+
+  @override
+  String get tabUnpin => 'Unpin tab';
+
+  @override
+  String get tabPinned => 'Pinned';
+
+  @override
+  String get tabSetDescription => 'Set description…';
+
+  @override
+  String get tabDescriptionPlaceholder => 'Tab description';
+
+  @override
+  String get tabStatusMenu => 'Status';
+
+  @override
+  String get tabStatusNone => 'No status';
+
+  @override
+  String get tabStatusInProgress => 'In progress';
+
+  @override
+  String get tabStatusReview => 'In review';
+
+  @override
+  String get tabStatusBlocked => 'Blocked';
+
+  @override
+  String get tabStatusDone => 'Done';
+
+  @override
+  String tabStatusLabel(String status) {
+    return 'Status: $status';
+  }
+
+  @override
+  String get tabPinnedCloseTitle => 'Close pinned tab?';
+
+  @override
+  String tabPinnedCloseBody(String name) {
+    return '“$name” is pinned.';
+  }
 }

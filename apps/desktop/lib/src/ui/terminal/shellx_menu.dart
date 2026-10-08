@@ -13,6 +13,7 @@ final class ShellxMenuEntry<T> {
     this.dividerBefore = false,
     this.tooltip,
     this.heading = false,
+    this.checked = false,
   });
 
   final T value;
@@ -37,6 +38,10 @@ final class ShellxMenuEntry<T> {
   /// `caption` `textSecondary`, never selectable (not at 38 %: it is
   /// meant to be read).
   final bool heading;
+
+  /// A11 D18: the current choice of a list (the tab status): a check mark
+  /// at the end and "checked" for screen readers.
+  final bool checked;
 }
 
 /// UI §3.1 context menu at [at] (global): `surface`, 1 px `border`, `r8`,
@@ -143,6 +148,14 @@ class _ShellxMenuItemState<T>
             ),
           ),
         ),
+        if (entry.checked) ...[
+          const SizedBox(width: ShellxSpace.s16),
+          const Icon(
+            Icons.check,
+            size: 14,
+            color: ShellxDesktopColors.textSecondary,
+          ),
+        ],
         if (shortcut != null) ...[
           const SizedBox(width: ShellxSpace.s16),
           ExcludeSemantics(

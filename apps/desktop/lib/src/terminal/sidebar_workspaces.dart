@@ -13,6 +13,7 @@ import '../platform/settings_store.dart';
 import '../remote/ssh_settings.dart';
 import '../restore/restore_snapshot.dart';
 import 'local_sessions_provider.dart';
+import 'tab_meta.dart';
 import 'terminal_tabs.dart';
 
 const String kDefaultWorkspaceId = 'default';
@@ -132,6 +133,16 @@ final class RenameTab extends RenameTarget {
   bool operator ==(Object other) => other is RenameTab && other.id == id;
   @override
   int get hashCode => id.hashCode;
+}
+
+/// A11 D18: the tab whose one-line description field is open.
+final class EditDescription extends RenameTarget {
+  const EditDescription(this.id);
+  final int id;
+  @override
+  bool operator ==(Object other) => other is EditDescription && other.id == id;
+  @override
+  int get hashCode => Object.hash('desc', id);
 }
 
 final class RenameWorkspace extends RenameTarget {
@@ -513,7 +524,15 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
         ],
     };
     final target = members[workspaceId]!;
-    target.insert(at.clamp(0, target.length), tabId);
+    // A11 D18: pinned tabs are the first of a workspace, others after.
+    final pinnedCount = target.where(_isPinned).length;
+    final isPinned = _isPinned(tabId);
+    target.insert(
+      isPinned
+          ? at.clamp(0, pinnedCount)
+          : at.clamp(pinnedCount, target.length),
+      tabId,
+    );
     final selected = ref.read(terminalTabsProvider).selectedId == tabId;
     state = state.copyWith(
       members: members,
@@ -541,6 +560,8 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     final list = state.tabsOf(from);
     final next = list.indexOf(tabId) + step;
     if (next >= 0 && next < list.length) {
+      // A11 D18: one step never crosses between the pinned and the rest.
+      if (_isPinned(list[next]) != _isPinned(tabId)) return null;
       return (from, step > 0 ? next + 1 : next);
     }
     if (!state.showHeaders) return null;
@@ -604,6 +625,9 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
         state.tabsOf(w.id).where((id) => !moved.contains(id)),
       );
     }
+    for (final w in members.keys) {
+      members[w] = sortPinnedFirst(members[w]!, _isPinned);
+    }
     final selectedIn = selectedTabId == null
         ? null
         : members.entries
@@ -615,6 +639,16 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       currentId: selectedIn ?? state.currentId,
     );
   }
+
+  bool _isPinned(int tabId) =>
+      ref
+          .read(terminalTabsProvider)
+          .tabs
+          .where((t) => t.id == tabId)
+          .firstOrNull
+          ?.meta
+          .pinned ??
+      false;
 
   void startRename(RenameTarget target) =>
       state = state.copyWith(renaming: target);
@@ -661,6 +695,13 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       members[target]!.add(tab.id);
       expand.add(target); // a tab opened here is never born hidden
     }
+    // A11 D18: pinned tabs lead their workspace, whatever changed.
+    for (final w in members.keys.toList()) {
+      members[w] = sortPinnedFirst(
+        members[w]!,
+        (id) => live[id]?.meta.pinned ?? false,
+      );
+    }
     var current = s.currentId;
     final selected = tabs.selectedId;
     if (selected != null) {
@@ -671,6 +712,7 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     if (!members.containsKey(current)) current = kDefaultWorkspaceId;
     final renaming = switch (s.renaming) {
       RenameTab(:final id) when !live.containsKey(id) => null,
+      EditDescription(:final id) when !live.containsKey(id) => null,
       final other => other,
     };
     final workspaces = expand.isEmpty

@@ -387,6 +387,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           _announceFocusedPane();
         }
       }, enabled: (intent) => tabs.canSwapFocusedPane(intent.direction)),
+      TogglePinTabIntent: run<TogglePinTabIntent>((_) {
+        final tab = ref.read(terminalTabsProvider).selected;
+        if (tab == null) return;
+        tabs.setMeta(tab.id, (m) => m.copyWith(pinned: !m.pinned));
+      }),
       BreakPaneIntent: run<BreakPaneIntent>((_) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;

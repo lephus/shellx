@@ -12,6 +12,7 @@ import 'package:shellx_desktop/src/restore/restore_snapshot.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/tab_meta.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -771,5 +772,44 @@ void main() {
         expect(state().notice, isA<SessionLimitNotice>());
       },
     );
+  });
+
+  test('A11 D18: restored tabs get their pin, description and status, and '
+      'a pinned tab leads its workspace', () async {
+    boot();
+    final s = RestoreSnapshot(
+      savedAt: DateTime.utc(2026, 10, 7),
+      cleanExit: true,
+      selectedTab: k1,
+      workspaces: [
+        // Saved with the pinned tab last (a hand-edited file).
+        SavedWorkspace(id: 'default', tabs: [k1, k2]),
+      ],
+      tabs: [
+        SavedTab(
+          key: k1,
+          focused: k1,
+          layout: SavedPane(key: k1, cwd: '/w/a'),
+        ),
+        SavedTab(
+          key: k2,
+          focused: k2,
+          layout: SavedPane(key: k2, cwd: '/w/b'),
+          pinned: true,
+          description: 'nightly build',
+          status: TabStatus.inProgress,
+        ),
+      ],
+    );
+    final out = await restore(s);
+    await pumpEventQueue();
+    final pinned = state().tabs.firstWhere((t) => t.id == out.tabIdByKey[k2]);
+    expect(pinned.meta.pinned, isTrue);
+    expect(pinned.meta.description, 'nightly build');
+    expect(pinned.meta.status, TabStatus.inProgress);
+    expect(sidebar().tabsOf('default'), [
+      out.tabIdByKey[k2],
+      out.tabIdByKey[k1],
+    ]);
   });
 }

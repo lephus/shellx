@@ -24,6 +24,7 @@ import 'local_sessions_provider.dart';
 import 'pane_layout.dart';
 import 'pane_moves.dart' as moves;
 import 'resize_settler.dart';
+import 'tab_meta.dart';
 import 'terminal_feed.dart';
 import 'terminal_input.dart' show desktopInputHandlerWith;
 import 'terminal_style.dart';
@@ -350,6 +351,7 @@ final class TerminalTab {
     this.zoomedPaneId,
     this.paneHistory = const [],
     this.customTitle,
+    this.meta = TabMeta.empty,
   });
 
   factory TerminalTab.single(PaneSession pane) => TerminalTab(
@@ -377,6 +379,9 @@ final class TerminalTab {
 
   /// C6: the user's name for this tab (desktop only); wins over [title].
   final String? customTitle;
+
+  /// A11 D18: pin, one-line description and status, all the user's.
+  final TabMeta meta;
 
   PaneSession get focused => panes[focusedPaneId]!;
 
@@ -436,6 +441,7 @@ final class TerminalTab {
     Object? zoomedPaneId = _unset,
     List<int>? paneHistory,
     Object? customTitle = _unset,
+    TabMeta? meta,
   }) => TerminalTab(
     id: id,
     origin: origin ?? this.origin,
@@ -449,6 +455,7 @@ final class TerminalTab {
     customTitle: identical(customTitle, _unset)
         ? this.customTitle
         : customTitle as String?,
+    meta: meta ?? this.meta,
   );
 }
 
@@ -820,6 +827,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     final clipped = clipName(name ?? '', kTabNameMaxLength);
     final value = clipped.isEmpty ? null : clipped;
     _update(id, (t) => t.copyWith(customTitle: value));
+  }
+
+  /// A11 D18: changes tab [id]'s pin, description or status. A description
+  /// is cleaned (one line, no control characters, at most 120 characters).
+  void setMeta(int id, TabMeta Function(TabMeta meta) change) {
+    final tab = _tab(id);
+    if (tab == null) return;
+    final next = change(tab.meta);
+    final clean = next.copyWith(
+      description: TabMeta.cleanDescription(next.description),
+    );
+    if (clean == tab.meta) return;
+    _update(id, (t) => t.copyWith(meta: clean));
   }
 
   /// A notice from outside the tab list (workspaces, port links).

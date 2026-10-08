@@ -402,8 +402,8 @@ void main() {
     expect(find.byKey(const Key('menu.automaticName')), findsOneWidget);
     // mark read, mark all read (UI-A4 §10.4) ─ rename | automatic ─
     // move to, up, down ─ ports ─ close
-    // A3 adds the split group (UI-A3 §4.2).
-    expect(find.byType(PopupMenuDivider), findsNWidgets(5));
+    // A3 adds the split group (UI-A3 §4.2), A11 D18 the pin group.
+    expect(find.byType(PopupMenuDivider), findsNWidgets(6));
     expect(
       tester.getTopLeft(find.byKey(const Key('menu.port.3000'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const Key('menu.port.5173'))).dy),
@@ -424,7 +424,7 @@ void main() {
 
     await tester.tap(row(1), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
-    expect(find.byType(PopupMenuDivider), findsNWidgets(4)); // no ports
+    expect(find.byType(PopupMenuDivider), findsNWidgets(5)); // no ports
     await tester.tap(find.byKey(const Key('menu.renameTab')));
     await tester.pumpAndSettle();
     expect(sidebar().renaming, const RenameTab(1));

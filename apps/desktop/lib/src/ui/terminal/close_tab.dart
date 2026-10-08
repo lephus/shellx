@@ -14,17 +14,32 @@ Future<void> closeTabWithConfirm({
   ConfirmClose confirm = ConfirmClose.whenRunning,
 }) async {
   final running = tabs.runningPaneCount(tab.id);
+  // A11 D18: a pinned tab asks too, unless the user turned the question
+  // off (confirm-close-surface = false).
+  final pinned = tab.meta.pinned && confirm != ConfirmClose.never;
   // A9 D20: Ghostty's confirm-close-surface; `true` = A1 D15 / A3 D28.
-  final ask = switch (confirm) {
-    ConfirmClose.never => false,
-    ConfirmClose.always => true,
-    ConfirmClose.whenRunning => running > 0,
-  };
+  final ask =
+      pinned ||
+      switch (confirm) {
+        ConfirmClose.never => false,
+        ConfirmClose.always => true,
+        ConfirmClose.whenRunning => running > 0,
+      };
   if (ask) {
     final ok = await router.confirm(
       ConfirmRequest(
-        title: l10n.confirmCloseRunningTitle(tab.label),
-        body: running > 0
+        title: pinned
+            ? l10n.tabPinnedCloseTitle
+            : l10n.confirmCloseRunningTitle(tab.label),
+        body: pinned
+            ? [
+                l10n.tabPinnedCloseBody(tab.label),
+                if (running > 0)
+                  tab.isSplit
+                      ? l10n.confirmCloseRunningPanesBody(running)
+                      : l10n.confirmCloseRunningBody,
+              ].join(' ')
+            : running > 0
             ? (tab.isSplit
                   ? l10n.confirmCloseRunningPanesBody(running)
                   : l10n.confirmCloseRunningBody)

@@ -2512,4 +2512,53 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get searchAllGone => 'Đã trôi khỏi lịch sử cuộn';
+
+  @override
+  String get actionTogglePinTab => 'Ghim hoặc bỏ ghim tab';
+
+  @override
+  String get tabPin => 'Ghim tab';
+
+  @override
+  String get tabUnpin => 'Bỏ ghim tab';
+
+  @override
+  String get tabPinned => 'Đã ghim';
+
+  @override
+  String get tabSetDescription => 'Đặt mô tả…';
+
+  @override
+  String get tabDescriptionPlaceholder => 'Mô tả tab';
+
+  @override
+  String get tabStatusMenu => 'Trạng thái';
+
+  @override
+  String get tabStatusNone => 'Không có trạng thái';
+
+  @override
+  String get tabStatusInProgress => 'Đang làm';
+
+  @override
+  String get tabStatusReview => 'Chờ duyệt';
+
+  @override
+  String get tabStatusBlocked => 'Bị chặn';
+
+  @override
+  String get tabStatusDone => 'Xong';
+
+  @override
+  String tabStatusLabel(String status) {
+    return 'Trạng thái: $status';
+  }
+
+  @override
+  String get tabPinnedCloseTitle => 'Đóng tab đã ghim?';
+
+  @override
+  String tabPinnedCloseBody(String name) {
+    return '“$name” đã được ghim.';
+  }
 }

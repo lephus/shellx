@@ -22,6 +22,7 @@ class InlineNameField extends StatefulWidget {
     required this.onCancel,
     this.identity,
     this.keepTextInPlace = false,
+    this.maxLength = InlineNameField.defaultMaxLength,
   });
 
   final String initial;
@@ -51,7 +52,10 @@ class InlineNameField extends StatefulWidget {
   static const double textInset = 8;
 
   /// Matches `kTabNameMaxLength` and `kWorkspaceNameMaxLength`.
-  static const int maxLength = 64;
+  static const int defaultMaxLength = 64;
+
+  /// The longest text the field takes (a description: 120).
+  final int maxLength;
 
   @override
   State<InlineNameField> createState() => _InlineNameFieldState();
@@ -169,7 +173,7 @@ class _InlineNameFieldState extends State<InlineNameField> {
               ),
               cursorColor: ShellxDesktopColors.accent,
               maxLines: 1,
-              maxLength: InlineNameField.maxLength,
+              maxLength: widget.maxLength,
               textAlignVertical: TextAlignVertical.center,
               onSubmitted: (_) => _commit(),
               decoration: InputDecoration(

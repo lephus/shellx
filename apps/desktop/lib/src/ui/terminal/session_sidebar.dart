@@ -13,6 +13,7 @@ import '../../terminal/local_sessions_provider.dart';
 import '../../terminal/pane_layout.dart';
 import '../../terminal/sidebar_workspaces.dart';
 import '../../terminal/tab_attention.dart';
+import '../../terminal/tab_meta.dart';
 import '../../config/config_controller.dart';
 import '../../remote/remote_port_forwards.dart';
 import '../../terminal/terminal_tabs.dart';
@@ -188,6 +189,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             i,
             tabs.length,
             notified: attention.hasUnread(tab.id),
+            editingDescription: s.renaming == EditDescription(tab.id),
           ),
         );
       }
@@ -213,11 +215,14 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// UI-A2 §1.3 + UI-A4 §1.3 heights.
   static double _extent(_Item item, TextScaler scaler) => switch (item) {
     _HeaderItem() => WorkspaceHeader.heightFor(scaler),
-    _RowItem(:final tab, :final notified) => SessionTabRow.heightFor(
-      scaler,
-      context: tab.hasContext,
-      notification: notified,
-    ),
+    _RowItem(:final tab, :final notified, :final editingDescription) =>
+      SessionTabRow.heightFor(
+        scaler,
+        context: tab.hasContext,
+        notification: notified,
+        description: tab.meta.description.isNotEmpty,
+        editingDescription: editingDescription,
+      ),
     _EmptyItem() => max(
       ShellxSizes.emptyWorkspaceRow,
       scaler.scale(ShellxSizes.contextLine) + 16,
@@ -526,6 +531,53 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
   }
 
+  // ---- pin, description, status (A11 D18) -------------------------------
+
+  void _togglePin(TerminalTab tab) {
+    ref
+        .read(terminalTabsProvider.notifier)
+        .setMeta(tab.id, (m) => m.copyWith(pinned: !m.pinned));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(tab.id));
+  }
+
+  void _startDescription(int id, {required bool fromList}) {
+    final target = EditDescription(id);
+    _renameFromList = fromList ? target : null;
+    ref.read(sidebarWorkspacesProvider.notifier).startRename(target);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
+  }
+
+  void _commitDescription(int id, String text) {
+    if (!mounted) return;
+    ref
+        .read(terminalTabsProvider.notifier)
+        .setMeta(id, (m) => m.copyWith(description: text));
+    _endRename(EditDescription(id));
+  }
+
+  /// "Status ▸": the five states at the row menu's place, the current one
+  /// checked.
+  Future<void> _statusMenu(TerminalTab tab, Offset at) async {
+    final l10n = AppLocalizations.of(context);
+    final choice = await showShellxMenu<TabStatus>(
+      context: context,
+      at: at,
+      entries: [
+        for (final s in TabStatus.values)
+          ShellxMenuEntry(
+            key: Key('menu.status.${s.wire}'),
+            value: s,
+            label: tabStatusText(l10n, s),
+            checked: tab.meta.status == s,
+          ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    ref
+        .read(terminalTabsProvider.notifier)
+        .setMeta(tab.id, (m) => m.copyWith(status: choice));
+  }
+
   void _startWorkspaceRename(String id, {required bool fromList}) {
     final target = RenameWorkspace(id);
     _renameFromList = fromList ? target : null;
@@ -731,6 +783,23 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               value: _RowAction.automaticName,
               label: l10n.tabUseAutomaticName,
             ),
+          // A11 D18.
+          ShellxMenuEntry(
+            key: const Key('menu.pinTab'),
+            value: _RowAction.togglePin,
+            label: tab.meta.pinned ? l10n.tabUnpin : l10n.tabPin,
+            dividerBefore: true,
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.setDescription'),
+            value: _RowAction.setDescription,
+            label: l10n.tabSetDescription,
+          ),
+          ShellxMenuEntry(
+            key: const Key('menu.status'),
+            value: _RowAction.status,
+            label: '${l10n.tabStatusMenu} ▸',
+          ),
           // UI-A3 §4.2.
           ShellxMenuEntry(
             key: const Key('menu.row.splitRight'),
@@ -810,6 +879,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           _startTabRename(tab.id, fromList: fromList);
         case _RowAction.automaticName:
           ref.read(terminalTabsProvider.notifier).rename(tab.id, null);
+        case _RowAction.togglePin:
+          _togglePin(tab);
+        case _RowAction.setDescription:
+          _startDescription(tab.id, fromList: fromList);
+        case _RowAction.status:
+          await _statusMenu(tab, at);
         case _RowAction.splitRight:
           _splitFromRow(tab, SplitAxis.row);
         case _RowAction.splitDown:
@@ -940,6 +1015,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             ref.read(tabAttentionProvider.notifier).markAllRead(),
       CustomSemanticsAction(label: l10n.tabRename): () =>
           _startTabRename(tab.id, fromList: widget.focusNode.hasFocus),
+      CustomSemanticsAction(
+        label: tab.meta.pinned ? l10n.tabUnpin : l10n.tabPin,
+      ): () =>
+          _togglePin(tab),
+      CustomSemanticsAction(label: l10n.tabSetDescription): () =>
+          _startDescription(tab.id, fromList: widget.focusNode.hasFocus),
       // UI-A3 §8.
       CustomSemanticsAction(label: l10n.paneSplitRight): () =>
           _splitFromRow(tab, SplitAxis.row),
@@ -1525,6 +1606,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           onStartRename: () => _startTabRename(tab.id, fromList: false),
           onRename: (text) => _commitTabName(tab.id, text),
           onCancelRename: () => _endRename(RenameTab(tab.id)),
+          editingDescription: sidebar.renaming == EditDescription(tab.id),
+          onDescription: (text) => _commitDescription(tab.id, text),
+          onCancelDescription: () => _endRename(EditDescription(tab.id)),
           onOpenPort: (port) => unawaited(_openPort(tab, port)),
           portTooltip: (port) => remotePortTooltipFor(ref, l10n, tab, port),
           onMenu: (at) => unawaited(_rowMenu(tab, at)),
@@ -1557,7 +1641,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               tab,
               home,
               row,
-              enabled: sidebar.renaming != RenameTab(tab.id),
+              enabled:
+                  sidebar.renaming != RenameTab(tab.id) &&
+                  sidebar.renaming != EditDescription(tab.id),
             ),
           ),
         ),
@@ -1760,6 +1846,9 @@ enum _RowAction {
   markAllRead,
   rename,
   automaticName,
+  togglePin,
+  setDescription,
+  status,
   splitRight,
   splitDown,
   equalize,
@@ -1802,6 +1891,7 @@ final class _RowItem extends _Item {
     this.index,
     this.count, {
     this.notified = false,
+    this.editingDescription = false,
   });
   final TerminalTab tab;
   final Workspace workspace;
@@ -1811,6 +1901,9 @@ final class _RowItem extends _Item {
   /// The tab has unread: the row grows by the notification line
   /// (UI-A4 §1.3).
   final bool notified;
+
+  /// A11 D18: the description field is open on this row.
+  final bool editingDescription;
 }
 
 /// The hint of an expanded workspace without tabs (UI-A2 §3.4).

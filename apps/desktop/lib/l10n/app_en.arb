@@ -1052,5 +1052,22 @@
   "paneSwapRight": "Pane on the right",
   "paneSwapUp": "Pane above",
   "paneSwapDown": "Pane below",
-  "searchAllGone": "Scrolled out of history"
+  "searchAllGone": "Scrolled out of history",
+  "actionTogglePinTab": "Pin or unpin tab",
+  "tabPin": "Pin tab",
+  "tabUnpin": "Unpin tab",
+  "tabPinned": "Pinned",
+  "tabSetDescription": "Set description…",
+  "tabDescriptionPlaceholder": "Tab description",
+  "tabStatusMenu": "Status",
+  "tabStatusNone": "No status",
+  "tabStatusInProgress": "In progress",
+  "tabStatusReview": "In review",
+  "tabStatusBlocked": "Blocked",
+  "tabStatusDone": "Done",
+  "tabStatusLabel": "Status: {status}",
+  "@tabStatusLabel": {"placeholders": {"status": {"type": "String"}}},
+  "tabPinnedCloseTitle": "Close pinned tab?",
+  "tabPinnedCloseBody": "“{name}” is pinned.",
+  "@tabPinnedCloseBody": {"placeholders": {"name": {"type": "String"}}}
 }

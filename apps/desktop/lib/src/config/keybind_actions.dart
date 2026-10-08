@@ -134,6 +134,8 @@ final Map<String, ActionSpec> kActionSpecs = {
     // A11 D14: the newest closed tab or pane, with its scrollback.
     const ActionSpec('reopen_closed', ActionGroup.tabs),
     const ActionSpec('new_workspace', ActionGroup.tabs),
+    // A11 D18: no default key.
+    const ActionSpec('toggle_pin_tab', ActionGroup.tabs),
     const ActionSpec('ssh_connect', ActionGroup.tabs),
     const ActionSpec('tmux_attach', ActionGroup.tabs),
     const ActionSpec(
@@ -332,6 +334,7 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'close_tab' => const CloseWholeTabIntent(),
   'reopen_closed' => const ReopenClosedIntent(),
   'new_workspace' => const NewWorkspaceIntent(),
+  'toggle_pin_tab' => const TogglePinTabIntent(),
   'ssh_connect' => const OpenSshConnectIntent(),
   'tmux_attach' => const OpenTmuxAttachIntent(),
   'goto_tab' => SelectTabIntent(int.parse(a.param!)),

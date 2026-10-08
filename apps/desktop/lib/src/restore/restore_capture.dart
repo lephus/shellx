@@ -37,6 +37,9 @@ RestoreSnapshot captureSnapshot({
       focused: live(tab.focusedPaneId) ?? leaves.first.key,
       zoomed: live(tab.zoomedPaneId),
       layout: layout,
+      pinned: tab.meta.pinned,
+      description: tab.meta.description,
+      status: tab.meta.status,
     );
   }
   final ordered = sidebar.orderedTabIds;

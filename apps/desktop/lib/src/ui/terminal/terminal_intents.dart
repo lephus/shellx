@@ -210,6 +210,11 @@ class ReopenClosedIntent extends Intent {
   const ReopenClosedIntent();
 }
 
+/// A11 D18 `toggle_pin_tab` (no default key): pins or unpins the selected tab.
+class TogglePinTabIntent extends Intent {
+  const TogglePinTabIntent();
+}
+
 /// A11 D20 `swap_split:<dir>` (no default key).
 class SwapPaneIntent extends Intent {
   const SwapPaneIntent(this.direction);

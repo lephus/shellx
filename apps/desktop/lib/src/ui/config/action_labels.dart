@@ -140,6 +140,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'resize_split' => l10n.actionResizePane(a.param ?? 'down'),
   'swap_split' => l10n.actionSwapSplit(a.param ?? 'down'),
   'break_pane' => l10n.actionBreakPane,
+  'toggle_pin_tab' => l10n.actionTogglePinTab,
   'join_pane' => l10n.actionJoinPane(a.param ?? ''),
   'toggle_split_zoom' => l10n.actionToggleZoom,
   'equalize_splits' => l10n.actionEqualize,

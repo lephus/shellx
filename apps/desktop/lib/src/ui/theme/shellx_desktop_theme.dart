@@ -34,6 +34,8 @@ abstract final class ShellxDesktopColors {
   static const Color warnBg = Color(0xFF2A2412);
   static const Color warnBorder = Color(0xFF4A3F1C);
   static const Color err = Color(0xFFF07178);
+  // A11 D18: the tab status "in progress".
+  static const Color statusInProgress = Color(0xFF6EA8FE);
   static const Color errDialog = Color(0xFFF26A70);
   static const Color onErr = Color(0xFF2A0A0C);
   static const Color noticeBg = Color(0xFF2A1416);
@@ -285,6 +287,10 @@ abstract final class ShellxSizes {
   static const double notificationIconGap = 4;
   static const double rowWithNotification = 46;
   static const double rowWithNotificationAndContext = 62;
+  // A11 D18: description + notification + context.
+  static const double rowWithThreeLines = 78;
+  static const double tabStatusDot = 8;
+  static const double pinIcon = 12;
   static const double ringWidth = 2;
   static const double ringGlowWidth = 1;
   static const double aggregateDot = 6;

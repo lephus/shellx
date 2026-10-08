@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:shellx_agent/shellx_agent.dart' show SessionLaunch;
 
 import '../terminal/pane_layout.dart';
+import '../terminal/tab_meta.dart';
 
 // Pure model of `restore/layout.json`: imports only the A3 pane tree, so
 // the tab and sidebar notifiers can depend on it without a cycle. Capture
@@ -92,6 +93,9 @@ final class SavedTab {
     required this.focused,
     this.zoomed,
     required this.layout,
+    this.pinned = false,
+    this.description = '',
+    this.status = TabStatus.none,
   });
 
   /// The key of the pane that created the tab (A3 D1). When that pane has
@@ -104,6 +108,16 @@ final class SavedTab {
   final String focused;
   final String? zoomed;
   final SavedPaneNode layout;
+
+  /// A11 D18, optional keys `pinned`, `desc`, `status`: written only when
+  /// not the default, so an older build ignores them and a plain layout is
+  /// byte-identical to before.
+  final bool pinned;
+  final String description;
+  final TabStatus status;
+
+  TabMeta get meta =>
+      TabMeta(pinned: pinned, description: description, status: status);
 }
 
 final class SavedWorkspace {
@@ -168,6 +182,9 @@ final class RestoreSnapshot {
           'focused': t.focused,
           'zoomed': t.zoomed,
           'layout': _nodeToJson(t.layout),
+          if (t.pinned) 'pinned': true,
+          if (t.description.isNotEmpty) 'desc': t.description,
+          if (t.status != TabStatus.none) 'status': t.status.wire,
         },
     ],
   };
@@ -212,6 +229,14 @@ final class RestoreSnapshot {
             focused: focused,
             zoomed: zoomed,
             layout: layout,
+            // Repaired, never fatal: a damaged marker must not lose a
+            // whole layout.
+            pinned: t['pinned'] == true,
+            description: switch (t['desc']) {
+              final String d => TabMeta.cleanDescription(d),
+              _ => '',
+            },
+            status: TabStatus.fromWire(t['status']),
           ),
         );
       }

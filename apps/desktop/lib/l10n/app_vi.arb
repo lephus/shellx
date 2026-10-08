@@ -641,5 +641,20 @@
   "paneSwapRight": "Pane bên phải",
   "paneSwapUp": "Pane phía trên",
   "paneSwapDown": "Pane phía dưới",
-  "searchAllGone": "Đã trôi khỏi lịch sử cuộn"
+  "searchAllGone": "Đã trôi khỏi lịch sử cuộn",
+  "actionTogglePinTab": "Ghim hoặc bỏ ghim tab",
+  "tabPin": "Ghim tab",
+  "tabUnpin": "Bỏ ghim tab",
+  "tabPinned": "Đã ghim",
+  "tabSetDescription": "Đặt mô tả…",
+  "tabDescriptionPlaceholder": "Mô tả tab",
+  "tabStatusMenu": "Trạng thái",
+  "tabStatusNone": "Không có trạng thái",
+  "tabStatusInProgress": "Đang làm",
+  "tabStatusReview": "Chờ duyệt",
+  "tabStatusBlocked": "Bị chặn",
+  "tabStatusDone": "Xong",
+  "tabStatusLabel": "Trạng thái: {status}",
+  "tabPinnedCloseTitle": "Đóng tab đã ghim?",
+  "tabPinnedCloseBody": "“{name}” đã được ghim."
 }
