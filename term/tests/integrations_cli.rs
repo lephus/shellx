@@ -192,3 +192,61 @@ fn status_json_has_no_file_content_and_claude_config_dir_is_followed() {
     );
     let _ = std::fs::remove_dir_all(&h);
 }
+
+#[test]
+fn opencode_gets_a_plugin_file_and_uninstall_removes_it_and_the_folders_made() {
+    let h = home("opencode");
+    let out = run(&h, &["install", "opencode", "--yes"], true);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let plugin = h.join(".config/opencode/plugins/shellx-agent.js");
+    let body = std::fs::read_to_string(&plugin).unwrap();
+    assert!(body.starts_with("// shellx-agent-integration v1"));
+    let again = run(&h, &["install", "opencode", "--yes"], true);
+    assert!(text(&again.stdout).contains("Already installed."));
+    // A plugin file of the user's is never replaced.
+    std::fs::write(&plugin, "export const Mine = 1\n").unwrap();
+    let out = run(&h, &["install", "opencode", "--yes"], true);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        std::fs::read_to_string(&plugin).unwrap(),
+        "export const Mine = 1\n"
+    );
+    std::fs::write(&plugin, &body).unwrap();
+    let out = run(&h, &["uninstall", "opencode", "--yes"], true);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(!plugin.exists() && !h.join(".config").exists());
+    assert!(h.exists());
+    let _ = std::fs::remove_dir_all(&h);
+}
+
+#[test]
+fn codex_refuses_a_users_notify_and_installs_into_a_clean_file() {
+    let h = home("codex");
+    let dir = h.join(".codex");
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("config.toml");
+    std::fs::write(&f, "notify = [\"mine\"]\n").unwrap();
+    let out = run(&h, &["install", "codex", "--yes"], true);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("\"notify\" is already set in config.toml"));
+    assert_eq!(
+        std::fs::read_to_string(&f).unwrap(),
+        "notify = [\"mine\"]\n"
+    );
+    std::fs::write(&f, "model = \"o3\"\n").unwrap();
+    assert_eq!(
+        run(&h, &["install", "codex", "--yes"], true).status.code(),
+        Some(0)
+    );
+    assert!(std::fs::read_to_string(&f)
+        .unwrap()
+        .contains("\"agent-event\""));
+    assert_eq!(
+        run(&h, &["uninstall", "codex", "--yes"], true)
+            .status
+            .code(),
+        Some(0)
+    );
+    assert_eq!(std::fs::read_to_string(&f).unwrap(), "model = \"o3\"\n");
+    let _ = std::fs::remove_dir_all(&h);
+}

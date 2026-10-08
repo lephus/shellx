@@ -13,6 +13,7 @@ pub mod diff;
 pub mod gemini;
 pub mod json;
 pub mod nested_json;
+pub mod opencode_js;
 pub mod real;
 
 use std::io;
@@ -24,10 +25,11 @@ pub enum Agent {
     Claude,
     Codex,
     Gemini,
+    OpenCode,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 3] = [Agent::Claude, Agent::Codex, Agent::Gemini];
+    pub const ALL: [Agent; 4] = [Agent::Claude, Agent::Codex, Agent::Gemini, Agent::OpenCode];
 
     /// The name used on the command line and in `agent-event`.
     pub fn name(self) -> &'static str {
@@ -35,6 +37,7 @@ impl Agent {
             Agent::Claude => "claude",
             Agent::Codex => "codex",
             Agent::Gemini => "gemini",
+            Agent::OpenCode => "opencode",
         }
     }
 
@@ -48,6 +51,7 @@ impl Agent {
             Agent::Claude => "Claude Code",
             Agent::Codex => "Codex",
             Agent::Gemini => "Gemini CLI",
+            Agent::OpenCode => "OpenCode",
         }
     }
 
@@ -57,6 +61,7 @@ impl Agent {
             Agent::Claude => "claude",
             Agent::Codex => "codex",
             Agent::Gemini => "gemini",
+            Agent::OpenCode => "opencode",
         }
     }
 
@@ -64,7 +69,7 @@ impl Agent {
     fn nested(self) -> &'static nested_json::NestedSpec {
         match self {
             Agent::Gemini => &gemini::GEMINI,
-            Agent::Claude | Agent::Codex => &nested_json::CLAUDE,
+            Agent::Claude | Agent::Codex | Agent::OpenCode => &nested_json::CLAUDE,
         }
     }
 }
@@ -90,12 +95,13 @@ pub fn refusal_message(a: Agent, r: Refusal) -> String {
         Refusal::Invalid | Refusal::WrongType => match a {
             Agent::Claude | Agent::Gemini => "refusing: the file has comments, is not valid JSON or does not have the expected shape (use --print to see what to add)".into(),
             Agent::Codex => "refusing: config.toml could not be read safely (use --print to see what to add)".into(),
+            Agent::OpenCode => "refusing: the plugin file could not be read safely (use --print to see it)".into(),
         },
         Refusal::Foreign("notify") => {
             "refusing: \"notify\" is already set in config.toml (shellx will not replace it; see --print)".into()
         }
         Refusal::Foreign(what) => {
-            format!("refusing: a {what} of yours is already there (shellx will not replace it; see --print)")
+            format!("refusing: a {what} that is not ShellX's is already there (shellx will not replace it; see --print)")
         }
         Refusal::TooBig => "refusing: the file is over 1 MiB".into(),
         Refusal::Edited => {
@@ -116,6 +122,7 @@ pub fn plan_install(a: Agent, current: Option<&str>) -> Result<Plan, Refusal> {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::install(a.nested(), current),
         Agent::Codex => codex_toml::install(current),
+        Agent::OpenCode => opencode_js::install(current),
     }
 }
 
@@ -124,6 +131,7 @@ pub fn plan_uninstall(a: Agent, current: &str) -> Result<Plan, Refusal> {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::uninstall(a.nested(), current),
         Agent::Codex => codex_toml::uninstall(current),
+        Agent::OpenCode => opencode_js::uninstall(current),
     }
 }
 
@@ -132,6 +140,7 @@ pub fn installed(a: Agent, current: Option<&str>) -> bool {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::installed(a.nested(), current),
         Agent::Codex => codex_toml::installed(current),
+        Agent::OpenCode => opencode_js::installed(current),
     }
 }
 
@@ -140,13 +149,14 @@ pub fn installed(a: Agent, current: Option<&str>) -> bool {
 pub fn leaves_nothing(a: Agent, after: &str) -> bool {
     match a {
         Agent::Claude | Agent::Gemini => after.trim_start_matches('\u{feff}').trim() == "{}",
-        Agent::Codex => after.trim_start_matches('\u{feff}').trim().is_empty(),
+        Agent::Codex | Agent::OpenCode => after.trim_start_matches('\u{feff}').trim().is_empty(),
     }
 }
 
 /// The agent's file is wholly ShellX's: uninstall deletes it.
 pub fn owns_file(a: Agent) -> bool {
     match a {
+        Agent::OpenCode => true,
         Agent::Claude | Agent::Codex | Agent::Gemini => false,
     }
 }
@@ -156,6 +166,7 @@ pub fn snippet(a: Agent) -> String {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::snippet(a.nested()),
         Agent::Codex => codex_toml::snippet(),
+        Agent::OpenCode => opencode_js::snippet(),
     }
 }
 
@@ -170,6 +181,10 @@ pub fn config_path(a: Agent, env: &dyn Fn(&str) -> Option<String>, home: &Path) 
             .map_or_else(|| home.join(".codex"), PathBuf::from)
             .join("config.toml"),
         Agent::Gemini => home.join(".gemini").join("settings.json"),
+        Agent::OpenCode => var("OPENCODE_CONFIG_DIR")
+            .map_or_else(|| home.join(".config").join("opencode"), PathBuf::from)
+            .join("plugins")
+            .join("shellx-agent.js"),
     }
 }
 
@@ -595,6 +610,49 @@ mod tests {
             ("codex", "Codex", "codex")
         );
         assert!(snippet(Agent::Codex).contains("turn-complete"));
+    }
+
+    #[test]
+    fn opencode_is_a_file_we_own_in_its_plugins_folder() {
+        let none = |_: &str| None;
+        assert_eq!(
+            config_path(Agent::OpenCode, &none, Path::new("/h")),
+            PathBuf::from("/h/.config/opencode/plugins/shellx-agent.js")
+        );
+        let set = |k: &str| (k == "OPENCODE_CONFIG_DIR").then(|| "/oc".to_string());
+        assert_eq!(
+            config_path(Agent::OpenCode, &set, Path::new("/h")),
+            PathBuf::from("/oc/plugins/shellx-agent.js")
+        );
+        assert!(owns_file(Agent::OpenCode));
+        let plan = plan_install(Agent::OpenCode, None).unwrap();
+        assert!(installed(Agent::OpenCode, Some(&plan.after)));
+        assert!(plan_uninstall(Agent::OpenCode, &plan.after)
+            .unwrap()
+            .after
+            .is_empty());
+        assert!(leaves_nothing(Agent::OpenCode, ""));
+        assert_eq!(
+            plan_install(Agent::OpenCode, Some("export const X = 1\n")).unwrap_err(),
+            Refusal::Foreign("plugin file")
+        );
+        assert!(
+            refusal_message(Agent::OpenCode, Refusal::Foreign("plugin file"))
+                .contains("plugin file")
+        );
+        assert!(refusal_message(Agent::OpenCode, Refusal::Edited).contains("delete it yourself"));
+        assert_eq!(
+            (
+                Agent::OpenCode.name(),
+                Agent::OpenCode.product(),
+                Agent::OpenCode.binary()
+            ),
+            ("opencode", "OpenCode", "opencode")
+        );
+        assert_eq!(
+            Agent::ALL.map(Agent::name),
+            ["claude", "codex", "gemini", "opencode"]
+        );
     }
 
     #[test]

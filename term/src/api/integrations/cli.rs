@@ -98,6 +98,28 @@ fn with_suffix(p: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
+/// How many folders from `dir` upwards do not exist yet.
+fn missing_dirs(fs: &dyn Fs, dir: &Path) -> usize {
+    let mut n = 0;
+    let mut d = dir;
+    while !fs.exists(d) {
+        n += 1;
+        match d.parent() {
+            Some(p) => d = p,
+            None => break,
+        }
+    }
+    n
+}
+
+/// The `dirs=N` of a `.shellx-created` marker.
+fn dirs_made(marker: &str) -> usize {
+    marker
+        .lines()
+        .find_map(|l| l.strip_prefix("dirs=")?.trim().parse().ok())
+        .unwrap_or(0)
+}
+
 fn path_var(ctx: &Ctx) -> String {
     (ctx.env)("PATH").unwrap_or_default()
 }
@@ -294,7 +316,10 @@ fn apply(
     match change {
         Change::Install => {
             let dir = real.parent().map(Path::to_path_buf);
-            let made_dir = !existed && dir.as_deref().is_some_and(|d| !fs.exists(d));
+            let made_dirs = match (existed, dir.as_deref()) {
+                (false, Some(d)) => missing_dirs(fs, d),
+                _ => 0,
+            };
             if let (false, Some(d)) = (existed, dir.as_deref()) {
                 if fs.create_dir_all(d).is_err() {
                     return Err(io_fail(ctx));
@@ -308,7 +333,7 @@ fn apply(
             }
             if !existed {
                 // So that uninstall knows the file (and folder) are ours.
-                let _ = fs.write_atomic(&marker, if made_dir { "dir\n" } else { "" }, None);
+                let _ = fs.write_atomic(&marker, &format!("dirs={made_dirs}\n"), None);
             }
         }
         Change::Uninstall => {
@@ -317,11 +342,18 @@ fn apply(
                     return Err(io_fail(ctx));
                 }
                 let _ = fs.remove(&marker);
-                if note.is_some_and(|n| n.contains("dir")) {
-                    if let Some(d) = real.parent() {
-                        // Only if nothing else lives there.
-                        let _ = fs.remove(d);
+                // The folders install made, innermost first; one with anything
+                // else in it stays, and so does the home folder.
+                let made = note.as_deref().map_or(0, dirs_made);
+                let mut dir = real.parent();
+                for _ in 0..made {
+                    let Some(d) = dir.filter(|d| *d != home) else {
+                        break;
+                    };
+                    if fs.remove(d).is_err() {
+                        break;
                     }
+                    dir = d.parent();
                 }
                 removed = true;
             } else {
@@ -545,6 +577,8 @@ mod tests {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let mut input: &[u8] = b"";
         let mut shell = fs.clone();
+        // The home folder is there.
+        fs.0.borrow_mut().dirs.insert(PathBuf::from(HOME));
         let code = {
             let mut ctx = crate::api::run::Ctx {
                 env: &get,
@@ -1002,7 +1036,7 @@ mod tests {
         let r = go(&["status"], &fs, &mut FakePrompt::no_tty(), &["/bin"]);
         assert_eq!(
             r.out,
-            "✗ claude    not installed\n- codex     not found on PATH\n- gemini    not found on PATH\n"
+            "✗ claude    not installed\n- codex     not found on PATH\n- gemini    not found on PATH\n- opencode  not found on PATH\n"
         );
         let r = go(
             &["status", "claude"],
@@ -1142,6 +1176,125 @@ mod tests {
         assert_eq!(r.code, 0, "{}", r.err);
         assert!(fs.text(CODEX).is_none() && !fs.is_dir("/h/.codex"));
         assert!(r.out.contains("Removed ~/.codex/config.toml."), "{}", r.out);
+    }
+
+    const PLUGIN_PATH: &str = "/h/.config/opencode/plugins/shellx-agent.js";
+
+    #[test]
+    fn opencode_creates_the_plugin_and_uninstall_removes_the_folders_we_made() {
+        let fs = FakeFs::default();
+        fs.0.borrow_mut().dirs.insert(PathBuf::from("/h/.config"));
+        let r = go(
+            &["install", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(
+            r.out
+                .contains("--- ~/.config/opencode/plugins/shellx-agent.js\n"),
+            "{}",
+            r.out
+        );
+        assert!(
+            r.out.contains("+// shellx-agent-integration v1"),
+            "{}",
+            r.out
+        );
+        assert!(fs
+            .text(PLUGIN_PATH)
+            .unwrap()
+            .starts_with("// shellx-agent-integration v1"));
+        let again = go(
+            &["install", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert!(again.out.contains("Already installed."));
+        assert!(fs.text(&format!("{PLUGIN_PATH}.shellx-bak")).is_none());
+        let r = go(
+            &["uninstall", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(fs.text(PLUGIN_PATH).is_none());
+        assert!(!fs.is_dir("/h/.config/opencode/plugins") && !fs.is_dir("/h/.config/opencode"));
+        assert!(
+            fs.is_dir("/h/.config"),
+            "only what we made, and never the home folder"
+        );
+        assert!(fs.is_dir("/h"));
+    }
+
+    #[test]
+    fn a_plugin_folder_that_was_there_stays_and_so_do_its_other_files() {
+        let fs = FakeFs::default();
+        fs.put("/h/.config/opencode/plugins/other.js", "x", 0o644);
+        go(
+            &["install", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        let r = go(
+            &["uninstall", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(fs.text(PLUGIN_PATH).is_none());
+        assert_eq!(
+            fs.text("/h/.config/opencode/plugins/other.js").as_deref(),
+            Some("x")
+        );
+    }
+
+    #[test]
+    fn a_foreign_or_edited_plugin_is_refused_and_untouched() {
+        let fs = FakeFs::default();
+        fs.put(PLUGIN_PATH, "export const Mine = 1\n", 0o644);
+        let r = go(
+            &["install", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 1);
+        assert!(
+            r.err.contains("refusing:") && r.err.contains("plugin file"),
+            "{}",
+            r.err
+        );
+        assert!(!r.err.contains("Mine") && !r.out.contains("Mine"));
+        let r = go(
+            &["uninstall", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(
+            (r.code, r.out.as_str()),
+            (0, "Not installed.\n"),
+            "not ours: nothing to remove"
+        );
+        assert_eq!(fs.writes(), 0);
+        // Ours but edited: uninstall refuses even with --yes.
+        let edited = format!("{}// tweak\n", super::super::opencode_js::PLUGIN);
+        fs.put(PLUGIN_PATH, &edited, 0o644);
+        let r = go(
+            &["uninstall", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 1);
+        assert!(r.err.contains("delete it yourself"), "{}", r.err);
+        assert_eq!(fs.text(PLUGIN_PATH).as_deref(), Some(edited.as_str()));
     }
 
     #[test]
