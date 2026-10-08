@@ -13,11 +13,13 @@ class MachineListController extends Controller {
   MachineListController({
     required ShellxBackend backend,
     WorkspaceRegistry? registry,
+    AppSettings? settings,
     Future<void> Function()? onReconnectReplaced,
     void Function(int paired)? onPairedMachines,
     DateTime Function()? now,
   }) : _backend = backend,
        _registry = registry,
+       _settings = settings,
        _onReconnectReplaced = onReconnectReplaced,
        _onPairedMachines = onPairedMachines,
        _now = now ?? DateTime.now {
@@ -32,16 +34,22 @@ class MachineListController extends Controller {
   }
 
   @factoryMethod
-  static MachineListController create(SessionHolder session, WorkspaceRegistry registry, PushController push) =>
-      MachineListController(
-        backend: session.requireBackend,
-        registry: registry,
-        onReconnectReplaced: session.reconnectReplaced,
-        onPairedMachines: push.onPairedMachines,
-      );
+  static MachineListController create(
+    SessionHolder session,
+    WorkspaceRegistry registry,
+    PushController push,
+    AppSettings settings,
+  ) => MachineListController(
+    backend: session.requireBackend,
+    registry: registry,
+    settings: settings,
+    onReconnectReplaced: session.reconnectReplaced,
+    onPairedMachines: push.onPairedMachines,
+  );
 
   final ShellxBackend _backend;
   final WorkspaceRegistry? _registry;
+  final AppSettings? _settings;
   final Future<void> Function()? _onReconnectReplaced;
 
   /// Push spec §6: the notification permission is asked once a paired machine is listed.
@@ -76,6 +84,9 @@ class MachineListController extends Controller {
   /// Tabs open on this phone for [agentId] ("2 tab"). Delegates to the reactive
   /// `WorkspaceRegistry.tabCount`, so a `computed`/`Watch` reading this follows it.
   int tabsOpen(String agentId) => _registry?.tabCount(agentId) ?? 0;
+
+  /// Tabs of [agentId] with output nobody has looked at ("1 có chữ mới"). Reactive like [tabsOpen].
+  int unseenTabs(String agentId) => _registry?.unseenCount(agentId) ?? 0;
 
   /// "Kết nối lại" after close code 4001 (spec §12). The real path (`resume()` →
   /// `ClientService.start()` → loading the pinned machines) reads secure storage and can throw;
@@ -121,14 +132,17 @@ class MachineListController extends Controller {
     ]);
   }
 
-  /// Design "Danh sách máy": online on top, "Offline" below.
+  /// Design "Danh sách máy": online on top, "Offline" below. A11 D28: among the online ones the machine
+  /// opened last comes first; the offline ones keep their place.
   MachineList _sorted(List<MachineEntry> machines) {
     int byName(MachineEntry a, MachineEntry b) => a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    final last = _settings?.lastMachineId.peek();
+    final online = machines.where((m) => m.online).toList()..sort(byName);
+    final lastIndex = last == null ? -1 : online.indexWhere((m) => m.id == last);
+    if (lastIndex > 0) online.insert(0, online.removeAt(lastIndex));
     return MachineList(
-      List.unmodifiable([
-        ...machines.where((m) => m.online).toList()..sort(byName),
-        ...machines.where((m) => !m.online).toList()..sort(byName),
-      ]),
+      List.unmodifiable([...online, ...machines.where((m) => !m.online).toList()..sort(byName)]),
+      lastUsedId: lastIndex >= 0 ? last : null,
     );
   }
 

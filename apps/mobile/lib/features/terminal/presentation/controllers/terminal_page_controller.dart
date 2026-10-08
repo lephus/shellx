@@ -60,6 +60,12 @@ class TerminalPageController extends Controller {
       return;
     }
     _workspace = workspace;
+    // A11 D28: the machine list puts this one first next time. Only its id is stored.
+    unawaited(
+      settings.setLastMachine(agentId).catchError((Object error) {
+        if (kDebugMode) debugPrint('Last machine not saved: ${error.runtimeType}');
+      }),
+    );
     _machineState = signal(workspace.machine.state);
     _machineStates = workspace.machine.states.listen(_onMachineState);
   }
@@ -107,6 +113,21 @@ class TerminalPageController extends Controller {
   bool get hasWorkspace => _workspace != null;
 
   TerminalWorkspace get workspace => _workspace ?? (throw StateError('The machine is not pinned'));
+
+  /// A11 D28: this page is on screen (true) or not — left, or the app in the background (false). The tabs'
+  /// "new output" follows. Nothing once the page is leaving: the workspace may be disposed.
+  void setViewing(bool viewing) {
+    if (_closed || _dropped) return;
+    _workspace?.setViewing(viewing);
+  }
+
+  /// Coming in from the machine list: the first tab with new output is shown, unless a notification asked
+  /// for a tab (it wins).
+  void showFirstUnseen() {
+    final workspace = _workspace;
+    if (_closed || _dropped || workspace == null || workspace.hasPendingSelect) return;
+    workspace.selectFirstUnseen();
+  }
 
   /// Font size of this page (pinch or "Aa"); the default comes from Settings (spec §9.2 #5).
   ReadonlySignal<double> get fontSize => _fontSize;

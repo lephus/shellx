@@ -445,5 +445,13 @@
   "arrowPadUp": "Up",
   "arrowPadDown": "Down",
   "arrowPadLeft": "Left",
-  "arrowPadRight": "Right"
+  "arrowPadRight": "Right",
+  "machineLastUsed": "Last used",
+  "machineTabsActivity": "{tabs, plural, =1{1 tab} other{{tabs} tabs}} · {unseen} with new output",
+  "@machineTabsActivity": {"placeholders": {"tabs": {"type": "int"}, "unseen": {"type": "int"}}},
+  "machineNewOutput": "New output",
+  "machinesErrorTitle": "Couldn’t load your computers",
+  "machinesRetry": "Try again",
+  "machinesCheckConnection": "Check your internet connection.",
+  "machinesReload": "Reload"
 }

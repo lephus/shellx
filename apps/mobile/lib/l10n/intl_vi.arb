@@ -250,5 +250,13 @@
   "arrowPadUp": "Lên",
   "arrowPadDown": "Xuống",
   "arrowPadLeft": "Trái",
-  "arrowPadRight": "Phải"
+  "arrowPadRight": "Phải",
+  "machineLastUsed": "Dùng gần nhất",
+  "machineTabsActivity": "{tabs} tab · {unseen} có chữ mới",
+  "@machineTabsActivity": {"placeholders": {"tabs": {"type": "int"}, "unseen": {"type": "int"}}},
+  "machineNewOutput": "Có chữ mới",
+  "machinesErrorTitle": "Không tải được danh sách máy",
+  "machinesRetry": "Thử lại",
+  "machinesCheckConnection": "Hãy kiểm tra kết nối mạng.",
+  "machinesReload": "Tải lại"
 }

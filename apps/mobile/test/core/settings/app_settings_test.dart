@@ -86,4 +86,17 @@ void main() {
       expect(settings.voiceLocale.value, isNull);
     });
   });
+
+  test('A11 D28: the last machine is remembered across restarts and starts empty', () async {
+    final store = InMemoryKeyValueStore();
+    final settings = AppSettings(store);
+    await settings.load();
+    expect(settings.lastMachineId.value, isNull);
+    await settings.setLastMachine('agent-b');
+    expect(settings.lastMachineId.value, 'agent-b');
+    final reloaded = AppSettings(store);
+    await reloaded.load();
+    expect(reloaded.lastMachineId.value, 'agent-b');
+    expect(await store.read(AppSettings.lastMachineKey), 'agent-b');
+  });
 }

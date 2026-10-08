@@ -67,7 +67,18 @@ class _TerminalPageState extends State<TerminalPage> {
     // Creating it is cheap: the recognizer is only initialised on the first mic tap.
     _voice = getIt<VoiceComposerController>()..attach(canSend: _activeTabLive, onSubmit: _controller.submitLine);
     // A call, the lock screen or the app switcher stops the listen; the text stays (spec §5).
-    _lifecycle = AppLifecycleListener(onInactive: _voice.pause, onHide: _voice.pause);
+    // A11 D28: the tabs' "new output" counts what comes while the page is not on screen.
+    _lifecycle = AppLifecycleListener(
+      onInactive: () {
+        _voice.pause();
+        _controller.setViewing(false);
+      },
+      onHide: () {
+        _voice.pause();
+        _controller.setViewing(false);
+      },
+      onResume: () => _controller.setViewing(true),
+    );
     // Spec §3.1: while the composer is open the keyboard types into it, not into the terminal.
     var wasOpen = false;
     _stopVoicePhase = _voice.phase.subscribe((phase) {
@@ -79,6 +90,9 @@ class _TerminalPageState extends State<TerminalPage> {
     _stopDraft = _controller.hasWorkspace
         ? _controller.workspace.activeTab.subscribe((tab) => _voice.useDraft(tab?.draft))
         : () {};
+    _controller
+      ..showFirstUnseen()
+      ..setViewing(true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
@@ -100,6 +114,7 @@ class _TerminalPageState extends State<TerminalPage> {
     // Leaving the page cancels the listen and drops the text (spec §5).
     _stopVoicePhase();
     _stopDraft();
+    _controller.setViewing(false);
     _lifecycle.dispose();
     _voice.dispose();
     _terminalFocus.dispose();

@@ -31,13 +31,14 @@ void main() {
   late WorkspaceRegistry registry;
   late List<Object?> results;
   late FakeSpeechInput speech;
+  late AppSettings settings;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
     machine = backend.addMachine(agentA);
     session = FakeSessionHolder(backend);
     registry = WorkspaceRegistry(session.backend);
-    final settings = AppSettings(InMemoryKeyValueStore());
+    settings = AppSettings(InMemoryKeyValueStore());
     results = [];
     getIt
       ..registerSingleton<PopupHandler>(FakePopupHandler())
@@ -334,6 +335,62 @@ void main() {
     await tester.tap(find.text('Dán'));
     await tester.pumpAndSettle();
     expect(lastInput(), 'echo 1\recho 2');
+  });
+
+  group('A11 D28: new output and the last machine', () {
+    testWidgets('opening the page remembers the machine', (tester) async {
+      expect(settings.lastMachineId.value, isNull);
+      await open(tester);
+      expect(settings.lastMachineId.value, agentA);
+    });
+
+    testWidgets('output on the tab in front is seen; another tab, or leaving the page, makes it new', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      machine.handles.last.emit(const TabOutput('front'));
+      machine.handles.first.emit(const TabOutput('behind'));
+      expect(workspace.unseenCount, 1, reason: 'only the tab behind');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(workspace.unseenCount, 0, reason: 'looking at it clears it');
+
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      machine.handles.first.emit(const TabOutput('while away'));
+      expect(workspace.unseenCount, 1, reason: 'the page is not showing');
+    });
+
+    testWidgets('coming back from the list shows the first tab with new output', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      workspace.select(1);
+      machine.handles.first.emit(const TabOutput('done building'));
+      expect(workspace.unseenCount, 1);
+      expect(workspace.activeIndex.value, 1);
+      await openPushed(tester);
+      expect(workspace.activeIndex.value, 0, reason: 'the tab with new output is in front');
+      expect(workspace.unseenCount, 0);
+    });
+
+    testWidgets('a notification\'s pending tab wins over the first unseen one', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      workspace.select(1);
+      machine.handles.first.emit(const TabOutput('x'));
+      workspace.pendingSelect(102);
+      await openPushed(tester);
+      expect(workspace.activeIndex.value, 1);
+    });
   });
 
   testWidgets('"Aa" opens the font size slider', (tester) async {

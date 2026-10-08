@@ -83,6 +83,7 @@ class TerminalWorkspace extends Controller {
     final index = _tabs.peek().indexWhere((tab) => tab.id == sessionId);
     if (index >= 0) {
       select(index);
+      _externalSelect = true;
       return;
     }
     _pendingSelectId = sessionId;
@@ -104,12 +105,44 @@ class TerminalWorkspace extends Controller {
     if (index >= 0) _select(index);
   }
 
-  /// A10 D29: only the active tab's output is written at the foreground's pace.
+  /// A10 D29: only the active tab's output is written at the foreground's pace. A11 D28: only the active
+  /// tab of a page that is showing is looked at.
   void _syncActive() {
     final active = _activeTab.peek();
     for (final tab in _tabs.peek()) {
       tab.setActive(identical(tab, active));
+      tab.setViewed(identical(tab, active) && _viewing);
     }
+  }
+
+  bool _viewing = false;
+
+  /// A notification chose a tab that was already open, just before the page is shown: entering the page must
+  /// not move to the first tab with new output instead. Dropped once the page is shown or left.
+  bool _externalSelect = false;
+
+  /// The terminal page of this machine is on screen (true) or not: left, covered, or the app in the
+  /// background (false). Output of a tab that is not looked at is counted by [unseenCount].
+  void setViewing(bool viewing) {
+    if (_disposed) return;
+    _externalSelect = false;
+    if (_viewing == viewing) return;
+    _viewing = viewing;
+    _syncActive();
+  }
+
+  /// Tabs with output nobody has looked at. Reactive: read inside a `computed`/`Watch`. Counted from the
+  /// tabs each time, so a closed tab is never left in it.
+  int get unseenCount => _tabs.value.where((tab) => tab.unseen.value).length;
+
+  /// Enters the machine from the list: the first tab with new output is shown. Nothing when none has.
+  void selectFirstUnseen() {
+    if (_externalSelect) {
+      _externalSelect = false;
+      return;
+    }
+    final index = _tabs.peek().indexWhere((tab) => tab.unseen.peek());
+    if (index >= 0) _select(index);
   }
 
   /// Runs the IK handshake when needed. Throws the [MachineFailed] state
@@ -337,6 +370,12 @@ class WorkspaceRegistry {
   int tabCount(String agentId) {
     _version.value; // depend on create/replace/remove so a later forMachine() is observed too
     return _workspaces[agentId]?.tabs.value.length ?? 0;
+  }
+
+  /// Tabs of [agentId] with new output (the dot of the machine list). Reactive like [tabCount].
+  int unseenCount(String agentId) {
+    _version.value;
+    return _workspaces[agentId]?.unseenCount ?? 0;
   }
 
   void _clear() {
