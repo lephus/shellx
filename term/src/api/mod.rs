@@ -3,6 +3,7 @@
 //! ShellX window (or the A5b daemon) over the local mux socket. Separate
 //! from `proto`, which is the terminal-sharing link and must not change.
 
+pub mod agent_event;
 pub mod args;
 pub mod browser_js;
 pub mod client;
@@ -18,9 +19,13 @@ pub mod wire;
 
 /// Entry point of the `shellx` command. Returns the exit code (D10).
 pub fn main(args: Vec<std::ffi::OsString>) -> i32 {
-    use std::io::Write;
+    use std::io::{IsTerminal, Write};
+    // D5: a hook never sees a failure, not even a usage error (exit 2 is
+    // "block" to some agents).
+    let hook = args.first().is_some_and(|a| a == "agent-event");
     let args: Vec<String> = match args.into_iter().map(|a| a.into_string()).collect() {
         Ok(a) => a,
+        Err(_) if hook => return 0,
         Err(_) => {
             let _ = writeln!(
                 std::io::stderr(),
@@ -30,6 +35,12 @@ pub fn main(args: Vec<std::ffi::OsString>) -> i32 {
         }
     };
     match args::parse(&args) {
+        Err(msg) if hook => {
+            if std::io::stdout().is_terminal() {
+                let _ = writeln!(std::io::stderr(), "shellx: {msg} (usage)");
+            }
+            0
+        }
         Err(msg) => {
             let _ = writeln!(std::io::stderr(), "shellx: {msg} (usage)");
             2
@@ -125,6 +136,15 @@ fn run_real(parsed: &args::Parsed) -> i32 {
     let stdin = std::io::stdin();
     let stdin_is_tty = stdin.is_terminal();
     let mut input = stdin.lock();
+    let hook = parsed.spec.path == ["agent-event"];
+    if hook {
+        guard_hook();
+    }
+    let now_ms = || {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis().min(i64::MAX as u128) as i64)
+    };
     let mut ctx = run::Ctx {
         env: &get,
         out: &mut out,
@@ -138,10 +158,29 @@ fn run_real(parsed: &args::Parsed) -> i32 {
         connect: &connect,
         stdout_gone: STDOUT_GONE,
         exe: std::env::current_exe().ok(),
+        now_ms: &now_ms,
+        stdout_is_tty: stdout.is_terminal(),
     };
-    let code = run::run(parsed, &mut ctx);
+    let code = if hook {
+        // D5: not even a bug may turn into a non-zero exit.
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run::run(parsed, &mut ctx)))
+            .map_or(0, |_| 0)
+    } else {
+        run::run(parsed, &mut ctx)
+    };
     let _ = ctx.out.flush();
     code
+}
+
+/// D5, D26: `agent-event` ends with exit 0 after [`agent_event::BUDGET`]
+/// at the latest (a hook whose stdin never closes, a host that never
+/// answers), and a bug in it prints nothing.
+fn guard_hook() {
+    std::panic::set_hook(Box::new(|_| {}));
+    std::thread::spawn(|| {
+        std::thread::sleep(agent_event::BUDGET);
+        std::process::exit(0);
+    });
 }
 
 /// Review I1: `events --follow | head -1` must end once `head` has gone,

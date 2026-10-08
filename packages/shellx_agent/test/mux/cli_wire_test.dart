@@ -126,6 +126,12 @@ void main() {
     }
   });
 
+  test('A12: the agent-event type and cap', () {
+    expect(CliType.uiAgentEvent, 'ui.agent.event');
+    expect(kCliCaps, contains('ui.agent'));
+    expect(CliType.allowedForCli(CliType.uiAgentEvent), isTrue);
+  });
+
   test('golden vectors match term/protocol/mux_vectors.txt', () {
     final lines = {
       for (final l in _vectorsFile.readAsLinesSync())

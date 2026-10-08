@@ -24,6 +24,7 @@ mod tests;
 use config::config_remote;
 use notify::notify;
 use prepare::{prepare, timeout_ms, Prepared};
+pub(crate) use targets::canonical;
 
 /// Connects and authenticates; the argument is `--socket`.
 pub type Connect<'a> = dyn Fn(Option<&str>) -> Result<Box<dyn Session>, ApiError> + 'a;
@@ -47,6 +48,10 @@ pub struct Ctx<'a> {
     pub stdout_gone: Option<fn(std::time::Duration) -> bool>,
     /// This executable (`doctor` checks that its folder is in `PATH`).
     pub exe: Option<PathBuf>,
+    /// Milliseconds since the Unix epoch (`agent-event`'s `at`).
+    pub now_ms: &'a dyn Fn() -> i64,
+    /// stdout is a terminal (`agent-event` explains itself only then).
+    pub stdout_is_tty: bool,
 }
 
 /// D32: a text field of a request.
@@ -157,6 +162,8 @@ impl Api {
             "ui.ssh"
         } else if t.starts_with("ui.tmux.") {
             "ui.tmux"
+        } else if t.starts_with("ui.agent.") {
+            "ui.agent"
         } else {
             t
         };
@@ -219,6 +226,11 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
         "skills install" => return skills::install(p, ctx),
         "skills print" => return skills::print(p, ctx),
         "notify" => return notify(p, ctx),
+        // D5: whatever happens, the agent's hook sees success.
+        "agent-event" => {
+            super::agent_event::command(p, ctx);
+            return Ok(());
+        }
         "config path" => return config_path::print_path(p, ctx),
         "config check" | "config validate" | "config reload" | "config show" => {
             return config_remote(p, ctx, &path)

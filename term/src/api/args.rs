@@ -190,6 +190,18 @@ pub static COMMANDS: &[CommandSpec] = &[
             "show a ShellX notification (and push to the phone from a pane)",
         )
     },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
+            &["agent-event"],
+            &["AGENT", "EVENT", "PAYLOAD?"],
+            &[
+                v("session", "ID", "the agent's session id"),
+                v("message", "TEXT", "the agent's notice text"),
+            ],
+            "report an agent event (used by hooks)",
+        )
+    },
     c(
         &["wait"],
         &["PANE"],
@@ -938,6 +950,7 @@ mod tests {
             "workspace rename",
             "workspace move",
             "notify",
+            "agent-event",
             "wait",
             "events",
             "browser ls",

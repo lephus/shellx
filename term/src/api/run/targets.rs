@@ -14,7 +14,7 @@ pub(super) enum Want {
 /// The host's canonical id forms (`^p(0|-?[1-9]\d{0,14})$`,
 /// `^t([1-9]\d{0,14})$`): no sign but `-`, no leading zeros, no `-0`, at
 /// most 15 digits. A tab id is positive.
-pub(super) fn canonical(s: &str, tab: bool) -> Option<i64> {
+pub(crate) fn canonical(s: &str, tab: bool) -> Option<i64> {
     let (negative, digits) = match s.strip_prefix('-') {
         Some(d) if !tab => (true, d),
         Some(_) => return None,

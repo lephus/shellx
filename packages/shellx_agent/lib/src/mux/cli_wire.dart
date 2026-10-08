@@ -35,6 +35,9 @@ abstract final class CliType {
   static const uiTmuxList = 'ui.tmux.list';
   static const uiTmuxAttach = 'ui.tmux.attach';
 
+  /// A12 D4: a coding agent's hook event, normalised by `shellx agent-event`.
+  static const uiAgentEvent = 'ui.agent.event';
+
   /// D3: what a `cli` client may send. Everything else is `forbidden`.
   static bool allowedForCli(String t) =>
       t.startsWith('api.') ||
@@ -83,6 +86,7 @@ const List<String> kCliCaps = [
   'ui.config',
   'ui.ssh',
   'ui.tmux',
+  'ui.agent',
 ];
 
 MuxMessage cliResult(int? q, [Map<String, Object?> fields = const {}]) =>
