@@ -4619,6 +4619,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn’t check right now.'**
   String get updateFailed;
+
+  /// No description provided for @configProblemAgentCommandBad.
+  ///
+  /// In en, this message translates to:
+  /// **'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes'**
+  String get configProblemAgentCommandBad;
 }
 
 class _AppLocalizationsDelegate

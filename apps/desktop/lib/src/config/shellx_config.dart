@@ -8,6 +8,7 @@ import 'config_files.dart';
 import 'config_paths.dart';
 import 'config_problem.dart';
 import 'config_syntax.dart';
+import '../integrations/command_line.dart';
 import 'keybind_actions.dart' show KeyAction;
 import 'keybind_trigger.dart' show KeyChord, parseKeyChord;
 import 'keybindings.dart' show checkTrigger;
@@ -569,8 +570,20 @@ final class _Builder {
             value: '',
           );
         }
-        if (v.length > 4096 || v.contains(RegExp(r'[\r\n]'))) {
-          return _badValue(e, g, 'one line, up to 4096 characters');
+        // One line of plain words naming a program by place, with nothing
+        // hidden in it; the text is never echoed in the problem.
+        final argv = v.isEmpty
+            ? const <String>['']
+            : splitCommand(v, home: home);
+        if (v.isNotEmpty &&
+            (argv == null ||
+                !programIsAbsolute(argv.first, windows: windows))) {
+          return _problem(
+            e,
+            ConfigSeverity.error,
+            ConfigProblemCode.badValue,
+            value: '',
+          );
         }
         agentEventCommand = v;
       case 'working-directory':

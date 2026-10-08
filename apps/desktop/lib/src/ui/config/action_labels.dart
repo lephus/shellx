@@ -17,6 +17,8 @@ String problemText(AppLocalizations l10n, ConfigProblem problem) {
     ConfigProblemCode.syntax => l10n.configProblemSyntax,
     ConfigProblemCode.badKey => l10n.configProblemBadKey(key),
     ConfigProblemCode.unknownKey => l10n.configProblemUnknownKey(key),
+    ConfigProblemCode.badValue when key == 'agent-event-command' =>
+      l10n.configProblemAgentCommandBad,
     ConfigProblemCode.badValue => l10n.configProblemBadValue(key, value, hint),
     ConfigProblemCode.outOfRange => l10n.configProblemOutOfRange(
       key,

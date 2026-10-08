@@ -104,8 +104,8 @@ void main() {
       'with no main file named (a single value being checked) it counts',
       () {
         expect(
-          build({'agent-event-command': 'x'}).config.agentEventCommand,
-          'x',
+          build({'agent-event-command': '/bin/x'}).config.agentEventCommand,
+          '/bin/x',
         );
       },
     );
@@ -130,7 +130,7 @@ void main() {
         file: '/c/shellx',
         line: 1,
         key: 'agent-event-command',
-        value: 'good',
+        value: '/bin/good',
       );
       final inc = ConfigEntry(
         file: '/c/extra',
@@ -147,7 +147,7 @@ void main() {
         home: '/h',
         mainFile: '/c/shellx',
       );
-      expect(config.agentEventCommand, 'good');
+      expect(config.agentEventCommand, '/bin/good');
       expect(problems, hasLength(1));
     });
 
@@ -155,7 +155,7 @@ void main() {
       expect(kGhosttyKeys.contains('agent-event-command'), isFalse);
       expect(
         build(
-          {'agent-event-command': 'x'},
+          {'agent-event-command': '/bin/x'},
           ghostty: true,
           mainFile: '/c',
         ).config.agentEventCommand,
@@ -169,6 +169,32 @@ void main() {
       expect(long.problems.single.code, ConfigProblemCode.badValue);
       final nl = build({'agent-event-command': 'a\nb'}, mainFile: '/c');
       expect(nl.config.agentEventCommand, '');
+    });
+
+    test('a bare program name is a bad value (no PATH search)', () {
+      for (final v in ['on-agent --fast', './x', 'bin/x']) {
+        final r = build({'agent-event-command': v}, mainFile: '/c');
+        expect(r.config.agentEventCommand, '', reason: v);
+        expect(r.problems.single.code, ConfigProblemCode.badValue);
+        expect(r.problems.single.value ?? '', isNot(contains('on-agent')));
+      }
+    });
+
+    test('hidden characters are a bad value and are not echoed', () {
+      for (final c in ['\u202E', '\u200B', '\u2066', '\uFEFF', '\u0085']) {
+        final r = build({
+          'agent-event-command': '/bin/run$c x',
+        }, mainFile: '/c');
+        expect(r.config.agentEventCommand, '');
+        expect(r.problems.single.code, ConfigProblemCode.badValue);
+        expect(r.problems.single.value ?? '', isEmpty);
+      }
+    });
+
+    test('an unbalanced quote is a bad value', () {
+      final r = build({'agent-event-command': '/bin/x "oops'}, mainFile: '/c');
+      expect(r.config.agentEventCommand, '');
+      expect(r.problems.single.code, ConfigProblemCode.badValue);
     });
   });
 }

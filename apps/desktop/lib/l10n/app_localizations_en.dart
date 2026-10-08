@@ -2991,4 +2991,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateFailed => 'Couldn’t check right now.';
+
+  @override
+  String get configProblemAgentCommandBad =>
+      'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes';
 }

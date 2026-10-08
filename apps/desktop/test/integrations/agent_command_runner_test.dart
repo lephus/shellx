@@ -11,10 +11,21 @@ import 'package:shellx_desktop/src/platform/settings_store.dart';
 final t0 = DateTime.utc(2026, 10, 8, 9);
 
 /// A process that records what it is given and ends when told to.
+final class _HangingConsumer implements StreamConsumer<List<int>> {
+  @override
+  Future<void> addStream(Stream<List<int>> stream) => stream.drain<void>();
+  @override
+  Future<void> close() => Completer<void>().future;
+}
+
 final class FakeProcess implements Process {
-  FakeProcess() {
-    _stdinBytes.stream.listen(stdinBytes.addAll);
-    stdin = IOSink(_stdinBytes);
+  FakeProcess({bool hangOnStdin = false}) {
+    if (hangOnStdin) {
+      stdin = IOSink(_HangingConsumer());
+    } else {
+      _stdinBytes.stream.listen(stdinBytes.addAll);
+      stdin = IOSink(_stdinBytes);
+    }
   }
 
   final _stdinBytes = StreamController<List<int>>();
@@ -145,6 +156,63 @@ void main() {
       }
     });
 
+    test('hidden characters are refused', () {
+      for (final code in [
+        0x202A,
+        0x202B,
+        0x202C,
+        0x202D,
+        0x202E,
+        0x2066,
+        0x2067,
+        0x2068,
+        0x2069,
+        0x200B,
+        0x200C,
+        0x200D,
+        0x200E,
+        0x200F,
+        0x2060,
+        0xFEFF,
+        0x0085,
+        0x2028,
+        0x2029,
+        0x00AD,
+        0x061C,
+        0xE0041,
+      ]) {
+        final c = String.fromCharCode(code);
+        expect(s('/bin/x a${c}b'), isNull, reason: code.toRadixString(16));
+        expect(s('/bin/x "$c"'), isNull, reason: code.toRadixString(16));
+      }
+      expect(hasHiddenChars('/bin/ok é ế 日本'), isFalse);
+    });
+
+    test('visibleArgs: one per line, spaces and edges can be seen', () {
+      expect(
+        visibleArgs(['/bin/x', 'a b', ' lead', 'trail ', '', 'tab\t', r'b\s']),
+        [
+          '/bin/x',
+          'a\u2423b',
+          '\u2423lead',
+          'trail\u2423',
+          '""',
+          r'tab\t',
+          r'b\\s',
+        ],
+      );
+    });
+
+    test('programIsAbsolute', () {
+      expect(programIsAbsolute('/bin/x', windows: false), isTrue);
+      expect(programIsAbsolute('~/bin/x', windows: false), isTrue);
+      expect(programIsAbsolute('x', windows: false), isFalse);
+      expect(programIsAbsolute('./x', windows: false), isFalse);
+      expect(programIsAbsolute(r'C:\x\a.exe', windows: true), isTrue);
+      expect(programIsAbsolute('powershell', windows: true), isTrue);
+      expect(programIsAbsolute('a.exe', windows: true), isFalse);
+    });
+
     test('no home: a leading ~/ stays as typed', () {
       expect(splitCommand('~/x', home: ''), ['~/x']);
     });
@@ -223,6 +291,7 @@ void main() {
     late List<String> notApproved;
     late int couldNotRun;
     late Object? startError;
+    var hangStdin = false;
     late Map<String, String> parentEnv;
 
     AgentCommandRunner make(FakeAsync fa, {bool windows = false}) {
@@ -235,6 +304,9 @@ void main() {
         now: fa.getClock(t0).now,
         onNotApproved: notApproved.add,
         onCouldNotRun: () => couldNotRun++,
+        killTree: (p) async {
+          p.kill();
+        },
         start:
             (
               exe,
@@ -246,7 +318,7 @@ void main() {
             }) async {
               final error = startError;
               if (error != null) throw error;
-              final p = FakeProcess();
+              final p = FakeProcess(hangOnStdin: hangStdin);
               started.add((
                 exe: exe,
                 args: args,
@@ -268,6 +340,7 @@ void main() {
       notApproved = [];
       couldNotRun = 0;
       startError = null;
+      hangStdin = false;
       parentEnv = {
         'PATH': '/usr/bin',
         'HOME': '/Users/me',
@@ -554,6 +627,77 @@ void main() {
         expect(couldNotRun, 1);
         r.dispose();
       });
+    });
+
+    test('what runs is what was approved when the event came in', () {
+      fakeAsync((fa) {
+        final r = make(fa);
+        for (var pane = 0; pane < 5; pane++) {
+          r.emit(ev(pane: pane));
+        }
+        fa.flushMicrotasks();
+        expect(started, hasLength(4)); // the fifth waits
+        // The file is edited meanwhile: the new string is not allowed.
+        cmd = '/tmp/evil --now';
+        started[0].proc.finish();
+        fa.flushMicrotasks();
+        expect(started, hasLength(5));
+        expect(started[4].exe, '/Users/me/bin/on-agent');
+        expect(started[4].args, ['--fast']);
+        for (final s in started) {
+          expect(s.exe, isNot('/tmp/evil'));
+        }
+        r.dispose();
+      });
+    });
+
+    test('a command whose approval is gone at its turn does not run', () {
+      fakeAsync((fa) {
+        final r = make(fa);
+        for (var pane = 0; pane < 5; pane++) {
+          r.emit(ev(pane: pane));
+        }
+        fa.flushMicrotasks();
+        approvedHashes.clear();
+        started[0].proc.finish();
+        fa.flushMicrotasks();
+        expect(started, hasLength(4));
+        r.dispose();
+      });
+    });
+
+    test('the 10 s clock starts at once, not after stdin closes', () {
+      fakeAsync((fa) {
+        hangStdin = true;
+        final r = make(fa);
+        r.emit(ev());
+        fa.flushMicrotasks();
+        fa.elapse(const Duration(seconds: 10, milliseconds: 100));
+        expect(started.single.proc.killed, isTrue);
+        r.dispose();
+      });
+    });
+
+    test('a bare program name or a hidden character cannot run', () {
+      for (final bad in [
+        'on-agent --fast',
+        './on-agent',
+        'bin/on-agent',
+        '/tmp/a\u202Eb',
+        '/tmp/a\u200Bb',
+      ]) {
+        fakeAsync((fa) {
+          cmd = bad;
+          approvedHashes = {commandHash(cmd)};
+          couldNotRun = 0;
+          final r = make(fa);
+          r.emit(ev());
+          fa.flushMicrotasks();
+          expect(started, isEmpty, reason: bad);
+          expect(couldNotRun, 1, reason: bad);
+          r.dispose();
+        });
+      }
     });
 
     test('dispose kills what is running and drops the queue', () {

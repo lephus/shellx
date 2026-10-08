@@ -2900,4 +2900,8 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get updateFailed => 'Không kiểm tra được lúc này.';
+
+  @override
+  String get configProblemAgentCommandBad =>
+      'agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng';
 }

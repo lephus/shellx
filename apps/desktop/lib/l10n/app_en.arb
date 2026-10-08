@@ -1185,5 +1185,6 @@
   "@updateAvailable": {"placeholders": {"version": {"type": "String"}}},
   "updateDownload": "Download",
   "updateRequired": "This version is too old. Update to keep using phone access.",
-  "updateFailed": "Couldn’t check right now."
+  "updateFailed": "Couldn’t check right now.",
+  "configProblemAgentCommandBad": "agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes"
 }

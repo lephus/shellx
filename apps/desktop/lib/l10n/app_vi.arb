@@ -751,5 +751,6 @@
   "updateAvailable": "Đã có bản {version}.",
   "updateDownload": "Tải xuống",
   "updateRequired": "Bản này đã quá cũ. Hãy cập nhật để tiếp tục dùng truy cập từ điện thoại.",
-  "updateFailed": "Không kiểm tra được lúc này."
+  "updateFailed": "Không kiểm tra được lúc này.",
+  "configProblemAgentCommandBad": "agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng"
 }

@@ -8,7 +8,11 @@ import 'package:shellx_agent/shellx_agent.dart' show sha256Bytes;
 import 'package:shellx_core/shellx_core.dart' show bytesToHex;
 
 import '../config/config_controller.dart' show shellxConfigProvider;
+import '../platform/process_tree.dart';
 import '../platform/settings_store.dart';
+import 'command_line.dart';
+
+export 'command_line.dart';
 import '../terminal/local_sessions_provider.dart' show homeDirectoryProvider;
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 import '../terminal/terminal_tabs.dart';
@@ -19,8 +23,6 @@ const int kAgentCommandParallel = 4;
 const int kAgentCommandQueue = 16;
 const Duration kAgentCommandGap = Duration(seconds: 1);
 
-/// The longest `agent-event-command` string (also checked by the loader).
-const int kAgentCommandMaxLength = 4096;
 const int _maxApproved = 20;
 
 /// The only names of the app's environment the command inherits.
@@ -41,9 +43,6 @@ String commandHash(String command) =>
 
 final RegExp _hash = RegExp(r'^[0-9a-f]{64}$');
 
-/// Every control character but the tab (a word separator).
-final RegExp _control = RegExp(r'[\u0000-\u0008\u000a-\u001f\u007f]');
-
 /// Whether the user allowed the command whose hash is [hash].
 bool isCommandApproved(SettingsStore settings, String hash) =>
     _hash.hasMatch(hash) &&
@@ -63,101 +62,6 @@ Future<void> approveCommand(SettingsStore settings, String hash) async {
     ))
       h,
   ]);
-}
-
-/// A small word splitter, not a shell: whitespace separates words; single
-/// quotes keep everything; double quotes keep everything but `\"` and `\\`;
-/// outside quotes a backslash escapes the next character. `$`, backticks,
-/// globs and operators are ordinary characters. A word that starts with an
-/// unquoted `~/` begins at [home]. Null: empty, an unbalanced quote, a
-/// trailing backslash, or a control character anywhere.
-List<String>? splitCommand(String input, {required String home}) {
-  if (input.length > kAgentCommandMaxLength || _control.hasMatch(input)) {
-    return null;
-  }
-  final words = <String>[];
-  final word = StringBuffer();
-  var inWord = false;
-  var tilde = false; // the word began with an unquoted `~/`
-  var index = 0;
-  final n = input.length;
-
-  void end() {
-    if (!inWord) return;
-    var text = word.toString();
-    if (tilde && home.isNotEmpty) {
-      text = home.endsWith('/')
-          ? '$home${text.substring(2)}'
-          : '$home${text.substring(1)}';
-    }
-    words.add(text);
-    word.clear();
-    inWord = false;
-    tilde = false;
-  }
-
-  while (index < n) {
-    final c = input[index];
-    if (c == ' ' || c == '\t') {
-      end();
-      index++;
-    } else if (c == "'") {
-      final close = input.indexOf("'", index + 1);
-      if (close < 0) return null;
-      inWord = true;
-      word.write(input.substring(index + 1, close));
-      index = close + 1;
-    } else if (c == '"') {
-      inWord = true;
-      index++;
-      var closed = false;
-      while (index < n) {
-        final d = input[index];
-        if (d == '"') {
-          closed = true;
-          index++;
-          break;
-        }
-        if (d == r'\' &&
-            index + 1 < n &&
-            (input[index + 1] == '"' || input[index + 1] == r'\')) {
-          word.write(input[index + 1]);
-          index += 2;
-        } else {
-          word.write(d);
-          index++;
-        }
-      }
-      if (!closed) return null;
-    } else if (c == r'\') {
-      if (index + 1 >= n) return null;
-      inWord = true;
-      word.write(input[index + 1]);
-      index += 2;
-    } else {
-      if (!inWord && c == '~' && index + 1 < n && input[index + 1] == '/') {
-        tilde = true;
-      }
-      inWord = true;
-      word.write(c);
-      index++;
-    }
-  }
-  end();
-  return words.isEmpty ? null : words;
-}
-
-/// Windows has no shell here, so only a program that can start without one:
-/// an `.exe`, or PowerShell with `-File`. Elsewhere any non-empty program.
-bool argvAllowed(List<String> argv, {required bool windows}) {
-  if (argv.isEmpty || argv.first.isEmpty) return false;
-  if (!windows) return true;
-  final exe = argv.first.toLowerCase();
-  const shells = {'powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'};
-  if (shells.contains(exe)) {
-    return argv.length >= 3 && argv[1].toLowerCase() == '-file';
-  }
-  return exe.endsWith('.exe');
 }
 
 /// One agent status event for the user's command. Its words come from the
@@ -237,6 +141,7 @@ class AgentCommandRunner {
     required void Function(String command) onNotApproved,
     required void Function() onCouldNotRun,
     ProcessStarter? start,
+    Future<void> Function(Process process)? killTree,
     DateTime Function()? now,
   }) : _command = command,
        _approved = approved,
@@ -244,6 +149,7 @@ class AgentCommandRunner {
        _onNotApproved = onNotApproved,
        _onCouldNotRun = onCouldNotRun,
        _start = start ?? Process.start,
+       _killTree = killTree ?? killProcessTree,
        _now = now ?? DateTime.now;
 
   final String Function() _command;
@@ -254,10 +160,12 @@ class AgentCommandRunner {
   final void Function(String command) _onNotApproved;
   final void Function() _onCouldNotRun;
   final ProcessStarter _start;
+  final Future<void> Function(Process process) _killTree;
   final DateTime Function() _now;
 
-  final _queue = <AgentCommandEvent>[];
+  final _queue = <_Queued>[];
   final _running = <Process>{};
+  final _timers = <Timer>{};
 
   /// Commands being started or running (never more than the limit).
   int _active = 0;
@@ -284,7 +192,16 @@ class AgentCommandRunner {
     if (_last.length > 256) {
       _last.removeWhere((_, t) => now.difference(t) >= kAgentCommandGap);
     }
-    _queue.add(e);
+    // What was approved is what runs: the words are fixed now, not read
+    // again when the event's turn comes (the file may have changed).
+    final argv = splitCommand(command, home: home);
+    if (argv == null ||
+        !argvAllowed(argv, windows: windows) ||
+        !programIsAbsolute(argv.first, windows: windows)) {
+      _couldNotRun();
+      return;
+    }
+    _queue.add(_Queued(e, hash, argv));
     while (_queue.length > kAgentCommandQueue) {
       _queue.removeAt(0);
     }
@@ -299,9 +216,9 @@ class AgentCommandRunner {
 
   void _pump() {
     while (!_disposed && _active < kAgentCommandParallel && _queue.isNotEmpty) {
-      final e = _queue.removeAt(0);
+      final item = _queue.removeAt(0);
       _active++;
-      unawaited(_run(e));
+      unawaited(_run(item));
     }
   }
 
@@ -310,13 +227,12 @@ class AgentCommandRunner {
     ...e.env(),
   };
 
-  Future<void> _run(AgentCommandEvent e) async {
+  Future<void> _run(_Queued item) async {
+    final e = item.event;
+    final argv = item.argv;
     try {
-      final argv = splitCommand(_command(), home: home);
-      if (argv == null || !argvAllowed(argv, windows: windows)) {
-        _couldNotRun();
-        return;
-      }
+      // The user may have taken the permission back while it waited.
+      if (!_approved(item.hash)) return;
       final Process process;
       try {
         process = await _start(
@@ -336,25 +252,30 @@ class AgentCommandRunner {
         return;
       }
       _running.add(process);
+      // From the start, whatever the command does with its input.
+      final timer = Timer(kAgentCommandTimeout, () => _kill(process));
+      _timers.add(timer);
       // Output is read and dropped so the pipe never fills.
       unawaited(process.stdout.drain<void>().catchError((Object _) {}));
       unawaited(process.stderr.drain<void>().catchError((Object _) {}));
       // A command that does not read its input breaks the pipe: that is
       // its business, not an error of ours.
       unawaited(process.stdin.done.catchError((Object _) {}));
-      try {
-        process.stdin.writeln(e.jsonLine());
-        await process.stdin.close();
-      } on Object {
-        // The command did not read its input: not our problem.
-      }
-      final timer = Timer(kAgentCommandTimeout, () => _kill(process));
+      unawaited(() async {
+        try {
+          process.stdin.writeln(e.jsonLine());
+          await process.stdin.close();
+        } on Object {
+          // The command did not read its input: not our problem.
+        }
+      }());
       try {
         await process.exitCode;
       } on Object {
         // Gone.
       } finally {
         timer.cancel();
+        _timers.remove(timer);
         _running.remove(process);
       }
     } finally {
@@ -363,24 +284,15 @@ class AgentCommandRunner {
     }
   }
 
-  void _kill(Process process) {
-    if (windows) {
-      // The tree, not just the parent.
-      unawaited(
-        Process.run('taskkill', [
-          '/F',
-          '/T',
-          '/PID',
-          '${process.pid}',
-        ]).then<void>((_) {}).catchError((Object _) {}),
-      );
-    }
-    process.kill(ProcessSignal.sigkill);
-  }
+  void _kill(Process process) => unawaited(_killTree(process));
 
   void dispose() {
     _disposed = true;
     _queue.clear();
+    for (final t in _timers.toList()) {
+      t.cancel();
+    }
+    _timers.clear();
     for (final p in _running.toList()) {
       _kill(p);
     }
@@ -390,8 +302,21 @@ class AgentCommandRunner {
   String toString() => '…';
 }
 
+final class _Queued {
+  const _Queued(this.event, this.hash, this.argv);
+  final AgentCommandEvent event;
+
+  /// The hash of the string that was approved when the event came in.
+  final String hash;
+  final List<String> argv;
+}
+
 /// How a process is started (tests replace it).
 final agentCommandStarterProvider = Provider<ProcessStarter?>((_) => null);
+
+/// How a process tree is stopped (tests replace it).
+final agentCommandKillTreeProvider =
+    Provider<Future<void> Function(Process process)?>((_) => null);
 
 /// The window's one runner. The background service never has one: it has
 /// no configuration and no status model, so a command runs once.
@@ -405,6 +330,7 @@ final agentCommandRunnerProvider = Provider<AgentCommandRunner>((ref) {
     environment: Platform.environment,
     windows: Platform.isWindows,
     start: ref.read(agentCommandStarterProvider),
+    killTree: ref.read(agentCommandKillTreeProvider),
     onNotApproved: (command) =>
         tabs.showNotice(AgentCommandNotApprovedNotice(command)),
     onCouldNotRun: () => tabs.showNotice(const AgentCommandFailedNotice()),

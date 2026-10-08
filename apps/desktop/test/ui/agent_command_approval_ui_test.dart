@@ -8,6 +8,8 @@ import 'package:shellx_desktop/src/integrations/agent_command_runner.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/agent_status.dart';
 import 'package:shellx_desktop/src/terminal/agent_status_notifier.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart'
+    show homeDirectoryProvider;
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
@@ -53,6 +55,10 @@ void main() {
       locale: locale,
       extra: [
         agentStatusClockProvider.overrideWithValue(() => now),
+        homeDirectoryProvider.overrideWithValue('/Users/me'),
+        agentCommandKillTreeProvider.overrideWithValue((p) async {
+          p.kill();
+        }),
         agentCommandStarterProvider.overrideWithValue((
           exe,
           args, {
@@ -97,7 +103,9 @@ void main() {
     await t.pump();
     final request = r.c.read(windowRouterProvider).confirm as ConfirmRequest;
     expect(request.title, 'Allow this command?');
-    expect(request.body, contains(command));
+    // The exact words, one per line, in a monospace block.
+    expect(request.code, ['/Users/me/bin/on-agent', '--fast'].join('\n'));
+    expect(request.body, isNot(contains('on-agent')));
     expect(request.confirmLabel, 'Allow');
     expect(request.cancelLabel, 'Cancel');
     expect(request.destructive, isTrue); // starts on Cancel

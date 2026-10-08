@@ -46,11 +46,16 @@ final class ConfirmRequest {
     this.secondaryLabel,
     this.escapeCloses = true,
     this.onConfirm,
+    this.code,
   });
 
   final String title;
   final String body;
   final String confirmLabel;
+
+  /// Text shown after the body in a monospace block (a command line, one
+  /// word per line); null: none.
+  final String? code;
 
   /// The secondary button's text; null: "Cancel" (A5b UI-A5 §7.3 "Để
   /// sau", §7.4 "Thoát").

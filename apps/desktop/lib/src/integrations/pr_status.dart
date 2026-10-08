@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../terminal/local_sessions_provider.dart' show homeDirectoryProvider;
+import '../platform/process_tree.dart';
 import 'gh_locator.dart';
 import 'pr_status_parse.dart';
 
@@ -68,6 +69,11 @@ abstract interface class GhRunner {
   });
 }
 
+/// Runs the real `gh`. Note: `gh` run in a repository somebody else made
+/// reads that repository's git configuration, which can name programs git
+/// runs: the same as running `gh` yourself there. That is why this is off
+/// by default.
+///
 /// Runs the real `gh`: no shell, no stdin, the output capped, the process
 /// killed when it takes too long.
 final class ProcessGhRunner implements GhRunner {
@@ -102,18 +108,8 @@ final class ProcessGhRunner implements GhRunner {
       final code = await process.exitCode.timeout(timeout);
       return GhResult(code, await out, await err);
     } on TimeoutException {
-      if (Platform.isWindows) {
-        // gh starts git: take the tree down, not just the parent.
-        unawaited(
-          Process.run('taskkill', [
-            '/F',
-            '/T',
-            '/PID',
-            '${process.pid}',
-          ]).then<void>((_) {}).catchError((Object _) {}),
-        );
-      }
-      process.kill(ProcessSignal.sigkill);
+      // gh starts git: take the whole tree down.
+      await killProcessTree(process);
       return const GhResult.timedOut();
     }
   }
