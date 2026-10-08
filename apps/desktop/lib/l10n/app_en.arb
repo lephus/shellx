@@ -1051,5 +1051,6 @@
   "paneSwapLeft": "Pane on the left",
   "paneSwapRight": "Pane on the right",
   "paneSwapUp": "Pane above",
-  "paneSwapDown": "Pane below"
+  "paneSwapDown": "Pane below",
+  "searchAllGone": "Scrolled out of history"
 }

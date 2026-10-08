@@ -2599,4 +2599,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paneSwapDown => 'Pane below';
+
+  @override
+  String get searchAllGone => 'Scrolled out of history';
 }

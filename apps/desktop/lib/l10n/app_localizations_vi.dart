@@ -2509,4 +2509,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get paneSwapDown => 'Pane phía dưới';
+
+  @override
+  String get searchAllGone => 'Đã trôi khỏi lịch sử cuộn';
 }

@@ -570,3 +570,13 @@ Task 15 — chạm vào URL (iPhone, Android)
 Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - [ ] Trên máy tính chạy `yes | head -c 50M` ở tab A, sang tab B trên điện thoại và gõ: echo tức thì; quay lại A không đứng lâu; Performance overlay: khung hình p95 <= 32 ms trong lúc xả.
 - [ ] Mở 4 tab bận, xem pin/nhiệt trong một phút.
+
+## 21. A11 — chất lượng P1 (2026-10-08)
+
+**Ghi chú đã biết (Task 11–12).**
+- ⌘⇧F (`search_all`) tìm trong buffer đang hiển thị của mỗi pane: khi một TUI (vim, htop, tmux) đang dùng màn hình phụ thì chỉ tìm được phần nhìn thấy, không có cuộn (spec D21 nói buffer chính; đổi để kết quả luôn mở được bằng thanh tìm A10).
+- Pane đã chuyển tab (`break_pane`, `join_pane`, "Chuyển pane tới tab") mất huy hiệu chưa đọc; lịch sử thông báo vẫn nhảy tới được.
+- Tách/chuyển pane và "Chuyển tab tới workspace" **không có hoàn tác**.
+- `$SHELLX_TAB_ID` trong shell của pane đã chuyển vẫn là tab cũ (`$SHELLX_PANE_ID` vẫn đúng); CLI `@tab` theo biến cũ trỏ tab cũ. Sự kiện mới `pane.moved {pane, from, to}`.
+- Tab mà pane tạo ra nó đã chuyển đi lưu bằng khoá riêng (khoá của `-tab.id`) trong `layout.json`; pane tách ra từ pane tạo tab nhận id tab tổng hợp từ 2000000000.
+

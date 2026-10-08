@@ -3953,6 +3953,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pane below'**
   String get paneSwapDown;
+
+  /// No description provided for @searchAllGone.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrolled out of history'**
+  String get searchAllGone;
 }
 
 class _AppLocalizationsDelegate

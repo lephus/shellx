@@ -139,4 +139,47 @@ void main() {
     expect(tab.focused, k1);
     expect(tab.zoomed, isNull);
   });
+
+  test('captureSnapshot: a tab whose creating pane moved to another tab '
+      'still saves a layout that loads (A11 review C1)', () async {
+    local
+      ..add(local.summary(1, origin: SessionOrigin.desktop))
+      ..add(local.summary(2, origin: SessionOrigin.desktop));
+    boot();
+    final tabs = container.read(terminalTabsProvider.notifier);
+    tabs.select(1);
+    await tabs.split(SplitAxis.row); // tab 1: 1 | 100
+    expect(tabs.joinPane(1, 2), isTrue); // pane 1 (tab 1's creator) -> tab 2
+    final kt = 'd' * 32;
+    final keys = {1: k1, 2: k2, 100: k3, -1: kt};
+    final s = capture(keys);
+    final loaded = RestoreSnapshot.tryParse(s.encode());
+    expect(loaded, isNotNull, reason: 'the whole file must still load');
+    expect(loaded!.tabs.map((t) => t.key).toSet(), hasLength(2));
+    final first = loaded.tabs.firstWhere(
+      (t) => savedLeaves(t.layout).map((p) => p.key).contains(k3),
+    );
+    expect(first.key, kt, reason: 'not the key of a pane of another tab');
+    expect(
+      savedLeaves(
+        loaded.tabs.firstWhere((t) => t.key == k2).layout,
+      ).map((p) => p.key),
+      [k2, k1],
+    );
+  });
+
+  test('captureSnapshot: a pane broken out of the tab it created gets a '
+      'tab of its own with a synthetic id and a loadable layout', () async {
+    local.add(local.summary(1, origin: SessionOrigin.desktop));
+    boot();
+    final tabs = container.read(terminalTabsProvider.notifier);
+    await tabs.split(SplitAxis.row); // 1 | 100
+    expect(tabs.breakPane(1), isTrue);
+    final state = container.read(terminalTabsProvider);
+    expect(state.tabs.map((t) => t.id), [1, kSyntheticTabIdBase]);
+    final kt = 'e' * 32;
+    final s = capture({1: k1, 100: k2, kSyntheticTabIdBase: k3, -1: kt});
+    expect(RestoreSnapshot.tryParse(s.encode()), isNotNull);
+    expect(s.tabs.map((t) => t.key).toSet(), hasLength(2));
+  });
 }

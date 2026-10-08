@@ -192,6 +192,7 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     }
     if (find.matchCase) find.toggleMatchCase();
     find.setQuery(query);
+    // A line that left the history: the first match of the pane.
     final row = hit.liveRow ?? 0;
     find.goToMatchAtOrAfter(row);
     WidgetsBinding.instance

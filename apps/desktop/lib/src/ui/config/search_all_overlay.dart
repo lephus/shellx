@@ -220,7 +220,8 @@ class _SearchAllOverlayState extends ConsumerState<SearchAllOverlay> {
   String _location(AppLocalizations l10n, GlobalHit h) => [
     h.tabLabel,
     if (_splitTabs.contains(h.tabId)) l10n.searchAllPane(h.paneNumber),
-    l10n.searchAllLine(h.row + 1),
+    // Where the line is now; a line that left the history says so.
+    h.liveRow == null ? l10n.searchAllGone : l10n.searchAllLine(h.liveRow! + 1),
   ].join(' · ');
 
   @override

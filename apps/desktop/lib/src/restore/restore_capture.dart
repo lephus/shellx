@@ -6,7 +6,9 @@ import 'restore_snapshot.dart';
 /// What is restorable right now (D9: exited panes and tabs left with no
 /// live pane are skipped). [keyOf] gives each session its pane key (D14);
 /// a tab's key is that of the session that created it (A3 D1), kept even
-/// after that pane has closed.
+/// after that pane has closed. When that pane now lives in another tab (A11
+/// D20), the tab's key is [keyOf] of the negated tab id instead: a pane key
+/// of its own that no leaf of any tab carries, so the file still loads.
 RestoreSnapshot captureSnapshot({
   required TerminalTabsState tabs,
   required SidebarState sidebar,
@@ -27,8 +29,10 @@ RestoreSnapshot captureSnapshot({
       return keys.contains(key) ? key : null;
     }
 
+    final displaced =
+        !tab.panes.containsKey(tab.id) && tabs.tabOfSession(tab.id) != null;
     saved[tab.id] = SavedTab(
-      key: keyOf(tab.id),
+      key: keyOf(displaced ? -tab.id : tab.id),
       name: tab.customTitle,
       focused: live(tab.focusedPaneId) ?? leaves.first.key,
       zoomed: live(tab.zoomedPaneId),

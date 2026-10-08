@@ -429,6 +429,7 @@ final class TerminalTab {
   }
 
   TerminalTab copyWith({
+    SessionOrigin? origin,
     PaneNode? layout,
     Map<int, PaneSession>? panes,
     int? focusedPaneId,
@@ -437,7 +438,7 @@ final class TerminalTab {
     Object? customTitle = _unset,
   }) => TerminalTab(
     id: id,
-    origin: origin,
+    origin: origin ?? this.origin,
     layout: layout ?? this.layout,
     panes: panes ?? this.panes,
     focusedPaneId: focusedPaneId ?? this.focusedPaneId,

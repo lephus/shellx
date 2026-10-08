@@ -165,4 +165,22 @@ void main() {
     ]..sort();
     expect(afterBreak, paneIdsOf(from).toList()..sort());
   });
+
+  test('a desktop pane joining a tab a phone opened makes it a desktop tab '
+      '(A11 review M2)', () {
+    final phone = TerminalTab(
+      id: 5,
+      origin: SessionOrigin.phone,
+      layout: PaneLeaf(5),
+      panes: {5: session(5)},
+      focusedPaneId: 5,
+      paneHistory: const [5],
+    );
+    final r = joinPane(tabWithPanes([1, 2]), phone, 2)!;
+    expect(r.to.origin, SessionOrigin.desktop);
+    expect(
+      joinPane(tabWithPanes([1, 2]), tabWithPanes([7]), 2)!.to.origin,
+      SessionOrigin.desktop,
+    );
+  });
 }

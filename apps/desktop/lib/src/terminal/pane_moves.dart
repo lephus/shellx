@@ -1,3 +1,5 @@
+import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
+
 import 'pane_layout.dart';
 import 'terminal_tabs.dart';
 
@@ -102,6 +104,8 @@ MovedPane? joinPane(
     return null;
   }
   final joined = to.copyWith(
+    // A desktop pane in a tab a phone opened: the user made it theirs.
+    origin: pane.origin == SessionOrigin.desktop ? SessionOrigin.desktop : null,
     layout: splitPane(to.layout, to.focusedPaneId, paneId, axis),
     panes: {...to.panes, paneId: pane},
     focusedPaneId: paneId,
