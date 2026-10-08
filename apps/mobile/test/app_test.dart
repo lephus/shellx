@@ -141,7 +141,7 @@ void main() {
       ..registerSingleton<PushController>(push)
       ..registerFactory<LoginController>(() => LoginController(session))
       ..registerFactory<RegisterController>(() => RegisterController(session))
-      ..registerFactory<MachineListController>(() => MachineListController.create(session, registry, push))
+      ..registerFactory<MachineListController>(() => MachineListController.create(session, registry, push, settings))
       ..registerFactoryParam<TerminalPageController, String, void>(
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       )

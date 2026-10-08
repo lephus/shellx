@@ -440,5 +440,21 @@
   "@viewAsTextTruncated": {"placeholders": {"lines": {"type": "int"}}},
   "linkSheetTitle": "Open link?",
   "linkSheetOpen": "Open",
-  "linkSheetCopy": "Copy link"
+  "linkSheetCopy": "Copy link",
+  "arrowPadLabel": "Arrow pad. Drag to move the cursor.",
+  "arrowPadUp": "Up",
+  "arrowPadDown": "Down",
+  "arrowPadLeft": "Left",
+  "arrowPadRight": "Right",
+  "machineLastUsed": "Last used",
+  "machineTabsActivity": "{tabs, plural, =1{1 tab} other{{tabs} tabs}} · {unseen} with new output",
+  "@machineTabsActivity": {"placeholders": {"tabs": {"type": "int"}, "unseen": {"type": "int"}}},
+  "machineNewOutput": "New output",
+  "machinesErrorTitle": "Couldn’t load your computers",
+  "machinesRetry": "Try again",
+  "machinesCheckConnection": "Check your internet connection.",
+  "machinesReload": "Reload",
+  "settingsFixedHeight": "Keep terminal size when the keyboard opens",
+  "settingsFixedHeightHint": "The keyboard covers the terminal instead of shrinking it.",
+  "voiceDraftSaved": "Draft saved"
 }

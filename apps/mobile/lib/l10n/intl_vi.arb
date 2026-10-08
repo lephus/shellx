@@ -245,5 +245,21 @@
   "viewAsTextTruncated": "Hiển thị {lines} dòng cuối",
   "linkSheetTitle": "Mở liên kết?",
   "linkSheetOpen": "Mở",
-  "linkSheetCopy": "Sao chép liên kết"
+  "linkSheetCopy": "Sao chép liên kết",
+  "arrowPadLabel": "Bàn xoay mũi tên. Kéo để di chuyển con trỏ.",
+  "arrowPadUp": "Lên",
+  "arrowPadDown": "Xuống",
+  "arrowPadLeft": "Trái",
+  "arrowPadRight": "Phải",
+  "machineLastUsed": "Dùng gần nhất",
+  "machineTabsActivity": "{tabs} tab · {unseen} có chữ mới",
+  "@machineTabsActivity": {"placeholders": {"tabs": {"type": "int"}, "unseen": {"type": "int"}}},
+  "machineNewOutput": "Có chữ mới",
+  "machinesErrorTitle": "Không tải được danh sách máy",
+  "machinesRetry": "Thử lại",
+  "machinesCheckConnection": "Hãy kiểm tra kết nối mạng.",
+  "machinesReload": "Tải lại",
+  "settingsFixedHeight": "Giữ cỡ terminal khi mở bàn phím",
+  "settingsFixedHeightHint": "Bàn phím che lên terminal thay vì làm nó co lại.",
+  "voiceDraftSaved": "Có bản nháp"
 }

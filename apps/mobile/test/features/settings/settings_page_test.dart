@@ -107,6 +107,21 @@ void main() {
     await openPushed(tester);
   }
 
+  group('A11 D31: keep the terminal size', () {
+    testWidgets('the switch is off, explains itself and stores the choice', (tester) async {
+      await openSettings(tester);
+      expect(find.text('Giữ cỡ terminal khi mở bàn phím'), findsOneWidget);
+      expect(find.text('Bàn phím che lên terminal thay vì làm nó co lại.'), findsOneWidget);
+      final tile = find.byKey(const Key('settings.fixedHeight'));
+      expect(tester.widget<SwitchListTile>(tile).value, isFalse);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+      expect(settings.fixedTerminalHeight.value, isTrue);
+      expect(await store.read(AppSettings.fixedTerminalHeightKey), 'true');
+    });
+  });
+
   group('notifications (push spec §6)', () {
     testWidgets('granted: "On" with the footnote, no action', (tester) async {
       messaging.current = PushPermission.granted;
@@ -293,12 +308,12 @@ void main() {
     settings = AppSettings(_UnwritableStore());
     lock.lockOnLaunch();
     await openSettings(tester);
-    await tester.tap(find.byType(SwitchListTile));
+    await tester.tap(find.byType(SwitchListTile).last);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(popups.errors, isNotEmpty);
     expect(settings.biometricLock.value, isTrue);
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, isTrue);
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile).last).value, isTrue);
     expect(lock.isLocked.value, isTrue); // settingChanged() only runs after a stored change
   });
 
@@ -307,8 +322,8 @@ void main() {
     await openSettings(tester);
     expect(find.text('Khóa bằng Face ID'), findsOneWidget);
     expect(find.text('Hỏi khi mở app và khi quay lại sau hơn 5 phút.'), findsOneWidget);
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, isTrue);
-    await tester.tap(find.byType(SwitchListTile));
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile).last).value, isTrue);
+    await tester.tap(find.byType(SwitchListTile).last);
     await tester.pumpAndSettle();
     expect(settings.biometricLock.value, isFalse);
     // AppLockController.settingChanged() ran after the setting changed: turning the lock off must
@@ -320,7 +335,7 @@ void main() {
     biometrics.available = false;
     await openSettings(tester);
     expect(find.text('Thiết bị chưa đặt mã khóa hoặc sinh trắc học'), findsOneWidget);
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged, isNull);
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile).last).onChanged, isNull);
   });
 
   testWidgets('unpair asks, unpairs, drops the tabs and refreshes the list (spec §5.5)', (tester) async {

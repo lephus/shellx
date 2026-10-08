@@ -2243,6 +2243,126 @@ class S {
   String get linkSheetCopy {
     return Intl.message('Copy link', name: 'linkSheetCopy', desc: '', args: []);
   }
+
+  /// `Arrow pad. Drag to move the cursor.`
+  String get arrowPadLabel {
+    return Intl.message(
+      'Arrow pad. Drag to move the cursor.',
+      name: 'arrowPadLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Up`
+  String get arrowPadUp {
+    return Intl.message('Up', name: 'arrowPadUp', desc: '', args: []);
+  }
+
+  /// `Down`
+  String get arrowPadDown {
+    return Intl.message('Down', name: 'arrowPadDown', desc: '', args: []);
+  }
+
+  /// `Left`
+  String get arrowPadLeft {
+    return Intl.message('Left', name: 'arrowPadLeft', desc: '', args: []);
+  }
+
+  /// `Right`
+  String get arrowPadRight {
+    return Intl.message('Right', name: 'arrowPadRight', desc: '', args: []);
+  }
+
+  /// `Last used`
+  String get machineLastUsed {
+    return Intl.message(
+      'Last used',
+      name: 'machineLastUsed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{tabs, plural, =1{1 tab} other{{tabs} tabs}} · {unseen} with new output`
+  String machineTabsActivity(int tabs, int unseen) {
+    return Intl.message(
+      '${Intl.plural(tabs, one: '1 tab', other: '$tabs tabs')} · $unseen with new output',
+      name: 'machineTabsActivity',
+      desc: '',
+      args: [tabs, unseen],
+    );
+  }
+
+  /// `New output`
+  String get machineNewOutput {
+    return Intl.message(
+      'New output',
+      name: 'machineNewOutput',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Couldn’t load your computers`
+  String get machinesErrorTitle {
+    return Intl.message(
+      'Couldn’t load your computers',
+      name: 'machinesErrorTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Try again`
+  String get machinesRetry {
+    return Intl.message('Try again', name: 'machinesRetry', desc: '', args: []);
+  }
+
+  /// `Check your internet connection.`
+  String get machinesCheckConnection {
+    return Intl.message(
+      'Check your internet connection.',
+      name: 'machinesCheckConnection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reload`
+  String get machinesReload {
+    return Intl.message('Reload', name: 'machinesReload', desc: '', args: []);
+  }
+
+  /// `Keep terminal size when the keyboard opens`
+  String get settingsFixedHeight {
+    return Intl.message(
+      'Keep terminal size when the keyboard opens',
+      name: 'settingsFixedHeight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The keyboard covers the terminal instead of shrinking it.`
+  String get settingsFixedHeightHint {
+    return Intl.message(
+      'The keyboard covers the terminal instead of shrinking it.',
+      name: 'settingsFixedHeightHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Draft saved`
+  String get voiceDraftSaved {
+    return Intl.message(
+      'Draft saved',
+      name: 'voiceDraftSaved',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

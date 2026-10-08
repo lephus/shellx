@@ -37,10 +37,13 @@ final class MachineEntry extends Equatable {
 
 /// The machine list as one value for a `StateSignal`.
 final class MachineList extends Equatable {
-  const MachineList(this.machines);
+  const MachineList(this.machines, {this.lastUsedId});
 
   final List<MachineEntry> machines;
 
+  /// A11 D28: the id of the machine opened last when it is listed and online (it is first, with a chip).
+  final String? lastUsedId;
+
   @override
-  List<Object?> get props => [machines];
+  List<Object?> get props => [machines, lastUsedId];
 }

@@ -36,6 +36,15 @@ final class TabBanner {
   final String? detail;
 }
 
+/// The text typed in the voice composer for one terminal (A11 D29). In memory only, never written to disk
+/// or logged: it may hold a password.
+final class DraftHolder {
+  String value = '';
+
+  @override
+  String toString() => '…';
+}
+
 /// Binds one [TabHandle] to an xterm terminal: output → screen, keys → input,
 /// size → resize, lifecycle events → [banner].
 class TerminalTabController extends Controller {
@@ -104,6 +113,9 @@ class TerminalTabController extends Controller {
 
   final int id;
 
+  /// What the composer holds for this terminal; dropped with the tab.
+  final DraftHolder draft = DraftHolder();
+
   /// False for a [TerminalTabController.failed] tab: there is no session on the machine to close,
   /// and its title is left to the UI (empty [title]).
   final bool hasSession;
@@ -121,10 +133,17 @@ class TerminalTabController extends Controller {
 
   /// Selection state for long-press copy (spec §9.4).
   final TerminalController selection = TerminalController();
+
+  /// The terminal view's scroll position, so the keyboard cover knows when the view is scrolled up (A11 D31).
+  final ScrollController scroll = ScrollController();
   late final Signal<ShellxTerminal> _terminal;
   final Signal<TabBanner?> _banner = signal(null);
   final Signal<bool> _bound = signal(false);
   final Signal<String?> _oscTitle = signal(null);
+
+  /// A11 D28: output arrived since this tab was last looked at (computed on the phone, never sent anywhere).
+  final Signal<bool> _unseen = signal(false);
+  bool _viewed = true;
 
   /// The phone drives right after any attach: taking over at an unchanged size brings no
   /// `session.driver` (ledger "Ghi cho P5").
@@ -157,6 +176,9 @@ class TerminalTabController extends Controller {
   ReadonlySignal<ShellxTerminal> get terminal => _terminal;
   ReadonlySignal<TabBanner?> get banner => _banner;
   ReadonlySignal<bool> get isLive => _isLive;
+
+  /// "New output": text came while the tab was not in front of the user ([setViewed]); cleared when it is.
+  ReadonlySignal<bool> get unseen => _unseen;
 
   /// Spec §7: the terminal title (OSC 0/2) if the shell set one, else "`<shell> <index>`"; empty
   /// for a tab without a session ([hasSession]), which has neither.
@@ -207,6 +229,7 @@ class TerminalTabController extends Controller {
     switch (event) {
       case TabOutput(:final text):
         _feed.add(text);
+        if (!_viewed && text.isNotEmpty && !_unseen.peek()) _unseen.value = true;
       case TabReset():
         _feed.clear();
         final current = _terminal.peek();
@@ -348,12 +371,20 @@ class TerminalTabController extends Controller {
   /// The workspace tells which tab is in front (A10 D29).
   void setActive(bool active) => _feed.isActive = active;
 
+  /// The workspace tells whether the user is looking at this tab: it is the active one and the page shows.
+  void setViewed(bool viewed) {
+    if (_disposed) return;
+    _viewed = viewed;
+    if (viewed && _unseen.peek()) _unseen.value = false;
+  }
+
   void dispose() {
     _disposed = true;
     _feed.dispose();
     _resizeTimer?.cancel();
     unawaited(_events?.cancel());
     selection.dispose();
+    scroll.dispose();
     _showDriverBanner.dispose();
     _isLive.dispose();
     _title.dispose();
@@ -362,5 +393,6 @@ class TerminalTabController extends Controller {
     _banner.dispose();
     _bound.dispose();
     _oscTitle.dispose();
+    _unseen.dispose();
   }
 }

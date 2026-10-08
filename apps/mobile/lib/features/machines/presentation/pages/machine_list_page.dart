@@ -115,7 +115,10 @@ class _MachineListPageState extends State<MachineListPage> {
                 final state = _controller.state;
                 final machines = state.value.machines;
                 if (!state.isLoading && !state.hasError && machines.isEmpty) {
-                  return _EmptyState(onScan: _scan);
+                  return _EmptyState(onScan: _scan, onReload: _controller.refresh);
+                }
+                if (!state.isLoading && state.hasError && machines.isEmpty) {
+                  return _ErrorState(error: state.error, onRetry: _controller.refresh);
                 }
                 final waiting = _controller.waiting.value;
                 final online = machines.where((m) => m.online).toList();
@@ -126,6 +129,8 @@ class _MachineListPageState extends State<MachineListPage> {
                   // Only a paired machine has tabs to count: an unpaired one's workspace (if the
                   // registry still holds one) is dead.
                   tabs: machine.paired ? _controller.tabsOpen(machine.id) : 0,
+                  unseen: machine.paired ? _controller.unseenTabs(machine.id) : 0,
+                  lastUsed: machine.online && machine.id == state.value.lastUsedId,
                   now: _controller.now(),
                   onTap: waiting || !machine.online
                       ? null
@@ -153,6 +158,11 @@ class _MachineListPageState extends State<MachineListPage> {
                                       child: NoticeBanner(
                                         text: state.error!.title,
                                         leading: const Icon(Icons.error_outline),
+                                        action: TextButton(
+                                          key: const Key('machines.retry'),
+                                          onPressed: _controller.refresh,
+                                          child: Text(strings.machinesRetry),
+                                        ),
                                       ),
                                     ),
                                   for (final machine in online) card(machine),
@@ -213,11 +223,19 @@ class MachineCard extends StatelessWidget {
     required this.tabs,
     required this.now,
     required this.onTap,
+    this.unseen = 0,
+    this.lastUsed = false,
   });
 
   final MachineEntry machine;
   final bool waiting;
   final int tabs;
+
+  /// A11 D28: tabs of this machine with output nobody has looked at (a subset of [tabs]).
+  final int unseen;
+
+  /// A11 D28: the machine opened last: a "Last used" chip.
+  final bool lastUsed;
   final DateTime now;
 
   /// Null when the card cannot be opened (offline, or the relay is reconnecting).
@@ -310,6 +328,18 @@ class MachineCard extends StatelessWidget {
                                 style: context.typo.metadata12.bold.copyWith(color: colors.link),
                               ),
                             ),
+                          if (lastUsed && !waiting)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.primarySoft,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                strings.machineLastUsed,
+                                style: context.typo.metadata12.bold.copyWith(color: colors.link),
+                              ),
+                            ),
                           if (tabs > 0 && !waiting && machine.paired)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -317,9 +347,32 @@ class MachineCard extends StatelessWidget {
                                 color: colors.divider,
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              child: Text(
-                                strings.machineTabs(tabs),
-                                style: context.typo.metadata12.bold.copyWith(color: colors.secondaryText),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (unseen > 0) ...[
+                                    Semantics(
+                                      label: strings.machineNewOutput,
+                                      child: ExcludeSemantics(
+                                        child: Container(
+                                          key: const ValueKey('dot-new-output'),
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(color: colors.accent, shape: BoxShape.circle),
+                                        ),
+                                      ),
+                                    ),
+                                    5.sizedWidth,
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      unseen > 0
+                                          ? strings.machineTabsActivity(tabs, unseen)
+                                          : strings.machineTabs(tabs),
+                                      style: context.typo.metadata12.bold.copyWith(color: colors.secondaryText),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                         ],
@@ -339,9 +392,10 @@ class MachineCard extends StatelessWidget {
 
 /// Design "Lần đầu dùng": the three pairing steps and "Quét mã QR".
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onScan});
+  const _EmptyState({required this.onScan, required this.onReload});
 
   final VoidCallback onScan;
+  final Future<void> Function() onReload;
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +473,65 @@ class _EmptyState extends StatelessWidget {
             ),
             onTap: onScan,
           ),
+          8.sizedHeight,
+          TextButton(
+            key: const Key('machines.reload'),
+            onPressed: onReload,
+            child: Text(strings.machinesReload),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// A11 D28: the list could not be loaded and there is nothing to show instead: what happened, a hint and
+/// "Try again". With machines already listed the list stays and a slim banner carries the same button.
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.error, required this.onRetry});
+
+  final AppError? error;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = S.of(context);
+    final colors = context.colors;
+    return Center(
+      key: const Key('machines.error'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 56, color: colors.secondaryText),
+            16.sizedHeight,
+            Text(strings.machinesErrorTitle, textAlign: TextAlign.center, style: context.typo.heading20.heavy),
+            8.sizedHeight,
+            if (error != null)
+              Text(
+                error!.title,
+                textAlign: TextAlign.center,
+                style: context.typo.paragraph.copyWith(color: colors.secondaryText),
+              ),
+            Text(
+              strings.machinesCheckConnection,
+              textAlign: TextAlign.center,
+              style: context.typo.paragraph.copyWith(color: colors.secondaryText),
+            ),
+            20.sizedHeight,
+            AppButton(
+              key: const Key('machines.retry'),
+              title: strings.machinesRetry,
+              width: double.infinity,
+              prefix: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Icon(Icons.refresh, color: colors.onPrimary),
+              ),
+              onTap: onRetry,
+            ),
+          ],
+        ),
       ),
     );
   }

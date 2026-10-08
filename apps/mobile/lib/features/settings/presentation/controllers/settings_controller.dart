@@ -197,6 +197,9 @@ class SettingsController extends Controller {
   /// When the slider is released: the size is stored; a failed write shows the toast.
   Future<void> setFontSize(double size) => guard(() => settings.setFontSize(size));
 
+  /// A11 D31: keep the terminal size when the keyboard opens; a failed write shows the toast.
+  Future<void> setFixedTerminalHeight(bool enabled) => guard(() => settings.setFixedTerminalHeight(enabled));
+
   /// The lock follows the setting only once it is stored; a failed write shows the toast and
   /// leaves both as they were.
   Future<void> setBiometricLock(bool enabled) => guard(() async {

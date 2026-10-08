@@ -31,7 +31,8 @@ enum TerminalExit {
 class TerminalPageController extends Controller {
   TerminalPageController(@factoryParam this.agentId, this._registry, this._session, AppSettings settings)
     : _backend = _session.backend.peek(),
-      _fontSize = signal(settings.fontSize.peek()) {
+      _fontSize = signal(settings.fontSize.peek()),
+      fixedHeight = settings.fixedTerminalHeight.peek() {
     final backend = _backend;
     _relayState = signal(backend?.relayState ?? RelayConnectionState.stopped);
     _relayStates = backend?.relayStates.listen(_onRelayState);
@@ -60,6 +61,12 @@ class TerminalPageController extends Controller {
       return;
     }
     _workspace = workspace;
+    // A11 D28: the machine list puts this one first next time. Only its id is stored.
+    unawaited(
+      settings.setLastMachine(agentId).catchError((Object error) {
+        if (kDebugMode) debugPrint('Last machine not saved: ${error.runtimeType}');
+      }),
+    );
     _machineState = signal(workspace.machine.state);
     _machineStates = workspace.machine.states.listen(_onMachineState);
   }
@@ -67,6 +74,10 @@ class TerminalPageController extends Controller {
   static const Duration noticeDuration = Duration(seconds: 4);
 
   final String agentId;
+
+  /// A11 D31: the keyboard covers the terminal instead of shrinking it. Read when the page opens: the
+  /// switch is in Settings, which cannot be reached from here.
+  final bool fixedHeight;
   final WorkspaceRegistry _registry;
   final SessionHolder _session;
 
@@ -103,7 +114,25 @@ class TerminalPageController extends Controller {
 
   /// The machine's tabs. Throws [StateError] when the machine was not pinned (or nobody was signed
   /// in) when the page opened ([closing] is then true from the start).
+  /// False when the machine is not pinned (the page then exits as untrusted): [workspace] throws.
+  bool get hasWorkspace => _workspace != null;
+
   TerminalWorkspace get workspace => _workspace ?? (throw StateError('The machine is not pinned'));
+
+  /// A11 D28: this page is on screen (true) or not — left, or the app in the background (false). The tabs'
+  /// "new output" follows. Nothing once the page is leaving: the workspace may be disposed.
+  void setViewing(bool viewing) {
+    if (_closed || _dropped) return;
+    _workspace?.setViewing(viewing);
+  }
+
+  /// Coming in from the machine list: the first tab with new output is shown, unless a notification asked
+  /// for a tab (it wins).
+  void showFirstUnseen() {
+    final workspace = _workspace;
+    if (_closed || _dropped || workspace == null || workspace.hasPendingSelect) return;
+    workspace.selectFirstUnseen();
+  }
 
   /// Font size of this page (pinch or "Aa"); the default comes from Settings (spec §9.2 #5).
   ReadonlySignal<double> get fontSize => _fontSize;

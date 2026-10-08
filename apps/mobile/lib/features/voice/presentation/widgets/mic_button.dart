@@ -20,12 +20,15 @@ class MicButton extends StatelessWidget {
       final strings = S.of(context);
       // Listening, the mic stays usable even if the tab stopped being live: "Dừng nghe" must work.
       final active = enabled || listening;
+      // A draft waits for this terminal while the composer is closed (A11 D29).
+      final draft = controller.phase.value == VoicePhase.closed && controller.hasDraft.value;
       return Semantics(
         button: true,
         enabled: active,
         // The GestureDetector's own action is excluded with the icon; the screen reader taps here.
         onTap: active ? onTap : null,
         label: listening ? strings.voiceStopTooltip : strings.voiceMicTooltip,
+        value: draft ? strings.voiceDraftSaved : null,
         excludeSemantics: true,
         child: GestureDetector(
           key: const ValueKey('voice-mic'),
@@ -44,13 +47,29 @@ class MicButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: const [BoxShadow(color: Color(0x47000000), offset: Offset(0, 1))],
                 ),
-                child: _Pulse(
-                  active: listening,
-                  child: Icon(
-                    listening ? Icons.mic : Icons.mic_none,
-                    size: 20,
-                    color: listening ? colors.onPrimary : colors.keyAccent,
-                  ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    _Pulse(
+                      active: listening,
+                      child: Icon(
+                        listening ? Icons.mic : Icons.mic_none,
+                        size: 20,
+                        color: listening ? colors.onPrimary : colors.keyAccent,
+                      ),
+                    ),
+                    if (draft)
+                      Positioned(
+                        top: 5,
+                        right: 6,
+                        child: Container(
+                          key: const ValueKey('voice-draft'),
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(color: colors.accent, shape: BoxShape.circle),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),

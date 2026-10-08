@@ -31,13 +31,14 @@ void main() {
   late WorkspaceRegistry registry;
   late List<Object?> results;
   late FakeSpeechInput speech;
+  late AppSettings settings;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
     machine = backend.addMachine(agentA);
     session = FakeSessionHolder(backend);
     registry = WorkspaceRegistry(session.backend);
-    final settings = AppSettings(InMemoryKeyValueStore());
+    settings = AppSettings(InMemoryKeyValueStore());
     results = [];
     getIt
       ..registerSingleton<PopupHandler>(FakePopupHandler())
@@ -313,6 +314,12 @@ void main() {
     addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     await open(tester);
 
+    // The arrow pad and the mic come first: bring the arrow keys into view.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('extra-key-up')).hitTestable(),
+      100,
+      scrollable: find.descendant(of: find.byType(ExtraKeysBar), matching: find.byType(Scrollable)),
+    );
     await tester.tap(find.byKey(const ValueKey('extra-key-up')));
     expect(lastInput(), '\x1b[A');
 
@@ -328,6 +335,88 @@ void main() {
     await tester.tap(find.text('Dán'));
     await tester.pumpAndSettle();
     expect(lastInput(), 'echo 1\recho 2');
+  });
+
+  group('A11 D28: new output and the last machine', () {
+    testWidgets('opening the page remembers the machine', (tester) async {
+      expect(settings.lastMachineId.value, isNull);
+      await open(tester);
+      expect(settings.lastMachineId.value, agentA);
+    });
+
+    testWidgets('output on the tab in front is seen; another tab, or leaving the page, makes it new', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      machine.handles.last.emit(const TabOutput('front'));
+      machine.handles.first.emit(const TabOutput('behind'));
+      expect(workspace.unseenCount, 1, reason: 'only the tab behind');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(workspace.unseenCount, 0, reason: 'looking at it clears it');
+
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      machine.handles.first.emit(const TabOutput('while away'));
+      expect(workspace.unseenCount, 1, reason: 'the page is not showing');
+    });
+
+    testWidgets('coming back from the list shows the first tab with new output', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      workspace.select(1);
+      machine.handles.first.emit(const TabOutput('done building'));
+      expect(workspace.unseenCount, 1);
+      expect(workspace.activeIndex.value, 1);
+      await openPushed(tester);
+      expect(workspace.activeIndex.value, 0, reason: 'the tab with new output is in front');
+      expect(workspace.unseenCount, 0);
+    });
+
+    testWidgets('resuming the app with another page on top does not mark the terminal as viewed', (tester) async {
+      await open(tester);
+      final workspace = registry.forMachine(agentA);
+      final context = tester.element(find.byType(Scaffold).first);
+      unawaited(
+        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('on top')))),
+      );
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      machine.handles.first.emit(const TabOutput('while covered'));
+      expect(workspace.unseenCount, 1);
+    });
+
+    testWidgets('resuming the app on the terminal page marks it as viewed again', (tester) async {
+      await open(tester);
+      final workspace = registry.forMachine(agentA);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      machine.handles.first.emit(const TabOutput('x'));
+      expect(workspace.unseenCount, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(workspace.unseenCount, 0);
+      machine.handles.first.emit(const TabOutput('y'));
+      expect(workspace.unseenCount, 0);
+    });
+
+    testWidgets('a notification\'s pending tab wins over the first unseen one', (tester) async {
+      await open(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final workspace = registry.forMachine(agentA);
+      await tester.tap(find.byTooltip('Về danh sách máy'));
+      await tester.pumpAndSettle();
+      workspace.select(1);
+      machine.handles.first.emit(const TabOutput('x'));
+      workspace.pendingSelect(102);
+      await openPushed(tester);
+      expect(workspace.activeIndex.value, 1);
+    });
   });
 
   testWidgets('"Aa" opens the font size slider', (tester) async {
@@ -1530,6 +1619,60 @@ void main() {
       await tester.tap(mic());
       await tester.pump();
       expect(speech.stops, 1);
+      await tester.pump(const Duration(milliseconds: 150));
+    });
+
+    testWidgets('A11 D29: a tab with a draft shows it on the mic while the composer is closed', (tester) async {
+      await openQuiet(tester);
+      final dot = find.byKey(const ValueKey('voice-draft'));
+      expect(dot, findsNothing);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      final tabs = registry.forMachine(agentA).tabs.value;
+      tabs.first.draft.value = 'git push';
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(dot, findsOneWidget);
+      expect(find.byKey(const ValueKey('voice-text')), findsNothing, reason: 'not opened by itself');
+      expect(
+        find.byWidgetPredicate((w) => w is Semantics && w.properties.value == 'Có bản nháp'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('tab-102')));
+      await tester.pumpAndSettle();
+      expect(dot, findsNothing);
+    });
+
+    testWidgets('A11 D29: each tab keeps its own draft; closing a tab drops its draft', (tester) async {
+      await openQuiet(tester);
+      await tester.tap(find.byTooltip('Mở phiên mới'));
+      await tester.pumpAndSettle();
+      await tester.tap(mic());
+      await tester.pumpAndSettle();
+      speech.emit(const SpeechListening(true));
+      speech.emit(const SpeechListening(false));
+      await tester.pump();
+      String field() => tester.widget<TextField>(find.byKey(const ValueKey('voice-text'))).controller!.text;
+      await tester.enterText(find.byKey(const ValueKey('voice-text')), 'ls -la');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(field(), '', reason: 'the other tab starts empty');
+      await tester.enterText(find.byKey(const ValueKey('voice-text')), 'git status');
+      await tester.tap(find.byKey(const ValueKey('tab-102')));
+      await tester.pumpAndSettle();
+      expect(field(), 'ls -la');
+      await tester.tap(find.byKey(const ValueKey('tab-101')));
+      await tester.pumpAndSettle();
+      expect(field(), 'git status');
+      final tabs = registry.forMachine(agentA).tabs.value;
+      expect([for (final tab in tabs) tab.draft.value], ['git status', 'ls -la']);
+      await tester.tap(
+        find.descendant(of: find.byKey(const ValueKey('tab-101')), matching: find.byTooltip('Đóng phiên')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đóng phiên'));
+      await tester.pumpAndSettle();
+      expect(field(), 'ls -la', reason: 'the closed tab took its draft with it');
       await tester.pump(const Duration(milliseconds: 150));
     });
 

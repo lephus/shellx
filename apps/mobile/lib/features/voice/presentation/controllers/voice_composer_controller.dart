@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart' show DraftHolder;
 import 'package:shellx_mobile/features/voice/domain/speech_input.dart';
 import 'package:shellx_mobile/features/voice/domain/voice_command_parser.dart';
 import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
@@ -20,6 +21,8 @@ enum VoiceIssue { noPermission, unsupported, localeUnavailable, network, failed 
 class VoiceComposerController extends Controller {
   VoiceComposerController(this._speech, this._settings) {
     _events = _speech.events.listen(_onEvent);
+    // An assignment to a String, kept in memory only (a draft may hold a password): no debounce needed.
+    text.addListener(_saveDraft);
   }
 
   final SpeechInput _speech;
@@ -55,6 +58,30 @@ class VoiceComposerController extends Controller {
   ReadonlySignal<VoiceIssue?> get issue => _issue;
   ReadonlySignal<VoiceLocale> get locale => _locale;
   ReadonlySignal<Set<VoiceLocale>> get unavailable => _unavailable;
+
+  DraftHolder? _draft;
+
+  /// A11 D29: the composer shows the draft of the terminal in front. The text typed so far is kept in
+  /// the holder of the terminal being left; [holder] null (no tab) leaves a plain composer. Partial
+  /// speech belongs to the previous terminal and is dropped.
+  void useDraft(DraftHolder? holder) {
+    if (_disposed || identical(holder, _draft)) return;
+    _saveDraft();
+    _draft = holder;
+    _committed = '';
+    if (_active) _cancelListen();
+    text.text = holder?.value ?? '';
+  }
+
+  void _saveDraft() {
+    _draft?.value = text.text;
+    _hasDraft.value = text.text.isNotEmpty;
+  }
+
+  final Signal<bool> _hasDraft = signal(false);
+
+  /// The composer holds text (this terminal's draft); with the composer closed the mic says so.
+  ReadonlySignal<bool> get hasDraft => _hasDraft;
 
   /// [canSend]: the active tab is live. [onSubmit]: sends one line with Enter.
   void attach({required bool Function() canSend, required void Function(String line) onSubmit}) {
@@ -259,10 +286,12 @@ class VoiceComposerController extends Controller {
       unawaited(_speech.cancel());
     }
     unawaited(_events.cancel());
+    text.removeListener(_saveDraft);
     text.dispose();
     _phase.dispose();
     _issue.dispose();
     _locale.dispose();
     _unavailable.dispose();
+    _hasDraft.dispose();
   }
 }

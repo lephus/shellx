@@ -215,6 +215,7 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.SessionHolder>(),
         gh<_i667.WorkspaceRegistry>(),
         gh<_i737.PushController>(),
+        gh<_i351.AppSettings>(),
       ),
     );
     gh.factory<_i1035.SettingsController>(

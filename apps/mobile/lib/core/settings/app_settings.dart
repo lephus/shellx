@@ -12,6 +12,8 @@ class AppSettings {
   static const String fontSizeKey = 'settings_font_size';
   static const String biometricLockKey = 'settings_biometric_lock';
   static const String voiceLocaleKey = 'settings_voice_locale';
+  static const String lastMachineKey = 'settings_last_machine';
+  static const String fixedTerminalHeightKey = 'settings_fixed_terminal_height';
   static const double defaultFontSize = 14;
   static const double minFontSize = 8;
   static const double maxFontSize = 32;
@@ -26,6 +28,16 @@ class AppSettings {
   /// composer then follows the app language).
   final Signal<VoiceLocale?> _voiceLocale = signal(null);
 
+  /// A11 D28: the computer whose terminal was opened last (its id, never its name); the machine list puts
+  /// it first among the online ones. Null until one is opened.
+  final Signal<String?> _lastMachineId = signal(null);
+
+  /// A11 D31: the keyboard covers the terminal instead of shrinking it (no `resize` when it opens). Off by
+  /// default: today's behaviour.
+  final Signal<bool> _fixedTerminalHeight = signal(false);
+
+  ReadonlySignal<bool> get fixedTerminalHeight => _fixedTerminalHeight;
+  ReadonlySignal<String?> get lastMachineId => _lastMachineId;
   ReadonlySignal<double> get fontSize => _fontSize;
   ReadonlySignal<bool> get biometricLock => _biometricLock;
   ReadonlySignal<VoiceLocale?> get voiceLocale => _voiceLocale;
@@ -39,10 +51,14 @@ class AppSettings {
     final double? storedSize;
     final bool biometricLock;
     final String? voiceCode;
+    final String? lastMachine;
+    final bool fixedHeight;
     try {
       storedSize = double.tryParse(await _store.read(fontSizeKey) ?? '');
       biometricLock = await _store.read(biometricLockKey) != 'false';
       voiceCode = await _store.read(voiceLocaleKey);
+      lastMachine = await _store.read(lastMachineKey);
+      fixedHeight = await _store.read(fixedTerminalHeightKey) == 'true';
     } catch (error) {
       if (kDebugMode) debugPrint('AppSettings load error: ${error.runtimeType}');
       return;
@@ -51,6 +67,8 @@ class AppSettings {
       _fontSize.value = clampFontSize(storedSize ?? defaultFontSize);
       _biometricLock.value = biometricLock;
       _voiceLocale.value = VoiceLocale.values.where((l) => l.languageCode == voiceCode).firstOrNull;
+      _fixedTerminalHeight.value = fixedHeight;
+      _lastMachineId.value = (lastMachine == null || lastMachine.isEmpty) ? null : lastMachine;
     });
   }
 
@@ -72,5 +90,18 @@ class AppSettings {
   Future<void> setVoiceLocale(VoiceLocale locale) async {
     _voiceLocale.value = locale;
     await _store.write(voiceLocaleKey, locale.languageCode);
+  }
+
+  /// The machine whose terminal opens now. Shown at once; a failed write only loses it after a restart.
+  Future<void> setLastMachine(String id) async {
+    if (_lastMachineId.peek() == id) return;
+    _lastMachineId.value = id;
+    await _store.write(lastMachineKey, id);
+  }
+
+  /// Stored first, like [setBiometricLock]: a failed write leaves the setting as it was.
+  Future<void> setFixedTerminalHeight(bool enabled) async {
+    await _store.write(fixedTerminalHeightKey, enabled.toString());
+    _fixedTerminalHeight.value = enabled;
   }
 }
