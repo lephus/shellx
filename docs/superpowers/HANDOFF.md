@@ -573,6 +573,23 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 
 ## 21. A11 — chất lượng P1 (2026-10-08)
 
+**Tính năng (một dòng mỗi mục, kèm quyết định spec).** T1 phím soạn dòng `edit_line` (D11); T2 mobile: chạm thông báo chọn đúng tab dù đang kết nối lại (`pendingSelect`, D27); T3 chọn nhanh: ba lần nhấp chọn dòng, Option-kéo chọn khối (D12); T4 chế độ copy bàn phím kiểu vi (D13); T5 mở lại tab/pane vừa đóng, `⌘⇧T`, chỉ trong bộ nhớ (D14); T6 lịch sử focus `⌘⌃[`/`]` (D15); T7 chỉnh chiều cao ô, con trỏ nhấp nháy 530 ms, `font-feature` chỉ báo (D16–D17); T8–T10 Cài đặt: bảy trang trên một nguồn sự thật, ghi tệp cấu hình an toàn, xem trước khi rê (D3–D10); T11 `⌘⇧F` tìm trong mọi terminal (D21); T12 đổi chỗ/tách/chuyển pane, chuyển tab sang workspace khác (D20); T13 ghim tab, mô tả và trạng thái tab, lưu trong `layout.json` (D18); T14 zoom theo workspace −6…+10 pt (D19); T15 CLI `shellx doctor`, `new-tab` theo `fromPane` (D26); T16 tour lần đầu và thẻ "Có gì mới" (D23–D24); T17 phím toàn cục hiện/ẩn cửa sổ (D22); T18 danh sách máy trên mobile có "đầu ra mới" (D29); T19 bàn phím mũi tên trên mobile (D30); T20 nháp theo từng terminal trên mobile, chỉ trong bộ nhớ (D28); T21 tuỳ chọn giữ cỡ terminal khi bàn phím mở (D31). Giao thức điện thoại, relay, agent, daemon **không đổi** (D34). Số test cuối: desktop 2712, mobile 813 (progress.md).
+
+**Thay đổi phím cần ghi vào ghi chú phát hành.** `⌘,` / `Ctrl+,` nay mở **Cài đặt** (trước đây mở tệp cấu hình). Mở tệp cấu hình: `⌘⌥,` (macOS) / `Ctrl+Shift+Alt+,` (Windows) hoặc nút "Mở tệp" trong Cài đặt (D10). Ai đã tự gán lại `open_config` giữ nguyên gán của mình.
+
+**Hoãn A12 (D36).** Hook agent (`shellx integrations install`), resume phiên agent sau khôi phục, trạng thái Running/Needs-input/Idle, PR status qua `gh`, đặt mô tả/trạng thái tab từ CLI/hook, vạch scrollbar theo prompt agent, "Open With", tự cài bản cập nhật, tìm regex. **Task 22 (độ trong suốt/blur cửa sổ macOS) hoãn sang A12**: không kiểm chứng được bằng mắt trên máy này (không có quyền ghi màn hình); cửa sổ trong suốt vẽ sai tệ hơn là chưa có.
+
+**Giới hạn đã biết (bổ sung, ngoài các mục Task 11–12 và 17 dưới đây).**
+- Xterm 4.0.0 không hỗ trợ ligature: `font-feature` chỉ được ghi nhận kèm ghi chú, không có tác dụng.
+- Lịch sử đóng tab (T5) chỉ nằm trong bộ nhớ (tối đa 10 mục / 2 MiB), mất khi thoát; mô tả tab nằm trong `layout.json` (0600).
+- Phím toàn cục không phát hiện được tổ hợp bị app khác giữ (xem Task 17); Settings có dòng gợi ý.
+- Mobile: bộ đếm "đầu ra mới" tính trên điện thoại và cũng đếm phần phát lại bù sau khi kết nối lại cho tab nền (giao thức không đổi nên không phân biệt được). Với tuỳ chọn giữ cỡ terminal, khi người dùng cuộn lên lịch sử thì phần dịch lên vẫn theo hàng con trỏ của viewport.
+- Chạm thông báo (D27): nếu sau khi kết nối lại tab chờ chọn không phải tab cuối thì tab thêm sau vẫn thành tab đang xem (hành vi `_add` cũ).
+- Alt giữ khi chương trình bật báo chuột: xterm vẫn báo click cho chương trình nên không tạo được vùng chọn khối. `Option+Backspace/Delete` mặc định là phím cửa sổ bất kể `macos-option-as-alt` (gán lại được).
+- Chuyển pane (D20) không phân biệt được trong shell: `shellx new-tab` từ pane đã kéo sang workspace khác dùng `fromPane` nên đúng; chỉ biến môi trường cũ là sai.
+- `shellx doctor`: so sánh phiên bản bỏ qua `+build`; CLI dev so với app release báo một dòng lỗi.
+- Parked: không có hoàn tác cho `break`/`join`/chuyển; `workspace new` và `tmux attach` không gửi `fromPane`/`fromTab`.
+
 **Ghi chú đã biết (Task 11–12).**
 - ⌘⇧F (`search_all`) tìm trong buffer đang hiển thị của mỗi pane: khi một TUI (vim, htop, tmux) đang dùng màn hình phụ thì chỉ tìm được phần nhìn thấy, không có cuộn (spec D21 nói buffer chính; đổi để kết quả luôn mở được bằng thanh tìm A10).
 - Pane đã chuyển tab (`break_pane`, `join_pane`, "Chuyển pane tới tab") mất huy hiệu chưa đọc; lịch sử thông báo vẫn nhảy tới được.
@@ -587,5 +604,54 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - Phím toàn cục (`global-hotkey`, mặc định tắt) dùng `hotkey_manager` 0.2.3 (ghim chính xác): macOS dùng Carbon `RegisterEventHotKey` qua pod HotKey (không cần quyền Trợ năng), Windows dùng `RegisterHotKey` trên cửa sổ gốc. **Cả hai phía native của plugin luôn trả `true`**, nên tổ hợp đang bị app khác giữ **không** được báo: phím chỉ không bao giờ chạy. "Đăng ký thất bại" (vấn đề cấu hình `unsupportedValue` + dòng "Tổ hợp này đang được ứng dụng khác dùng") chỉ xảy ra khi plugin ném lỗi hoặc phím không có trong bảng. Muốn báo đúng: viết `ChannelHotkey` (`GlobalHotkey` giữ nguyên, chỉ thay `HotkeyManagerHotkey`).
 - Windows gửi lại WM_HOTKEY khi giữ phím: binder bỏ qua lần bấm cách lần trước dưới 300 ms.
 - Bấm khi cửa sổ đang hiện và có focus: ẩn về khay (như nút đóng, đóng luôn hộp thoại đang mở). Khi ẩn / thu nhỏ / ở sau app khác: hiện ra trước, mở tab nếu chưa có (như "Mở cửa sổ terminal" của khay).
+
+**⚠ Danh sách kiểm tra thủ công A11 (chưa ai chạy trên máy thật; chỉ phát hành khi tất cả đạt, mỗi task đã merge vào main sau review nhưng danh sách này chặn phát hành)**
+
+Task 1 — soạn dòng (Mac, Windows)
+- [ ] zsh, bash, fish: `Ctrl-A`/`Ctrl-E`, `Option+←/→`, `Option+Backspace`, `⌘+Backspace` sửa đúng dòng lệnh; trong `vim` (màn hình phụ) và pane đã thoát các phím không bị chặn (Ctrl-A không tăng số).
+- [ ] Gõ tiếng Việt Telex có dùng Option vẫn ra dấu. Windows: `Ctrl+Alt` chỉ bằng Alt trái.
+
+Task 2 — thông báo khi kết nối lại (iPhone, Android)
+- [ ] Tắt mạng điện thoại, chạm thông báo "lệnh xong", bật mạng: mở đúng tab của thông báo, không nhảy sang tab cuối. Thử khi tab chờ không phải tab cuối.
+
+Task 3 — chọn nhanh (Mac, Windows)
+- [ ] Ba lần nhấp chọn đúng dòng (cả dòng bị xuống dòng mềm); Option-kéo chọn khối trong shell thường (Windows: Alt trái); chương trình đang bật báo chuột (tmux/vim mouse) thì không tạo khối (đã biết).
+
+Task 4 — chế độ copy (Mac, Windows)
+- [ ] Vào bằng chord mặc định, cuộn scrollback thật bằng `Ctrl-u/d/b/f`; `v`/`V`/`Ctrl-v` hiển thị đúng (khối là hình chữ nhật); `y` dán đúng chữ ở nơi khác; `/` rồi `n`/`N`; bố cục Telex/Hangul gõ `hjkl` vẫn chạy; trong `vim` chỉ thấy các hàng nhìn thấy; chip và toast đúng chỗ.
+
+Task 5 — mở lại tab (Mac, Windows)
+- [ ] Đóng tab có output và cwd, `⌘⇧T`: shell cùng cwd, chữ cũ phía trên dải phân cách, không phát lại lệnh. Đóng một pane của tab chia; pane SSH mở lại qua launch; bật phiên nền A5b; thoát app thì lịch sử mất.
+
+Task 6 — lịch sử focus (Mac, Windows)
+- [ ] `⌘⌃[` / `]` qua tab, pane, workspace; phím không lọt vào shell. Windows `Ctrl+Alt+[`/`]` chưa thử.
+
+Task 7 — nhìn (Mac, Windows)
+- [ ] Con trỏ nhấp nháy 530 ms; `top`/`vim` ẩn con trỏ thì không hiện lại; CPU khi nhấp nháy đo bằng Activity Monitor (một pane); cửa sổ mất focus thì dừng. `adjust-cell-height` đổi chiều cao ô, chọn và IME vẫn đúng.
+
+Task 9–10 — Cài đặt (Mac, Windows)
+- [ ] Cài đặt ở 640 px và toàn màn; VoiceOver qua bảy trang và vùng thông báo trực tiếp; gõ Telex vào ô tìm và ô font; đổi theme/cỡ chữ khi `htop` chạy (pane thật không đổi khi rê/focus); sửa tay tệp cấu hình khi Cài đặt mở (Notepad trên Windows) → bị từ chối và nạp lại; chế độ sáng/tối hệ thống; kiểm tra độ tương phản của kết quả tìm nhảy tới và viền focus.
+- [ ] `⌘,` mở Cài đặt, `⌘⌥,` mở tệp (Windows: `Ctrl+,` và `Ctrl+Shift+Alt+,`).
+
+Task 11–12 — tìm mọi terminal và chuyển pane (Mac, Windows)
+- [ ] Chuyển pane có `vim`/`htop` giữa các tab (đổi cỡ PTY thật), pane SSH sang tab cục bộ; `⌘⇧F` với scrollback rất lớn vẫn mượt; Windows `Ctrl+Shift+Alt+F`; chưa có người dùng screen reader thử lớp phủ tìm.
+
+Task 13–15 — ghim/mô tả, zoom, CLI (Mac, Windows)
+- [ ] Hàng ghim/mô tả/trạng thái (cao 78), menu trạng thái, kéo giới hạn; `⌘⌥=` trên bàn phím thật (Option có thể ra ký tự), Windows `Ctrl+Alt+=` bằng Alt trái; tooltip trên đầu workspace đã zoom; `shellx doctor` với bản cài thật (dòng PATH/skills); `shellx new-tab` từ pane đã kéo sang workspace khác.
+
+Task 16 — tour và "Có gì mới" (Mac, Windows)
+- [ ] Xoá `tour_done`/`last_seen_version`: tour hiện một lần; VoiceOver đọc tên hộp thoại và "n / 4"; Tab/Shift+Tab giữ trong hộp; Esc trả focus về terminal. Cài bản mới hơn với `whats_new.json` đã điền: thẻ hiện một lần; tiếng Việt.
+
+Task 17 — phím toàn cục (Mac, Windows)
+- [ ] Mac: `global-hotkey = ctrl+alt+j`; từ Safari/Slack/Space khác/màn hình khoá: ShellX hiện ra trước và focus terminal; bấm lại thì ẩn; không có hộp thoại Trợ năng; tổ hợp bị Spotlight chiếm sẽ im lặng (đã biết); ô ghi phím (Esc, phím trần, chỉ phím bổ trợ); tắt trong Cài đặt hoặc thoát app thì phím ngừng; gõ trong ShellX không bị ảnh hưởng.
+- [ ] Windows 10/11: build runner (C++ của plugin chưa từng biên dịch ở đây), cùng quy trình, RDP, bàn phím AltGr (Đức, Ba Lan) với chord Ctrl+Alt, giữ phím (chống lặp 300 ms).
+
+Task 18–21 — mobile (iPhone, Android)
+- [ ] Bàn phím mũi tên: cảm giác trong `vim`/`claude`, TalkBack/VoiceOver đọc các hành động tuỳ chỉnh, đổi hướng không kẹt, dừng khi app tạm dừng.
+- [ ] Danh sách máy: chạy `yes | head -c 50M` ở tab nền, kiểm tra "đầu ra mới" tăng, xoá khi mở tab; sau khi kết nối lại biết rằng phần phát lại cũng được đếm.
+- [ ] Nháp: gõ nháp ở terminal A, sang B, quay lại: nháp còn; huy hiệu nháp trên nút mic; đóng app thì nháp mất.
+- [ ] Giữ cỡ terminal khi bàn phím mở: không gửi `resize`, lớp phủ theo tab đang xem; Android IME animation, xoay ngang, con trỏ ở hàng cuối trong `vim`.
+
+**Quy trình phát hành.** (1) Điền `apps/desktop/assets/whats_new.json` cho phiên bản mới (xem mục Task 16 trên) và dịch vi + en. (2) Ghi vào ghi chú phát hành: `⌘,` mở Cài đặt, `⌘⌥,` mở tệp cấu hình. (3) Chạy hết danh sách thủ công ở trên. (4) Chính sách quyền riêng tư (`web/src/pages/privacy.md`, `en/privacy.md`) đã nêu danh sách tab vừa đóng chỉ nằm trong bộ nhớ.
 
 Branding: logo gốc ở `assets/brand/` (3 SVG); tạo lại icon: `qlmanage -t -s 1024 -o /tmp/shellx-brand assets/brand/*.svg` rồi `python3 assets/brand/gen_icons.py /tmp/shellx-brand` (Pillow; ghi macOS/Windows/iOS/Android + `apps/mobile/assets/images/logo.png`; `sips` dùng được để kiểm tra kích thước). Icon khay hệ thống (`apps/desktop/assets/tray`) và `web/` có bộ nhận diện riêng, không đổi.

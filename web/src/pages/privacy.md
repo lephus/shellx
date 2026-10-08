@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: "ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu, mã hóa đầu cuối bảo vệ nội dung terminal ra sao, và cách xóa tài khoản của bạn."
-updated: "2026-10-07"
+updated: "2026-10-08"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -74,6 +74,7 @@ Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại �
 - **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
 - **Full Disk Access (macOS):** quyền này không bắt buộc và chỉ để các lệnh bạn chạy trong terminal truy cập được thư mục của bạn. Agent không tự đọc hay tải lên tệp nào của bạn.
 - **Khôi phục phiên (máy tính):** để mở lại đúng chỗ làm việc sau khi bạn thoát ứng dụng hoặc khởi động lại máy, ShellX lưu bố cục tab/pane, thư mục làm việc của từng terminal và — nếu "Lưu nội dung terminal khi thoát" đang bật (mặc định bật) — tối đa 2.000 dòng nội dung cuối của mỗi terminal (không quá 256 KiB mỗi terminal). Các tệp này chỉ nằm trên máy tính của bạn, trong thư mục dữ liệu của ứng dụng thuộc tài khoản của bạn: trên macOS là `~/Library/Application Support/pro.shellx.desktop/restore`, chỉ tài khoản của bạn đọc được và không đưa vào bản sao lưu Time Machine; trên Windows là `%LOCALAPPDATA%\ShellX\restore`, được xóa khi gỡ cài đặt. Nội dung này có thể chứa bất cứ thứ gì đã hiện trên terminal; nó không bao giờ được gửi lên máy chủ, tới điện thoại hay đồng bộ đi đâu. Bạn có thể tắt việc lưu nội dung hoặc xóa nội dung đã lưu bất cứ lúc nào trong menu ShellX trên máy tính → Terminal. Ảnh bạn dán vào terminal được lưu tạm trên máy tính, trong thư mục riêng của ứng dụng, và bị xoá sau 24 giờ, hoặc khi ShellX thoát và đóng các shell của bạn; ShellX không gửi ảnh đi đâu.
+- **Tab vừa đóng (máy tính):** Danh sách các tab bạn vừa đóng chỉ nằm trong bộ nhớ của máy tính và mất khi bạn thoát ứng dụng.
 - **SSH (máy tính):** khi bạn kết nối tới máy chủ, ShellX chạy lệnh `ssh` của máy bạn với khoá và cấu hình của bạn; ShellX không hỏi, không lưu mật khẩu. Nếu bật hook, ShellX ghi vài tệp script nhỏ vào `~/.cache/shellx/` trên máy chủ để biết thư mục, nhánh git và cổng đang mở — không gửi gì khác đi đâu. Danh sách máy gần đây chỉ lưu trên máy tính này. Tên máy chủ và thư mục bạn đang ở trên đó có thể hiện trong danh sách phiên trên điện thoại đã ghép nối của bạn, như một thư mục cục bộ.
 
 ## 5. Những gì chúng tôi không làm

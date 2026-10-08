@@ -177,3 +177,24 @@ Rulings (copied from the A10 progress ledger):
 - Ruling (T8-9): the shell family for drops comes from the launched shell; document the limitation — bracketed, no Enter — cost: wrong quoting when another shell runs inside.
 - Ruling (T10-12): never recover over a user-emptied layout (track userEmptied) — cost: one snapshot field.
 - Ruling (T13-16): Android composer keeps enableSuggestions true (Vietnamese Telex/VNI composing on Gboard/Samsung) — cost: suggestion strip visible on Android.
+
+## A11 (quality P1) — execution
+
+Plan: docs/superpowers/plans/2026-10-07-quality-p1-a11.md. Branch feat/desktop-a11; tasks merged to main in groups after review (T1-3, T4-6, T7-8, T9-10, T11-12, T13-15, T16-17, T18-21). T22 (macOS opacity/blur) deferred to A12.
+
+Test counts (from progress.md): desktop 2279 at T1-3, 2281 after the T1-3 merge, 2352 after T4-6, 2467 after T7-8, 2544 after T9-10, 2594 after T11-12, 2640 after T13-15, 2712 after T16-17 (final desktop 2712, +5 pre-existing skips). Mobile 741 at T1-3, 743 after the merge, 804 at T18-21, 813 final. Phone protocol, relay, agent, daemon unchanged (D34).
+
+Review-found fixes: notification tab lost on reconnect (T2); copy-mode surrogates, wrapped-space yank, focus history after reconnect (T4-6); refused Settings write leaving the attempted value shown, dispose-flush result dropped (T9-10); CRITICAL tab key colliding with a moved pane key, which rejected the whole layout.json on restart (T12); `shellx ssh` landing in the caller's workspace (T15); pending tour / What's new lost while an overlay is open (T16-17); mobile keyboard cover following the previous tab, arrow pad hysteresis and lifecycle (T21).
+
+Pending manual: every item of the checklist in HANDOFF section 21 (Tasks 1-21; nothing was run on a Mac, Windows PC or phone) is "pending manual" and gates release. Windows native build of the hotkey plugin was never compiled.
+
+Rulings (copied from the A11 progress ledger):
+- Ruling (user merge-each + away mode): each task merges to main after review; manual list gates release. T22 (opacity/blur) optional — drop if it can't be verified safely.
+- Ruling (T1-3): an automatic first-visit openNew (machine has no sessions) drops the pending notification tab — the session no longer exists — cost: none.
+- Ruling (T4-6): paste/drop while in copy mode: exit copy mode then act.
+- Ruling (T11-12): active buffer search accepted; synthetic tab ids >= 2e9 accepted; pane.moved accepted; stale SHELLX_TAB_ID -> T15 resolves via fromPane.
+- Ruling (T13-15): shellx ssh keeps A8 D23 (server's own workspace, else create one) — caller workspace must not swallow server tabs — cost: none.
+- Ruling (T13-15): doctor version compare ignores +build.
+- Ruling (T16-17): hotkey conflicts undetectable via plugin (always success) — accept, feature off by default, document in HANDOFF + Settings hint — cost: a taken chord silently never fires.
+- Ruling (T18-21): show a draft badge on the mic, no auto-open.
+- Ruling (T22): deferred to A12 — cannot be verified visually here (no screen recording permission); a transparent window that renders wrong is worse than none — cost: feature later.
