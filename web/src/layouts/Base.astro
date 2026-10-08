@@ -77,7 +77,7 @@ const home = pathFor(lang, 'home');
   <body>
     <header class="top">
       <div class="wrap top-inner">
-        <a class="brand" href={home}><span class="brand-mark" aria-hidden="true">~/</span>shellx</a>
+        <a class="brand" href={home}><img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />shellx</a>
         <nav class="top-nav" aria-label={t.mainNav}>
           <a href={`${home}#features`}>{t.featuresHeading}</a>
           <a href={`${home}#security`}>{t.securityHeading}</a>
@@ -94,7 +94,7 @@ const home = pathFor(lang, 'home');
     <footer class="bottom">
       <div class="wrap bottom-inner">
         <div>
-          <a class="brand" href={home}><span class="brand-mark" aria-hidden="true">~/</span>shellx</a>
+          <a class="brand" href={home}><img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />shellx</a>
           <p class="muted">{t.footerTagline}</p>
         </div>
         <nav aria-label="Footer">
@@ -190,8 +190,8 @@ const home = pathFor(lang, 'home');
     border-bottom: 1px solid rgba(42, 33, 69, 0.7);
   }
   .top-inner { display: flex; align-items: center; gap: 0.5rem 1.5rem; min-height: 4rem; }
-  .brand { font-family: var(--mono); font-weight: 700; font-size: 1.1rem; color: var(--fg); text-decoration: none; }
-  .brand-mark { color: var(--purple-l); }
+  .brand { display: inline-flex; align-items: center; gap: 0.55rem; font-family: var(--mono); font-weight: 700; font-size: 1.1rem; color: var(--fg); text-decoration: none; }
+  .brand-mark { display: block; width: 1.75rem; height: 1.75rem; }
   .top-nav { display: flex; gap: 1.5rem; margin-right: auto; margin-left: 1rem; }
   .top-nav a, .lang-switch { color: var(--muted); text-decoration: none; font-size: 0.95rem; }
   .top-nav a:hover, .lang-switch:hover { color: var(--fg); }
