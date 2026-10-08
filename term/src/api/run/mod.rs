@@ -225,6 +225,9 @@ fn execute(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
     match path.as_str() {
         "skills install" => return skills::install(p, ctx),
         "skills print" => return skills::print(p, ctx),
+        "integrations status" | "integrations install" | "integrations uninstall" => {
+            return super::integrations::cli::command(p, ctx)
+        }
         "notify" => return notify(p, ctx),
         // D5: whatever happens, the agent's hook sees success.
         "agent-event" => {

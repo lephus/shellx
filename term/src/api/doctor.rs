@@ -6,6 +6,8 @@
 
 use super::args::Parsed;
 use super::client::ApiError;
+use super::integrations::real::RealFs;
+use super::integrations::{config_path, installed, Agent, Fs};
 use super::run::{Api, Ctx};
 use super::value::{to_json, Value};
 use std::path::Path;
@@ -112,12 +114,30 @@ pub fn on_path(
     if exe_dir.is_some_and(|d| path_contains(path_var, d, windows)) {
         return true;
     }
+    binary_in_path(path_var, "shellx", windows, exists)
+}
+
+/// Some `PATH` folder holds a program called `name` (Windows: `.exe`,
+/// `.cmd` or `.bat` too).
+pub fn binary_in_path(
+    path_var: &str,
+    name: &str,
+    windows: bool,
+    exists: &dyn Fn(&Path) -> bool,
+) -> bool {
     let sep = if windows { ';' } else { ':' };
-    let name = if windows { "shellx.exe" } else { "shellx" };
-    path_var
-        .split(sep)
-        .filter(|e| !e.is_empty())
-        .any(|e| exists(&Path::new(e.trim_matches('"')).join(name)))
+    let names: Vec<String> = if windows {
+        ["", ".exe", ".cmd", ".bat"]
+            .iter()
+            .map(|e| format!("{name}{e}"))
+            .collect()
+    } else {
+        vec![name.to_string()]
+    };
+    path_var.split(sep).filter(|e| !e.is_empty()).any(|e| {
+        let dir = Path::new(e.trim_matches('"'));
+        names.iter().any(|n| exists(&dir.join(n)))
+    })
 }
 
 /// An agent skill is installed when `shellx/SKILL.md` exists under one of
@@ -130,6 +150,31 @@ pub fn skills_installed(home: &Path, exists: &dyn Fn(&Path) -> bool) -> bool {
     ]
     .iter()
     .any(|d| exists(&home.join(d).join("shellx").join("SKILL.md")))
+}
+
+/// D23: one line per agent found on `PATH` — whether ShellX's hooks are in
+/// its configuration — and a failure when some are but `shellx` is not on
+/// the `PATH` (the agent would run a command that does not exist). Only the
+/// agent's name and a state: no path, no file content.
+pub fn hook_checks(agents: &[(Agent, bool)], shellx_on_path: Option<bool>) -> Vec<Check> {
+    let mut checks: Vec<Check> = agents
+        .iter()
+        .map(|(a, installed)| {
+            let state = if *installed {
+                "installed"
+            } else {
+                "not installed"
+            };
+            Check::ok("hooks", format!("{} hooks: {state}", a.product()))
+        })
+        .collect();
+    if agents.iter().any(|(_, i)| *i) && shellx_on_path == Some(false) {
+        checks.push(Check::fail(
+            "hooks-path",
+            "Agent hooks are installed but shellx is not in your PATH — they do nothing until it is",
+        ));
+    }
+    checks
 }
 
 /// `1.2.3+45` → `1.2.3`: the build number is not part of the version.
@@ -219,6 +264,11 @@ pub fn run(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             },
         );
     }
+    let shellx_on_path = ctx.exe.as_deref().map(|exe| {
+        let path_var = (ctx.env)("PATH").unwrap_or_default();
+        let dir = exe.parent().map(|d| d.to_string_lossy().into_owned());
+        on_path(&path_var, dir.as_deref(), cfg!(windows), &|f| f.is_file())
+    });
     checks.push(match ctx.home.as_deref() {
         Some(home) if skills_installed(home, &|f| f.is_file()) => {
             Check::ok("skills", "Agent skills are installed")
@@ -228,6 +278,18 @@ pub fn run(p: &Parsed, ctx: &mut Ctx) -> Result<(), ApiError> {
             "Agent skills are not installed — run: shellx skills install",
         ),
     });
+    if let Some(home) = ctx.home.as_deref() {
+        let path_var = (ctx.env)("PATH").unwrap_or_default();
+        let agents: Vec<(Agent, bool)> = Agent::ALL
+            .into_iter()
+            .filter(|a| binary_in_path(&path_var, a.binary(), cfg!(windows), &|f| f.is_file()))
+            .map(|a| {
+                let current = RealFs.read(&config_path(a, ctx.env, home)).ok().flatten();
+                (a, installed(a, current.as_deref()))
+            })
+            .collect();
+        checks.extend(hook_checks(&agents, shellx_on_path));
+    }
     if let Some(api) = api.as_mut() {
         checks.push(match api.call("ui.config.check", vec![]) {
             Ok(r) => config_check(&super::output::result_json(&r)),
@@ -368,6 +430,38 @@ mod tests {
             &at("/Users/me/.codex/skills/shellx/SKILL.md")
         ));
         assert!(!skills_installed(home, &|_| false));
+    }
+
+    #[test]
+    fn hook_lines_name_the_agent_and_the_state_only() {
+        let lines = hook_checks(&[(Agent::Claude, true)], Some(true));
+        assert_eq!(lines.len(), 1);
+        assert_eq!(
+            (lines[0].ok, lines[0].message.as_str()),
+            (true, "Claude Code hooks: installed")
+        );
+        let lines = hook_checks(&[(Agent::Claude, false)], Some(false));
+        assert_eq!(lines.len(), 1, "no hooks, so nothing to warn about");
+        assert!(lines[0].ok && lines[0].message == "Claude Code hooks: not installed");
+        assert!(
+            hook_checks(&[], Some(false)).is_empty(),
+            "no agent, no line"
+        );
+        let bad = hook_checks(&[(Agent::Claude, true)], Some(false));
+        assert_eq!(bad.len(), 2);
+        assert!(!bad[1].ok && bad[1].message.contains("shellx is not in your PATH"));
+        // Unknown (no exe) is not a failure.
+        assert!(hook_checks(&[(Agent::Claude, true)], None)
+            .iter()
+            .all(|c| c.ok));
+        for c in bad {
+            assert!(
+                !c.message.contains('/') || c.message.contains("— "),
+                "{}",
+                c.message
+            );
+            assert!(!c.message.contains(".claude") && !c.message.contains("settings"));
+        }
     }
 
     #[test]

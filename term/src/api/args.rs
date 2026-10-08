@@ -377,6 +377,40 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec {
         needs_ui: false,
         ..c(
+            &["integrations", "status"],
+            &["AGENT?"],
+            &[],
+            "show which agents have ShellX hooks installed",
+        )
+    },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
+            &["integrations", "install"],
+            &["AGENT"],
+            &[
+                f("yes", "apply without asking"),
+                f("dry-run", "print the change and write nothing"),
+                f("print", "print what to add by hand and write nothing"),
+            ],
+            "add ShellX's hooks to an agent's configuration (shows the change first)",
+        )
+    },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
+            &["integrations", "uninstall"],
+            &["AGENT"],
+            &[
+                f("yes", "apply without asking"),
+                f("dry-run", "print the change and write nothing"),
+            ],
+            "remove ShellX's hooks from an agent's configuration",
+        )
+    },
+    CommandSpec {
+        needs_ui: false,
+        ..c(
             &["config", "path"],
             &[],
             &[f("ghostty", "also print the Ghostty files ShellX reads")],
@@ -676,7 +710,14 @@ fn words_after(prefix: &[&str]) -> Vec<&'static str> {
     out
 }
 
-const GROUPS: [&str; 5] = ["workspace", "browser", "tmux", "skills", "config"];
+const GROUPS: [&str; 6] = [
+    "workspace",
+    "browser",
+    "tmux",
+    "skills",
+    "integrations",
+    "config",
+];
 /// Positionals that name a pane, tab or workspace: completed from `shellx ls --ids`.
 const ID_POSITIONALS: [&str; 4] = ["TARGET", "PANE", "TAB", "WORKSPACE"];
 
@@ -974,6 +1015,9 @@ mod tests {
             "tmux attach",
             "skills install",
             "skills print",
+            "integrations status",
+            "integrations install",
+            "integrations uninstall",
             "config path",
             "config check",
             "config validate",
