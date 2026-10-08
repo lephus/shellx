@@ -2561,4 +2561,18 @@ class AppLocalizationsVi extends AppLocalizations {
   String tabPinnedCloseBody(String name) {
     return '“$name” đã được ghim.';
   }
+
+  @override
+  String get actionWorkspaceFontBigger => 'Tăng cỡ chữ trong workspace này';
+
+  @override
+  String get actionWorkspaceFontSmaller => 'Giảm cỡ chữ trong workspace này';
+
+  @override
+  String get actionWorkspaceFontReset => 'Đặt lại cỡ chữ trong workspace này';
+
+  @override
+  String workspaceZoomTip(String step) {
+    return 'Cỡ chữ $step';
+  }
 }

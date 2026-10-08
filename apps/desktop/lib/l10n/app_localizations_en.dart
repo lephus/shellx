@@ -2651,4 +2651,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String tabPinnedCloseBody(String name) {
     return '“$name” is pinned.';
   }
+
+  @override
+  String get actionWorkspaceFontBigger =>
+      'Increase text size in this workspace';
+
+  @override
+  String get actionWorkspaceFontSmaller =>
+      'Decrease text size in this workspace';
+
+  @override
+  String get actionWorkspaceFontReset => 'Reset text size in this workspace';
+
+  @override
+  String workspaceZoomTip(String step) {
+    return 'Text size $step';
+  }
 }

@@ -656,5 +656,9 @@
   "tabStatusDone": "Xong",
   "tabStatusLabel": "Trạng thái: {status}",
   "tabPinnedCloseTitle": "Đóng tab đã ghim?",
-  "tabPinnedCloseBody": "“{name}” đã được ghim."
+  "tabPinnedCloseBody": "“{name}” đã được ghim.",
+  "actionWorkspaceFontBigger": "Tăng cỡ chữ trong workspace này",
+  "actionWorkspaceFontSmaller": "Giảm cỡ chữ trong workspace này",
+  "actionWorkspaceFontReset": "Đặt lại cỡ chữ trong workspace này",
+  "workspaceZoomTip": "Cỡ chữ {step}"
 }

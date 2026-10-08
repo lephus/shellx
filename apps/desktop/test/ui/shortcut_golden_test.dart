@@ -57,7 +57,7 @@ Set<String> a11Changes(String platform) => platform == 'mac'
 
 /// A11: D11 macOS line editing at the prompt (Windows binds none), D13
 /// copy mode (⌘⇧M / Ctrl+Shift+M), D14 reopen closed (⌘⇧T /
-/// Ctrl+Shift+Alt+T), D21 search all (⌘⇧F / Ctrl+Shift+Alt+F), D15 focus history (⌘⌃[ / ⌘⌃]; Ctrl+Alt+[ / ]).
+/// Ctrl+Shift+Alt+T), D21 search all (⌘⇧F / Ctrl+Shift+Alt+F), D15 focus history (⌘⌃[ / ⌘⌃]; Ctrl+Alt+[ / ]), D19 workspace text size (⌘⌥= - 0; Ctrl+Alt+= -).
 Set<String> a11Additions(String platform) => platform == 'mac'
     ? const {
         'meta+100000302 -> EditLineIntent(line_start)',
@@ -70,6 +70,10 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'shift+meta+66 norepeat -> SearchAllIntent',
         'ctrl+meta+5b norepeat -> FocusHistoryIntent(back)',
         'ctrl+meta+5d norepeat -> FocusHistoryIntent(forward)',
+        // D19: the text size of the selected tab's workspace.
+        'alt+meta+3d -> WorkspaceFontIntent(1.0)',
+        'alt+meta+2d -> WorkspaceFontIntent(-1.0)',
+        'alt+meta+30 -> WorkspaceFontIntent(reset)',
       }
     : const {
         'ctrl+shift+6d norepeat -> ToggleCopyModeIntent',
@@ -77,6 +81,8 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'ctrl+alt+shift+66 norepeat -> SearchAllIntent',
         'ctrl+alt+5b norepeat -> FocusHistoryIntent(back)',
         'ctrl+alt+5d norepeat -> FocusHistoryIntent(forward)',
+        'ctrl+alt+3d -> WorkspaceFontIntent(1.0)',
+        'ctrl+alt+2d -> WorkspaceFontIntent(-1.0)',
       };
 
 void main() {

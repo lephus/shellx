@@ -1509,6 +1509,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               key: key,
               workspaceId: w.id,
               name: w.displayName(l10n),
+              fontStep: w.fontStep,
               count: item.count,
               collapsed: w.collapsed,
               containsSelected: item.containsSelected,

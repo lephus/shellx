@@ -4049,6 +4049,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“{name}” is pinned.'**
   String tabPinnedCloseBody(String name);
+
+  /// No description provided for @actionWorkspaceFontBigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase text size in this workspace'**
+  String get actionWorkspaceFontBigger;
+
+  /// No description provided for @actionWorkspaceFontSmaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease text size in this workspace'**
+  String get actionWorkspaceFontSmaller;
+
+  /// No description provided for @actionWorkspaceFontReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset text size in this workspace'**
+  String get actionWorkspaceFontReset;
+
+  /// No description provided for @workspaceZoomTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size {step}'**
+  String workspaceZoomTip(String step);
 }
 
 class _AppLocalizationsDelegate

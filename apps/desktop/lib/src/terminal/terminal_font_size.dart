@@ -8,6 +8,12 @@ import '../config/config_controller.dart';
 import '../platform/settings_store.dart';
 import 'terminal_style.dart';
 
+/// A11 D19: the size a tab is drawn at: the global size plus the step of
+/// its workspace, kept within the same 9–28 as the global size.
+double effectiveFontSize(double global, double step) => (global + step)
+    .clamp(kTerminalFontSizeMin, kTerminalFontSizeMax)
+    .toDouble();
+
 final terminalFontSizeProvider = NotifierProvider<TerminalFontSize, double>(
   TerminalFontSize.new,
 );

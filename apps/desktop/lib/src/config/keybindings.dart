@@ -293,6 +293,27 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     b(font(LogicalKeyboardKey.numpadSubtract), 'decrease_font_size', '1'),
     b(font(LogicalKeyboardKey.digit0), 'reset_font_size'),
     b(font(LogicalKeyboardKey.numpad0), 'reset_font_size'),
+    // A11 D19: Cmd+Opt+= / - / 0; Windows Ctrl+Alt+= and Ctrl+Alt+- (left
+    // Alt only), no key for the reset.
+    b(
+      mac
+          ? const KeyChord(LogicalKeyboardKey.equal, meta: true, alt: true)
+          : const KeyChord(LogicalKeyboardKey.equal, control: true, alt: true),
+      'increase_workspace_font_size',
+      '1',
+    ),
+    b(
+      mac
+          ? const KeyChord(LogicalKeyboardKey.minus, meta: true, alt: true)
+          : const KeyChord(LogicalKeyboardKey.minus, control: true, alt: true),
+      'decrease_workspace_font_size',
+      '1',
+    ),
+    if (mac)
+      b(
+        const KeyChord(LogicalKeyboardKey.digit0, meta: true, alt: true),
+        'reset_workspace_font_size',
+      ),
     b(const KeyChord(LogicalKeyboardKey.f6, control: true), 'next_region'),
     b(
       const KeyChord(LogicalKeyboardKey.f6, control: true, shift: true),

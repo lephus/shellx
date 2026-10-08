@@ -1069,5 +1069,10 @@
   "@tabStatusLabel": {"placeholders": {"status": {"type": "String"}}},
   "tabPinnedCloseTitle": "Close pinned tab?",
   "tabPinnedCloseBody": "“{name}” is pinned.",
-  "@tabPinnedCloseBody": {"placeholders": {"name": {"type": "String"}}}
+  "@tabPinnedCloseBody": {"placeholders": {"name": {"type": "String"}}},
+  "actionWorkspaceFontBigger": "Increase text size in this workspace",
+  "actionWorkspaceFontSmaller": "Decrease text size in this workspace",
+  "actionWorkspaceFontReset": "Reset text size in this workspace",
+  "workspaceZoomTip": "Text size {step}",
+  "@workspaceZoomTip": {"placeholders": {"step": {"type": "String"}}}
 }

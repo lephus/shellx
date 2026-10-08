@@ -19,6 +19,11 @@ import 'terminal_tabs.dart';
 const String kDefaultWorkspaceId = 'default';
 const int kWorkspaceNameMaxLength = 64;
 
+/// A11 D19: how far a workspace's text size may sit from the global one,
+/// in points.
+const double kWorkspaceFontStepMin = -6;
+const double kWorkspaceFontStepMax = 10;
+
 /// At most [kWorkspaceNameMaxLength] user-perceived characters (a cut
 /// never splits an accent from its letter), trimmed after the cut.
 String _clip(String text) => clipName(text, kWorkspaceNameMaxLength);
@@ -31,6 +36,7 @@ final class Workspace {
     this.name,
     this.collapsed = false,
     this.ssh,
+    this.fontStep = 0,
   });
 
   final String id;
@@ -44,23 +50,30 @@ final class Workspace {
   /// null for a local workspace.
   final String? ssh;
 
+  /// A11 D19: points added to the global text size for every tab here
+  /// (JSON key `zoom`; −6…+10; 0 when missing or odd).
+  final double fontStep;
+
   bool get isDefault => id == kDefaultWorkspaceId;
 
   String displayName(AppLocalizations l10n) =>
       name ?? l10n.workspaceDefaultName;
 
-  Workspace copyWith({String? name, bool? collapsed}) => Workspace(
-    id: id,
-    name: name ?? this.name,
-    collapsed: collapsed ?? this.collapsed,
-    ssh: ssh,
-  );
+  Workspace copyWith({String? name, bool? collapsed, double? fontStep}) =>
+      Workspace(
+        id: id,
+        name: name ?? this.name,
+        collapsed: collapsed ?? this.collapsed,
+        ssh: ssh,
+        fontStep: fontStep ?? this.fontStep,
+      );
 
   String encode() => jsonEncode({
     'id': id,
     if (name != null) 'name': name,
     'collapsed': collapsed,
     if (ssh != null) 'ssh': ssh,
+    if (fontStep != 0) 'zoom': fontStep,
   });
 
   /// Null for anything that is not a well-formed entry (Review Focus 5).
@@ -76,6 +89,7 @@ final class Workspace {
     final name = value['name'];
     final collapsed = value['collapsed'];
     final rawSsh = value['ssh'];
+    final rawZoom = value['zoom'];
     if (id is! String || id.isEmpty || id.length > 64) return null;
     if (name != null && name is! String) return null;
     if (collapsed != null && collapsed is! bool) return null;
@@ -90,6 +104,14 @@ final class Workspace {
       name: clean.isEmpty ? null : _clip(clean),
       collapsed: collapsed as bool? ?? false,
       ssh: id == kDefaultWorkspaceId ? null : ssh,
+      // A11 D19: anything but a finite number is no zoom; a number is cut
+      // to the allowed range.
+      fontStep: rawZoom is num && rawZoom.isFinite
+          ? rawZoom
+                .toDouble()
+                .clamp(kWorkspaceFontStepMin, kWorkspaceFontStepMax)
+                .toDouble()
+          : 0,
     );
   }
 
@@ -99,10 +121,11 @@ final class Workspace {
       other.id == id &&
       other.name == name &&
       other.collapsed == collapsed &&
-      other.ssh == ssh;
+      other.ssh == ssh &&
+      other.fontStep == fontStep;
 
   @override
-  int get hashCode => Object.hash(id, name, collapsed, ssh);
+  int get hashCode => Object.hash(id, name, collapsed, ssh, fontStep);
 }
 
 /// The stored list, without broken or duplicate entries, and always with
@@ -195,6 +218,13 @@ final class SidebarState {
     return null;
   }
 
+  /// A11 D19: the text size step of the workspace holding [tabId]; 0 for
+  /// a tab not placed yet.
+  double fontStepOf(int tabId) {
+    final id = workspaceOf(tabId);
+    return id == null ? 0 : workspace(id)?.fontStep ?? 0;
+  }
+
   List<int> get orderedTabIds => [for (final w in workspaces) ...tabsOf(w.id)];
 
   /// What the sidebar shows, top to bottom; ⌘1–9, Ctrl+Tab and ↑/↓ follow
@@ -255,6 +285,14 @@ final class SidebarState {
         : renaming as RenameTarget?,
   );
 }
+
+/// A11 D19: the step of the workspace of the selected tab (0 with none);
+/// Settings says its preview does not include it.
+final selectedWorkspaceFontStepProvider = Provider<double>((ref) {
+  final selected = ref.watch(terminalTabsProvider.select((s) => s.selectedId));
+  final sidebar = ref.watch(sidebarWorkspacesProvider);
+  return selected == null ? 0 : sidebar.fontStepOf(selected);
+});
 
 final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => ref.watch(desktopServicesProvider).settings,
@@ -450,6 +488,33 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
       workspaces: [
         for (final w in state.workspaces)
           w.id == id ? w.copyWith(name: _clip(clean)) : w,
+      ],
+    );
+    _save();
+  }
+
+  /// A11 D19: [delta] points more (or fewer) for every tab of workspace
+  /// [id], kept within −6…+10 and saved with the workspace.
+  void zoom(String id, double delta) {
+    final w = state.workspace(id);
+    if (w == null) return;
+    _setFontStep(w, w.fontStep + delta);
+  }
+
+  void resetZoom(String id) {
+    final w = state.workspace(id);
+    if (w != null) _setFontStep(w, 0);
+  }
+
+  void _setFontStep(Workspace w, double step) {
+    final next = step
+        .clamp(kWorkspaceFontStepMin, kWorkspaceFontStepMax)
+        .toDouble();
+    if (next == w.fontStep) return;
+    state = state.copyWith(
+      workspaces: [
+        for (final x in state.workspaces)
+          x.id == w.id ? x.copyWith(fontStep: next) : x,
       ],
     );
     _save();

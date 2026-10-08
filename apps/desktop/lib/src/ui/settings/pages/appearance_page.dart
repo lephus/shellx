@@ -8,6 +8,8 @@ import '../../../config/config_controller.dart';
 import '../../../config/settings_schema.dart';
 import '../../../config/shellx_config.dart' show TerminalFontWeight;
 import '../../../config/theme_listing.dart';
+import '../../../terminal/sidebar_workspaces.dart'
+    show selectedWorkspaceFontStepProvider;
 import '../../../terminal/terminal_style.dart'
     show kTerminalFontSizeMax, kTerminalFontSizeMin;
 import '../../theme/shellx_desktop_theme.dart';
@@ -89,6 +91,19 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
           padding: EdgeInsets.fromLTRB(12, 0, 12, 4),
           child: PreviewTerminal(key: Key('preview.terminal')),
         ),
+        // A11 D19: the sample shows the global size; a workspace zoomed on
+        // its own differs from it.
+        if (ref.watch(selectedWorkspaceFontStepProvider) != 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Text(
+              AppLocalizations.of(context).settingsPreviewNote,
+              key: const Key('preview.note'),
+              style: ShellxText.caption.copyWith(
+                color: ShellxDesktopColors.textSecondary,
+              ),
+            ),
+          ),
         Expanded(
           child: ListView(
             key: const Key('settings.appearance.list'),
