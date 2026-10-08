@@ -392,6 +392,7 @@ pub static COMMANDS: &[CommandSpec] = &[
                 f("yes", "apply without asking"),
                 f("dry-run", "print the change and write nothing"),
                 f("print", "print what to add by hand and write nothing"),
+                f("force", "replace an OpenCode plugin file of ShellX's that was edited"),
             ],
             "add ShellX's hooks to an agent's configuration (shows the change first)",
         )

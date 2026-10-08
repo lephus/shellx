@@ -53,10 +53,13 @@ fn done(before: Option<&str>, after: String) -> Plan {
     }
 }
 
-pub fn install(current: Option<&str>) -> Result<Plan, Refusal> {
+/// A file of ours that is not a text ShellX shipped was edited: it is
+/// replaced only with `force`.
+pub fn install(current: Option<&str>, force: bool) -> Result<Plan, Refusal> {
     match current {
         None => Ok(done(None, PLUGIN.to_string())),
         Some(t) if t.len() > MAX_BYTES => Err(Refusal::TooBig),
+        Some(t) if is_ours(t) && !force && !SHIPPED.contains(&t) => Err(Refusal::Edited),
         Some(t) if is_ours(t) => Ok(done(current, PLUGIN.to_string())),
         Some(_) => Err(Refusal::Foreign("plugin file")),
     }
@@ -135,9 +138,9 @@ mod tests {
 
     #[test]
     fn install_creates_the_file_and_is_idempotent() {
-        let p = install(None).unwrap();
+        let p = install(None, false).unwrap();
         assert!(p.changed && p.before.is_none() && p.after == PLUGIN);
-        let again = install(Some(PLUGIN)).unwrap();
+        let again = install(Some(PLUGIN), false).unwrap();
         assert!(!again.changed && again.after == PLUGIN);
         assert!(installed(Some(PLUGIN)));
         assert!(!installed(None));
@@ -147,9 +150,16 @@ mod tests {
     #[test]
     fn an_older_file_of_ours_is_replaced_and_a_foreign_one_never() {
         let old = "// shellx-agent-integration v0 (managed by \"shellx integrations\")\nexport const Old = 1\n";
-        let p = install(Some(old)).unwrap();
+        // Unknown text with our marker was edited (or is from a version we
+        // cannot vouch for): not replaced silently.
+        assert_eq!(install(Some(old), false), Err(Refusal::Edited));
+        let p = install(Some(old), true).unwrap();
         assert!(p.changed && p.after == PLUGIN);
         assert!(installed(Some(old)), "status: a plugin of ours is there");
+        let edited = format!("{PLUGIN}// tweak\n");
+        assert_eq!(install(Some(&edited), false), Err(Refusal::Edited));
+        assert!(install(Some(&edited), true).unwrap().changed);
+        assert!(!install(Some(PLUGIN), false).unwrap().changed);
         for foreign in [
             "export const Mine = async () => ({})\n",
             "",
@@ -158,13 +168,13 @@ mod tests {
             " // shellx-agent-integration v1\n",
         ] {
             assert_eq!(
-                install(Some(foreign)),
+                install(Some(foreign), true),
                 Err(Refusal::Foreign("plugin file")),
                 "{foreign:?}"
             );
         }
         let big = format!("{}{}", PLUGIN, "x".repeat(1 << 20));
-        assert_eq!(install(Some(&big)), Err(Refusal::TooBig));
+        assert_eq!(install(Some(&big), false), Err(Refusal::TooBig));
     }
 
     #[test]

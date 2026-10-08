@@ -122,6 +122,44 @@ pub fn unified_diff(before: &str, after: &str, context: usize) -> Option<String>
     Some(out)
 }
 
+/// For the terminal only: escape sequences (CSI, OSC, other ESC pairs),
+/// control characters other than tab and newline, C1 controls and bidi
+/// overrides are dropped, so a file cannot draw on the screen or hide what
+/// the diff says.
+pub fn sanitize_display(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut it = s.chars().peekable();
+    while let Some(c) = it.next() {
+        match c {
+            '\u{1b}' => match it.next() {
+                Some('[') => {
+                    // Parameters and intermediates, then one final byte.
+                    for n in it.by_ref() {
+                        if ('\u{40}'..='\u{7e}').contains(&n) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    // Up to BEL or ESC \.
+                    while let Some(n) = it.next() {
+                        if n == '\u{7}' || (n == '\u{1b}' && it.next_if_eq(&'\\').is_some()) {
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            },
+            '\n' | '\t' => out.push(c),
+            c if c.is_control()
+                || matches!(c, '\u{200e}' | '\u{200f}' | '\u{061c}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}') =>
+                {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 const SECRET_WORDS: [&str; 6] = ["key", "token", "secret", "password", "auth", "credential"];
 /// Starts of well-known credentials, in case the key does not say so.
 const SECRET_PREFIXES: [&str; 9] = [
@@ -463,6 +501,20 @@ mod tests {
         let m = mask_secrets(" \"HTTPS_PROXY\": \"http://user:FAKEPASS@proxy.example:8080\",\n");
         assert!(!m.contains("FAKEPASS") && !m.contains("user:"), "{m}");
         assert!(m.contains("proxy.example"), "{m}");
+    }
+
+    #[test]
+    fn control_and_escape_characters_never_reach_the_terminal() {
+        let evil = "+  \"a\": \"x\u{1b}[31mred\u{1b}[0m\u{1b}]0;title\u{7}\u{1b}]8;;http://x\u{1b}\\y\u{0}\u{8}\u{85}\u{9b}31m\u{7f}z\r\ttab\u{202e}\"\n kept\n";
+        let shown = sanitize_display(evil);
+        assert_eq!(shown, "+  \"a\": \"xredy31mz\ttab\"\n kept\n", "{shown:?}");
+        for c in shown.chars() {
+            assert!(
+                c == '\n' || c == '\t' || !(c.is_control() || c == '\u{202e}'),
+                "{c:?}"
+            );
+        }
+        assert_eq!(sanitize_display("tab\there\n"), "tab\there\n");
     }
 
     #[test]

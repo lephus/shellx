@@ -43,14 +43,29 @@ fn command(spec: &NestedSpec, sub: &str) -> String {
 }
 
 fn group(spec: &NestedSpec, sub: &str) -> Json {
-    Json::Obj(vec![(
-        "hooks".into(),
+    let hooks = (
+        "hooks".to_string(),
         Json::Arr(vec![Json::Obj(vec![
             ("type".into(), Json::Str("command".into())),
             ("command".into(), Json::Str(command(spec, sub))),
             ("timeout".into(), Json::Num(i64::from(spec.timeout))),
         ])]),
-    )])
+    );
+    Json::Obj(vec![hooks])
+}
+
+/// A group put into an array that the user left empty. The empty
+/// `"matcher"` (which matches everything, as no matcher does) is the sign
+/// that the array was theirs: uninstall removes the group but keeps the
+/// array.
+fn group_in_users_array(spec: &NestedSpec, sub: &str) -> Json {
+    match group(spec, sub) {
+        Json::Obj(mut m) => {
+            m.insert(0, ("matcher".into(), Json::Str(String::new())));
+            Json::Obj(m)
+        }
+        other => other,
+    }
 }
 
 fn refuse(e: JsonError) -> Refusal {
@@ -165,7 +180,12 @@ pub fn install(spec: &NestedSpec, current: Option<&str>) -> Result<Plan, Refusal
                     .collect();
                 if mine.is_empty() {
                     let arr = get(hooks, event).ok_or(Refusal::Invalid)?;
-                    let value = render(&group(spec, sub), 3, &st);
+                    let g = if groups.is_empty() {
+                        group_in_users_array(spec, sub)
+                    } else {
+                        group(spec, sub)
+                    };
+                    let value = render(&g, 3, &st);
                     text = append_element(&text, arr, 2, &value, &st);
                 } else if let Some((node, _)) = mine.iter().find(|(_, c)| *c != want) {
                     text = splice(&text, node, &crate::api::value::json_string(&want));
@@ -199,7 +219,8 @@ fn first_ours<'a>(root: &'a Node, own: &str) -> Option<Cut<'a>> {
             if es.len() > 1 {
                 return Some(Cut::Element(inner, ei));
             }
-            if groups.len() > 1 {
+            // Several groups, or one that sits in an array the user had.
+            if groups.len() > 1 || get(g, "matcher").is_some() {
                 return Some(Cut::Element(&ev.value, gi));
             }
             if events.len() > 1 {

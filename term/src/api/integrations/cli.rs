@@ -6,10 +6,10 @@
 //! `.shellx-bak` and `.shellx-created` neighbours) is touched, and no
 //! sentence here quotes the file or anything the user typed.
 
-use super::diff::{mask_secrets, unified_diff};
+use super::diff::{mask_secrets, sanitize_display, unified_diff};
 use super::real::{RealFs, RealPrompt};
 use super::{
-    config_path, installed, leaves_nothing, owns_file, plan_install, plan_uninstall,
+    config_path, installed, leaves_nothing, owns_file, plan_install_forced, plan_uninstall,
     refusal_message, snippet, Agent, Fs, Plan, Prompt, ReadError, Refusal,
 };
 use crate::api::args::Parsed;
@@ -182,7 +182,7 @@ fn install(
     let home = home(ctx)?;
     let path = config_path(a, ctx.env, &home);
     let current = read(ctx, fs, a, &path)?;
-    let plan = match plan_install(a, current.as_deref()) {
+    let plan = match plan_install_forced(a, current.as_deref(), p.has("force")) {
         Ok(plan) => plan,
         Err(r) => return Err(fail(ctx, &refusal_message(a, r))),
     };
@@ -253,7 +253,7 @@ fn apply(
         let _ = write!(
             ctx.out,
             "--- {name}\n+++ {name} (after)\n{}",
-            mask_secrets(&diff)
+            sanitize_display(&mask_secrets(&diff))
         );
     };
     if p.has("dry-run") {
@@ -302,6 +302,7 @@ fn apply(
     let delete = change == Change::Uninstall
         && (owns_file(a) || (note.is_some() && leaves_nothing(a, &plan.after)));
     let mut backed_up = false;
+    let mut kept_backup = false;
     if existed && !delete {
         let bak = with_suffix(&real, BACKUP);
         // The first copy is the one worth keeping: never over an older one.
@@ -310,6 +311,8 @@ fn apply(
                 return Err(io_fail(ctx));
             }
             backed_up = true;
+        } else {
+            kept_backup = true;
         }
     }
     let mut removed = false;
@@ -372,6 +375,12 @@ fn apply(
     }
     if backed_up {
         let _ = writeln!(ctx.out, "Backed up the old file to {name}{BACKUP}");
+    }
+    if kept_backup {
+        let _ = writeln!(
+            ctx.out,
+            "A backup from the first install is kept at {name}{BACKUP} (not overwritten)."
+        );
     }
     match change {
         Change::Install => {
@@ -932,6 +941,13 @@ mod tests {
             fs.text("/h/.claude/settings.json.shellx-bak").as_deref(),
             Some("THE FIRST ONE")
         );
+        let r = go(
+            &["uninstall", "claude", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert!(r.out.contains("A backup from the first install is kept at ~/.claude/settings.json.shellx-bak (not overwritten)."), "{}", r.out);
     }
 
     #[test]
@@ -1295,6 +1311,74 @@ mod tests {
         assert_eq!(r.code, 1);
         assert!(r.err.contains("delete it yourself"), "{}", r.err);
         assert_eq!(fs.text(PLUGIN_PATH).as_deref(), Some(edited.as_str()));
+    }
+
+    #[test]
+    fn an_edited_opencode_plugin_needs_force_and_the_backup_notice_is_shown() {
+        let fs = FakeFs::default();
+        let edited = format!("{}// tweak\n", super::super::opencode_js::PLUGIN);
+        fs.put(PLUGIN_PATH, &edited, 0o644);
+        let r = go(
+            &["install", "opencode", "--yes"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 1);
+        assert!(
+            r.err.contains("--force") && r.err.contains("delete it yourself"),
+            "{}",
+            r.err
+        );
+        assert_eq!(fs.text(PLUGIN_PATH).as_deref(), Some(edited.as_str()));
+        let r = go(
+            &["install", "opencode", "--yes", "--force"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(fs
+            .text(PLUGIN_PATH)
+            .unwrap()
+            .starts_with("// shellx-agent-integration v1"));
+        assert_eq!(
+            fs.text(&format!("{PLUGIN_PATH}.shellx-bak")).as_deref(),
+            Some(edited.as_str())
+        );
+        // A second forced replace keeps the first backup and says so.
+        fs.put(PLUGIN_PATH, &format!("{edited}// more\n"), 0o644);
+        let r = go(
+            &["install", "opencode", "--yes", "--force"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert!(r.out.contains("(not overwritten)"), "{}", r.out);
+    }
+
+    #[test]
+    fn the_diff_shown_has_no_terminal_escapes() {
+        // A TOML comment may hold any character.
+        let fs = FakeFs::default();
+        fs.put(
+            CODEX,
+            "# a\u{1b}[2Jb\u{7}\u{1b}]0;t\u{7}\nmodel = 1\n",
+            0o600,
+        );
+        let r = go(
+            &["install", "codex", "--dry-run"],
+            &fs,
+            &mut FakePrompt::no_tty(),
+            &[],
+        );
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(r.out.contains("# ab"), "{:?}", r.out);
+        assert!(
+            !r.out.contains('\u{1b}') && !r.out.contains('\u{7}'),
+            "{:?}",
+            r.out
+        );
     }
 
     #[test]

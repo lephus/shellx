@@ -105,7 +105,7 @@ pub fn refusal_message(a: Agent, r: Refusal) -> String {
         }
         Refusal::TooBig => "refusing: the file is over 1 MiB".into(),
         Refusal::Edited => {
-            "refusing: the file was edited after ShellX wrote it; delete it yourself".into()
+            "refusing: the file was edited after ShellX wrote it; delete it yourself (install also takes --force to replace it)".into()
         }
     }
 }
@@ -119,10 +119,15 @@ pub struct Plan {
 }
 
 pub fn plan_install(a: Agent, current: Option<&str>) -> Result<Plan, Refusal> {
+    plan_install_forced(a, current, false)
+}
+
+/// `force` lets OpenCode's plugin replace a file of ours that was edited.
+pub fn plan_install_forced(a: Agent, current: Option<&str>, force: bool) -> Result<Plan, Refusal> {
     match a {
         Agent::Claude | Agent::Gemini => nested_json::install(a.nested(), current),
         Agent::Codex => codex_toml::install(current),
-        Agent::OpenCode => opencode_js::install(current),
+        Agent::OpenCode => opencode_js::install(current, force),
     }
 }
 
@@ -653,6 +658,28 @@ mod tests {
             Agent::ALL.map(Agent::name),
             ["claude", "codex", "gemini", "opencode"]
         );
+    }
+
+    #[test]
+    fn a_users_empty_containers_survive_install_and_uninstall() {
+        for agent in [Agent::Claude, Agent::Gemini] {
+            let event = if agent == Agent::Claude {
+                "Stop"
+            } else {
+                "AfterAgent"
+            };
+            for t in [
+                format!("{{\n  \"hooks\": {{\n    \"{event}\": []\n  }}\n}}\n"),
+                format!("{{\n  \"hooks\": {{\n    \"{event}\": [],\n    \"Other\": []\n  }},\n  \"model\": 1\n}}\n"),
+            ] {
+                let out = plan_install(agent, Some(&t)).unwrap();
+                assert!(installed(agent, Some(&out.after)), "{t}");
+                let back = plan_uninstall(agent, &out.after).unwrap();
+                assert_eq!(back.after, t, "{agent:?}");
+                let again = plan_install(agent, Some(&out.after)).unwrap();
+                assert!(!again.changed);
+            }
+        }
     }
 
     #[test]
