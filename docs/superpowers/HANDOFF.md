@@ -580,3 +580,5 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - `$SHELLX_TAB_ID` trong shell của pane đã chuyển vẫn là tab cũ (`$SHELLX_PANE_ID` vẫn đúng); CLI `@tab` theo biến cũ trỏ tab cũ. Sự kiện mới `pane.moved {pane, from, to}`.
 - Tab mà pane tạo ra nó đã chuyển đi lưu bằng khoá riêng (khoá của `-tab.id`) trong `layout.json`; pane tách ra từ pane tạo tab nhận id tab tổng hợp từ 2000000000.
 
+
+Branding: logo gốc ở `assets/brand/` (3 SVG); tạo lại icon: `qlmanage -t -s 1024 -o /tmp/shellx-brand assets/brand/*.svg` rồi `python3 assets/brand/gen_icons.py /tmp/shellx-brand` (Pillow; ghi macOS/Windows/iOS/Android + `apps/mobile/assets/images/logo.png`; `sips` dùng được để kiểm tra kích thước). Icon khay hệ thống (`apps/desktop/assets/tray`) và `web/` có bộ nhận diện riêng, không đổi.
