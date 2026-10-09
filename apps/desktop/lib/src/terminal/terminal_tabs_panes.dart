@@ -76,6 +76,8 @@ extension TerminalTabsPanes on TerminalTabs {
   bool breakPane(int sessionId) {
     final tab = _state.tabOfSession(sessionId);
     if (tab == null || !tab.isSplit) return false;
+    // A6 D5: the last terminal pane stays with the browser panes.
+    if (tab.panes.length == 1 && tab.browsers.isNotEmpty) return false;
     // A tab id is the id of the session that created it (A3 D1): when the
     // pane is the one that created this tab, the tab still has that id.
     final taken = _state.tabs.any((t) => t.id == sessionId);
@@ -110,6 +112,7 @@ extension TerminalTabsPanes on TerminalTabs {
     final from = _state.tabOfSession(sessionId);
     final to = _tab(toTabId);
     if (from == null || to == null || from.id == to.id) return false;
+    if (from.panes.length == 1 && from.browsers.isNotEmpty) return false; // D5
     if (!_roomToSplit(to, to.focusedPaneId, axis)) {
       throw const PaneNoRoomException();
     }
@@ -130,6 +133,11 @@ extension TerminalTabsPanes on TerminalTabs {
   /// ⌘W on a split tab, the pane ×, "Đóng pane" (D6): the last pane closes
   /// the tab.
   void closePane(int sessionId) {
+    // A6 D4: a browser pane is no session; the registry disposes its page.
+    if (isBrowserPaneId(sessionId)) {
+      if (_state.tabOfPane(sessionId) != null) _removePane(sessionId);
+      return;
+    }
     final pane = _state.tabOfSession(sessionId)?.panes[sessionId];
     if (pane == null) return;
     if (!pane.exited) {
@@ -171,6 +179,7 @@ extension TerminalTabsPanes on TerminalTabs {
     final tab = _state.selected;
     if (tab == null || _state.opening) return;
     try {
+      // A6 D6: from a browser pane the new shell is the tab's.
       await splitPaneFor(tab.focusedPaneId, axis, focus: true, local: local);
     } on PaneNoRoomException {
       if (_ref.mounted) _set(notice: const PaneNoRoomNotice());
@@ -201,8 +210,10 @@ extension TerminalTabsPanes on TerminalTabs {
     bool ownFolder = false,
     String? restoreText,
   }) async {
-    final tab = _state.tabOfSession(target);
-    final pane = tab?.panes[target];
+    // A6 D6: [target] may be a browser pane; the new shell then takes the
+    // folder and grid of the tab's active terminal.
+    final tab = _state.tabOfPane(target);
+    final pane = tab?.panes[target] ?? tab?.activeTerminalPane;
     if (tab == null || pane == null) throw const PaneGoneException();
     if (_state.opening) throw const OpenBusyException();
     if (!_roomToSplit(tab, target, axis)) throw const PaneNoRoomException();
@@ -252,7 +263,7 @@ extension TerminalTabsPanes on TerminalTabs {
   /// A click in a pane, a jump to a notification: [sessionId]'s tab is
   /// selected and the pane focused; a zoom that hides it ends (D10).
   void focusPane(int sessionId) {
-    final tab = _state.tabOfSession(sessionId);
+    final tab = _state.tabOfPane(sessionId);
     if (tab == null) return;
     final unzoom = tab.zoomedPaneId != null && tab.zoomedPaneId != sessionId;
     if (tab.focusedPaneId != sessionId || unzoom) {
@@ -395,7 +406,7 @@ extension TerminalTabsPanes on TerminalTabs {
       _sync(); // Ended between the listing and now; others may wait (D5).
       return;
     }
-    final at = tab.panes.containsKey(target) ? target : tab.paneOrder.first;
+    final at = tab.paneOrder.contains(target) ? target : tab.paneOrder.first;
     final unzoom = focus && tab.zoomedPaneId != null;
     final layout = splitPane(tab.layout, at, id, axis);
     final panes = {...tab.panes, id: pane};
@@ -437,7 +448,12 @@ extension TerminalTabsPanes on TerminalTabs {
   /// ([panePixelSizes]) and the halves the new split will really get
   /// ([splitExtents] at 0.5: the first half is snapped, so a sum check can
   /// leave the second one a pixel short — final ruling m-2).
-  bool _roomToSplit(TerminalTab tab, int target, SplitAxis axis) {
+  bool _roomToSplit(
+    TerminalTab tab,
+    int target,
+    SplitAxis axis, {
+    bool newIsBrowser = false,
+  }) {
     final m = _metrics;
     if (m == null) return true;
     final size = panePixelSizes(
@@ -451,11 +467,19 @@ extension TerminalTabsPanes on TerminalTabs {
     final (along, across) = row
         ? (size.width, size.height)
         : (size.height, size.width);
+    // A6 D31: a browser target keeps its own, larger, minimum.
+    final targetMin = isBrowserPaneId(target) ? kBrowserMinSize : m.minPane;
+    final newMin = newIsBrowser ? kBrowserMinSize : m.minPane;
     final (minAlong, minAcross) = row
-        ? (m.minPane.width, m.minPane.height)
-        : (m.minPane.height, m.minPane.width);
+        ? (newMin.width, newMin.height)
+        : (newMin.height, newMin.width);
+    final (targetAlong, targetAcross) = row
+        ? (targetMin.width, targetMin.height)
+        : (targetMin.height, targetMin.width);
     final (a, b) = splitExtents(along, 0.5, m.divider, m.devicePixelRatio);
-    return a >= minAlong && b >= minAlong && across >= minAcross;
+    return a >= targetAlong &&
+        b >= minAlong &&
+        across >= max(minAcross, targetAcross);
   }
 
   /// D4: no pane of either side may end up below [PaneMetrics.minPane].
@@ -516,8 +540,9 @@ extension TerminalTabsPanes on TerminalTabs {
     final m = _metrics!;
     final half = 0.5 / (m.devicePixelRatio > 0 ? m.devicePixelRatio : 1.0);
     switch (node) {
-      case PaneLeaf():
-        return axis == SplitAxis.row ? m.minPane.width : m.minPane.height;
+      case PaneLeaf(:final sessionId):
+        final min = isBrowserPaneId(sessionId) ? kBrowserMinSize : m.minPane;
+        return axis == SplitAxis.row ? min.width : min.height;
       case PaneSplit(axis: final a, :final ratio, :final first, :final second)
           when a == axis:
         // snap(r·X) ≥ min(first); X − divider − snap(r·X) ≥ min(second).

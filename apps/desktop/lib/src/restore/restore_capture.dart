@@ -25,7 +25,9 @@ RestoreSnapshot captureSnapshot({
     final leaves = savedLeaves(layout);
     final keys = {for (final p in leaves) p.key};
     String? live(int? id) {
-      if (id == null) return null;
+      // A6: a browser pane is no session and has no key (keyOf of a
+      // negative id would alias a displaced tab's key); it is not saved.
+      if (id == null || isBrowserPaneId(id)) return null;
       final key = keyOf(id);
       return keys.contains(key) ? key : null;
     }

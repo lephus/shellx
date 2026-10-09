@@ -211,7 +211,9 @@ final class CliEventBus {
           }
         }
       }
+      // A6: a browser pane is not a session; scripts hear about terminals.
       if (o.focusedPaneId != t.focusedPaneId &&
+          !isBrowserPaneId(t.focusedPaneId) &&
           _swappedEnd(o.focusedPaneId) != t.focusedPaneId) {
         _emitFor(t.id, {
           'kind': 'pane.focused',

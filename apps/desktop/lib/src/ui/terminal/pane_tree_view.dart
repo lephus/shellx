@@ -285,6 +285,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   Widget _pane(int id) {
     final l10n = AppLocalizations.of(context);
     final tab = widget.tab;
+    // A6 Task 9a draws the browser pane; until then its leaf is an empty
+    // rectangle (nothing opens one yet).
+    if (isBrowserPaneId(id)) return SizedBox.expand(key: Key('pane.$id'));
     final pane = tab.panes[id]!;
     final split = tab.isSplit;
     final focused = id == tab.focusedPaneId;
@@ -607,7 +610,10 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     final labels = {for (final t in state.tabs) t.id: t.label};
     final moveTargets = [
       for (final tabId in ref.read(sidebarWorkspacesProvider).orderedTabIds)
-        if (tabId != widget.tab.id && labels.containsKey(tabId)) tabId,
+        if (tabId != widget.tab.id &&
+            labels.containsKey(tabId) &&
+            widget.tab.canMovePane(id))
+          tabId,
     ].take(20).toList();
     final choice = await showShellxMenu<Object>(
       context: context,
@@ -703,14 +709,16 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
         ],
         // A11 D20: swap, break and move; the session is never touched.
         if (widget.tab.isSplit) ...[
-          ShellxMenuEntry(
-            key: const Key('menu.breakPane'),
-            value: const BreakPaneIntent(),
-            label: l10n.actionBreakPane,
-            dividerBefore: true,
-          ),
+          if (widget.tab.canMovePane(id))
+            ShellxMenuEntry(
+              key: const Key('menu.breakPane'),
+              value: const BreakPaneIntent(),
+              label: l10n.actionBreakPane,
+              dividerBefore: true,
+            ),
           ShellxMenuEntry<Object>(
             key: const Key('menu.swapPane'),
+            dividerBefore: !widget.tab.canMovePane(id),
             value: _PaneMove.swap,
             label: l10n.paneSwapMenu,
           ),

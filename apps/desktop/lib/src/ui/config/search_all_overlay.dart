@@ -26,13 +26,15 @@ List<PaneSource> searchAllSources(TerminalTabsState state) {
   return [
     for (final tab in tabs)
       for (final id in tab.paneOrder)
-        PaneSource(
-          tabId: tab.id,
-          paneId: id,
-          tabLabel: tab.label,
-          paneNumber: tab.paneNumber(id),
-          terminal: tab.panes[id]!.terminal,
-        ),
+        // A6: a browser pane has no terminal to search.
+        if (tab.panes[id] != null)
+          PaneSource(
+            tabId: tab.id,
+            paneId: id,
+            tabLabel: tab.label,
+            paneNumber: tab.paneNumber(id),
+            terminal: tab.panes[id]!.terminal,
+          ),
   ];
 }
 

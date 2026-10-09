@@ -207,11 +207,15 @@ final class FakeLocalSessions implements LocalSessions {
 
   @override
   LocalSessionView view(int id) {
+    viewRequests.add(id);
     final view = views[id];
     if (view == null) throw StateError('No session $id');
     view.viewed++;
     return view;
   }
+
+  /// Every `view` call, in order (A6: a browser pane is never viewed).
+  final viewRequests = <int>[];
 
   /// Every `watchPorts` call, in order (A2 D8).
   final watched = <bool>[];

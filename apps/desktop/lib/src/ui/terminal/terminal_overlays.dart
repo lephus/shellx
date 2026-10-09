@@ -668,6 +668,9 @@ class _NoticeToastState extends State<NoticeToast> {
     AgentCommandFailedNotice() => l10n.agentCommandFailed,
     ConfigGhosttyNotice() => l10n.configGhosttyNotice,
     PaneNoRoomNotice() => l10n.paneSplitNoRoom,
+    BrowserLimitNotice(:final max) => l10n.browserLimitReached(max),
+    BrowserSchemeBlockedNotice() => l10n.browserSchemeBlocked,
+    BrowserDownloadBlockedNotice() => l10n.browserDownloadBlocked,
     PasteTooLargeNotice() => l10n.pasteTooLarge,
     InputNotice(:final kind) => switch (kind) {
       InputNoticeKind.dropSsh => l10n.dropSsh,

@@ -10,6 +10,8 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../browser/browser_controller.dart' show BrowserError, BrowserPaneState;
+import '../browser/browser_url.dart' show aboutBlank;
 import '../agent/desktop_services.dart' show clockProvider;
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
@@ -29,6 +31,7 @@ import 'terminal_feed.dart';
 import 'terminal_input.dart' show desktopInputHandlerWith;
 import 'terminal_style.dart';
 
+part 'terminal_tabs_browser.dart';
 part 'terminal_tabs_config.dart';
 part 'terminal_tabs_panes.dart';
 part 'terminal_tabs_remote.dart';
@@ -108,6 +111,22 @@ final class ReopenNothingNotice extends TabNotice {
 final class ReopenedNotice extends TabNotice {
   const ReopenedNotice(this.name);
   final String name;
+}
+
+/// A6 D28: the tab model already holds [kMaxBrowserPanes] browser panes.
+final class BrowserLimitNotice extends TabNotice {
+  const BrowserLimitNotice(this.max);
+  final int max;
+}
+
+/// A6 D10: a page asked to open a scheme a pane may not show.
+final class BrowserSchemeBlockedNotice extends TabNotice {
+  const BrowserSchemeBlockedNotice();
+}
+
+/// A6 D15: a page started a download; panes do not download.
+final class BrowserDownloadBlockedNotice extends TabNotice {
+  const BrowserDownloadBlockedNotice();
 }
 
 /// D4: the focused pane is too small to hold two (neutral toast).
@@ -336,6 +355,23 @@ final class PaneSession {
   );
 }
 
+/// A6 D4: a browser pane's id. Browser panes are leaves of the pane tree
+/// like sessions but are not sessions: their ids are negative, counted down
+/// from -1 by [TerminalTabs] and never reused in a run. Session ids (the
+/// daemon counts from 1) and A11's synthetic tab ids (>= 2e9, tab ids only)
+/// are positive, so the spaces are disjoint. Restore keys
+/// (`restore_persistence`) use negatives of *tab* ids for displaced tabs:
+/// a browser id must therefore never reach `keyOf`, nor `_links`, nor any
+/// `LocalSessions` call.
+bool isBrowserPaneId(int id) => id < 0;
+
+/// A6 D28: browser panes at once, across all tabs.
+const int kMaxBrowserPanes = 8;
+
+/// A6 D31 (UI-A6 §1.2 `browserMinWidth`/`browserMinHeight`): pane header,
+/// toolbar and a usable page.
+const Size kBrowserMinSize = Size(240, 160);
+
 /// A sidebar tab (A3 P1): a tree of panes, one session each. Its id is the
 /// id of the session that created it and never changes (D1). The A1/A2
 /// getters read the focused pane, so the sidebar, the workspaces and A4
@@ -352,6 +388,7 @@ final class TerminalTab {
     this.paneHistory = const [],
     this.customTitle,
     this.meta = TabMeta.empty,
+    this.browsers = const {},
   });
 
   factory TerminalTab.single(PaneSession pane) => TerminalTab(
@@ -383,12 +420,37 @@ final class TerminalTab {
   /// A11 D18: pin, one-line description and status, all the user's.
   final TabMeta meta;
 
-  PaneSession get focused => panes[focusedPaneId]!;
+  /// A6 D4: the browser panes of the tree, by their negative ids. Not
+  /// sessions: never in [panes].
+  final Map<int, BrowserPaneState> browsers;
+
+  /// A6 D6: the pane the A1/A2 getters describe — the focused pane when it
+  /// is a terminal, else the most recently used terminal pane. A6 D5
+  /// guarantees there is one.
+  PaneSession get activeTerminalPane {
+    final focusedPane = panes[focusedPaneId];
+    if (focusedPane != null) return focusedPane;
+    for (final id in paneHistory) {
+      final pane = panes[id];
+      if (pane != null) return pane;
+    }
+    return panes[paneOrder.firstWhere(panes.containsKey)]!;
+  }
+
+  PaneSession get focused => activeTerminalPane;
+
+  /// A11 D20 + A6 D5: terminal pane [id] may leave this tab (break, move).
+  /// Browser panes never move, and the last terminal pane stays with the
+  /// browser panes of its tab.
+  bool canMovePane(int id) =>
+      panes.containsKey(id) && !(panes.length == 1 && browsers.isNotEmpty);
 
   /// D23: reading order.
   List<int> get paneOrder => paneIds(layout);
-  int get paneCount => panes.length;
-  bool get isSplit => panes.length > 1;
+
+  /// The layout's leaves: terminal and browser panes (A6).
+  int get paneCount => paneOrder.length;
+  bool get isSplit => layout is PaneSplit;
 
   /// 1-based position of [sessionId] in [paneOrder] ("Pane 2 of 3").
   int paneNumber(int sessionId) => paneOrder.indexOf(sessionId) + 1;
@@ -442,6 +504,7 @@ final class TerminalTab {
     List<int>? paneHistory,
     Object? customTitle = _unset,
     TabMeta? meta,
+    Map<int, BrowserPaneState>? browsers,
   }) => TerminalTab(
     id: id,
     origin: origin ?? this.origin,
@@ -456,6 +519,7 @@ final class TerminalTab {
         ? this.customTitle
         : customTitle as String?,
     meta: meta ?? this.meta,
+    browsers: browsers ?? this.browsers,
   );
 }
 
@@ -489,6 +553,18 @@ final class TerminalTabsState {
     }
     return null;
   }
+
+  /// The tab holding pane [id] — a session or a browser pane (A6).
+  TerminalTab? tabOfPane(int id) {
+    for (final tab in tabs) {
+      if (tab.panes.containsKey(id) || tab.browsers.containsKey(id)) {
+        return tab;
+      }
+    }
+    return null;
+  }
+
+  int get browserCount => tabs.fold(0, (n, tab) => n + tab.browsers.length);
 }
 
 /// What a tab holds that is not state: its view, feed, selection and
@@ -603,6 +679,9 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// A11 D20: tab ids handed out when a broken-out pane's own id is already
   /// a tab's (see [kSyntheticTabIdBase]).
   int _syntheticTabIds = 0;
+
+  /// A6 D4: the next browser pane id; counts down, never repeats.
+  int _nextBrowserId = -1;
 
   /// A7 D21: how the last 64 sessions that ended here ended (exit 0
   /// removes the pane; `wait --exit` still reports it).
@@ -1100,8 +1179,16 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     if (link == null) return; // Already closed here.
     _recordExit(id, code);
     if (code == 0 || link.view.closedOnRequest) {
-      _removePane(id);
-      return;
+      final tab = state.tabOfSession(id);
+      final keep =
+          tab != null && tab.panes.length == 1 && tab.browsers.isNotEmpty;
+      // A6 D5: the shell of a tab that has browser panes stays (exit line,
+      // Enter closes the tab): the browser panes do not vanish because a
+      // shell ended, whoever ended it.
+      if (!keep) {
+        _removePane(id);
+        return;
+      }
     }
     link.feed.drain();
     final terminal = link.terminal;
@@ -1165,16 +1252,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   /// D7/D8: the sibling takes the place; focus goes to the most recently
   /// used remaining pane. The last pane takes the tab with it.
   void _removePane(int sessionId) {
-    final tab = state.tabOfSession(sessionId);
+    final tab = state.tabOfPane(sessionId);
     if (tab == null) {
       _links.remove(sessionId)?.dispose();
       return;
     }
-    if (!tab.isSplit) {
+    // A6 D5: the last terminal pane takes the tab (and its browser panes)
+    // with it — a tab never holds browser panes alone.
+    final isBrowser = isBrowserPaneId(sessionId);
+    if (!tab.isSplit || (!isBrowser && tab.panes.length == 1)) {
       _removeTab(tab.id);
       return;
     }
-    _links.remove(sessionId)?.dispose();
+    if (!isBrowser) _links.remove(sessionId)?.dispose();
     final layout = removePane(tab.layout, sessionId)!;
     final remaining = paneIds(layout);
     final history = [
@@ -1195,7 +1285,10 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     _replaceTab(
       tab.copyWith(
         layout: layout,
-        panes: Map.of(tab.panes)..remove(sessionId),
+        panes: isBrowser ? tab.panes : (Map.of(tab.panes)..remove(sessionId)),
+        browsers: isBrowser
+            ? (Map.of(tab.browsers)..remove(sessionId))
+            : tab.browsers,
         focusedPaneId: focused,
         paneHistory: [focused, ...history.where((id) => id != focused)],
         zoomedPaneId: zoomed,

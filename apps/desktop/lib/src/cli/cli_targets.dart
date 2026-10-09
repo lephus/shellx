@@ -76,9 +76,12 @@ TerminalTab? _tabById(TerminalTabsState s, int id) =>
 
 /// A terminal pane id; a tab gives its focused pane. Throws `not_found`.
 int resolvePane(TerminalTabsState s, CliTarget target) => switch (target) {
-  FocusedRef() => (s.selected ?? (throw _noSelection)).focusedPaneId,
+  // A6: a focused browser pane is no terminal pane; the tab's active
+  // terminal answers (browser targets come with the browser commands).
+  FocusedRef() => (s.selected ?? (throw _noSelection)).activeTerminalPane.id,
   PaneRef(:final id) => s.tabOfSession(id) != null ? id : throw _noPane(id),
-  TabRef(:final id) => (_tabById(s, id) ?? (throw _noTab(id))).focusedPaneId,
+  TabRef(:final id) =>
+    (_tabById(s, id) ?? (throw _noTab(id))).activeTerminalPane.id,
 };
 
 /// A tab id; a pane gives the tab holding it. Throws `not_found`.

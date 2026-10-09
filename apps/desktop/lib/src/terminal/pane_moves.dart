@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
 
 import 'pane_layout.dart';
@@ -15,7 +17,9 @@ PaneNode swapLeaves(PaneNode node, int a, int b) {
   if (a == b) return node;
   final ids = paneIds(node);
   if (!ids.contains(a) || !ids.contains(b)) return node;
-  const tmp = -1; // session ids are never negative
+  // A6: browser panes have negative ids, so the temporary leaf takes an id
+  // below every leaf of the tree instead of a fixed one.
+  final tmp = ids.reduce(min) - 1;
   return replaceLeaf(replaceLeaf(replaceLeaf(node, a, tmp), b, a), tmp, b);
 }
 
@@ -72,6 +76,8 @@ typedef BrokenPane = ({TerminalTab from, TerminalTab detached});
 BrokenPane? breakPane(TerminalTab tab, int paneId, {int? detachedId}) {
   final pane = tab.panes[paneId];
   if (pane == null || !tab.isSplit) return null;
+  // A6 D5: the last terminal pane stays with its tab's browser panes.
+  if (tab.panes.length == 1 && tab.browsers.isNotEmpty) return null;
   return (
     from: _without(tab, paneId),
     detached: TerminalTab(
@@ -103,6 +109,7 @@ MovedPane? joinPane(
   if (pane == null || from.id == to.id || to.panes.containsKey(paneId)) {
     return null;
   }
+  if (from.panes.length == 1 && from.browsers.isNotEmpty) return null; // D5
   final joined = to.copyWith(
     // A desktop pane in a tab a phone opened: the user made it theirs.
     origin: pane.origin == SessionOrigin.desktop ? SessionOrigin.desktop : null,

@@ -224,7 +224,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   int? _joinTarget(JoinPaneIntent intent) {
     final state = ref.read(terminalTabsProvider);
     final selected = state.selected;
-    if (selected == null) return null;
+    if (selected == null || !selected.canMovePane(selected.focusedPaneId)) {
+      return null;
+    }
     final id =
         intent.tabId ??
         switch (intent.position) {
@@ -393,11 +395,19 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         if (tab == null) return;
         tabs.setMeta(tab.id, (m) => m.copyWith(pinned: !m.pinned));
       }),
-      BreakPaneIntent: run<BreakPaneIntent>((_) {
-        closePanel();
-        final tab = ref.read(terminalTabsProvider).selected;
-        if (tab != null && tabs.breakPane(tab.focusedPaneId)) focusTerminal();
-      }, enabled: _isSplit),
+      BreakPaneIntent: run<BreakPaneIntent>(
+        (_) {
+          closePanel();
+          final tab = ref.read(terminalTabsProvider).selected;
+          if (tab != null && tabs.breakPane(tab.focusedPaneId)) focusTerminal();
+        },
+        enabled: (_) {
+          final tab = ref.read(terminalTabsProvider).selected;
+          return tab != null &&
+              tab.isSplit &&
+              tab.canMovePane(tab.focusedPaneId);
+        },
+      ),
       JoinPaneIntent: run<JoinPaneIntent>((intent) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
@@ -461,7 +471,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       StartSearchIntent: run<StartSearchIntent>((_) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
-        if (tab == null) return;
+        if (tab == null || isBrowserPaneId(tab.focusedPaneId)) return;
         ref.read(findSessionsProvider.notifier).open(tab.focusedPaneId);
         WidgetsBinding.instance
           ..addPostFrameCallback(
@@ -471,7 +481,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
                 .requestFocus(),
           )
           ..ensureVisualUpdate();
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      }, enabled: (_) => _terminalPaneFocused()),
       NavigateSearchIntent: run<NavigateSearchIntent>((intent) {
         final bar = _focusedFind();
         intent.next ? bar?.next() : bar?.previous();
@@ -494,6 +504,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         enabled: (_) {
           final pane = ref.read(terminalTabsProvider).selected?.focused;
           return pane != null &&
+              _terminalPaneFocused() &&
               terminalFocus.hasFocus &&
               canEditLine(
                 exited: pane.exited,
@@ -520,10 +531,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       ToggleCopyModeIntent: run<ToggleCopyModeIntent>((_) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
-        if (tab == null) return;
+        if (tab == null || isBrowserPaneId(tab.focusedPaneId)) return;
         ref.read(copyModeProvider.notifier).toggle(tab.focusedPaneId);
         focusTerminal();
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      }, enabled: (_) => _terminalPaneFocused()),
       FontBiggerIntent: run<FontBiggerIntent>(
         (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
@@ -576,10 +587,17 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     tab.selection.clearSelection();
   }
 
+  /// A6: the selected tab's focused pane is a terminal. Find, copy mode,
+  /// paste and line editing never attach to a browser pane.
+  bool _terminalPaneFocused() {
+    final tab = ref.read(terminalTabsProvider).selected;
+    return tab != null && !isBrowserPaneId(tab.focusedPaneId);
+  }
+
   /// A10 D4: the find bar of the selected tab's focused pane, if open.
   FindSession? _focusedFind() {
     final tab = ref.read(terminalTabsProvider).selected;
-    return tab == null
+    return tab == null || isBrowserPaneId(tab.focusedPaneId)
         ? null
         : ref.read(findSessionsProvider)[tab.focusedPaneId];
   }
@@ -587,7 +605,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// ⌘A / Ctrl+Shift+A / the menu: every line, scrollback included.
   void _selectAll() {
     final tab = ref.read(terminalTabsProvider).selected;
-    if (tab == null) return;
+    if (tab == null || isBrowserPaneId(tab.focusedPaneId)) return;
     final buffer = tab.terminal.buffer;
     tab.selection.setSelection(
       buffer.createAnchor(0, 0),
@@ -605,7 +623,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// panes behave alike.
   Future<void> _paste() async {
     final tab = ref.read(terminalTabsProvider).selected;
-    if (tab == null) return;
+    if (tab == null || isBrowserPaneId(tab.focusedPaneId)) return;
     final paneId = tab.focusedPaneId;
     // A11 D13: a paste (the menu's too) is for the program, not for copy
     // mode: the mode ends first.
