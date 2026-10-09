@@ -41,8 +41,9 @@ fi
 #    refuse to load every embedded framework ("different Team IDs": dyld aborts at launch). Only
 #    for "-", add disable-library-validation to a temporary copy; Developer ID builds are unchanged.
 if [[ "$MACOS_SIGNING_IDENTITY" == "-" ]]; then
-  adhoc_entitlements="$(mktemp -t shellx-adhoc-entitlements).plist"
-  trap 'rm -f "$adhoc_entitlements"' EXIT
+  adhoc_dir="$(mktemp -d -t shellx-adhoc)"
+  trap 'rm -rf "$adhoc_dir"' EXIT
+  adhoc_entitlements="$adhoc_dir/entitlements.plist"
   cp "$entitlements" "$adhoc_entitlements"
   /usr/libexec/PlistBuddy -c 'Add :com.apple.security.cs.disable-library-validation bool true' "$adhoc_entitlements"
   entitlements="$adhoc_entitlements"
