@@ -2,6 +2,7 @@
 library;
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:test/test.dart';
@@ -67,21 +68,28 @@ void main() {
     addTearDown(sharing.stop);
 
     final ports = <int>{};
+    final secrets = <int, Uint8List>{};
+    void note() {
+      final (port, secret) = readEndpoint(path);
+      ports.add(port);
+      secrets[port] = secret;
+    }
+
     await Future.wait([
-      sharing.start().then((_) => ports.add(readEndpoint(path).$1)),
-      sharing.start().then((_) => ports.add(readEndpoint(path).$1)),
+      sharing.start().then((_) => note()),
+      sharing.start().then((_) => note()),
     ]);
     expect(sharing.enabled, isTrue);
     expect(ports, hasLength(1));
 
     await sharing.stop();
     expect(File(path).existsSync(), isFalse);
-    // Nothing is left listening on any port either start published.
+    // Nothing of ours is left listening on any port either start published.
+    // (Under load another process may legitimately reuse the freed ephemeral
+    // port, so a connection alone proves nothing: it must not speak our
+    // protocol with our secret.)
     for (final port in ports) {
-      await expectLater(
-        Socket.connect(InternetAddress.loopbackIPv4, port),
-        throwsA(isA<SocketException>()),
-      );
+      expect(await stillServes(port, secrets[port]!), isFalse);
     }
   });
 }

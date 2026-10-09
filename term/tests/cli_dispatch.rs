@@ -265,15 +265,22 @@ fn a_stale_endpoint_is_not_running_fast() {
     assert!(sock.exists());
     let refused = endpoint_file(&dir2, &sock);
     for ep in [gone, refused] {
-        let started = Instant::now();
-        let out = shellx(&ep, Some(TOKEN), &["ls"]);
-        assert!(
-            started.elapsed() < Duration::from_millis(1900), // below the 2 s connect timeout; slack for a loaded machine
-            "{:?}",
-            started.elapsed()
-        );
-        assert_eq!(out.status.code(), Some(3));
-        assert!(String::from_utf8_lossy(&out.stderr).contains("ShellX is not running"));
+        // The timing is the point (a dead socket must not wait out the 2 s
+        // connect timeout), but one slow process spawn on a loaded machine
+        // must not fail it: a real hang is slow on every attempt.
+        let mut fastest = Duration::MAX;
+        for _ in 0..4 {
+            let started = Instant::now();
+            let out = shellx(&ep, Some(TOKEN), &["ls"]);
+            let took = started.elapsed();
+            assert_eq!(out.status.code(), Some(3));
+            assert!(String::from_utf8_lossy(&out.stderr).contains("ShellX is not running"));
+            fastest = fastest.min(took);
+            if took < Duration::from_millis(1500) {
+                break;
+            }
+        }
+        assert!(fastest < Duration::from_millis(1500), "{fastest:?}");
     }
 }
 

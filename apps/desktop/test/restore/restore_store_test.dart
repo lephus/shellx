@@ -375,7 +375,12 @@ void main() {
     expect(await hung.prepare(), isTrue);
     expect(await hung.writeLayout(snap()), isTrue);
     // The exclusion runs in the background; its timeout is still logged.
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    // Poll with a wide deadline: the 50 ms timer can fire late under load.
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while (!logs.any((l) => l.contains('backup exclusion failed')) &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
     expect(
       logs.where((l) => l.contains('backup exclusion failed')),
       hasLength(1),

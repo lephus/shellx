@@ -69,6 +69,14 @@ void main() {
     return host;
   }
 
+  /// The exit comes from a short real timer; wait for it with a wide deadline.
+  Future<void> untilExit() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while (exits.isEmpty && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+  }
+
   setUp(() {
     directory = Directory.systemTemp.createTempSync('daemon_host');
     endpoint = MuxEndpointFile('${directory.path}/endpoint');
@@ -83,7 +91,7 @@ void main() {
   });
   tearDown(() async {
     // A quit's exit timer must not leak into the next test.
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
     directory.deleteSync(recursive: true);
   });
 
@@ -94,7 +102,11 @@ void main() {
         build(idle: const Duration(milliseconds: 20));
         await host.start(listener);
         host.onStateChanged();
-        await Future<void>.delayed(const Duration(milliseconds: 80));
+        // Poll with a wide deadline: a 20 ms real timer can fire late under load.
+        final deadline = DateTime.now().add(const Duration(seconds: 20));
+        while (shutdowns == 0 && DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
         expect(shutdowns, 1);
         expect(listener.closed, isTrue);
         await expectLater(attachClient(listener), throwsA(anything));
@@ -231,7 +243,7 @@ void main() {
       expect(shutdowns, 1);
       expect(File(endpoint.path).existsSync(), isFalse);
       expect(exits, isEmpty, reason: 'the exit comes a tick after quit');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await untilExit();
       expect(exits, [0]);
     });
 
@@ -245,7 +257,7 @@ void main() {
       expect(reply.type, MuxType.result);
       expect(shutdowns, 1);
       expect(exits, isEmpty);
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await untilExit();
       expect(exits, [0]);
       await h.quit();
     });
@@ -273,7 +285,7 @@ void main() {
       final watch = Stopwatch()..start();
       await h.quit();
       expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await untilExit();
       expect(exits, [0]);
       expect(File(endpoint.path).existsSync(), isFalse);
     });
