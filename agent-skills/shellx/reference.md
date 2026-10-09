@@ -147,6 +147,18 @@ JSON: `{}`. Exit codes: 0, 2, 3, 4, 6, 7.
 
 JSON: `{"workspace":"w:abc","tab":"t105"}`. Exit codes: 0, 1, 3, 6, 7.
 
+## shellx tab describe
+
+`shellx tab describe TAB TEXT...` — set the one-line description shown under a tab in the sidebar (cut to 120 characters, control characters removed; an empty text `""` clears it). `TAB` is `tN`, `@tab` or `@self`. Does not change focus; the text never appears in `ls`.
+
+JSON: `{}`. Exit codes: 0, 2, 3, 4, 6, 7.
+
+## shellx tab status
+
+`shellx tab status TAB STATE` — mark a tab's progress: `none`, `in_progress`, `review`, `blocked` or `done` (anything else exits 2). Does not change focus.
+
+JSON: `{}`. Exit codes: 0, 2, 3, 4, 6, 7.
+
 ## shellx workspace rename
 
 `shellx workspace rename WORKSPACE NAME...` — rename a workspace (`w:<id>` or its name; a blank name exits 2).

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:characters/characters.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -7,6 +8,7 @@ import 'package:shellx_desktop/src/cli/agent_marks.dart';
 import 'package:shellx_desktop/src/cli/ui_command_handler.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/tab_meta.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 
 import '../support/fake_local_sessions.dart';
@@ -254,6 +256,34 @@ void main() {
     await call('ui.close', {'tab': 100});
     expect(tabs().tabs, isEmpty);
     await expectLater(call('ui.close', {'tab': 100}), fails('not_found'));
+  });
+
+  test('tab meta: describe and status (A12 D18)', () async {
+    await call('ui.tab.meta', {
+      'tab': 100,
+      'description': '  fix\u202e login\n now ${'x' * 200}',
+    });
+    final m = tabs().selected!.meta;
+    expect(m.description.characters.length, lessThanOrEqualTo(120));
+    expect(m.description, startsWith('fix login'));
+    expect(m.description, isNot(contains('\u202e')));
+    expect(m.status, TabStatus.none);
+    await call('ui.tab.meta', {'tab': 100, 'status': 'review'});
+    expect(tabs().selected!.meta.status, TabStatus.review);
+    expect(tabs().selected!.meta.description, isNotEmpty); // untouched
+    await expectLater(
+      call('ui.tab.meta', {'tab': 100, 'status': 'bogus'}),
+      fails('bad_request'),
+    );
+    expect(tabs().selected!.meta.status, TabStatus.review);
+    await call('ui.tab.meta', {'tab': 100, 'description': ''});
+    expect(tabs().selected!.meta.description, '');
+    await call('ui.tab.meta', {'tab': 100, 'status': 'none'});
+    expect(tabs().selected!.meta.status, TabStatus.none);
+    await expectLater(
+      call('ui.tab.meta', {'tab': 999, 'status': 'done'}),
+      fails('not_found'),
+    );
   });
 
   test('rename tab and workspaces; move a tab (D22)', () async {
