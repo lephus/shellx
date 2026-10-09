@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:characters/characters.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -264,7 +263,7 @@ void main() {
       'description': '  fix\u202e login\n now ${'x' * 200}',
     });
     final m = tabs().selected!.meta;
-    expect(m.description.characters.length, lessThanOrEqualTo(120));
+    expect(m.description.length, lessThanOrEqualTo(120));
     expect(m.description, startsWith('fix login'));
     expect(m.description, isNot(contains('\u202e')));
     expect(m.status, TabStatus.none);

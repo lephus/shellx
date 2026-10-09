@@ -654,4 +654,51 @@ Task 18–21 — mobile (iPhone, Android)
 
 **Quy trình phát hành.** (1) Điền `apps/desktop/assets/whats_new.json` cho phiên bản mới (xem mục Task 16 trên) và dịch vi + en. (2) Ghi vào ghi chú phát hành: `⌘,` mở Cài đặt, `⌘⌥,` mở tệp cấu hình. (3) Chạy hết danh sách thủ công ở trên. (4) Chính sách quyền riêng tư (`web/src/pages/privacy.md`, `en/privacy.md`) đã nêu danh sách tab vừa đóng chỉ nằm trong bộ nhớ.
 
+## 22. A12 — agent và trau chuốt (2026-10-08)
+
+**Tính năng (một dòng mỗi mục, kèm quyết định spec).** T1-2 CLI `shellx agent-event` (D4, D5: luôn thoát 0, im lặng khi không có tty); T3-6 `shellx integrations status|install|uninstall` cho Claude Code, Gemini CLI, Codex, OpenCode, có diff, hỏi `y/N`, `.shellx-bak`, ghi nguyên tử (D6, D7, D8); T7 trạng thái agent theo pane Running/Needs input/Idle/Done, tự hết hạn khi im 20 s (D9, D11); T8 huy hiệu sidebar/header pane, thông báo "cần bạn" đúng pane, gộp hook + OSC trong 3 s (D10, D12); T9 dải "Tiếp tục phiên" sau khi khởi động lại, id phiên lưu trong `layout.json` (D13, D14); T10 nút "Cài đặt trong terminal" trong Cài đặt › Agent (D23); T11 trạng thái PR + CI trong sidebar qua `gh`, tắt mặc định (D16); T12 `agent-event-command` có cổng cho phép theo SHA-256, không qua shell (D17); T13 chọn ngôn ngữ (D19); T14 nút "Kiểm tra cập nhật" (D20); T16 CLI `shellx tab describe|status` (D18); T17 mobile: chip trạng thái agent cạnh phiên desktop (D22); T18 tài liệu, chính sách riêng tư, "Có gì mới" (D27).
+
+**Giới hạn đã biết.**
+- Codex chỉ báo hết lượt (`notify`), không có "đang chạy".
+- Hook không đi qua SSH: agent chạy trên máy từ xa không báo gì.
+- Daemon không có cửa sổ (dịch vụ nền A5b, ShellX đóng) thì sự kiện hook bị mất; không có bộ đệm.
+- `SHELLX_PANE_ID` cũ trong tmux chạy trong ShellX: sự kiện có thể gắn nhầm pane cũ sau khi khôi phục.
+- Ngôn ngữ cần khởi động lại; dịch vụ nền giữ ngôn ngữ hệ thống.
+- PR cần `gh` đã đăng nhập và tắt mặc định. `gh` chạy trong thư mục của pane: với một bản clone không tin cậy `gh` đọc cấu hình git của repo đó (remote, host), nên đừng bật `pr-status` khi làm việc trong mã lạ.
+- `agent-event-command` không qua shell, phải là đường dẫn tuyệt đối hoặc `~/`; trên Windows chỉ `.exe`; một tên lệnh trần chưa kiểm chứng.
+- "Điện thoại đã trả lời" chỉ là heuristic: ShellX coi đổi người lái phiên (điện thoại) hoặc dán là một lần trả lời, nên có thể xoá "Cần bạn" sớm.
+- Payload của hook và từ khoá resume (`claude --resume`, `codex resume`, `gemini --resume`, `opencode --session`) lấy từ tài liệu, chưa kiểm với bản thật của từng agent; fixture không phải bản ghi thật; Gemini/Codex/OpenCode có thể không gửi id phiên.
+- `.shellx-bak` giữ từ lần cài đầu, không ghi đè: có thể cũ hơn các chỉnh sửa sau của người dùng.
+- Mobile (D22): chip chỉ cập nhật ở lần `session.list` kế tiếp; `DesktopSessionManager` nhận `agentOf` nhưng ứng dụng desktop chưa nối nó vào `AgentStatusNotifier` (phiên `shellx-term` và pane của ShellX dùng id khác nhau), nên hôm nay desktop chưa gửi hai khoá.
+- T15 (cửa sổ trong suốt + blur) **bỏ khỏi A12**: cần kiểm bằng mắt trên Mac thật; chuyển sang A13.
+
+**Hoãn A13.** Xem spec §10: hook qua SSH, trạng thái Codex đầy đủ (`hooks.json`), bộ đệm sự kiện ở daemon, cây subagent, hibernation, thêm agent, tự cập nhật, đổi ngôn ngữ ngay, `shellx config set`, T15.
+
+**⚠ Danh sách kiểm tra thủ công A12 (chưa ai chạy trên máy thật; mỗi task đã merge sau review nhưng danh sách này chặn phát hành)**
+
+Task 3-6 — cài hook (Mac, Windows)
+- [ ] `shellx integrations install claude` trên `settings.json` thật có sẵn hook: diff đúng; `n` không ghi; `y` ghi; chạy `claude` không báo lỗi hook; `uninstall` trả nguyên trạng (so với `.shellx-bak`); tệp là symlink (dotfiles); loại thông báo `Notification` đúng.
+- [ ] Gemini CLI (tên trường/sự kiện, có cần bật hooks), Codex `notify` (argv, có id phiên), OpenCode nạp được plugin và tên sự kiện đúng; ghi phiên bản từng agent vào ledger. PATH của agent mở từ GUI. Windows: `%USERPROFILE%\.claude`, tty `CONIN$`/`CONOUT$`.
+
+Task 7-8 — trạng thái và thông báo (Mac)
+- [ ] Với Claude thật: hỏi quyền, trả lời, Stop, Esc giữa lượt, `/clear`, `/exit`, hai pane agent trong một tab, tab khác đang xem khi cần bạn; VoiceOver đọc huy hiệu và vùng thông báo trực tiếp; chế độ dịch vụ nền (A5b) từ đầu đến cuối.
+
+Task 9-10 — tiếp tục phiên và Cài đặt (Mac, Windows)
+- [ ] `kill -9` ShellX giữa lúc `claude` chạy, mở lại, dải hiện, bấm "Tiếp tục phiên" đúng phiên; "Bỏ qua"; bật dịch vụ nền: không có dải; tmux trong ShellX (biến `SHELLX_PANE_ID` cũ). Kiểm từ khoá resume và id phiên đến thật từ hook của Gemini/Codex/OpenCode.
+- [ ] Nút "Cài đặt trong terminal" mở tab mới, gõ và chạy lệnh cài; diff và `[y/N]` hiện trong tab đó; `shellx` có trong PATH của shell tab mới; heuristic "không tìm thấy" im lặng khi agent cài qua nvm có thư mục cấu hình.
+
+Task 11-14 — PR, hook người dùng, ngôn ngữ, cập nhật (Mac, Windows)
+- [ ] PR: `gh` đã đăng nhập / chưa / không có; repo không phải GitHub; nhánh có PR nháp, đã merge; CI lỗi; mạng tắt; tab SSH không hiện chip; bấm mở trình duyệt; không dùng `GH_TOKEN`; Windows `gh.exe`.
+- [ ] `agent-event-command`: script ghi một dòng vào tệp tạm khi needs_input/done/end; đổi chuỗi thì hỏi lại; tệp include có khoá này bị bỏ qua kèm báo lỗi; script treo bị giết sau 10 s; tên lệnh trần; Windows `.exe`/`powershell -File`.
+- [ ] Ngôn ngữ: chọn Tiếng Việt, khởi động lại: khay, menu, thông báo, Cài đặt theo ngôn ngữ chọn; dịch vụ nền giữ ngôn ngữ hệ thống.
+- [ ] Cập nhật: `latest_agent` trên relay thử cao hơn bản đang chạy thì "Tải xuống" mở trang; bằng thì "mới nhất"; thấp hơn `min_agent` thì dòng bắt buộc; ngoại tuyến thì báo không kiểm tra được; palette "Check for updates"; URL không tin cậy bị từ chối.
+
+Task 16 — CLI mô tả/trạng thái (Mac)
+- [ ] `shellx tab describe/status` từ agent đang chạy trong tab khác workspace: không cướp focus, mô tả hiện đúng hàng và không có trong `shellx ls`.
+
+Task 17 — mobile (iPhone, Android)
+- [ ] Bộ chọn phiên hiện chip "Claude Code · cần bạn trả lời" khi desktop gửi hai khoá (cần nối `agentOf`, xem Giới hạn); desktop cũ không gửi thì không lỗi; thông báo đẩy "cần bạn" tới đúng phiên.
+
+**Quy trình phát hành.** (1) Đổi khoá trong `apps/desktop/assets/whats_new.json` (đang là `1.1.0`) thành số phiên bản thật của bản phát hành, dịch vi + en, tối đa 5 dòng mỗi ngôn ngữ. (2) Chạy hết danh sách ⚠ trên. (3) Trang riêng tư (vi + en) đã thêm mục "Agent lập trình"; cập nhật `updated` nếu phát hành sau ngày đó.
+
 Branding: logo gốc ở `assets/brand/` (3 SVG); tạo lại icon: `qlmanage -t -s 1024 -o /tmp/shellx-brand assets/brand/*.svg` rồi `python3 assets/brand/gen_icons.py /tmp/shellx-brand` (Pillow; ghi macOS/Windows/iOS/Android + `apps/mobile/assets/images/logo.png`; `sips` dùng được để kiểm tra kích thước). Icon khay hệ thống (`apps/desktop/assets/tray`) và `web/` có bộ nhận diện riêng, không đổi.

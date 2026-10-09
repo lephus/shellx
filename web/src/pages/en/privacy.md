@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
-updated: "2026-10-08"
+updated: "2026-10-09"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -76,6 +76,8 @@ The device private key, access token, the list of trusted phones (on the compute
 - **Session restore (computer):** to reopen your workspace after you quit the app or restart the computer, ShellX saves the tab/pane layout, each terminal's working folder and — if "Save terminal contents on quit" is on (the default) — up to the last 2,000 lines of each terminal (at most 256 KiB per terminal). These files stay on your computer, in the app's data folder for your account: on macOS `~/Library/Application Support/pro.shellx.desktop/restore`, readable only by your account and excluded from Time Machine backups; on Windows `%LOCALAPPDATA%\ShellX\restore`, deleted when you uninstall. These contents can include anything that was shown in the terminal; they are never sent to our servers, to your phone, or synced anywhere. You can turn off saving the contents, or clear what was saved, at any time from the ShellX menu on the computer → Terminal. An image you paste into the terminal stays on your computer, in the app's private folder, and is deleted after 24 hours, or when ShellX quits and closes your shells; ShellX does not send it anywhere.
 - **Recently closed tabs (computer):** The list of tabs you recently closed is kept only in your computer's memory and is gone when you quit the app.
 - **SSH (desktop):** when you connect to a server, ShellX runs your computer's `ssh` with your keys and configuration; it never asks for or stores passwords. With the hook on, ShellX writes a few small script files to `~/.cache/shellx/` on the server to know its folder, git branch and listening ports — nothing else is sent anywhere. The recent-servers list stays on this computer. The server's name and the folder you are in there can appear in the session list on your paired phone, as a local folder does.
+- **Coding agents (computer):** when you ask for it (`shellx integrations install`), ShellX adds hooks to the agent's own configuration file so it can tell ShellX whether the agent is running or waiting for you; ShellX does not send that information anywhere. If an agent asks for permission or sends a notification while you are away, its notification text is treated like any other program notification (section 3) and may be pushed to your paired phone. To offer "resume" after a restart, ShellX stores the agent's session id in the saved layout (`layout.json`, readable only by you) on your computer. If you turn on pull request status, it is fetched with the GitHub CLI (`gh`) that is already signed in on your computer; ShellX never reads or stores its token.
+
 
 ## 5. What we do not do
 
