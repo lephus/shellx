@@ -65,8 +65,32 @@ Future<void> closePaneWithConfirm({
   required int paneId,
   ConfirmClose confirm = ConfirmClose.whenRunning,
 }) async {
+  // A6 D4: a browser pane is no session: nothing to confirm or look up.
+  if (tab.browsers.containsKey(paneId)) {
+    tabs.closePane(paneId);
+    return;
+  }
   final pane = tab.panes[paneId];
   if (pane == null) return;
+  // A6 D5: the last terminal takes the browser panes with it, so say so.
+  if (tab.browsers.isNotEmpty && tab.panes.length == 1) {
+    final running = tabs.needsPaneCloseConfirm(paneId);
+    if (confirm != ConfirmClose.never) {
+      final ok = await router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmCloseRunningTitle(tab.label),
+          body: [
+            l10n.confirmCloseBrowsersBody(tab.browsers.length),
+            if (running) l10n.confirmCloseRunningBody,
+          ].join(' '),
+          confirmLabel: l10n.confirmCloseRunningAction,
+        ),
+      );
+      if (!ok) return;
+    }
+    tabs.closePane(paneId);
+    return;
+  }
   if (!tab.isSplit) {
     return closeTabWithConfirm(
       tabs: tabs,

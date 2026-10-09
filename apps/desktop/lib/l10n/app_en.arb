@@ -475,6 +475,8 @@
   "@confirmCloseAlwaysBody": {"description": "A9 D20 confirm-close-surface = always, idle one-pane tab"},
   "confirmCloseAlwaysPanesBody": "{count, plural, =1{1 pane in this tab will close.} other{{count} panes in this tab will close.}}",
   "@confirmCloseAlwaysPanesBody": {"description": "A9 D20, idle split tab", "placeholders": {"count": {"type": "int"}}},
+  "confirmCloseBrowsersBody": "{count, plural, =1{The browser pane in this tab will close with it.} other{The {count} browser panes in this tab will close with it.}}",
+  "@confirmCloseBrowsersBody": {"description": "A6: closing the last terminal pane of a tab that has browser panes", "placeholders": {"count": {"type": "int"}}},
   "confirmClosePaneAlwaysBody": "The shell in this pane will close.",
   "@confirmClosePaneAlwaysBody": {"description": "A9 D20, idle pane"},
   "terminalRestoredDivider": "— Session restored · {time} —",

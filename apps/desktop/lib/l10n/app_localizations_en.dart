@@ -1055,6 +1055,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String confirmCloseBrowsersBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count browser panes in this tab will close with it.',
+      one: 'The browser pane in this tab will close with it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get confirmClosePaneAlwaysBody => 'The shell in this pane will close.';
 
   @override

@@ -96,6 +96,48 @@ void main() {
     });
   });
 
+  group('browser panes (A6 Task 5 review)', () {
+    test('closing a browser pane never asks and never touches a session; '
+        'the terminal stays', () async {
+      final session = tab().id;
+      for (final mode in ConfirmClose.values) {
+        final id = tabs().openBrowser();
+        expect(tab().browsers.containsKey(id), isTrue);
+        await closePane(mode, id);
+        expect(window().confirm, isNull);
+        expect(tab().browsers, isEmpty);
+        expect(tab().panes.keys, [session]);
+        expect(local.closed, isNot(contains(session)));
+      }
+    });
+
+    test('closing the last terminal of a tab with browser panes names them '
+        'before closing the tab', () async {
+      final session = tab().id;
+      tabs().openBrowser();
+      final pending = closePane(ConfirmClose.whenRunning, session);
+      await pumpEventQueue();
+      final request = window().confirm!;
+      expect(request.body, contains(l10n.confirmCloseBrowsersBody(1)));
+      request.complete(false);
+      await pending;
+      expect(tab().browsers, hasLength(1));
+      final again = closePane(ConfirmClose.whenRunning, session);
+      await pumpEventQueue();
+      window().confirm!.complete(true);
+      await again;
+      expect(c.read(terminalTabsProvider).tabs, isEmpty);
+    });
+
+    test('never: the last terminal closes at once', () async {
+      final session = tab().id;
+      tabs().openBrowser();
+      await closePane(ConfirmClose.never, session);
+      expect(window().confirm, isNull);
+      expect(c.read(terminalTabsProvider).tabs, isEmpty);
+    });
+  });
+
   group('a pane of a split tab (D20)', () {
     test('always: an idle pane asks with the new body', () async {
       await splitTab();

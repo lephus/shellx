@@ -1591,6 +1591,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 pane in this tab will close.} other{{count} panes in this tab will close.}}'**
   String confirmCloseAlwaysPanesBody(int count);
 
+  /// A6: closing the last terminal pane of a tab that has browser panes
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The browser pane in this tab will close with it.} other{The {count} browser panes in this tab will close with it.}}'**
+  String confirmCloseBrowsersBody(int count);
+
   /// A9 D20, idle pane
   ///
   /// In en, this message translates to:

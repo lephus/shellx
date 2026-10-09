@@ -92,6 +92,19 @@ void main() {
     expect(registry().controller(id), isNull);
   });
 
+  test('closing a whole tab disposes its browsers (D34)', () async {
+    local.add(local.summary(1));
+    local.add(local.summary(2));
+    boot();
+    final id = tabs().openBrowser(tabId: 1);
+    await pumpEventQueue();
+    expect(engines[id]!.disposed, isFalse);
+    tabs().close(1);
+    await pumpEventQueue();
+    expect(engines[id]!.disposed, isTrue);
+    expect(container.read(browserRegistryProvider), isEmpty);
+  });
+
   test(
     'notices, shortcuts and clicks are re-published with the pane id',
     () async {
