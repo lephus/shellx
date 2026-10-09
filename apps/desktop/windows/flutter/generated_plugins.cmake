@@ -10,6 +10,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   pasteboard
   screen_retriever_windows
   tray_manager
+  webview_windows
   window_manager
 )
 
