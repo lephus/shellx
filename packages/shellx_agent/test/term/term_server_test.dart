@@ -41,15 +41,13 @@ void main() {
     'start writes the endpoint; stop removes it and closes the port',
     () async {
       expect(server.running, isTrue);
-      final (port, _) = readEndpoint(path);
+      final (port, secret) = readEndpoint(path);
       expect(port, server.port);
       await server.stop();
       expect(server.running, isFalse);
       expect(File(path).existsSync(), isFalse);
-      await expectLater(
-        Socket.connect(InternetAddress.loopbackIPv4, port),
-        throwsA(isA<SocketException>()),
-      );
+      // A freed ephemeral port may be reused by another process under load.
+      expect(await stillServes(port, secret), isFalse);
     },
   );
 

@@ -87,3 +87,21 @@ final class FakeTerm {
 
   void destroy() => _socket.destroy();
 }
+
+/// Whether something on [port] still completes the agent handshake.
+Future<bool> stillServes(int port, Uint8List secret) async {
+  FakeTerm term;
+  try {
+    term = await FakeTerm.connect(port);
+  } on SocketException {
+    return false;
+  }
+  try {
+    final answer = await term
+        .handshake(secret)
+        .timeout(const Duration(seconds: 2));
+    return answer is AgentReady;
+  } on Object {
+    return false;
+  }
+}

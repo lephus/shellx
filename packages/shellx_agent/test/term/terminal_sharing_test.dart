@@ -9,24 +9,6 @@ import 'package:test/test.dart';
 
 import '../support/fake_term.dart';
 
-/// Whether something on [port] still completes the agent handshake.
-Future<bool> _stillServes(int port, Uint8List secret) async {
-  FakeTerm term;
-  try {
-    term = await FakeTerm.connect(port);
-  } on SocketException {
-    return false;
-  }
-  try {
-    final answer = await term
-        .handshake(secret)
-        .timeout(const Duration(seconds: 2));
-    return answer is AgentReady;
-  } on Object {
-    return false;
-  }
-}
-
 void main() {
   test(
     'start/stop: enabled, endpoint, sessions cleared, port closed',
@@ -107,7 +89,7 @@ void main() {
     // port, so a connection alone proves nothing: it must not speak our
     // protocol with our secret.)
     for (final port in ports) {
-      expect(await _stillServes(port, secrets[port]!), isFalse);
+      expect(await stillServes(port, secrets[port]!), isFalse);
     }
   });
 }
