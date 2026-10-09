@@ -445,10 +445,18 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// `desktop: true` (A2 C4).
   List<SessionInfo> get sessionInfosWithContext => _infos(context: true);
 
+  /// A12 D22: the coding agent shown in a session, as closed-set names
+  /// (`agent`, `state`); null when none shows. Set by the desktop window
+  /// (its status model lives in the UI process); only the `desktop: true`
+  /// list carries it.
+  ({String agent, String state})? Function(int sessionId)? agentOf;
+
   List<SessionInfo> _infos({required bool context}) => [
     for (final s in _sessions.values)
       if (!s.closing)
         SessionInfo(
+          agent: (context ? agentOf?.call(s.id)?.agent : null) ?? '',
+          agentState: (context ? agentOf?.call(s.id)?.state : null) ?? '',
           id: s.id,
           index: s.index,
           shell: s.shell,

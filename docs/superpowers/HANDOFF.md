@@ -669,7 +669,7 @@ Task 18–21 — mobile (iPhone, Android)
 - "Điện thoại đã trả lời" chỉ là heuristic: ShellX coi đổi người lái phiên (điện thoại) hoặc dán là một lần trả lời, nên có thể xoá "Cần bạn" sớm.
 - Payload của hook và từ khoá resume (`claude --resume`, `codex resume`, `gemini --resume`, `opencode --session`) lấy từ tài liệu, chưa kiểm với bản thật của từng agent; fixture không phải bản ghi thật; Gemini/Codex/OpenCode có thể không gửi id phiên.
 - `.shellx-bak` giữ từ lần cài đầu, không ghi đè: có thể cũ hơn các chỉnh sửa sau của người dùng.
-- Mobile (D22): chip chỉ cập nhật ở lần `session.list` kế tiếp; `DesktopSessionManager` nhận `agentOf` nhưng ứng dụng desktop chưa nối nó vào `AgentStatusNotifier` (phiên `shellx-term` và pane của ShellX dùng id khác nhau), nên hôm nay desktop chưa gửi hai khoá.
+- Mobile (D22): chip chỉ cập nhật ở lần `session.list` kế tiếp (và chỉ khi điện thoại gửi `desktop: true`). Trạng thái agent nằm trong cửa sổ ShellX: ở chế độ dịch vụ nền không có cửa sổ thì daemon không gửi hai khoá.
 - T15 (cửa sổ trong suốt + blur) **bỏ khỏi A12**: cần kiểm bằng mắt trên Mac thật; chuyển sang A13.
 
 **Hoãn A13.** Xem spec §10: hook qua SSH, trạng thái Codex đầy đủ (`hooks.json`), bộ đệm sự kiện ở daemon, cây subagent, hibernation, thêm agent, tự cập nhật, đổi ngôn ngữ ngay, `shellx config set`, T15.
@@ -697,7 +697,7 @@ Task 16 — CLI mô tả/trạng thái (Mac)
 - [ ] `shellx tab describe/status` từ agent đang chạy trong tab khác workspace: không cướp focus, mô tả hiện đúng hàng và không có trong `shellx ls`.
 
 Task 17 — mobile (iPhone, Android)
-- [ ] Bộ chọn phiên hiện chip "Claude Code · cần bạn trả lời" khi desktop gửi hai khoá (cần nối `agentOf`, xem Giới hạn); desktop cũ không gửi thì không lỗi; thông báo đẩy "cần bạn" tới đúng phiên.
+- [ ] Bộ chọn phiên hiện chip "Claude Code · cần bạn trả lời" khi desktop gửi hai khoá; desktop cũ không gửi thì không lỗi; thông báo đẩy "cần bạn" tới đúng phiên.
 
 **Quy trình phát hành.** (1) Đổi khoá trong `apps/desktop/assets/whats_new.json` (đang là `1.1.0`) thành số phiên bản thật của bản phát hành, dịch vi + en, tối đa 5 dòng mỗi ngôn ngữ. (2) Chạy hết danh sách ⚠ trên. (3) Trang riêng tư (vi + en) đã thêm mục "Agent lập trình"; cập nhật `updated` nếu phát hành sau ngày đó.
 

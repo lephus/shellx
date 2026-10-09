@@ -344,6 +344,10 @@ class PrStatusService {
       PrInfo? parsed;
       if (!result.timedOut && result.exitCode == 0) {
         parsed = parsePrJson(result.stdout);
+        // `gh` answers for the checkout, not for the key: a refresh of a
+        // branch the checkout has left must not store another PR here.
+        final head = parsed == null ? null : parsePrHead(result.stdout);
+        if (head != null && head != key.$2) parsed = null;
       }
       if (parsed != null) {
         entry

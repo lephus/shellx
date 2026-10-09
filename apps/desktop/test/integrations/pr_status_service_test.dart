@@ -97,7 +97,7 @@ void main() {
         'pr',
         'view',
         '--json',
-        'number,state,isDraft,url,reviewDecision,statusCheckRollup',
+        'number,state,isDraft,url,reviewDecision,statusCheckRollup,headRefName',
       ]);
       expect(c.cwd, '/repo');
       expect(c.t, const Duration(seconds: 8));
@@ -107,6 +107,25 @@ void main() {
       expect(changes, greaterThan(0));
       // Another branch is another key.
       expect(s.peek('/repo/sub', 'other'), isNull);
+      s.dispose();
+    });
+  });
+
+  test('a result for another branch is discarded (the checkout moved)', () {
+    fakeAsync((fa) {
+      runner.answer = (_) => GhResult(
+        0,
+        jsonEncode({...jsonDecode(okJson()) as Map, 'headRefName': 'y'}),
+        '',
+      );
+      final s = make(fa);
+      s.want('/repo', 'x');
+      fa.flushMicrotasks();
+      expect(runner.calls, hasLength(1));
+      expect(s.peek('/repo', 'x'), isNull);
+      s.want('/repo', 'y');
+      fa.flushMicrotasks();
+      expect(s.peek('/repo', 'y')!.number, 12);
       s.dispose();
     });
   });

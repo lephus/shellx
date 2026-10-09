@@ -101,7 +101,6 @@ final class DesktopSessionManager {
     Duration reconnectGrace = const Duration(seconds: 30),
     Duration drainTimeout = const Duration(seconds: 30),
     AgentNotifications? notifications,
-    this.agentOf,
   }) : _nextId = nextId,
        _notifications = notifications,
        _maxSessions = maxSessions,
@@ -117,10 +116,6 @@ final class DesktopSessionManager {
   final Duration _grace;
   final Duration _drainTimeout;
   final AgentNotifications? _notifications;
-
-  /// A12 D22: the coding agent shown in a session, as closed-set names
-  /// (`agent`, `state`); null when none shows. Set by the desktop app.
-  final ({String agent, String state})? Function(int sessionId)? agentOf;
 
   final _outbound = StreamController<OutboundMessage>.broadcast(sync: true);
   final _changes = StreamController<void>.broadcast();
@@ -156,8 +151,6 @@ final class DesktopSessionManager {
     for (final s in _sessions.values)
       if (!s.closing)
         SessionInfo(
-          agent: agentOf?.call(s.id)?.agent ?? '',
-          agentState: agentOf?.call(s.id)?.state ?? '',
           id: s.id,
           index: s.index,
           shell: s.info.shell,

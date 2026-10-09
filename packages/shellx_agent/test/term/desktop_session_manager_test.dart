@@ -31,21 +31,6 @@ void main() {
       });
     });
 
-    test('a session shows its agent when the host knows one (A12 D22)', () {
-      fakeAsync((async) {
-        final rig = DesktopRig(
-          agentOf: (id) =>
-              id == 100 ? (agent: 'claude', state: 'running') : null,
-        );
-        rig.connect(1);
-        rig.connect(2);
-        async.flushMicrotasks();
-        final infos = rig.manager.sessionInfos;
-        expect((infos[0].agent, infos[0].agentState), ('claude', 'running'));
-        expect(infos[1].toMap().containsKey('agent'), isFalse);
-      });
-    });
-
     test('the limit admits reconnecting windows, not new ones', () {
       fakeAsync((async) {
         final rig = DesktopRig(maxSessions: 2);
