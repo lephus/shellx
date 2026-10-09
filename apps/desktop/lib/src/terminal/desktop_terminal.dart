@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
+import '../platform/ime_trace.dart';
 import 'hyperlink_registry.dart';
 import 'terminal_input.dart';
 
@@ -34,6 +35,7 @@ final class DesktopTerminal extends Terminal {
   @override
   void write(String data) {
     final filtered = _sgr.filter(data);
+    ImeTrace.note('out ${data.length}${_syncOpen ? ' sync' : ''}');
     final opens = _opensSync(filtered);
     // Before the parse: it notifies the views when it is done.
     if (opens == true) _beginSync();
