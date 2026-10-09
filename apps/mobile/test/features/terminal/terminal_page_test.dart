@@ -952,6 +952,29 @@ void main() {
       expect(machine.attached.single.id, 40);
     }
 
+    testWidgets('A12 D22: a desktop row shows the agent state; a row without one shows no chip', (tester) async {
+      machine
+        ..sessions = [
+          const SessionInfo(
+            id: 41,
+            index: 2,
+            shell: 'zsh',
+            createdAt: 1790000000000,
+            attached: false,
+            kind: SessionKind.desktop,
+            app: 'Terminal',
+            agent: 'claude',
+            agentState: 'needs_input',
+          ),
+          window,
+        ]
+        ..desktopSharingValue = true;
+      await open(tester);
+      expect(find.text('Claude Code · cần bạn trả lời'), findsOneWidget);
+      expect(find.byKey(const ValueKey('picker-agent-41')), findsOneWidget);
+      expect(find.byKey(const ValueKey('picker-agent-40')), findsNothing);
+    });
+
     testWidgets('the picker shows two groups and "Phiên mới"; a desktop row attaches with its label', (tester) async {
       machine
         ..sessions = [shellxSession, window]

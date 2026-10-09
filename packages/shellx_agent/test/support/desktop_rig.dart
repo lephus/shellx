@@ -20,12 +20,17 @@ TermInfo windowInfo(int n, {String app = 'Terminal'}) => TermInfo(
 );
 
 final class DesktopRig {
-  DesktopRig({int maxSessions = 32, int bufferCapacity = 256 * 1024}) {
+  DesktopRig({
+    int maxSessions = 32,
+    int bufferCapacity = 256 * 1024,
+    ({String agent, String state})? Function(int)? agentOf,
+  }) {
     var next = 100;
     manager = DesktopSessionManager(
       nextId: () => next++,
       maxSessions: maxSessions,
       bufferCapacity: bufferCapacity,
+      agentOf: agentOf,
     );
     manager.outbound.listen(sent.add);
   }

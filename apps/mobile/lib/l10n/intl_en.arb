@@ -291,6 +291,14 @@
     }
   },
   "pickerAttachedElsewhere": "open on another device",
+  "pickerAgentRunning": "{name} · running",
+  "@pickerAgentRunning": {"placeholders": {"name": {"type": "String"}}},
+  "pickerAgentNeedsInput": "{name} · needs your answer",
+  "@pickerAgentNeedsInput": {"placeholders": {"name": {"type": "String"}}},
+  "pickerAgentIdle": "{name} · waiting",
+  "@pickerAgentIdle": {"placeholders": {"name": {"type": "String"}}},
+  "pickerAgentDone": "{name} · done",
+  "@pickerAgentDone": {"placeholders": {"name": {"type": "String"}}},
   "sessionEnded": "Session ended",
   "sessionExitedBody": "The last command exited with code {code}. The output above can still be read and copied.",
   "@sessionExitedBody": {
