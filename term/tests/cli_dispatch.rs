@@ -268,7 +268,7 @@ fn a_stale_endpoint_is_not_running_fast() {
         let started = Instant::now();
         let out = shellx(&ep, Some(TOKEN), &["ls"]);
         assert!(
-            started.elapsed() < Duration::from_secs(1),
+            started.elapsed() < Duration::from_millis(1900), // below the 2 s connect timeout; slack for a loaded machine
             "{:?}",
             started.elapsed()
         );

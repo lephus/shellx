@@ -133,6 +133,8 @@ final class SessionInfo {
     this.title = '',
     this.cwd = '',
     this.branch = '',
+    this.agent = '',
+    this.agentState = '',
   });
 
   final int id;
@@ -159,6 +161,16 @@ final class SessionInfo {
   /// The git branch of [cwd] (A2 C4), empty when unknown.
   final String branch;
 
+  /// A12 D22: the coding agent in a desktop session (`claude`, `codex`,
+  /// `gemini`, `opencode`) and its state (`running`, `needs_input`,
+  /// `idle`, `done`); both empty when none shows. Optional keys, so
+  /// released decoders ignore them. Never carries the agent's words.
+  final String agent;
+  final String agentState;
+
+  static const _agents = {'claude', 'codex', 'gemini', 'opencode'};
+  static const _agentStates = {'running', 'needs_input', 'idle', 'done'};
+
   Map<String, Object?> toMap() => {
     'id': id,
     'index': index,
@@ -167,6 +179,10 @@ final class SessionInfo {
     'attached': attached,
     if (cwd.isNotEmpty) 'cwd': cwd,
     if (branch.isNotEmpty) 'branch': branch,
+    if (agent.isNotEmpty && agentState.isNotEmpty) ...{
+      'agent': agent,
+      'agentState': agentState,
+    },
     if (kind == SessionKind.desktop) ...{
       'kind': 'desktop',
       'app': app,
@@ -187,6 +203,9 @@ final class SessionInfo {
       _ => null,
     };
     if (kind == null) return null;
+    final agent = f.optionalString('agent') ?? '';
+    final agentState = f.optionalString('agentState') ?? '';
+    final known = _agents.contains(agent) && _agentStates.contains(agentState);
     return SessionInfo(
       id: f.integer('id'),
       index: f.integer('index'),
@@ -198,6 +217,8 @@ final class SessionInfo {
       title: f.optionalString('title') ?? '',
       cwd: f.optionalString('cwd') ?? '',
       branch: f.optionalString('branch') ?? '',
+      agent: known ? agent : '',
+      agentState: known ? agentState : '',
     );
   }
 

@@ -161,6 +161,18 @@ pub static COMMANDS: &[CommandSpec] = &[
         "rename a tab (empty name: automatic title)",
     ),
     c(
+        &["tab", "describe"],
+        &["TAB", "TEXT..."],
+        &[],
+        "set a tab's one-line description (empty text clears it)",
+    ),
+    c(
+        &["tab", "status"],
+        &["TAB", "STATE"],
+        &[],
+        "mark a tab: none, in_progress, review, blocked or done",
+    ),
+    c(
         &["workspace", "new"],
         &["NAME?"],
         &[FOCUS],
@@ -988,6 +1000,8 @@ mod tests {
             "send",
             "read",
             "rename",
+            "tab describe",
+            "tab status",
             "workspace new",
             "workspace rename",
             "workspace move",

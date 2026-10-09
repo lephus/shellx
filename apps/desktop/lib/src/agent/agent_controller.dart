@@ -10,6 +10,8 @@ import '../platform/wake_detector.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_controller_base.dart';
+import '../terminal/agent_status.dart' show agentStateVisible, agentStateWire;
+import '../terminal/agent_status_notifier.dart' show agentStatusProvider;
 import 'agent_runtime.dart';
 import 'agent_state.dart';
 import 'desktop_services.dart';
@@ -759,6 +761,7 @@ class AgentController extends AgentControllerBase {
       ),
     );
     _runtime = runtime;
+    _shareAgentStatus(runtime);
     _attachThrottle.clear();
     _runtimeSubscriptions.addAll([
       runtime.relayStates.listen(_onRelayState),
@@ -793,6 +796,19 @@ class AgentController extends AgentControllerBase {
       if (!identical(_runtime, runtime)) return;
       await _notify(title: _s.l10n.notifyTerminalSharingStartFailedTitle);
     }
+  }
+
+  /// A12 D22: a phone listing with `desktop: true` sees the agent state of
+  /// each ShellX pane. The status model lives in the window: in the
+  /// background service (no window) nothing is known, so no keys are sent.
+  void _shareAgentStatus(AgentRuntime runtime) {
+    if (runtime is! CoreAgentRuntime) return;
+    runtime.shellSessions.agentOf = (id) {
+      if (!ref.mounted || !ref.exists(agentStatusProvider)) return null;
+      final r = ref.read(agentStatusProvider)[id];
+      if (r == null || !agentStateVisible(r.state)) return null;
+      return (agent: r.agent.name, state: agentStateWire(r.state));
+    };
   }
 
   /// Disconnects every phone and the relay; the shells keep running (A1

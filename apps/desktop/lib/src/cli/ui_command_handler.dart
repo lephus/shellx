@@ -9,6 +9,7 @@ import '../terminal/local_sessions_provider.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/tab_attention.dart';
+import '../terminal/tab_meta.dart';
 import '../terminal/terminal_tabs.dart';
 import 'agent_marks.dart';
 import 'cli_event_bus.dart';
@@ -92,6 +93,7 @@ final class UiCommandHandler implements UiApi {
       CliType.uiLs => _ls(),
       CliType.uiTabNew => _tabNew(request, (cancelled, isGone)),
       CliType.uiTabRename => _tabRename(request),
+      CliType.uiTabMeta => _tabMeta(request),
       CliType.uiPaneSplit => _split(request, (cancelled, isGone)),
       CliType.uiFocus => _focus(request),
       CliType.uiClose => _close(request),
@@ -394,6 +396,26 @@ final class UiCommandHandler implements UiApi {
   Future<Map<String, Object?>> _tabRename(MuxMessage r) async {
     final tab = resolveTab(_tabsState, parseTarget(null, r.fields['tab']));
     _tabs.rename(tab, stringField(r, 'name', max: 1024) ?? '');
+    _marks.touch(tab: tab);
+    return const {};
+  }
+
+  /// A12 D18: `shellx tab describe|status`. The text is cleaned by
+  /// [TabMeta.cleanDescription] (inside `setMeta`); an unknown status is
+  /// `bad_request`. No focus change; nothing the user wrote is echoed.
+  Future<Map<String, Object?>> _tabMeta(MuxMessage r) async {
+    final tab = resolveTab(_tabsState, parseTarget(null, r.fields['tab']));
+    final description = stringField(r, 'description', max: 1024);
+    final statusWire = stringField(r, 'status', max: 32);
+    final status = statusWire == null ? null : TabStatus.fromWire(statusWire);
+    if (statusWire != null &&
+        !TabStatus.values.any((s) => s.wire == statusWire)) {
+      throw const CliFailure(MuxError.badRequest, 'unknown status');
+    }
+    _tabs.setMeta(
+      tab,
+      (m) => m.copyWith(description: description, status: status),
+    );
     _marks.touch(tab: tab);
     return const {};
   }

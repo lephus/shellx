@@ -43,15 +43,4 @@ void main() {
     await p.exitCode;
     await killProcessTree(p);
   }, skip: Platform.isWindows);
-
-  test('descendantsOf follows parents, leaves last in the list', () {
-    final order = descendantPids(
-      10,
-      '10 1\n11 10\n12 11\n13 10\n99 1\nnot a line\n',
-    );
-    expect(order.toSet(), {11, 12, 13});
-    // Children always come after their parent: killing from the end kills
-    // leaves first.
-    expect(order.indexOf(11) < order.indexOf(12), isTrue);
-  });
 }

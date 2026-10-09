@@ -198,3 +198,22 @@ Rulings (copied from the A11 progress ledger):
 - Ruling (T16-17): hotkey conflicts undetectable via plugin (always success) — accept, feature off by default, document in HANDOFF + Settings hint — cost: a taken chord silently never fires.
 - Ruling (T18-21): show a draft badge on the mic, no auto-open.
 - Ruling (T22): deferred to A12 — cannot be verified visually here (no screen recording permission); a transparent window that renders wrong is worse than none — cost: feature later.
+
+## A12 (agents) — execution
+
+Plan: docs/superpowers/plans/2026-10-07-agents-a12.md. Branch feat/desktop-a12; tasks merged to main in groups after review (T1-2, T3-6, T7-8, T9-10, T11-14); T16-18 batched. T15 (opacity/blur) deferred.
+
+Test counts (from progress.md): rust 243 lib after T2, 357 after the T1-2 merge, 450 after T3-6 (328 lib + integration targets after T16); shellx_agent 766 (767 after T17); desktop 2720 at T2, 2743 after T3-6, 2811 after T7-8, 2876 after T9-10, 3030 after T11-14; mobile 817 after T17.
+
+Review-found fixes: .shellx-bak never overwritten, diff sanitised, edited OpenCode plugin refused (T3-6); announce limit, hook/OSC double notify, bookkeeping leak, needs_input stuck after paste/phone answer (T7-8); resume typed into a foreground program, `shellx` bare in Set up (T9-10); approved-vs-run race, POSIX process-tree kill, hidden characters in the approval dialog (T11-14).
+
+Agent versions tested: none - hook payloads for Claude Code, Codex, Gemini CLI and OpenCode come from documented shapes, never from a captured run (see HANDOFF section 22).
+
+Pending manual: every item of the checklist in HANDOFF section 22 (Tasks 3-18; nothing was run on a Mac, Windows PC or phone) is "pending manual" and gates release.
+
+Rulings (copied from the A12 progress ledger):
+- Ruling (merge-each + away mode): each task merges to main after review; ⚠ manual list gates release; T15 opacity merges only after a manual Mac check (stays on branch otherwise). T1 BASE 23cfbf6
+- Minors db62a4d; T3 051acc9, T4 9a004fc, T5 a06f7b2, T6 c2c119c (rust 446). Ruling: .shellx-bak kept from the first install, never overwritten (safer than D7(3)) — cost: bak may be older than later user edits; spec updated in T18.
+- T7–8 review: spec ❌ D12 60 s announce limit; Important: reverse-order hook/OSC double notify, bookkeeping leak, needs_input stuck when answered by paste/phone. Rulings: ls --json agent_name/agent_status accepted (amend D11); icon-only narrow rows accepted; idle ignored in needs_input accepted (amend D9); paste+phone count as typing. Fix round sent.
+- T11–14 review: spec ❌ D17; Important: approved-vs-run string race, POSIX tree kill missing, hidden chars in approval dialog. Ruling: agent-event-command requires absolute path or ~/. Fix round sent.
+- Ruling (user: speed up): T15 opacity/blur deferred again — needs a real-Mac visual check; T16–T18 batched in one dispatch; merge script gets a 20-min watchdog + one retry (a test run hung 15 h at terminal_workspace_test; reruns pass). T16 BASE 9a2bb44

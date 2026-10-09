@@ -1319,6 +1319,46 @@ class S {
     );
   }
 
+  /// `{name} · running`
+  String pickerAgentRunning(String name) {
+    return Intl.message(
+      '$name · running',
+      name: 'pickerAgentRunning',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} · needs your answer`
+  String pickerAgentNeedsInput(String name) {
+    return Intl.message(
+      '$name · needs your answer',
+      name: 'pickerAgentNeedsInput',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} · waiting`
+  String pickerAgentIdle(String name) {
+    return Intl.message(
+      '$name · waiting',
+      name: 'pickerAgentIdle',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} · done`
+  String pickerAgentDone(String name) {
+    return Intl.message(
+      '$name · done',
+      name: 'pickerAgentDone',
+      desc: '',
+      args: [name],
+    );
+  }
+
   /// `Session ended`
   String get sessionEnded {
     return Intl.message(
