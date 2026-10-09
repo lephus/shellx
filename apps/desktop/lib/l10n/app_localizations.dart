@@ -4625,6 +4625,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes'**
   String get configProblemAgentCommandBad;
+
+  /// UI-A6 §7 browserOpenPane
+  ///
+  /// In en, this message translates to:
+  /// **'Open browser pane'**
+  String get browserOpenPane;
+
+  /// UI-A6 §7 browserOpenPortInPane
+  ///
+  /// In en, this message translates to:
+  /// **'Open :{port} in a browser pane'**
+  String browserOpenPortInPane(int port);
+
+  /// UI-A6 §7 browserOpenPortInPaneMenu
+  ///
+  /// In en, this message translates to:
+  /// **'Open port in a browser pane…'**
+  String get browserOpenPortInPaneMenu;
+
+  /// UI-A6 §7 browserPortAltClickHint
+  ///
+  /// In en, this message translates to:
+  /// **'{modifier}-click: open in a browser pane'**
+  String browserPortAltClickHint(String modifier);
+
+  /// UI-A6 §7 browserBack
+  ///
+  /// In en, this message translates to:
+  /// **'Back  {shortcut}'**
+  String browserBack(String shortcut);
+
+  /// UI-A6 §7 browserForward
+  ///
+  /// In en, this message translates to:
+  /// **'Forward  {shortcut}'**
+  String browserForward(String shortcut);
+
+  /// UI-A6 §7 browserReload
+  ///
+  /// In en, this message translates to:
+  /// **'Reload  {shortcut}'**
+  String browserReload(String shortcut);
+
+  /// UI-A6 §7 browserStop
+  ///
+  /// In en, this message translates to:
+  /// **'Stop  Esc'**
+  String get browserStop;
+
+  /// UI-A6 §7 browserOpenExternal
+  ///
+  /// In en, this message translates to:
+  /// **'Open in system browser'**
+  String get browserOpenExternal;
+
+  /// UI-A6 §7 browserCopyAddress
+  ///
+  /// In en, this message translates to:
+  /// **'Copy page address'**
+  String get browserCopyAddress;
+
+  /// UI-A6 §7 browserAddressLabel
+  ///
+  /// In en, this message translates to:
+  /// **'Page address'**
+  String get browserAddressLabel;
+
+  /// UI-A6 §7 browserAddressHint
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an address or port'**
+  String get browserAddressHint;
+
+  /// UI-A6 §7 browserAddressInvalid
+  ///
+  /// In en, this message translates to:
+  /// **'Not a web address'**
+  String get browserAddressInvalid;
+
+  /// UI-A6 §7 browserOriginLocal
+  ///
+  /// In en, this message translates to:
+  /// **'Page on this computer'**
+  String get browserOriginLocal;
+
+  /// UI-A6 §7 browserOriginSecure
+  ///
+  /// In en, this message translates to:
+  /// **'Secure connection'**
+  String get browserOriginSecure;
+
+  /// UI-A6 §7 browserOriginInsecure
+  ///
+  /// In en, this message translates to:
+  /// **'Not secure'**
+  String get browserOriginInsecure;
+
+  /// UI-A6 §7 browserUntitled
+  ///
+  /// In en, this message translates to:
+  /// **'Browser'**
+  String get browserUntitled;
+
+  /// UI-A6 §7 browserLoadingLabel
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get browserLoadingLabel;
+
+  /// UI-A6 §7 browserAgentMark
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get browserAgentMark;
+
+  /// UI-A6 §7 browserAgentMarkTooltip
+  ///
+  /// In en, this message translates to:
+  /// **'An agent on this computer is controlling this page'**
+  String get browserAgentMarkTooltip;
+
+  /// UI-A6 §7 browserAnnounceAgent
+  ///
+  /// In en, this message translates to:
+  /// **'An agent is controlling the browser pane'**
+  String get browserAnnounceAgent;
+
+  /// UI-A6 §7 browserAnnounceLoaded
+  ///
+  /// In en, this message translates to:
+  /// **'Loaded {title}'**
+  String browserAnnounceLoaded(String title);
+
+  /// UI-A6 §7 browserPaneRegionLabel
+  ///
+  /// In en, this message translates to:
+  /// **'Pane {index} of {count} — Browser: {title}'**
+  String browserPaneRegionLabel(int index, int count, String title);
+
+  /// UI-A6 §7 browserToolbarRegionLabel
+  ///
+  /// In en, this message translates to:
+  /// **'Browser toolbar'**
+  String get browserToolbarRegionLabel;
+
+  /// UI-A6 §7 browserSchemeBlocked
+  ///
+  /// In en, this message translates to:
+  /// **'The browser pane only opens http and https pages'**
+  String get browserSchemeBlocked;
+
+  /// UI-A6 §7 browserDownloadBlocked
+  ///
+  /// In en, this message translates to:
+  /// **'The browser pane doesn’t download files — use “Open in system browser”'**
+  String get browserDownloadBlocked;
+
+  /// UI-A6 §7 browserLimitReached
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve reached the maximum of {count} browser panes'**
+  String browserLimitReached(int count);
+
+  /// UI-A6 §7 browserErrorLocalRefusedTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is running at {host}'**
+  String browserErrorLocalRefusedTitle(String host);
+
+  /// UI-A6 §7 browserErrorLocalRefusedBody
+  ///
+  /// In en, this message translates to:
+  /// **'Start the server in a terminal (for example npm run dev), then try again.'**
+  String get browserErrorLocalRefusedBody;
+
+  /// UI-A6 §7 browserErrorUnreachableTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t reach {host}'**
+  String browserErrorUnreachableTitle(String host);
+
+  /// UI-A6 §7 browserErrorUnreachableBody
+  ///
+  /// In en, this message translates to:
+  /// **'Check the address and your network, then try again.'**
+  String get browserErrorUnreachableBody;
+
+  /// UI-A6 §7 browserErrorDnsTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find {host}'**
+  String browserErrorDnsTitle(String host);
+
+  /// UI-A6 §7 browserErrorDnsBody
+  ///
+  /// In en, this message translates to:
+  /// **'The domain doesn’t exist or the network isn’t ready.'**
+  String get browserErrorDnsBody;
+
+  /// UI-A6 §7 browserErrorTimeoutTitle
+  ///
+  /// In en, this message translates to:
+  /// **'{host} took too long to respond'**
+  String browserErrorTimeoutTitle(String host);
+
+  /// UI-A6 §7 browserErrorCertTitle
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to {host} isn’t secure'**
+  String browserErrorCertTitle(String host);
+
+  /// UI-A6 §7 browserErrorCertBody
+  ///
+  /// In en, this message translates to:
+  /// **'The site’s certificate isn’t valid. ShellX won’t open this page; you can open it in your system browser.'**
+  String get browserErrorCertBody;
+
+  /// UI-A6 §7 browserErrorCrashedTitle
+  ///
+  /// In en, this message translates to:
+  /// **'The page stopped unexpectedly'**
+  String get browserErrorCrashedTitle;
+
+  /// UI-A6 §7 browserErrorCrashedBody
+  ///
+  /// In en, this message translates to:
+  /// **'Reload to open the page again.'**
+  String get browserErrorCrashedBody;
+
+  /// UI-A6 §7 browserErrorRuntimeTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Microsoft Edge WebView2 Runtime is required'**
+  String get browserErrorRuntimeTitle;
+
+  /// UI-A6 §7 browserErrorRuntimeBody
+  ///
+  /// In en, this message translates to:
+  /// **'The browser pane uses Windows WebView2. Install the WebView2 Runtime, then open the pane again.'**
+  String get browserErrorRuntimeBody;
+
+  /// UI-A6 §7 browserErrorRuntimeAction
+  ///
+  /// In en, this message translates to:
+  /// **'Get WebView2'**
+  String get browserErrorRuntimeAction;
+
+  /// UI-A6 §7 browserErrorGenericTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t open the page'**
+  String get browserErrorGenericTitle;
+
+  /// UI-A6 §7 browserErrorRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get browserErrorRetry;
+
+  /// UI-A6 §7 browserTrayMenu
+  ///
+  /// In en, this message translates to:
+  /// **'Browser'**
+  String get browserTrayMenu;
+
+  /// UI-A6 §7 browserTrayKeepData
+  ///
+  /// In en, this message translates to:
+  /// **'Keep browser data (cookies, sign-ins)'**
+  String get browserTrayKeepData;
+
+  /// UI-A6 §7 browserTrayAgentAllOrigins
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents control any page'**
+  String get browserTrayAgentAllOrigins;
+
+  /// UI-A6 §7 browserTrayClearData
+  ///
+  /// In en, this message translates to:
+  /// **'Clear browser data'**
+  String get browserTrayClearData;
+
+  /// UI-A6 §7 browserKeepDataRestartNote
+  ///
+  /// In en, this message translates to:
+  /// **'The change takes effect when you reopen ShellX.'**
+  String get browserKeepDataRestartNote;
+
+  /// UI-A6 §7 browserDataCleared
+  ///
+  /// In en, this message translates to:
+  /// **'Browser data cleared'**
+  String get browserDataCleared;
+
+  /// UI-A6 §7 browserConfirmAllOriginsTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents control any page?'**
+  String get browserConfirmAllOriginsTitle;
+
+  /// UI-A6 §7 browserConfirmAllOriginsBody
+  ///
+  /// In en, this message translates to:
+  /// **'Agents on this computer (through the ShellX command line) will be able to run JavaScript, take screenshots and read the console of any page in a browser pane — including pages you’re signed in to. Only turn this on if you trust the agents you run.'**
+  String get browserConfirmAllOriginsBody;
+
+  /// UI-A6 §7 browserConfirmAllOriginsAction
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get browserConfirmAllOriginsAction;
+
+  /// UI-A6 §7 browserDialogTitle
+  ///
+  /// In en, this message translates to:
+  /// **'{host} says'**
+  String browserDialogTitle(String host);
 }
 
 class _AppLocalizationsDelegate

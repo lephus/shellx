@@ -58,6 +58,8 @@ final class TrayLocalState {
     this.backgroundService = SettingKeys.backgroundServiceDefault,
     this.daemonMode = false,
     this.appLanguage = 'system',
+    this.browserKeepData = false,
+    this.browserAgentAllOrigins = false,
   });
   final bool restoreScrollback;
   final bool hasSavedScrollback;
@@ -84,6 +86,10 @@ final class TrayLocalState {
   /// A12 D19: the stored app language choice (`system`, `en`, `vi`).
   final String appLanguage;
 
+  /// A6 D27: the "Trình duyệt" submenu switches.
+  final bool browserKeepData;
+  final bool browserAgentAllOrigins;
+
   @override
   bool operator ==(Object other) =>
       other is TrayLocalState &&
@@ -97,7 +103,9 @@ final class TrayLocalState {
       other.hasRecentServers == hasRecentServers &&
       other.backgroundService == backgroundService &&
       other.daemonMode == daemonMode &&
-      other.appLanguage == appLanguage;
+      other.appLanguage == appLanguage &&
+      other.browserKeepData == browserKeepData &&
+      other.browserAgentAllOrigins == browserAgentAllOrigins;
 
   @override
   int get hashCode => Object.hash(
@@ -112,6 +120,8 @@ final class TrayLocalState {
     backgroundService,
     daemonMode,
     appLanguage,
+    browserKeepData,
+    browserAgentAllOrigins,
   );
 }
 
@@ -218,8 +228,24 @@ Menu buildTrayMenu(
     ),
   ]);
 
-  // A7 D26: right after "Thông báo" in both menus (A6's "Trình duyệt",
-  // when it lands, goes before it). Toggles apply at once, never ask.
+  // UI-A6 §5: after "Thông báo" and before A7's "Dòng lệnh", in both menus.
+  MenuItem browser() => sub(TrayKeys.browser, l10n.browserTrayMenu, [
+    check(
+      TrayKeys.browserKeepData,
+      l10n.browserTrayKeepData,
+      local.browserKeepData,
+    ),
+    check(
+      TrayKeys.browserAgentAllOrigins,
+      l10n.browserTrayAgentAllOrigins,
+      local.browserAgentAllOrigins,
+    ),
+    sep(),
+    item(TrayKeys.browserClearData, l10n.browserTrayClearData),
+  ]);
+
+  // A7 D26: right after "Trình duyệt" in both menus. Toggles apply at
+  // once, never ask.
   MenuItem commandLine() => sub(TrayKeys.commandLine, l10n.trayCommandLine, [
     check(TrayKeys.cliControl, l10n.trayCliControl, local.cliControlEnabled),
     check(
@@ -278,6 +304,7 @@ Menu buildTrayMenu(
         // UI-A4 §7: after the window item, before the status line.
         terminal(),
         notifications(),
+        browser(),
         commandLine(),
         ssh(),
         config(),
@@ -387,6 +414,7 @@ Menu buildTrayMenu(
       // UI-A4 §7: where push §7's threshold submenu was.
       terminal(),
       notifications(),
+      browser(),
       commandLine(),
       ssh(),
       config(),

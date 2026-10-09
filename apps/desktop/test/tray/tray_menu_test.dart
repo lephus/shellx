@@ -66,6 +66,7 @@ void main() {
       'Terminal',
       'Thông báo',
       // A7 D26 (A6 absent: no "Trình duyệt" before it).
+      'Trình duyệt',
       'Dòng lệnh',
       'SSH', // A8 UI §5.3
       'Cấu hình',
@@ -196,6 +197,7 @@ void main() {
       '---',
       'Terminal',
       'Thông báo',
+      'Trình duyệt',
       'Dòng lệnh',
       'SSH', // A8 UI §5.3
       'Cấu hình',

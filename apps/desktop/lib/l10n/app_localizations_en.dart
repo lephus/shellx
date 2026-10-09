@@ -2995,4 +2995,202 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get configProblemAgentCommandBad =>
       'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes';
+
+  @override
+  String get browserOpenPane => 'Open browser pane';
+
+  @override
+  String browserOpenPortInPane(int port) {
+    return 'Open :$port in a browser pane';
+  }
+
+  @override
+  String get browserOpenPortInPaneMenu => 'Open port in a browser pane…';
+
+  @override
+  String browserPortAltClickHint(String modifier) {
+    return '$modifier-click: open in a browser pane';
+  }
+
+  @override
+  String browserBack(String shortcut) {
+    return 'Back  $shortcut';
+  }
+
+  @override
+  String browserForward(String shortcut) {
+    return 'Forward  $shortcut';
+  }
+
+  @override
+  String browserReload(String shortcut) {
+    return 'Reload  $shortcut';
+  }
+
+  @override
+  String get browserStop => 'Stop  Esc';
+
+  @override
+  String get browserOpenExternal => 'Open in system browser';
+
+  @override
+  String get browserCopyAddress => 'Copy page address';
+
+  @override
+  String get browserAddressLabel => 'Page address';
+
+  @override
+  String get browserAddressHint => 'Enter an address or port';
+
+  @override
+  String get browserAddressInvalid => 'Not a web address';
+
+  @override
+  String get browserOriginLocal => 'Page on this computer';
+
+  @override
+  String get browserOriginSecure => 'Secure connection';
+
+  @override
+  String get browserOriginInsecure => 'Not secure';
+
+  @override
+  String get browserUntitled => 'Browser';
+
+  @override
+  String get browserLoadingLabel => 'Loading';
+
+  @override
+  String get browserAgentMark => 'Agent';
+
+  @override
+  String get browserAgentMarkTooltip =>
+      'An agent on this computer is controlling this page';
+
+  @override
+  String get browserAnnounceAgent => 'An agent is controlling the browser pane';
+
+  @override
+  String browserAnnounceLoaded(String title) {
+    return 'Loaded $title';
+  }
+
+  @override
+  String browserPaneRegionLabel(int index, int count, String title) {
+    return 'Pane $index of $count — Browser: $title';
+  }
+
+  @override
+  String get browserToolbarRegionLabel => 'Browser toolbar';
+
+  @override
+  String get browserSchemeBlocked =>
+      'The browser pane only opens http and https pages';
+
+  @override
+  String get browserDownloadBlocked =>
+      'The browser pane doesn’t download files — use “Open in system browser”';
+
+  @override
+  String browserLimitReached(int count) {
+    return 'You’ve reached the maximum of $count browser panes';
+  }
+
+  @override
+  String browserErrorLocalRefusedTitle(String host) {
+    return 'Nothing is running at $host';
+  }
+
+  @override
+  String get browserErrorLocalRefusedBody =>
+      'Start the server in a terminal (for example npm run dev), then try again.';
+
+  @override
+  String browserErrorUnreachableTitle(String host) {
+    return 'Can’t reach $host';
+  }
+
+  @override
+  String get browserErrorUnreachableBody =>
+      'Check the address and your network, then try again.';
+
+  @override
+  String browserErrorDnsTitle(String host) {
+    return 'Can’t find $host';
+  }
+
+  @override
+  String get browserErrorDnsBody =>
+      'The domain doesn’t exist or the network isn’t ready.';
+
+  @override
+  String browserErrorTimeoutTitle(String host) {
+    return '$host took too long to respond';
+  }
+
+  @override
+  String browserErrorCertTitle(String host) {
+    return 'The connection to $host isn’t secure';
+  }
+
+  @override
+  String get browserErrorCertBody =>
+      'The site’s certificate isn’t valid. ShellX won’t open this page; you can open it in your system browser.';
+
+  @override
+  String get browserErrorCrashedTitle => 'The page stopped unexpectedly';
+
+  @override
+  String get browserErrorCrashedBody => 'Reload to open the page again.';
+
+  @override
+  String get browserErrorRuntimeTitle =>
+      'Microsoft Edge WebView2 Runtime is required';
+
+  @override
+  String get browserErrorRuntimeBody =>
+      'The browser pane uses Windows WebView2. Install the WebView2 Runtime, then open the pane again.';
+
+  @override
+  String get browserErrorRuntimeAction => 'Get WebView2';
+
+  @override
+  String get browserErrorGenericTitle => 'Can’t open the page';
+
+  @override
+  String get browserErrorRetry => 'Try again';
+
+  @override
+  String get browserTrayMenu => 'Browser';
+
+  @override
+  String get browserTrayKeepData => 'Keep browser data (cookies, sign-ins)';
+
+  @override
+  String get browserTrayAgentAllOrigins => 'Let agents control any page';
+
+  @override
+  String get browserTrayClearData => 'Clear browser data';
+
+  @override
+  String get browserKeepDataRestartNote =>
+      'The change takes effect when you reopen ShellX.';
+
+  @override
+  String get browserDataCleared => 'Browser data cleared';
+
+  @override
+  String get browserConfirmAllOriginsTitle => 'Let agents control any page?';
+
+  @override
+  String get browserConfirmAllOriginsBody =>
+      'Agents on this computer (through the ShellX command line) will be able to run JavaScript, take screenshots and read the console of any page in a browser pane — including pages you’re signed in to. Only turn this on if you trust the agents you run.';
+
+  @override
+  String get browserConfirmAllOriginsAction => 'Turn on';
+
+  @override
+  String browserDialogTitle(String host) {
+    return '$host says';
+  }
 }

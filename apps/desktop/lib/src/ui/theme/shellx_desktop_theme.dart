@@ -70,6 +70,20 @@ abstract final class ShellxRadius {
 abstract final class ShellxSizes {
   static const double sidebarWidth = 220;
 
+  // A6 (UI-A6 §1.2). The minimum equals the browser pane's `kBrowserMinSize`.
+  static const double browserToolbar = 32;
+  static const double browserToolbarPadH = 6;
+  static const double browserButton = 28;
+  static const double browserButtonGap = 2;
+  static const double browserAddressHeight = 24;
+  static const double browserAddressPadH = 8;
+  static const double browserOriginIcon = 14;
+  static const double browserProgress = 2;
+  static const double browserMinWidth = 240; // == kBrowserMinSize.width
+  static const double browserMinHeight = 160; // == kBrowserMinSize.height
+  static const double browserAgentMark = 20;
+  static const double browserErrorMaxWidth = 420;
+
   // A8 (UI-A8 §1.2).
   static const double remoteMark = 12;
   static const double remoteMarkGap = 2;

@@ -2904,4 +2904,204 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get configProblemAgentCommandBad =>
       'agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng';
+
+  @override
+  String get browserOpenPane => 'Mở pane trình duyệt';
+
+  @override
+  String browserOpenPortInPane(int port) {
+    return 'Mở :$port trong pane trình duyệt';
+  }
+
+  @override
+  String get browserOpenPortInPaneMenu => 'Mở cổng trong pane trình duyệt…';
+
+  @override
+  String browserPortAltClickHint(String modifier) {
+    return '$modifier-click: mở trong pane trình duyệt';
+  }
+
+  @override
+  String browserBack(String shortcut) {
+    return 'Lùi  $shortcut';
+  }
+
+  @override
+  String browserForward(String shortcut) {
+    return 'Tiến  $shortcut';
+  }
+
+  @override
+  String browserReload(String shortcut) {
+    return 'Tải lại  $shortcut';
+  }
+
+  @override
+  String get browserStop => 'Dừng  Esc';
+
+  @override
+  String get browserOpenExternal => 'Mở trong trình duyệt hệ thống';
+
+  @override
+  String get browserCopyAddress => 'Sao chép địa chỉ trang';
+
+  @override
+  String get browserAddressLabel => 'Địa chỉ trang';
+
+  @override
+  String get browserAddressHint => 'Nhập địa chỉ hoặc cổng';
+
+  @override
+  String get browserAddressInvalid => 'Không phải địa chỉ web';
+
+  @override
+  String get browserOriginLocal => 'Trang trên máy này';
+
+  @override
+  String get browserOriginSecure => 'Kết nối bảo mật';
+
+  @override
+  String get browserOriginInsecure => 'Không bảo mật';
+
+  @override
+  String get browserUntitled => 'Trình duyệt';
+
+  @override
+  String get browserLoadingLabel => 'Đang tải';
+
+  @override
+  String get browserAgentMark => 'Agent';
+
+  @override
+  String get browserAgentMarkTooltip =>
+      'Một agent trên máy này đang điều khiển trang';
+
+  @override
+  String get browserAnnounceAgent => 'Agent đang điều khiển pane trình duyệt';
+
+  @override
+  String browserAnnounceLoaded(String title) {
+    return 'Đã tải $title';
+  }
+
+  @override
+  String browserPaneRegionLabel(int index, int count, String title) {
+    return 'Pane $index trên $count — Trình duyệt: $title';
+  }
+
+  @override
+  String get browserToolbarRegionLabel => 'Thanh công cụ trình duyệt';
+
+  @override
+  String get browserSchemeBlocked =>
+      'Pane trình duyệt chỉ mở trang http và https';
+
+  @override
+  String get browserDownloadBlocked =>
+      'Pane trình duyệt không tải file xuống — dùng “Mở trong trình duyệt hệ thống”';
+
+  @override
+  String browserLimitReached(int count) {
+    return 'Đã đạt tối đa $count pane trình duyệt';
+  }
+
+  @override
+  String browserErrorLocalRefusedTitle(String host) {
+    return 'Chưa có gì chạy ở $host';
+  }
+
+  @override
+  String get browserErrorLocalRefusedBody =>
+      'Khởi động server trong terminal (vd. npm run dev) rồi thử lại.';
+
+  @override
+  String browserErrorUnreachableTitle(String host) {
+    return 'Không kết nối được tới $host';
+  }
+
+  @override
+  String get browserErrorUnreachableBody =>
+      'Kiểm tra địa chỉ và kết nối mạng rồi thử lại.';
+
+  @override
+  String browserErrorDnsTitle(String host) {
+    return 'Không tìm thấy $host';
+  }
+
+  @override
+  String get browserErrorDnsBody =>
+      'Tên miền không tồn tại hoặc mạng chưa sẵn sàng.';
+
+  @override
+  String browserErrorTimeoutTitle(String host) {
+    return '$host phản hồi quá lâu';
+  }
+
+  @override
+  String browserErrorCertTitle(String host) {
+    return 'Kết nối tới $host không an toàn';
+  }
+
+  @override
+  String get browserErrorCertBody =>
+      'Chứng chỉ của trang không hợp lệ. ShellX không mở trang này; bạn có thể mở trong trình duyệt hệ thống.';
+
+  @override
+  String get browserErrorCrashedTitle => 'Trang đã dừng bất ngờ';
+
+  @override
+  String get browserErrorCrashedBody => 'Tải lại để mở lại trang.';
+
+  @override
+  String get browserErrorRuntimeTitle => 'Cần Microsoft Edge WebView2 Runtime';
+
+  @override
+  String get browserErrorRuntimeBody =>
+      'Pane trình duyệt dùng WebView2 của Windows. Cài WebView2 Runtime rồi mở lại pane.';
+
+  @override
+  String get browserErrorRuntimeAction => 'Tải WebView2';
+
+  @override
+  String get browserErrorGenericTitle => 'Không mở được trang';
+
+  @override
+  String get browserErrorRetry => 'Thử lại';
+
+  @override
+  String get browserTrayMenu => 'Trình duyệt';
+
+  @override
+  String get browserTrayKeepData =>
+      'Giữ dữ liệu trình duyệt (cookie, đăng nhập)';
+
+  @override
+  String get browserTrayAgentAllOrigins =>
+      'Cho phép agent điều khiển mọi trang';
+
+  @override
+  String get browserTrayClearData => 'Xóa dữ liệu trình duyệt';
+
+  @override
+  String get browserKeepDataRestartNote =>
+      'Thay đổi có hiệu lực khi mở lại ShellX.';
+
+  @override
+  String get browserDataCleared => 'Đã xóa dữ liệu trình duyệt';
+
+  @override
+  String get browserConfirmAllOriginsTitle =>
+      'Cho phép agent điều khiển mọi trang?';
+
+  @override
+  String get browserConfirmAllOriginsBody =>
+      'Agent trên máy này (qua dòng lệnh ShellX) sẽ chạy được JavaScript, chụp ảnh và đọc console của mọi trang trong pane trình duyệt — kể cả trang bạn đã đăng nhập. Chỉ bật khi bạn tin các agent đang chạy.';
+
+  @override
+  String get browserConfirmAllOriginsAction => 'Bật';
+
+  @override
+  String browserDialogTitle(String host) {
+    return '$host cho biết';
+  }
 }

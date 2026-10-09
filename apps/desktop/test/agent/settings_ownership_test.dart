@@ -62,6 +62,9 @@ const _expectedUi = {
   // A12 D19: the window reads it once at start; the service keeps the
   // system language.
   'app_language',
+  // A6 D26/D27: the browser panes live in the window, so does the switch.
+  'browser_keep_data',
+  'browser_agent_all_origins',
 };
 
 final class _Listener implements MuxListener {
@@ -86,7 +89,7 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(30));
+    expect(SettingKeys.all, hasLength(32));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -5,6 +7,7 @@ import 'package:shellx_core/shellx_core.dart';
 import '../agent/agent_controller.dart';
 import '../agent/agent_state.dart';
 import '../agent/desktop_services.dart';
+import '../browser/browser_profile.dart';
 import '../cli/cli_install.dart';
 import '../cli/cli_service.dart';
 import '../cli/cli_settings.dart';
@@ -51,6 +54,12 @@ final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
       ref.read(settingsStoreProvider),
     ),
     appLanguage: appLanguageChoice(ref.read(settingsStoreProvider)),
+    browserKeepData: ref
+        .read(settingsStoreProvider)
+        .getBool(SettingKeys.browserKeepData, defaultValue: false),
+    browserAgentAllOrigins: ref
+        .read(settingsStoreProvider)
+        .getBool(SettingKeys.browserAgentAllOrigins, defaultValue: false),
     configProblemCount: ref.watch(
       shellxConfigProvider.select((s) => s.visibleProblemCount),
     ),
@@ -223,6 +232,57 @@ class TrayActions {
         } finally {
           _ref.invalidate(trayLocalStateProvider);
         }
+      // A6 D26/D27: UI-owned. On Windows the profile folder is chosen at
+      // start, so the change waits for a restart (says so); on macOS
+      // turning it off clears now.
+      case ToggleBrowserKeepData():
+        final settings = _ref.read(settingsStoreProvider);
+        final keep = !settings.getBool(
+          SettingKeys.browserKeepData,
+          defaultValue: false,
+        );
+        try {
+          await settings.setBool(SettingKeys.browserKeepData, keep);
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        if (Platform.isWindows) {
+          await _services.notifier.show(
+            title: 'ShellX',
+            body: l10n.browserKeepDataRestartNote,
+          );
+        } else if (!keep) {
+          await _ref.read(browserProfileProvider).clearNow();
+        }
+      // Turning it on asks (agents may then drive pages you are signed in
+      // to); turning it off is immediate.
+      case RequestBrowserAgentAllOrigins():
+        final settings = _ref.read(settingsStoreProvider);
+        final on = settings.getBool(
+          SettingKeys.browserAgentAllOrigins,
+          defaultValue: false,
+        );
+        if (!on) {
+          final ok = await _router.confirm(
+            ConfirmRequest(
+              title: l10n.browserConfirmAllOriginsTitle,
+              body: l10n.browserConfirmAllOriginsBody,
+              confirmLabel: l10n.browserConfirmAllOriginsAction,
+            ),
+          );
+          if (!ok) return;
+        }
+        try {
+          await settings.setBool(SettingKeys.browserAgentAllOrigins, !on);
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+      case ClearBrowserData():
+        final now = await _ref.read(browserProfileProvider).clearNow();
+        await _services.notifier.show(
+          title: 'ShellX',
+          body: now ? l10n.browserDataCleared : l10n.browserKeepDataRestartNote,
+        );
       case ClearSavedScrollback():
         await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
       // A7 D26, amendment: at once, without asking; the host rechecks.

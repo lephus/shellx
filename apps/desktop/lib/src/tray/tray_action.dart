@@ -191,6 +191,22 @@ final class ClearRecentServers extends TrayAction {
   const ClearRecentServers();
 }
 
+/// A6 D27: "Giữ dữ liệu trình duyệt".
+final class ToggleBrowserKeepData extends TrayAction {
+  const ToggleBrowserKeepData();
+}
+
+/// A6 D20, D27: "Cho phép agent điều khiển mọi trang". Turning it on asks;
+/// turning it off is immediate.
+final class RequestBrowserAgentAllOrigins extends TrayAction {
+  const RequestBrowserAgentAllOrigins();
+}
+
+/// A6 D26: "Xóa dữ liệu trình duyệt".
+final class ClearBrowserData extends TrayAction {
+  const ClearBrowserData();
+}
+
 /// "Disconnect phone" on a desktop terminal; never ends the terminal.
 final class DisconnectDesktopPhone extends TrayAction {
   const DisconnectDesktopPhone(this.id);
@@ -238,6 +254,10 @@ abstract final class TrayKeys {
   static const String tmuxAttach = 'tmux_attach';
   static const String sshHook = 'ssh_hook';
   static const String sshClearRecent = 'ssh_clear_recent';
+  static const String browser = 'browser';
+  static const String browserKeepData = 'browser_keep_data';
+  static const String browserAgentAllOrigins = 'browser_agent_all_origins';
+  static const String browserClearData = 'browser_clear_data';
   static const String config = 'config';
   static const String configSettings = 'config_settings';
   static const String configOpen = 'config_open';
@@ -309,6 +329,9 @@ TrayAction? trayActionForKey(String? key) {
     TrayKeys.tmuxAttach => const OpenTmuxAttach(),
     TrayKeys.sshHook => const ToggleSshHook(),
     TrayKeys.sshClearRecent => const ClearRecentServers(),
+    TrayKeys.browserKeepData => const ToggleBrowserKeepData(),
+    TrayKeys.browserAgentAllOrigins => const RequestBrowserAgentAllOrigins(),
+    TrayKeys.browserClearData => const ClearBrowserData(),
     TrayKeys.configSettings => const OpenSettings(),
     TrayKeys.configOpen => const OpenConfigFile(),
     TrayKeys.configReload => const ReloadConfig(),

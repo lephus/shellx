@@ -84,7 +84,8 @@ void main() {
         (i) => i.key == TrayKeys.commandLine,
       );
       expect(notifications, greaterThanOrEqualTo(0));
-      expect(commandLine, notifications + 1);
+      // A6's "Trình duyệt" sits between them.
+      expect(commandLine, notifications + 2);
       final sub = items[commandLine];
       expect(sub.label, 'Dòng lệnh');
       expect(sub.submenu!.items!.map((i) => i.key), [

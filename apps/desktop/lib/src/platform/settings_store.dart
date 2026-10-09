@@ -95,6 +95,14 @@ abstract final class SettingKeys {
   /// change shows after a restart. UI-owned.
   static const String appLanguage = 'app_language';
 
+  /// A6 D26/D27: keep the browser panes' cookies and site data between
+  /// runs (default off: a fresh private profile every run). UI-owned.
+  static const String browserKeepData = 'browser_keep_data';
+
+  /// A6 D20/D27: agents may read any page, not only local ones (default
+  /// off). UI-owned.
+  static const String browserAgentAllOrigins = 'browser_agent_all_origins';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -126,6 +134,8 @@ abstract final class SettingKeys {
     lastSeenVersion,
     agentCommandApproved,
     appLanguage,
+    browserKeepData,
+    browserAgentAllOrigins,
   };
 }
 
@@ -178,6 +188,8 @@ abstract final class UiSettingKeys {
     SettingKeys.lastSeenVersion,
     SettingKeys.agentCommandApproved,
     SettingKeys.appLanguage,
+    SettingKeys.browserKeepData,
+    SettingKeys.browserAgentAllOrigins,
   };
 }
 
