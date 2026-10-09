@@ -20,6 +20,9 @@ final class FakeBrowserEngine implements BrowserEngine {
   final List<String> scripts = [];
   List<String> forwarded = const [];
   Object? scriptError;
+
+  /// When set, [runScript] waits for it (a slow engine).
+  Completer<void>? scriptGate;
   Uint8List png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]);
   void Function()? onCapture;
   bool disposed = false;
@@ -42,6 +45,7 @@ final class FakeBrowserEngine implements BrowserEngine {
 
   @override
   Future<void> runScript(String script) async {
+    await scriptGate?.future;
     if (scriptError != null) throw scriptError!;
     scripts.add(script);
   }

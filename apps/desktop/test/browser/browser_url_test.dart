@@ -11,7 +11,8 @@ void main() {
       'localhost:3000': 'http://localhost:3000/',
       'localhost:3000/docs?x=1': 'http://localhost:3000/docs?x=1',
       'localhost': 'http://localhost/',
-      'app.localhost:5173': 'http://app.localhost:5173/',
+      // S5: only bare localhost and loopback literals are local.
+      'app.localhost:5173': 'https://app.localhost:5173/',
       '127.0.0.1:8080': 'http://127.0.0.1:8080/',
       '[::1]:3000': 'http://[::1]:3000/',
       '192.168.1.20:8080': 'http://192.168.1.20:8080/',
@@ -29,6 +30,15 @@ void main() {
       'http://': null,
       'localhost:99999': null,
       '': null,
+      // S3: backslashes, control characters and userinfo are refused.
+      r'http://evil.com\@localhost': null,
+      r'evil.com\@localhost': null,
+      'https://google.com@evil.com': null,
+      'http://user:pw@localhost:3000/': null,
+      'user@example.com': null,
+      'http://exa\u0000mple.com/': null,
+      'http://example.com/\u007f': null,
+      'http://@example.com/': 'http://example.com/',
     };
     cases.forEach((input, expected) {
       test('"$input"', () {
@@ -44,11 +54,14 @@ void main() {
     final cases = <String, BrowserOrigin>{
       'http://localhost:3000/': BrowserOrigin.local,
       'https://localhost/': BrowserOrigin.local,
-      'http://app.localhost/': BrowserOrigin.local,
+      // S5: *.localhost and 0.0.0.0 are not trusted as local.
+      'http://app.localhost/': BrowserOrigin.insecure,
+      'http://evil.localhost.example.com/': BrowserOrigin.insecure,
+      'http://127.0.0.256/': BrowserOrigin.insecure,
       'http://127.0.0.1/': BrowserOrigin.local,
       'http://127.8.9.10/': BrowserOrigin.local,
       'http://[::1]:8000/': BrowserOrigin.local,
-      'http://0.0.0.0:8000/': BrowserOrigin.local,
+      'http://0.0.0.0:8000/': BrowserOrigin.insecure,
       'https://example.com/': BrowserOrigin.secure,
       'http://example.com/': BrowserOrigin.insecure,
       'http://localhost.example.com/': BrowserOrigin.insecure,
@@ -97,5 +110,14 @@ void main() {
       'http://example.com/',
     );
     expect(displayAddress(aboutBlank), '');
+    // S3: userinfo never shows (spoofing "google.com@evil.com").
+    expect(
+      displayAddress(Uri.parse('https://google.com@evil.com/x')),
+      'evil.com/x',
+    );
+    expect(
+      displayAddress(Uri.parse('http://u:p@example.com/')),
+      'http://example.com/',
+    );
   });
 }

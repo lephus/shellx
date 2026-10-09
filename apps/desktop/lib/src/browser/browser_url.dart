@@ -12,6 +12,10 @@ const int kMaxAddressLength = 2048;
 
 final RegExp _digits = RegExp(r'^\d{1,5}$');
 final RegExp _whitespace = RegExp(r'\s');
+
+/// S3: a backslash (WHATWG treats it as `/`, so `http://a.com\@b` means
+/// host a.com in a browser but not in Dart) and control characters.
+final RegExp _forbidden = RegExp(r'[\\\x00-\x1f\x7f]');
 final RegExp _scheme = RegExp(r'^([a-zA-Z][a-zA-Z0-9+.-]*):');
 final RegExp _hostPort = RegExp(r'^[A-Za-z0-9.-]+:\d{1,5}(?:[/?#].*)?$');
 final RegExp _ipv4 = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$');
@@ -28,7 +32,7 @@ Uri? parseAddressInput(String raw) {
     if (port < 1 || port > 65535) return null;
     return Uri.parse('http://localhost:$port/');
   }
-  if (_whitespace.hasMatch(text)) return null;
+  if (_whitespace.hasMatch(text) || _forbidden.hasMatch(text)) return null;
   final scheme = _scheme.firstMatch(text)?.group(1)?.toLowerCase();
   if (scheme == 'http' || scheme == 'https') return _web(text);
   // "localhost:3000" also looks like a scheme; anything else with a
@@ -50,19 +54,25 @@ Uri? _web(String text) {
     return null;
   }
   if (uri.host.isEmpty) return null;
+  // S3: "https://google.com@evil.com" reads as google.com. No credentials
+  // in a typed address (an empty "@" is harmless: dropped).
+  if (uri.userInfo.isNotEmpty) return null;
   if (uri.hasPort && (uri.port < 1 || uri.port > 65535)) return null;
-  return uri.path.isEmpty ? uri.replace(path: '/') : uri;
+  final clean = text.contains('@') ? uri.replace(userInfo: '') : uri;
+  return clean.path.isEmpty ? clean.replace(path: '/') : clean;
 }
 
 bool _isIpLiteral(String host) => _ipv4.hasMatch(host) || host.contains(':');
 
-/// D11: loopback and `*.localhost` (RFC 6761: never resolved outside).
+/// D11 (tightened, S5): the literal loopback addresses (127.0.0.0/8, ::1)
+/// and bare `localhost`. Not `*.localhost` (a resolver may send it
+/// anywhere) and not 0.0.0.0.
 bool isLocalHost(String rawHost) {
   final host = rawHost.toLowerCase();
-  if (host == 'localhost' || host.endsWith('.localhost')) return true;
-  if (host == '::1' || host == '[::1]' || host == '0.0.0.0') return true;
+  if (host == 'localhost' || host == '::1' || host == '[::1]') return true;
   final v4 = _ipv4.firstMatch(host);
-  return v4 != null && v4.group(1) == '127';
+  if (v4 == null || v4.group(1) != '127') return false;
+  return [2, 3, 4].every((i) => int.parse(v4.group(i)!) <= 255);
 }
 
 BrowserOrigin classifyOrigin(Uri? uri) {
@@ -98,7 +108,8 @@ String? urlForRestore(Uri? uri) {
 /// percent-escapes decoded for reading.
 String displayAddress(Uri uri) {
   if (uri == aboutBlank) return '';
-  final text = Uri.decodeFull(uri.toString());
+  // S3: never the userinfo — "google.com@evil.com" must read as evil.com.
+  final text = Uri.decodeFull(uri.replace(userInfo: '').toString());
   return switch (classifyOrigin(uri)) {
     BrowserOrigin.local || BrowserOrigin.secure => text.replaceFirst(
       RegExp(r'^https?://', caseSensitive: false),

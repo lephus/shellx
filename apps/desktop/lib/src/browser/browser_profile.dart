@@ -38,15 +38,27 @@ final class BrowserProfile {
   /// Windows: the WebView2 user data folder chosen by [prepare].
   String? get userDataPath => _userDataPath;
 
-  Directory get _root => Directory(
-    '${_localAppData ?? r'C:\Users\Default\AppData\Local'}'
-    '${Platform.pathSeparator}ShellX${Platform.pathSeparator}webview',
-  );
+  /// Whether the macOS clearer is wired (the real app must have it, or
+  /// "keep data off" would clear nothing).
+  bool get hasClearer => _clearer != null;
+
+  /// Never a fallback location: without `%LOCALAPPDATA%` there is no safe
+  /// place for a profile (a shared `C:\Users\Default` would be wrong).
+  Directory get _root {
+    final base = _localAppData;
+    if (base == null || base.isEmpty) {
+      throw StateError('no_local_app_data');
+    }
+    return Directory(
+      '$base${Platform.pathSeparator}ShellX${Platform.pathSeparator}webview',
+    );
+  }
 
   /// Before the first web view of this run. Windows: removes every
   /// per-run folder of earlier runs (WebView2 locked them while running)
   /// and picks this run's folder. macOS: clears the app's website data
-  /// unless kept — also covers a crash last time.
+  /// unless kept — also covers a crash last time. Throws [StateError] on
+  /// Windows without `%LOCALAPPDATA%`: no web view may start then.
   Future<void> prepare() async {
     if (!isWindows) {
       if (!_keepData()) await _clearer?.clearWebsiteData();
@@ -65,11 +77,12 @@ final class BrowserProfile {
       }
     }
     final marker = File('${root.path}${Platform.pathSeparator}clear-profile');
-    if (await marker.exists()) {
+    // Keeping is off now: whatever an earlier "keep" run left goes too.
+    if (!_keepData() || await marker.exists()) {
       final kept = Directory('${root.path}${Platform.pathSeparator}profile');
       try {
         if (await kept.exists()) await kept.delete(recursive: true);
-        await marker.delete();
+        if (await marker.exists()) await marker.delete();
       } on FileSystemException {
         // Still locked: try again next run.
       }
@@ -94,6 +107,7 @@ final class BrowserProfile {
       await _clearer?.clearWebsiteData();
       return true;
     }
+    if (_localAppData == null || _localAppData.isEmpty) return true;
     final kept = Directory('${_root.path}${Platform.pathSeparator}profile');
     if (_userDataPath == kept.path) {
       await File(
@@ -113,7 +127,7 @@ final class BrowserProfile {
 
 /// The profile of this run. The window's startup (Task 9) calls [prepare]
 /// before the first web view and passes the macOS clearer; until then
-/// [clearNow] on macOS has nothing to clear.
+/// [clearNow] on macOS has nothing to clear (see [BrowserProfile.hasClearer]).
 final browserProfileProvider = Provider<BrowserProfile>((ref) {
   final settings = ref.watch(settingsStoreProvider);
   return BrowserProfile(

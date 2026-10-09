@@ -186,6 +186,7 @@ final class BrowserController {
   DateTime? _lastAnnounce;
   DateTime? _windowStart;
   int _windowCount = 0;
+  int _evalCount = 0;
   int _dropped = 0;
   bool _disposed = false;
 
@@ -197,7 +198,16 @@ final class BrowserController {
     ).join();
   }
 
+  /// S4: console and network entries belong to the origin that produced
+  /// them; a page on another origin never reads its predecessor's.
+  static String _originKey(Uri u) =>
+      '${u.scheme.toLowerCase()}://${u.host.toLowerCase()}:${u.hasPort ? u.port : ''}';
+
   void _set(BrowserPaneState next) {
+    if (_originKey(next.url) != _originKey(_state.url)) {
+      _console.clear();
+      _network.clear();
+    }
     _state = next;
     if (!_disposed) _onState(next);
   }
@@ -274,7 +284,9 @@ final class BrowserController {
   }
 
   /// D19: [body] is an async function body; the result is the decoded
-  /// JSON value (`null` for undefined).
+  /// JSON value (`null` for undefined). A body that does not parse makes
+  /// the engine reject the script: `eval_error` at once (S10), not a
+  /// timeout.
   Future<Object?> evalJs(String body, {Duration timeout = kEvalTimeout}) async {
     _alive();
     if (body.length > kEvalScriptMax) throw const BrowserError('bad_request');
@@ -307,10 +319,13 @@ final class BrowserController {
   /// D20, D24: refused when the page left an allowed origin meanwhile.
   Future<Uint8List> screenshot() async {
     _alive();
-    _gate();
+    // S6: while loading, the URL may be [navigate]'s target, not the page
+    // on screen: only a settled page is captured without the all-origins
+    // setting. Agents call waitForLoad first.
+    _gate(confirmed: true);
     final before = _state.url;
     final png = await _engine.capturePng();
-    if (_state.url != before) _gate();
+    if (_state.url != before || _state.loading) _gate(confirmed: true);
     return png;
   }
 
@@ -367,11 +382,11 @@ final class BrowserController {
     _agentTimer?.cancel();
     await _sub.cancel();
     for (final c in _evals.values) {
-      c.completeError(const BrowserError('not_found'));
+      _failQuietly(c, const BrowserError('not_found'));
     }
     _evals.clear();
     for (final c in _waiters) {
-      c.completeError(const BrowserError('not_found'));
+      _failQuietly(c, const BrowserError('not_found'));
     }
     _waiters.clear();
     await _engine.dispose();
@@ -379,14 +394,35 @@ final class BrowserController {
 
   // ---- internals ----
 
+  /// S11: a completer nobody listens to yet (an eval whose script is still
+  /// being injected) would raise an unhandled async error; `ignore()`
+  /// marks it handled and a later listener still receives the error.
+  void _failQuietly<T>(Completer<T> c, Object error) {
+    c.future.ignore();
+    c.completeError(error);
+  }
+
   void _alive() {
     if (_disposed) throw const BrowserError('not_found');
   }
 
-  void _gate() {
-    final origin = _state.origin;
-    if (origin == BrowserOrigin.local || origin == BrowserOrigin.none) return;
+  /// D20. Only `about:blank` is an empty page; blob:, data:, file: and
+  /// engine error pages hold content the origin rule cannot vouch for, so
+  /// they are refused whatever the setting says. With [confirmed], a URL
+  /// the engine has not yet reported (a navigation is under way and
+  /// [navigate] set the target optimistically) counts as non-local.
+  void _gate({bool confirmed = false}) {
+    final url = _state.url;
+    if (url == aboutBlank) return;
+    final scheme = url.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      throw const BrowserError('forbidden_origin');
+    }
     if (_allowAnyOrigin()) return;
+    if (_state.origin == BrowserOrigin.local &&
+        !(confirmed && _state.loading)) {
+      return;
+    }
     throw const BrowserError('forbidden_origin');
   }
 
@@ -416,13 +452,14 @@ final class BrowserController {
 
   /// D21 / §5: at most 200 bridge messages a second; the excess is counted
   /// into one `warn` entry when the next second starts.
-  bool _admit() {
+  bool _admit({bool eval = false}) {
     final now = _clock();
     final start = _windowStart;
     if (start == null || now.difference(start) >= const Duration(seconds: 1)) {
       final dropped = _dropped;
       _windowStart = now;
       _windowCount = 0;
+      _evalCount = 0;
       _dropped = 0;
       if (dropped > 0) {
         _push(
@@ -436,6 +473,11 @@ final class BrowserController {
           ),
         );
       }
+    }
+    // Eval results have their own budget so a console flood cannot starve
+    // them; a page forging the prefix only spends that budget.
+    if (eval) {
+      return _evalCount++ < kBridgeMessagesPerSecond;
     }
     if (_windowCount >= kBridgeMessagesPerSecond) {
       _dropped++;
@@ -464,7 +506,7 @@ final class BrowserController {
       case LoadFailed(:final kind):
         _set(_state.copyWith(loading: false, progress: null, error: kind));
         for (final c in _waiters) {
-          c.completeError(BrowserError('load_failed', kind.name));
+          _failQuietly(c, BrowserError('load_failed', kind.name));
         }
         _waiters.clear();
       case HistoryChanged(:final canGoBack, :final canGoForward):
@@ -482,10 +524,17 @@ final class BrowserController {
     }
   }
 
+  /// Our eval script posts `{"t":"eval",…` first (JSON.stringify of an
+  /// object literal in that key order); it is a hint for budgeting only.
+  static const String _evalPrefix = '{"t":"eval"';
+
   void _onBridge(String raw) {
+    // S7: size and rate before jsonDecode, so a flooding page costs a
+    // length check and a counter, not a parse.
+    if (raw.length > kBridgeMessageMax) return;
+    if (!_admit(eval: raw.startsWith(_evalPrefix))) return;
     final message = parseBridgeMessage(raw);
     if (message == null) return;
-    if (message is! EvalResultMessage && !_admit()) return;
     final now = _clock();
     switch (message) {
       case ConsoleMessage(:final level, :final text, :final url):
@@ -523,7 +572,7 @@ final class BrowserController {
         if (m.ok) {
           c.complete(jsonDecode(m.json!));
         } else {
-          c.completeError(BrowserError(m.code!, m.message));
+          _failQuietly(c, BrowserError(m.code!, m.message));
         }
     }
   }

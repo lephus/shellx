@@ -25,13 +25,14 @@ const int kEvalScriptMax = 32 * 1024;
 /// How a page reaches ShellX: macOS WKScriptMessageHandler, Windows
 /// WebView2 `chrome.webview.postMessage`.
 enum BridgeTransport {
-  webkit('window.webkit.messageHandlers.ShellxBrowser.postMessage(s)'),
-  webview2('window.chrome.webview.postMessage(s)');
+  webkit('window.webkit.messageHandlers.ShellxBrowser'),
+  webview2('window.chrome.webview');
 
-  const BridgeTransport(this.postStatement);
+  const BridgeTransport(this.target);
 
-  /// A statement that sends the string `s`.
-  final String postStatement;
+  /// The object whose `postMessage` sends a string. Scripts capture it and
+  /// its method once at injection, before the page can replace them.
+  final String target;
 }
 
 sealed class BridgeMessage {
@@ -164,7 +165,13 @@ BridgeMessage? parseBridgeMessage(String raw) {
 /// runs as an async function body; the page's origin is checked again
 /// inside the page (it may have navigated since Dart checked); the result
 /// goes back through the bridge tagged with [nonce]. No `eval()` or
-/// `new Function`, so the page's CSP does not apply.
+/// `new Function`, so the page's CSP does not apply. `JSON.stringify` and
+/// the transport's `postMessage` are captured on the first lines, so a
+/// page that patches them later cannot read or forge the result (S8).
+///
+/// A [body] that does not parse makes the whole script a syntax error:
+/// the engine's `runScript` rejects and [BrowserController.evalJs] fails
+/// fast with `eval_error` (S10) instead of waiting for the timeout.
 String buildEvalScript({
   required String nonce,
   required String body,
@@ -174,15 +181,17 @@ String buildEvalScript({
   final n = jsonEncode(nonce);
   return '''
 (function () {
+  var stringify = JSON.stringify;
+  var target = ${transport.target};
+  var send = target.postMessage;
   var post = function (m) {
-    try { var s = JSON.stringify(m); ${transport.postStatement}; } catch (e) {}
+    try { send.call(target, stringify(m)); } catch (e) {}
   };
   var n = $n;
   var h = location.hostname, p = location.protocol;
   var allowed = $allowAnyOrigin || location.href === 'about:blank' ||
     ((p === 'http:' || p === 'https:') &&
-     (h === 'localhost' || /\\.localhost\$/.test(h) || h === '[::1]' ||
-      h === '::1' || h === '0.0.0.0' || /^127\\.\\d+\\.\\d+\\.\\d+\$/.test(h)));
+     (h === 'localhost' || h === '[::1]' || h === '::1' || /^127\\.\\d+\\.\\d+\\.\\d+\$/.test(h)));
   if (!allowed) { post({t: 'eval', n: n, ok: false, code: 'forbidden_origin'}); return; }
   var fail = function (code, e) {
     post({t: 'eval', n: n, ok: false, code: code,
@@ -192,7 +201,7 @@ String buildEvalScript({
 $body
   })().then(function (v) {
     var s;
-    try { s = JSON.stringify(v === undefined ? null : v); }
+    try { s = stringify(v === undefined ? null : v); }
     catch (e) { fail('not_serializable', e); return; }
     if (s === undefined) s = 'null';
     if (s.length > $kEvalResultMax) { post({t: 'eval', n: n, ok: false, code: 'result_too_large'}); return; }

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:shellx_desktop/src/browser/browser_bridge.dart';
 import 'package:shellx_desktop/src/browser/browser_controller.dart';
 import 'package:shellx_desktop/src/browser/browser_engine.dart';
 import '../support/fake_browser_engine.dart';
@@ -122,6 +124,16 @@ void main() {
       );
     });
 
+    test('a rejected script leaves nothing pending (S10)', () async {
+      engine.scriptError = StateError('SyntaxError');
+      await expectLater(
+        controller.evalJs('return ('),
+        throwsA(browserError('eval_error')),
+      );
+      // The late answer for that nonce is a forgery now: ignored, no throw.
+      answer('nonce1', 1);
+    });
+
     test('times out (default 10 s, capped at 30 s)', () {
       fakeAsync((async) {
         Object? error;
@@ -200,6 +212,112 @@ void main() {
       expect(await controller.screenshot(), engine.png);
     },
   );
+
+  group('only about:blank passes as none (S1)', () {
+    for (final url in [
+      'blob:https://example.com/uuid',
+      'data:text/html,hi',
+      'file:///etc/passwd',
+      'about:srcdoc',
+      'chrome-error://chromewebdata/',
+    ]) {
+      test(url, () async {
+        boot(url: url);
+        anyOrigin = true; // even the "all origins" setting does not open it
+        await expectLater(
+          controller.evalJs('return 1;'),
+          throwsA(browserError('forbidden_origin')),
+        );
+        await expectLater(
+          controller.screenshot(),
+          throwsA(browserError('forbidden_origin')),
+        );
+        expect(
+          () => controller.console(),
+          throwsA(browserError('forbidden_origin')),
+        );
+      });
+    }
+
+    test('about:blank still works', () async {
+      boot(url: 'about:blank');
+      expect(controller.console(), isEmpty);
+      expect(await controller.screenshot(), engine.png);
+    });
+  });
+
+  group('buffers reset per origin (S4)', () {
+    test('remote entries are unreadable after moving to localhost', () {
+      boot(url: 'https://example.com/');
+      anyOrigin = true;
+      bridge({'t': 'console', 'level': 'log', 'text': 'secret'});
+      bridge({'t': 'net', 'url': 'https://example.com/api', 'type': 'fetch'});
+      expect(controller.console(), hasLength(1));
+      anyOrigin = false;
+      engine.emit(UrlChanged(Uri.parse('http://localhost:3000/')));
+      expect(controller.console(), isEmpty);
+      expect(controller.network(), isEmpty);
+    });
+
+    test('same-origin navigation keeps them', () {
+      bridge({'t': 'console', 'level': 'log', 'text': 'keep'});
+      engine.emit(UrlChanged(Uri.parse('http://localhost:8000/other')));
+      expect(controller.console(), hasLength(1));
+      engine.emit(UrlChanged(Uri.parse('http://localhost:9000/')));
+      expect(controller.console(), isEmpty);
+    });
+
+    test('navigate() to another origin clears at once', () async {
+      bridge({'t': 'console', 'level': 'log', 'text': 'old'});
+      await controller.navigate(Uri.parse('http://localhost:9000/'));
+      expect(controller.console(), isEmpty);
+    });
+  });
+
+  group('screenshot waits for an engine-confirmed URL (S6)', () {
+    test('refused while loading a page that is not yet confirmed', () async {
+      boot(url: 'https://example.com/');
+      // The user-typed URL is local, but the engine still shows example.com.
+      await controller.navigate(Uri.parse('http://localhost:3000/'));
+      expect(controller.state.loading, isTrue);
+      await expectLater(
+        controller.screenshot(),
+        throwsA(browserError('forbidden_origin')),
+      );
+      engine.emit(UrlChanged(Uri.parse('http://localhost:3000/')));
+      engine.emit(const LoadFinished());
+      expect(await controller.screenshot(), engine.png);
+    });
+
+    test('a load starting during the capture discards it', () async {
+      engine.onCapture = () => engine.emit(const LoadStarted());
+      await expectLater(
+        controller.screenshot(),
+        throwsA(browserError('forbidden_origin')),
+      );
+    });
+  });
+
+  group('bridge admission happens before decoding (S7)', () {
+    test('malformed and oversized raw strings count against the rate', () {
+      for (var i = 0; i < 200; i++) {
+        engine.emit(const BridgeReceived('not json'));
+      }
+      engine.emit(BridgeReceived('x' * (kBridgeMessageMax + 1)));
+      bridge({'t': 'console', 'level': 'log', 'text': 'late'});
+      expect(controller.console(), isEmpty);
+    });
+
+    test('eval results are not starved by a console flood', () async {
+      final result = controller.evalJs('return 1;');
+      await Future<void>.delayed(Duration.zero);
+      for (var i = 0; i < 300; i++) {
+        bridge({'t': 'console', 'level': 'log', 'text': 'f'});
+      }
+      answer('nonce1', 7);
+      expect(await result, 7);
+    });
+  });
 
   group('console and network (D22, D23)', () {
     test('ring of 500, since/limit paging, level filter', () {
@@ -343,4 +461,20 @@ void main() {
       expect(() => controller.reload(), throwsA(browserError('not_found')));
     },
   );
+
+  test('dispose with an unlistened eval raises no async error (S11)', () async {
+    final errors = <Object>[];
+    await runZonedGuarded(() async {
+      boot();
+      engine.scriptGate = Completer<void>();
+      final pending = controller.evalJs('return 1;');
+      final seen = pending.then<Object?>((_) => null, onError: (Object e) => e);
+      await Future<void>.delayed(Duration.zero);
+      await controller.dispose();
+      engine.scriptGate!.complete();
+      expect(await seen, browserError('not_found'));
+      await Future<void>.delayed(Duration.zero);
+    }, (e, _) => errors.add(e));
+    expect(errors, isEmpty);
+  });
 }

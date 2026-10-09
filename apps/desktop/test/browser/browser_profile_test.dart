@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_desktop/src/browser/browser_profile.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,7 +20,7 @@ void main() {
 
   group('Windows', () {
     test(
-      'a fresh per-run folder; earlier runs removed; kept profile untouched',
+      'a fresh per-run folder; earlier runs removed; a kept profile is removed when keeping is off (S2)',
       () async {
         await Directory('${root()}/s-old1').create(recursive: true);
         await Directory('${root()}/profile').create(recursive: true);
@@ -33,7 +34,7 @@ void main() {
         expect(p.userDataPath, startsWith('${root()}/s-'));
         expect(p.userDataPath!.split('/').last, hasLength(18)); // s- + 16 hex
         expect(Directory('${root()}/s-old1').existsSync(), isFalse);
-        expect(Directory('${root()}/profile').existsSync(), isTrue);
+        expect(Directory('${root()}/profile').existsSync(), isFalse);
         expect(Directory(p.userDataPath!).existsSync(), isTrue);
       },
     );
@@ -67,6 +68,39 @@ void main() {
       expect(File('${root()}/clear-profile').existsSync(), isFalse);
     });
   });
+
+  test('Windows without LOCALAPPDATA never falls back to Default (S9)', () {
+    final p = BrowserProfile(isWindows: true, keepData: () => false);
+    expect(p.prepare(), throwsA(isA<StateError>()));
+    expect(Directory(r'C:\Users\Default').existsSync(), isFalse);
+  });
+
+  test(
+    'turning keep-data off clears at once when the folder is idle (S2)',
+    () async {
+      await Directory('${root()}/profile').create(recursive: true);
+      var keep = false;
+      final p = BrowserProfile(
+        isWindows: true,
+        keepData: () => keep,
+        localAppData: tmp.path,
+      );
+      await p.prepare(); // runs on a per-run folder
+      expect(await p.clearNow(), isTrue);
+      expect(Directory('${root()}/profile').existsSync(), isFalse);
+      keep = true;
+    },
+  );
+
+  test(
+    'the real app container wires the macOS clearer (S2)',
+    () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      expect(container.read(browserProfileProvider).hasClearer, isTrue);
+    },
+    skip: 'Task 7/9 wires the macOS WebsiteDataClearer: flip this on then',
+  );
 
   group('macOS', () {
     test('clears at start and quit unless kept', () async {

@@ -139,15 +139,27 @@ void main() {
       expect(s, contains('return document.title;'));
       expect(s, contains("code: 'forbidden_origin'"));
       expect(s, contains('var allowed = false ||'));
-      expect(
-        s,
-        contains('window.webkit.messageHandlers.ShellxBrowser.postMessage(s)'),
-      );
+      expect(s, contains('window.webkit.messageHandlers.ShellxBrowser'));
       expect(script(any: true), contains('var allowed = true ||'));
       expect(
         script(t: BridgeTransport.webview2),
-        contains('window.chrome.webview.postMessage(s)'),
+        contains('window.chrome.webview'),
       );
+    });
+
+    test('JSON.stringify and postMessage are captured at injection (S8)', () {
+      for (final t in BridgeTransport.values) {
+        final s = script(t: t);
+        expect(s, contains('var stringify = JSON.stringify;'));
+        expect(s, contains('.postMessage;'));
+        // Every use after the prologue goes through the cached copies.
+        expect(
+          'JSON.stringify'.allMatches(s).length,
+          1,
+          reason: 'only the capture may name JSON.stringify',
+        );
+        expect(s, isNot(contains('.postMessage(')));
+      }
     });
 
     test('never uses eval or new Function (CSP)', () {
@@ -176,14 +188,15 @@ void main() {
     );
     for (final part in [
       "h === 'localhost'",
-      r"/\.localhost$/.test(h)",
       "h === '[::1]'",
-      "h === '0.0.0.0'",
       r"/^127\.\d+\.\d+\.\d+$/.test(h)",
       "location.href === 'about:blank'",
       "(p === 'http:' || p === 'https:')",
     ]) {
       expect(s, contains(part));
     }
+    // S5: no *.localhost, no 0.0.0.0.
+    expect(s, isNot(contains('.localhost')));
+    expect(s, isNot(contains('0.0.0.0')));
   });
 }
