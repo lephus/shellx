@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 /// A12 D16: what ShellX asks `gh pr view` for. Nothing the user typed is
 /// ever part of the arguments, and no title or body is requested.
 const String kPrFields =
-    'number,state,isDraft,url,reviewDecision,statusCheckRollup';
+    'number,state,isDraft,url,reviewDecision,statusCheckRollup,headRefName';
 
 enum PrState { open, draft, merged, closed }
 
@@ -110,6 +110,17 @@ bool _safeUrl(String url) {
       uri.host.isNotEmpty &&
       uri.userInfo.isEmpty &&
       !uri.hasFragment;
+}
+
+/// The branch the answer is about (`headRefName`); null when absent.
+String? parsePrHead(String stdout) {
+  try {
+    final json = jsonDecode(stdout);
+    final head = json is Map<String, Object?> ? json['headRefName'] : null;
+    return head is String ? head : null;
+  } on FormatException {
+    return null;
+  }
 }
 
 /// The answer of `gh pr view --json [kPrFields]`, read strictly: anything

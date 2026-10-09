@@ -12,6 +12,9 @@ abstract final class CliType {
   static const uiLs = 'ui.ls';
   static const uiTabNew = 'ui.tab.new';
   static const uiTabRename = 'ui.tab.rename';
+
+  /// A12 D18: a tab's description and status.
+  static const uiTabMeta = 'ui.tab.meta';
   static const uiPaneSplit = 'ui.pane.split';
   static const uiFocus = 'ui.focus';
   static const uiClose = 'ui.close';
@@ -74,6 +77,7 @@ const List<String> kCliCaps = [
   CliType.uiLs,
   CliType.uiTabNew,
   CliType.uiTabRename,
+  CliType.uiTabMeta,
   CliType.uiPaneSplit,
   CliType.uiFocus,
   CliType.uiClose,

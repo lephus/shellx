@@ -227,6 +227,29 @@ pub(super) fn prepare(p: &Parsed, ctx: &mut Ctx, path: &str) -> Result<Prepared,
                 ("name", Some(Value::text(rest(1)))),
             ],
         ),
+        "tab describe" => simple(
+            "ui.tab.meta",
+            vec![
+                ("tab", Some(tab(pos(0), ctx)?)),
+                (
+                    "description",
+                    Some(Value::text(rest(1).chars().take(1024).collect::<String>())),
+                ),
+            ],
+        ),
+        "tab status" => {
+            let state = pos(1);
+            if !["none", "in_progress", "review", "blocked", "done"].contains(&state) {
+                return Err(usage("STATE is none, in_progress, review, blocked or done"));
+            }
+            simple(
+                "ui.tab.meta",
+                vec![
+                    ("tab", Some(tab(pos(0), ctx)?)),
+                    ("status", Some(Value::text(state))),
+                ],
+            )
+        }
         "workspace new" => Prepared::Simple {
             t: "ui.workspace.new",
             fields: vec![

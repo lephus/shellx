@@ -49,6 +49,7 @@ const ALL: &[&str] = &[
     "ui.ls",
     "ui.tab.new",
     "ui.tab.rename",
+    "ui.tab.meta",
     "ui.pane.split",
     "ui.focus",
     "ui.close",
@@ -538,6 +539,49 @@ fn targets() {
         (m.get("tab"), m.get("name")),
         (Some(&Value::Int(7)), Some(&Value::text("build server")))
     );
+    // A12 D18: describe / status.
+    let d = go(
+        &["tab", "describe", "@tab", "fix", "login"],
+        &[("SHELLX_TAB_ID", "7")],
+        vec![],
+        "",
+        PLAIN,
+    );
+    let m = sent(&d, "ui.tab.meta");
+    assert_eq!(
+        (m.get("tab"), m.get("description"), m.get("status")),
+        (Some(&Value::Int(7)), Some(&Value::text("fix login")), None)
+    );
+    let c = go(&["tab", "describe", "t7", ""], &[], vec![], "", PLAIN);
+    assert_eq!(
+        sent(&c, "ui.tab.meta").get("description"),
+        Some(&Value::text(""))
+    );
+    let s = go(
+        &["tab", "status", "t7", "in_progress"],
+        &[],
+        vec![],
+        "",
+        PLAIN,
+    );
+    let m = sent(&s, "ui.tab.meta");
+    assert_eq!(m.get("status"), Some(&Value::text("in_progress")));
+    assert_eq!(m.get("description"), None);
+    for st in ["none", "review", "blocked", "done"] {
+        assert_eq!(
+            go(&["tab", "status", "t7", st], &[], vec![], "", PLAIN).code,
+            0
+        );
+    }
+    let o = go(&["tab", "status", "t7", "bogus"], &[], vec![], "", PLAIN);
+    assert_eq!((o.code, o.connected), (2, false));
+    assert!(parse(&["tab".to_string(), "status".to_string(), "t7".to_string()]).is_err());
+    let long = "x".repeat(5000);
+    let l = go(&["tab", "describe", "t7", &long], &[], vec![], "", PLAIN);
+    let Some(Value::Text(t)) = sent(&l, "ui.tab.meta").get("description") else {
+        panic!("no description")
+    };
+    assert!(t.chars().count() <= 1024);
     // Final ruling M4: a pane command takes a tab — the host resolves it
     // to that tab's focused pane, so it goes out in its written form.
     let st = go(&["send", "t5", "--text", "x"], &[], vec![], "", PLAIN);

@@ -217,4 +217,23 @@ void main() {
     final rich = rig.manager.sessionInfosWithContext.single;
     expect((rich.cwd, rich.branch), ('/w', 'main'));
   });
+
+  test(
+    'agentOf fills agent and agentState in the context list only (A12 D22)',
+    () async {
+      final rig = SessionRig(gitHeads: _Lookup());
+      await rig.manager.open(cols: 80, rows: 24);
+      await rig.manager.open(cols: 80, rows: 24);
+      final first = rig.manager.sessions.first.id;
+      rig.manager.agentOf = (id) =>
+          id == first ? (agent: 'claude', state: 'needs_input') : null;
+      final rich = rig.manager.sessionInfosWithContext;
+      expect((rich[0].agent, rich[0].agentState), ('claude', 'needs_input'));
+      expect(rich[1].agent, '');
+      expect(
+        rig.manager.sessionInfos.first.toMap().containsKey('agent'),
+        isFalse,
+      );
+    },
+  );
 }

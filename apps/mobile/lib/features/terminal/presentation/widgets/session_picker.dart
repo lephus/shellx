@@ -24,6 +24,26 @@ String desktopSessionLabel(SessionInfo session) {
   return parts.isEmpty ? session.shell : parts.join(' — ');
 }
 
+/// A12 D22: "Claude Code · needs your answer"; null when the desktop sent no (or an unknown)
+/// agent state, as every older desktop does.
+String? agentChipText(S strings, SessionInfo session) {
+  final name = switch (session.agent) {
+    'claude' => 'Claude Code',
+    'codex' => 'Codex',
+    'gemini' => 'Gemini CLI',
+    'opencode' => 'OpenCode',
+    _ => null,
+  };
+  if (name == null) return null;
+  return switch (session.agentState) {
+    'running' => strings.pickerAgentRunning(name),
+    'needs_input' => strings.pickerAgentNeedsInput(name),
+    'idle' => strings.pickerAgentIdle(name),
+    'done' => strings.pickerAgentDone(name),
+    _ => null,
+  };
+}
+
 /// Spec §9.2 #4 and terminal sharing §9.1 / design "Terminal trên máy tính": the bottom sheet
 /// offering the sessions not open as tabs, in two groups — "Terminal trên máy tính" (or, without any,
 /// a hint picked by `desktop_sharing`) and "Phiên ShellX" — then "Phiên mới". Returns null when
@@ -232,6 +252,16 @@ class _SessionRow extends StatelessWidget {
                       ].join(' · '),
                       style: context.typo.paragraph13.copyWith(color: colors.secondaryText),
                     ),
+                    if (agentChipText(strings, session) case final chip?) ...[
+                      2.sizedHeight,
+                      Text(
+                        chip,
+                        key: ValueKey('picker-agent-${session.id}'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.typo.paragraph13.bold.copyWith(color: colors.link),
+                      ),
+                    ],
                   ],
                 ),
               ),

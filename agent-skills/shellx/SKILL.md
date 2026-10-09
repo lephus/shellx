@@ -55,6 +55,8 @@ Tell the user you are done (shows on their computer and phone):
 shellx notify --title "Claude" "Tests pass — ready for review"
 ```
 
+Describe or mark your tab for the user (no focus change): `shellx tab describe @tab "fixing login"`, `shellx tab status @tab review` (`none`, `in_progress`, `review`, `blocked`, `done`; `describe @tab ""` clears it).
+
 See everything that is open: `shellx ls` (or `shellx ls --json`). Follow what happens: `shellx events --follow` (one JSON object per line). Full reference: `shellx skills print reference`.
 
 ## Exit codes
