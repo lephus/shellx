@@ -3,6 +3,9 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_desktop/src/browser/browser_profile.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart'
+    show settingsStoreProvider;
 import 'package:flutter_test/flutter_test.dart';
 
 final class FakeClearer implements WebsiteDataClearer {
@@ -92,15 +95,15 @@ void main() {
     },
   );
 
-  test(
-    'the real app container wires the macOS clearer (S2)',
-    () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      expect(container.read(browserProfileProvider).hasClearer, isTrue);
-    },
-    skip: 'Task 7/9 wires the macOS WebsiteDataClearer: flip this on then',
-  );
+  test('the real app container wires the macOS clearer (S2)', () {
+    final container = ProviderContainer(
+      overrides: [
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+    expect(container.read(browserProfileProvider).hasClearer, isTrue);
+  }, skip: !Platform.isMacOS);
 
   group('macOS', () {
     test('clears at start and quit unless kept', () async {

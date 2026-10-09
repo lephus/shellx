@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../platform/settings_store.dart';
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
+import 'engines/wk_webview_engine.dart' show browserNativeMacProvider;
 
 /// macOS side of D26 (Task 7 implements it over the BrowserNative channel).
 abstract interface class WebsiteDataClearer {
@@ -126,13 +127,14 @@ final class BrowserProfile {
 }
 
 /// The profile of this run. The window's startup (Task 9) calls [prepare]
-/// before the first web view and passes the macOS clearer; until then
-/// [clearNow] on macOS has nothing to clear (see [BrowserProfile.hasClearer]).
+/// before the first web view; on macOS the clearer is wired here.
 final browserProfileProvider = Provider<BrowserProfile>((ref) {
   final settings = ref.watch(settingsStoreProvider);
   return BrowserProfile(
     isWindows: Platform.isWindows,
     localAppData: Platform.environment['LOCALAPPDATA'],
+    // D26: the macOS clearer is the BrowserNative channel.
+    clearer: Platform.isMacOS ? ref.watch(browserNativeMacProvider) : null,
     keepData: () =>
         settings.getBool(SettingKeys.browserKeepData, defaultValue: false),
   );
