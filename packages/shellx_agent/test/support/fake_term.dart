@@ -93,7 +93,9 @@ Future<bool> stillServes(int port, Uint8List secret) async {
   FakeTerm term;
   try {
     term = await FakeTerm.connect(port);
-  } on SocketException {
+  } on Object {
+    // Refused, or reset by whatever now owns the freed port (it may surface
+    // as a SocketException or a bare OSError).
     return false;
   }
   try {
