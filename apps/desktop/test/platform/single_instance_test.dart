@@ -4,8 +4,22 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/platform/single_instance.dart';
 
+/// The `dart` to run the probe with. `flutter test` does not guarantee `dart`
+/// is on PATH, so prefer the SDK bundled with the running Flutter.
+String _dartExecutable() {
+  final root = Platform.environment['FLUTTER_ROOT'];
+  if (root != null) {
+    final exe = Platform.isWindows ? 'dart.exe' : 'dart';
+    final bundled = File(
+      [root, 'bin', 'cache', 'dart-sdk', 'bin', exe].join(Platform.pathSeparator),
+    );
+    if (bundled.existsSync()) return bundled.path;
+  }
+  return 'dart';
+}
+
 Future<String> _probe(String lockPath) async {
-  final result = await Process.run('dart', [
+  final result = await Process.run(_dartExecutable(), [
     'test/fixtures/lock_probe.dart',
     lockPath,
   ]);
