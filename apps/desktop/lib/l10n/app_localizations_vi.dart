@@ -2771,4 +2771,137 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get integrationNeedsCli =>
       'Hãy cài lệnh shellx trước (Cài đặt › Dòng lệnh)';
+
+  @override
+  String get settingPrStatus => 'Hiện trạng thái pull request';
+
+  @override
+  String get settingPrStatusDesc =>
+      'Dùng GitHub CLI (gh) đã đăng nhập sẵn trên máy. ShellX không bao giờ đọc token của bạn.';
+
+  @override
+  String get settingPrStatusNoGh => 'Không tìm thấy GitHub CLI (gh).';
+
+  @override
+  String get prOpen => 'đang mở';
+
+  @override
+  String get prDraft => 'nháp';
+
+  @override
+  String get prMerged => 'đã merge';
+
+  @override
+  String get prClosed => 'đã đóng';
+
+  @override
+  String get prChecksPassing => 'CI đạt';
+
+  @override
+  String get prChecksFailing => 'CI lỗi';
+
+  @override
+  String get prChecksPending => 'CI đang chạy';
+
+  @override
+  String get prChecksNone => 'không có CI';
+
+  @override
+  String get prReviewApproved => 'đã duyệt';
+
+  @override
+  String get prReviewChanges => 'cần sửa';
+
+  @override
+  String prTooltip(int number, String state, String checks) {
+    return 'Pull request #$number: $state, $checks';
+  }
+
+  @override
+  String get prOpenInBrowser => 'Mở trong trình duyệt';
+
+  @override
+  String tabOpenPr(int number) {
+    return 'Mở pull request #$number';
+  }
+
+  @override
+  String get settingAgentCommand => 'Chạy lệnh khi agent có sự kiện';
+
+  @override
+  String get settingAgentCommandDesc =>
+      'Đặt agent-event-command trong tệp cấu hình. ShellX hỏi trước khi chạy một lệnh mới.';
+
+  @override
+  String get agentCommandApproveTitle => 'Cho phép lệnh này?';
+
+  @override
+  String get agentCommandApproveBody =>
+      'ShellX sẽ chạy lệnh này khi agent bắt đầu, cần nhập hoặc xong. Lệnh không có quyền gì với phiên ShellX của bạn.';
+
+  @override
+  String get agentCommandApproveAllow => 'Cho phép';
+
+  @override
+  String get agentCommandApproveCancel => 'Huỷ';
+
+  @override
+  String get agentCommandNotApproved =>
+      'Đã đặt lệnh sự kiện agent nhưng chưa được cho phép.';
+
+  @override
+  String get agentCommandReview => 'Xem';
+
+  @override
+  String get agentCommandFailed => 'Lệnh sự kiện agent không chạy được.';
+
+  @override
+  String get configProblemAgentCommandMainOnly =>
+      'agent-event-command chỉ được đọc từ tệp cấu hình ShellX chính';
+
+  @override
+  String get settingLanguage => 'Ngôn ngữ';
+
+  @override
+  String get settingLanguageSystem => 'Theo hệ thống';
+
+  @override
+  String get settingLanguageEn => 'English';
+
+  @override
+  String get settingLanguageVi => 'Tiếng Việt';
+
+  @override
+  String get settingLanguageRestart =>
+      'Có hiệu lực sau khi bạn khởi động lại ShellX.';
+
+  @override
+  String get updateCheck => 'Kiểm tra cập nhật';
+
+  @override
+  String get updateChecking => 'Đang kiểm tra…';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'Bạn đang dùng bản mới nhất ($version).';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return 'Đã có bản $version.';
+  }
+
+  @override
+  String get updateDownload => 'Tải xuống';
+
+  @override
+  String get updateRequired =>
+      'Bản này đã quá cũ. Hãy cập nhật để tiếp tục dùng truy cập từ điện thoại.';
+
+  @override
+  String get updateFailed => 'Không kiểm tra được lúc này.';
+
+  @override
+  String get configProblemAgentCommandBad =>
+      'agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng';
 }

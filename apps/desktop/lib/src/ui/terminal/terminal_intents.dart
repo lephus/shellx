@@ -177,6 +177,12 @@ class ShowWhatsNewIntent extends Intent {
   const ShowWhatsNewIntent();
 }
 
+/// A12 D20: "Check for updates" (no default chord): opens Settings on the
+/// row that shows the answer.
+class CheckForUpdatesIntent extends Intent {
+  const CheckForUpdatesIntent();
+}
+
 /// A9 D36: the problems panel (no default chord).
 class ShowConfigProblemsIntent extends Intent {
   const ShowConfigProblemsIntent();

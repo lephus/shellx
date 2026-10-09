@@ -8,6 +8,7 @@ import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../integrations/pr_status_parse.dart';
 import '../../remote/remote_state.dart';
 import '../../terminal/agent_names.dart';
 import '../../terminal/agent_status_notifier.dart' show AgentBadgeInfo;
@@ -78,6 +79,8 @@ class SessionTabRow extends StatefulWidget {
     this.agent = false,
     this.agentStatus,
     this.agentLive = false,
+    this.pr,
+    this.onOpenPr,
     this.portTooltip,
     this.editingDescription = false,
     this.onDescription,
@@ -142,6 +145,11 @@ class SessionTabRow extends StatefulWidget {
   /// A12 D12: the row speaks its question now (at most once a minute per
   /// tab, decided by the status model).
   final bool agentLive;
+
+  /// A12 D16: the pull request of this tab's branch (`pr-status` on, a local
+  /// pane); null: none known. A tap opens its page.
+  final PrInfo? pr;
+  final void Function(PrInfo pr)? onOpenPr;
 
   /// A8: the tooltip of a port link, when it differs from "Open http://…"
   /// (a server's port is forwarded over SSH).
@@ -259,6 +267,7 @@ class SessionTabRowState extends State<SessionTabRow> {
         agentStatusLabel(l10n, a.agent, a.state),
       if (tab.gitBranch case final branch?)
         l10n.sidebarBranch(remote == null ? branch : cleanServerText(branch)),
+      if (widget.pr case final pr?) prTooltipText(l10n, pr),
       if (tab.cwd case final cwd?)
         l10n.sidebarFolder(
           displayPath(
@@ -795,6 +804,8 @@ class SessionTabRowState extends State<SessionTabRow> {
                               home: widget.home,
                               onOpenPort: widget.onOpenPort,
                               portTooltip: widget.portTooltip,
+                              pr: widget.pr,
+                              onOpenPr: widget.onOpenPr,
                             ),
                           ),
                         ),
@@ -1036,12 +1047,16 @@ class _ContextLine extends StatelessWidget {
     required this.home,
     required this.onOpenPort,
     this.portTooltip,
+    this.pr,
+    this.onOpenPr,
   });
 
   final TerminalTab tab;
   final String home;
   final void Function(int port)? onOpenPort;
   final String Function(int port)? portTooltip;
+  final PrInfo? pr;
+  final void Function(PrInfo pr)? onOpenPr;
 
   @override
   Widget build(BuildContext context) {
@@ -1083,6 +1098,13 @@ class _ContextLine extends StatelessWidget {
         });
         final ports = _sortedPorts(tab);
         final glyph = scaler.scale(ShellxSizes.branchGlyph);
+        final pr = remote == null ? this.pr : null;
+        final prWidth = pr == null
+            ? 0.0
+            : glyph +
+                  ShellxSizes.branchGlyphGap +
+                  measure('#${pr.number}') +
+                  2 * ShellxSizes.portPadH;
         final layout = layoutContextLine(
           branch: branchText,
           path: path,
@@ -1091,6 +1113,7 @@ class _ContextLine extends StatelessWidget {
           measure: measure,
           windows: windows,
           branchGlyph: glyph + ShellxSizes.branchGlyphGap,
+          prWidth: prWidth,
         );
         Widget text(String s) =>
             Text(s, style: style, maxLines: 1, softWrap: false);
@@ -1113,6 +1136,11 @@ class _ContextLine extends StatelessWidget {
             )
             ..add(const SizedBox(width: ShellxSizes.branchGlyphGap))
             ..add(text(branch));
+          if (layout.showPr && pr != null) {
+            children
+              ..add(const SizedBox(width: ShellxSizes.portGap))
+              ..add(_PrChip(pr: pr, glyph: glyph, onOpen: onOpenPr));
+          }
         }
         if (layout.path case final p?) {
           separator();
@@ -1172,6 +1200,108 @@ class _ContextLine extends StatelessWidget {
         }
         return ExcludeSemantics(child: line);
       },
+    );
+  }
+}
+
+/// The words of a pull request (tooltip and row semantics).
+String prTooltipText(AppLocalizations l10n, PrInfo pr) {
+  final state = switch (pr.state) {
+    PrState.open => l10n.prOpen,
+    PrState.draft => l10n.prDraft,
+    PrState.merged => l10n.prMerged,
+    PrState.closed => l10n.prClosed,
+  };
+  final checks = switch (pr.checks) {
+    PrChecks.passing => l10n.prChecksPassing,
+    PrChecks.failing => l10n.prChecksFailing,
+    PrChecks.pending => l10n.prChecksPending,
+    PrChecks.none => l10n.prChecksNone,
+  };
+  final review = switch (pr.review) {
+    PrReview.approved => ', ${l10n.prReviewApproved}',
+    PrReview.changes => ', ${l10n.prReviewChanges}',
+    null => '',
+  };
+  return '${l10n.prTooltip(pr.number, state, checks)}$review';
+}
+
+/// The glyph of a CI rollup: a shape for each, never colour alone.
+({IconData icon, Color color}) prChecksLook(
+  PrChecks checks,
+) => switch (checks) {
+  PrChecks.passing => (icon: Icons.check_circle, color: ShellxDesktopColors.ok),
+  PrChecks.failing => (icon: Icons.cancel, color: ShellxDesktopColors.err),
+  PrChecks.pending => (icon: Icons.schedule, color: ShellxDesktopColors.warn),
+  PrChecks.none => (
+    icon: Icons.merge_type,
+    color: ShellxDesktopColors.textSecondary,
+  ),
+};
+
+/// A12 D16 (spec §4.4): `#12` and a CI glyph after the branch; a tap opens
+/// the pull request in the browser. The tooltip is the whole sentence.
+class _PrChip extends StatefulWidget {
+  const _PrChip({required this.pr, required this.glyph, this.onOpen});
+  final PrInfo pr;
+  final double glyph;
+  final void Function(PrInfo pr)? onOpen;
+
+  @override
+  State<_PrChip> createState() => _PrChipState();
+}
+
+class _PrChipState extends State<_PrChip> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final pr = widget.pr;
+    final look = prChecksLook(pr.checks);
+    final live = widget.onOpen != null;
+    final style = ShellxText.caption.copyWith(
+      color: live
+          ? ShellxDesktopColors.accent
+          : ShellxDesktopColors.textSecondary,
+      decoration: live && _hover ? TextDecoration.underline : null,
+      decorationColor: ShellxDesktopColors.accent,
+    );
+    final chip = Container(
+      key: const Key('row.pr'),
+      height: ShellxSizes.portHit,
+      padding: const EdgeInsets.symmetric(horizontal: ShellxSizes.portPadH),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            look.icon,
+            key: const Key('row.pr.glyph'),
+            size: widget.glyph,
+            color: look.color,
+          ),
+          const SizedBox(width: ShellxSizes.branchGlyphGap),
+          Text('#${pr.number}', style: style, maxLines: 1, softWrap: false),
+        ],
+      ),
+    );
+    if (!live) return chip;
+    return Tooltip(
+      message: '${prTooltipText(l10n, pr)} · ${l10n.prOpenInBrowser}',
+      excludeFromSemantics: true,
+      positionDelegate: besideSidebar,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // Wins the arena over the row's tap: a chip click never selects.
+          onTap: () => widget.onOpen?.call(pr),
+          child: chip,
+        ),
+      ),
     );
   }
 }

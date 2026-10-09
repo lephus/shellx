@@ -116,6 +116,13 @@ final class ToggleBackgroundService extends TrayAction {
   const ToggleBackgroundService();
 }
 
+/// A12 D19: the app language, `system` / `en` / `vi` (anything else is
+/// stored as `system`). Applies after a restart.
+final class SetAppLanguage extends TrayAction {
+  const SetAppLanguage(this.code);
+  final String code;
+}
+
 /// A5a D13: "Xóa nội dung đã lưu".
 final class ClearSavedScrollback extends TrayAction {
   const ClearSavedScrollback();

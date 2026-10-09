@@ -48,6 +48,8 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
     '# working-directory = home  (inherit, or an absolute path)',
     '# global-hotkey = ctrl+alt+j  (show or hide ShellX from any app; off by default)',
     '# agent-resume = ask  (off: never offer to resume an agent after a restart)',
+    '# pr-status = false  (true: show the pull request of the branch, through the GitHub CLI gh)',
+    '# agent-event-command = ~/bin/on-agent --fast  (run when an agent starts, needs input or ends; read from this file only, ShellX asks before running a new command)',
     '',
     '# --- Keys (Ghostty keybind syntax; later lines win) ---',
     '# keybind = $split=new_split:down',

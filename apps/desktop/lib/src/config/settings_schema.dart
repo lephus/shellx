@@ -101,7 +101,8 @@ final class SettingDef {
   final String? fileKey;
 
   /// [SettingOwner.app] only: the action the tray also uses (a
-  /// representative one for a multi-valued switch, `SetNotifyThreshold`).
+  /// representative one for a multi-valued switch, `SetNotifyThreshold`,
+  /// `SetAppLanguage`).
   final TrayAction? toggle;
 
   /// [SettingOwner.app], UI-owned switches only: the `SettingKeys` value
@@ -409,6 +410,29 @@ final List<SettingDef> kSettings = List.unmodifiable([
   ),
   // App switches: the tray's, one row each.
   SettingDef(
+    id: 'app-language',
+    owner: SettingOwner.app,
+    page: SettingPage.general,
+    control: SettingControl.choice,
+    toggle: const SetAppLanguage('system'),
+    storeKey: SettingKeys.appLanguage,
+    label: (l) => l.settingLanguage,
+    keywords: const [
+      'language',
+      'english',
+      'vietnamese',
+      'locale',
+      'ngôn ngữ',
+      'tiếng việt',
+      'tiếng anh',
+    ],
+    choices: [
+      SettingChoice('system', (l) => l.settingLanguageSystem),
+      SettingChoice('en', (l) => l.settingLanguageEn),
+      SettingChoice('vi', (l) => l.settingLanguageVi),
+    ],
+  ),
+  SettingDef(
     id: 'launch-at-startup',
     owner: SettingOwner.app,
     page: SettingPage.general,
@@ -485,6 +509,20 @@ final List<SettingDef> kSettings = List.unmodifiable([
     sampleValues: const [
       SettingSample('off', 'off'),
       SettingSample('ask', 'ask'),
+    ],
+  ),
+  SettingDef(
+    id: 'pr-status',
+    owner: SettingOwner.file,
+    page: SettingPage.agents,
+    control: SettingControl.toggle,
+    fileKey: 'pr-status',
+    label: (l) => l.settingPrStatus,
+    description: (l) => l.settingPrStatusDesc,
+    keywords: const ['github', 'gh', 'pull request', 'ci', 'checks'],
+    sampleValues: const [
+      SettingSample('true', 'true'),
+      SettingSample('false', 'false'),
     ],
   ),
   SettingDef(

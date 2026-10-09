@@ -40,6 +40,19 @@ final class ConfigProblemsNotice extends TabNotice {
   final bool hasErrors;
 }
 
+/// A12 D17: an `agent-event-command` is set but not allowed yet; the toast
+/// has a button that shows [command] exactly and asks. The string is the
+/// user's: nothing here prints it.
+final class AgentCommandNotApprovedNotice extends TabNotice {
+  const AgentCommandNotApprovedNotice(this.command);
+  final String command;
+}
+
+/// A12 D17: the command could not be started (once a session).
+final class AgentCommandFailedNotice extends TabNotice {
+  const AgentCommandFailedNotice();
+}
+
 /// A9 D9: a reload the user asked for found nothing wrong (neutral).
 final class ConfigReloadedNotice extends TabNotice {
   const ConfigReloadedNotice();

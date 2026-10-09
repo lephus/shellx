@@ -15,6 +15,7 @@ import '../../terminal/terminal_tabs.dart';
 import '../../terminal/user_commands.dart';
 import 'terminal_intents.dart';
 import 'terminal_workspace_notices.dart' show A9Overlay;
+import '../settings/update_check_ui.dart';
 
 /// A window shortcut's action; [enabled] lets a key fall through to the
 /// terminal when it does not apply.
@@ -117,6 +118,11 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       ),
       ShowTourIntent: run<ShowTourIntent>((_) => openOverlay(A9Overlay.tour)),
       ShowWhatsNewIntent: run<ShowWhatsNewIntent>((_) => openWhatsNew()),
+      // A12 D20: the answer shows in Settings > General.
+      CheckForUpdatesIntent: run<CheckForUpdatesIntent>((_) {
+        openOverlay(A9Overlay.settings);
+        unawaited(ref.read(updateCheckUiProvider.notifier).check());
+      }),
       // Always enabled: the palette lists it only when there are problems
       // (D33), a bound key may ask any time.
       ShowConfigProblemsIntent: run<ShowConfigProblemsIntent>(

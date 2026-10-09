@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../integrations/integration_probe.dart';
+import '../../../config/config_controller.dart' show shellxConfigProvider;
 import '../../../integrations/integration_status.dart';
+import '../../../integrations/pr_status.dart' show ghFoundProvider;
 import '../../../terminal/agent_names.dart';
 import '../../../terminal/agent_status.dart';
 import '../../../tray/tray_action.dart';
@@ -45,7 +47,57 @@ class AgentsPage extends ConsumerWidget {
         settingWidget(settingById('ssh-hook')),
         const _IntegrationsSection(),
         settingWidget(settingById('agent-resume')),
+        _PrStatusRow(),
+        const _AgentCommandRow(),
       ],
+    );
+  }
+}
+
+/// A12 D16: the pull request switch; when it is on and `gh` cannot be
+/// found, the row says so.
+class _PrStatusRow extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final on = ref.watch(shellxConfigProvider.select((s) => s.config.prStatus));
+    final found = on ? ref.watch(ghFoundProvider).value : null;
+    return settingWidget(
+      settingById('pr-status'),
+      note: found == false ? l10n.settingPrStatusNoGh : null,
+    );
+  }
+}
+
+/// A12 D17: what `agent-event-command` is for. It is set in the file (an
+/// edit here would put a command line in front of the user without the
+/// approval dialog), so this row only says so.
+class _AgentCommandRow extends StatelessWidget {
+  const _AgentCommandRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      key: const Key('setting.agent-event-command'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.settingAgentCommand,
+            style: ShellxText.body.copyWith(
+              color: ShellxDesktopColors.textPrimary,
+            ),
+          ),
+          Text(
+            l10n.settingAgentCommandDesc,
+            style: ShellxText.small.copyWith(
+              color: ShellxDesktopColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

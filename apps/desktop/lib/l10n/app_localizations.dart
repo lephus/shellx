@@ -4391,6 +4391,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the shellx command first (Settings › Command line)'**
   String get integrationNeedsCli;
+
+  /// No description provided for @settingPrStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Show pull request status'**
+  String get settingPrStatus;
+
+  /// No description provided for @settingPrStatusDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the GitHub CLI (gh) already signed in on this computer. ShellX never reads your token.'**
+  String get settingPrStatusDesc;
+
+  /// No description provided for @settingPrStatusNoGh.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub CLI (gh) was not found.'**
+  String get settingPrStatusNoGh;
+
+  /// No description provided for @prOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'open'**
+  String get prOpen;
+
+  /// No description provided for @prDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'draft'**
+  String get prDraft;
+
+  /// No description provided for @prMerged.
+  ///
+  /// In en, this message translates to:
+  /// **'merged'**
+  String get prMerged;
+
+  /// No description provided for @prClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'closed'**
+  String get prClosed;
+
+  /// No description provided for @prChecksPassing.
+  ///
+  /// In en, this message translates to:
+  /// **'checks passing'**
+  String get prChecksPassing;
+
+  /// No description provided for @prChecksFailing.
+  ///
+  /// In en, this message translates to:
+  /// **'checks failing'**
+  String get prChecksFailing;
+
+  /// No description provided for @prChecksPending.
+  ///
+  /// In en, this message translates to:
+  /// **'checks running'**
+  String get prChecksPending;
+
+  /// No description provided for @prChecksNone.
+  ///
+  /// In en, this message translates to:
+  /// **'no checks'**
+  String get prChecksNone;
+
+  /// No description provided for @prReviewApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'approved'**
+  String get prReviewApproved;
+
+  /// No description provided for @prReviewChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'changes requested'**
+  String get prReviewChanges;
+
+  /// No description provided for @prTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull request #{number}: {state}, {checks}'**
+  String prTooltip(int number, String state, String checks);
+
+  /// No description provided for @prOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get prOpenInBrowser;
+
+  /// No description provided for @tabOpenPr.
+  ///
+  /// In en, this message translates to:
+  /// **'Open pull request #{number}'**
+  String tabOpenPr(int number);
+
+  /// No description provided for @settingAgentCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a command on agent events'**
+  String get settingAgentCommand;
+
+  /// No description provided for @settingAgentCommandDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Set agent-event-command in the config file. ShellX asks before running a new command.'**
+  String get settingAgentCommandDesc;
+
+  /// No description provided for @agentCommandApproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this command?'**
+  String get agentCommandApproveTitle;
+
+  /// No description provided for @agentCommandApproveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'ShellX will run it when an agent starts, needs input or finishes. It gets no access to your ShellX session.'**
+  String get agentCommandApproveBody;
+
+  /// No description provided for @agentCommandApproveAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get agentCommandApproveAllow;
+
+  /// No description provided for @agentCommandApproveCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get agentCommandApproveCancel;
+
+  /// No description provided for @agentCommandNotApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent-event command is set but not allowed yet.'**
+  String get agentCommandNotApproved;
+
+  /// No description provided for @agentCommandReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get agentCommandReview;
+
+  /// No description provided for @agentCommandFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent-event command could not run.'**
+  String get agentCommandFailed;
+
+  /// No description provided for @configProblemAgentCommandMainOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'agent-event-command is only read from the main ShellX config file'**
+  String get configProblemAgentCommandMainOnly;
+
+  /// No description provided for @settingLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingLanguage;
+
+  /// No description provided for @settingLanguageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get settingLanguageSystem;
+
+  /// No description provided for @settingLanguageEn.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingLanguageEn;
+
+  /// No description provided for @settingLanguageVi.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiếng Việt'**
+  String get settingLanguageVi;
+
+  /// No description provided for @settingLanguageRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes effect after you restart ShellX.'**
+  String get settingLanguageRestart;
+
+  /// No description provided for @updateCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheck;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get updateChecking;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re up to date ({version}).'**
+  String updateUpToDate(String version);
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available.'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
+
+  /// No description provided for @updateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This version is too old. Update to keep using phone access.'**
+  String get updateRequired;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t check right now.'**
+  String get updateFailed;
+
+  /// No description provided for @configProblemAgentCommandBad.
+  ///
+  /// In en, this message translates to:
+  /// **'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes'**
+  String get configProblemAgentCommandBad;
 }
 
 class _AppLocalizationsDelegate

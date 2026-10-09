@@ -67,6 +67,7 @@ String fileSettingText(
   },
   'ghostty-config' => '${c.ghosttyConfig}',
   'agent-resume' => c.agentResume.name,
+  'pr-status' => '${c.prStatus}',
   'global-hotkey' =>
     c.globalHotkey == null ? '' : chordConfigText(c.globalHotkey!) ?? '',
   _ => '',

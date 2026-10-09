@@ -119,6 +119,10 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   String? _error;
   double? _dragValue;
 
+  /// A12 D19: a language was chosen in this window: it shows after a
+  /// restart.
+  bool _restartNote = false;
+
   /// A pointer is on the slider (a drag): it writes on release. Keys and
   /// assistive actions also start and end a "drag", so they are told apart
   /// by the pointer, and write 300 ms after the last step.
@@ -443,6 +447,47 @@ class _SettingRowState extends ConsumerState<SettingRow> {
   Widget _appControl(AppLocalizations l10n, String label) {
     final agent = ref.watch(agentControllerProvider);
     final local = ref.watch(trayLocalStateProvider);
+    if (def.control == SettingControl.choice && def.choices != null) {
+      // A12 D19: the app language; read at the next start, which the line
+      // under the chips says once something was chosen.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final choice in def.choices!)
+                ChoiceChip(
+                  key: Key('setting.${def.id}.opt.${choice.wire}'),
+                  label: Text(choice.label(l10n)),
+                  selected: local.appLanguage == choice.wire,
+                  onSelected: widget.enabled
+                      ? (_) {
+                          setState(() => _restartNote = true);
+                          _handle(SetAppLanguage(choice.wire));
+                        }
+                      : null,
+                ),
+            ],
+          ),
+          if (_restartNote)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  l10n.settingLanguageRestart,
+                  key: Key('setting.${def.id}.restart'),
+                  style: ShellxText.small.copyWith(
+                    color: ShellxDesktopColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
     if (def.control == SettingControl.choice) {
       // The long-command threshold: one choice per `SetNotifyThreshold`.
       return Wrap(

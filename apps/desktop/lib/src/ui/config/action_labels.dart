@@ -17,6 +17,8 @@ String problemText(AppLocalizations l10n, ConfigProblem problem) {
     ConfigProblemCode.syntax => l10n.configProblemSyntax,
     ConfigProblemCode.badKey => l10n.configProblemBadKey(key),
     ConfigProblemCode.unknownKey => l10n.configProblemUnknownKey(key),
+    ConfigProblemCode.badValue when key == 'agent-event-command' =>
+      l10n.configProblemAgentCommandBad,
     ConfigProblemCode.badValue => l10n.configProblemBadValue(key, value, hint),
     ConfigProblemCode.outOfRange => l10n.configProblemOutOfRange(
       key,
@@ -41,6 +43,8 @@ String problemText(AppLocalizations l10n, ConfigProblem problem) {
     // A11 D22: the global shortcut could not be registered.
     ConfigProblemCode.unsupportedValue when key == 'global-hotkey' =>
       l10n.settingsGlobalHotkeyTaken,
+    ConfigProblemCode.unsupportedValue when key == 'agent-event-command' =>
+      l10n.configProblemAgentCommandMainOnly,
     ConfigProblemCode.unsupportedValue => l10n.configProblemUnsupportedValue(
       key,
       value,
@@ -163,6 +167,7 @@ String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'show_config_problems' => l10n.actionShowConfigProblems,
   'show_tour' => l10n.actionShowTour,
   'show_whats_new' => l10n.actionShowWhatsNew,
+  'check_for_updates' => l10n.updateCheck,
   'run_command' => l10n.actionRunCommand(a.param ?? ''),
   'text' || 'csi' || 'esc' => l10n.actionSendText,
   'ignore' => l10n.actionIgnore,

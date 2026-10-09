@@ -78,6 +78,23 @@ class _ConfirmPageState extends State<ConfirmPage> {
       title: request.title,
       content: [
         SelectableText(request.body, style: theme.textTheme.bodyMedium),
+        if (request.code case final code?) ...[
+          const SizedBox(height: ShellxSpace.s8),
+          Container(
+            key: const Key('confirm.code'),
+            padding: const EdgeInsets.all(ShellxSpace.s8),
+            decoration: BoxDecoration(
+              color: ShellxDesktopColors.rowSelected,
+              borderRadius: BorderRadius.circular(ShellxRadius.r6),
+            ),
+            child: SelectableText(
+              code,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'JetBrainsMono',
+              ),
+            ),
+          ),
+        ],
       ],
       footer: Row(
         mainAxisAlignment: MainAxisAlignment.end,

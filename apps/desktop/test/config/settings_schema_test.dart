@@ -120,6 +120,8 @@ void main() {
       'config-file',
       'font-feature',
       'cursor-color-text',
+      // A12 D17: set in the file only (the approval dialog is its editor).
+      'agent-event-command',
     };
     const loaderScalarKeys = {
       'font-family',
@@ -142,6 +144,7 @@ void main() {
       'ghostty-config',
       'global-hotkey',
       'agent-resume',
+      'pr-status',
     };
     final have = {
       for (final d in kSettings)
@@ -167,6 +170,7 @@ void main() {
       ToggleCliPath,
       ToggleSshHook,
       SetNotifyThreshold,
+      SetAppLanguage,
     };
     final used = [
       for (final d in kSettings)

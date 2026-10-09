@@ -2863,4 +2863,136 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get integrationNeedsCli =>
       'Install the shellx command first (Settings › Command line)';
+
+  @override
+  String get settingPrStatus => 'Show pull request status';
+
+  @override
+  String get settingPrStatusDesc =>
+      'Uses the GitHub CLI (gh) already signed in on this computer. ShellX never reads your token.';
+
+  @override
+  String get settingPrStatusNoGh => 'GitHub CLI (gh) was not found.';
+
+  @override
+  String get prOpen => 'open';
+
+  @override
+  String get prDraft => 'draft';
+
+  @override
+  String get prMerged => 'merged';
+
+  @override
+  String get prClosed => 'closed';
+
+  @override
+  String get prChecksPassing => 'checks passing';
+
+  @override
+  String get prChecksFailing => 'checks failing';
+
+  @override
+  String get prChecksPending => 'checks running';
+
+  @override
+  String get prChecksNone => 'no checks';
+
+  @override
+  String get prReviewApproved => 'approved';
+
+  @override
+  String get prReviewChanges => 'changes requested';
+
+  @override
+  String prTooltip(int number, String state, String checks) {
+    return 'Pull request #$number: $state, $checks';
+  }
+
+  @override
+  String get prOpenInBrowser => 'Open in browser';
+
+  @override
+  String tabOpenPr(int number) {
+    return 'Open pull request #$number';
+  }
+
+  @override
+  String get settingAgentCommand => 'Run a command on agent events';
+
+  @override
+  String get settingAgentCommandDesc =>
+      'Set agent-event-command in the config file. ShellX asks before running a new command.';
+
+  @override
+  String get agentCommandApproveTitle => 'Allow this command?';
+
+  @override
+  String get agentCommandApproveBody =>
+      'ShellX will run it when an agent starts, needs input or finishes. It gets no access to your ShellX session.';
+
+  @override
+  String get agentCommandApproveAllow => 'Allow';
+
+  @override
+  String get agentCommandApproveCancel => 'Cancel';
+
+  @override
+  String get agentCommandNotApproved =>
+      'An agent-event command is set but not allowed yet.';
+
+  @override
+  String get agentCommandReview => 'Review';
+
+  @override
+  String get agentCommandFailed => 'The agent-event command could not run.';
+
+  @override
+  String get configProblemAgentCommandMainOnly =>
+      'agent-event-command is only read from the main ShellX config file';
+
+  @override
+  String get settingLanguage => 'Language';
+
+  @override
+  String get settingLanguageSystem => 'System default';
+
+  @override
+  String get settingLanguageEn => 'English';
+
+  @override
+  String get settingLanguageVi => 'Tiếng Việt';
+
+  @override
+  String get settingLanguageRestart => 'Takes effect after you restart ShellX.';
+
+  @override
+  String get updateCheck => 'Check for updates';
+
+  @override
+  String get updateChecking => 'Checking…';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'You’re up to date ($version).';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return 'Version $version is available.';
+  }
+
+  @override
+  String get updateDownload => 'Download';
+
+  @override
+  String get updateRequired =>
+      'This version is too old. Update to keep using phone access.';
+
+  @override
+  String get updateFailed => 'Couldn’t check right now.';
+
+  @override
+  String get configProblemAgentCommandBad =>
+      'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes';
 }

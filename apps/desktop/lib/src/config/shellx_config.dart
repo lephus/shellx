@@ -8,6 +8,7 @@ import 'config_files.dart';
 import 'config_paths.dart';
 import 'config_problem.dart';
 import 'config_syntax.dart';
+import '../integrations/command_line.dart';
 import 'keybind_actions.dart' show KeyAction;
 import 'keybind_trigger.dart' show KeyChord, parseKeyChord;
 import 'keybindings.dart' show checkTrigger;
@@ -115,6 +116,8 @@ final class ShellxConfig {
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
     this.agentResume = AgentResume.ask,
+    this.prStatus = false,
+    this.agentEventCommand = '',
     this.workingDirectory = const WorkingDirectory.home(),
     this.keybinds = const [],
     this.commands = const [],
@@ -154,6 +157,13 @@ final class ShellxConfig {
 
   /// `agent-resume` (ShellX file only, A12 D13).
   final AgentResume agentResume;
+
+  /// `pr-status` (ShellX file only, A12 D16): off by default.
+  final bool prStatus;
+
+  /// `agent-event-command` (the main ShellX file only, A12 D17): a command
+  /// line for ShellX to run on agent events, once the user allowed it.
+  final String agentEventCommand;
   final WorkingDirectory workingDirectory;
   final List<KeybindEntry> keybinds;
   final List<UserCommand> commands;
@@ -198,8 +208,15 @@ ShellxConfig buildShellxConfig({
   required bool macos,
   required String home,
   bool windows = false,
+  String? mainFile,
 }) {
-  final b = _Builder(problems, macos: macos, home: home, windows: windows);
+  final b = _Builder(
+    problems,
+    macos: macos,
+    home: home,
+    windows: windows,
+    mainFile: mainFile,
+  );
   if (ghosttyEnabled(shellx)) {
     for (final e in ghostty) {
       if (kGhosttyKeys.contains(e.key)) b.apply(e, fromGhostty: true);
@@ -223,8 +240,12 @@ final class _Builder {
     required this.macos,
     required this.home,
     required this.windows,
+    this.mainFile,
   });
 
+  /// The root of the ShellX chain; null: every ShellX line counts as its
+  /// own (a single value being checked, a test).
+  final String? mainFile;
   final List<ConfigProblem> problems;
   final bool macos;
   final String home;
@@ -247,6 +268,8 @@ final class _Builder {
   var optionAsAlt = OptionAsAlt.off;
   var confirmClose = ConfirmClose.whenRunning;
   var agentResume = AgentResume.ask;
+  var prStatus = false;
+  var agentEventCommand = '';
   WorkingDirectory workingDirectory = const WorkingDirectory.home();
   final keybinds = <KeybindEntry>[];
   final commands = <UserCommand>[];
@@ -531,6 +554,38 @@ final class _Builder {
         };
         if (mode == null) return _badValue(e, g, 'ask, off');
         agentResume = mode;
+      case 'pr-status':
+        final on = v.isEmpty ? false : _bool(v);
+        if (on == null) return _badValue(e, g, 'true, false');
+        prStatus = on;
+      case 'agent-event-command':
+        // Only the user's own file: a file an agent can edit (an include,
+        // through the `shellx-config` skill) must not choose what runs.
+        final main = mainFile;
+        if (main != null && e.file != main) {
+          return _problem(
+            e,
+            ConfigSeverity.warning,
+            ConfigProblemCode.unsupportedValue,
+            value: '',
+          );
+        }
+        // One line of plain words naming a program by place, with nothing
+        // hidden in it; the text is never echoed in the problem.
+        final argv = v.isEmpty
+            ? const <String>['']
+            : splitCommand(v, home: home);
+        if (v.isNotEmpty &&
+            (argv == null ||
+                !programIsAbsolute(argv.first, windows: windows))) {
+          return _problem(
+            e,
+            ConfigSeverity.error,
+            ConfigProblemCode.badValue,
+            value: '',
+          );
+        }
+        agentEventCommand = v;
       case 'working-directory':
         if (v.isEmpty || v == 'home') {
           workingDirectory = const WorkingDirectory.home();
@@ -675,6 +730,8 @@ final class _Builder {
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,
     agentResume: agentResume,
+    prStatus: prStatus,
+    agentEventCommand: agentEventCommand,
     workingDirectory: workingDirectory,
     keybinds: List.unmodifiable(keybinds),
     commands: List.unmodifiable(commands),

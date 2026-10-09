@@ -139,6 +139,7 @@ final class ContextLineLayout {
     this.ports = const [],
     this.morePorts = 0,
     this.truncated = false,
+    this.showPr = false,
   });
 
   final String? branch;
@@ -151,6 +152,10 @@ final class ContextLineLayout {
   /// Something was cut or left out: the row shows the full-line tooltip.
   final bool truncated;
 
+  /// A12 D16: the pull request chip fits after the branch without cutting
+  /// the branch or the ports.
+  final bool showPr;
+
   bool get isEmpty => branch == null && path == null && ports.isEmpty;
 }
 
@@ -159,6 +164,54 @@ final class ContextLineLayout {
 /// end-cut; [branchGlyph] is the glyph and gap drawn before it) > path
 /// (cut by components, dropped under 40 px unless it fits whole).
 ContextLineLayout layoutContextLine({
+  required String? branch,
+  required String? path,
+  required List<int> ports,
+  required double width,
+  required double Function(String) measure,
+  required bool windows,
+  double branchGlyph = 0,
+  double prWidth = 0,
+}) {
+  final base = _layoutContextLine(
+    branch: branch,
+    path: path,
+    ports: ports,
+    width: width,
+    measure: measure,
+    windows: windows,
+    branchGlyph: branchGlyph,
+  );
+  // A12 D16: the pull request chip is the first thing to go when the row is
+  // narrow: it stays only if the branch and the ports lose nothing to it.
+  if (prWidth <= 0 || branch == null || base.branch == null) return base;
+  final slot = prWidth + _portGap;
+  if (width - slot <= 0) return base;
+  final withPr = _layoutContextLine(
+    branch: branch,
+    path: path,
+    ports: ports,
+    width: width - slot,
+    measure: measure,
+    windows: windows,
+    branchGlyph: branchGlyph,
+  );
+  if (withPr.branch != base.branch ||
+      withPr.ports.length != base.ports.length ||
+      withPr.morePorts != base.morePorts) {
+    return base;
+  }
+  return ContextLineLayout(
+    branch: withPr.branch,
+    path: withPr.path,
+    ports: withPr.ports,
+    morePorts: withPr.morePorts,
+    truncated: withPr.truncated,
+    showPr: true,
+  );
+}
+
+ContextLineLayout _layoutContextLine({
   required String? branch,
   required String? path,
   required List<int> ports,
