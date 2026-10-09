@@ -56,6 +56,23 @@ test('sign-app.sh signs nested code and the app with hardened runtime', { skip }
   }
 });
 
+test('sign-app.sh ad-hoc signature disables library validation so the dry-run app can load its frameworks', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shellx-sign-'));
+  try {
+    const app = fakeApp(dir);
+    const entitlements = join(dir, 'Release.entitlements');
+    writeFileSync(entitlements, plist({ 'com.apple.security.network.client': true }));
+    const result = run(join(scripts, 'sign-app.sh'), [app, entitlements], { MACOS_SIGNING_IDENTITY: '-' });
+    assert.equal(result.status, 0, result.stderr);
+    const info = run('codesign', ['-d', '--entitlements', '-', app]);
+    const text = info.stdout + info.stderr;
+    assert.match(text, /com\.apple\.security\.cs\.disable-library-validation/);
+    assert.match(text, /com\.apple\.security\.network\.client/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('sign-app.sh refuses entitlements that enable App Sandbox', { skip }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'shellx-sign-'));
   try {
