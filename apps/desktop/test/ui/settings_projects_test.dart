@@ -77,4 +77,26 @@ void main() {
     );
     await disposeWorkspace(t, w.container);
   });
+
+  testWidgets('a folder edit still in a focused field is kept when the '
+      'overlay is closed with Esc', (t) async {
+    final w = await pumpConfiguredWorkspace(t, platform: TargetPlatform.macOS);
+    await openProjects(t);
+    await t.enterText(
+      find.byKey(const Key('settings.project.$kDefaultWorkspaceId.root')),
+      '/Users/me/escaped',
+    );
+    // No Enter, no focus change: close the overlay while editing.
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
+    expect(find.byType(SettingsOverlay), findsNothing);
+    expect(
+      w.container
+          .read(sidebarWorkspacesProvider)
+          .workspace(kDefaultWorkspaceId)!
+          .root,
+      '/Users/me/escaped',
+    );
+    await disposeWorkspace(t, w.container);
+  });
 }

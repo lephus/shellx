@@ -100,6 +100,16 @@ class _ProjectCardState extends ConsumerState<_ProjectCard> {
   }
 
   @override
+  void deactivate() {
+    // Closing the overlay (Esc) tears the subtree down without the focus
+    // nodes firing a lost-focus event, so commit any pending edit here
+    // while [ref] is still valid. Both commits no-op when unchanged.
+    _commitName();
+    _commitRoot();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _root.dispose();
