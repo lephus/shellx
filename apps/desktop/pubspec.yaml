@@ -46,11 +46,13 @@ dependencies:
   tray_manager: ^0.5.3
   win32: ^5.15.0
   window_manager: ^0.5.2
-  # Pinned exactly, same version as apps/mobile (A1 D12): the terminal works
-  # around xterm 4.0.0's cursor-key and paste handling (terminal_input.dart),
-  # which a newer version may change. Bump together with mobile, with the
-  # benchmark (test/terminal/xterm_benchmark_test.dart) and a full test run.
-  xterm: 4.0.0
+  # xterm 4.0.0 (same version as apps/mobile, A1 D12), vendored for one
+  # patch: macOS input methods that edit typed text in place (Vietnamese
+  # Telex) see the word being typed. See third_party/xterm/SHELLX_PATCHES.md.
+  # The terminal also works around 4.0.0's cursor-key and paste handling
+  # (terminal_input.dart); bump with the benchmark and a full test run.
+  xterm:
+    path: ../../third_party/xterm
 
 dev_dependencies:
   fake_async: ^1.3.3
