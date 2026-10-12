@@ -2166,6 +2166,44 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsPageAdvanced => 'Nâng cao';
 
   @override
+  String get settingsPageProjects => 'Dự án';
+
+  @override
+  String get settingsProjectsIntro =>
+      'Dự án là một nhóm terminal. Gán cho dự án một thư mục thì tab mới trong dự án đó sẽ mở tại đây.';
+
+  @override
+  String get settingsProjectsNew => 'Tạo dự án';
+
+  @override
+  String get settingsProjectName => 'Tên dự án';
+
+  @override
+  String get settingsProjectFolder => 'Thư mục dự án';
+
+  @override
+  String get settingsProjectFolderHint => '/đường/dẫn/tới/dự-án';
+
+  @override
+  String get settingsProjectFolderEmpty =>
+      'Dùng cài đặt chung “Tab mới bắt đầu ở”';
+
+  @override
+  String get settingsProjectDelete => 'Xoá dự án';
+
+  @override
+  String settingsProjectTabCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tab',
+      one: '1 tab',
+      zero: 'Chưa có tab',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get settingsTheme => 'Chủ đề';
 
   @override
