@@ -44,6 +44,7 @@ import 'src/platform/app_reopen.dart';
 import 'src/platform/attention_badge.dart';
 import 'src/platform/desktop_notifications.dart';
 import 'src/platform/global_hotkey.dart';
+import 'src/platform/ime_trace.dart';
 import 'src/platform/notifier.dart';
 import 'src/platform/pty/flutter_pty_factory.dart';
 import 'src/platform/settings_store.dart';
@@ -92,6 +93,7 @@ Future<void> main(List<String> args) async {
     exit(await _terminalSharingCleanup());
   }
   WidgetsFlutterBinding.ensureInitialized();
+  ImeTrace.installFrom(Platform.environment);
   final locale = resolveAppLocale(PlatformDispatcher.instance.locales);
   final l10n = lookupAppLocalizations(locale);
 

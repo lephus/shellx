@@ -52,9 +52,11 @@ dependencies:
   # Voice input (voice spec V4), BSD-3-Clause. Pinned exactly: 7.5.0+ needs Dart ^3.12 / Flutter 3.44.
   speech_to_text: 7.4.0
   url_launcher: ^6.3.2
-  # Pinned exactly (see signals_flutter): the terminal works around xterm 4.0.0's cursor-key,
-  # modifier and paste handling, which a newer version may change.
-  xterm: 4.0.0
+  # xterm 4.0.0, the copy apps/desktop patches (third_party/xterm/SHELLX_PATCHES.md; the patch is
+  # macOS-only). The terminal works around 4.0.0's cursor-key, modifier and paste handling, which a
+  # newer version may change.
+  xterm:
+    path: ../../third_party/xterm
 
 dev_dependencies:
   flutter_test:

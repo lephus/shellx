@@ -205,7 +205,7 @@ void main() {
 
   test('the runtime packages the app works around are pinned exactly (pubspec.lock is not committed)', () {
     final pubspec = readFile('pubspec.yaml');
-    expect(pubspec, contains('\n  xterm: 4.0.0\n'));
+    expect(pubspec, contains('\n  xterm:\n    path: ../../third_party/xterm\n'));
     expect(pubspec, contains('\n  signals_flutter: 6.3.1\n'));
   });
 
