@@ -419,6 +419,8 @@
   "notificationsPanelTitle": "Notifications",
   "notificationsPanelTooltip": "Notifications  {shortcut}",
   "@notificationsPanelTooltip": {"placeholders": {"shortcut": {"type": "String"}}},
+  "settingsTooltip": "Settings  {shortcut}",
+  "@settingsTooltip": {"placeholders": {"shortcut": {"type": "String"}}},
   "notificationsPanelNextHint": "Next unread  {shortcut}",
   "@notificationsPanelNextHint": {"placeholders": {"shortcut": {"type": "String"}}},
   "notificationsPanelOpened": "{count, plural, =1{Notifications, 1 item} other{Notifications, {count} items}}",

@@ -37,6 +37,8 @@ String? tmuxAttachShortcutLabel() =>
     actionShortcutLabel(const KeyAction('tmux_attach'));
 String? notificationsShortcutLabel() =>
     actionShortcutLabel(const KeyAction('toggle_notifications'));
+String? settingsShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('open_settings'));
 String? nextUnreadShortcutLabel() =>
     actionShortcutLabel(const KeyAction('jump_to_unread'));
 String? splitRightShortcutLabel() =>

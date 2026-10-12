@@ -1358,6 +1358,12 @@ abstract class AppLocalizations {
   /// **'Notifications  {shortcut}'**
   String notificationsPanelTooltip(String shortcut);
 
+  /// No description provided for @settingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings  {shortcut}'**
+  String settingsTooltip(String shortcut);
+
   /// No description provided for @notificationsPanelNextHint.
   ///
   /// In en, this message translates to:

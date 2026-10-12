@@ -210,6 +210,8 @@
   "terminalPaneUnreadLabel": "Terminal {title}, có thông báo chưa đọc",
   "notificationsPanelTitle": "Thông báo",
   "notificationsPanelTooltip": "Thông báo  {shortcut}",
+  "settingsTooltip": "Cài đặt  {shortcut}",
+  "@settingsTooltip": {"placeholders": {"shortcut": {"type": "String"}}},
   "notificationsPanelNextHint": "Chưa đọc tiếp theo  {shortcut}",
   "notificationsPanelOpened": "{count, plural, other{Thông báo, {count} mục}}",
   "notificationsTabClosed": "Tab đã đóng",

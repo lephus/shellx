@@ -855,6 +855,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String settingsTooltip(String shortcut) {
+    return 'Settings  $shortcut';
+  }
+
+  @override
   String notificationsPanelNextHint(String shortcut) {
     return 'Next unread  $shortcut';
   }

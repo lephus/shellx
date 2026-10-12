@@ -841,6 +841,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String settingsTooltip(String shortcut) {
+    return 'Cài đặt  $shortcut';
+  }
+
+  @override
   String notificationsPanelNextHint(String shortcut) {
     return 'Chưa đọc tiếp theo  $shortcut';
   }

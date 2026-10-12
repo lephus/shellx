@@ -1474,6 +1474,16 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ),
       ],
     );
+    // A gear that opens Settings (and its Projects page) with a click, so
+    // it is not reachable by ⌘, alone.
+    final settings = ShellxIconButton(
+      key: const Key('sidebar.settings'),
+      icon: Icons.settings_outlined,
+      semanticLabel: l10n.settingsTitle,
+      tooltip: shortcutTooltip(l10n.settingsTooltip, settingsShortcutLabel()),
+      onPressed: () =>
+          Actions.maybeInvoke(context, const OpenSettingsIntent()),
+    );
     // macOS: both centred on the traffic-light line y = 14 (UI §2.1).
     final buttonTop = EdgeInsets.only(
       top: mac ? ShellxSizes.trafficLightsCenterY - ShellxSizes.iconHit / 2 : 0,
@@ -1488,7 +1498,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           // macOS: the traffic lights own the left 80 px (UI §2.1).
           if (mac) const SizedBox(width: ShellxSizes.trafficLightsInset),
           const Spacer(),
-          // Tab order: bell → `+` → list (UI-A4 §5.1).
+          // Tab order: settings → bell → `+` → list (UI-A4 §5.1).
+          Padding(padding: buttonTop, child: settings),
+          const SizedBox(width: ShellxSizes.headerBellGap - 2 * _bellInset),
           Padding(padding: buttonTop, child: bell),
           // 4 px between the 24 px visuals (A1 band): the hit squares touch.
           const SizedBox(width: ShellxSizes.headerBellGap - 2 * _bellInset),

@@ -19,6 +19,17 @@ Future<void> openProjects(WidgetTester t) async {
 }
 
 void main() {
+  testWidgets('the sidebar gear button opens Settings without a shortcut', (
+    t,
+  ) async {
+    final w = await pumpConfiguredWorkspace(t, platform: TargetPlatform.macOS);
+    expect(find.byType(SettingsOverlay), findsNothing);
+    await t.tap(find.byKey(const Key('sidebar.settings')));
+    await t.pumpAndSettle();
+    expect(find.byType(SettingsOverlay), findsOneWidget);
+    await disposeWorkspace(t, w.container);
+  });
+
   testWidgets('the Projects page lists the Default project and its intro', (
     t,
   ) async {
