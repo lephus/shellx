@@ -2255,6 +2255,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageAdvanced => 'Advanced';
 
   @override
+  String get settingsPageProjects => 'Projects';
+
+  @override
+  String get settingsProjectsIntro =>
+      'A project groups your terminals. Give it a folder and new tabs in that project start there.';
+
+  @override
+  String get settingsProjectsNew => 'New project';
+
+  @override
+  String get settingsProjectName => 'Project name';
+
+  @override
+  String get settingsProjectFolder => 'Project folder';
+
+  @override
+  String get settingsProjectFolderHint => '/path/to/project';
+
+  @override
+  String get settingsProjectFolderEmpty =>
+      'Uses the global “New tabs start in” setting';
+
+  @override
+  String get settingsProjectDelete => 'Delete project';
+
+  @override
+  String settingsProjectTabCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+      zero: 'No tabs yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get settingsTheme => 'Theme';
 
   @override

@@ -19,6 +19,7 @@ import 'pages/general_page.dart';
 import 'pages/keys_page.dart';
 import 'pages/page_parts.dart';
 import 'pages/phone_page.dart';
+import 'pages/projects_page.dart';
 import 'pages/terminal_page.dart';
 import 'settings_row.dart';
 import 'settings_values.dart';
@@ -413,6 +414,7 @@ class _SettingsOverlayState extends ConsumerState<SettingsOverlay> {
     SettingPage.general => const GeneralPage(),
     SettingPage.appearance => const AppearancePage(),
     SettingPage.terminal => const TerminalPage(),
+    SettingPage.projects => const ProjectsPage(),
     SettingPage.keys => const KeysPage(),
     SettingPage.agents => const AgentsPage(),
     SettingPage.phone => const PhonePage(),

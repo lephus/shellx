@@ -3372,6 +3372,60 @@ abstract class AppLocalizations {
   /// **'Advanced'**
   String get settingsPageAdvanced;
 
+  /// No description provided for @settingsPageProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get settingsPageProjects;
+
+  /// No description provided for @settingsProjectsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A project groups your terminals. Give it a folder and new tabs in that project start there.'**
+  String get settingsProjectsIntro;
+
+  /// No description provided for @settingsProjectsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New project'**
+  String get settingsProjectsNew;
+
+  /// No description provided for @settingsProjectName.
+  ///
+  /// In en, this message translates to:
+  /// **'Project name'**
+  String get settingsProjectName;
+
+  /// No description provided for @settingsProjectFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Project folder'**
+  String get settingsProjectFolder;
+
+  /// No description provided for @settingsProjectFolderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'/path/to/project'**
+  String get settingsProjectFolderHint;
+
+  /// No description provided for @settingsProjectFolderEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the global “New tabs start in” setting'**
+  String get settingsProjectFolderEmpty;
+
+  /// No description provided for @settingsProjectDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete project'**
+  String get settingsProjectDelete;
+
+  /// No description provided for @settingsProjectTabCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No tabs yet} =1{1 tab} other{{count} tabs}}'**
+  String settingsProjectTabCount(int count);
+
   /// No description provided for @settingsTheme.
   ///
   /// In en, this message translates to:
