@@ -71,9 +71,9 @@ void main() {
     await pumpView(tester);
     tester.testTextInput.updateEditingValue(keyboard('xin'));
     await tester.pump();
-    // After a commit the view resets the field to its two guard spaces; a keyboard that repeats
-    // the reset state (no text after them) must send nothing.
-    tester.testTextInput.updateEditingValue(keyboard(''));
+    // The view keeps the word in the field so in-place IMEs can edit it; a
+    // keyboard that repeats the same state must send nothing more.
+    tester.testTextInput.updateEditingValue(keyboard('xin'));
     await tester.pump();
     expect(out, ['xin']);
   });

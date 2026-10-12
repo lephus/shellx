@@ -227,14 +227,15 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
 
   // ShellX: the word being typed, kept in the platform's document.
   //
-  // Upstream resets the document to empty after every character. macOS
-  // input methods that edit typed text in place instead of composing it
+  // Upstream resets the document to empty after every character. Input
+  // methods that edit typed text in place instead of composing it
   // (Vietnamese Telex and VNI: "chao" then "f" asks to replace "chao" with
-  // "chào") then find nothing to edit and type the raw key. On macOS the
-  // document keeps the trailing word (letters, marks, digits; at most
-  // [_maxWord] characters); an edit of it reaches the terminal as
-  // Backspaces plus the new tail, as a Vietnamese input method types into
-  // Terminal.app.
+  // "chào") then find nothing to edit and type the raw key — on macOS
+  // desktop and on the mobile soft keyboard (iOS Telex, VNI) alike. The
+  // document instead keeps the trailing word (letters, marks, digits; at
+  // most [_maxWord] characters), behind the [_guard] spaces on mobile; an
+  // edit of it reaches the terminal as Backspaces plus the new tail, as a
+  // Vietnamese input method types into Terminal.app.
   String _word = '';
 
   static const int _maxWord = 32;
@@ -244,8 +245,17 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
     unicode: true,
   );
 
+  // ShellX: keep the word on macOS desktop (empty-based document) and on
+  // mobile (where [deleteDetection] keeps two guard spaces in front of the
+  // word, so a soft-keyboard Backspace at an empty word is still seen).
+  // Windows and other desktops keep upstream behaviour.
   bool get _keepsWord =>
-      defaultTargetPlatform == TargetPlatform.macOS && !widget.deleteDetection;
+      defaultTargetPlatform == TargetPlatform.macOS || widget.deleteDetection;
+
+  // ShellX: the spaces kept in front of the word ([deleteDetection]'s two
+  // guard spaces on mobile, none on desktop). The platform document is
+  // always this guard followed by [_word].
+  String get _guard => _initEditingState.text;
 
   static String _dropLast(String s) {
     if (s.isEmpty) return s;
@@ -264,9 +274,10 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
 
   void _setWord(String word) {
     _word = word;
+    final text = '$_guard$word';
     final value = TextEditingValue(
-      text: word,
-      selection: TextSelection.collapsed(offset: word.length),
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
     _currentEditingState = value;
     _connection?.setEditingState(value);
@@ -276,7 +287,16 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
   /// nothing composing: one Backspace per character of [_word] after the
   /// common prefix, then the text that replaces them.
   void _commitWordEdit() {
-    final text = _currentEditingState.text;
+    final guard = _guard;
+    final fullText = _currentEditingState.text;
+    // ShellX (mobile): a soft-keyboard Backspace at an empty word eats into
+    // the guard spaces; that means one cell back in the terminal.
+    if (fullText.length < guard.length) {
+      widget.onDelete();
+      _setWord('');
+      return;
+    }
+    final text = fullText.substring(guard.length);
     final base = _word;
     var prefix = 0;
     final shorter = text.length < base.length ? text.length : base.length;
@@ -298,9 +318,9 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
     if (inserted.isNotEmpty) widget.onInsert(inserted);
 
     final word = _tailWord(text);
-    if (word != text ||
+    if (fullText != '$guard$word' ||
         _currentEditingState.selection !=
-            TextSelection.collapsed(offset: text.length)) {
+            TextSelection.collapsed(offset: guard.length + word.length)) {
       _setWord(word);
     } else {
       _word = word;
