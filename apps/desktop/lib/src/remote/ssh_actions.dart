@@ -79,14 +79,10 @@ final class SshActions {
     return idle.future.whenComplete(sub.close);
   }
 
-  /// ⌘T, sidebar `+` (D23).
-  Future<void> newTab() async {
-    final side = _ref.read(sidebarWorkspacesProvider);
-    if (side.workspace(side.currentId)?.ssh != null) {
-      return _side.openTabIn(side.currentId);
-    }
-    return _tabs.openTab();
-  }
+  /// ⌘T, sidebar `+` (D23). Opens in the current workspace so its SSH
+  /// target (D23) or local project root (cmux gap 36) both apply.
+  Future<void> newTab() =>
+      _side.openTabIn(_ref.read(sidebarWorkspacesProvider).currentId);
 
   /// The dialog's Connect (D23, D42). [noHook] is the box's value when the
   /// user could see it (null: leave the per-server setting alone).

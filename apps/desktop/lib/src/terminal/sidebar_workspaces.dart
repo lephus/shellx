@@ -39,6 +39,7 @@ final class Workspace {
     this.collapsed = false,
     this.ssh,
     this.fontStep = 0,
+    this.root,
   });
 
   final String id;
@@ -56,19 +57,29 @@ final class Workspace {
   /// (JSON key `zoom`; −6…+10; 0 when missing or odd).
   final double fontStep;
 
+  /// Project root: the folder a new LOCAL tab in this workspace starts in
+  /// (cmux gap 36). Null falls back to the global working-directory
+  /// setting. Ignored by SSH workspaces (a server has its own paths).
+  final String? root;
+
   bool get isDefault => id == kDefaultWorkspaceId;
 
   String displayName(AppLocalizations l10n) =>
       name ?? l10n.workspaceDefaultName;
 
-  Workspace copyWith({String? name, bool? collapsed, double? fontStep}) =>
-      Workspace(
-        id: id,
-        name: name ?? this.name,
-        collapsed: collapsed ?? this.collapsed,
-        ssh: ssh,
-        fontStep: fontStep ?? this.fontStep,
-      );
+  Workspace copyWith({
+    String? name,
+    bool? collapsed,
+    double? fontStep,
+    Object? root = _keep,
+  }) => Workspace(
+    id: id,
+    name: name ?? this.name,
+    collapsed: collapsed ?? this.collapsed,
+    ssh: ssh,
+    fontStep: fontStep ?? this.fontStep,
+    root: identical(root, _keep) ? this.root : root as String?,
+  );
 
   String encode() => jsonEncode({
     'id': id,
@@ -76,6 +87,7 @@ final class Workspace {
     'collapsed': collapsed,
     if (ssh != null) 'ssh': ssh,
     if (fontStep != 0) 'zoom': fontStep,
+    if (root != null) 'root': root,
   });
 
   /// Null for anything that is not a well-formed entry (Review Focus 5).
@@ -92,6 +104,7 @@ final class Workspace {
     final collapsed = value['collapsed'];
     final rawSsh = value['ssh'];
     final rawZoom = value['zoom'];
+    final rawRoot = value['root'];
     if (id is! String || id.isEmpty || id.length > 64) return null;
     if (name != null && name is! String) return null;
     if (collapsed != null && collapsed is! bool) return null;
@@ -100,6 +113,10 @@ final class Workspace {
     // A8 D23: only a canonical key; anything else leaves a local workspace.
     final ssh = rawSsh is String && SshTarget.parseKey(rawSsh) != null
         ? rawSsh
+        : null;
+    // A project root is a non-blank string; anything else leaves it unset.
+    final root = rawRoot is String && rawRoot.trim().isNotEmpty
+        ? rawRoot.trim()
         : null;
     return Workspace(
       id: id,
@@ -114,6 +131,7 @@ final class Workspace {
                 .clamp(kWorkspaceFontStepMin, kWorkspaceFontStepMax)
                 .toDouble()
           : 0,
+      root: root,
     );
   }
 
@@ -124,10 +142,11 @@ final class Workspace {
       other.name == name &&
       other.collapsed == collapsed &&
       other.ssh == ssh &&
-      other.fontStep == fontStep;
+      other.fontStep == fontStep &&
+      other.root == root;
 
   @override
-  int get hashCode => Object.hash(id, name, collapsed, ssh, fontStep);
+  int get hashCode => Object.hash(id, name, collapsed, ssh, fontStep, root);
 }
 
 /// The stored list, without broken or duplicate entries, and always with
@@ -459,11 +478,18 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
   /// Header `+` (UI-A2 §3.1): a new tab in [id], which expands; in a
   /// server's workspace it opens that server ([launch] overrides).
   Future<void> openTabIn(String id, {SessionLaunch? launch}) async {
-    if (state.workspace(id) == null) return;
+    final w = state.workspace(id);
+    if (w == null) return;
     _pendingTarget = id;
     setCollapsed(id, false);
     try {
-      await _tabs.openTab(launch: launch ?? launchFor(id));
+      final resolved = launch ?? launchFor(id);
+      // A local tab (no SSH launch) starts in the workspace's project
+      // root when it has one; otherwise the global setting decides.
+      await _tabs.openTab(
+        launch: resolved,
+        cwd: resolved == null ? w.root : null,
+      );
     } finally {
       _pendingTarget = null;
     }
@@ -480,6 +506,23 @@ class SidebarWorkspaces extends Notifier<SidebarState> {
     } finally {
       _pendingTarget = null;
     }
+  }
+
+  /// Sets (or, on a blank path, clears) the project root of workspace
+  /// [id] — the folder a new local tab there starts in (cmux gap 36).
+  void setRoot(String id, String? path) {
+    final w = state.workspace(id);
+    if (w == null) return;
+    final clean = path?.trim();
+    final next = clean == null || clean.isEmpty ? null : clean;
+    if (next == w.root) return;
+    state = state.copyWith(
+      workspaces: [
+        for (final x in state.workspaces)
+          x.id == id ? x.copyWith(root: next) : x,
+      ],
+    );
+    _save();
   }
 
   /// Blank keeps the old name (UI-A2 §4).

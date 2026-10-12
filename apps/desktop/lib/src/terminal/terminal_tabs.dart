@@ -654,13 +654,15 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   void reportGrid(TerminalGrid grid) => _grid = grid;
 
   /// ⌘T, `+`: a selected tab; a failure is a toast. With [launch] (A8) it
-  /// opens that SSH or tmux session, never a local folder.
-  Future<void> openTab({SessionLaunch? launch}) async {
+  /// opens that SSH or tmux session, never a local folder. [cwd] overrides
+  /// where a local shell starts (a workspace's project root); null uses
+  /// the global working-directory setting.
+  Future<void> openTab({SessionLaunch? launch, String? cwd}) async {
     // A5b: no background service yet — nothing to open a shell in.
     if (state.opening || ref.read(daemonStateProvider).waiting) return;
     try {
       await openTabFor(
-        cwd: launch == null ? newTabCwd() : null,
+        cwd: launch == null ? (cwd ?? newTabCwd()) : null,
         launch: launch,
         select: true,
       );

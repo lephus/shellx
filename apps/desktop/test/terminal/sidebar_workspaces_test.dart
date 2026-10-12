@@ -79,6 +79,48 @@ void main() {
     });
   });
 
+  group('project root (cmux gap 36)', () {
+    test('encode/decode round trips root; blank or non-string drops it', () {
+      final w = Workspace(id: 'w5', name: 'API', root: '/Users/me/api');
+      expect(Workspace.decode(w.encode())!.root, '/Users/me/api');
+      expect(
+        Workspace.decode('{"id":"w6","name":"X","root":"  "}')!.root,
+        isNull,
+      );
+      expect(
+        Workspace.decode('{"id":"w7","name":"X","root":42}')!.root,
+        isNull,
+      );
+      expect(Workspace.decode('{"id":"w8","name":"X"}')!.root, isNull);
+    });
+
+    test('copyWith sets, keeps and clears root; equality includes it', () {
+      const w = Workspace(id: 'w1', name: 'X');
+      final withRoot = w.copyWith(root: '/tmp/p');
+      expect(withRoot.root, '/tmp/p');
+      expect(withRoot == w, isFalse);
+      expect(w.copyWith().root, isNull); // omitted: kept
+      expect(withRoot.copyWith(root: null).root, isNull); // explicit clear
+      expect(withRoot.copyWith(name: 'Y').root, '/tmp/p'); // unrelated field
+    });
+
+    test('setRoot stores the path, persists, and clears on blank', () {
+      boot();
+      sidebar().setRoot(kDefaultWorkspaceId, '/Users/me/proj');
+      expect(state().workspace(kDefaultWorkspaceId)!.root, '/Users/me/proj');
+      expect(saved()!.any((s) => s.contains('/Users/me/proj')), isTrue);
+      sidebar().setRoot(kDefaultWorkspaceId, '   ');
+      expect(state().workspace(kDefaultWorkspaceId)!.root, isNull);
+    });
+
+    test('a local tab opened in a workspace spawns at its root', () async {
+      boot();
+      sidebar().setRoot(kDefaultWorkspaceId, '/Users/me/proj');
+      await sidebar().openTabIn(kDefaultWorkspaceId);
+      expect(local.openCwds.last, '/Users/me/proj');
+    });
+  });
+
   test(
     'desktop tabs join the current workspace, phone tabs Default; a '
     'closed tab leaves and its open rename is dropped (Review Focus 4)',
