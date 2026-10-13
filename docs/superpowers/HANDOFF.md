@@ -584,7 +584,7 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - Lịch sử đóng tab (T5) chỉ nằm trong bộ nhớ (tối đa 10 mục / 2 MiB), mất khi thoát; mô tả tab nằm trong `layout.json` (0600).
 - Phím toàn cục không phát hiện được tổ hợp bị app khác giữ (xem Task 17); Settings có dòng gợi ý.
 - Mobile: bộ đếm "đầu ra mới" tính trên điện thoại. ~~Cũng đếm phần phát lại bù sau khi kết nối lại cho tab nền~~ — đã sửa 2026-10-13: `session.attached` mang thêm `seq` tuỳ chọn (đầu luồng, spec v1 §6.4), `TabOutput.replay` đánh dấu phần phát lại và phần đó không tính; với agent/desktop cũ (không gửi `seq`) phần gửi sau `session.attached` vẫn được tính như trước. Với tuỳ chọn giữ cỡ terminal, khi người dùng cuộn lên lịch sử thì phần dịch lên vẫn theo hàng con trỏ của viewport.
-- Chạm thông báo (D27): nếu sau khi kết nối lại tab chờ chọn không phải tab cuối thì tab thêm sau vẫn thành tab đang xem (hành vi `_add` cũ).
+- Chạm thông báo (D27): ~~nếu sau khi kết nối lại tab chờ chọn không phải tab cuối thì tab thêm sau vẫn thành tab đang xem (hành vi `_add` cũ)~~ — đã sửa ở 829a940 + efcb009 (tab của thông báo giữ focus tới hết 30 s); 2026-10-13 bỏ thêm lần nháy qua tab cuối khi tab mới được thêm (`_add` chọn thẳng tab chờ).
 - Alt giữ khi chương trình bật báo chuột: xterm vẫn báo click cho chương trình nên không tạo được vùng chọn khối. `Option+Backspace/Delete` mặc định là phím cửa sổ bất kể `macos-option-as-alt` (gán lại được).
 - Chuyển pane (D20) không phân biệt được trong shell: `shellx new-tab` từ pane đã kéo sang workspace khác dùng `fromPane` nên đúng; chỉ biến môi trường cũ là sai.
 - `shellx doctor`: so sánh phiên bản bỏ qua `+build`; CLI dev so với app release báo một dòng lỗi.
@@ -612,7 +612,7 @@ Task 1 — soạn dòng (Mac, Windows)
 - [ ] Gõ tiếng Việt Telex có dùng Option vẫn ra dấu. Windows: `Ctrl+Alt` chỉ bằng Alt trái.
 
 Task 2 — thông báo khi kết nối lại (iPhone, Android)
-- [ ] Tắt mạng điện thoại, chạm thông báo "lệnh xong", bật mạng: mở đúng tab của thông báo, không nhảy sang tab cuối. Thử khi tab chờ không phải tab cuối.
+- [ ] Tắt mạng điện thoại, chạm thông báo "lệnh xong", bật mạng: mở đúng tab của thông báo, không nhảy sang tab cuối. Thử khi tab chờ không phải tab cuối. (Đã sửa trong code ở 829a940, efcb009 và bản bỏ nháy 2026-10-13; vẫn cần kiểm trên máy thật.)
 
 Task 3 — chọn nhanh (Mac, Windows)
 - [ ] Ba lần nhấp chọn đúng dòng (cả dòng bị xuống dòng mềm); Option-kéo chọn khối trong shell thường (Windows: Alt trái); chương trình đang bật báo chuột (tmux/vim mouse) thì không tạo khối (đã biết).
