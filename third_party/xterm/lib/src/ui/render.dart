@@ -204,6 +204,19 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     super.systemFontsDidChange();
   }
 
+  /// ShellX: optional diagnostics (SHELLX_SCROLL_TRACE), null in normal use.
+  /// Called at the end of every layout with the live scroll state, so a
+  /// terminal that will not scroll can be debugged on a real device.
+  static void Function({
+    required int terminalId,
+    required double offset,
+    required double maxExtent,
+    required double viewport,
+    required int bufferLines,
+    required bool altBuffer,
+    required bool stickToBottom,
+  })? debugScrollHook;
+
   @override
   void performLayout() {
     size = constraints.biggest;
@@ -214,6 +227,19 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
     if (_stickToBottom) {
       _offset.correctBy(_maxScrollExtent - _scrollOffset);
+    }
+
+    final hook = debugScrollHook;
+    if (hook != null) {
+      hook(
+        terminalId: identityHashCode(_terminal),
+        offset: _scrollOffset,
+        maxExtent: _maxScrollExtent,
+        viewport: _viewportHeight,
+        bufferLines: _terminal.buffer.lines.length,
+        altBuffer: _terminal.isUsingAltBuffer,
+        stickToBottom: _stickToBottom,
+      );
     }
   }
 

@@ -6,6 +6,12 @@ commit that added this directory is the pristine package (`lib/`, licence, readm
 changelog; tests, examples and media left out); every later change is listed here and
 marked with `ShellX:` comments.
 
+## `lib/src/ui/render.dart`
+
+| Change | Why |
+|---|---|
+| `RenderTerminal.debugScrollHook`: an optional static callback, null by default (no effect in normal use), invoked at the end of `performLayout` with the scroll state (offset, max extent, viewport, buffer line count, alt-buffer, stick-to-bottom). | Diagnose "the terminal won't scroll" on a real device without reproducing in widget tests: the desktop app wires it to a file when started with `SHELLX_SCROLL_TRACE=<file>`. |
+
 ## `lib/src/ui/custom_text_edit.dart`
 
 | Change | Why |
