@@ -96,7 +96,7 @@ void main() {
 
   testWidgets('each key sends exactly one key', (tester) async {
     await open(tester);
-    // Application cursor mode on: the reply keys still send the plain sequences.
+    // Application cursor mode on: the arrows follow it, as the extra keys do.
     machine.handles.single.emit(const TabOutput('\x1b[?1h'));
     await tell(tester, needsInput);
     const expected = {
@@ -107,8 +107,8 @@ void main() {
       ReplyKey.no: 'n',
       ReplyKey.enter: '\r',
       ReplyKey.esc: '\x1b',
-      ReplyKey.up: '\x1b[A',
-      ReplyKey.down: '\x1b[B',
+      ReplyKey.up: '\x1bOA',
+      ReplyKey.down: '\x1bOB',
     };
     for (final MapEntry(:key, :value) in expected.entries) {
       final finder = find.byKey(ValueKey('reply-key-${key.name}'));

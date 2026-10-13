@@ -48,7 +48,8 @@ String? extraKeyLabel(ExtraKey key) => switch (key) {
 enum ReplyKey { one, two, three, yes, no, enter, esc, up, down }
 
 /// What each [ReplyKey] sends: exactly one key, as typed by hand, never with the sticky modifiers. The arrows
-/// are the plain (normal cursor mode) sequences.
+/// here are the normal cursor mode sequences; the page sends them through `Terminal.keyInput`, so application
+/// cursor mode gives `ESC O A` / `ESC O B` as on the extra keys.
 String replyKeyText(ReplyKey key) => switch (key) {
   ReplyKey.one => '1',
   ReplyKey.two => '2',

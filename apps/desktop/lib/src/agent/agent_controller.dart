@@ -815,10 +815,17 @@ class AgentController extends AgentControllerBase {
     if (runtime is! CoreAgentRuntime) return;
     runtime.shellSessions.agentOf = (id) {
       if (!ref.mounted || !ref.exists(agentStatusProvider)) return null;
+      // A model made after the runtime started is listened to from the
+      // first phone that asks (attach, list).
+      _listenAgentStatus();
       return agentWireOf(ref.read(agentStatusProvider)[id]);
     };
-    // One listener for every runtime; only where the window's status model
-    // already lives (never created here, as in the background service).
+    _listenAgentStatus();
+  }
+
+  /// One listener for every runtime; only where the window's status model
+  /// already lives (never created here, as in the background service).
+  void _listenAgentStatus() {
     if (_agentStates != null || !ref.exists(agentStatusProvider)) return;
     _agentStates = ref.listen<Map<int, AgentPane>>(agentStatusProvider, (
       before,

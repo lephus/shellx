@@ -8,6 +8,7 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_k
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
+import 'package:xterm/core.dart';
 
 /// Why the terminal page closed itself; the machine list reacts (design "Khi có sự cố").
 enum TerminalExit {
@@ -209,7 +210,17 @@ class TerminalPageController extends Controller {
   /// terminal's output → `input`), as is: no sticky modifiers, no cursor-mode rewriting.
   void sendReply(ReplyKey key) {
     if (_closed) return;
-    workspace.activeTab.peek()?.terminal.peek().onOutput?.call(replyKeyText(key));
+    final terminal = workspace.activeTab.peek()?.terminal.peek();
+    if (terminal == null) return;
+    // The arrows go through keyInput, as on the extra keys: application cursor mode applies.
+    switch (key) {
+      case ReplyKey.up:
+        terminal.keyInput(TerminalKey.arrowUp);
+      case ReplyKey.down:
+        terminal.keyInput(TerminalKey.arrowDown);
+      default:
+        terminal.onOutput?.call(replyKeyText(key));
+    }
   }
 
   /// Agent quick reply D2: "⌨" on the reply bar.
