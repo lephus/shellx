@@ -41,6 +41,22 @@ void main() {
       expect(tab.unseen.peek(), isFalse, reason: 'being looked at');
     });
 
+    test('the catch-up replayed on a re-attach is not new output; what follows it is', () {
+      tab
+        ..setActive(false)
+        ..setViewed(false);
+      handle.emit(const TabOutput('the screen it already had', replay: true));
+      expect(tab.unseen.peek(), isFalse);
+      handle.emit(const TabOutput('done', replay: false));
+      expect(tab.unseen.peek(), isTrue);
+    });
+
+    test('output from an agent that sends no stream head counts as before (replay is false)', () {
+      tab.setViewed(false);
+      handle.emit(const TabOutput('anything'));
+      expect(tab.unseen.peek(), isTrue);
+    });
+
     test('a tab nobody has left alone starts as seen', () {
       expect(tab.unseen.peek(), isFalse);
     });

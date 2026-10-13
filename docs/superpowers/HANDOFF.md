@@ -583,7 +583,7 @@ Task 16 — đầu ra theo khẩu phần (điện thoại + máy tính)
 - Xterm 4.0.0 không hỗ trợ ligature: `font-feature` chỉ được ghi nhận kèm ghi chú, không có tác dụng.
 - Lịch sử đóng tab (T5) chỉ nằm trong bộ nhớ (tối đa 10 mục / 2 MiB), mất khi thoát; mô tả tab nằm trong `layout.json` (0600).
 - Phím toàn cục không phát hiện được tổ hợp bị app khác giữ (xem Task 17); Settings có dòng gợi ý.
-- Mobile: bộ đếm "đầu ra mới" tính trên điện thoại và cũng đếm phần phát lại bù sau khi kết nối lại cho tab nền (giao thức không đổi nên không phân biệt được). Với tuỳ chọn giữ cỡ terminal, khi người dùng cuộn lên lịch sử thì phần dịch lên vẫn theo hàng con trỏ của viewport.
+- Mobile: bộ đếm "đầu ra mới" tính trên điện thoại. ~~Cũng đếm phần phát lại bù sau khi kết nối lại cho tab nền~~ — đã sửa 2026-10-13: `session.attached` mang thêm `seq` tuỳ chọn (đầu luồng, spec v1 §6.4), `TabOutput.replay` đánh dấu phần phát lại và phần đó không tính; với agent/desktop cũ (không gửi `seq`) phần gửi sau `session.attached` vẫn được tính như trước. Với tuỳ chọn giữ cỡ terminal, khi người dùng cuộn lên lịch sử thì phần dịch lên vẫn theo hàng con trỏ của viewport.
 - Chạm thông báo (D27): nếu sau khi kết nối lại tab chờ chọn không phải tab cuối thì tab thêm sau vẫn thành tab đang xem (hành vi `_add` cũ).
 - Alt giữ khi chương trình bật báo chuột: xterm vẫn báo click cho chương trình nên không tạo được vùng chọn khối. `Option+Backspace/Delete` mặc định là phím cửa sổ bất kể `macos-option-as-alt` (gán lại được).
 - Chuyển pane (D20) không phân biệt được trong shell: `shellx new-tab` từ pane đã kéo sang workspace khác dùng `fromPane` nên đúng; chỉ biến môi trường cũ là sai.
@@ -648,7 +648,7 @@ Task 17 — phím toàn cục (Mac, Windows)
 
 Task 18–21 — mobile (iPhone, Android)
 - [ ] Bàn phím mũi tên: cảm giác trong `vim`/`claude`, TalkBack/VoiceOver đọc các hành động tuỳ chỉnh, đổi hướng không kẹt, dừng khi app tạm dừng.
-- [ ] Danh sách máy: chạy `yes | head -c 50M` ở tab nền, kiểm tra "đầu ra mới" tăng, xoá khi mở tab; sau khi kết nối lại biết rằng phần phát lại cũng được đếm.
+- [ ] Danh sách máy: chạy `yes | head -c 50M` ở tab nền, kiểm tra "đầu ra mới" tăng, xoá khi mở tab; tắt/bật mạng điện thoại khi tab nền đã xem hết: sau khi kết nối lại phần phát lại **không** làm tab thành "đầu ra mới" (desktop phải cùng bản có `session.attached {seq}`).
 - [ ] Nháp: gõ nháp ở terminal A, sang B, quay lại: nháp còn; huy hiệu nháp trên nút mic; đóng app thì nháp mất.
 - [ ] Giữ cỡ terminal khi bàn phím mở: không gửi `resize`, lớp phủ theo tab đang xem; Android IME animation, xoay ngang, con trỏ ở hàng cuối trong `vim`.
 

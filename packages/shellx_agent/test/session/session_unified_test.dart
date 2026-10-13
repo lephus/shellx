@@ -273,7 +273,7 @@ void main() {
       // The phone may remember driving before the drop: it is told.
       expect(rig.to(phone).where((m) => m is! OutputMessage), [
         SessionDriver(id: id, by: DriverSide.desktop),
-        SessionAttached(id: id),
+        SessionAttached(id: id, seq: 5),
       ]);
 
       await rig.manager.handle(

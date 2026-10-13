@@ -67,7 +67,8 @@ final class SessionStream {
   /// Attaches [mobileId] from [lastSeq] and replays: `taken_over` to the
   /// previous phone, `session.reset` when [lastSeq] is outside the buffer.
   /// Returns the phone that was attached before. Does not send
-  /// `session.attached`.
+  /// `session.attached`; the owner sends it with [end], read right after
+  /// this call, as its `seq` (the stream head, spec §6.4).
   String? attach(String mobileId, int lastSeq) {
     final previous = attachedMobileId;
     if (previous != null && previous != mobileId) {

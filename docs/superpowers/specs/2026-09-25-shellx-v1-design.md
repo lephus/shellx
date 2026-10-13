@@ -247,7 +247,7 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
 | `session.open` | M → A | `cols, rows` | Mở phiên mới |
 | `session.opened` | A → M | `id, index, shell` | Phiên đã mở và gắn vào điện thoại này |
 | `session.attach` | M → A | `id, cols, rows, last_seq` | Gắn vào phiên có sẵn |
-| `session.attached` | A → M | `id` | Đã gắn; output bù đã gửi trước tin này |
+| `session.attached` | A → M | `id, seq?` | Đã gắn; output bù đã gửi trước tin này (phần cửa sổ gửi cho phép). `seq` (tuỳ chọn, thêm 2026-10-13): đầu luồng (`end` của bộ đệm) lúc bắt đầu phát lại — byte có vị trí `< seq` là output bù, kể cả phần gửi sau tin này khi `ack` mở cửa sổ; từ `seq` trở đi là output mới. Agent cũ không gửi: client coi mọi output sau tin này là mới |
 | `session.reset` | A → M | `id` | Client xóa màn hình; output tiếp theo bắt đầu từ đầu bộ đệm |
 | `output` | A → M | `id, seq, data` | Output terminal; `seq` là vị trí byte đầu tiên của `data` |
 | `ack` | M → A | `id, seq` | Đã nhận tới vị trí byte `seq` |
@@ -281,7 +281,7 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
   - `last_seq ≥ start`: gửi output từ `last_seq` tới `end`.
   - `last_seq < start`: gửi `session.reset`, rồi output từ `start`.
   - Sau đó áp dụng `cols, rows` của tin attach. Nếu kích thước không đổi, agent resize sang `(cols, rows - 1)` rồi về `(cols, rows)` để ép các ứng dụng toàn màn hình vẽ lại.
-  - Cuối cùng gửi `session.attached`.
+  - Cuối cùng gửi `session.attached {seq: end}`, với `end` đọc ngay khi bắt đầu phát lại (mục 6.4) — để điện thoại không đếm phần phát lại là "đầu ra mới".
 - **Tiêu đề tab** do mobile quyết định: tiêu đề terminal (OSC 0/2) nếu shell đặt, không thì `"<shell> <index>"`.
 - **Kết thúc phiên:** khi shell thoát (gửi `session.exited`), khi điện thoại gửi `session.close`, hoặc khi đóng từ tray (`session.detached {reason: "closed_by_host"}` rồi `session.exited`). Đóng phiên nghĩa là đóng PTY và kết thúc toàn bộ cây tiến trình con.
 - v1.0 **không tự đóng** phiên bị bỏ quên.

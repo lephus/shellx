@@ -149,6 +149,105 @@ void main() {
     });
   });
 
+  group('replayed output (spec §6.4: session.attached carries the head)', () {
+    List<(String, bool)> outputs(List<TabEvent> events) => [
+      for (final e in events.whereType<TabOutput>()) (e.text, e.replay),
+    ];
+
+    test('output of a tab that was opened, not attached, is live', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.handleOutput(0, bytes(utf8.encode('prompt')));
+        async.flushMicrotasks();
+        expect(outputs(events), [('prompt', false)]);
+      });
+    });
+
+    test('output before session.attached is the catch-up, after it new '
+        'output up to the head is still catch-up, beyond it live', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.handleOutput(0, bytes(utf8.encode('old')));
+        tab.beginAttach();
+        tab.handleOutput(3, bytes(utf8.encode('miss'))); // within the window
+        tab.handleAttached(10);
+        tab.handleOutput(
+          7,
+          bytes(utf8.encode('ed!')),
+        ); // after acks: ends at 10
+        tab.handleOutput(10, bytes(utf8.encode('new')));
+        async.flushMicrotasks();
+        expect(outputs(events), [
+          ('old', false),
+          ('miss', true),
+          ('ed!', true),
+          ('new', false),
+        ]);
+      });
+    });
+
+    test('a chunk straddling the head is split: replay part, then live', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.beginAttach();
+        tab.handleAttached(4);
+        tab.handleOutput(0, bytes(utf8.encode('abcdef')));
+        async.flushMicrotasks();
+        expect(outputs(events), [('abcd', true), ('ef', false)]);
+        expect(tab.received, 6);
+      });
+    });
+
+    test('an overlapping resend is cut before the head is compared', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.beginAttach();
+        tab.handleAttached(4);
+        tab.handleOutput(0, bytes(utf8.encode('ab')));
+        tab.handleOutput(0, bytes(utf8.encode('abcdef')));
+        async.flushMicrotasks();
+        expect(outputs(events), [('ab', true), ('cd', true), ('ef', false)]);
+      });
+    });
+
+    test('an older agent (no head): output after session.attached is live, '
+        'as before', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.beginAttach();
+        tab.handleAttached(null);
+        tab.handleOutput(0, bytes(utf8.encode('x')));
+        async.flushMicrotasks();
+        expect(outputs(events), [('x', false)]);
+      });
+    });
+
+    test('a reset during the attach keeps the replay from start as replay', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab.beginAttach();
+        tab.handleReset();
+        tab.handleOutput(6, bytes(utf8.encode('tail')));
+        tab.handleAttached(10);
+        tab.handleOutput(10, bytes(utf8.encode('!')));
+        async.flushMicrotasks();
+        expect(outputs(events), [('tail', true), ('!', false)]);
+      });
+    });
+  });
+
   // Final review M4.
   test('held keystrokes keep the newest 64 KiB and are dropped when the tab '
       'ends', () {

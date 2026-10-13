@@ -110,12 +110,12 @@ void main() {
 
       rig.router.handle(phone, const SessionList(desktop: true));
       rig.router.handle(phone, attach);
-      expect(rig.to(phone).last, SessionAttached(id: id));
+      expect(rig.to(phone).last, SessionAttached(id: id, seq: 0));
 
       rig.router.mobileDisconnected(phone);
       rig.sent.clear();
       rig.router.handle(phone, attach);
-      expect(rig.to(phone).last, SessionAttached(id: id));
+      expect(rig.to(phone).last, SessionAttached(id: id, seq: 0));
     });
   });
 
