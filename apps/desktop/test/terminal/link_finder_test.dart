@@ -36,6 +36,40 @@ void main() {
     final hit = findLinkAt(t, const CellOffset(8, 0), paths: true)!;
     expect(hit.kind, TerminalLinkKind.path);
     expect(hit.target, '/usr/local/bin/dart');
+    expect(hit.line, 12);
+    expect(hit.column, isNull);
+  });
+
+  test('a path keeps its :line:col (an editor opens there)', () {
+    final t = term('lib/main.dart:42:7: error');
+    final hit = findLinkAt(t, const CellOffset(3, 0), paths: true)!;
+    expect(hit.target, 'lib/main.dart');
+    expect(hit.line, 42);
+    expect(hit.column, 7);
+    expect(hit.toString(), isNot(contains('main')));
+    final plain = findLinkAt(
+      term('lib/main.dart x'),
+      const CellOffset(3, 0),
+      paths: true,
+    )!;
+    expect(plain.line, isNull);
+    expect(plain.column, isNull);
+  });
+
+  test('LinkHit equality counts the line and column', () {
+    LinkHit hit({int? line, int? column}) => LinkHit(
+      source: LinkSource.detected,
+      kind: TerminalLinkKind.path,
+      target: 'a.dart',
+      begin: const CellOffset(0, 0),
+      end: const CellOffset(6, 0),
+      line: line,
+      column: column,
+    );
+    expect(hit(line: 1, column: 2), hit(line: 1, column: 2));
+    expect(hit(line: 1, column: 2).hashCode, hit(line: 1, column: 2).hashCode);
+    expect(hit(line: 1) == hit(line: 2), isFalse);
+    expect(hit(line: 1) == hit(line: 1, column: 3), isFalse);
   });
 
   test(

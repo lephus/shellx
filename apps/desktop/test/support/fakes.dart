@@ -11,6 +11,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/platform/editor_links.dart';
 import 'package:shellx_desktop/src/platform/keep_awake.dart';
 import 'package:shellx_desktop/src/platform/launch_at_login.dart';
 import 'package:shellx_desktop/src/platform/notifier.dart';
@@ -446,6 +447,20 @@ final class RecordingUrlOpener implements UrlOpener {
   Future<void> reveal(String path, {required bool isDirectory}) async {
     if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
     revealed.add((path, isDirectory));
+  }
+
+  /// Files opened in an editor (editor, path, line, column).
+  final List<(EditorApp, String, int?, int?)> edited = [];
+
+  @override
+  Future<void> openInEditor(
+    EditorApp editor,
+    String path, {
+    int? line,
+    int? column,
+  }) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    edited.add((editor, path, line, column));
   }
 }
 

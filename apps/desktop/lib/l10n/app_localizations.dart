@@ -4392,6 +4392,48 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get settingAgentResumeOff;
 
+  /// No description provided for @settingLinkEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Open file links in'**
+  String get settingLinkEditor;
+
+  /// No description provided for @settingLinkEditorDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'⌘-click (Ctrl-click on Windows) on a file path such as main.dart:12:3 opens it at that line. Automatic uses the first installed of Cursor, VS Code and Zed. Folders, and paths on a server, are always shown in Finder or Explorer.'**
+  String get settingLinkEditorDesc;
+
+  /// No description provided for @settingLinkEditorAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get settingLinkEditorAuto;
+
+  /// No description provided for @settingLinkEditorCursor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor'**
+  String get settingLinkEditorCursor;
+
+  /// No description provided for @settingLinkEditorVscode.
+  ///
+  /// In en, this message translates to:
+  /// **'VS Code'**
+  String get settingLinkEditorVscode;
+
+  /// No description provided for @settingLinkEditorZed.
+  ///
+  /// In en, this message translates to:
+  /// **'Zed'**
+  String get settingLinkEditorZed;
+
+  /// No description provided for @settingLinkEditorFinder.
+  ///
+  /// In en, this message translates to:
+  /// **'Finder / Explorer'**
+  String get settingLinkEditorFinder;
+
   /// No description provided for @settingsAgentIntegrations.
   ///
   /// In en, this message translates to:

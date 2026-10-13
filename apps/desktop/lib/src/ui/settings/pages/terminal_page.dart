@@ -10,7 +10,8 @@ import '../../../tray/tray_actions.dart';
 import 'page_parts.dart';
 
 /// Terminal: scrollback, where new tabs start, Option as Alt (macOS), the
-/// close question, the global show/hide shortcut, and what is saved when
+/// close question, the editor a ⌘-clicked file path opens in
+/// (`link-editor`), the global show/hide shortcut, and what is saved when
 /// the app quits.
 class TerminalPage extends ConsumerWidget {
   const TerminalPage({super.key});
@@ -31,6 +32,7 @@ class TerminalPage extends ConsumerWidget {
         settingWidget(settingById('working-directory')),
         if (mac) settingWidget(settingById('macos-option-as-alt')),
         settingWidget(settingById('confirm-close-surface')),
+        settingWidget(settingById('link-editor')),
         settingWidget(settingById('restore-scrollback')),
         settingWidget(settingById('global-hotkey')),
         ActionRow(
