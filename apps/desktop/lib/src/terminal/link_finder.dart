@@ -21,6 +21,8 @@ final class LinkHit {
     required this.end,
     this.needsConfirm = false,
     this.visible,
+    this.line,
+    this.column,
   });
 
   final LinkSource source;
@@ -37,6 +39,12 @@ final class LinkHit {
   /// The text shown for an OSC 8 link.
   final String? visible;
 
+  /// A detected path's `:line` / `:line:col` (or `(line,col)`), 1-based as
+  /// printed; null when the path has none. `link-editor` opens the file
+  /// there.
+  final int? line;
+  final int? column;
+
   bool get isWeb => kind == TerminalLinkKind.url;
 
   @override
@@ -46,10 +54,13 @@ final class LinkHit {
       other.kind == kind &&
       other.target == target &&
       other.begin == begin &&
-      other.end == end;
+      other.end == end &&
+      other.line == line &&
+      other.column == column;
 
   @override
-  int get hashCode => Object.hash(source, kind, target, begin, end);
+  int get hashCode =>
+      Object.hash(source, kind, target, begin, end, line, column);
 
   /// Never shows the target (A10 §5).
   @override
@@ -109,5 +120,7 @@ LinkHit? findLinkAt(
     target: link.target,
     begin: line.beginOf(link.start),
     end: line.endAfter(link.end - 1),
+    line: link.line,
+    column: link.column,
   );
 }

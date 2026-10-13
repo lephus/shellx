@@ -38,6 +38,13 @@ enum ConfirmClose { whenRunning, never, always }
 /// resume the agent that was running; `off` shows nothing.
 enum AgentResume { ask, off }
 
+/// `link-editor`: where ⌘-click (Ctrl-click on Windows) opens a file path
+/// found in a local pane. `auto` = the first installed of Cursor, VS Code,
+/// Zed; `finder` = only reveal it in Finder / Explorer (A10 D7, as before).
+/// Folders, server panes and missing paths never reach an editor. The names
+/// are the wire values.
+enum LinkEditor { auto, vscode, cursor, zed, finder }
+
 /// `font-weight`: the bundled terminal font's face for normal text.
 enum TerminalFontWeight { light, regular }
 
@@ -116,6 +123,7 @@ final class ShellxConfig {
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
     this.agentResume = AgentResume.ask,
+    this.linkEditor = LinkEditor.auto,
     this.prStatus = false,
     this.agentEventCommand = '',
     this.workingDirectory = const WorkingDirectory.home(),
@@ -157,6 +165,9 @@ final class ShellxConfig {
 
   /// `agent-resume` (ShellX file only, A12 D13).
   final AgentResume agentResume;
+
+  /// `link-editor` (ShellX file only): the editor a file path opens in.
+  final LinkEditor linkEditor;
 
   /// `pr-status` (ShellX file only, A12 D16): off by default.
   final bool prStatus;
@@ -228,6 +239,10 @@ ShellxConfig buildShellxConfig({
   return b.build();
 }
 
+final Map<String, LinkEditor> _linkEditors = {
+  for (final e in LinkEditor.values) e.name: e,
+};
+
 final RegExp _digits = RegExp(r'^\d+$');
 final RegExp _decimal = RegExp(r'^-?(\d+\.?\d*|\.\d+)$');
 
@@ -268,6 +283,7 @@ final class _Builder {
   var optionAsAlt = OptionAsAlt.off;
   var confirmClose = ConfirmClose.whenRunning;
   var agentResume = AgentResume.ask;
+  var linkEditor = LinkEditor.auto;
   var prStatus = false;
   var agentEventCommand = '';
   WorkingDirectory workingDirectory = const WorkingDirectory.home();
@@ -554,6 +570,12 @@ final class _Builder {
         };
         if (mode == null) return _badValue(e, g, 'ask, off');
         agentResume = mode;
+      case 'link-editor':
+        final editor = v.isEmpty ? LinkEditor.auto : _linkEditors[v];
+        if (editor == null) {
+          return _badValue(e, g, 'auto, vscode, cursor, zed, finder');
+        }
+        linkEditor = editor;
       case 'pr-status':
         final on = v.isEmpty ? false : _bool(v);
         if (on == null) return _badValue(e, g, 'true, false');
@@ -730,6 +752,7 @@ final class _Builder {
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,
     agentResume: agentResume,
+    linkEditor: linkEditor,
     prStatus: prStatus,
     agentEventCommand: agentEventCommand,
     workingDirectory: workingDirectory,

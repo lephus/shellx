@@ -11,6 +11,8 @@ import 'package:xterm/xterm.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart';
+import '../../config/config_controller.dart';
+import '../../platform/editor_links.dart';
 import '../../terminal/link_finder.dart';
 import '../../terminal/link_resolver.dart';
 import '../../terminal/terminal_tabs.dart';
@@ -22,6 +24,17 @@ final linkResolverProvider = Provider<LinkResolver>(
   (ref) => LinkResolver(
     home: Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'],
     windows: Platform.isWindows,
+  ),
+);
+
+/// `link-editor = auto`: which editors are installed (overridden in tests,
+/// which never look at the real disk).
+final editorDetectorProvider = Provider<EditorDetector>(
+  (ref) => EditorDetector(
+    windows: Platform.isWindows,
+    macos: Platform.isMacOS,
+    env: Platform.environment,
+    home: Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'],
   ),
 );
 
@@ -58,8 +71,11 @@ String shortenAddress(String uri) {
       '${parsed.host}${parsed.hasPort ? ':${parsed.port}' : ''}$shortTail';
 }
 
-/// Opens or reveals [hit] (A10 D6, D7, D10). Never throws; a failure is a
-/// toast.
+/// Opens or reveals [hit] (A10 D6, D7, D10). A FILE in a local pane opens
+/// in the `link-editor` at the hit's line and column (Cursor, VS Code or
+/// Zed through its URL handler); a folder, a file when no editor is found
+/// or `link-editor = finder`, is revealed in Finder / Explorer as before,
+/// and nothing is ever run. Never throws; a failure is a toast.
 Future<void> activateLink(
   WidgetRef ref,
   BuildContext context,
@@ -92,6 +108,21 @@ Future<void> activateLink(
           .read(linkResolverProvider)
           .resolve(hit.target, cwd: pane.cwd);
       if (found == null) return;
+      if (!found.isDirectory && paneHasLocalPaths(pane)) {
+        final editor = await editorFor(
+          ref.read(shellxConfigProvider).config.linkEditor,
+          ref.read(editorDetectorProvider),
+        );
+        if (editor != null) {
+          await opener.openInEditor(
+            editor,
+            found.path,
+            line: hit.line,
+            column: hit.column,
+          );
+          return;
+        }
+      }
       await opener.reveal(found.path, isDirectory: found.isDirectory);
     }
   } on Object catch (error) {

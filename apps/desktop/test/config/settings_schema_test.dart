@@ -145,6 +145,7 @@ void main() {
       'global-hotkey',
       'agent-resume',
       'pr-status',
+      'link-editor',
     };
     final have = {
       for (final d in kSettings)

@@ -2781,6 +2781,28 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingAgentResumeOff => 'Tắt';
 
   @override
+  String get settingLinkEditor => 'Mở liên kết tệp bằng';
+
+  @override
+  String get settingLinkEditorDesc =>
+      '⌘-click (Ctrl-click trên Windows) vào đường dẫn tệp như main.dart:12:3 sẽ mở tệp đúng dòng đó. Tự động dùng trình đầu tiên đã cài trong Cursor, VS Code và Zed. Thư mục và đường dẫn trên máy chủ luôn được hiện trong Finder hoặc Explorer.';
+
+  @override
+  String get settingLinkEditorAuto => 'Tự động';
+
+  @override
+  String get settingLinkEditorCursor => 'Cursor';
+
+  @override
+  String get settingLinkEditorVscode => 'VS Code';
+
+  @override
+  String get settingLinkEditorZed => 'Zed';
+
+  @override
+  String get settingLinkEditorFinder => 'Finder / Explorer';
+
+  @override
   String get settingsAgentIntegrations => 'Tích hợp agent';
 
   @override

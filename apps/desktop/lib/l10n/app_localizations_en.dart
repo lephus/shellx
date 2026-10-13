@@ -2873,6 +2873,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingAgentResumeOff => 'Off';
 
   @override
+  String get settingLinkEditor => 'Open file links in';
+
+  @override
+  String get settingLinkEditorDesc =>
+      '⌘-click (Ctrl-click on Windows) on a file path such as main.dart:12:3 opens it at that line. Automatic uses the first installed of Cursor, VS Code and Zed. Folders, and paths on a server, are always shown in Finder or Explorer.';
+
+  @override
+  String get settingLinkEditorAuto => 'Automatic';
+
+  @override
+  String get settingLinkEditorCursor => 'Cursor';
+
+  @override
+  String get settingLinkEditorVscode => 'VS Code';
+
+  @override
+  String get settingLinkEditorZed => 'Zed';
+
+  @override
+  String get settingLinkEditorFinder => 'Finder / Explorer';
+
+  @override
   String get settingsAgentIntegrations => 'Agent integrations';
 
   @override

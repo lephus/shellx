@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart';
+import 'package:shellx_desktop/src/platform/editor_links.dart';
 import 'package:shellx_desktop/src/terminal/link_resolver.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/terminal/link_layer.dart';
@@ -41,8 +42,170 @@ Future<TestGesture> hover(WidgetTester t, Offset at) async {
   return g;
 }
 
+/// Sees only the app bundles in [installed] (never the real disk).
+EditorDetector editors(Set<String> installed) => EditorDetector(
+  windows: false,
+  env: const {},
+  home: '/Users/me',
+  exists: (path) async => installed.contains(path),
+);
+
+/// `/work/notes.txt` is a file, `/work/src` a folder, nothing else exists.
+LinkResolver workResolver() => LinkResolver(
+  home: '/Users/me',
+  windows: false,
+  typeOf: (path) async => switch (path) {
+    '/work/notes.txt' => FileSystemEntityType.file,
+    '/work/src' => FileSystemEntityType.directory,
+    _ => FileSystemEntityType.notFound,
+  },
+);
+
+/// ⌘-clicks cell ([col], 0) of a pane showing [text], with [config] loaded
+/// and [installed] app bundles.
+Future<dynamic> cmdClickPath(
+  WidgetTester t, {
+  required String text,
+  required int col,
+  String config = '',
+  Set<String> installed = const {'/Applications/Cursor.app'},
+  bool fail = false,
+}) async {
+  final w = await pumpConfiguredWorkspace(
+    t,
+    config: config,
+    extra: [
+      linkResolverProvider.overrideWithValue(workResolver()),
+      editorDetectorProvider.overrideWithValue(editors(installed)),
+    ],
+  );
+  final tab = w.container.read(terminalTabsProvider).selected!;
+  tab.terminal.write(text);
+  await t.pump();
+  opener(w).fail = fail;
+  await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+  await click(t, cellCentre(t, col, 0));
+  await t.pump(const Duration(milliseconds: 400));
+  await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+  return w;
+}
+
 void main() {
   final mac = TargetPlatformVariant.only(TargetPlatform.macOS);
+
+  group('link-editor: ⌘-click a file path', () {
+    testWidgets('auto: the first installed editor opens it at line:col', (
+      t,
+    ) async {
+      final w = await cmdClickPath(t, text: '/work/notes.txt:12:3 x', col: 3);
+      expect(opener(w).edited.single, (
+        EditorApp.cursor,
+        '/work/notes.txt',
+        12,
+        3,
+      ));
+      expect(opener(w).revealed, isEmpty);
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('auto prefers Cursor, then VS Code, then Zed', (t) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/notes.txt:4',
+        col: 3,
+        installed: const {
+          '/Applications/Zed.app',
+          '/Applications/Visual Studio Code.app',
+        },
+      );
+      expect(opener(w).edited.single, (
+        EditorApp.vscode,
+        '/work/notes.txt',
+        4,
+        null,
+      ));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('auto with no editor installed reveals, as before', (t) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/notes.txt:4',
+        col: 3,
+        installed: const {},
+      );
+      expect(opener(w).edited, isEmpty);
+      expect(opener(w).revealed.single, ('/work/notes.txt', false));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('finder: always reveals, whatever is installed', (t) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/notes.txt:4',
+        col: 3,
+        config: 'link-editor = finder\n',
+      );
+      expect(opener(w).edited, isEmpty);
+      expect(opener(w).revealed.single, ('/work/notes.txt', false));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('a named editor is used even when not found on disk', (
+      t,
+    ) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/notes.txt',
+        col: 3,
+        config: 'link-editor = zed\n',
+        installed: const {},
+      );
+      expect(opener(w).edited.single, (
+        EditorApp.zed,
+        '/work/notes.txt',
+        null,
+        null,
+      ));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('a folder is still revealed, never sent to an editor', (
+      t,
+    ) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/src',
+        col: 3,
+        config: 'link-editor = cursor\n',
+      );
+      expect(opener(w).edited, isEmpty);
+      expect(opener(w).revealed.single, ('/work/src', true));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('a missing file opens nothing', (t) async {
+      final w = await cmdClickPath(t, text: '/work/gone.txt:3', col: 3);
+      expect(opener(w).edited, isEmpty);
+      expect(opener(w).revealed, isEmpty);
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+
+    testWidgets('an editor that fails to open is the usual toast', (t) async {
+      final w = await cmdClickPath(
+        t,
+        text: '/work/notes.txt:1',
+        col: 3,
+        fail: true,
+      );
+      expect(
+        w.container.read(terminalTabsProvider).notice,
+        isA<LinkOpenFailedNotice>(),
+      );
+      await t.pump(const Duration(seconds: 7));
+      await disposeWorkspace(t, w.container);
+    }, variant: mac);
+  });
 
   testWidgets('hover with ⌘ underlines a URL; without it nothing', (t) async {
     final w = await pumpConfiguredWorkspace(t);
@@ -157,7 +320,11 @@ void main() {
     );
     final w = await pumpConfiguredWorkspace(
       t,
-      extra: [linkResolverProvider.overrideWithValue(resolver)],
+      extra: [
+        linkResolverProvider.overrideWithValue(resolver),
+        // No editor installed: a file is shown in Finder, as before.
+        editorDetectorProvider.overrideWithValue(editors(const {})),
+      ],
     );
     final tab = w.container.read(terminalTabsProvider).selected!;
     tab.terminal.write('/work/notes.txt /work/missing.txt');

@@ -46,6 +46,7 @@ String configTemplate({required bool mac, required List<String> ghosttyFiles}) {
     '# macos-option-as-alt = false  (true, left, right)',
     '# confirm-close-surface = true  (false, always)',
     '# working-directory = home  (inherit, or an absolute path)',
+    '# link-editor = auto  (vscode, cursor, zed, finder: where Cmd/Ctrl-click opens a file path:line; auto = the first installed of Cursor, VS Code, Zed)',
     '# global-hotkey = ctrl+alt+j  (show or hide ShellX from any app; off by default)',
     '# agent-resume = ask  (off: never offer to resume an agent after a restart)',
     '# pr-status = false  (true: show the pull request of the branch, through the GitHub CLI gh)',

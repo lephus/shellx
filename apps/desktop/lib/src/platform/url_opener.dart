@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:shellx_core/shellx_core.dart' show webUriOf;
 
+import 'editor_links.dart';
+
 typedef UrlCommandRunner =
     Future<ProcessResult> Function(String executable, List<String> arguments);
 
@@ -23,12 +25,26 @@ abstract interface class UrlOpener {
   /// folder too, so a `.app` bundle is never launched. Never runs the file. Throws [ArgumentError] for a path that is
   /// not absolute or holds a control character.
   Future<void> reveal(String path, {required bool isDirectory});
+
+  /// `link-editor`: opens the FILE [path] (absolute) in [editor] at [line]
+  /// and [column] through the editor's URL handler
+  /// (`vscode://file/<path>:<line>:<col>`, see [editorFileUrl]). Only a
+  /// URL with the editor's scheme reaches the OS — never the path itself,
+  /// so nothing is run. Throws [ArgumentError] for a path that is not
+  /// absolute or holds a control character, without running a command.
+  Future<void> openInEditor(
+    EditorApp editor,
+    String path, {
+    int? line,
+    int? column,
+  });
 }
 
 /// Opens URLs (download links, the macOS Full Disk Access pane) with the OS.
 ///
 /// Opens only absolute `https` URLs, plus [fullDiskAccessPane] on macOS,
-/// plus `http://localhost:<port>/` through [openLocalPort]; anything else
+/// plus `http://localhost:<port>/` through [openLocalPort], plus the
+/// `cursor:` / `vscode:` / `zed:` file URLs [openInEditor] builds; anything else
 /// throws [ArgumentError] without running a command. Windows'
 /// `url.dll,FileProtocolHandler` runs `file:` and UNC executables, and
 /// macOS `open` opens any app or file (and reads a leading `-` as an
@@ -101,6 +117,29 @@ final class SystemUrlOpener implements UrlOpener {
       await _run('explorer.exe', ['/select,$path']);
     } else {
       await _run('/usr/bin/open', ['-R', path]);
+    }
+  }
+
+  @override
+  Future<void> openInEditor(
+    EditorApp editor,
+    String path, {
+    int? line,
+    int? column,
+  }) async {
+    // Built from a fixed scheme and the encoded path: a `-` or a space can
+    // never start an option, and no `file:` URL reaches the handler.
+    final url = editorFileUrl(
+      editor,
+      path,
+      line: line,
+      column: column,
+      windows: _isWindows,
+    );
+    if (_isWindows) {
+      await _run('rundll32', ['url.dll,FileProtocolHandler', url]);
+    } else {
+      await _run('/usr/bin/open', [url]);
     }
   }
 
