@@ -215,6 +215,29 @@ String agentStateWire(AgentState s) => switch (s) {
   AgentState.unknown => 'unknown',
 };
 
+/// A12 D22, agent quick reply D1: what a phone is told of a pane's agent,
+/// as wire names; null when nothing shows (no record, or a restored
+/// `unknown` one).
+({String agent, String state})? agentWireOf(AgentPane? p) =>
+    p == null || !agentStateVisible(p.state)
+    ? null
+    : (agent: p.agent.name, state: agentStateWire(p.state));
+
+/// Agent quick reply §2: calls [publish] for each pane (= its shell session
+/// id) whose shown agent differs between [before] and [after]; empty names
+/// when it no longer shows. The session managers drop repeats.
+void agentWireChanges(
+  Map<int, AgentPane> before,
+  Map<int, AgentPane> after,
+  void Function(int sessionId, String agent, String state) publish,
+) {
+  for (final id in {...before.keys, ...after.keys}) {
+    final next = agentWireOf(after[id]);
+    if (agentWireOf(before[id]) == next) continue;
+    publish(id, next?.agent ?? '', next?.state ?? '');
+  }
+}
+
 const _eventNames = {
   'start': AgentEventKind.start,
   'running': AgentEventKind.running,

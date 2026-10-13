@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderSubscription;
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 
@@ -10,7 +12,8 @@ import '../platform/wake_detector.dart';
 import '../terminal_sharing/attach_throttle.dart';
 import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_controller_base.dart';
-import '../terminal/agent_status.dart' show agentStateVisible, agentStateWire;
+import '../terminal/agent_status.dart'
+    show AgentPane, agentWireChanges, agentWireOf;
 import '../terminal/agent_status_notifier.dart' show agentStatusProvider;
 import 'agent_runtime.dart';
 import 'agent_state.dart';
@@ -43,6 +46,9 @@ class AgentController extends AgentControllerBase {
   final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
   StreamSubscription<void>? _trustedSubscription;
   StreamSubscription<void>? _shellSubscription;
+
+  /// Agent quick reply §2: the panes' agent states, sent on to phones.
+  ProviderSubscription<Map<int, AgentPane>>? _agentStates;
   Timer? _updateTimer;
   WakeDetector? _wakeDetector;
   bool _updateCheckFailed = false;
@@ -801,14 +807,31 @@ class AgentController extends AgentControllerBase {
   /// A12 D22: a phone listing with `desktop: true` sees the agent state of
   /// each ShellX pane. The status model lives in the window: in the
   /// background service (no window) nothing is known, so no keys are sent.
+  ///
+  /// Agent quick reply D1, §2: a phone attached to a pane's session is
+  /// also told each change as it happens (`agent.state`; the session
+  /// manager drops repeats), and `session.attached` brings it up to date.
   void _shareAgentStatus(AgentRuntime runtime) {
     if (runtime is! CoreAgentRuntime) return;
     runtime.shellSessions.agentOf = (id) {
       if (!ref.mounted || !ref.exists(agentStatusProvider)) return null;
-      final r = ref.read(agentStatusProvider)[id];
-      if (r == null || !agentStateVisible(r.state)) return null;
-      return (agent: r.agent.name, state: agentStateWire(r.state));
+      return agentWireOf(ref.read(agentStatusProvider)[id]);
     };
+    // One listener for every runtime; only where the window's status model
+    // already lives (never created here, as in the background service).
+    if (_agentStates != null || !ref.exists(agentStatusProvider)) return;
+    _agentStates = ref.listen<Map<int, AgentPane>>(agentStatusProvider, (
+      before,
+      after,
+    ) {
+      final current = _runtime;
+      if (current is! CoreAgentRuntime) return;
+      agentWireChanges(
+        before ?? const {},
+        after,
+        current.shellSessions.publishAgentState,
+      );
+    });
   }
 
   /// Disconnects every phone and the relay; the shells keep running (A1
@@ -1114,6 +1137,8 @@ class AgentController extends AgentControllerBase {
     _wakeDetector?.stop();
     unawaited(_trustedSubscription?.cancel());
     unawaited(_shellSubscription?.cancel());
+    _agentStates?.close();
+    _agentStates = null;
     for (final subscription in _runtimeSubscriptions) {
       unawaited(subscription.cancel());
     }

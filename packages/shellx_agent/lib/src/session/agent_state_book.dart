@@ -31,9 +31,7 @@ final class AgentStateBook {
   /// the agent [current]ly showing (`agentOf`); what it carries counts as
   /// told, so the same state is not sent again right after.
   SessionAttached attached(int id, int head, AgentShown? current) {
-    final shown = current == null || current.agent.isEmpty
-        ? null
-        : current;
+    final shown = current == null || current.agent.isEmpty ? null : current;
     change(id, shown?.agent ?? '', shown?.state ?? '');
     return SessionAttached(
       id: id,

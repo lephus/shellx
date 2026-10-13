@@ -412,22 +412,25 @@ void main() {
       expect(decoded.agentState, isNull);
     });
 
-    test('agent.state with an unknown agent or state reads as "none shows"', () {
-      final decoded =
-          decodeBatch(
-                encodeCbor([
-                  {
-                    't': 'agent.state',
-                    'id': 4,
-                    'agent': 'claude',
-                    'state': 'thinking',
-                  },
-                ]),
-              ).single
-              as AgentStateMessage;
-      expect(decoded, const AgentStateMessage(id: 4, agent: '', state: ''));
-      expect(decoded.wireState, isNull);
-    });
+    test(
+      'agent.state with an unknown agent or state reads as "none shows"',
+      () {
+        final decoded =
+            decodeBatch(
+                  encodeCbor([
+                    {
+                      't': 'agent.state',
+                      'id': 4,
+                      'agent': 'claude',
+                      'state': 'thinking',
+                    },
+                  ]),
+                ).single
+                as AgentStateMessage;
+        expect(decoded, const AgentStateMessage(id: 4, agent: '', state: ''));
+        expect(decoded.wireState, isNull);
+      },
+    );
 
     test('agent.state needs id, agent and state', () {
       expect(
