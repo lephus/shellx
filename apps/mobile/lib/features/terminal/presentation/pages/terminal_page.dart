@@ -13,6 +13,7 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/termina
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_shortcuts.dart';
+import 'package:shellx_mobile/features/terminal/presentation/widgets/agent_reply_bar.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/extra_keys_bar.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/link_sheet.dart';
 import 'package:shellx_mobile/features/terminal/presentation/widgets/pinch_zoom.dart';
@@ -325,19 +326,30 @@ class _TerminalPageState extends State<TerminalPage> {
       color: context.colors.keyboardBackground,
       child: SafeArea(
         top: false,
-        child: ExtraKeysBar(
-          controller: workspace.extraKeys,
-          onKey: _controller.sendKey,
-          onPaste: _paste,
+        // Agent quick reply D2: while the active tab's agent waits, its reply keys take the extra keys' place.
+        child: Watch((context) {
           // Always there, disabled while the tab cannot take a line: the keys never shift.
-          leading: Watch(
+          final mic = Watch(
             (context) => MicButton(
               controller: _voice,
               enabled: workspace.activeTab.value?.isLive.value ?? false,
               onTap: () => _voice.toggleMic(Localizations.localeOf(context).languageCode),
             ),
-          ),
-        ),
+          );
+          if (workspace.activeTab.value?.showReplyBar.value ?? false) {
+            return AgentReplyBar(
+              onKey: _controller.sendReply,
+              onShowExtraKeys: _controller.showExtraKeys,
+              leading: mic,
+            );
+          }
+          return ExtraKeysBar(
+            controller: workspace.extraKeys,
+            onKey: _controller.sendKey,
+            onPaste: _paste,
+            leading: mic,
+          );
+        }),
       ),
     ),
   ];
@@ -838,6 +850,22 @@ class _TabChip extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Agent quick reply §3: a waiting agent in amber, a running one neutral; nothing otherwise.
+                  if (_agentDot(tab.agentState.value) case final dot?)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Semantics(
+                        label: dot.label(S.of(context)),
+                        child: ExcludeSemantics(
+                          child: Container(
+                            key: ValueKey('tab-agent-${tab.id}'),
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(color: dot.color, shape: BoxShape.circle),
+                          ),
+                        ),
+                      ),
+                    ),
                   // 44 × 44 pt: it sits next to the label, and on a desktop tab it detaches without asking.
                   Tooltip(
                     message: closeTooltip,
@@ -860,6 +888,13 @@ class _TabChip extends StatelessWidget {
     });
   }
 }
+
+/// Agent quick reply §3: the tab strip's agent dot; null for a state that shows none.
+({Color color, String Function(S) label})? _agentDot(AgentWireState? state) => switch (state) {
+  AgentWireState.needsInput => (color: TerminalColors.yellow, label: (s) => s.agentDotNeedsInput),
+  AgentWireState.running => (color: TerminalColors.muted, label: (s) => s.agentDotRunning),
+  _ => null,
+};
 
 /// No tab yet: the session list is loading, or every tab was closed.
 class _NoTab extends StatelessWidget {

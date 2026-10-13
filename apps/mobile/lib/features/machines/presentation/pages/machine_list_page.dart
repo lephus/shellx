@@ -130,6 +130,7 @@ class _MachineListPageState extends State<MachineListPage> {
                   // registry still holds one) is dead.
                   tabs: machine.paired ? _controller.tabsOpen(machine.id) : 0,
                   unseen: machine.paired ? _controller.unseenTabs(machine.id) : 0,
+                  agentState: machine.paired ? _controller.agentState(machine.id) : null,
                   lastUsed: machine.online && machine.id == state.value.lastUsedId,
                   now: _controller.now(),
                   onTap: waiting || !machine.online
@@ -224,6 +225,7 @@ class MachineCard extends StatelessWidget {
     required this.now,
     required this.onTap,
     this.unseen = 0,
+    this.agentState,
     this.lastUsed = false,
   });
 
@@ -233,6 +235,10 @@ class MachineCard extends StatelessWidget {
 
   /// A11 D28: tabs of this machine with output nobody has looked at (a subset of [tabs]).
   final int unseen;
+
+  /// Agent quick reply §3: a coding agent waits for the user (warning dot) or runs (neutral dot) on one of
+  /// this machine's tabs; null shows none.
+  final AgentWireState? agentState;
 
   /// A11 D28: the machine opened last: a "Last used" chip.
   final bool lastUsed;
@@ -350,6 +356,25 @@ class MachineCard extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  if (switch (agentState) {
+                                        AgentWireState.needsInput => (colors.warn, strings.agentDotNeedsInput),
+                                        AgentWireState.running => (colors.secondaryText, strings.agentDotRunning),
+                                        _ => null,
+                                      }
+                                      case (final color, final label)) ...[
+                                    Semantics(
+                                      label: label,
+                                      child: ExcludeSemantics(
+                                        child: Container(
+                                          key: const ValueKey('dot-agent'),
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                                        ),
+                                      ),
+                                    ),
+                                    5.sizedWidth,
+                                  ],
                                   if (unseen > 0) ...[
                                     Semantics(
                                       label: strings.machineNewOutput,

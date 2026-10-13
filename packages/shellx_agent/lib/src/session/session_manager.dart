@@ -23,6 +23,7 @@ import '../remote/ssh_command.dart';
 import '../remote/ssh_target.dart';
 import '../term/osc_title.dart';
 import 'agent_sessions.dart';
+import 'agent_state_book.dart';
 import 'local_sessions.dart';
 import 'session_ids.dart';
 import 'session_notice.dart';
@@ -449,7 +450,28 @@ final class SessionManager implements AgentSessions, LocalSessions {
   /// (`agent`, `state`); null when none shows. Set by the desktop window
   /// (its status model lives in the UI process); only the `desktop: true`
   /// list carries it.
+  ///
+  /// Agent quick reply D1: also what `session.attached` carries.
   ({String agent, String state})? Function(int sessionId)? agentOf;
+
+  final _agentStates = AgentStateBook();
+
+  /// Agent quick reply D1, §2: the coding agent showing in session
+  /// [sessionId] is now [agent] in [state] (both empty: none shows). Sends
+  /// `agent.state` to the phone attached to it, unless that phone was told
+  /// this already; a session without a phone only records it (the attach
+  /// brings it, from [agentOf]). Unknown sessions are ignored.
+  void publishAgentState(int sessionId, String agent, String state) {
+    final session = _sessions[sessionId];
+    if (session == null || session.closing) return;
+    if (!_agentStates.change(sessionId, agent, state)) return;
+    final mobileId = session.attachedMobileId;
+    if (mobileId == null) return;
+    _send(
+      mobileId,
+      AgentStateMessage(id: sessionId, agent: agent, state: state),
+    );
+  }
 
   List<SessionInfo> _infos({required bool context}) => [
     for (final s in _sessions.values)
@@ -1062,7 +1084,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       if (receivesDriver(mobileId)) {
         _send(mobileId, SessionDriver(id: id, by: session.driver));
       }
-      _send(mobileId, SessionAttached(id: id, seq: head));
+      _send(mobileId, _agentStates.attached(id, head, agentOf?.call(id)));
       if (previous != mobileId) _changes.add(null);
       return;
     }
@@ -1076,7 +1098,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       session.rows = r;
       session.resize(c, r);
     }
-    _send(mobileId, SessionAttached(id: id, seq: head));
+    _send(mobileId, _agentStates.attached(id, head, agentOf?.call(id)));
     if (previous != mobileId) _changes.add(null);
   }
 
@@ -1433,6 +1455,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
     final recipient = session.attachedMobileId ?? session.exitRecipient;
     session.remote?.plainTimer?.cancel();
     _sessions.remove(session.id);
+    _agentStates.forget(session.id);
     session.ports = const [];
     _portWatcher?.sessionsChanged();
     _remotePorts?.sessionsChanged();

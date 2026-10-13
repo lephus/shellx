@@ -464,5 +464,15 @@
   "machinesReload": "Reload",
   "settingsFixedHeight": "Keep terminal size when the keyboard opens",
   "settingsFixedHeightHint": "The keyboard covers the terminal instead of shrinking it.",
-  "voiceDraftSaved": "Draft saved"
+  "voiceDraftSaved": "Draft saved",
+  "replyKeyOption": "Option {number}",
+  "@replyKeyOption": {"placeholders": {"number": {"type": "int"}}},
+  "replyKeyYes": "Yes",
+  "replyKeyNo": "No",
+  "replyKeyEnter": "Enter",
+  "replyKeyEscape": "Escape",
+  "replyShowExtraKeys": "Show the extra keys",
+  "replyBarLabel": "Quick replies to the agent",
+  "agentDotNeedsInput": "An agent needs your answer",
+  "agentDotRunning": "An agent is running"
 }

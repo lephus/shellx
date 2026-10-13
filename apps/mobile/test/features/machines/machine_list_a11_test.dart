@@ -132,6 +132,49 @@ void main() {
     expect(find.text('2 tab'), findsOneWidget);
   });
 
+  testWidgets('agent quick reply: the card shows a dot while an agent waits or runs on one of its tabs', (
+    tester,
+  ) async {
+    final workspace = registry.forMachine(agentA);
+    await workspace.openNew((cols: 80, rows: 24));
+    await openList(tester);
+    final dot = find.descendant(of: card(agentA), matching: find.byKey(const ValueKey('dot-agent')));
+    expect(dot, findsNothing);
+
+    final handle = backend.machines[agentA]!.handles.single;
+    handle.emit(const TabAgent(agent: 'codex', state: AgentWireState.running));
+    await tester.pump();
+    expect(
+      tester.widget<Container>(dot).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', tester.element(dot).colors.secondaryText),
+    );
+    expect(
+      find.descendant(
+        of: card(agentA),
+        matching: find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Agent đang chạy'),
+      ),
+      findsOneWidget,
+    );
+
+    handle.emit(const TabAgent(agent: 'codex', state: AgentWireState.needsInput));
+    await tester.pump();
+    expect(
+      tester.widget<Container>(dot).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', tester.element(dot).colors.warn),
+    );
+    expect(
+      find.descendant(
+        of: card(agentA),
+        matching: find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Agent cần bạn trả lời'),
+      ),
+      findsOneWidget,
+    );
+
+    handle.emit(const TabAgent());
+    await tester.pump();
+    expect(dot, findsNothing);
+  });
+
   testWidgets('a failed load with nothing listed shows the error with a retry that reloads once', (tester) async {
     backend.devicesError = const ApiException(status: 500, code: 'x', message: 'boom');
     await openList(tester);

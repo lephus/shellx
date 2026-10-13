@@ -8,6 +8,7 @@ import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_k
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.dart';
+import 'package:xterm/core.dart';
 
 /// Why the terminal page closed itself; the machine list reacts (design "Khi có sự cố").
 enum TerminalExit {
@@ -203,6 +204,29 @@ class TerminalPageController extends Controller {
     if (_closed) return;
     final tab = workspace.activeTab.peek();
     if (tab != null) workspace.extraKeys.sendKey(key, tab.terminal.peek());
+  }
+
+  /// Agent quick reply D2: one key of the reply bar to the active tab, the way a typed key goes (the
+  /// terminal's output → `input`), as is: no sticky modifiers, no cursor-mode rewriting.
+  void sendReply(ReplyKey key) {
+    if (_closed) return;
+    final terminal = workspace.activeTab.peek()?.terminal.peek();
+    if (terminal == null) return;
+    // The arrows go through keyInput, as on the extra keys: application cursor mode applies.
+    switch (key) {
+      case ReplyKey.up:
+        terminal.keyInput(TerminalKey.arrowUp);
+      case ReplyKey.down:
+        terminal.keyInput(TerminalKey.arrowDown);
+      default:
+        terminal.onOutput?.call(replyKeyText(key));
+    }
+  }
+
+  /// Agent quick reply D2: "⌨" on the reply bar.
+  void showExtraKeys() {
+    if (_closed) return;
+    workspace.activeTab.peek()?.dismissReplyBar();
   }
 
   /// Bracketed when the program enabled it, CR line breaks (spec §9.4).

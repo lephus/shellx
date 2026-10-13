@@ -40,6 +40,17 @@ final class TabDriver extends TabEvent {
   final DriverSide by;
 }
 
+/// Agent quick reply §3: the coding agent showing in the session (from
+/// `agent.state`, or what `session.attached` carries). Both null when none
+/// shows, including after an attach from a desktop that sends no state.
+final class TabAgent extends TabEvent {
+  const TabAgent({this.agent, this.state});
+
+  /// `claude`, `codex`, `gemini` or `opencode`.
+  final String? agent;
+  final AgentWireState? state;
+}
+
 final class TabDetached extends TabEvent {
   const TabDetached(this.reason);
   final DetachReason reason;
@@ -148,11 +159,26 @@ final class ClientTab {
   }
 
   /// `session.attached` came, with the stream [head] (null from an older
-  /// agent): output ending at or before it is still catch-up.
+  /// agent): output ending at or before it is still catch-up. Also tells
+  /// the [agent] in [agentState] it carries, or none: a re-attach brings
+  /// the tab up to date (agent quick reply §4).
   @internal
-  void handleAttached(int? head) {
+  void handleAttached(int? head, {String? agent, String? agentState}) {
     _awaitingAttached = false;
     _head = head;
+    handleAgent(agent ?? '', agentState ?? '');
+  }
+
+  /// `agent.state` (agent quick reply D1): empty or unknown names are none.
+  @internal
+  void handleAgent(String agent, String state) {
+    final known = isKnownAgent(agent, state);
+    _emit(
+      TabAgent(
+        agent: known ? agent : null,
+        state: known ? AgentWireState.fromWire(state) : null,
+      ),
+    );
   }
 
   /// Keystrokes are waiting for the agent to confirm the (re-)attach.

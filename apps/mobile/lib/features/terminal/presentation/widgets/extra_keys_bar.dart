@@ -73,7 +73,7 @@ class ExtraKeysBar extends StatelessWidget {
           for (final key in ExtraKey.values)
             Watch(
               key: ValueKey('extra-key-${key.name}'),
-              (context) => _KeyCap(
+              (context) => KeyCap(
                 label: extraKeyLabel(key) ?? S.of(context).keyPaste,
                 semanticsLabel: _semanticsLabel(context, key),
                 isPaste: key == ExtraKey.paste,
@@ -91,13 +91,15 @@ class ExtraKeysBar extends StatelessWidget {
   }
 }
 
-class _KeyCap extends StatelessWidget {
-  const _KeyCap({
+/// One key cap of the keyboard-styled bars (the extra keys, the agent reply bar).
+class KeyCap extends StatelessWidget {
+  const KeyCap({
+    super.key,
     required this.label,
     required this.semanticsLabel,
-    required this.isPaste,
-    required this.latch,
     required this.onTap,
+    this.isPaste = false,
+    this.latch,
   });
 
   final String label;

@@ -247,7 +247,8 @@ Payload của mỗi TRANSPORT là **mảng CBOR gồm 1..n tin nhắn**. Mỗi t
 | `session.open` | M → A | `cols, rows` | Mở phiên mới |
 | `session.opened` | A → M | `id, index, shell` | Phiên đã mở và gắn vào điện thoại này |
 | `session.attach` | M → A | `id, cols, rows, last_seq` | Gắn vào phiên có sẵn |
-| `session.attached` | A → M | `id, seq?` | Đã gắn; output bù đã gửi trước tin này (phần cửa sổ gửi cho phép). `seq` (tuỳ chọn, thêm 2026-10-13): đầu luồng (`end` của bộ đệm) lúc bắt đầu phát lại — byte có vị trí `< seq` là output bù, kể cả phần gửi sau tin này khi `ack` mở cửa sổ; từ `seq` trở đi là output mới. Agent cũ không gửi: client coi mọi output sau tin này là mới |
+| `session.attached` | A → M | `id, seq?, agent?, agent_state?` | Đã gắn; output bù đã gửi trước tin này (phần cửa sổ gửi cho phép). `seq` (tuỳ chọn, thêm 2026-10-13): đầu luồng (`end` của bộ đệm) lúc bắt đầu phát lại — byte có vị trí `< seq` là output bù, kể cả phần gửi sau tin này khi `ack` mở cửa sổ; từ `seq` trở đi là output mới. Agent cũ không gửi: client coi mọi output sau tin này là mới. `agent`/`agent_state` (tuỳ chọn, thêm 2026-10-13, spec trả lời nhanh agent): agent lập trình đang hiện trong phiên lúc gắn (`claude\|codex\|gemini\|opencode`, `running\|needs_input\|idle\|done`); chỉ ghi khi có, vắng hoặc tên lạ → không có agent |
+| `agent.state` | A → M | `id, agent, state` | (thêm 2026-10-13, spec trả lời nhanh agent) Agent lập trình trong phiên đổi trạng thái; chỉ gửi cho điện thoại đang gắn phiên đó, mỗi thay đổi một lần. `agent`, `state` như trên, cả hai `""` khi không còn agent nào hiện; tên lạ đọc như `""`. Không bao giờ mang lời của agent. App cũ bỏ qua `t` lạ |
 | `session.reset` | A → M | `id` | Client xóa màn hình; output tiếp theo bắt đầu từ đầu bộ đệm |
 | `output` | A → M | `id, seq, data` | Output terminal; `seq` là vị trí byte đầu tiên của `data` |
 | `ack` | M → A | `id, seq` | Đã nhận tới vị trí byte `seq` |

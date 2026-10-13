@@ -417,4 +417,46 @@ void main() {
       expect(events.map((e) => (e.mobileId, e.sessionId)), [(phone, 100)]);
     });
   });
+
+  group('agent state (agent quick reply D1)', () {
+    test('goes to the attached phone once per change', () {
+      fakeAsync((async) {
+        final rig = DesktopRig();
+        rig.connect(1);
+        rig.connect(2);
+        rig.manager.attach(phone, 100, 80, 24, 0);
+        async.flushMicrotasks();
+        rig.clear();
+
+        rig.manager
+          ..publishAgentState(100, 'claude', 'needs_input')
+          ..publishAgentState(100, 'claude', 'needs_input')
+          ..publishAgentState(101, 'claude', 'running');
+
+        expect(rig.to(phone), [
+          const AgentStateMessage(
+            id: 100,
+            agent: 'claude',
+            state: 'needs_input',
+          ),
+        ]);
+        expect(rig.sent, hasLength(1), reason: '101 has no phone');
+      });
+    });
+
+    test('session.attached carries the state from agentOf', () {
+      fakeAsync((async) {
+        final rig = DesktopRig();
+        rig.connect(1);
+        rig.manager.agentOf = (_) => (agent: 'gemini', state: 'running');
+        rig.manager.attach(phone, 100, 80, 24, 0);
+        async.flushMicrotasks();
+        final attached = rig.to(phone).whereType<SessionAttached>().single;
+        expect((attached.agent, attached.agentState), ('gemini', 'running'));
+        rig.clear();
+        rig.manager.publishAgentState(100, 'gemini', 'running');
+        expect(rig.sent, isEmpty);
+      });
+    });
+  });
 }
