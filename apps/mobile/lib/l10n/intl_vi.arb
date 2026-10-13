@@ -265,5 +265,14 @@
   "machinesReload": "Tải lại",
   "settingsFixedHeight": "Giữ cỡ terminal khi mở bàn phím",
   "settingsFixedHeightHint": "Bàn phím che lên terminal thay vì làm nó co lại.",
-  "voiceDraftSaved": "Có bản nháp"
+  "voiceDraftSaved": "Có bản nháp",
+  "replyKeyOption": "Lựa chọn {number}",
+  "replyKeyYes": "Có",
+  "replyKeyNo": "Không",
+  "replyKeyEnter": "Enter",
+  "replyKeyEscape": "Thoát",
+  "replyShowExtraKeys": "Hiện phím phụ",
+  "replyBarLabel": "Trả lời nhanh cho agent",
+  "agentDotNeedsInput": "Agent cần bạn trả lời",
+  "agentDotRunning": "Agent đang chạy"
 }

@@ -2403,6 +2403,76 @@ class S {
       args: [],
     );
   }
+
+  /// `Option {number}`
+  String replyKeyOption(int number) {
+    return Intl.message(
+      'Option $number',
+      name: 'replyKeyOption',
+      desc: '',
+      args: [number],
+    );
+  }
+
+  /// `Yes`
+  String get replyKeyYes {
+    return Intl.message('Yes', name: 'replyKeyYes', desc: '', args: []);
+  }
+
+  /// `No`
+  String get replyKeyNo {
+    return Intl.message('No', name: 'replyKeyNo', desc: '', args: []);
+  }
+
+  /// `Enter`
+  String get replyKeyEnter {
+    return Intl.message('Enter', name: 'replyKeyEnter', desc: '', args: []);
+  }
+
+  /// `Escape`
+  String get replyKeyEscape {
+    return Intl.message('Escape', name: 'replyKeyEscape', desc: '', args: []);
+  }
+
+  /// `Show the extra keys`
+  String get replyShowExtraKeys {
+    return Intl.message(
+      'Show the extra keys',
+      name: 'replyShowExtraKeys',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Quick replies to the agent`
+  String get replyBarLabel {
+    return Intl.message(
+      'Quick replies to the agent',
+      name: 'replyBarLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An agent needs your answer`
+  String get agentDotNeedsInput {
+    return Intl.message(
+      'An agent needs your answer',
+      name: 'agentDotNeedsInput',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An agent is running`
+  String get agentDotRunning {
+    return Intl.message(
+      'An agent is running',
+      name: 'agentDotRunning',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

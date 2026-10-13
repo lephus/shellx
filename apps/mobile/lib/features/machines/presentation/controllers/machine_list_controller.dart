@@ -88,6 +88,9 @@ class MachineListController extends Controller {
   /// Tabs of [agentId] with output nobody has looked at ("1 có chữ mới"). Reactive like [tabsOpen].
   int unseenTabs(String agentId) => _registry?.unseenCount(agentId) ?? 0;
 
+  /// Agent quick reply §3: a coding agent waits (or runs) on one of [agentId]'s tabs. Reactive like [tabsOpen].
+  AgentWireState? agentState(String agentId) => _registry?.agentState(agentId);
+
   /// "Kết nối lại" after close code 4001 (spec §12). The real path (`resume()` →
   /// `ClientService.start()` → loading the pinned machines) reads secure storage and can throw;
   /// guarded so that failure shows the spec §12 text as a toast instead of going unhandled.

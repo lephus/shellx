@@ -44,6 +44,36 @@ String? extraKeyLabel(ExtraKey key) => switch (key) {
   ExtraKey.paste => null,
 };
 
+/// Agent quick reply D2: the keys of the reply bar shown while a coding agent waits for the user, in order.
+enum ReplyKey { one, two, three, yes, no, enter, esc, up, down }
+
+/// What each [ReplyKey] sends: exactly one key, as typed by hand, never with the sticky modifiers. The arrows
+/// are the plain (normal cursor mode) sequences.
+String replyKeyText(ReplyKey key) => switch (key) {
+  ReplyKey.one => '1',
+  ReplyKey.two => '2',
+  ReplyKey.three => '3',
+  ReplyKey.yes => 'y',
+  ReplyKey.no => 'n',
+  ReplyKey.enter => '\r',
+  ReplyKey.esc => '\x1b',
+  ReplyKey.up => '\x1b[A',
+  ReplyKey.down => '\x1b[B',
+};
+
+/// The cap text of a [ReplyKey].
+String replyKeyLabel(ReplyKey key) => switch (key) {
+  ReplyKey.one => '1',
+  ReplyKey.two => '2',
+  ReplyKey.three => '3',
+  ReplyKey.yes => 'y',
+  ReplyKey.no => 'n',
+  ReplyKey.enter => 'Enter',
+  ReplyKey.esc => 'Esc',
+  ReplyKey.up => '↑',
+  ReplyKey.down => '↓',
+};
+
 enum ModifierLatch { off, oneShot, locked }
 
 /// Sticky modifiers that other input paths (soft keyboard, hardware keyboard)

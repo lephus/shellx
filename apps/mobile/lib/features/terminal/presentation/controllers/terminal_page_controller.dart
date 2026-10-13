@@ -205,6 +205,19 @@ class TerminalPageController extends Controller {
     if (tab != null) workspace.extraKeys.sendKey(key, tab.terminal.peek());
   }
 
+  /// Agent quick reply D2: one key of the reply bar to the active tab, the way a typed key goes (the
+  /// terminal's output → `input`), as is: no sticky modifiers, no cursor-mode rewriting.
+  void sendReply(ReplyKey key) {
+    if (_closed) return;
+    workspace.activeTab.peek()?.terminal.peek().onOutput?.call(replyKeyText(key));
+  }
+
+  /// Agent quick reply D2: "⌨" on the reply bar.
+  void showExtraKeys() {
+    if (_closed) return;
+    workspace.activeTab.peek()?.dismissReplyBar();
+  }
+
   /// Bracketed when the program enabled it, CR line breaks (spec §9.4).
   void paste(String text) {
     if (text.isEmpty || _closed) return;

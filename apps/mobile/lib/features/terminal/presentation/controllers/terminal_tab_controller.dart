@@ -154,6 +154,16 @@ class TerminalTabController extends Controller {
   );
   late final Computed<String> _title = computed(() => _oscTitle.value ?? _fallbackTitle);
 
+  /// Agent quick reply §3: the coding agent's state in this session, as the desktop tells it (`agent.state`,
+  /// `session.attached`); null when none shows or the desktop is older. Never the agent's words.
+  final Signal<AgentWireState?> _agentState = signal(null);
+
+  /// Agent quick reply D2: "⌨" put the extra keys back for the current question.
+  final Signal<bool> _replyDismissed = signal(false);
+  late final Computed<bool> _showReplyBar = computed(
+    () => _isLive.value && _agentState.value == AgentWireState.needsInput && !_replyDismissed.value,
+  );
+
   /// Sent a size since the computer last took it back: typing claims only once.
   bool _claimed = false;
 
@@ -186,6 +196,18 @@ class TerminalTabController extends Controller {
 
   /// Who sets the desktop terminal's size now.
   ReadonlySignal<DriverSide> get driver => _driver;
+
+  /// Agent quick reply §3: the agent's live state (the dots of the tab strip and the machine list).
+  ReadonlySignal<AgentWireState?> get agentState => _agentState;
+
+  /// Agent quick reply D2: the reply bar takes the extra keys' place: the tab is live, its agent waits for
+  /// the user and "⌨" was not tapped for this question.
+  ReadonlySignal<bool> get showReplyBar => _showReplyBar;
+
+  /// "⌨": the extra keys again, until the agent asks the next time (leaves `needs_input` and comes back).
+  void dismissReplyBar() {
+    if (!_disposed) _replyDismissed.value = true;
+  }
 
   /// "Máy tính đang dùng terminal này": a live desktop tab whose size the computer has taken.
   ReadonlySignal<bool> get showDriverBanner => _showDriverBanner;
@@ -238,6 +260,7 @@ class TerminalTabController extends Controller {
         _terminal.value = _createTerminal(current.viewWidth, current.viewHeight);
         selection.clearSelection();
       case TabExited(:final exitCode):
+        _agentState.value = null;
         _feed.drain(); // the banner never comes before the last output
         // "Closed on the computer" says more than the exit code that follows it.
         if (_banner.peek()?.notice != TabNotice.closedByHost) {
@@ -249,13 +272,19 @@ class TerminalTabController extends Controller {
         _claimed = false;
         _driver.value = by;
         if (by == DriverSide.phone) _sendViewSizeIfChanged();
+      case TabAgent(:final state):
+        // A new question (not the same one told again, as a re-attach does) brings the bar back.
+        if (state != AgentWireState.needsInput) _replyDismissed.value = false;
+        _agentState.value = state;
       case TabDetached(:final reason):
+        _agentState.value = null; // another device or the computer has it now; the attach tells again
         _banner.value = TabBanner(switch (reason) {
           DetachReason.takenOver => TabNotice.takenOver,
           DetachReason.closedByHost => TabNotice.closedByHost,
           DetachReason.terminalGone => TabNotice.terminalGone,
         });
       case TabError(:final code, :final message):
+        _agentState.value = null;
         _banner.value = code == AppErrorCode.sessionNotFound
             ? TabBanner(isDesktop ? TabNotice.terminalGone : TabNotice.sessionEnded)
             : TabBanner(TabNotice.failed, errorCode: code, detail: message);
@@ -389,6 +418,9 @@ class TerminalTabController extends Controller {
     selection.dispose();
     scroll.dispose();
     _showDriverBanner.dispose();
+    _showReplyBar.dispose();
+    _agentState.dispose();
+    _replyDismissed.dispose();
     _isLive.dispose();
     _title.dispose();
     _driver.dispose();

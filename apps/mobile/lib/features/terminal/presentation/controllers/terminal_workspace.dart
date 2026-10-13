@@ -137,6 +137,15 @@ class TerminalWorkspace extends Controller {
   /// tabs each time, so a closed tab is never left in it.
   int get unseenCount => _tabs.value.where((tab) => tab.unseen.value).length;
 
+  /// Agent quick reply §3: the most urgent agent state of the tabs (a waiting agent, else a running one); null
+  /// when no tab shows either. Reactive like [unseenCount].
+  AgentWireState? get agentState {
+    final states = {for (final tab in _tabs.value) tab.agentState.value};
+    if (states.contains(AgentWireState.needsInput)) return AgentWireState.needsInput;
+    if (states.contains(AgentWireState.running)) return AgentWireState.running;
+    return null;
+  }
+
   /// Enters the machine from the list: the first tab with new output is shown. Nothing when none has.
   void selectFirstUnseen() {
     if (_externalSelect) {
@@ -378,6 +387,12 @@ class WorkspaceRegistry {
   int unseenCount(String agentId) {
     _version.value;
     return _workspaces[agentId]?.unseenCount ?? 0;
+  }
+
+  /// [TerminalWorkspace.agentState] of [agentId] (the agent dot of the machine list). Reactive like [tabCount].
+  AgentWireState? agentState(String agentId) {
+    _version.value;
+    return _workspaces[agentId]?.agentState;
   }
 
   void _clear() {

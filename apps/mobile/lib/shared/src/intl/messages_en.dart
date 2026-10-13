@@ -74,32 +74,34 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m21(count) =>
       "${Intl.plural(count, one: 'This computer has 1 session', other: 'This computer has ${count} sessions')}";
 
-  static String m22(menu) =>
+  static String m22(number) => "Option ${number}";
+
+  static String m23(menu) =>
       "macOS: click the ShellX icon in the menu bar. Windows: click the icon in the system tray. Choose ${menu}";
 
-  static String m23(code) =>
+  static String m24(code) =>
       "The last command exited with code ${code}. The output above can still be read and copied.";
 
-  static String m24(method) => "Lock with ${method}";
+  static String m25(method) => "Lock with ${method}";
 
-  static String m25(name) =>
+  static String m26(name) =>
       "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
 
-  static String m26(version, build) => "ShellX ${version} (${build})";
+  static String m27(version, build) => "ShellX ${version} (${build})";
 
-  static String m27(terms, privacy) =>
+  static String m28(terms, privacy) =>
       "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m28(length) =>
+  static String m29(length) =>
       "Password must be at least ${length} characters.";
 
-  static String m29(length) => "Must be at most ${length} characters.";
+  static String m30(length) => "Must be at most ${length} characters.";
 
-  static String m30(length) => "Must be at least ${length} characters.";
+  static String m31(length) => "Must be at least ${length} characters.";
 
-  static String m31(lines) => "Showing the last ${lines} lines";
+  static String m32(lines) => "Showing the last ${lines} lines";
 
-  static String m32(target) => "To: ${target}";
+  static String m33(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -107,6 +109,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "actionClose": MessageLookupByLibrary.simpleMessage("Close"),
     "actionLater": MessageLookupByLibrary.simpleMessage("Later"),
     "actionScanCode": MessageLookupByLibrary.simpleMessage("Scan code"),
+    "agentDotNeedsInput": MessageLookupByLibrary.simpleMessage(
+      "An agent needs your answer",
+    ),
+    "agentDotRunning": MessageLookupByLibrary.simpleMessage(
+      "An agent is running",
+    ),
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),
     "arrowPadDown": MessageLookupByLibrary.simpleMessage("Down"),
     "arrowPadLabel": MessageLookupByLibrary.simpleMessage(
@@ -349,6 +357,17 @@ class MessageLookup extends MessageLookupByLibrary {
       "One account for your phone and all your computers.",
     ),
     "registerTitle": MessageLookupByLibrary.simpleMessage("Create account"),
+    "replyBarLabel": MessageLookupByLibrary.simpleMessage(
+      "Quick replies to the agent",
+    ),
+    "replyKeyEnter": MessageLookupByLibrary.simpleMessage("Enter"),
+    "replyKeyEscape": MessageLookupByLibrary.simpleMessage("Escape"),
+    "replyKeyNo": MessageLookupByLibrary.simpleMessage("No"),
+    "replyKeyOption": m22,
+    "replyKeyYes": MessageLookupByLibrary.simpleMessage("Yes"),
+    "replyShowExtraKeys": MessageLookupByLibrary.simpleMessage(
+      "Show the extra keys",
+    ),
     "retry": MessageLookupByLibrary.simpleMessage("Retry"),
     "scanAgain": MessageLookupByLibrary.simpleMessage("Scan again"),
     "scanQrButton": MessageLookupByLibrary.simpleMessage("Scan QR code"),
@@ -358,14 +377,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "scannerCameraError": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t start the camera.",
     ),
-    "scannerCardBody": m22,
+    "scannerCardBody": m23,
     "scannerCardTitle": MessageLookupByLibrary.simpleMessage(
       "The code is on your computer",
     ),
     "scannerPairing": MessageLookupByLibrary.simpleMessage("Pairing…"),
     "scannerTitle": MessageLookupByLibrary.simpleMessage("Scan pairing code"),
     "sessionEnded": MessageLookupByLibrary.simpleMessage("Session ended"),
-    "sessionExitedBody": m23,
+    "sessionExitedBody": m24,
     "sessionGoneBody": MessageLookupByLibrary.simpleMessage(
       "The computer no longer has this session. The output above can still be read and copied.",
     ),
@@ -396,7 +415,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Asked when the app opens and when you come back after more than 5 minutes.",
     ),
-    "settingsLockWith": m24,
+    "settingsLockWith": m25,
     "settingsLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
     "settingsLogoutConfirm": MessageLookupByLibrary.simpleMessage(
       "Sign out of ShellX? Paired computers are kept for your next sign-in.",
@@ -438,11 +457,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Unpair"),
-    "settingsUnpairConfirm": m25,
+    "settingsUnpairConfirm": m26,
     "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t unpair yet.",
     ),
-    "settingsVersion": m26,
+    "settingsVersion": m27,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Your account has been deleted.",
     ),
@@ -476,7 +495,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Open a new session",
     ),
     "termsLink": MessageLookupByLibrary.simpleMessage("Terms"),
-    "termsNotice": m27,
+    "termsNotice": m28,
     "unauthorized": MessageLookupByLibrary.simpleMessage("Unauthorized"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Unknown Error"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage("Unknown computer"),
@@ -502,7 +521,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Password must contain at least one lowercase letter.",
     ),
-    "validationPasswordMinLength": m28,
+    "validationPasswordMinLength": m29,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Passwords do not match.",
     ),
@@ -521,8 +540,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Phone number is required.",
     ),
-    "validationTextMaxLength": m29,
-    "validationTextMinLength": m30,
+    "validationTextMaxLength": m30,
+    "validationTextMinLength": m31,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
@@ -533,7 +552,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
     "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
-    "viewAsTextTruncated": m31,
+    "viewAsTextTruncated": m32,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -579,7 +598,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-    "voiceTarget": m32,
+    "voiceTarget": m33,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

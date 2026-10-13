@@ -149,6 +149,44 @@ void main() {
     });
   });
 
+  group('agent state (agent quick reply §3)', () {
+    List<(String?, AgentWireState?)> agents(List<TabEvent> events) => [
+      for (final e in events.whereType<TabAgent>()) (e.agent, e.state),
+    ];
+
+    test('agent.state becomes TabAgent; empty names are none', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab
+          ..handleAgent('claude', 'needs_input')
+          ..handleAgent('', '');
+        async.flushMicrotasks();
+        expect(agents(events), [
+          ('claude', AgentWireState.needsInput),
+          (null, null),
+        ]);
+      });
+    });
+
+    test('session.attached tells the state it carries, and none when it '
+        'carries none (what was shown before the drop may be over)', () {
+      fakeAsync((async) {
+        final tab = newTab([]);
+        final events = <TabEvent>[];
+        tab.events.listen(events.add);
+        tab
+          ..beginAttach()
+          ..handleAttached(4, agent: 'gemini', agentState: 'idle')
+          ..beginAttach()
+          ..handleAttached(4);
+        async.flushMicrotasks();
+        expect(agents(events), [('gemini', AgentWireState.idle), (null, null)]);
+      });
+    });
+  });
+
   group('replayed output (spec §6.4: session.attached carries the head)', () {
     List<(String, bool)> outputs(List<TabEvent> events) => [
       for (final e in events.whereType<TabOutput>()) (e.text, e.replay),
