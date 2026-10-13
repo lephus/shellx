@@ -245,7 +245,8 @@ void main() {
   test('session_limit and spawn_failed surface as AppErrorException', () {
     fakeAsync((async) {
       final h = Harness(async, keys);
-      for (var i = 0; i < 10; i++) {
+      // SessionManager's default limit: 32 sessions (9f83a9a).
+      for (var i = 0; i < 32; i++) {
         h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
       }
       expect(

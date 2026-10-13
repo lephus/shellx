@@ -33,7 +33,9 @@ void main() {
       expect(recorder.text, 'before during');
       expect(recorder.events.whereType<TabReset>(), isEmpty);
       expect(h.sessions.sessions.single.attachedMobileId, phoneId);
-      expect(h.pty.resizes, [(80, 23), (80, 24)]);
+      // A resume only records the phone's size (8956ae6): no redraw bounce,
+      // so a desktop typing in this tab keeps driving.
+      expect(h.pty.resizes, isEmpty);
     });
   });
 
