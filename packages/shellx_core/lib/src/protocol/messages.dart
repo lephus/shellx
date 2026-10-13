@@ -46,10 +46,7 @@ sealed class AppMessage {
         rows: f.integer('rows'),
         lastSeq: f.integer('last_seq'),
       ),
-      'session.attached' => SessionAttached(
-        id: f.integer('id'),
-        seq: f.optionalInteger('seq'),
-      ),
+      'session.attached' => _attached(f),
       'session.reset' => SessionReset(id: f.integer('id')),
       'output' => OutputMessage(
         id: f.integer('id'),
@@ -73,6 +70,11 @@ sealed class AppMessage {
         id: f.integer('id'),
         exitCode: f.integer('exit_code'),
       ),
+      'agent.state' => AgentStateMessage._known(
+        id: f.integer('id'),
+        agent: f.string('agent'),
+        state: f.string('state'),
+      ),
       'session.detached' => SessionDetached(
         id: f.integer('id'),
         reason: DetachReason.fromWire(f.string('reason')),
@@ -84,6 +86,20 @@ sealed class AppMessage {
       ),
       _ => null,
     };
+  }
+
+  /// Agent quick reply D1: an agent or state this version does not know
+  /// reads as none (both null), like `SessionInfo`'s.
+  static SessionAttached _attached(_Fields f) {
+    final agent = f.optionalString('agent');
+    final state = f.optionalString('agent_state');
+    final known = isKnownAgent(agent ?? '', state ?? '');
+    return SessionAttached(
+      id: f.integer('id'),
+      seq: f.optionalInteger('seq'),
+      agent: known ? agent : null,
+      agentState: known ? state : null,
+    );
   }
 
   @override
@@ -118,6 +134,36 @@ final class SessionList extends AppMessage {
   String get type => 'session.list';
   @override
   Map<String, Object?> toMap() => {'t': type, if (desktop) 'desktop': true};
+}
+
+/// The coding agents a desktop names on the wire (A12 D22): `AgentKind`'s
+/// names on the desktop.
+const Set<String> kWireAgents = {'claude', 'codex', 'gemini', 'opencode'};
+
+/// Whether [agent] and [state] are both names this version knows (an empty
+/// one is not): anything else is shown as no agent at all.
+bool isKnownAgent(String agent, String state) =>
+    kWireAgents.contains(agent) && AgentWireState.fromWire(state) != null;
+
+/// A coding agent's state as the desktop sends it (A12 D22, agent quick
+/// reply D1): the same words as the desktop's `agentStateWire`.
+enum AgentWireState {
+  running('running'),
+  needsInput('needs_input'),
+  idle('idle'),
+  done('done');
+
+  const AgentWireState(this.wire);
+  final String wire;
+
+  /// Null for an empty or unknown word (a newer desktop's state): never
+  /// throws, so a new state never breaks a message.
+  static AgentWireState? fromWire(String wire) {
+    for (final state in values) {
+      if (state.wire == wire) return state;
+    }
+    return null;
+  }
 }
 
 /// Where a session's terminal lives (spec §7.1). Absent on the wire means
@@ -171,9 +217,6 @@ final class SessionInfo {
   final String agent;
   final String agentState;
 
-  static const _agents = {'claude', 'codex', 'gemini', 'opencode'};
-  static const _agentStates = {'running', 'needs_input', 'idle', 'done'};
-
   Map<String, Object?> toMap() => {
     'id': id,
     'index': index,
@@ -208,7 +251,7 @@ final class SessionInfo {
     if (kind == null) return null;
     final agent = f.optionalString('agent') ?? '';
     final agentState = f.optionalString('agentState') ?? '';
-    final known = _agents.contains(agent) && _agentStates.contains(agentState);
+    final known = isKnownAgent(agent, agentState);
     return SessionInfo(
       id: f.integer('id'),
       index: f.integer('index'),
@@ -303,7 +346,12 @@ final class SessionAttach extends AppMessage {
 }
 
 final class SessionAttached extends AppMessage {
-  const SessionAttached({required this.id, this.seq});
+  const SessionAttached({
+    required this.id,
+    this.seq,
+    this.agent,
+    this.agentState,
+  });
   final int id;
 
   /// The stream head when the attach was answered (spec §6.4, §6.5): the
@@ -312,6 +360,15 @@ final class SessionAttached extends AppMessage {
   /// leaves it out (null), and it is only written when set, so the old wire
   /// form is unchanged.
   final int? seq;
+
+  /// Agent quick reply D1: the coding agent showing in the session when the
+  /// attach was answered (`claude`, `codex`, `gemini`, `opencode`) and its
+  /// state (`running`, `needs_input`, `idle`, `done`), so a re-attach
+  /// catches up on `agent.state` sent while the phone was away. Optional
+  /// and only written when set: null from an older desktop and when no
+  /// agent shows. Decoded as null unless both are names this version knows.
+  final String? agent;
+  final String? agentState;
   @override
   String get type => 'session.attached';
   @override
@@ -319,6 +376,45 @@ final class SessionAttached extends AppMessage {
     't': type,
     'id': id,
     if (seq != null) 'seq': seq,
+    if (agent != null) 'agent': agent,
+    if (agentState != null) 'agent_state': agentState,
+  };
+}
+
+/// Agent quick reply D1: the coding agent showing in session [id] changed
+/// (desktop → phone, only to a phone attached to it, never repeated). Both
+/// [agent] and [state] are empty when none shows any more; decoded as empty
+/// when either is a name this version does not know. Never carries the
+/// agent's words. An older phone skips the unknown `t` (spec §6.4).
+final class AgentStateMessage extends AppMessage {
+  const AgentStateMessage({
+    required this.id,
+    required this.agent,
+    required this.state,
+  });
+
+  factory AgentStateMessage._known({
+    required int id,
+    required String agent,
+    required String state,
+  }) => isKnownAgent(agent, state)
+      ? AgentStateMessage(id: id, agent: agent, state: state)
+      : AgentStateMessage(id: id, agent: '', state: '');
+
+  final int id;
+  final String agent;
+  final String state;
+
+  /// [state] as a value; null when no agent shows.
+  AgentWireState? get wireState => AgentWireState.fromWire(state);
+  @override
+  String get type => 'agent.state';
+  @override
+  Map<String, Object?> toMap() => {
+    't': type,
+    'id': id,
+    'agent': agent,
+    'state': state,
   };
 }
 

@@ -5,6 +5,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../notify/agent_notifications.dart';
 import '../session/agent_sessions.dart';
+import '../session/agent_state_book.dart';
 import '../session/session_stream.dart';
 import 'osc_title.dart';
 import 'term_link.dart';
@@ -164,6 +165,28 @@ final class DesktopSessionManager {
 
   bool owns(int id) => _sessions.containsKey(id);
 
+  /// Agent quick reply D1: the coding agent showing in a desktop terminal
+  /// (`agent`, `state` wire names), for `session.attached`; null when none
+  /// shows or nobody knows (no status source sets it today).
+  ({String agent, String state})? Function(int sessionId)? agentOf;
+
+  final _agentStates = AgentStateBook();
+
+  /// Agent quick reply D1, §2: like `SessionManager.publishAgentState`, for
+  /// a desktop terminal: `agent.state` to its attached phone, once per
+  /// change.
+  void publishAgentState(int sessionId, String agent, String state) {
+    final s = _sessions[sessionId];
+    if (s == null || s.closing) return;
+    if (!_agentStates.change(sessionId, agent, state)) return;
+    final mobileId = s.attachedMobileId;
+    if (mobileId == null) return;
+    _send(
+      mobileId,
+      AgentStateMessage(id: sessionId, agent: agent, state: state),
+    );
+  }
+
   /// `TermServer`'s check at `auth` (spec §7.8 step 3): a window that
   /// already has a session (it is reconnecting) is always admitted.
   bool canAdmit(TermInfo info) =>
@@ -226,7 +249,7 @@ final class DesktopSessionManager {
     // Spec §6.4: the stream head, the end of the replay just started.
     final head = s.stream.end;
     _drive(s, _clamp(cols), _clamp(rows));
-    _send(mobileId, SessionAttached(id: id, seq: head));
+    _send(mobileId, _agentStates.attached(id, head, agentOf?.call(id)));
     if (previous != mobileId) {
       _changes.add(null);
       _attached.add(DesktopPhoneAttached(mobileId, id));
@@ -447,6 +470,7 @@ final class DesktopSessionManager {
     s.drainTimer?.cancel();
     _dropLink(s);
     _sessions.remove(s.id);
+    _agentStates.forget(s.id);
     if (identical(_byTerm[s.info.key], s)) _byTerm.remove(s.info.key);
     _changes.add(null);
   }

@@ -69,6 +69,30 @@ void main() {
       'id': 3,
       'seq': 5000000000,
     },
+    const SessionAttached(
+      id: 3,
+      seq: 12,
+      agent: 'claude',
+      agentState: 'needs_input',
+    ): {
+      't': 'session.attached',
+      'id': 3,
+      'seq': 12,
+      'agent': 'claude',
+      'agent_state': 'needs_input',
+    },
+    const AgentStateMessage(id: 3, agent: 'codex', state: 'running'): {
+      't': 'agent.state',
+      'id': 3,
+      'agent': 'codex',
+      'state': 'running',
+    },
+    const AgentStateMessage(id: 3, agent: '', state: ''): {
+      't': 'agent.state',
+      'id': 3,
+      'agent': '',
+      'state': '',
+    },
     const SessionReset(id: 3): {'t': 'session.reset', 'id': 3},
     OutputMessage(
       id: 3,
@@ -350,6 +374,94 @@ void main() {
         ]),
       );
       expect((decoded.single as SessionAttached).seq, 4096);
+    });
+
+    test('session.attached without agent fields (an older desktop, or no '
+        'agent showing) decodes them as null and writes none', () {
+      final decoded =
+          decodeBatch(
+                encodeCbor([
+                  {'t': 'session.attached', 'id': 4, 'seq': 9},
+                ]),
+              ).single
+              as SessionAttached;
+      expect(decoded.agent, isNull);
+      expect(decoded.agentState, isNull);
+      expect(const SessionAttached(id: 4, seq: 9).toMap(), {
+        't': 'session.attached',
+        'id': 4,
+        'seq': 9,
+      });
+    });
+
+    test('session.attached with an agent or state this version does not '
+        'know carries neither', () {
+      final decoded =
+          decodeBatch(
+                encodeCbor([
+                  {
+                    't': 'session.attached',
+                    'id': 4,
+                    'agent': 'aider',
+                    'agent_state': 'running',
+                  },
+                ]),
+              ).single
+              as SessionAttached;
+      expect(decoded.agent, isNull);
+      expect(decoded.agentState, isNull);
+    });
+
+    test('agent.state with an unknown agent or state reads as "none shows"', () {
+      final decoded =
+          decodeBatch(
+                encodeCbor([
+                  {
+                    't': 'agent.state',
+                    'id': 4,
+                    'agent': 'claude',
+                    'state': 'thinking',
+                  },
+                ]),
+              ).single
+              as AgentStateMessage;
+      expect(decoded, const AgentStateMessage(id: 4, agent: '', state: ''));
+      expect(decoded.wireState, isNull);
+    });
+
+    test('agent.state needs id, agent and state', () {
+      expect(
+        () => decodeBatch(
+          encodeCbor([
+            {'t': 'agent.state', 'id': 4, 'agent': 'claude'},
+          ]),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('a batch with agent.state between known messages still decodes '
+        '(an older phone skips the unknown "t")', () {
+      final bytes = encodeCbor([
+        {'t': 'ack', 'id': 1, 'seq': 2},
+        {'t': 'agent.state', 'id': 1, 'agent': 'claude', 'state': 'idle'},
+        {'t': 'session.reset', 'id': 1},
+      ]);
+      expect(decodeBatch(bytes), [
+        const AckMessage(id: 1, seq: 2),
+        const AgentStateMessage(id: 1, agent: 'claude', state: 'idle'),
+        const SessionReset(id: 1),
+      ]);
+    });
+
+    test('AgentWireState maps the wire words, null for anything else', () {
+      expect(AgentWireState.fromWire('running'), AgentWireState.running);
+      expect(AgentWireState.fromWire('needs_input'), AgentWireState.needsInput);
+      expect(AgentWireState.fromWire('idle'), AgentWireState.idle);
+      expect(AgentWireState.fromWire('done'), AgentWireState.done);
+      expect(AgentWireState.fromWire(''), isNull);
+      expect(AgentWireState.fromWire('unknown'), isNull);
+      expect(AgentWireState.needsInput.wire, 'needs_input');
     });
 
     test('DriverSide.fromWire rejects an unknown side', () {
