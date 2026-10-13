@@ -227,9 +227,11 @@ class TerminalTabController extends Controller {
 
   void _onEvent(TabEvent event) {
     switch (event) {
-      case TabOutput(:final text):
+      case TabOutput(:final text, :final replay):
         _feed.add(text);
-        if (!_viewed && text.isNotEmpty && !_unseen.peek()) _unseen.value = true;
+        // The catch-up a re-attach replays (spec §6.4: up to the head `session.attached` carries) is
+        // output the tab already had, not new output: it does not mark the tab.
+        if (!_viewed && !replay && text.isNotEmpty && !_unseen.peek()) _unseen.value = true;
       case TabReset():
         _feed.clear();
         final current = _terminal.peek();

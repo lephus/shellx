@@ -12,8 +12,15 @@ sealed class TabEvent {
 /// Terminal output, already decoded from UTF-8 as a stream: a character
 /// split across two `output` messages is emitted whole.
 final class TabOutput extends TabEvent {
-  const TabOutput(this.text);
+  const TabOutput(this.text, {this.replay = false});
   final String text;
+
+  /// The catch-up of a (re-)attach (spec §6.4, §6.5): bytes the session
+  /// produced before the phone attached, not new output. True for output
+  /// received before `session.attached`, and after it for bytes up to the
+  /// stream head that message carries. False for an agent that sends no
+  /// head, once it has answered (the behaviour before the head existed).
+  final bool replay;
 }
 
 /// The agent restarted the stream from the start of its buffer: clear the
@@ -97,6 +104,17 @@ final class ClientTab {
   int _received = 0;
   int _acked = 0;
   bool _attached = true;
+
+  /// A (re-)attach was sent and `session.attached` has not come: all output
+  /// now is catch-up, since the agent sends it before answering (spec §6.4).
+  bool _awaitingAttached = false;
+
+  /// The stream head of the last `session.attached`; null when not attached
+  /// that way or the agent is older than the field.
+  int? _head;
+
+  /// Labels the text the decoder emits while bytes are fed to it.
+  bool _replaying = false;
   Timer? _ackTimer;
   final _heldInput = BytesBuilder();
 
@@ -126,6 +144,15 @@ final class ClientTab {
   void beginAttach() {
     _attached = true;
     _acked = _received;
+    _awaitingAttached = true;
+  }
+
+  /// `session.attached` came, with the stream [head] (null from an older
+  /// agent): output ending at or before it is still catch-up.
+  @internal
+  void handleAttached(int? head) {
+    _awaitingAttached = false;
+    _head = head;
   }
 
   /// Keystrokes are waiting for the agent to confirm the (re-)attach.
@@ -159,7 +186,20 @@ final class ClientTab {
         ? Uint8List.sublistView(data, _received - seq)
         : data;
     _received = end;
-    _decoder.add(fresh);
+    // How many of the fresh bytes are catch-up: all of them before
+    // `session.attached`, else those before the head. A chunk straddling
+    // the head is fed in two parts, so its tail is labelled live.
+    final start = end - fresh.length;
+    final replayEnd = _awaitingAttached ? end : (_head ?? start);
+    final replayCount = (replayEnd - start).clamp(0, fresh.length);
+    if (replayCount > 0) {
+      _replaying = true;
+      _decoder.add(Uint8List.sublistView(fresh, 0, replayCount));
+      _replaying = false;
+    }
+    if (replayCount < fresh.length) {
+      _decoder.add(Uint8List.sublistView(fresh, replayCount));
+    }
     if (_received - _acked >= kAckThresholdBytes) {
       _flushAck();
     } else {
@@ -226,7 +266,7 @@ final class ClientTab {
   ByteConversionSink _newDecoder() =>
       const Utf8Decoder(allowMalformed: true).startChunkedConversion(
         _TextSink((text) {
-          if (text.isNotEmpty) _emit(TabOutput(text));
+          if (text.isNotEmpty) _emit(TabOutput(text, replay: _replaying));
         }),
       );
 

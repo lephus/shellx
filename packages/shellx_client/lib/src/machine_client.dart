@@ -555,7 +555,9 @@ final class MachineClient {
         pending.completer.complete(tab);
       case SessionDriver(:final id, :final by):
         _tabs[id]?.handleDriver(by);
-      case SessionAttached(:final id):
+      case SessionAttached(:final id, :final seq):
+        // Before completing, so output from here on is labelled by the head.
+        _tabs[id]?.handleAttached(seq);
         _takeAttach(id)?.complete();
         // The agent takes this tab's input again: send what was held.
         final tab = _tabs[id];

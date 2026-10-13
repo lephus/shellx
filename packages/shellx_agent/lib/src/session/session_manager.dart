@@ -1043,6 +1043,9 @@ final class SessionManager implements AgentSessions, LocalSessions {
       return;
     }
     final previous = session.stream.attach(mobileId, lastSeq);
+    // Spec §6.4: `session.attached` carries the stream head as it was when
+    // the replay began, so the phone tells catch-up output from new output.
+    final head = session.stream.end;
     session.exitRecipient = null;
     final c = _clampDimension(cols);
     final r = _clampDimension(rows);
@@ -1059,7 +1062,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       if (receivesDriver(mobileId)) {
         _send(mobileId, SessionDriver(id: id, by: session.driver));
       }
-      _send(mobileId, SessionAttached(id: id));
+      _send(mobileId, SessionAttached(id: id, seq: head));
       if (previous != mobileId) _changes.add(null);
       return;
     }
@@ -1073,7 +1076,7 @@ final class SessionManager implements AgentSessions, LocalSessions {
       session.rows = r;
       session.resize(c, r);
     }
-    _send(mobileId, SessionAttached(id: id));
+    _send(mobileId, SessionAttached(id: id, seq: head));
     if (previous != mobileId) _changes.add(null);
   }
 

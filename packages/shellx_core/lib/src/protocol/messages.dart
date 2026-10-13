@@ -46,7 +46,10 @@ sealed class AppMessage {
         rows: f.integer('rows'),
         lastSeq: f.integer('last_seq'),
       ),
-      'session.attached' => SessionAttached(id: f.integer('id')),
+      'session.attached' => SessionAttached(
+        id: f.integer('id'),
+        seq: f.optionalInteger('seq'),
+      ),
       'session.reset' => SessionReset(id: f.integer('id')),
       'output' => OutputMessage(
         id: f.integer('id'),
@@ -300,12 +303,23 @@ final class SessionAttach extends AppMessage {
 }
 
 final class SessionAttached extends AppMessage {
-  const SessionAttached({required this.id});
+  const SessionAttached({required this.id, this.seq});
   final int id;
+
+  /// The stream head when the attach was answered (spec §6.4, §6.5): the
+  /// end position of the catch-up output, so the phone can tell replayed
+  /// bytes (ending at or before it) from new ones. Optional: an older agent
+  /// leaves it out (null), and it is only written when set, so the old wire
+  /// form is unchanged.
+  final int? seq;
   @override
   String get type => 'session.attached';
   @override
-  Map<String, Object?> toMap() => {'t': type, 'id': id};
+  Map<String, Object?> toMap() => {
+    't': type,
+    'id': id,
+    if (seq != null) 'seq': seq,
+  };
 }
 
 final class SessionReset extends AppMessage {

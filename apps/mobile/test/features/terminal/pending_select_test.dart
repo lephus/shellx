@@ -61,6 +61,31 @@ void main() {
     expect(workspace.hasPendingSelect, isFalse);
   });
 
+  test('the pending tab appearing is selected directly: no flicker through the last tab', () async {
+    await open(1);
+    await open(2);
+    workspace.select(0);
+    workspace.pendingSelect(7);
+    final ids = <int?>[];
+    final stop = effect(() => ids.add(workspace.activeTab.value?.id));
+    addTearDown(stop);
+    await open(7);
+    await open(3); // another tab arriving while 7 is pending, so 7 is not the last
+    expect(workspace.activeTab.peek()?.id, 7);
+    expect(ids, [1, 7], reason: 'the effect runs once at once, then only for the pending tab');
+  });
+
+  test('a tab arriving while the pending one is already open keeps the focus on it', () async {
+    workspace.pendingSelect(7);
+    await open(7);
+    final indexes = <int>[];
+    final stop = effect(() => indexes.add(workspace.activeIndex.value));
+    addTearDown(stop);
+    await open(1);
+    await open(2);
+    expect(indexes, [0], reason: 'never moved to the new last index');
+  });
+
   test('a user openNew drops the pending one', () async {
     workspace.pendingSelect(2);
     await open(2);

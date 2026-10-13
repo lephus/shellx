@@ -64,6 +64,11 @@ void main() {
       'last_seq': 4096,
     },
     const SessionAttached(id: 3): {'t': 'session.attached', 'id': 3},
+    const SessionAttached(id: 3, seq: 5000000000): {
+      't': 'session.attached',
+      'id': 3,
+      'seq': 5000000000,
+    },
     const SessionReset(id: 3): {'t': 'session.reset', 'id': 3},
     OutputMessage(
       id: 3,
@@ -320,6 +325,31 @@ void main() {
       expect(sessions.single.kind, SessionKind.desktop);
       expect(sessions.single.app, '');
       expect(sessions.single.title, '');
+    });
+
+    test('session.attached without seq (an older agent) decodes seq as '
+        'null and is byte-identical to before', () {
+      final decoded = decodeBatch(
+        encodeCbor([
+          {'t': 'session.attached', 'id': 4},
+        ]),
+      );
+      expect((decoded.single as SessionAttached).seq, isNull);
+      expect(
+        encodeBatch([const SessionAttached(id: 4)]),
+        encodeCbor([
+          {'t': 'session.attached', 'id': 4},
+        ]),
+      );
+    });
+
+    test('session.attached with seq carries the stream head', () {
+      final decoded = decodeBatch(
+        encodeCbor([
+          {'t': 'session.attached', 'id': 4, 'seq': 4096},
+        ]),
+      );
+      expect((decoded.single as SessionAttached).seq, 4096);
     });
 
     test('DriverSide.fromWire rejects an unknown side', () {

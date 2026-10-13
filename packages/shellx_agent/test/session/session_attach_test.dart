@@ -29,10 +29,49 @@ void main() {
       expect(messages.first, isA<OutputMessage>());
       expect((messages.first as OutputMessage).seq, 4);
       expect(outputText(messages, id), '456789ABC');
-      expect(messages.last, isA<SessionAttached>());
+      // The stream head: the replay ends at 13, so the phone can tell it
+      // from new output (spec §6.4).
+      expect(messages.last, SessionAttached(id: id, seq: 13));
       expect(messages.whereType<SessionReset>(), isEmpty);
     },
   );
+
+  test('a fresh attach (last_seq 0) also tells the stream head', () async {
+    final rig = SessionRig();
+    final id = await rig.open(phone);
+    rig.pty(0).emit('hello');
+    await pumpEventQueue();
+    rig.manager.mobileDisconnected(phone);
+    rig.clear();
+
+    await rig.manager.handle(
+      phone,
+      SessionAttach(id: id, cols: 80, rows: 24, lastSeq: 0),
+    );
+
+    final messages = rig.to(phone);
+    expect(outputText(messages, id), 'hello');
+    expect(messages.last, SessionAttached(id: id, seq: 5));
+  });
+
+  test('the head counts the whole backlog, even the part the send window '
+      'holds back until acks', () async {
+    final rig = SessionRig(sendWindow: 4);
+    final id = await rig.open(phone);
+    rig.manager.mobileDisconnected(phone);
+    rig.pty(0).emit('0123456789');
+    await pumpEventQueue();
+    rig.clear();
+
+    await rig.manager.handle(
+      phone,
+      SessionAttach(id: id, cols: 80, rows: 24, lastSeq: 2),
+    );
+
+    final messages = rig.to(phone);
+    expect(outputText(messages, id), '2345');
+    expect(messages.last, SessionAttached(id: id, seq: 10));
+  });
 
   test(
     'attach with last_seq before start resets and replays from start',

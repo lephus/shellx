@@ -98,7 +98,7 @@ void main() {
     test('attach makes the phone the driver: resize, driver, attached', () {
       fakeAsync((async) {
         final rig = DesktopRig();
-        final link = rig.connect(1)..snapshot('');
+        final link = rig.connect(1)..snapshot('screen');
         async.flushMicrotasks();
         rig.manager.attach(phone, 100, 50, 20, 0);
         expect(link.sent.single, isA<AgentResize>());
@@ -108,7 +108,8 @@ void main() {
           messages,
           containsAllInOrder([
             const SessionDriver(id: 100, by: DriverSide.phone),
-            const SessionAttached(id: 100),
+            // seq: the stream head, the end of the replayed snapshot.
+            const SessionAttached(id: 100, seq: 6),
           ]),
         );
       });

@@ -223,8 +223,10 @@ final class DesktopSessionManager {
       return;
     }
     final previous = s.stream.attach(mobileId, lastSeq);
+    // Spec §6.4: the stream head, the end of the replay just started.
+    final head = s.stream.end;
     _drive(s, _clamp(cols), _clamp(rows));
-    _send(mobileId, SessionAttached(id: id));
+    _send(mobileId, SessionAttached(id: id, seq: head));
     if (previous != mobileId) {
       _changes.add(null);
       _attached.add(DesktopPhoneAttached(mobileId, id));

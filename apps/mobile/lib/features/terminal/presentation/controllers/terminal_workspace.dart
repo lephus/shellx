@@ -75,8 +75,8 @@ class TerminalWorkspace extends Controller {
   bool get hasPendingSelect => _pendingSelectId != null;
 
   /// A11 D27: a notification named [sessionId] before its tab exists (the phone is still reconnecting).
-  /// The tab is selected when it appears and stays selected while tabs keep arriving (each new tab takes
-  /// the focus, then this one gets it back); the user picking or opening a tab, or [ttl], drops the
+  /// The tab is selected when it appears and stays selected while tabs keep arriving (a new tab does not
+  /// take the focus from it, not even for a moment); the user picking or opening a tab, or [ttl], drops the
   /// request. When the tab is already open it is selected at once.
   void pendingSelect(int sessionId, {Duration ttl = const Duration(seconds: 30)}) {
     if (_disposed) return;
@@ -97,12 +97,14 @@ class TerminalWorkspace extends Controller {
     _pendingTimer = null;
   }
 
-  /// Re-asserts the pending tab after the list changed; the request stays until [ttl] or a user pick.
-  void _applyPending() {
+  /// The index of the pending tab in [tabs]; null when nothing is pending or it is not open yet. The
+  /// request stays until [ttl] or a user pick, so a tab added or re-attached later lands on it directly
+  /// (no flicker through another tab: `activeIndex` and [TerminalTabController.setViewed] never see it).
+  int? _pendingIndex(List<TerminalTabController> tabs) {
     final id = _pendingSelectId;
-    if (id == null) return;
-    final index = _tabs.peek().indexWhere((tab) => tab.id == id);
-    if (index >= 0) _select(index);
+    if (id == null) return null;
+    final index = tabs.indexWhere((tab) => tab.id == id);
+    return index >= 0 ? index : null;
   }
 
   /// A10 D29: only the active tab's output is written at the foreground's pace. A11 D28: only the active
@@ -215,9 +217,9 @@ class TerminalWorkspace extends Controller {
     final tabs = _tabs.peek();
     final existing = tabs.indexWhere((tab) => tab.id == session.id);
     if (existing >= 0) {
-      // A reconnect re-attaching an open tab is not the user's choice.
-      _select(existing);
-      _applyPending();
+      // A reconnect re-attaching an open tab is not the user's choice: a pending notification tab keeps
+      // the focus.
+      _select(_pendingIndex(tabs) ?? existing);
       return tabs[existing];
     }
     await ensureConnected();
@@ -249,10 +251,10 @@ class TerminalWorkspace extends Controller {
     final tabs = [..._tabs.peek(), tab];
     batch(() {
       _tabs.value = List.unmodifiable(tabs);
-      _active.value = tabs.length - 1;
+      // The new tab takes the focus, unless a notification's tab is pending and open (A11 D27).
+      _active.value = _pendingIndex(tabs) ?? tabs.length - 1;
     });
     _syncActive();
-    _applyPending();
     return tab;
   }
 

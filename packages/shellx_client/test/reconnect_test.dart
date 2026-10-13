@@ -130,6 +130,20 @@ void main() {
       expect(afterReset.length, 256 * 1024);
       expect(tab.received, 3 + 300 * 1024);
       expect(tab.isAttached, isTrue);
+      // All of it is catch-up (spec §6.4), even the part sent after
+      // session.attached as acks open the window; what the shell prints
+      // next is new.
+      expect(
+        recorder.events
+            .skipWhile((e) => e is! TabReset)
+            .whereType<TabOutput>()
+            .every((e) => e.replay),
+        isTrue,
+      );
+      h.pty.emit('next');
+      settle(async);
+      final last = recorder.events.whereType<TabOutput>().last;
+      expect((last.text, last.replay), ('next', false));
     });
   });
 
