@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/testing.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_ask_card.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_timeline.dart';
 
 import '../../support/ai_fakes.dart';
@@ -160,6 +161,133 @@ void main() {
         'support yet',
       ),
       findsOneWidget,
+    );
+    await runtime.dispose();
+  });
+
+  /// A conversation long enough to scroll, then the question [steps] ends.
+  Future<(FakeAiRuntimes, AiRuntime)> askedAfterLongText(WidgetTester t) async {
+    final long = List.generate(
+      200,
+      (i) => 'Paragraph $i of the plan the agent wrote.',
+    ).join('\n\n');
+    final fakes = FakeAiRuntimes(
+      FakeScenario(
+        turns: [
+          [FakeSteps.text(long), FakeSteps.ask(_form)],
+        ],
+      ),
+    );
+    final runtime = partRuntime(fakes);
+    await runtime.start();
+    await pumpAiPart(t, const AiTimeline(), runtime: runtime);
+    await runtime.send([const TextBlock('go')]);
+    for (var i = 0; i < 10; i++) {
+      await t.pump();
+    }
+    expect(find.text('A few details'), findsOneWidget);
+    return (fakes, runtime);
+  }
+
+  /// The user scrolls up to re-read the plan, then taps "Jump to latest".
+  Future<void> scrollAwayAndBack(WidgetTester t) async {
+    // The keyboard goes elsewhere (the composer, a click in another pane).
+    FocusManager.instance.primaryFocus?.unfocus();
+    // Ink splashes fade (they keep a list item alive while they last).
+    await t.pump(const Duration(seconds: 3));
+    await t.pump(const Duration(seconds: 3));
+    await t.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 20000));
+    await t.pump();
+    expect(
+      find.text('A few details'),
+      findsNothing,
+      reason: 'the card is out of the list now',
+    );
+    await t.tap(find.byKey(const Key('ai.jumpToLatest')));
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(find.text('A few details'), findsOneWidget);
+  }
+
+  testWidgets('what is typed and picked in a question survives scrolling '
+      'away and back, and is what Send answers (a card that waits is kept '
+      'alive)', (t) async {
+    final (fakes, runtime) = await askedAfterLongText(t);
+    await t.enterText(find.byKey(const Key('ai.ask.name')), 'Ann');
+    await t.enterText(find.byKey(const Key('ai.ask.age')), '30');
+    await t.tap(find.byKey(const Key('ai.ask.ok')));
+    await t.tap(find.byKey(const Key('ai.ask.color.blue')));
+    await t.tap(find.byKey(const Key('ai.ask.tags.a')));
+    await t.tap(find.byKey(const Key('ai.ask.tags.c')));
+    await t.pump();
+    await scrollAwayAndBack(t);
+    expect(
+      t
+          .widget<TextField>(find.byKey(const Key('ai.ask.name')))
+          .controller!
+          .text,
+      'Ann',
+    );
+    expect(
+      t.widget<TextField>(find.byKey(const Key('ai.ask.age'))).controller!.text,
+      '30',
+    );
+    expect(t.widget<Switch>(find.byKey(const Key('ai.ask.ok'))).value, isTrue);
+    expect(
+      t.widget<ChoiceChip>(find.byKey(const Key('ai.ask.color.blue'))).selected,
+      isTrue,
+    );
+    expect(
+      t.widget<FilterChip>(find.byKey(const Key('ai.ask.tags.a'))).selected,
+      isTrue,
+    );
+    expect(
+      t.widget<FilterChip>(find.byKey(const Key('ai.ask.tags.b'))).selected,
+      isFalse,
+    );
+    expect(
+      t.widget<FilterChip>(find.byKey(const Key('ai.ask.tags.c'))).selected,
+      isTrue,
+    );
+    await t.tap(find.byKey(const Key('ai.ask.send')));
+    await t.pump();
+    await t.pump();
+    expect(
+      fakes.agent().received,
+      contains(
+        'ask:accept={"name":"Ann","age":30,"ok":true,"color":"blue",'
+        '"tags":["a","c"]}',
+      ),
+    );
+    await runtime.dispose();
+  });
+
+  testWidgets('a question that was answered is not kept alive: it folds to '
+      'one line and goes with the list items that scroll out', (t) async {
+    final (fakes, runtime) = await askedAfterLongText(t);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pump(const Duration(seconds: 3));
+    await t.pump(const Duration(seconds: 3));
+    await t.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 20000));
+    await t.pump();
+    expect(find.text('A few details'), findsNothing);
+    expect(
+      find.byType(AiAskCard, skipOffstage: false),
+      findsOneWidget,
+      reason: 'it waits for an answer: kept alive out of sight',
+    );
+    // The turn is stopped: the question is answered `cancel`.
+    runtime.cancel();
+    await runtime.whenIdle();
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(fakes.agent().received, contains('ask:cancel'));
+    expect(
+      find.byType(AiAskCard, skipOffstage: false),
+      findsNothing,
+      reason: 'answered: nothing keeps it',
     );
     await runtime.dispose();
   });

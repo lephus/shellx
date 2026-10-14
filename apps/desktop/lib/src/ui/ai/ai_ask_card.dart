@@ -22,6 +22,11 @@ import 'ai_theme.dart';
 ///   click) answers `accept`; `elicitation/complete` marks it done.
 /// - A type ShellX cannot show was declined already: the card says so.
 /// Once answered it folds to one line.
+///
+/// A question that waits is kept alive in the conversation list: what the user
+/// typed and picked lives in this card's State, and a list drops the items
+/// that scroll far out of view. Scrolling up to re-read the plan and coming
+/// back must not hand the agent the defaults. An answered card is not kept.
 class AiAskCard extends ConsumerStatefulWidget {
   const AiAskCard({super.key, required this.item});
   final AskItem item;
@@ -30,10 +35,23 @@ class AiAskCard extends ConsumerStatefulWidget {
   ConsumerState<AiAskCard> createState() => _AiAskCardState();
 }
 
-class _AiAskCardState extends ConsumerState<AiAskCard> {
+class _AiAskCardState extends ConsumerState<AiAskCard>
+    with AutomaticKeepAliveClientMixin<AiAskCard> {
   final _text = <String, TextEditingController>{};
   final _values = <String, Object>{};
   var _invalid = false;
+
+  /// The form (or the page to open) is still open: the user may be midway.
+  @override
+  bool get wantKeepAlive =>
+      widget.item.response == null && !widget.item.autoDeclined;
+
+  @override
+  void didUpdateWidget(AiAskCard old) {
+    super.didUpdateWidget(old);
+    // Answered, cancelled or declined meanwhile: the list may let it go.
+    updateKeepAlive();
+  }
 
   @override
   void initState() {
@@ -216,6 +234,7 @@ class _AiAskCardState extends ConsumerState<AiAskCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin
     final l10n = AppLocalizations.of(context);
     final item = widget.item;
     final request = item.request;
