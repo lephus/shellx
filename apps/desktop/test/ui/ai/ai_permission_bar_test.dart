@@ -7,6 +7,8 @@ import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_dock.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_permission_bar.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_timeline.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_tool_card.dart';
 
 import '../../support/ai_fakes.dart';
 import '../../support/ai_parts.dart';
@@ -223,6 +225,33 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+
+  testWidgets('a click in the conversation keeps the composer\'s keys too: '
+      'keys 1–9 and Esc still answer after a card is opened', (t) async {
+    final (fakes, runtime) = await asking(
+      t,
+      around: (dock) => Column(
+        children: [
+          const Expanded(child: AiTimeline()),
+          dock,
+        ],
+      ),
+    );
+    final composer = t
+        .widget<TextField>(find.byKey(const Key('ai.composer')))
+        .focusNode!;
+    expect(composer.hasPrimaryFocus, isTrue);
+    final header = find
+        .descendant(of: find.byType(AiToolCard), matching: find.byType(InkWell))
+        .first;
+    await t.tap(header, kind: PointerDeviceKind.mouse);
+    await t.pump();
+    expect(composer.hasPrimaryFocus, isTrue, reason: 'after the card');
+    await t.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await t.pump();
+    expect(answers(fakes), ['allow-with-updates']);
+    await runtime.dispose();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   const planOptions = <Map<String, Object?>>[
     {

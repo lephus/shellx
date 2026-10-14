@@ -7,6 +7,7 @@ import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ai/ai_project_files.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_dock.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_file_viewer.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_scope.dart';
 
 import '../../support/ai_fakes.dart';
 import '../../support/ai_parts.dart';
@@ -69,6 +70,58 @@ void main() {
     }, path: 'min.txt');
     final code = t.widget<CodeEditor>(find.byKey(const Key('ai.viewer.code')));
     expect(code.maxLengthSingleLineRendering, 2000);
+    await runtime.dispose();
+  });
+
+  testWidgets('the viewer takes the keyboard even from a composer that kept '
+      'it; Esc closes it and the composer has the keyboard back', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    await runtime.start();
+    final part = await pumpAiPart(
+      t,
+      Builder(
+        builder: (context) {
+          final ui = AiPaneScope.of(context).ui;
+          return Stack(
+            children: [
+              const Positioned.fill(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: AiDock(),
+                ),
+              ),
+              ListenableBuilder(
+                listenable: ui,
+                builder: (context, _) => switch (ui.overlay) {
+                  final overlay? => Positioned.fill(child: overlay),
+                  null => const SizedBox.shrink(),
+                },
+              ),
+            ],
+          );
+        },
+      ),
+      runtime: runtime,
+      overrides: [
+        aiProjectFilesProvider.overrideWithValue(
+          FakeProject(testAiCwd, {'README.md': '# Hi\n'}),
+        ),
+      ],
+    );
+    final composer = t
+        .widget<TextField>(find.byKey(const Key('ai.composer')))
+        .focusNode!;
+    composer.requestFocus();
+    await t.pump();
+    expect(composer.hasPrimaryFocus, isTrue);
+    part.ui.showOverlay(AiFileViewer(key: UniqueKey(), path: 'README.md'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 50));
+    expect(composer.hasPrimaryFocus, isFalse);
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pump();
+    expect(part.ui.overlay, isNull);
+    expect(composer.hasPrimaryFocus, isTrue);
     await runtime.dispose();
   });
 }

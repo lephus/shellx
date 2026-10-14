@@ -93,6 +93,18 @@ class _AiFileViewerState extends ConsumerState<AiFileViewer> {
   CodeLineEditingController? _code;
   AiFileContent? _content;
   var _started = false;
+  final _focus = FocusNode(debugLabel: 'ai viewer');
+
+  @override
+  void initState() {
+    super.initState();
+    // Esc closes it: it takes the keyboard even from a composer that kept it
+    // through the click that opened the viewer (`autofocus` only takes a
+    // keyboard that nobody has).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -104,6 +116,7 @@ class _AiFileViewerState extends ConsumerState<AiFileViewer> {
 
   @override
   void dispose() {
+    _focus.dispose();
     _code?.dispose();
     super.dispose();
   }
@@ -184,7 +197,7 @@ class _AiFileViewerState extends ConsumerState<AiFileViewer> {
         const SingleActivator(LogicalKeyboardKey.escape): pane.ui.closeOverlay,
       },
       child: Focus(
-        autofocus: true,
+        focusNode: _focus,
         child: Container(
           key: const Key('ai.viewer'),
           margin: const EdgeInsets.all(ShellxSpace.s16),

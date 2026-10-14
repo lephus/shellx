@@ -98,6 +98,7 @@ class _AiTimelineState extends State<AiTimeline> {
       return hit.widget;
     }
     AiTimeline.debugItemBuilds++;
+    final content = aiTimelineItem(item);
     final widget = KeyedSubtree(
       key: ObjectKey(item),
       child: Align(
@@ -109,7 +110,13 @@ class _AiTimelineState extends State<AiTimeline> {
               horizontal: ShellxSpace.s16,
               vertical: ShellxSpace.s4,
             ),
-            child: aiTimelineItem(item),
+            // Like the dock, "in" the composer's field for a tap: opening a
+            // card must not take the keys 1–9 and Esc of a question that is
+            // waiting. Not a notice (sign in, install…): the sheet it opens
+            // is meant to take the keyboard.
+            child: item is NoticeItem
+                ? content
+                : TextFieldTapRegion(child: content),
           ),
         ),
       ),
@@ -154,11 +161,13 @@ class _AiTimelineState extends State<AiTimeline> {
                 right: 0,
                 bottom: ShellxSpace.s12,
                 child: Center(
-                  child: FilledButton.tonalIcon(
-                    key: const Key('ai.jumpToLatest'),
-                    onPressed: _jumpToLatest,
-                    icon: const Icon(Icons.arrow_downward, size: 14),
-                    label: Text(l10n.aiJumpToLatest),
+                  child: TextFieldTapRegion(
+                    child: FilledButton.tonalIcon(
+                      key: const Key('ai.jumpToLatest'),
+                      onPressed: _jumpToLatest,
+                      icon: const Icon(Icons.arrow_downward, size: 14),
+                      label: Text(l10n.aiJumpToLatest),
+                    ),
                   ),
                 ),
               ),
