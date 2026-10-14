@@ -20,6 +20,8 @@ import 'src/agent/agent_state.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/agent/remote_agent_controller.dart';
 import 'src/agent/ui_services.dart';
+import 'src/ai/ai_host_provider.dart';
+import 'src/ai/ai_startup.dart';
 import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
 import 'src/remote/ssh_reconnector.dart';
@@ -280,6 +282,12 @@ Future<void> _start(_Startup startup) async {
   // Runs after the shutdown. Each step is bounded, so quitting always ends
   // in exit(0).
   Future<void> quitApp() async {
+    // V2-1 §6: no agent outlives the app (stdin closed, 2 s, process tree).
+    await runBounded(
+      () => stopAi(container),
+      timeout: const Duration(seconds: 4),
+      label: 'stopping AI agents',
+    );
     // A11 D22: the global shortcut goes first, so nothing toggles a window
     // that is being torn down. The system drops it with the process anyway.
     await runBounded(
@@ -359,6 +367,11 @@ Future<void> _start(_Startup startup) async {
   container = ProviderContainer(
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
+      // V2-1: the AI host (agents, restore points) and the run sheet's PTYs.
+      aiHostProvider.overrideWithValue(
+        buildAiHost(supportDir: supportDirectory.path, version: info.version),
+      ),
+      aiPtyFactoryProvider.overrideWithValue(ptyFactory),
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
       pasteImageStoreProvider.overrideWithValue(pasteImages),
@@ -685,6 +698,9 @@ Future<void> _start(_Startup startup) async {
   // A5a D16: the restore reopens its panes now; the activation below waits
   // for it, so a restored window gets no extra tab.
   layoutReady.complete();
+  // V2-1 smoothness (warm start): stray agents, old restore points, the
+  // login environment and every agent's readiness, in the background.
+  _unawaitedLogged(startAi(container), 'AI startup');
   await handleActivation(container);
 }
 
