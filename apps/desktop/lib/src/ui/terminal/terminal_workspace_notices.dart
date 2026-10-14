@@ -146,16 +146,18 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
             l10n.moveTabToWorkspace(w.displayName(l10n)),
             MoveTabToWorkspaceIntent(w.id),
           ),
-      for (final id
-          in side.orderedTabIds
-              .where((id) => id != selected.id)
-              .where((id) => tabs.tabs.any((t) => t.id == id))
-              .take(20))
-        entry(
-          'join-pane:$id',
-          l10n.movePaneToTab(tabs.tabs.firstWhere((t) => t.id == id).label),
-          JoinPaneIntent(tabId: id),
-        ),
+      // V2-1 B10: no pane moves into or out of an AI tab.
+      if (!selected.isAi)
+        for (final id
+            in side.orderedTabIds
+                .where((id) => id != selected.id)
+                .where((id) => tabs.tabs.any((t) => t.id == id && !t.isAi))
+                .take(20))
+          entry(
+            'join-pane:$id',
+            l10n.movePaneToTab(tabs.tabs.firstWhere((t) => t.id == id).label),
+            JoinPaneIntent(tabId: id),
+          ),
     ];
   }
 

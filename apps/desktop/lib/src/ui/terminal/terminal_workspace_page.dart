@@ -268,6 +268,12 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   Future<void> _splitPane(SplitAxis axis) async {
     final origin = ref.read(terminalTabsProvider).selected;
     if (origin == null) return;
+    // V2-1 D3: in the AI pane, ⌘D / ⌘⇧D open the tab's terminal under it.
+    if (origin.isAi && origin.focused == null) {
+      await ref.read(terminalTabsProvider.notifier).openAiTerminal(origin.id);
+      if (mounted) focusTerminal();
+      return;
+    }
     await ref.read(terminalTabsProvider.notifier).split(axis);
     if (!mounted) return;
     final tab = ref.read(terminalTabsProvider).selected;
@@ -451,10 +457,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       }),
       SelectAllIntent: run<SelectAllIntent>(
         (_) => _selectAll(),
-        // Outside the terminal (sidebar, a toast…) the key does nothing.
+        // Outside the terminal (sidebar, a toast…) the key does nothing;
+        // V2-1 D2: so does it in the AI pane (its fields take ⌘A).
         enabled: (intent) =>
-            ref.read(terminalTabsProvider).selected != null &&
-            (intent.fromMenu || terminalFocus.hasFocus),
+            _terminalFocused() && (intent.fromMenu || terminalFocus.hasFocus),
       ),
       // A10 D4: ⌘F opens the focused pane's bar (or refocuses it); ⌘G and
       // ⌘⇧G step through its matches. With no bar open ⌘G is the shell's.
@@ -471,7 +477,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
                 .requestFocus(),
           )
           ..ensureVisualUpdate();
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+        // V2-1 D2: only a focused terminal pane has something to find.
+      }, enabled: (_) => _terminalFocused()),
       NavigateSearchIntent: run<NavigateSearchIntent>((intent) {
         final bar = _focusedFind();
         intent.next ? bar?.next() : bar?.previous();
@@ -523,7 +530,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         if (tab == null) return;
         ref.read(copyModeProvider.notifier).toggle(tab.focusedPaneId);
         focusTerminal();
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+        // V2-1 D2: copy mode is a terminal pane's.
+      }, enabled: (_) => _terminalFocused()),
       FontBiggerIntent: run<FontBiggerIntent>(
         (i) => ref.read(terminalFontSizeProvider.notifier).increase(i.step),
       ),
@@ -576,6 +584,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     );
     pane.selection.clearSelection();
   }
+
+  /// V2-1 D2: the selected tab's focused pane is a terminal pane (not the
+  /// AI pane): find, copy mode and select-all apply.
+  bool _terminalFocused() =>
+      ref.read(terminalTabsProvider).selected?.focused != null;
 
   /// A10 D4: the find bar of the selected tab's focused pane, if open.
   FindSession? _focusedFind() {

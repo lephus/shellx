@@ -102,4 +102,22 @@ extension TerminalTabsAi on TerminalTabs {
       },
     );
   }
+
+  /// D3 "Terminal" (the header button, ⌘D in the AI pane):
+  /// [addAiTerminal], its failures shown as [split]'s are.
+  Future<void> openAiTerminal(int tabId) async {
+    try {
+      await addAiTerminal(tabId);
+    } on PaneNoRoomException {
+      if (_ref.mounted) _set(notice: const PaneNoRoomNotice());
+    } on SessionLimitException catch (error) {
+      if (_ref.mounted) _set(notice: SessionLimitNotice(error.max));
+    } on SpawnFailedException catch (error) {
+      if (_ref.mounted) _set(notice: spawnNoticeFor(error));
+    } on PaneGoneException {
+      // The new shell ended before it could be placed: nothing to show.
+    } on OpenBusyException {
+      // Another open is in flight: nothing to add.
+    }
+  }
 }

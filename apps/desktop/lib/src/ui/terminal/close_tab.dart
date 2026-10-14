@@ -14,6 +14,8 @@ Future<void> closeTabWithConfirm({
   ConfirmClose confirm = ConfirmClose.whenRunning,
 }) async {
   final running = tabs.runningPaneCount(tab.id);
+  // V2-1 D3: an AI tab whose agent is working counts as running.
+  final aiBusy = tab.isAi && (tabs.aiBusy?.call(tab.id) ?? false);
   // A11 D18: a pinned tab asks too, unless the user turned the question
   // off (confirm-close-surface = false).
   final pinned = tab.meta.pinned && confirm != ConfirmClose.never;
@@ -23,9 +25,19 @@ Future<void> closeTabWithConfirm({
       switch (confirm) {
         ConfirmClose.never => false,
         ConfirmClose.always => true,
-        ConfirmClose.whenRunning => running > 0,
+        ConfirmClose.whenRunning => running > 0 || aiBusy,
       };
-  if (ask) {
+  if (ask && aiBusy && !pinned) {
+    // V2-1 D3: "Stop the turn and close?"
+    final ok = await router.confirm(
+      ConfirmRequest(
+        title: l10n.aiCloseRunningTitle,
+        body: l10n.aiCloseRunningBody(tab.ai?.agentName ?? ''),
+        confirmLabel: l10n.aiCloseRunningAction,
+      ),
+    );
+    if (!ok) return;
+  } else if (ask) {
     final ok = await router.confirm(
       ConfirmRequest(
         title: pinned
@@ -65,6 +77,16 @@ Future<void> closePaneWithConfirm({
   required int paneId,
   ConfirmClose confirm = ConfirmClose.whenRunning,
 }) async {
+  // V2-1 D3: closing the AI pane closes its tab.
+  if (isAiPaneId(paneId)) {
+    return closeTabWithConfirm(
+      tabs: tabs,
+      router: router,
+      l10n: l10n,
+      tab: tab,
+      confirm: confirm,
+    );
+  }
   final pane = tab.panes[paneId];
   if (pane == null) return;
   if (!tab.isSplit) {

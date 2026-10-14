@@ -32,6 +32,7 @@ import '../../terminal/terminal_search.dart' show SearchMatch;
 import '../../terminal/terminal_style.dart';
 import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
+import '../ai/ai_pane_view.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart'
     show terminalFocusRequestProvider, windowActiveProvider;
@@ -239,7 +240,8 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     // The pane headers' tooltips follow a reload (A9 D29).
     ref.watch(shellxConfigProvider.select((s) => s.bindings));
     final tab = widget.tab;
-    _keys.removeWhere((id, _) => !tab.panes.containsKey(id));
+    // V2-1 D3: the AI pane keeps its key (and state) too.
+    _keys.removeWhere((id, _) => !tab.hasPane(id));
     _viewKeys.removeWhere((id, _) => !tab.panes.containsKey(id));
     if (!tab.isSplit) return _pane(tab.focusedPaneId);
     final zoomed = tab.zoomedPaneId;
@@ -283,6 +285,7 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
   );
 
   Widget _pane(int id) {
+    if (isAiPaneId(id)) return _aiPane(id);
     final l10n = AppLocalizations.of(context);
     final tab = widget.tab;
     final pane = tab.panes[id]!;
@@ -582,6 +585,51 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     if (action == null || !action.isEnabled(intent)) return false;
     Actions.invoke(context, intent);
     return true;
+  }
+
+  /// V2-1 D3: the AI pane, a negative leaf with its own header and
+  /// composer, no terminal. Keyed like a terminal pane, so a split or a
+  /// zoom moves it without losing its state.
+  Widget _aiPane(int id) {
+    final tab = widget.tab;
+    final ai = tab.aiPanes[id];
+    final focused = id == tab.focusedPaneId;
+    final appearance = ref.watch(terminalAppearanceProvider);
+    return KeyedSubtree(
+      key: _keyFor(id),
+      child: Listener(
+        onPointerDown: (_) => _pointerDown(id),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ai == null
+                  ? const SizedBox.shrink()
+                  : AiPaneView(
+                      key: ValueKey('ai.$id'),
+                      tab: tab,
+                      pane: ai,
+                      selected: widget.selected,
+                      focusNode: widget.selected && focused
+                          ? widget.terminalFocus
+                          : null,
+                    ),
+            ),
+            // UI-A3 §2.5: the focus outline of a split tab, as for a
+            // terminal pane.
+            if (tab.isSplit && focused && tab.zoomedPaneId == null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DevicePixelOutline(
+                    key: const Key('pane.focusOutline'),
+                    color: appearance.focusOutline,
+                    devicePixelRatio: View.of(context).devicePixelRatio,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// A1 ruling I6 entries; the pane under the pointer is focused first

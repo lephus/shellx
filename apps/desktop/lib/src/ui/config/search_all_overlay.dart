@@ -26,13 +26,15 @@ List<PaneSource> searchAllSources(TerminalTabsState state) {
   return [
     for (final tab in tabs)
       for (final id in tab.paneOrder)
-        PaneSource(
-          tabId: tab.id,
-          paneId: id,
-          tabLabel: tab.label,
-          paneNumber: tab.paneNumber(id),
-          terminal: tab.panes[id]!.terminal,
-        ),
+        // V2-1 §4.7: an AI pane has no terminal to search.
+        if (tab.panes[id] case final pane?)
+          PaneSource(
+            tabId: tab.id,
+            paneId: id,
+            tabLabel: tab.label,
+            paneNumber: tab.paneNumber(id),
+            terminal: pane.terminal,
+          ),
   ];
 }
 

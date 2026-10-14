@@ -26,9 +26,14 @@ String agentStatusLabel(
   AppLocalizations l10n,
   AgentKind kind,
   AgentState state,
-) {
-  final name = agentDisplayName(l10n, kind);
-  return state == AgentState.needsInput
-      ? l10n.agentStatusAnnounce(name)
-      : l10n.agentStatusTooltip(name, agentStateWord(l10n, state));
-}
+) => agentStatusLabelNamed(l10n, agentDisplayName(l10n, kind), state);
+
+/// [agentStatusLabel] for an agent called [name]: an AI pane's own agent
+/// ("Claude", V2-1 B6).
+String agentStatusLabelNamed(
+  AppLocalizations l10n,
+  String name,
+  AgentState state,
+) => state == AgentState.needsInput
+    ? l10n.agentStatusAnnounce(name)
+    : l10n.agentStatusTooltip(name, agentStateWord(l10n, state));

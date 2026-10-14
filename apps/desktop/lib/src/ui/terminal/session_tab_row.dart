@@ -254,7 +254,11 @@ class SessionTabRowState extends State<SessionTabRow> {
         l10n.tabStatusLabel(tabStatusText(l10n, tab.meta.status)),
       if (tab.meta.description.isNotEmpty) cleanDescription(tab.meta),
       if (tab.isSplit) l10n.sidebarPaneCount(tab.paneCount),
-      if (tab.exited)
+      // V2-1 §4.7: an AI tab says so and who its agent is.
+      if (tab.ai case final ai?) ...[
+        l10n.aiTabRowLabel,
+        if (widget.agentStatus == null) ai.agentName,
+      ] else if (tab.exited)
         l10n.sidebarStatusExited(tab.exitCode!)
       else if (tab.runningCommand)
         l10n.sidebarStatusRunning
@@ -265,7 +269,10 @@ class SessionTabRowState extends State<SessionTabRow> {
         l10n.attentionRowSemantics(u.count, u.text(l10n)),
       if (widget.agent) l10n.agentChipTooltip,
       if (widget.agentStatus case final a?)
-        agentStatusLabel(l10n, a.agent, a.state),
+        switch (tab.ai) {
+          final ai? => agentStatusLabelNamed(l10n, ai.agentName, a.state),
+          null => agentStatusLabel(l10n, a.agent, a.state),
+        },
       if (tab.gitBranch case final branch?)
         l10n.sidebarBranch(remote == null ? branch : cleanServerText(branch)),
       if (widget.pr case final pr?) prTooltipText(l10n, pr),
@@ -356,7 +363,8 @@ class SessionTabRowState extends State<SessionTabRow> {
     final tab = widget.tab;
     final renaming = widget.renaming;
     final scaler = MediaQuery.textScalerOf(context);
-    final withContext = tab.hasContext;
+    // V2-1 §4.7: an AI tab always has its second line (state · agent).
+    final withContext = tab.isAi || tab.hasContext;
     final editingDescription = widget.editingDescription;
     final description = cleanDescription(tab.meta);
     final withDescription = description.isNotEmpty || editingDescription;
@@ -451,7 +459,9 @@ class SessionTabRowState extends State<SessionTabRow> {
       children: [
         SizedBox(
           width: ShellxSizes.dotSlot,
-          child: Center(child: TabStatusDot(tab)),
+          child: Center(
+            child: tab.isAi ? const _AiTabIcon() : TabStatusDot(tab),
+          ),
         ),
         const SizedBox(width: ShellxSpace.s8),
         Expanded(
@@ -489,7 +499,8 @@ class SessionTabRowState extends State<SessionTabRow> {
                     ],
                     // A12 D12: the agent's state follows the title; narrow
                     // rows keep the icon only.
-                    if (widget.agentStatus case final a?) ...[
+                    // V2-1 §4.7: an AI tab shows its state on line 2.
+                    if (widget.agentStatus case final a? when !tab.isAi) ...[
                       const SizedBox(width: ShellxSpace.s4),
                       AgentBadge(
                         key: Key('tab.agent.${tab.id}'),
@@ -801,14 +812,19 @@ class SessionTabRowState extends State<SessionTabRow> {
                           child: _HitBand(
                             cornerWidth: closeColumn,
                             cornerHeight: overlap,
-                            child: _ContextLine(
-                              tab: tab,
-                              home: widget.home,
-                              onOpenPort: widget.onOpenPort,
-                              portTooltip: widget.portTooltip,
-                              pr: widget.pr,
-                              onOpenPr: widget.onOpenPr,
-                            ),
+                            child: tab.isAi
+                                ? _AiStatusLine(
+                                    tab: tab,
+                                    status: widget.agentStatus,
+                                  )
+                                : _ContextLine(
+                                    tab: tab,
+                                    home: widget.home,
+                                    onOpenPort: widget.onOpenPort,
+                                    portTooltip: widget.portTooltip,
+                                    pr: widget.pr,
+                                    onOpenPr: widget.onOpenPr,
+                                  ),
                           ),
                         ),
                     ],
@@ -1037,6 +1053,56 @@ class TabStatusDot extends StatelessWidget {
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         color: ShellxDesktopColors.ok,
+      ),
+    );
+  }
+}
+
+/// V2-1 §4.7: an AI tab's mark in the status-dot slot.
+class _AiTabIcon extends StatelessWidget {
+  const _AiTabIcon();
+
+  @override
+  Widget build(BuildContext context) => const Icon(
+    Icons.auto_awesome,
+    key: Key('dot.ai'),
+    size: ShellxSizes.dotSlot - 4,
+    color: ShellxDesktopColors.accent,
+  );
+}
+
+/// V2-1 §4.7: an AI tab's second line — A12's "{state} · {agent}" in the
+/// badge's colour, or the agent alone before it reports anything. The
+/// row's label says it to screen readers.
+class _AiStatusLine extends StatelessWidget {
+  const _AiStatusLine({required this.tab, required this.status});
+  final TerminalTab tab;
+  final AgentBadgeInfo? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final name = tab.ai?.agentName ?? '';
+    final s = status;
+    final look = s == null ? null : agentBadgeLook(s.state);
+    final color = look?.color ?? ShellxDesktopColors.textSecondary;
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          if (look != null) ...[
+            Icon(look.icon, size: ShellxSizes.agentBadgeRowIcon, color: color),
+            const SizedBox(width: ShellxSpace.s4),
+          ],
+          Flexible(
+            child: Text(
+              s == null ? name : '${agentStateWord(l10n, s.state)} · $name',
+              key: Key('row.ai.${tab.id}'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ShellxText.caption.copyWith(color: color),
+            ),
+          ),
+        ],
       ),
     );
   }
