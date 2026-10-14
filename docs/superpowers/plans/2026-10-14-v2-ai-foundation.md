@@ -7913,16 +7913,20 @@ final class CheckpointStore with Redacted implements Checkpoints {
     _writeMeta();
   }
 
-  /// Keeps nested repositories and big new files out (ruling R4).
+  /// Keeps nested repositories and big new files out (ruling R4). The size
+  /// checks are async and batched: the store runs on the app's UI isolate,
+  /// and a first snapshot can list 200 000 files (smooth-UI requirement).
   Future<void> _exclude(List<String> untracked, Duration timeout) async {
     final nested = [for (final e in untracked) if (e.endsWith('/')) e];
+    final files = [for (final e in untracked) if (!e.endsWith('/')) e];
     final big = <String>[];
-    for (final e in untracked) {
-      if (e.endsWith('/')) continue;
-      try {
-        if (File(p.join(project, e)).lengthSync() > maxFileBytes) big.add(e);
-      } on FileSystemException {
-        // Gone already: `add -A` sees that.
+    for (var i = 0; i < files.length; i += 256) {
+      final batch = files.sublist(i, i + 256 > files.length ? files.length : i + 256);
+      final sizes = await Future.wait([
+        for (final e in batch) FileStat.stat(p.join(project, e)).then((s) => s.size),
+      ]);
+      for (var j = 0; j < batch.length; j++) {
+        if (sizes[j] > maxFileBytes) big.add(batch[j]);
       }
     }
     if (nested.isEmpty && big.isEmpty) return;
