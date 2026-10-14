@@ -44,8 +44,11 @@ enum _More { settings, restart, log }
 ///   runtime; a hidden pane's views hear nothing until it shows again.
 /// - [focusNode] is the window's terminal focus while this pane is the
 ///   selected tab's focused pane. The whole pane holds it and hands the
-///   keyboard on to the composer (or the folder field), so the window's
-///   shortcuts and `focusTerminal` reach the pane.
+///   keyboard on to the folder field while the folder card is up, the run
+///   sheet while one is, else the composer, so the window's shortcuts and
+///   `focusTerminal` reach the pane.
+/// - The folder card ("Choose folder" over a conversation) comes over the
+///   conversation without unmounting it: Cancel finds the composer's text.
 class AiPaneView extends ConsumerStatefulWidget {
   const AiPaneView({
     super.key,
@@ -171,12 +174,20 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     if (node.context != null && node.canRequestFocus) node.requestFocus();
   }
 
-  /// [_forward] once the frame is built, if this pane holds the window's
-  /// keyboard: not another pane of a split tab, nor a tab out of sight.
+  /// [_forward] once the frame is built, if the keyboard is this pane's to
+  /// move: the pane holds the window's keyboard (not another pane of a split
+  /// tab, nor a tab out of sight), and it is in the pane still or fell to the
+  /// workspace when what had it went — not in a field elsewhere (Settings,
+  /// the sidebar, a dialog) that the user is typing in.
   void _forwardSoon() {
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
-        if (mounted && widget.focusNode != null) _forward();
+        if (!mounted || widget.focusNode == null) return;
+        final primary = FocusManager.instance.primaryFocus;
+        final lost =
+            primary == null ||
+            identical(primary, FocusScope.of(context, createDependency: false));
+        if (lost || widget.focusNode!.hasFocus) _forward();
       })
       ..ensureVisualUpdate();
   }
