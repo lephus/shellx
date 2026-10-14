@@ -20,14 +20,31 @@ abstract interface class ClipboardMedia {
 /// `pasteboard` (macOS and Windows). A plugin that fails or hangs is "no
 /// files / no image": a paste never waits on it for more than 2 s.
 final class SystemClipboardMedia implements ClipboardMedia {
-  const SystemClipboardMedia();
+  const SystemClipboardMedia({
+    Future<List<String>> Function() readFiles = Pasteboard.files,
+    bool Function(String path) exists = _onDisk,
+  }) : _readFiles = readFiles,
+       _exists = exists;
+
+  final Future<List<String>> Function() _readFiles;
+  final bool Function(String path) _exists;
 
   static const _limit = Duration(seconds: 2);
 
+  static bool _onDisk(String path) =>
+      FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound;
+
+  /// Only paths that exist: on macOS a copied web link (`https://host/a.png`)
+  /// also reads as the "file" `/a.png`, and pasting that would swallow the
+  /// link.
   @override
   Future<List<String>> files() async {
     try {
-      return await Pasteboard.files().timeout(_limit);
+      final paths = await _readFiles().timeout(_limit);
+      return [
+        for (final path in paths)
+          if (_exists(path)) path,
+      ];
     } on Object {
       return const [];
     }
