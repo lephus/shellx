@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/src/terminal/agent_notify_policy.dart';
 import 'package:shellx_desktop/src/terminal/agent_status.dart';
 
 final t0 = DateTime.utc(2026, 10, 7, 12);
@@ -9,6 +10,14 @@ AgentEvent ev(AgentEventKind k, {int s = 0, String? session}) => AgentEvent(
   kind: k,
   at: t0.add(Duration(seconds: s)),
   session: session,
+);
+
+/// An event of an AI pane (V2-1 D3: its id is negative).
+AgentEvent aiEv(AgentEventKind k, {int s = 0}) => AgentEvent(
+  pane: -1,
+  agent: AgentKind.claude,
+  kind: k,
+  at: t0.add(Duration(seconds: s)),
 );
 
 AgentPane? reduce(AgentPane? p, AgentEvent e, {bool visible = true}) =>
@@ -83,6 +92,42 @@ void main() {
     expect((p.state, p.runningSince), (AgentState.running, t0));
     p = reduce(p, ev(AgentEventKind.idle, s: 40), visible: false)!;
     expect((p.state, p.runningSince), (AgentState.done, t0));
+  });
+
+  test('an AI pane answered after a question keeps when its turn began '
+      '(D13: the runtime reports running, nobody types)', () {
+    var p = reduce(null, aiEv(AgentEventKind.start))!;
+    p = reduce(p, aiEv(AgentEventKind.running))!;
+    p = reduce(p, aiEv(AgentEventKind.needsInput, s: 290))!;
+    expect(p.runningSince, t0);
+    p = reduce(p, aiEv(AgentEventKind.running, s: 296))!;
+    expect(
+      (p.state, p.runningSince, p.since),
+      (AgentState.running, t0, t0.add(const Duration(seconds: 296))),
+      reason: 'a turn of 296 s, not of 0 s',
+    );
+    // The turn ends unwatched, 4 s after the last answer: finished, and
+    // the long-turn notification (30 s by default) is due.
+    final end = aiEv(AgentEventKind.idle, s: 300);
+    expect(
+      AgentNotifyPolicy.decide(
+        end,
+        p,
+        paneVisible: false,
+        threshold: const Duration(seconds: 30),
+        lastNoticeAt: t0.add(const Duration(seconds: 290)),
+      ).text,
+      AgentNoticeText.done,
+    );
+    expect(reduce(p, end, visible: false)!.state, AgentState.done);
+  });
+
+  test('a terminal pane told running after a question starts a new turn '
+      '(its typing is what answers: userTyped)', () {
+    var p = reduce(null, ev(AgentEventKind.running))!;
+    p = reduce(p, ev(AgentEventKind.needsInput, s: 290))!;
+    p = reduce(p, ev(AgentEventKind.running, s: 296))!;
+    expect(p.runningSince, t0.add(const Duration(seconds: 296)));
   });
 
   test('userTyped: needsInput → running; others unchanged', () {

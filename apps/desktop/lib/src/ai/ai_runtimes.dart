@@ -204,8 +204,11 @@ class AiRuntimes extends Notifier<void> {
     final kind = agentKindOf(_agentOf[paneId] ?? '');
     if (kind == null || !ref.mounted) return; // B5: a custom agent
     final notifier = ref.read(agentStatusProvider.notifier);
+    // The A12 clock, as every other event's: a test drives it, and it is the
+    // one the long-turn threshold is measured on.
+    final clock = ref.read(agentStatusClockProvider);
     void send(AgentEventKind k) => notifier.ingest(
-      AgentEvent(pane: paneId, agent: kind, kind: k, at: DateTime.now()),
+      AgentEvent(pane: paneId, agent: kind, kind: k, at: clock()),
     );
     final last = _last[paneId];
     if (last == null && status != AiStatus.ended) send(AgentEventKind.start);

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../ai/ai_pane_state.dart' show isAiPaneId;
+
 /// A12 D9: how long a running agent's pane may stay silent before it counts
 /// as idle (its spinner always prints, so silence means it stopped).
 const Duration kAgentQuietDecay = Duration(seconds: 20);
@@ -129,13 +131,18 @@ AgentPane? reduceAgent(
       );
     case AgentEventKind.running:
       final already = prev?.state == AgentState.running;
+      // V2-1 D13: an AI pane's runtime says "running" itself when its
+      // question is answered; the turn goes on, so it keeps its start (a
+      // terminal pane learns of the answer from the typing: [userTyped]).
+      final answered =
+          isAiPaneId(e.pane) && prev?.state == AgentState.needsInput;
       return AgentPane(
         agent: e.agent,
         state: AgentState.running,
         since: already ? prev!.since : e.at,
         lastEventAt: e.at,
         session: e.session ?? prev?.session,
-        runningSince: already ? (prev!.runningSince ?? e.at) : e.at,
+        runningSince: already || answered ? (prev!.runningSince ?? e.at) : e.at,
       );
     case AgentEventKind.needsInput:
       return AgentPane(
