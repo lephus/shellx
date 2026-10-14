@@ -386,6 +386,10 @@ void main() {
       // The two above fail the host check; these have a host and fail only
       // the scheme check.
       expect(url('ftp://example.com/a').isWebUrl, isFalse, reason: 'scheme');
+      // A user name before the host can disguise it
+      // (`https://accounts.google.com@evil.com` goes to evil.com).
+      expect(url('https://accounts.google.com@evil.com/a').isWebUrl, isFalse);
+      expect(url('https://user:pass@example.com').isWebUrl, isFalse);
       expect(url('myapp://open/x').isWebUrl, isFalse, reason: 'scheme');
       expect(
         ElicitationRequest.fromJson({'mode': 'url', 'message': 'm'}),

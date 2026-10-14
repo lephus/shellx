@@ -129,12 +129,14 @@ final class ElicitationUrl extends ElicitationRequest {
   final String url;
 
   /// Only http and https URLs with a host may be opened, after a click
-  /// (spec D22, §5).
+  /// (spec D22, §5). A user name before the host is refused: it can
+  /// disguise the host (`https://accounts.google.com@evil.com`).
   bool get isWebUrl {
     final u = Uri.tryParse(url);
     return u != null &&
         (u.scheme == 'http' || u.scheme == 'https') &&
-        u.host.isNotEmpty;
+        u.host.isNotEmpty &&
+        u.userInfo.isEmpty;
   }
 }
 
