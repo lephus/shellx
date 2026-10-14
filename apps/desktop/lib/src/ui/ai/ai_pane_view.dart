@@ -21,6 +21,7 @@ import 'ai_dock.dart';
 import 'ai_files_panel.dart';
 import 'ai_folder_card.dart';
 import 'ai_header.dart';
+import 'ai_history.dart';
 import 'ai_log_dialog.dart';
 import 'ai_permission_bar.dart';
 import 'ai_run_sheet.dart';
@@ -249,6 +250,28 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     }
   }
 
+  /// D15: an earlier session of this folder, in a new AI tab of the same
+  /// agent that reopens it (D14).
+  Future<void> _history(AiRuntime runtime) => showAiHistory(
+    context,
+    runtime,
+    onOpen: (sessionId, title) {
+      final l10n = AppLocalizations.of(context);
+      final pane = widget.pane;
+      ref
+          .read(terminalTabsProvider.notifier)
+          .openAiTab(
+            agentId: pane.agentId,
+            agentName: pane.agentName,
+            title: (title?.trim().isNotEmpty ?? false)
+                ? title!
+                : l10n.aiNewSession,
+            cwd: runtime.state.cwd,
+            sessionId: sessionId,
+          );
+    },
+  );
+
   /// Through the window's action when there is one (it also announces).
   void _zoom() {
     final tabs = ref.read(terminalTabsProvider.notifier)
@@ -367,6 +390,10 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
         agentName: pane.agentName,
         title: widget.tab.label,
         view: view,
+        // D15: only for an agent that lists its sessions.
+        onHistory: runtime != null && runtime.state.capabilities.listSessions
+            ? () => unawaited(_history(runtime))
+            : null,
         onPanel: runtime == null ? null : _ui.togglePanel,
         panelOpen: _ui.panelOpen,
         onTerminal: () => unawaited(tabs.openAiTerminal(widget.tab.id)),
