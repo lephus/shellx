@@ -5,9 +5,11 @@ import 'package:shellx_ai/shellx_ai.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_markdown.dart';
+import 'ai_notice_card.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
 import 'ai_tool_card.dart';
+import 'ai_turn_summary.dart';
 
 /// One conversation item's widget (spec §4.2).
 Widget aiTimelineItem(TimelineItem item) => switch (item) {
@@ -16,8 +18,8 @@ Widget aiTimelineItem(TimelineItem item) => switch (item) {
   ThoughtItem() => AiThought(item: item),
   ToolItem() => AiToolCard(item: item),
   AskItem() => _AskFallback(item: item),
-  TurnEndItem() => const SizedBox(height: ShellxSpace.s8),
-  NoticeItem() => const SizedBox.shrink(),
+  TurnEndItem() => AiTurnSummary(item: item),
+  NoticeItem() => AiNoticeCard(item: item),
 };
 
 /// The conversation (spec §4.1, §4.2). Smoothness:

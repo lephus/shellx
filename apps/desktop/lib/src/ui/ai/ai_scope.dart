@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:shellx_acp/shellx_acp.dart' show AuthMethodTerminal;
 import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 
@@ -40,6 +41,23 @@ class AiPaneScope extends InheritedWidget {
       pane != old.pane;
 }
 
+/// D8: what a card asks the run sheet to run.
+sealed class AiRunRequest {
+  const AiRunRequest();
+}
+
+/// One of the agent's terminal sign-in methods: its own command plus the
+/// method's args and env. Nothing in it is ever read back.
+final class AiRunLogin extends AiRunRequest {
+  const AiRunLogin(this.method);
+  final AuthMethodTerminal method;
+}
+
+/// The agent's pinned npm install (D6, D7).
+final class AiRunInstall extends AiRunRequest {
+  const AiRunInstall();
+}
+
 /// The AI pane's own UI state, which its parts change: the overlay over the
 /// conversation (run sheet, viewer), the side panel, and text for the
 /// composer (Files › "Mention in chat").
@@ -52,6 +70,15 @@ final class AiPaneUi extends ChangeNotifier {
 
   /// Text the composer inserts at its cursor, then clears.
   final insert = ValueNotifier<String?>(null);
+
+  /// Set by the pane: the run sheet (D8).
+  void Function(AiRunRequest request)? onRun;
+
+  /// Set by the pane: the folder card (D5, §6 "folder gone").
+  void Function()? onChooseFolder;
+
+  /// Set by the pane: "Revert turn" N (§4.4).
+  void Function(int turn)? onRevertTurn;
 
   void showOverlay(Widget overlay) {
     _overlay = overlay;
