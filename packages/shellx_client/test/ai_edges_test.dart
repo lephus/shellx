@@ -367,6 +367,90 @@ void main() {
     });
   });
 
+  group('watching the list', () {
+    test('unwatch is the inverse of watch: nobody looks at the machine, so a '
+        'lost channel is not brought back for the list', () {
+      fakeAsync((async) {
+        final tap = _Tap(AiPhoneHub(source: _Window(), epoch: 'ep'));
+        final h = Harness(async, keys, ai: tap);
+        final machine = h.phoneMachine;
+        final ai = machine.ai;
+        ai.unwatch(); // nothing is watched yet: nothing happens
+        expect(ai.wantsChannel, isFalse);
+        h.run(ai.watch());
+        settle(async);
+        expect(ai.wantsChannel, isTrue);
+        ai.unwatch();
+        ai.unwatch(); // again: the same
+        expect(ai.wantsChannel, isFalse);
+        h.disconnectPhone();
+        h.reconnectPhone();
+        settle(async, const Duration(seconds: 5));
+        // No relay or presence event makes a handshake for it.
+        expect(machine.state, isA<MachineIdle>());
+        expect(tap.fromPhone.whereType<AiList>(), hasLength(1));
+      });
+    });
+
+    test('watch, unwatch, watch again: the list is asked for again and the '
+        'channel is wanted again', () {
+      fakeAsync((async) {
+        final tap = _Tap(AiPhoneHub(source: _Window(), epoch: 'ep'));
+        final h = Harness(async, keys, ai: tap);
+        final machine = h.phoneMachine;
+        final ai = machine.ai;
+        final heard = <AiListing>[];
+        ai.listings.listen(heard.add);
+        h.run(ai.watch());
+        settle(async);
+        ai.unwatch();
+        h.run(ai.watch()); // the channel is there: asked at once
+        settle(async);
+        expect(ai.wantsChannel, isTrue);
+        expect(tap.fromPhone.whereType<AiList>(), hasLength(2));
+        expect(heard, hasLength(2));
+        // Wanted for real: a lost channel comes back, and asks again.
+        h.disconnectPhone();
+        h.reconnectPhone();
+        settle(async, const Duration(seconds: 1));
+        expect(machine.state, isA<MachineReady>());
+        expect(tap.fromPhone.whereType<AiList>(), hasLength(3));
+      });
+    });
+
+    test('unwatch while the first channel is still being made: it comes, '
+        'and the list is not asked for', () {
+      fakeAsync((async) {
+        final tap = _Tap(AiPhoneHub(source: _Window(), epoch: 'ep'));
+        final h = Harness(async, keys, ai: tap);
+        final machine = h.phoneMachine;
+        final watching = _Outcome(machine.ai.watch()); // connects first
+        machine.ai.unwatch();
+        settle(async);
+        expect(watching.errors, isEmpty);
+        expect(machine.state, isA<MachineReady>());
+        expect(tap.fromPhone.whereType<AiList>(), isEmpty);
+        expect(machine.ai.wantsChannel, isFalse);
+      });
+    });
+
+    test('unwatch drops only the list: an open mirror still wants the '
+        'channel', () {
+      fakeAsync((async) {
+        final tap = _Tap(AiPhoneHub(source: _Window(), epoch: 'ep'));
+        final h = Harness(async, keys, ai: tap);
+        final ai = h.phoneMachine.ai;
+        final link = ai.attach('ep.-1');
+        h.run(ai.watch());
+        settle(async);
+        ai.unwatch();
+        expect(ai.wantsChannel, isTrue);
+        link.detach();
+        expect(ai.wantsChannel, isFalse);
+      });
+    });
+  });
+
   group('acks', () {
     test('at most one per 50 ms per session, with the last seq received', () {
       fakeAsync((async) {
@@ -440,6 +524,77 @@ void main() {
       });
     });
 
+    test('a body skipped while the link awaits a snapshot is not acked: a '
+        'stale one that crossed onto the new channel must not clear the '
+        'window of the new subscription', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final machine = h.phoneMachine;
+        var attaches = 0;
+        d.onMessage = (m) {
+          if (m is! AiAttach) return;
+          attaches++;
+          if (attaches == 1) {
+            d.say(_snapshot(40, n: 1, items: [_item(0)]));
+          } else {
+            // Through the background service a body of the old subscription
+            // can cross `ai.gone` and reach the new channel first.
+            d.say(_update(41, n: 2, items: [_item(1)]));
+            Timer(
+              const Duration(milliseconds: 300),
+              () => d.say(_snapshot(1, n: 1, items: [_item(0)])),
+            );
+          }
+        };
+        final link = machine.ai.attach(_sid);
+        settle(async);
+        h.run(machine.dropChannel());
+        settle(async, const Duration(seconds: 1));
+        expect(attaches, 2);
+        expect(link.state, AiLinkState.live);
+        expect(link.mirror.end, 1); // the stale body was not applied
+        expect(d.sinceNth<AiAttach, AiAck>(2).map((a) => a.seq), [1]);
+      });
+    });
+
+    test('bodies skipped while the link awaits a snapshot send no ack at '
+        'all, and the one that made the gap is acked once', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        var attaches = 0;
+        d.onMessage = (m) {
+          if (m is! AiAttach) return;
+          attaches++;
+          if (attaches == 1) {
+            d.say(_snapshot(40, n: 1, items: [_item(0)]));
+          } else {
+            Timer(
+              const Duration(milliseconds: 400),
+              () => d.say(_snapshot(57, n: 1, items: [_item(0)])),
+            );
+          }
+        };
+        final link = h.phoneMachine.ai.attach(_sid);
+        settle(async);
+        d.say(_update(41, n: 3, items: [_item(2)])); // a gap: 1 is missing
+        // Old bodies keep coming, each after the ack of the one before has
+        // gone out: none of them is applied, none is acked.
+        for (var seq = 42; seq <= 44; seq++) {
+          settle(async, const Duration(milliseconds: 80));
+          d.say(_update(seq, n: 3 + seq, items: [_item(seq)]));
+        }
+        settle(async, const Duration(milliseconds: 100));
+        expect(attaches, 2);
+        expect(link.mirror.end, 1);
+        expect(d.sinceNth<AiAttach, AiAck>(2).map((a) => a.seq), [41]);
+        settle(async, const Duration(milliseconds: 400));
+        expect(link.state, AiLinkState.live);
+        expect(d.sinceNth<AiAttach, AiAck>(2).map((a) => a.seq), [41, 57]);
+      });
+    });
+
     test('a gap attaches again with what is held; the new snapshot may '
         'carry any seq, and the old bodies in between are not applied', () {
       fakeAsync((async) {
@@ -477,7 +632,7 @@ void main() {
           'from': 0,
           'revs': [1, 1],
         });
-        // Made for what the phone held before: not applied, but acked.
+        // Made for what the phone held before: not applied, and not acked.
         d.say(_update(42, n: 6, items: [_item(5)]));
         settle(async, const Duration(milliseconds: 20));
         expect(link.mirror.end, 2);
@@ -485,6 +640,7 @@ void main() {
         settle(async, const Duration(milliseconds: 200));
         expect(link.state, AiLinkState.live);
         expect(link.mirror.end, 5);
+        expect(d.got<AiAck>().map((a) => a.seq), isNot(contains(42)));
         expect(d.got<AiAck>().last.seq, 57);
       });
     });

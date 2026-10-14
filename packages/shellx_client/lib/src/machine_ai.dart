@@ -50,10 +50,11 @@ final class AiSessionLink {
   String? _closedReason;
   var _awaitingSnapshot = true;
 
-  /// The `seq` of the last body received on this channel; 0: none yet. It is
-  /// what an ack carries, whatever its number: a snapshot goes on from the
-  /// numbers before it (also after a re-attach), and on a new channel the
-  /// desktop counts anew, so nothing here assumes a snapshot is number 1.
+  /// The `seq` of the last body taken on this channel (one skipped while
+  /// awaiting a snapshot does not count); 0: none yet. It is what an ack
+  /// carries, whatever its number: a snapshot goes on from the numbers before
+  /// it (also after a re-attach), and on a new channel the desktop counts
+  /// anew, so nothing here assumes a snapshot is number 1.
   var _lastSeq = 0;
 
   /// Bodies in a row that could not be taken.
@@ -113,13 +114,14 @@ final class AiSessionLink {
 
   void _body(int seq, Uint8List body, {required bool snapshot}) {
     if (_state == AiLinkState.closed) return;
+    // Made for what the phone held before its re-attach: not applied, and not
+    // acked either. Through the background service it can even be a body of
+    // the previous channel's subscription that crossed `ai.gone`: its seq
+    // would clear the window of the subscription that answers this attach.
+    if (!snapshot && _awaitingSnapshot) return;
     _lastSeq = seq;
     _scheduleAck();
-    if (snapshot) {
-      _awaitingSnapshot = false;
-    } else if (_awaitingSnapshot) {
-      return; // made for what the phone held before its re-attach
-    }
+    if (snapshot) _awaitingSnapshot = false;
     if (!_apply(body, snapshot: snapshot)) {
       _unreadable();
       return;
@@ -241,6 +243,13 @@ final class MachineAi {
     _watching = true;
     if (!_send([const AiList()])) await _connect(); // channelReady asks
   }
+
+  /// The inverse of [watch], and it does nothing when nothing is watched: the
+  /// list is no longer wanted, so a lost channel is not brought back for it
+  /// and a new one does not ask for it (an open mirror still wants the
+  /// channel). The computer keeps sending the changes of the list until the
+  /// channel ends (it cannot be asked to stop); they are still read.
+  void unwatch() => _watching = false;
 
   /// Mirrors session [sid] (the same link while it stays open).
   AiSessionLink attach(String sid) {
