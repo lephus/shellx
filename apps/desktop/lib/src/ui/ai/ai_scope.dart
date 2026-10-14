@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
@@ -36,10 +37,13 @@ class AiPaneScope extends InheritedWidget {
     return scope!;
   }
 
+  /// Smoothness: the tab list makes a new record of the tab for anything
+  /// that touches it (a focus, a title elsewhere); only another tab (or
+  /// runtime, or pane) is worth building every visible item again.
   @override
   bool updateShouldNotify(AiPaneScope old) =>
       !identical(runtime, old.runtime) ||
-      !identical(tab, old.tab) ||
+      tab.id != old.tab.id ||
       pane != old.pane;
 }
 
@@ -195,6 +199,50 @@ final class AiPaneUi extends ChangeNotifier {
     images.dispose();
     super.dispose();
   }
+}
+
+/// Smoothness: [builder] runs again once a second while the pane is on
+/// screen — the header's "Running · 0:12", the seconds of a running tool
+/// call. A pane that is hidden (another tab is selected) stops its clock, and
+/// shows the right time at once when it shows again: nothing ticks that
+/// nobody sees.
+class AiEverySecond extends StatefulWidget {
+  const AiEverySecond({super.key, required this.builder});
+
+  final WidgetBuilder builder;
+
+  @override
+  State<AiEverySecond> createState() => _AiEverySecondState();
+}
+
+class _AiEverySecondState extends State<AiEverySecond> {
+  Timer? _tick;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!aiPaneShown(context)) {
+      _stop();
+    } else {
+      _tick ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  void _stop() {
+    _tick?.cancel();
+    _tick = null;
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }
 
 /// Smoothness: [builder] runs again only when [select] of the session

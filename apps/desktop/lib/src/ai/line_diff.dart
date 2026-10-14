@@ -26,8 +26,9 @@ DiffStat diffStat(List<DiffLine> lines) => (
   removed: lines.where((l) => l.op == DiffOp.removed).length,
 );
 
-/// Above this many lines in all, a diff runs off the UI isolate.
-const int kInlineDiffLines = 2000;
+/// Above this many lines in all, a diff runs off the UI isolate: below it
+/// it is a few milliseconds of the frame, above it a card would drop frames.
+const int kInlineDiffLines = 300;
 
 List<String> _lines(String text) {
   // §6 Windows: shown without CR, so a CRLF file does not differ on every

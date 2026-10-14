@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_ai/shellx_ai.dart';
@@ -10,6 +8,7 @@ import '../../terminal/agent_status.dart';
 import '../../terminal/agent_status_notifier.dart' show agentPaneBadgeProvider;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_labels.dart';
+import 'ai_scope.dart' show AiEverySecond;
 import 'ai_theme.dart';
 
 /// What the header shows of a session. Compared once per frame, so the
@@ -178,8 +177,15 @@ class AiHeader extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: ShellxSpace.s12),
+            // A live region of its own, saying the state and nothing that
+            // changes while it holds (the clock is for the eyes): without a
+            // container the flag lands on the whole pane, and a clock in the
+            // label is read again every second.
             Semantics(
+              container: true,
               liveRegion: true,
+              label: status.text,
+              excludeSemantics: true,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -247,8 +253,8 @@ class AiHeader extends ConsumerWidget {
 }
 
 /// "Running · 0:12": the time since [since], once a second (text, never an
-/// animation).
-class _Clock extends StatefulWidget {
+/// animation), while the pane is on screen.
+class _Clock extends StatelessWidget {
   const _Clock({
     super.key,
     required this.label,
@@ -261,33 +267,12 @@ class _Clock extends StatefulWidget {
   final Color color;
 
   @override
-  State<_Clock> createState() => _ClockState();
-}
-
-class _ClockState extends State<_Clock> {
-  late final Timer _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _tick.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Text(
-      l10n.aiStatusWithTime(
-        widget.label,
-        aiClock(DateTime.now().difference(widget.since)),
-      ),
-      style: ShellxText.caption.copyWith(color: widget.color),
-    );
-  }
+  Widget build(BuildContext context) => AiEverySecond(
+    builder: (context) => Text(
+      AppLocalizations.of(
+        context,
+      ).aiStatusWithTime(label, aiClock(DateTime.now().difference(since))),
+      style: ShellxText.caption.copyWith(color: color),
+    ),
+  );
 }
