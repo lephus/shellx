@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -293,6 +295,39 @@ void main() {
     await t.pumpAndSettle();
     expect(find.textContaining('Stopped turn 2'), findsOneWidget);
     expect(note(), findsNothing);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('a turn that starts while the question is open: the revert '
+      'says to wait — it did not fail', (t) async {
+    final files = project();
+    final (c, fakes) = await pane(
+      t,
+      files,
+      turns: [
+        [FakeSteps.text('Done.')],
+        [FakeSteps.waitCancel()],
+      ],
+    );
+    await say(t, 'one');
+    files.files['new.txt'] = 'mine\n'; // so that the question is asked
+    await openPanel(t);
+    await t.tap(find.byKey(const Key('ai.changes.revert')));
+    await t.pumpAndSettle();
+    expect(find.text('Some files changed after this turn'), findsOneWidget);
+    // Something else starts a turn while the dialog is open.
+    unawaited(fakes.made.single.send([const TextBlock('two')]));
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(fakes.made.single.state.turn, isNotNull);
+    await t.tap(find.byKey(const Key('ai.revert.all')));
+    await t.pump();
+    await t.pump();
+    expect(t.widget<Text>(note()).data, 'Wait for the running turn to finish.');
+    expect(files.restored, isEmpty);
+    fakes.made.single.cancel();
+    await t.pumpAndSettle();
     await disposeWorkspace(t, c);
   }, variant: mac);
 
