@@ -420,7 +420,10 @@ class TabAttention extends Notifier<AttentionState> {
     final tabs = ref.read(terminalTabsProvider.notifier);
     ref.read(sidebarWorkspacesProvider.notifier).reveal(tabId);
     tabs.select(tabId);
-    final tab = ref.read(terminalTabsProvider).tabOfSession(newest ?? -1);
+    // V2-1 D13: an AI pane too (negative ids: never a `-1` default here).
+    final tab = newest == null
+        ? null
+        : ref.read(terminalTabsProvider).tabOfPane(newest);
     if (newest != null && tab?.id == tabId) tabs.focusPane(newest);
     markRead(tabId);
     ref.read(terminalFocusRequestProvider.notifier).request();
@@ -439,6 +442,37 @@ class TabAttention extends Notifier<AttentionState> {
     // A12 D10: what a hook event already told (an OSC / bell right after
     // it) is not told twice.
     if (ref.read(agentStatusProvider.notifier).swallowNotice(notice)) return;
+    _record(tabs, tab, notice);
+  }
+
+  /// V2-1 D13: a notice from AI pane [paneId] of tab [tabId] (no session
+  /// carries it): the same path as a pane's own notice — the focused-pane
+  /// rule, the badge, the panel and the system notification with its
+  /// limits (A4).
+  void addAiNotice(
+    int tabId,
+    int paneId, {
+    String? title,
+    required String body,
+  }) {
+    if (!ref.mounted) return;
+    final tabs = ref.read(terminalTabsProvider);
+    final tab = tabs.tabs.where((t) => t.id == tabId).firstOrNull;
+    if (tab == null || !tab.aiPanes.containsKey(paneId)) return;
+    _record(
+      tabs,
+      tab,
+      SessionNotice(
+        sessionId: paneId,
+        kind: SessionNoticeKind.message,
+        at: DateTime.now(),
+        title: title,
+        body: body,
+      ),
+    );
+  }
+
+  void _record(TerminalTabsState tabs, TerminalTab tab, SessionNotice notice) {
     final pane = notice.sessionId;
     // A3 D18: only the focused pane of the selected tab is in view.
     final seen =
@@ -540,7 +574,7 @@ class TabAttention extends Notifier<AttentionState> {
     };
     bool paneGone(int tabId, int paneId) =>
         tabId != kCommandLineTabId &&
-        !(present[tabId]?.panes.containsKey(paneId) ?? false);
+        !(present[tabId]?.hasPane(paneId) ?? false);
     final unread = <int, TabUnread>{};
     final emptied = <int>[];
     var changed = false;

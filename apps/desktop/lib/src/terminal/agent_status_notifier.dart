@@ -15,6 +15,7 @@ import 'agent_notify_policy.dart';
 import 'agent_status.dart';
 import 'local_sessions_provider.dart';
 import 'sidebar_workspaces.dart' show settingsStoreProvider;
+import 'tab_attention.dart' show tabAttentionProvider;
 import 'terminal_tabs.dart';
 
 /// The clock of the agent status (tests set it).
@@ -192,7 +193,8 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
   /// the pane is that tab's focused one.
   bool paneVisible(int pane) {
     final tabs = ref.read(terminalTabsProvider);
-    final tab = tabs.tabOfSession(pane);
+    // V2-1 D13: an AI pane is watched like a terminal pane.
+    final tab = tabs.tabOfPane(pane);
     return tab != null &&
         tabs.selectedId == tab.id &&
         tab.focusedPaneId == pane &&
@@ -204,13 +206,14 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
   /// [kAgentEventsPerSecond] in a second. Never throws.
   bool ingest(AgentEvent e) {
     if (!ref.mounted) return false;
-    final pane = ref
-        .read(terminalTabsProvider)
-        .tabOfSession(e.pane)
-        ?.panes[e.pane];
-    if (pane == null || pane.exited) {
-      return false;
-    }
+    final tab = ref.read(terminalTabsProvider).tabOfPane(e.pane);
+    // V2-1 D13: an AI pane is live while it is in its tab; a terminal pane
+    // while its shell runs.
+    final live =
+        tab != null &&
+        (tab.aiPanes.containsKey(e.pane) ||
+            !(tab.panes[e.pane]?.exited ?? true));
+    if (!live) return false;
     final now = _now;
     final recent = _recent.putIfAbsent(e.pane, () => <DateTime>[])
       ..removeWhere((t) => now.difference(t) >= const Duration(seconds: 1));
@@ -271,7 +274,10 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     final osc = _oscAt[e.pane];
     if (osc != null && _now.difference(osc) < kAgentOscMerge) return;
     final l10n = ref.read(appL10nProvider);
-    final name = agentDisplayName(l10n, e.agent);
+    // V2-1 B6: an AI pane says its own agent's name ("Claude", D21).
+    final tab = ref.read(terminalTabsProvider).tabOfPane(e.pane);
+    final name =
+        tab?.aiPanes[e.pane]?.agentName ?? agentDisplayName(l10n, e.agent);
     final body = switch (kind) {
       AgentNoticeText.needsInput =>
         decision.message ?? l10n.agentNotifyNeedsInput(name),
@@ -279,6 +285,17 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       AgentNoticeText.message => decision.message!,
     };
     _noticeAt[e.pane] = e.at;
+    if (isAiPaneId(e.pane)) {
+      // V2-1 D13: no session carries an AI pane's notice: A4's path
+      // directly (same focused-pane rule and limits). The tab names the
+      // system notification; the body already says who asks.
+      if (tab != null) {
+        ref
+            .read(tabAttentionProvider.notifier)
+            .addAiNotice(tab.id, e.pane, body: body);
+      }
+      return;
+    }
     final now = _now;
     final own = _own.putIfAbsent(e.pane, () => [])
       ..removeWhere((o) => now.difference(o.at) >= kAgentNoticeGap)
@@ -366,7 +383,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     final now = _shown(next);
     if (was != now || (now != null && before?.agent != next?.agent)) {
       final record = next ?? before!;
-      final tab = ref.read(terminalTabsProvider).tabOfSession(id)?.id;
+      final tab = ref.read(terminalTabsProvider).tabOfPane(id)?.id;
       _changes.add(
         AgentStatusChange(pane: id, tab: tab, agent: record.agent, state: now),
       );
@@ -408,7 +425,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
 
   /// D12: a question is spoken by its tab's row, at most once a minute.
   void _updateLive(int id, AgentPane? before, AgentPane? next) {
-    final tab = ref.read(terminalTabsProvider).tabOfSession(id);
+    final tab = ref.read(terminalTabsProvider).tabOfPane(id);
     if (tab == null) return;
     final live = ref.read(agentLiveTabsProvider.notifier);
     final asks = next?.state == AgentState.needsInput;
@@ -420,7 +437,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
         live.set(tab.id, true);
       }
     } else if (!asks) {
-      final others = tab.panes.keys.any(
+      final others = tab.paneOrder.any(
         (p) => p != id && state[p]?.state == AgentState.needsInput,
       );
       if (!others) live.set(tab.id, false);
@@ -431,7 +448,9 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       p != null && agentStateVisible(p.state) ? p.state : null;
 
   void _armQuiet(int id, AgentPane? p) {
-    if (p == null || p.state != AgentState.running) {
+    // V2-1 B6: an AI pane's runtime says when a turn ends; its silence (an
+    // agent thinking) is not idleness.
+    if (p == null || p.state != AgentState.running || isAiPaneId(id)) {
       _quiet.remove(id)?.cancel();
       _lastOutput.remove(id);
       return;
@@ -508,7 +527,7 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     final tabs = ref.read(terminalTabsProvider);
     // Bookkeeping lives as long as its pane (a lost server pane included).
     for (final id in trackedPanes) {
-      if (tabs.tabOfSession(id) == null) _forget(id);
+      if (tabs.tabOfPane(id) == null) _forget(id);
     }
     for (final id in _spoke.keys.toList()) {
       if (!tabs.tabs.any((t) => t.id == id)) {
@@ -517,10 +536,13 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
       }
     }
     for (final id in state.keys.toList()) {
-      final pane = tabs.tabOfSession(id)?.panes[id];
+      final tab = tabs.tabOfPane(id);
+      final pane = tab?.panes[id];
+      // V2-1 D13: an AI pane's record lives as long as the pane.
+      final ai = tab?.aiPanes.containsKey(id) ?? false;
       // A lost server pane keeps its record: a reconnect gives it a new id
       // and the record follows (A8 D22).
-      if (pane == null || (pane.exited && !pane.canReconnect)) {
+      if (!ai && (pane == null || (pane.exited && !pane.canReconnect))) {
         _store(id, null);
         _forget(id);
         continue;

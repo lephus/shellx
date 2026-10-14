@@ -325,6 +325,8 @@ class ClosedItemsRecorder extends Notifier<void> {
           _placeOf.remove(t.id);
           continue;
         }
+        // V2-1 B10: nothing of an AI tab is offered back.
+        if (t.isAi) continue;
         for (final MapEntry(key: id, value: pane) in t.panes.entries) {
           if (still.panes.containsKey(id) ||
               alive.contains(id) ||
@@ -354,6 +356,8 @@ class ClosedItemsRecorder extends Notifier<void> {
   }
 
   void _captureTab(TerminalTab t, DateTime now) {
+    // V2-1 B10: a closed AI tab is not offered back.
+    if (t.isAi) return;
     final keys = <int, String>{};
     String keyOf(int id) => keys.putIfAbsent(id, newPaneKey);
     final layout = savePaneTree(

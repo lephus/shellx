@@ -125,14 +125,14 @@ class FocusHistoryNotifier extends Notifier<FocusHistory> {
     if (to == null || from == to) return;
     // A tab or pane that closed hands the focus to its successor: that is
     // not somewhere the user went.
-    if (from != null && next.tabOfSession(from.paneId)?.id != from.tabId) {
+    if (from != null && next.tabOfPane(from.paneId)?.id != from.tabId) {
       return;
     }
     state.visit(to);
   }
 
   bool _alive(FocusEntry e) =>
-      ref.read(terminalTabsProvider).tabOfSession(e.paneId)?.id == e.tabId;
+      ref.read(terminalTabsProvider).tabOfPane(e.paneId)?.id == e.tabId;
 
   /// One step back or forward; false when there is nowhere to go (nothing
   /// happens then, and nothing is said).
