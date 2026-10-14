@@ -669,6 +669,9 @@ final class CheckpointStores with Redacted {
   /// queue, so a snapshot that is running finishes first and the next one
   /// starts a fresh repository. What is left under [root] and no store holds
   /// goes after. Everything is tried; the first failure is thrown at the end.
+  ///
+  /// [root] itself stays, empty: the app excludes it from Time Machine once a
+  /// launch, and a folder made again would be backed up until the next one.
   Future<void> deleteAll() async {
     Object? failure;
     StackTrace? trace;
@@ -692,13 +695,6 @@ final class CheckpointStores with Redacted {
           } on FileSystemException catch (error, stack) {
             failed(error, stack);
           }
-        }
-        // The folder itself, once nothing is in it; a snapshot that already
-        // started a repository again keeps it.
-        try {
-          await dir.delete();
-        } on FileSystemException {
-          // Not empty, or gone.
         }
       }
     } on FileSystemException catch (error, stack) {

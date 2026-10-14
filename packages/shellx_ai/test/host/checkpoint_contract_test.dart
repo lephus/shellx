@@ -1273,7 +1273,12 @@ void main() {
         final (first, _) = await s.forProject(gp.project, env);
         expect(await first!.snapshot('s/1'), isNotNull);
         await s.deleteAll();
-        expect(Directory(root).existsSync(), isFalse);
+        expect(
+          Directory(root).existsSync(),
+          isTrue,
+          reason: 'the folder stays (the app excludes it from Time Machine)',
+        );
+        expect(Directory(root).listSync(), isEmpty);
         final (second, _) = await s.forProject(gp.project, env);
         expect(
           identical(first, second),

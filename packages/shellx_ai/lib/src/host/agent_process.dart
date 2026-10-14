@@ -71,14 +71,16 @@ final class _Stranger implements Process {
 /// [stop] also ends what the agent started and left running (a dev server
 /// holding a port, a test run): an agent that leaves when stdin closes leaves
 /// its children to nobody. The process table is read first, while the agent is
-/// still their parent ([processTable]); after the exit, or after the grace,
-/// what of them is still the same process is killed through [killTree].
+/// still their parent ([processTable], for at most [firstReadLimit]); after
+/// the exit, or after the grace, what of them is still the same process is
+/// killed through [killTree].
 final class AgentProcess implements AgentChannel {
   AgentProcess._(
     this._process,
     this._killTree,
     this._grace,
     this._processTable,
+    this._firstReadLimit,
   ) {
     _process.stderr.listen(_stderr.add, onError: (Object _) {});
     unawaited(_process.exitCode.then((_) => _exited = true));
@@ -90,6 +92,7 @@ final class AgentProcess implements AgentChannel {
     KillTree killTree = killOnly,
     Duration grace = const Duration(seconds: 2),
     ProcessTableReader processTable = readProcessTable,
+    Duration? firstReadLimit,
   }) async {
     final process = await Process.start(
       command.executable,
@@ -98,13 +101,20 @@ final class AgentProcess implements AgentChannel {
       environment: command.environment,
       includeParentEnvironment: false,
     );
-    return AgentProcess._(process, killTree, grace, processTable);
+    return AgentProcess._(
+      process,
+      killTree,
+      grace,
+      processTable,
+      firstReadLimit ?? firstTableReadLimit(),
+    );
   }
 
   final Process _process;
   final KillTree _killTree;
   final Duration _grace;
   final ProcessTableReader _processTable;
+  final Duration? _firstReadLimit;
   final _stderr = ByteRing(256 * 1024);
   Future<void>? _stopping;
   var _exited = false;
@@ -146,15 +156,21 @@ final class AgentProcess implements AgentChannel {
   /// it has left already (its pid may be another process's now), when the
   /// table cannot be read, and when the table does not show the agent as this
   /// process's child, so that only what it started can ever be killed.
+  ///
+  /// Never this process, nor what is above it in the table (as far as that
+  /// does not run into the agent), nor pid 0 or 1, nor what is only under
+  /// them: whatever the table says, ShellX is not something its agent left,
+  /// and the tree killer ends with an unconditional `killPid`.
   Future<List<ProcessRow>> _descendants() async {
     if (_exited) return const [];
     try {
-      final rows = await _processTable();
+      final rows = await _table(_firstReadLimit);
       final me = rows?.where((r) => r.pid == _process.pid).firstOrNull;
       if (rows == null || me == null || me.parentPid != _ownPid) {
         return const [];
       }
-      return descendantsIn(me.pid, rows);
+      final above = ancestorsIn(_ownPid, rows).takeWhile((p) => p != me.pid);
+      return descendantsIn(me.pid, rows, never: {_ownPid, ...above});
     } on Object {
       return const [];
     }
@@ -189,9 +205,17 @@ final class AgentProcess implements AgentChannel {
     }
   }
 
+  /// The table, or null when it is not there within [limit] (the reader's
+  /// own when null). The wait is ended here as well as in the reader: the read
+  /// may be one that was under way before ([SharedProcessTable]).
+  Future<List<ProcessRow>?> _table(Duration? limit) {
+    final read = _processTable(limit: limit);
+    return limit == null ? read : read.timeout(limit, onTimeout: () => null);
+  }
+
   /// The rows of [rows] that the table shows now as the same process.
   Future<List<ProcessRow>> _stillThere(List<ProcessRow> rows) async {
-    final now = await _processTable();
+    final now = await _table(null);
     if (now == null) return const [];
     return [
       for (final r in rows)

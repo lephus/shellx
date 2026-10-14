@@ -4,6 +4,7 @@
 // while the agent is still their parent, closes stdin, and after the exit (or
 // the grace) kills what is left of them: only what it started, and only what
 // is still the same process.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:shellx_ai/host.dart';
@@ -88,15 +89,25 @@ void main() {
     /// The agent is a Dart process that leaves when stdin closes (or one that
     /// ignores it). [tables] are the answers to the 1st, 2nd… read of the
     /// process table, the last one repeating; each is given the agent's pid.
-    Future<({AgentProcess agent, List<int> killed, List<String> log})> run(
-      List<List<ProcessRow>? Function(int agent)> tables, {
+    Future<
+      ({
+        AgentProcess agent,
+        List<int> killed,
+        List<String> log,
+        List<Duration?> limits,
+      })
+    >
+    run(
+      List<FutureOr<List<ProcessRow>?> Function(int agent)> tables, {
       bool ignoresStdin = false,
       String? source,
       Duration grace = const Duration(seconds: 2),
+      Duration? firstReadLimit,
       Set<int> failing = const {},
     }) async {
       final killed = <int>[];
       final log = <String>[];
+      final limits = <Duration?>[];
       var reads = 0;
       late final AgentProcess agent;
       agent = track(
@@ -116,8 +127,10 @@ void main() {
           ),
           cwd: tmp.path,
           grace: grace,
-          processTable: () async {
+          firstReadLimit: firstReadLimit,
+          processTable: ({limit}) async {
             log.add('table');
+            limits.add(limit);
             final answer =
                 tables[reads < tables.length ? reads : tables.length - 1];
             reads++;
@@ -132,7 +145,7 @@ void main() {
           },
         ),
       );
-      return (agent: agent, killed: killed, log: log);
+      return (agent: agent, killed: killed, log: log, limits: limits);
     }
 
     test('the table is read before stdin closes: the agent is still their '
@@ -152,7 +165,7 @@ void main() {
             environment: Platform.environment,
           ),
           cwd: tmp.path,
-          processTable: () async {
+          processTable: ({limit}) async {
             // Once the agent is up: a stdin closed before that would be seen
             // the moment it listens.
             for (var i = 0; i < 400 && !up.existsSync(); i++) {
@@ -318,6 +331,143 @@ void main() {
       await r.agent.kill();
       await r.agent.exitCode.timeout(const Duration(seconds: 10));
       expect(r.log, ['kill agent']);
+    });
+
+    // A table can say what cannot be: Windows keeps a parent id after the
+    // parent has left, and that pid may be the agent's now, so a process that
+    // began within the slack of the agent seems to be its child. Whatever the
+    // table says, ShellX and what is above it are never killed (the desktop's
+    // killProcessTree ends with an unconditional killPid), nor pid 0 and 1,
+    // nor anything that is only under them. What the agent really left is
+    // still killed.
+    group('never this process, what is above it, or pid 0 and 1', () {
+      /// The dev server the agent really left, and its worker.
+      List<ProcessRow> left(int agent) => [
+        row(_nowhere + 1, agent),
+        row(_nowhere + 2, _nowhere + 1),
+      ];
+
+      Future<void> expectOnlyTheLeftovers(
+        List<ProcessRow> Function(int agent) table,
+      ) async {
+        final r = await run([table]);
+        await r.agent.stop();
+        expect(await r.agent.exitCode, 0);
+        expect(r.killed, [
+          _nowhere + 1,
+          _nowhere + 2,
+        ], reason: 'what the agent left, and nothing else');
+      }
+
+      test('this process listed as a child of the agent: neither it nor what '
+          'is under it', () async {
+        await expectOnlyTheLeftovers(
+          (agent) => [
+            row(agent, pid), // the agent, a child of this process
+            row(pid, agent), // this process, "a child of the agent"
+            row(_nowhere + 20, pid), // a shell this process started
+            row(_nowhere + 21, _nowhere + 20), // its child
+            ...left(agent),
+          ],
+        );
+      });
+
+      test('an ancestor listed as a child of the agent: neither it nor what '
+          'is under it', () async {
+        const parent = _nowhere + 30;
+        const grandparent = _nowhere + 31;
+        await expectOnlyTheLeftovers(
+          (agent) => [
+            row(agent, pid),
+            row(pid, parent), // this process, started by `parent`…
+            row(parent, grandparent), // …which `grandparent` started…
+            row(grandparent, agent), // …and that is "a child of the agent"
+            row(_nowhere + 32, grandparent), // under an ancestor
+            row(_nowhere + 33, parent), // under another
+            ...left(agent),
+          ],
+        );
+      });
+
+      test('pid 1 and pid 0 listed as children of the agent: neither them '
+          'nor what is under them', () async {
+        await expectOnlyTheLeftovers(
+          (agent) => [
+            row(agent, pid),
+            row(1, agent, command: 'launchd'),
+            row(0, agent, command: 'kernel_task'),
+            row(_nowhere + 40, 1), // anything the system started
+            row(_nowhere + 41, 0),
+            ...left(agent),
+          ],
+        );
+      });
+
+      test('the same in the table read after the exit', () async {
+        // The first table is right; the second lists this process under the
+        // agent. Only what was in the first can be killed anyway.
+        final r = await run([
+          (agent) => [row(agent, pid), ...left(agent)],
+          (agent) => [row(pid, agent), ...left(agent)],
+        ]);
+        await r.agent.stop();
+        expect(r.killed, [_nowhere + 1, _nowhere + 2]);
+      });
+    });
+
+    // On Windows every read of the table is a PowerShell, a second or two:
+    // the stop waits for the first only a little, and the agents that stop
+    // together (quit) share it (see SharedProcessTable).
+    group('what a stop waits for', () {
+      test('the read before stdin closes has the short limit; the ones after '
+          'the reader\'s own', () async {
+        final r = await run([
+          tree,
+          (agent) => afterwards(),
+          (agent) => afterwards(worker: false),
+        ], firstReadLimit: const Duration(milliseconds: 1500));
+        await r.agent.stop();
+        expect(r.limits.length, greaterThanOrEqualTo(2));
+        expect(r.limits.first, const Duration(milliseconds: 1500));
+        expect(r.limits.skip(1), everyElement(isNull));
+      });
+
+      test('with no limit given, the first read has the platform\'s', () async {
+        final r = await run([tree, (agent) => afterwards()]);
+        await r.agent.stop();
+        expect(r.limits.first, firstTableReadLimit());
+        expect(r.limits.skip(1), everyElement(isNull));
+      });
+
+      test('a table that does not answer holds the stop for the limit and '
+          'no longer', () async {
+        final r = await run([
+          (agent) => Completer<List<ProcessRow>?>().future,
+        ], firstReadLimit: const Duration(milliseconds: 300));
+        final clock = Stopwatch()..start();
+        await r.agent.stop();
+        expect(await r.agent.exitCode, 0);
+        expect(
+          clock.elapsed,
+          lessThan(const Duration(seconds: 5)),
+          reason: 'it was not held for the table, it went when stdin closed',
+        );
+        expect(r.log, ['table'], reason: 'no snapshot, so no read after');
+        expect(r.killed, isEmpty);
+      }, timeout: const Timeout(Duration(seconds: 20)));
+
+      test('a table that answers in time is used', () async {
+        final r = await run([
+          (agent) async {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return tree(agent);
+          },
+          (agent) => afterwards(testRun: false),
+          (agent) => [row(_nowhere + 5, 1)],
+        ], firstReadLimit: const Duration(seconds: 5));
+        await r.agent.stop();
+        expect(r.killed, [_nowhere + 1]);
+      });
     });
   });
 

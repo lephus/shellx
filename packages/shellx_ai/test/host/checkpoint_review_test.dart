@@ -42,6 +42,18 @@ void main() {
   LoginEnv env() =>
       LoginEnv(Platform.environment, source: LoginEnvSource.process);
 
+  /// The folder of restore points stays after "Delete all": the app excludes
+  /// it from Time Machine once a launch, and a folder made again would be
+  /// backed up until the next one. Only what is in it goes.
+  void expectRootKeptEmpty() {
+    expect(
+      Directory(root).existsSync(),
+      isTrue,
+      reason: 'the folder itself stays (its Time Machine exclusion with it)',
+    );
+    expect(Directory(root).listSync(), isEmpty);
+  }
+
   group('a broad folder gets no restore points (I-1)', () {
     /// A machine where asking for git is a failure of the test: the lookup
     /// would run `git --version`, which the probe refuses.
@@ -204,7 +216,7 @@ void main() {
         final before = (await store!.snapshot('s/1'))!;
         await s.deleteAll();
         expect(Directory(store.gitDir).existsSync(), isFalse);
-        expect(Directory(root).existsSync(), isFalse, reason: 'the folder too');
+        expectRootKeptEmpty();
         gp.put('a.txt', 'two');
         final after = (await store.snapshot('s/2'))!;
         expect(after.commit, isNot(before.commit));
@@ -278,11 +290,11 @@ void main() {
         [old.gitDir, noMeta.path, stray.path].map(FileSystemEntity.typeSync),
         everyElement(FileSystemEntityType.notFound),
       );
-      expect(Directory(root).existsSync(), isFalse);
+      expectRootKeptEmpty();
     });
 
-    test('with no folder of restore points at all it does nothing, and '
-        'throws nothing', () async {
+    test('with no folder of restore points at all it does nothing, makes none '
+        'and throws nothing', () async {
       await stores().deleteAll();
       expect(Directory(root).existsSync(), isFalse);
     });

@@ -25,8 +25,10 @@ final class ProcessRow with Redacted {
 }
 
 /// The process table as it is now; null when it cannot be read (no `ps`, a
-/// PowerShell that does not answer in time).
-typedef ProcessTableReader = Future<List<ProcessRow>?> Function();
+/// PowerShell that does not answer in time). [limit] is how long it may take
+/// (null: the reader's own limit).
+typedef ProcessTableReader =
+    Future<List<ProcessRow>?> Function({Duration? limit});
 
 final _psRow = RegExp(r'^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$');
 
@@ -82,26 +84,57 @@ const _cimScript =
     r"ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ProcessId, $_.ParentProcessId, "
     r"$_.CreationDate.ToUniversalTime().ToString('o'), $_.ExecutablePath }";
 
-/// The real [ProcessTableReader]: `ps` on macOS and Linux, CIM through
-/// PowerShell on Windows. Gives up after a few seconds, so a stop never waits
-/// on it for long.
-Future<List<ProcessRow>?> readProcessTable() async {
+/// The real [ProcessTableReader]: `ps` on macOS and Linux (2 s unless a
+/// [limit] is given), CIM through PowerShell on Windows (3 s). It gives up
+/// after that, so a stop never waits on it for long.
+Future<List<ProcessRow>?> readProcessTable({Duration? limit}) async {
   if (Platform.isWindows) {
     final r = await runProbe('powershell', [
       '-NoProfile',
       '-NonInteractive',
       '-Command',
       _cimScript,
-    ], timeout: const Duration(seconds: 3));
+    ], timeout: limit ?? const Duration(seconds: 3));
     return r == null || r.exitCode != 0 ? null : parseCimRows(r.stdout);
   }
   final r = await runProbe('/bin/ps', [
     '-A',
     '-o',
     'pid=,ppid=,etime=,comm=',
-  ], timeout: const Duration(seconds: 2));
+  ], timeout: limit ?? const Duration(seconds: 2));
   if (r == null || r.exitCode != 0) return null;
   return parsePsRows(r.stdout, now: DateTime.now().toUtc());
+}
+
+/// How long a stop waits for the table it reads before it closes stdin (the
+/// agent is told to go only after it). Windows starts a PowerShell for the
+/// table, a second or two when it is cold: a stop waits 1.5 s for it at most,
+/// and goes on without a snapshot when the table is not there by then.
+/// Elsewhere `ps` answers in milliseconds, and the reader's own limit is all
+/// there is (null).
+Duration? firstTableReadLimit({bool? isWindows}) =>
+    (isWindows ?? Platform.isWindows)
+    ? const Duration(milliseconds: 1500)
+    : null;
+
+/// One read of the process table for everyone who asks while it is under way.
+///
+/// Agents that stop together (⌘Q with several tabs open: every tab's runtime
+/// is stopped in one go) all read the table at the same moment, before their
+/// stdin closes, and on Windows each read is a PowerShell. They share one. A
+/// read asked for after the last one ended is a new one, so an answer is
+/// never older than the read that was under way when it was asked for. The
+/// read is made with the [limit] of whoever started it.
+final class SharedProcessTable {
+  SharedProcessTable([ProcessTableReader read = readProcessTable])
+    : _read = read;
+
+  final ProcessTableReader _read;
+  Future<List<ProcessRow>?>? _underWay;
+
+  /// The table: the read that is under way, or a new one.
+  Future<List<ProcessRow>?> call({Duration? limit}) =>
+      _underWay ??= _read(limit: limit).whenComplete(() => _underWay = null);
 }
 
 /// Everything [root] started that is in [rows]: children, their children…
@@ -110,16 +143,24 @@ Future<List<ProcessRow>?> readProcessTable() async {
 /// names: Windows does not clear the parent of a process that has left, so
 /// that pid may since belong to another process. [slack] is how much earlier
 /// than its parent a child may seem to begin (ages are rounded to seconds).
+///
+/// The pids in [never], and pid 0 and 1, are not listed and not walked
+/// through either: what is only under them is not listed. A table can say
+/// what cannot be (that same stale parent id, within the slack), and the
+/// caller names what must never be taken for a descendant: itself, and what
+/// is above it.
 List<ProcessRow> descendantsIn(
   int root,
   List<ProcessRow> rows, {
   Duration slack = const Duration(seconds: 2),
+  Set<int> never = const {},
 }) {
-  if (root <= 1) return const [];
+  bool barred(int pid) => pid <= 1 || never.contains(pid);
+  if (barred(root)) return const [];
   final byPid = {for (final r in rows) r.pid: r};
   final children = <int, List<ProcessRow>>{};
   for (final r in rows) {
-    if (r.pid == r.parentPid) continue;
+    if (r.pid == r.parentPid || barred(r.pid)) continue;
     final parent = byPid[r.parentPid];
     if (parent != null &&
         r.startedAt.isBefore(parent.startedAt.subtract(slack))) {
@@ -138,6 +179,23 @@ List<ProcessRow> descendantsIn(
     }
   }
   return found;
+}
+
+/// The pids above [pid] in [rows]: its parent, that one's parent… as far as
+/// the table shows them. Never pid 0 or 1, and never a pid twice (a loop in
+/// the table ends the chain).
+List<int> ancestorsIn(int pid, List<ProcessRow> rows) {
+  final byPid = {for (final r in rows) r.pid: r};
+  final above = <int>[];
+  final seen = {pid};
+  var at = byPid[pid];
+  while (at != null) {
+    final parent = at.parentPid;
+    if (parent <= 1 || !seen.add(parent)) break;
+    above.add(parent);
+    at = byPid[parent];
+  }
+  return above;
 }
 
 /// Whether [now] is [then] still: the same pid, the same program, begun at

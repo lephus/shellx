@@ -153,6 +153,66 @@ void main() {
     });
   });
 
+  group('descendantsIn never lists a pid it is told to bar', () {
+    test('a barred pid is neither listed nor walked through', () {
+      final rows = [
+        row(10, 1),
+        row(11, 10),
+        row(99, 10), // barred, "a child of 10"
+        row(98, 99), // only under the barred pid
+        row(97, 98),
+        row(12, 11),
+      ];
+      expect(descendantsIn(10, rows, never: {99}).map((r) => r.pid), [11, 12]);
+      expect(
+        descendantsIn(10, rows).map((r) => r.pid),
+        [11, 99, 12, 98, 97],
+        reason: 'without the bar, all of it',
+      );
+    });
+
+    test('a barred root has no descendants', () {
+      final rows = [row(10, 1), row(11, 10)];
+      expect(descendantsIn(10, rows, never: {10}), isEmpty);
+    });
+
+    test('pid 0 and 1 are never listed or walked through, bar or not', () {
+      final rows = [
+        row(10, 1),
+        row(1, 10), // init, "a child of 10"
+        row(0, 10),
+        row(20, 1), // under init
+        row(21, 0),
+        row(11, 10),
+      ];
+      expect(descendantsIn(10, rows).map((r) => r.pid), [11]);
+    });
+  });
+
+  group('ancestorsIn', () {
+    test('the parent, its parent… up to but not pid 1', () {
+      final rows = [row(1, 0), row(2, 1), row(3, 2), row(4, 3), row(5, 4)];
+      expect(ancestorsIn(5, rows), [4, 3, 2]);
+      expect(ancestorsIn(3, rows), [2]);
+      expect(ancestorsIn(2, rows), isEmpty, reason: 'its parent is init');
+    });
+
+    test(
+      'as far as the table has links: a parent without a row is the end',
+      () {
+        final rows = [row(5, 4), row(4, 3)]; // 3 has no row of its own
+        expect(ancestorsIn(5, rows), [4, 3]);
+        expect(ancestorsIn(9, rows), isEmpty, reason: 'not in the table');
+      },
+    );
+
+    test('a loop ends, and a pid is listed once', () {
+      final rows = [row(5, 4), row(4, 3), row(3, 5)];
+      expect(ancestorsIn(5, rows), [4, 3]);
+      expect(ancestorsIn(5, [row(5, 5)]), isEmpty);
+    });
+  });
+
   group('isSameProcess', () {
     test(
       'the pid, the program (by name) and the start (within a few seconds)',
@@ -198,6 +258,91 @@ void main() {
         );
       },
     );
+  });
+
+  group('firstTableReadLimit', () {
+    test('Windows starts a PowerShell for the table: a stop waits for it only '
+        'a little; elsewhere the reader\'s own limit is all there is', () {
+      expect(
+        firstTableReadLimit(isWindows: true),
+        const Duration(milliseconds: 1500),
+      );
+      expect(firstTableReadLimit(isWindows: false), isNull);
+      expect(firstTableReadLimit(), Platform.isWindows ? isNotNull : isNull);
+    });
+  });
+
+  group('SharedProcessTable', () {
+    /// A reader that answers [answer] after [delay], and counts its calls.
+    ({ProcessTableReader read, List<Duration?> limits}) reader(
+      List<ProcessRow>? Function(int call) answer, {
+      Duration delay = const Duration(milliseconds: 50),
+    }) {
+      final limits = <Duration?>[];
+      return (
+        limits: limits,
+        read: ({Duration? limit}) async {
+          final call = limits.length;
+          limits.add(limit);
+          await Future<void>.delayed(delay);
+          return answer(call);
+        },
+      );
+    }
+
+    test('whoever asks while a read is under way gets that read', () async {
+      final r = reader((call) => [row(call + 1, 1)]);
+      final table = SharedProcessTable(r.read);
+      final all = await Future.wait([table(), table(), table()]);
+      expect(r.limits, hasLength(1));
+      expect(all.map((rows) => rows!.single.pid), [1, 1, 1]);
+    });
+
+    test('one asked for after it ended is a new read', () async {
+      final r = reader((call) => [row(call + 1, 1)]);
+      final table = SharedProcessTable(r.read);
+      expect((await table())!.single.pid, 1);
+      expect((await table())!.single.pid, 2);
+      expect(r.limits, hasLength(2));
+    });
+
+    test('the read is made with the limit of the one who started it', () async {
+      final r = reader((call) => const []);
+      final table = SharedProcessTable(r.read);
+      await Future.wait([
+        table(limit: const Duration(seconds: 1)),
+        table(limit: const Duration(seconds: 9)),
+      ]);
+      expect(r.limits, [const Duration(seconds: 1)]);
+      await table();
+      expect(r.limits.last, isNull);
+    });
+
+    test(
+      'a read that fails fails them all, and the next one is made',
+      () async {
+        var calls = 0;
+        final table = SharedProcessTable(({limit}) async {
+          calls++;
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          if (calls == 1) throw StateError('ps broke');
+          return <ProcessRow>[];
+        });
+        final first = [table(), table()];
+        for (final f in first) {
+          await expectLater(f, throwsA(isA<StateError>()));
+        }
+        expect(await table(), isEmpty);
+        expect(calls, 2);
+      },
+    );
+
+    test('a read that cannot be had (null) is shared as it is', () async {
+      final r = reader((call) => null);
+      final table = SharedProcessTable(r.read);
+      expect(await Future.wait([table(), table()]), [null, null]);
+      expect(r.limits, hasLength(1));
+    });
   });
 
   test(

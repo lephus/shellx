@@ -360,6 +360,40 @@ void main() {
       },
     );
 
+    test('agents that stop together share one read of the process table '
+        '(quit with several tabs open)', () async {
+      var reads = 0;
+      final host = AiHost(
+        supportDir: e.tmp.path,
+        clientVersion: '2.0.0',
+        processTable: ({limit}) async {
+          reads++;
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+          return const <ProcessRow>[]; // the agents are not in it
+        },
+      );
+      final agents = [
+        for (var i = 0; i < 3; i++)
+          await e.launch(
+            host,
+            e.script('wait$i', _markerThenWait, [p.join(e.tmp.path, 'up$i')]),
+          ),
+      ];
+      await Future.wait([for (final a in agents) a.stop()]);
+      expect(reads, 1, reason: 'one PowerShell on Windows, not three');
+      for (final a in agents) {
+        expect(await a.exitCode.timeout(const Duration(seconds: 10)), 0);
+      }
+      // A stop that comes later asks again: no answer is older than the read
+      // that was under way when it was asked for.
+      final later = await e.launch(
+        host,
+        e.script('wait9', _markerThenWait, [p.join(e.tmp.path, 'up9')]),
+      );
+      await later.stop();
+      expect(reads, 2);
+    });
+
     test('agents are killed with the tree killer the host was given', () async {
       final killed = <int>[];
       final host = AiHost(

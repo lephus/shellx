@@ -11,6 +11,7 @@ import 'agent_resolver.dart';
 import 'ai_runtime.dart';
 import 'checkpoint_store.dart';
 import 'login_shell_env.dart';
+import 'process_snapshot.dart';
 import 'running_agents.dart';
 
 /// The AI services of the app, one per app; the desktop builds it at
@@ -24,6 +25,7 @@ final class AiHost with Redacted {
     CheckpointStores? checkpoints,
     RunningAgents? running,
     KillTree killTree = killOnly,
+    ProcessTableReader? processTable,
     DateTime Function()? now,
   }) : env = env ?? LoginShellEnv(),
        resolver =
@@ -36,6 +38,7 @@ final class AiHost with Redacted {
            running ??
            RunningAgents(File(p.join(supportDir, 'ai', 'running.json'))),
        _killTree = killTree,
+       _processTable = SharedProcessTable(processTable ?? readProcessTable),
        _now = now ?? DateTime.now;
 
   /// `<app support>` (macOS `~/Library/Application Support/pro.shellx.desktop`,
@@ -47,6 +50,9 @@ final class AiHost with Redacted {
   final CheckpointStores checkpoints;
   final RunningAgents running;
   final KillTree _killTree;
+
+  /// The one read of the process table that agents stopping together share.
+  final SharedProcessTable _processTable;
   final DateTime Function() _now;
 
   /// The one [startup], and the sweep inside it that [launch] waits for.
@@ -79,6 +85,7 @@ final class AiHost with Redacted {
       command,
       cwd: cwd,
       killTree: _killTree,
+      processTable: _processTable.call,
     );
     try {
       await running.add(
