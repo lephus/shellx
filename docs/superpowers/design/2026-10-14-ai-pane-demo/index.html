@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShellX · Pane AI</title>
+<meta name="description" content="Đề xuất pane AI cho ShellX: làm việc với agent CLI bằng giao diện thật thay vì terminal — kèm demo chạy cục bộ.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%2346c9d7' d='M8 1.2l1.7 4.6 4.6 1.7-4.6 1.7L8 13.8l-1.7-4.6L1.7 7.5l4.6-1.7z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#top"><span class="brand-mark">›_</span>ShellX <span class="brand-sub">Pane AI</span></a>
+    <nav class="nav" aria-label="Mục">
+      <a href="#demo">Demo</a>
+      <a href="#cach-hoat-dong">Cách hoạt động</a>
+      <a href="#bai-toan">Bài toán</a>
+      <a href="#quyet-dinh">5 quyết định</a>
+      <a href="#giai-doan-1">Giai đoạn 1</a>
+      <a href="#plugin">Plugin</a>
+      <a href="#lo-trinh">Lộ trình</a>
+      <a href="#rui-ro">Rủi ro</a>
+      <a href="#can-ban-quyet" class="nav-cta">Cần bạn quyết</a>
+    </nav>
+    <div class="seg" role="group" aria-label="Giao diện trang">
+      <button data-theme-set="system">Hệ thống</button><button data-theme-set="light">Sáng</button><button data-theme-set="dark">Tối</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============================================================ hero -->
+  <section class="hero" id="top">
+    <div>
+      <p class="eyebrow">Đề xuất · branch shellx-v2 · 14/10/2026 · chờ bạn duyệt</p>
+      <h1>Pane AI: làm việc với agent bằng giao diện thật, ngay trong ShellX</h1>
+      <p class="lead">Một loại pane mới. Bạn làm việc với Claude Code, Codex, Gemini CLI hay OpenCode qua hội thoại; mỗi việc agent làm hiện thành một thẻ, có diff, có nút cho phép hay từ chối, và hoàn tác được. Không phải đọc giao diện chữ của agent trong terminal nữa — nhưng terminal vẫn ở ngay bên dưới.</p>
+      <div class="hero-cta">
+        <a class="btn-p" href="#demo">Chạy demo</a>
+        <a class="btn-s" href="#can-ban-quyet">4 việc cần bạn quyết</a>
+      </div>
+    </div>
+    <div class="facts">
+      <div><b>ACP v1</b><span>Một giao thức chung cho mọi agent. Zed, JetBrains, Neovim, Emacs đã làm client. Bản 1.25.0 ổn định.</span></div>
+      <div><b>Thuần Flutter</b><span>Giao diện lõi không đặt lên webview: trên Windows, Flutter chưa nhúng được view native (flutter#31713).</span></div>
+      <div><b>Hoàn tác mọi thay đổi</b><span>Chụp thư mục trước mỗi lượt vào một repo git ẩn — bắt cả chỗ agent sửa bằng lệnh shell.</span></div>
+      <div><b>Không đụng credential</b><span>Đăng nhập do chính agent làm, trong một pane terminal. ShellX không đọc, không lưu, không chuyển.</span></div>
+    </div>
+    <ol class="phases" aria-label="Ba giai đoạn">
+      <li class="is-now"><i>Giai đoạn 1 · đề xuất chi tiết</i><b>Pane AI</b><span>Hội thoại, thẻ, xin quyền, diff, hoàn tác, khôi phục phiên.</span></li>
+      <li><i>Giai đoạn 2 · phác thảo</i><b>Nền tảng plugin</b><span>Viết HTML/JS, “Thêm từ thư mục” là dùng; tool riêng cho mọi agent qua MCP.</span></li>
+      <li><i>Giai đoạn 3 · phác thảo</i><b>Điện thoại</b><span>Xem phiên AI, trả lời xin quyền ngay từ thông báo đẩy.</span></li>
+    </ol>
+  </section>
+
+  <!-- ============================================================ demo -->
+  <section class="sect" id="demo">
+    <div class="sec-h">
+      <p class="eyebrow">Demo chạy trên máy bạn</p>
+      <h2>Cách nó hoạt động — bấm thử</h2>
+      <p>Agent ở đây là <b>agent giả</b> chạy kịch bản soạn sẵn, nhưng nói đúng thông điệp ACP v1 (đối chiếu schema 1.25.0 và mã nguồn adapter Claude 0.90.0). Cửa sổ dùng đúng bảng màu desktop của ShellX. Bên phải là <b>nhật ký</b>: mọi thông điệp giữa ShellX và agent, và những việc ShellX tự làm (điểm khôi phục, trạng thái, thông báo). Bấm một dòng để xem JSON.</p>
+      <p class="note">Phím: <kbd>Enter</kbd> gửi · <kbd>Shift</kbd>+<kbd>Enter</kbd> xuống dòng · <kbd>1</kbd>–<kbd>3</kbd> trả lời xin quyền · <kbd>Esc</kbd> từ chối hoặc dừng lượt · <kbd>@</kbd> nhắc tệp · <kbd>/</kbd> lệnh của agent.</p>
+    </div>
+    <div id="demo-root"></div>
+    <p class="note">Màn hình hẹp: cửa sổ demo cuộn ngang. Mọi thứ chạy trong trình duyệt của bạn — không gọi agent thật, không gửi gì đi.</p>
+  </section>
+
+  <!-- ================================================= how it works -->
+  <section class="sect" id="cach-hoat-dong">
+    <div class="sec-h">
+      <p class="eyebrow">Kiến trúc</p>
+      <h2>Ai làm gì</h2>
+      <p>ShellX không tự làm agent. Nó chạy agent CLI bạn đã có như một tiến trình con, nói chuyện bằng ACP qua stdin/stdout, và dựng giao diện từ những gì agent báo về. Agent tự đọc, ghi tệp và chạy lệnh; ShellX canh chừng bằng điểm khôi phục. Bấm một khối để xem chi tiết.</p>
+    </div>
+    <div>
+      <div class="arch">
+        <div class="arch-shellx">
+          <div class="arch-cap">ShellX desktop · Flutter (macOS, Windows)</div>
+          <button class="arch-box" data-arch="ui"><b>Pane AI</b><span>hội thoại · thẻ · xin quyền · ô nhập</span></button>
+          <button class="arch-box" data-arch="panel"><b>Thay đổi · Tệp</b><span>diff thật trên đĩa · hoàn tác · xem tệp</span></button>
+          <button class="arch-box" data-arch="session"><b>Phiên AI</b><span>session/update → dòng hội thoại · hàng đợi tin</span></button>
+          <button class="arch-box" data-arch="ckpt"><b>Điểm khôi phục</b><span>repo git ẩn · chụp trước mỗi lượt</span></button>
+          <button class="arch-box" data-arch="acp"><b>shellx_acp</b><span>gói Dart thuần · JSON-RPC 2.0 theo dòng</span></button>
+          <button class="arch-box" data-arch="launch"><b>Chạy agent</b><span>env từ login shell · không qua shell · killProcessTree</span></button>
+          <button class="arch-box" data-arch="tree"><b>Cây pane + layout.json</b><span>loại pane mới · khôi phục khi mở lại</span></button>
+          <button class="arch-box" data-arch="a12"><b>Trạng thái A12</b><span>sidebar · thông báo A4 · điện thoại</span></button>
+        </div>
+        <div class="arch-mid" aria-hidden="true">
+          <div class="arch-arrow"><b>stdin/stdout</b>ACP v1 · JSON-RPC</div>
+          <div class="arch-arrow"><b>git (repo ẩn)</b>chụp · so sánh · khôi phục</div>
+          <div class="arch-arrow"><b>pane terminal</b>đăng nhập của agent</div>
+        </div>
+        <div class="arch-right">
+          <div class="arch-cap">Ngoài ShellX</div>
+          <button class="arch-box ext" data-arch="agent"><b>Tiến trình agent</b><span>claude-agent-acp → Agent SDK → CLI Claude · codex-acp · gemini --acp · opencode acp</span></button>
+          <button class="arch-box ext" data-arch="disk"><b>Thư mục dự án</b><span>agent tự đọc, ghi tệp và chạy lệnh</span></button>
+          <button class="arch-box ext" data-arch="auth"><b>Đăng nhập</b><span>màn đăng nhập của chính agent</span></button>
+          <button class="arch-box ext" data-arch="plugin"><b>Plugin (GĐ2)</b><span>webview + server MCP của bạn</span></button>
+        </div>
+      </div>
+      <div class="arch-detail" id="arch-detail" aria-live="polite"></div>
+    </div>
+
+    <div class="sec-h" style="margin-top:12px">
+      <h2>Một lượt diễn ra thế nào</h2>
+      <p>Đúng thứ tự bạn thấy trong nhật ký của demo.</p>
+    </div>
+    <ol class="seq">
+      <li><span class="seq-n">1</span><span class="seq-who"><span class="who you">Bạn</span>→<span class="who sx">ShellX</span></span><span>Gõ yêu cầu, nhấn Enter. Có thể nhắc tệp bằng <code>@</code>, gọi lệnh của agent bằng <code>/</code>, dán ảnh. Đang có lượt chạy thì tin được xếp hàng.</span></li>
+      <li><span class="seq-n">2</span><span class="seq-who"><span class="who sx">ShellX</span>→<span class="who disk">Đĩa</span></span><span>Chụp <b>điểm khôi phục</b>: <code>git add -A</code> + <code>commit</code> trong repo git ẩn của ShellX (theo <code>.gitignore</code>; không đụng <code>.git</code> của bạn).</span></li>
+      <li><span class="seq-n">3</span><span class="seq-who"><span class="who sx">ShellX</span>→<span class="who ag">Agent</span></span><span><code>session/prompt</code>: chữ, <code>resource_link</code> cho tệp được nhắc, ảnh.</span></li>
+      <li><span class="seq-n">4</span><span class="seq-who"><span class="who ag">Agent</span>→<span class="who sx">ShellX</span></span><span>Chuỗi <code>session/update</code>: <code>plan</code>, <code>agent_thought_chunk</code>, <code>tool_call</code> / <code>tool_call_update</code> (diff, đầu ra lệnh), <code>agent_message_chunk</code>. ShellX biến mỗi cái thành một phần của dòng hội thoại.</span></li>
+      <li><span class="seq-n">5</span><span class="seq-who"><span class="who ag">Agent</span>→<span class="who sx">ShellX</span>→<span class="who you">Bạn</span></span><span><code>session/request_permission</code> → thanh xin quyền, sidebar “Cần bạn trả lời”, thông báo nếu bạn không nhìn pane → bạn nhấn <kbd>1</kbd>/<kbd>2</kbd>/<kbd>Esc</kbd> → ShellX trả <code>outcome</code>.</span></li>
+      <li><span class="seq-n">6</span><span class="seq-who"><span class="who ag">Agent</span>→<span class="who disk">Đĩa</span></span><span>Agent <b>tự</b> ghi tệp và chạy lệnh. ShellX không ghi hộ (không cung cấp <code>fs/*</code> của ACP).</span></li>
+      <li><span class="seq-n">7</span><span class="seq-who"><span class="who ag">Agent</span>→<span class="who sx">ShellX</span></span><span>Trả lời <code>session/prompt</code>: <code>stopReason: end_turn</code> — hoặc <code>cancelled</code> nếu bạn nhấn Esc (ShellX gửi <code>session/cancel</code>).</span></li>
+      <li><span class="seq-n">8</span><span class="seq-who"><span class="who sx">ShellX</span></span><span>So với điểm khôi phục → panel <b>Thay đổi</b>, tóm tắt lượt, nút hoàn tác. Trạng thái A12 → “Đang chờ” (hoặc “Xong” + thông báo nếu bạn đang ở tab khác).</span></li>
+    </ol>
+  </section>
+
+  <!-- ========================================================= problem -->
+  <section class="sect" id="bai-toan">
+    <div class="sec-h">
+      <p class="eyebrow">Bài toán</p>
+      <h2>Mình hiểu yêu cầu thế nào</h2>
+      <p>Phần “giả định” là chỗ bạn sửa nếu mình hiểu sai — nhất là dòng về “sáng tạo UI/UX”.</p>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <h3>Bạn đã chốt</h3>
+        <ul>
+          <li>Sản phẩm công khai cho developer.</li>
+          <li>Điều khiển agent CLI có sẵn (Claude Code, Codex…), không tự xây agent.</li>
+          <li>Là tính năng trong ShellX; công nghệ để mình chọn.</li>
+          <li>Bản đầu: xem và duyệt (diff, chấp nhận/hoàn tác); sửa code ở editor ngoài.</li>
+          <li>Có nền tảng để người dùng tự viết giao diện hoặc tool rồi import vào.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Mình giả định</h3>
+        <ul>
+          <li>Desktop macOS và Windows như hiện nay; điện thoại để sau.</li>
+          <li>“Sáng tạo UI/UX” = người dùng <b>thêm</b> panel/tool của họ, không thay giao diện lõi. Nếu bạn muốn thay cả lõi (kiểu Obsidian) thì lõi phải viết bằng web — đề xuất này sẽ đổi.</li>
+          <li>Đợt đầu: 4 agent ShellX đã biết + một ô “agent tuỳ chỉnh” cho mọi agent nói ACP.</li>
+          <li>Tiếng Việt và tiếng Anh; không thêm server; mọi thứ chạy trên máy người dùng.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Tiêu chí thành công</h3>
+        <ol>
+          <li>Máy đã đăng nhập Claude Code: mở pane AI và gửi câu đầu trong dưới 30 giây, không gõ lệnh.</li>
+          <li>Mọi việc agent làm hiện thành thẻ; xin quyền trả lời bằng một phím.</li>
+          <li>Hoàn tác từng tệp hoặc cả lượt — kể cả khi agent sửa bằng lệnh shell.</li>
+          <li>Thoát rồi mở lại ShellX: phiên hiện lại lịch sử và gõ tiếp được.</li>
+          <li>Gõ Telex trong ô chat đúng như mọi ô nhập khác.</li>
+          <li>“Đang chạy / Cần bạn / Xong” lên sidebar và thông báo hệ thống như agent trong terminal hôm nay.</li>
+          <li>Không làm hỏng tính năng terminal nào.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= decisions -->
+  <section class="sect" id="quyet-dinh">
+    <div class="sec-h">
+      <p class="eyebrow">Kiến trúc</p>
+      <h2>Năm quyết định</h2>
+      <p>Mỗi quyết định kèm lý do, phương án đã loại và nguồn kiểm chứng.</p>
+    </div>
+    <div class="grid2 dec">
+      <article class="card k-card">
+        <span class="k">K1</span>
+        <h3>Nối với agent qua ACP v1</h3>
+        <p class="k-pick">JSON-RPC 2.0 qua stdin/stdout, mỗi thông điệp một dòng.</p>
+        <h4>Vì sao</h4>
+        <ul>
+          <li>Một giao thức cho mọi agent; trả về đúng dữ liệu có cấu trúc giao diện cần: việc agent làm theo loại, diff, xin quyền, kế hoạch, lệnh <code>/</code>, chế độ và model, mức dùng context, <code>session/load</code> và <code>session/list</code>.</li>
+          <li>Bản v1 ổn định (schema 1.25.0, 09/10/2026). Zed, JetBrains, Neovim, Emacs đã làm client.</li>
+          <li>Claude và Codex có adapter do nhóm ACP duy trì; Gemini CLI, OpenCode, Copilot CLI, Cursor, Goose hỗ trợ trực tiếp.</li>
+        </ul>
+        <h4>Đã loại</h4>
+        <ul class="rej">
+          <li>Tích hợp riêng từng agent: tốn gấp nhiều lần; giao thức stdin của Claude là nội bộ, không cam kết ổn định.</li>
+          <li>Đọc chữ trên màn hình terminal của agent: quá dễ vỡ.</li>
+          <li>ACP v2: đang là bản nháp — chỉ làm v1, như nhóm ACP khuyến cáo.</li>
+        </ul>
+        <p class="src">Nguồn: <a href="https://github.com/agentclientprotocol/agent-client-protocol" target="_blank" rel="noopener">agent-client-protocol</a> (schema/v1, CHANGELOG 1.25.0) · <a href="https://github.com/agentclientprotocol/claude-agent-acp" target="_blank" rel="noopener">claude-agent-acp</a> 0.90.0 (đã đọc mã: <code>loadSession: true</code>, <code>sessionCapabilities.list</code>).</p>
+      </article>
+      <article class="card k-card">
+        <span class="k">K2</span>
+        <h3>Giao diện lõi viết thuần Flutter</h3>
+        <p class="k-pick">Không đặt pane AI lên webview.</p>
+        <h4>Vì sao</h4>
+        <ul>
+          <li><b>Windows:</b> Flutter vẫn chưa nhúng thẳng view native vào giao diện; webview nhúng phải vẽ qua texture, kéo theo lỗi focus và lỗi bộ gõ đang mở. <b>macOS:</b> lỗi lớp phủ, click xuyên lớp.</li>
+          <li>A6 (pane trình duyệt) đang kẹt đúng ở bước thử webview này. Đặt cả IDE lên webview là đặt lõi lên chỗ rủi ro nhất.</li>
+          <li>Flutter đủ gói: <code>flutter_markdown_plus</code> (kế nhiệm chính thức), <code>re_editor</code> + <code>re_highlight</code> để xem code chỉ đọc.</li>
+          <li>Ô nhập chuẩn của Flutter giữ chữ đang gõ cho bộ gõ thấy — gốc lỗi Telex của xterm (xoá chữ đang gõ) không có ở đây. Vẫn kiểm tay.</li>
+        </ul>
+        <h4>Đã loại</h4>
+        <ul class="rej">
+          <li>Giao diện web chạy trong webview.</li>
+          <li>App Electron/Tauri riêng: không còn là tính năng trong ShellX; làm trùng cài đặt, thông báo, điện thoại.</li>
+        </ul>
+        <p class="src">Nguồn: <a href="https://github.com/flutter/flutter/issues/31713" target="_blank" rel="noopener">flutter#31713</a> · ledger A6 (<code>docs/superpowers/ledgers/a1-desktop-terminal.md</code>: “A6 is BLOCKED at its gate”).</p>
+      </article>
+      <article class="card k-card">
+        <span class="k">K3</span>
+        <h3>Pane AI là một loại pane mới</h3>
+        <p class="k-pick">Nằm trong cây pane: chia đôi cạnh terminal, phóng to, focus, khôi phục, sidebar.</p>
+        <h4>Vì sao</h4>
+        <ul>
+          <li>Hôm nay cây pane chỉ có pane terminal (<code>PaneLeaf(sessionId)</code>).</li>
+          <li>Lấy thiết kế D4–D7 của A6 (nhánh chưa merge): cây pane chứa được pane không phải terminal, tab luôn giữ ≥ 1 pane terminal để các thuộc tính của tab vẫn đúng. Viết dạng dùng chung để A6 và plugin dùng lại.</li>
+          <li>Hệ quả: terminal của dự án luôn chỉ cách một phím.</li>
+        </ul>
+        <p class="src">Nguồn: <code>apps/desktop/lib/src/terminal/pane_layout.dart:23</code> · spec A6 D4–D7 · commit <code>675001a</code> trên <code>feat/desktop-a6</code>.</p>
+      </article>
+      <article class="card k-card">
+        <span class="k">K4</span>
+        <h3>Hoàn tác bằng điểm khôi phục trước mỗi lượt</h3>
+        <p class="k-pick">Repo git ẩn trong thư mục dữ liệu của ShellX, mỗi dự án một repo.</p>
+        <h4>Vì sao</h4>
+        <ul>
+          <li>Agent tự ghi tệp, không qua IDE: Claude và Codex không dùng <code>fs/*</code> của ACP; ACP v2 bỏ hẳn phần này.</li>
+          <li>Lệnh shell không có diff: adapter Claude báo lệnh Bash chỉ gồm câu lệnh và đầu ra. <code>sed -i</code>, code sinh tự động… chỉ điểm khôi phục mới thấy.</li>
+          <li><code>/rewind</code> của Claude bỏ sót chỗ sửa bằng Bash và không gọi được qua ACP. Adapter có báo thay đổi tệp, nhưng chỉ cho JetBrains AIR (mở rộng ngoài chuẩn).</li>
+          <li>Cline và Roo Code dùng đúng cách này. Không đụng <code>.git</code>, index, nhánh của bạn; tôn trọng <code>.gitignore</code>.</li>
+        </ul>
+        <p class="src">Nguồn: mã nguồn adapter 0.90.0 (<code>tool-calls/reporters/bash.js</code>, <code>file-change-audit.js</code>).</p>
+      </article>
+      <article class="card k-card">
+        <span class="k">K5</span>
+        <h3>Đăng nhập do agent tự lo</h3>
+        <p class="k-pick">ShellX không bao giờ đọc, lưu hay chuyển credential.</p>
+        <h4>Vì sao</h4>
+        <ul>
+          <li>Điều khoản Anthropic cấm bên thứ ba thu, lưu hay đứng giữa chuyển credential claude.ai.</li>
+          <li>ACP có kiểu đăng nhập “terminal”: client chạy lại chính lệnh của agent kèm <code>args</code> trong một terminal; mã thoát 0 là thành công; client không gọi <code>authenticate</code>. Rất tự nhiên với một app terminal.</li>
+          <li>Adapter Claude đưa sẵn hai cách: <b>Claude Subscription</b> (<code>--cli auth login --claudeai</code>) và <b>Anthropic Console</b> (<code>--console</code>); cờ <code>--hide-claude-auth</code> ẩn cách thứ nhất và từ chối lượt nào tính vào gói thuê bao.</li>
+        </ul>
+        <p class="src">Nguồn: schema ACP <code>AuthMethodTerminal</code> · adapter 0.90.0 (<code>acp-agent.js</code>, <code>hide-claude-auth.js</code>). Rủi ro chính sách: xem <a href="#rui-ro">Rủi ro</a>.</p>
+      </article>
+      <article class="card">
+        <h3>Thử ngay trong demo</h3>
+        <ul>
+          <li>K1 · nhật ký bên phải demo: mọi dòng là thông điệp ACP thật về hình dạng.</li>
+          <li>K3 · pane AI ở trên, terminal của tab ở dưới; nút phóng to ẩn terminal.</li>
+          <li>K4 · <a href="#demo" data-run="s2">kịch bản 2</a>: agent sửa bằng <code>sed</code>, panel vẫn thấy và hoàn tác được.</li>
+          <li>K5 · <a href="#demo" data-run="s3">kịch bản 3</a>: lần đầu, đăng nhập trong pane terminal.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===================================================== phase 1 -->
+  <section class="sect" id="giai-doan-1">
+    <div class="sec-h">
+      <p class="eyebrow">Giai đoạn 1</p>
+      <h2>Pane AI — chi tiết</h2>
+      <p>Phần này sẽ thành spec <code>docs/superpowers/specs/2026-10-14-ai-pane-design.md</code> sau khi bạn duyệt.</p>
+    </div>
+    <div>
+      <details class="acc" open>
+        <summary>Trải nghiệm <small>mở, gửi tin, xin quyền, chế độ</small></summary>
+        <div class="acc-b">
+          <ul>
+            <li><b>Mở:</b> “Phiên AI mới” từ nút ở sidebar, bảng lệnh hoặc phím tắt (chốt trong bảng phím A9). Tab mới trong workspace hiện tại, thư mục = gốc dự án của workspace (chưa đặt thì lấy thư mục của pane đang focus). Hoặc “Chia AI” từ một tab terminal.</li>
+            <li><b>Gửi:</b> Enter gửi, Shift+Enter xuống dòng. Agent đang chạy mà gửi tiếp: tin xếp hàng, tự gửi khi lượt xong. Esc dừng lượt.</li>
+            <li><b>Ô nhập:</b> <code>@</code> tìm tệp (gửi kèm <code>resource_link</code>); <code>/</code> gọi lệnh do agent gửi; dán hoặc kéo ảnh nếu agent nhận ảnh.</li>
+            <li><b>Chế độ, model, mức suy nghĩ:</b> lấy từ <code>configOptions</code> của agent. Với Claude 0.90.0: Manual, Accept edits, Plan, Auto, Bypass permissions — ShellX dịch tên các id đã biết, không tự thêm chế độ. “Bỏ qua mọi quyền” phải xác nhận rõ.</li>
+            <li><b>Xin quyền:</b> thẻ trong dòng hội thoại + thanh dính trên ô nhập. Phím 1–4 theo thứ tự lựa chọn agent gửi; Esc từ chối. Nhãn chính dịch theo <code>kind</code> (Cho phép / Luôn cho phép / Từ chối), nhãn phụ giữ nguyên chữ của agent vì chỉ agent biết phạm vi “luôn”. Thanh không cướp focus: đang có chữ trong ô nhập thì phím số vào ô nhập.</li>
+            <li><b>Câu hỏi của agent</b> (chọn đáp án hoặc nhập chữ — elicitation) hiện thành thẻ trả lời được.</li>
+            <li><b>Đang chạy:</b> chữ kèm đồng hồ (“Đang chạy · 0:12”), không spinner, không hoạt ảnh lặp — theo nguyên tắc A1.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Thẻ theo từng loại việc <small>theo <code>ToolKind</code> của ACP</small></summary>
+        <div class="acc-b">
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Loại (ACP)</th><th>Cách hiển thị</th></tr></thead>
+            <tbody>
+              <tr><td><code>read</code>, <code>search</code>, <code>fetch</code></td><td>Một dòng gọn; bấm để mở tệp đúng dòng hoặc xem kết quả tìm.</td></tr>
+              <tr><td><code>edit</code>, <code>delete</code>, <code>move</code></td><td>Tên tệp, số dòng thêm/bớt, diff mở rộng được, “Mở trong editor” (link-editor sẵn có).</td></tr>
+              <tr><td><code>execute</code></td><td>Dòng lệnh, đầu ra (màu cơ bản), mã thoát, thời gian chạy.</td></tr>
+              <tr><td><code>think</code> / <code>agent_thought_chunk</code></td><td>Gập sẵn.</td></tr>
+              <tr><td><code>plan</code></td><td>Danh sách dính phía trên ô nhập, cập nhật trực tiếp.</td></tr>
+              <tr><td><code>other</code> (tool MCP)</td><td>Tên server · tên tool, tham số và kết quả khi mở.</td></tr>
+              <tr><td>Cuối lượt</td><td>“Lượt 1 · 0:41 · 2 tệp đổi +44 −5 · Xem · Hoàn tác lượt”.</td></tr>
+            </tbody>
+          </table></div>
+          <p class="muted">Nhãn dựng từ <code>kind</code> + <code>locations</code> (dịch được); <code>title</code> của agent làm dự phòng.</p>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Duyệt và hoàn tác <small>điểm khôi phục</small></summary>
+        <div class="acc-b">
+          <ul>
+            <li>Trước mỗi lượt: chụp thư mục dự án vào <code>&lt;app support&gt;/ai/checkpoints/&lt;dự án&gt;</code>. Thao tác git của cùng một dự án chạy lần lượt theo hàng đợi.</li>
+            <li>Panel <b>Thay đổi</b>: tệp đã đổi so với đầu phiên hoặc đầu lượt, diff thật trên đĩa, ô “Đã xem”, hoàn tác từng tệp hoặc cả lượt; cảnh báo nếu tệp bị sửa tiếp sau lượt (bởi bạn hay phiên khác).</li>
+            <li>Lần chụp đầu chạy nền khi mở pane. Dự án quá lớn (ngưỡng chốt trong spec, vd hơn 200 000 tệp hoặc chụp quá 30 giây): tắt hoàn tác cho dự án đó và báo rõ.</li>
+            <li>Không có git: vẫn xem diff agent báo, tắt hoàn tác, hướng dẫn cài. macOS: kiểm Command Line Tools trước khi gọi <code>/usr/bin/git</code> để không bật hộp thoại cài đặt bất ngờ.</li>
+            <li>Tệp bị <code>.gitignore</code> bỏ qua (vd <code>.env</code>) không hoàn tác được — giao diện ghi rõ.</li>
+            <li>Điểm khôi phục tự xoá sau 14 ngày (đổi được); có nút xoá trong Cài đặt.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Tệp <small>xem chỉ đọc</small></summary>
+        <div class="acc-b">
+          <ul>
+            <li>Cây thư mục tải dần, ẩn <code>.git</code>, cập nhật khi tệp trên đĩa đổi, đánh dấu tệp agent vừa sửa.</li>
+            <li>Xem tệp chỉ đọc, tô màu cú pháp, số dòng; “Mở trong editor” đúng dòng và “Nhắc trong chat”.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Chạy agent và đăng nhập <small>4 agent + tuỳ chỉnh</small></summary>
+        <div class="acc-b">
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Agent</th><th>Chạy bằng</th><th>Cần có</th><th>Đăng nhập</th></tr></thead>
+            <tbody>
+              <tr><td>Claude Code</td><td>Adapter <code>@agentclientprotocol/claude-agent-acp</code> (bản ghim; 0.90.0 lúc viết) — bọc Agent SDK nên chạy chính CLI chính thức</td><td>Node ≥ 22</td><td>Terminal: Claude Subscription hoặc Anthropic Console</td></tr>
+              <tr><td>Codex</td><td>Adapter <code>@agentclientprotocol/codex-acp</code> (bản ghim, đã kèm Codex)</td><td>Node</td><td>Agent tự lo: trình duyệt, API key hoặc mã thiết bị</td></tr>
+              <tr><td>Gemini CLI</td><td><code>gemini --acp</code></td><td>Đã cài Gemini CLI</td><td>Do Gemini lo</td></tr>
+              <tr><td>OpenCode</td><td><code>opencode acp</code></td><td>Đã cài OpenCode</td><td>Terminal</td></tr>
+              <tr><td>Tuỳ chỉnh</td><td>Lệnh + tham số bạn nhập</td><td>Tuỳ agent</td><td>Tuỳ agent</td></tr>
+            </tbody>
+          </table></div>
+          <ul>
+            <li><b>Adapter npm:</b> cài <b>một lần</b> vào thư mục riêng (bản ghim, chỉ nâng sau khi test) rồi chạy thẳng bằng <code>node</code> — không <code>npx</code> mỗi lần: tắt <code>npx</code> để lại tiến trình agent mồ côi, <code>npx.cmd</code> trên Windows lỗi khi đường dẫn có dấu cách, và không cần mạng mỗi lần mở.</li>
+            <li><b>Biến môi trường:</b> lấy PATH và env của login shell bằng ký tự đánh dấu như <code>LoginPathCheck</code>, rồi chạy agent <b>không qua shell</b> — profile in chữ ra stdout là hỏng giao thức (Zed từng gặp).</li>
+            <li><b>Dừng:</b> <code>killProcessTree</code> sẵn có.</li>
+            <li><b>Cài đặt › Agents</b> thêm mục “Pane AI”: trạng thái từng agent (Sẵn sàng / Thiếu Node 22 / Chưa cài / Chưa đăng nhập), nút Cài đặt và Đăng nhập chạy lệnh trong pane terminal để bạn thấy lệnh, agent mặc định, agent tuỳ chỉnh. Xem trong demo: menu ⋯ của pane.</li>
+            <li><b>Gemini:</b> từ 18/06/2026 Google chuyển người dùng miễn phí và Google One sang Antigravity CLI. Spec sẽ quyết có hỗ trợ cả Antigravity hay không.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Trạng thái, thông báo, khôi phục, lịch sử</summary>
+        <div class="acc-b">
+          <ul>
+            <li><b>Trạng thái:</b> đi vào đúng mô hình A12 (đang chạy / cần bạn / đang chờ / xong) → sidebar, viền chú ý, thông báo hệ thống, điện thoại. Cần mở rộng hai chỗ hiện chỉ nhận pane terminal: <code>AgentStatusNotifier.ingest</code> và đường thông báo A4.</li>
+            <li><b>Khôi phục:</b> <code>layout.json</code> lưu pane AI (agent, id phiên, thư mục, tiêu đề). Mở lại: pane hiện khung + tiêu đề; agent chỉ chạy khi bạn quay lại tab, rồi <code>session/load</code> phát lại lịch sử. Spec chốt cách ghi để bản ShellX cũ đọc <code>layout.json</code> mới không lỗi (hôm nay <code>_nodeFromJson</code> ném lỗi với khoá lạ).</li>
+            <li><b>Riêng tư:</b> ShellX không lưu nội dung hội thoại — agent giữ lịch sử của nó (đúng tinh thần A12).</li>
+            <li><b>Lịch sử:</b> <code>session/list</code> cho danh sách phiên cũ theo dự án.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Lỗi và trường hợp biên</summary>
+        <div class="acc-b">
+          <ul>
+            <li>Thiếu agent, thiếu Node, chưa đăng nhập: thẻ hướng dẫn có nút làm ngay.</li>
+            <li>Agent đòi đăng nhập khi tạo phiên (<code>-32000</code> ở <code>session/new</code>): thẻ đăng nhập, xong tự thử lại.</li>
+            <li>Agent chết giữa lượt: lượt báo lỗi; “Khởi động lại” chạy lại agent rồi <code>session/load</code>.</li>
+            <li>Bấm dừng mà 10 giây agent chưa trả lời: nút “Dừng hẳn”.</li>
+            <li>Dòng JSON hỏng: bỏ qua; hỏng lặp lại thì coi là agent lỗi. Chấp nhận dòng dài nhiều MB (ảnh, diff cả tệp).</li>
+            <li>Cập nhật đến sau khi lượt xong (tác vụ nền): vẫn hiện.</li>
+            <li>stderr của agent chỉ giữ trong bộ nhớ cho “Xem log”; không ghi nội dung vào log của ShellX.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Cấu trúc code</summary>
+        <div class="acc-b">
+          <ul>
+            <li><code>packages/shellx_acp</code> (Dart thuần, mới): kiểu ACP v1 cần dùng, kết nối JSON-RPC theo dòng, test đối chiếu schema chính thức. ACP chưa có SDK Dart chính thức; gói cộng đồng rất nhỏ — tự viết gọn, test kỹ.</li>
+            <li><code>apps/desktop/lib/src/ai/</code>: trạng thái phiên, biến <code>session/update</code> thành dòng hội thoại, chạy agent, điểm khôi phục, nối trạng thái vào sidebar và thông báo.</li>
+            <li><code>apps/desktop/lib/src/ui/ai/</code>: pane AI, header, dòng hội thoại, thẻ, ô nhập, thanh xin quyền, panel Thay đổi và Tệp, khung xem diff và tệp.</li>
+            <li>Markdown: <code>flutter_markdown_plus</code> + tự chia khối để khi stream chỉ khối cuối vẽ lại. Diff: <code>diff_match_patch</code> + khung xem tự viết. Ghim bản chạy được trên Flutter 3.41.4 (một số bản mới cần 3.44) — kiểm bằng <code>pub get</code> ở task đầu.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Kiểm thử</summary>
+        <div class="acc-b">
+          <ul>
+            <li><b>Agent giả</b> bằng Dart nói ACP theo kịch bản: stream chữ, việc agent làm, diff, xin quyền, đòi đăng nhập, chết, treo, dòng rất dài, rác lẫn vào stdout. Kịch bản lấy từ bản ghi phiên thật của Claude và Codex ở task đầu. (Demo trên trang này là bản phác của chính ý tưởng đó.)</li>
+            <li>Test đơn vị: mã hoá/giải mã giao thức; biến cập nhật thành dòng hội thoại; điểm khôi phục chạy git thật trong thư mục tạm trên macOS và Windows; luật chuyển trạng thái.</li>
+            <li>Test widget: thẻ, phím của thanh xin quyền, ô nhập.</li>
+            <li>Kiểm tay như các đợt A: agent thật trên macOS và Windows, gõ Telex, VoiceOver và Narrator.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="acc">
+        <summary>Ngoài giai đoạn 1</summary>
+        <div class="acc-b">
+          <ul>
+            <li>Trình soạn thảo, LSP.</li>
+            <li>Chạy lệnh của agent trong terminal ShellX (<code>terminal/*</code> của ACP ít agent dùng).</li>
+            <li>Worktree riêng mỗi phiên để nhiều agent chạy song song không đụng nhau.</li>
+            <li>Cài agent từ ACP Registry (sha256 còn tuỳ chọn, chưa ký số); tự tải kèm Node.</li>
+            <li>Chen tin vào lượt đang chạy (adapter Claude có mở rộng riêng <code>_session/steering</code>) — giai đoạn 1 xếp hàng.</li>
+            <li>Điện thoại, plugin.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ========================================================= plugins -->
+  <section class="sect" id="plugin">
+    <div class="sec-h">
+      <p class="eyebrow">Giai đoạn 2 · phác thảo, spec riêng</p>
+      <h2>Nền tảng plugin: code xong, import là dùng</h2>
+      <p>Đây là phần trả lời cho “người dùng tự sáng tạo UI/UX hoặc xây tool riêng”. Xem <a href="#demo" data-run="s6">kịch bản 6</a> trong demo.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Plugin là một thư mục</h3>
+        <ul>
+          <li><code>shellx-plugin.json</code> + HTML, JS, CSS — React, Svelte hay JS thuần đều được.</li>
+          <li>Đóng góp: <b>pane hoặc panel</b> (chạy trong webview), <b>lệnh</b> trong bảng lệnh, và <b>tool cho agent qua MCP</b> — ShellX đưa server MCP của plugin vào <code>session/new</code> của mọi phiên AI, nên tool cá nhân dùng được với mọi agent. ACP v1 bắt buộc agent nhận server MCP qua stdio.</li>
+          <li><b>Import:</b> Cài đặt › Plugin › “Thêm từ thư mục” (chế độ dev: lưu tệp là tự tải lại), “Cài từ .zip”, hoặc <code>shellx plugin dev &lt;thư mục&gt;</code>.</li>
+          <li><b>Tạo bằng AI:</b> “Plugin mới…” dựng khung rồi mở pane AI ngay trong thư mục đó, kèm một skill mô tả API. Bạn mô tả, agent viết, plugin tự tải lại trước mắt.</li>
+        </ul>
+        <h4>Điều kiện trước khi làm</h4>
+        <p>Phải qua cổng thử webview của A6 trên Mac và Windows thật. Không đạt: plugin mở trong cửa sổ riêng (<code>desktop_webview_window</code> 0.3.1) thay vì nhúng vào pane.</p>
+        <h4>Ngoài phạm vi</h4>
+        <p>Chợ plugin, ký số, plugin sửa giao diện lõi.</p>
+      </div>
+      <div class="card">
+        <h3>Manifest (phác thảo)</h3>
+<pre class="code">{
+  "id": "dev.minh.board",
+  "name": "Bảng việc",
+  "version": "0.1.0",
+  "panes": [{ "id": "board", "title": "Bảng việc",
+              "entry": "panel/index.html" }],
+  "commands": [{ "id": "board.open", "title": "Mở Bảng việc" }],
+  "mcp": { "command": "node", "args": ["mcp/server.js"] },
+  "permissions": ["storage"]
+}</pre>
+        <h3>Cầu nối <code>window.shellx</code> (phác thảo)</h3>
+<pre class="code">// panel/index.html — mỗi quyền phải khai trong manifest,
+// người dùng đồng ý một lần và thu hồi được.
+const cards = (await shellx.storage.get('cards')) ?? [];
+shellx.theme.onChange(applyColors);           // màu theo ShellX
+shellx.ai.onUpdate((u) =&gt; render(u));         // session/update
+await shellx.ai.prompt('Tóm tắt các thẻ đang mở');
+const src = await shellx.project.read('src/a.ts'); // cần project.read</pre>
+        <p class="muted">Câu hỏi mở cho spec: server MCP của plugin và panel chia sẻ dữ liệu ra sao (qua kho riêng của plugin hay qua cầu nối); có cho khai tool bằng JS ngay trong plugin (ShellX làm server MCP qua CLI <code>shellx</code>) để khỏi chạy tiến trình riêng không.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== phone -->
+  <section class="sect" id="dien-thoai">
+    <div class="sec-h">
+      <p class="eyebrow">Giai đoạn 3 · phác thảo</p>
+      <h2>Trên điện thoại</h2>
+      <p>Có thể đổi thứ tự với giai đoạn 2.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <ul>
+          <li>Xem danh sách phiên AI và nội dung hội thoại.</li>
+          <li>Trả lời xin quyền ngay từ thông báo đẩy; gửi prompt.</li>
+          <li>Thêm loại tin mới vào giao thức relay, vẫn mã hoá đầu cuối như hiện nay. Trạng thái <code>agent.state</code> lên điện thoại đã có từ đợt “agent quick reply”.</li>
+        </ul>
+      </div>
+      <div class="phone" aria-label="Minh hoạ thông báo trên điện thoại">
+        <div class="phone-note"><small>ShellX · bây giờ</small><b>Claude cần bạn trả lời</b>Sửa lỗi token hết hạn: muốn chạy <code>npm test -- auth</code><div class="phone-acts"><span>Cho phép</span><span>Từ chối</span></div></div>
+        <div class="phone-note"><small>ShellX · 2 phút trước</small><b>Claude đã xong</b>Đổi URL sang https · 2 tệp đổi</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== roadmap -->
+  <section class="sect" id="lo-trinh">
+    <div class="sec-h">
+      <p class="eyebrow">Lộ trình</p>
+      <h2>Thứ tự làm giai đoạn 1</h2>
+      <p>Mỗi mốc merge được riêng.</p>
+    </div>
+    <ol class="timeline">
+      <li><b>M1</b><strong>Nền</strong>Gói <code>shellx_acp</code>, agent giả, chạy agent (env, dừng). Ghi lại phiên thật của Claude và Codex làm dữ liệu test.</li>
+      <li><b>M2</b><strong>Cây pane</strong>Chứa được pane không phải terminal; <code>layout.json</code> tương thích ngược.</li>
+      <li><b>M3</b><strong>Pane AI dùng được</strong>Hội thoại stream, thẻ, xin quyền, dừng, chế độ và model, trạng thái lên sidebar và thông báo.</li>
+      <li><b>M4</b><strong>Duyệt và hoàn tác</strong>Điểm khôi phục, panel Thay đổi, panel Tệp.</li>
+      <li><b>M5</b><strong>Agent</strong>Cài đặt, đăng nhập, Cài đặt › Agents, khôi phục phiên, lịch sử, <code>@</code>, <code>/</code>, ảnh, xếp hàng.</li>
+      <li><b>M6</b><strong>Hoàn thiện</strong>Tiếng Việt và Anh, trợ năng, phím tắt vào bảng A9, kiểm tay.</li>
+    </ol>
+    <p class="muted">Sau đó: giai đoạn 2 (plugin, cần qua cổng thử webview A6) hoặc giai đoạn 3 (điện thoại) — bạn chọn ở câu 4 bên dưới.</p>
+  </section>
+
+  <!-- ========================================================== risks -->
+  <section class="sect" id="rui-ro">
+    <div class="sec-h">
+      <p class="eyebrow">Rủi ro</p>
+      <h2>Rủi ro còn lại</h2>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Rủi ro</th><th>Mức</th><th>Cách xử lý</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Dùng gói thuê bao Claude trong sản phẩm công khai.</b> Ba nguồn chính thức nói khác nhau: tài liệu Agent SDK (bên thứ ba “không được cung cấp đăng nhập claude.ai… trừ khi được duyệt trước”), trang pháp lý (người dùng tự đăng nhập vào CLI chính thức, chưa sửa đổi, thì không bị cấm), trang hỗ trợ 07/10/2026 (app bên thứ ba vẫn dùng được hạn mức của gói). Anthropic từng chặn công cụ giả danh Claude Code (01/2026), có thể chặn không báo trước.</td>
+          <td><span class="pill hi">Cao</span></td>
+          <td><ul><li>Chỉ chạy adapter và CLI chính thức; không đụng credential; màn đăng nhập là của chính Claude.</li><li>Công tắc chỉ cho API key: cờ <code>--hide-claude-auth</code> có sẵn trong adapter.</li><li>Không dùng chữ “Claude Code” trong tên hay logo tính năng.</li><li><b>Xin Anthropic xác nhận bằng văn bản trước khi phát hành công khai.</b> Codex và Google: kiểm điều khoản tương tự trong spec.</li></ul></td>
+        </tr>
+        <tr><td>Adapter đổi nhanh (đã đổi tên một lần; ACP v2 là bản nháp).</td><td><span class="pill mid">Trung bình</span></td><td>Ghim phiên bản, chỉ làm v1, test tuân thủ bằng agent giả, phần giao thức tách riêng trong <code>shellx_acp</code>.</td></tr>
+        <tr><td>Claude và Codex cần Node (Claude: ≥ 22).</td><td><span class="pill mid">Trung bình</span></td><td>Phát hiện và hướng dẫn cài; tự tải kèm Node (như JetBrains) là bước sau.</td></tr>
+        <tr><td>Gói Flutter bản mới cần Flutter 3.44.</td><td><span class="pill lo">Thấp–TB</span></td><td>Ghim bản hợp với 3.41.4; nâng Flutter là việc riêng.</td></tr>
+        <tr><td>Dự án rất lớn làm chậm việc chụp điểm khôi phục.</td><td><span class="pill mid">Trung bình</span></td><td>Chụp chạy nền, có ngưỡng, quá ngưỡng thì tắt và báo.</td></tr>
+        <tr><td>Webview cho plugin.</td><td><span class="pill hi">Cao (GĐ2)</span></td><td>Thử trên máy thật trước khi làm; dự phòng cửa sổ riêng.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Chưa kiểm được — kiểm ngay ở task đầu</h3>
+        <ul>
+          <li>Adapter Claude cư xử thế nào khi ShellX khai <code>fs</code> và <code>terminal</code> là <code>false</code> (mã nguồn cho thấy nó tự chạy tool, nhưng chưa chạy thật).</li>
+          <li>Gemini có chạy đủ khi ShellX không cung cấp <code>fs/*</code> không; Gemini sau khi Google chuyển sang Antigravity.</li>
+          <li>Các gói Flutter có chạy trên 3.41.4 không.</li>
+          <li><code>codex-acp</code> bản hiện hành: yêu cầu Node, cách đăng nhập.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Đã kiểm thêm khi làm demo (14/10)</h3>
+        <ul>
+          <li>Schema ACP v1 bản 1.25.0 (09/10/2026): mọi phương thức và kiểu dùng trong demo khớp schema.</li>
+          <li>Adapter Claude 0.90.0 (Node ≥ 22): chế độ Manual / Accept edits / Plan / Auto / Bypass permissions; lựa chọn xin quyền “Yes” / “Yes, allow all edits during this session” / “No”; đăng nhập terminal Claude Subscription / Anthropic Console.</li>
+          <li>Diff của adapter: Edit và Write gửi diff kèm kết quả; lệnh Bash chỉ có câu lệnh và đầu ra — xác nhận K4.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================== decisions -->
+  <section class="sect" id="can-ban-quyet">
+    <div class="sec-h">
+      <p class="eyebrow">Việc của bạn</p>
+      <h2>Cần bạn quyết</h2>
+      <p>Chọn xong, bấm “Sao chép câu trả lời” rồi dán vào Claude Code. Lựa chọn được nhớ trong trình duyệt này.</p>
+    </div>
+    <form class="qa" id="qa">
+      <fieldset class="q" style="border:1px solid var(--line)">
+        <h3>1. Duyệt hướng tổng thể (K1–K5 và ba giai đoạn)?</h3>
+        <label><input type="radio" name="q1" value="Duyệt K1–K5 và ba giai đoạn" checked><span>Duyệt<span class="rec">đề xuất</span><small>Mình viết spec giai đoạn 1 + lộ trình ngắn cho giai đoạn 2–3.</small></span></label>
+        <label><input type="radio" name="q1" value="Cần sửa (ghi chú bên dưới)"><span>Cần sửa<small>Ghi điều cần đổi vào ô ghi chú.</small></span></label>
+      </fieldset>
+      <fieldset class="q" style="border:1px solid var(--line)">
+        <h3>2. Claude và gói thuê bao</h3>
+        <label><input type="radio" name="q2" value="(a) Cho đăng nhập bằng gói như Zed, kèm công tắc tắt nhanh; song song xin Anthropic xác nhận" checked><span>(a) Cho đăng nhập bằng gói như Zed, kèm công tắc tắt nhanh; song song xin Anthropic xác nhận<span class="rec">đề xuất</span></span></label>
+        <label><input type="radio" name="q2" value="(b) Chỉ API key cho tới khi Anthropic xác nhận"><span>(b) Chỉ API key cho tới khi Anthropic xác nhận<small>Bật sẵn <code>--hide-claude-auth</code>.</small></span></label>
+      </fieldset>
+      <fieldset class="q" style="border:1px solid var(--line)">
+        <h3>3. Bố cục mặc định của tab AI</h3>
+        <label><input type="radio" name="q3" value="Pane AI ở trên, terminal nhỏ ở dưới" checked><span>Pane AI ở trên, terminal nhỏ ở dưới<span class="rec">đề xuất</span><small>Như demo; phóng to để ẩn terminal.</small></span></label>
+        <label><input type="radio" name="q3" value="Pane AI chiếm hết, terminal chỉ mở khi cần"><span>Pane AI chiếm hết, terminal chỉ mở khi cần</span></label>
+      </fieldset>
+      <fieldset class="q" style="border:1px solid var(--line)">
+        <h3>4. Sau giai đoạn 1 làm gì trước?</h3>
+        <label><input type="radio" name="q4" value="Plugin trước (giai đoạn 2)" checked><span>Plugin trước<span class="rec">đề xuất</span><small>Đúng thứ tự bạn nêu; cần qua cổng thử webview A6.</small></span></label>
+        <label><input type="radio" name="q4" value="Điện thoại trước (giai đoạn 3)"><span>Điện thoại trước</span></label>
+      </fieldset>
+      <fieldset class="q" style="border:1px solid var(--line)">
+        <h3>Ghi chú thêm (tuỳ chọn)</h3>
+        <textarea name="note" rows="3" style="font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical" placeholder="Ví dụ: “sáng tạo UI/UX” ý mình là…"></textarea>
+      </fieldset>
+      <div class="answer">
+        <strong>Câu trả lời của bạn</strong>
+        <pre id="qa-out"></pre>
+        <div class="row-b"><button type="button" class="btn-p" id="qa-copy">Sao chép câu trả lời</button><span class="note" id="qa-msg" aria-live="polite"></span></div>
+      </div>
+    </form>
+    <div class="card">
+      <h3>Bước tiếp theo</h3>
+      <p>Bạn trả lời xong, mình viết spec giai đoạn 1 vào <code>docs/superpowers/specs/2026-10-14-ai-pane-design.md</code> kèm một trang lộ trình ngắn cho giai đoạn 2 và 3, commit lên branch <code>shellx-v2</code>. Bạn xem spec, rồi mình viết plan và bắt đầu làm.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Trang tĩnh chạy trên máy bạn · <code>docs/superpowers/design/2026-10-14-ai-pane-demo/</code> · branch <code>shellx-v2</code> · chỉ tải font từ Google Fonts (không có mạng thì dùng font hệ thống).
+</footer>
+
+<script src="demo-data.js"></script>
+<script src="demo.js"></script>
+<script src="page.js"></script>
+</body>
+</html>
