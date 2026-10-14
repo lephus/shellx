@@ -22,6 +22,7 @@ import 'src/agent/remote_agent_controller.dart';
 import 'src/agent/ui_services.dart';
 import 'src/ai/ai_host_provider.dart';
 import 'src/ai/ai_paths.dart';
+import 'src/ai/ai_phone.dart';
 import 'src/ai/ai_startup.dart';
 import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
@@ -283,6 +284,10 @@ Future<void> _start(_Startup startup) async {
   // Runs after the shutdown. Each step is bounded, so quitting always ends
   // in exit(0).
   Future<void> quitApp() async {
+    // V2-2 D1: a phone that still mirrors an AI session hears the window
+    // quit, not its agent stop; the agent side's slot answers "unavailable"
+    // from then on. Never throws.
+    stopAiPhone(container);
     // V2-1 §6: no agent outlives the app (stdin closed, 2 s, process tree).
     await runBounded(
       () => stopAi(container),
@@ -384,6 +389,12 @@ Future<void> _start(_Startup startup) async {
       // The agents' adapters and the restore points stay out of Time Machine.
       aiBackupExcluderProvider.overrideWithValue(
         Platform.isMacOS ? excludeFromBackupMacOS : null,
+      ),
+      // V2-2 D11: where AI pushes go — this process's notifications, or the
+      // background service's (`ai.push`), whichever holds the relay link.
+      aiPushSinkFor(
+        daemonMode: daemonMode,
+        notifications: side?.core.notifications,
       ),
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
@@ -683,6 +694,12 @@ Future<void> _start(_Startup startup) async {
   // in the background from the first frame on. Before the bootstrap and the
   // restore below, so the sweep is in flight before any AI tab can launch.
   startAiAfterFirstFrame(container);
+  // V2-2 D1: phones reach the AI tabs — through this process's relay link
+  // (the agent side's slot), or through the background service's (a binding
+  // on each link to it). After the AI startup above is scheduled (an agent's
+  // launch waits for its sweep); before the bootstrap and the service link
+  // below, so the hub is there before any phone can attach.
+  startAiPhone(container, slot: side?.core.ai);
   container.read(windowRouterProvider.notifier).showTerminal();
   if (daemonMode) {
     // UI-A5 §7.3, §7.4: the dialogs come over the window; leaving them is

@@ -493,9 +493,60 @@ void main() {
         expect(pushes, isEmpty);
       });
     });
+
+    test('dispose tells every phone first, as a service whose window quit '
+        'does: the list is unavailable, every session it mirrors or waits '
+        'for closes desktop_closed (V2-2 D1)', () {
+      final rig = HubRig();
+      rig.source
+        ..add(-1)
+        ..add(-2, runs: false, unavailable: AiRemoteState.noFolder)
+        ..add(-3);
+      rig.hub
+        ..handle(phone, const AiList())
+        ..handle(phone, const AiAttach(sid: 'ep.-1'))
+        ..handle(phone, const AiAttach(sid: 'ep.-2')) // waits: cannot run
+        ..handle(tablet, const AiAttach(sid: 'ep.-3')); // never listed
+      rig.sent.clear();
+      rig.hub.dispose();
+      expect(rig.to(phone).map((m) => m.type), [
+        'ai.list.result',
+        'ai.closed',
+        'ai.closed',
+      ]);
+      final list = rig.last<AiListResult>(phone);
+      expect(list.available, isFalse);
+      expect(listing(list).sessions, isEmpty);
+      expect(
+        {for (final m in rig.to(phone).whereType<AiClosed>()) m.sid: m.reason},
+        {'ep.-1': 'desktop_closed', 'ep.-2': 'desktop_closed'},
+      );
+      expect(rig.to(tablet).map((m) => (m as AiClosed).sid), ['ep.-3']);
+      expect(rig.last<AiClosed>(tablet).reason, 'desktop_closed');
+      rig.hub.dispose(); // again: nothing more
+      expect(rig.sent, hasLength(4));
+    });
   });
 
   group('requests', () {
+    test('a refusal of the window\'s own is what the phone gets, and nothing '
+        'is answered (an answer only the computer gives)', () {
+      final rig = HubRig();
+      final s = rig.source.add(-1)..beginTurn(const [TextBlock('go')], aiT0);
+      final p = s.addPermission(perm('c1'), aiT0);
+      final control = rig.source.controls[-1]!
+        ..refuse = const AiRefused('on_computer');
+      rig.hub.handle(
+        phone,
+        AiAnswer(sid: 'ep.-1', rid: 1, permission: p.id, option: 'allow'),
+      );
+      final result = rig.last<AiResult>(phone);
+      expect((result.ok, result.code), (false, 'on_computer'));
+      expect(control.permissions, isEmpty);
+      expect(s.currentPermission?.id, p.id);
+      expect('${const AiRefused('on_computer')}', 'AiRefused(on_computer)');
+    });
+
     test('a session is named only the way the hub names it', () {
       final rig = HubRig()..source.add(1);
       for (final sid in ['ep.01', 'ep.+1', 'ep.0x1', 'ep. 1', 'ep.1 ']) {

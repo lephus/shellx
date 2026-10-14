@@ -48,8 +48,27 @@ abstract interface class AiControl {
   Future<bool> send(List<ContentBlock> prompt);
   void cancel();
   Future<void> forceStop();
+
+  /// Throws [AiRefused] for an answer the window takes only on the computer.
   void answerPermission(int id, String optionId);
+
+  /// Throws [AiRefused] for an answer the window takes only on the computer.
   void answerAsk(int id, ElicitationResponse response);
+}
+
+/// An [AiControl] will not do what a phone asks, for a reason of the
+/// window's own: the phone's `ai.result` carries [code] (V2-2 D7). The
+/// desktop refuses this way an answer it gives only on the computer, after a
+/// question there: `on_computer` (an option that turns on a mode acting
+/// without asking, V2-1 R6, V2-2 D13).
+final class AiRefused implements Exception {
+  const AiRefused(this.code);
+
+  /// An `ai.result` code: a short snake_case word.
+  final String code;
+
+  @override
+  String toString() => 'AiRefused($code)';
 }
 
 /// The window, as the hub sees it (V2-2 D2). The desktop app implements
@@ -344,8 +363,23 @@ final class AiPhoneHub implements AiEndpoint {
   @override
   void allPhonesGone() => _phones.clear();
 
-  /// Stops listening; the window is going.
+  /// Stops listening; the window is going. Every phone hears it first, as
+  /// from a background service whose window quit (V2-2 D1): a phone that
+  /// lists gets `available: false`, every session it mirrors or waits for
+  /// `ai.closed {desktop_closed}`. Then nothing more is sent.
   void dispose() {
+    if (_disposed) return;
+    for (final MapEntry(key: mobileId, value: phone) in [..._phones.entries]) {
+      if (phone.listing) {
+        _send(
+          mobileId,
+          AiListResult(available: false, body: emptyAiListingBody),
+        );
+      }
+      for (final sid in {...phone.subs.keys, ...phone.parked}) {
+        _send(mobileId, AiClosed(sid: sid, reason: 'desktop_closed'));
+      }
+    }
     _disposed = true;
     unawaited(_changes.cancel());
     for (final t in _flushTimers.values) {
@@ -816,6 +850,8 @@ final class AiPhoneHub implements AiEndpoint {
     try {
       final control = _controlOf(sid);
       code = control == null ? 'not_found' : run(control);
+    } on AiRefused catch (refusal) {
+      code = refusal.code; // the window's own reason (V2-2 D7)
     } on Object {
       code = 'refused'; // the window's code failed: still one answer
     }
