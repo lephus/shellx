@@ -373,16 +373,36 @@ final class AiRuntime with Redacted {
 
   /// After the run sheet's login exits 0, or after the setup is fixed
   /// (spec D8): a live agent reopens the session; otherwise start again.
-  Future<void> retry() async {
-    if (state.phase == AgentPhase.needsAuth && _client != null) {
+  ///
+  /// With [newSession] the session the tab keeps trying to reopen is let go
+  /// first: the id is dropped, a new session opens, and the tab says so once
+  /// with the note an agent's "not found" gets (`CannotResume`). That is the
+  /// way out of a session that cannot be reopened (a project folder that was
+  /// moved, a transcript the agent pruned) when the agent answers it with
+  /// something other than "not found": a plain retry repeats the same load for
+  /// good (V2-1 final review I-6). Nothing to let go of: a plain retry.
+  Future<void> retry({bool newSession = false}) async {
+    final reopen = state.phase == AgentPhase.needsAuth && _client != null;
+    final again =
+        state.phase == AgentPhase.failed || state.phase == AgentPhase.stopped;
+    if (!reopen && !again) return;
+    if (newSession && _resumeId != null) {
+      _resumeId = null;
+      state.addNotice(const CannotResume());
+    }
+    if (reopen) {
       state.setPhase(AgentPhase.starting);
       await _openSession();
-      return;
-    }
-    if (state.phase == AgentPhase.failed || state.phase == AgentPhase.stopped) {
+    } else {
       await start();
     }
   }
+
+  /// Whether the next start reopens an earlier session (`session/load`): a
+  /// restored tab, or one whose session was opened. False for a tab that
+  /// never got one, and after `retry(newSession: true)` until the new session
+  /// is open.
+  bool get resumesSession => _resumeId != null;
 
   /// For an agent-type login method: `authenticate`, then the session. False
   /// unless the agent is waiting for a sign-in and the session then opens.

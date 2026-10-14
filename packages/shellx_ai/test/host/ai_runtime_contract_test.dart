@@ -969,6 +969,146 @@ void main() {
     );
   });
 
+  group('a session that cannot be reopened (final review I-6)', () {
+    const history = [
+      {
+        'sessionUpdate': 'user_message_chunk',
+        'content': {'type': 'text', 'text': 'q1'},
+      },
+      {
+        'sessionUpdate': 'agent_message_chunk',
+        'content': {'type': 'text', 'text': 'a1'},
+      },
+    ];
+    const boom = {'code': -32603, 'message': 'boom'};
+
+    List<String> loads(FakeAgent a) =>
+        a.received.where((e) => e.startsWith('session/load')).toList();
+
+    test('"Start a new session" drops the old id, opens a new session and '
+        'says so once', () async {
+      final r = RuntimeRig(
+        first: const FakeScenario(loadSessionError: boom, history: history),
+        later: const [FakeScenario()],
+        resume: 'old-1',
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      expect(r.state.phase, AgentPhase.failed);
+      expect(r.notices.single, isA<StartFailed>());
+      expect(r.runtime.resumesSession, isTrue);
+
+      await r.runtime.retry(newSession: true);
+
+      expect(r.state.phase, AgentPhase.ready);
+      expect(r.agent(1).received, contains('session/new'));
+      expect(loads(r.agent(1)), isEmpty, reason: 'the old one is let go');
+      expect(r.state.sessionId, 'sess-1');
+      expect(r.notices.whereType<CannotResume>(), hasLength(1));
+      expect(
+        r.cards.firstWhere((c) => c.notice is StartFailed).resolved,
+        isTrue,
+        reason: 'the failure card folds',
+      );
+    });
+
+    test(
+      'a plain retry repeats the same load (that is what is stuck)',
+      () async {
+        final r = RuntimeRig(
+          first: const FakeScenario(loadSessionError: boom, history: history),
+          later: const [FakeScenario(loadSessionError: boom)],
+          resume: 'old-1',
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        await r.runtime.retry();
+        expect(r.state.phase, AgentPhase.failed);
+        expect(loads(r.agent(1)), ['session/load:old-1']);
+      },
+    );
+
+    test('later restarts reopen the new session, not the old one', () async {
+      final r = RuntimeRig(
+        first: const FakeScenario(loadSessionError: boom),
+        later: const [FakeScenario()],
+        resume: 'old-1',
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      await r.runtime.retry(newSession: true);
+      await r.runtime.restart();
+      expect(r.state.phase, AgentPhase.ready);
+      expect(loads(r.agent(2)), ['session/load:sess-1']);
+      expect(r.notices.whereType<CannotResume>(), hasLength(1));
+    });
+
+    test(
+      'a tab that resumes nothing says so, and the call is a plain retry',
+      () async {
+        var fixed = false;
+        final r = RuntimeRig(
+          resolve: () async => fixed
+              ? const AgentReady(fakeCommand)
+              : const AgentNeedsNode(required: 22, found: 'v20.1.0'),
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        expect(r.runtime.resumesSession, isFalse);
+        fixed = true;
+        await r.runtime.retry(newSession: true);
+        expect(r.state.phase, AgentPhase.ready);
+        expect(
+          r.notices.whereType<CannotResume>(),
+          isEmpty,
+          reason: 'there was nothing to let go',
+        );
+      },
+    );
+
+    test(
+      'a second ask while the first is under way does not say it twice',
+      () async {
+        final r = RuntimeRig(
+          first: const FakeScenario(loadSessionError: boom),
+          later: const [FakeScenario()],
+          resume: 'old-1',
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        await Future.wait([
+          r.runtime.retry(newSession: true),
+          r.runtime.retry(newSession: true),
+        ]);
+        expect(r.state.phase, AgentPhase.ready);
+        expect(r.notices.whereType<CannotResume>(), hasLength(1));
+        expect(r.launcher.channels, hasLength(2), reason: 'one new agent');
+      },
+    );
+
+    test(
+      'a tab waiting for a sign-in can start a new session as well',
+      () async {
+        final r = RuntimeRig(
+          first: const FakeScenario(
+            requireAuth: true,
+            authMethods: [
+              {'id': 'login', 'name': 'Log in', 'type': 'terminal'},
+            ],
+          ),
+          resume: 'old-1',
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        expect(r.state.phase, AgentPhase.needsAuth);
+        await r.runtime.retry(newSession: true);
+        expect(r.state.phase, AgentPhase.needsAuth, reason: 'still signed out');
+        expect(r.runtime.resumesSession, isFalse);
+        expect(r.notices.whereType<CannotResume>(), hasLength(1));
+      },
+    );
+  });
+
   group('status (spec D13)', () {
     test(
       'Stop with a question open: running again at once, even if the agent hangs',
