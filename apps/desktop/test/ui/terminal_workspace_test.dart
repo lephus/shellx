@@ -847,7 +847,7 @@ void main() {
       await rightClick(tester);
       await tester.tap(find.byKey(const Key('menu.selectAll')));
       await tester.pumpAndSettle();
-      expect(tabs().selected!.selection.selection, isNotNull);
+      expect(tabs().selected!.selection!.selection, isNotNull);
       await rightClick(tester);
       expect(item(tester, 'menu.copy').enabled, isTrue);
       await tester.tap(find.byKey(const Key('menu.copy')));
@@ -885,11 +885,11 @@ void main() {
       page(tester).sidebarFocus.requestFocus();
       await tester.pump();
       await selectAll();
-      expect(tabs().selected!.selection.selection, isNull);
+      expect(tabs().selected!.selection!.selection, isNull);
       page(tester).terminalFocus.requestFocus();
       await tester.pump();
       await selectAll();
-      expect(tabs().selected!.selection.selection, isNotNull);
+      expect(tabs().selected!.selection!.selection, isNotNull);
     },
     variant: TargetPlatformVariant(const {
       TargetPlatform.macOS,
@@ -963,7 +963,7 @@ void main() {
         .scrollController!;
     expect(scroll.offset, 0);
     expect(
-      tabs().selected!.terminal.buffer.getText(),
+      tabs().selected!.terminal!.buffer.getText(),
       startsWith('first line'),
     );
   });

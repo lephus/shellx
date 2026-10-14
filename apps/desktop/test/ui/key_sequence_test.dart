@@ -79,7 +79,7 @@ void main() {
     variant: mac,
     (tester) async {
       final w = await pumpConfiguredWorkspace(tester, config: cfg);
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       await ctrlA(tester);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();
@@ -94,7 +94,7 @@ void main() {
     tester,
   ) async {
     final w = await pumpConfiguredWorkspace(tester, config: cfg);
-    final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+    final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
     await ctrlA(tester);
     await ctrlA(tester);
     expect(w.local.views[id]!.writes.join(), '\x01');
@@ -107,7 +107,7 @@ void main() {
     variant: mac,
     (tester) async {
       final w = await pumpConfiguredWorkspace(tester, config: cfg);
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       await tester.sendKeyDownEvent(ctrl);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA);
       for (var i = 0; i < 4; i++) {
@@ -127,7 +127,7 @@ void main() {
     variant: mac,
     (tester) async {
       final w = await pumpConfiguredWorkspace(tester, config: cfg);
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       final tabs = w.container.read(terminalTabsProvider).tabs.length;
       await ctrlA(tester);
       // Ctrl+E is not a second step: the sequence ends and the key reaches

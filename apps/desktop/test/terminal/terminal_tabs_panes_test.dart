@@ -118,7 +118,7 @@ void main() {
     await pumpEventQueue();
     expect(state().tabs.single.exited, isTrue);
     expect(state().tabs.single.panes[1]!.exitCode, 3);
-    state().tabs.single.terminal.keyInput(TerminalKey.enter);
+    state().tabs.single.terminal!.keyInput(TerminalKey.enter);
     expect(state().tabs, isEmpty);
   });
 
@@ -146,7 +146,7 @@ void main() {
         ),
       );
       expect(only().focusedPaneId, 100);
-      expect(only().terminal.viewWidth, 39);
+      expect(only().terminal!.viewWidth, 39);
       expect(state().opening, isFalse);
     });
 
@@ -252,7 +252,7 @@ void main() {
       final before = r1.length;
       only1().panes[1]!.terminal.resize(50, 20);
       expect(r1.length, before); // hidden by the zoom
-      state().tabs.firstWhere((t) => t.id == 2).terminal.resize(60, 20);
+      state().tabs.firstWhere((t) => t.id == 2).terminal!.resize(60, 20);
       expect(r2, isEmpty); // not the selected tab
       expect(tabs().toggleZoom(), isFalse);
       expect(r1.last, (50, 20));

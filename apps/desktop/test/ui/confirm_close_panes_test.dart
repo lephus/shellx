@@ -152,11 +152,11 @@ void main() {
   });
 
   test('text and commands to an exited pane do nothing', () async {
-    final id = tab().focused.id;
+    final id = tab().focused!.id;
     local.views[id]!.end(2);
     await pumpEventQueue();
     await Future<void>.delayed(const Duration(milliseconds: 20));
-    expect(tab().focused.exited, isTrue);
+    expect(tab().focused!.exited, isTrue);
     local.views[id]!.writes.clear();
     final state = c.read(terminalTabsProvider);
     expect(sendTextToFocused(state, 'x'), CommandRun.noTerminal);

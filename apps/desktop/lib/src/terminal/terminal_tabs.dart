@@ -11,6 +11,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
 import '../agent/desktop_services.dart' show clockProvider;
+import '../ai/ai_pane_state.dart';
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../config/shellx_config.dart' show OptionAsAlt, WorkingDirectoryKind;
@@ -29,6 +30,9 @@ import 'terminal_feed.dart';
 import 'terminal_input.dart' show desktopInputHandlerWith;
 import 'terminal_style.dart';
 
+export '../ai/ai_pane_state.dart';
+
+part 'terminal_tabs_ai.dart';
 part 'terminal_tabs_config.dart';
 part 'terminal_tabs_panes.dart';
 part 'terminal_tabs_remote.dart';
@@ -340,6 +344,11 @@ final class PaneSession {
 /// id of the session that created it and never changes (D1). The A1/A2
 /// getters read the focused pane, so the sidebar, the workspaces and A4
 /// read a tab exactly as before.
+///
+/// V2-1 D2/D3: an AI tab ([kind] [TabKind.ai]) has a synthetic id and one
+/// AI pane, a negative leaf whose record is in [aiPanes]; a terminal pane
+/// may join it under the AI pane. Its [focused] is null whenever the AI
+/// pane has the focus, and the terminal getters then answer null or empty.
 @immutable
 final class TerminalTab {
   const TerminalTab({
@@ -352,7 +361,28 @@ final class TerminalTab {
     this.paneHistory = const [],
     this.customTitle,
     this.meta = TabMeta.empty,
+    this.kind = TabKind.terminal,
+    this.aiPanes = const {},
   });
+
+  /// V2-1 D2/D3: an AI tab with its one AI pane and no terminal pane.
+  factory TerminalTab.ai({
+    required int id,
+    required AiPaneState pane,
+    String? customTitle,
+    TabMeta meta = TabMeta.empty,
+  }) => TerminalTab(
+    id: id,
+    origin: SessionOrigin.desktop,
+    layout: PaneLeaf(pane.id),
+    panes: const {},
+    focusedPaneId: pane.id,
+    paneHistory: [pane.id],
+    customTitle: customTitle,
+    meta: meta,
+    kind: TabKind.ai,
+    aiPanes: {pane.id: pane},
+  );
 
   factory TerminalTab.single(PaneSession pane) => TerminalTab(
     id: pane.id,
@@ -383,28 +413,52 @@ final class TerminalTab {
   /// A11 D18: pin, one-line description and status, all the user's.
   final TabMeta meta;
 
-  PaneSession get focused => panes[focusedPaneId]!;
+  /// V2-1 D2.
+  final TabKind kind;
 
-  /// D23: reading order.
+  /// V2-1 D3: the AI pane of an AI tab, by its negative leaf id. Not a
+  /// session: never in [panes].
+  final Map<int, AiPaneState> aiPanes;
+
+  bool get isAi => kind == TabKind.ai;
+
+  /// The AI pane of an AI tab (exactly one, D3); null for a terminal tab.
+  AiPaneState? get ai => aiPanes.values.firstOrNull;
+
+  /// Pane [id] (a session or an AI pane) is a leaf of this tab.
+  bool hasPane(int id) => panes.containsKey(id) || aiPanes.containsKey(id);
+
+  /// The focused pane when it is a terminal pane; null while an AI pane
+  /// has the focus (V2-1 D2): readers must not reach a terminal then.
+  PaneSession? get focused => panes[focusedPaneId];
+
+  /// D23: reading order (V2-1: the AI pane is a leaf too).
   List<int> get paneOrder => paneIds(layout);
-  int get paneCount => panes.length;
-  bool get isSplit => panes.length > 1;
+
+  /// The leaves: terminal panes and the AI pane (V2-1 D3).
+  int get paneCount => paneOrder.length;
+  bool get isSplit => layout is PaneSplit;
 
   /// 1-based position of [sessionId] in [paneOrder] ("Pane 2 of 3").
   int paneNumber(int sessionId) => paneOrder.indexOf(sessionId) + 1;
 
-  int get index => focused.index;
-  String get shell => focused.shell;
-  String get title => focused.title;
-  bool get runningCommand => focused.runningCommand;
-  DesktopTerminal get terminal => focused.terminal;
-  DesktopTerminalController get selection => focused.selection;
-  String? get cwd => focused.cwd;
-  String? get gitBranch => focused.gitBranch;
-  List<int> get ports => focused.ports;
-  int? get exitCode => focused.exitCode;
-  bool get exited => focused.exited;
-  String get automaticLabel => focused.automaticLabel;
+  int get index => focused?.index ?? 0;
+  String get shell => focused?.shell ?? '';
+  String get title => isAi ? ai?.title ?? '' : focused?.title ?? '';
+  bool get runningCommand => focused?.runningCommand ?? false;
+  DesktopTerminal? get terminal => focused?.terminal;
+  DesktopTerminalController? get selection => focused?.selection;
+
+  /// V2-1 D2: an AI tab's folder is its session's.
+  String? get cwd => isAi ? ai?.cwd : focused?.cwd;
+  String? get gitBranch => isAi ? null : focused?.gitBranch;
+  List<int> get ports => isAi ? const [] : focused?.ports ?? const [];
+  int? get exitCode => focused?.exitCode;
+  bool get exited => focused?.exited ?? false;
+
+  /// V2-1 D2: an AI tab's automatic title is its session's.
+  String get automaticLabel =>
+      isAi ? ai?.title ?? '' : focused?.automaticLabel ?? '';
 
   /// What the sidebar, the window title and dialogs show.
   String get label => customTitle ?? automaticLabel;
@@ -418,7 +472,8 @@ final class TerminalTab {
     return panes[sessionId]?.automaticLabel ?? label;
   }
 
-  bool get hasContext => focused.hasContext;
+  /// V2-1 §4.7: an AI tab's second line is its agent's state instead.
+  bool get hasContext => !isAi && (focused?.hasContext ?? false);
 
   /// D19: 👁 when any pane has a phone attached.
   bool get phoneAttached => panes.values.any((p) => p.phoneAttached);
@@ -426,11 +481,26 @@ final class TerminalTab {
   /// D19: the 👁 turns `warn` when any attached pane is phone-driven.
   bool get phoneDriving =>
       panes.values.any((p) => p.phoneAttached && p.driver == DriverSide.phone);
-  DriverSide get driver => phoneDriving ? DriverSide.phone : focused.driver;
+  DriverSide get driver =>
+      phoneDriving ? DriverSide.phone : focused?.driver ?? DriverSide.desktop;
 
   TerminalTab withPane(int id, PaneSession Function(PaneSession pane) change) {
     final pane = panes[id];
     return pane == null ? this : copyWith(panes: {...panes, id: change(pane)});
+  }
+
+  /// V2-1 D2: this AI tab with its AI pane alone (its terminal panes'
+  /// sessions are gone: a rebuild of the tab list).
+  TerminalTab aiOnly() {
+    final pane = ai;
+    if (pane == null) return this;
+    return copyWith(
+      layout: PaneLeaf(pane.id),
+      panes: const {},
+      focusedPaneId: pane.id,
+      zoomedPaneId: null,
+      paneHistory: [pane.id],
+    );
   }
 
   TerminalTab copyWith({
@@ -442,6 +512,7 @@ final class TerminalTab {
     List<int>? paneHistory,
     Object? customTitle = _unset,
     TabMeta? meta,
+    Map<int, AiPaneState>? aiPanes,
   }) => TerminalTab(
     id: id,
     origin: origin ?? this.origin,
@@ -456,6 +527,8 @@ final class TerminalTab {
         ? this.customTitle
         : customTitle as String?,
     meta: meta ?? this.meta,
+    kind: kind,
+    aiPanes: aiPanes ?? this.aiPanes,
   );
 }
 
@@ -486,6 +559,14 @@ final class TerminalTabsState {
   TerminalTab? tabOfSession(int sessionId) {
     for (final tab in tabs) {
       if (tab.panes.containsKey(sessionId)) return tab;
+    }
+    return null;
+  }
+
+  /// V2-1 D3: the tab holding pane [id] — a session or an AI pane.
+  TerminalTab? tabOfPane(int id) {
+    for (final tab in tabs) {
+      if (tab.hasPane(id)) return tab;
     }
     return null;
   }
@@ -601,8 +682,19 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
   final _paneMoves = StreamController<PaneMove>.broadcast(sync: true);
 
   /// A11 D20: tab ids handed out when a broken-out pane's own id is already
-  /// a tab's (see [kSyntheticTabIdBase]).
+  /// a tab's (see [kSyntheticTabIdBase]). V2-1 D2: AI tabs take theirs from
+  /// the same counter.
   int _syntheticTabIds = 0;
+
+  /// V2-1 D3: the next AI pane id; counts down, never repeats in a run.
+  int _nextAiPaneId = -1;
+
+  /// V2-1 D2: the last state, so AI tabs outlive a rebuild ([build]).
+  TerminalTabsState? _lastState;
+
+  /// V2-1 D3: whether tab [tabId]'s AI pane runs a turn; set by the AI
+  /// runtimes (a close then asks first). Null: never.
+  bool Function(int tabId)? aiBusy;
 
   /// A7 D21: how the last 64 sessions that ended here ended (exit 0
   /// removes the pane; `wait --exit` still reports it).
@@ -647,8 +739,21 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
     _settlerInitialized = true;
     _changes = _local.changes.listen((_) => _sync());
     ref.onDispose(_dispose);
-    final tabs = _merge(const []);
-    return TerminalTabsState(tabs: tabs, selectedId: tabs.firstOrNull?.id);
+    // V2-1 D2: AI tabs are no session's: a rebuild (a new background-service
+    // link) keeps them, without the terminal panes of the old sessions.
+    final carried = [
+      for (final t in _lastState?.tabs ?? const <TerminalTab>[])
+        if (t.isAi) t.aiOnly(),
+    ];
+    listenSelf((_, next) => _lastState = next);
+    final tabs = [..._merge(const []), ...carried];
+    final kept = _lastState?.selectedId;
+    return TerminalTabsState(
+      tabs: tabs,
+      selectedId: carried.any((t) => t.id == kept)
+          ? kept
+          : tabs.firstOrNull?.id,
+    );
   }
 
   void reportGrid(TerminalGrid grid) => _grid = grid;

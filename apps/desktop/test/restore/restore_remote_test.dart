@@ -76,7 +76,7 @@ RestoreSnapshot capture(Map<int, String> keys) => captureSnapshot(
   cleanExit: true,
 );
 
-String text(TerminalTab tab) => tab.terminal.mainBuffer.lines
+String text(TerminalTab tab) => tab.terminal!.mainBuffer.lines
     .toList()
     .map((l) => l.getText().trimRight())
     .join('\n');

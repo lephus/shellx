@@ -257,7 +257,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       AppLocalizations.of(context).paneRegionLabel(
         tab.paneNumber(tab.focusedPaneId),
         tab.paneCount,
-        tab.focused.automaticLabel,
+        tab.focused?.automaticLabel ?? tab.label,
       ),
     );
   }
@@ -443,7 +443,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       CopySelectionIntent: run<CopySelectionIntent>(
         (_) => _copy(),
         enabled: (_) =>
-            ref.read(terminalTabsProvider).selected?.selection.selection !=
+            ref.read(terminalTabsProvider).selected?.selection?.selection !=
             null,
       ),
       PasteClipboardIntent: run<PasteClipboardIntent>((_) {
@@ -489,7 +489,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
             .read(terminalTabsProvider)
             .selected
             ?.focused
-            .terminal
+            ?.terminal
             .sendUserText(editLineSequence(i.op)),
         enabled: (_) {
           final pane = ref.read(terminalTabsProvider).selected?.focused;
@@ -559,21 +559,22 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   }
 
   void _copy() {
-    final tab = ref.read(terminalTabsProvider).selected;
-    final range = tab?.selection.selection;
-    if (tab == null || range == null) return;
+    // V2-1 D2: only a terminal pane has a terminal selection.
+    final pane = ref.read(terminalTabsProvider).selected?.focused;
+    final range = pane?.selection.selection;
+    if (pane == null || range == null) return;
     unawaited(
       Clipboard.setData(
         ClipboardData(
           text: selectionText(
-            tab.terminal.buffer,
+            pane.terminal.buffer,
             range,
-            tab.selection.selectionMode,
+            pane.selection.selectionMode,
           ),
         ),
       ),
     );
-    tab.selection.clearSelection();
+    pane.selection.clearSelection();
   }
 
   /// A10 D4: the find bar of the selected tab's focused pane, if open.
@@ -586,12 +587,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
 
   /// ⌘A / Ctrl+Shift+A / the menu: every line, scrollback included.
   void _selectAll() {
-    final tab = ref.read(terminalTabsProvider).selected;
-    if (tab == null) return;
-    final buffer = tab.terminal.buffer;
-    tab.selection.setSelection(
+    // V2-1 D2: with the AI pane focused, its own fields take ⌘A.
+    final pane = ref.read(terminalTabsProvider).selected?.focused;
+    if (pane == null) return;
+    final buffer = pane.terminal.buffer;
+    pane.selection.setSelection(
       buffer.createAnchor(0, 0),
-      buffer.createAnchor(tab.terminal.viewWidth, buffer.height - 1),
+      buffer.createAnchor(pane.terminal.viewWidth, buffer.height - 1),
       mode: SelectionMode.line,
     );
   }
@@ -610,7 +612,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     // A11 D13: a paste (the menu's too) is for the program, not for copy
     // mode: the mode ends first.
     ref.read(copyModeProvider.notifier).exit(paneId);
-    final terminal = tab.focused.terminal;
+    // V2-1 D2: nothing to paste into while the AI pane has the focus (its
+    // composer takes ⌘V itself).
+    final terminal = tab.focused?.terminal;
+    if (terminal == null) return;
     final media = ref.read(clipboardMediaProvider);
     final input = ref.read(paneInputProvider);
     // A10 D15: files copied in Finder / Explorer first (their name is also

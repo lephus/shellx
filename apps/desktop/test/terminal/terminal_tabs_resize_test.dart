@@ -42,7 +42,7 @@ void main() {
       final terminal = state().tabs.single.terminal;
       final before = view.resizes.length;
       for (var i = 0; i < 120; i++) {
-        terminal.resize(80 + i % 30, 24);
+        terminal!.resize(80 + i % 30, 24);
         if (i < 119) async.elapse(const Duration(milliseconds: 16));
       }
       expect(view.resizes.length, before, reason: 'nothing mid-drag');
@@ -59,7 +59,7 @@ void main() {
       local.add(local.summary(1, origin: SessionOrigin.desktop));
       boot();
       final terminal = state().tabs.single.terminal;
-      terminal.resize(132, 43);
+      terminal!.resize(132, 43);
       expect((terminal.viewWidth, terminal.viewHeight), (132, 43));
     });
   });
@@ -73,7 +73,7 @@ void main() {
         final view = local.views[1]!;
         final terminal = state().tabs.single.terminal;
         final before = view.resizes.length;
-        terminal.resize(100, 30);
+        terminal!.resize(100, 30);
         expect(view.resizes.length, before);
         terminal.textInput('x');
         expect(view.resizes.length, before + 1, reason: 'sent before the key');
@@ -89,7 +89,7 @@ void main() {
       boot();
       final view = local.views[1]!;
       final before = view.resizes.length;
-      state().tabs.single.terminal.resize(90, 20);
+      state().tabs.single.terminal!.resize(90, 20);
       tabs().flushResizes();
       tabs().flushResizes();
       async.elapse(const Duration(seconds: 1));
@@ -103,7 +103,7 @@ void main() {
       boot();
       final view = local.views[1]!;
       final before = view.resizes.length;
-      state().tabs.single.terminal.resize(90, 20);
+      state().tabs.single.terminal!.resize(90, 20);
       view.end(3);
       async.elapse(const Duration(seconds: 1));
       expect(view.resizes.length, before);
@@ -122,7 +122,7 @@ void main() {
         expect(state().selectedId, 1);
         final view = local.views[2]!;
         final before = view.resizes.length;
-        hidden.terminal.resize(111, 33);
+        hidden.terminal!.resize(111, 33);
         async.elapse(const Duration(seconds: 1));
         expect(view.resizes.length, before, reason: 'never while hidden');
         tabs().select(2);
@@ -137,7 +137,7 @@ void main() {
       fakeAsync((async) {
         local.add(local.summary(1, origin: SessionOrigin.desktop));
         boot();
-        state().tabs.single.terminal.resize(90, 20);
+        state().tabs.single.terminal!.resize(90, 20);
         tabs().close(1);
         container.dispose();
         async.elapse(

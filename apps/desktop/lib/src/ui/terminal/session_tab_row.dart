@@ -242,12 +242,13 @@ class SessionTabRowState extends State<SessionTabRow> {
   /// [origin] · [viewing/driving] · position.
   String _semanticsLabel(AppLocalizations l10n) {
     final tab = widget.tab;
-    final remote = tab.focused.remote;
+    final pane = tab.focused;
+    final remote = pane?.remote;
     final windows =
         remote == null && defaultTargetPlatform == TargetPlatform.windows;
     final home = remote == null ? widget.home : (remote.home ?? '');
     final parts = <String>[
-      '${tab.label}${remoteSemantics(l10n, tab.focused)}',
+      '${tab.label}${pane == null ? '' : remoteSemantics(l10n, pane)}',
       if (tab.meta.pinned) l10n.tabPinned,
       if (tab.meta.status != TabStatus.none)
         l10n.tabStatusLabel(tabStatusText(l10n, tab.meta.status)),
@@ -534,9 +535,10 @@ class SessionTabRowState extends State<SessionTabRow> {
                       ),
                     ],
                     // UI-A8 §2.1: badge → pane count → SSH/tmux → 📱.
-                    if (tab.focused.remote != null) ...[
+                    if (tab.focused case final pane?
+                        when pane.remote != null) ...[
                       const SizedBox(width: ShellxSpace.s4),
-                      RemoteMark(tab.focused),
+                      RemoteMark(pane),
                     ],
                     // A7 D27: after the pane count, before 📱.
                     if (widget.agent) ...[
@@ -724,7 +726,7 @@ class SessionTabRowState extends State<SessionTabRow> {
                                   unread != null ||
                                   tab.isSplit ||
                                   tab.meta.pinned ||
-                                  tab.focused.remote != null ||
+                                  tab.focused?.remote != null ||
                                   widget.agent,
                             ),
                           ),
@@ -988,7 +990,7 @@ class TabStatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tab.focused.remoteState == RemoteState.connecting) {
+    if (tab.focused?.remoteState == RemoteState.connecting) {
       return const ConnectingDot();
     }
     if (tab.exited) {
@@ -1061,7 +1063,7 @@ class _ContextLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final remote = tab.focused.remote;
+    final remote = tab.focused?.remote;
     final windows =
         remote == null && defaultTargetPlatform == TargetPlatform.windows;
     final style = ShellxText.caption.copyWith(

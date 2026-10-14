@@ -123,21 +123,21 @@ void main() {
     final c = rig.container;
     final copied = mockClipboard(t);
     final tab = c.read(terminalTabsProvider).selected!;
-    tab.terminal.write('hello');
-    final lines = tab.terminal.buffer.lines;
+    tab.terminal!.write('hello');
+    final lines = tab.terminal!.buffer.lines;
     await pressMetaShift(t, LogicalKeyboardKey.keyM);
     await key(t, LogicalKeyboardKey.digit0);
     await key(t, LogicalKeyboardKey.keyV);
     await key(t, LogicalKeyboardKey.keyL);
     await key(t, LogicalKeyboardKey.keyL);
-    expect(tab.selection.selection, isNotNull, reason: 'drawn as selection');
+    expect(tab.selection!.selection, isNotNull, reason: 'drawn as selection');
     await key(t, LogicalKeyboardKey.keyY);
     expect(copied, ['hel']);
     expect(c.read(copyModeProvider), isEmpty);
     expect(c.read(terminalTabsProvider).notice, isA<CopyModeCopiedNotice>());
     // No highlight, no selection, no anchor is left on the pane.
-    expect(tab.selection.selection, isNull);
-    expect(tab.selection.highlights, isEmpty);
+    expect(tab.selection!.selection, isNull);
+    expect(tab.selection!.highlights, isEmpty);
     expect(lines[0].anchors, isEmpty);
     await disposeWorkspace(t, c);
   }, variant: mac);
@@ -147,7 +147,7 @@ void main() {
     final c = rig.container;
     final tab = c.read(terminalTabsProvider).selected!;
     final writes = rig.local.views[tab.focusedPaneId]!.writes;
-    tab.terminal.write('abcdef');
+    tab.terminal!.write('abcdef');
     await pressMetaShift(t, LogicalKeyboardKey.keyM);
     await key(t, LogicalKeyboardKey.digit0);
     writes.clear();
@@ -220,7 +220,7 @@ void main() {
     final c = rig.container;
     final copied = mockClipboard(t);
     final tab = c.read(terminalTabsProvider).selected!;
-    tab.terminal.write('secret-token');
+    tab.terminal!.write('secret-token');
     await pressMetaShift(t, LogicalKeyboardKey.keyM);
     await key(t, LogicalKeyboardKey.digit0);
     await key(t, LogicalKeyboardKey.keyV);
@@ -238,7 +238,7 @@ void main() {
     final rig = await pumpConfiguredWorkspace(t);
     final c = rig.container;
     final tab = c.read(terminalTabsProvider).selected!;
-    tab.terminal.write('  abcdef');
+    tab.terminal!.write('  abcdef');
     await pressMetaShift(t, LogicalKeyboardKey.keyM);
     await key(t, LogicalKeyboardKey.digit0);
     // A layout that makes "$" on another key: the character decides.
@@ -345,11 +345,11 @@ void main() {
     final c = rig.container;
     final copied = mockClipboard(t);
     final tab = c.read(terminalTabsProvider).selected!;
-    tab.terminal.write('a😀b');
+    tab.terminal!.write('a😀b');
     await pressMetaShift(t, LogicalKeyboardKey.keyM);
     await key(t, LogicalKeyboardKey.digit0);
     await key(t, LogicalKeyboardKey.keyL);
-    final h = tab.selection.highlights.single;
+    final h = tab.selection!.highlights.single;
     expect((h.p1.x, h.p2.x), (1, 3), reason: 'both cells of the emoji');
     await key(t, LogicalKeyboardKey.keyV);
     await key(t, LogicalKeyboardKey.keyY);

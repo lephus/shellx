@@ -35,7 +35,7 @@ void main() {
     final tabs = c.read(terminalTabsProvider.notifier);
     final second = await tabs.openTabFor(select: true);
     await t.pumpAndSettle();
-    c.read(terminalTabsProvider).tabs.last.terminal.write('hello history');
+    c.read(terminalTabsProvider).tabs.last.terminal!.write('hello history');
     final sessionsBefore = rig.local.sessions.length;
     tabs.close(second);
     await t.pumpAndSettle();
@@ -48,8 +48,8 @@ void main() {
     expect(state.tabs, hasLength(2));
     final tab = state.selected!;
     expect(tab.id, state.tabs.last.id, reason: 'the reopened tab is selected');
-    expect(textOf(tab.focused), contains('hello history'));
-    expect(textOf(tab.focused), contains('Session restored'));
+    expect(textOf(tab.focused!), contains('hello history'));
+    expect(textOf(tab.focused!), contains('Session restored'));
     expect(rig.local.sessions.length, sessionsBefore, reason: 'no leak');
     expect(
       c.read(closedItemsProvider).length,
@@ -83,7 +83,7 @@ void main() {
     expect(after.id, tab.id);
     expect(after.paneCount, 2);
     expect(after.focusedPaneId, isNot(doomed));
-    expect(textOf(after.focused), contains('pane text'));
+    expect(textOf(after.focused!), contains('pane text'));
     await disposeWorkspace(t, c);
   }, variant: mac);
 
@@ -163,7 +163,7 @@ void main() {
     final tabs = c.read(terminalTabsProvider.notifier);
     final second = await tabs.openTabFor(select: true);
     await t.pumpAndSettle();
-    c.read(terminalTabsProvider).tabs.last.terminal.write('hello history');
+    c.read(terminalTabsProvider).tabs.last.terminal!.write('hello history');
     tabs.close(second);
     await t.pumpAndSettle();
     await reopenChord(t);
@@ -179,7 +179,7 @@ void main() {
     final tabs = c.read(terminalTabsProvider.notifier);
     final second = await tabs.openTabFor(select: true);
     await t.pumpAndSettle();
-    c.read(terminalTabsProvider).tabs.last.terminal.write('keep me');
+    c.read(terminalTabsProvider).tabs.last.terminal!.write('keep me');
     tabs.close(second);
     await t.pumpAndSettle();
     rig.local.openError = const SessionLimitException(2);
@@ -216,7 +216,7 @@ void main() {
     final tabs = c.read(terminalTabsProvider.notifier);
     final second = await tabs.openTabFor(select: true);
     await t.pumpAndSettle();
-    c.read(terminalTabsProvider).tabs.last.terminal.write('worth keeping');
+    c.read(terminalTabsProvider).tabs.last.terminal!.write('worth keeping');
     tabs.close(second);
     await t.pumpAndSettle();
     await palette();

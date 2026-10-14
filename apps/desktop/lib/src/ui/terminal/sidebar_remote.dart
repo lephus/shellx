@@ -107,7 +107,7 @@ String remotePortTooltipFor(
   TerminalTab tab,
   int port,
 ) {
-  final key = tab.focused.remote?.hostKey;
+  final key = tab.focused?.remote?.hostKey;
   if (key == null) return l10n.portOpenTooltip(port);
   final host = cleanServerText(key);
   final local = ref

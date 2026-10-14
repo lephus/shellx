@@ -44,7 +44,8 @@ extension TerminalTabsPanes on TerminalTabs {
   /// stays on the same session, which has moved. False when there is none.
   bool swapFocusedPane(PaneDirection direction) {
     final tab = _state.selected;
-    if (tab == null || !tab.isSplit) return false;
+    // V2-1 D3: an AI tab's panes stay where they are.
+    if (tab == null || !tab.isSplit || tab.isAi) return false;
     final layout = moves.swapInDirection(
       tab.layout,
       tab.focusedPaneId,
@@ -61,6 +62,7 @@ extension TerminalTabsPanes on TerminalTabs {
     final tab = _state.selected;
     return tab != null &&
         tab.isSplit &&
+        !tab.isAi &&
         neighbourPane(
               tab.layout,
               tab.focusedPaneId,
@@ -75,7 +77,8 @@ extension TerminalTabsPanes on TerminalTabs {
   /// running; nothing is closed. False when its tab has only that pane.
   bool breakPane(int sessionId) {
     final tab = _state.tabOfSession(sessionId);
-    if (tab == null || !tab.isSplit) return false;
+    // V2-1 D3: a pane never leaves an AI tab.
+    if (tab == null || !tab.isSplit || tab.isAi) return false;
     // A tab id is the id of the session that created it (A3 D1): when the
     // pane is the one that created this tab, the tab still has that id.
     final taken = _state.tabs.any((t) => t.id == sessionId);
@@ -110,6 +113,8 @@ extension TerminalTabsPanes on TerminalTabs {
     final from = _state.tabOfSession(sessionId);
     final to = _tab(toTabId);
     if (from == null || to == null || from.id == to.id) return false;
+    // V2-1 D3: no pane moves into or out of an AI tab.
+    if (from.isAi || to.isAi) return false;
     if (!_roomToSplit(to, to.focusedPaneId, axis)) {
       throw const PaneNoRoomException();
     }
@@ -252,7 +257,8 @@ extension TerminalTabsPanes on TerminalTabs {
   /// A click in a pane, a jump to a notification: [sessionId]'s tab is
   /// selected and the pane focused; a zoom that hides it ends (D10).
   void focusPane(int sessionId) {
-    final tab = _state.tabOfSession(sessionId);
+    // V2-1 D3: an AI pane is focused like a terminal pane.
+    final tab = _state.tabOfPane(sessionId);
     if (tab == null) return;
     final unzoom = tab.zoomedPaneId != null && tab.zoomedPaneId != sessionId;
     if (tab.focusedPaneId != sessionId || unzoom) {

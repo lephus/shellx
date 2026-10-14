@@ -64,8 +64,8 @@ RestoreSnapshot saved({bool cleanExit = false, String cwd = '/w'}) =>
     );
 
 String screen(TerminalTab tab) => [
-  for (var i = 0; i < tab.terminal.mainBuffer.lines.length; i++)
-    tab.terminal.mainBuffer.lines[i].getText().trimRight(),
+  for (var i = 0; i < tab.terminal!.mainBuffer.lines.length; i++)
+    tab.terminal!.mainBuffer.lines[i].getText().trimRight(),
 ].join('\n');
 
 /// What restore logged in this test (kept out of the test output; never

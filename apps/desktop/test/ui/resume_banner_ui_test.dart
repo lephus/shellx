@@ -214,7 +214,7 @@ void main() {
           ),
       isTrue,
     );
-    c.read(terminalTabsProvider).tabs.last.terminal.write('history');
+    c.read(terminalTabsProvider).tabs.last.terminal!.write('history');
     tabs.close(second);
     await t.pumpAndSettle();
     expect(c.read(closedItemsProvider).length, 1);

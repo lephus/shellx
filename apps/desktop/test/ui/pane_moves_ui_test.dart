@@ -152,11 +152,11 @@ void main() {
     final c = rig.container;
     final tabs = c.read(terminalTabsProvider.notifier);
     final first = c.read(terminalTabsProvider).tabs.first;
-    first.terminal.write('left behind');
+    first.terminal!.write('left behind');
     final second = await tabs.openTabFor(select: true);
     await t.pumpAndSettle();
     final moving = c.read(terminalTabsProvider).selected!;
-    moving.terminal.write('travelling text');
+    moving.terminal!.write('travelling text');
     final terminal = moving.terminal;
     final sessions = rig.local.sessions.length;
 
@@ -168,7 +168,7 @@ void main() {
     expect(state.selected!.paneOrder, [first.id, second]);
     expect(state.selected!.focusedPaneId, second);
     expect(state.selected!.panes[second]!.terminal, same(terminal));
-    expect(terminal.buffer.getText(), contains('travelling text'));
+    expect(terminal!.buffer.getText(), contains('travelling text'));
     expect(rig.local.sessions.length, sessions);
     expect(rig.local.closed, isEmpty);
     expect(c.read(closedItemsProvider).length, 0);
@@ -265,8 +265,8 @@ void main() {
     final before = view.resizes.length;
 
     final oldSize = (
-      c.read(terminalTabsProvider).selected!.terminal.viewWidth,
-      c.read(terminalTabsProvider).selected!.terminal.viewHeight,
+      c.read(terminalTabsProvider).selected!.terminal!.viewWidth,
+      c.read(terminalTabsProvider).selected!.terminal!.viewHeight,
     );
     expect(tabs.joinPane(second, first.id), isTrue);
     await t.pump();

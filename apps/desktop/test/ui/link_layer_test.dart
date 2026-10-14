@@ -80,7 +80,7 @@ Future<dynamic> cmdClickPath(
     ],
   );
   final tab = w.container.read(terminalTabsProvider).selected!;
-  tab.terminal.write(text);
+  tab.terminal!.write(text);
   await t.pump();
   opener(w).fail = fail;
   await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
@@ -210,7 +210,7 @@ void main() {
   testWidgets('hover with ⌘ underlines a URL; without it nothing', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('visit https://example.com/a?b=1.');
+    tab.terminal!.write('visit https://example.com/a?b=1.');
     await t.pump();
     await hover(t, cellCentre(t, 10, 0));
     expect(find.byKey(const Key('link.underline')), findsNothing);
@@ -229,7 +229,7 @@ void main() {
       'does not', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('visit https://example.com/a?b=1.');
+    tab.terminal!.write('visit https://example.com/a?b=1.');
     await t.pump();
     final at = cellCentre(t, 10, 0);
     await click(t, at);
@@ -248,7 +248,7 @@ void main() {
   testWidgets('an OSC 8 link whose text differs asks first', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write(
+    tab.terminal!.write(
       '\x1b]8;;https://example.com\x1b\\click here\x1b]8;;\x1b\\',
     );
     await t.pump();
@@ -270,7 +270,7 @@ void main() {
   testWidgets('a failing browser is a toast, not an error', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('https://example.com');
+    tab.terminal!.write('https://example.com');
     await t.pump();
     opener(w).fail = true;
     await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
@@ -290,7 +290,7 @@ void main() {
   ) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('https://example.com/SECRET-LINK-TEXT');
+    tab.terminal!.write('https://example.com/SECRET-LINK-TEXT');
     await t.pump();
     opener(w).fail = true;
     final lines = <String>[];
@@ -327,7 +327,7 @@ void main() {
       ],
     );
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('/work/notes.txt /work/missing.txt');
+    tab.terminal!.write('/work/notes.txt /work/missing.txt');
     await t.pump();
     await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await click(t, cellCentre(t, 20, 0)); // on /work/missing.txt
@@ -352,7 +352,7 @@ void main() {
     final tab = c.read(terminalTabsProvider).tabs.firstWhere((x) => x.id == 7);
     c.read(terminalTabsProvider.notifier).focusPane(7);
     await t.pump();
-    tab.terminal.write('/etc/hosts https://example.com');
+    tab.terminal!.write('/etc/hosts https://example.com');
     await t.pump();
     await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await click(t, cellCentre(t, 3, 0));
@@ -370,7 +370,7 @@ void main() {
   ) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('https://example.com/x');
+    tab.terminal!.write('https://example.com/x');
     await t.pump();
     await t.tapAt(cellCentre(t, 4, 0), buttons: kSecondaryButton);
     await t.pumpAndSettle();
@@ -385,7 +385,7 @@ void main() {
   testWidgets('the menu away from a link has neither', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    tab.terminal.write('plain words');
+    tab.terminal!.write('plain words');
     await t.pump();
     await t.tapAt(cellCentre(t, 2, 0), buttons: kSecondaryButton);
     await t.pumpAndSettle();
@@ -400,7 +400,7 @@ void main() {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
     final url = 'https://${'u' * 300}@evil.example/path';
-    tab.terminal.write('\x1b]8;;$url\x1b\\paypal.com\x1b]8;;\x1b\\');
+    tab.terminal!.write('\x1b]8;;$url\x1b\\paypal.com\x1b]8;;\x1b\\');
     await t.pump();
     await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await click(t, cellCentre(t, 2, 0));
@@ -418,8 +418,8 @@ void main() {
   testWidgets('a click outside the grid opens nothing', (t) async {
     final w = await pumpConfiguredWorkspace(t);
     final tab = w.container.read(terminalTabsProvider).selected!;
-    final cols = tab.terminal.viewWidth;
-    tab.terminal.write('https://example.com/${'a' * cols}');
+    final cols = tab.terminal!.viewWidth;
+    tab.terminal!.write('https://example.com/${'a' * cols}');
     await t.pump();
     final render = t
         .state<TerminalViewState>(find.byType(TerminalView))

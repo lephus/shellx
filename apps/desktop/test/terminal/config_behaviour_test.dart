@@ -48,11 +48,11 @@ void main() {
     'scrollback-limit applies to panes opened after the load (D17)',
     () async {
       await tabs().openTab();
-      expect(state().selected!.focused.terminal.maxLines, 10000);
+      expect(state().selected!.focused!.terminal.maxLines, 10000);
       await config('scrollback-limit = 2000\n');
       await tabs().openTab();
-      expect(state().selected!.focused.terminal.maxLines, 2000);
-      expect(state().tabs.first.focused.terminal.maxLines, 10000);
+      expect(state().selected!.focused!.terminal.maxLines, 2000);
+      expect(state().tabs.first.focused!.terminal.maxLines, 10000);
     },
   );
 
@@ -63,7 +63,7 @@ void main() {
     await tabs().openTab();
     expect(local.openCwds.last, '/tmp/w');
     await config('working-directory = inherit\n');
-    local.setCwd(state().selected!.focused.id, '/repo'); // A2 OSC 7 in the fake
+    local.setCwd(state().selected!.focused!.id, '/repo'); // A2 OSC 7 in the fake
     await tabs().openTab();
     expect(local.openCwds.last, '/repo');
   });
@@ -96,7 +96,7 @@ void main() {
     'user commands paste and press Enter; snippets only paste (D35)',
     () async {
       await tabs().openTab();
-      final id = state().selected!.focused.id;
+      final id = state().selected!.focused!.id;
       final entry = ConfigEntry(file: '/c', line: 1, key: 'command', value: '');
       expect(
         runUserCommand(
@@ -134,7 +134,7 @@ void main() {
   test('a command waits for a paste already running in the pane', () async {
     await tabs().openTab();
     final pane = state().selected!.focused;
-    final id = pane.id;
+    final id = pane!.id;
     final sink = PanePasteSink(state, id, pane.terminal);
     final big = 'k' * 400000;
     final first = c.read(pasteSenderProvider).send(id, big, sink);
@@ -166,7 +166,7 @@ void main() {
 
   test('text: bytes go out raw, as typed input (D31)', () async {
     await tabs().openTab();
-    final id = state().selected!.focused.id;
+    final id = state().selected!.focused!.id;
     expect(sendTextToFocused(state(), '\x1b[A'), CommandRun.ran);
     expect(local.views[id]!.writes.join(), '\x1b[A');
   });
@@ -178,11 +178,11 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       await tabs().openTab();
       final tab = state().selected!;
-      final writes = local.views[tab.focused.id]!.writes;
-      tab.terminal.keyInput(TerminalKey.keyF, alt: true);
+      final writes = local.views[tab.focused!.id]!.writes;
+      tab.terminal!.keyInput(TerminalKey.keyF, alt: true);
       expect(writes, isEmpty);
       await config('macos-option-as-alt = true\n');
-      tab.terminal.keyInput(TerminalKey.keyF, alt: true);
+      tab.terminal!.keyInput(TerminalKey.keyF, alt: true);
       expect(writes.join(), '\x1bf');
     },
   );

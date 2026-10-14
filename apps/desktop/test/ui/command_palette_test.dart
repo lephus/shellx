@@ -63,7 +63,7 @@ void main() {
       expect(find.text('npm run lint'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       expect(w.local.views[id]!.writes.join(), 'npm run lint\r');
       await disposeWorkspace(tester, w.container);
     },
@@ -135,7 +135,7 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'hello',
       );
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       expect(w.local.views[id]!.writes, isEmpty);
       await disposeWorkspace(tester, w.container);
     },
@@ -211,7 +211,7 @@ void main() {
       expect(find.text('Snippet'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       expect(w.local.views[id]!.writes.join(), 'hello');
       await disposeWorkspace(tester, w.container);
     },
@@ -315,7 +315,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.byType(CommandPalette), findsOneWidget);
-    final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+    final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
     expect(w.local.views[id]!.writes, isEmpty);
     await disposeWorkspace(tester, w.container);
   });
@@ -356,7 +356,7 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'hello',
       );
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       expect(w.local.views[id]!.writes, isEmpty);
       await disposeWorkspace(tester, w.container);
     },

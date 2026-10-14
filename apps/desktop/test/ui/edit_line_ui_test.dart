@@ -44,7 +44,7 @@ void main() {
       final rig = await pumpConfiguredWorkspace(t);
       final c = rig.container;
       final tab = c.read(terminalTabsProvider).selected!;
-      tab.terminal.write('\x1b[?1049h'); // vim switches to the alternate screen
+      tab.terminal!.write('\x1b[?1049h'); // vim switches to the alternate screen
       final writes = rig.local.views[tab.focusedPaneId]!.writes;
       writes.clear();
       await chord(t, LogicalKeyboardKey.arrowLeft, meta: true);

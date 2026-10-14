@@ -33,13 +33,13 @@ void main() {
     final rig = await pumpConfiguredWorkspace(t);
     final c = rig.container;
     final first = c.read(terminalTabsProvider).tabs.first;
-    first.terminal.write('alpha\r\nbeta error one\r\ngamma');
+    first.terminal!.write('alpha\r\nbeta error one\r\ngamma');
     final second = await c
         .read(terminalTabsProvider.notifier)
         .openTabFor(select: true);
     await t.pumpAndSettle();
     final tab = c.read(terminalTabsProvider).tabs.last;
-    tab.terminal.write('nothing here\r\nanother ERROR two');
+    tab.terminal!.write('nothing here\r\nanother ERROR two');
     return (rig: rig, first: first.id, second: second);
   }
 
@@ -56,7 +56,7 @@ void main() {
     final rig = await pumpConfiguredWorkspace(t);
     final c = rig.container;
     final tab = c.read(terminalTabsProvider).tabs.first;
-    tab.terminal.write(
+    tab.terminal!.write(
       [for (var i = 0; i < 4000; i++) 'filler line number $i'].join('\r\n'),
     );
     await searchAllChord(t);
@@ -197,7 +197,7 @@ void main() {
     final rig = await pumpConfiguredWorkspace(t);
     final c = rig.container;
     final tab = c.read(terminalTabsProvider).selected!;
-    tab.terminal.write(
+    tab.terminal!.write(
       [for (var i = 0; i < 4000; i++) 'filler line number $i'].join('\r\n'),
     );
     await searchAllChord(t);

@@ -404,13 +404,13 @@ void main() {
     await pumpWorkspace(tester);
     final copied = mockClipboard(tester);
     final tab = tabs().selected!;
-    tab.selection.setSelection(
-      tab.terminal.buffer.createAnchor(0, 0),
-      tab.terminal.buffer.createAnchor(5, 0),
+    tab.selection!.setSelection(
+      tab.terminal!.buffer.createAnchor(0, 0),
+      tab.terminal!.buffer.createAnchor(5, 0),
     );
     await chord(tester, primary(mac), LogicalKeyboardKey.keyC);
     expect(copied, ['hello']);
-    expect(tab.selection.selection, isNull);
+    expect(tab.selection!.selection, isNull);
     expect(local.views[1]!.writes, isEmpty);
   });
 

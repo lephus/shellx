@@ -21,8 +21,8 @@ void main() {
       final rig = await pumpConfiguredWorkspace(t);
       final c = rig.container;
       final tab = c.read(terminalTabsProvider).selected!;
-      tab.terminal.write('alpha\r\nbeta error\r\ngamma error');
-      final before = (tab.terminal.viewWidth, tab.terminal.viewHeight);
+      tab.terminal!.write('alpha\r\nbeta error\r\ngamma error');
+      final before = (tab.terminal!.viewWidth, tab.terminal!.viewHeight);
       final resizes = rig.local.views[tab.focusedPaneId]!.resizes.length;
       await pressMeta(t, LogicalKeyboardKey.keyF);
       await t.pump();
@@ -31,7 +31,7 @@ void main() {
         c.read(findSessionsProvider)[tab.focusedPaneId]!.focusNode.hasFocus,
         isTrue,
       );
-      expect((tab.terminal.viewWidth, tab.terminal.viewHeight), before);
+      expect((tab.terminal!.viewWidth, tab.terminal!.viewHeight), before);
       expect(rig.local.views[tab.focusedPaneId]!.resizes.length, resizes);
       await disposeWorkspace(t, c);
     },
@@ -44,7 +44,7 @@ void main() {
       final rig = await pumpConfiguredWorkspace(t);
       final c = rig.container;
       final tab = c.read(terminalTabsProvider).selected!;
-      tab.terminal.write('one error\r\ntwo error\r\nthree error');
+      tab.terminal!.write('one error\r\ntwo error\r\nthree error');
       await pressMeta(t, LogicalKeyboardKey.keyF);
       await t.enterText(find.byKey(const Key('find.field')), 'error');
       await t.pump();
@@ -57,7 +57,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const Key('find.bar')), findsNothing);
       expect(c.read(findSessionsProvider), isEmpty);
-      expect(tab.selection.highlights, isEmpty);
+      expect(tab.selection!.highlights, isEmpty);
       // The keyboard is back in the terminal (A10 D23 F2).
       expect(FocusManager.instance.primaryFocus?.debugLabel, 'terminal');
       await disposeWorkspace(t, c);
@@ -105,12 +105,12 @@ void main() {
       final rig = await pumpConfiguredWorkspace(t);
       final c = rig.container;
       final tab = c.read(terminalTabsProvider).selected!;
-      tab.terminal.write('x x x');
+      tab.terminal!.write('x x x');
       await pressMeta(t, LogicalKeyboardKey.keyF);
       await t.enterText(find.byKey(const Key('find.field')), 'x');
       await t.pump();
       final terminal = tab.terminal;
-      expect(terminal.buffer.lines[0].anchors, isNotEmpty);
+      expect(terminal!.buffer.lines[0].anchors, isNotEmpty);
       c.read(terminalTabsProvider.notifier).close(tab.id);
       await t.pump();
       expect(c.read(findSessionsProvider), isEmpty);

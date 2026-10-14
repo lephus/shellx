@@ -124,7 +124,7 @@ command = Lint = npm run lint
 keybind = super+l=run_command:Lint
 ''',
       );
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       final writes = w.local.views[id]!.writes;
       await chord(tester, [ctrl], LogicalKeyboardKey.keyG);
       expect(writes.join(), 'ls\n');
@@ -176,7 +176,7 @@ keybind = super+l=run_command:Lint
         config:
             'keybind = ctrl+alt+k=new_split:right\nkeybind = ctrl+alt+j=text:J\nkeybind = ctrl+alt+l=ignore\n',
       );
-      final id = w.container.read(terminalTabsProvider).selected!.focused.id;
+      final id = w.container.read(terminalTabsProvider).selected!.focused!.id;
       final writes = w.local.views[id]!.writes;
       await chord(tester, [
         ctrl,

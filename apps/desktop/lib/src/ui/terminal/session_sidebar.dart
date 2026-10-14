@@ -663,8 +663,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     }
   }
 
-  Future<void> _openPort(TerminalTab tab, int port) =>
-      ref.read(remotePortForwardsProvider.notifier).open(tab.focused, port);
+  Future<void> _openPort(TerminalTab tab, int port) async {
+    // V2-1 D2: an AI pane has no ports.
+    final pane = tab.focused;
+    if (pane == null) return;
+    await ref.read(remotePortForwardsProvider.notifier).open(pane, port);
+  }
 
   /// "claude, tab 2 of 3 in Backend": where the tab is after a move.
   String? _whereIs(int id) {
@@ -1623,7 +1627,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             prChipProvider((
               cwd: tab.cwd,
               branch: tab.gitBranch,
-              remote: tab.focused.remote != null,
+              remote: tab.focused?.remote != null,
               visible: tab.id == state.selectedId,
             )),
           );

@@ -73,10 +73,11 @@ extension TerminalTabsConfig on TerminalTabs {
       WorkingDirectoryKind.home => null,
       WorkingDirectoryKind.path => wd.path,
       // A8: a folder on a server means nothing on this computer.
+      // V2-1 §4.7: an AI tab gives its session's folder (its `cwd`).
       WorkingDirectoryKind.inherit =>
-        _state.selected?.focused.remote?.launch.host != null
+        _state.selected?.focused?.remote?.launch.host != null
             ? null
-            : _state.selected?.focused.cwd,
+            : _state.selected?.cwd,
     };
   }
 }

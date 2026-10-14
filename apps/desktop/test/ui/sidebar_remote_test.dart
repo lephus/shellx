@@ -103,7 +103,7 @@ void main() {
     await tester.tap(find.byKey(const Key('menu.ws.newLocalTab')));
     await tester.pumpAndSettle();
     expect(tabs().tabs, hasLength(1));
-    expect(tabs().tabs.single.focused.remote, isNull);
+    expect(tabs().tabs.single.focused!.remote, isNull);
     expect(sidebar().tabsOf(id), [tabs().tabs.single.id]);
   });
 

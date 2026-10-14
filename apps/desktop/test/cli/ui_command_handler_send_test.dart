@@ -54,7 +54,7 @@ void main() {
       final sink = PanePasteSink(
         () => c.read(terminalTabsProvider),
         100,
-        tab.focused.terminal,
+        tab.focused!.terminal,
       );
       final big = 'k' * 400000;
       final first = c.read(pasteSenderProvider).send(100, big, sink);
@@ -68,7 +68,7 @@ void main() {
       final sink = PanePasteSink(
         () => c.read(terminalTabsProvider),
         100,
-        tab.focused.terminal,
+        tab.focused!.terminal,
       );
       final big = 'k' * 400000;
       unawaited(c.read(pasteSenderProvider).send(100, big, sink));
@@ -82,7 +82,7 @@ void main() {
     test('PanePasteSink is not alive for a replaced terminal or an exited '
         'pane', () async {
       final tab = c.read(terminalTabsProvider).selected!;
-      final terminal = tab.focused.terminal;
+      final terminal = tab.focused!.terminal;
       PanePasteSink sink(DesktopTerminal t) =>
           PanePasteSink(() => c.read(terminalTabsProvider), 100, t);
       expect(sink(terminal).alive, isTrue);

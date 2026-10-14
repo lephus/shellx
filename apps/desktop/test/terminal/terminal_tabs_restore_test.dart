@@ -135,8 +135,8 @@ void main() {
     );
     final tab = state().selected!;
     final lines = [
-      for (var i = 0; i < tab.terminal.mainBuffer.lines.length; i++)
-        tab.terminal.mainBuffer.lines[i].getText().trimRight(),
+      for (var i = 0; i < tab.terminal!.mainBuffer.lines.length; i++)
+        tab.terminal!.mainBuffer.lines[i].getText().trimRight(),
     ].where((l) => l.isNotEmpty).toList();
     expect(lines.take(3), [
       'old line',
@@ -734,7 +734,7 @@ void main() {
       );
       expect(id, isNotNull);
       expect(state().selected!.id, id);
-      expect(textOf(state().selected!.focused), contains('solo'));
+      expect(textOf(state().selected!.focused!), contains('solo'));
     });
 
     test('an SSH pane reopens through its launch, on its server', () async {

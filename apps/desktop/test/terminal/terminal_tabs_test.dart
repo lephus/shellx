@@ -21,7 +21,7 @@ void main() {
   TerminalTabs tabs() => container.read(terminalTabsProvider.notifier);
   TerminalTabsState state() => container.read(terminalTabsProvider);
   String text(int id) =>
-      state().tabs.firstWhere((t) => t.id == id).terminal.buffer.getText();
+      state().tabs.firstWhere((t) => t.id == id).terminal!.buffer.getText();
 
   void boot({AppLocalizations? l10n}) {
     container = ProviderContainer.test(
@@ -130,7 +130,7 @@ void main() {
     local.add(local.summary(1));
     boot();
     final terminal = state().tabs.single.terminal;
-    terminal.textInput('ls');
+    terminal!.textInput('ls');
     terminal.write('\x1b[6n');
     expect(local.views[1]!.writes, ['ls']);
     expect(local.views[1]!.replies, hasLength(1));
@@ -145,7 +145,7 @@ void main() {
     final terminal = state().tabs.single.terminal;
     late.complete(Uint8List.fromList(utf8.encode('old\x1b[6n\x1b[c')));
     await pumpEventQueue();
-    expect(terminal.buffer.getText(), contains('old'));
+    expect(terminal!.buffer.getText(), contains('old'));
     expect(local.views[1]!.replies, isEmpty);
     local.views[1]!.emit('new');
     await pumpEventQueue();
@@ -163,7 +163,7 @@ void main() {
     local.views[1]!.replaying = true;
     local.views[1]!.emit('replayed');
     await pumpEventQueue();
-    expect(terminal.buffer.getText(), contains('replayed'));
+    expect(terminal!.buffer.getText(), contains('replayed'));
     expect(seen, isEmpty);
     local.views[1]!.replaying = false;
     local.views[1]!.emit('live');
@@ -187,7 +187,7 @@ void main() {
     await pumpEventQueue();
     local.views[1]!.replaying = false;
     await Future<void>.delayed(const Duration(milliseconds: 60));
-    expect(terminal.buffer.getText(), contains('replayed'));
+    expect(terminal!.buffer.getText(), contains('replayed'));
     expect(seen, [1]);
     expect(local.views[1]!.replies, isEmpty);
     await sub.cancel();
@@ -206,7 +206,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 80));
     expect(seen, isEmpty);
     expect(local.views[1]!.replies, isEmpty);
-    expect(terminal.buffer.getText(), contains('end'));
+    expect(terminal!.buffer.getText(), contains('end'));
     await sub.cancel();
   });
 
@@ -214,7 +214,7 @@ void main() {
     local.add(local.summary(1));
     boot();
     local.views[1]!.resizes.clear();
-    state().tabs.single.terminal.resize(90, 30);
+    state().tabs.single.terminal!.resize(90, 30);
     expect(local.views[1]!.resizes, [(90, 30)]);
   });
 
@@ -229,7 +229,7 @@ void main() {
     }
     // The window grows: every mounted TerminalView lays out again.
     for (final tab in state().tabs) {
-      tab.terminal.resize(100, 30);
+      tab.terminal!.resize(100, 30);
     }
     expect(local.views[1]!.resizes, [(100, 30)]);
     expect(local.views[2]!.resizes, isEmpty);
@@ -247,7 +247,7 @@ void main() {
     local.add(local.summary(2));
     boot();
     for (final tab in state().tabs) {
-      tab.terminal.resize(90, 28);
+      tab.terminal!.resize(90, 28);
     }
     local.views[2]!.resizes.clear();
     tabs().close(1);
@@ -308,10 +308,10 @@ void main() {
       expect(text(2), contains('[Process exited with code 2]'));
       expect(state().selectedId, 1);
 
-      tab.terminal.textInput('x');
+      tab.terminal!.textInput('x');
       expect(state().tabs, hasLength(2));
       expect(local.views[2]!.writes, isEmpty);
-      tab.terminal.textInput('\r');
+      tab.terminal!.textInput('\r');
       expect(state().tabs.map((t) => t.id), [1]);
     });
 
@@ -442,8 +442,8 @@ void main() {
     final first = state().tabs.first.selection;
     final second = state().tabs.last.selection;
     tabs().close(1);
-    expect(_isDisposed(first), isTrue);
-    expect(_isDisposed(second), isFalse);
+    expect(_isDisposed(first!), isTrue);
+    expect(_isDisposed(second!), isFalse);
     container.dispose();
     expect(_isDisposed(second), isTrue);
   });
