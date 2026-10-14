@@ -17,11 +17,15 @@ dependencies:
   # become a temp file. Pinned exactly (native plugins on macOS and
   # Windows): bump with a manual check of both.
   desktop_drop: 0.8.4
+  # V2-1 D17: line diffs for the AI tab (pure Dart).
+  diff_match_patch: 0.4.1
   ffi: ^2.2.0
   # Vendored and patched, see third_party/flutter_pty/SHELLX_PATCHES.md.
   flutter_pty:
     path: ../../third_party/flutter_pty
   flutter_riverpod: ^3.3.2
+  # V2-1 D17: the AI tab's markdown.
+  flutter_markdown_plus: 1.0.12
   flutter_secure_storage: ^10.3.4
   http: ^1.5.0
   # A11 D22: the optional global show/hide shortcut. Pinned exactly (native
@@ -37,6 +41,9 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
+  # V2-1 D17: the AI tab's read-only code view and its highlighting.
+  re_editor: 0.10.0
+  re_highlight: 0.0.3
   # Already in the lock file (window_manager uses it): the display list, so
   # a window saved on a monitor that is gone opens centred (A1 D9).
   screen_retriever: ^0.2.2
