@@ -1460,7 +1460,7 @@
   "aiHistoryUntitled": "Untitled session",
   "aiRunSheetFailed": "Ended with exit code {code}",
   "@aiRunSheetFailed": {"placeholders": {"code": {"type": "int"}}},
-  "aiRunSheetNote": "This is the agent's own program; ShellX does not read or keep what happens here.",
+  "aiRunSheetNote": "This is the agent’s own program; ShellX does not read or keep what happens here.",
   "aiLoginFailed": "Sign-in did not work.",
   "aiJumpToLatest": "Jump to latest",
   "aiShowAllLines": "Show all {count} lines",

@@ -6003,7 +6003,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiRunSheetNote.
   ///
   /// In en, this message translates to:
-  /// **'This is the agent\'s own program; ShellX does not read or keep what happens here.'**
+  /// **'This is the agent’s own program; ShellX does not read or keep what happens here.'**
   String get aiRunSheetNote;
 
   /// No description provided for @aiLoginFailed.

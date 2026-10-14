@@ -59,6 +59,15 @@ void main() {
     expect(en.aiNodeMissing('Codex', 20), 'Codex needs Node.js 20 or newer');
   });
 
+  test('the run sheet note spells its apostrophe like the rest of the file', () {
+    expect(
+      en.aiRunSheetNote,
+      'This is the agent’s own program; ShellX does not read or keep what '
+      'happens here.',
+    );
+    expect(en.aiRunSheetNote, isNot(contains("'")));
+  });
+
   test('feature names say Claude, never Claude Code (D21)', () {
     for (final l in [en, vi]) {
       for (final s in [

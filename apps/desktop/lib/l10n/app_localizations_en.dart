@@ -3815,7 +3815,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiRunSheetNote =>
-      'This is the agent\'s own program; ShellX does not read or keep what happens here.';
+      'This is the agent’s own program; ShellX does not read or keep what happens here.';
 
   @override
   String get aiLoginFailed => 'Sign-in did not work.';
