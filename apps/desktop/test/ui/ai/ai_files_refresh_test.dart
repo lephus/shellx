@@ -41,6 +41,26 @@ final class _GatedFiles implements AiProjectFiles {
   Future<List<String>> index(String root) => inner.index(root);
 }
 
+/// A project whose `lib` listing fails from the second time on.
+final class _FailingFiles implements AiProjectFiles {
+  _FailingFiles(this.inner);
+
+  final FakeProject inner;
+  var _lib = 0;
+
+  @override
+  Future<List<AiDirEntry>> list(String root, String dir) {
+    if (dir == 'lib' && ++_lib > 1) throw StateError('the isolate died');
+    return inner.list(root, dir);
+  }
+
+  @override
+  Future<AiFileContent> read(String path) => inner.read(path);
+
+  @override
+  Future<List<String>> index(String root) => inner.index(root);
+}
+
 /// V2-1 D18, D16: the Files tree and the `@` index look at the project again
 /// when a turn ends — with undo off too — and when a folder opens.
 void main() {
@@ -163,6 +183,22 @@ void main() {
     await t.pumpAndSettle();
     expect(file('lib/a.dart'), findsOneWidget);
     expect(file('lib/b.dart'), findsOneWidget);
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('a listing that fails leaves the rows as they were (no error '
+      'escapes)', (t) async {
+    final project = FakeProject(testAiCwd, {'lib/a.dart': 'one\n'});
+    final c = await pane(t, _FailingFiles(project));
+    await filesTab(t);
+    await t.tap(file('lib'));
+    await t.pumpAndSettle();
+    expect(file('lib/a.dart'), findsOneWidget);
+    await t.tap(file('lib')); // closed
+    await t.pumpAndSettle();
+    await t.tap(file('lib')); // opened again: this listing fails
+    await t.pumpAndSettle();
+    expect(file('lib/a.dart'), findsOneWidget);
     await disposeWorkspace(t, c);
   }, variant: mac);
 
