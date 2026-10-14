@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart' show desktopServicesProvider;
 import '../../ai/ai_open.dart';
+import '../ai/ai_intro.dart';
 import '../../cli/agent_marks.dart';
 import '../../integrations/pr_status.dart';
 import '../../integrations/pr_status_parse.dart' show PrInfo;
@@ -1891,6 +1892,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                 ),
               ),
             ),
+          ),
+          // V2-1 D4: the one-time intro card (nothing when it is not due).
+          FocusTraversalGroup(
+            descendantsAreTraversable: false,
+            child: const AiIntroCard(),
           ),
           // V2-1 D5: "New AI session" at the foot of the sidebar. Not a Tab
           // stop (⌘⇧E is the keyboard's way): Tab keeps going sidebar →

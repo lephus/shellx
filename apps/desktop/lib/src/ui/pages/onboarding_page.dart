@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/desktop_services.dart';
 import '../../platform/url_opener.dart';
+import '../ai/ai_intro.dart';
 import '../dialogs/dialog_layout.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_router.dart';
@@ -75,6 +76,9 @@ class OnboardingPage extends ConsumerWidget {
           l10n.onboardingTrayHint(isMac ? 'macos' : 'windows'),
           style: theme.textTheme.bodySmall,
         ),
+        // V2-1 D4: how new tabs open (`new-tab-kind`).
+        const SizedBox(height: ShellxSpace.s16),
+        const AiOnboardingChoice(),
       ],
       // S-5: pinned, so "Finish" is on screen even at 640×400.
       footer: Align(
@@ -83,6 +87,8 @@ class OnboardingPage extends ConsumerWidget {
           key: const Key('onboarding.finish'),
           // completeOnboarding never throws.
           onPressed: () async {
+            // V2-1 D4: asked here, so the intro card never comes.
+            await ref.read(aiIntroDueProvider.notifier).done();
             await agent.completeOnboarding();
             ref.read(windowRouterProvider.notifier).close();
           },

@@ -487,6 +487,8 @@ final class TestHarness {
   }) : settings = InMemorySettingsStore({
          // A11 D24: the first-run tour is its own tests' business.
          SettingKeys.tourDone: true,
+         // V2-1 D4: so is the AI intro card.
+         SettingKeys.aiIntroShown: true,
          ...?settings,
        }),
        l10n = lookupAppLocalizations(locale);
