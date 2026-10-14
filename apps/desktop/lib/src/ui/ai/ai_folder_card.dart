@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -10,16 +11,22 @@ import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
 
 /// D5 "Choose a project folder" (ruling B7: a typed path, as Settings ›
-/// Projects takes one): absolute, `~` allowed, and it must exist.
+/// Projects takes one): absolute, `~` allowed, and it must exist. Over a
+/// conversation (§6 "folder gone") it can be cancelled — "Cancel" or Esc —
+/// and the conversation is as it was.
 class AiFolderCard extends ConsumerStatefulWidget {
   const AiFolderCard({
     super.key,
     required this.onChosen,
+    this.onCancel,
     this.initial,
     this.focusNode,
   });
 
   final void Function(String folder) onChosen;
+
+  /// Null: there is nothing to go back to (a pane that never had a folder).
+  final VoidCallback? onCancel;
   final String? initial;
   final FocusNode? focusNode;
 
@@ -56,6 +63,28 @@ class _AiFolderCardState extends ConsumerState<AiFolderCard> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final onCancel = widget.onCancel;
+    Widget field = Shortcuts(
+      shortcuts: textEditingShortcuts(),
+      child: TextField(
+        key: const Key('ai.folder.field'),
+        controller: _text,
+        focusNode: widget.focusNode,
+        autofocus: widget.focusNode == null,
+        onSubmitted: (_) => unawaited(_use()),
+        decoration: InputDecoration(
+          labelText: l10n.aiFolderField,
+          hintText: '~/code/project',
+          errorText: _invalid ? l10n.aiFolderInvalid : null,
+        ),
+      ),
+    );
+    if (onCancel != null) {
+      field = CallbackShortcuts(
+        bindings: {const SingleActivator(LogicalKeyboardKey.escape): onCancel},
+        child: field,
+      );
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -79,26 +108,24 @@ class _AiFolderCardState extends ConsumerState<AiFolderCard> {
                 ),
               ),
               const SizedBox(height: ShellxSpace.s16),
-              Shortcuts(
-                shortcuts: textEditingShortcuts(),
-                child: TextField(
-                  key: const Key('ai.folder.field'),
-                  controller: _text,
-                  focusNode: widget.focusNode,
-                  autofocus: widget.focusNode == null,
-                  onSubmitted: (_) => unawaited(_use()),
-                  decoration: InputDecoration(
-                    labelText: l10n.aiFolderField,
-                    hintText: '~/code/project',
-                    errorText: _invalid ? l10n.aiFolderInvalid : null,
-                  ),
-                ),
-              ),
+              field,
               const SizedBox(height: ShellxSpace.s12),
-              FilledButton(
-                key: const Key('ai.folder.use'),
-                onPressed: _checking ? null : () => unawaited(_use()),
-                child: Text(l10n.aiFolderUse),
+              Row(
+                children: [
+                  if (onCancel != null) ...[
+                    TextButton(
+                      key: const Key('ai.folder.cancel'),
+                      onPressed: onCancel,
+                      child: Text(l10n.actionCancel),
+                    ),
+                    const SizedBox(width: ShellxSpace.s8),
+                  ],
+                  FilledButton(
+                    key: const Key('ai.folder.use'),
+                    onPressed: _checking ? null : () => unawaited(_use()),
+                    child: Text(l10n.aiFolderUse),
+                  ),
+                ],
               ),
             ],
           ),

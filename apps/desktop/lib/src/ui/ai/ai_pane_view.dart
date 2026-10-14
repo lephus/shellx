@@ -79,6 +79,11 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   /// the composer ([_forward]).
   final _overlayFocus = FocusNode(debugLabel: 'ai overlay');
   var _overlayUp = false;
+
+  /// The folder field's focus. The card can come over a conversation whose
+  /// composer stays mounted (its text is kept), so the two cannot share one
+  /// node.
+  final _folderInput = FocusNode(debugLabel: 'ai folder');
   AiRuntime? _runtime;
   AiFrameNotifier? _frames;
 
@@ -96,7 +101,10 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   @override
   void initState() {
     super.initState();
-    _ui.onChooseFolder = () => setState(() => _choosing = true);
+    _ui.onChooseFolder = () {
+      setState(() => _choosing = true);
+      _forwardSoon();
+    };
     _ui.onRun = (request) => unawaited(_run(request));
     _ui.fileIndex = _fileIndex;
     _ui.clipboardImage = () => ref.read(clipboardMediaProvider).image();
@@ -138,6 +146,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     _ui.dispose();
     _input.dispose();
     _overlayFocus.dispose();
+    _folderInput.dispose();
     super.dispose();
   }
 
@@ -147,12 +156,29 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     if (widget.focusNode?.hasPrimaryFocus ?? false) _forward();
   }
 
-  /// To the run sheet while it is up (a terminal program needs the keys),
-  /// else to the composer or the folder field.
+  /// To the folder field while the card is up, to the run sheet while it is
+  /// up (a terminal program needs the keys), else to the composer.
   void _forward() {
     final sheet = _overlayFocus;
-    final node = _ui.overlay != null && sheet.context != null ? sheet : _input;
+    final FocusNode node;
+    if (widget.pane.cwd == null || _choosing) {
+      node = _folderInput;
+    } else if (_ui.overlay != null && sheet.context != null) {
+      node = sheet;
+    } else {
+      node = _input;
+    }
     if (node.context != null && node.canRequestFocus) node.requestFocus();
+  }
+
+  /// [_forward] once the frame is built, if this pane holds the window's
+  /// keyboard: not another pane of a split tab, nor a tab out of sight.
+  void _forwardSoon() {
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted && widget.focusNode != null) _forward();
+      })
+      ..ensureVisualUpdate();
   }
 
   /// An overlay went (the run sheet, a viewer): the keyboard was theirs,
@@ -161,14 +187,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     final up = _ui.overlay != null;
     if (up == _overlayUp) return;
     _overlayUp = up;
-    if (up) return;
-    WidgetsBinding.instance
-      ..addPostFrameCallback((_) {
-        // Only the pane that holds the window's keyboard takes it back: not
-        // another pane of a split tab, nor a tab out of sight.
-        if (mounted && widget.focusNode != null) _forward();
-      })
-      ..ensureVisualUpdate();
+    if (!up) _forwardSoon();
   }
 
   void _attachSoon() {
@@ -197,11 +216,21 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             : (AiFrameNotifier(runtime.state)..active = widget.selected);
       });
       old?.dispose();
+      // The composer of the new runtime is built next: it takes the keyboard
+      // the folder card (or the old composer) had.
+      if (runtime != null) _forwardSoon();
     }
     if (runtime != null && widget.selected && !identical(_started, runtime)) {
       _started = runtime;
       unawaited(runtime.start());
     }
+  }
+
+  /// "Cancel" on the folder card of a conversation: back to it, with the
+  /// keyboard in its composer.
+  void _cancelFolder() {
+    setState(() => _choosing = false);
+    _forwardSoon();
   }
 
   /// D5: the folder the user chose. Another folder is another runtime: the
@@ -407,6 +436,15 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     final runtime = _runtime;
     final frames = _frames;
     final needsFolder = pane.cwd == null || _choosing;
+    // D5, §6: the card for a folder to work in. Over a conversation (the
+    // folder is gone) it can be cancelled.
+    final card = AiFolderCard(
+      key: const Key('ai.folder'),
+      initial: pane.cwd,
+      focusNode: _folderInput,
+      onChosen: _useFolder,
+      onCancel: pane.cwd == null ? null : _cancelFolder,
+    );
     final Widget body;
     if (!offered) {
       body = _Message(
@@ -414,17 +452,12 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             ? l10n.aiClaudeOff
             : l10n.aiAgentUnknown,
       );
-    } else if (needsFolder) {
-      body = AiFolderCard(
-        key: const Key('ai.folder'),
-        initial: pane.cwd,
-        focusNode: _input,
-        onChosen: _useFolder,
-      );
     } else if (runtime == null || frames == null) {
-      body = _Message(text: '', resuming: _resuming);
+      body = needsFolder ? card : _Message(text: '', resuming: _resuming);
     } else {
-      body = AiPaneScope(
+      // The conversation stays mounted under the card — out of sight, out of
+      // the keyboard's way — so cancelling it finds the composer as it was.
+      final conversation = AiPaneScope(
         runtime: runtime,
         frames: frames,
         tab: widget.tab,
@@ -445,6 +478,17 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             ),
           ],
         ),
+      );
+      body = Stack(
+        fit: StackFit.expand,
+        children: [
+          Visibility(
+            visible: !needsFolder,
+            maintainState: true,
+            child: conversation,
+          ),
+          if (needsFolder) card,
+        ],
       );
     }
     final tabs = ref.read(terminalTabsProvider.notifier);
