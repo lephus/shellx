@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:shellx_agent/shellx_agent.dart' show SessionOrigin;
 
 import 'pane_layout.dart';
@@ -15,7 +17,9 @@ PaneNode swapLeaves(PaneNode node, int a, int b) {
   if (a == b) return node;
   final ids = paneIds(node);
   if (!ids.contains(a) || !ids.contains(b)) return node;
-  const tmp = -1; // session ids are never negative
+  // A stand-in id that is in no leaf: below the smallest. (Not `-1`: an AI
+  // pane's id, V2-1 D3 — the ids of a tab's leaves may be negative.)
+  final tmp = ids.reduce(min) - 1;
   return replaceLeaf(replaceLeaf(replaceLeaf(node, a, tmp), b, a), tmp, b);
 }
 

@@ -46,6 +46,21 @@ TerminalTab tabWithPanes(List<int> ids) {
 List<int> paneIdsOf(TerminalTab t) => paneIds(t.layout);
 
 void main() {
+  test('swapLeaves works whatever the ids are: the stand-in is in no leaf, '
+      'an AI pane (-1, V2-1 D3) included', () {
+    expect(paneIds(swapLeaves(two(-1, 5), -1, 5)), [5, -1]);
+    expect(paneIds(swapLeaves(two(5, -1), 5, -1)), [-1, 5]);
+    final deeper = PaneSplit(
+      axis: SplitAxis.column,
+      ratio: 0.3,
+      first: two(-2, -1),
+      second: PaneLeaf(7),
+    );
+    expect(paneIds(swapLeaves(deeper, -1, 7)), [-2, 7, -1]);
+    expect(paneIds(swapLeaves(deeper, -2, -1)), [-1, -2, 7]);
+    expect(paneIds(swapLeaves(two(0, 1), 0, 1)), [1, 0]);
+  });
+
   test('swapLeaves exchanges two sessions and nothing else', () {
     final t = PaneSplit(
       axis: SplitAxis.column,
