@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../terminal/local_sessions_provider.dart' show homeDirectoryProvider;
 import 'ai_gitignore.dart';
 import 'ai_off_thread.dart';
+import 'ai_paths.dart' show aiFolderIsBroad;
 
 /// What a file holds, as the AI pane shows it (§4.4).
 sealed class AiFileContent {
@@ -64,15 +66,29 @@ abstract interface class AiProjectFiles {
 
 /// The disk; listings and the index run off the UI isolate.
 final class DiskProjectFiles implements AiProjectFiles {
-  const DiskProjectFiles(this._run);
+  DiskProjectFiles(this._run, {this.home = '', bool? isWindows})
+    : _isWindows = isWindows;
   final OffThread _run;
+
+  /// The user's home folder, to tell a folder too broad to be a project.
+  final String home;
+  final bool? _isWindows;
 
   @override
   Future<List<AiDirEntry>> list(String root, String dir) =>
       _run(aiListDir, (root, dir));
 
+  /// Final review I-1: the home folder, a folder above it and a disk root
+  /// are not walked — a crawl of all of it, with macOS asking for Desktop,
+  /// Documents and Downloads on the way. `@` offers nothing there; the
+  /// Files panel still lists one folder at a time, as the user opens it.
   @override
-  Future<List<String>> index(String root) => _run(aiIndexProject, root);
+  Future<List<String>> index(String root) {
+    if (aiFolderIsBroad(root, home: home, isWindows: _isWindows)) {
+      return Future.value(const <String>[]);
+    }
+    return _run(aiIndexProject, root);
+  }
 
   @override
   Future<AiFileContent> read(String path) async {
@@ -87,5 +103,8 @@ final class DiskProjectFiles implements AiProjectFiles {
 }
 
 final aiProjectFilesProvider = Provider<AiProjectFiles>(
-  (ref) => DiskProjectFiles(ref.read(aiOffThreadProvider)),
+  (ref) => DiskProjectFiles(
+    ref.read(aiOffThreadProvider),
+    home: ref.read(homeDirectoryProvider),
+  ),
 );
