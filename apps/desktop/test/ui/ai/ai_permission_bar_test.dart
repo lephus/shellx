@@ -175,6 +175,36 @@ void main() {
     },
   );
 
+  testWidgets('the agent\'s own words for "always" are as long as it likes: '
+      'they scroll in a box too; the buttons and the composer stay in the '
+      'window', (t) async {
+    final words = [for (var i = 0; i < 40; i++) 'path/$i/**'].join('\n');
+    final (_, runtime) = await asking(
+      t,
+      options: [
+        {'optionId': 'once', 'name': 'Yes', 'kind': 'allow_once'},
+        {
+          'optionId': 'always',
+          'name': 'Yes, and do not ask again for:\n$words',
+          'kind': 'allow_always',
+        },
+        {'optionId': 'reject', 'name': 'No', 'kind': 'reject_once'},
+      ],
+    );
+    expect(
+      t.getRect(find.byKey(const ValueKey('ai.permission.1'))).bottom,
+      lessThanOrEqualTo(700),
+    );
+    expect(
+      t.getRect(find.byKey(const Key('ai.composer'))).bottom,
+      lessThanOrEqualTo(700),
+    );
+    final note = find.byKey(const Key('ai.permission.note'));
+    expect(t.getSize(note).height, lessThanOrEqualTo(80));
+    expect(find.textContaining('path/39/**', findRichText: true), findsWidgets);
+    await runtime.dispose();
+  });
+
   testWidgets('the dock, top to bottom: plan, permission bar, queue, composer '
       '(spec §4.1)', (t) async {
     final (_, runtime) = await asking(t);

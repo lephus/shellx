@@ -187,14 +187,19 @@ class AiPermissionBar extends StatelessWidget {
                 ),
                 if (always != null) ...[
                   const SizedBox(height: ShellxSpace.s6),
-                  Text(
-                    l10n.aiPermAlwaysNote(
-                      aiPermissionLabel(l10n, always),
-                      scope.state.agentName,
-                      always.name,
-                    ),
-                    style: ShellxText.small.copyWith(
-                      color: ShellxDesktopColors.textSecondary,
+                  // The agent's own words: as long as it likes, whole.
+                  AiCapped(
+                    key: const Key('ai.permission.note'),
+                    max: kAiPermissionNoteMax,
+                    child: Text(
+                      l10n.aiPermAlwaysNote(
+                        aiPermissionLabel(l10n, always),
+                        scope.state.agentName,
+                        always.name,
+                      ),
+                      style: ShellxText.small.copyWith(
+                        color: ShellxDesktopColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -210,51 +215,31 @@ class AiPermissionBar extends StatelessWidget {
 /// The tallest the request's first line grows before it scrolls.
 const double kAiPermissionTitleMax = 112;
 
+/// The same for the agent's words for "always".
+const double kAiPermissionNoteMax = 72;
+
 /// The request's first line, read once as a live region of its own (the
 /// words, never the buttons around them). Claude's Bash title is the whole
 /// command — a heredoc may be fifty lines: the line stops at
 /// [kAiPermissionTitleMax] px and scrolls, so the buttons and the composer
 /// never leave the window and the command stays there to read.
-class _Title extends StatefulWidget {
+class _Title extends StatelessWidget {
   const _Title(this.text);
   final String text;
-
-  @override
-  State<_Title> createState() => _TitleState();
-}
-
-class _TitleState extends State<_Title> {
-  final _scroll = ScrollController();
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) => Semantics(
     container: true,
     liveRegion: true,
-    label: widget.text,
+    label: text,
     excludeSemantics: true,
-    child: ConstrainedBox(
+    child: AiCapped(
       key: const Key('ai.permission.title'),
-      constraints: const BoxConstraints(maxHeight: kAiPermissionTitleMax),
-      child: Scrollbar(
-        controller: _scroll,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: _scroll,
-          child: Padding(
-            padding: const EdgeInsets.only(right: ShellxSpace.s8),
-            child: Text(
-              widget.text,
-              style: ShellxText.bodyStrong.copyWith(
-                color: ShellxDesktopColors.textTitle,
-              ),
-            ),
-          ),
+      max: kAiPermissionTitleMax,
+      child: Text(
+        text,
+        style: ShellxText.bodyStrong.copyWith(
+          color: ShellxDesktopColors.textTitle,
         ),
       ),
     ),

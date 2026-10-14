@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart' show Scrollbar;
 import 'package:flutter/widgets.dart';
 import 'package:shellx_acp/shellx_acp.dart' show AuthMethodTerminal;
 import 'package:shellx_ai/host.dart';
@@ -243,6 +244,45 @@ class _AiEverySecondState extends State<AiEverySecond> {
 
   @override
   Widget build(BuildContext context) => widget.builder(context);
+}
+
+/// [child], at most [max] px high; taller, it scrolls (and says so with a
+/// scrollbar). What an agent writes has no length: the dock's buttons and
+/// the composer must stay in the window whatever it says.
+class AiCapped extends StatefulWidget {
+  const AiCapped({super.key, required this.max, required this.child});
+
+  final double max;
+  final Widget child;
+
+  @override
+  State<AiCapped> createState() => _AiCappedState();
+}
+
+class _AiCappedState extends State<AiCapped> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(maxHeight: widget.max),
+    child: Scrollbar(
+      controller: _scroll,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: widget.child,
+        ),
+      ),
+    ),
+  );
 }
 
 /// Smoothness: [builder] runs again only when [select] of the session

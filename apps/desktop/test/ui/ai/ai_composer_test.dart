@@ -388,6 +388,27 @@ void main() {
     await runtime.dispose();
   });
 
+  testWidgets('a long plan, opened, scrolls in a box; the composer stays in '
+      'the window', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    runtime.state.applyUpdate(
+      PlanUpdated([
+        for (var i = 0; i < 40; i++)
+          PlanEntry(content: 'Step $i', status: PlanStatus.pending),
+      ]),
+      DateTime(2026, 10, 14),
+    );
+    await pumpAiPart(t, const AiDock(), runtime: runtime);
+    await t.tap(find.byKey(const Key('ai.plan')));
+    await t.pump();
+    expect(find.text('Step 39'), findsOneWidget, reason: 'all of it is there');
+    expect(
+      t.getRect(find.byKey(const Key('ai.composer'))).bottom,
+      lessThanOrEqualTo(700),
+    );
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('context use and the plan (spec §4.1)', (t) async {
     final fakes = FakeAiRuntimes(const FakeScenario());
     final runtime = partRuntime(fakes);

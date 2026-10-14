@@ -75,6 +75,9 @@ class AiDock extends StatelessWidget {
   }
 }
 
+/// The tallest an open plan grows before it scrolls.
+const double kAiPlanMax = 200;
+
 /// The agent's plan (`plan` updates): one line that folds open.
 class AiPlanBar extends StatefulWidget {
   const AiPlanBar({super.key, required this.entries});
@@ -105,46 +108,55 @@ class _AiPlanBarState extends State<AiPlanBar> {
             label: Text(l10n.aiPlan(done, widget.entries.length)),
           ),
           if (_open)
-            for (final e in widget.entries)
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: ShellxSpace.s12,
-                  bottom: ShellxSpace.s4,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      switch (e.status) {
-                        PlanStatus.completed => Icons.check,
-                        PlanStatus.inProgress => Icons.circle,
-                        PlanStatus.pending => Icons.circle_outlined,
-                      },
-                      size: 12,
-                      color: e.status == PlanStatus.inProgress
-                          ? ShellxDesktopColors.accent
-                          : ShellxDesktopColors.textSecondary,
-                    ),
-                    const SizedBox(width: ShellxSpace.s6),
-                    Expanded(
-                      child: Text(
-                        e.content,
-                        style: ShellxText.small.copyWith(
-                          color: e.status == PlanStatus.completed
-                              ? ShellxDesktopColors.textSecondary
-                              : ShellxDesktopColors.textPrimary,
-                        ),
+            // A plan has no length either: the composer stays in the window.
+            AiCapped(
+              max: kAiPlanMax,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final e in widget.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: ShellxSpace.s12,
+                        bottom: ShellxSpace.s4,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            switch (e.status) {
+                              PlanStatus.completed => Icons.check,
+                              PlanStatus.inProgress => Icons.circle,
+                              PlanStatus.pending => Icons.circle_outlined,
+                            },
+                            size: 12,
+                            color: e.status == PlanStatus.inProgress
+                                ? ShellxDesktopColors.accent
+                                : ShellxDesktopColors.textSecondary,
+                          ),
+                          const SizedBox(width: ShellxSpace.s6),
+                          Expanded(
+                            child: Text(
+                              e.content,
+                              style: ShellxText.small.copyWith(
+                                color: e.status == PlanStatus.completed
+                                    ? ShellxDesktopColors.textSecondary
+                                    : ShellxDesktopColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (e.priority == 'high')
+                            Text(
+                              l10n.aiPlanHigh,
+                              style: ShellxText.caption.copyWith(
+                                color: ShellxDesktopColors.warn,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    if (e.priority == 'high')
-                      Text(
-                        l10n.aiPlanHigh,
-                        style: ShellxText.caption.copyWith(
-                          color: ShellxDesktopColors.warn,
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
+            ),
         ],
       ),
     );
