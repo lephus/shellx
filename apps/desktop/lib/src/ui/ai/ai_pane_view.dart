@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/shellx_ai.dart';
@@ -10,6 +10,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_agents.dart';
 import '../../ai/ai_frame_notifier.dart';
+import '../../ai/ai_host_provider.dart';
 import '../../ai/ai_project_files.dart';
 import '../../ai/ai_runtimes.dart';
 import '../../config/settings_schema.dart' show SettingPage;
@@ -98,8 +99,9 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   var _choosing = false;
 
   /// D14: the pane reopens a session (a restored tab, History): "Resume
-  /// session" shows while it loads.
-  late final bool _resuming = widget.pane.sessionId != null;
+  /// session" shows while it loads. A new folder starts a new session
+  /// ([_useFolder]), and nothing is being resumed then.
+  late bool _resuming = widget.pane.sessionId != null;
 
   @override
   void initState() {
@@ -245,20 +247,28 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   }
 
   /// D5: the folder the user chose. Another folder is another runtime: the
-  /// old one stops; the session id stays (the agent says whether it can
-  /// reopen it there, D14).
+  /// old one stops. Claude keeps a session under its project's folder, so the
+  /// id of the old folder's session opens nothing in another one, and a load
+  /// that fails there would leave the tab stuck (final review I-6): a new
+  /// folder starts a new session. The same folder (it came back) reopens its
+  /// own, as the agent says it can (D14).
   void _useFolder(String folder) {
     final old = _frames;
+    final same = folder == widget.pane.cwd;
     setState(() {
       _choosing = false;
       _runtime = null;
       _frames = null;
+      if (!same) _resuming = false;
     });
     old?.dispose();
     ref.read(aiRuntimesProvider.notifier).forget(widget.pane.id);
     ref
         .read(terminalTabsProvider.notifier)
-        .updateAiPane(widget.pane.id, (p) => p.copyWith(cwd: folder));
+        .updateAiPane(
+          widget.pane.id,
+          (p) => p.copyWith(cwd: folder, sessionId: same ? p.sessionId : null),
+        );
     _attachSoon();
   }
 
@@ -393,6 +403,18 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     }
   }
 
+  /// I-4: "Restart agent" looks at the login shell's environment again, as
+  /// Settings › Agents does, so a Node, git or agent installed since ShellX
+  /// started is found (the environment is otherwise kept for the whole run).
+  void _forgetLoginEnvironment() {
+    try {
+      ref.read(aiHostProvider).env.invalidate();
+    } on Object {
+      // No AI host (a window of a test of something else): the agent
+      // restarts all the same.
+    }
+  }
+
   Future<void> _more(Offset at) async {
     final l10n = AppLocalizations.of(context);
     final runtime = _runtime;
@@ -427,7 +449,10 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             .read(configUiRequestProvider.notifier)
             .request(ConfigUiRequest.settings);
       case _More.restart:
-        if (runtime != null) unawaited(runtime.restart());
+        if (runtime != null) {
+          _forgetLoginEnvironment();
+          unawaited(runtime.restart());
+        }
       case _More.log:
         if (runtime != null) unawaited(showAiLogDialog(context, runtime));
       case null:
@@ -576,11 +601,74 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
 }
 
 /// The conversation, the dock under it, and what lies over it.
-class _Conversation extends StatelessWidget {
+///
+/// Keys 1–9 and Esc answer the waiting question wherever the keyboard is in
+/// the conversation (final review M-2). The composer takes them first, as
+/// before ([AiDock.keyHook]); but a click on the agent's words (a
+/// `SelectionArea`) or on the user's message (a `SelectableText`) moves the
+/// keyboard there, to read or copy, and the composer's handler no longer
+/// hears it. So the column listens too, for the keys that reach it: from
+/// anywhere in it except a field the user is typing in, and never from what
+/// lies over it (the run sheet's terminal, a viewer) or from another pane or
+/// a dialog, which are not in it.
+///
+/// A click on the blank space of the column is "inside" the composer's field
+/// as well (like the dock and the cards): on macOS and Windows a click
+/// outside a field takes its focus.
+class _Conversation extends StatefulWidget {
   const _Conversation({required this.input, required this.resuming});
 
   final FocusNode input;
   final bool resuming;
+
+  @override
+  State<_Conversation> createState() => _ConversationState();
+}
+
+class _ConversationState extends State<_Conversation> {
+  /// The Esc or digit key taken on key-down, until it is let go: its repeats
+  /// are taken too (as the composer does), so a held key answers one
+  /// question, not the next as well.
+  LogicalKeyboardKey? _held;
+
+  /// Whether the keyboard is in a field the user types into (the composer, a
+  /// question's text field): its keys are its own. A read-only text (the
+  /// user's message, a log) is no field.
+  static bool _typing() {
+    final focus = FocusManager.instance.primaryFocus?.context;
+    if (focus == null) return false;
+    final widget = focus.widget;
+    final field = widget is EditableText
+        ? widget
+        : focus.findAncestorWidgetOfExactType<EditableText>();
+    return field != null && !field.readOnly;
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (event is KeyUpEvent) {
+      if (key == _held) _held = null;
+      return KeyEventResult.ignored;
+    }
+    if (event is KeyRepeatEvent && key == _held) return KeyEventResult.handled;
+    // A press by the user, never one the system made up (a key held while
+    // the window came back), and only while a question waits.
+    if (event is! KeyDownEvent || event.synthesized) {
+      return KeyEventResult.ignored;
+    }
+    _held = null;
+    final scope = context.getInheritedWidgetOfExactType<AiPaneScope>();
+    if (scope == null || scope.state.currentPermission == null || _typing()) {
+      return KeyEventResult.ignored;
+    }
+    // Not typing: a draft in the composer does not keep the digits from the
+    // question.
+    if (!aiPermissionKeys(scope.runtime, event, hasText: false)) {
+      return KeyEventResult.ignored;
+    }
+    _held = key;
+    return KeyEventResult.handled;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -589,24 +677,37 @@ class _Conversation extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Expanded(child: AiTimeline()),
-              AiDock(
-                focusNode: input,
-                permissionBar: const AiPermissionBar(),
-                keyHook: (event, {required hasText}) =>
-                    aiPermissionKeys(runtime, event, hasText: hasText),
+          child: TapRegion(
+            groupId: EditableText,
+            behavior: HitTestBehavior.opaque,
+            child: Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onKeyEvent: _onKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Expanded(child: AiTimeline()),
+                  AiDock(
+                    focusNode: widget.input,
+                    permissionBar: const AiPermissionBar(),
+                    keyHook: (event, {required hasText}) =>
+                        aiPermissionKeys(runtime, event, hasText: hasText),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-        if (resuming)
+        if (widget.resuming)
+          // M-3: until the session has loaded; after that a stopped or
+          // restarting agent is no loading, and the conversation stays.
           AiSelect<bool>(
             frames: scope.frames,
             select: (s) =>
-                s.phase == AgentPhase.stopped || s.phase == AgentPhase.starting,
+                s.sessionId == null &&
+                (s.phase == AgentPhase.stopped ||
+                    s.phase == AgentPhase.starting),
             builder: (context, loading) =>
                 loading ? const _ResumeCard() : const SizedBox.shrink(),
           ),
