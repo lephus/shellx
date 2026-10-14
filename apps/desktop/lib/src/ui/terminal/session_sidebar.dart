@@ -225,7 +225,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _RowItem(:final tab, :final notified, :final editingDescription) =>
       SessionTabRow.heightFor(
         scaler,
-        context: tab.hasContext,
+        context: SessionTabRow.hasContextLine(tab),
         notification: notified,
         description: tab.meta.description.isNotEmpty,
         editingDescription: editingDescription,

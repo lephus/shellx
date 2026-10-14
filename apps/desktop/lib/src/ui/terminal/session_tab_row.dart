@@ -160,6 +160,11 @@ class SessionTabRow extends StatefulWidget {
   final void Function(String text)? onDescription;
   final VoidCallback? onCancelDescription;
 
+  /// V2-1 §4.7: an AI tab always has its second line (state · agent), a
+  /// terminal tab when its pane has context. The row draws by this and the
+  /// sidebar sums [heightFor] by it: the two must not differ.
+  static bool hasContextLine(TerminalTab tab) => tab.isAi || tab.hasContext;
+
   /// UI-A1 §1.3, UI-A2 §1.3, UI-A4 §1.3: the title line, then an optional
   /// notification line and an optional context line, each 14·s plus a
   /// 2 px gap: max(30, 18·s + 12); one extra line max(46, 18·s + 14·s +
@@ -363,8 +368,7 @@ class SessionTabRowState extends State<SessionTabRow> {
     final tab = widget.tab;
     final renaming = widget.renaming;
     final scaler = MediaQuery.textScalerOf(context);
-    // V2-1 §4.7: an AI tab always has its second line (state · agent).
-    final withContext = tab.isAi || tab.hasContext;
+    final withContext = SessionTabRow.hasContextLine(tab);
     final editingDescription = widget.editingDescription;
     final description = cleanDescription(tab.meta);
     final withDescription = description.isNotEmpty || editingDescription;
