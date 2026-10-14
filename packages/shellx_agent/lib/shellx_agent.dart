@@ -2,6 +2,7 @@
 library;
 
 export 'src/ai/ai_endpoint.dart';
+export 'src/ai/ai_phone_hub.dart';
 export 'src/context/cwd_url.dart';
 export 'src/context/git_head.dart';
 export 'src/context/listening_ports.dart';

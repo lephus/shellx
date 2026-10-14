@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../ai/ai_phone_hub.dart';
 import 'command_tracker.dart';
 import 'notification_sender.dart';
 import 'notification_text.dart';
@@ -50,6 +51,42 @@ final class AgentNotifications {
   /// A phone opened a channel to this agent or paired: lifts the sender's
   /// pause after an unheard notification ([NotificationSender.resume]).
   void phoneConnected() => sender.resume();
+
+  /// V2-2 D11: an AI session needs the user, or finished a long turn
+  /// (title `<machine> · <agent>`). The phone opens that session from
+  /// `ai_session`; an older phone opens the machine. Never throws.
+  void aiNotice(AiPush push) {
+    try {
+      NotificationText text;
+      try {
+        text = NotificationText(config.locale());
+      } catch (_) {
+        text = NotificationText('en');
+      }
+      String machine;
+      try {
+        machine = config.machineName();
+      } catch (_) {
+        machine = '';
+      }
+      final body = switch (push.kind) {
+        AiPushKind.needsInput => text.aiNeedsInput(push.detail),
+        AiPushKind.done => text.aiDone(
+          push.turn ?? 0,
+          push.elapsed ?? Duration.zero,
+        ),
+      };
+      sender.send(
+        AgentNotification(
+          title: text.title(machine, push.agentName),
+          body: body,
+          data: {'kind': 'ai', 'ai_session': push.sid},
+        ),
+      );
+    } catch (_) {
+      // A notification must never break anything.
+    }
+  }
 
   /// A ShellX session (title `<machine> · Phiên <index>`).
   SessionNotifier forShell({required int sessionId, required int index}) =>
