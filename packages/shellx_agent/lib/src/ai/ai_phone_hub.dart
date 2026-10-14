@@ -930,9 +930,10 @@ final class AiPhoneHub implements AiEndpoint {
 
   /// The snapshot of a session that cannot run: its header says why, without
   /// items. The names are the tab's and the folder's, cut like a listing's.
-  /// Its `seq` goes on from what the phone was sent of the session. With no
-  /// reason (the window made no runtime) it is just not started, as the
-  /// listing says. The phone then waits for a runtime ([_Phone.parked]).
+  /// Its `seq` goes on from what the phone was sent of the session. The
+  /// phone then waits for a runtime ([_Phone.parked], with the reason the
+  /// entry gave: none when the window made no runtime, which the header
+  /// still words as "no folder" so that the phone offers no composer).
   void _sendUnavailable(
     String mobileId,
     _Phone phone,
@@ -960,7 +961,7 @@ final class AiPhoneHub implements AiEndpoint {
             'name': clipText(entry.agentName, 200),
             'title': clipText(entry.title, 400),
             'cwd': ?(cwd == null ? null : clipText(cwd, 600)),
-            'unavailable': ?entry.unavailable?.wire,
+            'unavailable': (entry.unavailable ?? AiRemoteState.noFolder).wire,
           },
           'items': const <Object?>[],
         }),

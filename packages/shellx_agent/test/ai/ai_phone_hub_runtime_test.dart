@@ -178,15 +178,19 @@ void main() {
       expect(rig.source.started, [-2, -2]);
     });
 
-    test('a window that cannot make the runtime: the phone is told the '
-        'session is not started, not the reason that went, and only once', () {
+    test('a window that cannot make the runtime: the attach runs again '
+        'once, and its answer is what a plain attach gets', () {
       final rig = HubRig()..source.add(-1);
       rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
       rig.source.forget(-1, unavailable: AiRemoteState.agentOff);
+      final before = rig.to(phone).whereType<AiSnapshot>().length;
       rig.source.forget(-1); // no reason now, and no runtime will come
-      final head = rig.mirror(phone, 'ep.-1').head!;
-      expect((head.unavailable, head.phase), (null, 'stopped'));
-      final sent = rig.sent.length;
+      final snapshots = rig.to(phone).whereType<AiSnapshot>().toList();
+      expect(snapshots, hasLength(before + 1));
+      // Still no composer: the session cannot run (as an attach to such a
+      // tab is told).
+      expect(rig.mirror(phone, 'ep.-1').head!.unavailable, isNotNull);
+      final sent = rig.to(phone).length;
       rig.source.add(-5); // another change: the attach is not run again
       expect(rig.to(phone).length, sent);
     });
