@@ -5,13 +5,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../config/config_controller.dart' show shellxConfigProvider;
+import '../../config/shellx_config.dart' show NewTabKind;
 import '../../remote/ssh_actions.dart';
 import '../window_router.dart';
 import 'shellx_menu.dart';
 import 'shortcut_labels.dart';
+import 'terminal_intents.dart';
 import 'terminal_overlays.dart';
 
-enum _NewAction { tab, ssh, tmux }
+enum _NewAction { tab, ai, terminal, ssh, tmux }
 
 /// The sidebar header's `+` (A8 UI §5.2): a click is "New tab" (A1: in an
 /// SSH workspace, an SSH tab); right click, Shift+F10 and the Menu key open
@@ -30,6 +33,8 @@ class SidebarNewButton extends ConsumerWidget {
 
   Future<void> _menu(BuildContext context, WidgetRef ref, Offset at) async {
     final l10n = AppLocalizations.of(context);
+    final ai =
+        ref.read(shellxConfigProvider).config.newTabKind == NewTabKind.ai;
     final choice = await showShellxMenu<_NewAction>(
       context: context,
       at: at,
@@ -40,6 +45,19 @@ class SidebarNewButton extends ConsumerWidget {
           label: l10n.terminalNewTab,
           shortcut: newTabShortcutLabel(),
         ),
+        // V2-1 D5: an AI session; a terminal tab while "a new tab" is one.
+        ShellxMenuEntry(
+          key: const Key('menu.new.ai'),
+          value: _NewAction.ai,
+          label: l10n.aiNewSession,
+          shortcut: newAiSessionShortcutLabel(),
+        ),
+        if (ai)
+          ShellxMenuEntry(
+            key: const Key('menu.new.terminal'),
+            value: _NewAction.terminal,
+            label: l10n.actionNewTerminalTab,
+          ),
         ShellxMenuEntry(
           key: const Key('menu.new.ssh'),
           value: _NewAction.ssh,
@@ -58,6 +76,14 @@ class SidebarNewButton extends ConsumerWidget {
     switch (choice) {
       case _NewAction.tab:
         unawaited(ref.read(sshActionsProvider).newTab());
+      case _NewAction.ai:
+        if (context.mounted) {
+          Actions.maybeInvoke(context, const NewAiSessionIntent());
+        }
+      case _NewAction.terminal:
+        if (context.mounted) {
+          Actions.maybeInvoke(context, const NewTerminalTabIntent());
+        }
       case _NewAction.ssh:
         router.open(const SshConnectRoute());
       case _NewAction.tmux:

@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/agent_controller.dart';
 import '../../agent/agent_state.dart';
+import '../../ai/ai_open.dart';
 import '../../config/config_controller.dart';
 import '../../config/keybindings.dart';
 import '../../mux/daemon_state.dart' show daemonStateProvider;
@@ -329,6 +330,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       NewTabIntent: run<NewTabIntent>((_) {
         closePanel();
         unawaited(ref.read(sshActionsProvider).newTab());
+        focusTerminal();
+      }),
+      // V2-1 D5: ⌘⇧E, the sidebar's button, the `+` menu, the palette.
+      NewAiSessionIntent: run<NewAiSessionIntent>((_) {
+        closePanel();
+        ref.read(aiOpenerProvider).newSession();
+        focusTerminal();
+      }),
+      // V2-1 D5: a terminal tab, whatever `new-tab-kind` says.
+      NewTerminalTabIntent: run<NewTerminalTabIntent>((_) {
+        closePanel();
+        unawaited(
+          workspaces.openTabIn(ref.read(sidebarWorkspacesProvider).currentId),
+        );
         focusTerminal();
       }),
       CloseTabIntent: run<CloseTabIntent>((_) {

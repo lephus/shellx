@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart' show desktopServicesProvider;
+import '../../ai/ai_open.dart';
 import '../../cli/agent_marks.dart';
 import '../../integrations/pr_status.dart';
 import '../../integrations/pr_status_parse.dart' show PrInfo;
@@ -1121,7 +1122,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final workspaces = ref.read(sidebarWorkspacesProvider.notifier);
     switch (choice) {
       case _HeaderAction.newTab:
-        await workspaces.openTabIn(w.id);
+        await ref.read(aiOpenerProvider).newTabIn(w.id);
       case _HeaderAction.rename:
         _startWorkspaceRename(w.id, fromList: fromList);
       case _HeaderAction.toggle:
@@ -1485,8 +1486,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       icon: Icons.settings_outlined,
       semanticLabel: l10n.settingsTitle,
       tooltip: shortcutTooltip(l10n.settingsTooltip, settingsShortcutLabel()),
-      onPressed: () =>
-          Actions.maybeInvoke(context, const OpenSettingsIntent()),
+      onPressed: () => Actions.maybeInvoke(context, const OpenSettingsIntent()),
     );
     // macOS: both centred on the traffic-light line y = 14 (UI §2.1).
     final buttonTop = EdgeInsets.only(
@@ -1561,7 +1561,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               onStartRename: () => _startWorkspaceRename(w.id, fromList: false),
               onRename: (text) => _commitWorkspaceName(w.id, text),
               onCancelRename: () => _endRename(RenameWorkspace(w.id)),
-              onNewTab: () => unawaited(workspaces.openTabIn(w.id)),
+              onNewTab: () =>
+                  unawaited(ref.read(aiOpenerProvider).newTabIn(w.id)),
               onMenu: (at) => unawaited(_headerMenu(w, at)),
               onDelete: () => workspaces.delete(w.id),
             ),
@@ -1887,6 +1888,37 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                         ),
                     ],
                   ),
+                ),
+              ),
+            ),
+          ),
+          // V2-1 D5: "New AI session" at the foot of the sidebar. Not a Tab
+          // stop (⌘⇧E is the keyboard's way): Tab keeps going sidebar →
+          // strip → terminal.
+          FocusTraversalGroup(
+            descendantsAreTraversable: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ShellxSpace.s8,
+                ShellxSpace.s4,
+                ShellxSpace.s8,
+                ShellxSpace.s8,
+              ),
+              child: Tooltip(
+                message: switch (newAiSessionShortcutLabel()) {
+                  final shortcut? => l10n.aiNewSessionTooltip(shortcut),
+                  null => l10n.aiNewSession,
+                },
+                child: TextButton.icon(
+                  key: const Key('sidebar.newAi'),
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    foregroundColor: ShellxDesktopColors.textSecondary,
+                  ),
+                  onPressed: () =>
+                      Actions.maybeInvoke(context, const NewAiSessionIntent()),
+                  icon: const Icon(Icons.auto_awesome, size: 14),
+                  label: Text(l10n.aiNewSession),
                 ),
               ),
             ),

@@ -11,6 +11,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:xterm/xterm.dart';
 
 import '../agent/desktop_services.dart' show clockProvider;
+import '../ai/ai_open.dart' show aiOpenerProvider;
 import '../ai/ai_pane_state.dart';
 import '../cli/cli_install.dart' show LoginPathHint;
 import '../config/config_controller.dart' show shellxConfigProvider;
@@ -872,7 +873,11 @@ class TerminalTabs extends Notifier<TerminalTabsState> {
       await restoring.future;
       if (!ref.mounted) return;
     }
-    if (state.tabs.isEmpty && !state.opening) await openTab();
+    if (state.tabs.isEmpty && !state.opening) {
+      // V2-1 D5: an AI session when `new-tab-kind = ai`.
+      if (_ref.read(aiOpenerProvider).firstTab()) return;
+      await openTab();
+    }
   }
 
   void select(int id) {
