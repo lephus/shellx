@@ -26,6 +26,12 @@ final class PushMessage {
   /// The session (tab) it is about, when it names one.
   int? get sessionId => int.tryParse(data['session_id'] ?? '');
 
+  /// V2-2 D11: the AI session it is about (`kind: ai`), when it names one.
+  String? get aiSession {
+    final sid = data['ai_session'];
+    return sid == null || sid.isEmpty ? null : sid;
+  }
+
   /// Never the title or body: they carry command lines (push spec §9).
   @override
   String toString() => 'PushMessage(agentId: $agentId, sessionId: $sessionId)';

@@ -77,6 +77,19 @@ class FakeMachineNavigator implements MachineNavigator {
     shown.add((agentId, machineName));
     showing = agentId;
   }
+
+  /// V2-2: the AI session on top, as `agentId/sid`.
+  String? showingAi;
+  final List<(String, String, String)> shownAi = [];
+
+  @override
+  bool isShowingAi(String agentId, String sid) => showingAi == '$agentId/$sid';
+
+  @override
+  void showAi(String agentId, String machineName, String sid) {
+    shownAi.add((agentId, machineName, sid));
+    showingAi = '$agentId/$sid';
+  }
 }
 
 /// Records what [NotificationOpener.open] was given.

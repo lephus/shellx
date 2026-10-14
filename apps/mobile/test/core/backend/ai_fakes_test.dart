@@ -226,6 +226,25 @@ void main() {
       expect(ai.watchCalls, 1);
     });
 
+    test('watch() and unwatch() are counted, and the list is watched in between (like MachineAi)', () async {
+      final ai = FakeAiMachine();
+      expect(ai.watching, isFalse);
+      ai.unwatch(); // nothing is watched yet: nothing happens, but the call is recorded
+      expect((ai.watchCalls, ai.unwatchCalls, ai.watching), (0, 1, false));
+
+      await ai.watch();
+      expect((ai.watchCalls, ai.unwatchCalls, ai.watching), (1, 1, true));
+      ai.unwatch();
+      ai.unwatch(); // again: the same
+      expect((ai.watchCalls, ai.unwatchCalls, ai.watching), (1, 3, false));
+
+      // A machine that cannot be reached is still watched, for when it can be: the real watch() asks
+      // for the list on every new channel from its first call on.
+      ai.connectFailure = MachineConnectionFailure.agentOffline;
+      await expectLater(ai.watch(), throwsA(isA<MachineConnectionException>()));
+      expect((ai.watchCalls, ai.watching), (2, true));
+    });
+
     test('failWith makes requests fail with that code, and a failed request is recorded too', () async {
       final ai = FakeAiMachine()..failWith = 'stale';
       await expectLater(ai.prompt('s1', 'again'), throwsRequest('stale'));

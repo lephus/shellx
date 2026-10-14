@@ -8,11 +8,14 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/core/router/auth_guard.dart';
 import 'package:shellx_mobile/core/router/update_guard.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
+import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/app/app.dart';
 import 'package:shellx_mobile/features/app/font_licenses.dart';
 import 'package:shellx_mobile/features/app/launch.dart';
@@ -77,17 +80,23 @@ void main() {
   late PushController push;
   late DateTime clock;
 
+  /// Runs on every backend the factory makes: what a test needs the computer to hold already.
+  void Function(FakeBackend backend)? onNewBackend;
+
   setUp(() async {
+    onNewBackend = null;
     SharedPreferences.setMockInitialValues({});
     // AdaptiveTheme (the base's theme switcher) reads its mode through SharedPreferencesAsync.
     SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
     relay = FakeRelayHttp();
     store = _Keychain();
-    backends = FakeBackendFactory(
-      () => FakeBackend(devices: [agentDevice(agentA, 'MacBook-Pro')], pinnedList: [pinned(agentA)])
+    backends = FakeBackendFactory(() {
+      final backend = FakeBackend(devices: [agentDevice(agentA, 'MacBook-Pro')], pinnedList: [pinned(agentA)])
         ..onlineIds.add(agentA)
-        ..addMachine(agentA),
-    );
+        ..addMachine(agentA);
+      onNewBackend?.call(backend);
+      return backend;
+    });
     biometrics = FakeBiometricAuthenticator();
     popups = FakePopupHandler();
     links = FakeExternalLinks();
@@ -144,6 +153,9 @@ void main() {
       ..registerFactory<MachineListController>(() => MachineListController.create(session, registry, push, settings))
       ..registerFactoryParam<TerminalPageController, String, void>(
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
+      )
+      ..registerFactoryParam<AiSessionController, String, String>(
+        (agentId, sid) => AiSessionController(agentId, sid, session),
       )
       ..registerFactory<VoiceComposerController>(() => VoiceComposerController(FakeSpeechInput(), settings))
       ..registerFactory<QrScannerController>(() => QrScannerController(session))
@@ -257,6 +269,201 @@ void main() {
     messaging.initial = const PushMessage(data: {'agent_id': agentA, 'session_id': '5'});
     await launch(tester);
     expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+  });
+
+  group('push: an AI session (V2-2 D11)', () {
+    PushMessage aiPush(String sid, {String agentId = agentA}) => PushMessage(
+      title: 'MacBook-Pro · Claude',
+      body: 'Cần bạn trả lời: Sửa src/main.ts',
+      data: {'agent_id': agentId, 'kind': 'ai', 'ai_session': sid},
+    );
+
+    PermissionRequest permission() => PermissionRequest.fromJson({
+      'sessionId': 's',
+      'toolCall': {'toolCallId': 'c1', 'title': 'Edit src/main.ts', 'kind': 'edit'},
+      'options': [
+        {'optionId': 'allow', 'name': 'Yes', 'kind': 'allow_once'},
+        {'optionId': 'reject', 'name': 'No', 'kind': 'reject_once'},
+      ],
+    });
+
+    /// The computer holds [sid] (idle, so the page has nothing that ticks or spins) before the phone asks.
+    void computerHolds(String sid, {bool waiting = false, String agentId = agentA}) {
+      final previous = onNewBackend;
+      onNewBackend = (backend) {
+        previous?.call(backend);
+        final ai = backend.machines[agentId]!.ai.session(sid);
+        if (waiting) {
+          ai.desktop
+            ..beginTurn(const [TextBlock('Sửa')], DateTime.now())
+            ..addPermission(permission(), DateTime.now());
+        }
+        ai.sync();
+      };
+    }
+
+    String? topSid() => (router.topRoute.args as AiSessionRouteArgs?)?.sid;
+
+    /// Frames for [time], 100 ms apart (what `pumpAndSettle` does until there is nothing left to draw).
+    Future<void> pumpFor(WidgetTester tester, Duration time) async {
+      for (var passed = Duration.zero; passed < time; passed += const Duration(milliseconds: 100)) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    FakeAiMachine ai() => backends.backends.single.machines[agentA]!.ai;
+
+    testWidgets('opens that session over the machine list; the same push again opens no second page', (tester) async {
+      computerHolds('e.-1');
+      computerHolds('e.-2');
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(aiPush('e.-1'));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+      expect(topSid(), 'e.-1');
+      expect((router.topRoute.args as AiSessionRouteArgs).machineName, 'MacBook-Pro');
+      expect(find.byKey(const Key('ai.composer.bar')), findsOneWidget);
+
+      messaging.opened.add(aiPush('e.-1'));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+
+      // Another session of the same machine takes the place of the first: still one page.
+      messaging.opened.add(aiPush('e.-2'));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+      expect(topSid(), 'e.-2');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a session that no longer exists shows as closed on the computer; back is the machine list', (
+      tester,
+    ) async {
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(aiPush('e.-9'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+
+      ai().session('e.-9').close('gone'); // what the computer answers an attach to a session it does not hold
+      await tester.pumpAndSettle();
+      final strip = find.byKey(const Key('ai.closed'));
+      expect(strip, findsOneWidget);
+      expect(
+        find.descendant(of: strip, matching: find.text(AiWords.closed(S.of(tester.element(strip)), 'gone'))),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('ai.composer.bar')), findsNothing, reason: 'nothing to write to');
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const Key('ai.back')));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name]);
+    });
+
+    for (final reason in ['desktop_closed', 'unavailable']) {
+      testWidgets('the computer closed the session ($reason) or cannot serve it now: the strip says so', (
+        tester,
+      ) async {
+        computerHolds('e.-1');
+        await launch(tester);
+        await signIn(tester);
+        messaging.opened.add(aiPush('e.-1'));
+        await tester.pumpAndSettle();
+        ai().session('e.-1').close(reason);
+        await tester.pumpAndSettle();
+        final strip = find.byKey(const Key('ai.closed'));
+        expect(strip, findsOneWidget);
+        expect(
+          find.descendant(of: strip, matching: find.text(AiWords.closed(S.of(tester.element(strip)), reason))),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the notification that launched the app opens its session', (tester) async {
+      await AuthStorageImpl(store).save(
+        const AccountSession(userId: testUserId, deviceId: testDeviceId, token: 'saved', email: 'me@example.com'),
+      );
+      computerHolds('e.-1');
+      messaging.initial = aiPush('e.-1');
+      await launch(tester);
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+      expect(topSid(), 'e.-1');
+    });
+
+    testWidgets('opening it answers nothing: the request waits for a tap, however long it takes', (tester) async {
+      computerHolds('e.-1', waiting: true);
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(aiPush('e.-1'));
+      await pumpFor(tester, const Duration(seconds: 1)); // a running turn ticks: nothing settles
+      expect(find.byKey(const Key('ai.permission')), findsOneWidget);
+
+      await pumpFor(tester, const Duration(seconds: 10));
+      await tester.pump(const Duration(minutes: 5));
+      expect(find.byKey(const Key('ai.permission')), findsOneWidget);
+      final machineAi = ai();
+      expect(machineAi.permissionAnswers, isEmpty);
+      expect(machineAi.askAnswers, isEmpty);
+      expect(machineAi.prompts, isEmpty);
+      expect(machineAi.cancels, isEmpty);
+      expect(machineAi.forceStops, isEmpty);
+      expect(machineAi.opened, isEmpty);
+    });
+
+    testWidgets('a push of a terminal session while an AI session is open goes to that machine\'s terminal', (
+      tester,
+    ) async {
+      computerHolds('e.-1');
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(aiPush('e.-1'));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+
+      messaging.opened.add(const PushMessage(title: 'MacBook-Pro · Phiên 1', data: {'agent_id': agentA}));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+    });
+
+    testWidgets('the same session id on another machine is another session: it opens, in the place of the first', (
+      tester,
+    ) async {
+      onNewBackend = (backend) {
+        backend.pinnedList.add(pinned(agentB));
+        backend.deviceList.add(agentDevice(agentB, 'Mac-mini'));
+        backend.addMachine(agentB);
+      };
+      computerHolds('e.-1');
+      computerHolds('e.-1', agentId: agentB);
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(aiPush('e.-1'));
+      await tester.pumpAndSettle();
+      expect((router.topRoute.args as AiSessionRouteArgs).agentId, agentA);
+
+      messaging.opened.add(aiPush('e.-1', agentId: agentB));
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name, AiSessionRoute.name]);
+      final top = router.topRoute.args as AiSessionRouteArgs;
+      expect((top.agentId, top.sid, top.machineName), (agentB, 'e.-1', 'Mac-mini'));
+    });
+
+    testWidgets('an AI push of a machine that is not paired on this phone opens nothing', (
+      tester,
+    ) async {
+      await launch(tester);
+      await signIn(tester);
+      messaging.opened.add(
+        PushMessage(data: {'agent_id': agentB, 'kind': 'ai', 'ai_session': 'e.-1'}),
+      );
+      await tester.pumpAndSettle();
+      expect(stack(), [MachineListRoute.name]);
+    });
   });
 
   testWidgets('push: a message in the foreground shows the in-app banner (spec §6)', (tester) async {

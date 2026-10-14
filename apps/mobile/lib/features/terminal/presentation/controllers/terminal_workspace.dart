@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -10,12 +11,20 @@ import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.da
 /// What the session picker offers (terminal sharing §9.1): the sessions not open as tabs yet, and
 /// the agent's `desktop_sharing` for the hint shown when there is no desktop terminal.
 final class SessionListing {
-  const SessionListing(this.sessions, {required this.desktopSharing});
+  const SessionListing(this.sessions, {required this.desktopSharing, this.aiSupported, this.ai});
 
   final List<SessionInfo> sessions;
 
   /// Null: an agent older than terminal sharing ("Cập nhật ShellX trên máy tính…").
   final bool? desktopSharing;
+
+  /// V2-2: whether the computer has AI sessions for phones (false: "Cập nhật ShellX trên máy
+  /// tính để dùng phiên AI…"); null when unknown.
+  final bool? aiSupported;
+
+  /// V2-2: the computer's AI sessions, agents and folders; null when not supported or not
+  /// received yet.
+  final AiListing? ai;
 
   /// "Terminal trên máy tính".
   List<SessionInfo> get desktop => [
@@ -29,8 +38,9 @@ final class SessionListing {
       if (session.kind != SessionKind.desktop) session,
   ];
 
-  /// Nothing to pick: `+` opens a new session at once.
-  bool get isEmpty => sessions.isEmpty;
+  /// Nothing to pick: `+` opens a new session at once. A computer with AI for phones always
+  /// offers the picker ("Phiên AI mới").
+  bool get isEmpty => sessions.isEmpty && aiSupported != true;
 }
 
 /// The tabs of one machine. Outlives its page so terminals keep receiving
@@ -181,17 +191,106 @@ class TerminalWorkspace extends Controller {
     return pickable();
   }
 
+  /// How long the picker waits for the first AI listing.
+  static const Duration aiListingWait = Duration(seconds: 3);
+
   /// Terminal sharing §9.1, for `+`: lists the machine's sessions (desktop terminals included)
   /// again, leaving out those already open as tabs.
   Future<SessionListing> pickable() async {
     await ensureConnected();
     final sessions = await machine.listSessions();
     _listedSessions = true;
+    final ai = await _pickableAiListing();
+    // After the wait for the AI listing: a session attached meanwhile is a tab by now.
     final open = {for (final tab in _tabs.peek()) tab.id};
-    return SessionListing([
-      for (final session in sessions)
-        if (!open.contains(session.id)) session,
-    ], desktopSharing: machine.desktopSharing);
+    return SessionListing(
+      [
+        for (final session in sessions)
+          if (!open.contains(session.id)) session,
+      ],
+      desktopSharing: machine.desktopSharing,
+      aiSupported: machine.ai.supported,
+      ai: ai,
+    );
+  }
+
+  // V2-2: the computer's AI sessions. The list is watched while a page shows it (or the picker is being
+  // made), and not otherwise: every relay or presence event would make a handshake with every machine
+  // ever watched.
+  int _aiHolders = 0;
+  bool _aiWatching = false;
+
+  /// What the client holds of the listing predates the last [AiMachine.unwatch]: the computer's changes
+  /// do not reach a channel that did not ask for them. Cleared by the first listing that arrives once
+  /// the list is watched again.
+  bool _aiStale = false;
+  StreamSubscription<AiListing>? _aiFeed;
+
+  /// The computer's AI listing as far as it can be trusted: null when none came yet, or none since the
+  /// list was last watched (the client still holds the old one then).
+  AiListing? get aiListing => _aiStale ? null : machine.ai.listing;
+
+  /// A page shows the computer's AI sessions (the ✦ button, the picker): the list is watched from now
+  /// on, once the computer is known to have AI for phones, until the returned function is called. The
+  /// client's watch is one switch, not a count, so the holders are counted here: the last to let go
+  /// stops it, and a page that is left never stops the watch of one that took its place. Letting go
+  /// twice is letting go once.
+  void Function() holdAiListing() {
+    _aiHolders++;
+    _syncAiWatch();
+    var held = true;
+    return () {
+      if (!held) return;
+      held = false;
+      _aiHolders--;
+      _syncAiWatch();
+    };
+  }
+
+  /// Watches while somebody holds the list and the computer has AI; stops when nobody does.
+  void _syncAiWatch() {
+    final ai = machine.ai;
+    final want = !_disposed && _aiHolders > 0 && ai.supported == true;
+    if (want == _aiWatching) return;
+    _aiWatching = want;
+    if (want) {
+      _aiFeed = ai.listings.listen((_) => _aiStale = false);
+      // A machine that cannot be reached now is asked again on its next channel.
+      unawaited(ai.watch().catchError((Object _) {}));
+    } else {
+      unawaited(_aiFeed?.cancel());
+      _aiFeed = null;
+      _aiStale = true;
+      ai.unwatch();
+    }
+  }
+
+  /// The listing for the picker: null when the computer has no AI for phones, or did not answer within
+  /// [aiListingWait]. The list is watched meanwhile, and let go again afterwards unless a page holds it.
+  Future<AiListing?> _pickableAiListing() async {
+    if (_disposed || machine.ai.supported != true) return null;
+    final release = holdAiListing();
+    try {
+      return aiListing ?? await _nextAiListing();
+    } finally {
+      release();
+    }
+  }
+
+  /// The next listing the computer sends; null once [aiListingWait] has passed, or when the machine is
+  /// dropped. Neither the timer nor the subscription outlives the wait.
+  Future<AiListing?> _nextAiListing() {
+    final next = Completer<AiListing?>();
+    void finish(AiListing? listing) {
+      if (!next.isCompleted) next.complete(listing);
+    }
+
+    final timer = Timer(aiListingWait, () => finish(null));
+    final heard = machine.ai.listings.listen(finish, onDone: () => finish(null));
+    return next.future.whenComplete(() {
+      timer.cancel();
+      unawaited(heard.cancel());
+    });
   }
 
   /// Spec §12: `spawn_failed` shows its reason inside a tab, so it becomes a
@@ -302,6 +401,7 @@ class TerminalWorkspace extends Controller {
 
   void dispose() {
     _disposed = true;
+    _syncAiWatch();
     clearPendingSelect();
     for (final tab in _tabs.peek()) {
       tab.dispose();

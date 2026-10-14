@@ -1,5 +1,7 @@
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/machines/presentation/last_seen.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/shared/shared.dart';
@@ -15,6 +17,17 @@ final class AttachSession extends SessionChoice {
 
 final class OpenNewSession extends SessionChoice {
   const OpenNewSession();
+}
+
+/// V2-2: open an AI session of the computer.
+final class OpenAiSession extends SessionChoice {
+  const OpenAiSession(this.session);
+  final AiSessionInfo session;
+}
+
+/// V2-2: "Phiên AI mới".
+final class NewAiSession extends SessionChoice {
+  const NewAiSession();
 }
 
 /// Terminal sharing §9.1: the main line of a desktop terminal, "app — title"; a missing part
@@ -73,9 +86,18 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(strings.pickerTitle(listing.sessions.length), style: context.typo.heading20.heavy),
+              Text(
+                strings.pickerTitle(listing.sessions.length + (listing.ai?.sessions.length ?? 0)),
+                style: context.typo.heading20.heavy,
+              ),
               6.sizedHeight,
               Text(strings.pickerSubtitle, style: context.typo.subHeader15.copyWith(color: colors.secondaryText)),
+              if (listing.aiSupported != null) ...[
+                14.sizedHeight,
+                _GroupHeader(strings.aiGroup),
+                8.sizedHeight,
+                _Group(children: _aiRows(context, listing)),
+              ],
               14.sizedHeight,
               _GroupHeader(strings.pickerDesktopGroup),
               8.sizedHeight,
@@ -123,6 +145,102 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
       );
     },
   );
+}
+
+/// V2-2 §5.1: the AI sessions first (they wait for the user more often than terminals do),
+/// then "Phiên AI mới"; a hint instead when the computer cannot serve them.
+List<Widget> _aiRows(BuildContext context, SessionListing listing) {
+  final s = S.of(context);
+  final ai = listing.ai;
+  if (listing.aiSupported != true) return [_Hint(key: const ValueKey('picker-ai-hint'), text: s.aiUpdateDesktop)];
+  if (ai == null || !ai.available) return [_Hint(key: const ValueKey('picker-ai-hint'), text: s.aiUnavailable)];
+  final canStart = ai.agents.any((a) => a.ready) && ai.folders.isNotEmpty;
+  return [
+    for (final session in ai.sessions) _AiRow(session: session),
+    if (canStart)
+      InkWell(
+        key: const ValueKey('picker-ai-new'),
+        onTap: () => Navigator.pop(context, const NewAiSession()),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.add, size: 20, color: context.colors.link),
+              10.sizedWidth,
+              Text(s.aiNewSession, style: context.typo.subHeader15.bold.copyWith(color: context.colors.link)),
+            ],
+          ),
+        ),
+      )
+    else
+      _Hint(
+        key: const ValueKey('picker-ai-hint'),
+        text: ai.agents.any((a) => a.ready) ? s.aiNewNoFolders : s.aiNewNoAgents,
+      ),
+  ];
+}
+
+/// One AI session: "Nút đăng xuất" / "Claude · Cần bạn trả lời" / what it waits for.
+class _AiRow extends StatelessWidget {
+  const _AiRow({required this.session});
+
+  final AiSessionInfo session;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final colors = context.colors;
+    final waiting = session.state == AiRemoteState.needsInput;
+    return InkWell(
+      key: ValueKey('picker-ai-${session.sid}'),
+      onTap: () => Navigator.pop(context, OpenAiSession(session)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Icon(Icons.auto_awesome, size: 20, color: waiting ? colors.warn : colors.secondaryText),
+              ),
+              10.sizedWidth,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.title.isEmpty ? s.aiUntitled : session.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.subHeader15.bold.copyWith(color: colors.primaryText),
+                    ),
+                    2.sizedHeight,
+                    Text(
+                      s.aiRowSubtitle(session.agentName, AiWords.state(s, session.state)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.paragraph13.bold.copyWith(
+                        color: waiting ? colors.warn : colors.secondaryText,
+                      ),
+                    ),
+                    if (waiting && session.waiting != null)
+                      Text(
+                        session.waiting!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.typo.paragraph13.copyWith(color: colors.secondaryText),
+                      ),
+                  ],
+                ),
+              ),
+              10.sizedWidth,
+              Text(s.pickerOpen, style: context.typo.subHeader15.bold.copyWith(color: colors.link)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Design `.list-h`.

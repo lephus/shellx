@@ -432,6 +432,19 @@ class FakeAiMachine implements AiMachine {
   String openedSid = 'e.-9';
   int watchCalls = 0;
 
+  /// Every [unwatch], the ones that found nothing watched included.
+  int unwatchCalls = 0;
+
+  /// The list is wanted: set by [watch] (also when the machine cannot be reached: the real one asks
+  /// for the list on every new channel from its first call on), cleared by [unwatch].
+  bool watching = false;
+
+  /// Somebody still listens to [listings]: what a screen that is gone must not leave behind.
+  bool get hasListingListener => _listings.hasListener;
+
+  /// The machine is dropped (unpaired, signed out): its listings end, as `MachineAi.dispose` ends them.
+  Future<void> endListings() => _listings.close();
+
   /// Requests wait for this when set (an answer still travelling).
   Completer<void>? gate;
 
@@ -465,8 +478,15 @@ class FakeAiMachine implements AiMachine {
   @override
   Future<void> watch() async {
     watchCalls++;
+    watching = true;
     final failure = connectFailure;
     if (failure != null) throw MachineConnectionException(failure);
+  }
+
+  @override
+  void unwatch() {
+    unwatchCalls++;
+    watching = false;
   }
 
   @override

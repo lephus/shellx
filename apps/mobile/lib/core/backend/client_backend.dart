@@ -270,6 +270,9 @@ final class _AiMachineAdapter implements AiMachine {
   Future<void> watch() => _ai.watch();
 
   @override
+  void unwatch() => _ai.unwatch();
+
+  @override
   AiSessionHandle attach(String sid) {
     final link = _ai.attach(sid);
     _links.removeWhere((key, _) => key.state == AiLinkState.closed && !identical(key, link));

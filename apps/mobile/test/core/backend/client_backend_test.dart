@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -214,6 +215,53 @@ void main() {
     },
   );
 
+  group('watching the AI list', () {
+    /// What the machine does when the relay comes back, after the list was watched while the relay was
+    /// down (and, with [unwatch], not watched any more): the handshakes it starts, and the frames it
+    /// sends to the relay for them.
+    Future<({int handshakes, int frames})> whenTheRelayReturns({required bool unwatch}) async {
+      await pin(agentA, publicKey: (await NoiseKeyPair.generate()).publicKey);
+      final relayUp = Completer<RelaySocket>();
+      final backend = await ClientBackend.start(
+        relayBaseUri: Uri.parse('http://127.0.0.1:8787'),
+        api: api,
+        userId: 'user-1',
+        deviceId: phoneId,
+        identity: await NoiseKeyPair.generate(),
+        store: store,
+        appVersion: '1.0.0',
+        device: const DeviceDescription(name: 'iPhone 15', platform: DevicePlatform.ios),
+        connector: (uri, headers) => relayUp.future,
+      );
+      addTearDown(backend.dispose);
+      final machine = backend.machine(agentA);
+      final handshakes = <MachineConnectionState>[];
+      machine.states.listen((state) {
+        if (state is MachineConnecting) handshakes.add(state);
+      });
+
+      // The relay is not up: watching can only fail, but the list is wanted from now on.
+      await expectLater(machine.ai.watch(), throwsA(isA<MachineConnectionException>()));
+      handshakes.clear();
+      if (unwatch) machine.ai.unwatch();
+      final relay = _QuietSocket();
+      relayUp.complete(relay);
+      await pumpEventQueue();
+      return (handshakes: handshakes.length, frames: relay.sent.length);
+    }
+
+    test('a watched list brings the machine back when the relay returns', () async {
+      final back = await whenTheRelayReturns(unwatch: false);
+      expect(back.handshakes, 1);
+      expect(back.frames, greaterThan(0), reason: 'the handshake goes out over the relay');
+    });
+
+    test('unwatch() goes through the adapter: nobody wants the channel for the list any more', () async {
+      final back = await whenTheRelayReturns(unwatch: true);
+      expect((back.handshakes, back.frames), (0, 0));
+    });
+  });
+
   test('an untrusted machine is forgotten: machine() throws, the pin is gone', () async {
     // A pin that cannot be used is treated as untrusted by shellx_client, like an HS2 `untrusted`.
     await pin(agentB, publicKey: Uint8List(31));
@@ -248,4 +296,25 @@ void main() {
     expect(deletes, hasLength(2));
     expect(deletes.last.url.path, '/v1/pairings/$agentA/$phoneId');
   });
+}
+
+/// A relay connection that says nothing and counts the frames the phone sends (the relay is "up").
+final class _QuietSocket implements RelaySocket {
+  final StreamController<Object> _messages = StreamController<Object>();
+  final List<Uint8List> sent = [];
+
+  @override
+  Stream<Object> get messages => _messages.stream;
+
+  @override
+  void sendText(String text) {}
+
+  @override
+  void sendBytes(Uint8List bytes) => sent.add(bytes);
+
+  @override
+  Future<void> close([int? code, String? reason]) => _messages.close();
+
+  @override
+  int? get closeCode => null;
 }

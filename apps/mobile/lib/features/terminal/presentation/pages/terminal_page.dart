@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_new_session_sheet.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
 import 'package:shellx_mobile/features/terminal/domain/terminal_links.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
@@ -190,9 +192,32 @@ class _TerminalPageState extends State<TerminalPage> {
         await _controller.attach(session, _grid);
       case OpenNewSession():
         await _controller.openNew(_grid);
+      case OpenAiSession(:final session):
+        await _openAi(session.sid);
+      case NewAiSession():
+        final ai = listing.ai;
+        if (ai == null) return;
+        final choice = await showAiNewSessionSheet(context, ai);
+        if (choice == null || !mounted || _controller.closing.peek()) return;
+        final opened = await _controller.openAi(choice.agent, choice.folder);
+        if (!mounted) return;
+        final sid = opened.sid;
+        if (sid != null) {
+          await _openAi(sid);
+        } else if (opened.code case final code?) {
+          final text = AiWords.failure(S.of(context), code);
+          if (text != null) _controller.popupHandler.showError(title: text);
+        }
       case null:
         break;
     }
+  }
+
+  /// V2-2: the AI session over this page; the terminal tabs are not looked at meanwhile.
+  Future<void> _openAi(String sid) async {
+    _controller.setViewing(false);
+    await context.router.push(AiSessionRoute(agentId: widget.agentId, machineName: widget.machineName, sid: sid));
+    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) _controller.setViewing(true);
   }
 
   /// A live ShellX session asks first (closing it stops its programs). A desktop terminal never asks:
@@ -413,6 +438,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _AiButton(controller: _controller, onPressed: _onAdd),
                       _ViewAsTextButton(onPressed: _showViewAsText),
                       _FontSizeButton(onPressed: _showFontSize),
                       IconButton(
@@ -431,6 +457,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          _AiButton(controller: _controller, onPressed: _onAdd),
                           _ViewAsTextButton(onPressed: _showViewAsText),
                           _FontSizeButton(onPressed: _showFontSize),
                         ],
@@ -599,6 +626,35 @@ class _ChromeBar extends StatelessWidget {
     _ when ready => (strings.terminalConnected, context.colors.okDot),
     _ => (strings.terminalConnecting, TerminalColors.yellow),
   };
+}
+
+/// V2-2 §5.1: the computer's AI sessions (the picker, AI group first), with how many wait for
+/// the user. Only when the computer has AI for phones and a window serves it, in portrait and in
+/// landscape; like `+`, not while a request of the page is on its way.
+class _AiButton extends StatelessWidget {
+  const _AiButton({required this.controller, required this.onPressed});
+
+  final TerminalPageController controller;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Watch((context) {
+    final listing = controller.aiListing.value;
+    if (listing == null || !listing.available) return const SizedBox.shrink();
+    final waiting = listing.needsInput;
+    return IconButton(
+      key: const ValueKey('terminal-ai'),
+      tooltip: S.of(context).aiChromeTooltip,
+      onPressed: controller.canOpen.value ? onPressed : null,
+      icon: Badge(
+        isLabelVisible: waiting > 0,
+        label: Text('$waiting'),
+        backgroundColor: TerminalColors.yellow,
+        textColor: TerminalColors.background,
+        child: const Icon(Icons.auto_awesome, color: TerminalColors.cyan),
+      ),
+    );
+  });
 }
 
 /// A10 D28: opens "View as text" for the active tab.

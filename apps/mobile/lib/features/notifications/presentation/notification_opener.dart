@@ -15,6 +15,12 @@ abstract interface class MachineNavigator {
   /// for the machine list to appear; it does nothing when it never does (signed out, an outdated
   /// app).
   void show(String agentId, String machineName);
+
+  /// V2-2: AI session [sid] of [agentId] is the top page.
+  bool isShowingAi(String agentId, String sid);
+
+  /// V2-2: back to the machine list, then AI session [sid] of the machine (like [show]).
+  void showAi(String agentId, String machineName, String sid);
 }
 
 @LazySingleton(as: MachineNavigator)
@@ -34,9 +40,24 @@ final class RouterMachineNavigator implements MachineNavigator {
   static const Duration _firstPageWait = Duration(seconds: 5);
 
   @override
-  void show(String agentId, String machineName) {
+  bool isShowingAi(String agentId, String sid) {
+    final top = _router.topRoute;
+    final args = top.args;
+    return top.name == AiSessionRoute.name && args is AiSessionRouteArgs && args.agentId == agentId && args.sid == sid;
+  }
+
+  @override
+  void showAi(String agentId, String machineName, String sid) =>
+      _whenListed(() => _push(AiSessionRoute(agentId: agentId, machineName: machineName, sid: sid)));
+
+  @override
+  void show(String agentId, String machineName) =>
+      _whenListed(() => _push(TerminalRoute(agentId: agentId, machineName: machineName)));
+
+  /// Runs [go] once the machine list is on the stack (at launch it may still be resolving).
+  void _whenListed(void Function() go) {
     if (_hasMachineList) {
-      _go(agentId, machineName);
+      go();
       return;
     }
     // A notification that launched the app arrives while the first page may still be resolving.
@@ -51,7 +72,7 @@ final class RouterMachineNavigator implements MachineNavigator {
       if (!_hasMachineList) return;
       stop();
       // Not from inside the router's own notification.
-      scheduleMicrotask(() => _go(agentId, machineName));
+      scheduleMicrotask(go);
     };
     _router.addListener(listener);
     timer = Timer(_firstPageWait, stop);
@@ -59,16 +80,18 @@ final class RouterMachineNavigator implements MachineNavigator {
 
   bool get _hasMachineList => _router.stack.any((route) => route.name == MachineListRoute.name);
 
-  void _go(String agentId, String machineName) {
+  void _push(PageRouteInfo route) {
     _router.popUntilRouteWithName(MachineListRoute.name);
     // Completes when the page pops: not awaited.
-    unawaited(_router.push(TerminalRoute(agentId: agentId, machineName: machineName)));
+    unawaited(_router.push(route));
   }
 }
 
 /// A tapped notification (push spec §6): opens the machine `agent_id`, and switches to the tab of
-/// `session_id` when that tab is open, or as soon as it opens (within 30 s). A machine that is not paired on
-/// this phone (another account's, or unpaired since) and a signed-out app open nothing.
+/// `session_id` when that tab is open, or as soon as it opens (within 30 s). A push with `ai_session` (V2-2 D11)
+/// opens that AI session instead, over the machine list, and never twice: one already on top is left as it
+/// is. Opening only shows; it answers nothing. A machine that is not paired on this phone (another account's,
+/// or unpaired since) and a signed-out app open nothing.
 @lazySingleton
 class NotificationOpener {
   NotificationOpener(this._session, this._registry, this._navigator);
@@ -89,6 +112,17 @@ class NotificationOpener {
       final pinned = await backend.pinnedMachines();
       if (!pinned.any((machine) => machine.agentId == agentId)) return;
       if (!identical(_session.backend.peek(), backend)) return;
+      // V2-2 D11: an AI session's push opens that session, over the machine list.
+      final aiSession = message.aiSession;
+      if (aiSession != null) {
+        if (_navigator.isShowingAi(agentId, aiSession)) return;
+        final name = await _machineName(backend, agentId, message);
+        if (!identical(_session.backend.peek(), backend)) return;
+        // The same push may have opened it while the machine was being named.
+        if (_navigator.isShowingAi(agentId, aiSession)) return;
+        _navigator.showAi(agentId, name, aiSession);
+        return;
+      }
       final sessionId = message.sessionId;
       // Selects now when the tab is open; else when it appears (the phone may still be reconnecting).
       if (sessionId != null) _registry.forMachine(agentId).pendingSelect(sessionId);

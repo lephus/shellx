@@ -156,9 +156,21 @@ abstract interface class AiMachine {
   AiListing? get listing;
   Stream<AiListing> get listings;
 
-  /// Keeps [listing] current while the app is connected. There is no way to stop it: from the first
-  /// call on, a lost channel is brought back even with no terminal tab open.
+  /// Keeps [listing] current while the app is connected: asks now (connecting first when there is no
+  /// channel) and again on every new channel, and a lost channel is brought back even with no terminal
+  /// tab open, until [unwatch]. It is one switch, not a count: whoever shares the list between screens
+  /// counts them.
   Future<void> watch();
+
+  /// The inverse of [watch], for the screen that watched when it goes away or stops showing the machine.
+  /// Nobody wants the list any more, so a lost channel is not brought back for it and a new channel does
+  /// not ask for it (an open session still wants the channel); otherwise every relay or presence event
+  /// would make a handshake with every machine ever watched. It does nothing when nothing is watched.
+  ///
+  /// The computer keeps sending the changes of the list until the channel ends (it cannot be asked to
+  /// stop) and they are still read; but a new channel does not carry them, so [listing] is only as
+  /// current as the last time the list was watched.
+  void unwatch();
   AiSessionHandle attach(String sid);
   Future<void> prompt(String sid, String text);
   Future<void> answerPermission(String sid, int permission, String option);

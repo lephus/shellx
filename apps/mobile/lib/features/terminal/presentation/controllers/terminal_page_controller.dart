@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
@@ -70,6 +71,13 @@ class TerminalPageController extends Controller {
     );
     _machineState = signal(workspace.machine.state);
     _machineStates = workspace.machine.states.listen(_onMachineState);
+    // V2-2: the AI sessions for the chrome's badge. The list is watched while this page exists; the
+    // listing of an earlier visit is not shown (the workspace says when it can be trusted).
+    _releaseAiListing = workspace.holdAiListing();
+    _aiListing.value = workspace.aiListing;
+    _aiListings = workspace.machine.ai.listings.listen((l) {
+      if (!_closed) _aiListing.value = l;
+    });
   }
 
   static const Duration noticeDuration = Duration(seconds: 4);
@@ -91,6 +99,9 @@ class TerminalPageController extends Controller {
   late final Signal<MachineConnectionState> _machineState;
   late final Signal<RelayConnectionState> _relayState;
   StreamSubscription<MachineConnectionState>? _machineStates;
+  StreamSubscription<AiListing>? _aiListings;
+  void Function()? _releaseAiListing;
+  final Signal<AiListing?> _aiListing = signal(null);
   StreamSubscription<RelayConnectionState>? _relayStates;
   late final void Function() _stopSessionWatch;
   late final Computed<bool> _canOpen = computed(() => !_busy.value);
@@ -151,6 +162,26 @@ class TerminalPageController extends Controller {
   /// The page is leaving (untrusted, proto_unsupported, not pinned, signed out) and must not
   /// read [workspace] any more: it may already be disposed.
   ReadonlySignal<bool> get closing => _closing;
+
+  /// V2-2: the computer's AI sessions; null until listed (or without AI for phones).
+  ReadonlySignal<AiListing?> get aiListing => _aiListing;
+
+  /// V2-2 "Phiên AI mới": the new session's id, else the computer's refusal code (shown by the
+  /// page); a connection failure becomes the notice like any request (both null).
+  Future<({String? sid, String? code})> openAi(String agent, String folder) async {
+    if (_closed) return (sid: null, code: null);
+    _setBusy(++_running);
+    try {
+      return (sid: await workspace.machine.ai.open(agent, folder), code: null);
+    } on AiRequestException catch (e) {
+      return (sid: null, code: e.code);
+    } catch (error) {
+      await _handleFailure(error);
+      return (sid: null, code: null);
+    } finally {
+      _setBusy(--_running);
+    }
+  }
 
   /// For the status line under the machine name.
   ReadonlySignal<MachineConnectionState> get machineState => _machineState;
@@ -355,6 +386,10 @@ class TerminalPageController extends Controller {
     // Cancelling takes effect at once; the futures only report cleanup (never awaited: fake_async).
     unawaited(_machineStates?.cancel());
     unawaited(_relayStates?.cancel());
+    unawaited(_aiListings?.cancel());
+    // The workspace outlives the page: the list stops being watched with the last page that shows it.
+    _releaseAiListing?.call();
+    _aiListing.dispose();
     _canOpen.dispose();
     _fontSize.dispose();
     _busy.dispose();
