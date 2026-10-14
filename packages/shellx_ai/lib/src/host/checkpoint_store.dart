@@ -6,9 +6,11 @@ import 'package:path/path.dart' as p;
 import 'package:shellx_acp/shellx_acp.dart' show Redacted;
 
 import '../model/changes.dart';
+import 'broad_folder.dart';
 import 'git_locator.dart';
 import 'git_runner.dart';
 import 'login_shell_env.dart';
+import 'probe.dart' show envValue;
 import 'serial_queue.dart';
 
 /// Files bigger than this are not checkpointed (ruling R4).
@@ -83,6 +85,12 @@ final class CheckpointStore with Redacted implements Checkpoints {
   }
 
   static const _offRetry = Duration(days: 7);
+
+  /// The reasons undo stays off across runs. `failed` is not one of them: a
+  /// locked file, a stale lock or a moment of full disk on the first snapshot
+  /// is not a fact about the project, and writing it down would switch undo
+  /// off for a week (V2-1 final review M-8). It holds for this run only.
+  static const _remembered = {UndoOff.tooManyFiles, UndoOff.tooSlow};
   static const _excludeHeader =
       '# Managed by ShellX: nested repositories and files over 50 MiB are not checkpointed.\n';
 
@@ -312,6 +320,17 @@ final class CheckpointStore with Redacted implements Checkpoints {
     }
   });
 
+  /// Deletes this project's repository and forgets what the store knew of it
+  /// ("Delete all restore points"). One queued operation, like every other:
+  /// a snapshot that is running finishes first, and the next one starts the
+  /// repository again. Throws when the folder cannot be deleted.
+  Future<void> deleteRepository() => _serial(() async {
+    final dir = Directory(gitDir);
+    if (dir.existsSync()) await dir.delete(recursive: true);
+    // The note that undo was off was in the folder that is gone.
+    _off = null;
+  });
+
   Future<bool> _hasCheckpoints() async {
     if (!File(p.join(gitDir, 'HEAD')).existsSync()) return false;
     return (await _git.text([
@@ -450,7 +469,10 @@ final class CheckpointStore with Redacted implements Checkpoints {
           .where((o) => o.name == j['off'])
           .firstOrNull;
       final at = j['offAt'];
-      if (reason == null || at is! int) return null;
+      // A `failed` that an earlier version wrote down is not believed either.
+      if (reason == null || !_remembered.contains(reason) || at is! int) {
+        return null;
+      }
       final since = _now().difference(DateTime.fromMillisecondsSinceEpoch(at));
       return since > _offRetry ? null : reason;
     } on Object {
@@ -460,7 +482,7 @@ final class CheckpointStore with Redacted implements Checkpoints {
 
   void _setOff(UndoOff reason) {
     _off = reason;
-    _writeMeta(off: reason);
+    if (_remembered.contains(reason)) _writeMeta(off: reason);
   }
 
   void _writeMeta({UndoOff? off}) {
@@ -585,14 +607,20 @@ final class CheckpointStores with Redacted {
     }
   }
 
-  /// The store for [project], or why undo is off on this machine.
+  /// The store for [project], or why undo is off for it.
+  ///
+  /// A folder that is no project (the home folder, a folder above it, a disk
+  /// root: [isBroadFolder]) gets none, and nothing is asked of git for it: the
+  /// first snapshot would crawl all of it while the first message waits (V2-1
+  /// final review I-1).
   Future<(CheckpointStore?, UndoOff?)> forProject(
     String project,
     LoginEnv env,
   ) async {
+    final real = _real(project);
+    if (_isBroad(project, real, env)) return (null, UndoOff.broadFolder);
     final (git, off) = await _locate(env);
     if (git == null) return (null, off);
-    final real = _real(project);
     final id = projectId(real, isWindows: _isWindows);
     return (
       _stores.putIfAbsent(
@@ -633,12 +661,66 @@ final class CheckpointStores with Redacted {
     }
   }
 
-  /// "Xoá điểm khôi phục" in Settings. No turn may be running, and none may
-  /// start before this is done.
+  /// "Xoá điểm khôi phục" in Settings: every project's repository goes.
+  ///
+  /// The stores stay: a tab holds its store, and a second one for the same
+  /// project would have a queue of its own on the same git directory (V2-1
+  /// final review M-7). Each store deletes its own repository through its own
+  /// queue, so a snapshot that is running finishes first and the next one
+  /// starts a fresh repository. What is left under [root] and no store holds
+  /// goes after. Everything is tried; the first failure is thrown at the end.
   Future<void> deleteAll() async {
-    _stores.clear();
+    Object? failure;
+    StackTrace? trace;
+    void failed(Object error, StackTrace stack) {
+      failure ??= error;
+      trace ??= stack;
+    }
+
+    await Future.wait([
+      for (final store in [..._stores.values])
+        store.deleteRepository().then<void>((_) {}, onError: failed),
+    ]);
     final dir = Directory(root);
-    if (dir.existsSync()) await dir.delete(recursive: true);
+    try {
+      if (dir.existsSync()) {
+        for (final entry in dir.listSync(followLinks: false)) {
+          // A store made meanwhile (a tab opened during the delete) is held.
+          if (_holds(entry.path)) continue;
+          try {
+            await entry.delete(recursive: true);
+          } on FileSystemException catch (error, stack) {
+            failed(error, stack);
+          }
+        }
+        // The folder itself, once nothing is in it; a snapshot that already
+        // started a repository again keeps it.
+        try {
+          await dir.delete();
+        } on FileSystemException {
+          // Not empty, or gone.
+        }
+      }
+    } on FileSystemException catch (error, stack) {
+      failed(error, stack);
+    }
+    final error = failure;
+    if (error != null) Error.throwWithStackTrace(error, trace!);
+  }
+
+  bool _holds(String path) =>
+      _stores.values.any((s) => p.equals(s.gitDir, path));
+
+  /// Whether [project] — as given, and as it really is, so that a link to the
+  /// home folder is the home folder — is a folder that is no project.
+  bool _isBroad(String project, String real, LoginEnv env) {
+    final home = envValue(env.vars, _isWindows ? 'USERPROFILE' : 'HOME');
+    if (isBroadFolder(project, home: home, isWindows: _isWindows)) return true;
+    return isBroadFolder(
+      real,
+      home: home == null || home.isEmpty ? null : _real(home),
+      isWindows: _isWindows,
+    );
   }
 
   static String? _projectOf(Directory repo) {

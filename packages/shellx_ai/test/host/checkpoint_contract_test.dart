@@ -1266,7 +1266,7 @@ void main() {
     });
 
     test(
-      'deleteAll removes every repository; the next forProject starts clean',
+      'deleteAll removes every repository; the store a tab holds starts clean',
       () async {
         gp.put('a.txt', 'a');
         final s = stores();
@@ -1275,7 +1275,11 @@ void main() {
         await s.deleteAll();
         expect(Directory(root).existsSync(), isFalse);
         final (second, _) = await s.forProject(gp.project, env);
-        expect(identical(first, second), isFalse);
+        expect(
+          identical(first, second),
+          isTrue,
+          reason: 'one store, one queue, a project (final review M-7)',
+        );
         expect(await second!.snapshot('s/1'), isNotNull);
       },
     );

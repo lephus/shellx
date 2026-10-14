@@ -35,7 +35,14 @@ enum UndoOff {
   noGit,
   noCommandLineTools,
   gitTooOld,
+
+  /// The folder is the home folder, a folder above it or a disk root: a
+  /// snapshot would crawl all of it, so there is none (V2-1 final review I-1).
+  broadFolder,
   tooManyFiles,
   tooSlow,
+
+  /// The first snapshot failed (a locked file, a full disk, a git that would
+  /// not start). Held for the run it happened in only.
   failed,
 }
