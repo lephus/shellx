@@ -2969,4 +2969,773 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get configProblemAgentCommandBad =>
       'agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng';
+
+  @override
+  String get aiNewSession => 'Phiên AI mới';
+
+  @override
+  String get aiNewTabKindLabel => 'Tab mới mở dạng';
+
+  @override
+  String get aiNewTabKindAi => 'Giao diện AI';
+
+  @override
+  String get aiNewTabKindTerminal => 'Terminal';
+
+  @override
+  String get aiOnboardingTitle => 'Bạn muốn làm việc theo kiểu nào?';
+
+  @override
+  String aiComposerHint(String agent) {
+    return 'Nhắn cho $agent… (@ nhắc tệp, / gọi lệnh)';
+  }
+
+  @override
+  String aiPermTitle(String agent, String action) {
+    return '$agent xin quyền: $action';
+  }
+
+  @override
+  String get aiPermAllowOnce => 'Cho phép';
+
+  @override
+  String get aiPermAllowAlways => 'Luôn cho phép';
+
+  @override
+  String get aiPermRejectOnce => 'Từ chối';
+
+  @override
+  String get aiPermRejectAlways => 'Luôn từ chối';
+
+  @override
+  String aiTurnSummary(int n, String time, int count) {
+    return 'Lượt $n · $time · $count tệp đổi';
+  }
+
+  @override
+  String get aiRevertTurn => 'Hoàn tác lượt';
+
+  @override
+  String get aiRevertSession => 'Hoàn tác cả phiên';
+
+  @override
+  String get aiChangedAfterTurn => 'đã sửa sau lượt';
+
+  @override
+  String aiLoginNeeded(String agent) {
+    return '$agent cần đăng nhập';
+  }
+
+  @override
+  String aiRunSheetLogin(String agent) {
+    return 'Đăng nhập $agent';
+  }
+
+  @override
+  String aiRunSheetInstall(String agent) {
+    return 'Cài $agent';
+  }
+
+  @override
+  String aiNodeMissing(String agent, int version) {
+    return '$agent cần Node.js $version trở lên';
+  }
+
+  @override
+  String aiAgentExited(String agent, int code) {
+    return '$agent dừng bất ngờ (mã thoát $code)';
+  }
+
+  @override
+  String get aiForceStop => 'Dừng hẳn';
+
+  @override
+  String get aiResumeSession => 'Tiếp tục phiên';
+
+  @override
+  String get aiHistory => 'Lịch sử phiên';
+
+  @override
+  String aiNoUndo(String reason) {
+    return 'Hoàn tác đang tắt cho dự án này ($reason)';
+  }
+
+  @override
+  String aiBypassConfirm(String agent) {
+    return '$agent sẽ sửa tệp và chạy lệnh mà không hỏi.';
+  }
+
+  @override
+  String aiPaneLabel(String agent) {
+    return 'Phiên AI với $agent';
+  }
+
+  @override
+  String get aiTabRowLabel => 'Phiên AI';
+
+  @override
+  String get aiStatusStarting => 'Đang khởi động…';
+
+  @override
+  String get aiStatusNotRunning => 'Agent chưa chạy';
+
+  @override
+  String get aiStatusSignIn => 'Cần đăng nhập';
+
+  @override
+  String get aiStatusStopped => 'Đã dừng';
+
+  @override
+  String aiStatusWithTime(String state, String time) {
+    return '$state · $time';
+  }
+
+  @override
+  String get aiHeaderPanel => 'Thay đổi và tệp';
+
+  @override
+  String get aiHeaderTerminal => 'Terminal trong tab này';
+
+  @override
+  String get aiHeaderZoom => 'Phóng to';
+
+  @override
+  String get aiHeaderMore => 'Thêm';
+
+  @override
+  String get aiMenuAgentsSettings => 'Cài đặt › Agents';
+
+  @override
+  String get aiMenuRestart => 'Khởi động lại agent';
+
+  @override
+  String get aiMenuViewLog => 'Xem log';
+
+  @override
+  String get aiLogTitle => 'Log của agent (stderr)';
+
+  @override
+  String get aiLogNote =>
+      'Chỉ giữ trong bộ nhớ cho mục này; ShellX không ghi vào log của mình.';
+
+  @override
+  String get aiLogEmpty => '(trống)';
+
+  @override
+  String get aiResumeLoading => 'Đang nạp hội thoại…';
+
+  @override
+  String get aiYou => 'Bạn';
+
+  @override
+  String get aiThinking => 'Suy nghĩ';
+
+  @override
+  String get aiToolRead => 'Đọc';
+
+  @override
+  String get aiToolEdit => 'Sửa';
+
+  @override
+  String get aiToolCreate => 'Tạo';
+
+  @override
+  String get aiToolDelete => 'Xoá';
+
+  @override
+  String get aiToolMove => 'Đổi tên';
+
+  @override
+  String get aiToolSearch => 'Tìm';
+
+  @override
+  String get aiToolExecute => 'Chạy';
+
+  @override
+  String get aiToolFetch => 'Tải';
+
+  @override
+  String aiToolModeChanged(String title) {
+    return 'Đổi chế độ: $title';
+  }
+
+  @override
+  String get aiToolPending => 'chờ';
+
+  @override
+  String get aiToolAwaiting => 'chờ bạn';
+
+  @override
+  String aiToolRunning(String seconds) {
+    return 'đang chạy · $seconds s';
+  }
+
+  @override
+  String get aiToolDone => 'xong';
+
+  @override
+  String get aiToolRejected => 'bị từ chối';
+
+  @override
+  String get aiToolStopped => 'đã dừng';
+
+  @override
+  String get aiToolFailed => 'lỗi';
+
+  @override
+  String aiToolTook(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get aiToolNoOutput =>
+      'Không có đầu ra. Panel Thay đổi vẫn thấy tệp mà lệnh đã đổi.';
+
+  @override
+  String get aiToolInput => 'Tham số';
+
+  @override
+  String get aiToolResult => 'Kết quả';
+
+  @override
+  String get aiViewFile => 'Xem cả tệp';
+
+  @override
+  String get aiOpenInEditor => 'Mở trong editor';
+
+  @override
+  String aiPermWaiting(int n) {
+    return 'Chờ bạn trả lời ở thanh xin quyền phía dưới — phím 1–$n, Esc để từ chối';
+  }
+
+  @override
+  String aiPermChosen(String label, String name) {
+    return 'Bạn chọn: $label ($name)';
+  }
+
+  @override
+  String get aiPermCancelled => 'Lượt bị dừng trước khi bạn trả lời';
+
+  @override
+  String aiPermAlwaysNote(String label, String agent, String name) {
+    return '“$label” theo lời agent: $name';
+  }
+
+  @override
+  String aiTurnStopped(int n, String time) {
+    return 'Đã dừng lượt $n · $time';
+  }
+
+  @override
+  String aiTurnInterrupted(int n, String time) {
+    return 'Lượt $n bị gián đoạn · $time';
+  }
+
+  @override
+  String aiTurnFailed(int n, String time) {
+    return 'Lượt $n lỗi · $time';
+  }
+
+  @override
+  String get aiTurnNoChanges => 'không đổi tệp nào';
+
+  @override
+  String get aiTurnView => 'Xem';
+
+  @override
+  String aiNotInstalled(String agent) {
+    return '$agent chưa được cài';
+  }
+
+  @override
+  String get aiInstall => 'Cài đặt';
+
+  @override
+  String get aiNoNpm => 'Không tìm thấy npm cạnh Node.js.';
+
+  @override
+  String get aiNodeGuide => 'Hướng dẫn cài';
+
+  @override
+  String aiCommandMissing(String command) {
+    return 'Không tìm thấy lệnh: $command';
+  }
+
+  @override
+  String get aiCommandShimOnly =>
+      'Chỉ tìm thấy tệp .cmd hoặc .bat; ShellX chạy chương trình trực tiếp.';
+
+  @override
+  String aiAgentOutputInvalid(String agent) {
+    return '$agent gửi dữ liệu ShellX không đọc được nên đã bị dừng';
+  }
+
+  @override
+  String aiStartFailed(String agent) {
+    return '$agent không khởi động được';
+  }
+
+  @override
+  String get aiRestart => 'Khởi động lại';
+
+  @override
+  String get aiRetry => 'Thử lại';
+
+  @override
+  String get aiCannotResume =>
+      'Agent này không khôi phục được phiên cũ; đã mở phiên mới.';
+
+  @override
+  String get aiFolderMissing => 'Thư mục dự án không còn';
+
+  @override
+  String get aiChooseFolder => 'Chọn thư mục';
+
+  @override
+  String get aiChooseFolderTitle => 'Chọn thư mục dự án';
+
+  @override
+  String get aiChooseFolderBody => 'Agent làm việc trong thư mục này.';
+
+  @override
+  String get aiFolderField => 'Thư mục';
+
+  @override
+  String get aiFolderInvalid =>
+      'Nhập đường dẫn tuyệt đối của một thư mục có thật.';
+
+  @override
+  String get aiFolderUse => 'Dùng thư mục này';
+
+  @override
+  String get aiUndoNoGit => 'không tìm thấy git';
+
+  @override
+  String get aiUndoNoCommandLineTools => 'chưa cài Command Line Tools';
+
+  @override
+  String get aiUndoGitTooOld => 'git cũ hơn 2.26';
+
+  @override
+  String get aiUndoTooManyFiles => 'hơn 200 000 tệp';
+
+  @override
+  String get aiUndoTooSlow => 'lần chụp đầu quá 30 s';
+
+  @override
+  String get aiUndoFailed => 'chụp điểm khôi phục lỗi';
+
+  @override
+  String aiNoUndoTurn(String reason) {
+    return 'Hoàn tác đang tắt cho lượt này ($reason)';
+  }
+
+  @override
+  String get aiClaudeOff => 'Tích hợp Claude đang tắt (ai-agent-claude = off).';
+
+  @override
+  String get aiAgentUnknown => 'Agent này không còn trong Cài đặt › Agents.';
+
+  @override
+  String get aiSend => 'Gửi';
+
+  @override
+  String get aiQueue => 'Xếp hàng';
+
+  @override
+  String get aiStop => 'Dừng';
+
+  @override
+  String aiQueued(String text) {
+    return 'Xếp hàng: “$text” — gửi khi lượt này xong';
+  }
+
+  @override
+  String get aiQueueRemove => 'Bỏ';
+
+  @override
+  String get aiQueueFull => 'Tối đa 5 tin có thể chờ.';
+
+  @override
+  String get aiCannotSend => 'Agent chưa nhận tin lúc này.';
+
+  @override
+  String aiContextUsed(int percent) {
+    return 'Ngữ cảnh $percent%';
+  }
+
+  @override
+  String aiPlan(int done, int total) {
+    return 'Kế hoạch · $done/$total xong';
+  }
+
+  @override
+  String get aiPlanHigh => 'ưu tiên';
+
+  @override
+  String get aiComposerWaiting => 'Đang chờ agent…';
+
+  @override
+  String get aiMention => 'Nhắc một tệp (@)';
+
+  @override
+  String get aiCommands => 'Lệnh của agent (/)';
+
+  @override
+  String get aiAttachImage => 'Đính ảnh (dán hoặc kéo thả)';
+
+  @override
+  String get aiRemoveImage => 'Bỏ ảnh';
+
+  @override
+  String aiImageUnsupported(String agent) {
+    return '$agent không nhận ảnh.';
+  }
+
+  @override
+  String get aiNoMatches => 'Không có kết quả';
+
+  @override
+  String get aiPanelChanges => 'Thay đổi';
+
+  @override
+  String get aiPanelFiles => 'Tệp';
+
+  @override
+  String get aiScopeTurn => 'Lượt này';
+
+  @override
+  String get aiScopeSession => 'Cả phiên';
+
+  @override
+  String get aiChangesNoTurn =>
+      'Chưa có lượt nào. Trước mỗi lượt, ShellX chụp thư mục dự án vào một repo git ẩn; mọi thay đổi sau đó hiện ở đây, kể cả khi agent sửa bằng lệnh shell.';
+
+  @override
+  String get aiChangesEmpty => 'Không có thay đổi nào từ lúc đó.';
+
+  @override
+  String get aiReviewed => 'Đã xem';
+
+  @override
+  String get aiRevertFile => 'Hoàn tác tệp này';
+
+  @override
+  String aiCheckpoint(int n, String hash) {
+    return 'Điểm khôi phục: trước lượt $n · $hash';
+  }
+
+  @override
+  String get aiIgnoredNote => 'Không theo dõi tệp bị .gitignore bỏ qua.';
+
+  @override
+  String get aiOutsideNote =>
+      'Không theo dõi thay đổi bên ngoài thư mục dự án.';
+
+  @override
+  String get aiRevertDialogTitle => 'Có tệp đã đổi sau lượt này';
+
+  @override
+  String aiRevertDialogBody(String files) {
+    return '$files đã bị sửa sau khi lượt kết thúc, có thể do bạn hoặc một phiên khác. Hoàn tác sẽ ghi đè cả thay đổi đó.';
+  }
+
+  @override
+  String get aiRevertOnlyClean => 'Chỉ hoàn tác tệp chưa sửa';
+
+  @override
+  String get aiRevertAll => 'Hoàn tác tất cả';
+
+  @override
+  String get aiRevertBusy => 'Đợi lượt đang chạy xong.';
+
+  @override
+  String aiReverted(int count) {
+    return 'Đã hoàn tác $count tệp.';
+  }
+
+  @override
+  String get aiRevertFailed => 'Hoàn tác không thành công.';
+
+  @override
+  String get aiVsTurnStart => 'so với đầu lượt';
+
+  @override
+  String get aiVsSessionStart => 'so với đầu phiên';
+
+  @override
+  String get aiReadOnly => 'chỉ đọc';
+
+  @override
+  String get aiMentionInChat => 'Nhắc trong chat';
+
+  @override
+  String get aiBinaryFile => 'Tệp nhị phân';
+
+  @override
+  String get aiFileTooLarge => 'Tệp quá lớn để hiện';
+
+  @override
+  String get aiIgnored => 'bỏ qua';
+
+  @override
+  String get aiFilesNote =>
+      'Tệp do agent sửa có nhãn M/A. Bấm một tệp để xem (chỉ đọc).';
+
+  @override
+  String get aiModeDefault => 'Hỏi trước';
+
+  @override
+  String get aiModeAcceptEdits => 'Tự sửa tệp';
+
+  @override
+  String get aiModePlan => 'Lập kế hoạch';
+
+  @override
+  String get aiModeAuto => 'Tự động';
+
+  @override
+  String get aiModeBypass => 'Bỏ qua mọi quyền';
+
+  @override
+  String get aiBypassTitle => 'Bật “Bỏ qua mọi quyền”?';
+
+  @override
+  String get aiBypassNote =>
+      'Điểm khôi phục vẫn chạy trước mỗi lượt, nhưng không lấy lại được việc đã ra ngoài máy (git push, gọi API, gửi email).';
+
+  @override
+  String get aiBypassTurnOn => 'Bật';
+
+  @override
+  String aiConfigModel(String name) {
+    return 'Model: $name';
+  }
+
+  @override
+  String aiConfigEffort(String name) {
+    return 'Suy nghĩ: $name';
+  }
+
+  @override
+  String aiConfigOther(String name, String value) {
+    return '$name: $value';
+  }
+
+  @override
+  String get aiAskSend => 'Gửi';
+
+  @override
+  String get aiAskDecline => 'Từ chối';
+
+  @override
+  String get aiAskCancel => 'Huỷ';
+
+  @override
+  String get aiAskOpen => 'Mở trong trình duyệt';
+
+  @override
+  String aiAskUrlNote(String agent) {
+    return '$agent nhờ bạn mở trang này:';
+  }
+
+  @override
+  String get aiAskAnswered => 'Đã trả lời';
+
+  @override
+  String get aiAskDeclined => 'Đã từ chối';
+
+  @override
+  String get aiAskCancelled => 'Đã huỷ';
+
+  @override
+  String get aiAskCompleted => 'Xong';
+
+  @override
+  String get aiAskRequired => 'Bắt buộc';
+
+  @override
+  String get aiAskInvalid => 'Kiểm tra lại các câu trả lời được đánh dấu.';
+
+  @override
+  String get aiAskUnsupported =>
+      'Câu hỏi này dùng kiểu trả lời ShellX chưa hỗ trợ';
+
+  @override
+  String get aiOnboardingAiBody =>
+      'Tab mới là một phiên AI: trò chuyện, xem agent làm gì, duyệt thay đổi, không cần gõ lệnh.';
+
+  @override
+  String get aiOnboardingTerminalBody =>
+      'Như ShellX hiện nay: tab mới là một shell.';
+
+  @override
+  String get aiOnboardingNote =>
+      'Đổi lại được bất cứ lúc nào trong Cài đặt › Chung.';
+
+  @override
+  String get aiIntroText =>
+      'Mới: giao diện AI. Bạn muốn tab mới mở theo kiểu nào?';
+
+  @override
+  String get aiSettingsSection => 'Giao diện AI';
+
+  @override
+  String get aiAgentReady => 'Sẵn sàng';
+
+  @override
+  String aiAgentNeedsNode(int version) {
+    return 'Thiếu Node $version';
+  }
+
+  @override
+  String get aiAgentNotInstalled => 'Chưa cài';
+
+  @override
+  String get aiAgentNeedsLogin => 'Cần đăng nhập';
+
+  @override
+  String get aiAgentError => 'Lỗi';
+
+  @override
+  String get aiAgentChecking => 'Đang kiểm tra…';
+
+  @override
+  String get aiAgentLogin => 'Đăng nhập';
+
+  @override
+  String get aiDefaultAgent => 'Agent mặc định';
+
+  @override
+  String get aiAddCustomAgent => 'Thêm agent tuỳ chỉnh';
+
+  @override
+  String get aiCustomName => 'Tên';
+
+  @override
+  String get aiCustomCommand => 'Lệnh (đường dẫn tuyệt đối hoặc tên trên PATH)';
+
+  @override
+  String get aiCustomArgs => 'Tham số, mỗi dòng một';
+
+  @override
+  String get aiCustomEnv => 'Biến môi trường, TÊN=giá trị mỗi dòng';
+
+  @override
+  String get aiCustomSave => 'Lưu';
+
+  @override
+  String get aiCustomRemove => 'Xoá';
+
+  @override
+  String get aiCustomInvalid => 'Nhập tên và lệnh.';
+
+  @override
+  String get aiSettingClaude => 'Claude trong giao diện AI';
+
+  @override
+  String get aiSettingClaudeDesc =>
+      'Chạy Claude Code qua adapter Claude Agent. Tắt thì ẩn Claude ở mọi nơi.';
+
+  @override
+  String get aiSettingOn => 'Bật';
+
+  @override
+  String get aiSettingOff => 'Tắt';
+
+  @override
+  String get aiSettingCheckpointDays => 'Giữ điểm khôi phục (ngày)';
+
+  @override
+  String get aiSettingCheckpointDaysDesc =>
+      'Điểm khôi phục cũ hơn bị xoá khi mở ShellX.';
+
+  @override
+  String get aiSettingNewTabKindDesc =>
+      '⌘T / Ctrl+Shift+T, nút + và cửa sổ trống mở loại tab này.';
+
+  @override
+  String get aiDeleteCheckpoints => 'Xoá mọi điểm khôi phục';
+
+  @override
+  String get aiDeleteCheckpointsTitle => 'Xoá mọi điểm khôi phục?';
+
+  @override
+  String get aiDeleteCheckpointsBody =>
+      'Không hoàn tác được các lượt trước lúc này. Dự án của bạn không bị đụng tới.';
+
+  @override
+  String get aiDeleteCheckpointsDone => 'Đã xoá điểm khôi phục.';
+
+  @override
+  String get actionNewAiSession => 'Phiên AI mới';
+
+  @override
+  String get actionNewTerminalTab => 'Tab terminal mới';
+
+  @override
+  String aiNewSessionTooltip(String shortcut) {
+    return 'Phiên AI mới  $shortcut';
+  }
+
+  @override
+  String get aiCloseRunningTitle => 'Dừng lượt và đóng?';
+
+  @override
+  String aiCloseRunningBody(String agent) {
+    return '$agent vẫn đang làm việc trong tab này.';
+  }
+
+  @override
+  String get aiCloseRunningAction => 'Dừng và đóng';
+
+  @override
+  String get aiHistoryEmpty => 'Chưa có phiên nào trước đây cho thư mục này.';
+
+  @override
+  String get aiHistoryCurrent => 'phiên hiện tại';
+
+  @override
+  String aiHistoryUnavailable(String agent) {
+    return '$agent không liệt kê phiên.';
+  }
+
+  @override
+  String get aiHistoryUntitled => 'Phiên chưa đặt tên';
+
+  @override
+  String aiRunSheetFailed(int code) {
+    return 'Kết thúc với mã thoát $code';
+  }
+
+  @override
+  String get aiRunSheetNote =>
+      'Đây là chương trình của chính agent; ShellX không đọc và không lưu những gì diễn ra ở đây.';
+
+  @override
+  String get aiLoginFailed => 'Đăng nhập không thành công.';
+
+  @override
+  String get aiJumpToLatest => 'Xuống tin mới nhất';
+
+  @override
+  String aiShowAllLines(int count) {
+    return 'Hiện cả $count dòng';
+  }
+
+  @override
+  String aiOutputCut(int count) {
+    return 'Ẩn $count dòng';
+  }
+
+  @override
+  String get aiStopping => 'Đang dừng…';
+
+  @override
+  String aiTurnDone(int n, String time) {
+    return 'Lượt $n · $time';
+  }
+
+  @override
+  String get aiFileMissing => 'Tệp này không còn nữa.';
 }

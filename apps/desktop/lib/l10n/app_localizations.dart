@@ -4727,6 +4727,1326 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes'**
   String get configProblemAgentCommandBad;
+
+  /// No description provided for @aiNewSession.
+  ///
+  /// In en, this message translates to:
+  /// **'New AI session'**
+  String get aiNewSession;
+
+  /// No description provided for @aiNewTabKindLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New tabs open as'**
+  String get aiNewTabKindLabel;
+
+  /// No description provided for @aiNewTabKindAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI interface'**
+  String get aiNewTabKindAi;
+
+  /// No description provided for @aiNewTabKindTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get aiNewTabKindTerminal;
+
+  /// No description provided for @aiOnboardingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How do you want to work?'**
+  String get aiOnboardingTitle;
+
+  /// No description provided for @aiComposerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Message {agent}… (@ file, / command)'**
+  String aiComposerHint(String agent);
+
+  /// No description provided for @aiPermTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} asks: {action}'**
+  String aiPermTitle(String agent, String action);
+
+  /// No description provided for @aiPermAllowOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get aiPermAllowOnce;
+
+  /// No description provided for @aiPermAllowAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always allow'**
+  String get aiPermAllowAlways;
+
+  /// No description provided for @aiPermRejectOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get aiPermRejectOnce;
+
+  /// No description provided for @aiPermRejectAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always reject'**
+  String get aiPermRejectAlways;
+
+  /// No description provided for @aiTurnSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn {n} · {time} · {count, plural, =1{1 file changed} other{{count} files changed}}'**
+  String aiTurnSummary(int n, String time, int count);
+
+  /// No description provided for @aiRevertTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert turn'**
+  String get aiRevertTurn;
+
+  /// No description provided for @aiRevertSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert session'**
+  String get aiRevertSession;
+
+  /// No description provided for @aiChangedAfterTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'changed after the turn'**
+  String get aiChangedAfterTurn;
+
+  /// No description provided for @aiLoginNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} needs you to sign in'**
+  String aiLoginNeeded(String agent);
+
+  /// No description provided for @aiRunSheetLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to {agent}'**
+  String aiRunSheetLogin(String agent);
+
+  /// No description provided for @aiRunSheetInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install {agent}'**
+  String aiRunSheetInstall(String agent);
+
+  /// No description provided for @aiNodeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} needs Node.js {version} or newer'**
+  String aiNodeMissing(String agent, int version);
+
+  /// No description provided for @aiAgentExited.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} stopped unexpectedly (exit {code})'**
+  String aiAgentExited(String agent, int code);
+
+  /// No description provided for @aiForceStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Force stop'**
+  String get aiForceStop;
+
+  /// No description provided for @aiResumeSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume session'**
+  String get aiResumeSession;
+
+  /// No description provided for @aiHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Session history'**
+  String get aiHistory;
+
+  /// No description provided for @aiNoUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo is off for this project ({reason})'**
+  String aiNoUndo(String reason);
+
+  /// No description provided for @aiBypassConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} will edit files and run commands without asking.'**
+  String aiBypassConfirm(String agent);
+
+  /// No description provided for @aiPaneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AI session with {agent}'**
+  String aiPaneLabel(String agent);
+
+  /// No description provided for @aiTabRowLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AI session'**
+  String get aiTabRowLabel;
+
+  /// No description provided for @aiStatusStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting…'**
+  String get aiStatusStarting;
+
+  /// No description provided for @aiStatusNotRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent not running'**
+  String get aiStatusNotRunning;
+
+  /// No description provided for @aiStatusSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in needed'**
+  String get aiStatusSignIn;
+
+  /// No description provided for @aiStatusStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get aiStatusStopped;
+
+  /// No description provided for @aiStatusWithTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{state} · {time}'**
+  String aiStatusWithTime(String state, String time);
+
+  /// No description provided for @aiHeaderPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes and files'**
+  String get aiHeaderPanel;
+
+  /// No description provided for @aiHeaderTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal in this tab'**
+  String get aiHeaderTerminal;
+
+  /// No description provided for @aiHeaderZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom'**
+  String get aiHeaderZoom;
+
+  /// No description provided for @aiHeaderMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get aiHeaderMore;
+
+  /// No description provided for @aiMenuAgentsSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings › Agents'**
+  String get aiMenuAgentsSettings;
+
+  /// No description provided for @aiMenuRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart agent'**
+  String get aiMenuRestart;
+
+  /// No description provided for @aiMenuViewLog.
+  ///
+  /// In en, this message translates to:
+  /// **'View log'**
+  String get aiMenuViewLog;
+
+  /// No description provided for @aiLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent log (stderr)'**
+  String get aiLogTitle;
+
+  /// No description provided for @aiLogNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept in memory for this view only; ShellX does not write it to its own log.'**
+  String get aiLogNote;
+
+  /// No description provided for @aiLogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'(empty)'**
+  String get aiLogEmpty;
+
+  /// No description provided for @aiResumeLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the conversation…'**
+  String get aiResumeLoading;
+
+  /// No description provided for @aiYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get aiYou;
+
+  /// No description provided for @aiThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking'**
+  String get aiThinking;
+
+  /// No description provided for @aiToolRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get aiToolRead;
+
+  /// No description provided for @aiToolEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get aiToolEdit;
+
+  /// No description provided for @aiToolCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get aiToolCreate;
+
+  /// No description provided for @aiToolDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get aiToolDelete;
+
+  /// No description provided for @aiToolMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get aiToolMove;
+
+  /// No description provided for @aiToolSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get aiToolSearch;
+
+  /// No description provided for @aiToolExecute.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get aiToolExecute;
+
+  /// No description provided for @aiToolFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch'**
+  String get aiToolFetch;
+
+  /// No description provided for @aiToolModeChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode changed: {title}'**
+  String aiToolModeChanged(String title);
+
+  /// No description provided for @aiToolPending.
+  ///
+  /// In en, this message translates to:
+  /// **'waiting'**
+  String get aiToolPending;
+
+  /// No description provided for @aiToolAwaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'waiting for you'**
+  String get aiToolAwaiting;
+
+  /// No description provided for @aiToolRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'running · {seconds} s'**
+  String aiToolRunning(String seconds);
+
+  /// No description provided for @aiToolDone.
+  ///
+  /// In en, this message translates to:
+  /// **'done'**
+  String get aiToolDone;
+
+  /// No description provided for @aiToolRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'rejected'**
+  String get aiToolRejected;
+
+  /// No description provided for @aiToolStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'stopped'**
+  String get aiToolStopped;
+
+  /// No description provided for @aiToolFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'error'**
+  String get aiToolFailed;
+
+  /// No description provided for @aiToolTook.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String aiToolTook(String seconds);
+
+  /// No description provided for @aiToolNoOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'No output. The Changes panel still sees the files a command changed.'**
+  String get aiToolNoOutput;
+
+  /// No description provided for @aiToolInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get aiToolInput;
+
+  /// No description provided for @aiToolResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get aiToolResult;
+
+  /// No description provided for @aiViewFile.
+  ///
+  /// In en, this message translates to:
+  /// **'View whole file'**
+  String get aiViewFile;
+
+  /// No description provided for @aiOpenInEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in editor'**
+  String get aiOpenInEditor;
+
+  /// No description provided for @aiPermWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your answer below — keys 1–{n}, Esc to reject'**
+  String aiPermWaiting(int n);
+
+  /// No description provided for @aiPermChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'You chose: {label} ({name})'**
+  String aiPermChosen(String label, String name);
+
+  /// No description provided for @aiPermCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The turn stopped before you answered'**
+  String get aiPermCancelled;
+
+  /// No description provided for @aiPermAlwaysNote.
+  ///
+  /// In en, this message translates to:
+  /// **'“{label}” as {agent} puts it: {name}'**
+  String aiPermAlwaysNote(String label, String agent, String name);
+
+  /// No description provided for @aiTurnStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped turn {n} · {time}'**
+  String aiTurnStopped(int n, String time);
+
+  /// No description provided for @aiTurnInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn {n} was interrupted · {time}'**
+  String aiTurnInterrupted(int n, String time);
+
+  /// No description provided for @aiTurnFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn {n} failed · {time}'**
+  String aiTurnFailed(int n, String time);
+
+  /// No description provided for @aiTurnNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'no files changed'**
+  String get aiTurnNoChanges;
+
+  /// No description provided for @aiTurnView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get aiTurnView;
+
+  /// No description provided for @aiNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} is not installed'**
+  String aiNotInstalled(String agent);
+
+  /// No description provided for @aiInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get aiInstall;
+
+  /// No description provided for @aiNoNpm.
+  ///
+  /// In en, this message translates to:
+  /// **'npm was not found next to Node.js.'**
+  String get aiNoNpm;
+
+  /// No description provided for @aiNodeGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation guide'**
+  String get aiNodeGuide;
+
+  /// No description provided for @aiCommandMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Command not found: {command}'**
+  String aiCommandMissing(String command);
+
+  /// No description provided for @aiCommandShimOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a .cmd or .bat file was found; ShellX runs programs directly.'**
+  String get aiCommandShimOnly;
+
+  /// No description provided for @aiAgentOutputInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} sent output ShellX cannot read and was stopped'**
+  String aiAgentOutputInvalid(String agent);
+
+  /// No description provided for @aiStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} could not start'**
+  String aiStartFailed(String agent);
+
+  /// No description provided for @aiRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get aiRestart;
+
+  /// No description provided for @aiRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get aiRetry;
+
+  /// No description provided for @aiCannotResume.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent cannot restore the previous session; a new session started.'**
+  String get aiCannotResume;
+
+  /// No description provided for @aiFolderMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The project folder no longer exists'**
+  String get aiFolderMissing;
+
+  /// No description provided for @aiChooseFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder'**
+  String get aiChooseFolder;
+
+  /// No description provided for @aiChooseFolderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a project folder'**
+  String get aiChooseFolderTitle;
+
+  /// No description provided for @aiChooseFolderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent works in this folder.'**
+  String get aiChooseFolderBody;
+
+  /// No description provided for @aiFolderField.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get aiFolderField;
+
+  /// No description provided for @aiFolderInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the absolute path of an existing folder.'**
+  String get aiFolderInvalid;
+
+  /// No description provided for @aiFolderUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this folder'**
+  String get aiFolderUse;
+
+  /// No description provided for @aiUndoNoGit.
+  ///
+  /// In en, this message translates to:
+  /// **'git was not found'**
+  String get aiUndoNoGit;
+
+  /// No description provided for @aiUndoNoCommandLineTools.
+  ///
+  /// In en, this message translates to:
+  /// **'the Command Line Tools are not installed'**
+  String get aiUndoNoCommandLineTools;
+
+  /// No description provided for @aiUndoGitTooOld.
+  ///
+  /// In en, this message translates to:
+  /// **'git is older than 2.26'**
+  String get aiUndoGitTooOld;
+
+  /// No description provided for @aiUndoTooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'more than 200,000 files'**
+  String get aiUndoTooManyFiles;
+
+  /// No description provided for @aiUndoTooSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'the first snapshot took over 30 s'**
+  String get aiUndoTooSlow;
+
+  /// No description provided for @aiUndoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'a snapshot failed'**
+  String get aiUndoFailed;
+
+  /// No description provided for @aiNoUndoTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo is off for this turn ({reason})'**
+  String aiNoUndoTurn(String reason);
+
+  /// No description provided for @aiClaudeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'The Claude integration is turned off (ai-agent-claude = off).'**
+  String get aiClaudeOff;
+
+  /// No description provided for @aiAgentUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent is no longer in Settings › Agents.'**
+  String get aiAgentUnknown;
+
+  /// No description provided for @aiSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get aiSend;
+
+  /// No description provided for @aiQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue'**
+  String get aiQueue;
+
+  /// No description provided for @aiStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiStop;
+
+  /// No description provided for @aiQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued: “{text}” — sent when this turn ends'**
+  String aiQueued(String text);
+
+  /// No description provided for @aiQueueRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get aiQueueRemove;
+
+  /// No description provided for @aiQueueFull.
+  ///
+  /// In en, this message translates to:
+  /// **'At most 5 messages can wait.'**
+  String get aiQueueFull;
+
+  /// No description provided for @aiCannotSend.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent cannot take a message now.'**
+  String get aiCannotSend;
+
+  /// No description provided for @aiContextUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Context {percent}%'**
+  String aiContextUsed(int percent);
+
+  /// No description provided for @aiPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan · {done}/{total} done'**
+  String aiPlan(int done, int total);
+
+  /// No description provided for @aiPlanHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'priority'**
+  String get aiPlanHigh;
+
+  /// No description provided for @aiComposerWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the agent…'**
+  String get aiComposerWaiting;
+
+  /// No description provided for @aiMention.
+  ///
+  /// In en, this message translates to:
+  /// **'Mention a file (@)'**
+  String get aiMention;
+
+  /// No description provided for @aiCommands.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent commands (/)'**
+  String get aiCommands;
+
+  /// No description provided for @aiAttachImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach an image (paste or drop)'**
+  String get aiAttachImage;
+
+  /// No description provided for @aiRemoveImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove image'**
+  String get aiRemoveImage;
+
+  /// No description provided for @aiImageUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} does not take images.'**
+  String aiImageUnsupported(String agent);
+
+  /// No description provided for @aiNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get aiNoMatches;
+
+  /// No description provided for @aiPanelChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes'**
+  String get aiPanelChanges;
+
+  /// No description provided for @aiPanelFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get aiPanelFiles;
+
+  /// No description provided for @aiScopeTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'This turn'**
+  String get aiScopeTurn;
+
+  /// No description provided for @aiScopeSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole session'**
+  String get aiScopeSession;
+
+  /// No description provided for @aiChangesNoTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'No turn yet. Before each turn, ShellX snapshots the project into a hidden git repository; every change after that shows here, even from shell commands.'**
+  String get aiChangesNoTurn;
+
+  /// No description provided for @aiChangesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes since then.'**
+  String get aiChangesEmpty;
+
+  /// No description provided for @aiReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get aiReviewed;
+
+  /// No description provided for @aiRevertFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert this file'**
+  String get aiRevertFile;
+
+  /// No description provided for @aiCheckpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore point: before turn {n} · {hash}'**
+  String aiCheckpoint(int n, String hash);
+
+  /// No description provided for @aiIgnoredNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Files that .gitignore ignores are not tracked and cannot be reverted.'**
+  String get aiIgnoredNote;
+
+  /// No description provided for @aiOutsideNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes outside the project folder are not tracked.'**
+  String get aiOutsideNote;
+
+  /// No description provided for @aiRevertDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Some files changed after this turn'**
+  String get aiRevertDialogTitle;
+
+  /// No description provided for @aiRevertDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{files} changed after the turn ended, maybe by you or another session. Reverting overwrites that too.'**
+  String aiRevertDialogBody(String files);
+
+  /// No description provided for @aiRevertOnlyClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Only revert unchanged files'**
+  String get aiRevertOnlyClean;
+
+  /// No description provided for @aiRevertAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert all'**
+  String get aiRevertAll;
+
+  /// No description provided for @aiRevertBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the running turn to finish.'**
+  String get aiRevertBusy;
+
+  /// No description provided for @aiReverted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Reverted 1 file.} other{Reverted {count} files.}}'**
+  String aiReverted(int count);
+
+  /// No description provided for @aiRevertFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The revert did not work.'**
+  String get aiRevertFailed;
+
+  /// No description provided for @aiVsTurnStart.
+  ///
+  /// In en, this message translates to:
+  /// **'compared with the start of the turn'**
+  String get aiVsTurnStart;
+
+  /// No description provided for @aiVsSessionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'compared with the start of the session'**
+  String get aiVsSessionStart;
+
+  /// No description provided for @aiReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'read-only'**
+  String get aiReadOnly;
+
+  /// No description provided for @aiMentionInChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Mention in chat'**
+  String get aiMentionInChat;
+
+  /// No description provided for @aiBinaryFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Binary file'**
+  String get aiBinaryFile;
+
+  /// No description provided for @aiFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Too large to show'**
+  String get aiFileTooLarge;
+
+  /// No description provided for @aiIgnored.
+  ///
+  /// In en, this message translates to:
+  /// **'ignored'**
+  String get aiIgnored;
+
+  /// No description provided for @aiFilesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Files the agent changed carry M or A. Click a file to view it (read-only).'**
+  String get aiFilesNote;
+
+  /// No description provided for @aiModeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask first'**
+  String get aiModeDefault;
+
+  /// No description provided for @aiModeAcceptEdits.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-edit files'**
+  String get aiModeAcceptEdits;
+
+  /// No description provided for @aiModePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get aiModePlan;
+
+  /// No description provided for @aiModeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get aiModeAuto;
+
+  /// No description provided for @aiModeBypass.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass permissions'**
+  String get aiModeBypass;
+
+  /// No description provided for @aiBypassTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on “Bypass permissions”?'**
+  String get aiBypassTitle;
+
+  /// No description provided for @aiBypassNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore points still run before each turn, but they cannot undo what left this computer (git push, API calls, email).'**
+  String get aiBypassNote;
+
+  /// No description provided for @aiBypassTurnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get aiBypassTurnOn;
+
+  /// No description provided for @aiConfigModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {name}'**
+  String aiConfigModel(String name);
+
+  /// No description provided for @aiConfigEffort.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking: {name}'**
+  String aiConfigEffort(String name);
+
+  /// No description provided for @aiConfigOther.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {value}'**
+  String aiConfigOther(String name, String value);
+
+  /// No description provided for @aiAskSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get aiAskSend;
+
+  /// No description provided for @aiAskDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get aiAskDecline;
+
+  /// No description provided for @aiAskCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiAskCancel;
+
+  /// No description provided for @aiAskOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get aiAskOpen;
+
+  /// No description provided for @aiAskUrlNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} asks you to open this page:'**
+  String aiAskUrlNote(String agent);
+
+  /// No description provided for @aiAskAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get aiAskAnswered;
+
+  /// No description provided for @aiAskDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get aiAskDeclined;
+
+  /// No description provided for @aiAskCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get aiAskCancelled;
+
+  /// No description provided for @aiAskCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get aiAskCompleted;
+
+  /// No description provided for @aiAskRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get aiAskRequired;
+
+  /// No description provided for @aiAskInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the marked answers.'**
+  String get aiAskInvalid;
+
+  /// No description provided for @aiAskUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This question uses an answer type ShellX does not support yet'**
+  String get aiAskUnsupported;
+
+  /// No description provided for @aiOnboardingAiBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A new tab is an AI session: chat, see what the agent does, review changes, no commands to type.'**
+  String get aiOnboardingAiBody;
+
+  /// No description provided for @aiOnboardingTerminalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'As ShellX works today: a new tab is a shell.'**
+  String get aiOnboardingTerminalBody;
+
+  /// No description provided for @aiOnboardingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'You can change this any time in Settings › General.'**
+  String get aiOnboardingNote;
+
+  /// No description provided for @aiIntroText.
+  ///
+  /// In en, this message translates to:
+  /// **'New: an AI interface. How should new tabs open?'**
+  String get aiIntroText;
+
+  /// No description provided for @aiSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'AI interface'**
+  String get aiSettingsSection;
+
+  /// No description provided for @aiAgentReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get aiAgentReady;
+
+  /// No description provided for @aiAgentNeedsNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs Node {version}'**
+  String aiAgentNeedsNode(int version);
+
+  /// No description provided for @aiAgentNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get aiAgentNotInstalled;
+
+  /// No description provided for @aiAgentNeedsLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs sign-in'**
+  String get aiAgentNeedsLogin;
+
+  /// No description provided for @aiAgentError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get aiAgentError;
+
+  /// No description provided for @aiAgentChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get aiAgentChecking;
+
+  /// No description provided for @aiAgentLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get aiAgentLogin;
+
+  /// No description provided for @aiDefaultAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Default agent'**
+  String get aiDefaultAgent;
+
+  /// No description provided for @aiAddCustomAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a custom agent'**
+  String get aiAddCustomAgent;
+
+  /// No description provided for @aiCustomName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get aiCustomName;
+
+  /// No description provided for @aiCustomCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Command (absolute path or a name on PATH)'**
+  String get aiCustomCommand;
+
+  /// No description provided for @aiCustomArgs.
+  ///
+  /// In en, this message translates to:
+  /// **'Arguments, one per line'**
+  String get aiCustomArgs;
+
+  /// No description provided for @aiCustomEnv.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment, NAME=value per line'**
+  String get aiCustomEnv;
+
+  /// No description provided for @aiCustomSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get aiCustomSave;
+
+  /// No description provided for @aiCustomRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get aiCustomRemove;
+
+  /// No description provided for @aiCustomInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name and a command.'**
+  String get aiCustomInvalid;
+
+  /// No description provided for @aiSettingClaude.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude in the AI interface'**
+  String get aiSettingClaude;
+
+  /// No description provided for @aiSettingClaudeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs Claude Code through the Claude Agent adapter. Off hides Claude everywhere.'**
+  String get aiSettingClaudeDesc;
+
+  /// No description provided for @aiSettingOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get aiSettingOn;
+
+  /// No description provided for @aiSettingOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get aiSettingOff;
+
+  /// No description provided for @aiSettingCheckpointDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep restore points (days)'**
+  String get aiSettingCheckpointDays;
+
+  /// No description provided for @aiSettingCheckpointDaysDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Older restore points are deleted at start.'**
+  String get aiSettingCheckpointDaysDesc;
+
+  /// No description provided for @aiSettingNewTabKindDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'⌘T / Ctrl+Shift+T, the + button and the empty window open this kind of tab.'**
+  String get aiSettingNewTabKindDesc;
+
+  /// No description provided for @aiDeleteCheckpoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all restore points'**
+  String get aiDeleteCheckpoints;
+
+  /// No description provided for @aiDeleteCheckpointsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all restore points?'**
+  String get aiDeleteCheckpointsTitle;
+
+  /// No description provided for @aiDeleteCheckpointsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo will not reach turns before now. Your projects are not touched.'**
+  String get aiDeleteCheckpointsBody;
+
+  /// No description provided for @aiDeleteCheckpointsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore points deleted.'**
+  String get aiDeleteCheckpointsDone;
+
+  /// No description provided for @actionNewAiSession.
+  ///
+  /// In en, this message translates to:
+  /// **'New AI session'**
+  String get actionNewAiSession;
+
+  /// No description provided for @actionNewTerminalTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New terminal tab'**
+  String get actionNewTerminalTab;
+
+  /// No description provided for @aiNewSessionTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'New AI session  {shortcut}'**
+  String aiNewSessionTooltip(String shortcut);
+
+  /// No description provided for @aiCloseRunningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the turn and close?'**
+  String get aiCloseRunningTitle;
+
+  /// No description provided for @aiCloseRunningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} is still working in this tab.'**
+  String aiCloseRunningBody(String agent);
+
+  /// No description provided for @aiCloseRunningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and close'**
+  String get aiCloseRunningAction;
+
+  /// No description provided for @aiHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier sessions for this folder.'**
+  String get aiHistoryEmpty;
+
+  /// No description provided for @aiHistoryCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'current session'**
+  String get aiHistoryCurrent;
+
+  /// No description provided for @aiHistoryUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} does not list its sessions.'**
+  String aiHistoryUnavailable(String agent);
+
+  /// No description provided for @aiHistoryUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled session'**
+  String get aiHistoryUntitled;
+
+  /// No description provided for @aiRunSheetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended with exit code {code}'**
+  String aiRunSheetFailed(int code);
+
+  /// No description provided for @aiRunSheetNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the agent\'s own program; ShellX does not read or keep what happens here.'**
+  String get aiRunSheetNote;
+
+  /// No description provided for @aiLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in did not work.'**
+  String get aiLoginFailed;
+
+  /// No description provided for @aiJumpToLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to latest'**
+  String get aiJumpToLatest;
+
+  /// No description provided for @aiShowAllLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count} lines'**
+  String aiShowAllLines(int count);
+
+  /// No description provided for @aiOutputCut.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} lines hidden'**
+  String aiOutputCut(int count);
+
+  /// No description provided for @aiStopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping…'**
+  String get aiStopping;
+
+  /// No description provided for @aiTurnDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn {n} · {time}'**
+  String aiTurnDone(int n, String time);
+
+  /// No description provided for @aiFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not there any more.'**
+  String get aiFileMissing;
 }
 
 class _AppLocalizationsDelegate

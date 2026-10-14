@@ -3060,4 +3060,787 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get configProblemAgentCommandBad =>
       'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes';
+
+  @override
+  String get aiNewSession => 'New AI session';
+
+  @override
+  String get aiNewTabKindLabel => 'New tabs open as';
+
+  @override
+  String get aiNewTabKindAi => 'AI interface';
+
+  @override
+  String get aiNewTabKindTerminal => 'Terminal';
+
+  @override
+  String get aiOnboardingTitle => 'How do you want to work?';
+
+  @override
+  String aiComposerHint(String agent) {
+    return 'Message $agent… (@ file, / command)';
+  }
+
+  @override
+  String aiPermTitle(String agent, String action) {
+    return '$agent asks: $action';
+  }
+
+  @override
+  String get aiPermAllowOnce => 'Allow';
+
+  @override
+  String get aiPermAllowAlways => 'Always allow';
+
+  @override
+  String get aiPermRejectOnce => 'Reject';
+
+  @override
+  String get aiPermRejectAlways => 'Always reject';
+
+  @override
+  String aiTurnSummary(int n, String time, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files changed',
+      one: '1 file changed',
+    );
+    return 'Turn $n · $time · $_temp0';
+  }
+
+  @override
+  String get aiRevertTurn => 'Revert turn';
+
+  @override
+  String get aiRevertSession => 'Revert session';
+
+  @override
+  String get aiChangedAfterTurn => 'changed after the turn';
+
+  @override
+  String aiLoginNeeded(String agent) {
+    return '$agent needs you to sign in';
+  }
+
+  @override
+  String aiRunSheetLogin(String agent) {
+    return 'Sign in to $agent';
+  }
+
+  @override
+  String aiRunSheetInstall(String agent) {
+    return 'Install $agent';
+  }
+
+  @override
+  String aiNodeMissing(String agent, int version) {
+    return '$agent needs Node.js $version or newer';
+  }
+
+  @override
+  String aiAgentExited(String agent, int code) {
+    return '$agent stopped unexpectedly (exit $code)';
+  }
+
+  @override
+  String get aiForceStop => 'Force stop';
+
+  @override
+  String get aiResumeSession => 'Resume session';
+
+  @override
+  String get aiHistory => 'Session history';
+
+  @override
+  String aiNoUndo(String reason) {
+    return 'Undo is off for this project ($reason)';
+  }
+
+  @override
+  String aiBypassConfirm(String agent) {
+    return '$agent will edit files and run commands without asking.';
+  }
+
+  @override
+  String aiPaneLabel(String agent) {
+    return 'AI session with $agent';
+  }
+
+  @override
+  String get aiTabRowLabel => 'AI session';
+
+  @override
+  String get aiStatusStarting => 'Starting…';
+
+  @override
+  String get aiStatusNotRunning => 'Agent not running';
+
+  @override
+  String get aiStatusSignIn => 'Sign-in needed';
+
+  @override
+  String get aiStatusStopped => 'Stopped';
+
+  @override
+  String aiStatusWithTime(String state, String time) {
+    return '$state · $time';
+  }
+
+  @override
+  String get aiHeaderPanel => 'Changes and files';
+
+  @override
+  String get aiHeaderTerminal => 'Terminal in this tab';
+
+  @override
+  String get aiHeaderZoom => 'Zoom';
+
+  @override
+  String get aiHeaderMore => 'More';
+
+  @override
+  String get aiMenuAgentsSettings => 'Settings › Agents';
+
+  @override
+  String get aiMenuRestart => 'Restart agent';
+
+  @override
+  String get aiMenuViewLog => 'View log';
+
+  @override
+  String get aiLogTitle => 'Agent log (stderr)';
+
+  @override
+  String get aiLogNote =>
+      'Kept in memory for this view only; ShellX does not write it to its own log.';
+
+  @override
+  String get aiLogEmpty => '(empty)';
+
+  @override
+  String get aiResumeLoading => 'Loading the conversation…';
+
+  @override
+  String get aiYou => 'You';
+
+  @override
+  String get aiThinking => 'Thinking';
+
+  @override
+  String get aiToolRead => 'Read';
+
+  @override
+  String get aiToolEdit => 'Edit';
+
+  @override
+  String get aiToolCreate => 'Create';
+
+  @override
+  String get aiToolDelete => 'Delete';
+
+  @override
+  String get aiToolMove => 'Rename';
+
+  @override
+  String get aiToolSearch => 'Search';
+
+  @override
+  String get aiToolExecute => 'Run';
+
+  @override
+  String get aiToolFetch => 'Fetch';
+
+  @override
+  String aiToolModeChanged(String title) {
+    return 'Mode changed: $title';
+  }
+
+  @override
+  String get aiToolPending => 'waiting';
+
+  @override
+  String get aiToolAwaiting => 'waiting for you';
+
+  @override
+  String aiToolRunning(String seconds) {
+    return 'running · $seconds s';
+  }
+
+  @override
+  String get aiToolDone => 'done';
+
+  @override
+  String get aiToolRejected => 'rejected';
+
+  @override
+  String get aiToolStopped => 'stopped';
+
+  @override
+  String get aiToolFailed => 'error';
+
+  @override
+  String aiToolTook(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get aiToolNoOutput =>
+      'No output. The Changes panel still sees the files a command changed.';
+
+  @override
+  String get aiToolInput => 'Input';
+
+  @override
+  String get aiToolResult => 'Result';
+
+  @override
+  String get aiViewFile => 'View whole file';
+
+  @override
+  String get aiOpenInEditor => 'Open in editor';
+
+  @override
+  String aiPermWaiting(int n) {
+    return 'Waiting for your answer below — keys 1–$n, Esc to reject';
+  }
+
+  @override
+  String aiPermChosen(String label, String name) {
+    return 'You chose: $label ($name)';
+  }
+
+  @override
+  String get aiPermCancelled => 'The turn stopped before you answered';
+
+  @override
+  String aiPermAlwaysNote(String label, String agent, String name) {
+    return '“$label” as $agent puts it: $name';
+  }
+
+  @override
+  String aiTurnStopped(int n, String time) {
+    return 'Stopped turn $n · $time';
+  }
+
+  @override
+  String aiTurnInterrupted(int n, String time) {
+    return 'Turn $n was interrupted · $time';
+  }
+
+  @override
+  String aiTurnFailed(int n, String time) {
+    return 'Turn $n failed · $time';
+  }
+
+  @override
+  String get aiTurnNoChanges => 'no files changed';
+
+  @override
+  String get aiTurnView => 'View';
+
+  @override
+  String aiNotInstalled(String agent) {
+    return '$agent is not installed';
+  }
+
+  @override
+  String get aiInstall => 'Install';
+
+  @override
+  String get aiNoNpm => 'npm was not found next to Node.js.';
+
+  @override
+  String get aiNodeGuide => 'Installation guide';
+
+  @override
+  String aiCommandMissing(String command) {
+    return 'Command not found: $command';
+  }
+
+  @override
+  String get aiCommandShimOnly =>
+      'Only a .cmd or .bat file was found; ShellX runs programs directly.';
+
+  @override
+  String aiAgentOutputInvalid(String agent) {
+    return '$agent sent output ShellX cannot read and was stopped';
+  }
+
+  @override
+  String aiStartFailed(String agent) {
+    return '$agent could not start';
+  }
+
+  @override
+  String get aiRestart => 'Restart';
+
+  @override
+  String get aiRetry => 'Try again';
+
+  @override
+  String get aiCannotResume =>
+      'This agent cannot restore the previous session; a new session started.';
+
+  @override
+  String get aiFolderMissing => 'The project folder no longer exists';
+
+  @override
+  String get aiChooseFolder => 'Choose folder';
+
+  @override
+  String get aiChooseFolderTitle => 'Choose a project folder';
+
+  @override
+  String get aiChooseFolderBody => 'The agent works in this folder.';
+
+  @override
+  String get aiFolderField => 'Folder';
+
+  @override
+  String get aiFolderInvalid =>
+      'Enter the absolute path of an existing folder.';
+
+  @override
+  String get aiFolderUse => 'Use this folder';
+
+  @override
+  String get aiUndoNoGit => 'git was not found';
+
+  @override
+  String get aiUndoNoCommandLineTools =>
+      'the Command Line Tools are not installed';
+
+  @override
+  String get aiUndoGitTooOld => 'git is older than 2.26';
+
+  @override
+  String get aiUndoTooManyFiles => 'more than 200,000 files';
+
+  @override
+  String get aiUndoTooSlow => 'the first snapshot took over 30 s';
+
+  @override
+  String get aiUndoFailed => 'a snapshot failed';
+
+  @override
+  String aiNoUndoTurn(String reason) {
+    return 'Undo is off for this turn ($reason)';
+  }
+
+  @override
+  String get aiClaudeOff =>
+      'The Claude integration is turned off (ai-agent-claude = off).';
+
+  @override
+  String get aiAgentUnknown => 'This agent is no longer in Settings › Agents.';
+
+  @override
+  String get aiSend => 'Send';
+
+  @override
+  String get aiQueue => 'Queue';
+
+  @override
+  String get aiStop => 'Stop';
+
+  @override
+  String aiQueued(String text) {
+    return 'Queued: “$text” — sent when this turn ends';
+  }
+
+  @override
+  String get aiQueueRemove => 'Remove';
+
+  @override
+  String get aiQueueFull => 'At most 5 messages can wait.';
+
+  @override
+  String get aiCannotSend => 'The agent cannot take a message now.';
+
+  @override
+  String aiContextUsed(int percent) {
+    return 'Context $percent%';
+  }
+
+  @override
+  String aiPlan(int done, int total) {
+    return 'Plan · $done/$total done';
+  }
+
+  @override
+  String get aiPlanHigh => 'priority';
+
+  @override
+  String get aiComposerWaiting => 'Waiting for the agent…';
+
+  @override
+  String get aiMention => 'Mention a file (@)';
+
+  @override
+  String get aiCommands => 'Agent commands (/)';
+
+  @override
+  String get aiAttachImage => 'Attach an image (paste or drop)';
+
+  @override
+  String get aiRemoveImage => 'Remove image';
+
+  @override
+  String aiImageUnsupported(String agent) {
+    return '$agent does not take images.';
+  }
+
+  @override
+  String get aiNoMatches => 'No matches';
+
+  @override
+  String get aiPanelChanges => 'Changes';
+
+  @override
+  String get aiPanelFiles => 'Files';
+
+  @override
+  String get aiScopeTurn => 'This turn';
+
+  @override
+  String get aiScopeSession => 'Whole session';
+
+  @override
+  String get aiChangesNoTurn =>
+      'No turn yet. Before each turn, ShellX snapshots the project into a hidden git repository; every change after that shows here, even from shell commands.';
+
+  @override
+  String get aiChangesEmpty => 'No changes since then.';
+
+  @override
+  String get aiReviewed => 'Reviewed';
+
+  @override
+  String get aiRevertFile => 'Revert this file';
+
+  @override
+  String aiCheckpoint(int n, String hash) {
+    return 'Restore point: before turn $n · $hash';
+  }
+
+  @override
+  String get aiIgnoredNote =>
+      'Files that .gitignore ignores are not tracked and cannot be reverted.';
+
+  @override
+  String get aiOutsideNote =>
+      'Changes outside the project folder are not tracked.';
+
+  @override
+  String get aiRevertDialogTitle => 'Some files changed after this turn';
+
+  @override
+  String aiRevertDialogBody(String files) {
+    return '$files changed after the turn ended, maybe by you or another session. Reverting overwrites that too.';
+  }
+
+  @override
+  String get aiRevertOnlyClean => 'Only revert unchanged files';
+
+  @override
+  String get aiRevertAll => 'Revert all';
+
+  @override
+  String get aiRevertBusy => 'Wait for the running turn to finish.';
+
+  @override
+  String aiReverted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Reverted $count files.',
+      one: 'Reverted 1 file.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiRevertFailed => 'The revert did not work.';
+
+  @override
+  String get aiVsTurnStart => 'compared with the start of the turn';
+
+  @override
+  String get aiVsSessionStart => 'compared with the start of the session';
+
+  @override
+  String get aiReadOnly => 'read-only';
+
+  @override
+  String get aiMentionInChat => 'Mention in chat';
+
+  @override
+  String get aiBinaryFile => 'Binary file';
+
+  @override
+  String get aiFileTooLarge => 'Too large to show';
+
+  @override
+  String get aiIgnored => 'ignored';
+
+  @override
+  String get aiFilesNote =>
+      'Files the agent changed carry M or A. Click a file to view it (read-only).';
+
+  @override
+  String get aiModeDefault => 'Ask first';
+
+  @override
+  String get aiModeAcceptEdits => 'Auto-edit files';
+
+  @override
+  String get aiModePlan => 'Plan';
+
+  @override
+  String get aiModeAuto => 'Auto';
+
+  @override
+  String get aiModeBypass => 'Bypass permissions';
+
+  @override
+  String get aiBypassTitle => 'Turn on “Bypass permissions”?';
+
+  @override
+  String get aiBypassNote =>
+      'Restore points still run before each turn, but they cannot undo what left this computer (git push, API calls, email).';
+
+  @override
+  String get aiBypassTurnOn => 'Turn on';
+
+  @override
+  String aiConfigModel(String name) {
+    return 'Model: $name';
+  }
+
+  @override
+  String aiConfigEffort(String name) {
+    return 'Thinking: $name';
+  }
+
+  @override
+  String aiConfigOther(String name, String value) {
+    return '$name: $value';
+  }
+
+  @override
+  String get aiAskSend => 'Send';
+
+  @override
+  String get aiAskDecline => 'Decline';
+
+  @override
+  String get aiAskCancel => 'Cancel';
+
+  @override
+  String get aiAskOpen => 'Open in browser';
+
+  @override
+  String aiAskUrlNote(String agent) {
+    return '$agent asks you to open this page:';
+  }
+
+  @override
+  String get aiAskAnswered => 'Answered';
+
+  @override
+  String get aiAskDeclined => 'Declined';
+
+  @override
+  String get aiAskCancelled => 'Cancelled';
+
+  @override
+  String get aiAskCompleted => 'Done';
+
+  @override
+  String get aiAskRequired => 'Required';
+
+  @override
+  String get aiAskInvalid => 'Check the marked answers.';
+
+  @override
+  String get aiAskUnsupported =>
+      'This question uses an answer type ShellX does not support yet';
+
+  @override
+  String get aiOnboardingAiBody =>
+      'A new tab is an AI session: chat, see what the agent does, review changes, no commands to type.';
+
+  @override
+  String get aiOnboardingTerminalBody =>
+      'As ShellX works today: a new tab is a shell.';
+
+  @override
+  String get aiOnboardingNote =>
+      'You can change this any time in Settings › General.';
+
+  @override
+  String get aiIntroText => 'New: an AI interface. How should new tabs open?';
+
+  @override
+  String get aiSettingsSection => 'AI interface';
+
+  @override
+  String get aiAgentReady => 'Ready';
+
+  @override
+  String aiAgentNeedsNode(int version) {
+    return 'Needs Node $version';
+  }
+
+  @override
+  String get aiAgentNotInstalled => 'Not installed';
+
+  @override
+  String get aiAgentNeedsLogin => 'Needs sign-in';
+
+  @override
+  String get aiAgentError => 'Error';
+
+  @override
+  String get aiAgentChecking => 'Checking…';
+
+  @override
+  String get aiAgentLogin => 'Sign in';
+
+  @override
+  String get aiDefaultAgent => 'Default agent';
+
+  @override
+  String get aiAddCustomAgent => 'Add a custom agent';
+
+  @override
+  String get aiCustomName => 'Name';
+
+  @override
+  String get aiCustomCommand => 'Command (absolute path or a name on PATH)';
+
+  @override
+  String get aiCustomArgs => 'Arguments, one per line';
+
+  @override
+  String get aiCustomEnv => 'Environment, NAME=value per line';
+
+  @override
+  String get aiCustomSave => 'Save';
+
+  @override
+  String get aiCustomRemove => 'Remove';
+
+  @override
+  String get aiCustomInvalid => 'Enter a name and a command.';
+
+  @override
+  String get aiSettingClaude => 'Claude in the AI interface';
+
+  @override
+  String get aiSettingClaudeDesc =>
+      'Runs Claude Code through the Claude Agent adapter. Off hides Claude everywhere.';
+
+  @override
+  String get aiSettingOn => 'On';
+
+  @override
+  String get aiSettingOff => 'Off';
+
+  @override
+  String get aiSettingCheckpointDays => 'Keep restore points (days)';
+
+  @override
+  String get aiSettingCheckpointDaysDesc =>
+      'Older restore points are deleted at start.';
+
+  @override
+  String get aiSettingNewTabKindDesc =>
+      '⌘T / Ctrl+Shift+T, the + button and the empty window open this kind of tab.';
+
+  @override
+  String get aiDeleteCheckpoints => 'Delete all restore points';
+
+  @override
+  String get aiDeleteCheckpointsTitle => 'Delete all restore points?';
+
+  @override
+  String get aiDeleteCheckpointsBody =>
+      'Undo will not reach turns before now. Your projects are not touched.';
+
+  @override
+  String get aiDeleteCheckpointsDone => 'Restore points deleted.';
+
+  @override
+  String get actionNewAiSession => 'New AI session';
+
+  @override
+  String get actionNewTerminalTab => 'New terminal tab';
+
+  @override
+  String aiNewSessionTooltip(String shortcut) {
+    return 'New AI session  $shortcut';
+  }
+
+  @override
+  String get aiCloseRunningTitle => 'Stop the turn and close?';
+
+  @override
+  String aiCloseRunningBody(String agent) {
+    return '$agent is still working in this tab.';
+  }
+
+  @override
+  String get aiCloseRunningAction => 'Stop and close';
+
+  @override
+  String get aiHistoryEmpty => 'No earlier sessions for this folder.';
+
+  @override
+  String get aiHistoryCurrent => 'current session';
+
+  @override
+  String aiHistoryUnavailable(String agent) {
+    return '$agent does not list its sessions.';
+  }
+
+  @override
+  String get aiHistoryUntitled => 'Untitled session';
+
+  @override
+  String aiRunSheetFailed(int code) {
+    return 'Ended with exit code $code';
+  }
+
+  @override
+  String get aiRunSheetNote =>
+      'This is the agent\'s own program; ShellX does not read or keep what happens here.';
+
+  @override
+  String get aiLoginFailed => 'Sign-in did not work.';
+
+  @override
+  String get aiJumpToLatest => 'Jump to latest';
+
+  @override
+  String aiShowAllLines(int count) {
+    return 'Show all $count lines';
+  }
+
+  @override
+  String aiOutputCut(int count) {
+    return '$count lines hidden';
+  }
+
+  @override
+  String get aiStopping => 'Stopping…';
+
+  @override
+  String aiTurnDone(int n, String time) {
+    return 'Turn $n · $time';
+  }
+
+  @override
+  String get aiFileMissing => 'This file is not there any more.';
 }
