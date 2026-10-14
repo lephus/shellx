@@ -223,7 +223,7 @@ void main() {
     test('one the computer does not show is pushed at once, and not again '
         'at its minute', () {
       fakeAsync((async) {
-        final (rig, s, pushes) = running(async);
+        final (_, s, pushes) = running(async);
         s.addPermission(perm('c1'), aiT0);
         expect(pushes, hasLength(1));
         async.elapse(const Duration(minutes: 10));
@@ -284,7 +284,7 @@ void main() {
   group('a question (M2)', () {
     test('its push says the agent asks, never what it asks', () {
       fakeAsync((async) {
-        final (rig, s, pushes) = running(async);
+        final (_, s, pushes) = running(async);
         s.addAsk(
           ElicitationRequest.fromJson({
             'mode': 'form',

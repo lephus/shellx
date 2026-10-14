@@ -183,10 +183,10 @@ final class _Phone {
   /// per session. The next ack that opens the window answers it.
   final earlier = <String, int>{};
 
-  /// Sessions this phone was told cannot run now, with the reason it was
-  /// told (no folder, their agent off; null: none, the window made no
-  /// runtime): a runtime that comes brings them live again, and so does the
-  /// reason going away (the attach runs again).
+  /// Sessions this phone was told cannot run now, with the reason their
+  /// entry gave then (no folder, their agent off; null: none, the window
+  /// made no runtime): a runtime that comes brings them live again, and so
+  /// does a reason going away (the attach runs again).
   final parked = <String, AiRemoteState?>{};
 
   /// The `seq` of the last mirror message sent for a session by a
