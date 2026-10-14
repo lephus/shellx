@@ -28,18 +28,23 @@ final class AiOutgoing with Redacted {
 /// mode, then a permission's options) until it fits. The strings the desktop
 /// itself sets in the header (the agent's name, the folder) are taken as
 /// they are, so whoever sends the bodies checks their size once more.
-/// About [windowBytes] wait for an `ai.ack` at most; an [earlier] page is
-/// not held back by it (ask [canSend] first). Pure bookkeeping: the hub
-/// decides when to call it. Kept across re-attaches of the same phone, so
-/// [AiOutgoing.seq] never goes back.
+/// About [windowBytes] wait for an `ai.ack` at most, an [earlier] page
+/// included (whether to answer at all while it is full is the hub's to
+/// decide: [canSend]). Pure bookkeeping: the hub decides when to call it.
+/// Kept across re-attaches of the same phone, so [AiOutgoing.seq] never goes
+/// back. One that replaces another (a new runtime, a phone that left and came
+/// back) is made with [afterSeq] = the old one's [lastSeq]: its first message
+/// is the next number, and the phone's late ack of the old one clears nothing
+/// of it.
 final class AiSubscription with Redacted {
   AiSubscription(
     this.state, {
     required this.generation,
+    int afterSeq = 0,
     this.attachItems = kAiAttachItems,
     this.pageItems = kAiPageItems,
     this.windowBytes = kAiWindowBytes,
-  });
+  }) : _seq = afterSeq;
 
   final AiSessionState state;
 
@@ -50,8 +55,12 @@ final class AiSubscription with Redacted {
   final int pageItems;
   final int windowBytes;
 
-  var _seq = 0;
+  int _seq;
   var _from = 0;
+
+  /// The `seq` of the last message made; 0 when none was (and no
+  /// subscription came before this one).
+  int get lastSeq => _seq;
 
   /// The rev sent for each index from [_from] on; -1: the phone's copy is
   /// outdated or a text is still partial.
@@ -124,15 +133,20 @@ final class AiSubscription with Redacted {
   /// The page before index [before] (it must be [from]): whole items, the
   /// newest body first, each one continuing the held window downwards. A
   /// text longer than one piece comes cut, with `clip` = its full length.
-  /// The page is not held back by the window, however many bytes wait for
-  /// an ack: ask [canSend] before.
+  /// A page holds at most [pageItems] items and, like [delta], what the
+  /// window has left (one body at least, and always one item): `more` stays
+  /// true while items are left, and the phone asks again. Whether to answer
+  /// at all while the window is full is the caller's to decide ([canSend]).
   List<AiOutgoing> earlier(int before) {
     if (before != _from || _from == 0) return const [];
     final items = state.timeline.items;
     final start = max(0, _from - pageItems);
+    final budget = max(kAiBodyBytes, windowBytes - unackedBytes);
     final records = <(String, int)>[];
     final revs = <int>[];
+    var produced = 0;
     for (var i = _from - 1; i >= start; i--) {
+      if (records.isNotEmpty && produced >= budget) break; // the next page
       final item = items[i];
       String record;
       if (item is UserItem || item is StreamedTextItem) {
@@ -142,7 +156,9 @@ final class AiSubscription with Redacted {
       } else {
         record = encodeItemRecord(item, i);
       }
-      records.add((record, utf8Length(record)));
+      final size = utf8Length(record);
+      records.add((record, size));
+      produced += size + 1;
       revs.add(item.rev);
     }
     final out = <AiOutgoing>[];
@@ -165,7 +181,7 @@ final class AiSubscription with Redacted {
       );
     }
     _revs.insertAll(0, revs.reversed);
-    _from = start;
+    _from -= records.length;
     return out;
   }
 

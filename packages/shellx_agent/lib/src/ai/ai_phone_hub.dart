@@ -150,6 +150,16 @@ final class _Phone {
   /// "Load earlier" asked while the window was full: where to page from,
   /// per session. The next ack that opens the window answers it.
   final earlier = <String, int>{};
+
+  /// Sessions this phone was told cannot run now (no folder, their agent
+  /// off): a runtime that comes brings them live again.
+  final parked = <String>{};
+
+  /// The `seq` of the last mirror message sent for a session by a
+  /// subscription that is gone (or by the "cannot run" snapshot): the next
+  /// subscription goes on from it, so `seq` never goes back and a late ack of
+  /// the old one clears nothing of the new one.
+  final seqs = <String, int>{};
   double tokens = _AiBudget.burst;
   DateTime refilled = DateTime.fromMillisecondsSinceEpoch(0);
 }
@@ -186,10 +196,9 @@ final class _Cut<T> {
 }
 
 final class _Watch {
-  _Watch(this.state, this.listener, this.generation, this.items);
+  _Watch(this.state, this.listener, this.items);
   final AiSessionState state;
   final void Function() listener;
-  final int generation;
   int? attention;
   int items;
 
@@ -216,7 +225,7 @@ final class AiPhoneHub implements AiEndpoint {
        _push = push,
        _now = now ?? DateTime.now,
        epoch = epoch ?? _newEpoch() {
-    _changes = source.changes.listen((_) => _rescan());
+    _changes = source.changes.listen((_) => _rescan(), onError: (Object _) {});
     _rescan();
   }
 
@@ -281,7 +290,7 @@ final class AiPhoneHub implements AiEndpoint {
       case AiAttach(:final sid, :final body):
         _attach(mobileId, phone, sid, AiHave.fromJson(decodeBody(body)));
       case AiDetach(:final sid):
-        _drop(phone, sid);
+        _leave(phone, sid);
       case AiAck(:final sid, :final seq):
         final sub = phone.subs[sid];
         if (sub == null) return;
@@ -293,7 +302,7 @@ final class AiPhoneHub implements AiEndpoint {
         phone.earlier[sid] = before;
         _sendEarlier(mobileId, phone, sid);
       case AiPrompt(:final sid, :final rid, :final text):
-        unawaited(_prompt(mobileId, sid, rid, text));
+        unawaited(_prompt(mobileId, phone, sid, rid, text));
       case AiAnswer():
         _answer(mobileId, message);
       case AiCancel(:final sid, :final rid):
@@ -317,7 +326,7 @@ final class AiPhoneHub implements AiEndpoint {
           return null;
         });
       case AiOpen(:final rid, :final agent, :final folder):
-        unawaited(_open(mobileId, rid, agent, folder));
+        unawaited(_open(mobileId, phone, rid, agent, folder));
       case AiListResult() ||
           AiSnapshot() ||
           AiUpdate() ||
@@ -355,62 +364,115 @@ final class AiPhoneHub implements AiEndpoint {
 
   void _rescan() {
     if (_disposed) return;
-    final entries = _source.sessions;
+    final List<AiSessionEntry> entries;
+    try {
+      entries = _source.sessions;
+    } on Object {
+      return; // the window's code failed: the next change looks again
+    }
     final live = <int>{};
     for (final e in entries) {
       final state = e.state;
-      if (state == null) continue;
+      if (state == null) {
+        // No runtime now. With a reason it cannot run (no folder, agent off);
+        // without one another is on its way, and phones wait for it.
+        if (e.unavailable != null) _park(e);
+        continue;
+      }
       live.add(e.paneId);
       final watch = _watched[e.paneId];
       if (watch != null && identical(watch.state, state)) continue;
-      if (watch != null) {
-        watch.state.removeListener(watch.listener);
-        _resubscribe(e.paneId, state);
+      watch?.state.removeListener(watch.listener);
+      // A state this session did not have: the phones that mirror it (or
+      // wait for it) start over on it — also after a gap with no state at all.
+      _resubscribe(e.paneId, state);
+      void listener() {
+        try {
+          _onState(e.paneId);
+        } on Object {
+          // Whatever the window's code does, this listener runs inside the
+          // runtime's loop over its listeners: it must not throw into it.
+        }
       }
-      void listener() => _onState(e.paneId);
+
       state.addListener(listener);
-      _watched[e.paneId] = _Watch(
-        state,
-        listener,
-        _generation(state),
-        state.timeline.items.length,
-      )..attention = state.currentPermission?.id ?? state.currentAsk?.id;
+      _watched[e.paneId] = _Watch(state, listener, state.timeline.items.length)
+        ..attention = state.currentPermission?.id ?? state.currentAsk?.id;
     }
     for (final paneId in [..._watched.keys]) {
       if (live.contains(paneId)) continue;
       final w = _watched.remove(paneId)!;
       w.state.removeListener(w.listener);
     }
-    // Sessions that went away close on every phone that mirrors them.
+    // Sessions that went away close on every phone that mirrors them or was
+    // waiting for them, and leave no timer or clock behind.
     final present = {for (final e in entries) sidOf(e.paneId)};
     for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
-      for (final sid in [...phone.subs.keys]) {
+      for (final sid in {...phone.subs.keys, ...phone.parked}) {
         if (present.contains(sid)) continue;
-        _drop(phone, sid);
+        _leave(phone, sid);
         _send(mobileId, AiClosed(sid: sid, reason: 'gone'));
       }
+      // The counts of sessions that are gone, also a phone that had left.
+      phone.seqs.removeWhere((sid, _) => !present.contains(sid));
     }
+    for (final sid in [..._flushTimers.keys]) {
+      if (!present.contains(sid)) _flushTimers.remove(sid)?.cancel();
+    }
+    _lastFlush.removeWhere((sid, _) => !present.contains(sid));
     _scheduleListing();
   }
 
-  /// [phone] mirrors [sid] no more (nor waits for a page of it).
+  /// [phone] mirrors [sid] no more (nor waits for a page of it); the next
+  /// subscription goes on from this one's `seq`.
   void _drop(_Phone phone, String sid) {
-    phone.subs.remove(sid);
+    final sub = phone.subs.remove(sid);
+    if (sub != null) phone.seqs[sid] = sub.lastSeq;
     phone.earlier.remove(sid);
+  }
+
+  /// [phone] is done with [sid]: it left, or the session is gone.
+  void _leave(_Phone phone, String sid) {
+    _drop(phone, sid);
+    phone.parked.remove(sid);
+  }
+
+  /// [phone]'s subscription to [sid] on [state], replacing any other, going
+  /// on from its `seq`.
+  AiSubscription _subscribe(_Phone phone, String sid, AiSessionState state) {
+    _leave(phone, sid);
+    return phone.subs[sid] = AiSubscription(
+      state,
+      generation: _generation(state),
+      afterSeq: phone.seqs[sid] ?? 0,
+    );
   }
 
   int _generation(AiSessionState state) =>
       _generations[state] ??= _nextGeneration++;
 
-  /// The session got a new state (a new runtime): phones start over.
+  /// The session got a state it did not have (a new runtime, or one after a
+  /// gap): phones that mirror it, or were told it cannot run, start over.
   void _resubscribe(int paneId, AiSessionState state) {
     final sid = sidOf(paneId);
     for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
-      if (!phone.subs.containsKey(sid)) continue;
-      final sub = AiSubscription(state, generation: _generation(state));
-      _drop(phone, sid);
-      phone.subs[sid] = sub;
+      final old = phone.subs[sid];
+      if (old == null && !phone.parked.contains(sid)) continue;
+      if (old != null && identical(old.state, state)) continue; // up to date
+      final sub = _subscribe(phone, sid, state);
       _sendAll(mobileId, phone, sid, sub.attach(null));
+    }
+  }
+
+  /// A session that cannot run now while phones mirror it: they are told why
+  /// (no frozen mirror) and wait for a runtime to come back.
+  void _park(AiSessionEntry entry) {
+    final sid = sidOf(entry.paneId);
+    for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
+      if (!phone.subs.containsKey(sid)) continue;
+      _drop(phone, sid);
+      phone.parked.add(sid);
+      _sendUnavailable(mobileId, phone, sid, entry);
     }
   }
 
@@ -432,7 +494,7 @@ final class AiPhoneHub implements AiEndpoint {
       if (item is! TurnEndItem || item.outcome == TurnOutcome.cancelled) {
         continue;
       }
-      final threshold = _source.doneThreshold;
+      final threshold = _doneThreshold();
       if (threshold == null || item.elapsed < threshold) continue;
       _maybePush(
         paneId,
@@ -460,7 +522,7 @@ final class AiPhoneHub implements AiEndpoint {
     // phone that only lists still gets the push: the app shows it as an
     // in-app banner while open, a notification otherwise.
     if (_phones.values.any((p) => p.subs.containsKey(sid))) return;
-    if (_source.seenOnDesktop(paneId)) return;
+    if (_seenOnDesktop(paneId)) return;
     if (kind == AiPushKind.needsInput) {
       // The limit is of "needs you" pushes among themselves: a done push
       // just before must not hide the question that follows it.
@@ -473,16 +535,40 @@ final class AiPhoneHub implements AiEndpoint {
       }
       w.needsPushedAt = now;
     }
-    push(
-      AiPush(
-        kind: kind,
-        agentName: w.state.agentName,
-        sid: sid,
-        detail: detail,
-        turn: turn,
-        elapsed: elapsed,
-      ),
-    );
+    try {
+      push(
+        AiPush(
+          kind: kind,
+          agentName: w.state.agentName,
+          sid: sid,
+          detail: detail,
+          turn: turn,
+          elapsed: elapsed,
+        ),
+      );
+    } on Object {
+      // A push that cannot be sent is lost; this runs inside the runtime's
+      // loop over its listeners, which an error must not cut short.
+    }
+  }
+
+  /// Whether the user looks at the pane now. A window that cannot say is
+  /// taken as not looking: a push too many beats one too few.
+  bool _seenOnDesktop(int paneId) {
+    try {
+      return _source.seenOnDesktop(paneId);
+    } on Object {
+      return false;
+    }
+  }
+
+  /// The "long turn" threshold; null (off) when the window cannot say.
+  Duration? _doneThreshold() {
+    try {
+      return _source.doneThreshold;
+    } on Object {
+      return null;
+    }
   }
 
   // ------------------------------------------------------------- listing --
@@ -498,30 +584,36 @@ final class AiPhoneHub implements AiEndpoint {
   }
 
   void _sendListing(String mobileId, _Phone phone) {
-    final listing = AiListing(
-      sessions: [
-        for (final e in _source.sessions)
-          AiSessionInfo(
-            sid: sidOf(e.paneId),
-            agentId: e.agentId,
-            agentName: e.agentName,
-            title: e.state?.label ?? e.title,
-            state:
-                e.unavailable ??
-                (e.state == null
-                    ? AiRemoteState.stopped
-                    : aiRemoteStateOf(e.state!)),
-            cwd: e.cwd,
-            since: e.state?.turn?.startedAt.millisecondsSinceEpoch,
-            waiting: e.state == null ? null : aiWaitingOf(e.state!),
-            acpSessionId: e.state?.sessionId ?? e.acpSessionId,
-          ),
-      ],
-      agents: _source.agents,
-      folders: _source.folders,
-      defaultAgent: _source.defaultAgent,
-    );
-    final text = _listingText(listing);
+    final String text;
+    try {
+      text = _listingText(
+        AiListing(
+          sessions: [
+            for (final e in _source.sessions)
+              AiSessionInfo(
+                sid: sidOf(e.paneId),
+                agentId: e.agentId,
+                agentName: e.agentName,
+                title: e.state?.label ?? e.title,
+                state:
+                    e.unavailable ??
+                    (e.state == null
+                        ? AiRemoteState.stopped
+                        : aiRemoteStateOf(e.state!)),
+                cwd: e.cwd,
+                since: e.state?.turn?.startedAt.millisecondsSinceEpoch,
+                waiting: e.state == null ? null : aiWaitingOf(e.state!),
+                acpSessionId: e.state?.sessionId ?? e.acpSessionId,
+              ),
+          ],
+          agents: _source.agents,
+          folders: _source.folders,
+          defaultAgent: _source.defaultAgent,
+        ),
+      );
+    } on Object {
+      return; // the window's code failed: the phone keeps its last list
+    }
     if (text == phone.sentListing) return;
     phone.sentListing = text;
     _send(
@@ -565,58 +657,89 @@ final class AiPhoneHub implements AiEndpoint {
   // -------------------------------------------------------------- mirror --
 
   void _attach(String mobileId, _Phone phone, String sid, AiHave? have) {
+    try {
+      _attachSession(mobileId, phone, sid, have);
+    } on Object {
+      // The window's code failed (a runtime that cannot be made): the phone
+      // is told the session is gone, and the attach is not left unanswered.
+      _leave(phone, sid);
+      _closed(mobileId, sid);
+    }
+  }
+
+  /// `ai.closed {gone}`, unless the name is too long to be one of ours: the
+  /// answer would be as big as the question.
+  void _closed(String mobileId, String sid) {
+    if (sid.length <= _maxSidLength) {
+      _send(mobileId, AiClosed(sid: sid, reason: 'gone'));
+    }
+  }
+
+  void _attachSession(String mobileId, _Phone phone, String sid, AiHave? have) {
     final paneId = _paneOf(sid);
     final entry = paneId == null
         ? null
         : _source.sessions.where((e) => e.paneId == paneId).firstOrNull;
     if (paneId == null || entry == null) {
-      _drop(phone, sid);
-      // A name too long to be one of ours is not repeated: the answer would
-      // be as big as the question.
-      if (sid.length <= _maxSidLength) {
-        _send(mobileId, AiClosed(sid: sid, reason: 'gone'));
-      }
+      _leave(phone, sid);
+      _closed(mobileId, sid);
       return;
     }
     final state = _source.control(paneId, start: true)?.state ?? entry.state;
     if (state == null) {
-      // It cannot run yet: the phone shows why (set up on the computer). The
-      // names are the tab's and the folder's: cut like a listing's.
-      _drop(phone, sid);
-      final cwd = entry.cwd;
-      _send(
-        mobileId,
-        AiSnapshot(
-          sid: sid,
-          seq: 1,
-          body: encodeBody({
-            'v': kAiWireVersion,
-            'g': 0,
-            'from': 0,
-            'n': 0,
-            'reset': true,
-            'head': {
-              'phase': 'stopped',
-              'agent': entry.agentId,
-              'name': clipText(entry.agentName, 200),
-              'title': clipText(entry.title, 400),
-              'cwd': ?(cwd == null ? null : clipText(cwd, 600)),
-              'unavailable': (entry.unavailable ?? AiRemoteState.noFolder).wire,
-            },
-            'items': const <Object?>[],
-          }),
-        ),
-      );
+      // It cannot run: the phone shows why (set up on the computer) and
+      // waits for a runtime to come.
+      _leave(phone, sid);
+      phone.parked.add(sid);
+      _sendUnavailable(mobileId, phone, sid, entry);
       return;
     }
-    _rescan(); // a runtime may just have been made
     var sub = phone.subs[sid];
     if (sub == null || !identical(sub.state, state)) {
-      sub = AiSubscription(state, generation: _generation(state));
-      phone.subs[sid] = sub;
+      sub = _subscribe(phone, sid, state);
     }
+    phone.parked.remove(sid);
     phone.earlier.remove(sid); // the phone starts from this snapshot
+    _rescan(); // a runtime may just have been made
+    if (!identical(phone.subs[sid], sub)) return; // the rescan ended it
     _sendAll(mobileId, phone, sid, sub.attach(have));
+  }
+
+  /// The snapshot of a session that cannot run: its header says why, without
+  /// items. The names are the tab's and the folder's, cut like a listing's.
+  /// Its `seq` goes on from what the phone was sent of the session.
+  void _sendUnavailable(
+    String mobileId,
+    _Phone phone,
+    String sid,
+    AiSessionEntry entry,
+  ) {
+    final seq = (phone.seqs[sid] ?? 0) + 1;
+    phone.seqs[sid] = seq;
+    final cwd = entry.cwd;
+    _send(
+      mobileId,
+      AiSnapshot(
+        sid: sid,
+        seq: seq,
+        body: encodeBody({
+          'v': kAiWireVersion,
+          'g': 0,
+          'from': 0,
+          'n': 0,
+          'reset': true,
+          'head': {
+            'phase': 'stopped',
+            'agent': entry.agentId,
+            'name': clipText(entry.agentName, 200),
+            'title': clipText(entry.title, 400),
+            'cwd': ?(cwd == null ? null : clipText(cwd, 600)),
+            'unavailable': (entry.unavailable ?? AiRemoteState.noFolder).wire,
+          },
+          'items': const <Object?>[],
+        }),
+      ),
+    );
   }
 
   /// Sends [out] as mirror messages of [sid]. A body over [kAiMaxBodyBytes]
@@ -689,16 +812,12 @@ final class AiPhoneHub implements AiEndpoint {
     int rid,
     String? Function(AiControl control) run,
   ) {
-    final control = _controlOf(sid);
     String? code;
-    if (control == null) {
-      code = 'not_found';
-    } else {
-      try {
-        code = run(control);
-      } on Object {
-        code = 'refused'; // a runtime that fails still answers, once
-      }
+    try {
+      final control = _controlOf(sid);
+      code = control == null ? 'not_found' : run(control);
+    } on Object {
+      code = 'refused'; // the window's code failed: still one answer
     }
     _send(mobileId, AiResult(rid: rid, ok: code == null, code: code));
   }
@@ -710,30 +829,34 @@ final class AiPhoneHub implements AiEndpoint {
     return _source.control(paneId);
   }
 
+  /// The answer goes to [phone] only: if it is gone by then, or came back on
+  /// a new channel, nothing is sent (a result belongs to the request that
+  /// made it).
   Future<void> _prompt(
     String mobileId,
+    _Phone phone,
     String sid,
     int rid,
     String text,
   ) async {
-    final control = _controlOf(sid);
     String? code;
-    if (control == null) {
-      code = 'not_found';
-    } else if (text.trim().isEmpty) {
-      code = 'refused';
-    } else if (utf8Length(text) > kAiMaxPromptBytes) {
-      code = 'too_large';
-    } else if (control.state.queue.length >= AiSessionState.maxQueue) {
-      code = 'queue_full';
-    } else {
-      try {
-        if (!await control.send([TextBlock(text)])) code = 'refused';
-      } on Object {
-        code = 'refused'; // nothing escapes into the window's zone
+    try {
+      final control = _controlOf(sid);
+      if (control == null) {
+        code = 'not_found';
+      } else if (text.trim().isEmpty) {
+        code = 'refused';
+      } else if (utf8Length(text) > kAiMaxPromptBytes) {
+        code = 'too_large';
+      } else if (control.state.queue.length >= AiSessionState.maxQueue) {
+        code = 'queue_full';
+      } else if (!await control.send([TextBlock(text)])) {
+        code = 'refused';
       }
+    } on Object {
+      code = 'refused'; // nothing escapes into the window's zone
     }
-    _send(mobileId, AiResult(rid: rid, ok: code == null, code: code));
+    _send(mobileId, AiResult(rid: rid, ok: code == null, code: code), phone);
   }
 
   void _answer(String mobileId, AiAnswer a) {
@@ -777,19 +900,28 @@ final class AiPhoneHub implements AiEndpoint {
     });
   }
 
+  /// Only an agent the computer lists as ready, in a folder it offers (V2-2
+  /// D9): the phone's words are checked here, not left to the window. The
+  /// answer goes to [phone] only, like a prompt's.
   Future<void> _open(
     String mobileId,
+    _Phone phone,
     int rid,
     String agent,
     String folder,
   ) async {
     int? paneId;
     try {
-      paneId = await _source.open(agent, folder);
+      final choice = _source.agents.where((a) => a.id == agent).firstOrNull;
+      if (choice != null &&
+          choice.ready &&
+          _source.folders.any((f) => f.key == folder)) {
+        paneId = await _source.open(agent, folder);
+        if (paneId != null) _rescan();
+      }
     } on Object {
       paneId = null;
     }
-    if (paneId != null) _rescan();
     _send(
       mobileId,
       AiResult(
@@ -798,6 +930,7 @@ final class AiPhoneHub implements AiEndpoint {
         code: paneId == null ? 'refused' : null,
         sid: paneId == null ? null : sidOf(paneId),
       ),
+      phone,
     );
   }
 
@@ -829,8 +962,13 @@ final class AiPhoneHub implements AiEndpoint {
   };
 
   /// A phone that is gone gets nothing (an answer may come after it left).
-  void _send(String mobileId, AiMessage message) {
-    if (_disposed || !_phones.containsKey(mobileId)) return;
+  /// With [to], only that one: a phone that came back on a new channel is
+  /// another [_Phone] and does not get the answer to a request it never made.
+  void _send(String mobileId, AiMessage message, [_Phone? to]) {
+    final phone = _phones[mobileId];
+    if (_disposed || phone == null || (to != null && !identical(phone, to))) {
+      return;
+    }
     _out.add(OutboundMessage(mobileId, message));
   }
 }

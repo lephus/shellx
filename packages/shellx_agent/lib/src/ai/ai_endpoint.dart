@@ -71,7 +71,12 @@ final class AiEndpointSlot implements AiEndpoint {
     final target = _target;
     if (target != null) return target.handle(mobileId, message);
     final reply = aiUnavailableReply(message);
-    if (reply != null) _out.add(OutboundMessage(mobileId, reply));
+    if (reply == null) return;
+    // The reply may repeat the phone's session id: one over a sealed batch
+    // would make `SecureChannel.seal` throw and drop the whole channel, so it
+    // is not sent.
+    if (encodeBatch([reply]).length > kMaxSealedBatchBytes) return;
+    _out.add(OutboundMessage(mobileId, reply));
   }
 
   @override

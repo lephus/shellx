@@ -112,5 +112,29 @@ void main() {
       expect(spy.handled, hasLength(1));
       expect(out.last.message, const AiResult(rid: 9, ok: true));
     });
+
+    test('an answer that would not fit a sealed batch is not sent: the echo '
+        'of a long session id', () {
+      // The longest id an attach can carry, so the phone's message fits one
+      // batch …
+      var length = kMaxSealedBatchBytes - 30;
+      while (encodeBatch([AiAttach(sid: 'x' * length)]).length >
+          kMaxSealedBatchBytes) {
+        length--;
+      }
+      final sid = 'x' * length;
+      // … while the `ai.closed` that repeats it, with its reason, does not.
+      expect(
+        encodeBatch([AiClosed(sid: sid, reason: 'unavailable')]).length,
+        greaterThan(kMaxSealedBatchBytes),
+      );
+      final slot = AiEndpointSlot();
+      final out = <OutboundMessage>[];
+      slot.outbound.listen(out.add);
+      slot.handle(phone, AiAttach(sid: sid));
+      expect(out, isEmpty); // sealing it would have dropped the channel
+      slot.handle(phone, const AiAttach(sid: 'x.1'));
+      expect(out.single.message, isA<AiClosed>());
+    });
   });
 }

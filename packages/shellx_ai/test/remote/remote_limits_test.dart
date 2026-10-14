@@ -297,4 +297,124 @@ void main() {
       expect((head.modeId, head.modeName), ('plan', 'Plan'));
     });
   });
+
+  group('a page of older items stays within the window', () {
+    /// A card of about 32 KiB once cut for a phone: three diffs of 4 KiB a
+    /// side and an output of 4 KiB at both ends.
+    void heavy(AiSessionState s, int i) => tool(s, 'c$i', {
+      'title': 'Edit $i',
+      'kind': 'edit',
+      'content': [
+        for (var d = 0; d < 3; d++)
+          {
+            'type': 'diff',
+            'path': '/p/$i/$d',
+            'oldText': 'old line\n' * 800,
+            'newText': 'new line\n' * 800,
+          },
+        {
+          'type': 'content',
+          'content': {'type': 'text', 'text': 'out line\n' * 2000},
+        },
+      ],
+    });
+
+    /// What a page may hold: the window, and the one record that crosses it
+    /// (and the envelopes of its bodies).
+    const most = kAiWindowBytes + kAiRecordBytes + 4096;
+
+    int bytesOf(List<AiOutgoing> out) =>
+        out.fold(0, (n, o) => n + o.body.length);
+
+    /// 200 heavy cards, a phone that holds the last 60 and has acked all.
+    (AiSessionState, AiSubscription, AiMirror) attachedToHeavy() {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      for (var i = 0; i < 200; i++) {
+        heavy(s, i);
+      }
+      final sub = AiSubscription(s, generation: 1);
+      final mirror = AiMirror();
+      var out = sub.attach(null);
+      for (var round = 0; round < 40; round++) {
+        expect(feed(mirror, out), isTrue);
+        for (final o in out) {
+          sub.ack(o.seq);
+        }
+        if (!sub.dirty) break;
+        out = sub.delta();
+      }
+      expect(sub.dirty, isFalse);
+      expect(mirror.from, 141); // 201 items, the last 60
+      return (s, sub, mirror);
+    }
+
+    test('one page holds what the window has left, then the phone asks '
+        'again until index 0', () {
+      final (s, sub, mirror) = attachedToHeavy();
+      var page = sub.earlier(mirror.from);
+      expect(bytesOf(page), lessThanOrEqualTo(most)); // not 60 cards
+      expect(feed(mirror, page), isTrue);
+      expect(
+        mirror.from,
+        allOf(lessThan(141), greaterThan(141 - kAiPageItems)),
+      );
+      expect(mirror.hasEarlier, isTrue); // `more`: ask again
+      var pages = 1;
+      while (mirror.from > 0 && pages < 60) {
+        for (final o in page) {
+          sub.ack(o.seq);
+        }
+        page = sub.earlier(mirror.from);
+        expect(page, isNotEmpty);
+        expect(bytesOf(page), lessThanOrEqualTo(most));
+        expect(feed(mirror, page), isTrue);
+        pages++;
+      }
+      expect((mirror.from, mirror.hasEarlier), (0, false));
+      expect(pages, greaterThan(3));
+      expectSame(mirror, s);
+    });
+
+    test('with the window full a page is one body and a record, not a '
+        'window; the phone still gets somewhere', () {
+      final (s, sub, mirror) = attachedToHeavy();
+      // Cards the phone has not acked fill the window.
+      for (var i = 0; i < 20; i++) {
+        heavy(s, 1000 + i);
+      }
+      feed(mirror, sub.delta());
+      expect(sub.canSend, isFalse);
+      final page = sub.earlier(mirror.from);
+      expect(page, isNotEmpty);
+      expect(bytesOf(page), lessThanOrEqualTo(2 * kAiBodyBytes + 1024));
+      expect(feed(mirror, page), isTrue);
+      expect(mirror.from, lessThan(141));
+    });
+  });
+
+  group('seq goes on from the subscription a new one replaces', () {
+    test('the first message is the next one, and a late ack of the old '
+        'subscription clears nothing of the new one', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      for (var i = 0; i < 5; i++) {
+        say(s, 'x' * 40000); // a few bodies
+      }
+      final first = AiSubscription(s, generation: 1);
+      final sent = first.attach(null);
+      expect(first.lastSeq, sent.last.seq);
+      expect(AiSubscription(s, generation: 1).lastSeq, 0);
+
+      final next = AiSubscription(s, generation: 2, afterSeq: first.lastSeq);
+      expect(next.lastSeq, first.lastSeq);
+      final out = next.attach(null);
+      expect(out.first.seq, first.lastSeq + 1);
+      expect(next.lastSeq, out.last.seq);
+      final waiting = next.unackedBytes;
+      expect(waiting, greaterThan(0));
+      next.ack(first.lastSeq); // the phone's ack of the old one's last body
+      expect(next.unackedBytes, waiting);
+      next.ack(next.lastSeq);
+      expect(next.unackedBytes, 0);
+    });
+  });
 }
