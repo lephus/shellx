@@ -6,6 +6,7 @@ import '../session/local_sessions.dart';
 import '../term/term_frames.dart';
 import 'cli_host.dart';
 import 'cli_wire.dart';
+import 'mux_ai.dart';
 import 'mux_handshake.dart';
 import 'mux_messages.dart';
 import 'mux_transport.dart';
@@ -55,6 +56,10 @@ final class MuxServer {
   /// toggles) call `cli.recheck()` directly in the daemon; there is no
   /// `daemon.cli.recheck` message.
   CliHost? cli;
+
+  /// V2-2 D1: phones' `ai.*` messages for the attached window; null: the
+  /// window's `ai.*` messages are ignored (like an older service).
+  MuxAiForwarder? ai;
 
   /// D11: stop streaming a view above this many unacked bytes; resume
   /// (with `view.reset`) below [resumeBelow].
@@ -370,6 +375,15 @@ final class _UiLink {
       (server.uiApi as _UiForwarder).emit(m.fields);
       return;
     }
+    // V2-2: no answer is ever asked for (an older service ignores them).
+    if (m.type == MuxType.aiServe) {
+      server.ai?.serve(this, _send);
+      return;
+    }
+    if (m.type == MuxType.aiOut || m.type == MuxType.aiPush) {
+      server.ai?.fromUi(this, m);
+      return;
+    }
     _primed = true;
     try {
       switch (m.type) {
@@ -594,6 +608,7 @@ final class _UiLink {
 
   void dispose() {
     _changedTimer?.cancel();
+    server.ai?.unserve(this);
     for (final s in _subs) {
       unawaited(s.cancel());
     }
