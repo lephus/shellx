@@ -10,6 +10,14 @@ final aiFolderExistsProvider = Provider<Future<bool> Function(String path)>(
       (path) => Directory(path).exists(),
 );
 
+/// D8: makes [path] and its parents. An install's folder
+/// (`<support>/ai/agents/<id>`) does not exist before the first install, and
+/// npm cannot start in it until it does. A seam, as above.
+final aiMakeFolderProvider = Provider<Future<void> Function(String path)>(
+  (ref) =>
+      (path) => Directory(path).create(recursive: true),
+);
+
 /// D5: what the user typed as a project folder, made absolute: `~` is the
 /// home folder. Null when it is not an absolute path.
 String? aiFolderFrom(String typed, {required String home}) {

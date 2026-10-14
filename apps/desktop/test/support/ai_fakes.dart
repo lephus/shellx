@@ -26,7 +26,10 @@ final class FakeAiRuntimes {
 
   final FakeLauncher launcher;
   final Checkpoints? checkpoints;
-  final AgentReadiness? readiness;
+
+  /// What every agent's check answers (null: ready); a test may change it
+  /// (an install that worked).
+  AgentReadiness? readiness;
   final made = <AiRuntime>[];
   final requests = <AiRuntimeRequest>[];
 

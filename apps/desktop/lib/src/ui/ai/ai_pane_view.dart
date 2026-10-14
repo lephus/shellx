@@ -21,6 +21,7 @@ import 'ai_folder_card.dart';
 import 'ai_header.dart';
 import 'ai_log_dialog.dart';
 import 'ai_permission_bar.dart';
+import 'ai_run_sheet.dart';
 import 'ai_scope.dart';
 import 'ai_timeline.dart';
 
@@ -82,6 +83,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   void initState() {
     super.initState();
     _ui.onChooseFolder = () => setState(() => _choosing = true);
+    _ui.onRun = (request) => unawaited(_run(request));
     widget.focusNode?.addListener(_onWindowFocus);
     _attachSoon();
   }
@@ -169,6 +171,68 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
         .read(terminalTabsProvider.notifier)
         .updateAiPane(widget.pane.id, (p) => p.copyWith(cwd: folder));
     _attachSoon();
+  }
+
+  /// D8: a card's sign-in or install, in the run sheet over the
+  /// conversation. Exit 0 closes the sheet and the session goes on: a
+  /// sign-in reopens the session (`retry`), an install starts the agent and
+  /// refreshes Settings › Agents.
+  Future<void> _run(AiRunRequest request) async {
+    final runtime = _runtime;
+    if (runtime == null) return;
+    final l10n = AppLocalizations.of(context);
+    final name = widget.pane.agentName;
+    switch (request) {
+      case AiRunLogin(:final method):
+        final command = runtime.loginCommand(method);
+        if (command == null) return;
+        _ui.showOverlay(
+          AiRunSheet(
+            key: UniqueKey(),
+            title: l10n.aiRunSheetLogin(name),
+            command: command,
+            workingDirectory: runtime.state.cwd,
+            failureNote: l10n.aiLoginFailed,
+            onDone: () {
+              _ui.closeOverlay();
+              unawaited(runtime.retry());
+            },
+            onClose: _ui.closeOverlay,
+          ),
+        );
+      case AiRunInstall():
+        final agent = aiAgentById(
+          ref.read(aiAgentsProvider),
+          widget.pane.agentId,
+        );
+        if (agent == null) return;
+        final readiness = await ref.read(aiReadinessSourceProvider)(agent);
+        if (!mounted || !identical(runtime, _runtime)) return;
+        final install = readiness is AgentNeedsInstall
+            ? readiness.install
+            : null;
+        if (install == null) {
+          // Installed meanwhile, or npm went away: the next start says.
+          unawaited(runtime.retry());
+          return;
+        }
+        final folder = install.workingDirectory;
+        _ui.showOverlay(
+          AiRunSheet(
+            key: UniqueKey(),
+            title: l10n.aiRunSheetInstall(name),
+            command: install,
+            workingDirectory: folder ?? runtime.state.cwd,
+            makeFolder: folder != null,
+            onDone: () {
+              _ui.closeOverlay();
+              unawaited(ref.read(aiReadinessProvider.notifier).refresh());
+              unawaited(runtime.retry());
+            },
+            onClose: _ui.closeOverlay,
+          ),
+        );
+    }
   }
 
   /// Through the window's action when there is one (it also announces).
