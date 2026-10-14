@@ -259,20 +259,27 @@ class _AiComposerState extends ConsumerState<AiComposer> {
     Set<String> mentions,
   ) async {
     final cwd = scope.state.cwd;
-    // D16: the images, as `image` blocks (base64 off the UI isolate when big).
-    final data = await aiEncodeImages(run, [for (final i in images) i.bytes]);
-    final blocks = <ContentBlock>[
-      if (text.trim().isNotEmpty) TextBlock(text.trim()),
-      for (final (i, image) in images.indexed)
-        ImageBlock(data: data[i], mimeType: image.mime),
-      for (final path in mentions)
-        ResourceLinkBlock(
-          uri: Uri.file(p.join(cwd, path)).toString(),
-          name: p.basename(path),
-          title: path,
-        ),
-    ];
-    final ok = await scope.runtime.send(blocks);
+    var ok = false;
+    try {
+      // D16: the images, as `image` blocks (base64 off the UI isolate when
+      // big).
+      final data = await aiEncodeImages(run, [for (final i in images) i.bytes]);
+      final blocks = <ContentBlock>[
+        if (text.trim().isNotEmpty) TextBlock(text.trim()),
+        for (final (i, image) in images.indexed)
+          ImageBlock(data: data[i], mimeType: image.mime),
+        for (final path in mentions)
+          ResourceLinkBlock(
+            uri: Uri.file(p.join(cwd, path)).toString(),
+            name: p.basename(path),
+            title: path,
+          ),
+      ];
+      ok = await scope.runtime.send(blocks);
+    } on Object catch (error) {
+      // Never the content; and never a message lost or a send stuck.
+      debugPrint('ShellX: message not sent: ${error.runtimeType}');
+    }
     if (ok || !mounted) return;
     // Nothing is lost: the text (before what was typed meanwhile), the
     // images and the files come back.

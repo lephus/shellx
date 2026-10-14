@@ -344,6 +344,50 @@ void main() {
     await runtime.dispose();
   });
 
+  testWidgets('a message that cannot be prepared comes back whole, and the '
+      'next one still goes (the sends are not stuck behind it)', (t) async {
+    var calls = 0;
+    Future<R> failing<Q, R>(R Function(Q) work, Q input) async {
+      if (calls++ == 0) throw StateError('the isolate is gone');
+      return work(input);
+    }
+
+    final fakes = FakeAiRuntimes(const FakeScenario());
+    final runtime = partRuntime(fakes);
+    await runtime.start();
+    await pumpAiPart(
+      t,
+      const AiDock(),
+      runtime: runtime,
+      overrides: [aiOffThreadProvider.overrideWithValue(failing)],
+    );
+    await t.tap(find.byKey(const Key('ai.composer')));
+    final ui = uiOf(t);
+    final big = Uint8List(400 << 10)..setRange(0, 4, [0x89, 0x50, 0x4E, 0x47]);
+    ui.images.add(big, 'image/png');
+    await t.pump();
+    await t.enterText(find.byKey(const Key('ai.composer')), 'look');
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pump();
+    await t.pump();
+    expect(composerText(t), 'look', reason: 'the text is back');
+    expect(ui.images.items, hasLength(1), reason: 'the image is back');
+    expect(find.text('The agent cannot take a message now.'), findsOneWidget);
+    expect(
+      fakes.agent().received.where((r) => r.startsWith('session/prompt')),
+      isEmpty,
+    );
+    // Sent again, it goes.
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pump();
+    await t.pump();
+    expect(
+      fakes.agent().received.where((r) => r.startsWith('session/prompt')),
+      hasLength(1),
+    );
+    await runtime.dispose();
+  });
+
   testWidgets('context use and the plan (spec §4.1)', (t) async {
     final fakes = FakeAiRuntimes(const FakeScenario());
     final runtime = partRuntime(fakes);
