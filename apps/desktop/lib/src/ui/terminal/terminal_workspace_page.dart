@@ -204,7 +204,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         .firstOrNull;
     // Only this pane going away is news: a cancelled dialog says nothing,
     // even when another pane exited meanwhile.
-    if (tab.isSplit && after != null && !after.panes.containsKey(paneId)) {
+    if (tab.isSplit && after != null && !after.hasPane(paneId)) {
       _announce(l10n.paneAnnounceClosed(after.paneCount));
     }
     focusTerminal();
@@ -219,13 +219,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   bool _isSplit(Intent intent) =>
       ref.read(terminalTabsProvider).selected?.isSplit ?? false;
 
+  /// A11 D20 `break_pane`: a split tab's pane; V2-1 B10: not an AI tab's.
+  bool _canBreakPane(Intent intent) {
+    final selected = ref.read(terminalTabsProvider).selected;
+    return selected != null && selected.isSplit && !selected.isAi;
+  }
+
   /// A11 D20: the tab the selected tab's focused pane would join for
   /// [intent] (a tab id, or a 1-based place in the sidebar); null when there
   /// is no such other tab.
   int? _joinTarget(JoinPaneIntent intent) {
     final state = ref.read(terminalTabsProvider);
     final selected = state.selected;
-    if (selected == null) return null;
+    // V2-1 B10: no pane leaves an AI tab, and none joins one.
+    if (selected == null || selected.isAi) return null;
     final id =
         intent.tabId ??
         switch (intent.position) {
@@ -238,7 +245,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           null => null,
         };
     if (id == null || id == selected.id) return null;
-    return state.tabs.any((t) => t.id == id) ? id : null;
+    final target = state.tabs.where((t) => t.id == id).firstOrNull;
+    return target == null || target.isAi ? null : id;
   }
 
   /// D22: polite, once.
@@ -418,7 +426,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
         if (tab != null && tabs.breakPane(tab.focusedPaneId)) focusTerminal();
-      }, enabled: _isSplit),
+      }, enabled: _canBreakPane),
       JoinPaneIntent: run<JoinPaneIntent>((intent) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;

@@ -264,8 +264,7 @@ class _NotificationsPanelState extends ConsumerState<NotificationsPanel> {
       // tab, the pane that sent it (final ruling m-6); once that pane is
       // gone, the name it arrived with.
       final tab = byId[e.tabId];
-      final gone =
-          tab == null || (tab.isSplit && !tab.panes.containsKey(e.paneId));
+      final gone = tab == null || (tab.isSplit && !tab.hasPane(e.paneId));
       // A7 D23: "Command line", in the language shown now.
       final name = e.tabId == kCommandLineTabId
           ? l10n.cliNoticeSource

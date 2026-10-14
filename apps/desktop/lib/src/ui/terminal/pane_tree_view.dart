@@ -651,12 +651,24 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
     }
     if (!mounted) return;
     // A11 D20: the other tabs this pane can move to, in sidebar order.
+    // V2-1 B10: no pane moves into or out of an AI tab (the tab list refuses
+    // both): none from one, and an AI tab is no destination.
     final state = ref.read(terminalTabsProvider);
     final labels = {for (final t in state.tabs) t.id: t.label};
-    final moveTargets = [
-      for (final tabId in ref.read(sidebarWorkspacesProvider).orderedTabIds)
-        if (tabId != widget.tab.id && labels.containsKey(tabId)) tabId,
-    ].take(20).toList();
+    final aiTabs = {
+      for (final t in state.tabs)
+        if (t.isAi) t.id,
+    };
+    final moveTargets = widget.tab.isAi
+        ? const <int>[]
+        : [
+            for (final tabId
+                in ref.read(sidebarWorkspacesProvider).orderedTabIds)
+              if (tabId != widget.tab.id &&
+                  labels.containsKey(tabId) &&
+                  !aiTabs.contains(tabId))
+                tabId,
+          ].take(20).toList();
     final choice = await showShellxMenu<Object>(
       context: context,
       at: at,
@@ -749,8 +761,9 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
             shortcut: equalizePanesShortcutLabel(),
           ),
         ],
-        // A11 D20: swap, break and move; the session is never touched.
-        if (widget.tab.isSplit) ...[
+        // A11 D20: swap, break and move; the session is never touched. Not
+        // in an AI tab (B10): its panes stay where they are.
+        if (widget.tab.isSplit && !widget.tab.isAi) ...[
           ShellxMenuEntry(
             key: const Key('menu.breakPane'),
             value: const BreakPaneIntent(),
