@@ -206,7 +206,10 @@ final class UiCommandHandler implements UiApi {
 
     Map<String, Object?> tab(TerminalTab tab) => {
       'id': tab.id,
+      // V2-1 D19: older CLIs ignore the key.
+      'kind': tab.isAi ? 'ai' : 'terminal',
       'title': tab.label,
+      if (tab.isAi) 'cwd': tab.cwd,
       'custom': tab.customTitle != null,
       'selected': tab.id == tabs.selectedId,
       'unread': unread[tab.id]?.count ?? 0,
@@ -233,7 +236,8 @@ final class UiCommandHandler implements UiApi {
           },
       ],
       'selectedTab': tabs.selectedId,
-      'focusedPane': tabs.selected?.focusedPaneId,
+      // V2-1 D19: a terminal pane only (null while an AI pane has focus).
+      'focusedPane': tabs.selected?.focused?.id,
     };
   }
 

@@ -75,11 +75,18 @@ TerminalTab? _tabById(TerminalTabsState s, int id) =>
     s.tabs.where((t) => t.id == id).firstOrNull;
 
 /// A terminal pane id; a tab gives its focused pane. Throws `not_found`.
+/// V2-1 D19: an AI tab gives its terminal pane — the focused one, else the
+/// first — and `not_found` when it has none.
 int resolvePane(TerminalTabsState s, CliTarget target) => switch (target) {
-  FocusedRef() => (s.selected ?? (throw _noSelection)).focusedPaneId,
+  FocusedRef() => _terminalPaneOf(s.selected ?? (throw _noSelection)),
   PaneRef(:final id) => s.tabOfSession(id) != null ? id : throw _noPane(id),
-  TabRef(:final id) => (_tabById(s, id) ?? (throw _noTab(id))).focusedPaneId,
+  TabRef(:final id) => _terminalPaneOf(_tabById(s, id) ?? (throw _noTab(id))),
 };
+
+int _terminalPaneOf(TerminalTab tab) =>
+    tab.focused?.id ??
+    tab.paneOrder.where(tab.panes.containsKey).firstOrNull ??
+    (throw _noPane(tab.focusedPaneId));
 
 /// A tab id; a pane gives the tab holding it. Throws `not_found`.
 int resolveTab(TerminalTabsState s, CliTarget target) => switch (target) {

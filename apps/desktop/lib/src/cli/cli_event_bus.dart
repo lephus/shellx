@@ -211,7 +211,9 @@ final class CliEventBus {
           }
         }
       }
+      // V2-1 §4.7: never for an AI pane (negative id).
       if (o.focusedPaneId != t.focusedPaneId &&
+          !isAiPaneId(t.focusedPaneId) &&
           _swappedEnd(o.focusedPaneId) != t.focusedPaneId) {
         _emitFor(t.id, {
           'kind': 'pane.focused',
