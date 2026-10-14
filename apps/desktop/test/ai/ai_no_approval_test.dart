@@ -55,6 +55,82 @@ void main() {
     );
   });
 
+  test('any mark between the words is noise, not only a space, `_` and `-`: '
+      '`.`, `:`, `/`, a tab, a no-break space…', () {
+    for (final id in [
+      'full.access',
+      'skip:permissions',
+      'allow-all-tools',
+      'auto-approve',
+      'approveAll',
+      'Full.Access',
+      'bypass.permissions',
+      'dangerously/skip/permissions',
+      'no:approval',
+      'yolo!',
+      '(yolo)',
+      'allow all',
+      'allow_all',
+      'trust-all',
+      'trustAll',
+      'Trust All Tools',
+      'auto approve',
+      'auto_approve_everything',
+      'autoApprove',
+      'approve-all',
+      'approve.all',
+      'full\taccess',
+      'full\u00A0access',
+      'full\naccess',
+      'full+access',
+      'full#access',
+    ]) {
+      expect(aiIsNoApprovalMode(id), isTrue, reason: id);
+    }
+    expect(aiTurnsOnNoApproval(configId: 'full.access', value: true), isTrue);
+    expect(aiTurnsOnNoApproval(configId: 'auto-approve', value: true), isTrue);
+    expect(
+      aiTurnsOnNoApproval(configId: 'auto-approve', value: false),
+      isFalse,
+    );
+    expect(
+      aiTurnsOnNoApproval(configId: 'mode', value: 'skip:permissions'),
+      isTrue,
+    );
+  });
+
+  test('the everyday modes of the agents still do not match, with any mark '
+      'between their words', () {
+    for (final id in [
+      'default',
+      'acceptEdits',
+      'plan',
+      'auto',
+      'auto_edit',
+      'read-only',
+      'ask',
+      'code',
+      'architect',
+      'build',
+      'on-request',
+      'dontAsk',
+      // The same, with other marks between their words.
+      'accept.edits',
+      'accept:edits',
+      'auto/edit',
+      'read.only',
+      'on request',
+      'dont-ask',
+      'don\'t ask',
+      'workspace.write',
+      'Auto (edit)',
+    ]) {
+      expect(aiIsNoApprovalMode(id), isFalse, reason: id);
+    }
+    expect(aiTurnsOnNoApproval(configId: 'auto.edit', value: true), isFalse);
+    expect(aiTurnsOnNoApproval(configId: 'dontAsk', value: true), isFalse);
+  });
+
   test('the modes people use every day do not match', () {
     for (final id in [
       'default',
