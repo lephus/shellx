@@ -400,3 +400,19 @@ Danh sách đủ (khoảng 100 khoá) nằm trong Task 8 của plan. Chữ thẻ
 | Thông báo đẩy mang tên việc dạng rõ | Thấp | Như N3; muốn kín thì đổi một chuỗi |
 | Tin quá nhiều trên relay khi nhiều điện thoại mở nhiều phiên | Thấp | ≤ 10 Hz mỗi phiên mỗi điện thoại, cửa sổ 256 KiB, gộp lô 16 ms của `AgentChannel` |
 | Markdown của agent rất dài làm chậm khi cuộn | Thấp | Chia khối, khối không đổi không dựng lại, danh sách ảo hoá |
+
+---
+
+## 13. Sửa đổi sau khi làm và review (2026-10-15, chế độ vắng mặt)
+
+Các điểm dưới đây thay thế chữ tương ứng ở trên. Lý do và cái giá nếu sai có trong ledger `.superpowers/sdd/2026-10-14-v2-2-phone-ai/progress.md`.
+
+- **D5, bắt kịp:** khi một điện thoại bị bỏ lại hơn 120 mục, desktop gửi bản chụp mới gồm 60 mục cuối, không gửi bù từng mục. Trong lúc agent đang khởi động, kể cả khi phát lại lịch sử bằng `session/load`, điện thoại chỉ nhận header; khi agent sẵn sàng, nó nhận bản chụp. Mở lại một phiên đã khôi phục vì thế chỉ tải 60 mục cuối.
+- **D11, ai đang xem:** một điện thoại chỉ được tính là "đang mở phiên" với một yêu cầu khi nó đã ack phần thân mang yêu cầu đó. Điện thoại chưa ack sau 10 s thì không tính.
+- **D11, rời đi:** nếu điện thoại rời đi (`phoneGone`) khi một yêu cầu đang chờ, và không còn ai xem, desktop đẩy ngay.
+- **D11, bỏ đi khỏi bàn:** một yêu cầu chưa ai trả lời sau 60 s thì vẫn được đẩy, kể cả khi cửa sổ đang active và pane đang focus. Mỗi yêu cầu được đẩy nhiều nhất một lần.
+- **D11, câu hỏi:** thông báo đẩy cho câu hỏi chỉ ghi "<agent> hỏi bạn", không chép nội dung câu hỏi. Thông báo xin quyền vẫn ghi tên việc (N3). Tin `ai.push` (§4.6) có thêm khoá `question` (tuỳ chọn); peer cũ bỏ qua khoá này.
+- **D13, §4.1:** `ai.result` có thêm mã `on_computer`. Điện thoại chọn một tuỳ chọn bật chế độ không cần duyệt (ví dụ "bypass permissions") thì bị từ chối, và yêu cầu vẫn mở trên máy tính. Điện thoại chỉ ra chữ "Trả lời yêu cầu này trên máy tính".
+- **D15:** khi điện thoại attach, desktop chỉ khởi động runtime chưa từng mở phiên. Runtime đã dừng (kể cả dừng hẳn) không tự chạy lại, và tin đang xếp hàng của nó không tự gửi.
+- **§7, khi dịch vụ nền khởi động lại:** sau `ai.closed {unavailable}`, điện thoại tự attach lại một lần khi danh sách báo phiên đó có lại.
+- **§5.3, chống chạm nhầm:** bảng xin quyền và bảng câu hỏi bỏ qua chạm trong 400 ms sau khi một yêu cầu mới hiện ra (kể cả khi yêu cầu thay đổi tại chỗ). Nút Dừng thay chỗ nút Gửi cũng vậy.
