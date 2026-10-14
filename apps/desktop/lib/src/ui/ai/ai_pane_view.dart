@@ -73,6 +73,12 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   /// the window's (a text field would keep a terminal view's key handler
   /// on it, below).
   final _input = FocusNode(debugLabel: 'ai input');
+
+  /// The overlay's keyboard focus (the run sheet's terminal): while the
+  /// sheet is up, the window's requests for the keyboard go to it, not to
+  /// the composer ([_forward]).
+  final _overlayFocus = FocusNode(debugLabel: 'ai overlay');
+  var _overlayUp = false;
   AiRuntime? _runtime;
   AiFrameNotifier? _frames;
 
@@ -101,6 +107,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
       unawaited(aiRevert(context, runtime, _ui, turn: turn));
     };
     widget.focusNode?.addListener(_onWindowFocus);
+    _ui.addListener(_onUi);
     _attachSoon();
   }
 
@@ -126,9 +133,11 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   @override
   void dispose() {
     widget.focusNode?.removeListener(_onWindowFocus);
+    _ui.removeListener(_onUi);
     _frames?.dispose();
     _ui.dispose();
     _input.dispose();
+    _overlayFocus.dispose();
     super.dispose();
   }
 
@@ -138,10 +147,28 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     if (widget.focusNode?.hasPrimaryFocus ?? false) _forward();
   }
 
+  /// To the run sheet while it is up (a terminal program needs the keys),
+  /// else to the composer or the folder field.
   void _forward() {
-    if (_input.context != null && _input.canRequestFocus) {
-      _input.requestFocus();
-    }
+    final sheet = _overlayFocus;
+    final node = _ui.overlay != null && sheet.context != null ? sheet : _input;
+    if (node.context != null && node.canRequestFocus) node.requestFocus();
+  }
+
+  /// An overlay went (the run sheet, a viewer): the keyboard was theirs,
+  /// and it goes back to the composer instead of falling to the workspace.
+  void _onUi() {
+    final up = _ui.overlay != null;
+    if (up == _overlayUp) return;
+    _overlayUp = up;
+    if (up) return;
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        // Only the pane that holds the window's keyboard takes it back: not
+        // another pane of a split tab, nor a tab out of sight.
+        if (mounted && widget.focusNode != null) _forward();
+      })
+      ..ensureVisualUpdate();
   }
 
   void _attachSoon() {
@@ -215,6 +242,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             command: command,
             workingDirectory: runtime.state.cwd,
             failureNote: l10n.aiLoginFailed,
+            focusNode: _overlayFocus,
             onDone: () {
               _ui.closeOverlay();
               unawaited(runtime.retry());
@@ -246,6 +274,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             command: install,
             workingDirectory: folder ?? runtime.state.cwd,
             makeFolder: folder != null,
+            focusNode: _overlayFocus,
             onDone: () {
               _ui.closeOverlay();
               unawaited(ref.read(aiReadinessProvider.notifier).refresh());

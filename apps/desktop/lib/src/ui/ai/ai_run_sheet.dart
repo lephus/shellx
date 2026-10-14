@@ -25,6 +25,8 @@ import '../theme/shellx_desktop_theme.dart';
 /// - The program gets a real terminal (`TERM=xterm-256color`,
 ///   `COLORTERM=truecolor`) on top of [command]'s environment; the agents
 ///   themselves keep the `TERM=dumb` of the login environment.
+/// - The sheet asks for the keyboard once it is up (a button pressed from the
+///   keyboard keeps it, and `autofocus` does nothing then).
 class AiRunSheet extends ConsumerStatefulWidget {
   const AiRunSheet({
     super.key,
@@ -33,6 +35,7 @@ class AiRunSheet extends ConsumerStatefulWidget {
     required this.workingDirectory,
     this.makeFolder = false,
     this.failureNote,
+    this.focusNode,
     required this.onDone,
     required this.onClose,
   });
@@ -48,6 +51,11 @@ class AiRunSheet extends ConsumerStatefulWidget {
   /// Said before the exit code when the program fails ("Sign-in did not
   /// work.").
   final String? failureNote;
+
+  /// The terminal's keyboard focus when its owner needs to reach it (the AI
+  /// pane sends the window's focus requests here while the sheet is up);
+  /// the sheet's own when null. Never disposed by the sheet.
+  final FocusNode? focusNode;
   final VoidCallback onDone;
   final VoidCallback onClose;
 
@@ -57,7 +65,7 @@ class AiRunSheet extends ConsumerStatefulWidget {
 
 class _AiRunSheetState extends ConsumerState<AiRunSheet> {
   final _terminal = DesktopTerminal(maxLines: 2000);
-  final _focus = FocusNode(debugLabel: 'ai run sheet');
+  final _ownFocus = FocusNode(debugLabel: 'ai run sheet');
   Pty? _pty;
   StreamSubscription<String>? _output;
 
@@ -67,6 +75,8 @@ class _AiRunSheetState extends ConsumerState<AiRunSheet> {
   /// The exit code of a run that failed; null while it runs (or before).
   int? _failed;
 
+  FocusNode get _focus => widget.focusNode ?? _ownFocus;
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +84,12 @@ class _AiRunSheetState extends ConsumerState<AiRunSheet> {
       ..onUserInput = _send
       ..onReply = _send
       ..onResize = (cols, rows, _, _) => _pty?.resize(cols, rows);
+    // The program needs the keys. `autofocus` only applies while nothing
+    // has the keyboard: a sign-in button activated from the keyboard keeps
+    // it, and the next Enter would press the button again.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
     unawaited(_run());
   }
 
@@ -82,7 +98,7 @@ class _AiRunSheetState extends ConsumerState<AiRunSheet> {
     unawaited(_output?.cancel());
     // Closed while it still runs: the program goes with the sheet.
     if (_running) _pty?.kill();
-    _focus.dispose();
+    _ownFocus.dispose();
     super.dispose();
   }
 
