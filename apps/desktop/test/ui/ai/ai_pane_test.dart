@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +8,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ai/ai_folders.dart';
 import 'package:shellx_desktop/src/ai/ai_frame_notifier.dart';
+import 'package:shellx_desktop/src/terminal/clipboard_media.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/ui/settings/pages/agents_page.dart';
 import 'package:shellx_desktop/src/ui/settings/settings_start_page.dart';
@@ -14,6 +18,24 @@ import '../../support/ai_fakes.dart';
 import '../../support/ai_tabs.dart';
 import '../../support/config_harness.dart';
 import '../../support/config_workspace.dart';
+
+/// A 1×1 PNG.
+final _png = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+);
+
+/// A clipboard that holds files copied in Finder.
+final class _CopiedFiles implements ClipboardMedia {
+  const _CopiedFiles(this.paths);
+
+  final List<String> paths;
+
+  @override
+  Future<List<String>> files() async => paths;
+
+  @override
+  Future<Uint8List?> image() async => null;
+}
 
 /// V2-1 §4.1, D3, D5, D14, B11: the AI pane in the window.
 void main() {
@@ -312,4 +334,65 @@ void main() {
     await t.pump();
     expect(heard, 1);
   });
+
+  testWidgets('⌘V of an image file copied in Finder attaches the picture: '
+      'the pane asks the clipboard for files and reads the file itself', (
+    t,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('ai_pane_paste_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final shot = File('${dir.path}/shot.png')..writeAsBytesSync(_png);
+    // Finder puts the name of a copied file on the clipboard as text too.
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async =>
+          call.method == 'Clipboard.getData' ? {'text': 'shot.png'} : null,
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final fakes = FakeAiRuntimes(const FakeScenario());
+    final w = await pumpConfiguredWorkspace(
+      t,
+      platform: TargetPlatform.macOS,
+      clipboard: _CopiedFiles([shot.path]),
+      extra: [
+        ...fakes.overrides,
+        aiFolderExistsProvider.overrideWithValue(
+          (path) async => path == testAiCwd,
+        ),
+      ],
+    );
+    final c = w.container;
+    openTestAiTab(c, cwd: testAiCwd);
+    c.read(terminalFocusRequestProvider.notifier).request();
+    await t.pumpAndSettle();
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    // The pane reads the file off the disk: real time.
+    for (
+      var i = 0;
+      i < 100 && find.byKey(const Key('ai.image.0')).evaluate().isEmpty;
+      i++
+    ) {
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await t.pump();
+    }
+    expect(find.byKey(const Key('ai.image.0')), findsOneWidget);
+    expect(
+      t
+          .widget<TextField>(find.byKey(const Key('ai.composer')))
+          .controller!
+          .text,
+      isEmpty,
+      reason: 'the name of the file is not pasted',
+    );
+    await disposeWorkspace(t, c);
+  }, variant: mac);
 }
