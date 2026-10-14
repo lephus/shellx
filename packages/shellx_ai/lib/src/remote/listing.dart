@@ -28,6 +28,15 @@ enum AiRemoteState {
       values.firstWhere((s) => s.wire == wire, orElse: () => idle);
 }
 
+// The longest strings a listing carries, in UTF-8 bytes. A title, a path or
+// a name can be as long as an agent or a folder makes it; a message cannot
+// (V2-2 D4), and one that is too big drops the phone's whole channel.
+const int _titleBytes = 200;
+const int _acpIdBytes = 200;
+const int _pathBytes = 600;
+const int _nameBytes = 200;
+const int _waitingBytes = 240;
+
 /// What [state] shows a phone: a waiting permission or question wins.
 AiRemoteState aiRemoteStateOf(AiSessionState state) => switch (state.phase) {
   AgentPhase.stopped => AiRemoteState.stopped,
@@ -86,16 +95,18 @@ final class AiSessionInfo with Redacted {
   /// the same session again under its new [sid].
   final String? acpSessionId;
 
+  /// The long strings are cut (see the limits above); [sid] and [agentId]
+  /// are keys the phone sends back, and go whole.
   Map<String, Object?> toJson() => {
     'sid': sid,
     'agent': agentId,
-    'name': agentName,
-    'title': title,
+    'name': clipText(agentName, _nameBytes),
+    'title': clipText(title, _titleBytes),
     'state': state.wire,
-    if (cwd != null) 'cwd': cwd,
+    if (cwd != null) 'cwd': clipText(cwd!, _pathBytes),
     if (since != null) 'since': since,
-    if (waiting != null) 'waiting': waiting,
-    if (acpSessionId != null) 'acp': acpSessionId,
+    if (waiting != null) 'waiting': clipText(waiting!, _waitingBytes),
+    if (acpSessionId != null) 'acp': clipText(acpSessionId!, _acpIdBytes),
   };
 
   /// Null without a `sid`.
@@ -131,7 +142,11 @@ final class AiAgentChoice with Redacted {
   /// greyed with "Cài trên máy tính".
   final bool ready;
 
-  Map<String, Object?> toJson() => {'id': id, 'name': name, 'ready': ready};
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': clipText(name, _nameBytes),
+    'ready': ready,
+  };
 
   static AiAgentChoice? fromJson(Map<String, Object?> j) {
     final id = jString(j, 'id');
@@ -157,8 +172,8 @@ final class AiFolderChoice with Redacted {
 
   Map<String, Object?> toJson() => {
     'key': key,
-    'name': name,
-    if (path != null) 'path': path,
+    'name': clipText(name, _nameBytes),
+    if (path != null) 'path': clipText(path!, _pathBytes),
   };
 
   static AiFolderChoice? fromJson(Map<String, Object?> j) {

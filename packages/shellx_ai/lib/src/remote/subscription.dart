@@ -23,9 +23,15 @@ final class AiOutgoing with Redacted {
 /// What one phone has been sent of one session, and what to send next
 /// (V2-2 D5): item records keyed by index and `rev`, text as appended
 /// pieces, the header when it changed. Every body stays within
-/// [kAiBodyBytes]; about [windowBytes] wait for an `ai.ack` at most. Pure
-/// bookkeeping: the hub decides when to call it. Kept across re-attaches
-/// of the same phone, so [AiOutgoing.seq] never goes back.
+/// [kAiBodyBytes]: a record is cut to fit, and a header over
+/// [kAiRecordBytes] loses what an agent sends without bound (its plan, its
+/// mode, then a permission's options) until it fits. The strings the desktop
+/// itself sets in the header (the agent's name, the folder) are taken as
+/// they are, so whoever sends the bodies checks their size once more.
+/// About [windowBytes] wait for an `ai.ack` at most; an [earlier] page is
+/// not held back by it (ask [canSend] first). Pure bookkeeping: the hub
+/// decides when to call it. Kept across re-attaches of the same phone, so
+/// [AiOutgoing.seq] never goes back.
 final class AiSubscription with Redacted {
   AiSubscription(
     this.state, {
@@ -118,6 +124,8 @@ final class AiSubscription with Redacted {
   /// The page before index [before] (it must be [from]): whole items, the
   /// newest body first, each one continuing the held window downwards. A
   /// text longer than one piece comes cut, with `clip` = its full length.
+  /// The page is not held back by the window, however many bytes wait for
+  /// an ack: ask [canSend] before.
   List<AiOutgoing> earlier(int before) {
     if (before != _from || _from == 0) return const [];
     final items = state.timeline.items;
@@ -198,7 +206,7 @@ final class AiSubscription with Redacted {
       records.add((record, size));
       produced += size + 1;
     }
-    final head = jsonEncode(encodeHead(state, _indexOf));
+    final head = _headJson();
     final headChanged = head != _head;
     _head = head;
     if (snapshot == null && records.isEmpty && !headChanged) return const [];
@@ -237,6 +245,33 @@ final class AiSubscription with Redacted {
       first = false;
     } while (k < records.length);
     return out;
+  }
+
+  /// The header as JSON, within [kAiRecordBytes] so that a body holds it with
+  /// its envelope (a body over [kAiBodyBytes] would drop the phone's whole
+  /// channel). An agent decides how long its plan, its mode's id and a
+  /// permission's options are, so when the header is too big they go, one
+  /// after the other and the least needed first: the plan, the mode, then
+  /// the options — the request itself (id, title) stays, so the phone knows
+  /// one waits and the user answers it on the computer.
+  String _headJson() {
+    final head = encodeHead(state, _indexOf);
+    var json = jsonEncode(head);
+    final cuts = <void Function()>[
+      () => head.remove('plan'),
+      () => head.remove('mode'),
+      () {
+        if (head['perm'] case final Map<String, Object?> perm) {
+          perm['options'] = const <Object?>[];
+        }
+      },
+    ];
+    for (final cut in cuts) {
+      if (utf8Length(json) <= kAiRecordBytes) break;
+      cut();
+      json = jsonEncode(head);
+    }
+    return json;
   }
 
   void _setRev(int k, int rev) {

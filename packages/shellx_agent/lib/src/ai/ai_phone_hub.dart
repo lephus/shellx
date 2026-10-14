@@ -580,8 +580,10 @@ final class AiPhoneHub implements AiEndpoint {
     }
     final state = _source.control(paneId, start: true)?.state ?? entry.state;
     if (state == null) {
-      // It cannot run yet: the phone shows why (set up on the computer).
+      // It cannot run yet: the phone shows why (set up on the computer). The
+      // names are the tab's and the folder's: cut like a listing's.
       _drop(phone, sid);
+      final cwd = entry.cwd;
       _send(
         mobileId,
         AiSnapshot(
@@ -596,9 +598,9 @@ final class AiPhoneHub implements AiEndpoint {
             'head': {
               'phase': 'stopped',
               'agent': entry.agentId,
-              'name': entry.agentName,
-              'title': entry.title,
-              'cwd': ?entry.cwd,
+              'name': clipText(entry.agentName, 200),
+              'title': clipText(entry.title, 400),
+              'cwd': ?(cwd == null ? null : clipText(cwd, 600)),
               'unavailable': (entry.unavailable ?? AiRemoteState.noFolder).wire,
             },
             'items': const <Object?>[],

@@ -61,13 +61,94 @@ void fillWindow(FakeAsync async, AiSessionState s) {
   }
 }
 
-/// The phone acks everything it was sent of its latest attach.
+/// The phone acks everything it was sent of session [sid].
 void ackAll(HubRig rig, String who, String sid) {
   final last = [
     for (final m in rig.to(who))
-      if (m is AiSnapshot) m.seq else if (m is AiUpdate) m.seq,
+      if (m is AiSnapshot && m.sid == sid)
+        m.seq
+      else if (m is AiUpdate && m.sid == sid)
+        m.seq,
   ].last;
   rig.hub.handle(who, AiAck(sid: sid, seq: last));
+}
+
+/// An agent that sends everything at its worst, on pane -1 of [rig]: titles,
+/// a plan, a mode, a permission with a thousand options, a question with
+/// five hundred fields, cards no cut can fit, a full queue, 300 KB of text.
+AiSessionState hostileAgent(HubRig rig) {
+  final s = rig.source.add(-1)..beginTurn(const [TextBlock('go')], aiT0);
+  void update(Map<String, Object?> json) =>
+      s.applyUpdate(SessionUpdate.fromJson(json), aiT0);
+  update({'sessionUpdate': 'session_info_update', 'title': 'T' * 70000});
+  update({
+    'sessionUpdate': 'plan',
+    'entries': [
+      for (var i = 0; i < 30; i++)
+        {'content': '\x01' * 700, 'status': 'pending', 'priority': 'low'},
+    ],
+  });
+  update({
+    'sessionUpdate': 'tool_call',
+    'toolCallId': 'c' * 100000, // only the stub of a card is left
+    'title': 'Edit',
+    'kind': 'edit',
+  });
+  update({
+    'sessionUpdate': 'tool_call',
+    'toolCallId': 'd1',
+    'title': 'Edit',
+    'kind': 'edit',
+    'content': [
+      for (var i = 0; i < 3; i++)
+        {
+          'type': 'diff',
+          'path': '/p/$i',
+          'oldText': null,
+          'newText': '\x01' * 200000,
+        },
+    ],
+  });
+  s.setSession(
+    'sess',
+    modes: SessionModes(
+      currentModeId: 'm' * 70000,
+      available: [SessionMode(id: 'm' * 70000, name: 'Ask')],
+    ),
+  );
+  s.addAsk(
+    ElicitationRequest.fromJson({
+      'mode': 'form',
+      'message': 'M' * 70000,
+      'requestedSchema': {
+        'type': 'object',
+        'properties': {
+          for (var i = 0; i < 500; i++)
+            'f$i': {'type': 'string', 'title': 'T' * 100},
+        },
+      },
+    }),
+  );
+  s.addPermission(
+    PermissionRequest.fromJson({
+      'sessionId': 's',
+      'toolCall': {'toolCallId': 'p1', 'title': 'P' * 70000},
+      'options': [
+        for (var i = 0; i < 1000; i++)
+          {
+            'optionId': 'option-$i-${'x' * 200}',
+            'name': 'Option $i',
+            'kind': 'allow_once',
+          },
+      ],
+    }),
+    aiT0,
+  );
+  for (var i = 0; i < AiSessionState.maxQueue; i++) {
+    s.enqueue([TextBlock('q' * 30000)]);
+  }
+  say(s, 'x\n' * 150000);
+  return s;
 }
 
 bool isOlderPage(AiMessage m) =>
@@ -218,6 +299,128 @@ void main() {
       expect(result.body.length, lessThan(100));
       expect(result.available, isTrue);
       expect(listing(result).sessions, isEmpty);
+    });
+
+    test('a title of 70 KB is clipped in the listing; the session stays', () {
+      final rig = HubRig();
+      rig.source.add(-1, title: 'T' * 70000); // the tab's title
+      rig.source
+          .add(-2)
+          .applyUpdate(
+            // the agent's title
+            SessionUpdate.fromJson({
+              'sessionUpdate': 'session_info_update',
+              'title': 'U' * 70000,
+            }),
+            aiT0,
+          );
+      rig.hub.handle(phone, const AiList());
+      final result = rig.last<AiListResult>(phone);
+      expect(result.body.length, lessThanOrEqualTo(kAiMaxBodyBytes));
+      final l = listing(result);
+      expect(l.sessions.map((s) => s.sid), ['ep.-1', 'ep.-2']);
+      for (final s in l.sessions) {
+        expect(utf8Length(s.title), lessThanOrEqualTo(200));
+        expect(s.title, endsWith('…'));
+      }
+    });
+
+    test('a session that cannot run says why, whatever its names are', () {
+      final rig = HubRig();
+      rig.source.entries.add(
+        AiSessionEntry(
+          paneId: -2,
+          agentId: 'claude',
+          agentName: 'N' * 70000,
+          title: 'T' * 70000,
+          cwd: 'C' * 70000,
+          unavailable: AiRemoteState.agentOff,
+        ),
+      );
+      rig.hub.handle(phone, const AiAttach(sid: 'ep.-2'));
+      expect(rig.last<AiSnapshot>(phone).body.length, lessThan(4096));
+      final head = rig.mirror(phone, 'ep.-2').head!;
+      expect(head.unavailable, AiRemoteState.agentOff);
+      expect(head.title, endsWith('…'));
+    });
+
+    test('whatever the sessions hold, no message to a phone passes one '
+        'sealed batch', () {
+      fakeAsync((async) {
+        final rig = HubRig();
+        final bad = hostileAgent(rig);
+        // A tab with no folder whose names are huge; a state whose header the
+        // codec cannot bound; and enough sessions to cut the listing.
+        rig.source.entries.add(
+          AiSessionEntry(
+            paneId: -2,
+            agentId: 'claude',
+            agentName: 'N' * 70000,
+            title: 'T' * 70000,
+            cwd: 'C' * 70000,
+            acpSessionId: 'A' * 70000,
+            unavailable: AiRemoteState.noFolder,
+          ),
+        );
+        rig.source.addState(
+          -3,
+          AiSessionState(agentId: 'claude', agentName: 'C' * 70000, cwd: '/p')
+            ..setPhase(AgentPhase.ready),
+        );
+        for (var i = 4; i < 200; i++) {
+          rig.source.add(-i, title: 'T$i ${'x' * 300}');
+        }
+
+        rig.hub.handle(phone, const AiList());
+        for (final sid in ['ep.-1', 'ep.-2', 'ep.-3']) {
+          rig.hub.handle(phone, AiAttach(sid: sid));
+        }
+        // The agent's worst is bounded by the codec, not by closing it.
+        expect(
+          rig.to(phone).whereType<AiSnapshot>().map((m) => m.sid),
+          containsAll(['ep.-1', 'ep.-2']),
+        );
+        for (var i = 0; i < 30; i++) {
+          say(bad, 'Dòng\n' * 3000);
+          async.elapse(const Duration(milliseconds: 150));
+          ackAll(rig, phone, 'ep.-1');
+        }
+
+        for (final o in rig.sent) {
+          final m = o.message;
+          expect(
+            encodeBatch([m]).length,
+            lessThanOrEqualTo(kMaxSealedBatchBytes),
+            reason: m.type,
+          );
+          final body = switch (m) {
+            AiListResult(:final body) ||
+            AiSnapshot(:final body) ||
+            AiUpdate(:final body) => body.length,
+            _ => 0,
+          };
+          expect(body, lessThanOrEqualTo(kAiMaxBodyBytes), reason: m.type);
+        }
+        // What the codec bounds is still there to read and to answer.
+        final mirror = rig.mirror(phone, 'ep.-1');
+        expect(mirror.head!.permission, isNotNull);
+        expect(mirror.head!.ask, isNotNull);
+        expect(
+          mirror.items.whereType<MirrorUnknown>().where((i) => i.kind == 'big'),
+          isNotEmpty,
+        );
+        expect(
+          rig.mirror(phone, 'ep.-2').head!.unavailable,
+          AiRemoteState.noFolder,
+        );
+        // The one nothing can bound is closed; the listing is cut, not lost.
+        expect(rig.to(phone).whereType<AiClosed>().map((c) => c.sid), [
+          'ep.-3',
+        ]);
+        final l = listing(rig.last<AiListResult>(phone));
+        expect(l.sessions.first.sid, 'ep.-1');
+        expect(l.sessions.length, allOf(greaterThan(20), lessThan(199)));
+      });
     });
 
     test('a session id too long to answer is not answered', () {

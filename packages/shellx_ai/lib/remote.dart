@@ -10,6 +10,7 @@ export 'src/remote/mirror.dart';
 export 'src/remote/subscription.dart';
 export 'src/remote/wire.dart'
     show
+        clipText,
         decodeBody,
         encodeBody,
         kAiAttachItems,
