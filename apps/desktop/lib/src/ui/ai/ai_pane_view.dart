@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../ai/ai_frame_notifier.dart';
 import '../../ai/ai_project_files.dart';
 import '../../ai/ai_runtimes.dart';
 import '../../config/settings_schema.dart' show SettingPage;
+import '../../terminal/clipboard_media.dart' show clipboardMediaProvider;
 import '../../terminal/terminal_tabs.dart';
 import '../config/config_ui_request.dart';
 import '../settings/settings_start_page.dart';
@@ -90,6 +93,8 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     _ui.onChooseFolder = () => setState(() => _choosing = true);
     _ui.onRun = (request) => unawaited(_run(request));
     _ui.fileIndex = _fileIndex;
+    _ui.clipboardImage = () => ref.read(clipboardMediaProvider).image();
+    _ui.readImageFile = _readImage;
     _ui.onRevertTurn = (turn) {
       final runtime = _runtime;
       if (runtime == null) return;
@@ -249,6 +254,17 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             onClose: _ui.closeOverlay,
           ),
         );
+    }
+  }
+
+  /// D16: a dropped image, at most 10 MiB (agents refuse bigger ones).
+  static Future<Uint8List?> _readImage(String path) async {
+    try {
+      final file = File(path);
+      if (await file.length() > 10 << 20) return null;
+      return await file.readAsBytes();
+    } on FileSystemException {
+      return null;
     }
   }
 

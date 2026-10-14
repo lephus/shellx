@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:shellx_acp/shellx_acp.dart' show AuthMethodTerminal;
 import 'package:shellx_ai/host.dart';
@@ -61,6 +63,36 @@ final class AiRunInstall extends AiRunRequest {
 /// The right panel's tabs (§4.4).
 enum AiPanelTab { changes, files }
 
+/// D16: the images going with the next message, and what the composer has
+/// to say about images ("Claude does not take images.").
+final class AiImages extends ChangeNotifier {
+  final items = <({Uint8List bytes, String mime})>[];
+  String? note;
+
+  void add(Uint8List bytes, String mime) {
+    items.add((bytes: bytes, mime: mime));
+    note = null;
+    notifyListeners();
+  }
+
+  void remove(int index) {
+    items.removeAt(index);
+    notifyListeners();
+  }
+
+  void say(String? text) {
+    note = text;
+    notifyListeners();
+  }
+
+  void clear() {
+    if (items.isEmpty && note == null) return;
+    items.clear();
+    note = null;
+    notifyListeners();
+  }
+}
+
 /// The AI pane's own UI state, which its parts change: the overlay over the
 /// conversation (run sheet, viewer), the side panel, and text for the
 /// composer (Files › "Mention in chat").
@@ -99,6 +131,16 @@ final class AiPaneUi extends ChangeNotifier {
   /// isolate and kept until a turn ends.
   Future<List<String>> Function()? fileIndex;
 
+  /// D16: the images of the next message.
+  final images = AiImages();
+
+  /// Set by the pane: an image on the clipboard; null: none.
+  Future<Uint8List?> Function()? clipboardImage;
+
+  /// Set by the pane: a dropped file's bytes; null: unreadable or over
+  /// 10 MiB.
+  Future<Uint8List?> Function(String path)? readImageFile;
+
   void showOverlay(Widget overlay) {
     _overlay = overlay;
     notifyListeners();
@@ -132,6 +174,7 @@ final class AiPaneUi extends ChangeNotifier {
     insert.dispose();
     note.dispose();
     changes.dispose();
+    images.dispose();
     super.dispose();
   }
 }

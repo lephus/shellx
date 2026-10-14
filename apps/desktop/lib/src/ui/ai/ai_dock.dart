@@ -4,6 +4,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_composer.dart';
+import 'ai_images.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
 
@@ -48,7 +49,10 @@ class AiDock extends StatelessWidget {
               },
             ),
             ?permissionBar,
-            AiComposer(focusNode: focusNode, keyHook: keyHook),
+            // D16: images pasted or dropped on the composer.
+            AiImageInput(
+              child: AiComposer(focusNode: focusNode, keyHook: keyHook),
+            ),
           ],
         ),
       ),

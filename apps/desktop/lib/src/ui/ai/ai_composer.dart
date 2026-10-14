@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,12 +12,20 @@ import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_completer.dart';
 import 'ai_config_chips.dart';
+import 'ai_images.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
 
 /// A key the composer offers to others first (the permission bar, D10):
 /// [handled] true stops it there.
 typedef AiKeyHook = bool Function(KeyEvent event, {required bool hasText});
+
+/// The text field's keys: a paste becomes [AiPasteIntent] (an image first,
+/// D16); the rest as in every field of the window.
+final Map<ShortcutActivator, Intent> _keys = {
+  for (final MapEntry(:key, :value) in textEditingShortcuts().entries)
+    key: value is PasteTextIntent ? const AiPasteIntent() : value,
+};
 
 /// What the composer's buttons and hint depend on: rebuilt only when this
 /// changes, never per streamed chunk (smoothness: no dropped keystrokes).
@@ -163,13 +172,17 @@ class _AiComposerState extends State<AiComposer> {
 
   Future<void> _send() async {
     final text = _text.text;
-    if (text.trim().isEmpty || !_canSend) return;
     final scope = _scope!;
+    final images = [...scope.ui.images.items];
+    if ((text.trim().isEmpty && images.isEmpty) || !_canSend) return;
     final l10n = AppLocalizations.of(context);
     // D16: each file still mentioned goes along as a `resource_link`.
     final cwd = scope.state.cwd;
     final blocks = <ContentBlock>[
-      TextBlock(text.trim()),
+      if (text.trim().isNotEmpty) TextBlock(text.trim()),
+      // D16: the images, as `image` blocks.
+      for (final i in images)
+        ImageBlock(data: base64Encode(i.bytes), mimeType: i.mime),
       for (final path in _mentions)
         if (text.contains('@$path'))
           ResourceLinkBlock(
@@ -179,6 +192,7 @@ class _AiComposerState extends State<AiComposer> {
           ),
     ];
     _mentions.clear();
+    scope.ui.images.clear();
     _text.clear();
     setState(() => _note = null);
     final ok = await scope.runtime.send(blocks);
@@ -271,6 +285,7 @@ class _AiComposerState extends State<AiComposer> {
                 ? _Suggestions(completer: _completer, onPick: _take)
                 : const SizedBox.shrink(),
           ),
+          const AiAttachments(),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: AiSizes.composerMax),
             child: Focus(
@@ -278,7 +293,7 @@ class _AiComposerState extends State<AiComposer> {
               skipTraversal: true,
               onKeyEvent: _onKey,
               child: Shortcuts(
-                shortcuts: textEditingShortcuts(),
+                shortcuts: _keys,
                 child: TextField(
                   key: const Key('ai.composer'),
                   controller: _text,
