@@ -289,6 +289,21 @@ void main() {
     expect(pushes.single.sid, sid);
   });
 
+  test('startAiPhone never throws: a hub that cannot be made leaves phones '
+      'on "unavailable", and main.dart goes on to show the window', () async {
+    final c = _window(const FakeScenario(), [
+      aiPhoneHubProvider.overrideWith((ref) => throw StateError('no hub')),
+    ]);
+    final core = _core();
+    final phone = _Phone();
+    final router = _router(core, phone);
+    expect(() => startAiPhone(c, slot: core.ai), returnsNormally);
+    expect(() => startAiPhone(c), returnsNormally);
+    expect(core.ai.target, isNull);
+    await router.handle(_phone, const AiList());
+    expect(phone.all<AiListResult>().single.available, isFalse);
+  });
+
   group('pushes go out with the notifications of whoever holds the relay '
       'link (V2-2 D11)', () {
     final permission = FakeScenario(

@@ -286,11 +286,13 @@ Future<void> _start(_Startup startup) async {
   Future<void> quitApp() async {
     // V2-2 D1: a phone that still mirrors an AI session hears the window
     // quit, not its agent stop; the agent side's slot answers "unavailable"
-    // from then on. Never throws.
-    stopAiPhone(container);
-    // V2-1 §6: no agent outlives the app (stdin closed, 2 s, process tree).
+    // from then on. V2-1 §6: then no agent outlives the app (stdin closed,
+    // 2 s, process tree).
     await runBounded(
-      () => stopAi(container),
+      () {
+        stopAiPhone(container);
+        return stopAi(container);
+      },
       timeout: const Duration(seconds: 4),
       label: 'stopping AI agents',
     );
@@ -698,7 +700,8 @@ Future<void> _start(_Startup startup) async {
   // (the agent side's slot), or through the background service's (a binding
   // on each link to it). After the AI startup above is scheduled (an agent's
   // launch waits for its sweep); before the bootstrap and the service link
-  // below, so the hub is there before any phone can attach.
+  // below, so the hub is there before any phone can attach. Never throws:
+  // the window is shown whatever happens here.
   startAiPhone(container, slot: side?.core.ai);
   container.read(windowRouterProvider.notifier).showTerminal();
   if (daemonMode) {

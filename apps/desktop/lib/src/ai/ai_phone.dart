@@ -81,14 +81,30 @@ final class DesktopAiSource implements AiSessionSource {
   @override
   Stream<void> get changes => _changes.stream;
 
+  /// The AI sessions in the sidebar's order, as the interface says.
   @override
   List<AiSessionEntry> get sessions {
     final runtimes = _ref.read(aiRuntimesProvider.notifier);
     final agents = _ref.read(aiAgentsProvider);
     return [
-      for (final tab in _ref.read(terminalTabsProvider).tabs)
+      for (final tab in _tabsInSidebarOrder())
         if (tab.ai case final pane?)
           _entry(pane, runtimes.existing(pane.id)?.state, agents),
+    ];
+  }
+
+  /// The tabs as the sidebar shows them, top to bottom: workspace by
+  /// workspace, pinned ones first (not the order they were opened in). A
+  /// tab the sidebar has not placed yet comes after them.
+  List<TerminalTab> _tabsInSidebarOrder() {
+    final tabs = _ref.read(terminalTabsProvider).tabs;
+    final byId = {for (final t in tabs) t.id: t};
+    final placed = <int>{};
+    return [
+      for (final id in _ref.read(sidebarWorkspacesProvider).orderedTabIds)
+        if (placed.add(id)) ?byId[id],
+      for (final t in tabs)
+        if (!placed.contains(t.id)) t,
     ];
   }
 
@@ -152,7 +168,7 @@ final class DesktopAiSource implements AiSessionSource {
         ),
       );
     }
-    for (final tab in _ref.read(terminalTabsProvider).tabs) {
+    for (final tab in _tabsInSidebarOrder()) {
       final cwd = tab.ai?.cwd;
       if (cwd == null || !seen.add(cwd)) continue;
       final name =
@@ -173,8 +189,14 @@ final class DesktopAiSource implements AiSessionSource {
     try {
       final runtime = _ref.read(aiRuntimesProvider.notifier).runtimeFor(paneId);
       if (runtime == null) return null;
-      // D15: a restored tab that has not run yet starts, as when it is shown.
-      if (start && runtime.state.phase == AgentPhase.stopped) {
+      // D15: a tab whose agent never ran (restored, or not shown yet) starts,
+      // as when it is shown. One that ran and stopped ("Dừng hẳn") stays
+      // stopped until the user sends something: a phone that attaches again
+      // (its channel came back) must not start it, nor run what was queued
+      // before the stop (D13). The pane starts each runtime once, likewise.
+      if (start &&
+          runtime.state.phase == AgentPhase.stopped &&
+          runtime.state.sessionId == null) {
         unawaited(runtime.start());
       }
       return _RuntimeControl(runtime);
@@ -206,7 +228,12 @@ final class DesktopAiSource implements AiSessionSource {
         .firstOrNull
         ?.ai;
     if (pane == null) return null;
-    control(pane.id, start: true); // its agent starts at once (D9)
+    // Its agent starts at once (D9). A runtime that cannot be made leaves no
+    // tab behind: the phone hears "refused" (§7), the computer shows nothing.
+    if (control(pane.id, start: true) == null) {
+      _ref.read(terminalTabsProvider.notifier).close(tabId);
+      return null;
+    }
     return pane.id;
   }
 
@@ -215,9 +242,7 @@ final class DesktopAiSource implements AiSessionSource {
   /// the one the computer shows.
   String? _workspaceFor(String folderKey, String path) {
     if (folderKey.startsWith('ws:')) return folderKey.substring(3);
-    final tab = _ref
-        .read(terminalTabsProvider)
-        .tabs
+    final tab = _tabsInSidebarOrder()
         .where((t) => t.ai?.cwd == path)
         .firstOrNull;
     if (tab == null) return null;
@@ -267,9 +292,10 @@ final class _RuntimeControl implements AiControl {
         .options
         .where((o) => o.optionId == optionId)
         .firstOrNull;
-    if (!(option?.kind.isReject ?? false) && aiIsNoApprovalMode(optionId)) {
-      throw const AiRefused('on_computer');
-    }
+    final enables = option == null
+        ? aiIsNoApprovalMode(optionId)
+        : aiOptionEnablesNoApproval(option);
+    if (enables) throw const AiRefused('on_computer');
     _runtime.answerPermission(id, optionId);
   }
 
@@ -368,13 +394,19 @@ final aiDaemonBindingProvider = Provider<void>((ref) {
 /// any phone can reach the window: in-process the hub becomes the target of
 /// the agent side's [slot] (every runtime's router sends it `ai.*`); with
 /// the background service it binds to each link to the service instead.
+/// Never throws: the window starts whatever happens here (phones then hear
+/// "unavailable"); the error's type goes to the log.
 void startAiPhone(ProviderContainer container, {AiEndpointSlot? slot}) {
-  final hub = container.read(aiPhoneHubProvider);
-  if (slot != null) {
-    container.read(_aiSlotPlugProvider).slot = slot;
-    slot.target = hub;
-  } else {
-    container.read(aiDaemonBindingProvider);
+  try {
+    final hub = container.read(aiPhoneHubProvider);
+    if (slot != null) {
+      container.read(_aiSlotPlugProvider).slot = slot;
+      slot.target = hub;
+    } else {
+      container.read(aiDaemonBindingProvider);
+    }
+  } on Object catch (error) {
+    debugPrint('ShellX: AI for phones failed to start: ${error.runtimeType}');
   }
 }
 
