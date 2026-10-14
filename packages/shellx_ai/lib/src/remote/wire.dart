@@ -20,7 +20,7 @@ const int kAiAttachItems = 60;
 const int kAiPageItems = 60;
 
 /// The most text one item record carries; a longer text follows in more
-/// records (`at` = where the piece starts).
+/// records (`at` = where the piece starts; `r` = -1 until the last one).
 const int kAiTextChunkBytes = 32 * 1024;
 
 /// Tool output kept for the phone: this much from the start and this much
