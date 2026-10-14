@@ -612,6 +612,36 @@ void main() {
     await runtime.dispose();
   }, variant: mac);
 
+  testWidgets('an empty text on the clipboard is no text: the picture '
+      'attaches', (t) async {
+    mockClipboardText(t, '');
+    final (_, runtime, ui) = await dock(
+      t,
+      const FakeScenario(),
+      clipboard: _png,
+    );
+    await paste(t);
+    expect(ui.images.items, hasLength(1));
+    expect(composerText(t), isEmpty);
+    await runtime.dispose();
+  }, variant: mac);
+
+  testWidgets('a BMP over 64 MiB is said to be too large, not decoded', (
+    t,
+  ) async {
+    mockClipboardText(t, null);
+    final bmp = Uint8List((64 << 20) + 1)..setRange(0, 2, [0x42, 0x4D]);
+    final (_, runtime, ui) = await dock(
+      t,
+      const FakeScenario(),
+      clipboard: bmp,
+    );
+    await paste(t);
+    expect(ui.images.items, isEmpty);
+    expect(find.text('The image is too large (at most 10 MB).'), findsOne);
+    await runtime.dispose();
+  }, variant: mac);
+
   testWidgets('a sixth image is said to be one too many; five stay', (t) async {
     mockClipboardText(t, null);
     final (_, runtime, ui) = await dock(
