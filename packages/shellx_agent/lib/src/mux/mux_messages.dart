@@ -39,6 +39,14 @@ abstract final class MuxType {
   static const viewLive = 'view.live';
   static const agentState = 'agent.state', agentCall = 'agent.call';
   static const agentGet = 'agent.get';
+
+  /// V2-2 (additive): a phone's `ai.*` message for the window (`ai.in`,
+  /// `{m: phone, b: CBOR bytes}`), a phone that left (`ai.gone`, `{m?}`),
+  /// the window's answer (`ai.out`, `{m, b}`), the window serving AI from
+  /// now on (`ai.serve`) and a push it asks for (`ai.push`). An older
+  /// service ignores the window's three; an older window never gets one.
+  static const aiIn = 'ai.in', aiGone = 'ai.gone', aiOut = 'ai.out';
+  static const aiServe = 'ai.serve', aiPush = 'ai.push';
 }
 
 abstract final class MuxError {
