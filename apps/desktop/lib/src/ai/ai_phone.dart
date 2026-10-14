@@ -249,6 +249,9 @@ final class DesktopAiSource implements AiSessionSource {
     return _ref.read(sidebarWorkspacesProvider).workspaceOf(tab.id);
   }
 
+  /// D11: the window active and the pane focused. Focus says nothing of a
+  /// user who walked away, so the hub pushes a request anyway once it waited
+  /// a minute (`AiPhoneHub.overdueAfter`).
   @override
   bool seenOnDesktop(int paneId) {
     if (!readWindowActive(_ref.read)) return false;

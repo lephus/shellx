@@ -97,7 +97,9 @@ abstract interface class AiSessionSource {
   Future<int?> open(String agentId, String folderKey);
 
   /// The user is looking at pane [paneId] on the computer now (window
-  /// focused, pane focused): no push for it (V2-2 D11).
+  /// focused, pane focused): no push for its request (V2-2 D11) until the
+  /// request has waited [AiPhoneHub.overdueAfter] — a computer left in front
+  /// of an empty chair keeps its focus.
   bool seenOnDesktop(int paneId);
 
   /// A4's long-command threshold: a turn at least this long that ends
@@ -233,12 +235,19 @@ final class _Watch {
   var graceOver = false;
   Timer? grace;
 
+  /// [attention] has waited [AiPhoneHub.overdueAfter]: the window showing
+  /// the session no longer holds its push back.
+  var overdue = false;
+  Timer? overdueTimer;
+
   /// When the last "needs you" push went; a done push does not count.
   DateTime? needsPushedAt;
 
   void stop() {
     grace?.cancel();
     grace = null;
+    overdueTimer?.cancel();
+    overdueTimer = null;
   }
 }
 
@@ -248,7 +257,8 @@ final class _Watch {
 /// requests — only explicit ones, checked against what is pending now —
 /// and asks for a push when a session needs the user and nobody shows the
 /// request: no phone that mirrors the session took it, and the window does
-/// not show it. Never logs anything a session holds.
+/// not show it (or the request has waited a minute). Never logs anything a
+/// session holds.
 final class AiPhoneHub implements AiEndpoint {
   AiPhoneHub({
     required AiSessionSource source,
@@ -259,6 +269,7 @@ final class AiPhoneHub implements AiEndpoint {
     this.listEvery = const Duration(milliseconds: 250),
     this.pushEvery = const Duration(seconds: 30),
     this.ackGrace = const Duration(seconds: 10),
+    this.overdueAfter = const Duration(seconds: 60),
   }) : _source = source,
        _push = push,
        _now = now ?? DateTime.now,
@@ -284,6 +295,12 @@ final class AiPhoneHub implements AiEndpoint {
   /// died without a word (a lift, a pocket), which the relay notices only
   /// minutes later, and the push must not wait for that.
   final Duration ackGrace;
+
+  /// A request still unanswered this long after it came is pushed even while
+  /// the window shows its session (V2-2 D11, as ruled after review): someone
+  /// at the screen answers within a minute, and a computer left in front of
+  /// an empty chair keeps its focus.
+  final Duration overdueAfter;
 
   final _out = StreamController<OutboundMessage>.broadcast(sync: true);
   final _phones = <String, _Phone>{};
@@ -580,11 +597,12 @@ final class AiPhoneHub implements AiEndpoint {
   /// The session of pane [paneId] waits for [request] now, or for nothing.
   /// A new request is pushed at once when nobody shows it ([_lookAt]), and
   /// looked at again when the phones that mirror the session had their
-  /// [ackGrace] to take it.
+  /// [ackGrace] to take it, and when it has waited [overdueAfter].
   void _attend(int paneId, _Watch w, int? request) {
     w
       ..attention = request
-      ..stop();
+      ..stop()
+      ..overdue = false;
     final s = w.state;
     // Answered or withdrawn: its id is never used again.
     w.pushed.retainWhere(
@@ -595,6 +613,12 @@ final class AiPhoneHub implements AiEndpoint {
       return;
     }
     _startGrace(paneId, w);
+    w.overdueTimer = Timer(overdueAfter, () {
+      w
+        ..overdueTimer = null
+        ..overdue = true;
+      if (identical(_watched[paneId], w)) _lookAt(paneId);
+    });
     _lookAt(paneId);
   }
 
@@ -622,11 +646,12 @@ final class AiPhoneHub implements AiEndpoint {
   /// Pushes the request session [paneId] waits for when nobody shows it
   /// (V2-2 D11): no phone that mirrors the session shows it — took it
   /// (acknowledged a header that asks it), or may still take it within its
-  /// [ackGrace] — and the window does not show it. When the grace ends, only
-  /// a phone that stayed silent makes it go: one that left the session by
-  /// itself is no sign of a dead socket. A phone that only lists still gets
-  /// the push: the app shows it as an in-app banner while open. Never twice
-  /// for one request, and at most one per [pushEvery] for a session.
+  /// [ackGrace] — and the window does not show it, or the request has
+  /// waited [overdueAfter]. When the grace ends, only a phone that stayed
+  /// silent makes it go: one that left the session by itself is no sign of
+  /// a dead socket (the minute still comes). A phone that only lists still
+  /// gets the push: the app shows it as an in-app banner while open. Never
+  /// twice for one request, and at most one per [pushEvery] for a session.
   void _lookAt(int paneId, {bool graceEnded = false}) {
     final w = _watched[paneId];
     final push = _push;
@@ -647,7 +672,7 @@ final class AiPhoneHub implements AiEndpoint {
       silent = true;
     }
     if (graceEnded && !silent) return;
-    if (_seenOnDesktop(paneId)) return;
+    if (!w.overdue && _seenOnDesktop(paneId)) return;
     // The limit is of "needs you" pushes among themselves: a done push just
     // before must not hide the question that follows it.
     final now = _now();

@@ -190,4 +190,94 @@ void main() {
       });
     });
   });
+
+  group('a minute after it came, whatever the computer shows (I4)', () {
+    test('a request the computer shows: no push at 59 s, one at 60 s, '
+        'never again', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        rig.source.seen.add(-1); // focused window, focused pane
+        s.addPermission(perm('c1'), aiT0);
+        async.elapse(const Duration(seconds: 59));
+        expect(pushes, isEmpty);
+        async.elapse(const Duration(seconds: 1));
+        expect(pushes.single.kind, AiPushKind.needsInput);
+        expect(pushes.single.detail, 'Sửa src/main.ts');
+        async.elapse(const Duration(minutes: 10));
+        expect(pushes, hasLength(1));
+      });
+    });
+
+    test('answered before its minute: no push', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        rig.source.seen.add(-1);
+        final p = s.addPermission(perm('c1'), aiT0);
+        async.elapse(const Duration(seconds: 59));
+        s.resolvePermission(p.id, const PermissionSelected('allow'));
+        async.elapse(const Duration(minutes: 10));
+        expect(pushes, isEmpty);
+      });
+    });
+
+    test('one the computer does not show is pushed at once, and not again '
+        'at its minute', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        s.addPermission(perm('c1'), aiT0);
+        expect(pushes, hasLength(1));
+        async.elapse(const Duration(minutes: 10));
+        expect(pushes, hasLength(1));
+      });
+    });
+
+    test('the next request has a minute of its own', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        rig.source.seen.add(-1);
+        final p = s.addPermission(perm('c1'), aiT0);
+        async.elapse(const Duration(seconds: 50));
+        s.resolvePermission(p.id, const PermissionSelected('allow'));
+        s.addPermission(perm('c2'), aiT0);
+        async.elapse(const Duration(seconds: 59));
+        expect(pushes, isEmpty);
+        async.elapse(const Duration(seconds: 1));
+        expect(pushes, hasLength(1));
+      });
+    });
+
+    test('one a phone left on its page by itself: pushed when its minute is '
+        'up, not when the phone leaves', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        rig.source.seen.add(-1);
+        rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+        s.addPermission(perm('c1'), aiT0);
+        async.elapse(const Duration(milliseconds: 150));
+        ackAll(rig, phone);
+        async.elapse(const Duration(seconds: 20));
+        rig.hub.handle(phone, const AiDetach(sid: 'ep.-1'));
+        async.elapse(const Duration(seconds: 39));
+        expect(pushes, isEmpty);
+        async.elapse(const Duration(seconds: 1));
+        expect(pushes, hasLength(1));
+      });
+    });
+
+    test('a phone that shows it goes after the minute: pushed then, the '
+        'computer showing it or not', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        rig.source.seen.add(-1);
+        rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+        s.addPermission(perm('c1'), aiT0);
+        async.elapse(const Duration(milliseconds: 150));
+        ackAll(rig, phone);
+        async.elapse(const Duration(seconds: 90));
+        expect(pushes, isEmpty); // the phone shows it
+        rig.hub.phoneGone(phone);
+        expect(pushes, hasLength(1));
+      });
+    });
+  });
 }
