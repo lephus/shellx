@@ -10,6 +10,9 @@ sealed class MirrorItem with Redacted {
   const MirrorItem(this.index, this.rev, this.turn);
 
   final int index;
+
+  /// The desktop item's `rev`; -1 while a long text is only partly here (its
+  /// [AiHave] then makes the desktop send the text again).
   final int rev;
   final int turn;
 }

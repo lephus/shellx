@@ -126,13 +126,10 @@ final class AiSubscription with Redacted {
     final revs = <int>[];
     for (var i = _from - 1; i >= start; i--) {
       final item = items[i];
-      final text = itemText(item);
       String record;
-      if (text != null) {
-        final (json, end) = encodeTextRecord(item, i);
-        record = end < text.length
-            ? '${json.substring(0, json.length - 1)},"clip":${text.length}}'
-            : json;
+      if (item is UserItem || item is StreamedTextItem) {
+        final (json, end) = encodeTextRecord(item, i, clip: true);
+        record = json;
         _textSent[i] = end;
       } else {
         record = encodeItemRecord(item, i);
@@ -215,13 +212,18 @@ final class AiSubscription with Redacted {
           prefix.write(',"${e.key}":${jsonEncode(e.value)}');
         }
       }
-      if (first && (headChanged || snapshot != null)) {
-        prefix.write(',"head":$head');
-      }
+      final withHead = first && (headChanged || snapshot != null);
+      if (withHead) prefix.write(',"head":$head');
       final batch = <String>[];
       var size = utf8Length(prefix.toString()) + 16;
+      // The first record is taken whatever its size, as only the envelope is
+      // around it. With the header that is not so: the header may be bigger
+      // than the 1 KiB [kAiRecordBytes] leaves, so a record that does not fit
+      // beside it starts the next body (a body over [kAiBodyBytes] would drop
+      // the whole channel).
       while (k < records.length &&
-          (batch.isEmpty || size + records[k].$2 + 1 <= kAiBodyBytes)) {
+          ((batch.isEmpty && !withHead) ||
+              size + records[k].$2 + 1 <= kAiBodyBytes)) {
         batch.add(records[k].$1);
         size += records[k].$2 + 1;
         k++;

@@ -20,19 +20,27 @@ String? itemText(TimelineItem item) => switch (item) {
 /// A text record of item [index]: its text from char [from] (UTF-16 code
 /// units), at most [maxBytes] of UTF-8. Returns the record and where the
 /// piece ends (= the text's length when all of it went).
+///
+/// While the text goes on in a later piece the record has `r` = -1, not the
+/// item's rev: the phone does not hold the item yet, so a channel lost here
+/// must not make its [AiHave] claim it, or the rest would never come. With
+/// [clip] the piece is all the phone gets of the text (an older page): it
+/// has the item's rev, and `clip` = the whole length when the text goes on.
 (Map<String, Object?>, int) encodeTextPiece(
   TimelineItem item,
   int index, {
   int from = 0,
   int maxBytes = kAiTextChunkBytes,
+  bool clip = false,
 }) {
   final text = itemText(item) ?? '';
   final start = min(from, text.length);
   final end = utf8Cut(text, maxBytes, from: start);
+  final goesOn = end < text.length;
   return (
     {
       'i': index,
-      'r': item.rev,
+      'r': goesOn && !clip ? -1 : item.rev,
       'k': switch (item) {
         UserItem() => 'user',
         ThoughtItem() => 'thought',
@@ -41,14 +49,21 @@ String? itemText(TimelineItem item) => switch (item) {
       'turn': item.turn,
       'at': start,
       'add': text.substring(start, end),
+      if (goesOn && clip) 'clip': text.length,
     },
     end,
   );
 }
 
 /// A text piece of item [index] from char [from] as JSON, within
-/// [kAiRecordBytes] once escaped (newlines and quotes grow in JSON).
-(String, int) encodeTextRecord(TimelineItem item, int index, {int from = 0}) {
+/// [kAiRecordBytes] once escaped (newlines and quotes grow in JSON). See
+/// [encodeTextPiece] for [clip].
+(String, int) encodeTextRecord(
+  TimelineItem item,
+  int index, {
+  int from = 0,
+  bool clip = false,
+}) {
   var maxBytes = kAiTextChunkBytes;
   while (true) {
     final (piece, end) = encodeTextPiece(
@@ -56,6 +71,7 @@ String? itemText(TimelineItem item) => switch (item) {
       index,
       from: from,
       maxBytes: maxBytes,
+      clip: clip,
     );
     final json = jsonEncode(piece);
     if (utf8Length(json) <= kAiRecordBytes || maxBytes <= 256) {
