@@ -28,9 +28,18 @@ final class FakeAiControl implements AiControl {
   /// Set: `send` waits for it first (a prompt still on its way).
   Completer<void>? hold;
 
+  /// Set: `answerPermission` and `answerAsk` refuse with it (an answer the
+  /// window takes only on the computer).
+  AiRefused? refuse;
+
   void _fail() {
     final error = failWith;
     if (error != null) throw error;
+  }
+
+  void _refuse() {
+    final refusal = refuse;
+    if (refusal != null) throw refusal;
   }
 
   @override
@@ -64,12 +73,14 @@ final class FakeAiControl implements AiControl {
 
   @override
   void answerPermission(int id, String optionId) {
+    _refuse();
     permissions.add((id, optionId));
     state.resolvePermission(id, PermissionSelected(optionId));
   }
 
   @override
   void answerAsk(int id, ElicitationResponse response) {
+    _refuse();
     asks.add((id, response));
     state.resolveAsk(id, response);
   }

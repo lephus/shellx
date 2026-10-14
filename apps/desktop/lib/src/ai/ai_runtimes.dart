@@ -110,6 +110,11 @@ class AiRuntimes extends Notifier<void> {
   final _listeners = <int, void Function()>{};
   final _queued = <int>{};
   final _stopping = <Future<void>>{};
+  final _made = StreamController<int>.broadcast(sync: true);
+
+  /// V2-2: the pane of each runtime as it is made. The phone hub listens, so
+  /// a phone sees a session's state as soon as it exists.
+  Stream<int> get made => _made.stream;
 
   /// [stopAll] ran: the app is quitting, no runtime is made any more.
   var _stopped = false;
@@ -184,6 +189,7 @@ class AiRuntimes extends Notifier<void> {
     void listener() => _queueSync(paneId);
     _listeners[paneId] = listener;
     runtime.state.addListener(listener);
+    _made.add(paneId);
     return runtime;
   }
 
