@@ -8,6 +8,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_agents.dart';
 import '../../ai/ai_frame_notifier.dart';
+import '../../ai/ai_project_files.dart';
 import '../../ai/ai_runtimes.dart';
 import '../../config/settings_schema.dart' show SettingPage;
 import '../../terminal/terminal_tabs.dart';
@@ -88,6 +89,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     super.initState();
     _ui.onChooseFolder = () => setState(() => _choosing = true);
     _ui.onRun = (request) => unawaited(_run(request));
+    _ui.fileIndex = _fileIndex;
     _ui.onRevertTurn = (turn) {
       final runtime = _runtime;
       if (runtime == null) return;
@@ -248,6 +250,24 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
           ),
         );
     }
+  }
+
+  Future<List<String>>? _index;
+  int? _indexTurn;
+
+  /// D16: the project's files for `@`, read again after each turn.
+  Future<List<String>> _fileIndex() {
+    final runtime = _runtime;
+    if (runtime == null) return Future.value(const []);
+    final turn = aiTurnsOf(runtime.state).lastFinished;
+    if (_index == null || _indexTurn != turn) {
+      _indexTurn = turn;
+      _index = ref
+          .read(aiProjectFilesProvider)
+          .index(runtime.state.cwd)
+          .catchError((Object _) => const <String>[]);
+    }
+    return _index!;
   }
 
   /// D15: an earlier session of this folder, in a new AI tab of the same

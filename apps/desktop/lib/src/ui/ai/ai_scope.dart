@@ -95,6 +95,10 @@ final class AiPaneUi extends ChangeNotifier {
   /// Set by the pane: "Revert turn" N (§4.4).
   void Function(int turn)? onRevertTurn;
 
+  /// Set by the pane: the project's files for `@` (D16), read off the UI
+  /// isolate and kept until a turn ends.
+  Future<List<String>> Function()? fileIndex;
+
   void showOverlay(Widget overlay) {
     _overlay = overlay;
     notifyListeners();

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'ai_completer.dart';
 import 'ai_config_chips.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
@@ -53,7 +55,22 @@ class _AiComposerState extends State<AiComposer> {
   _View? _view;
   String? _note;
 
+  /// D16: `@` file suggestions; the files mentioned so far (sent along as
+  /// `resource_link` while their `@path` is still in the text).
+  late final _completer = AiCompleter(
+    files: () => _scope?.ui.fileIndex?.call() ?? Future.value(const []),
+  );
+  final _mentions = <String>{};
+
   FocusNode get _focus => widget.focusNode ?? _ownFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _text.addListener(_onText);
+  }
+
+  void _onText() => unawaited(_completer.update(_text.value));
 
   @override
   void didChangeDependencies() {
@@ -75,6 +92,7 @@ class _AiComposerState extends State<AiComposer> {
     _scope?.ui.insert.removeListener(_onInsert);
     _text.dispose();
     _ownFocus.dispose();
+    _completer.dispose();
     super.dispose();
   }
 
@@ -104,6 +122,26 @@ class _AiComposerState extends State<AiComposer> {
       text: v.text.replaceRange(at, end, add),
       selection: TextSelection.collapsed(offset: at + add.length),
     );
+    if (add.startsWith('@')) _mentions.add(add.substring(1).trim());
+    _focus.requestFocus();
+  }
+
+  /// A suggestion goes in place of what was typed.
+  void _take([int? index]) {
+    final (value, pick) = _completer.accept(_text.value, index);
+    _text.value = value;
+    if (pick.mention case final path?) _mentions.add(path);
+  }
+
+  /// The "@" button: a mention starts at the cursor.
+  void _startMention() {
+    final v = _text.value;
+    final at = v.selection.isValid ? v.selection.start : v.text.length;
+    final space = at > 0 && v.text[at - 1].trim().isNotEmpty ? ' ' : '';
+    _text.value = TextEditingValue(
+      text: v.text.replaceRange(at, at, '$space@'),
+      selection: TextSelection.collapsed(offset: at + space.length + 1),
+    );
     _focus.requestFocus();
   }
 
@@ -117,9 +155,22 @@ class _AiComposerState extends State<AiComposer> {
     if (text.trim().isEmpty || !_canSend) return;
     final scope = _scope!;
     final l10n = AppLocalizations.of(context);
+    // D16: each file still mentioned goes along as a `resource_link`.
+    final cwd = scope.state.cwd;
+    final blocks = <ContentBlock>[
+      TextBlock(text.trim()),
+      for (final path in _mentions)
+        if (text.contains('@$path'))
+          ResourceLinkBlock(
+            uri: Uri.file(p.join(cwd, path)).toString(),
+            name: p.basename(path),
+            title: path,
+          ),
+    ];
+    _mentions.clear();
     _text.clear();
     setState(() => _note = null);
-    final ok = await scope.runtime.send([TextBlock(text.trim())]);
+    final ok = await scope.runtime.send(blocks);
     if (ok || !mounted) return;
     _text.text = text;
     setState(
@@ -144,6 +195,26 @@ class _AiComposerState extends State<AiComposer> {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
     // §1.10: the input method's keys while it composes.
     if (_text.value.composing.isValid) return KeyEventResult.ignored;
+    // D16: an open suggestion list takes its keys first (Esc closes it,
+    // never a question).
+    if (_completer.active) {
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.arrowDown:
+          _completer.move(1);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowUp:
+          _completer.move(-1);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.enter ||
+            LogicalKeyboardKey.numpadEnter ||
+            LogicalKeyboardKey.tab:
+          _take();
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.escape:
+          _completer.dismiss();
+          return KeyEventResult.handled;
+      }
+    }
     if (widget.keyHook?.call(event, hasText: _text.text.isNotEmpty) ?? false) {
       return KeyEventResult.handled;
     }
@@ -183,6 +254,12 @@ class _AiComposerState extends State<AiComposer> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          ListenableBuilder(
+            listenable: _completer,
+            builder: (context, _) => _completer.active
+                ? _Suggestions(completer: _completer, onPick: _take)
+                : const SizedBox.shrink(),
+          ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: AiSizes.composerMax),
             child: Focus(
@@ -229,6 +306,14 @@ class _AiComposerState extends State<AiComposer> {
             ),
             child: Row(
               children: [
+                IconButton(
+                  key: const Key('ai.mention'),
+                  tooltip: l10n.aiMention,
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _canSend ? _startMention : null,
+                  icon: const Icon(Icons.alternate_email),
+                ),
                 if (_note case final note?)
                   Expanded(
                     child: Text(
@@ -267,6 +352,66 @@ class _AiComposerState extends State<AiComposer> {
       ),
     );
   }
+}
+
+/// D16: the suggestions over the field: the selected one lit; a click
+/// takes one.
+class _Suggestions extends StatelessWidget {
+  const _Suggestions({required this.completer, required this.onPick});
+
+  final AiCompleter completer;
+  final void Function(int index) onPick;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    child: Padding(
+      padding: const EdgeInsets.all(ShellxSpace.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, s) in completer.items.indexed)
+            InkWell(
+              key: Key('ai.suggest.$i'),
+              onTap: () => onPick(i),
+              child: Container(
+                color: i == completer.selected
+                    ? ShellxDesktopColors.rowSelected
+                    : null,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ShellxSpace.s8,
+                  vertical: ShellxSpace.s2,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        s.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kAiMono,
+                      ),
+                    ),
+                    if (s.detail case final detail?)
+                      Flexible(
+                        child: Text(
+                          detail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ShellxText.caption.copyWith(
+                            color: ShellxDesktopColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Send (⏎) / Queue (⏎) / Stop (Esc) / Stopping… / Force stop.
