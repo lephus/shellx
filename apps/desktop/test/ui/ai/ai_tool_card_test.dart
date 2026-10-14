@@ -603,6 +603,77 @@ void main() {
     expect(find.textContaining('console'), findsNothing);
   });
 
+  group('the fence of a result comes off a command\'s output only', () {
+    // claude-agent-acp wraps what a command printed in a "console" fence. A
+    // fetched page, a search hit or an MCP tool's text is the tool's own: a
+    // code fence in it is part of what it says.
+    const fenced = '```console\nhello.txt\n```';
+
+    /// A finished call of [kind] holding [fenced], its card opened.
+    Future<AiSessionState> opened(WidgetTester t, ToolKind kind) async {
+      final s = await pumpCard(t, (s) {
+        tool(
+          s,
+          'x',
+          kind,
+          'a call',
+          status: ToolCallStatus.completed,
+          content: [ToolContentBlock(const TextBlock(fenced))],
+        );
+      });
+      if (shownText(t).isEmpty) {
+        final header = find.descendant(
+          of: find.byType(AiToolCard),
+          matching: find.byType(InkWell),
+        );
+        await t.tap(header.first);
+        await t.pump();
+      }
+      return s;
+    }
+
+    for (final kind in [
+      ToolKind.search,
+      ToolKind.fetch,
+      ToolKind.other,
+      ToolKind.edit,
+      ToolKind.delete,
+      ToolKind.move,
+      ToolKind.think,
+    ]) {
+      testWidgets('${kind.name}: the result keeps its fences', (t) async {
+        await opened(t, kind);
+        expect(shownText(t), [fenced]);
+      });
+    }
+
+    testWidgets('a command\'s result loses its fence, as before', (t) async {
+      await opened(t, ToolKind.execute);
+      expect(shownText(t), ['hello.txt']);
+    });
+
+    testWidgets('a call that turns out to be a command is unfenced from then '
+        'on, and one that stops being one is not', (t) async {
+      final s = await opened(t, ToolKind.other);
+      expect(shownText(t), [fenced]);
+      // The same content, another kind: what is shown follows the kind.
+      s.applyUpdate(
+        const ToolCallUpdated('x', ToolCallFields(kind: ToolKind.execute)),
+        at,
+      );
+      await t.pump();
+      await t.pump();
+      expect(shownText(t), ['hello.txt']);
+      s.applyUpdate(
+        const ToolCallUpdated('x', ToolCallFields(kind: ToolKind.fetch)),
+        at,
+      );
+      await t.pump();
+      await t.pump();
+      expect(shownText(t), [fenced]);
+    });
+  });
+
   testWidgets('the arguments of a tool (pretty-printed JSON) are capped like '
       'an output: a 1 MB value does not freeze the card (I-5)', (t) async {
     await pumpCard(t, (s) {

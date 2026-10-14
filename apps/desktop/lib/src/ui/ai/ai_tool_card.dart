@@ -246,7 +246,8 @@ final _fenceOpen = RegExp(r'^(`{3,}|~{3,})[^`\n]*\n');
 /// command's result as "```console\n…\n```": the card shows the output, not
 /// the fence lines (which would also count as lines). Text that is not
 /// wrapped in one — or holds a line that would close the fence early — is
-/// returned as it is.
+/// returned as it is. The card does this for a command's output (`execute`)
+/// only: what any other tool returned is its own text.
 String aiUnfence(String text) {
   final open = _fenceOpen.firstMatch(text);
   if (open == null) return text;
@@ -331,13 +332,16 @@ class AiToolCard extends ConsumerStatefulWidget {
 
 /// What a card shows of a call's text, made once per revision of the call (a
 /// card that is built again, opened, or scrolled out of the list and back in
-/// is not made again): the output without its fence and escape codes, cut;
-/// and the arguments as JSON, cut.
+/// is not made again): the output without escape codes, and without its fence
+/// when it is a command's, cut; and the arguments as JSON, cut.
 final class _Shown {
-  _Shown(this.content, this.rawInput, this.output);
+  _Shown(this.content, this.rawInput, this.kind, this.output);
 
   final List<ToolContent>? content;
   final Object? rawInput;
+
+  /// The kind the output was made for: a command's loses its fence.
+  final ToolKind? kind;
   final AiOutput output;
 
   late final AiOutput? input = rawInput == null
@@ -352,19 +356,24 @@ _Shown _shownOf(ToolItem item) {
   final hit = _shown[item];
   if (hit != null &&
       identical(hit.content, f.content) &&
-      identical(hit.rawInput, f.rawInput)) {
+      identical(hit.rawInput, f.rawInput) &&
+      hit.kind == f.kind) {
     return hit;
   }
   AiToolCard.debugOutputPreps++;
+  // Only a command's output is wrapped in a fence by the adapter; what any
+  // other tool returned is its own text, fences and all.
+  final unfence = f.kind == ToolKind.execute;
   return _shown[item] = _Shown(
     f.content,
     f.rawInput,
+    f.kind,
     aiOutputOf(
       aiStripAnsi(
         [
           for (final c in f.content ?? const <ToolContent>[])
             if (c case ToolContentBlock(block: TextBlock(:final text)))
-              aiUnfence(text),
+              unfence ? aiUnfence(text) : text,
         ].join('\n'),
       ),
     ),
