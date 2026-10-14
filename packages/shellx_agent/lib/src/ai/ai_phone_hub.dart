@@ -183,9 +183,11 @@ final class _Phone {
   /// per session. The next ack that opens the window answers it.
   final earlier = <String, int>{};
 
-  /// Sessions this phone was told cannot run now (no folder, their agent
-  /// off): a runtime that comes brings them live again.
-  final parked = <String>{};
+  /// Sessions this phone was told cannot run now, with the reason it was
+  /// told (no folder, their agent off; null: none, the window made no
+  /// runtime): a runtime that comes brings them live again, and so does the
+  /// reason going away (the attach runs again).
+  final parked = <String, AiRemoteState?>{};
 
   /// The `seq` of the last mirror message sent for a session by a
   /// subscription that is gone (or by the "cannot run" snapshot): the next
@@ -438,7 +440,7 @@ final class AiPhoneHub implements AiEndpoint {
           AiListResult(available: false, body: emptyAiListingBody),
         );
       }
-      for (final sid in {...phone.subs.keys, ...phone.parked}) {
+      for (final sid in {...phone.subs.keys, ...phone.parked.keys}) {
         _send(mobileId, AiClosed(sid: sid, reason: 'desktop_closed'));
       }
     }
@@ -468,12 +470,24 @@ final class AiPhoneHub implements AiEndpoint {
       return; // the window's code failed: the next change looks again
     }
     final live = <int>{};
+    // Phones told why a session could not run, whose reason went away while
+    // no runtime came (its agent switched on again, a folder chosen): their
+    // attach runs again once this scan is done.
+    final again = <(String, _Phone, String)>[];
     for (final e in entries) {
       final state = e.state;
       if (state == null) {
         // No runtime now. With a reason it cannot run (no folder, agent off);
-        // without one another is on its way, and phones wait for it.
-        if (e.unavailable != null) _park(e);
+        // without one another is on its way, and phones wait for it — or the
+        // window makes it when asked, as an attach does.
+        if (e.unavailable != null) {
+          _park(e);
+        } else {
+          final sid = sidOf(e.paneId);
+          for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
+            if (phone.parked[sid] != null) again.add((mobileId, phone, sid));
+          }
+        }
         continue;
       }
       live.add(e.paneId);
@@ -511,7 +525,7 @@ final class AiPhoneHub implements AiEndpoint {
     // waiting for them, and leave no timer or clock behind.
     final present = {for (final e in entries) sidOf(e.paneId)};
     for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
-      for (final sid in {...phone.subs.keys, ...phone.parked}) {
+      for (final sid in {...phone.subs.keys, ...phone.parked.keys}) {
         if (present.contains(sid)) continue;
         _leave(phone, sid);
         _send(mobileId, AiClosed(sid: sid, reason: 'gone'));
@@ -524,6 +538,13 @@ final class AiPhoneHub implements AiEndpoint {
     }
     _lastFlush.removeWhere((sid, _) => !present.contains(sid));
     _scheduleListing();
+    for (final (mobileId, phone, sid) in again) {
+      // Still that phone, still waiting with a reason it was told (the scan
+      // an attach makes may have brought it back already).
+      if (identical(_phones[mobileId], phone) && phone.parked[sid] != null) {
+        _attach(mobileId, phone, sid, null);
+      }
+    }
   }
 
   /// [phone] mirrors [sid] no more (nor waits for a page of it); the next
@@ -560,7 +581,7 @@ final class AiPhoneHub implements AiEndpoint {
     final sid = sidOf(paneId);
     for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
       final old = phone.subs[sid];
-      if (old == null && !phone.parked.contains(sid)) continue;
+      if (old == null && !phone.parked.containsKey(sid)) continue;
       if (old != null && identical(old.state, state)) continue; // up to date
       final sub = _subscribe(phone, sid, state);
       _sendAll(mobileId, phone, sid, sub.attach(null));
@@ -568,13 +589,17 @@ final class AiPhoneHub implements AiEndpoint {
   }
 
   /// A session that cannot run now while phones mirror it: they are told why
-  /// (no frozen mirror) and wait for a runtime to come back.
+  /// (no frozen mirror) and wait for a runtime to come back. One told
+  /// another reason before hears the new one.
   void _park(AiSessionEntry entry) {
     final sid = sidOf(entry.paneId);
     for (final MapEntry(key: mobileId, value: phone) in _phones.entries) {
-      if (!phone.subs.containsKey(sid)) continue;
+      final told = phone.parked.containsKey(sid);
+      if (!phone.subs.containsKey(sid) &&
+          !(told && phone.parked[sid] != entry.unavailable)) {
+        continue;
+      }
       _drop(phone, sid);
-      phone.parked.add(sid);
       _sendUnavailable(mobileId, phone, sid, entry);
     }
   }
@@ -879,7 +904,6 @@ final class AiPhoneHub implements AiEndpoint {
       // It cannot run: the phone shows why (set up on the computer) and
       // waits for a runtime to come.
       _leave(phone, sid);
-      phone.parked.add(sid);
       _sendUnavailable(mobileId, phone, sid, entry);
       return;
     }
@@ -906,13 +930,16 @@ final class AiPhoneHub implements AiEndpoint {
 
   /// The snapshot of a session that cannot run: its header says why, without
   /// items. The names are the tab's and the folder's, cut like a listing's.
-  /// Its `seq` goes on from what the phone was sent of the session.
+  /// Its `seq` goes on from what the phone was sent of the session. With no
+  /// reason (the window made no runtime) it is just not started, as the
+  /// listing says. The phone then waits for a runtime ([_Phone.parked]).
   void _sendUnavailable(
     String mobileId,
     _Phone phone,
     String sid,
     AiSessionEntry entry,
   ) {
+    phone.parked[sid] = entry.unavailable;
     final seq = (phone.seqs[sid] ?? 0) + 1;
     phone.seqs[sid] = seq;
     final cwd = entry.cwd;
@@ -933,7 +960,7 @@ final class AiPhoneHub implements AiEndpoint {
             'name': clipText(entry.agentName, 200),
             'title': clipText(entry.title, 400),
             'cwd': ?(cwd == null ? null : clipText(cwd, 600)),
-            'unavailable': (entry.unavailable ?? AiRemoteState.noFolder).wire,
+            'unavailable': ?entry.unavailable?.wire,
           },
           'items': const <Object?>[],
         }),

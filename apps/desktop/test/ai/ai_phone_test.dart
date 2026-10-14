@@ -320,6 +320,28 @@ void main() {
       expect(fakes.launcher.channels.single.stopCalls, 1);
     });
 
+    test('Claude switched on again while the phone still says it is off: the '
+        'page comes back, its agent started as an attach does (M3)', () async {
+      final fs = MemoryConfigFs();
+      boot(const FakeScenario(), more: configOverrides(fs));
+      final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
+      final sid = hub.sidOf(ai.ai!.id);
+      hub.handle(_phone, AiAttach(sid: sid));
+      await until(() => stateOf(ai).phase == AgentPhase.ready);
+      fs.write(testConfigPaths().shellx, 'ai-agent-claude = off\n');
+      await loadConfig(c);
+      await until(
+        () => mirror(sid).head?.unavailable == AiRemoteState.agentOff,
+      );
+      // On again: no runtime yet (the pane is not shown), and no reason now.
+      fs.write(testConfigPaths().shellx, 'ai-agent-claude = on\n');
+      await loadConfig(c);
+      await until(() => fakes.launcher.channels.length == 2);
+      await until(() => mirror(sid).head?.phase == 'ready');
+      expect(mirror(sid).head!.unavailable, isNull);
+      expect(sent<AiClosed>(), isEmpty);
+    });
+
     test('a tab that cannot run says why, in the list and to a phone that '
         'opens it: no folder, or its agent off or unknown (D14)', () {
       boot(const FakeScenario());

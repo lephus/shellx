@@ -134,6 +134,89 @@ void main() {
     });
   });
 
+  group('a phone told why a session cannot run, once the reason is gone and '
+      'no runtime came (M3)', () {
+    test('its agent switched on again: the attach runs again, the session '
+        'goes live', () {
+      fakeAsync((async) {
+        final rig = HubRig()..source.add(-1);
+        rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+        rig.source.forget(-1, unavailable: AiRemoteState.agentOff);
+        expect(
+          rig.mirror(phone, 'ep.-1').head!.unavailable,
+          AiRemoteState.agentOff,
+        );
+        rig.source.started.clear();
+        rig.source
+          ..lazy.add(-1) // made when asked for, as a pane does
+          ..forget(-1); // switched on: no reason, and no runtime yet
+        expect(rig.source.started, [-1]); // as the phone's attach does (D15)
+        final mirror = rig.mirror(phone, 'ep.-1');
+        expect(mirror.head!.unavailable, isNull);
+        expect(mirror.head!.phase, 'ready');
+        final s = rig.source.controls[-1]!.state
+          ..beginTurn(const [TextBlock('go')], aiT0);
+        say(s, 'live');
+        async.elapse(const Duration(milliseconds: 150));
+        final live = rig.mirror(phone, 'ep.-1');
+        expect((live.items.last as MirrorText).text, 'live');
+      });
+    });
+
+    test('a folder chosen for a tab it opened without one: the same', () {
+      final rig = HubRig()
+        ..source.add(-2, runs: false, unavailable: AiRemoteState.noFolder);
+      rig.hub.handle(phone, const AiAttach(sid: 'ep.-2'));
+      expect(
+        rig.mirror(phone, 'ep.-2').head!.unavailable,
+        AiRemoteState.noFolder,
+      );
+      rig.source
+        ..lazy.add(-2)
+        ..forget(-2);
+      expect(rig.mirror(phone, 'ep.-2').head!.unavailable, isNull);
+      expect(rig.source.started, [-2, -2]);
+    });
+
+    test('a window that cannot make the runtime: the phone is told the '
+        'session is not started, not the reason that went, and only once', () {
+      final rig = HubRig()..source.add(-1);
+      rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+      rig.source.forget(-1, unavailable: AiRemoteState.agentOff);
+      rig.source.forget(-1); // no reason now, and no runtime will come
+      final head = rig.mirror(phone, 'ep.-1').head!;
+      expect((head.unavailable, head.phase), (null, 'stopped'));
+      final sent = rig.sent.length;
+      rig.source.add(-5); // another change: the attach is not run again
+      expect(rig.to(phone).length, sent);
+    });
+
+    test('a phone that left the session is not brought back', () {
+      final rig = HubRig()..source.add(-1);
+      rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+      rig.source.forget(-1, unavailable: AiRemoteState.agentOff);
+      rig.hub.handle(phone, const AiDetach(sid: 'ep.-1'));
+      rig.source.started.clear();
+      final sent = rig.sent.length;
+      rig.source
+        ..lazy.add(-1)
+        ..forget(-1);
+      expect(rig.sent.length, sent);
+      expect(rig.source.started, isEmpty);
+    });
+
+    test('a reason that changes is told', () {
+      final rig = HubRig()..source.add(-1);
+      rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+      rig.source.forget(-1, unavailable: AiRemoteState.agentOff);
+      rig.source.forget(-1, unavailable: AiRemoteState.noFolder);
+      expect(
+        rig.mirror(phone, 'ep.-1').head!.unavailable,
+        AiRemoteState.noFolder,
+      );
+    });
+  });
+
   group('seq only goes up for a phone and a session', () {
     test('a new runtime goes on from the old one, and the late ack of the '
         'old one clears nothing of the new one', () {

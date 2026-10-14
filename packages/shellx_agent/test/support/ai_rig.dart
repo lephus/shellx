@@ -243,11 +243,40 @@ final class FakeAiSource implements AiSessionSource {
   @override
   String? defaultAgent = 'claude';
 
+  /// Panes whose runtime this window makes when asked for it ([control]), as
+  /// `AiRuntimes.runtimeFor` does for a tab that can run and has none yet (a
+  /// restored tab, an agent switched back on).
+  final lazy = <int>{};
+
   @override
   AiControl? control(int paneId, {bool start = false}) {
     _maybeFail('control');
     if (start) started.add(paneId);
+    if (controls[paneId] == null && lazy.contains(paneId)) _make(paneId);
     return controls[paneId];
+  }
+
+  void _make(int paneId) {
+    final i = entries.indexWhere((e) => e.paneId == paneId);
+    if (i < 0 || entries[i].unavailable != null) return;
+    final old = entries[i];
+    final state = AiSessionState(
+      agentId: old.agentId,
+      agentName: old.agentName,
+      cwd: '/p',
+    )..setPhase(AgentPhase.ready);
+    entries[i] = AiSessionEntry(
+      paneId: paneId,
+      agentId: old.agentId,
+      agentName: old.agentName,
+      title: old.title,
+      cwd: old.cwd,
+      state: state,
+    );
+    controls[paneId] = FakeAiControl(state);
+    // Listed at once; the window tells of it a little later, coalesced
+    // (`AiRuntimes.made`).
+    scheduleMicrotask(() => _changes.add(null));
   }
 
   /// Set: `open` waits for it first (a tab still being made).
