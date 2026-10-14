@@ -1425,4 +1425,201 @@ void main() {
       });
     });
   });
+
+  group('a page closed "unavailable": no window served AI then (M10)', () {
+    const unavailable = AiClosed(sid: _sid, reason: 'unavailable');
+    AiListResult listed({required bool available}) => AiListResult(
+      available: available,
+      body: encodeBody(
+        AiListing(
+          sessions: [
+            if (available)
+              const AiSessionInfo(
+                sid: _sid,
+                agentId: 'claude',
+                agentName: 'Claude',
+                title: 'T',
+                state: AiRemoteState.idle,
+              ),
+          ],
+        ).toJson(),
+      ),
+    );
+
+    test('attaches once more when the list next says AI is available, and '
+        'the page comes back', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final ai = h.phoneMachine.ai;
+        var serving = false;
+        d.onMessage = (m) {
+          if (m is AiAttach) d.say(serving ? _snapshot(1) : unavailable);
+        };
+        final link = ai.attach(_sid);
+        settle(async);
+        expect(link.state, AiLinkState.closed);
+        expect(link.closedReason, 'unavailable');
+        // It asks for the list, to hear when a window serves AI again; the
+        // channel stays wanted meanwhile.
+        expect(d.got<AiList>(), hasLength(1));
+        expect(ai.wantsChannel, isTrue);
+        d.say(listed(available: false));
+        settle(async);
+        expect(d.got<AiAttach>(), hasLength(1));
+
+        serving = true;
+        final states = <AiLinkState>[];
+        link.changes.listen((_) => states.add(link.state));
+        d.say(listed(available: true));
+        settle(async);
+        expect(d.got<AiAttach>(), hasLength(2));
+        expect(states, [AiLinkState.attaching, AiLinkState.live]);
+        expect((link.state, link.closedReason), (AiLinkState.live, null));
+        expect(ai.attach(_sid), same(link)); // the page's own link
+      });
+    });
+
+    test('never a loop: another "unavailable" before the page came back '
+        'closes it for good', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final ai = h.phoneMachine.ai;
+        d.onMessage = (m) {
+          if (m is AiAttach) d.say(unavailable);
+        };
+        final link = ai.attach(_sid);
+        settle(async);
+        d.say(listed(available: true));
+        settle(async);
+        expect(d.got<AiAttach>(), hasLength(2)); // the one retry
+        expect(link.closedReason, 'unavailable');
+        for (var i = 0; i < 3; i++) {
+          d.say(listed(available: true));
+          settle(async);
+        }
+        expect(d.got<AiAttach>(), hasLength(2));
+        expect(d.got<AiList>(), hasLength(1));
+        expect(ai.wantsChannel, isFalse);
+      });
+    });
+
+    test('a page that came back, then lost it again, gets one more try', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final ai = h.phoneMachine.ai;
+        var serving = false;
+        d.onMessage = (m) {
+          if (m is AiAttach) d.say(serving ? _snapshot(1) : unavailable);
+        };
+        final link = ai.attach(_sid);
+        settle(async);
+        serving = true;
+        d.say(listed(available: true));
+        settle(async);
+        expect(link.state, AiLinkState.live);
+        serving = false;
+        d.say(unavailable); // the service restarted again, say
+        settle(async);
+        expect(link.closedReason, 'unavailable');
+        serving = true;
+        d.say(listed(available: true));
+        settle(async);
+        expect(link.state, AiLinkState.live);
+        expect(d.got<AiAttach>(), hasLength(3));
+      });
+    });
+
+    test('other reasons stay final, and a page that left is not brought '
+        'back', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final ai = h.phoneMachine.ai;
+        d.onMessage = (m) {
+          if (m is AiAttach) {
+            d.say(
+              m.sid == _sid
+                  ? const AiClosed(sid: _sid, reason: 'gone')
+                  : AiClosed(sid: m.sid, reason: 'unavailable'),
+            );
+          }
+        };
+        final gone = ai.attach(_sid);
+        final left = ai.attach('x.2');
+        settle(async);
+        left.detach();
+        d.say(listed(available: true));
+        settle(async);
+        expect(d.got<AiAttach>(), hasLength(2));
+        expect(gone.closedReason, 'gone');
+        expect(left.closedReason, 'unavailable');
+        expect(ai.wantsChannel, isFalse);
+      });
+    });
+
+    test('a channel lost while it waits: the next one asks for the list '
+        'again', () {
+      fakeAsync((async) {
+        final d = _Desktop(() => async.elapsed);
+        final h = Harness(async, keys, ai: d);
+        final ai = h.phoneMachine.ai;
+        var serving = false;
+        d.onMessage = (m) {
+          if (m is AiAttach) d.say(serving ? _snapshot(1) : unavailable);
+        };
+        final link = ai.attach(_sid);
+        settle(async);
+        h.disconnectPhone();
+        h.reconnectPhone();
+        settle(async, const Duration(seconds: 1));
+        expect(d.got<AiList>(), hasLength(2));
+        serving = true;
+        d.say(listed(available: true));
+        settle(async);
+        expect(link.state, AiLinkState.live);
+      });
+    });
+
+    test('the background service back before the window (a restart): the '
+        'open page attaches again once the window serves', () {
+      fakeAsync((async) {
+        final forwarder = MuxAiForwarder();
+        final h = Harness(async, keys, ai: forwarder);
+        final ai = h.phoneMachine.ai;
+        final link = ai.attach('ep.-1');
+        settle(async);
+        expect(link.closedReason, 'unavailable'); // no window serves yet
+
+        // The window comes back and serves AI through the service.
+        final hub = AiPhoneHub(source: _Window(), epoch: 'ep');
+        final window = Object();
+        hub.outbound.listen(
+          (o) => forwarder.fromUi(
+            window,
+            MuxMessage(
+              MuxType.aiOut,
+              fields: {'m': o.mobileId, 'b': encodeCbor(o.message.toMap())},
+            ),
+          ),
+        );
+        forwarder.serve(window, (m) {
+          final mobileId = m.get<String>('m');
+          final bytes = m.get<Uint8List>('b');
+          if (m.type != MuxType.aiIn || mobileId == null || bytes == null) {
+            return;
+          }
+          final message = AppMessage.fromMap(
+            decodeCbor(bytes) as Map<Object?, Object?>,
+          );
+          if (message is AiMessage) hub.handle(mobileId, message);
+        });
+        settle(async, const Duration(seconds: 1));
+        expect(link.state, AiLinkState.live);
+        expect(link.mirror.head!.agentName, 'Claude');
+      });
+    });
+  });
 }

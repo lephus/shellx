@@ -28,7 +28,9 @@ enum AiLinkState {
   live,
 
   /// The computer closed it ([AiSessionLink.closedReason]) or it was
-  /// detached.
+  /// detached. Final, but for `unavailable` (no window served AI then): the
+  /// link attaches once more, and is [attaching] again, when the next
+  /// listing says AI is available.
   closed,
 }
 
@@ -59,6 +61,15 @@ final class AiSessionLink {
 
   /// Bodies in a row that could not be taken.
   var _failures = 0;
+
+  /// The computer answered `unavailable` (no window served AI: a background
+  /// service that came back before the window did, say): the next listing
+  /// that says AI is available attaches once more.
+  var _retry = false;
+
+  /// That one more attach was made since the link was last live: another
+  /// `unavailable` closes it for good, never a loop.
+  var _retried = false;
   Timer? _ack;
   var _notifying = false;
   var _notifyAgain = false;
@@ -127,6 +138,7 @@ final class AiSessionLink {
       return;
     }
     _failures = 0;
+    _retried = false;
     if (_state != AiLinkState.live) _state = AiLinkState.live;
     _notify();
   }
@@ -222,10 +234,12 @@ final class MachineAi {
   final _pending = <int, _Pending>{};
   var _nextRid = 1;
 
-  /// A listing is watched or a mirror is open: a lost channel must come
-  /// back even without a terminal tab.
+  /// A listing is watched or a mirror is open (or waits for AI to be
+  /// available again): a lost channel must come back even without a
+  /// terminal tab.
   bool get wantsChannel =>
-      _watching || _links.values.any((l) => l.state != AiLinkState.closed);
+      _watching ||
+      _links.values.any((l) => l.state != AiLinkState.closed || l._retry);
 
   /// Whether the computer has AI sessions for phones (`ai` in
   /// `session.list.result`); null before the first desktop list.
@@ -359,6 +373,7 @@ final class MachineAi {
         // No window serves AI: whatever was asked of it gets no answer.
         if (!available) _failPending(const AiRequestException('unavailable'));
         _listings.add(listing);
+        if (available) _attachAgain();
       case AiSnapshot(:final sid, :final seq, :final body):
         _links[sid]?._body(seq, body, snapshot: true);
       case AiUpdate(:final sid, :final seq, :final body):
@@ -369,7 +384,16 @@ final class MachineAi {
           AiRequestException(reason == 'gone' ? 'not_found' : 'unavailable'),
           sid: sid,
         );
-        _links[sid]?._set(AiLinkState.closed, reason);
+        final link = _links[sid];
+        if (link == null) break;
+        // No window served AI (a background service that came back before
+        // the window, say): the page attaches once more when the list says
+        // one does, and asks for the list to hear it.
+        if (reason == 'unavailable' && !link._retried) {
+          link._retry = true;
+          if (!_watching) _send([const AiList()]);
+        }
+        link._set(AiLinkState.closed, reason);
       case AiResult(:final rid):
         _pending.remove(rid)?.done.complete(message);
       default:
@@ -377,11 +401,14 @@ final class MachineAi {
     }
   }
 
-  /// A new channel: the listing and every open mirror resume on it.
+  /// A new channel: the listing and every open mirror resume on it; a page
+  /// that waits for AI to be available asks for the listing too.
   @internal
   void channelReady() {
     if (_disposed) return;
-    if (_watching) _send([const AiList()]);
+    if (_watching || _links.values.any((l) => l._retry)) {
+      _send([const AiList()]);
+    }
     for (final link in [..._links.values]) {
       if (link.state != AiLinkState.closed) _attachNow(link);
     }
@@ -430,6 +457,7 @@ final class MachineAi {
   }
 
   void _detach(AiSessionLink link) {
+    link._retry = false;
     if (identical(_links[link.sid], link)) {
       _links.remove(link.sid);
       if (link.state != AiLinkState.closed) {
@@ -438,6 +466,21 @@ final class MachineAi {
       }
     }
     link._dispose();
+  }
+
+  /// A window serves AI again (M10): each page closed `unavailable` attaches
+  /// once more. The computer answers: a snapshot, or `gone` when the session
+  /// is not there any more (another run of the window).
+  void _attachAgain() {
+    for (final link in [..._links.values]) {
+      if (!link._retry) continue;
+      link
+        .._retry = false
+        .._retried = true
+        .._closedReason = null;
+      _attachNow(link);
+      link._set(AiLinkState.attaching);
+    }
   }
 
   bool _send(List<AppMessage> messages) => _sendRaw(messages);
