@@ -48,7 +48,10 @@ dependencies:
   # a window saved on a monitor that is gone opens centred (A1 D9).
   screen_retriever: ^0.2.2
   shared_preferences: ^2.5.5
+  # V2-1 (V2-1a): the ACP client and the AI session model and host.
+  shellx_acp: any
   shellx_agent: any
+  shellx_ai: any
   shellx_core: any
   tray_manager: ^0.5.3
   win32: ^5.15.0
