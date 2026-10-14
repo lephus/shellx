@@ -7,6 +7,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import 'client_tab.dart';
 import 'client_types.dart';
+import 'machine_ai.dart';
 
 /// A `session.open` waiting for its answer. `session.open` has no request
 /// id: the agent answers requests in order, so answers are matched to the
@@ -24,8 +25,16 @@ final class _PendingOpen {
 
 /// A `session.list` waiting for its answer (matched in order, like opens).
 final class _PendingList {
-  _PendingList({this.retires = const [], this.abandoned = false});
+  _PendingList({
+    this.desktop = false,
+    this.retires = const [],
+    this.abandoned = false,
+  });
   final completer = Completer<List<SessionInfo>>();
+
+  /// Asked for desktop terminals too: only the answer to such a list says
+  /// whether the machine has AI sessions for phones (`ai`).
+  final bool desktop;
 
   /// Abandoned opens this list was sent after: the agent answers in order,
   /// so one still unanswered when this list's answer arrives never will be.
@@ -73,6 +82,13 @@ final class MachineClient {
   /// While the phone is pairing with this agent: completes when that is
   /// over (see [ClientService.pair]); null otherwise.
   final Future<void>? Function() _pairing;
+
+  /// V2-2: the machine's AI sessions (listing, mirrors, requests).
+  late final MachineAi ai = MachineAi(
+    send: _send,
+    connect: connect,
+    timeout: _timeout,
+  );
 
   MachineConnectionState _state = const MachineIdle();
   final _states = StreamController<MachineConnectionState>.broadcast();
@@ -140,7 +156,7 @@ final class MachineClient {
   Future<List<SessionInfo>> listSessions({bool includeDesktop = false}) async {
     await connect();
     if (includeDesktop) _listedDesktop = true;
-    final pending = _PendingList();
+    final pending = _PendingList(desktop: includeDesktop);
     _pendingLists.add(pending);
     return _request(
       pending.completer,
@@ -324,6 +340,7 @@ final class MachineClient {
   @internal
   void shutdown() {
     _channelLost();
+    ai.dispose();
     _pendingCloses.clear();
     for (final tab in _tabs.values) {
       tab.dispose();
@@ -420,6 +437,7 @@ final class MachineClient {
     _secure = SecureChannel(handshake.split());
     _sendPendingCloses();
     _setState(const MachineReady());
+    ai.channelReady();
     // Whoever asked for this channel, stale tabs re-attach on it.
     unawaited(_resume());
     return true;
@@ -529,6 +547,7 @@ final class MachineClient {
         if (desktopSharing != null) _desktopSharing = desktopSharing;
         if (_pendingLists.isEmpty) return;
         final pending = _pendingLists.removeAt(0);
+        if (pending.desktop) ai.noteListResult(message);
         pending.retires.forEach(_pendingOpens.remove);
         if (!pending.abandoned) pending.completer.complete(sessions);
       case SessionOpened(:final id, :final index, :final shell):
@@ -579,6 +598,8 @@ final class MachineClient {
         _tabs[id]?.handleExited(exitCode);
       case SessionDetached(:final id, :final reason):
         _tabs[id]?.handleDetached(reason);
+      case AiMessage():
+        ai.handle(message);
       case ErrorMessage(:final code, :final message, :final id):
         final error = AppErrorException(code, message);
         if (id == null) {
@@ -698,7 +719,11 @@ final class MachineClient {
 
   Future<void> _resumeOnce() async {
     if (_pinnedKey() == null) return; // Untrusted or unpaired: nothing to do.
-    if (!_tabs.values.any(_isStale) && _pendingCloses.isEmpty) return;
+    if (!_tabs.values.any(_isStale) &&
+        _pendingCloses.isEmpty &&
+        !ai.wantsChannel) {
+      return;
+    }
     try {
       await connect(); // Joins a handshake the app already started.
       // Tabs opened or attached on this channel since are not stale.
@@ -735,6 +760,7 @@ final class MachineClient {
   void _channelLost() {
     _losses++;
     _attachedHere.clear();
+    ai.channelLost();
     for (final tab in _tabs.values) {
       tab.dropHeldInput(); // Typed before an outage: never run after it.
     }
