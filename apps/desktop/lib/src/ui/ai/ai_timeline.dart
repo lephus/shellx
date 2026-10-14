@@ -7,13 +7,14 @@ import '../theme/shellx_desktop_theme.dart';
 import 'ai_markdown.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
+import 'ai_tool_card.dart';
 
 /// One conversation item's widget (spec §4.2).
 Widget aiTimelineItem(TimelineItem item) => switch (item) {
   UserItem() => AiUserMessage(item: item),
   AgentTextItem() => AiAgentText(item: item),
   ThoughtItem() => AiThought(item: item),
-  ToolItem() => _PlainLine(text: item.fields.title ?? ''),
+  ToolItem() => AiToolCard(item: item),
   AskItem() => _AskFallback(item: item),
   TurnEndItem() => const SizedBox(height: ShellxSpace.s8),
   NoticeItem() => const SizedBox.shrink(),
