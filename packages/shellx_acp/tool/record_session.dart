@@ -9,19 +9,16 @@ import 'package:shellx_acp/shellx_acp.dart';
 Future<void> main(List<String> args) async {
   final [node, entry, project, outPath] = args;
   final out = File(outPath).openWrite();
-  final pending = <String, StringBuffer>{
-    'in': StringBuffer(),
-    'out': StringBuffer(),
-  };
+  // The output is RAW: scrub it and read all of it before committing it.
+  // Bytes are split on newlines before decoding, so a character split
+  // across two chunks stays whole.
+  final pending = <String, List<int>>{'in': [], 'out': []};
   void log(String dir, List<int> bytes) {
-    final buf = pending[dir]!..write(utf8.decode(bytes, allowMalformed: true));
-    final text = buf.toString();
-    final cut = text.lastIndexOf('\n');
-    if (cut < 0) return;
-    buf
-      ..clear()
-      ..write(text.substring(cut + 1));
-    for (final line in const LineSplitter().convert(text.substring(0, cut))) {
+    final buf = pending[dir]!..addAll(bytes);
+    var start = 0;
+    for (var nl = buf.indexOf(10); nl >= 0; nl = buf.indexOf(10, start)) {
+      final line = utf8.decode(buf.sublist(start, nl), allowMalformed: true);
+      start = nl + 1;
       if (line.trim().isEmpty) continue;
       try {
         out.writeln(jsonEncode({'dir': dir, 'msg': jsonDecode(line)}));
@@ -29,9 +26,20 @@ Future<void> main(List<String> args) async {
         out.writeln(jsonEncode({'dir': dir, 'raw': line.length}));
       }
     }
+    buf.removeRange(0, start);
+  }
+
+  // Inside means the canonical project folder itself or below it.
+  final root = Uri.directory(Directory(project).absolute.path).normalizePath();
+  bool inside(String path) {
+    final file = Uri.file(path).normalizePath();
+    return file.path.startsWith(root.path) && !file.pathSegments.contains('..');
   }
 
   Future<(Process, AcpClient)> start() async {
+    for (final b in pending.values) {
+      b.clear();
+    }
     final p = await Process.start(node, [entry], workingDirectory: project);
     p.stderr.drain<void>();
     final toAgent = StreamController<List<int>>();
@@ -47,19 +55,18 @@ Future<void> main(List<String> args) async {
       JsonRpcConnection(input: fromAgent, output: toAgent.sink),
     );
     // The recording's own policy (never ShellX's): allow once only reads and
-    // edits inside the scratch project and an `ls`; reject anything else.
+    // edits inside the scratch project and a bare `ls`; reject the rest.
     client.onPermission = (r) async {
       final kind = r.toolCall.kind;
       final paths = [
         for (final l in r.toolCall.locations ?? const <ToolLocation>[]) l.path,
       ];
-      final inside =
-          paths.isNotEmpty && paths.every((x) => x.startsWith(project));
       final title = r.toolCall.title ?? '';
       final ok =
-          ((kind == ToolKind.read || kind == ToolKind.edit) && inside) ||
-          (kind == ToolKind.execute &&
-              RegExp(r'^ls( |$)').hasMatch(title.trim()));
+          ((kind == ToolKind.read || kind == ToolKind.edit) &&
+              paths.isNotEmpty &&
+              paths.every(inside)) ||
+          (kind == ToolKind.execute && title.trim() == 'ls');
       stdout.writeln('permission: ${kind?.wire} ok=$ok');
       final want = ok ? PermissionKind.allowOnce : PermissionKind.rejectOnce;
       final option = r.options.where((o) => o.kind == want).firstOrNull;
