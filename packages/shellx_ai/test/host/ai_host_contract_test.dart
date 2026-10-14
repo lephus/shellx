@@ -29,6 +29,21 @@ void main(List<String> args) {
 
 const _quickExit = 'void main() {}';
 
+/// A file system on which every path is an executable: `git` is found on any
+/// PATH, so that asking it for its version is what the test would notice.
+final class _AnyExecutable implements FileProbe {
+  const _AnyExecutable();
+
+  @override
+  bool isExecutable(String path) => true;
+
+  @override
+  bool isFile(String path) => true;
+
+  @override
+  String? read(String path) => null;
+}
+
 /// A temp folder and everything a test started inside it, cleaned up in one
 /// step and in the right order: runtimes and processes first, the folder last.
 final class _Env {
@@ -431,6 +446,74 @@ void main() {
         () => runtime.stderrTail.contains('RECV session/load:old-1'),
       );
     });
+
+    test(
+      'a tab on the home folder: undo is off for it, git is asked for '
+      'nothing and the first message goes out at once (final review I-1)',
+      () async {
+        final home = Directory(p.join(e.tmp.path, 'home'))..createSync();
+        final asked = <String>[];
+        final host = AiHost(
+          supportDir: p.join(e.tmp.path, 'support'),
+          clientVersion: '2.0.0',
+          env: LoginShellEnv(
+            processEnv: {...Platform.environment, 'HOME': home.path},
+            run: (s, a, c, t) async => (0, <int>[]),
+          ),
+          checkpoints: CheckpointStores(
+            root: p.join(e.tmp.path, 'support', 'ai', 'checkpoints'),
+            locator: GitLocator(
+              files: const _AnyExecutable(),
+              probe: (exe, args, {environment}) async {
+                asked.add(exe);
+                return null;
+              },
+            ),
+          ),
+        );
+        final spec = AgentSpec(
+          id: 'fake',
+          name: 'Fake',
+          launch: CustomLaunch(
+            command: Platform.resolvedExecutable,
+            args: fakeAgentArgs(
+              writeScenario(
+                FakeScenario(
+                  turns: [
+                    [FakeSteps.text('hello')],
+                  ],
+                ),
+                e.tmp,
+              ),
+            ),
+          ),
+        );
+        final runtime = host.runtime(agent: spec, cwd: home.path);
+        e.runtimes.add(runtime);
+        await runtime.start();
+        await runtime.send(const [TextBlock('hi')]);
+        await runtime.whenIdle();
+        final notes = runtime.state.timeline.items
+            .whereType<NoticeItem>()
+            .map((n) => n.notice)
+            .whereType<UndoUnavailable>();
+        expect(notes.map((n) => (n.reason, n.turnOnly)), [
+          (UndoOff.broadFolder, false),
+        ]);
+        expect(asked, isEmpty, reason: 'no git work for a folder like that');
+        expect(
+          runtime.state.timeline.items.whereType<TurnEndItem>().single.outcome,
+          TurnOutcome.finished,
+        );
+        expect(
+          Directory(
+            p.join(e.tmp.path, 'support', 'ai', 'checkpoints'),
+          ).existsSync(),
+          isFalse,
+          reason: 'no repository was made',
+        );
+      },
+    );
 
     test('the remembered choices', () async {
       final runtime = e.fakeRuntime(
