@@ -69,6 +69,9 @@ jobs:
       - name: shellx_agent
         working-directory: packages/shellx_agent
         run: dart test
+      - name: shellx_acp
+        working-directory: packages/shellx_acp
+        run: dart test
 
   desktop:
     # Spec §12: the desktop part of terminal sharing on real Windows. The installer's unit tests
