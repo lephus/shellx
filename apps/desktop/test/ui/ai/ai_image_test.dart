@@ -378,7 +378,7 @@ void main() {
     );
     expect(t.widget<DropTarget>(find.byType(DropTarget)).enable, isTrue);
     await runtime.dispose();
-  });
+  }, variant: mac);
   // ---- I-2: a paste whose clipboard has text and a picture ----------------
 
   const cells = 'Region\tSales\nNorth\t120\nSouth\t95';
@@ -886,7 +886,7 @@ void main() {
       ], reason: 'no more is read');
       expect(find.text('At most 5 images per message.'), findsOneWidget);
       await runtime.dispose();
-    });
+    }, variant: mac);
 
     testWidgets('an image over 10 MiB is said to be too large; the next one '
         'still attaches', (t) async {
@@ -904,7 +904,7 @@ void main() {
       // The note of the big one is cleared by the next one attached.
       expect(ui.images.note, isNull);
       await runtime.dispose();
-    });
+    }, variant: mac);
 
     testWidgets('the big one alone leaves its note', (t) async {
       final (runtime, ui, read) = await target(
@@ -916,7 +916,7 @@ void main() {
       expect(ui.images.items, isEmpty);
       expect(find.text('The image is too large (at most 10 MB).'), findsOne);
       await runtime.dispose();
-    });
+    }, variant: mac);
 
     testWidgets('a big file that is no image, and one that cannot be read, '
         'say nothing', (t) async {
@@ -932,7 +932,7 @@ void main() {
       expect(ui.images.items, isEmpty);
       expect(ui.images.note, isNull);
       await runtime.dispose();
-    });
+    }, variant: mac);
 
     testWidgets('a path that is not on the disk (as the terminal\'s drop '
         'tests make them) drops like any other', (t) async {
@@ -941,7 +941,7 @@ void main() {
       expect(read, ['/never/there.png']);
       expect(ui.images.items, hasLength(1));
       await runtime.dispose();
-    });
+    }, variant: mac);
 
     testWidgets('a file that is no image is not read past the cap, and says '
         'nothing about images', (t) async {
@@ -954,7 +954,7 @@ void main() {
       expect(read, hasLength(5));
       expect(ui.images.note, isNull);
       await runtime.dispose();
-    });
+    }, variant: mac);
   });
 
   // ---- ⌘V of files copied in Finder / Explorer ---------------------------
