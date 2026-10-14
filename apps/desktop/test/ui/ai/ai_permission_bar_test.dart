@@ -205,6 +205,81 @@ void main() {
     await runtime.dispose();
   });
 
+  testWidgets('each request opens at its start: the offset of the one before '
+      'does not carry over to the next (a user sees the start of the command '
+      'they approve)', (t) async {
+    final fakes = FakeAiRuntimes(const FakeScenario());
+    final runtime = partRuntime(fakes);
+    await runtime.start();
+    await pumpAiPart(
+      t,
+      const AiDock(permissionBar: AiPermissionBar()),
+      runtime: runtime,
+    );
+    String command(String name) => [
+      "cat > /tmp/$name.sh <<'EOF'",
+      for (var i = 0; i < 38; i++) 'echo "$name step $i of the installer"',
+      'EOF',
+    ].join('\n');
+    String words(String name) => [
+      'Yes, and do not ask again for:',
+      for (var i = 0; i < 40; i++) '$name/path/$i/**',
+    ].join('\n');
+    PermissionRequest request(String id, String name) =>
+        PermissionRequest.fromJson({
+          'sessionId': 's',
+          'toolCall': {
+            'toolCallId': id,
+            'title': command(name),
+            'kind': 'execute',
+          },
+          'options': [
+            {'optionId': 'once', 'name': 'Yes', 'kind': 'allow_once'},
+            {'optionId': 'always', 'name': words(name), 'kind': 'allow_always'},
+            {'optionId': 'reject', 'name': 'No', 'kind': 'reject_once'},
+          ],
+        });
+    final at = DateTime(2026, 10, 14, 9);
+    // Two requests wait together (parallel tool calls): answering the first
+    // shows the second at once, with no empty frame between.
+    final first = runtime.state.addPermission(request('a', 'first'), at);
+    runtime.state.addPermission(request('b', 'second'), at);
+    await t.pump();
+    await t.pump();
+    ScrollableState scrollOf(String key) => t.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(Key(key)),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    for (final key in ['ai.permission.title', 'ai.permission.note']) {
+      final scroll = scrollOf(key);
+      expect(scroll.position.maxScrollExtent, greaterThan(0), reason: key);
+      scroll.position.jumpTo(scroll.position.maxScrollExtent);
+      await t.pump();
+      expect(scroll.position.pixels, scroll.position.maxScrollExtent);
+    }
+    runtime.state.resolvePermission(first.id, const PermissionSelected('once'));
+    await t.pump();
+    await t.pump();
+    expect(find.textContaining('second step 0 of'), findsOneWidget);
+    expect(find.textContaining('first step 0 of'), findsNothing);
+    for (final key in ['ai.permission.title', 'ai.permission.note']) {
+      expect(
+        scrollOf(key).position.pixels,
+        0,
+        reason: '$key opens at its start',
+      );
+    }
+    final box = find.byKey(const Key('ai.permission.title'));
+    expect(
+      t.getTopLeft(find.textContaining('second step 0 of')).dy,
+      t.getTopLeft(box).dy,
+      reason: 'the first line of the command is the first thing in the box',
+    );
+    await runtime.dispose();
+  });
+
   testWidgets('the dock, top to bottom: plan, permission bar, queue, composer '
       '(spec §4.1)', (t) async {
     final (_, runtime) = await asking(t);

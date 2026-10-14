@@ -143,6 +143,12 @@ class AiPermissionBar extends StatelessWidget {
             )
             .firstOrNull;
         return ExcludeFocus(
+          // One request, one bar: when the answer to a request brings up the
+          // next one that was already waiting, the capped title and note
+          // start again at their first line, not at the offset the user had
+          // scrolled the one before to. The start of a command is what they
+          // must see before they approve it.
+          key: ValueKey(pending.id),
           child: Container(
             key: const Key('ai.permission'),
             margin: const EdgeInsets.fromLTRB(
