@@ -643,14 +643,20 @@ void main() {
     DropItemFile file(String path, int size) =>
         DropItemFile.fromData(Uint8List(0), path: path, length: size);
 
-    Future<(AiRuntime, AiPaneUi, List<String>)> target(WidgetTester t) async {
+    /// The pane's reader (`AiPaneView._readImage`) looks at a file's size
+    /// first and answers null for one over 10 MiB, without reading it; this
+    /// one does the same with the sizes it is told.
+    Future<(AiRuntime, AiPaneUi, List<String>)> target(
+      WidgetTester t, {
+      Map<String, int> sizes = const {},
+    }) async {
       final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
       await runtime.start();
       final part = await pumpAiPart(t, const AiDock(), runtime: runtime);
       final read = <String>[];
       part.ui.readImageFile = (path) async {
         read.add(path);
-        return _png;
+        return (sizes[path] ?? 0) > (10 << 20) ? null : _png;
       };
       return (runtime, part.ui, read);
     }
@@ -678,28 +684,58 @@ void main() {
       await runtime.dispose();
     });
 
-    testWidgets('an image over 10 MiB is said to be too large and not read', (
-      t,
-    ) async {
-      final (runtime, ui, read) = await target(t);
+    testWidgets('an image over 10 MiB is said to be too large; the next one '
+        'still attaches', (t) async {
+      final (runtime, ui, read) = await target(
+        t,
+        sizes: {'/shots/huge.png': (10 << 20) + 1},
+      );
       await drop(t, [
         file('/shots/huge.png', (10 << 20) + 1),
         file('/shots/ok.png', 1000),
       ]);
-      expect(read, ['/shots/ok.png']);
+      // The reader looks at the size before it reads, and gives up on it.
+      expect(read, ['/shots/huge.png', '/shots/ok.png']);
       expect(ui.images.items, hasLength(1));
-      // The note of the big one stays until something is attached: the
-      // next one attached clears it.
+      // The note of the big one is cleared by the next one attached.
       expect(ui.images.note, isNull);
       await runtime.dispose();
     });
 
     testWidgets('the big one alone leaves its note', (t) async {
-      final (runtime, ui, read) = await target(t);
+      final (runtime, ui, read) = await target(
+        t,
+        sizes: {'/shots/huge.jpg': 12 << 20},
+      );
       await drop(t, [file('/shots/huge.jpg', 12 << 20)]);
-      expect(read, isEmpty);
+      expect(read, ['/shots/huge.jpg']);
       expect(ui.images.items, isEmpty);
       expect(find.text('The image is too large (at most 10 MB).'), findsOne);
+      await runtime.dispose();
+    });
+
+    testWidgets('a big file that is no image, and one that cannot be read, '
+        'say nothing', (t) async {
+      final (runtime, ui, read) = await target(
+        t,
+        sizes: {'/backup.zip': 50 << 20},
+      );
+      await drop(t, [file('/backup.zip', 50 << 20)]);
+      expect(read, ['/backup.zip']);
+      // An image the reader cannot read, and that is not over the limit.
+      ui.readImageFile = (path) async => null;
+      await drop(t, [file('/shots/broken.png', 10)]);
+      expect(ui.images.items, isEmpty);
+      expect(ui.images.note, isNull);
+      await runtime.dispose();
+    });
+
+    testWidgets('a path that is not on the disk (as the terminal\'s drop '
+        'tests make them) drops like any other', (t) async {
+      final (runtime, ui, read) = await target(t);
+      await drop(t, [DropItemFile('/never/there.png')]);
+      expect(read, ['/never/there.png']);
+      expect(ui.images.items, hasLength(1));
       await runtime.dispose();
     });
 

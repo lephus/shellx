@@ -115,8 +115,8 @@ String aiStripAnsi(String text) =>
 
 /// Smoothness, and "capped outputs" is not negotiable: what a card shows of
 /// one output — the start and the end of it — is about this many characters,
-/// whatever the agent printed. An agent's words have no length (Gemini CLI,
-/// Codex and MCP tools do not cap their output).
+/// whatever the agent printed. What an agent writes has no length: some agents
+/// and tools hand over megabytes.
 const int kAiOutputMaxChars = 32 * 1024;
 
 /// A shown line is cut here, with "…". Text with no place to break a line (a

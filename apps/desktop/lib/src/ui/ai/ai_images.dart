@@ -206,11 +206,13 @@ class AiImageInput extends StatelessWidget {
     '.tiff',
   };
 
-  /// A dropped file is read only when it can still be attached: not past
-  /// [kAiImagesMax], not over [kAiImageMaxBytes] — its size comes from the
-  /// file system, not from reading it. What is said about the limits is said
-  /// for images (by their name); a text file dropped on a full composer is
-  /// just not an image.
+  /// A dropped file is read only while it can still be attached: past
+  /// [kAiImagesMax] nothing is read (the count is known without the disk).
+  /// The reader ([AiPaneUi.readImageFile]) does not read a file over
+  /// [kAiImageMaxBytes] either — it looks at its size first and gives null —
+  /// and then the user is told why, for an image (by its name): a text file
+  /// dropped on a full composer, or one that cannot be read, is just not
+  /// attached.
   Future<void> _drop(BuildContext context, DropDoneDetails details) async {
     final scope = AiPaneScope.of(context);
     final l10n = AppLocalizations.of(context);
@@ -223,22 +225,27 @@ class AiImageInput extends StatelessWidget {
         images.say(l10n.aiTooManyImages);
         return;
       }
-      int? size;
-      try {
-        size = await f.length();
-      } on Object {
-        size = null; // unreadable: the reader below says so by returning null
-      }
+      final bytes = await scope.ui.readImageFile?.call(f.path);
       if (!context.mounted) return;
-      if (size != null && size > kAiImageMaxBytes) {
-        if (image) images.say(l10n.aiImageTooLarge);
+      if (bytes == null) {
+        if (image && await _isTooLarge(f)) {
+          if (!context.mounted) return;
+          images.say(l10n.aiImageTooLarge);
+        }
         continue;
       }
-      final bytes = await scope.ui.readImageFile?.call(f.path);
-      if (bytes == null) continue;
-      if (!context.mounted) return;
       await aiAttachImage(scope, l10n, bytes, alive: () => context.mounted);
       if (!context.mounted) return;
+    }
+  }
+
+  /// Whether the dropped file is over [kAiImageMaxBytes] (its size is asked
+  /// of the file system, the file is not read).
+  static Future<bool> _isTooLarge(DropItem file) async {
+    try {
+      return await file.length() > kAiImageMaxBytes;
+    } on Object {
+      return false;
     }
   }
 
