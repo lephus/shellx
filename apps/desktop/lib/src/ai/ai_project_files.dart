@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'ai_gitignore.dart';
+import 'ai_off_thread.dart';
+
 /// What a file holds, as the AI pane shows it (§4.4).
 sealed class AiFileContent {
   const AiFileContent();
@@ -46,14 +49,30 @@ AiFileContent aiFileContentOf(List<int>? bytes) {
 }
 
 /// The project's files as the AI pane reads them (the diff of a change, the
-/// viewer). A seam: widget tests never touch the disk under fake async.
+/// viewer, the Files tree, `@`). A seam: widget tests never touch the disk
+/// under fake async.
 abstract interface class AiProjectFiles {
   /// The file at [path] (absolute).
   Future<AiFileContent> read(String path);
+
+  /// D18: folder [dir] of project [root] ('' is the root), as [aiListDir].
+  Future<List<AiDirEntry>> list(String root, String dir);
+
+  /// D16: the files `@` offers, as [aiIndexProject].
+  Future<List<String>> index(String root);
 }
 
+/// The disk; listings and the index run off the UI isolate.
 final class DiskProjectFiles implements AiProjectFiles {
-  const DiskProjectFiles();
+  const DiskProjectFiles(this._run);
+  final OffThread _run;
+
+  @override
+  Future<List<AiDirEntry>> list(String root, String dir) =>
+      _run(aiListDir, (root, dir));
+
+  @override
+  Future<List<String>> index(String root) => _run(aiIndexProject, root);
 
   @override
   Future<AiFileContent> read(String path) async {
@@ -68,5 +87,5 @@ final class DiskProjectFiles implements AiProjectFiles {
 }
 
 final aiProjectFilesProvider = Provider<AiProjectFiles>(
-  (ref) => const DiskProjectFiles(),
+  (ref) => DiskProjectFiles(ref.read(aiOffThreadProvider)),
 );

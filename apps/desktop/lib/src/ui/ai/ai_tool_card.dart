@@ -13,6 +13,7 @@ import '../../ai/line_diff.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_diff_view.dart';
 import 'ai_editor.dart';
+import 'ai_file_viewer.dart';
 import 'ai_labels.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
@@ -107,6 +108,18 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
 
   bool get _isOpen => _expandable && (_open ?? _autoOpen);
 
+  /// The viewer over the conversation (§4.2 "View whole file", `read`).
+  void _view(String path, int? line) {
+    final scope = AiPaneScope.of(context);
+    scope.ui.showOverlay(
+      AiFileViewer(
+        key: UniqueKey(),
+        path: aiRelativePath(path, scope.state.cwd),
+        line: line,
+      ),
+    );
+  }
+
   void _ensureDiff() {
     final d = item.fields.content?.whereType<ToolDiff>().firstOrNull;
     if (d == null || identical(d, _diffOf)) return;
@@ -145,8 +158,16 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
     final diff = _diff;
     final stat = diff == null ? null : diffStat(diff);
     final asking = item.awaitingPermission;
+    // §4.2: a `read` card opens the file at its line.
+    final at = item.fields.kind == ToolKind.read
+        ? item.fields.locations?.firstOrNull
+        : null;
     final header = InkWell(
-      onTap: _expandable ? () => setState(() => _open = !_isOpen) : null,
+      onTap: _expandable
+          ? () => setState(() => _open = !_isOpen)
+          : at == null
+          ? null
+          : () => _view(at.path, at.line),
       borderRadius: BorderRadius.circular(ShellxRadius.r8),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -252,14 +273,22 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
             : AiDiffView(lines: withContext(diff)),
       );
       parts.add(
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const Key('ai.tool.editor'),
-            onPressed: () => unawaited(aiOpenInEditor(ref, d.path, cwd)),
-            icon: const Icon(Icons.open_in_new, size: 14),
-            label: Text(l10n.aiOpenInEditor),
-          ),
+        Wrap(
+          spacing: ShellxSpace.s8,
+          children: [
+            TextButton.icon(
+              key: const Key('ai.tool.view'),
+              onPressed: () => _view(d.path, null),
+              icon: const Icon(Icons.article_outlined, size: 14),
+              label: Text(l10n.aiViewFile),
+            ),
+            TextButton.icon(
+              key: const Key('ai.tool.editor'),
+              onPressed: () => unawaited(aiOpenInEditor(ref, d.path, cwd)),
+              icon: const Icon(Icons.open_in_new, size: 14),
+              label: Text(l10n.aiOpenInEditor),
+            ),
+          ],
         ),
       );
     }

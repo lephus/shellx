@@ -18,6 +18,7 @@ import '../terminal/terminal_intents.dart' show TogglePaneZoomIntent;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_changes_panel.dart';
 import 'ai_dock.dart';
+import 'ai_files_panel.dart';
 import 'ai_folder_card.dart';
 import 'ai_header.dart';
 import 'ai_log_dialog.dart';
@@ -103,6 +104,12 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
       widget.focusNode?.addListener(_onWindowFocus);
     }
     _frames?.active = widget.selected;
+    // D18: the panels look again when the tab comes back to the front.
+    if (widget.selected && !old.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ui.changesChanged();
+      });
+    }
     if (old.selected != widget.selected || old.pane.cwd != widget.pane.cwd) {
       _attachSoon();
     }
@@ -344,8 +351,9 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
             // §4.4: the right panel, 268 px.
             ListenableBuilder(
               listenable: _ui,
-              builder: (context, _) =>
-                  _ui.panelOpen ? const AiSidePanel() : const SizedBox.shrink(),
+              builder: (context, _) => _ui.panelOpen
+                  ? const AiSidePanel(files: AiFilesPanel())
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
