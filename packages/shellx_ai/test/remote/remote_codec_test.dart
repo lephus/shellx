@@ -116,6 +116,54 @@ void main() {
       expect(AiSessionInfo.fromJson({'state': 'idle'}), isNull);
     });
 
+    test('what an agent or a folder name can make long is clipped, whole '
+        'characters only', () {
+      final long = 'Nút đăng xuất 😀 ' * 8000; // 130 000 characters
+      final json = AiListing(
+        sessions: [
+          AiSessionInfo(
+            sid: 'e.1',
+            agentId: 'claude',
+            agentName: long,
+            title: long,
+            state: AiRemoteState.needsInput,
+            cwd: long,
+            waiting: long,
+            acpSessionId: long,
+          ),
+        ],
+        agents: [AiAgentChoice(id: 'claude', name: long)],
+        folders: [AiFolderChoice(key: 'ws:a', name: long, path: long)],
+        defaultAgent: 'claude',
+      ).toJson();
+      expect(utf8Length(jsonEncode(json)), lessThan(3000));
+      final back = AiListing.fromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, Object?>,
+        available: true,
+      );
+      final s = back.sessions.single;
+      final f = back.folders.single;
+      final clipped = [
+        (s.title, 200),
+        (s.acpSessionId!, 200),
+        (s.cwd!, 600),
+        (s.waiting!, 240),
+        (s.agentName, 200),
+        (back.agents.single.name, 200),
+        (f.name, 200),
+        (f.path!, 600),
+      ];
+      for (final (text, limit) in clipped) {
+        expect(utf8Length(text), lessThanOrEqualTo(limit));
+        expect(text, endsWith('…'));
+        // No half of a surrogate pair: UTF-8 takes the text back unchanged.
+        expect(utf8.decode(utf8.encode(text)), text);
+      }
+      // What is short is left alone; the keys a phone sends back are not cut.
+      expect((s.sid, s.state), ('e.1', AiRemoteState.needsInput));
+      expect((f.key, back.agents.single.id), ('ws:a', 'claude'));
+    });
+
     test('state of a session: a waiting question wins', () {
       final s = fresh();
       expect(aiRemoteStateOf(s), AiRemoteState.stopped);
@@ -274,7 +322,7 @@ void main() {
       expect((diffs[1]['plus'], diffs[1]['minus']), (2, 0));
     });
 
-    test('a card too big even when cut harder becomes a big stub', () {
+    test('a card with huge diffs is cut harder and stays a card', () {
       final s = fresh()..beginTurn(const [TextBlock('edit')], t0);
       tool(s, 'c1', {
         'title': 'x' * 100,
@@ -292,8 +340,22 @@ void main() {
       final sub = AiSubscription(s, generation: 1);
       final mirror = AiMirror();
       expect(feed(mirror, sub.attach(null)), isTrue);
-      final card = mirror.at(1)!;
-      expect(card, anyOf(isA<MirrorTool>(), isA<MirrorUnknown>()));
+      final card = mirror.at(1)! as MirrorTool;
+      expect(card.diffs, hasLength(3));
+      expect(card.diffs.every((d) => d.cut), isTrue);
+    });
+
+    test('a card that no cut can fit becomes a big stub', () {
+      final s = fresh()..beginTurn(const [TextBlock('edit')], t0);
+      // The call's id is sent whole, whatever the cuts: 100 KB of it passes
+      // any record, so only the stub is left.
+      tool(s, 'c' * 100000, {'title': 'Edit a.ts', 'kind': 'edit'});
+      final sub = AiSubscription(s, generation: 1);
+      final mirror = AiMirror();
+      expect(feed(mirror, sub.attach(null)), isTrue);
+      final card = mirror.at(1)! as MirrorUnknown;
+      expect(card.kind, 'big');
+      expect((card.index, card.rev), (1, s.timeline.items[1].rev));
     });
 
     test('turn end, notice and question records', () {

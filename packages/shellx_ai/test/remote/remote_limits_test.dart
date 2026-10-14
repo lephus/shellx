@@ -157,4 +157,144 @@ void main() {
       expect(again['items'], isEmpty);
     });
   });
+
+  group('what an agent controls in the header cannot make a body too big', () {
+    PermissionRequest request(List<Map<String, Object?>> options) =>
+        PermissionRequest.fromJson({
+          'sessionId': 's',
+          'toolCall': {'toolCallId': 'c1', 'title': 'Edit main.ts'},
+          'options': options,
+        });
+
+    Map<String, Object?> option(String id, String kind) => {
+      'optionId': id,
+      'name': 'Option',
+      'kind': kind,
+    };
+
+    final threeOptions = [
+      option('allow', 'allow_once'),
+      option('always', 'allow_always'),
+      option('reject', 'reject_once'),
+    ];
+
+    /// A plan of 30 steps of 700 control characters: 6 bytes each once JSON
+    /// has escaped them, so 100 KB for a plan.
+    void hostilePlan(AiSessionState s) => update(s, {
+      'sessionUpdate': 'plan',
+      'entries': [
+        for (var i = 0; i < 30; i++)
+          {'content': '\x01' * 700, 'status': 'pending', 'priority': 'low'},
+      ],
+    });
+
+    /// A mode whose id alone passes a whole body.
+    void hostileMode(AiSessionState s) => s.setSession(
+      'sess',
+      modes: SessionModes(
+        currentModeId: 'm' * 70000,
+        available: [SessionMode(id: 'm' * 70000, name: 'Ask')],
+      ),
+    );
+
+    /// Attaches a phone and feeds it; every body is checked against the cap
+    /// by [feed].
+    AiMirror attached(AiSessionState s) {
+      final mirror = AiMirror();
+      final sub = AiSubscription(s, generation: 1);
+      expect(feed(mirror, sub.attach(null)), isTrue);
+      return mirror;
+    }
+
+    test('a thousand options: the request stays, its buttons go', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      final p = s.addPermission(
+        request([
+          for (var i = 0; i < 1000; i++)
+            option('option-$i-${'x' * 40}', 'allow_once'),
+        ]),
+        t0,
+      );
+      final head = attached(s).head!;
+      expect(head.permission!.id, p.id);
+      expect(head.permission!.title, 'Edit main.ts');
+      expect(head.permission!.options, isEmpty);
+    });
+
+    test('so does one option id of 70 KB, found by a later flush too', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      final sub = AiSubscription(s, generation: 1);
+      final mirror = AiMirror();
+      expect(feed(mirror, sub.attach(null)), isTrue); // nothing waits yet
+      final p = s.addPermission(
+        request([option('allow', 'allow_once'), option('x' * 70000, 'other')]),
+        t0,
+      );
+      expect(feed(mirror, sub.delta()), isTrue);
+      expect(mirror.head!.permission!.id, p.id);
+      expect(mirror.head!.permission!.options, isEmpty);
+      // The next attach finds the same.
+      final again = attached(s).head!;
+      expect(again.permission!.id, p.id);
+    });
+
+    test('a mode id of 70 KB goes; a request keeps its buttons', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      final p = s.addPermission(request(threeOptions), t0);
+      hostileMode(s);
+      final head = attached(s).head!;
+      expect((head.modeId, head.modeName), (null, null));
+      expect(head.permission!.id, p.id);
+      expect(head.permission!.options, hasLength(3));
+    });
+
+    test('a plan of 100 KB goes; a request keeps its buttons', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      final p = s.addPermission(request(threeOptions), t0);
+      hostilePlan(s);
+      final head = attached(s).head!;
+      expect(head.plan, isEmpty);
+      expect(head.permission!.id, p.id);
+      expect(head.permission!.options, hasLength(3));
+    });
+
+    test('all of them at once: the request and the session still show', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      final p = s.addPermission(
+        request([
+          for (var i = 0; i < 1000; i++) option('option-$i', 'allow_once'),
+        ]),
+        t0,
+      );
+      hostilePlan(s);
+      hostileMode(s);
+      final head = attached(s).head!;
+      expect(head.permission!.id, p.id);
+      expect(head.plan, isEmpty);
+      expect(head.modeId, isNull);
+      expect(head.running, isTrue);
+      expect(head.agentName, 'Claude');
+    });
+
+    test('a normal request, plan and mode are sent as they are', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      s.addPermission(request(threeOptions), t0);
+      plan(s, 10);
+      s.setSession(
+        'sess',
+        modes: const SessionModes(
+          currentModeId: 'plan',
+          available: [SessionMode(id: 'plan', name: 'Plan')],
+        ),
+      );
+      final head = attached(s).head!;
+      expect(head.permission!.options.map((o) => o.optionId), [
+        'allow',
+        'always',
+        'reject',
+      ]);
+      expect(head.plan, hasLength(10));
+      expect((head.modeId, head.modeName), ('plan', 'Plan'));
+    });
+  });
 }
