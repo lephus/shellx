@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart' show TextBlock;
 import 'package:shellx_ai/host.dart';
@@ -9,6 +10,8 @@ import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ai/ai_project_files.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_changes_panel.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_diff_overlay.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_images.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_scope.dart';
 
 import '../../support/ai_fakes.dart';
 import '../../support/ai_parts.dart';
@@ -165,6 +168,104 @@ void main() {
       await t.pump();
     }
     expect(t.takeException(), isNull);
+    await runtime.dispose();
+  });
+
+  /// An `AiImageInput` in a pane that a test can take away; [shown] says
+  /// whether it is there. The context is that of something inside it.
+  Future<({AiPaneUi ui, void Function() close, BuildContext Function() inner})>
+  pasteTarget(WidgetTester t, AiRuntime runtime) async {
+    late StateSetter swap;
+    late BuildContext inner;
+    var shown = true;
+    final part = await pumpAiPart(
+      t,
+      StatefulBuilder(
+        builder: (context, setState) {
+          swap = setState;
+          return shown
+              ? AiImageInput(
+                  child: Builder(
+                    builder: (context) {
+                      inner = context;
+                      return const SizedBox();
+                    },
+                  ),
+                )
+              : const SizedBox();
+        },
+      ),
+      runtime: runtime,
+    );
+    return (
+      ui: part.ui,
+      close: () => swap(() => shown = false),
+      inner: () => inner,
+    );
+  }
+
+  testWidgets('a paste that the clipboard answers after the pane is gone '
+      'writes nothing', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    await runtime.start();
+    final answer = Completer<Map<String, Object?>?>();
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async =>
+          call.method == 'Clipboard.getData' ? await answer.future : null,
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final target = await pasteTarget(t, runtime);
+    Actions.invoke(target.inner(), const AiPasteIntent());
+    await t.pump();
+    target.close();
+    await t.pump();
+    expect(target.inner().mounted, isFalse);
+    answer.complete({'text': 'late text'});
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(t.takeException(), isNull);
+    expect(target.ui.paste.value, isNull, reason: 'nobody left to paste into');
+    await runtime.dispose();
+  });
+
+  testWidgets('a picture that is read after the pane is gone is not '
+      'attached', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    await runtime.start();
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async => null, // a screenshot: no text
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final target = await pasteTarget(t, runtime);
+    final read = Completer<Uint8List?>();
+    target.ui.clipboardImage = () => read.future;
+    Actions.invoke(target.inner(), const AiPasteIntent());
+    await t.pump();
+    await t.pump();
+    target.close();
+    await t.pump();
+    read.complete(
+      Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    );
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(t.takeException(), isNull);
+    expect(target.ui.images.items, isEmpty);
+    expect(target.ui.images.note, isNull);
     await runtime.dispose();
   });
 }

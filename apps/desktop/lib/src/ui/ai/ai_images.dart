@@ -5,14 +5,17 @@ import 'dart:ui' as ui;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:shellx_ai/shellx_ai.dart' show AiSessionState;
 
 import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_off_thread.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_scope.dart';
 
-/// ⌘V / Ctrl+V (and Ctrl+Shift+V) in the composer, D16: an image on the
-/// clipboard first, else the text.
+/// ⌘V / Ctrl+V (and Ctrl+Shift+V) in the composer, D16: the text on the
+/// clipboard first, as in the terminal; an image only when there is no text
+/// (a screenshot has none).
 class AiPasteIntent extends Intent {
   const AiPasteIntent();
 }
@@ -91,32 +94,64 @@ Future<Uint8List?> aiPngOf(Uint8List bytes) async {
   }
 }
 
-/// D16: [bytes] go with the next message — when the agent takes images
-/// (`promptCapabilities.image`); otherwise the composer says it does not.
-/// A BMP or TIFF goes as a PNG. False: these bytes are not an image ShellX
-/// can send (or are over [kAiImageMaxBytes]); the paste then falls back to
-/// the text on the clipboard.
+/// Whether [state]'s agent has said it takes no images (`promptCapabilities.
+/// image`). Before `initialize` has answered it has said nothing: a new tab
+/// would otherwise tell its user "Claude does not take images" for the first
+/// seconds of every session. Nothing is refused then; the composer asks again
+/// when the message is sent.
+bool aiTakesNoImages(AiSessionState state) =>
+    state.agent != null && !state.capabilities.prompt.image;
+
+/// D16: [bytes] go with the next message — unless the agent takes no images
+/// (the composer says so), there are [kAiImagesMax] already, or they are over
+/// [kAiImageMaxBytes] (agents refuse bigger ones): each of these is said in
+/// the composer's note, never ignored. A BMP or TIFF goes as a PNG. True: the
+/// image is attached. False: it is not (and when that is news to the user,
+/// the note says why); a paste that has text never gets here.
+///
+/// [alive]: false once the widget that asked is gone (the decode of a BMP
+/// takes a while): then nothing is touched.
 Future<bool> aiAttachImage(
   AiPaneScope scope,
   AppLocalizations l10n,
-  Uint8List bytes,
-) async {
+  Uint8List bytes, {
+  bool Function()? alive,
+}) async {
   final images = scope.ui.images;
-  if (!scope.state.capabilities.prompt.image) {
+  if (aiTakesNoImages(scope.state)) {
     images.say(l10n.aiImageUnsupported(scope.state.agentName));
-    return true;
+    return false;
+  }
+  // Before any work is done on the bytes.
+  if (images.items.length >= kAiImagesMax) {
+    images.say(l10n.aiTooManyImages);
+    return false;
   }
   var data = bytes;
   var mime = aiImageMime(data);
-  if (mime == null && _isBmpOrTiff(data) && data.length <= kAiImageConvertMax) {
+  if (mime == null && _isBmpOrTiff(data)) {
+    if (data.length > kAiImageConvertMax) {
+      images.say(l10n.aiImageTooLarge);
+      return false;
+    }
     final png = await aiPngOf(data);
+    if (!(alive?.call() ?? true)) return false;
     if (png != null) {
       data = png;
       mime = 'image/png';
     }
   }
-  if (mime == null || data.length > kAiImageMaxBytes) return false;
-  if (images.items.length >= kAiImagesMax) return true;
+  // Not an image ShellX sends: nothing to say about it.
+  if (mime == null) return false;
+  if (data.length > kAiImageMaxBytes) {
+    images.say(l10n.aiImageTooLarge);
+    return false;
+  }
+  // Another may have come in while this one was decoded.
+  if (images.items.length >= kAiImagesMax) {
+    images.say(l10n.aiTooManyImages);
+    return false;
+  }
   images.add(data, mime);
   return true;
 }
@@ -132,31 +167,78 @@ Future<List<String>> aiEncodeImages(OffThread run, List<Uint8List> images) {
       : Future.value([for (final b in images) _base64(b)]);
 }
 
-/// D16 around the composer: a paste looks for an image on the clipboard
-/// first (else pastes the text at the cursor), and images dropped on it go
-/// with the next message. A hidden pane takes no drop (`DropTarget` hears
+/// D16 around the composer: a paste pastes the text on the clipboard at the
+/// cursor, else attaches the image on it, and images dropped on the composer
+/// go with the next message. A hidden pane takes no drop (`DropTarget` hears
 /// drops while invisible).
 class AiImageInput extends StatelessWidget {
   const AiImageInput({super.key, required this.child});
   final Widget child;
 
+  /// The text first, as the terminal does: Excel, Numbers, Word and Pages put
+  /// a picture of what was copied next to its text, and the text is what
+  /// someone pasting cells wants. A screenshot carries no text, so it still
+  /// attaches. [context] is the widget's: it may be gone when the clipboard
+  /// answers.
   Future<void> _paste(BuildContext context) async {
     final scope = AiPaneScope.of(context);
     final l10n = AppLocalizations.of(context);
-    final image = await scope.ui.clipboardImage?.call();
-    if (image != null && await aiAttachImage(scope, l10n, image)) return;
     final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!context.mounted) return;
     final text = data?.text;
-    if (text != null && text.isNotEmpty) scope.ui.paste.value = text;
+    if (text != null && text.isNotEmpty) {
+      scope.ui.paste.value = text;
+      return;
+    }
+    final image = await scope.ui.clipboardImage?.call();
+    if (image == null || !context.mounted) return;
+    await aiAttachImage(scope, l10n, image, alive: () => context.mounted);
   }
 
+  static const _imageTypes = {
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.bmp',
+    '.tif',
+    '.tiff',
+  };
+
+  /// A dropped file is read only when it can still be attached: not past
+  /// [kAiImagesMax], not over [kAiImageMaxBytes] — its size comes from the
+  /// file system, not from reading it. What is said about the limits is said
+  /// for images (by their name); a text file dropped on a full composer is
+  /// just not an image.
   Future<void> _drop(BuildContext context, DropDoneDetails details) async {
     final scope = AiPaneScope.of(context);
     final l10n = AppLocalizations.of(context);
+    final images = scope.ui.images;
     for (final f in details.files) {
       if (f.path.isEmpty) continue;
+      final image = _imageTypes.contains(p.extension(f.path).toLowerCase());
+      if (images.items.length >= kAiImagesMax) {
+        if (!image) continue;
+        images.say(l10n.aiTooManyImages);
+        return;
+      }
+      int? size;
+      try {
+        size = await f.length();
+      } on Object {
+        size = null; // unreadable: the reader below says so by returning null
+      }
+      if (!context.mounted) return;
+      if (size != null && size > kAiImageMaxBytes) {
+        if (image) images.say(l10n.aiImageTooLarge);
+        continue;
+      }
       final bytes = await scope.ui.readImageFile?.call(f.path);
-      if (bytes != null) await aiAttachImage(scope, l10n, bytes);
+      if (bytes == null) continue;
+      if (!context.mounted) return;
+      await aiAttachImage(scope, l10n, bytes, alive: () => context.mounted);
+      if (!context.mounted) return;
     }
   }
 

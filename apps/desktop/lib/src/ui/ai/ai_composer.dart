@@ -43,6 +43,20 @@ typedef _View = ({
 /// An image going with a message.
 typedef _Image = ({Uint8List bytes, String mime});
 
+/// A message with images that went out before the agent had said what it
+/// takes (`initialize` had not answered): it waits in the queue, and comes
+/// back to the composer if the agent then says it takes no images.
+final class _Unchecked {
+  _Unchecked(this.text, this.images, this.mentions, this.marker);
+
+  final String text;
+  final List<_Image> images;
+  final Set<String> mentions;
+
+  /// One of its image blocks: how the message is found in the queue.
+  final ContentBlock marker;
+}
+
 /// What the composer says in place of the chips, for as long as it is true.
 enum _Note { queueFull, cannotSend }
 
@@ -90,6 +104,11 @@ class _AiComposerState extends ConsumerState<AiComposer> {
   /// its images to be encoded.
   Future<void> _tail = Future.value();
 
+  /// Messages with images sent before the agent said what it takes; and the
+  /// session state that is told when it does.
+  final _unchecked = <_Unchecked>[];
+  AiSessionState? _watching;
+
   FocusNode get _focus => widget.focusNode ?? _ownFocus;
 
   @override
@@ -121,6 +140,7 @@ class _AiComposerState extends ConsumerState<AiComposer> {
 
   @override
   void dispose() {
+    _watching?.removeListener(_onCapabilities);
     _scope?.frames.removeListener(_onFrame);
     _scope?.ui.paste.removeListener(_onPaste);
     _scope?.ui.mentioned.removeListener(_onMention);
@@ -236,6 +256,15 @@ class _AiComposerState extends ConsumerState<AiComposer> {
     if ((text.trim().isEmpty && images.isEmpty) || !_canSend) {
       return Future.value();
     }
+    // D16: an image was accepted while the agent had not said what it takes;
+    // now it has, and it takes none. Refused, and nothing is lost: the text,
+    // the images and the files stay where they are.
+    if (images.isNotEmpty && aiTakesNoImages(scope.state)) {
+      scope.ui.images.say(
+        AppLocalizations.of(context).aiImageUnsupported(scope.state.agentName),
+      );
+      return Future.value();
+    }
     // D16: each file still mentioned goes along as a `resource_link`.
     final mentions = {
       for (final path in _mentions)
@@ -276,6 +305,19 @@ class _AiComposerState extends ConsumerState<AiComposer> {
           ),
       ];
       ok = await scope.runtime.send(blocks);
+      // Queued while the agent starts, and it has not said what it takes:
+      // the message is taken back if it turns out to take no images.
+      if (ok && images.isNotEmpty && scope.state.agent == null && mounted) {
+        _watchCapabilities(
+          scope.state,
+          _Unchecked(
+            text,
+            images,
+            mentions,
+            blocks.firstWhere((b) => b is ImageBlock),
+          ),
+        );
+      }
     } on Object catch (error) {
       // Never the content; and never a message lost or a send stuck.
       debugPrint('ShellX: message not sent: ${error.runtimeType}');
@@ -283,6 +325,22 @@ class _AiComposerState extends ConsumerState<AiComposer> {
     if (ok || !mounted) return;
     // Nothing is lost: the text (before what was typed meanwhile), the
     // images and the files come back.
+    _restore(scope, text, images, mentions);
+    setState(
+      () => _note = scope.state.queue.length >= AiSessionState.maxQueue
+          ? _Note.queueFull
+          : _Note.cannotSend,
+    );
+  }
+
+  /// A message that was not taken is in the composer again, whole: its text
+  /// (before what was typed meanwhile), its images and its files.
+  void _restore(
+    AiPaneScope scope,
+    String text,
+    List<_Image> images,
+    Set<String> mentions,
+  ) {
     _mentions.addAll(mentions);
     for (final image in images) {
       scope.ui.images.add(image.bytes, image.mime);
@@ -293,11 +351,42 @@ class _AiComposerState extends ConsumerState<AiComposer> {
       text: all,
       selection: TextSelection.collapsed(offset: all.length),
     );
-    setState(
-      () => _note = scope.state.queue.length >= AiSessionState.maxQueue
-          ? _Note.queueFull
-          : _Note.cannotSend,
-    );
+  }
+
+  /// [sent] waits in the queue for an agent that has not said what it takes.
+  /// The session state tells at once when `initialize` answers — before the
+  /// session is open, so before anything in the queue can go out.
+  void _watchCapabilities(AiSessionState state, _Unchecked sent) {
+    _unchecked.add(sent);
+    if (_watching != null) return;
+    _watching = state..addListener(_onCapabilities);
+  }
+
+  void _onCapabilities() {
+    final state = _watching;
+    if (state == null || state.agent == null) return;
+    state.removeListener(_onCapabilities);
+    _watching = null;
+    final waiting = [..._unchecked];
+    _unchecked.clear();
+    if (!mounted || !aiTakesNoImages(state)) return;
+    final scope = _scope!;
+    var taken = false;
+    for (final sent in waiting) {
+      final queued = state.queue
+          .where((q) => q.blocks.any((b) => identical(b, sent.marker)))
+          .firstOrNull;
+      // Gone already: sent, or taken out by the user.
+      if (queued == null) continue;
+      state.removeQueued(queued.id);
+      _restore(scope, sent.text, sent.images, sent.mentions);
+      taken = true;
+    }
+    if (taken) {
+      scope.ui.images.say(
+        AppLocalizations.of(context).aiImageUnsupported(state.agentName),
+      );
+    }
   }
 
   /// Stop (Esc): the turn is asked to end. Never more than that.
