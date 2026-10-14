@@ -7,6 +7,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 
 import '../terminal/agent_status.dart';
 import '../terminal/agent_status_notifier.dart';
+import '../terminal/local_sessions_provider.dart' show appL10nProvider;
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 import '../terminal/terminal_tabs.dart';
 import 'ai_agents.dart';
@@ -100,6 +101,12 @@ class AiRuntimes extends Notifier<void> {
   final _agentOf = <int, String>{};
   final _labels = <int, AiLabelCache>{};
   final _last = <int, AiStatus>{};
+
+  /// M-1: the session a pane reopened with a title of its own (the agent's,
+  /// or the first prompt of an earlier run): its tab keeps that title until
+  /// the agent sends one, because `session/load` replays the prompts and not
+  /// the title.
+  final _resumed = <int, String>{};
   final _listeners = <int, void Function()>{};
   final _queued = <int>{};
   final _stopping = <Future<void>>{};
@@ -169,6 +176,10 @@ class AiRuntimes extends Notifier<void> {
     _runtimes[paneId] = runtime;
     _agentOf[paneId] = agent.id;
     _labels[paneId] = AiLabelCache(ref.read(aiLabelReaderProvider));
+    final resume = pane.sessionId;
+    if (resume != null && _isSessionTitle(pane.title)) {
+      _resumed[paneId] = resume;
+    }
     runtime.onStatus = (status) => _report(paneId, status);
     void listener() => _queueSync(paneId);
     _listeners[paneId] = listener;
@@ -176,7 +187,8 @@ class AiRuntimes extends Notifier<void> {
     return runtime;
   }
 
-  /// D3: tab [tabId]'s AI pane runs a turn.
+  /// D3: tab [tabId]'s AI pane runs a turn, or has messages waiting for the
+  /// agent (M-9: one that is still starting drops them when the tab closes).
   bool busy(int tabId) {
     final tab = ref
         .read(terminalTabsProvider)
@@ -184,7 +196,8 @@ class AiRuntimes extends Notifier<void> {
         .where((t) => t.id == tabId)
         .firstOrNull;
     final ai = tab?.ai;
-    return ai != null && _runtimes[ai.id]?.state.turn != null;
+    final state = ai == null ? null : _runtimes[ai.id]?.state;
+    return state != null && (state.turn != null || state.queue.isNotEmpty);
   }
 
   /// Quit (§6): every agent stops — stdin closed, 2 s, then its process
@@ -204,8 +217,14 @@ class AiRuntimes extends Notifier<void> {
     final listener = _listeners.remove(paneId);
     if (listener != null) runtime.state.removeListener(listener);
     runtime.onStatus = null;
+    // M-5: the runtime's own `ended` no longer reaches A12 (its callback is
+    // gone), so a pane that stays — the agent switched off, a new folder —
+    // would keep "Running" or "Needs you" in the sidebar. A pane that leaves
+    // takes its record with it.
+    if (_last.containsKey(paneId)) _report(paneId, AiStatus.ended);
     _agentOf.remove(paneId);
     _labels.remove(paneId);
+    _resumed.remove(paneId);
     _last.remove(paneId);
     late final Future<void> stop;
     stop = runtime
@@ -217,6 +236,13 @@ class AiRuntimes extends Notifier<void> {
     _stopping.add(stop);
   }
 
+  /// Whether a tab's [title] names its session: not blank, and not the "New
+  /// AI session" a tab shows before it has a name.
+  bool _isSessionTitle(String title) {
+    final t = title.trim();
+    return t.isNotEmpty && t != ref.read(appL10nProvider).aiNewSession;
+  }
+
   /// The tab follows its session: title and id. Once per burst of updates
   /// (a streaming answer touches the state hundreds of times a second).
   void _queueSync(int paneId) {
@@ -226,12 +252,20 @@ class AiRuntimes extends Notifier<void> {
       final runtime = _runtimes[paneId];
       if (runtime == null || !ref.mounted) return;
       final s = runtime.state;
+      // M-1: the saved title stands while the agent has sent none and the
+      // session is the one reopened (a session that started anew is named
+      // by what is written in it).
+      final resumed = _resumed[paneId];
+      final keepSaved =
+          resumed != null &&
+          (s.title?.trim().isEmpty ?? true) &&
+          (s.sessionId == null || s.sessionId == resumed);
       ref
           .read(terminalTabsProvider.notifier)
           .updateAiPane(
             paneId,
             (p) => p.copyWith(
-              title: _labels[paneId]?.of(s) ?? p.title,
+              title: keepSaved ? p.title : _labels[paneId]?.of(s) ?? p.title,
               sessionId: s.sessionId ?? p.sessionId,
             ),
           );
