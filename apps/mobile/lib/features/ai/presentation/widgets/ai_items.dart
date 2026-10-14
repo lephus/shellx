@@ -63,7 +63,8 @@ class _UserBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              SelectableText(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
+              // Plain text: the timeline's one SelectionArea makes it selectable, without an editor of its own.
+              Text(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
               if (shown.cut || item.fullLength != null) _Hint(S.of(context).aiCutText),
             ],
           ),
@@ -101,8 +102,9 @@ class _ThoughtState extends State<_Thought> {
       children: [
         InkWell(
           onTap: () => setState(() => _open = !_open),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+          // At least 44 points under the finger, the whole row.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
             child: Row(
               children: [
                 Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.secondaryText),
@@ -258,15 +260,20 @@ class _Hint extends StatelessWidget {
 }
 
 class _CardFrame extends StatelessWidget {
-  const _CardFrame({required this.child, this.warn = false});
+  const _CardFrame({
+    required this.child,
+    this.warn = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  });
   final Widget child;
   final bool warn;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: padding,
       decoration: BoxDecoration(
         color: warn ? colors.warnSoft : colors.surface,
         borderRadius: BorderRadius.circular(12),
@@ -301,32 +308,42 @@ class _AiToolCardState extends State<AiToolCard> {
     final waiting = t.permission == MirrorPermissionState.waiting;
     final open = _open ?? waiting;
     final hasBody = t.diffs.isNotEmpty || t.output != null || t.input != null;
+    // What hangs below the header (the user's choice, the open body) needs room under it; a header alone
+    // is the whole card.
+    final below = t.answerKind != null || open;
     return _CardFrame(
       warn: waiting,
+      // The header is the button and is at least 44 points high: it takes the card's vertical padding
+      // inside itself, so a single line is not taller than it must be.
+      padding: EdgeInsets.fromLTRB(12, 0, 12, below ? 10 : 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: hasBody ? () => setState(() => _open = !open) : null,
-            child: Row(
-              children: [
-                Icon(_icon(t.kind), size: 18, color: colors.secondaryText),
-                8.sizedWidth,
-                Expanded(
-                  child: Text(
-                    AiWords.toolTitle(s, t),
-                    maxLines: open ? 4 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.typo.paragraph13.copyWith(
-                      fontFamily: FontFamily.jetBrainsMono,
-                      color: colors.primaryText,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Row(
+                children: [
+                  Icon(_icon(t.kind), size: 18, color: colors.secondaryText),
+                  8.sizedWidth,
+                  Expanded(
+                    child: Text(
+                      AiWords.toolTitle(s, t),
+                      maxLines: open ? 4 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.paragraph13.copyWith(
+                        fontFamily: FontFamily.jetBrainsMono,
+                        color: colors.primaryText,
+                      ),
                     ),
                   ),
-                ),
-                8.sizedWidth,
-                _ToolState(tool: t, clock: widget.clock),
-                if (hasBody) Icon(open ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.secondaryText),
-              ],
+                  8.sizedWidth,
+                  _ToolState(tool: t, clock: widget.clock),
+                  if (hasBody)
+                    Icon(open ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.secondaryText),
+                ],
+              ),
             ),
           ),
           if (t.answerKind != null) ...[
@@ -399,7 +416,7 @@ class _ToolState extends StatelessWidget {
     }
     switch (t.end) {
       case 'completed':
-        return Icon(Icons.check, size: 16, color: colors.ok, semanticLabel: 'ok');
+        return Icon(Icons.check, size: 16, color: colors.ok, semanticLabel: s.aiToolDone);
       case 'failed':
         final rejected = t.answerKind?.isReject ?? false;
         return Text(rejected ? s.aiToolRejected : s.aiToolFailed, style: style.copyWith(color: colors.error));

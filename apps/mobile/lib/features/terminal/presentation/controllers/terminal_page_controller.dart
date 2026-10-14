@@ -5,6 +5,7 @@ import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/extra_keys_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_tab_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
@@ -166,8 +167,12 @@ class TerminalPageController extends Controller {
   /// V2-2: the computer's AI sessions; null until listed (or without AI for phones).
   ReadonlySignal<AiListing?> get aiListing => _aiListing;
 
-  /// V2-2 "Phiên AI mới": the new session's id, else the computer's refusal code (shown by the
-  /// page); a connection failure becomes the notice like any request (both null).
+  /// V2-2 "Phiên AI mới": the new session's id, else the code of what went wrong (shown by the page,
+  /// [AiWords.failure]): the computer's refusal; or [AiWords.openUnknown] when the connection dropped or
+  /// the computer did not answer in time, since the request may have reached it and the session may
+  /// exist (D13: the user looks in the list, and nothing asks again by itself). A handshake that failed
+  /// (untrusted, update required) leaves the page like any request; any other failure is the notice
+  /// (code null).
   Future<({String? sid, String? code})> openAi(String agent, String folder) async {
     if (_closed) return (sid: null, code: null);
     _setBusy(++_running);
@@ -175,6 +180,12 @@ class TerminalPageController extends Controller {
       return (sid: await workspace.machine.ai.open(agent, folder), code: null);
     } on AiRequestException catch (e) {
       return (sid: null, code: e.code);
+    } on MachineConnectionException catch (e) {
+      final mayHaveLanded =
+          e.failure == MachineConnectionFailure.agentOffline || e.failure == MachineConnectionFailure.timeout;
+      if (mayHaveLanded) return (sid: null, code: AiWords.openUnknown);
+      await _handleFailure(e);
+      return (sid: null, code: null);
     } catch (error) {
       await _handleFailure(error);
       return (sid: null, code: null);

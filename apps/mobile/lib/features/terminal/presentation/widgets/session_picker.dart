@@ -92,7 +92,13 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
               ),
               6.sizedHeight,
               Text(strings.pickerSubtitle, style: context.typo.subHeader15.copyWith(color: colors.secondaryText)),
-              if (listing.aiSupported != null) ...[
+              if (listing.aiSupported == false) ...[
+                // An older computer has no AI group to head: only the way to get it.
+                14.sizedHeight,
+                _Group(
+                  children: [_Hint(key: const ValueKey('picker-ai-hint'), text: strings.aiUpdateDesktop)],
+                ),
+              ] else if (listing.aiSupported == true) ...[
                 14.sizedHeight,
                 _GroupHeader(strings.aiGroup),
                 8.sizedHeight,
@@ -148,11 +154,11 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
 }
 
 /// V2-2 §5.1: the AI sessions first (they wait for the user more often than terminals do),
-/// then "Phiên AI mới"; a hint instead when the computer cannot serve them.
+/// then "Phiên AI mới"; a hint instead when no window serves them. (A computer without AI for phones
+/// gets only a hint, no group: see [showSessionPicker].)
 List<Widget> _aiRows(BuildContext context, SessionListing listing) {
   final s = S.of(context);
   final ai = listing.ai;
-  if (listing.aiSupported != true) return [_Hint(key: const ValueKey('picker-ai-hint'), text: s.aiUpdateDesktop)];
   if (ai == null || !ai.available) return [_Hint(key: const ValueKey('picker-ai-hint'), text: s.aiUnavailable)];
   final canStart = ai.agents.any((a) => a.ready) && ai.folders.isNotEmpty;
   return [

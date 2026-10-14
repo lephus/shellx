@@ -17,6 +17,7 @@ import 'package:package_info_plus/package_info_plus.dart' as _i655;
 import 'package:shared_preferences/shared_preferences.dart' as _i460;
 import 'package:shellx_core/shellx_core.dart' as _i145;
 
+import '../../features/ai/domain/ai_drafts.dart' as _i267;
 import '../../features/ai/presentation/controllers/ai_session_controller.dart'
     as _i800;
 import '../../features/auth/presentation/controllers/login_controller.dart'
@@ -90,6 +91,7 @@ extension GetItInjectableX on _i174.GetIt {
       preResolve: true,
     );
     gh.lazySingleton<_i145.ShellxApi>(() => module.api);
+    gh.lazySingleton<_i267.AiDrafts>(() => _i267.AiDrafts());
     gh.lazySingleton<_i498.SpeechInput>(() => _i546.SpeechToTextInput());
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
@@ -141,6 +143,14 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.AppSettings>(),
       ),
     );
+    gh.factoryParam<_i800.AiSessionController, String, String>(
+      (agentId, sid) => _i800.AiSessionController(
+        agentId,
+        sid,
+        gh<_i351.SessionHolder>(),
+        gh<_i267.AiDrafts>(),
+      ),
+    );
     gh.factory<_i1044.QrScannerController>(
       () => _i1044.QrScannerController(gh<_i351.SessionHolder>()),
     );
@@ -171,10 +181,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i667.WorkspaceRegistry>(
       () => _i667.WorkspaceRegistry.create(gh<_i351.SessionHolder>()),
       dispose: (i) => i.dispose(),
-    );
-    gh.factoryParam<_i800.AiSessionController, String, String>(
-      (agentId, sid) =>
-          _i800.AiSessionController(agentId, sid, gh<_i351.SessionHolder>()),
     );
     gh.factory<_i409.BuildContext>(() => module.context(gh<_i81.AppRouter>()));
     gh.factoryParam<_i229.TerminalPageController, String, dynamic>(

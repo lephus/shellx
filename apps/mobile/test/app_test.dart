@@ -14,6 +14,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/core/router/auth_guard.dart';
 import 'package:shellx_mobile/core/router/update_guard.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/app/app.dart';
@@ -155,7 +156,7 @@ void main() {
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       )
       ..registerFactoryParam<AiSessionController, String, String>(
-        (agentId, sid) => AiSessionController(agentId, sid, session),
+        (agentId, sid) => AiSessionController(agentId, sid, session, AiDrafts()),
       )
       ..registerFactory<VoiceComposerController>(() => VoiceComposerController(FakeSpeechInput(), settings))
       ..registerFactory<QrScannerController>(() => QrScannerController(session))

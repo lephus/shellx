@@ -529,7 +529,10 @@ void main() {
     test('each reason has its words, the unreadable one too', () async {
       final vi = await S.load(const Locale('vi'));
       expect(AiWords.closed(vi, 'gone'), 'Phiên AI này đã đóng trên máy tính.');
-      expect(AiWords.closed(vi, 'desktop_closed'), 'ShellX trên máy tính đã thoát. Mở lại để tiếp tục.');
+      expect(
+        AiWords.closed(vi, 'desktop_closed'),
+        'ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.',
+      );
       expect(AiWords.closed(vi, 'unavailable'), 'Mở ShellX trên máy tính để dùng phiên AI.');
       expect(AiWords.closed(vi, 'unreadable'), 'Điện thoại không đọc được phiên AI này. Xem trên máy tính.');
       // The reason of a newer computer, and no reason at all: the session is closed there.
@@ -537,7 +540,10 @@ void main() {
       expect(AiWords.closed(vi, null), 'Phiên AI này đã đóng trên máy tính.');
       final en = await S.load(const Locale('en'));
       expect(AiWords.closed(en, 'gone'), 'This AI session was closed on the computer.');
-      expect(AiWords.closed(en, 'desktop_closed'), 'ShellX was closed on the computer. Open it to continue.');
+      expect(
+        AiWords.closed(en, 'desktop_closed'),
+        'ShellX was closed on the computer. Open ShellX on the computer, then open the session again.',
+      );
       expect(AiWords.closed(en, 'unavailable'), 'Open ShellX on the computer to use AI sessions.');
       expect(AiWords.closed(en, 'unreadable'), 'The phone cannot read this AI session. See it on the computer.');
     });
@@ -653,6 +659,19 @@ void main() {
       expect(AiWords.failure(en, 'update_required'), 'App update required');
     });
 
+    test('a new session that may have been created says so, and to look in the list first (D13)', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(
+        AiWords.failure(vi, 'open_unknown'),
+        'Có thể phiên mới chưa được tạo. Hãy xem lại danh sách trước khi thử lại.',
+      );
+      final en = await S.load(const Locale('en'));
+      expect(
+        AiWords.failure(en, 'open_unknown'),
+        'The new session may not have been created. Check the list before trying again.',
+      );
+    });
+
     test('an option the computer keeps for itself is answered there', () async {
       // The computer refuses an answer that would turn on a mode without approval (V2-2 D13); the
       // request stays open for it.
@@ -665,9 +684,9 @@ void main() {
     test('a request already on its way says nothing; anything else is a sentence', () async {
       final vi = await S.load(const Locale('vi'));
       expect(AiWords.failure(vi, 'in_flight'), isNull);
-      expect(AiWords.failure(vi, 'error'), 'Đã có lỗi xảy ra (error).');
+      expect(AiWords.failure(vi, 'error'), 'Đã có lỗi xảy ra'); // no "(error)" after it
       final en = await S.load(const Locale('en'));
-      expect(AiWords.failure(en, 'error'), 'Something went wrong (error).');
+      expect(AiWords.failure(en, 'error'), 'Something went wrong');
     });
 
     test('a computer that cannot be reached is worded by the machine, the offline one at length', () async {

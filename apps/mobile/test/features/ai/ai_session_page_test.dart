@@ -6,6 +6,7 @@ import 'package:shellx_ai/remote.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
@@ -45,32 +46,39 @@ void main() {
   late FakeMachineSession machine;
   late FakeSessionHolder session;
   late FakePopupHandler popups;
+  late AiDrafts drafts;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
     machine = backend.addMachine(agentA);
     session = FakeSessionHolder(backend);
     popups = FakePopupHandler();
+    drafts = AiDrafts();
     getIt
       ..registerSingleton<PopupHandler>(popups)
       ..registerSingleton<SessionHolder>(session)
       ..registerSingleton<ExternalLinks>(FakeExternalLinks())
       ..registerFactoryParam<AiSessionController, String, String>(
-        (agentId, sid) => AiSessionController(agentId, sid, session),
+        (agentId, sid) => AiSessionController(agentId, sid, session, drafts),
       );
   });
 
   tearDown(() async => getIt.reset());
 
-  /// Opens the page of [sid]; the desktop state is `machine.ai.session(sid).desktop`.
-  Future<FakeAiSession> open(WidgetTester tester, {List<Object?>? results}) async {
+  /// A panel that has just appeared, or a button that is free again, ignores taps for 400 ms (V2-1 D10: one
+  /// tap, meant). Time for it to settle.
+  Future<void> settle(WidgetTester tester) => tester.pump(const Duration(milliseconds: 400));
+
+  /// Opens the page of [forSid] (the page of [sid] by default); the desktop state is
+  /// `machine.ai.session(sid).desktop`. The panels on screen have settled when it returns.
+  Future<FakeAiSession> open(WidgetTester tester, {List<Object?>? results, String? forSid}) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    final ai = machine.ai.session(sid);
+    final ai = machine.ai.session(forSid ?? sid);
     await tester.pumpWidget(
       routedApp(
-        open: () => AiSessionRoute(agentId: agentA, machineName: 'MacBook', sid: sid),
+        open: () => AiSessionRoute(agentId: agentA, machineName: 'MacBook', sid: forSid ?? sid),
         routes: [AutoRoute(page: AiSessionRoute.page)],
         results: results,
       ),
@@ -82,6 +90,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     ai.sync();
     await tester.pumpAndSettle();
+    await settle(tester);
+    await tester.pumpAndSettle(); // the buttons that waited have lit up (Stop fades in)
+    return ai;
+  }
+
+  /// The page is left and opened again for the same session: a new link, waiting for its snapshot.
+  Future<FakeAiSession> reopen(WidgetTester tester, {String? forSid}) async {
+    await tester.tap(find.byKey(const Key('ai.back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    final ai = machine.ai.session(forSid ?? sid);
+    ai.sync();
+    await tester.pumpAndSettle();
+    await settle(tester);
+    await tester.pumpAndSettle(); // the buttons that waited have lit up (Stop fades in)
     return ai;
   }
 
@@ -101,7 +126,7 @@ void main() {
     final timeline = find.byKey(const Key('ai.timeline'));
     expect(find.descendant(of: timeline, matching: find.text('Thêm nút đăng xuất')), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('ai.title'))).data, 'Thêm nút đăng xuất');
-    expect(find.textContaining('Mình sẽ thêm'), findsOneWidget);
+    expect(find.textContaining('Mình sẽ thêm', findRichText: true), findsOneWidget);
     expect(find.byType(Image), findsNothing); // markdown never loads images
     expect(find.text('Đọc main.ts'), findsOneWidget);
     final status = tester.widget<Text>(find.byKey(const Key('ai.status'))).data!;
@@ -162,6 +187,7 @@ void main() {
     ai.sync();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('ai.stop')), findsOneWidget);
+    await settle(tester); // Stop has just taken the place of Send
     await tester.tap(find.byKey(const Key('ai.stop')));
     await tester.pumpAndSettle();
     expect(machine.ai.cancels, [sid]);
@@ -226,7 +252,7 @@ void main() {
     ); // the mirror stays
     ai.close('desktop_closed');
     await tester.pump();
-    expect(find.text('ShellX trên máy tính đã thoát. Mở lại để tiếp tục.'), findsOneWidget);
+    expect(find.text('ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.'), findsOneWidget);
     expect(find.byKey(const Key('ai.composer')), findsNothing);
   });
 
@@ -367,7 +393,7 @@ void main() {
   group('a session that closes or cannot run has its own words (V2-2 §5.5, D14)', () {
     for (final (reason, text) in [
       ('gone', 'Phiên AI này đã đóng trên máy tính.'),
-      ('desktop_closed', 'ShellX trên máy tính đã thoát. Mở lại để tiếp tục.'),
+      ('desktop_closed', 'ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.'),
       ('unavailable', 'Mở ShellX trên máy tính để dùng phiên AI.'),
       ('unreadable', 'Điện thoại không đọc được phiên AI này. Xem trên máy tính.'),
       ('a_reason_from_the_future', 'Phiên AI này đã đóng trên máy tính.'),
@@ -463,7 +489,8 @@ void main() {
       expect(find.text('Đang kết nối lại… nội dung có thể chưa mới nhất.'), findsNothing);
       expect(find.descendant(of: find.byKey(const Key('ai.timeline')), matching: find.text('go')), findsOneWidget);
       final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
-      expect((field.enabled, field.controller!.text), (false, 'bản nháp')); // locked, the draft kept
+      expect((field.enabled ?? true, field.controller!.text), (true, 'bản nháp')); // editable, the draft kept
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).onPressed, isNull); // only Send is shut
     });
 
     testWidgets('the machine is not pinned any more: its words, not "closed on the computer"', (tester) async {
@@ -571,6 +598,7 @@ void main() {
 
       // The user may take another option; nothing was answered for them.
       machine.ai.failWith = null;
+      await settle(tester); // the buttons are free again, after a moment
       await tester.tap(find.byKey(const Key('ai.option.reject')));
       await tester.pumpAndSettle();
       expect(machine.ai.permissionAnswers, [(sid, p.id, 'always'), (sid, p.id, 'reject')]);
@@ -669,6 +697,7 @@ void main() {
         items: [textRecord(0, 'user', 'Hỏi')],
       );
       await tester.pumpAndSettle();
+      await settle(tester); // a question that has just appeared waits a moment before it answers
       expect(find.byKey(const Key('ai.ask')), findsOneWidget);
       expect(find.text('Trả lời câu hỏi này trên máy tính.'), findsOneWidget);
       expect(find.byKey(const Key('ai.ask.submit')), findsNothing);
@@ -748,8 +777,12 @@ void main() {
       await tester.pump(const Duration(minutes: 5));
       expect(machine.ai.permissionAnswers, isEmpty);
       ai.sync(); // the link is back with what the computer holds: the request is still waiting
-      await tester.pumpAndSettle();
+      await tester.pump();
       expect(machine.ai.permissionAnswers, isEmpty); // not by itself
+      await tester.tap(find.byKey(const Key('ai.option.allow'))); // a tap on the very frame it came back
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, isEmpty);
+      await settle(tester);
       await tester.tap(find.byKey(const Key('ai.option.allow')));
       await tester.pumpAndSettle();
       expect(machine.ai.permissionAnswers, hasLength(1));
@@ -883,18 +916,22 @@ void main() {
       ai.lose();
       await tester.pump();
       expect(find.text('Đang kết nối lại… nội dung có thể chưa mới nhất.'), findsOneWidget);
-      expect(tester.widget<TextField>(find.byKey(const Key('ai.composer'))).enabled, isFalse);
+      expect(
+        tester.widget<TextField>(find.byKey(const Key('ai.composer'))).enabled,
+        isNot(false),
+      ); // the keyboard stays
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).onPressed, isNull);
       say(ai.desktop, ' hai'); // while the phone was away
       ai.sync(); // the new snapshot: its numbers are not 1
       await tester.pumpAndSettle();
       expect(find.text('Đang kết nối lại… nội dung có thể chưa mới nhất.'), findsNothing);
-      expect(find.textContaining('một hai'), findsOneWidget);
+      expect(find.textContaining('một hai', findRichText: true), findsOneWidget);
       final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
-      expect((field.enabled, field.controller!.text), (true, 'bản nháp'));
+      expect((field.enabled ?? true, field.controller!.text), (true, 'bản nháp'));
       say(ai.desktop, ' ba');
       ai.sync();
       await tester.pumpAndSettle();
-      expect(find.textContaining('một hai ba'), findsOneWidget);
+      expect(find.textContaining('một hai ba', findRichText: true), findsOneWidget);
     });
   });
 
@@ -922,7 +959,7 @@ void main() {
       }
       await tester.pump();
       expect(rebuilds[AiTimeline], 1);
-      expect(find.textContaining('từ4'), findsOneWidget);
+      expect(find.textContaining('từ4', findRichText: true), findsOneWidget);
     });
 
     testWidgets('a keyboard that opens leaves the last message in view', (tester) async {
@@ -1051,4 +1088,401 @@ void main() {
       expect(find.text('Quá lớn để xem trên điện thoại. Xem trên máy tính.'), findsOneWidget);
     }, timeout: const Timeout(Duration(minutes: 3)));
   });
+
+  // ----------------------------------------------------------------------------------------------
+  // Fix round 1 (the 9+10 pair review and the final review).
+  // ----------------------------------------------------------------------------------------------
+
+  PermissionRequest second() => PermissionRequest.fromJson({
+    'sessionId': 's',
+    'toolCall': {'toolCallId': 'c2', 'title': 'Edit src/other.ts', 'kind': 'edit'},
+    'options': [
+      {'optionId': 'allow', 'name': 'Yes', 'kind': 'allow_once'},
+      {'optionId': 'reject', 'name': 'No', 'kind': 'reject_once'},
+    ],
+  });
+
+  ElicitationRequest question(String message) => ElicitationRequest.fromJson({
+    'mode': 'form',
+    'message': message,
+    'requestedSchema': {
+      'type': 'object',
+      'properties': {
+        'yes': {'type': 'boolean', 'title': 'Đồng ý', 'default': true},
+      },
+    },
+  });
+
+  group('a panel that has just appeared waits a moment: a second tap does not answer the next request', () {
+    testWidgets('the request replaced by the next one in the same place (two queued): 50 ms after the first answer', (
+      tester,
+    ) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('Sửa')], DateTime.now());
+      final first = ai.desktop.addPermission(perm(), DateTime.now());
+      final next = ai.desktop.addPermission(second(), DateTime.now());
+      await open(tester);
+      expect(find.text('còn 1 yêu cầu'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, first.id, 'allow')]);
+
+      ai.desktop.resolvePermission(first.id, const PermissionSelected('allow'));
+      ai.sync(); // the computer shows the second request, in the very same place
+      await tester.pump();
+      expect(find.text('Edit src/other.ts'), findsWidgets);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('ai.option.allow'))); // the second tap of a double tap
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, hasLength(1), reason: 'the second request is not answered by it');
+
+      await tester.pump(const Duration(milliseconds: 350)); // 400 ms after it came
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, first.id, 'allow'), (sid, next.id, 'allow')]);
+    });
+
+    testWidgets('a waiting request stays answerable while updates keep coming (each rebuilds the panel)', (
+      tester,
+    ) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('Sửa')], DateTime.now());
+      final p = ai.desktop.addPermission(perm(), DateTime.now());
+      await open(tester);
+      for (var i = 0; i < 8; i++) {
+        say(ai.desktop, ' tiếp'); // news that does not touch the request
+        ai.sync();
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, p.id, 'allow')]);
+    });
+
+    testWidgets('Stop keeps working while the answer streams in (every update rebuilds the dock)', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      say(ai.desktop, 'một');
+      await open(tester);
+      for (var i = 0; i < 8; i++) {
+        say(ai.desktop, ' tiếp');
+        ai.sync();
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.tap(find.byKey(const Key('ai.stop')));
+      await tester.pump();
+      expect(machine.ai.cancels, [sid]);
+    });
+
+    testWidgets('a request answered on the computer and replaced by the next, under the finger: waits too', (
+      tester,
+    ) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('Sửa')], DateTime.now());
+      final first = ai.desktop.addPermission(perm(), DateTime.now());
+      final next = ai.desktop.addPermission(second(), DateTime.now());
+      await open(tester);
+      // Nothing was answered here (the phone never was busy): the computer's own answer takes the first away.
+      ai.desktop.resolvePermission(first.id, const PermissionSelected('allow'));
+      ai.sync();
+      await tester.pump();
+      expect(find.text('Edit src/other.ts'), findsWidgets);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, isEmpty, reason: 'a finger aimed at the first one is not an answer');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, next.id, 'allow')]);
+    });
+
+    testWidgets('50 ms after an answer that failed: the buttons are free again, but not at once', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('Sửa')], DateTime.now());
+      final p = ai.desktop.addPermission(perm(), DateTime.now());
+      await open(tester);
+      final gate = machine.ai.gate = Completer<void>(); // the answer is on its way for a moment
+      await tester.tap(find.byKey(const Key('ai.option.allow')));
+      await tester.pump();
+      machine.ai.failWith = 'stale';
+      machine.ai.gate = null;
+      gate.complete(); // the computer says it was answered elsewhere: the buttons are free again
+      await tester.pump();
+      await tester.pump();
+      expect(popups.errors, ['Đã được trả lời ở thiết bị khác.']);
+      machine.ai.failWith = null;
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('ai.option.reject')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, p.id, 'allow')], reason: 'a second tap 50 ms later answers nothing');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('ai.option.reject')));
+      await tester.pump();
+      expect(machine.ai.permissionAnswers, [(sid, p.id, 'allow'), (sid, p.id, 'reject')]);
+    });
+
+    testWidgets(
+      'a panel that appears while the user is looking at the conversation: the first 400 ms are for looking',
+      (
+        tester,
+      ) async {
+        final ai = await open(tester);
+        ai.desktop.beginTurn(const [TextBlock('Sửa')], DateTime.now());
+        final p = ai.desktop.addPermission(perm(), DateTime.now());
+        ai.sync();
+        await tester.pump();
+        expect(find.byKey(const Key('ai.permission')), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.tap(find.byKey(const Key('ai.option.allow')));
+        await tester.pump();
+        expect(machine.ai.permissionAnswers, isEmpty);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byKey(const Key('ai.option.allow')));
+        await tester.pump();
+        expect(machine.ai.permissionAnswers, [(sid, p.id, 'allow')]);
+      },
+    );
+
+    testWidgets('a question replaced by the next one waits too', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      final first = ai.desktop.addAsk(question('Câu một?'))!;
+      final next = ai.desktop.addAsk(question('Câu hai?'))!;
+      await open(tester);
+      expect(find.text('Câu một?'), findsWidgets);
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      await tester.pump();
+      await tester.pump();
+      expect(machine.ai.askAnswers.map((a) => a.$2), [first.id]);
+
+      ai.desktop.resolveAsk(first.id, const ElicitDecline());
+      ai.sync();
+      await tester.pump();
+      expect(find.text('Câu hai?'), findsWidgets);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      await tester.tap(find.byKey(const Key('ai.ask.submit')));
+      await tester.pump();
+      expect(machine.ai.askAnswers, hasLength(1));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      await tester.pump();
+      expect(machine.ai.askAnswers.map((a) => a.$2), [first.id, next.id]);
+    });
+
+    testWidgets('Stop that takes the place of Send, once a queued message went: 400 ms before it stops the turn', (
+      tester,
+    ) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      await open(tester);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'thêm nữa');
+      await tester.pump();
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).tooltip, 'Xếp hàng');
+      await tester.tap(find.byKey(const Key('ai.send')));
+      await tester.pump();
+      await tester.pump();
+      expect(machine.ai.prompts, [(sid, 'thêm nữa')]);
+      expect(find.byKey(const Key('ai.stop')), findsOneWidget); // the field is empty: Stop is where Send was
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('ai.stop'))); // the second tap of a double tap
+      await tester.pump();
+      expect(machine.ai.cancels, isEmpty);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byKey(const Key('ai.stop')));
+      await tester.pump();
+      expect(machine.ai.cancels, [sid]);
+    });
+  });
+
+  group('a session that is closed, or whose link is away, does not say it runs', () {
+    String status(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('ai.status'))).data!;
+
+    testWidgets('closed on the computer: the header says closed, with no state and no clock', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      await open(tester);
+      expect(status(tester), startsWith('Claude · Đang chạy · 0:0'));
+      ai.close('desktop_closed');
+      await tester.pump();
+      expect(status(tester), 'Claude · Đã đóng');
+      await tester.pump(const Duration(seconds: 5)); // nothing ticks any more
+      expect(status(tester), 'Claude · Đã đóng');
+    });
+
+    testWidgets('closed on the computer: the dot is grey, whatever the session was doing', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      await open(tester);
+      Color dot() => tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .map((box) => box.decoration)
+          .whereType<BoxDecoration>()
+          .singleWhere((decoration) => decoration.shape == BoxShape.circle)
+          .color!;
+      final colors = Brightness.light.appColors;
+      expect(dot(), colors.link, reason: 'a turn is running');
+      ai.close('desktop_closed');
+      await tester.pump();
+      expect(dot(), colors.secondaryText);
+    });
+
+    testWidgets('the link is away: the state stays, the clock is not drawn until it is back', (tester) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      await open(tester);
+      ai.lose();
+      await tester.pump();
+      expect(status(tester), 'Claude · Đang chạy');
+      ai.sync();
+      await tester.pump();
+      expect(status(tester), startsWith('Claude · Đang chạy · 0:0'));
+    });
+
+    testWidgets('the app in the background: the page tells the controller, which stops counting', (tester) async {
+      late _SpyController spy;
+      getIt
+        ..unregister<AiSessionController>()
+        ..registerFactoryParam<AiSessionController, String, String>(
+          (agentId, sid) => spy = _SpyController(agentId, sid, session, drafts),
+        );
+      final ai = machine.ai.session(sid);
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      await open(tester);
+      expect(spy.foreground, isEmpty, reason: 'it starts in the foreground: nothing to tell');
+      void lifecycle(AppLifecycleState state) => tester.binding.handleAppLifecycleStateChanged(state);
+
+      // `inactive` (the notification shade, a dialog of the system) still shows the page; `hidden` and
+      // `paused` do not.
+      lifecycle(AppLifecycleState.inactive);
+      expect(spy.foreground.last, isTrue);
+      lifecycle(AppLifecycleState.hidden);
+      expect(spy.foreground.last, isFalse);
+      lifecycle(AppLifecycleState.paused);
+      expect(spy.foreground.last, isFalse);
+      lifecycle(AppLifecycleState.hidden);
+      expect(spy.foreground.last, isFalse);
+      lifecycle(AppLifecycleState.inactive);
+      expect(spy.foreground.last, isTrue);
+      lifecycle(AppLifecycleState.resumed);
+      expect(spy.foreground.last, isTrue);
+
+      // The page goes away with its observer: a later change is no business of it.
+      await tester.tap(find.byKey(const Key('ai.back')));
+      await tester.pumpAndSettle();
+      final before = spy.foreground.length;
+      lifecycle(AppLifecycleState.inactive);
+      lifecycle(AppLifecycleState.hidden);
+      lifecycle(AppLifecycleState.paused);
+      lifecycle(AppLifecycleState.hidden);
+      lifecycle(AppLifecycleState.inactive);
+      lifecycle(AppLifecycleState.resumed);
+      expect(spy.foreground, hasLength(before));
+    });
+  });
+
+  group('the text field', () {
+    testWidgets('a lost connection leaves the keyboard open and the field editable; only Send is shut', (tester) async {
+      final ai = await open(tester);
+      await tester.showKeyboard(find.byKey(const Key('ai.composer')));
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'Thêm nút');
+      expect(tester.testTextInput.isVisible, isTrue);
+      ai.lose();
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue, reason: 'a network blip does not close the keyboard');
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'Thêm nút đăng xuất');
+      await tester.pump();
+      final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
+      expect((field.enabled ?? true, field.controller!.text), (true, 'Thêm nút đăng xuất'));
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).onPressed, isNull);
+      ai.sync();
+      await tester.pump();
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).onPressed, isNotNull);
+      expect(machine.ai.prompts, isEmpty);
+    });
+
+    testWidgets('the draft is found again when the page is left and opened again for the same session', (tester) async {
+      await open(tester);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'Thêm nút đăng xuất, viết dở');
+      await tester.pump();
+      await reopen(tester);
+      final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
+      expect(field.controller!.text, 'Thêm nút đăng xuất, viết dở');
+      expect(machine.ai.prompts, isEmpty, reason: 'nothing was sent');
+    });
+
+    testWidgets('a message that went leaves no draft; the draft of another session is not this one\'s', (tester) async {
+      await open(tester);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'đã gửi');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ai.send')));
+      await tester.pumpAndSettle();
+      expect(machine.ai.prompts, [(sid, 'đã gửi')]);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'còn dở');
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('ai.composer')), '');
+      await reopen(tester);
+      expect(tester.widget<TextField>(find.byKey(const Key('ai.composer'))).controller!.text, isEmpty);
+
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'của phiên một');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ai.back')));
+      await tester.pumpAndSettle();
+      machine.ai.session('e.-2').desktop.beginTurn(const [TextBlock('khác')], DateTime.now());
+      await open(tester, forSid: 'e.-2');
+      expect(tester.widget<TextField>(find.byKey(const Key('ai.composer'))).controller!.text, isEmpty);
+    });
+
+    group('a message on its way as the page is left', () {
+      /// Types [text], sends it with the answer held back, leaves the page, and lets the answer come
+      /// (failing with [failWith], else going through); opens the page again.
+      Future<String> leaveWhileSending(WidgetTester tester, String text, {String? failWith}) async {
+        final gate = machine.ai.gate = Completer<void>();
+        await tester.enterText(find.byKey(const Key('ai.composer')), text);
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.send')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.back')));
+        await tester.pumpAndSettle();
+        machine.ai.gate = null;
+        machine.ai.failWith = failWith;
+        gate.complete();
+        await tester.pump();
+        await tester.pump();
+        await tester.tap(find.text('open'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        machine.ai.session(sid).sync();
+        await tester.pumpAndSettle();
+        return tester.widget<TextField>(find.byKey(const Key('ai.composer'))).controller!.text;
+      }
+
+      testWidgets('that went through is no draft: it is not sent a second time by the next visit', (tester) async {
+        await open(tester);
+        expect(await leaveWhileSending(tester, 'gửi rồi rời đi'), isEmpty);
+        expect(machine.ai.prompts, [(sid, 'gửi rồi rời đi')]);
+      });
+
+      testWidgets('that did not go through stays: it is the user\'s to send again', (tester) async {
+        await open(tester);
+        expect(await leaveWhileSending(tester, 'không gửi được', failWith: 'queue_full'), 'không gửi được');
+        expect(machine.ai.prompts, [(sid, 'không gửi được')], reason: 'and it was not sent again by itself');
+      });
+    });
+  });
+}
+
+/// A controller that says what the page tells it about the app in the background.
+class _SpyController extends AiSessionController {
+  _SpyController(super.agentId, super.sid, super.session, super.drafts);
+
+  final foreground = <bool>[];
+
+  @override
+  void setForeground(bool value) {
+    foreground.add(value);
+    super.setForeground(value);
+  }
 }

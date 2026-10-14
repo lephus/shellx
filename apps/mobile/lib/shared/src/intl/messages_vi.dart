@@ -22,158 +22,142 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m0(agent) => "${agent} hỏi bạn";
 
-  static String m1(agent) => "${agent} cần bạn trả lời";
+  static String m1(agent) => "Nhắn cho ${agent}…";
 
-  static String m2(agent) => "Nhắn cho ${agent}…";
+  static String m2(percent) => "Ngữ cảnh ${percent}%";
 
-  static String m3(percent) => "Ngữ cảnh ${percent}%";
+  static String m3(count) => "${count} dòng; phần giữa xem trên máy tính";
 
-  static String m4(count) => "${count} dòng; phần giữa xem trên máy tính";
+  static String m4(count) => "+${count} tệp nữa";
 
-  static String m5(count) => "+${count} tệp nữa";
+  static String m5(agent, code) => "${agent} dừng bất ngờ (mã thoát ${code}).";
 
-  static String m6(agent, code) => "${agent} dừng bất ngờ (mã thoát ${code}).";
+  static String m6(agent) => "${agent} gửi dữ liệu ShellX không đọc được nên đã bị dừng.";
 
-  static String m7(agent) =>
-      "${agent} gửi dữ liệu ShellX không đọc được nên đã bị dừng.";
+  static String m7(agent) => "${agent} cần đăng nhập, trên máy tính.";
 
-  static String m8(agent) => "${agent} cần đăng nhập, trên máy tính.";
+  static String m8(agent) => "Không tìm thấy ${agent} trên máy tính.";
 
-  static String m9(agent) => "Không tìm thấy ${agent} trên máy tính.";
+  static String m9(agent, version) => "${agent} cần máy tính có Node.js ${version} trở lên.";
 
-  static String m10(agent, version) =>
-      "${agent} cần máy tính có Node.js ${version} trở lên.";
+  static String m10(agent) => "${agent} chưa được cài trên máy tính.";
 
-  static String m11(agent) => "${agent} chưa được cài trên máy tính.";
+  static String m11(agent) => "${agent} không khởi động được.";
 
-  static String m12(agent) => "${agent} không khởi động được.";
+  static String m12(reason) => "Hoàn tác đang tắt cho dự án này (${reason}).";
 
-  static String m13(reason) => "Hoàn tác đang tắt cho dự án này (${reason}).";
+  static String m13(reason) => "Hoàn tác đang tắt cho lượt này (${reason}).";
 
-  static String m14(reason) => "Hoàn tác đang tắt cho lượt này (${reason}).";
+  static String m14(count) => "còn ${count} yêu cầu";
 
-  static String m15(count) => "còn ${count} yêu cầu";
+  static String m15(agent) => "${agent} xin quyền:";
 
-  static String m16(agent) => "${agent} xin quyền:";
+  static String m16(done, total) => "Kế hoạch · ${done}/${total}";
 
-  static String m17(done, total) => "Kế hoạch · ${done}/${total}";
+  static String m17(reason) => "Máy tính không nhận (${reason}).";
 
-  static String m18(reason) => "Máy tính không nhận (${reason}).";
+  static String m18(agent, state) => "${agent} · ${state}";
 
-  static String m19(agent, state) => "${agent} · ${state}";
+  static String m19(max) => "Quá dài để gửi từ điện thoại (tối đa ${max} KB).";
 
-  static String m20(max) => "Quá dài để gửi từ điện thoại (tối đa ${max} KB).";
+  static String m20(target) => "Tạo ${target}";
 
-  static String m21(target) => "Tạo ${target}";
+  static String m21(target) => "Xóa ${target}";
 
-  static String m22(target) => "Xóa ${target}";
+  static String m22(target) => "Sửa ${target}";
 
-  static String m23(target) => "Sửa ${target}";
+  static String m23(target) => "Chạy ${target}";
 
-  static String m24(target) => "Chạy ${target}";
+  static String m24(target) => "Tải ${target}";
 
-  static String m25(target) => "Tải ${target}";
+  static String m25(target) => "Đổi tên ${target}";
 
-  static String m26(target) => "Đổi tên ${target}";
+  static String m26(target) => "Đọc ${target}";
 
-  static String m27(target) => "Đọc ${target}";
+  static String m27(time) => "đang chạy · ${time}";
 
-  static String m28(time) => "đang chạy · ${time}";
+  static String m28(target) => "Tìm ${target}";
 
-  static String m29(target) => "Tìm ${target}";
+  static String m29(n) => "Lượt ${n} lỗi";
 
-  static String m30(n) => "Lượt ${n} lỗi";
+  static String m30(count) => "${Intl.plural(count, other: '${count} tệp đổi')}";
 
-  static String m31(count) =>
-      "${Intl.plural(count, other: '${count} tệp đổi')}";
+  static String m31(n) => "Lượt ${n} bị gián đoạn";
 
-  static String m32(n) => "Lượt ${n} bị gián đoạn";
+  static String m32(n, time) => "Đã dừng lượt ${n} · ${time}";
 
-  static String m33(n, time) => "Đã dừng lượt ${n} · ${time}";
+  static String m33(n, time) => "Lượt ${n} · ${time}";
 
-  static String m34(n, time) => "Lượt ${n} · ${time}";
+  static String m34(option) => "Bạn chọn: ${option}";
 
-  static String m35(option) => "Bạn chọn: ${option}";
+  static String m35(email) => "Xóa tài khoản ${email}, mọi máy và mọi ghép nối.";
 
-  static String m36(email) =>
-      "Xóa tài khoản ${email}, mọi máy và mọi ghép nối.";
+  static String m36(site) => "Cài ShellX trên máy tính (macOS hoặc Windows) từ ${site}.";
 
-  static String m37(site) =>
-      "Cài ShellX trên máy tính (macOS hoặc Windows) từ ${site}.";
+  static String m37(menu) => "Bấm biểu tượng ShellX, chọn ${menu}, rồi quét mã.";
 
-  static String m38(menu) =>
-      "Bấm biểu tượng ShellX, chọn ${menu}, rồi quét mã.";
+  static String m38(reason) => "Không mở được shell: ${reason}";
 
-  static String m39(reason) => "Không mở được shell: ${reason}";
+  static String m39(code) => "Đã có lỗi xảy ra (${code}).";
 
-  static String m40(code) => "Đã có lỗi xảy ra (${code}).";
+  static String m40(day, month, time) => "${day}/${month}, ${time}";
 
-  static String m41(day, month, time) => "${day}/${month}, ${time}";
+  static String m41(count) => "${Intl.plural(count, other: '${count} phút trước')}";
 
-  static String m42(count) =>
-      "${Intl.plural(count, other: '${count} phút trước')}";
+  static String m42(time) => "hôm nay, ${time}";
 
-  static String m43(time) => "hôm nay, ${time}";
+  static String m43(time) => "hôm qua, ${time}";
 
-  static String m44(time) => "hôm qua, ${time}";
+  static String m44(method) => "Mở khóa bằng ${method}";
 
-  static String m45(method) => "Mở khóa bằng ${method}";
+  static String m45(when) => "Lần cuối online: ${when}";
 
-  static String m46(when) => "Lần cuối online: ${when}";
+  static String m46(count) => "${Intl.plural(count, other: '${count} tab')}";
 
-  static String m47(count) => "${Intl.plural(count, other: '${count} tab')}";
+  static String m47(tabs, unseen) => "${tabs} tab · ${unseen} có chữ mới";
 
-  static String m48(tabs, unseen) => "${tabs} tab · ${unseen} có chữ mới";
+  static String m48(name) => "${name} đã tin cậy điện thoại này. Từ giờ chỉ cần chạm vào máy để mở terminal.";
 
-  static String m49(name) =>
-      "${name} đã tin cậy điện thoại này. Từ giờ chỉ cần chạm vào máy để mở terminal.";
+  static String m49(count) => "${Intl.plural(count, other: 'Còn thiếu ${count} ký tự.')}";
 
-  static String m50(count) =>
-      "${Intl.plural(count, other: 'Còn thiếu ${count} ký tự.')}";
+  static String m50(count) => "${Intl.plural(count, other: 'Thừa ${count} ký tự.')}";
 
-  static String m51(count) =>
-      "${Intl.plural(count, other: 'Thừa ${count} ký tự.')}";
+  static String m51(name) => "${name} · xong";
 
-  static String m52(name) => "${name} · xong";
+  static String m52(name) => "${name} · đang chờ";
 
-  static String m53(name) => "${name} · đang chờ";
+  static String m53(name) => "${name} · cần bạn trả lời";
 
-  static String m54(name) => "${name} · cần bạn trả lời";
+  static String m54(name) => "${name} · đang chạy";
 
-  static String m55(name) => "${name} · đang chạy";
+  static String m55(when) => "mở ${when}";
 
-  static String m56(when) => "mở ${when}";
+  static String m56(count) => "${Intl.plural(count, other: 'Máy này đang có ${count} phiên')}";
 
-  static String m57(count) =>
-      "${Intl.plural(count, other: 'Máy này đang có ${count} phiên')}";
+  static String m57(number) => "Lựa chọn ${number}";
 
-  static String m58(number) => "Lựa chọn ${number}";
-
-  static String m59(menu) =>
+  static String m58(menu) =>
       "macOS: bấm biểu tượng ShellX trên thanh menu. Windows: bấm biểu tượng ở khay hệ thống. Chọn ${menu}";
 
-  static String m60(code) =>
-      "Lệnh cuối thoát với mã ${code}. Nội dung ở trên vẫn đọc và copy được.";
+  static String m59(code) => "Lệnh cuối thoát với mã ${code}. Nội dung ở trên vẫn đọc và copy được.";
 
-  static String m61(method) => "Khóa bằng ${method}";
+  static String m60(method) => "Khóa bằng ${method}";
 
-  static String m62(name) =>
-      "Bỏ ghép nối ${name}? Bạn sẽ phải quét lại mã QR để dùng máy này.";
+  static String m61(name) => "Bỏ ghép nối ${name}? Bạn sẽ phải quét lại mã QR để dùng máy này.";
 
-  static String m63(version, build) => "ShellX ${version} (${build})";
+  static String m62(version, build) => "ShellX ${version} (${build})";
 
-  static String m64(terms, privacy) =>
-      "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
+  static String m63(terms, privacy) => "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
 
-  static String m65(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
+  static String m64(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
 
-  static String m66(length) => "Tối đa ${length} ký tự.";
+  static String m65(length) => "Tối đa ${length} ký tự.";
 
-  static String m67(length) => "Phải có ít nhất ${length} ký tự.";
+  static String m66(length) => "Phải có ít nhất ${length} ký tự.";
 
-  static String m68(lines) => "Hiển thị ${lines} dòng cuối";
+  static String m67(lines) => "Hiển thị ${lines} dòng cuối";
 
-  static String m69(target) => "Gửi tới: ${target}";
+  static String m68(target) => "Gửi tới: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -206,14 +190,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiAskWaiting": MessageLookupByLibrary.simpleMessage(
       "Chờ bạn trả lời ở dưới",
     ),
-    "aiAttentionTitle": m1,
-    "aiBackToList": MessageLookupByLibrary.simpleMessage("Danh sách phiên AI"),
     "aiBusy": MessageLookupByLibrary.simpleMessage(
       "Quá nhiều yêu cầu cùng lúc. Chờ một lát rồi thử lại.",
     ),
     "aiChromeTooltip": MessageLookupByLibrary.simpleMessage("Phiên AI"),
     "aiClosedDesktop": MessageLookupByLibrary.simpleMessage(
-      "ShellX trên máy tính đã thoát. Mở lại để tiếp tục.",
+      "ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.",
     ),
     "aiClosedGone": MessageLookupByLibrary.simpleMessage(
       "Phiên AI này đã đóng trên máy tính.",
@@ -221,10 +203,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiClosedUnreadable": MessageLookupByLibrary.simpleMessage(
       "Điện thoại không đọc được phiên AI này. Xem trên máy tính.",
     ),
-    "aiComposerHint": m2,
-    "aiContext": m3,
+    "aiComposerHint": m1,
+    "aiContext": m2,
     "aiCreated": MessageLookupByLibrary.simpleMessage("tệp mới"),
-    "aiCutLines": m4,
+    "aiCutLines": m3,
     "aiCutText": MessageLookupByLibrary.simpleMessage(
       "Phần còn lại của tin này xem trên máy tính.",
     ),
@@ -246,17 +228,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiModeBypass": MessageLookupByLibrary.simpleMessage("Bỏ qua mọi quyền"),
     "aiModeDefault": MessageLookupByLibrary.simpleMessage("Hỏi trước"),
     "aiModePlan": MessageLookupByLibrary.simpleMessage("Lập kế hoạch"),
-    "aiMoreDiffs": m5,
+    "aiMoreDiffs": m4,
     "aiNewAgent": MessageLookupByLibrary.simpleMessage("Agent"),
-    "aiNewFirstMessage": MessageLookupByLibrary.simpleMessage(
-      "Tin nhắn đầu (không bắt buộc)",
-    ),
     "aiNewFolder": MessageLookupByLibrary.simpleMessage("Thư mục"),
     "aiNewNoAgents": MessageLookupByLibrary.simpleMessage(
-      "Chưa có agent nào sẵn sàng trên máy tính. Hãy thiết lập trong Cài đặt › Agents.",
+      "Chưa có agent nào sẵn sàng trên máy tính. Hãy thiết lập trong Cài đặt › Agent.",
     ),
     "aiNewNoFolders": MessageLookupByLibrary.simpleMessage(
-      "Hãy đặt thư mục dự án cho một workspace trên máy tính trước (Cài đặt › Dự án).",
+      "Hãy đặt thư mục cho một dự án trên máy tính trước (Cài đặt › Dự án).",
     ),
     "aiNewSession": MessageLookupByLibrary.simpleMessage("Phiên AI mới"),
     "aiNewStart": MessageLookupByLibrary.simpleMessage("Bắt đầu"),
@@ -264,39 +243,42 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiNoticeCannotResume": MessageLookupByLibrary.simpleMessage(
       "Agent này không khôi phục được phiên cũ; đã mở phiên mới.",
     ),
-    "aiNoticeExited": m6,
+    "aiNoticeExited": m5,
     "aiNoticeFolderMissing": MessageLookupByLibrary.simpleMessage(
       "Thư mục của phiên không còn. Chọn thư mục trên máy tính.",
     ),
-    "aiNoticeInvalid": m7,
-    "aiNoticeLogin": m8,
-    "aiNoticeMissing": m9,
-    "aiNoticeNode": m10,
-    "aiNoticeNotInstalled": m11,
+    "aiNoticeInvalid": m6,
+    "aiNoticeLogin": m7,
+    "aiNoticeMissing": m8,
+    "aiNoticeNode": m9,
+    "aiNoticeNotInstalled": m10,
     "aiNoticeOther": MessageLookupByLibrary.simpleMessage(
       "Thông báo từ máy tính.",
     ),
-    "aiNoticeStartFailed": m12,
+    "aiNoticeStartFailed": m11,
     "aiNoticeUndoOff": MessageLookupByLibrary.simpleMessage(
       "Hoàn tác đang tắt cho dự án này.",
     ),
-    "aiNoticeUndoOffReason": m13,
-    "aiNoticeUndoOffTurn": m14,
+    "aiNoticeUndoOffReason": m12,
+    "aiNoticeUndoOffTurn": m13,
+    "aiOpenOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
+      "Có thể phiên mới chưa được tạo. Hãy xem lại danh sách trước khi thử lại.",
+    ),
     "aiOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
       "Có thể chưa gửi được — kết nối bị gián đoạn. Hãy xem lại phiên trước khi thử lại.",
     ),
     "aiPermAllowAlways": MessageLookupByLibrary.simpleMessage("Luôn cho phép"),
     "aiPermAllowOnce": MessageLookupByLibrary.simpleMessage("Cho phép"),
     "aiPermDetails": MessageLookupByLibrary.simpleMessage("Xem chi tiết"),
-    "aiPermMore": m15,
+    "aiPermMore": m14,
     "aiPermOnComputer": MessageLookupByLibrary.simpleMessage(
       "Trả lời yêu cầu này trên máy tính.",
     ),
     "aiPermOption": MessageLookupByLibrary.simpleMessage("Lựa chọn"),
     "aiPermRejectAlways": MessageLookupByLibrary.simpleMessage("Luôn từ chối"),
     "aiPermRejectOnce": MessageLookupByLibrary.simpleMessage("Từ chối"),
-    "aiPermTitle": m16,
-    "aiPlan": m17,
+    "aiPermTitle": m15,
+    "aiPlan": m16,
     "aiQueue": MessageLookupByLibrary.simpleMessage("Xếp hàng"),
     "aiQueueFull": MessageLookupByLibrary.simpleMessage(
       "Đã có 5 tin đang chờ.",
@@ -309,12 +291,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Máy tính không nhận yêu cầu này.",
     ),
     "aiRemoveQueued": MessageLookupByLibrary.simpleMessage("Bỏ khỏi hàng đợi"),
-    "aiRequestFailed": m18,
-    "aiRowSubtitle": m19,
+    "aiRequestFailed": m17,
+    "aiRowSubtitle": m18,
     "aiSend": MessageLookupByLibrary.simpleMessage("Gửi"),
     "aiStateAgentOff": MessageLookupByLibrary.simpleMessage(
       "Agent đang tắt trên máy tính",
     ),
+    "aiStateClosed": MessageLookupByLibrary.simpleMessage("Đã đóng"),
     "aiStateFailed": MessageLookupByLibrary.simpleMessage("Lỗi"),
     "aiStateIdle": MessageLookupByLibrary.simpleMessage("Đang chờ"),
     "aiStateNeedsAuth": MessageLookupByLibrary.simpleMessage(
@@ -332,27 +315,28 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiStop": MessageLookupByLibrary.simpleMessage("Dừng"),
     "aiStopping": MessageLookupByLibrary.simpleMessage("Đang dừng…"),
     "aiThought": MessageLookupByLibrary.simpleMessage("Suy nghĩ"),
-    "aiTooLong": m20,
+    "aiTooLong": m19,
     "aiToolAwaiting": MessageLookupByLibrary.simpleMessage("chờ bạn"),
-    "aiToolCreate": m21,
-    "aiToolDelete": m22,
-    "aiToolEdit": m23,
-    "aiToolExecute": m24,
+    "aiToolCreate": m20,
+    "aiToolDelete": m21,
+    "aiToolDone": MessageLookupByLibrary.simpleMessage("xong"),
+    "aiToolEdit": m22,
+    "aiToolExecute": m23,
     "aiToolFailed": MessageLookupByLibrary.simpleMessage("lỗi"),
-    "aiToolFetch": m25,
-    "aiToolMove": m26,
+    "aiToolFetch": m24,
+    "aiToolMove": m25,
     "aiToolPending": MessageLookupByLibrary.simpleMessage("chờ"),
-    "aiToolRead": m27,
+    "aiToolRead": m26,
     "aiToolRejected": MessageLookupByLibrary.simpleMessage("bị từ chối"),
-    "aiToolRunningFor": m28,
-    "aiToolSearch": m29,
+    "aiToolRunningFor": m27,
+    "aiToolSearch": m28,
     "aiToolStopped": MessageLookupByLibrary.simpleMessage("đã dừng"),
     "aiToolSwitchMode": MessageLookupByLibrary.simpleMessage("Đổi chế độ"),
-    "aiTurnFailed": m30,
-    "aiTurnFiles": m31,
-    "aiTurnInterrupted": m32,
-    "aiTurnStopped": m33,
-    "aiTurnSummary": m34,
+    "aiTurnFailed": m29,
+    "aiTurnFiles": m30,
+    "aiTurnInterrupted": m31,
+    "aiTurnStopped": m32,
+    "aiTurnSummary": m33,
     "aiUnavailable": MessageLookupByLibrary.simpleMessage(
       "Mở ShellX trên máy tính để dùng phiên AI.",
     ),
@@ -377,7 +361,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiUpdateDesktop": MessageLookupByLibrary.simpleMessage(
       "Cập nhật ShellX trên máy tính để dùng phiên AI từ điện thoại.",
     ),
-    "aiYouChose": m35,
+    "aiYouChose": m34,
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),
     "arrowPadDown": MessageLookupByLibrary.simpleMessage("Xuống"),
     "arrowPadLabel": MessageLookupByLibrary.simpleMessage(
@@ -408,7 +392,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "deleteAccountButton": MessageLookupByLibrary.simpleMessage(
       "Xóa vĩnh viễn",
     ),
-    "deleteAccountLoseAccount": m36,
+    "deleteAccountLoseAccount": m35,
     "deleteAccountLoseComputers": MessageLookupByLibrary.simpleMessage(
       "Mọi máy tính đang đăng nhập sẽ bị đăng xuất.",
     ),
@@ -445,11 +429,11 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "emailHint": MessageLookupByLibrary.simpleMessage("email@example.com"),
     "emailLabel": MessageLookupByLibrary.simpleMessage("Email"),
-    "emptyStep1": m37,
+    "emptyStep1": m36,
     "emptyStep2": MessageLookupByLibrary.simpleMessage(
       "Đăng nhập cùng tài khoản này.",
     ),
-    "emptyStep3": m38,
+    "emptyStep3": m37,
     "emptyTitle": MessageLookupByLibrary.simpleMessage("Chưa có máy nào"),
     "errorAgentOffline": MessageLookupByLibrary.simpleMessage(
       "Máy tính đang offline. Hãy mở ShellX trên máy tính rồi thử lại.",
@@ -481,11 +465,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorSessionLimit": MessageLookupByLibrary.simpleMessage(
       "Máy đã mở tối đa 10 phiên. Hãy đóng bớt phiên.",
     ),
-    "errorSpawnFailed": m39,
+    "errorSpawnFailed": m38,
     "errorTimeout": MessageLookupByLibrary.simpleMessage(
       "Máy tính không phản hồi. Hãy thử lại.",
     ),
-    "errorUnknown": m40,
+    "errorUnknown": m39,
     "errorUntrusted": MessageLookupByLibrary.simpleMessage(
       "Máy không còn tin cậy điện thoại này. Hãy ghép nối lại.",
     ),
@@ -512,12 +496,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "keySlash": MessageLookupByLibrary.simpleMessage("Dấu gạch chéo"),
     "keyTilde": MessageLookupByLibrary.simpleMessage("Dấu ngã"),
     "keyboardTooltip": MessageLookupByLibrary.simpleMessage("Bàn phím"),
-    "lastSeenDate": m41,
+    "lastSeenDate": m40,
     "lastSeenJustNow": MessageLookupByLibrary.simpleMessage("vừa xong"),
-    "lastSeenMinutes": m42,
-    "lastSeenToday": m43,
+    "lastSeenMinutes": m41,
+    "lastSeenToday": m42,
     "lastSeenUnknown": MessageLookupByLibrary.simpleMessage("không rõ"),
-    "lastSeenYesterday": m44,
+    "lastSeenYesterday": m43,
     "linkSheetCopy": MessageLookupByLibrary.simpleMessage("Sao chép liên kết"),
     "linkSheetOpen": MessageLookupByLibrary.simpleMessage("Mở"),
     "linkSheetTitle": MessageLookupByLibrary.simpleMessage("Mở liên kết?"),
@@ -529,20 +513,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "Mở khóa để xem các máy và phiên terminal của bạn.",
     ),
     "lockTitle": MessageLookupByLibrary.simpleMessage("ShellX đang khóa"),
-    "lockUnlockWith": m45,
+    "lockUnlockWith": m44,
     "loginButton": MessageLookupByLibrary.simpleMessage("Đăng nhập"),
     "loginSubtitle": MessageLookupByLibrary.simpleMessage(
       "Dùng cùng tài khoản với ShellX trên máy tính.",
     ),
     "loginTitle": MessageLookupByLibrary.simpleMessage("Đăng nhập"),
-    "machineLastOnline": m46,
+    "machineLastOnline": m45,
     "machineLastUsed": MessageLookupByLibrary.simpleMessage("Dùng gần nhất"),
     "machineNewOutput": MessageLookupByLibrary.simpleMessage("Có chữ mới"),
     "machineNotPaired": MessageLookupByLibrary.simpleMessage("Chưa ghép nối"),
     "machineOffline": MessageLookupByLibrary.simpleMessage("Máy đang offline."),
     "machineOnline": MessageLookupByLibrary.simpleMessage("Online"),
-    "machineTabs": m47,
-    "machineTabsActivity": m48,
+    "machineTabs": m46,
+    "machineTabsActivity": m47,
     "machineWaiting": MessageLookupByLibrary.simpleMessage("Đang chờ kết nối"),
     "machinesCheckConnection": MessageLookupByLibrary.simpleMessage(
       "Hãy kiểm tra kết nối mạng.",
@@ -571,18 +555,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "Không ghép nối được",
     ),
     "pairingSucceeded": MessageLookupByLibrary.simpleMessage("Đã ghép nối"),
-    "pairingSucceededBody": m49,
+    "pairingSucceededBody": m48,
     "passwordHide": MessageLookupByLibrary.simpleMessage("Ẩn mật khẩu"),
     "passwordHint": MessageLookupByLibrary.simpleMessage("Mật khẩu"),
     "passwordLabel": MessageLookupByLibrary.simpleMessage("Mật khẩu"),
-    "passwordMissing": m50,
+    "passwordMissing": m49,
     "passwordRule": MessageLookupByLibrary.simpleMessage("Từ 8 đến 128 ký tự."),
     "passwordShow": MessageLookupByLibrary.simpleMessage("Hiện mật khẩu"),
-    "passwordTooLong": m51,
-    "pickerAgentDone": m52,
-    "pickerAgentIdle": m53,
-    "pickerAgentNeedsInput": m54,
-    "pickerAgentRunning": m55,
+    "passwordTooLong": m50,
+    "pickerAgentDone": m51,
+    "pickerAgentIdle": m52,
+    "pickerAgentNeedsInput": m53,
+    "pickerAgentRunning": m54,
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "đang mở trên thiết bị khác",
     ),
@@ -601,11 +585,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerNewSession": MessageLookupByLibrary.simpleMessage("Phiên mới"),
     "pickerOpen": MessageLookupByLibrary.simpleMessage("Mở"),
     "pickerShellxGroup": MessageLookupByLibrary.simpleMessage("Phiên ShellX"),
-    "pickerStarted": m56,
+    "pickerStarted": m55,
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Mở lại phiên cũ để xem tiếp đúng chỗ đã dừng, hoặc tạo phiên mới.",
     ),
-    "pickerTitle": m57,
+    "pickerTitle": m56,
     "privacyLink": MessageLookupByLibrary.simpleMessage(
       "Chính sách quyền riêng tư",
     ),
@@ -620,7 +604,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replyKeyEnter": MessageLookupByLibrary.simpleMessage("Enter"),
     "replyKeyEscape": MessageLookupByLibrary.simpleMessage("Thoát"),
     "replyKeyNo": MessageLookupByLibrary.simpleMessage("Không"),
-    "replyKeyOption": m58,
+    "replyKeyOption": m57,
     "replyKeyYes": MessageLookupByLibrary.simpleMessage("Có"),
     "replyShowExtraKeys": MessageLookupByLibrary.simpleMessage("Hiện phím phụ"),
     "retry": MessageLookupByLibrary.simpleMessage("Thử lại"),
@@ -632,14 +616,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "scannerCameraError": MessageLookupByLibrary.simpleMessage(
       "Không mở được camera.",
     ),
-    "scannerCardBody": m59,
+    "scannerCardBody": m58,
     "scannerCardTitle": MessageLookupByLibrary.simpleMessage(
       "Mã nằm trên máy tính của bạn",
     ),
     "scannerPairing": MessageLookupByLibrary.simpleMessage("Đang ghép nối…"),
     "scannerTitle": MessageLookupByLibrary.simpleMessage("Quét mã ghép nối"),
     "sessionEnded": MessageLookupByLibrary.simpleMessage("Phiên đã kết thúc"),
-    "sessionExitedBody": m60,
+    "sessionExitedBody": m59,
     "sessionGoneBody": MessageLookupByLibrary.simpleMessage(
       "Máy tính không còn phiên này. Nội dung ở trên vẫn đọc và copy được.",
     ),
@@ -668,7 +652,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Hỏi khi mở app và khi quay lại sau hơn 5 phút.",
     ),
-    "settingsLockWith": m61,
+    "settingsLockWith": m60,
     "settingsLogout": MessageLookupByLibrary.simpleMessage("Đăng xuất"),
     "settingsLogoutConfirm": MessageLookupByLibrary.simpleMessage(
       "Đăng xuất khỏi ShellX? Các máy đã ghép nối vẫn được giữ cho lần đăng nhập sau.",
@@ -714,11 +698,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Cài đặt"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Cài đặt"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Bỏ ghép nối"),
-    "settingsUnpairConfirm": m62,
+    "settingsUnpairConfirm": m61,
     "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
       "Chưa bỏ ghép nối được.",
     ),
-    "settingsVersion": m63,
+    "settingsVersion": m62,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Tài khoản đã được xóa.",
     ),
@@ -752,7 +736,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "terminalOpenNew": MessageLookupByLibrary.simpleMessage("Mở phiên mới"),
     "termsLink": MessageLookupByLibrary.simpleMessage("Điều khoản"),
-    "termsNotice": m64,
+    "termsNotice": m63,
     "unauthorized": MessageLookupByLibrary.simpleMessage("Chưa được xác thực"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Lỗi không xác định"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage(
@@ -780,7 +764,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu phải có ít nhất một chữ thường.",
     ),
-    "validationPasswordMinLength": m65,
+    "validationPasswordMinLength": m64,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu không khớp.",
     ),
@@ -799,8 +783,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Cần nhập số điện thoại.",
     ),
-    "validationTextMaxLength": m66,
-    "validationTextMinLength": m67,
+    "validationTextMaxLength": m65,
+    "validationTextMinLength": m66,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "Trường này là bắt buộc.",
     ),
@@ -813,7 +797,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage(
       "Xem dạng văn bản",
     ),
-    "viewAsTextTruncated": m68,
+    "viewAsTextTruncated": m67,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
@@ -859,7 +843,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Gửi"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Gửi phím Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Dừng nghe"),
-    "voiceTarget": m69,
+    "voiceTarget": m68,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Máy này không hỗ trợ nhận dạng giọng nói",
     ),

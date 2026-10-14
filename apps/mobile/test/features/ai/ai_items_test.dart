@@ -202,13 +202,9 @@ void main() {
   });
 
   group('markdown (V2-1 B15: no image is loaded, only web links open)', () {
-    /// Taps [word] in the (selectable) markdown on screen.
+    /// Taps [word] in the markdown on screen (plain `Text`: the timeline's one `SelectionArea` makes it selectable).
     Future<void> tapLink(WidgetTester tester, String word) async {
-      final editable = tester.allRenderObjects.whereType<RenderEditable>().single;
-      final start = editable.text!.toPlainText().indexOf(word);
-      expect(start, isNonNegative);
-      final boxes = editable.getBoxesForSelection(TextSelection(baseOffset: start, extentOffset: start + word.length));
-      await tester.tapAt(editable.localToGlobal(boxes.first.toRect().center));
+      await tester.tapOnText(find.textRange.ofSubstring(word));
       await tester.pumpAndSettle();
     }
 
@@ -218,7 +214,7 @@ void main() {
         const MirrorText(0, 1, 1, MirrorTextKind.agent, 'xem ![sơ đồ](https://example.com/x.png) này'),
       );
       expect(find.byType(Image), findsNothing);
-      expect(find.textContaining('sơ đồ'), findsOneWidget);
+      expect(find.textContaining('sơ đồ', findRichText: true), findsOneWidget);
     });
 
     for (final (href, opens) in [
@@ -230,6 +226,13 @@ void main() {
       ('tel:+84123', false),
       ('/relative/path', false),
       ('https://', false),
+      // A name before the host can pass one site for another ("good.com" is the user name here): never opened.
+      ('https://good.com@evil.com', false),
+      ('https://good.com@evil.com/a', false),
+      ('https://user:pw@host.com', false),
+      // An "@" later in the address is only a character of the path or the query.
+      ('https://host.com/@path', true),
+      ('https://host.com/a?mail=a@b.c', true),
     ]) {
       testWidgets('a link to $href ${opens ? 'opens' : 'does not'}', (tester) async {
         await pumpItem(tester, MirrorText(0, 1, 1, MirrorTextKind.agent, 'xem [tài liệu]($href) này'));
@@ -249,22 +252,108 @@ void main() {
           '# Tiêu đề\n\n- một\n- hai\n\n```dart\nvar a = 1;\n```\n\nxong **đậm**',
         ),
       );
-      expect(find.textContaining('Tiêu đề'), findsOneWidget);
-      expect(find.textContaining('var a = 1;'), findsOneWidget);
-      expect(find.textContaining('xong đậm'), findsOneWidget);
+      expect(find.textContaining('Tiêu đề', findRichText: true), findsOneWidget);
+      expect(find.textContaining('var a = 1;', findRichText: true), findsOneWidget);
+      expect(find.textContaining('xong đậm', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets(
+      'a long answer (paragraphs, a list, a table) makes no editor each: the timeline has one SelectionArea for them all',
+      (tester) async {
+        final text = [
+          for (var i = 0; i < 40; i++) 'đoạn $i **đậm**',
+          '- một\n- hai\n- ba',
+          '| a | b |\n|---|---|\n| 1 | 2 |',
+        ].join('\n\n');
+        await pumpItem(tester, MirrorText(0, 1, 1, MirrorTextKind.agent, text));
+        expect(find.byType(MarkdownBody), findsWidgets);
+        expect(find.byType(EditableText), findsNothing);
+        expect(find.byType(SelectableText), findsNothing);
+        expect(find.textContaining('đoạn 39 đậm', findRichText: true), findsOneWidget);
+      },
+    );
+
+    testWidgets('what the user wrote is plain text as well, and a thought opened too', (tester) async {
+      await pumpItem(tester, const MirrorText(0, 1, 1, MirrorTextKind.user, 'Thêm nút đăng xuất'));
+      expect(find.text('Thêm nút đăng xuất'), findsOneWidget);
+      expect(find.byType(EditableText), findsNothing);
+      await pumpItem(tester, const MirrorText(0, 1, 1, MirrorTextKind.thought, 'Mình đang nghĩ'));
+      await tester.tap(find.text('Suy nghĩ'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Mình đang nghĩ', findRichText: true), findsOneWidget);
+      expect(find.byType(EditableText), findsNothing);
+    });
+
+    testWidgets('only an opened card holds selectable text (its output, its diff)', (tester) async {
+      await pumpItem(
+        tester,
+        tool(
+          output: const MirrorOutput(head: 'ok'),
+          diffs: const [MirrorDiff(path: '/p/a.ts', oldText: 'a', newText: 'b', plus: 1, minus: 1)],
+        ),
+      );
+      expect(find.byType(EditableText), findsNothing);
+      await tester.tap(find.text('Chạy npm test'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectableText), findsWidgets);
     });
   });
 
   group('cards', () {
     testWidgets('a thought is folded until it is tapped', (tester) async {
       await pumpItem(tester, const MirrorText(0, 1, 1, MirrorTextKind.thought, 'Mình đang nghĩ'));
-      expect(find.textContaining('Mình đang nghĩ'), findsNothing);
+      expect(find.textContaining('Mình đang nghĩ', findRichText: true), findsNothing);
       await tester.tap(find.text('Suy nghĩ'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Mình đang nghĩ'), findsOneWidget);
+      expect(find.textContaining('Mình đang nghĩ', findRichText: true), findsOneWidget);
       await tester.tap(find.text('Suy nghĩ'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Mình đang nghĩ'), findsNothing);
+      expect(find.textContaining('Mình đang nghĩ', findRichText: true), findsNothing);
+    });
+
+    group('a finger can hit what it is meant to (at least 44 points, V2-2 fix round 1)', () {
+      testWidgets('the thought toggle, the whole row', (tester) async {
+        await pumpItem(tester, const MirrorText(0, 1, 1, MirrorTextKind.thought, 'Mình đang nghĩ'));
+        final toggle = find.ancestor(of: find.text('Suy nghĩ'), matching: find.byType(InkWell)).first;
+        expect(tester.getSize(toggle).height, greaterThanOrEqualTo(44));
+        // A tap at the edge of the row, away from the icon and the word, still opens it.
+        final box = tester.getRect(toggle);
+        await tester.tapAt(Offset(box.right - 4, box.top + 3));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Mình đang nghĩ', findRichText: true), findsOneWidget);
+      });
+
+      testWidgets('the tool card header, the whole row (and a card with nothing to open is not a button)', (
+        tester,
+      ) async {
+        await pumpItem(tester, tool(output: const MirrorOutput(head: 'ok')));
+        final header = find.descendant(of: find.byType(AiToolCard), matching: find.byType(InkWell)).first;
+        expect(tester.getSize(header).height, greaterThanOrEqualTo(44));
+        expect(tester.getSize(header).width, greaterThan(300));
+        final box = tester.getRect(header);
+        await tester.tapAt(Offset(box.left + 2, box.bottom - 3)); // the corner of the row, away from icon and title
+        await tester.pumpAndSettle();
+        expect(find.byType(SelectableText), findsWidgets);
+      });
+
+      testWidgets('a closed card is its header and nothing more: one line is not a block', (tester) async {
+        await pumpItem(tester, tool(output: const MirrorOutput(head: 'ok')));
+        expect(tester.getSize(find.byType(AiToolCard)).height, inInclusiveRange(44, 48)); // the header and the border
+      });
+
+      testWidgets('a card with a long title keeps its row at least 44 points, and no more than its text needs', (
+        tester,
+      ) async {
+        await pumpItem(
+          tester,
+          tool(
+            title: 'npm test -- --coverage --reporter=verbose ' * 4,
+            output: const MirrorOutput(head: 'ok'),
+          ),
+        );
+        final header = find.descendant(of: find.byType(AiToolCard), matching: find.byType(InkWell)).first;
+        expect(tester.getSize(header).height, inInclusiveRange(44, 60));
+      });
     });
 
     for (final (end, rejected, text) in [
@@ -280,6 +369,7 @@ void main() {
         );
         if (text == null) {
           expect(find.byIcon(Icons.check), findsOneWidget);
+          expect(tester.widget<Icon>(find.byIcon(Icons.check)).semanticLabel, 'xong');
         } else {
           expect(find.text(text), findsOneWidget);
         }
@@ -341,6 +431,11 @@ void main() {
       expect(find.text('đang chạy · 1:04'), findsOneWidget); // after a minute, minutes and seconds
       expect(rebuilds[AiToolCard], isNull);
       expect(rebuilds[AiItemView], isNull);
+    });
+
+    testWidgets('a finished tool says "done" in the language of the page, not "ok"', (tester) async {
+      await pumpItem(tester, tool(), locale: en);
+      expect(tester.widget<Icon>(find.byIcon(Icons.check)).semanticLabel, 'done');
     });
 
     testWidgets('and in English', (tester) async {
@@ -427,8 +522,15 @@ void main() {
       MirrorPermission permission, {
       bool busy = false,
       VoidCallback? onDetails,
+
+      /// Do not wait for the first 400 ms of the panel: the test is about them.
+      bool fresh = false,
+
+      /// Where the answers go: the same list for a panel shown again.
+      List<String>? answers,
     }) async {
-      final answers = <String>[];
+      answers ??= <String>[];
+      final taken = answers;
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -440,16 +542,24 @@ void main() {
                 permission: permission,
                 agentName: 'Claude',
                 busy: busy,
-                onAnswer: (o) => answers.add(o.optionId),
+                onAnswer: (o) => taken.add(o.optionId),
                 onDetails: onDetails,
               ),
             ),
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      if (!fresh) {
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 400)); // a panel that has just appeared waits (below)
+      }
       return answers;
     }
+
+    PermissionOption yes() => option('a', PermissionKind.allowOnce, 'Yes');
+    double opacityOf(WidgetTester tester, String id) => tester
+        .widget<Opacity>(find.ancestor(of: find.byKey(Key('ai.option.$id')), matching: find.byType(Opacity)).first)
+        .opacity;
 
     testWidgets('one big button per option, in the agent\'s order, each at least 52 points high', (tester) async {
       final answers = await pumpPanel(
@@ -480,6 +590,13 @@ void main() {
       expect(answers, ['c']);
     });
 
+    testWidgets('a button is the same 52 points high on a panel that has just appeared (dimmed, not shrunk)', (
+      tester,
+    ) async {
+      await pumpPanel(tester, MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]), fresh: true);
+      expect(tester.getSize(find.byKey(const Key('ai.option.a'))).height, greaterThanOrEqualTo(52));
+    });
+
     testWidgets('a tap gives a haptic, a button that waits gives none', (tester) async {
       final haptics = <Object?>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
@@ -490,7 +607,7 @@ void main() {
       final permission = MirrorPermission(id: 1, title: 'Edit a.ts', options: [option('a', PermissionKind.allowOnce)]);
       await pumpPanel(tester, permission);
       await tester.tap(find.byKey(const Key('ai.option.a')));
-      expect(haptics, ['HapticFeedbackType.mediumImpact']);
+      expect(haptics, ['HapticFeedbackType.lightImpact']); // the spec: "Rung nhẹ khi chạm"
       await pumpPanel(tester, permission, busy: true);
       await tester.tap(find.byKey(const Key('ai.option.a')));
       expect(haptics, hasLength(1));
@@ -504,6 +621,135 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('ai.option.a')));
       expect(answers, isEmpty);
+    });
+
+    testWidgets('busy: a screen reader hears a button that is switched off, not one that works', (tester) async {
+      final handle = tester.ensureSemantics();
+      // Two buttons, as a request has: each is a node of its own for a screen reader.
+      final permission = MirrorPermission(
+        id: 1,
+        title: 'Edit a.ts',
+        options: [yes(), option('b', PermissionKind.rejectOnce, 'No')],
+      );
+      SemanticsData allowNode() => find.semantics.byLabel(RegExp(r'^Cho phép$')).evaluate().single.getSemanticsData();
+      await pumpPanel(tester, permission);
+      expect(allowNode().flagsCollection.isButton, isTrue);
+      expect(allowNode().flagsCollection.isEnabled.toBoolOrNull(), isTrue);
+      expect(allowNode().hasAction(SemanticsAction.tap), isTrue);
+      await pumpPanel(tester, permission, busy: true);
+      expect(allowNode().flagsCollection.isButton, isTrue);
+      expect(allowNode().flagsCollection.isEnabled.toBoolOrNull(), isFalse); // "dimmed", not just "a button"
+      expect(allowNode().hasAction(SemanticsAction.tap), isFalse);
+      handle.dispose();
+    });
+
+    group('a panel that has just appeared waits 400 ms (V2-2 fix round 1: a double tap answers once)', () {
+      testWidgets('no button answers in the first 400 ms; they are dimmed meanwhile, and light up at 400', (
+        tester,
+      ) async {
+        final answers = await pumpPanel(
+          tester,
+          MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]),
+          fresh: true,
+        );
+        expect(opacityOf(tester, 'a'), lessThan(1));
+        await tester.pump(const Duration(milliseconds: 399));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        await tester.pump();
+        expect(answers, isEmpty);
+        expect(opacityOf(tester, 'a'), lessThan(1));
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(opacityOf(tester, 'a'), 1);
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, ['a']);
+      });
+
+      testWidgets('a tap that waits gives no haptic either', (tester) async {
+        final haptics = <Object?>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'HapticFeedback.vibrate') haptics.add(call.arguments);
+          return null;
+        });
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
+        );
+        await pumpPanel(tester, MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]), fresh: true);
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(haptics, isEmpty);
+      });
+
+      testWidgets('another request in the same place (the panel is kept) waits again, whoever answered', (
+        tester,
+      ) async {
+        final first = MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]);
+        final answers = await pumpPanel(tester, first);
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, ['a']);
+        // The computer shows the next request at once, in the very same place.
+        await pumpPanel(
+          tester,
+          MirrorPermission(id: 2, title: 'Edit b.ts', options: [yes()]),
+          fresh: true,
+          answers: answers,
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        await tester.pump();
+        expect(answers, ['a'], reason: 'the second tap of a double tap answers nothing');
+        expect(opacityOf(tester, 'a'), lessThan(1));
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, ['a', 'a']);
+      });
+
+      testWidgets('the same request shown again (the page rebuilt) does not wait again', (tester) async {
+        final permission = MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]);
+        final answers = await pumpPanel(tester, permission);
+        await pumpPanel(
+          tester,
+          MirrorPermission(id: 1, title: 'Edit a.ts', more: 1, options: [yes()]),
+          fresh: true,
+          answers: answers,
+        );
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, ['a']);
+      });
+
+      testWidgets('after an answer that came back with a refusal the buttons wait once more before they work', (
+        tester,
+      ) async {
+        final permission = MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]);
+        final answers = await pumpPanel(tester, permission);
+        await pumpPanel(tester, permission, busy: true, fresh: true, answers: answers); // the answer is on its way
+        await pumpPanel(tester, permission, fresh: true, answers: answers); // ... refused: free, but not at once
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        await tester.pump();
+        expect(answers, isEmpty);
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, ['a']);
+      });
+
+      testWidgets('while it is busy, the end of the 400 ms does not light the buttons up', (tester) async {
+        final permission = MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]);
+        final answers = await pumpPanel(tester, permission, busy: true, fresh: true);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(opacityOf(tester, 'a'), lessThan(1));
+        await tester.tap(find.byKey(const Key('ai.option.a')));
+        expect(answers, isEmpty);
+      });
+
+      testWidgets('a panel taken away within the 400 ms leaves no timer behind', (tester) async {
+        await pumpPanel(tester, MirrorPermission(id: 1, title: 'Edit a.ts', options: [yes()]), fresh: true);
+        await tester.pumpWidget(const SizedBox());
+        // The test framework fails a test that ends with a timer pending.
+      });
+
+      testWidgets('a panel with nothing to tap has nothing to wait for', (tester) async {
+        await pumpPanel(tester, const MirrorPermission(id: 1, title: 'Edit a.ts', options: []), fresh: true);
+        expect(find.text('Trả lời yêu cầu này trên máy tính.'), findsOneWidget);
+      });
     });
 
     testWidgets('without options: the computer answers, and there is no button', (tester) async {

@@ -98,6 +98,8 @@ void main() {
     machine.sessions = [const SessionInfo(id: 7, index: 1, shell: 'zsh', createdAt: 1, attached: false)];
     await open(tester);
     expect(find.text('Cập nhật ShellX trên máy tính để dùng phiên AI từ điện thoại.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('picker-ai-hint')), findsOneWidget);
+    expect(find.text('PHIÊN AI'), findsNothing, reason: 'the hint stands alone: there is no group for it to head');
     expect(find.byKey(const ValueKey('terminal-ai')), findsNothing);
   });
 

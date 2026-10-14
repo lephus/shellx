@@ -160,6 +160,10 @@ abstract final class AiWords {
   /// (V2-2 D13), so it is said so and never sent again by itself.
   static const String outcomeUnknown = 'outcome_unknown';
 
+  /// The same for a new session: the request to open one went out and nothing came back, so the
+  /// session may exist. Its words send the user to the list, and nothing asks again by itself (D13).
+  static const String openUnknown = 'open_unknown';
+
   /// The handshake failed before anything was sent: the computer no longer trusts this phone, or this
   /// version of the app is too old for it.
   static const String untrusted = 'untrusted';
@@ -192,10 +196,12 @@ abstract final class AiWords {
     // open there (V2-2 D13).
     'on_computer' => s.aiPermOnComputer,
     outcomeUnknown => s.aiOutcomeUnknown,
+    openUnknown => s.aiOpenOutcomeUnknown,
     untrusted => ErrorText(s).machine(MachineConnectionFailure.untrusted),
     updateRequired => ErrorText(s).machine(MachineConnectionFailure.protocolUnsupported),
     inFlight => null,
-    error => s.errorUnknown(code),
+    // No code to show: [error] is no word of the computer's, only "something on this side".
+    error => s.somethingWentWrong,
     _ => s.aiRequestFailed(code),
   };
 

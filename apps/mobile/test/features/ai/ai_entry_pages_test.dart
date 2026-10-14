@@ -353,22 +353,39 @@ void main() {
       await tester.pump(TerminalPageController.noticeDuration);
     });
 
-    testWidgets('a new AI session on a computer that went offline: the notice, nothing opens', (tester) async {
-      machine.ai
-        ..supportedValue = true
-        ..listingValue = _listing;
-      await open(tester);
-      machine.ai.connectFailure = MachineConnectionFailure.agentOffline;
-      await tester.tap(find.byKey(const ValueKey('picker-ai-new')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('ai-new-start')));
-      await tester.pumpAndSettle();
-      expect(machine.ai.opened, [('claude', 'ws:a')]);
-      expect(pushed, isEmpty);
-      expect(find.text(ErrorText(words(tester)).machine(MachineConnectionFailure.agentOffline)), findsWidgets);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
-      await tester.pump(TerminalPageController.noticeDuration);
-    });
+    // The request may have left the phone and reached the computer, which may have opened the session
+    // (V2-2 D13): the words say so, and nothing sends the request again by itself.
+    for (final failure in [MachineConnectionFailure.agentOffline, MachineConnectionFailure.timeout]) {
+      testWidgets(
+        'a new AI session whose request ends as ${failure.name}: it may not have been created, never retried',
+        (
+          tester,
+        ) async {
+          final results = <Object?>[];
+          machine.ai
+            ..supportedValue = true
+            ..listingValue = _listing;
+          await open(tester, results: results);
+          machine.ai.connectFailure = failure;
+          await tester.tap(find.byKey(const ValueKey('picker-ai-new')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('ai-new-start')));
+          await tester.pumpAndSettle();
+          expect(machine.ai.opened, [('claude', 'ws:a')]);
+          expect(pushed, isEmpty);
+          expect(popups.errors, [words(tester).aiOpenOutcomeUnknown], reason: 'the words of an unknown outcome');
+          expect(find.byType(LinearProgressIndicator), findsNothing);
+          expect(results, isEmpty, reason: 'the page stays: it is not a reason to leave');
+          // Nothing asks again: not when the computer is back, not later on.
+          machine.ai.connectFailure = null;
+          await tester.pump(const Duration(minutes: 2));
+          await tester.pumpAndSettle();
+          expect(machine.ai.opened, hasLength(1), reason: 'the user asks again, nothing else does');
+          expect(pushed, isEmpty);
+          await tester.pump(TerminalPageController.noticeDuration);
+        },
+      );
+    }
 
     testWidgets('a new AI session the computer cannot serve (no window): its words, a toast, no page', (tester) async {
       machine.ai

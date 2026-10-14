@@ -241,40 +241,44 @@ class _AiTimelineState extends State<AiTimeline> {
     final anchor = _anchor! < from ? from : _anchor!;
     return Stack(
       children: [
-        CustomScrollView(
-          key: const Key('ai.timeline'),
-          controller: _scroll,
-          center: _center,
-          // Slivers before [center] stack upwards from it: the page of older
-          // items right above the newer ones, "Tải thêm" at the very top.
-          slivers: [
-            if (mirror.hasEarlier)
-              SliverToBoxAdapter(
-                child: Center(
-                  child: TextButton(
-                    key: const Key('ai.loadEarlier'),
-                    onPressed: _loadingEarlier || widget.onLoadEarlier == null ? null : _loadEarlier,
-                    child: Text(S.of(context).aiLoadEarlier),
+        // One selection area for the whole conversation: the text of a message, a paragraph, a list item
+        // is selected and copied by a long press, with no editor of its own to build for each (V2-2 fix
+        // round 1). The items keep their keep-alive wrappers, which hold an item that has a selection
+        // when it scrolls out of the screen, so the selection is not lost. The button below is outside.
+        SelectionArea(
+          child: CustomScrollView(
+            key: const Key('ai.timeline'),
+            controller: _scroll,
+            center: _center,
+            // Slivers before [center] stack upwards from it: the page of older
+            // items right above the newer ones, "Tải thêm" at the very top.
+            slivers: [
+              if (mirror.hasEarlier)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: TextButton(
+                      key: const Key('ai.loadEarlier'),
+                      onPressed: _loadingEarlier || widget.onLoadEarlier == null ? null : _loadEarlier,
+                      child: Text(S.of(context).aiLoadEarlier),
+                    ),
                   ),
                 ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, position) => _build(anchor - 1 - position),
+                  childCount: anchor - from,
+                ),
               ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (_, position) => _build(anchor - 1 - position),
-                childCount: anchor - from,
-                addAutomaticKeepAlives: false,
+              SliverList(
+                key: _center,
+                delegate: SliverChildBuilderDelegate(
+                  (_, position) => _build(anchor + position),
+                  childCount: end - anchor,
+                ),
               ),
-            ),
-            SliverList(
-              key: _center,
-              delegate: SliverChildBuilderDelegate(
-                (_, position) => _build(anchor + position),
-                childCount: end - anchor,
-                addAutomaticKeepAlives: false,
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            ],
+          ),
         ),
         if (!_atBottom)
           Positioned(

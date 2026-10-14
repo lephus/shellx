@@ -28,9 +28,7 @@ class S {
   static const AppLocalizationDelegate delegate = AppLocalizationDelegate();
 
   static Future<S> load(Locale locale) {
-    final name = (locale.countryCode?.isEmpty ?? false)
-        ? locale.languageCode
-        : locale.toString();
+    final name = (locale.countryCode?.isEmpty ?? false) ? locale.languageCode : locale.toString();
     final localeName = Intl.canonicalizedLocale(name);
     return initializeMessages(localeName).then((_) {
       Intl.defaultLocale = localeName;
@@ -2584,6 +2582,11 @@ class S {
     );
   }
 
+  /// `Closed`
+  String get aiStateClosed {
+    return Intl.message('Closed', name: 'aiStateClosed', desc: '', args: []);
+  }
+
   /// `{agent} · {state}`
   String aiRowSubtitle(String agent, String state) {
     return Intl.message(
@@ -2624,25 +2627,15 @@ class S {
     return Intl.message('Folder', name: 'aiNewFolder', desc: '', args: []);
   }
 
-  /// `First message (optional)`
-  String get aiNewFirstMessage {
-    return Intl.message(
-      'First message (optional)',
-      name: 'aiNewFirstMessage',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Start`
   String get aiNewStart {
     return Intl.message('Start', name: 'aiNewStart', desc: '', args: []);
   }
 
-  /// `Set a project folder for a workspace on the computer first (Settings › Projects).`
+  /// `Set a folder for a project on the computer first (Settings › Projects).`
   String get aiNewNoFolders {
     return Intl.message(
-      'Set a project folder for a workspace on the computer first (Settings › Projects).',
+      'Set a folder for a project on the computer first (Settings › Projects).',
       name: 'aiNewNoFolders',
       desc: '',
       args: [],
@@ -2764,10 +2757,10 @@ class S {
     );
   }
 
-  /// `ShellX was closed on the computer. Open it to continue.`
+  /// `ShellX was closed on the computer. Open ShellX on the computer, then open the session again.`
   String get aiClosedDesktop {
     return Intl.message(
-      'ShellX was closed on the computer. Open it to continue.',
+      'ShellX was closed on the computer. Open ShellX on the computer, then open the session again.',
       name: 'aiClosedDesktop',
       desc: '',
       args: [],
@@ -2779,16 +2772,6 @@ class S {
     return Intl.message(
       'The phone cannot read this AI session. See it on the computer.',
       name: 'aiClosedUnreadable',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `AI sessions`
-  String get aiBackToList {
-    return Intl.message(
-      'AI sessions',
-      name: 'aiBackToList',
       desc: '',
       args: [],
     );
@@ -2829,6 +2812,16 @@ class S {
     return Intl.message(
       'This may not have been sent — the connection dropped. Check the session before trying again.',
       name: 'aiOutcomeUnknown',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The new session may not have been created. Check the list before trying again.`
+  String get aiOpenOutcomeUnknown {
+    return Intl.message(
+      'The new session may not have been created. Check the list before trying again.',
+      name: 'aiOpenOutcomeUnknown',
       desc: '',
       args: [],
     );
@@ -3059,6 +3052,11 @@ class S {
   /// `error`
   String get aiToolFailed {
     return Intl.message('error', name: 'aiToolFailed', desc: '', args: []);
+  }
+
+  /// `done`
+  String get aiToolDone {
+    return Intl.message('done', name: 'aiToolDone', desc: '', args: []);
   }
 
   /// `You chose: {option}`
@@ -3515,16 +3513,6 @@ class S {
       name: 'aiPlan',
       desc: '',
       args: [done, total],
-    );
-  }
-
-  /// `{agent} needs your answer`
-  String aiAttentionTitle(String agent) {
-    return Intl.message(
-      '$agent needs your answer',
-      name: 'aiAttentionTitle',
-      desc: '',
-      args: [agent],
     );
   }
 }

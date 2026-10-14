@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
@@ -8,6 +9,7 @@ import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart'
 import 'package:shellx_ai/remote.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/fake_links.dart';
 import '../../support/fakes.dart';
 import '../../support/widget_probes.dart';
 
@@ -210,6 +212,10 @@ void main() {
       ai.sync();
       await pump(tester);
       final finger = await tester.startGesture(tester.getCenter(find.byKey(const Key('ai.timeline'))));
+      // The selection area's own recognizers compete with the list for the finger, so the list wins it
+      // only once the finger has moved past the slop, and takes the movement from there: one move to win,
+      // the next to scroll, as with any list that has something to tap in it.
+      await finger.moveBy(const Offset(0, 30));
       await finger.moveBy(const Offset(0, 30)); // a little up, still within reach of the bottom
       await tester.pump();
       final pixels = position(tester).pixels;
@@ -505,6 +511,145 @@ void main() {
         await tester.pumpAndSettle();
         expectInView();
       }
+    });
+  });
+
+  group('text is selected through one SelectionArea for the whole list (V2-2 fix round 1)', () {
+    // The text of every paragraph, list item and table cell used to be an editor of its own
+    // (`selectable: true`): 125 ms per 100 blocks, against 19 ms for plain text.
+    testWidgets('a hundred blocks of an answer: one selection area, and no editor among them', (tester) async {
+      ai.desktop.beginTurn(const [TextBlock('Thêm nút')], DateTime.now());
+      say(ai.desktop, List.generate(100, (i) => 'Đoạn $i.').join('\n\n'));
+      ai.sync();
+      await pump(tester);
+      expect(find.byType(MarkdownBody), findsWidgets);
+      expect(find.descendant(of: find.byType(AiTimeline), matching: find.byType(SelectionArea)), findsOneWidget);
+      expect(find.byType(EditableText), findsNothing);
+      expect(find.byType(SelectableText), findsNothing);
+    });
+
+    testWidgets('the whole conversation can be selected and copied: the user\'s message, the answer, a list', (
+      tester,
+    ) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      ai.desktop.beginTurn(const [TextBlock('Thêm nút đăng xuất')], DateTime.now());
+      say(ai.desktop, 'Xong **rồi**.\n\n- một\n- hai');
+      ai.sync();
+      await pump(tester);
+      final region = tester.state<SelectableRegionState>(find.byType(SelectableRegion));
+      region.selectAll();
+      await tester.pump();
+      // "Sao chép" of the toolbar a long press brings.
+      region.contextMenuButtonItems.singleWhere((item) => item.type == ContextMenuButtonType.copy).onPressed!();
+      await tester.pump();
+      expect(copied, hasLength(1));
+      expect(
+        copied.single,
+        allOf(contains('Thêm nút đăng xuất'), contains('Xong rồi.'), contains('một'), contains('hai')),
+      );
+    });
+
+    testWidgets('a long press on a word of the answer selects it, and "Sao chép" copies it', (tester) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      say(ai.desktop, 'Xong rồi nhé.');
+      ai.sync();
+      await pump(tester);
+      final text = find.textContaining('Xong rồi nhé.');
+      await tester.longPressAt(tester.getTopLeft(text) + const Offset(6, 8)); // on the first word
+      await tester.pumpAndSettle();
+      final region = tester.state<SelectableRegionState>(find.byType(SelectableRegion));
+      region.contextMenuButtonItems.singleWhere((item) => item.type == ContextMenuButtonType.copy).onPressed!();
+      await tester.pump();
+      expect(copied, ['Xong']);
+    });
+
+    testWidgets('a selection does not vanish when its text scrolls away', (tester) async {
+      variedConversation(30);
+      ai.sync();
+      await pump(tester);
+      const lastLine = 'Dòng 8 của đoạn 29.'; // the last of the 9 lines of answer 29: 1 + (29 * 7) % 15
+      expect(find.textContaining(lastLine), findsOneWidget);
+      tester.state<SelectableRegionState>(find.byType(SelectableRegion)).selectAll();
+      await tester.pump();
+      await tester.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 3000)); // far up, to the top
+      await tester.pumpAndSettle();
+      expect(find.textContaining(lastLine), findsNothing, reason: 'it is not on screen');
+      expect(
+        find.textContaining(lastLine, skipOffstage: false),
+        findsOneWidget,
+        reason: 'but the list keeps what is selected',
+      );
+    });
+
+    testWidgets('nor does one in a page of earlier items', (tester) async {
+      ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+      for (var i = 0; i < 100; i++) {
+        read(ai.desktop, i);
+      }
+      ai.sync();
+      await pump(tester);
+      await tester.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 30000));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ai.loadEarlier')));
+      await tester.pumpAndSettle();
+      expect(ai.mirror.from, lessThan(40));
+      await tester.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 300)); // the end of the older page
+      await tester.pumpAndSettle();
+      final older = find.text('Đọc f39.ts'); // the last of the older page, just above the first one
+      expect(older, findsOneWidget);
+      tester.state<SelectableRegionState>(find.byType(SelectableRegion)).selectAll();
+      await tester.pump();
+      await tester.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 1500)); // further up, into the older page
+      await tester.pumpAndSettle();
+      expect(older, findsNothing, reason: 'it is far below the screen now');
+      expect(
+        find.text('Đọc f39.ts', skipOffstage: false),
+        findsOneWidget,
+        reason: 'but the list keeps what is selected',
+      );
+    });
+
+    testWidgets(
+      'a link in an answer still opens when it is tapped inside the area',
+      (tester) async {
+        final links = FakeExternalLinks();
+        getIt.registerSingleton<ExternalLinks>(links);
+        addTearDown(() => getIt.unregister<ExternalLinks>());
+        ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+        say(ai.desktop, 'xem [tài liệu](https://example.com/a) này');
+        ai.sync();
+        await pump(tester);
+        await tester.tapOnText(find.textRange.ofSubstring('tài liệu'));
+        await tester.pumpAndSettle();
+        expect(links.opened, [Uri.parse('https://example.com/a')]);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.android, TargetPlatform.iOS}),
+    );
+
+    testWidgets('the "Mới nhất" button is a button, not selectable text, and works from inside', (tester) async {
+      variedConversation(30);
+      ai.sync();
+      await pump(tester);
+      await tester.drag(find.byKey(const Key('ai.timeline')), const Offset(0, 500));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: find.byType(SelectionArea), matching: find.byKey(const Key('ai.latest'))),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('ai.latest')));
+      await tester.pumpAndSettle();
+      expect(position(tester).extentAfter, lessThan(1));
     });
   });
 

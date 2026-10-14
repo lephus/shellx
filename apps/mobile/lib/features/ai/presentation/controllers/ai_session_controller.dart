@@ -5,6 +5,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 
 /// V2-2 §5.2: one AI session on the phone. It mirrors the session while the
@@ -15,7 +16,7 @@ import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 /// error types.
 @injectable
 class AiSessionController extends Controller {
-  AiSessionController(@factoryParam this.agentId, @factoryParam this.sid, SessionHolder session)
+  AiSessionController(@factoryParam this.agentId, @factoryParam this.sid, SessionHolder session, this._drafts)
     : _backend = session.backend.peek() {
     final backend = _backend;
     if (backend == null) {
@@ -42,12 +43,16 @@ class AiSessionController extends Controller {
   final String agentId;
   final String sid;
   final ShellxBackend? _backend;
+  final AiDrafts _drafts;
   MachineSession? _machine;
   AiSessionHandle? _link;
   StreamSubscription<void>? _changes;
   StreamSubscription<MachineConnectionState>? _machineStates;
   Timer? _tick;
   bool _disposed = false;
+
+  /// The app is on screen (the page tells, see [setForeground]).
+  bool _foreground = true;
 
   /// The answer to a permission or question is on its way (only after it the buttons wait for the
   /// computer).
@@ -80,8 +85,26 @@ class AiSessionController extends Controller {
   ReadonlySignal<int?> get answering => _answering;
   ReadonlySignal<bool> get stopping => _stopping;
 
-  /// Ticks every second while a turn runs ("Đang chạy · 0:12").
+  /// Ticks every second while a turn runs on a live link, with the app on screen ("Đang chạy · 0:12").
   ReadonlySignal<DateTime> get now => _now;
+
+  /// What the user left in the text field of this session the last time, empty when nothing (in memory;
+  /// see [AiDrafts]). Of this session on this machine: the same id on another computer is another one.
+  String get draft => _drafts.of(_draftKey);
+
+  /// The text field now holds [text].
+  void keepDraft(String text) => _drafts.keep(_draftKey, text);
+
+  String get _draftKey => '$agentId/$sid';
+
+  /// The app comes to the foreground (true) or goes away from it (false): the page tells, since it is
+  /// the page that sees the lifecycle. In the background nothing counts the turn's time (a second tick
+  /// wakes the phone for a header nobody sees); coming back sets the clock at once.
+  void setForeground(bool value) {
+    if (_foreground == value) return;
+    _foreground = value;
+    _syncTick();
+  }
 
   AiMirror? get mirror => _link?.mirror;
   MirrorHead? get head => _link?.mirror.head;
@@ -225,17 +248,25 @@ class AiSessionController extends Controller {
     if (machine != null && link != null && link.state == AiLinkState.closed && link.closedReason == 'detached') {
       _follow(machine.ai.attach(sid));
     }
-    final running = _link?.mirror.head?.turn != null;
-    if (running && _tick == null) {
-      _tick = Timer.periodic(const Duration(seconds: 1), (_) => _set(_now, DateTime.now()));
-    } else if (!running) {
-      _tick?.cancel();
-      _tick = null;
-    }
+    _syncTick();
     batch(() {
       _releaseAnswer();
       _version.value++;
     });
+  }
+
+  /// The turn's clock runs while a turn runs on a link that is live, with the app on screen. After a
+  /// loss nothing is known of the turn (it may have ended long ago), a closed link has none, and the
+  /// background has nobody to look at it.
+  void _syncTick() {
+    final counting = !_disposed && _foreground && linkState == AiLinkState.live && head?.turn != null;
+    if (counting && _tick == null) {
+      _set(_now, DateTime.now()); // the time since the turn began is read at once, not a second later
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) => _set(_now, DateTime.now()));
+    } else if (!counting) {
+      _tick?.cancel();
+      _tick = null;
+    }
   }
 
   void _set<T>(Signal<T> s, T value) {

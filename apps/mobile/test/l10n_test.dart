@@ -111,7 +111,7 @@ void main() {
     );
     expect(vi.aiReconnecting, 'Đang kết nối lại… nội dung có thể chưa mới nhất.');
     expect(vi.aiClosedGone, 'Phiên AI này đã đóng trên máy tính.');
-    expect(vi.aiClosedDesktop, 'ShellX trên máy tính đã thoát. Mở lại để tiếp tục.');
+    expect(vi.aiClosedDesktop, 'ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.');
     expect(vi.aiClosedUnreadable, 'Điện thoại không đọc được phiên AI này. Xem trên máy tính.');
     expect(vi.aiPermTitle('Claude'), 'Claude xin quyền:');
     expect(
@@ -133,12 +133,18 @@ void main() {
     expect(vi.aiPermMore(2), 'còn 2 yêu cầu');
     expect(vi.aiContext(16), 'Ngữ cảnh 16%');
     expect(vi.aiPlan(2, 5), 'Kế hoạch · 2/5');
-    expect(vi.aiAttentionTitle('Claude'), 'Claude cần bạn trả lời');
     expect(vi.aiToolRunningFor('2:05'), 'đang chạy · 2:05');
     expect(vi.aiNoticeNode('Claude', 20), 'Claude cần máy tính có Node.js 20 trở lên.');
     expect(vi.aiToolDelete('old.ts'), 'Xóa old.ts');
     expect(vi.aiAskCancelled, 'Đã hủy');
-    expect(vi.aiNewNoAgents, 'Chưa có agent nào sẵn sàng trên máy tính. Hãy thiết lập trong Cài đặt › Agents.');
+    // The desktop's own page names: Cài đặt › Agent, Cài đặt › Dự án (and no "workspace", which it never shows).
+    expect(vi.aiNewNoAgents, 'Chưa có agent nào sẵn sàng trên máy tính. Hãy thiết lập trong Cài đặt › Agent.');
+    expect(vi.aiNewNoFolders, 'Hãy đặt thư mục cho một dự án trên máy tính trước (Cài đặt › Dự án).');
+    expect([vi.aiStateClosed, vi.aiToolDone], ['Đã đóng', 'xong']);
+    expect(
+      vi.aiOpenOutcomeUnknown,
+      'Có thể phiên mới chưa được tạo. Hãy xem lại danh sách trước khi thử lại.',
+    );
     expect(vi.aiNoticeExited('Claude', 1), 'Claude dừng bất ngờ (mã thoát 1).');
     expect(vi.aiRequestFailed('refused'), 'Máy tính không nhận (refused).');
     expect(vi.aiRefused, 'Máy tính không nhận yêu cầu này.');
@@ -163,7 +169,10 @@ void main() {
     );
     expect(en.aiReconnecting, 'Reconnecting… what you see may be behind.');
     expect(en.aiClosedGone, 'This AI session was closed on the computer.');
-    expect(en.aiClosedDesktop, 'ShellX was closed on the computer. Open it to continue.');
+    expect(
+      en.aiClosedDesktop,
+      'ShellX was closed on the computer. Open ShellX on the computer, then open the session again.',
+    );
     expect(en.aiClosedUnreadable, 'The phone cannot read this AI session. See it on the computer.');
     expect(en.aiPermTitle('Claude'), 'Claude asks:');
     expect(
@@ -185,12 +194,14 @@ void main() {
     expect(en.aiPermMore(2), '2 more waiting');
     expect(en.aiContext(16), 'Context 16%');
     expect(en.aiPlan(2, 5), 'Plan · 2/5');
-    expect(en.aiAttentionTitle('Claude'), 'Claude needs your answer');
     expect(en.aiToolRunningFor('2:05'), 'running · 2:05');
     expect(en.aiNoticeNode('Claude', 20), 'Claude needs Node.js 20 or newer on the computer.');
     expect(en.aiToolDelete('old.ts'), 'Delete old.ts');
     expect(en.aiAskCancelled, 'Cancelled');
     expect(en.aiNewNoAgents, 'No agent is ready on the computer. Set one up in Settings › Agents.');
+    expect(en.aiNewNoFolders, 'Set a folder for a project on the computer first (Settings › Projects).');
+    expect([en.aiStateClosed, en.aiToolDone], ['Closed', 'done']);
+    expect(en.aiOpenOutcomeUnknown, 'The new session may not have been created. Check the list before trying again.');
     expect(en.aiNoticeExited('Claude', 1), 'Claude stopped unexpectedly (exit 1).');
     expect(en.aiRequestFailed('refused'), 'The computer did not take it (refused).');
     expect(en.aiRefused, 'The computer did not accept this request.');

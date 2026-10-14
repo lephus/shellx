@@ -5,10 +5,15 @@ import 'package:shellx_mobile/shared/shared.dart';
 
 /// An agent's answer as markdown (V2-2 §5.2), split into blocks so a
 /// streaming answer re-renders only its last block. Images are never
-/// loaded (their alt text shows); a link opens on tap, http/https only
-/// (V2-1 B15). A text is split when it changes, not on every build, and the
-/// phone builds at most [kShownAnswerChars] characters and [kShownBlocks]
-/// blocks of it: the rest is read on the computer.
+/// loaded (their alt text shows); a link opens on tap, http/https only,
+/// with a host and without a user name before it (V2-1 B15). A text is split
+/// when it changes, not on every build, and the phone builds at most
+/// [kShownAnswerChars] characters and [kShownBlocks] blocks of it: the rest
+/// is read on the computer.
+///
+/// The text is plain `Text`, not selectable by itself: `selectable: true` makes an editor of every
+/// paragraph, list item and table cell (125 ms against 19 ms to build a hundred blocks). The timeline
+/// wraps the whole conversation in one `SelectionArea`, which selects it all.
 class AiMarkdown extends StatefulWidget {
   const AiMarkdown({super.key, required this.text, this.dim = false, this.truncated = false});
 
@@ -100,7 +105,6 @@ class _BlockState extends State<_Block> {
     final mono = TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 13, color: colors.primaryText);
     return MarkdownBody(
       data: widget.text,
-      selectable: true,
       styleSheet: MarkdownStyleSheet(
         p: base,
         code: mono.copyWith(backgroundColor: colors.primarySoft),
@@ -117,6 +121,8 @@ class _BlockState extends State<_Block> {
       onTapLink: (text, href, title) {
         final uri = href == null ? null : Uri.tryParse(href);
         if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https') || uri.host.isEmpty) return;
+        // A name before the host can pass one site for another ("https://good.com@evil.com" goes to evil.com).
+        if (uri.userInfo.isNotEmpty) return;
         getIt<ExternalLinks>().openOrToast(uri);
       },
     );

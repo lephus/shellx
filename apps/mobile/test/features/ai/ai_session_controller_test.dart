@@ -6,6 +6,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_client/shellx_client.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 
 import '../../support/fakes.dart';
@@ -40,7 +41,7 @@ void main() {
     session = FakeSessionHolder(backend);
   });
 
-  AiSessionController make() => AiSessionController(agentA, sid, session);
+  AiSessionController make() => AiSessionController(agentA, sid, session, AiDrafts());
 
   group('the link', () {
     test('attaches when made and detaches on dispose, which is safe to repeat', () {
@@ -121,7 +122,7 @@ void main() {
     });
 
     test('signed out: closed, nothing to show the relay state of', () async {
-      final controller = AiSessionController(agentA, sid, FakeSessionHolder());
+      final controller = AiSessionController(agentA, sid, FakeSessionHolder(), AiDrafts());
       expect(controller.closed.value, isTrue);
       expect(controller.backend, isNull);
       expect(await controller.send('hello'), 'refused');
@@ -147,12 +148,99 @@ void main() {
       });
     });
 
+    test('the clock ticks only while a turn runs on a live link, in the foreground (M8)', () {
+      fakeAsync((async) {
+        final controller = make();
+        final ai = machine.ai.session(sid);
+        ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+        ai.sync();
+        expect(async.periodicTimerCount, 1);
+
+        ai.lose(); // a channel lost: what the computer does meanwhile is not known
+        expect(async.periodicTimerCount, 0);
+        ai.sync();
+        expect(async.periodicTimerCount, 1);
+
+        controller.setForeground(false); // the app goes to the background
+        expect(async.periodicTimerCount, 0);
+        ai.desktop.touch();
+        ai.sync(); // news in the background does not wake it
+        expect(async.periodicTimerCount, 0);
+        controller.setForeground(true);
+        expect(async.periodicTimerCount, 1);
+
+        ai.close('desktop_closed'); // a closed link has no running turn to count
+        expect(async.periodicTimerCount, 0);
+        controller.dispose();
+        expect(async.periodicTimerCount, 0);
+      });
+    });
+
+    test('coming back to the foreground sets the clock at once', () {
+      fakeAsync((async) {
+        final controller = make();
+        final ai = machine.ai.session(sid);
+        ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
+        ai.sync();
+        controller.setForeground(false);
+        var changes = 0;
+        final stop = controller.now.subscribe((_) => changes++);
+        final before = changes;
+        controller.setForeground(true);
+        expect(changes, greaterThan(before));
+        stop();
+        controller.dispose();
+      });
+    });
+
     test('"Tải thêm" asks the link', () {
       final controller = make();
       final ai = machine.ai.session(sid)..sync();
       controller.loadEarlier();
       expect(ai.earlierCalls, 1);
       controller.dispose();
+    });
+  });
+
+  group('the draft of the text field', () {
+    test('a page left and opened again for the same session finds it; another session does not', () {
+      final drafts = AiDrafts();
+      final first = AiSessionController(agentA, sid, session, drafts);
+      expect(first.draft, isEmpty);
+      first
+        ..keepDraft('Thêm nút đăng xuất')
+        ..dispose();
+      final again = AiSessionController(agentA, sid, session, drafts);
+      expect(again.draft, 'Thêm nút đăng xuất');
+      again.dispose();
+      final other = AiSessionController(agentA, 'e.-2', session, drafts);
+      expect(other.draft, isEmpty);
+      other.dispose();
+    });
+
+    test('the same id on another computer is another session: its draft is not shown there', () {
+      backend.pinnedList = [pinned(agentA), pinned(agentB)];
+      backend.addMachine(agentB);
+      final drafts = AiDrafts();
+      AiSessionController(agentA, sid, session, drafts)
+        ..keepDraft('chỉ cho máy A')
+        ..dispose();
+      final there = AiSessionController(agentB, sid, session, drafts);
+      expect(there.draft, isEmpty);
+      there.dispose();
+      final here = AiSessionController(agentA, sid, session, drafts);
+      expect(here.draft, 'chỉ cho máy A');
+      here.dispose();
+    });
+
+    test('a draft is only the text: sending it, or clearing the field, leaves none', () {
+      final drafts = AiDrafts();
+      final controller = AiSessionController(agentA, sid, session, drafts)
+        ..keepDraft('đang viết')
+        ..keepDraft('');
+      expect(controller.draft, isEmpty);
+      controller.dispose();
+      expect(AiSessionController(agentA, sid, session, drafts).draft, isEmpty);
     });
   });
 

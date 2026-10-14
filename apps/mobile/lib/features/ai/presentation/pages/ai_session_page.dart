@@ -31,15 +31,43 @@ class AiSessionPage extends StatefulWidget {
 
 class _AiSessionPageState extends State<AiSessionPage> {
   late final AiSessionController _controller = getIt<AiSessionController>(param1: widget.agentId, param2: widget.sid);
-  final _text = TextEditingController();
+
+  /// The text field starts from the draft this session was left with, and keeps the draft as it changes
+  /// (in memory only): a page left by mistake and opened again does not cost a sentence.
+  late final _text = TextEditingController(text: _controller.draft);
   final _jumpTo = ValueNotifier<int?>(null);
+  late final AppLifecycleListener _lifecycle;
+  String _kept = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _kept = _text.text;
+    _text.addListener(_keepDraft);
+    // The clock of the turn runs only while the app is on screen: `inactive` (the notification shade, a
+    // dialog of the system) still shows it, `hidden` and `paused` do not.
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) => _controller.setForeground(
+        state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
+      ),
+    );
+  }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
+    _text.removeListener(_keepDraft);
     _controller.dispose();
     _text.dispose();
     _jumpTo.dispose();
     super.dispose();
+  }
+
+  void _keepDraft() {
+    final text = _text.text;
+    if (text == _kept) return; // a move of the cursor is no change of the text
+    _kept = text;
+    _controller.keepDraft(text);
   }
 
   void _say(String? code, {bool answer = false}) {
@@ -51,7 +79,12 @@ class _AiSessionPageState extends State<AiSessionPage> {
   Future<void> _send() async {
     final text = _text.text;
     final code = await _controller.send(text);
-    if (!mounted) return;
+    if (!mounted) {
+      // The page was left while the message was on its way. Gone, it is no draft (the next visit must not
+      // find it and send it twice); failed, it stays one.
+      if (code == null && _controller.draft == text) _controller.keepDraft('');
+      return;
+    }
     // The text stays when the message did not go (or may not have): the user decides what to do.
     if (code == null) {
       if (_text.text == text) _text.clear();
@@ -90,20 +123,28 @@ class _AiSessionPageState extends State<AiSessionPage> {
     _controller.now.value; // the clock: "Đang chạy · 0:12"
     final s = S.of(context);
     final head = _controller.head;
+    final closed = _controller.linkState == AiLinkState.closed;
     return _Header(
       title: (head?.title?.isNotEmpty ?? false) ? head!.title! : s.aiUntitled,
       subtitle: head == null ? widget.machineName : _subtitle(s, head),
-      state: head == null ? null : AiWords.headState(head),
+      // A closed session runs nothing: no state colour either.
+      state: head == null || closed ? null : AiWords.headState(head),
       onBack: () => context.router.maybePop(),
     );
   }
 
   String _subtitle(S s, MirrorHead head) {
+    // A closed session is not "running", whatever it was doing when it closed: it says "closed" (the strip
+    // below says why), and has no clock, mode or context to show.
+    if (_controller.linkState == AiLinkState.closed) return [head.agentName, s.aiStateClosed].join(' · ');
     final state = AiWords.state(s, AiWords.headState(head));
     final turn = head.turn;
+    // The clock counts only on a live link: after a loss nothing is known of the turn, and a clock that
+    // went on would show a time nobody measured. The state stays; the strip says it is reconnecting.
+    final counting = turn != null && _controller.linkState == AiLinkState.live;
     final parts = [
       head.agentName,
-      turn == null ? state : '$state · ${AiWords.clock(_controller.now.value.difference(turn.startedAt))}',
+      counting ? '$state · ${AiWords.clock(_controller.now.value.difference(turn.startedAt))}' : state,
       ?AiWords.mode(s, head),
       if (head.usage case final u? when u.size > 0) s.aiContext(u.percent),
     ];
@@ -243,7 +284,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
           key: const ValueKey('ai.composer.bar'),
           controller: _text,
           agentName: head.agentName,
-          enabled: live && head.canSend,
+          canSend: live && head.canSend,
           running: head.running,
           stopping: _controller.stopping.value || (head.turn?.stopping ?? false),
           canForceStop: head.turn?.canForceStop ?? false,
