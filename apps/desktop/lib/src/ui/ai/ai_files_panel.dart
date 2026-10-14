@@ -8,7 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_gitignore.dart';
 import '../../ai/ai_project_files.dart';
 import '../theme/shellx_desktop_theme.dart';
-import 'ai_changes_panel.dart' show aiTurnsOf, AiTurns;
+import 'ai_changes_panel.dart' show aiLastEndedTurn;
 import 'ai_file_viewer.dart';
 import 'ai_scope.dart';
 
@@ -16,7 +16,8 @@ import 'ai_scope.dart';
 /// files, `.git` hidden, loaded a folder at a time (off the UI isolate).
 /// Files the session changed carry M or A; what `.gitignore` drops is
 /// dimmed "ignored" (B12). A file opens in the viewer. It reloads when a
-/// turn ends and when its tab comes back to the front (D18; never
+/// turn ends (with or without a restore point) and when its tab comes back
+/// to the front; a folder is listed again each time it opens (D18; never
 /// continuously).
 class AiFilesPanel extends ConsumerStatefulWidget {
   const AiFilesPanel({super.key});
@@ -29,10 +30,18 @@ typedef _Row = ({AiDirEntry entry, int depth});
 
 class _AiFilesPanelState extends ConsumerState<AiFilesPanel> {
   AiPaneScope? _pane;
-  AiTurns? _turns;
+
+  /// The last turn that ended: another one means the project may have
+  /// changed (D18).
+  int? _ended;
   final _open = <String>{};
   final _children = <String, List<AiDirEntry>>{};
   Map<String, ChangeKind> _changed = const {};
+
+  /// The newest listing asked for per folder: an older one that lands later
+  /// (each runs on an isolate of its own) is dropped.
+  final _asked = <String, int>{};
+  var _seq = 0;
 
   @override
   void didChangeDependencies() {
@@ -44,7 +53,7 @@ class _AiFilesPanelState extends ConsumerState<AiFilesPanel> {
       pane.frames.addListener(_onFrame);
       pane.ui.changes.addListener(_onChanges);
       _pane = pane;
-      _turns = aiTurnsOf(pane.state);
+      _ended = aiLastEndedTurn(pane.state);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_reload());
       });
@@ -62,9 +71,9 @@ class _AiFilesPanelState extends ConsumerState<AiFilesPanel> {
   void _onChanges() => unawaited(_reload());
 
   void _onFrame() {
-    final next = aiTurnsOf(_pane!.state);
-    final ended = next.lastFinished != _turns?.lastFinished;
-    _turns = next;
+    final next = aiLastEndedTurn(_pane!.state);
+    final ended = next != _ended;
+    _ended = next;
     if (ended) unawaited(_reload());
   }
 
@@ -82,10 +91,18 @@ class _AiFilesPanelState extends ConsumerState<AiFilesPanel> {
   }
 
   Future<void> _load(String dir) async {
-    final entries = await ref
-        .read(aiProjectFilesProvider)
-        .list(_pane!.state.cwd, dir);
-    if (mounted) setState(() => _children[dir] = entries);
+    final n = _asked[dir] = ++_seq;
+    final List<AiDirEntry> entries;
+    try {
+      entries = await ref
+          .read(aiProjectFilesProvider)
+          .list(_pane!.state.cwd, dir);
+    } on Object catch (error) {
+      // The rows already there stay.
+      debugPrint('ShellX: folder not listed: ${error.runtimeType}');
+      return;
+    }
+    if (mounted && _asked[dir] == n) setState(() => _children[dir] = entries);
   }
 
   void _toggle(AiDirEntry folder) {
@@ -95,7 +112,9 @@ class _AiFilesPanelState extends ConsumerState<AiFilesPanel> {
       return;
     }
     setState(() => _open.add(path));
-    if (!_children.containsKey(path)) unawaited(_load(path));
+    // Listed again on every open: the folder may have changed since it was
+    // last open. The rows already there stay until the new ones land.
+    unawaited(_load(path));
   }
 
   List<_Row> _rows() {

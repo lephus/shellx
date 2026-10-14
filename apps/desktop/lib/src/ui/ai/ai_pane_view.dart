@@ -275,7 +275,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   Future<List<String>> _fileIndex() {
     final runtime = _runtime;
     if (runtime == null) return Future.value(const []);
-    final turn = aiTurnsOf(runtime.state).lastFinished;
+    final turn = aiLastEndedTurn(runtime.state);
     if (_index == null || _indexTurn != turn) {
       _indexTurn = turn;
       _index = ref
