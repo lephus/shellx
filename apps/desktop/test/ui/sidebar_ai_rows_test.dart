@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,40 @@ void main() {
       isTrue,
       reason: 'the last row is fully in view, not under the fold',
     );
+    await disposeWorkspace(t, c);
+  }, variant: mac);
+
+  testWidgets('the drag ghost of an AI tab carries the AI mark, not a shell '
+      'status dot', (t) async {
+    final rig = await pumpConfiguredWorkspace(
+      t,
+      platform: TargetPlatform.macOS,
+      extra: FakeAiRuntimes(const FakeScenario()).overrides,
+    );
+    final c = rig.container;
+    final ai = openTestAiTab(c, title: 'Fix login', cwd: null, select: false);
+    await t.pumpAndSettle();
+    final g = await t.startGesture(
+      t.getCenter(find.byKey(ValueKey('tab.${ai.id}'))),
+      kind: PointerDeviceKind.mouse,
+    );
+    await g.moveBy(const Offset(0, 8));
+    await t.pump();
+    await g.moveBy(const Offset(0, 8));
+    await t.pump();
+    final ghost = find.byKey(const Key('drag.ghost'));
+    expect(ghost, findsOneWidget);
+    expect(
+      find.descendant(of: ghost, matching: find.byKey(const Key('dot.ai'))),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: ghost, matching: find.byKey(const Key('dot.idle'))),
+      findsNothing,
+      reason: 'a shell\'s green dot says nothing about an agent',
+    );
+    await g.up();
+    await t.pumpAndSettle();
     await disposeWorkspace(t, c);
   }, variant: mac);
 }

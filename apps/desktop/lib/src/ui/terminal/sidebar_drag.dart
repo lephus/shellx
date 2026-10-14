@@ -118,7 +118,7 @@ Offset dragGhostTopLeft(DragGhostPlacement p, Size chip) {
   return Offset(x, y.clamp(p.bounds.top, maxY));
 }
 
-/// UI-A2 §6 (V1) drag feedback: a compact chip — the status dot and the
+/// UI-A2 §6 (V1) drag feedback: a compact chip — the status mark and the
 /// title on one 30 px line, at most 208 wide — opaque on `rowSelected`
 /// with a 1 px `border`, `r6` and `e1`. It hangs off the pointer (the
 /// draggable anchors its origin there) at [dragGhostTopLeft], so it never
@@ -181,7 +181,7 @@ class SidebarDragFeedback extends StatelessWidget {
         children: [
           SizedBox(
             width: ShellxSizes.dotSlot,
-            child: Center(child: TabStatusDot(tab)),
+            child: Center(child: TabMark(tab)),
           ),
           const SizedBox(width: ShellxSpace.s8),
           Flexible(

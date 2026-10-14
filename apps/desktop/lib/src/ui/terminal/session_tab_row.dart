@@ -463,9 +463,7 @@ class SessionTabRowState extends State<SessionTabRow> {
       children: [
         SizedBox(
           width: ShellxSizes.dotSlot,
-          child: Center(
-            child: tab.isAi ? const _AiTabIcon() : TabStatusDot(tab),
-          ),
+          child: Center(child: TabMark(tab)),
         ),
         const SizedBox(width: ShellxSpace.s8),
         Expanded(
@@ -1060,6 +1058,18 @@ class TabStatusDot extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What a tab shows in the status-dot slot (UI §3.1; V2-1 §4.7): an AI tab
+/// its mark, any other its shell's status dot. The row and the drag ghost
+/// share it.
+class TabMark extends StatelessWidget {
+  const TabMark(this.tab, {super.key});
+  final TerminalTab tab;
+
+  @override
+  Widget build(BuildContext context) =>
+      tab.isAi ? const _AiTabIcon() : TabStatusDot(tab);
 }
 
 /// V2-1 §4.7: an AI tab's mark in the status-dot slot.
