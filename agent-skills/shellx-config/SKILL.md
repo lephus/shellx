@@ -33,6 +33,9 @@ ShellX reads one plain-text file in Ghostty syntax: `key = value`, `#` starts a 
 | `macos-option-as-alt` | `false`, `true`, `left`, `right` | `false` |
 | `confirm-close-surface` | `true` (ask while a command runs), `false`, `always` | `true` |
 | `working-directory` | `home`, `inherit`, an absolute path (new tabs, also from `shellx new-tab`) | `home` |
+| `new-tab-kind` | `terminal`, `ai` (what a new tab opens: Cmd/Ctrl+T, `+`, the first tab; `ai` = an AI session, and `new_terminal_tab` still opens a terminal) | `terminal` |
+| `ai-agent-claude` | `on`, `off` (`off` hides Claude from the AI interface everywhere) | `on` |
+| `ai-checkpoint-days` | 1 to 90 (days the AI interface keeps its restore points, the copies that let the user undo an agent's edits) | 14 |
 | `link-editor` | `auto` (first installed of Cursor, VS Code, Zed), `vscode`, `cursor`, `zed`, `finder` (only reveal): where Cmd/Ctrl-click opens a file `path:line:col` | `auto` |
 | `keybind` | `trigger=action` (below) | ShellX's shortcuts |
 | `command`, `snippet` | `Name = text` (below) | none |

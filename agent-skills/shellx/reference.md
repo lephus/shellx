@@ -63,11 +63,13 @@ Ids are written without leading zeros (`p12`, not `p012`). `focus` and `close` t
 
 ```json
 {"workspaces":[{"id":"w:default","name":"Default","current":true,"collapsed":false,
-  "tabs":[{"id":"t1712","title":"vim","custom":false,"selected":true,"unread":2,"running":true,"agent":false,
+  "tabs":[{"id":"t1712","kind":"terminal","title":"vim","custom":false,"selected":true,"unread":2,"running":true,"agent":false,
     "panes":[{"id":"p1712","kind":"terminal","title":"vim","cwd":"/Users/me/app","branch":"main","ports":[3000],
               "running":true,"exited":false,"exitCode":null,"focused":true,"zoomed":false,"phone":false,"driver":"desktop","agent":false}]}]}],
  "selectedTab":"t1712","focusedPane":"p1712"}
 ```
+
+A tab has `"kind"`: `"terminal"`, or `"ai"` for an AI tab (a conversation with an agent, not a shell). An AI tab also has `"cwd"`, the folder its agent works in (`null` until one is chosen). Its `panes` list only terminal panes: none until a terminal is opened under the AI pane, and a command that needs a pane (`send`, `read`, `wait`…) answers `not_found` for such a tab. `focusedPane` is `null` while the AI pane has the focus. In the text tree an AI tab is a tab line with no pane lines. An older ShellX leaves `"kind"` out: read it as `"terminal"`.
 
 A pane whose agent reported through its hooks (`shellx integrations`) also has `"agent_name"` (`claude`, `codex`, `gemini`, `opencode`) and `"agent_status"` (`running`, `needs_input`, `idle`, `done`); `"agent"` stays the "a command-line client just acted here" flag. `cwd`, `branch` and `exitCode` may be `null` (unknown / still running); `selectedTab` and `focusedPane` are `null` when no tab is open. Browser panes (when available) have `"kind":"browser"` and `url`.
 
