@@ -73,6 +73,13 @@ class AiRuntimes extends Notifier<void> {
         if (next.tabOfPane(id) == null) _drop(id);
       }
     });
+    // D21: an agent switched off (`ai-agent-claude = off`) or removed stops
+    // at once; its panes say why.
+    ref.listen<List<AgentSpec>>(aiAgentsProvider, (_, next) {
+      for (final id in [..._runtimes.keys]) {
+        if (aiAgentById(next, _agentOf[id] ?? '') == null) _drop(id);
+      }
+    });
     // D3: a close asks first while a turn runs.
     ref.read(terminalTabsProvider.notifier).aiBusy = busy;
     ref.onDispose(() {
@@ -84,6 +91,10 @@ class AiRuntimes extends Notifier<void> {
 
   /// The runtime of AI pane [paneId] if one was made.
   AiRuntime? existing(int paneId) => _runtimes[paneId];
+
+  /// The pane chose another folder (D5, §6): its runtime stops; the next
+  /// [runtimeFor] makes one in the new folder.
+  void forget(int paneId) => _drop(paneId);
 
   /// The runtime of AI pane [paneId], made (not started) on the first call.
   /// Null while the pane has no folder (D5), is gone, or its agent is not

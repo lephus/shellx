@@ -194,7 +194,10 @@ class _AiComposerState extends State<AiComposer> {
                   key: const Key('ai.composer'),
                   controller: _text,
                   focusNode: _focus,
-                  enabled: _canSend,
+                  // Never `enabled: false`: a disabled field gives up the
+                  // keyboard, and it would not come back once the agent is
+                  // ready (signed in, restarted).
+                  readOnly: !_canSend,
                   minLines: 2,
                   maxLines: null,
                   keyboardType: TextInputType.multiline,
@@ -202,7 +205,9 @@ class _AiComposerState extends State<AiComposer> {
                     color: ShellxDesktopColors.textPrimary,
                   ),
                   decoration: InputDecoration(
-                    hintText: l10n.aiComposerHint(scope.state.agentName),
+                    hintText: _canSend
+                        ? l10n.aiComposerHint(scope.state.agentName)
+                        : l10n.aiComposerWaiting,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,

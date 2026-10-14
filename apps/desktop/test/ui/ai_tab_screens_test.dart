@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/terminal/agent_status.dart';
 import 'package:shellx_desktop/src/terminal/agent_status_notifier.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
@@ -10,6 +11,7 @@ import 'package:shellx_desktop/src/ui/config/search_all_overlay.dart';
 import 'package:shellx_desktop/src/ui/window_focus.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
+import '../support/ai_fakes.dart';
 import '../support/ai_tabs.dart';
 import '../support/config_workspace.dart';
 
@@ -32,8 +34,13 @@ void main() {
   }
 
   Future<(ProviderContainer, TerminalTab)> aiWorkspace(WidgetTester t) async {
-    final w = await pumpConfiguredWorkspace(t, platform: TargetPlatform.macOS);
-    final ai = openTestAiTab(w.container, title: 'Fix login');
+    // V2-1b Task 17: the AI pane starts its runtime when shown.
+    final w = await pumpConfiguredWorkspace(
+      t,
+      platform: TargetPlatform.macOS,
+      extra: FakeAiRuntimes(const FakeScenario()).overrides,
+    );
+    final ai = openTestAiTab(w.container, title: 'Fix login', cwd: testAiCwd);
     w.container.read(terminalFocusRequestProvider.notifier).request();
     await t.pumpAndSettle();
     return (w.container, ai);

@@ -108,3 +108,55 @@ final class AiPaneUi extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// Smoothness: [builder] runs again only when [select] of the session
+/// gives another value (checked once per frame), never per streamed chunk.
+class AiSelect<T> extends StatefulWidget {
+  const AiSelect({
+    super.key,
+    required this.frames,
+    required this.select,
+    required this.builder,
+  });
+
+  final AiFrameNotifier frames;
+  final T Function(AiSessionState state) select;
+  final Widget Function(BuildContext context, T value) builder;
+
+  @override
+  State<AiSelect<T>> createState() => _AiSelectState<T>();
+}
+
+class _AiSelectState<T> extends State<AiSelect<T>> {
+  late T _value = widget.select(widget.frames.state);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.frames.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(AiSelect<T> old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.frames, widget.frames)) {
+      old.frames.removeListener(_changed);
+      widget.frames.addListener(_changed);
+    }
+    _value = widget.select(widget.frames.state);
+  }
+
+  @override
+  void dispose() {
+    widget.frames.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    final next = widget.select(widget.frames.state);
+    if (next != _value) setState(() => _value = next);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _value);
+}

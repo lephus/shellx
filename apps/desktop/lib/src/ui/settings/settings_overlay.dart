@@ -22,6 +22,7 @@ import 'pages/phone_page.dart';
 import 'pages/projects_page.dart';
 import 'pages/terminal_page.dart';
 import 'settings_row.dart';
+import 'settings_start_page.dart';
 import 'settings_values.dart';
 import 'settings_writer.dart';
 
@@ -63,6 +64,19 @@ class _SettingsOverlayState extends ConsumerState<SettingsOverlay> {
   String _announcement = '';
   Timer? _announceLock;
   bool _announceDirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // V2-1 D7: "Settings › Agents" from an AI pane opens on that page.
+    final start = ref.read(settingsStartPageProvider);
+    if (start != null) {
+      _page = start;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(settingsStartPageProvider.notifier).set(null);
+      });
+    }
+  }
 
   @override
   void dispose() {

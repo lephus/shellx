@@ -14,8 +14,25 @@ final class AiFrameNotifier extends ChangeNotifier {
   final AiSessionState state;
   var _scheduled = false;
   var _disposed = false;
+  var _active = true;
+  var _missed = false;
+
+  /// Smoothness: a hidden pane (another tab is selected) hears nothing; it
+  /// catches up with one notification when it shows again.
+  set active(bool value) {
+    if (_active == value) return;
+    _active = value;
+    if (value && _missed) {
+      _missed = false;
+      _changed();
+    }
+  }
 
   void _changed() {
+    if (!_active) {
+      _missed = true;
+      return;
+    }
     if (_scheduled || _disposed) return;
     _scheduled = true;
     SchedulerBinding.instance.scheduleFrameCallback((_) {
