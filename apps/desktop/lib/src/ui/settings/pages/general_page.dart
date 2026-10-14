@@ -57,6 +57,8 @@ class GeneralPage extends ConsumerWidget {
             ),
           ),
         const _UpdateRow(),
+        // V2-1 D4. Last, so the rows above keep their place.
+        settingWidget(settingById('new-tab-kind')),
       ],
     );
   }

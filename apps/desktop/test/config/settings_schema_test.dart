@@ -146,6 +146,10 @@ void main() {
       'agent-resume',
       'pr-status',
       'link-editor',
+      // V2-1.
+      'new-tab-kind',
+      'ai-agent-claude',
+      'ai-checkpoint-days',
     };
     final have = {
       for (final d in kSettings)

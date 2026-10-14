@@ -6,6 +6,7 @@ import '../tray/tray_action.dart';
 import '../ui/config/command_palette.dart' show matchScore;
 import 'config_paths.dart';
 import 'config_state.dart';
+import 'shellx_config.dart' show kAiCheckpointDaysMax, kAiCheckpointDaysMin;
 
 /// A11 D4: who owns a setting. Exactly one.
 /// - [file]: a key of the configuration file. Settings reads `ConfigState`
@@ -469,6 +470,25 @@ final List<SettingDef> kSettings = List.unmodifiable([
       SettingChoice('vi', (l) => l.settingLanguageVi),
     ],
   ),
+  // V2-1 D4: what a new tab is (file key, as `agent-resume`).
+  SettingDef(
+    id: 'new-tab-kind',
+    owner: SettingOwner.file,
+    page: SettingPage.general,
+    control: SettingControl.segmented,
+    fileKey: 'new-tab-kind',
+    label: (l) => l.aiNewTabKindLabel,
+    description: (l) => l.aiSettingNewTabKindDesc,
+    keywords: const ['ai', 'agent', 'tab', 'claude', 'giao diện ai'],
+    choices: [
+      SettingChoice('terminal', (l) => l.aiNewTabKindTerminal),
+      SettingChoice('ai', (l) => l.aiNewTabKindAi),
+    ],
+    sampleValues: const [
+      SettingSample('ai', 'ai'),
+      SettingSample('terminal', 'terminal'),
+    ],
+  ),
   SettingDef(
     id: 'launch-at-startup',
     owner: SettingOwner.app,
@@ -547,6 +567,40 @@ final List<SettingDef> kSettings = List.unmodifiable([
       SettingSample('off', 'off'),
       SettingSample('ask', 'ask'),
     ],
+  ),
+  // V2-1 D21: the switch that turns the Claude integration off.
+  SettingDef(
+    id: 'ai-agent-claude',
+    owner: SettingOwner.file,
+    page: SettingPage.agents,
+    control: SettingControl.segmented,
+    fileKey: 'ai-agent-claude',
+    label: (l) => l.aiSettingClaude,
+    description: (l) => l.aiSettingClaudeDesc,
+    keywords: const ['claude', 'ai', 'agent', 'anthropic'],
+    choices: [
+      SettingChoice('on', (l) => l.aiSettingOn),
+      SettingChoice('off', (l) => l.aiSettingOff),
+    ],
+    sampleValues: const [
+      SettingSample('off', 'off'),
+      SettingSample('on', 'on'),
+    ],
+  ),
+  // V2-1 D12: how long restore points are kept.
+  SettingDef(
+    id: 'ai-checkpoint-days',
+    owner: SettingOwner.file,
+    page: SettingPage.agents,
+    control: SettingControl.slider,
+    fileKey: 'ai-checkpoint-days',
+    min: kAiCheckpointDaysMin.toDouble(),
+    max: kAiCheckpointDaysMax.toDouble(),
+    step: 1,
+    label: (l) => l.aiSettingCheckpointDays,
+    description: (l) => l.aiSettingCheckpointDaysDesc,
+    keywords: const ['undo', 'restore point', 'checkpoint', 'hoàn tác'],
+    sampleValues: const [SettingSample('7', '7'), SettingSample('30', '30')],
   ),
   SettingDef(
     id: 'pr-status',

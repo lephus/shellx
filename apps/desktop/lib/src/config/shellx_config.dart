@@ -17,6 +17,12 @@ const EdgeInsets kDefaultTerminalPadding = EdgeInsets.fromLTRB(10, 6, 10, 6);
 const int kScrollbackDefault = 10000;
 const int kScrollbackMin = 1000;
 const int kScrollbackMax = 100000;
+
+/// V2-1 D12 `ai-checkpoint-days`: how long the AI tab's restore points are
+/// kept, in days.
+const int kAiCheckpointDaysDefault = 14;
+const int kAiCheckpointDaysMin = 1;
+const int kAiCheckpointDaysMax = 90;
 const double kFontSizeMin = 9;
 const double kFontSizeMax = 28;
 const double kPaddingMax = 64;
@@ -37,6 +43,10 @@ enum ConfirmClose { whenRunning, never, always }
 /// A12 D13 `agent-resume`: after a restart, `ask` shows a button to
 /// resume the agent that was running; `off` shows nothing.
 enum AgentResume { ask, off }
+
+/// V2-1 D4 `new-tab-kind`: what ⌘T / Ctrl+Shift+T, `+`, the empty window's
+/// button and the startup tab open. The names are the wire values.
+enum NewTabKind { terminal, ai }
 
 /// `link-editor`: where ⌘-click (Ctrl-click on Windows) opens a file path
 /// found in a local pane. `auto` = the first installed of Cursor, VS Code,
@@ -123,6 +133,9 @@ final class ShellxConfig {
     this.optionAsAlt = OptionAsAlt.off,
     this.confirmClose = ConfirmClose.whenRunning,
     this.agentResume = AgentResume.ask,
+    this.newTabKind = NewTabKind.terminal,
+    this.aiAgentClaude = true,
+    this.aiCheckpointDays = kAiCheckpointDaysDefault,
     this.linkEditor = LinkEditor.auto,
     this.prStatus = false,
     this.agentEventCommand = '',
@@ -165,6 +178,16 @@ final class ShellxConfig {
 
   /// `agent-resume` (ShellX file only, A12 D13).
   final AgentResume agentResume;
+
+  /// `new-tab-kind` (ShellX file only, V2-1 D4): `terminal` by default.
+  final NewTabKind newTabKind;
+
+  /// `ai-agent-claude = on | off` (ShellX file only, V2-1 D21): off hides
+  /// Claude from the AI interface everywhere.
+  final bool aiAgentClaude;
+
+  /// `ai-checkpoint-days` (ShellX file only, V2-1 D12).
+  final int aiCheckpointDays;
 
   /// `link-editor` (ShellX file only): the editor a file path opens in.
   final LinkEditor linkEditor;
@@ -283,6 +306,9 @@ final class _Builder {
   var optionAsAlt = OptionAsAlt.off;
   var confirmClose = ConfirmClose.whenRunning;
   var agentResume = AgentResume.ask;
+  var newTabKind = NewTabKind.terminal;
+  var aiAgentClaude = true;
+  var aiCheckpointDays = kAiCheckpointDaysDefault;
   var linkEditor = LinkEditor.auto;
   var prStatus = false;
   var agentEventCommand = '';
@@ -570,6 +596,37 @@ final class _Builder {
         };
         if (mode == null) return _badValue(e, g, 'ask, off');
         agentResume = mode;
+      case 'new-tab-kind':
+        final kind = switch (v) {
+          '' || 'terminal' => NewTabKind.terminal,
+          'ai' => NewTabKind.ai,
+          _ => null,
+        };
+        if (kind == null) return _badValue(e, g, 'terminal, ai');
+        newTabKind = kind;
+      case 'ai-agent-claude':
+        final on = switch (v) {
+          '' || 'on' || 'true' => true,
+          'off' || 'false' => false,
+          _ => null,
+        };
+        if (on == null) return _badValue(e, g, 'on, off');
+        aiAgentClaude = on;
+      case 'ai-checkpoint-days':
+        if (v.isEmpty) {
+          aiCheckpointDays = kAiCheckpointDaysDefault;
+        } else {
+          final days = _ranged(
+            e,
+            v,
+            kAiCheckpointDaysMin.toDouble(),
+            kAiCheckpointDaysMax.toDouble(),
+            g,
+            integer: true,
+          );
+          if (days == null) return;
+          aiCheckpointDays = days.toInt();
+        }
       case 'link-editor':
         final editor = v.isEmpty ? LinkEditor.auto : _linkEditors[v];
         if (editor == null) {
@@ -752,6 +809,9 @@ final class _Builder {
     optionAsAlt: optionAsAlt,
     confirmClose: confirmClose,
     agentResume: agentResume,
+    newTabKind: newTabKind,
+    aiAgentClaude: aiAgentClaude,
+    aiCheckpointDays: aiCheckpointDays,
     linkEditor: linkEditor,
     prStatus: prStatus,
     agentEventCommand: agentEventCommand,

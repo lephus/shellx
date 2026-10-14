@@ -62,6 +62,11 @@ const _expectedUi = {
   // A12 D19: the window reads it once at start; the service keeps the
   // system language.
   'app_language',
+  // V2-1 D4, D7, D11, D23: the AI interface lives in the window.
+  'ai_intro_shown',
+  'ai_default_agent',
+  'ai_custom_agents',
+  'ai_agent_config',
 };
 
 final class _Listener implements MuxListener {
@@ -86,7 +91,7 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(30));
+    expect(SettingKeys.all, hasLength(34));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',

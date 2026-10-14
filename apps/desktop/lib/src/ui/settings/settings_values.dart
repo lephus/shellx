@@ -67,6 +67,9 @@ String fileSettingText(
   },
   'ghostty-config' => '${c.ghosttyConfig}',
   'agent-resume' => c.agentResume.name,
+  'new-tab-kind' => c.newTabKind.name,
+  'ai-agent-claude' => c.aiAgentClaude ? 'on' : 'off',
+  'ai-checkpoint-days' => '${c.aiCheckpointDays}',
   'link-editor' => c.linkEditor.name,
   'pr-status' => '${c.prStatus}',
   'global-hotkey' =>

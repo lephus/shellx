@@ -95,6 +95,21 @@ abstract final class SettingKeys {
   /// change shows after a restart. UI-owned.
   static const String appLanguage = 'app_language';
 
+  /// V2-1 D4: the one-time "how do you want to work?" card was answered or
+  /// closed. UI-owned.
+  static const String aiIntroShown = 'ai_intro_shown';
+
+  /// V2-1 D23: the agent "New AI session" starts, a one-element list (an
+  /// agent id); missing: the first ready one. UI-owned.
+  static const String aiDefaultAgent = 'ai_default_agent';
+
+  /// V2-1 D7: the user's own agents, one JSON object per element. UI-owned.
+  static const String aiCustomAgents = 'ai_custom_agents';
+
+  /// V2-1 D11: the remembered choices per agent, one
+  /// `agent<TAB>config<TAB>json value` per element. UI-owned.
+  static const String aiAgentConfig = 'ai_agent_config';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -126,6 +141,10 @@ abstract final class SettingKeys {
     lastSeenVersion,
     agentCommandApproved,
     appLanguage,
+    aiIntroShown,
+    aiDefaultAgent,
+    aiCustomAgents,
+    aiAgentConfig,
   };
 }
 
@@ -178,6 +197,10 @@ abstract final class UiSettingKeys {
     SettingKeys.lastSeenVersion,
     SettingKeys.agentCommandApproved,
     SettingKeys.appLanguage,
+    SettingKeys.aiIntroShown,
+    SettingKeys.aiDefaultAgent,
+    SettingKeys.aiCustomAgents,
+    SettingKeys.aiAgentConfig,
   };
 }
 
