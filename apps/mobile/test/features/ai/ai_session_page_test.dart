@@ -1471,6 +1471,226 @@ void main() {
         expect(machine.ai.prompts, [(sid, 'không gửi được')], reason: 'and it was not sent again by itself');
       });
     });
+
+    group('the page is opened again before the answer of a message comes back', () {
+      final composer = find.byKey(const Key('ai.composer'));
+      String fieldText(WidgetTester tester) => tester.widget<TextField>(composer).controller!.text;
+
+      /// Types [text], sends it with the answer held back, leaves the page and opens it again at once.
+      /// Returns the gate that holds the answer.
+      Future<Completer<void>> sendLeaveAndCome(WidgetTester tester, String text) async {
+        final gate = machine.ai.gate = Completer<void>();
+        await tester.enterText(composer, text);
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.send')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.back'))); // left, the message on its way
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('open')); // and opened again before the answer is back
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        machine.ai.session(sid).sync();
+        await tester.pumpAndSettle();
+        return gate;
+      }
+
+      /// The answer comes: through, or refused with [failWith].
+      Future<void> answer(WidgetTester tester, Completer<void> gate, {String? failWith}) async {
+        machine.ai.gate = null;
+        machine.ai.failWith = failWith;
+        gate.complete();
+        await tester.pump();
+        await tester.pump();
+        machine.ai.failWith = null;
+      }
+
+      testWidgets('the new page does not start with that message; the answer coming later changes nothing', (
+        tester,
+      ) async {
+        await open(tester);
+        final gate = await sendLeaveAndCome(tester, 'gửi dở');
+        expect(fieldText(tester), isEmpty, reason: 'it is on its way, it is no draft');
+        await answer(tester, gate);
+        expect(fieldText(tester), isEmpty);
+        expect(machine.ai.prompts, [(sid, 'gửi dở')], reason: 'sent once');
+        await reopen(tester);
+        expect(fieldText(tester), isEmpty, reason: 'and it went: no draft at the next visit either');
+      });
+
+      testWidgets('if it is refused, the text is back for the next visit', (tester) async {
+        await open(tester);
+        final gate = await sendLeaveAndCome(tester, 'gửi dở');
+        expect(fieldText(tester), isEmpty);
+        await answer(tester, gate, failWith: 'queue_full');
+        await reopen(tester);
+        expect(fieldText(tester), 'gửi dở', reason: 'it did not go: it is the user\'s to send again');
+        expect(machine.ai.prompts, [(sid, 'gửi dở')], reason: 'and it was not sent again by itself');
+      });
+
+      testWidgets('what the user wrote on the new page meanwhile is not taken over by a late refusal', (tester) async {
+        await open(tester);
+        final gate = await sendLeaveAndCome(tester, 'gửi dở');
+        await tester.enterText(composer, 'việc khác');
+        await tester.pump();
+        await answer(tester, gate, failWith: 'queue_full');
+        expect(fieldText(tester), 'việc khác');
+        await reopen(tester);
+        expect(fieldText(tester), 'việc khác');
+      });
+    });
+
+    group('a message on its way while the page stays', () {
+      final composer = find.byKey(const Key('ai.composer'));
+      String fieldText(WidgetTester tester) => tester.widget<TextField>(composer).controller!.text;
+
+      testWidgets('that is refused stays in the field, and is a draft again when the page is left', (tester) async {
+        await open(tester);
+        final gate = machine.ai.gate = Completer<void>();
+        await tester.enterText(composer, 'chưa gửi được');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.send')));
+        await tester.pump();
+        machine.ai.gate = null;
+        machine.ai.failWith = 'queue_full';
+        gate.complete();
+        await tester.pump();
+        await tester.pump();
+        machine.ai.failWith = null;
+        expect(fieldText(tester), 'chưa gửi được');
+        await reopen(tester);
+        expect(fieldText(tester), 'chưa gửi được');
+      });
+
+      testWidgets('that goes through leaves no draft, even if the cursor moved while it travelled', (tester) async {
+        await open(tester);
+        final gate = machine.ai.gate = Completer<void>();
+        await tester.enterText(composer, 'đã gửi');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.send')));
+        await tester.pump();
+        // A move of the cursor tells the listener of the field, though the text is the same.
+        tester.widget<TextField>(composer).controller!.selection = const TextSelection.collapsed(offset: 2);
+        await tester.pump();
+        machine.ai.gate = null;
+        gate.complete();
+        await tester.pump();
+        await tester.pump();
+        expect(fieldText(tester), isEmpty);
+        await reopen(tester);
+        expect(fieldText(tester), isEmpty);
+      });
+    });
+
+    group('a session that is over for good keeps no draft', () {
+      final composer = find.byKey(const Key('ai.composer'));
+      String fieldText(WidgetTester tester) => tester.widget<TextField>(composer).controller!.text;
+
+      for (final reason in ['gone', 'desktop_closed']) {
+        testWidgets('closed "$reason" with a draft in the field: none at the next visit', (tester) async {
+          final ai = await open(tester);
+          await tester.enterText(composer, 'còn dở');
+          await tester.pump();
+          ai.close(reason);
+          await tester.pump();
+          await reopen(tester);
+          expect(fieldText(tester), isEmpty);
+        });
+      }
+
+      for (final reason in ['unavailable', 'unreadable']) {
+        testWidgets('closed "$reason" (it may pass): the draft is still there at the next visit', (tester) async {
+          final ai = await open(tester);
+          await tester.enterText(composer, 'còn dở');
+          await tester.pump();
+          ai.close(reason);
+          await tester.pump();
+          await reopen(tester);
+          expect(fieldText(tester), 'còn dở');
+        });
+      }
+    });
+  });
+
+  group('a session whose agent is starting (a restored one replays its history there)', () {
+    const emptyText = 'Chưa có tin nhắn. Viết tin đầu tiên ở ô dưới.';
+
+    testWidgets('the phone has the header only: it says the session starts, not that there are no messages', (
+      tester,
+    ) async {
+      machine.ai.session(sid).desktop.setPhase(AgentPhase.starting);
+      await open(tester);
+      expect(find.byKey(const Key('ai.starting')), findsOneWidget);
+      expect(find.text('Đang khởi động'), findsOneWidget);
+      expect(find.text(emptyText), findsNothing);
+      expect(tester.widget<Text>(find.byKey(const Key('ai.status'))).data, 'Claude · Đang khởi động');
+    });
+
+    testWidgets('the composer is usable and a message queues as it does today', (tester) async {
+      machine.ai.session(sid).desktop.setPhase(AgentPhase.starting);
+      await open(tester);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'Thêm nút');
+      await tester.pump();
+      expect(tester.widget<IconButton>(find.byKey(const Key('ai.send'))).onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('ai.send')));
+      await tester.pump();
+      expect(machine.ai.prompts, [(sid, 'Thêm nút')]);
+    });
+
+    testWidgets('the history that replays on the computer comes as the agent is ready, and takes the place of it', (
+      tester,
+    ) async {
+      final ai = machine.ai.session(sid);
+      ai.desktop.setPhase(AgentPhase.starting);
+      await open(tester);
+      // The history replays while the agent starts (`session/load`): the computer sends the phone nothing of
+      // it yet (D15).
+      ai.desktop.applyUpdate(
+        SessionUpdate.fromJson({
+          'sessionUpdate': 'user_message_chunk',
+          'content': {'type': 'text', 'text': 'Sửa lỗi đăng nhập'},
+        }),
+        DateTime.now(),
+      );
+      say(ai.desktop, 'Mình đã sửa xong.');
+      ai.sync();
+      await tester.pump();
+      expect(find.byKey(const Key('ai.starting')), findsOneWidget, reason: 'nothing came yet');
+      expect(find.text(emptyText), findsNothing);
+      ai.desktop.setPhase(AgentPhase.ready);
+      ai.sync();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ai.starting')), findsNothing);
+      final timeline = find.byType(AiTimeline);
+      expect(find.descendant(of: timeline, matching: find.textContaining('Mình đã sửa xong.')), findsOneWidget);
+      expect(find.descendant(of: timeline, matching: find.text('Sửa lỗi đăng nhập')), findsOneWidget);
+    });
+
+    testWidgets('a session that starts but already shows messages shows them', (tester) async {
+      final ai = await open(tester);
+      feed(
+        ai,
+        head: {'phase': 'starting', 'agent': 'claude', 'name': 'Claude'},
+        items: [textRecord(0, 'user', 'Đã có tin')],
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ai.starting')), findsNothing);
+      expect(find.textContaining('Đã có tin'), findsOneWidget);
+    });
+
+    testWidgets('a session that is ready and has no messages says there are none yet', (tester) async {
+      machine.ai.session(sid).desktop.setPhase(AgentPhase.ready);
+      await open(tester);
+      expect(find.byKey(const Key('ai.starting')), findsNothing);
+      expect(find.text(emptyText), findsOneWidget);
+    });
+
+    for (final phase in [AgentPhase.needsAuth, AgentPhase.failed, AgentPhase.stopped]) {
+      testWidgets('a session that is ${phase.name} is not "starting"', (tester) async {
+        machine.ai.session(sid).desktop.setPhase(phase);
+        await open(tester);
+        expect(find.byKey(const Key('ai.starting')), findsNothing);
+      });
+    }
   });
 }
 

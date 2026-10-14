@@ -78,17 +78,21 @@ class _AiSessionPageState extends State<AiSessionPage> {
 
   Future<void> _send() async {
     final text = _text.text;
+    // While it is on its way the message is no draft: a page opened again before the answer comes back
+    // must not start with it (and send it twice). A message that did not go is put back below.
+    _controller.keepDraft('');
     final code = await _controller.send(text);
     if (!mounted) {
-      // The page was left while the message was on its way. Gone, it is no draft (the next visit must not
-      // find it and send it twice); failed, it stays one.
-      if (code == null && _controller.draft == text) _controller.keepDraft('');
+      // The page was left while the message was on its way. Gone, it is nobody's draft; refused, it is the
+      // user's again, unless a page opened since has a draft of its own.
+      if (code != null && _controller.draft.isEmpty) _controller.keepDraft(text);
       return;
     }
     // The text stays when the message did not go (or may not have): the user decides what to do.
     if (code == null) {
       if (_text.text == text) _text.clear();
     } else {
+      _controller.keepDraft(_text.text);
       _say(code);
     }
   }
@@ -203,6 +207,22 @@ class _AiSessionPageState extends State<AiSessionPage> {
           padding: const EdgeInsets.all(32),
           child: Text(
             AiWords.state(s, unavailable),
+            textAlign: TextAlign.center,
+            style: context.typo.paragraph.copyWith(color: colors.secondaryText),
+          ),
+        ),
+      );
+    }
+    if (head != null && head.phase == 'starting' && empty) {
+      // A restored session replays its history on the computer while its agent starts, and the phone gets
+      // the header only until the agent is ready (then a snapshot, V2-2 D15): not an empty conversation.
+      // The text field works meanwhile; what is sent queues.
+      return Center(
+        key: const Key('ai.starting'),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            AiWords.state(s, AiRemoteState.starting),
             textAlign: TextAlign.center,
             style: context.typo.paragraph.copyWith(color: colors.secondaryText),
           ),

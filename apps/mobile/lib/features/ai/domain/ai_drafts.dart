@@ -2,8 +2,9 @@ import 'package:injectable/injectable.dart';
 
 /// What the user typed in the text field of an AI session and has not sent (V2-2 §5.2), kept for a page
 /// that is left and opened again: a notification, a call or a tap in the wrong place must not cost a
-/// sentence. In memory only, never written anywhere and never logged: it is gone with the app (or with
-/// a reset of the dependencies on sign-out).
+/// sentence. In memory only, never written anywhere and never logged. It lives as long as the app process
+/// does: nothing clears it on sign-out, and a session that closes for good (`gone`, `desktop_closed`)
+/// drops its own draft (see `AiSessionController`). What it holds is bounded by [capacity] and [maxChars].
 ///
 /// The key is the caller's: the controller uses the session on its machine, since two computers both
 /// have an `e.-1`.

@@ -110,10 +110,15 @@ void main() {
       }
       expect(ai.mirror.items, hasLength(701));
       expect(find.byType(AiItemView).evaluate().length, inInclusiveRange(5, 40));
-      for (var i = 700; i < 1000; i++) {
-        read(ai.desktop, i);
+      // They come as a phone that stays up to date gets them. One that is more than 120 items behind starts
+      // over from the last 60 (V2-2 D5), which is not what this test is about.
+      for (var batch = 0; batch < 3; batch++) {
+        for (var i = 700 + batch * 100; i < 800 + batch * 100; i++) {
+          read(ai.desktop, i);
+        }
+        ai.sync();
+        await tester.pump();
       }
-      ai.sync();
       await tester.pumpAndSettle();
       expect(ai.mirror.items, hasLength(1001));
       expect(find.byType(AiItemView).evaluate().length, inInclusiveRange(5, 40));

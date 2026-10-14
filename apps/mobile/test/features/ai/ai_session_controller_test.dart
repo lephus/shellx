@@ -242,6 +242,48 @@ void main() {
       controller.dispose();
       expect(AiSessionController(agentA, sid, session, drafts).draft, isEmpty);
     });
+
+    group('a session that is over for good keeps no draft', () {
+      for (final reason in ['gone', 'desktop_closed']) {
+        test('closed "$reason": the draft goes, and a late restore does not bring it back', () {
+          final drafts = AiDrafts();
+          final controller = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
+          final ai = machine.ai.session(sid)..sync();
+          expect(controller.draft, 'còn dở');
+          ai.close(reason);
+          expect(controller.draft, isEmpty);
+          controller.keepDraft('một tin chưa gửi được'); // a failed message put back after the session closed
+          expect(controller.draft, isEmpty);
+          controller.dispose();
+          expect(AiSessionController(agentA, sid, session, drafts).draft, isEmpty, reason: 'nor on the next visit');
+        });
+      }
+
+      for (final reason in ['unavailable', 'unreadable']) {
+        test('closed "$reason" (it may pass): the draft stays, and is still kept', () {
+          final drafts = AiDrafts();
+          final controller = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
+          final ai = machine.ai.session(sid)..sync();
+          ai.close(reason);
+          expect(controller.draft, 'còn dở');
+          controller.keepDraft('còn dở, viết thêm');
+          expect(controller.draft, 'còn dở, viết thêm');
+          controller.dispose();
+        });
+      }
+
+      test('the other page of the same session leaving (the shared link is detached) does not drop the draft', () {
+        final drafts = AiDrafts();
+        final staying = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
+        final leaving = AiSessionController(agentA, sid, session, drafts);
+        machine.ai.session(sid).sync();
+        leaving.dispose();
+        expect(staying.draft, 'còn dở');
+        staying.keepDraft('còn dở, viết thêm');
+        expect(staying.draft, 'còn dở, viết thêm');
+        staying.dispose();
+      });
+    });
   });
 
   group('a request that the computer refuses says its code', () {

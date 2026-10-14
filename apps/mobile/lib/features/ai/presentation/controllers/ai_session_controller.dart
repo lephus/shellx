@@ -92,10 +92,24 @@ class AiSessionController extends Controller {
   /// see [AiDrafts]). Of this session on this machine: the same id on another computer is another one.
   String get draft => _drafts.of(_draftKey);
 
-  /// The text field now holds [text].
-  void keepDraft(String text) => _drafts.keep(_draftKey, text);
+  /// The text field now holds [text]. A session that is over for good keeps no draft: a message that was
+  /// refused after it closed is not put back.
+  void keepDraft(String text) {
+    if (_over) return;
+    _drafts.keep(_draftKey, text);
+  }
 
   String get _draftKey => '$agentId/$sid';
+
+  /// The computer dropped the session (`gone`) or ShellX quit there (`desktop_closed`): nothing more will
+  /// be said in it. Not `detached` (a page of this phone leaving), `unavailable` or `unreadable`: they may
+  /// pass. See [AiWords.closed].
+  bool get _over {
+    final link = _link;
+    return link != null &&
+        link.state == AiLinkState.closed &&
+        (link.closedReason == 'gone' || link.closedReason == 'desktop_closed');
+  }
 
   /// The app comes to the foreground (true) or goes away from it (false): the page tells, since it is
   /// the page that sees the lifecycle. In the background nothing counts the turn's time (a second tick
@@ -249,6 +263,10 @@ class AiSessionController extends Controller {
       _follow(machine.ai.attach(sid));
     }
     _syncTick();
+    if (_over) {
+      // A session that is over takes its draft with it (the drafts are bounded, but need not hold this one).
+      _drafts.keep(_draftKey, '');
+    }
     batch(() {
       _releaseAnswer();
       _version.value++;
