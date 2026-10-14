@@ -1,6 +1,10 @@
-# Pane AI — đề xuất và demo
+# Giao diện AI cho ShellX — đề xuất và demo
 
-Trang tĩnh trình bày đề xuất pane AI cho ShellX, kèm một demo bấm thử được: cửa sổ ShellX mô phỏng, agent giả nói đúng thông điệp ACP v1, và nhật ký ghi mọi thông điệp.
+Trang tĩnh trình bày đề xuất V2: giao diện AI cho người không muốn dùng terminal, tool riêng nhúng bằng một URL, và điện thoại xem, điều khiển được cả hai. Kèm một demo bấm thử được:
+- cửa sổ ShellX mô phỏng;
+- agent giả nói đúng thông điệp ACP v1;
+- app điện thoại mô phỏng;
+- nhật ký ghi mọi thông điệp.
 
 ## Chạy
 
@@ -16,20 +20,34 @@ Hoặc chạy một server tĩnh rồi vào <http://localhost:8765>:
 python3 -m http.server 8765 --directory docs/superpowers/design/2026-10-14-ai-pane-demo
 ```
 
-Mở thẳng một kịch bản, chạy nhanh gấp đôi: `index.html?kb=3&tocdo=2` (`kb` từ 1 đến 6).
+Muốn mở thẳng một kịch bản và chạy nhanh gấp đôi, dùng `index.html?kb=7&tocdo=2` (`kb` nhận giá trị từ 1 đến 7).
+
+## Bảy kịch bản
+
+1. **Một lượt sửa lỗi:** thẻ, xin quyền, diff, hoàn tác.
+2. **Hoàn tác lệnh shell:** agent sửa bằng `sed`, không gửi diff nào, nhưng panel Thay đổi vẫn bắt được.
+3. **Lần đầu dùng:** màn chào "Giao diện AI | Terminal"; đăng nhập chạy trong một khung nhỏ.
+4. **Thoát rồi mở lại:** phiên được khôi phục bằng `session/load`.
+5. **Agent gặp sự cố:** agent chết giữa lượt, rồi khởi động lại.
+6. **Tool qua URL (GĐ2):** thêm tool bằng tên và URL; tool mở cạnh pane AI.
+7. **Điện thoại (GĐ2):** gửi yêu cầu, trả lời xin quyền và mở tool, tất cả từ điện thoại.
 
 ## Tệp
 
 | Tệp | Nội dung |
 |---|---|
-| `index.html` | Đề xuất: tổng quan, cách hoạt động, 5 quyết định, giai đoạn 1, plugin, điện thoại, lộ trình, rủi ro, 4 việc cần quyết |
-| `demo.js` | Đóng vai ShellX: dựng pane AI từ thông điệp ACP, dự án giả trên “đĩa”, điểm khôi phục, nhật ký |
-| `demo-data.js` | Agent giả, dự án mẫu `shop-web`, dữ liệu ACP và 6 kịch bản |
-| `page.js` | Giao diện sáng/tối, sơ đồ kiến trúc, form trả lời |
-| `styles.css` | Bảng màu desktop của ShellX (`ShellxDesktopColors`) cho cửa sổ; token bảng thiết kế mobile cho trang |
+| `index.html` | Đề xuất: tổng quan, cách hoạt động, 7 quyết định, giai đoạn 1, tool qua URL, điện thoại, lộ trình, rủi ro, những gì đã chốt |
+| `demo.js` | Đóng vai ShellX: dựng tab AI từ thông điệp ACP, quản lý dự án giả trên "đĩa", điểm khôi phục, pane tool, app điện thoại và nhật ký |
+| `demo-data.js` | Agent giả, dự án mẫu `shop-web`, dữ liệu ACP và 7 kịch bản |
+| `page.js` | Chế độ sáng/tối, sơ đồ kiến trúc |
+| `styles.css` | Cửa sổ dùng bảng màu desktop của ShellX (`ShellxDesktopColors`); điện thoại dùng token tối của bảng thiết kế mobile; phần trang dùng token của bảng thiết kế |
 
 ## Độ chính xác
 
-Hình dạng thông điệp theo schema ACP v1 1.25.0 (09/10/2026). Danh sách chế độ, lựa chọn xin quyền, cách đăng nhập và tiêu đề việc agent làm lấy từ mã nguồn `@agentclientprotocol/claude-agent-acp` 0.90.0. Nội dung trả lời của agent, tên model và đường dẫn là minh hoạ.
+- **Theo nguồn thật:**
+  - Hình dạng thông điệp theo schema ACP v1 bản 1.25.0 (09/10/2026).
+  - Danh sách chế độ, lựa chọn xin quyền, cách đăng nhập và tiêu đề việc agent làm lấy từ mã nguồn `@agentclientprotocol/claude-agent-acp` 0.90.0.
+- **Đề xuất, chưa có trong giao thức:** các loại tin `ai.*` và `tool.*` giữa desktop và điện thoại.
+- **Minh hoạ:** nội dung agent trả lời, tên model và đường dẫn.
 
-Trang chỉ tải font từ Google Fonts; không có mạng thì dùng font hệ thống. Lựa chọn ở mục “Cần bạn quyết” và giao diện sáng/tối được nhớ trong `localStorage` của trình duyệt.
+Trang chỉ tải font từ Google Fonts; không có mạng thì dùng font hệ thống. Chế độ sáng/tối được nhớ trong `localStorage` của trình duyệt.

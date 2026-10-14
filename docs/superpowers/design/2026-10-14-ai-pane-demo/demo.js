@@ -70,6 +70,8 @@
     bell: '<path d="M4 11.2V7.3a4 4 0 0 1 8 0v3.9l1.4 1.4H2.6zM6.5 14.3h3"/>',
     gear: '<path d="M2 4.5h7M12.5 4.5H14M2 11.5h1.5M7 11.5h7"/><circle cx="10.7" cy="4.5" r="1.7"/><circle cx="5.2" cy="11.5" r="1.7"/>',
     key: '<circle cx="5.5" cy="10.5" r="3"/><path d="M7.7 8.3 13.5 2.5M11 5l1.8 1.8"/>',
+    phone: '<rect x="4.5" y="1.5" width="7" height="13" rx="1.6"/><path d="M7 12.3h2"/>',
+    lock: '<rect x="3" y="7" width="10" height="7.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
   };
   const svg = (name, cls) =>
     `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-hidden="true">${ICON[name] || ''}</svg>`;
@@ -354,7 +356,8 @@
       aiTab: true,
       selectedTab: 'ai',
       title: 'Phiên AI mới',
-      layout: { plugin: false, term: true, zoom: false, side: true },
+      // An AI tab has no terminal unless you ask for one (header button).
+      layout: { tool: false, term: false, zoom: false, side: true },
       focus: 'ai',
       process: null,
       sessionId: null,
@@ -382,7 +385,13 @@
       sheet: null,
       attachments: [],
       term: DATA.term.ai.slice(),
-      plugin: null,
+      // The sample tool's server state: desktop and phone views read the same.
+      board: null,
+      toolReg: [],
+      toolOpen: null,
+      runSheet: null,
+      phone: { on: false, screen: 'list', attached: false, draft: '', tool: null },
+      mirror: [],
       offline: false,
       empty: null,
       agents: JSON.parse(JSON.stringify(DATA.agents)),
@@ -390,7 +399,7 @@
       idIn: 0,
       hashes: DATA.hashes.slice(),
       log: [],
-      logFilter: { acp: true, hood: true },
+      logFilter: { acp: true, hood: true, relay: true },
       stick: true,
       dialogDone: null,
       menu: null,
@@ -533,11 +542,15 @@
     let head;
     if (e.lane === 'hood') {
       head = `<span class="lg-d">•</span><span class="lg-tag tag-${TAGS[e.tag] || 'file'}">${esc(e.tag)}</span>`;
+    } else if (e.lane === 'relay') {
+      head = `<span class="lg-d">${e.dir === 'down' ? '⇢' : '⇠'}</span><span class="lg-m">${esc(e.method)} <i>${e.dir === 'down' ? 'desktop → điện thoại' : 'điện thoại → desktop'}</i></span>`;
     } else {
       const id = e.id != null ? ` <i>#${e.id}</i>` : '';
       const kind = e.kind === 'res' ? ' <i>trả lời</i>' : e.kind === 'err' ? ' <i>lỗi</i>' : '';
       const n = e.count > 1 ? ` <i>×${e.count}</i>` : '';
-      head = `<span class="lg-d">${e.dir === 'out' ? '→' : '←'}</span><span class="lg-m">${esc(e.method)}${id}${kind}${e.sub ? ` <em>${esc(e.sub)}</em>` : ''}${n}</span>`;
+      // While a phone is attached, every session/update also goes out as ai.update.
+      const fwd = e.fwd ? ' <i class="lg-fwd" title="Desktop chuyển tiếp sang điện thoại (ai.update, đề xuất)">⇢ điện thoại</i>' : '';
+      head = `<span class="lg-d">${e.dir === 'out' ? '→' : '←'}</span><span class="lg-m">${esc(e.method)}${id}${kind}${e.sub ? ` <em>${esc(e.sub)}</em>` : ''}${n}${fwd}</span>`;
     }
     const sum = e.count > 1 ? `“${clip(e.text.replace(/\s+/g, ' '), 80)}”` : e.sum || '';
     e.el.innerHTML =
@@ -623,9 +636,11 @@
       chunk,
       text: chunk ? u.content.text : '',
       sum: sum || updateSummary(u),
+      fwd: S.phone.attached,
       json: { jsonrpc: '2.0', method: 'session/update', params: { sessionId: S.sessionId, update: u } },
     });
     applyUpdate(u, false);
+    if (S.phone.on) renderPhone();
   }
 
   /* --------------------------------------------------------- build DOM -- */
@@ -670,6 +685,7 @@
                     <span class="ai-tools">
                       <button class="ib" data-ai="history" title="Lịch sử phiên của dự án (session/list)">${svg('history')}</button>
                       <button class="ib" data-ai="side" title="Hiện/ẩn panel Thay đổi · Tệp">${svg('panel')}</button>
+                      <button class="ib" data-ai="term" title="Hiện/ẩn terminal của tab (ẩn sẵn)">${svg('term')}</button>
                       <button class="ib" data-ai="zoom" title="Phóng to pane (toggle_split_zoom)">${svg('max')}</button>
                       <button class="ib" data-ai="more" title="Thêm">${svg('more')}</button>
                     </span>
@@ -697,6 +713,7 @@
                       </div>
                       <div class="ai-sheet" hidden></div>
                       <div class="ai-empty" hidden></div>
+                      <div class="ai-run" hidden></div>
                     </div>
                     <aside class="ai-side" aria-label="Thay đổi và tệp">
                       <div class="side-tabs" role="tablist">
@@ -707,7 +724,7 @@
                     </aside>
                   </div>
                 </section>
-                <section class="pane plg" aria-label="Pane plugin" hidden></section>
+                <section class="pane plg" aria-label="Pane tool" hidden></section>
               </div>
               <section class="pane term" aria-label="Terminal">
                 <header class="pane-h">${svg('term')}<span class="term-title">zsh — ~/code/shop-web</span></header>
@@ -729,15 +746,17 @@
         <div class="win-off" hidden></div>
       </div>
     </div>
+    <aside class="dm-phone" aria-label="Điện thoại" hidden></aside>
     <aside class="dm-log" aria-label="Nhật ký">
       <div class="dm-log-h">
         <strong>Nhật ký</strong>
         <span class="dm-log-f">
           <button data-lf="acp" aria-pressed="true"><i class="lg-dot acp"></i>ACP</button>
           <button data-lf="hood" aria-pressed="true"><i class="lg-dot hood"></i>ShellX</button>
+          <button data-lf="relay" aria-pressed="true"><i class="lg-dot relay"></i>Điện thoại</button>
         </span>
       </div>
-      <p class="dm-log-legend"><b>→</b> ShellX gửi agent · <b>←</b> agent gửi ShellX · <b>•</b> ShellX tự làm. Bấm một dòng để xem JSON.</p>
+      <p class="dm-log-legend"><b>→</b> ShellX gửi agent · <b>←</b> agent gửi ShellX · <b>•</b> ShellX tự làm · <b>⇢ ⇠</b> desktop ↔ điện thoại (relay, mã hoá đầu cuối). Bấm một dòng để xem chi tiết.</p>
       <div class="dm-log-list"></div>
     </aside>
   </div>
@@ -771,6 +790,7 @@
       send: q('.ai-send'),
       sheet: q('.ai-sheet'),
       empty: q('.ai-empty'),
+      run: q('.ai-run'),
       side: q('.ai-side'),
       sideCnt: q('.side-tabs .cnt'),
       sideBody: q('.side-body'),
@@ -783,6 +803,8 @@
       modal: q('.win-modal'),
       off: q('.win-off'),
       logList: q('.dm-log-list'),
+      phone: q('.dm-phone'),
+      stage: q('.dm-stage'),
     };
     bind();
   }
@@ -803,9 +825,11 @@
     renderSide();
     renderSheet();
     renderTerm();
-    renderPlugin();
+    renderToolView();
+    renderRun();
     renderEmpty();
     renderOffline();
+    renderPhone();
   }
 
   function renderControls() {
@@ -822,6 +846,7 @@
     }
     W.logList.classList.toggle('no-acp', !S.logFilter.acp);
     W.logList.classList.toggle('no-hood', !S.logFilter.hood);
+    W.logList.classList.toggle('no-relay', !S.logFilter.relay);
   }
 
   function renderTop() {
@@ -847,18 +872,30 @@
     const aiRow = S.aiTab
       ? row('ai', `<span class="row-ic ai">${svg('spark')}</span>`, S.title, badge(S.status, S.agentName) || '<span class="muted">Pane AI</span>')
       : '';
+    const tools = S.toolReg.length
+      ? `<div class="ws-sub">Tool</div>` +
+        S.toolReg
+          .map(
+            (t) =>
+              `<button class="row row-tool${S.layout.tool && S.toolOpen === t.id ? ' on' : ''}" data-opentool="${t.id}" title="${esc(t.url)}"><i class="row-bar"></i><span class="row-ic tool">${svg('puzzle')}</span><span class="row-tt"><span class="row-t">${esc(t.name)}</span><span class="row-2">${esc(hostOf(t.url))}${t.phone ? ' · cả điện thoại' : ''}</span></span></button>`,
+          )
+          .join('')
+      : '';
     W.sb.innerHTML = `
       <div class="sb-list">
         <div class="ws"><div class="ws-h"><span class="ws-n">shop-web</span><span class="ws-p">~/code/shop-web</span></div>
           ${aiRow}
           ${row('dev', '<i class="dot dot-run"></i>', DATA.tabs.dev.title, '<span class="muted">zsh · npm run dev</span>')}
+          ${tools}
         </div>
         <div class="ws"><div class="ws-h"><span class="ws-n">shellx</span><span class="ws-p">~/code/shellx</span></div>
           ${row('cc', '<i class="dot"></i>', DATA.tabs.cc.title, badge('idle', 'Claude Code'))}
         </div>
       </div>
-      <div class="sb-foot"><button class="sb-new" data-act="new-ai">${svg('plus')}Phiên AI mới</button></div>`;
+      <div class="sb-foot"><button class="sb-new" data-act="new-ai">${svg('plus')}Phiên AI mới</button><button class="sb-new" data-act="add-tool">${svg('puzzle')}Thêm tool</button></div>`;
   }
+
+  const hostOf = (url) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   function renderPanes() {
     const onAi = S.selectedTab === 'ai' && S.aiTab;
@@ -869,7 +906,7 @@
       W.otherTitle.textContent = tab.header;
       W.otherOut.innerHTML = tab.lines.map(termLine).join('');
     }
-    W.plg.hidden = !S.layout.plugin;
+    W.plg.hidden = !S.layout.tool || S.layout.zoom;
     W.term.hidden = !S.layout.term || S.layout.zoom;
     W.side.hidden = !S.layout.side;
     W.ai.classList.toggle('is-focus', S.focus === 'ai');
@@ -1199,7 +1236,8 @@
   function addUser(msg) {
     endText(S.block);
     S.block = null;
-    const el = h('div', { class: 'um' }, h('div', { class: 'um-h' }, 'Bạn'), h('div', { class: 'um-t', html: userHtml(msg.text) }));
+    const el = h('div', { class: 'um' }, h('div', { class: 'um-h' }, msg.via === 'phone' ? 'Bạn · từ điện thoại' : 'Bạn'), h('div', { class: 'um-t', html: userHtml(msg.text) }));
+    S.mirror.push({ k: 'user', text: msg.text, via: msg.via });
     if (msg.images && msg.images.length) {
       el.append(h('div', { class: 'um-att', html: msg.images.map((a) => `<span class="chip">${svg('image')}${esc(a.name)}</span>`).join('') }));
     }
@@ -1381,6 +1419,7 @@
     if (!replay && ['user_message_chunk', 'agent_message_chunk', 'tool_call', 'tool_call_update'].includes(u.sessionUpdate)) {
       S.history.push(JSON.parse(JSON.stringify(u)));
     }
+    mirror(u);
     switch (u.sessionUpdate) {
       case 'user_message_chunk': {
         endText(S.block);
@@ -1736,6 +1775,7 @@
       W.conv.innerHTML = '';
       S.block = null;
       S.tools.clear();
+      S.mirror = [];
     }
     for (const u of hist) {
       logPush({
@@ -1947,6 +1987,10 @@
     );
     endText(t.block);
     t.block.el.append(turnSummary(t, stop, ch));
+    S.mirror.push({
+      k: 'sum',
+      text: (stop === 'cancelled' ? 'Đã dừng lượt · ' : '') + (ch.length ? `${ch.length} tệp đổi +${total(ch.map((c) => c.add))} −${total(ch.map((c) => c.del))}` : 'không đổi tệp nào'),
+    });
     if (S.plan) {
       S.planOpen = false;
       renderPlan();
@@ -1961,6 +2005,7 @@
     renderComposer();
     renderSide();
     stickBottom();
+    renderPhone();
   }
 
   function cancelTurn() {
@@ -2034,6 +2079,11 @@
     hood('trạng thái', 'A12: **Cần bạn trả lời** → sidebar ▲, viền vàng quanh pane, báo cho điện thoại');
     if (S.selectedTab !== 'ai') notify(`${S.agentName} cần bạn trả lời`, `${S.title}: ${label}`);
     else hood('thông báo', 'Không bật thông báo hệ thống: bạn đang nhìn pane này (quy tắc A4)');
+    if (S.phone.on) {
+      if (S.phone.attached) relay('down', 'ai.update', { id: 1, kind: 'permission', request: id, options: options.map((o) => o.optionId) }, `xin quyền: ${label}`);
+      hood('thông báo', 'Đẩy “cần bạn trả lời” tới điện thoại (đường A4/A12 sẵn có), kèm nút trả lời ngay trên thông báo', 'Mới: nút Cho phép / Từ chối trên thông báo đẩy; điện thoại gửi lại ai.answer.');
+      renderPhone();
+    }
     stickBottom(true);
     return waitUser('perm');
   }
@@ -2055,6 +2105,7 @@
     hood('trạng thái', `Bạn chọn “${KIND_VI[o.kind]}” → A12: **Đang chạy**`);
     unpause();
     fire('perm', o);
+    renderPhone();
   }
 
   function answerReject() {
@@ -2070,38 +2121,364 @@
     return A.granted.has(`${kind}:*`) || A.granted.has(`${kind}:${key || '*'}`);
   }
 
-  /* ------------------------------------------------------------ plugin -- */
+  /* ------------------------------------------------------------- tools -- */
 
-  function renderPlugin() {
-    const P = S.plugin;
-    if (!P) {
+  const BOARD_COLS = [
+    ['todo', 'Cần làm'],
+    ['doing', 'Đang làm'],
+    ['done', 'Xong'],
+  ];
+
+  /** The sample tool's page; desktop and phone render the same server state. */
+  function boardHtml(attr) {
+    const B = S.board;
+    if (!B) return '';
+    return `<div class="board">${BOARD_COLS.map(([k, name]) => {
+      const cards = B.cards.filter((c) => c.col === k);
+      return `<div class="bcol"><div class="bcol-h">${name}<span>${cards.length}</span></div>${cards
+        .map((c) => `<button class="bcard${c.id === B.flash ? ' is-new' : ''}" ${attr}="${c.id}" title="Bấm để chuyển cột">${esc(c.text)}</button>`)
+        .join('')}</div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderToolView() {
+    const t = S.toolReg.find((x) => x.id === S.toolOpen);
+    if (!t) {
       W.plg.innerHTML = '';
       return;
     }
-    const cols = [
-      ['todo', 'Cần làm'],
-      ['doing', 'Đang làm'],
-      ['done', 'Xong'],
-    ];
-    W.plg.innerHTML = `<header class="pane-h plg-h">${svg('puzzle')}<b>Bảng việc</b><span class="tag">plugin · webview</span><span class="tag tag-dev">dev · tự tải lại</span></header>
-      <div class="board theme-${P.theme}">${cols
-        .map(([k, name]) => {
-          const cards = P.cards.filter((c) => c.col === k);
-          return `<div class="bcol"><div class="bcol-h">${name}<span>${cards.length}</span></div>${cards
-            .map((c) => `<button class="bcard${c.id === P.flash ? ' is-new' : ''}" data-card="${c.id}" title="Bấm để chuyển cột">${esc(c.text)}${c.by ? `<small>${esc(c.by)}</small>` : ''}</button>`)
-            .join('')}</div>`;
-        })
-        .join('')}</div>
-      <p class="plg-f">HTML + JS của bạn, chạy trong webview. Gọi <code>window.shellx</code> theo quyền đã cấp.</p>`;
+    const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(t.url);
+    W.plg.innerHTML = `<header class="tv-h">${svg('puzzle')}<b>${esc(t.name)}</b>
+        <span class="tv-url${local ? ' is-local' : ''}" title="${local ? 'Trang trên máy này' : 'Trang không nằm trên máy này'}">${esc(hostOf(t.url))}</span>
+        <span class="grow"></span>
+        <button class="tv-phone${t.phone ? ' on' : ''}" data-tv="phone" aria-pressed="${t.phone}" title="Mở tool này trên điện thoại: ${t.phone ? 'đang bật' : 'đang tắt'} (qua relay, mã hoá đầu cuối)">${svg('phone')}<i>${t.phone ? 'bật' : 'tắt'}</i></button>
+        <button class="ib sm" data-tv="reload" title="Tải lại">${svg('restart')}</button>
+        <button class="ib sm" data-tv="close" title="Đóng pane tool">${svg('x')}</button></header>
+      ${boardHtml('data-card')}
+      <p class="plg-f">Trang của bạn ở <code>${esc(t.url)}</code>. ShellX chỉ hiển thị: không manifest, không cầu nối.</p>`;
   }
 
-  function pluginAddCard(text, by) {
-    const P = S.plugin;
-    const id = 'c' + (P.cards.length + 1);
-    P.cards.push({ id, text, col: 'todo', by });
-    P.flash = id;
-    renderPlugin();
-    return `#${P.cards.length}`;
+  function addTool(t, opts) {
+    const id = 't' + (S.toolReg.length + 1);
+    const url = /^https?:\/\//.test(t.url) ? t.url : 'http://' + t.url;
+    S.toolReg.push({ id, name: t.name, url, phone: !!t.phone });
+    if (!S.board) S.board = JSON.parse(JSON.stringify(DATA.board));
+    hood('tệp', `Lưu tool “${t.name}” vào workspace shop-web`, JSON.stringify({ name: t.name, url, phone: !!t.phone }, null, 2));
+    if (!opts || opts.open !== false) openTool(id);
+    renderSidebar();
+    renderPhone();
+    return id;
+  }
+
+  function openTool(id) {
+    const t = S.toolReg.find((x) => x.id === id);
+    if (!t) return;
+    S.toolOpen = id;
+    S.layout.tool = true;
+    S.layout.side = false;
+    if (S.selectedTab !== 'ai' && S.aiTab) selectTab('ai');
+    hood(
+      'tệp',
+      `Mở pane tool cạnh pane AI · ${hostOf(t.url)}`,
+      'Engine trình duyệt của A6: WKWebView (macOS), WebView2 (Windows).\nhttp://localhost → chỉ báo “trang trên máy này”; cookie cô lập khỏi trình duyệt của bạn.',
+    );
+    renderPanes();
+    renderToolView();
+    renderSidebar();
+  }
+
+  function onToolBar(act) {
+    const t = S.toolReg.find((x) => x.id === S.toolOpen);
+    if (!t) return;
+    if (act === 'close') {
+      S.layout.tool = false;
+      renderPanes();
+      renderSidebar();
+    } else if (act === 'reload') {
+      S.board.flash = null;
+      hood('tệp', `Tải lại ${hostOf(t.url)}`);
+      renderToolView();
+    } else if (act === 'phone') {
+      t.phone = !t.phone;
+      hood('tệp', t.phone ? `Cho mở “${t.name}” trên điện thoại` : `Thôi cho mở “${t.name}” trên điện thoại`, t.phone ? `Desktop sẽ proxy đúng ${t.url} cho điện thoại đã ghép đôi, qua relay mã hoá đầu cuối.` : 'Phiên đang mở trên điện thoại (nếu có) bị đóng ngay.');
+      if (!t.phone && S.phone.tool === t.id) S.phone.screen = 'tools';
+      renderToolView();
+      renderSidebar();
+      renderPhone();
+      fire('tool-phone', t.phone);
+    }
+  }
+
+  function moveCard(c) {
+    c.col = c.col === 'todo' ? 'doing' : c.col === 'doing' ? 'done' : 'todo';
+    S.board.flash = c.id;
+    renderToolView();
+    renderPhone();
+  }
+
+  async function openAddTool(pre) {
+    const p = pre || {};
+    const body = h('div', { class: 'addtool' });
+    body.innerHTML = `<label class="fld"><span>Tên</span><input name="name" value="${esc(p.name || '')}" placeholder="Bảng việc"></label>
+      <label class="fld"><span>URL</span><input name="url" value="${esc(p.url || '')}" placeholder="http://localhost:4000"></label>
+      <div class="sugg"><span class="muted">Cổng đang chạy mà ShellX thấy:</span>${DATA.ports
+        .map((x) => `<button type="button" class="sg" data-sg="${esc(x.url)}" data-sn="${esc(x.name)}">${esc(x.label)}</button>`)
+        .join('')}</div>
+      <label class="chk"><input type="checkbox" name="phone"${p.phone ? ' checked' : ''}><span>Cho mở trên điện thoại<small>Đi qua relay, mã hoá đầu cuối. Điện thoại chỉ tới được đúng URL này.</small></span></label>`;
+    body.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-sg]');
+      if (!b) return;
+      body.querySelector('[name=url]').value = b.dataset.sg;
+      const n = body.querySelector('[name=name]');
+      if (!n.value) n.value = b.dataset.sn;
+    });
+    const ok = await dialog({
+      title: 'Thêm tool',
+      body,
+      actions: [
+        { label: 'Huỷ', value: false },
+        { label: 'Thêm', value: true, kind: 'pri' },
+      ],
+    });
+    if (!ok) return null;
+    const url = body.querySelector('[name=url]').value.trim();
+    if (!url) return null;
+    return { name: body.querySelector('[name=name]').value.trim() || hostOf(url), url, phone: body.querySelector('[name=phone]').checked };
+  }
+
+  /* --------------------------------------------- small run sheet -- */
+
+  /** Login and install commands run in a small sheet over the AI pane: the
+   *  user sees the exact command, without a terminal pane in the tab. */
+  function renderRun() {
+    const r = S.runSheet;
+    W.run.hidden = !r;
+    if (!r) {
+      W.run.innerHTML = '';
+      return;
+    }
+    W.run.innerHTML = `<div class="rs-h">${svg(r.icon || 'key')}<b>${esc(r.title)}</b><span class="muted">${esc(r.sub || '')}</span><span class="grow"></span><button class="ib sm" data-act="run-close" title="Đóng">${svg('x')}</button></div>
+      <pre class="rs-out">${r.lines.map(termLine).join('')}</pre>${r.note ? `<p class="rs-n">${inline(r.note)}</p>` : ''}`;
+  }
+
+  /* ------------------------------------------------------------- phone -- */
+
+  /** One message between desktop and phone over the E2E relay channel.
+   *  `ai.*` and `tool.*` are proposals; today's protocol has session.*,
+   *  output/input and agent.state. */
+  function relay(dir, type, payload, sum) {
+    logPush({
+      lane: 'relay',
+      dir,
+      kind: 'relay',
+      method: type,
+      sum,
+      json: Object.assign({ t: type }, payload || {}),
+      note: 'Tin trong kênh mã hoá đầu cuối giữa desktop và điện thoại (CBOR, khoá "t"; hiển thị dạng JSON). Loại tin này là **đề xuất**.',
+    });
+  }
+
+  function waitFree(ms) {
+    const token = R.token;
+    return new Promise((resolve, reject) => {
+      R.timers.push({ at: S.clock + ms, token, turn: null, resolve, reject });
+    });
+  }
+
+  /** What the phone shows of the conversation (built from the same updates). */
+  function mirror(u) {
+    const M = S.mirror;
+    const last = M[M.length - 1];
+    if (u.sessionUpdate === 'agent_message_chunk') {
+      if (last && last.k === 'agent') last.text += u.content.text;
+      else M.push({ k: 'agent', text: u.content.text });
+    } else if (u.sessionUpdate === 'user_message_chunk') {
+      if (last && last.k === 'user' && last.replay) last.text += u.content.text;
+      else M.push({ k: 'user', text: u.content.text, replay: true });
+    } else if (u.sessionUpdate === 'tool_call') {
+      M.push({ k: 'tool', id: u.toolCallId });
+    }
+  }
+
+  const PH_STATE = { running: 'đang chạy', needsInput: 'cần bạn trả lời', idle: 'đang chờ', done: 'xong' };
+
+  function phonePermButtons() {
+    return S.perm.options.map((o, i) => `<button class="ph-pb k-${o.kind}" data-ph-perm="${i}">${KIND_VI[o.kind] || esc(o.name)}</button>`).join('');
+  }
+
+  function phoneList() {
+    const ai =
+      S.aiTab && S.sessionId
+        ? `<button class="ph-row" data-ph-open="ai"><span class="ph-ic ai">${svg('spark')}</span><span class="ph-rt"><b>${esc(S.title)}</b><small class="${S.status === 'needsInput' ? 'warn' : ''}">Claude · ${PH_STATE[S.status] || 'chưa chạy'}</small></span>${svg('chev', 'r')}</button>`
+        : '<p class="ph-empty">Chưa có phiên AI.</p>';
+    return `<div class="ph-hd"><b>Phiên</b><small>MacBook của bạn</small></div>
+      <div class="ph-sec">Phiên AI</div>${ai}
+      <div class="ph-sec">Terminal</div>
+      <div class="ph-row dim"><span class="ph-ic">${svg('term')}</span><span class="ph-rt"><b>dev server</b><small>zsh · npm run dev</small></span></div>
+      <div class="ph-row dim"><span class="ph-ic">${svg('term')}</span><span class="ph-rt"><b>claude</b><small>Claude Code · đang chờ</small></span></div>`;
+  }
+
+  function phoneToolList() {
+    const shared = S.toolReg.filter((t) => t.phone);
+    const off = S.toolReg.length - shared.length;
+    return (
+      `<div class="ph-hd"><b>Tool</b><small>tool bạn đã bật cho điện thoại</small></div>` +
+      (shared.length
+        ? shared
+            .map(
+              (t) =>
+                `<button class="ph-row" data-ph-tool="${t.id}"><span class="ph-ic tool">${svg('puzzle')}</span><span class="ph-rt"><b>${esc(t.name)}</b><small>${esc(hostOf(t.url))} · qua desktop</small></span>${svg('chev', 'r')}</button>`,
+            )
+            .join('')
+        : '<p class="ph-empty">Chưa có tool nào bật cho điện thoại. Trên desktop: thanh của tool › Điện thoại: bật.</p>') +
+      (off ? `<p class="ph-note">${off} tool chưa bật cho điện thoại.</p>` : '')
+    );
+  }
+
+  function phoneToolStatus(t) {
+    if (t.perm && !t.perm.answer) return `<i class="warn">${svg('warn')}</i>`;
+    if (t.status === 'completed') return `<i class="ok">${svg('check')}</i>`;
+    if (t.status === 'in_progress') return `<i class="run">${svg('dot')}</i>`;
+    if (t.status === 'failed') return `<i class="err">${svg('x')}</i>`;
+    return '';
+  }
+
+  function phoneAi() {
+    const items = S.mirror
+      .map((m) => {
+        if (m.k === 'user') return `<div class="ph-u">${esc(m.text)}${m.via === 'phone' ? '<small>từ điện thoại</small>' : ''}</div>`;
+        if (m.k === 'agent') return `<div class="ph-a md">${md(m.text)}</div>`;
+        if (m.k === 'sum') return `<div class="ph-sum">${esc(m.text)}</div>`;
+        const t = S.tools.get(m.id);
+        if (!t) return '';
+        const L = toolLabel(t);
+        return `<div class="ph-t">${svg(L.mcp ? 'puzzle' : KIND_ICON[t.kind] || 'puzzle')}<span>${esc(L.verb)} <code>${esc(L.target || '')}</code></span>${phoneToolStatus(t)}</div>`;
+      })
+      .join('');
+    const perm = S.perm
+      ? `<div class="ph-perm"><b>${esc(S.agentName)} xin quyền</b><span>${esc(S.perm.label)}</span><div class="ph-perm-a">${phonePermButtons()}</div></div>`
+      : '';
+    return `<div class="ph-hd"><button class="ph-back" data-ph="list">‹ Phiên</button><b>${esc(S.title)}</b><small class="${S.status === 'needsInput' ? 'warn' : ''}">Claude · ${PH_STATE[S.status] || 'chưa chạy'}${S.turn ? ' · ' + fmtDur(S.clock - S.turn.start) : ''}</small></div>
+      <div class="ph-conv">${items || '<p class="ph-empty">Chưa có tin nhắn.</p>'}${perm}</div>
+      <div class="ph-comp"><input class="ph-in" placeholder="Nhắn cho Claude…" aria-label="Tin nhắn từ điện thoại"${S.ready ? '' : ' disabled'}><button class="ph-send" data-ph-send="1" title="Gửi">${svg('send')}</button></div>`;
+  }
+
+  function phoneTool() {
+    const t = S.toolReg.find((x) => x.id === S.phone.tool);
+    if (!t || !t.phone) return phoneToolList();
+    return `<div class="ph-hd"><button class="ph-back" data-ph="tools">‹ Tool</button><b>${esc(t.name)}</b><small>${esc(hostOf(t.url))} · qua desktop</small></div>
+      <div class="ph-web">${S.phone.loading ? '<p class="ph-empty">Đang tải qua đường hầm…</p>' : boardHtml('data-pcard')}</div>`;
+  }
+
+  function renderPhone() {
+    const P = S.phone;
+    W.stage.classList.toggle('has-phone', P.on);
+    W.phone.hidden = !P.on;
+    if (!P.on) {
+      W.phone.innerHTML = '';
+      return;
+    }
+    // P.draft follows typing (input listener) and phoneDraft(); never read it back here.
+    const old = W.phone.querySelector('.ph-in');
+    const focused = old && document.activeElement === old;
+    const screen = P.screen === 'ai' ? phoneAi() : P.screen === 'tool' ? phoneTool() : P.screen === 'tools' ? phoneToolList() : phoneList();
+    const banner =
+      S.perm && P.screen !== 'ai'
+        ? `<div class="ph-banner"><button class="ph-bn" data-ph-open="ai"><small>ShellX · bây giờ</small><b>${esc(S.agentName)} cần bạn trả lời</b><span>${esc(S.perm.label)}</span></button><div class="ph-perm-a">${phonePermButtons()}</div></div>`
+        : '';
+    const tabOn = (s) => (P.screen === s || (s === 'list' && P.screen === 'ai') || (s === 'tools' && P.screen === 'tool') ? 'true' : 'false');
+    W.phone.innerHTML = `<div class="ph"><div class="ph-island"></div><div class="ph-status"><span>9:41</span><span class="ph-e2e" title="Kênh mã hoá đầu cuối với desktop">${svg('lock')}E2E</span></div>${banner}<div class="ph-screen">${screen}</div><nav class="ph-tabs"><button data-ph="list" aria-pressed="${tabOn('list')}">Phiên</button><button data-ph="tools" aria-pressed="${tabOn('tools')}">Tool</button></nav></div><p class="ph-cap">App ShellX trên điện thoại (mô phỏng) — nói chuyện với desktop qua relay, mã hoá đầu cuối.</p>`;
+    const inp = W.phone.querySelector('.ph-in');
+    if (inp) {
+      inp.value = P.draft;
+      if (focused) inp.focus({ preventScroll: true });
+    }
+    const conv = W.phone.querySelector('.ph-conv');
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  function phoneOn() {
+    S.phone.on = true;
+    hood('tiến trình', 'Điện thoại đã ghép đôi: desktop và điện thoại nói chuyện qua relay, mã hoá đầu cuối (như hôm nay)');
+    relay('up', 'ai.list', {}, 'xin danh sách phiên AI');
+    relay('down', 'ai.list.result', { sessions: S.sessionId ? [{ id: 1, title: S.title, agent: 'claude', state: 'idle' }] : [] }, S.sessionId ? '1 phiên AI' : 'chưa có phiên');
+    renderPhone();
+  }
+
+  function phoneOpenAi() {
+    const P = S.phone;
+    P.screen = 'ai';
+    if (!P.attached && S.sessionId) {
+      P.attached = true;
+      relay('up', 'ai.attach', { id: 1 }, 'mở phiên AI');
+      relay('down', 'ai.snapshot', { id: 1, items: S.mirror.length, state: S.status }, `bản chụp: ${S.mirror.length} mục + trạng thái; sau đó là cập nhật trực tiếp`);
+    }
+    renderPhone();
+    fire('ph-open-ai');
+  }
+
+  function phoneSend() {
+    const inp = W.phone.querySelector('.ph-in');
+    const text = (inp ? inp.value : S.phone.draft).trim();
+    if (!text || !S.ready) return;
+    S.phone.draft = '';
+    if (inp) inp.value = '';
+    relay('up', 'ai.prompt', { id: 1, text }, `“${clip(text, 50)}”`);
+    if (S.turn) {
+      queueMsg(text);
+      renderPhone();
+      return;
+    }
+    const msg = buildPrompt(text);
+    msg.via = 'phone';
+    addUser(msg);
+    S.history.push({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text } });
+    unpause();
+    if (!fire('phone-send', msg)) runDetached(() => genericTurn(msg));
+    renderPhone();
+  }
+
+  function phoneAnswer(i) {
+    const p = S.perm;
+    if (!p || !p.options[i]) return;
+    const o = p.options[i];
+    relay('up', 'ai.answer', { id: 1, request: p.id, option: o.optionId }, `${KIND_VI[o.kind]} · ${o.optionId}`);
+    answerPerm(i);
+  }
+
+  function phoneOpenTool(id) {
+    const t = S.toolReg.find((x) => x.id === id);
+    if (!t || !t.phone) return;
+    S.phone.screen = 'tool';
+    S.phone.tool = id;
+    S.phone.loading = true;
+    renderPhone();
+    runDetached(async () => {
+      relay('up', 'tool.open', { tool: id }, t.name);
+      hood('tiến trình', `Desktop mở proxy cho đúng ${hostOf(t.url)} — tool đã bật cho điện thoại`, 'Request tới URL khác bị từ chối. Điện thoại mở một cổng loopback cho webview; mọi byte đi qua kênh mã hoá đầu cuối, relay không đọc được.');
+      relay('up', 'tool.http', { tool: id, stream: 1, method: 'GET', path: '/' }, 'GET /');
+      await waitFree(350);
+      relay('down', 'tool.http', { stream: 1, status: 200, bytes: 48213, frames: 1 }, '200 · 47 KB · 1 khung');
+      relay('up', 'tool.http', { tool: id, stream: 2, method: 'GET', path: '/app.js' }, 'GET /app.js');
+      await waitFree(300);
+      relay('down', 'tool.http', { stream: 2, status: 200, bytes: 196608, frames: 4 }, '200 · 192 KB · 4 khung 64 KiB');
+      S.phone.loading = false;
+      renderPhone();
+      fire('ph-open-tool');
+    });
+  }
+
+  function phoneCard(id) {
+    const c = S.board && S.board.cards.find((x) => x.id === id);
+    if (!c) return;
+    runDetached(async () => {
+      relay('up', 'tool.http', { stream: 3, method: 'POST', path: `/api/cards/${id}/move` }, `POST /api/cards/${id}/move`);
+      await waitFree(250);
+      moveCard(c);
+      relay('down', 'tool.http', { stream: 3, status: 200, bytes: 512, frames: 1 }, '200');
+      hood('tệp', 'Pane tool trên desktop thấy ngay: cả hai cùng nói chuyện với một server của tool');
+      fire('ph-card');
+    });
   }
 
   /* --------------------------------------------------- popups & menus -- */
@@ -2197,15 +2574,16 @@
         { label: 'Cài đặt › Agents…', desc: 'Trạng thái agent, cài đặt, đăng nhập', value: 'settings' },
         { label: 'Khởi động lại agent', desc: 'Dừng rồi chạy lại, nạp lại phiên bằng session/load', value: 'restart', disabled: !S.process },
         { label: 'Xem log agent', desc: 'stderr giữ trong bộ nhớ, không ghi ra đĩa', value: 'log' },
+        { label: 'Hiện terminal của tab', desc: 'Tab AI ẩn sẵn terminal; bật khi bạn cần', value: 'term' },
         { sep: true },
-        { label: 'Thêm plugin từ thư mục…', desc: 'Giai đoạn 2', value: 'plugin' },
+        { label: 'Thêm tool…', desc: 'Tên + URL (vd http://localhost:4000)', value: 'tool' },
       ],
       (it) => {
         if (it.value === 'settings') openSettings();
         else if (it.value === 'log') showLog();
-        else if (it.value === 'plugin') {
-          if (!fire('add-plugin')) toast('Xem kịch bản 6 để thấy luồng thêm plugin.');
-        } else if (it.value === 'restart') {
+        else if (it.value === 'term') setLayout({ term: true, zoom: false });
+        else if (it.value === 'tool') onAct('add-tool');
+        else if (it.value === 'restart') {
           if (!fire('restart')) runDetached(restartAgent);
         }
       },
@@ -2263,23 +2641,32 @@
       const a = S.agents.find((x) => x.id === b.dataset.id);
       if (b.dataset.ag === 'install' && a) {
         closeDialog();
-        S.layout.term = true;
-        renderPanes();
-        termPrint([
-          { t: `$ npm install --prefix "${DATA.agentsDir}" ${a.pkg}`, c: 'cmd' },
-          { t: '(ShellX chạy lệnh này trong pane terminal — bạn thấy đúng lệnh trước khi nó chạy)', c: 'dim' },
-          { t: '✓ xong (mã thoát 0) — Codex: Sẵn sàng', c: 'ok' },
-        ]);
+        S.runSheet = {
+          icon: 'term',
+          title: `Cài adapter ${a.name}`,
+          sub: 'bạn thấy đúng lệnh ShellX chạy',
+          lines: [
+            { t: `$ npm install --prefix "${DATA.agentsDir}" ${a.pkg}`, c: 'cmd' },
+            { t: '✓ xong (mã thoát 0)', c: 'ok' },
+          ],
+          note: `**${a.name}: Sẵn sàng.** Bản ghim; ShellX chỉ nâng phiên bản sau khi đã test.`,
+        };
+        renderRun();
         a.status = 'ready';
         hood('tiến trình', `Cài ${a.pkg} (bản ghim) vào thư mục riêng của ShellX`, `npm install --prefix "${DATA.agentsDir}" ${a.pkg}\nChỉ nâng phiên bản sau khi đã test với ShellX.`);
       } else if (b.dataset.ag === 'login' && a) {
         closeDialog();
-        S.layout.term = true;
-        renderPanes();
-        termPrint([
-          { t: `$ ${a.loginCmd}`, c: 'cmd' },
-          { t: '(màn đăng nhập của chính agent chạy ở đây — ShellX không đọc, không lưu gì)', c: 'dim' },
-        ]);
+        S.runSheet = {
+          icon: 'key',
+          title: `Đăng nhập ${a.name}`,
+          sub: 'màn đăng nhập của chính agent',
+          lines: [
+            { t: `$ ${a.loginCmd}`, c: 'cmd' },
+            { t: '(màn đăng nhập của agent chạy ở đây — ShellX không đọc, không lưu gì)', c: 'dim' },
+          ],
+          note: '',
+        };
+        renderRun();
         a.status = 'ready';
       } else if (b.dataset.ag === 'guide') {
         toast('Mở trang hướng dẫn cài đặt của agent (trình duyệt).');
@@ -2288,6 +2675,23 @@
       }
     });
     await dialog({ title: 'Cài đặt › Agents · Pane AI', body, actions: [{ label: 'Đóng', value: true, kind: 'pri' }], wide: true });
+  }
+
+  /** First run: how should a new tab open? Kept in Settings › General. */
+  async function chooseStart() {
+    const body = h('div', { class: 'ob' });
+    body.innerHTML = `<p class="muted">Đổi lại được bất cứ lúc nào trong Cài đặt › Chung.</p>
+      <button class="ob-c" data-ob="ai">${svg('spark')}<span><b>Giao diện AI</b><small>Tab mới là một phiên AI: trò chuyện, xem agent làm gì, duyệt thay đổi — không cần gõ lệnh.</small></span></button>
+      <button class="ob-c" data-ob="terminal">${svg('term')}<span><b>Terminal</b><small>Như ShellX hiện nay: tab mới là một shell.</small></span></button>`;
+    const p = dialog({ title: 'Bạn muốn làm việc theo kiểu nào?', body, actions: [{ label: 'Để sau', value: null }] });
+    body.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-ob]');
+      if (b && S.dialogDone) {
+        unpause();
+        S.dialogDone(b.dataset.ob);
+      }
+    });
+    return p;
   }
 
   async function pickAgent() {
@@ -2308,7 +2712,7 @@
   function bind() {
     root.addEventListener('click', (ev) => {
       const el = ev.target.closest(
-        '[data-scen],[data-ctl],[data-speed],[data-lf],[data-log],[data-tab],[data-act],[data-ai],[data-cmp],[data-cfg],[data-perm],[data-tool],[data-file],[data-editor],[data-chg],[data-revert-file],[data-side],[data-scope],[data-sh],[data-pop],[data-unqueue],[data-unattach],[data-card]',
+        '[data-scen],[data-ctl],[data-speed],[data-lf],[data-log],[data-tab],[data-act],[data-ai],[data-cmp],[data-cfg],[data-perm],[data-tool],[data-file],[data-editor],[data-chg],[data-revert-file],[data-side],[data-scope],[data-sh],[data-pop],[data-unqueue],[data-unattach],[data-card],[data-opentool],[data-tv],[data-ph],[data-ph-open],[data-ph-tool],[data-ph-perm],[data-ph-send],[data-pcard]',
       );
       if (S && S.menu && !ev.target.closest('.win-menu')) closeMenu();
       if (!el || !S) return;
@@ -2346,7 +2750,11 @@
       if (d.ai === 'side') return setLayout({ side: !S.layout.side });
       if (d.ai === 'zoom') {
         setLayout({ zoom: !S.layout.zoom });
-        return hood('tệp', S.layout.zoom ? 'Phóng to pane AI (ẩn pane terminal của tab)' : 'Bỏ phóng to');
+        return hood('tệp', S.layout.zoom ? 'Phóng to pane AI (ẩn các pane khác của tab)' : 'Bỏ phóng to');
+      }
+      if (d.ai === 'term') {
+        setLayout({ term: !S.layout.term, zoom: false });
+        return hood('tệp', S.layout.term ? 'Hiện terminal của tab (tab AI ẩn sẵn terminal)' : 'Ẩn terminal của tab');
       }
       if (d.ai === 'more') return openMore(el);
       if (d.cmp === 'at' || d.cmp === 'slash') {
@@ -2438,13 +2846,33 @@
         return renderAttach();
       }
       if (d.card) {
-        const c = S.plugin && S.plugin.cards.find((x) => x.id === d.card);
+        const c = S.board && S.board.cards.find((x) => x.id === d.card);
         if (!c) return;
-        c.col = c.col === 'todo' ? 'doing' : c.col === 'doing' ? 'done' : 'todo';
-        S.plugin.flash = null;
-        renderPlugin();
-        return hood('plugin', 'Bảng việc lưu thẻ bằng `shellx.storage.set()` — dữ liệu riêng của plugin');
+        moveCard(c);
+        return hood('tệp', 'Tool tự xử lý cú bấm (vd `POST /api/cards/…`) — ShellX không can thiệp');
       }
+      if (d.opentool) return openTool(d.opentool);
+      if (d.tv) return onToolBar(d.tv);
+      if (d.ph) {
+        S.phone.screen = d.ph;
+        return renderPhone();
+      }
+      if (d.phOpen) return phoneOpenAi();
+      if (d.phTool) return phoneOpenTool(d.phTool);
+      if (d.phPerm != null) return phoneAnswer(+d.phPerm);
+      if (d.phSend) return phoneSend();
+      if (d.pcard) return phoneCard(d.pcard);
+    });
+
+    // The phone's message box: Enter sends (not while an IME is composing).
+    root.addEventListener('keydown', (ev) => {
+      if (ev.target.classList && ev.target.classList.contains('ph-in') && ev.key === 'Enter' && !ev.isComposing) {
+        ev.preventDefault();
+        phoneSend();
+      }
+    });
+    root.addEventListener('input', (ev) => {
+      if (ev.target.classList && ev.target.classList.contains('ph-in')) S.phone.draft = ev.target.value;
     });
 
     root.addEventListener('change', (ev) => {
@@ -2500,6 +2928,8 @@
 
     document.addEventListener('keydown', (ev) => {
       if (!S || !(visible || root.contains(document.activeElement))) return;
+      // The phone mock has its own controls; desktop shortcuts stay out of it.
+      if (ev.target && ev.target.closest && ev.target.closest('.dm-phone')) return;
       const tag = ev.target && ev.target.tagName;
       const inTa = ev.target === W.ta;
       const elsewhere = !inTa && (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (ev.target && ev.target.isContentEditable));
@@ -2591,6 +3021,17 @@
       return toast('Demo có một tab AI. Kịch bản 3 cho thấy luồng tạo phiên mới từ đầu.');
     }
     if (act === 'resume') return fire('resume');
+    if (act === 'add-tool') {
+      if (fire('add-tool')) return;
+      return runDetached(async () => {
+        const t = await openAddTool({ name: 'Bảng việc', url: 'http://localhost:4000' });
+        if (t) addTool(t);
+      });
+    }
+    if (act === 'run-close') {
+      S.runSheet = null;
+      renderRun();
+    }
   }
 
   /* --------------------------------------------------- scenario start -- */
@@ -2667,10 +3108,28 @@
     grep,
     readNumbered,
     agentAllows,
-    pluginAddCard,
     pickAgent,
+    chooseStart,
     openSettings,
     showLog,
+    openAddTool,
+    addTool,
+    openTool,
+    relay,
+    phoneOn,
+    phoneDraft(text) {
+      S.phone.draft = text;
+      renderPhone();
+    },
+    runSheet(r) {
+      S.runSheet = r;
+      renderRun();
+    },
+    runPrint(lines) {
+      if (!S.runSheet) return;
+      S.runSheet.lines.push(...lines);
+      renderRun();
+    },
     grant: (kind, key) => A.granted.add(`${kind}:${key || '*'}`),
     crash: (code, stderr) => {
       hood('tiến trình', `Tiến trình agent thoát bất ngờ (mã ${code}) — stdout đóng giữa lượt`, 'session/prompt đang chờ sẽ không bao giờ có trả lời: ShellX tự kết thúc lượt.\nstderr được giữ trong bộ nhớ cho mục “Xem log”.');
@@ -2688,6 +3147,7 @@
       W.conv.innerHTML = '';
       S.block = null;
       S.tools.clear();
+      S.mirror = [];
     },
     /** Shows a past turn at once (no log), as if it had happened earlier. */
     seedHistory(list) {

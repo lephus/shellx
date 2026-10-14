@@ -1,4 +1,4 @@
-/* ShellX · Pane AI — the scripted agent, the fake project and six scenarios.
+/* ShellX · Pane AI — the scripted agent, the fake project and seven scenarios.
  *
  * Message shapes follow the ACP v1 schema (1.25.0, 2026-10-09) and what
  * @agentclientprotocol/claude-agent-acp 0.90.0 actually sends: its mode list,
@@ -431,7 +431,7 @@ describe('refreshToken', () => {
     async run(D) {
       await boot(
         D,
-        'Bạn vừa mở **Phiên AI mới** trong workspace `shop-web`: pane AI ở trên, terminal của tab ở dưới. ShellX chạy adapter Claude trong thư mục gốc dự án rồi bắt tay bằng `initialize` → `session/new` (xem nhật ký bên phải).',
+        'Bạn vừa mở **Phiên AI mới** trong workspace `shop-web`: một tab AI, không kèm terminal (nút terminal trên header bật nó khi cần). ShellX chạy adapter Claude trong thư mục gốc dự án rồi bắt tay bằng `initialize` → `session/new` (xem nhật ký bên phải).',
       );
       D.beat('Pane sẵn sàng. Ô nhập đã điền sẵn một yêu cầu kèm `@src/auth/session.ts` — nhấn **Enter** hoặc bấm **Gửi**. Agent giả trả lời theo kịch bản, dù bạn gõ gì.');
       const msg = await D.expectSend(PROMPT1);
@@ -546,14 +546,23 @@ describe('refreshToken', () => {
 
   const s3 = {
     id: 's3',
-    name: 'Lần đầu: đăng nhập',
+    name: 'Lần đầu: chọn kiểu, đăng nhập',
     async run(D) {
       D.set((s) => {
         s.aiTab = false;
         s.selectedTab = 'dev';
         s.agents[0].status = 'login';
       });
-      D.beat('Bạn đang ở tab terminal **dev server**. Bấm **+ Phiên AI mới** ở cuối sidebar.', [{ label: '+ Phiên AI mới', key: 'new-ai', primary: true }]);
+      D.beat('Lần đầu mở ShellX bản mới, màn chào hỏi bạn muốn làm việc theo kiểu nào.');
+      await D.wait(500);
+      const kind = await D.chooseStart();
+      if (kind === 'ai') {
+        D.hood('tệp', 'Lưu cài đặt: tab mới mở dạng **AI** — ⌘T giờ mở một phiên AI');
+        D.beat('Bạn chọn **Giao diện AI**: từ giờ tab mới là một phiên AI, không có terminal. Bấm **+ Phiên AI mới** để mở phiên đầu tiên.', [{ label: '+ Phiên AI mới', key: 'new-ai', primary: true }]);
+      } else {
+        D.hood('tệp', 'Giữ cài đặt: tab mới mở dạng **Terminal** (như hiện nay)');
+        D.beat('ShellX giữ nguyên như hôm nay. Giao diện AI vẫn mở được bất cứ lúc nào bằng **+ Phiên AI mới**.', [{ label: '+ Phiên AI mới', key: 'new-ai', primary: true }]);
+      }
       await D.waitUser('new-ai');
       D.beat('Chọn agent. Danh sách lấy từ **Cài đặt › Agents**; agent chưa cài sẽ dẫn tới phần cài đặt.');
       const pick = await D.pickAgent();
@@ -565,8 +574,8 @@ describe('refreshToken', () => {
         s.aiTab = true;
       });
       D.selectTab('ai');
-      D.hood('tệp', 'Mở tab mới trong workspace `shop-web`: pane AI ở trên, terminal ở dưới', 'Thư mục làm việc = gốc dự án của workspace (Workspace.root).');
-      D.beat('ShellX chạy adapter và gửi `initialize` với `auth.terminal: true` — nghĩa là “tôi chạy được màn đăng nhập của agent trong một terminal”.');
+      D.hood('tệp', 'Mở tab AI trong workspace `shop-web` — không kèm pane terminal', 'Thư mục làm việc = gốc dự án của workspace (Workspace.root).');
+      D.beat('ShellX chạy adapter và gửi `initialize` với `auth.terminal: true` — nghĩa là “tôi chạy được màn đăng nhập của agent”.');
       await D.spawnAgent();
       await D.initialize();
       await D.newSession({ authRequired: true });
@@ -576,7 +585,7 @@ describe('refreshToken', () => {
       D.notice({
         kind: 'auth',
         title: 'Claude cần đăng nhập',
-        body: '<p><code>session/new</code> trả lỗi <code>-32000 Authentication required</code>. Agent đưa sẵn hai cách đăng nhập trong <code>authMethods</code> của <code>initialize</code>.</p><p class="muted">ShellX mở một pane terminal chạy đúng màn đăng nhập của Claude. ShellX không thấy, không lưu mật khẩu hay token.</p>',
+        body: '<p><code>session/new</code> trả lỗi <code>-32000 Authentication required</code>. Agent đưa sẵn hai cách đăng nhập trong <code>authMethods</code> của <code>initialize</code>.</p><p class="muted">ShellX chạy đúng màn đăng nhập của Claude trong một khung nhỏ; phần đăng nhập thật diễn ra trên trình duyệt. ShellX không thấy, không lưu mật khẩu hay token.</p>',
         actions: [
           { label: 'Claude Subscription', key: 'auth', value: 'claude-ai-login', kind: 'pri' },
           { label: 'Anthropic Console (API)', key: 'auth', value: 'console-login' },
@@ -585,46 +594,51 @@ describe('refreshToken', () => {
       D.beat('Agent báo cần đăng nhập. Chọn một cách trong thẻ (tên do agent đặt).');
       const method = await D.waitUser('auth');
       const args = method === 'console-login' ? '--cli auth login --console' : '--cli auth login --claudeai';
-      D.setLayout({ term: true, zoom: false });
-      D.focusPane('term');
-      D.termPrint([
-        { t: `~/code/shop-web $ node …/claude-agent-acp/dist/index.js ${args}`, c: 'cmd' },
-        { t: '[màn hình đăng nhập của chính Claude hiện ở đây — demo không mô phỏng nội dung]', c: 'dim' },
-      ]);
-      D.hood('tiến trình', 'Terminal auth: chạy lại chính lệnh của agent, thêm `args` của cách đăng nhập, trong một pane terminal', `node "${ADAPTER}" ${args}\n\nTheo schema ACP: mã thoát 0 = thành công; client KHÔNG gọi \`authenticate\` cho kiểu terminal.`);
-      D.beat('Bạn đăng nhập trong pane terminal phía dưới (trình duyệt sẽ mở để xác nhận). Khi xong:', [{ label: 'Mô phỏng: đăng nhập xong', key: 'logged', primary: true }]);
+      D.runSheet({
+        icon: 'key',
+        title: 'Đăng nhập Claude',
+        sub: method === 'console-login' ? 'Anthropic Console' : 'Claude Subscription',
+        lines: [
+          { t: `$ node …/claude-agent-acp/dist/index.js ${args}`, c: 'cmd' },
+          { t: '[màn đăng nhập của chính Claude — trình duyệt mở để bạn xác nhận; demo không mô phỏng nội dung]', c: 'dim' },
+        ],
+        note: 'Khung nhỏ này chạy đúng lệnh agent đưa ra (kiểu đăng nhập “terminal” của ACP). Xong là tự đóng — không cần mở terminal.',
+      });
+      D.hood('tiến trình', 'Đăng nhập kiểu terminal: chạy lại chính lệnh của agent, thêm `args` của cách đăng nhập, trong một khung nhỏ', `node "${ADAPTER}" ${args}\n\nTheo schema ACP: mã thoát 0 = thành công; client KHÔNG gọi \`authenticate\` cho kiểu terminal.`);
+      D.beat('Bạn đăng nhập trên trình duyệt. Khi xong:', [{ label: 'Mô phỏng: đăng nhập xong', key: 'logged', primary: true }]);
       await D.waitUser('logged');
-      D.termPrint([
-        { t: '✓ tiến trình đăng nhập thoát, mã 0', c: 'ok' },
-        { t: '~/code/shop-web $ ', c: 'prompt' },
-      ]);
+      D.runPrint([{ t: '✓ tiến trình đăng nhập thoát, mã 0', c: 'ok' }]);
       D.set((s) => {
         s.agents[0].status = 'ready';
       });
-      D.focusPane('ai');
-      D.hood('tiến trình', 'Đăng nhập xong (mã 0) → tự thử lại `session/new`');
+      await D.wait(800);
+      D.runSheet(null);
+      D.hood('tiến trình', 'Đăng nhập xong (mã 0) → đóng khung, tự thử lại `session/new`');
       await D.newSession();
-      D.beat('Xong. Claude dùng thông tin đăng nhập của chính nó; ShellX chỉ chạy lệnh. Bạn có thể gửi tin ngay, hoặc xem trạng thái các agent khác:', [{ label: 'Mở Cài đặt › Agents', key: 'settings' }]);
+      D.beat('Xong — không lần nào phải mở terminal. Bạn gửi tin được ngay, hoặc xem trạng thái các agent khác:', [{ label: 'Mở Cài đặt › Agents', key: 'settings' }]);
       await D.waitUser('settings');
       await D.openSettings();
-      D.beat('Trong Cài đặt › Agents: cài adapter (chạy lệnh trong pane terminal để bạn thấy), đăng nhập, chọn agent mặc định, thêm agent tuỳ chỉnh.');
+      D.beat('Cài đặt › Agents: cài adapter, đăng nhập (cũng trong khung nhỏ), chọn agent mặc định, thêm agent tuỳ chỉnh.');
     },
   };
 
   const LAYOUT_SNIPPET = `{
-  "tabs": [{
+  "v": 1,
+  "tabs": [ …các tab terminal, như hiện nay… ],
+  "aiTabs": [{
+    "key": "ai-1",
     "workspace": "shop-web",
-    "layout": {
-      "split": "vertical", "ratio": 0.72,
-      "first":  { "ai": { "agent": "claude", "session": "${SESSION}",
-                          "cwd": "~/code/shop-web", "title": "Sửa lỗi token hết hạn" } },
-      "second": { "terminal": { "cwd": "~/code/shop-web" } }
-    }
+    "agent": "claude",
+    "session": "${SESSION}",
+    "cwd": "~/code/shop-web",
+    "title": "Sửa lỗi token hết hạn",
+    "tools": ["t1"]
   }]
 }
 
-Minh hoạ: spec sẽ chốt cách ghi để bản ShellX cũ vẫn đọc được layout.json mới
-(hiện _nodeFromJson ném FormatException khi gặp khoá pane lạ).`;
+Tab AI nằm trong mảng mới "aiTabs" ở cấp trên cùng: bản ShellX cũ bỏ qua khoá lạ
+ở cấp này nên vẫn mở được các tab terminal. (Một nút lạ trong cây pane thì làm
+hỏng cả tệp — bản cũ đổi tên nó thành layout.json.bak.)`;
 
   const s4 = {
     id: 's4',
@@ -737,105 +751,81 @@ Error: Claude Code process exited with code 1
     },
   };
 
-  const PLUGIN_MANIFEST = `{
-  "id": "dev.minh.board",
-  "name": "Bảng việc",
-  "version": "0.1.0",
-  "panes": [{ "id": "board", "title": "Bảng việc", "entry": "panel/index.html" }],
-  "commands": [{ "id": "board.open", "title": "Mở Bảng việc" }],
-  "mcp": { "command": "node", "args": ["mcp/server.js"] },
-  "permissions": ["storage"]
-}`;
-  const CONSENT = `<p>Thư mục <code>~/tools/board</code> · <b>chế độ dev</b> (tự tải lại khi bạn lưu tệp)</p>
-<pre class="hd">${PLUGIN_MANIFEST.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
-<p><b>Plugin này muốn:</b></p>
-<ul class="perm-list">
-  <li>Hiện một pane: <b>Bảng việc</b> (webview)</li>
-  <li>Đưa tool cho mọi agent qua MCP: <code>add_card</code>, <code>move_card</code></li>
-  <li>Lưu dữ liệu riêng của plugin (<code>storage</code>)</li>
-</ul>
-<p class="muted">Không xin quyền đọc/ghi tệp dự án hay chạy lệnh. Thu hồi được bất cứ lúc nào trong Cài đặt › Plugin. Manifest ở đây là phác thảo — spec giai đoạn 2 sẽ chốt.</p>`;
-  const BOARD_MCP = { name: 'board', command: 'node', args: [HOME + '/tools/board/mcp/server.js'], env: [] };
-
   const s6 = {
     id: 's6',
-    name: 'Plugin tự viết',
+    name: 'Tool qua URL',
     phase: 'GĐ2',
     async run(D) {
-      await boot(D, '**Giai đoạn 2 (phác thảo).** Phiên AI đang chạy bình thường.');
-      D.beat('Bạn tự viết plugin **Bảng việc** trong `~/tools/board`: `shellx-plugin.json` + `panel/index.html` + `mcp/server.js`. Bấm **Thêm plugin từ thư mục…** (cũng có trong menu ⋯ của pane).', [
-        { label: 'Thêm plugin từ thư mục…', key: 'add-plugin', primary: true },
-      ]);
-      for (;;) {
-        await D.waitUser('add-plugin');
-        const ok = await D.dialog({
-          title: 'Thêm plugin “Bảng việc”?',
-          body: CONSENT,
-          wide: true,
-          actions: [
-            { label: 'Huỷ', value: false },
-            { label: 'Cho phép và bật', value: true, kind: 'pri' },
-          ],
-        });
-        if (ok) break;
-        D.beat('Bạn chưa bật plugin. Bấm lại khi sẵn sàng.', [{ label: 'Thêm plugin từ thư mục…', key: 'add-plugin', primary: true }]);
+      await boot(D, '**Giai đoạn 2.** Bạn tự làm một tool — bất kỳ công nghệ gì — đang chạy ở `http://localhost:4000` (vd `node server.js`).');
+      D.beat('Bấm **Thêm tool** ở cuối sidebar. Chỉ cần tên và URL: không manifest, không cài đặt, không SDK.', [{ label: 'Thêm tool', key: 'add-tool', primary: true }]);
+      let tool = null;
+      while (!tool) {
+        await D.waitUser('add-tool');
+        tool = await D.openAddTool({ name: 'Bảng việc', url: 'http://localhost:4000' });
+        if (!tool) D.beat('Bạn đã huỷ. Bấm **Thêm tool** khi sẵn sàng.', [{ label: 'Thêm tool', key: 'add-tool', primary: true }]);
       }
-      D.hood('plugin', 'Nạp `~/tools/board` ở chế độ dev: theo dõi thư mục, tự tải lại khi bạn lưu');
-      D.set((s) => {
-        s.plugin = {
-          theme: 1,
-          flash: null,
-          cards: [
-            { id: 'c1', text: 'Trang đăng ký: kiểm tra email trùng', col: 'todo' },
-            { id: 'c2', text: 'Sửa lỗi token hết hạn', col: 'doing' },
-            { id: 'c3', text: 'Nâng Vite lên 6', col: 'done' },
-          ],
-        };
-        s.layout.plugin = true;
-        s.layout.side = false;
-      });
-      D.hood('plugin', 'Plugin khai một server MCP (stdio) → ShellX nạp lại phiên kèm server đó để agent thấy tool mới', 'ACP v1: mọi agent BẮT BUỘC nhận server MCP chạy qua stdio trong session/new và session/load.');
-      D.beat('Pane **Bảng việc** (webview) mở cạnh pane AI. ShellX nạp lại phiên kèm `mcpServers` của plugin — vì vậy tool cá nhân chạy được với mọi agent.');
-      await D.loadSession({ mcpServers: [BOARD_MCP] });
-      D.beat('Nhấn **Enter** để nhờ agent dùng tool của plugin.');
-      const msg = await D.expectSend('Chia việc “làm mới token” thành các bước nhỏ và đưa lên Bảng việc giúp mình.');
-      await D.turn(msg.blocks, async () => {
+      D.addTool(tool);
+      D.beat('Tool mở cạnh pane AI và có tên trong sidebar. ShellX chỉ **hiển thị** trang của bạn (engine trình duyệt của A6) — tool tự lo giao diện và dữ liệu. Bấm một thẻ để chuyển cột, rồi bật **Điện thoại** trên thanh của tool.');
+      const on = await D.waitUser('tool-phone');
+      D.beat(on ? 'Tool này giờ mở được trên điện thoại đã ghép đôi (xem kịch bản 7). Desktop chỉ proxy đúng URL này, qua relay mã hoá đầu cuối.' : 'Đã tắt chia sẻ cho điện thoại. Bật lại bất cứ lúc nào trên thanh của tool.');
+    },
+  };
+
+  const MAIN_OLD = FILES['src/main.ts'];
+  const MAIN_NEW = `import { getAccessToken } from './auth/session';
+import { clearSession } from './auth/storage';
+
+const token = await getAccessToken();
+const app = document.querySelector('#app')!;
+app.textContent = token ? 'Xin chào!' : 'Vui lòng đăng nhập';
+
+if (token) {
+  const logout = document.createElement('button');
+  logout.textContent = 'Đăng xuất';
+  logout.onclick = () => {
+    clearSession();
+    location.reload();
+  };
+  app.append(logout);
+}
+`;
+
+  const s7 = {
+    id: 's7',
+    name: 'Điện thoại',
+    phase: 'GĐ2',
+    async run(D) {
+      await boot(D, '**Giai đoạn 2.** Phiên AI chạy trên desktop; điện thoại đã ghép đôi với ShellX như hôm nay (relay mã hoá đầu cuối).');
+      D.addTool({ name: 'Bảng việc', url: 'http://localhost:4000', phone: true });
+      D.phoneOn();
+      D.beat('Bên phải là app ShellX trên điện thoại. Bấm vào phiên AI ở mục **Phiên AI** để mở.');
+      await D.waitUser('ph-open-ai');
+      D.beat('Điện thoại thấy cùng hội thoại với desktop: bản chụp ban đầu rồi cập nhật trực tiếp. Gõ yêu cầu ở ô dưới cùng của **điện thoại** (đã điền sẵn) rồi bấm gửi.');
+      D.phoneDraft('Thêm nút đăng xuất ở trang chính.');
+      const msg = await D.waitUser('phone-send');
+      const stop = await D.turn(msg.blocks, async () => {
         await D.wait(400);
-        D.update({ sessionUpdate: 'session_info_update', title: 'Đưa việc lên Bảng việc' });
-        await D.stream('Mình chia thành 3 việc nhỏ và thêm từng thẻ bằng tool `add_card` của plugin.');
-        const cards = ['Làm mới token trước khi hết hạn 60 giây', 'Chỉ đăng xuất khi làm mới thất bại', 'Viết test cho getAccessToken'];
-        for (let i = 0; i < cards.length; i++) {
-          const id = `toolu_01Mcp${i}QeZ`;
-          D.update({ sessionUpdate: 'tool_call', toolCallId: id, title: 'mcp__board__add_card', kind: 'other', status: 'pending', rawInput: { title: cards[i], column: 'todo' } });
-          if (!D.agentAllows('mcp', 'mcp__board__add_card')) {
-            if (i === 0) D.beat('Tool của plugin cũng phải xin quyền như mọi tool khác. Nhấn **2** (Luôn cho phép) để agent không hỏi lại cho tool này.');
-            const choice = await D.ask({ toolCallId: id }, ruleOptions('mcp__board__add_card'));
-            if (choice.kind.startsWith('reject')) {
-              D.update({ sessionUpdate: 'tool_call_update', toolCallId: id, status: 'failed' });
-              await D.stream('Được, mình dừng ở đây.');
-              return 'end_turn';
-            }
-            if (choice.kind === 'allow_always') D.grant('mcp', 'mcp__board__add_card');
-          }
-          D.update({ sessionUpdate: 'tool_call_update', toolCallId: id, status: 'in_progress' });
-          await D.wait(450);
-          const ref = D.pluginAddCard(cards[i], 'từ Claude');
-          D.update({ sessionUpdate: 'tool_call_update', toolCallId: id, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: `Đã thêm thẻ ${ref} vào cột “Cần làm”` } }] });
-          await D.wait(300);
+        D.update({ sessionUpdate: 'session_info_update', title: 'Nút đăng xuất' });
+        await readTool(D, 'toolu_01Main4HkQ', 'src/main.ts');
+        await D.stream('Mình sẽ thêm nút **Đăng xuất** gọi `clearSession()` rồi tải lại trang.');
+        D.beat('Agent xin quyền sửa tệp. Điện thoại hiện yêu cầu ngay trong phiên (và trên thông báo đẩy nếu app đang ở nền) — bấm **Cho phép** trên **điện thoại**; desktop cập nhật theo.');
+        const ok = await fileTool(D, { id: 'toolu_01Main7BtR', path: 'src/main.ts', oldText: MAIN_OLD, newText: MAIN_NEW, full: MAIN_NEW });
+        if (!ok) {
+          await D.stream('Được, mình chưa sửa gì.');
+          return 'end_turn';
         }
-        await D.stream('Đã thêm 3 thẻ vào cột **Cần làm** của Bảng việc.');
+        await D.stream('Xong: thêm nút **Đăng xuất** trong `src/main.ts` — bấm là xoá phiên rồi tải lại trang.');
         return 'end_turn';
       });
-      D.beat('Agent gọi tool của plugin qua MCP và plugin cập nhật bảng ngay. Bấm một thẻ để chuyển cột (UI của chính plugin). Giờ thử **chế độ dev**:', [
-        { label: 'Mô phỏng: lưu panel/index.html', key: 'reload', primary: true },
-      ]);
-      await D.waitUser('reload');
-      D.hood('plugin', 'Thấy `~/tools/board/panel/index.html` đổi → tải lại webview của plugin (chế độ dev)');
-      D.set((s) => {
-        s.plugin.theme = 2;
-        s.plugin.flash = null;
-      });
-      D.beat('Plugin tải lại với giao diện mới — code xong là dùng, không build, không khởi động lại ShellX. **Điều kiện:** cổng thử webview của A6 phải đạt trên Mac và Windows thật; nếu không, plugin mở thành cửa sổ riêng.');
+      if (stop !== 'end_turn') {
+        D.beat('Lượt đã dừng. Bấm **Làm lại** để thử lại.');
+        return;
+      }
+      D.beat('Lượt xong — điện thoại thấy tóm tắt. Giờ mở tool trên điện thoại: tab **Tool** → **Bảng việc**.');
+      await D.waitUser('ph-open-tool');
+      D.beat('Điện thoại mở tool qua đường hầm: desktop chỉ proxy đúng URL đã bật, qua relay mã hoá đầu cuối. Bấm một thẻ trên **điện thoại** — pane tool trên desktop đổi theo vì hai bên cùng nói chuyện với một server.');
+      await D.waitUser('ph-card');
+      D.beat('Giới hạn relay hiện tại: khung 64 KiB, 500 khung/giây mỗi thiết bị — đủ cho trang quản trị hay dashboard; video, tệp lớn sẽ chậm và tốn băng thông relay.');
     },
   };
 
@@ -901,6 +891,20 @@ Error: Claude Code process exited with code 1
         ],
       },
     },
-    scenarios: [s1, s2, s3, s4, s5, s6],
+    // Ports the sidebar already shows for the workspace's terminals (A2).
+    ports: [
+      { url: 'http://localhost:4000', name: 'Bảng việc', label: ':4000 · node server.js' },
+      { url: 'http://localhost:5173', name: 'shop-web', label: ':5173 · vite' },
+    ],
+    board: {
+      flash: null,
+      cards: [
+        { id: 'c1', text: 'Trang đăng ký: kiểm tra email trùng', col: 'todo' },
+        { id: 'c2', text: 'Thêm nút đăng xuất', col: 'todo' },
+        { id: 'c3', text: 'Sửa lỗi token hết hạn', col: 'doing' },
+        { id: 'c4', text: 'Nâng Vite lên 6', col: 'done' },
+      ],
+    },
+    scenarios: [s1, s2, s3, s4, s5, s6, s7],
   };
 })();

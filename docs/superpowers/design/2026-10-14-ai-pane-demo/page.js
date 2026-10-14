@@ -78,8 +78,8 @@
 
   const ARCH = {
     ui: {
-      t: 'Pane AI',
-      d: 'Giao diện thuần Flutter (K2): dòng hội thoại, thẻ cho từng việc agent làm, thanh xin quyền, ô nhập có @tệp, /lệnh, ảnh; chọn chế độ, model, mức suy nghĩ từ configOptions của agent.',
+      t: 'Tab AI',
+      d: 'Giao diện thuần Flutter (K2), không kèm terminal (K3): dòng hội thoại, thẻ cho từng việc agent làm, thanh xin quyền, ô nhập có @tệp, /lệnh, ảnh; chế độ, model, mức suy nghĩ từ configOptions của agent. Đăng nhập và cài đặt chạy trong một khung nhỏ trên pane.',
       f: ['apps/desktop/lib/src/ui/ai/'],
     },
     panel: {
@@ -108,18 +108,18 @@
       f: ['apps/desktop/lib/src/cli/cli_install.dart (LoginPathCheck)', 'apps/desktop/lib/src/platform/process_tree.dart (killProcessTree)'],
     },
     tree: {
-      t: 'Cây pane + layout.json',
-      d: 'Pane AI là một lá mới trong cây pane (K3), theo D4–D7 của A6: tab luôn giữ ≥ 1 pane terminal. layout.json lưu {agent, id phiên, thư mục, tiêu đề}; cách ghi phải để bản ShellX cũ đọc không lỗi.',
-      f: ['apps/desktop/lib/src/terminal/pane_layout.dart', 'apps/desktop/lib/src/restore/restore_snapshot.dart'],
+      t: 'Tab, cây pane, layout.json',
+      d: 'Tab AI là loại tab mới, không bắt kèm terminal (K3): id từ dải tổng hợp (≥ 2 000 000 000); pane AI và pane tool là lá id âm với bản đồ riêng (mẫu A6); nhãn và thư mục lấy từ pane AI. layout.json ghi tab AI trong mảng mới "aiTabs" ở cấp trên cùng để bản cũ bỏ qua mà không hỏng.',
+      f: ['apps/desktop/lib/src/terminal/terminal_tabs.dart', 'apps/desktop/lib/src/terminal/pane_layout.dart', 'apps/desktop/lib/src/restore/restore_snapshot.dart'],
     },
     a12: {
-      t: 'Trạng thái A12',
-      d: 'Trạng thái của pane AI đi vào mô hình sẵn có (đang chạy / cần bạn / đang chờ / xong): sidebar, viền chú ý, thông báo hệ thống qua đường A4, agent.state cho điện thoại. Cần mở rộng ingest và đường thông báo cho pane không phải terminal.',
-      f: ['apps/desktop/lib/src/terminal/agent_status_notifier.dart', 'agent_status.dart'],
+      t: 'Trạng thái A12 · relay',
+      d: 'Pane AI báo trạng thái thẳng vào AgentStatusNotifier (tra theo pane chung thay vì chỉ pane terminal): sidebar, viền chú ý, thông báo hệ thống qua một lối mới của TabAttention. Điện thoại nhận phiên AI qua loại tin ai.* (đề xuất) trong kênh mã hoá đầu cuối.',
+      f: ['apps/desktop/lib/src/terminal/agent_status_notifier.dart', 'packages/shellx_core/lib/src/protocol/messages.dart'],
     },
     agent: {
       t: 'Tiến trình agent',
-      d: 'Mỗi pane AI một tiến trình. Claude: adapter @agentclientprotocol/claude-agent-acp bọc Agent SDK nên chạy chính CLI chính thức (Node ≥ 22). Codex: @agentclientprotocol/codex-acp (đã kèm Codex). Gemini CLI: gemini --acp. OpenCode: opencode acp. Hoặc bất kỳ agent nói ACP.',
+      d: 'Mỗi tab AI một tiến trình. Claude: adapter @agentclientprotocol/claude-agent-acp bọc Agent SDK nên chạy chính CLI chính thức (Node ≥ 22). Codex: @agentclientprotocol/codex-acp (đã kèm Codex). Gemini CLI: gemini --acp. OpenCode: opencode acp. Hoặc bất kỳ agent nói ACP.',
       f: [],
     },
     disk: {
@@ -129,13 +129,18 @@
     },
     auth: {
       t: 'Đăng nhập',
-      d: 'Kiểu “terminal” của ACP: ShellX chạy lại chính lệnh của agent kèm args của cách đăng nhập trong một pane terminal; mã thoát 0 = thành công; không gọi authenticate. ShellX không đọc, lưu hay chuyển credential (K5).',
+      d: 'Kiểu “terminal” của ACP: ShellX chạy lại chính lệnh của agent kèm args của cách đăng nhập trong một khung nhỏ trên pane AI (không phải pane terminal); mã thoát 0 = thành công; không gọi authenticate. ShellX không đọc, lưu hay chuyển credential và không bỏ cách đăng nhập nào (K5).',
       f: [],
     },
-    plugin: {
-      t: 'Plugin (giai đoạn 2)',
-      d: 'Thư mục shellx-plugin.json + HTML/JS: pane/panel trong webview, lệnh, và server MCP mà ShellX đưa vào mọi phiên AI. Cần qua cổng thử webview A6; dự phòng là cửa sổ riêng.',
+    tool: {
+      t: 'Tool của bạn',
+      d: 'Một web app bạn tự viết bằng bất kỳ công nghệ gì, chạy ở một URL (thường là localhost). ShellX chỉ hiển thị: engine trình duyệt A6 trên desktop, webview của app trên điện thoại (qua đường hầm). Không manifest, không SDK (K6).',
       f: [],
+    },
+    phone: {
+      t: 'App ShellX trên điện thoại',
+      d: 'Xem và điều khiển phiên AI (danh sách, hội thoại trực tiếp, prompt, trả lời xin quyền, dừng) và mở tool đã bật — qua relay mã hoá đầu cuối sẵn có, bằng loại tin ai.* và tool.* (đề xuất). Agent và tool vẫn chạy trên desktop (K7).',
+      f: ['apps/mobile/', 'packages/shellx_client/'],
     },
   };
   const detail = document.getElementById('arch-detail');
