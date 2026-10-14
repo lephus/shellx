@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:shellx_core/shellx_core.dart';
 
+import '../ai/ai_endpoint.dart';
 import '../term/desktop_session_manager.dart';
 import 'agent_sessions.dart';
 import 'session_manager.dart';
@@ -25,17 +26,24 @@ final class SessionRouter implements AgentSessions {
     required SessionManager shells,
     required DesktopSessionManager desktop,
     required bool Function() desktopSharing,
+    AiEndpoint? ai,
   }) : _shells = shells,
        _desktop = desktop,
-       _desktopSharing = desktopSharing {
+       _desktopSharing = desktopSharing,
+       _ai = ai {
     shells.receivesDriver = _receivesDriver;
     _subscriptions.addAll([
       shells.outbound.listen(_outbound.add),
       desktop.outbound.listen(_outbound.add),
       shells.changes.listen(_changes.add),
       desktop.changes.listen(_changes.add),
+      ?ai?.outbound.listen(_outbound.add),
     ]);
   }
+
+  /// V2-2 D1: where `ai.*` messages go; null: this agent has no AI for
+  /// phones (they are ignored, `session.list.result` carries no `ai`).
+  final AiEndpoint? _ai;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
 
@@ -71,13 +79,21 @@ final class SessionRouter implements AgentSessions {
         if (desktop) _desktopPhones.add(mobileId);
         _send(
           mobileId,
-          SessionListResult([
-            ...(desktop
-                ? _shells.sessionInfosWithContext
-                : _shells.sessionInfos),
-            if (desktop) ..._desktop.sessionInfos,
-          ], desktopSharing: desktop ? _desktopSharing() : null),
+          SessionListResult(
+            [
+              ...(desktop
+                  ? _shells.sessionInfosWithContext
+                  : _shells.sessionInfos),
+              if (desktop) ..._desktop.sessionInfos,
+            ],
+            desktopSharing: desktop ? _desktopSharing() : null,
+            // V2-2 D3: only to a phone that knows `desktop` (a new decoder);
+            // an older one skips the key anyway.
+            ai: desktop && _ai != null ? kAiProtocol : null,
+          ),
         );
+      case AiMessage():
+        _ai?.handle(mobileId, message);
       case SessionAttach(:final id, :final cols, :final rows, :final lastSeq)
           when _desktop.owns(id):
         if (_desktopPhones.contains(mobileId)) {
@@ -112,6 +128,7 @@ final class SessionRouter implements AgentSessions {
   void mobileDisconnected(String mobileId) {
     _shells.mobileDisconnected(mobileId);
     _desktop.mobileDisconnected(mobileId);
+    _ai?.phoneGone(mobileId);
   }
 
   @override
@@ -119,6 +136,7 @@ final class SessionRouter implements AgentSessions {
     _desktopPhones.remove(mobileId);
     _shells.closeSessionsAttachedTo(mobileId);
     _desktop.disconnectPhonesAttachedTo(mobileId);
+    _ai?.phoneGone(mobileId);
   }
 
   /// Tray: a shell session is closed; a desktop terminal only loses its
@@ -135,6 +153,7 @@ final class SessionRouter implements AgentSessions {
   void closeAll() {
     _shells.closeAll();
     _desktop.disconnectAllPhones();
+    _ai?.allPhonesGone();
   }
 
   /// The runtime stops (A1 D7): every phone is let go silently (it sees
@@ -142,6 +161,7 @@ final class SessionRouter implements AgentSessions {
   void disconnectAllPhones() {
     _shells.disconnectAllPhones();
     _desktop.releaseAllPhones();
+    _ai?.allPhonesGone();
   }
 
   /// The runtime is gone; the shell sessions live on (A1 D7) and must not
