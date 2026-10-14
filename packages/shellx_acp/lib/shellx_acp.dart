@@ -2,6 +2,7 @@
 /// protocol types ShellX uses and the client (spec D1).
 library;
 
+export 'src/acp_client.dart';
 export 'src/acp_content.dart';
 export 'src/acp_elicitation.dart';
 export 'src/acp_json.dart' show Redacted;
