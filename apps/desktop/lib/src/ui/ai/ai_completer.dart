@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:shellx_acp/shellx_acp.dart' show AvailableCommand;
 
 /// One line of the composer's suggestions (D16): what replaces the typed
 /// token, what the line shows, and the file it mentions (null: none).
@@ -39,14 +40,46 @@ List<AiSuggestion> aiMatchFiles(List<String> files, String query) {
   ];
 }
 
+/// D16: the agent's commands (`available_commands_update`) matching
+/// [query]: the name starting with it, then containing it; at most 8.
+List<AiSuggestion> aiMatchCommands(
+  List<AvailableCommand> commands,
+  String query,
+) {
+  final q = query.toLowerCase();
+  final starts = [
+    for (final c in commands)
+      if (c.name.toLowerCase().startsWith(q)) c,
+  ];
+  final contains = [
+    for (final c in commands)
+      if (!c.name.toLowerCase().startsWith(q) &&
+          c.name.toLowerCase().contains(q))
+        c,
+  ];
+  return [
+    for (final c in [...starts, ...contains].take(kAiSuggestMax))
+      (
+        insert: '/${c.name} ',
+        label: '/${c.name}',
+        detail: [c.description, ?c.hint].where((s) => s.isNotEmpty).join(' — '),
+        mention: null,
+      ),
+  ];
+}
+
 /// D16: what the composer offers while the user types `@…` (the project's
-/// files that `.gitignore` keeps, Task 25's index). ↑/↓ move, Enter or Tab
-/// take one, Esc closes the list until the token changes.
+/// files that `.gitignore` keeps, Task 25's index) or, at the start, `/…`
+/// (the agent's commands). ↑/↓ move, Enter or Tab take one, Esc closes the
+/// list until the token changes.
 final class AiCompleter extends ChangeNotifier {
-  AiCompleter({required this.files});
+  AiCompleter({required this.files, required this.commands});
 
   /// The project's files; loaded when `@` is first typed.
   final Future<List<String>> Function() files;
+
+  /// The agent's commands as last announced.
+  final List<AvailableCommand> Function() commands;
 
   List<AiSuggestion> _items = const [];
   var _selected = 0;
@@ -64,6 +97,11 @@ final class AiCompleter extends ChangeNotifier {
     final sel = value.selection;
     if (!sel.isValid || !sel.isCollapsed) return _clear();
     final before = value.text.substring(0, sel.baseOffset);
+    final slash = RegExp(r'^/(\S*)$').firstMatch(before);
+    if (slash != null) {
+      if (_closedAt == 0) return _clear();
+      return _show(0, aiMatchCommands(commands(), slash.group(1)!));
+    }
     final at = RegExp(r'(?:^|\s)@([^\s@]*)$').firstMatch(before);
     if (at == null) {
       _closedAt = -1;

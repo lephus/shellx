@@ -59,6 +59,7 @@ class _AiComposerState extends State<AiComposer> {
   /// `resource_link` while their `@path` is still in the text).
   late final _completer = AiCompleter(
     files: () => _scope?.ui.fileIndex?.call() ?? Future.value(const []),
+    commands: () => _scope?.state.commands ?? const [],
   );
   final _mentions = <String>{};
 
@@ -131,6 +132,16 @@ class _AiComposerState extends State<AiComposer> {
     final (value, pick) = _completer.accept(_text.value, index);
     _text.value = value;
     if (pick.mention case final path?) _mentions.add(path);
+  }
+
+  /// The "/" button: a command starts the message.
+  void _startCommand() {
+    final text = _text.text.startsWith('/') ? _text.text : '/${_text.text}';
+    _text.value = TextEditingValue(
+      text: text,
+      selection: const TextSelection.collapsed(offset: 1),
+    );
+    _focus.requestFocus();
   }
 
   /// The "@" button: a mention starts at the cursor.
@@ -313,6 +324,14 @@ class _AiComposerState extends State<AiComposer> {
                   visualDensity: VisualDensity.compact,
                   onPressed: _canSend ? _startMention : null,
                   icon: const Icon(Icons.alternate_email),
+                ),
+                IconButton(
+                  key: const Key('ai.commands'),
+                  tooltip: l10n.aiCommands,
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _canSend ? _startCommand : null,
+                  icon: const Icon(Icons.terminal),
                 ),
                 if (_note case final note?)
                   Expanded(
