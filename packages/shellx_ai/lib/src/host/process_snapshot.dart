@@ -200,6 +200,13 @@ final class _Read {
   late final Future<List<ProcessRow>?> table;
 }
 
+/// How much earlier than its parent a child may seem to begin and still be
+/// its child: `ps` gives ages in whole seconds (so 2 s), while Windows gives
+/// exact creation times (so 0.2 s): there a child that began a second before
+/// the pid it names is an orphan whose parent id was reused.
+Duration startSlack({required bool isWindows}) =>
+    isWindows ? const Duration(milliseconds: 200) : const Duration(seconds: 2);
+
 /// Everything [root] started that is in [rows]: children, their children…
 /// (not [root] itself), parents before children. A row that says it is its
 /// own parent is no child, and neither is one that began before the parent it

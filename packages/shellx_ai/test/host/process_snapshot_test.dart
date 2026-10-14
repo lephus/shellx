@@ -152,6 +152,41 @@ void main() {
       ];
       expect(descendantsIn(10, rows).map((r) => r.pid), [11, 14]);
     });
+
+    test('on Windows creation times are exact: a child a second older than '
+        'the pid it names is an orphan whose parent id was reused', () {
+      // Y (pid 21) lost its parent X long ago; L's child D' (pid 20) then
+      // took the pid X. Y began a second before D'.
+      final rows = [
+        row(10, 1, at: t0),
+        row(20, 10, at: t0.add(const Duration(seconds: 10))),
+        row(21, 20, at: t0.add(const Duration(seconds: 9))),
+      ];
+      expect(startSlack(isWindows: false), const Duration(seconds: 2));
+      expect(startSlack(isWindows: true), const Duration(milliseconds: 200));
+      expect(
+        descendantsIn(
+          10,
+          rows,
+          slack: startSlack(isWindows: true),
+        ).map((r) => r.pid),
+        [20],
+      );
+      expect(
+        ancestorsIn(21, rows, slack: startSlack(isWindows: true)),
+        isEmpty,
+        reason: 'the reused pid is no parent either',
+      );
+      // `ps` rounds ages to seconds: there the same second is the same time.
+      expect(
+        descendantsIn(
+          10,
+          rows,
+          slack: startSlack(isWindows: false),
+        ).map((r) => r.pid),
+        [20, 21],
+      );
+    });
   });
 
   group('descendantsIn never lists a pid it is told to bar', () {

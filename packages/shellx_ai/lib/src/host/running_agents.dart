@@ -195,9 +195,15 @@ final class RunningAgents {
           me.startedAt.difference(r.startedAt).abs() > tolerance) {
         return false;
       }
-      final above = ancestorsIn(_ownPid, rows);
+      final slack = startSlack(isWindows: _windows);
+      final above = ancestorsIn(_ownPid, rows, slack: slack);
       if (above.contains(r.pid)) return false;
-      below = descendantsIn(r.pid, rows, never: {_ownPid, ...above});
+      below = descendantsIn(
+        r.pid,
+        rows,
+        slack: slack,
+        never: {_ownPid, ...above},
+      );
     }
     // The agent first: it can start nothing more.
     await _killOne(r.pid);

@@ -208,8 +208,18 @@ final class AgentProcess implements AgentChannel {
       if (rows == null || me == null || me.parentPid != _ownPid) {
         return const [];
       }
-      final above = ancestorsIn(_ownPid, rows).takeWhile((p) => p != me.pid);
-      return descendantsIn(me.pid, rows, never: {_ownPid, ...above});
+      final slack = startSlack(isWindows: _windows);
+      final above = ancestorsIn(
+        _ownPid,
+        rows,
+        slack: slack,
+      ).takeWhile((p) => p != me.pid);
+      return descendantsIn(
+        me.pid,
+        rows,
+        slack: slack,
+        never: {_ownPid, ...above},
+      );
     } on Object {
       return const [];
     }
