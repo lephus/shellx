@@ -35,6 +35,43 @@ final class AiRuntimeRequest {
   String toString() => '…';
 }
 
+/// The tab label of one session (D2), asked of the session again only when
+/// it can have changed. `AiSessionState.label` reads the whole first prompt
+/// (spaces collapsed: ~2 ms for a 200 KB paste) and the tab asks after every
+/// burst of streamed chunks. The label follows the session title and the
+/// prompts; a prompt only grows while it is the last item (a replayed
+/// message arrives in chunks), so the title, the number of items and the last
+/// prompt's revision cover every change.
+final class AiLabelCache {
+  AiLabelCache([String? Function(AiSessionState state)? read])
+    : _read = read ?? _label;
+
+  static String? _label(AiSessionState state) => state.label;
+
+  final String? Function(AiSessionState state) _read;
+  ({String? title, int items, int prompt})? _key;
+  String? _value;
+
+  String? of(AiSessionState state) {
+    final items = state.timeline.items;
+    final last = items.isEmpty ? null : items.last;
+    final key = (
+      title: state.title,
+      items: items.length,
+      prompt: last is UserItem ? last.rev : -1,
+    );
+    if (key == _key) return _value;
+    _key = key;
+    return _value = _read(state);
+  }
+}
+
+/// How a session's tab label is read; tests count the reads.
+final aiLabelReaderProvider = Provider<String? Function(AiSessionState state)>(
+  (ref) =>
+      (state) => state.label,
+);
+
 /// Makes one AI pane's runtime. Tests swap it for runtimes over
 /// `FakeLauncher` (`test/support/ai_fakes.dart`): no process, no login
 /// shell, no git.
@@ -61,13 +98,18 @@ final aiRuntimesProvider = NotifierProvider<AiRuntimes, void>(AiRuntimes.new);
 class AiRuntimes extends Notifier<void> {
   final _runtimes = <int, AiRuntime>{};
   final _agentOf = <int, String>{};
+  final _labels = <int, AiLabelCache>{};
   final _last = <int, AiStatus>{};
   final _listeners = <int, void Function()>{};
   final _queued = <int>{};
   final _stopping = <Future<void>>{};
 
+  /// [stopAll] ran: the app is quitting, no runtime is made any more.
+  var _stopped = false;
+
   @override
   void build() {
+    _stopped = false;
     ref.listen<TerminalTabsState>(terminalTabsProvider, (_, next) {
       for (final id in [..._runtimes.keys]) {
         if (next.tabOfPane(id) == null) _drop(id);
@@ -98,11 +140,13 @@ class AiRuntimes extends Notifier<void> {
 
   /// The runtime of AI pane [paneId], made (not started) on the first call.
   /// Null while the pane has no folder (D5), is gone, or its agent is not
-  /// offered (switched off, removed). Never call it while building: it may
-  /// make a runtime.
+  /// offered (switched off, removed), and once [stopAll] ran. Never call it
+  /// while building: it may make a runtime.
   AiRuntime? runtimeFor(int paneId) {
     final made = _runtimes[paneId];
     if (made != null) return made;
+    // Quitting: a runtime made during the wait would outlive the stop.
+    if (_stopped) return null;
     final pane = ref
         .read(terminalTabsProvider)
         .tabOfPane(paneId)
@@ -124,6 +168,7 @@ class AiRuntimes extends Notifier<void> {
     );
     _runtimes[paneId] = runtime;
     _agentOf[paneId] = agent.id;
+    _labels[paneId] = AiLabelCache(ref.read(aiLabelReaderProvider));
     runtime.onStatus = (status) => _report(paneId, status);
     void listener() => _queueSync(paneId);
     _listeners[paneId] = listener;
@@ -143,8 +188,10 @@ class AiRuntimes extends Notifier<void> {
   }
 
   /// Quit (§6): every agent stops — stdin closed, 2 s, then its process
-  /// tree. Completes when all have.
+  /// tree. Completes when all have. The registry is closed from the first
+  /// moment: [runtimeFor] makes no more.
   Future<void> stopAll() async {
+    _stopped = true;
     for (final id in [..._runtimes.keys]) {
       _drop(id);
     }
@@ -158,6 +205,7 @@ class AiRuntimes extends Notifier<void> {
     if (listener != null) runtime.state.removeListener(listener);
     runtime.onStatus = null;
     _agentOf.remove(paneId);
+    _labels.remove(paneId);
     _last.remove(paneId);
     late final Future<void> stop;
     stop = runtime
@@ -183,7 +231,7 @@ class AiRuntimes extends Notifier<void> {
           .updateAiPane(
             paneId,
             (p) => p.copyWith(
-              title: s.label ?? p.title,
+              title: _labels[paneId]?.of(s) ?? p.title,
               sessionId: s.sessionId ?? p.sessionId,
             ),
           );

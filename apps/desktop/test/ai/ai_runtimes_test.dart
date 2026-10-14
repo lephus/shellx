@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/host.dart' show AiStatus;
+import 'package:shellx_ai/shellx_ai.dart' show AgentTextItem, AiSessionState;
 import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ai/ai_agents.dart';
 import 'package:shellx_desktop/src/ai/ai_runtimes.dart';
@@ -165,6 +166,122 @@ void main() {
     await runtimes().stopAll();
     expect([for (final ch in fakes.launcher.channels) ch.stopCalls], [1, 1]);
     expect([for (final ch in fakes.launcher.channels) ch.exited], [true, true]);
+  });
+
+  test('stopAll closes the registry: a runtime asked for during the quit '
+      'wait is never made, so none outlives the stop (§6)', () async {
+    boot(const FakeScenario());
+    final ai = openTestAiTab(c, cwd: testAiCwd);
+    await runtimes().runtimeFor(ai.ai!.id)!.start();
+    final stopping = runtimes().stopAll(); // the 4 s wait of the quit
+    final late = openTestAiTab(c, cwd: testAiCwd);
+    expect(runtimes().runtimeFor(late.ai!.id), isNull);
+    expect(runtimes().runtimeFor(ai.ai!.id), isNull);
+    await stopping;
+    expect(runtimes().runtimeFor(late.ai!.id), isNull);
+    expect(fakes.requests, hasLength(1), reason: 'only the one that stopped');
+    expect(fakes.launcher.channels.single.stopCalls, 1);
+  });
+
+  group('the tab label is kept until it can change', () {
+    final at = DateTime.utc(2026, 10, 14);
+    late int computed;
+    late AiLabelCache cache;
+    late AiSessionState state;
+
+    setUp(() {
+      computed = 0;
+      cache = AiLabelCache((s) {
+        computed++;
+        return s.label;
+      });
+      state = AiSessionState(agentId: 'claude', agentName: 'Claude', cwd: '/w');
+    });
+
+    test('streamed chunks of the answer do not ask again', () {
+      expect(cache.of(state), isNull);
+      state.beginTurn([const TextBlock('Fix   the login\nbug please')], at);
+      expect(cache.of(state), 'Fix the login bug please');
+      expect(computed, 2);
+      // The answer's first chunk adds an item; the rest only grow it.
+      for (var i = 0; i < 200; i++) {
+        state.applyUpdate(AgentMessageChunk(TextBlock('chunk $i ')), at);
+        expect(cache.of(state), 'Fix the login bug please');
+      }
+      expect(computed, 3, reason: 'once for the answer\'s item, not per chunk');
+    });
+
+    test('the session title replaces the prompt, and going again is free', () {
+      state.beginTurn([const TextBlock('first prompt')], at);
+      expect(cache.of(state), 'first prompt');
+      state.applyUpdate(
+        const SessionInfoUpdated(hasTitle: true, title: ' Login fix '),
+        at,
+      );
+      expect(cache.of(state), 'Login fix');
+      expect(cache.of(state), 'Login fix');
+      expect(computed, 2);
+      state.applyUpdate(
+        const SessionInfoUpdated(hasTitle: true, title: null),
+        at,
+      );
+      expect(cache.of(state), 'first prompt', reason: 'a cleared title');
+    });
+
+    test('a prompt that arrives in chunks (a replayed session) is read '
+        'whole', () {
+      state.applyUpdate(
+        const UserMessageChunk(TextBlock('Fix the '), messageId: 'm1'),
+        at,
+        history: true,
+      );
+      expect(cache.of(state), 'Fix the');
+      state.applyUpdate(
+        const UserMessageChunk(TextBlock('login bug'), messageId: 'm1'),
+        at,
+        history: true,
+      );
+      expect(state.timeline.items, hasLength(1), reason: 'one message');
+      expect(cache.of(state), 'Fix the login bug');
+    });
+
+    test('a prompt longer than 40 characters is cut as before', () {
+      state.beginTurn([TextBlock('x' * 200)], at);
+      expect(cache.of(state), state.label);
+      expect(cache.of(state), '${'x' * 40}…');
+    });
+  });
+
+  test('a streamed answer reads the tab label when it can have changed, '
+      'not after every chunk', () async {
+    var reads = 0;
+    boot(
+      FakeScenario(
+        turns: [
+          [for (var i = 0; i < 150; i++) FakeSteps.text('chunk $i ')],
+        ],
+      ),
+      overrides: [
+        aiLabelReaderProvider.overrideWithValue((state) {
+          reads++;
+          return state.label;
+        }),
+      ],
+    );
+    final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
+    final r = runtimes().runtimeFor(ai.ai!.id)!;
+    await r.start();
+    await r.send([const TextBlock('Fix the login bug')]);
+    await r.whenIdle();
+    await pumpEventQueue();
+    expect(tab(ai.id).label, 'Fix the login bug');
+    expect(
+      r.state.timeline.items.whereType<AgentTextItem>().single.text,
+      contains('chunk 149'),
+      reason: 'the whole answer streamed',
+    );
+    // Before, once per burst of chunks: more than a hundred reads.
+    expect(reads, lessThanOrEqualTo(8));
   });
 
   test('aiBusy is true while a turn runs (D3 close asks)', () async {
