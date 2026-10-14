@@ -153,6 +153,13 @@ Future<void> _serve({
     onQuit: () => host.quit(),
     onUiChanged: (attached) => host.onUiChanged(attached),
   );
+  // V2-2 D1: phones' AI messages go to the attached window that serves
+  // AI; its pushes go out with this service's account.
+  final aiForwarder = MuxAiForwarder(
+    onPush: (push) => core.notifications?.aiNotice(push),
+  );
+  server.ai = aiForwarder;
+  core.ai.target = aiForwarder;
   final cli = CliHost.adopted(
     ui: server.uiApi,
     enabled: () =>
