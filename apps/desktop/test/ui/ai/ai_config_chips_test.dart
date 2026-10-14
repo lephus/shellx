@@ -140,4 +140,84 @@ void main() {
     expect(find.text('Code'), findsOneWidget);
     await runtime.dispose();
   });
+
+  testWidgets('every agent\'s no-approval mode asks first and is never '
+      'remembered: Codex "full-access", a switch named "yolo" (R6)', (t) async {
+    final (fakes, runtime, c) = await dock(
+      t,
+      const FakeScenario(
+        configOptions: [
+          {
+            'id': 'mode',
+            'name': 'Mode',
+            'category': 'mode',
+            'type': 'select',
+            'currentValue': 'auto',
+            'options': [
+              {'value': 'read-only', 'name': 'Read Only'},
+              {'value': 'auto', 'name': 'Auto'},
+              {'value': 'full-access', 'name': 'Full Access'},
+            ],
+          },
+          {
+            'id': 'yolo',
+            'name': 'YOLO',
+            'type': 'boolean',
+            'currentValue': false,
+          },
+        ],
+      ),
+    );
+    List<String> sets() => [
+      for (final r in fakes.agent().received)
+        if (r.startsWith('session/set_config')) r,
+    ];
+    await pick(t, 'mode', 'full-access');
+    expect(find.text('Turn on “Bypass permissions”?'), findsOneWidget);
+    await t.tap(find.byKey(const Key('ai.bypass.cancel')));
+    await t.pumpAndSettle();
+    expect(sets(), isEmpty);
+    await t.tap(find.byKey(const Key('ai.config.yolo')));
+    await t.pumpAndSettle();
+    expect(find.text('Turn on “Bypass permissions”?'), findsOneWidget);
+    await t.tap(find.byKey(const Key('ai.bypass.cancel')));
+    await t.pumpAndSettle();
+    expect(sets(), isEmpty);
+    await pick(t, 'mode', 'read-only');
+    expect(sets(), ['session/set_config_option:mode=read-only']);
+    await pick(t, 'mode', 'full-access');
+    await t.tap(find.byKey(const Key('ai.bypass.on')));
+    await t.pumpAndSettle();
+    expect(sets().last, 'session/set_config_option:mode=full-access');
+    expect(rememberedConfig(c.read(settingsStoreProvider), 'claude'), {
+      'mode': 'read-only',
+    });
+    await runtime.dispose();
+  });
+
+  testWidgets('a legacy mode that acts without asking asks first too', (
+    t,
+  ) async {
+    final (fakes, runtime, _) = await dock(
+      t,
+      const FakeScenario(
+        modes: {
+          'currentModeId': 'default',
+          'availableModes': [
+            {'id': 'default', 'name': 'Default'},
+            {'id': 'yolo', 'name': 'YOLO'},
+          ],
+        },
+      ),
+    );
+    await pick(t, 'mode', 'yolo');
+    expect(find.text('Turn on “Bypass permissions”?'), findsOneWidget);
+    await t.tap(find.byKey(const Key('ai.bypass.cancel')));
+    await t.pumpAndSettle();
+    expect(
+      fakes.agent().received.where((r) => r.startsWith('session/set_mode')),
+      isEmpty,
+    );
+    await runtime.dispose();
+  });
 }

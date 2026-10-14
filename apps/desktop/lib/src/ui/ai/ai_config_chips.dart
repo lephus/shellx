@@ -6,6 +6,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_agents.dart' show kClaudeAgentId, rememberConfig;
+import '../../ai/ai_no_approval.dart';
 import '../../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 import '../terminal/shellx_menu.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -81,8 +82,9 @@ Future<bool> confirmAiBypass(BuildContext context, String agent) async {
 /// mode, model, thinking and the agent's others (`configOptions`), or the
 /// legacy `modes`. A choice goes to the agent (`session/set_config_option`
 /// or `session/set_mode`) and is remembered for the agent's next sessions,
-/// except "Bypass permissions", which always asks first and is never
-/// remembered (R6). Rebuilt only when the options change.
+/// except a mode that acts without asking ("Bypass permissions", Codex's
+/// "full-access", Gemini's "yolo": `aiIsNoApprovalMode`), which always asks
+/// first and is never remembered (R6). Rebuilt only when the options change.
 class AiConfigChips extends ConsumerWidget {
   const AiConfigChips({super.key});
 
@@ -166,7 +168,7 @@ class _OptionChip extends ConsumerWidget {
     AiPaneScope scope,
     Object value,
   ) async {
-    if (value == kAiBypassMode &&
+    if (aiTurnsOnNoApproval(configId: option.id, value: value) &&
         !await confirmAiBypass(context, scope.state.agentName)) {
       return;
     }
@@ -247,7 +249,7 @@ class _ModeChip extends StatelessWidget {
     if (choice == null || choice == modes.currentModeId || !context.mounted) {
       return;
     }
-    if (choice == kAiBypassMode &&
+    if (aiIsNoApprovalMode(choice) &&
         !await confirmAiBypass(context, scope.state.agentName)) {
       return;
     }

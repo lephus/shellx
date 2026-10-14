@@ -137,4 +137,31 @@ void main() {
     expect(rememberedConfig(settings, 'claude')['model'], 'sonnet');
     expect(rememberedConfig(settings, 'codex'), {'model': 'gpt'});
   });
+
+  test('no agent\'s no-approval mode is remembered, and old stored lines '
+      'never apply (R6)', () async {
+    await rememberConfig(settings, 'codex', 'mode', 'auto');
+    for (final (agent, id, value) in [
+      ('codex', 'mode', 'full-access'),
+      ('codex', 'mode', 'danger-full-access'),
+      ('gemini', 'mode', 'yolo'),
+      ('claude', 'mode', 'bypassPermissions'),
+    ]) {
+      await rememberConfig(settings, agent, id, value);
+    }
+    expect(rememberedConfig(settings, 'codex'), {'mode': 'auto'});
+    expect(rememberedConfig(settings, 'gemini'), isEmpty);
+    expect(rememberedConfig(settings, 'claude'), isEmpty);
+    // Lines written before the guard existed stay on disk; none applies.
+    await settings.setStrings(SettingKeys.aiAgentConfig, [
+      'codex\tmode\t"full-access"',
+      'codex\tmodel\t"gpt"',
+      'gemini\tmode\t"yolo"',
+      'claude\tmode\t"bypassPermissions"',
+      'claude\tmodel\t"opus"',
+    ]);
+    expect(rememberedConfig(settings, 'codex'), {'model': 'gpt'});
+    expect(rememberedConfig(settings, 'gemini'), isEmpty);
+    expect(rememberedConfig(settings, 'claude'), {'model': 'opus'});
+  });
 }

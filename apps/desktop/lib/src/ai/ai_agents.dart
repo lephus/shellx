@@ -10,6 +10,7 @@ import '../platform/settings_store.dart';
 import '../terminal/agent_status.dart' show AgentKind;
 import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
 import 'ai_host_provider.dart';
+import 'ai_no_approval.dart';
 
 /// The catalog id of Claude (D21: `ai-agent-claude = off` hides it).
 const kClaudeAgentId = 'claude';
@@ -264,7 +265,9 @@ final aiDefaultAgentProvider = Provider<AgentSpec?>((ref) {
       agents.firstOrNull;
 });
 
-/// V2-1 D11: the choices remembered for [agentId]'s new sessions.
+/// V2-1 D11: the choices remembered for [agentId]'s new sessions. A choice
+/// that acts without asking never comes back, even from a line an older
+/// version stored (ruling R6, never auto-allow).
 Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
   final out = <String, Object>{};
   for (final line in store.getStrings(SettingKeys.aiAgentConfig)) {
@@ -272,7 +275,9 @@ Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
     if (parts.length != 3 || parts[0] != agentId) continue;
     try {
       final value = jsonDecode(parts[2]);
-      if (value is String || value is bool) out[parts[1]] = value as Object;
+      if (value is! String && value is! bool) continue;
+      if (aiTurnsOnNoApproval(configId: parts[1], value: value)) continue;
+      out[parts[1]] = value as Object;
     } on FormatException {
       continue;
     }
@@ -281,14 +286,16 @@ Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
 }
 
 /// V2-1 D11: remembers [value] of [configId] for [agentId]'s new sessions.
-/// "Bypass permissions" is never remembered (ruling R6, never auto-allow).
+/// A mode that acts without asking ("Bypass permissions", Codex's
+/// "full-access", Gemini's "yolo") is never remembered (ruling R6, never
+/// auto-allow).
 Future<void> rememberConfig(
   SettingsStore store,
   String agentId,
   String configId,
   Object value,
 ) async {
-  if (value == 'bypassPermissions') return;
+  if (aiTurnsOnNoApproval(configId: configId, value: value)) return;
   final prefix = '$agentId\t$configId\t';
   await store.setStrings(SettingKeys.aiAgentConfig, [
     for (final line in store.getStrings(SettingKeys.aiAgentConfig))
