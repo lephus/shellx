@@ -4,12 +4,18 @@ import 'package:shellx_ai/host.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_theme.dart';
+import 'ai_tool_card.dart' show aiCapText;
 
 /// "View log" (D20): the agent's stderr, kept in memory only (the last
-/// 256 KiB). Shown, never logged.
+/// 256 KiB). Shown, never logged. Capped like an output (a long line is cut,
+/// the middle of a long log is counted): 256 KiB on one line took seconds to
+/// lay out.
 Future<void> showAiLogDialog(BuildContext context, AiRuntime runtime) {
   final l10n = AppLocalizations.of(context);
-  final text = runtime.stderrTail;
+  final text = aiCapText(
+    runtime.stderrTail,
+    (hidden) => '… ${l10n.aiOutputCut(hidden)} …',
+  );
   return showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(

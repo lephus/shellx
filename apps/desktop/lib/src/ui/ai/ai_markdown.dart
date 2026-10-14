@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../agent/desktop_services.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_theme.dart';
+import 'ai_tool_card.dart' show aiCapText;
 
 /// D17: splits [text] into blocks at blank lines outside fenced code, so a
 /// streaming message re-renders only its last block.
@@ -84,8 +86,17 @@ class _Block extends ConsumerWidget {
       height: 20 / 13,
       color: ShellxDesktopColors.textPrimary,
     );
+    // Past that length the block is plain text, capped like an output: a
+    // code block of a megabyte shows its start and end.
     final child = text.length > AiSizes.markdownBlockMax
-        ? Text(text, style: kAiMono)
+        ? Text(
+            aiCapText(
+              text,
+              (hidden) =>
+                  '… ${AppLocalizations.of(context).aiOutputCut(hidden)} …',
+            ),
+            style: kAiMono,
+          )
         : MarkdownBody(
             data: text,
             // B15: never fetch what an agent's text points at.

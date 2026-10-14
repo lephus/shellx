@@ -186,10 +186,15 @@ class AiUserMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final text = [
-      for (final b in item.blocks)
-        if (b is TextBlock) b.text,
-    ].join();
+    // A pasted log has no length either: its start and end are shown, and
+    // what lies between is counted (the agent got all of it).
+    final text = aiCapText(
+      [
+        for (final b in item.blocks)
+          if (b is TextBlock) b.text,
+      ].join(),
+      (hidden) => '… ${l10n.aiOutputCut(hidden)} …',
+    );
     final chips = [
       for (final b in item.blocks)
         if (b is ResourceLinkBlock)
@@ -302,8 +307,12 @@ class _AiThoughtState extends State<AiThought> {
         if (_open)
           Padding(
             padding: const EdgeInsets.only(left: ShellxSpace.s16),
+            // A thought has no length either.
             child: SelectableText(
-              widget.item.text,
+              aiCapText(
+                widget.item.text,
+                (hidden) => '… ${l10n.aiOutputCut(hidden)} …',
+              ),
               style: ShellxText.small.copyWith(color: dim),
             ),
           ),

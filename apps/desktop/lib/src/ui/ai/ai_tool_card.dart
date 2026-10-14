@@ -113,6 +113,169 @@ final _ansi = RegExp(
 String aiStripAnsi(String text) =>
     text.contains('\x1B') ? text.replaceAll(_ansi, '') : text;
 
+/// Smoothness, and "capped outputs" is not negotiable: what a card shows of
+/// one output — the start and the end of it — is about this many characters,
+/// whatever the agent printed. An agent's words have no length (Gemini CLI,
+/// Codex and MCP tools do not cap their output).
+const int kAiOutputMaxChars = 32 * 1024;
+
+/// A shown line is cut here, with "…". Text with no place to break a line (a
+/// base64 blob, a minified bundle, a run of `a`) costs a layout that grows
+/// faster than its length: 1 MB on one line froze the window for 23 s.
+const int kAiLineMaxChars = 2000;
+
+bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
+
+/// The line `text[start, end)`, cut at [kAiLineMaxChars] characters with "…"
+/// (never in the middle of a surrogate pair, which cannot be drawn).
+String _lineOf(String text, int start, int end) {
+  if (end - start <= kAiLineMaxChars) return text.substring(start, end);
+  var cut = start + kAiLineMaxChars;
+  if (_isHighSurrogate(text.codeUnitAt(cut - 1))) cut--;
+  return '${text.substring(start, cut)}…';
+}
+
+/// [line], cut at [kAiLineMaxChars] characters with "…".
+String aiCapLine(String line) => _lineOf(line, 0, line.length);
+
+int _lineCount(String text) {
+  var n = 1;
+  for (var i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) {
+    n++;
+  }
+  return n;
+}
+
+/// A long text as a card shows it: the first lines ([head]) and, when the
+/// middle is left out, [hidden] lines and then the last ones ([tail]).
+/// - Every line is cut at [kAiLineMaxChars] characters.
+/// - [head] and [tail] keep at most [kAiOutputMaxChars] characters between
+///   them, and at most the `endLines` the card was asked for each.
+/// - The pieces are found by scanning from both ends: nothing of the middle
+///   is copied, however long the text is.
+final class AiOutput {
+  AiOutput._(
+    this.text, {
+    required this.head,
+    required this.tail,
+    required this.hidden,
+    required this.lines,
+  });
+
+  /// The whole text.
+  final String text;
+  final String head;
+
+  /// Null: nothing is left out, [head] is all there is.
+  final String? tail;
+
+  /// How many lines are between [head] and [tail].
+  final int hidden;
+
+  /// How many lines [text] has.
+  final int lines;
+
+  bool get isEmpty => text.isEmpty;
+
+  /// Every line of [text], for the "Show all" list: made when it is asked
+  /// for, once. A row is cut with [aiCapLine] when it is drawn.
+  late final List<String> allLines = text.split('\n');
+}
+
+/// [text] as [AiOutput]: at most [endLines] lines and half of
+/// [kAiOutputMaxChars] characters from each end.
+AiOutput aiOutputOf(String text, {int endLines = AiSizes.outputLines}) {
+  const half = kAiOutputMaxChars ~/ 2;
+  final total = _lineCount(text);
+  final head = <String>[];
+  var used = 0;
+  for (var from = 0; head.length < endLines && head.length < total;) {
+    final nl = text.indexOf('\n', from);
+    final end = nl < 0 ? text.length : nl;
+    final line = _lineOf(text, from, end);
+    if (head.isNotEmpty && used + line.length + 1 > half) break;
+    head.add(line);
+    used += line.length + 1;
+    from = end + 1;
+  }
+  final tail = <String>[];
+  used = 0;
+  for (
+    var to = text.length;
+    tail.length < endLines && head.length + tail.length < total;
+  ) {
+    final nl = to == 0 ? -1 : text.lastIndexOf('\n', to - 1);
+    final line = _lineOf(text, nl + 1, to);
+    if (tail.isNotEmpty && used + line.length + 1 > half) break;
+    tail.add(line);
+    used += line.length + 1;
+    if (nl < 0) break;
+    to = nl;
+  }
+  final hidden = total - head.length - tail.length;
+  return hidden > 0
+      ? AiOutput._(
+          text,
+          head: head.join('\n'),
+          tail: tail.reversed.join('\n'),
+          hidden: hidden,
+          lines: total,
+        )
+      : AiOutput._(
+          text,
+          head: [...head, ...tail.reversed].join('\n'),
+          tail: null,
+          hidden: 0,
+          lines: total,
+        );
+}
+
+/// [text] in one piece for a place that has no "Show all" (the user's own
+/// message, a long block of the agent's words, the agent's log): the same
+/// caps as [aiOutputOf], and a line made by [marker] where the middle was
+/// left out.
+String aiCapText(String text, String Function(int hiddenLines) marker) {
+  final out = aiOutputOf(text, endLines: 1 << 30);
+  final tail = out.tail;
+  return tail == null ? out.head : '${out.head}\n${marker(out.hidden)}\n$tail';
+}
+
+final _fenceOpen = RegExp(r'^(`{3,}|~{3,})[^`\n]*\n');
+
+/// [text] without the one Markdown fence around it. claude-agent-acp sends a
+/// command's result as "```console\n…\n```": the card shows the output, not
+/// the fence lines (which would also count as lines). Text that is not
+/// wrapped in one — or holds a line that would close the fence early — is
+/// returned as it is.
+String aiUnfence(String text) {
+  final open = _fenceOpen.firstMatch(text);
+  if (open == null) return text;
+  final fence = open[1]!;
+  final mark = fence.codeUnitAt(0);
+  var end = text.length;
+  while (end > open.end && _isSpace(text.codeUnitAt(end - 1))) {
+    end--;
+  }
+  var run = 0;
+  while (end - run > open.end && text.codeUnitAt(end - run - 1) == mark) {
+    run++;
+  }
+  if (run < fence.length) return text;
+  final close = end - run;
+  // The closing fence is a line of its own.
+  if (close > open.end && text.codeUnitAt(close - 1) != 0x0A) return text;
+  final body = text.substring(open.end, close > open.end ? close - 1 : close);
+  // A line in it that would close the fence: this was not one wrapper.
+  if (body.contains(fence) &&
+      RegExp('^${RegExp.escape(fence)}', multiLine: true).hasMatch(body)) {
+    return text;
+  }
+  return body;
+}
+
+bool _isSpace(int unit) =>
+    unit == 0x20 || unit == 0x0A || unit == 0x0D || unit == 0x09;
+
 /// The exit code a finished command reports, or null when the agent says
 /// none. Codex gives it in `rawOutput` (`exit_code`), OpenCode in its
 /// `metadata` (`exit`); Claude reports a failed command as the text
@@ -157,8 +320,55 @@ class AiToolCard extends ConsumerStatefulWidget {
   const AiToolCard({super.key, required this.item});
   final ToolItem item;
 
+  /// Times an output was prepared for display (tests: once per revision of a
+  /// call, however often its card is built).
+  @visibleForTesting
+  static int debugOutputPreps = 0;
+
   @override
   ConsumerState<AiToolCard> createState() => _AiToolCardState();
+}
+
+/// What a card shows of a call's text, made once per revision of the call (a
+/// card that is built again, opened, or scrolled out of the list and back in
+/// is not made again): the output without its fence and escape codes, cut;
+/// and the arguments as JSON, cut.
+final class _Shown {
+  _Shown(this.content, this.rawInput, this.output);
+
+  final List<ToolContent>? content;
+  final Object? rawInput;
+  final AiOutput output;
+
+  late final AiOutput? input = rawInput == null
+      ? null
+      : aiOutputOf(const JsonEncoder.withIndent('  ').convert(rawInput));
+}
+
+final _shown = Expando<_Shown>('tool text');
+
+_Shown _shownOf(ToolItem item) {
+  final f = item.fields;
+  final hit = _shown[item];
+  if (hit != null &&
+      identical(hit.content, f.content) &&
+      identical(hit.rawInput, f.rawInput)) {
+    return hit;
+  }
+  AiToolCard.debugOutputPreps++;
+  return _shown[item] = _Shown(
+    f.content,
+    f.rawInput,
+    aiOutputOf(
+      aiStripAnsi(
+        [
+          for (final c in f.content ?? const <ToolContent>[])
+            if (c case ToolContentBlock(block: TextBlock(:final text)))
+              aiUnfence(text),
+        ].join('\n'),
+      ),
+    ),
+  );
 }
 
 class _AiToolCardState extends ConsumerState<AiToolCard> {
@@ -351,12 +561,8 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
   Widget _body(AppLocalizations l10n, String cwd) {
     final f = item.fields;
     final diffs = _toolDiffs;
-    final output = aiStripAnsi(
-      [
-        for (final c in f.content ?? const <ToolContent>[])
-          if (c case ToolContentBlock(block: TextBlock(:final text))) text,
-      ].join('\n'),
-    );
+    final shown = _shownOf(item);
+    final output = shown.output;
     final parts = <Widget>[];
     for (final (i, d) in diffs.indexed) {
       final lines = _diffLines[d];
@@ -386,17 +592,16 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
         ),
       );
     }
-    if (f.kind == ToolKind.other && f.rawInput != null) {
+    final input = f.kind == ToolKind.other ? shown.input : null;
+    if (input != null) {
       parts
         ..add(_Caption(l10n.aiToolInput))
-        ..add(
-          _Output(text: const JsonEncoder.withIndent('  ').convert(f.rawInput)),
-        );
-      if (output.isNotEmpty) parts.add(_Caption(l10n.aiToolResult));
+        ..add(_Output(output: input));
+      if (!output.isEmpty) parts.add(_Caption(l10n.aiToolResult));
     }
     final ended = f.kind == ToolKind.execute && item.end != null;
-    if (output.isNotEmpty && diffs.isEmpty) {
-      parts.add(_Output(text: output));
+    if (!output.isEmpty && diffs.isEmpty) {
+      parts.add(_Output(output: output));
     } else if (ended) {
       parts.add(
         Text(
@@ -601,11 +806,13 @@ class _Running extends StatelessWidget {
   );
 }
 
-/// Tool output: the first and last [AiSizes.outputLines] lines, "Show all"
-/// for the rest (smoothness: never thousands of rows at once).
+/// Tool output: the first and last [AiSizes.outputLines] lines — and at most
+/// [kAiOutputMaxChars] characters of them, each line cut at
+/// [kAiLineMaxChars] — "Show all" for the rest (smoothness: never thousands
+/// of rows, never a megabyte of text at once).
 class _Output extends StatefulWidget {
-  const _Output({required this.text});
-  final String text;
+  const _Output({required this.output});
+  final AiOutput output;
 
   @override
   State<_Output> createState() => _OutputState();
@@ -617,13 +824,13 @@ class _OutputState extends State<_Output> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final lines = widget.text.split('\n');
-    const n = AiSizes.outputLines;
+    final out = widget.output;
     const box = BoxDecoration(
       color: ShellxDesktopColors.surfaceInset,
       borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
     );
     if (_all) {
+      final lines = out.allLines;
       return Container(
         height: 360,
         decoration: box,
@@ -632,7 +839,7 @@ class _OutputState extends State<_Output> {
           itemExtent: 17,
           itemCount: lines.length,
           itemBuilder: (context, i) => Text(
-            lines[i],
+            aiCapLine(lines[i]),
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.clip,
@@ -641,21 +848,19 @@ class _OutputState extends State<_Output> {
         ),
       );
     }
-    final cut = lines.length > 2 * n;
-    Widget block(Iterable<String> ls) =>
-        SelectableText(ls.join('\n'), style: kAiMono);
+    Widget block(String text) => SelectableText(text, style: kAiMono);
     return Container(
       decoration: box,
       padding: const EdgeInsets.all(ShellxSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          block(cut ? lines.take(n) : lines),
-          if (cut) ...[
+          block(out.head),
+          if (out.tail case final tail?) ...[
             Row(
               children: [
                 Text(
-                  l10n.aiOutputCut(lines.length - 2 * n),
+                  l10n.aiOutputCut(out.hidden),
                   style: ShellxText.caption.copyWith(
                     color: ShellxDesktopColors.textSecondary,
                   ),
@@ -664,11 +869,11 @@ class _OutputState extends State<_Output> {
                 TextButton(
                   key: const Key('ai.tool.showAll'),
                   onPressed: () => setState(() => _all = true),
-                  child: Text(l10n.aiShowAllLines(lines.length)),
+                  child: Text(l10n.aiShowAllLines(out.lines)),
                 ),
               ],
             ),
-            block(lines.skip(lines.length - n)),
+            block(tail),
           ],
         ],
       ),

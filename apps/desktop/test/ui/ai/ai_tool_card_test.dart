@@ -480,4 +480,154 @@ void main() {
     expect(find.textContaining('should not be shown'), findsNothing);
     expect(find.text('rejected'), findsOneWidget);
   });
+
+  /// What the tool cards show as selectable text, all of it (not the
+  /// user's own message).
+  List<String> shownText(WidgetTester t) => [
+    for (final w in t.widgetList<SelectableText>(
+      find.descendant(
+        of: find.byType(AiToolCard),
+        matching: find.byType(SelectableText),
+      ),
+    ))
+      w.data ?? '',
+  ];
+
+  /// A finished `execute` card with [output], on screen after the frames that
+  /// build it; how long those frames took.
+  Future<({Duration took, AiSessionState state})> showOutput(
+    WidgetTester t,
+    String output, {
+    String id = 'x',
+  }) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    final s = runtime.state..beginTurn([const TextBlock('go')], at);
+    await pumpAiPart(t, const AiTimeline(), runtime: runtime);
+    await t.pump();
+    tool(
+      s,
+      id,
+      ToolKind.execute,
+      'base64 big.bin',
+      status: ToolCallStatus.completed,
+      content: [ToolContentBlock(TextBlock(output))],
+    );
+    final clock = Stopwatch()..start();
+    await t.pump();
+    await t.pump();
+    clock.stop();
+    return (took: clock.elapsed, state: s);
+  }
+
+  testWidgets('a 1 MB output on one line (a base64 blob, a minified bundle) '
+      'shows its card at once, the line cut at 2 000 characters (I-5)', (
+    t,
+  ) async {
+    // No space, no punctuation: the worst case for laying text out. Before
+    // the cap this took 23.5 s (the final review's measure) and froze the
+    // window, with no action of the user: the card opens by itself.
+    final shown = await showOutput(t, 'a' * (1 << 20));
+    // ignore: avoid_print
+    print('TIMING 1 MB on one line: ${shown.took.inMilliseconds} ms');
+    expect(
+      shown.took,
+      lessThan(const Duration(seconds: 3)),
+      reason: 'the frames that show the card',
+    );
+    final text = shownText(t).single;
+    expect(text.length, lessThanOrEqualTo(2001));
+    expect(text, endsWith('…'));
+  });
+
+  testWidgets('400 long lines: about 32 KB of the ends stay, the lines '
+      'between are counted; Show all lists them all, each row cut at 2 000 '
+      'characters (I-5)', (t) async {
+    final lines = [for (var i = 0; i < 400; i++) 'row $i ${'x' * 2994}'];
+    final shown = await showOutput(t, lines.join('\n'));
+    // ignore: avoid_print
+    print('TIMING 400 lines of 3000: ${shown.took.inMilliseconds} ms');
+    expect(shown.took, lessThan(const Duration(seconds: 3)));
+    final chars = shownText(t).fold<int>(0, (n, s) => n + s.length);
+    expect(chars, lessThanOrEqualTo(34 * 1024), reason: 'about 32 KB');
+    expect(chars, greaterThan(16 * 1024), reason: 'the ends are shown');
+    expect(shownText(t).first, startsWith('row 0 '));
+    expect(shownText(t).last, contains('row 399 '));
+    expect(find.textContaining('row 200 ', findRichText: true), findsNothing);
+    final hidden = find.byWidgetPredicate(
+      (w) => w is Text && RegExp(r'^\d+ lines hidden$').hasMatch(w.data ?? ''),
+    );
+    expect(hidden, findsOneWidget);
+    final count = int.parse(
+      RegExp(r'^(\d+)').firstMatch(t.widget<Text>(hidden).data!)![1]!,
+    );
+    expect(count, inInclusiveRange(370, 395));
+    expect(find.text('Show all 400 lines'), findsOneWidget);
+    await t.ensureVisible(find.byKey(const Key('ai.tool.showAll')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('ai.tool.showAll')));
+    await t.pump();
+    final rows = [
+      for (final w in t.widgetList<Text>(
+        find.descendant(
+          of: find.byType(ListView).last,
+          matching: find.byType(Text),
+        ),
+      ))
+        w.data ?? '',
+    ];
+    expect(rows, isNotEmpty);
+    expect(rows.first, startsWith('row 0 '));
+    for (final row in rows) {
+      expect(row.length, lessThanOrEqualTo(2001));
+      expect(row, endsWith('…'));
+    }
+  });
+
+  testWidgets('a long result wrapped in a fence by Claude\'s adapter shows '
+      'without the fence, which is no line (M-4)', (t) async {
+    final inner = [for (var i = 0; i < 405; i++) 'line $i'].join('\n');
+    await showOutput(t, '```console\n$inner\n```');
+    final text = shownText(t).join('\n');
+    expect(text, isNot(contains('```')));
+    expect(text, contains('line 0'));
+    expect(text, contains('line 404'));
+    expect(find.text('5 lines hidden'), findsOneWidget, reason: '405 - 400');
+    expect(find.text('Show all 405 lines'), findsOneWidget);
+  });
+
+  testWidgets('the recorded result of Claude\'s Bash tool: the fence is not '
+      'shown', (t) async {
+    // claude-agent-acp 0.90.0, the `ls` of the recorded session.
+    await showOutput(t, '```console\nhello.txt\n```');
+    expect(shownText(t), ['hello.txt']);
+    expect(find.textContaining('console'), findsNothing);
+  });
+
+  testWidgets('the arguments of a tool (pretty-printed JSON) are capped like '
+      'an output: a 1 MB value does not freeze the card (I-5)', (t) async {
+    await pumpCard(t, (s) {
+      tool(
+        s,
+        'm',
+        ToolKind.other,
+        'mcp__files__write',
+        status: ToolCallStatus.completed,
+        rawInput: {'path': 'a.txt', 'content': 'y' * (1 << 20)},
+        content: [ToolContentBlock(const TextBlock('ok'))],
+      );
+    });
+    final clock = Stopwatch()..start();
+    await t.tap(find.text('files · write'));
+    await t.pump();
+    await t.pump();
+    clock.stop();
+    // ignore: avoid_print
+    print('TIMING 1 MB rawInput: ${clock.elapsedMilliseconds} ms');
+    expect(clock.elapsed, lessThan(const Duration(seconds: 3)));
+    final text = shownText(t).first;
+    expect(text, contains('"path": "a.txt"'));
+    expect(text.length, lessThan(3000));
+    expect(text, contains('yyyy'));
+    expect(text, contains('…'));
+  });
 }
