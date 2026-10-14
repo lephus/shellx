@@ -260,9 +260,7 @@ class _AiComposerState extends ConsumerState<AiComposer> {
     // now it has, and it takes none. Refused, and nothing is lost: the text,
     // the images and the files stay where they are.
     if (images.isNotEmpty && aiTakesNoImages(scope.state)) {
-      scope.ui.images.say(
-        AppLocalizations.of(context).aiImageUnsupported(scope.state.agentName),
-      );
+      _sayNoImages(scope.ui, scope.state.agentName);
       return Future.value();
     }
     // D16: each file still mentioned goes along as a `resource_link`.
@@ -304,6 +302,19 @@ class _AiComposerState extends ConsumerState<AiComposer> {
             title: path,
           ),
       ];
+      // `initialize` may have answered while the images were encoded (off the
+      // UI isolate, when big): the check of [_send] was made before that.
+      // Asked again with no await before `send`, so no answer can land in
+      // between: an agent that takes none is not sent an image block, and the
+      // message comes back whole, as from a refused send. (A composer that is
+      // gone has nowhere to take it back to: it is not sent either.)
+      if (images.isNotEmpty && aiTakesNoImages(scope.state)) {
+        if (mounted) {
+          _restore(scope, text, images, mentions);
+          _sayNoImages(scope.ui, scope.state.agentName);
+        }
+        return;
+      }
       ok = await scope.runtime.send(blocks);
       // Queued while the agent starts, and it has not said what it takes:
       // the message is taken back if it turns out to take no images.
@@ -382,12 +393,13 @@ class _AiComposerState extends ConsumerState<AiComposer> {
       _restore(scope, sent.text, sent.images, sent.mentions);
       taken = true;
     }
-    if (taken) {
-      scope.ui.images.say(
-        AppLocalizations.of(context).aiImageUnsupported(state.agentName),
-      );
-    }
+    if (taken) _sayNoImages(scope.ui, state.agentName);
   }
+
+  /// [agent] takes no images: said in the images' note, where the image
+  /// limits are said too.
+  void _sayNoImages(AiPaneUi ui, String agent) =>
+      ui.images.say(AppLocalizations.of(context).aiImageUnsupported(agent));
 
   /// Stop (Esc): the turn is asked to end. Never more than that.
   void _cancel() => _scope!.runtime.cancel();

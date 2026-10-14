@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -5,12 +6,14 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart'
     show AgentCapabilities, InitializeResult, PromptCapabilities;
 import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/shellx_ai.dart' show AgentPhase;
 import 'package:shellx_ai/testing.dart';
+import 'package:shellx_desktop/src/ai/ai_off_thread.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_dock.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_images.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_scope.dart';
@@ -48,6 +51,32 @@ Uint8List _bmp() {
   b.add([0, 0, 255, 0, 255, 0, 0, 0]);
   b.add([255, 0, 0, 255, 255, 255, 0, 0]);
   return b.toBytes();
+}
+
+/// A PNG over the size from which base64 runs off the UI isolate.
+Uint8List _bigPng() =>
+    Uint8List.fromList([..._png, ...Uint8List(kAiInlineEncodeBytes)]);
+
+/// Off-thread work that waits until a test opens the gate: the encode of a big
+/// image is in flight, as it is while it runs on another isolate.
+final class _Gate {
+  final _waiting = <void Function()>[];
+
+  int get waiting => _waiting.length;
+
+  Future<R> call<Q, R>(R Function(Q input) work, Q input) {
+    final done = Completer<R>();
+    _waiting.add(() => done.complete(work(input)));
+    return done.future;
+  }
+
+  void open() {
+    final all = [..._waiting];
+    _waiting.clear();
+    for (final work in all) {
+      work();
+    }
+  }
 }
 
 /// V2-1 D16: images pasted into the composer.
@@ -359,10 +388,16 @@ void main() {
     WidgetTester t,
     FakeScenario scenario, {
     Uint8List? clipboard,
+    List<Override> overrides = const [],
   }) async {
     final fakes = FakeAiRuntimes(scenario);
     final runtime = partRuntime(fakes);
-    final part = await pumpAiPart(t, const AiDock(), runtime: runtime);
+    final part = await pumpAiPart(
+      t,
+      const AiDock(),
+      runtime: runtime,
+      overrides: overrides,
+    );
     part.ui.clipboardImage = () async => clipboard;
     await t.tap(find.byKey(const Key('ai.composer')));
     await t.pump();
@@ -592,6 +627,144 @@ void main() {
       ),
     );
     expect(t.takeException(), isNull);
+  }, variant: mac);
+
+  // ---- `initialize` answers while the images are encoded ------------------
+
+  /// The message is sent while the agent has said nothing: its images (over
+  /// 256 KB) are being encoded off the UI isolate, which the gate holds.
+  Future<(FakeAiRuntimes, AiRuntime, AiPaneUi, _Gate)> encoding(
+    WidgetTester t,
+    FakeScenario scenario,
+  ) async {
+    mockClipboardText(t, null);
+    final gate = _Gate();
+    final (fakes, runtime, ui) = await unknownAgent(
+      t,
+      scenario,
+      clipboard: _bigPng(),
+      overrides: [aiOffThreadProvider.overrideWithValue(gate.call)],
+    );
+    await paste(t);
+    expect(ui.images.items, hasLength(1));
+    ui.mention('lib/a.dart');
+    await t.pump();
+    await t.enterText(find.byKey(const Key('ai.composer')), 'look @lib/a.dart');
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pump();
+    expect(gate.waiting, 1, reason: 'the encode is under way');
+    expect(composerText(t), isEmpty, reason: 'the message left');
+    expect(ui.images.items, isEmpty);
+    return (fakes, runtime, ui, gate);
+  }
+
+  testWidgets('the agent says it takes no images while the images are '
+      'encoded: nothing is sent; the text, the image and the file come back '
+      'and the reason is said', (t) async {
+    final (fakes, runtime, ui, gate) = await encoding(
+      t,
+      const FakeScenario(image: false),
+    );
+    // The agent starts and answers `initialize`: no images. Then the encode
+    // ends, and the message would go on its way.
+    await runtime.start();
+    await t.pump();
+    gate.open();
+    await t.pump();
+    await t.pump();
+    expect(fakes.agent().params['session/prompt'], isNull, reason: 'not sent');
+    expect(runtime.state.queue, isEmpty);
+    expect(composerText(t), 'look @lib/a.dart');
+    expect(ui.images.items, hasLength(1));
+    expect(find.text('Claude does not take images.'), findsOneWidget);
+    // Nothing is lost: without the image the same message goes, with its file.
+    await t.tap(find.byKey(const Key('ai.image.remove.0')));
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pump();
+    await t.pump();
+    final prompt = fakes.agent().params['session/prompt']!['prompt']! as List;
+    expect(prompt.first, {'type': 'text', 'text': 'look @lib/a.dart'});
+    expect((prompt.last as Map)['type'], 'resource_link');
+    await runtime.dispose();
+  }, variant: mac);
+
+  testWidgets('the same while the agent is starting, where the message would '
+      'wait in the queue: it does not join it', (t) async {
+    final (fakes, runtime, ui, gate) = await encoding(t, const FakeScenario());
+    runtime.state.setPhase(AgentPhase.starting);
+    runtime.state.setAgent(
+      const InitializeResult(
+        protocolVersion: 1,
+        capabilities: AgentCapabilities(
+          prompt: PromptCapabilities(image: false),
+        ),
+      ),
+    );
+    gate.open();
+    await t.pump();
+    await t.pump();
+    expect(runtime.state.queue, isEmpty);
+    expect(composerText(t), 'look @lib/a.dart');
+    expect(ui.images.items, hasLength(1));
+    expect(find.text('Claude does not take images.'), findsOneWidget);
+    expect(fakes.launcher.channels, isEmpty, reason: 'nothing was started');
+  }, variant: mac);
+
+  testWidgets('what was typed while the images were encoded stays after the '
+      'message that comes back', (t) async {
+    final (_, runtime, ui, gate) = await encoding(
+      t,
+      const FakeScenario(image: false),
+    );
+    await t.enterText(find.byKey(const Key('ai.composer')), 'and this');
+    await runtime.start();
+    await t.pump();
+    gate.open();
+    await t.pump();
+    await t.pump();
+    expect(composerText(t), 'look @lib/a.dart\nand this');
+    expect(ui.images.items, hasLength(1));
+    await runtime.dispose();
+  }, variant: mac);
+
+  testWidgets('an agent that turns out to take images gets the message with '
+      'its image, as before', (t) async {
+    final (fakes, runtime, ui, gate) = await encoding(t, const FakeScenario());
+    await runtime.start();
+    await t.pump();
+    gate.open();
+    await t.pump();
+    await t.pump();
+    final prompt = fakes.agent().params['session/prompt']!['prompt']! as List;
+    expect(prompt.map((b) => (b as Map)['type']), [
+      'text',
+      'image',
+      'resource_link',
+    ]);
+    expect(composerText(t), isEmpty);
+    expect(ui.images.items, isEmpty);
+    expect(ui.images.note, isNull);
+    await runtime.dispose();
+  }, variant: mac);
+
+  testWidgets('a composer that is gone by then is not written to, and the '
+      'image is still not sent', (t) async {
+    final (fakes, runtime, ui, gate) = await encoding(
+      t,
+      const FakeScenario(image: false),
+    );
+    await runtime.start();
+    await t.pump();
+    await t.pumpWidget(const SizedBox());
+    gate.open();
+    await t.pump();
+    await t.pump();
+    expect(t.takeException(), isNull);
+    expect(fakes.agent().params['session/prompt'], isNull);
+    expect(runtime.state.queue, isEmpty);
+    expect(ui.images.items, isEmpty);
+    await runtime.dispose();
   }, variant: mac);
 
   // ---- the limits are said ------------------------------------------------
