@@ -273,13 +273,18 @@ final class FakeAiSource implements AiSessionSource {
 
 /// A hub over [source] whose messages are kept per phone. Pushes go to
 /// [pushes], or to [sink] when a test needs one that does something else.
+/// Its clock is [now], or [clock] (a fake one) when given.
 final class HubRig {
-  HubRig({FakeAiSource? source, this.pushes, AiPushSink? sink})
-    : source = source ?? FakeAiSource() {
+  HubRig({
+    FakeAiSource? source,
+    this.pushes,
+    AiPushSink? sink,
+    DateTime Function()? clock,
+  }) : source = source ?? FakeAiSource() {
     hub = AiPhoneHub(
       source: this.source,
       push: sink ?? pushes?.add,
-      now: () => now,
+      now: clock ?? () => now,
       epoch: 'ep',
     );
     hub.outbound.listen(sent.add);

@@ -232,6 +232,57 @@ void main() {
       expect(feed(mirror, sub.delta()), isFalse);
     });
 
+    test('a request is shown once the phone acknowledged a body whose '
+        'header asks it (D11: no push for it then)', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      tool(s, 'c1', {'title': 'Edit main.ts', 'kind': 'edit'});
+      final sub = AiSubscription(s, generation: 1);
+      final first = sub.attach(null);
+      final p = s.addPermission(perm('c1'), t0);
+      expect(sub.shown(p.id), isFalse); // not sent yet
+      final carried = sub.delta();
+      expect(sub.shown(p.id), isFalse); // sent, not acknowledged
+      sub.ack(first.last.seq); // an older body
+      expect(sub.shown(p.id), isFalse);
+      say(s, 'more'); // a body after it, without a header
+      final later = sub.delta();
+      sub.ack(later.last.seq); // acks are cumulative: it took both
+      expect(sub.shown(p.id), isTrue);
+
+      s.resolvePermission(p.id, const PermissionSelected('allow'));
+      final a = s.addAsk(
+        ElicitationRequest.fromJson({
+          'mode': 'form',
+          'message': 'Which?',
+          'requestedSchema': {
+            'type': 'object',
+            'properties': <String, Object?>{},
+          },
+        }),
+      )!;
+      expect(sub.shown(a.id), isFalse);
+      final asked = sub.delta();
+      sub.ack(asked.last.seq);
+      expect((sub.shown(a.id), sub.shown(p.id)), (true, false));
+      expect(carried, isNotEmpty);
+    });
+
+    test('a snapshot shows the request waiting when it was made; a full '
+        'window shows nothing new', () {
+      final s = fresh()..beginTurn(const [TextBlock('go')], t0);
+      tool(s, 'c1', {'title': 'Edit main.ts', 'kind': 'edit'});
+      final p = s.addPermission(perm('c1'), t0);
+      final sub = AiSubscription(s, generation: 1);
+      final snapshot = sub.attach(null);
+      sub.ack(snapshot.first.seq);
+      expect(sub.shown(p.id), isTrue);
+      // Another one comes while the phone acknowledged nothing new: until a
+      // body carries it and is acknowledged, it is not shown.
+      s.resolvePermission(p.id, const PermissionSelected('allow'));
+      final q = s.addPermission(perm('c1'), t0);
+      expect(sub.shown(q.id), isFalse);
+    });
+
     test('a phone far behind starts over from the last 60: one reset '
         'snapshot, not the whole history (D5)', () {
       final s = fresh()..setPhase(AgentPhase.ready);

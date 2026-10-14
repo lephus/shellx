@@ -336,8 +336,10 @@ void main() {
         rig.now = rig.now.add(const Duration(seconds: 31));
         rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
         s.addPermission(perm('c3'), aiT0); // queued behind c2: no new one
-        rig.hub.phoneGone(phone);
         rig.source.seen.add(-1);
+        // The phone that showed c2 goes: the computer shows it, so no push
+        // (without it, c2 would be pushed now: see the push tests).
+        rig.hub.phoneGone(phone);
         final p = s.permissions.first;
         s.resolvePermission(p.id, const PermissionSelected('allow'));
         expect(pushes, hasLength(1)); // seen on the computer

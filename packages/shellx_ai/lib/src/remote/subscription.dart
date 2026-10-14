@@ -73,6 +73,20 @@ final class AiSubscription with Redacted {
   var _rest = false;
   final _inflight = <(int, int)>[];
 
+  /// The request (a permission's or a question's id) the last header sent
+  /// asks, and the `seq` of the first message whose header asked it.
+  int? _asked;
+  var _askedSeq = 0;
+
+  /// The highest `seq` the phone acknowledged.
+  var _acked = 0;
+
+  /// The phone holds a header that asks [request]: it acknowledged a
+  /// message that carried one (acks are cumulative). Until then a phone
+  /// whose socket died unnoticed looks just like one that shows it (V2-2
+  /// D11: who shows a request gets no push for it).
+  bool shown(int request) => _asked == request && _acked >= _askedSeq;
+
   /// Bytes sent and not yet acknowledged.
   int get unackedBytes => _inflight.fold(0, (n, e) => n + e.$2);
 
@@ -202,7 +216,10 @@ final class AiSubscription with Redacted {
   }
 
   /// Every message up to [seq] arrived.
-  void ack(int seq) => _inflight.removeWhere((e) => e.$1 <= seq);
+  void ack(int seq) {
+    _inflight.removeWhere((e) => e.$1 <= seq);
+    if (seq > _acked) _acked = seq;
+  }
 
   List<AiOutgoing> _produce({Map<String, Object?>? snapshot}) {
     _version = state.version;
@@ -281,7 +298,16 @@ final class AiSubscription with Redacted {
       );
       first = false;
     } while (k < records.length);
+    if (headChanged || snapshot != null) _noteAsked(out.first.seq);
     return out;
+  }
+
+  /// The header that went with message [seq] asks the request waiting now.
+  void _noteAsked(int seq) {
+    final request = state.currentPermission?.id ?? state.currentAsk?.id;
+    if (request == _asked) return;
+    _asked = request;
+    _askedSeq = seq;
   }
 
   /// The header as JSON, within [kAiRecordBytes] so that a body holds it with

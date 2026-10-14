@@ -218,19 +218,37 @@ final class _Watch {
   _Watch(this.state, this.listener, this.items);
   final AiSessionState state;
   final void Function() listener;
-  int? attention;
   int items;
+
+  /// The request the session waits for now, the one its header shows: a
+  /// permission's or a question's id (one counter, never used again).
+  int? attention;
+
+  /// Requests a "needs you" push went for, while they wait: never twice.
+  final pushed = <int>{};
+
+  /// The phones that mirror the session had [AiPhoneHub.ackGrace] to
+  /// acknowledge [attention] (from when it came, or when the last of them
+  /// attached): one that has not does not count as showing it.
+  var graceOver = false;
+  Timer? grace;
 
   /// When the last "needs you" push went; a done push does not count.
   DateTime? needsPushedAt;
+
+  void stop() {
+    grace?.cancel();
+    grace = null;
+  }
 }
 
 /// The window's side of AI on phones (V2-2 D1, D2, D5, D11): lists the AI
 /// sessions, mirrors the ones a phone attaches (at most one update per
 /// [flushEvery] each, within each phone's window), runs the phone's
 /// requests — only explicit ones, checked against what is pending now —
-/// and asks for a push when a session needs the user and no phone has it
-/// open and the window does not show it. Never logs anything a session holds.
+/// and asks for a push when a session needs the user and nobody shows the
+/// request: no phone that mirrors the session took it, and the window does
+/// not show it. Never logs anything a session holds.
 final class AiPhoneHub implements AiEndpoint {
   AiPhoneHub({
     required AiSessionSource source,
@@ -240,6 +258,7 @@ final class AiPhoneHub implements AiEndpoint {
     this.flushEvery = const Duration(milliseconds: 100),
     this.listEvery = const Duration(milliseconds: 250),
     this.pushEvery = const Duration(seconds: 30),
+    this.ackGrace = const Duration(seconds: 10),
   }) : _source = source,
        _push = push,
        _now = now ?? DateTime.now,
@@ -259,6 +278,12 @@ final class AiPhoneHub implements AiEndpoint {
 
   /// At most one "needs you" push per session in this time.
   final Duration pushEvery;
+
+  /// How long a phone that mirrors a session may take to acknowledge a new
+  /// request before it does not count as showing it: its socket may have
+  /// died without a word (a lift, a pocket), which the relay notices only
+  /// minutes later, and the push must not wait for that.
+  final Duration ackGrace;
 
   final _out = StreamController<OutboundMessage>.broadcast(sync: true);
   final _phones = <String, _Phone>{};
@@ -356,12 +381,21 @@ final class AiPhoneHub implements AiEndpoint {
   }
 
   /// Forgets the phone: its mirrors, its listing, its budget. The router may
-  /// say it more than once; nothing is sent to a phone that is not known.
+  /// say it more than once; nothing is sent to a phone that is not known. A
+  /// request one of its mirrors showed may be shown by nobody now: it is
+  /// looked at again (V2-2 D11).
   @override
-  void phoneGone(String mobileId) => _phones.remove(mobileId);
+  void phoneGone(String mobileId) {
+    final phone = _phones.remove(mobileId);
+    if (phone != null) _lookAgain(phone.subs.keys);
+  }
 
   @override
-  void allPhonesGone() => _phones.clear();
+  void allPhonesGone() {
+    final sids = [for (final p in _phones.values) ...p.subs.keys];
+    _phones.clear();
+    _lookAgain(sids);
+  }
 
   /// Stops listening; the window is going. Every phone hears it first, as
   /// from a background service whose window quit (V2-2 D1): a phone that
@@ -389,6 +423,7 @@ final class AiPhoneHub implements AiEndpoint {
     _listTimer?.cancel();
     for (final w in _watched.values) {
       w.state.removeListener(w.listener);
+      w.stop();
     }
     _watched.clear();
     _phones.clear();
@@ -417,6 +452,7 @@ final class AiPhoneHub implements AiEndpoint {
       final watch = _watched[e.paneId];
       if (watch != null && identical(watch.state, state)) continue;
       watch?.state.removeListener(watch.listener);
+      watch?.stop();
       // A state this session did not have: the phones that mirror it (or
       // wait for it) start over on it — also after a gap with no state at all.
       _resubscribe(e.paneId, state);
@@ -430,13 +466,18 @@ final class AiPhoneHub implements AiEndpoint {
       }
 
       state.addListener(listener);
-      _watched[e.paneId] = _Watch(state, listener, state.timeline.items.length)
-        ..attention = state.currentPermission?.id ?? state.currentAsk?.id;
+      final w = _watched[e.paneId] = _Watch(
+        state,
+        listener,
+        state.timeline.items.length,
+      );
+      _attend(e.paneId, w, _requestOf(state));
     }
     for (final paneId in [..._watched.keys]) {
       if (live.contains(paneId)) continue;
       final w = _watched.remove(paneId)!;
       w.state.removeListener(w.listener);
+      w.stop();
     }
     // Sessions that went away close on every phone that mirrors them or was
     // waiting for them, and leave no timer or clock behind.
@@ -517,11 +558,8 @@ final class AiPhoneHub implements AiEndpoint {
     _scheduleFlush(sid);
     _scheduleListing();
     final s = w.state;
-    final attention = s.currentPermission?.id ?? s.currentAsk?.id;
-    if (attention != null && attention != w.attention) {
-      _maybePush(paneId, w, AiPushKind.needsInput, detail: aiWaitingOf(s));
-    }
-    w.attention = attention;
+    final request = _requestOf(s);
+    if (request != w.attention) _attend(paneId, w, request);
     final items = s.timeline.items;
     for (var i = w.items; i < items.length; i++) {
       final item = items[i];
@@ -530,59 +568,136 @@ final class AiPhoneHub implements AiEndpoint {
       }
       final threshold = _doneThreshold();
       if (threshold == null || item.elapsed < threshold) continue;
-      _maybePush(
-        paneId,
-        w,
-        AiPushKind.done,
-        turn: item.turn,
-        elapsed: item.elapsed,
-      );
+      _pushDone(paneId, w, item);
     }
     w.items = items.length;
   }
 
-  void _maybePush(
-    int paneId,
-    _Watch w,
-    AiPushKind kind, {
-    String? detail,
-    int? turn,
-    Duration? elapsed,
-  }) {
+  /// The request [s] waits for, the one its header shows; null: none.
+  static int? _requestOf(AiSessionState s) =>
+      s.currentPermission?.id ?? s.currentAsk?.id;
+
+  /// The session of pane [paneId] waits for [request] now, or for nothing.
+  /// A new request is pushed at once when nobody shows it ([_lookAt]), and
+  /// looked at again when the phones that mirror the session had their
+  /// [ackGrace] to take it.
+  void _attend(int paneId, _Watch w, int? request) {
+    w
+      ..attention = request
+      ..stop();
+    final s = w.state;
+    // Answered or withdrawn: its id is never used again.
+    w.pushed.retainWhere(
+      (id) =>
+          s.permissions.any((p) => p.id == id) || s.asks.any((a) => a.id == id),
+    );
+    if (request == null || _push == null || w.pushed.contains(request)) {
+      return;
+    }
+    _startGrace(paneId, w);
+    _lookAt(paneId);
+  }
+
+  void _startGrace(int paneId, _Watch w) {
+    w.grace?.cancel();
+    w
+      ..graceOver = false
+      ..grace = Timer(ackGrace, () {
+        w
+          ..grace = null
+          ..graceOver = true;
+        if (identical(_watched[paneId], w)) _lookAt(paneId, graceEnded: true);
+      });
+  }
+
+  /// Phones stopped mirroring [sids]: a request they showed may be shown by
+  /// nobody now.
+  void _lookAgain(Iterable<String> sids) {
+    for (final sid in {...sids}) {
+      final paneId = _paneOf(sid);
+      if (paneId != null) _lookAt(paneId);
+    }
+  }
+
+  /// Pushes the request session [paneId] waits for when nobody shows it
+  /// (V2-2 D11): no phone that mirrors the session shows it — took it
+  /// (acknowledged a header that asks it), or may still take it within its
+  /// [ackGrace] — and the window does not show it. When the grace ends, only
+  /// a phone that stayed silent makes it go: one that left the session by
+  /// itself is no sign of a dead socket. A phone that only lists still gets
+  /// the push: the app shows it as an in-app banner while open. Never twice
+  /// for one request, and at most one per [pushEvery] for a session.
+  void _lookAt(int paneId, {bool graceEnded = false}) {
+    final w = _watched[paneId];
+    final push = _push;
+    final request = w?.attention;
+    if (_disposed ||
+        w == null ||
+        push == null ||
+        request == null ||
+        w.pushed.contains(request)) {
+      return;
+    }
+    final sid = sidOf(paneId);
+    var silent = false;
+    for (final phone in _phones.values) {
+      final sub = phone.subs[sid];
+      if (sub == null) continue;
+      if (!w.graceOver || sub.shown(request)) return; // a phone shows it
+      silent = true;
+    }
+    if (graceEnded && !silent) return;
+    if (_seenOnDesktop(paneId)) return;
+    // The limit is of "needs you" pushes among themselves: a done push just
+    // before must not hide the question that follows it.
+    final now = _now();
+    final last = w.needsPushedAt;
+    if (last != null) {
+      // A clock set back says nothing of how long ago: do not hide it.
+      final since = now.difference(last);
+      if (!since.isNegative && since < pushEvery) return;
+    }
+    w
+      ..needsPushedAt = now
+      ..pushed.add(request);
+    _sendPush(
+      push,
+      AiPush(
+        kind: AiPushKind.needsInput,
+        agentName: w.state.agentName,
+        sid: sid,
+        detail: aiWaitingOf(w.state),
+      ),
+    );
+  }
+
+  /// A long turn ended (V2-2 D11): pushed unless a phone has the session
+  /// open or the window shows it.
+  void _pushDone(int paneId, _Watch w, TurnEndItem item) {
     final push = _push;
     if (push == null) return;
     final sid = sidOf(paneId);
-    // A phone that has the session open shows it already (V2-2 D11). A
-    // phone that only lists still gets the push: the app shows it as an
-    // in-app banner while open, a notification otherwise.
     if (_phones.values.any((p) => p.subs.containsKey(sid))) return;
     if (_seenOnDesktop(paneId)) return;
-    if (kind == AiPushKind.needsInput) {
-      // The limit is of "needs you" pushes among themselves: a done push
-      // just before must not hide the question that follows it.
-      final now = _now();
-      final last = w.needsPushedAt;
-      if (last != null) {
-        // A clock set back says nothing of how long ago: do not hide it.
-        final since = now.difference(last);
-        if (!since.isNegative && since < pushEvery) return;
-      }
-      w.needsPushedAt = now;
-    }
+    _sendPush(
+      push,
+      AiPush(
+        kind: AiPushKind.done,
+        agentName: w.state.agentName,
+        sid: sid,
+        turn: item.turn,
+        elapsed: item.elapsed,
+      ),
+    );
+  }
+
+  void _sendPush(AiPushSink push, AiPush message) {
     try {
-      push(
-        AiPush(
-          kind: kind,
-          agentName: w.state.agentName,
-          sid: sid,
-          detail: detail,
-          turn: turn,
-          elapsed: elapsed,
-        ),
-      );
+      push(message);
     } on Object {
       // A push that cannot be sent is lost; this runs inside the runtime's
-      // loop over its listeners, which an error must not cut short.
+      // loop over its listeners (or a timer), which an error must not cut
+      // short.
     }
   }
 
@@ -737,6 +852,16 @@ final class AiPhoneHub implements AiEndpoint {
     _rescan(); // a runtime may just have been made
     if (!identical(phone.subs[sid], sub)) return; // the rescan ended it
     _sendAll(mobileId, phone, sid, sub.attach(have));
+    // A request waits already: this phone gets its own time to take it (the
+    // others keep theirs until then too).
+    final w = _watched[paneId];
+    if (w != null &&
+        identical(w.state, state) &&
+        w.attention != null &&
+        !w.pushed.contains(w.attention) &&
+        _push != null) {
+      _startGrace(paneId, w);
+    }
   }
 
   /// The snapshot of a session that cannot run: its header says why, without
