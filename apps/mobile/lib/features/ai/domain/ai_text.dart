@@ -73,3 +73,48 @@ List<String> markdownBlocks(String text) {
   if (current.isNotEmpty) blocks.add(current.toString());
   return blocks;
 }
+
+/// What the phone lays out of one text, at most (V2-2 D4). The computer cuts what it sends (4 KiB of
+/// tool output at each end, 4 KiB per side of a diff, 2 KiB of input), but an agent's answer has no
+/// length, and a megabyte on one line takes seconds to lay out: the phone does not rely on being sent
+/// less. These stay above what the computer sends (and a user's text above the 32 KiB a phone may
+/// send), so nothing it meant to show is ever cut here.
+const int kShownTextChars = 40000;
+
+/// An agent's answer, a thought: markdown costs more than plain text, and a single word of that length
+/// (an encoded blob, a minified line) is the slowest to wrap.
+const int kShownAnswerChars = 20000;
+
+/// Blocks of one text the phone builds (each is a markdown widget).
+const int kShownBlocks = 200;
+
+/// One piece of tool output, one side of a diff: the computer's 8 KiB whole, or 4 KiB at each end.
+const int kShownOutputChars = 8192;
+
+/// A tool call's input as JSON (the computer sends 2 KiB at most).
+const int kShownInputChars = 4096;
+
+/// Lines of one piece of output or one side of a diff.
+const int kShownLines = 1000;
+
+/// [text] cut to what the phone lays out: at most [maxChars] UTF-16 units and [maxLines] lines (null:
+/// any number), never in the middle of a surrogate pair. [cut] says whether anything is left out;
+/// [text] is then the start of the original. A text within both limits comes back as it is (no copy).
+/// It reads at most [maxChars] units, so a megabyte costs no more than a short text.
+({String text, bool cut}) clipForDisplay(String text, {required int maxChars, int? maxLines = kShownLines}) {
+  var end = text.length < maxChars ? text.length : maxChars;
+  if (maxLines != null) {
+    var lines = 1;
+    for (var i = 0; i < end; i++) {
+      if (text.codeUnitAt(i) == 0x0A && ++lines > maxLines) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (end >= text.length) return (text: text, cut: false);
+  if (end > 0 && _isHighSurrogate(text.codeUnitAt(end - 1))) end--;
+  return (text: text.substring(0, end), cut: true);
+}
+
+bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;

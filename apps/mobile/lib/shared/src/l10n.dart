@@ -2824,6 +2824,16 @@ class S {
     );
   }
 
+  /// `This may not have been sent — the connection dropped. Check the session before trying again.`
+  String get aiOutcomeUnknown {
+    return Intl.message(
+      'This may not have been sent — the connection dropped. Check the session before trying again.',
+      name: 'aiOutcomeUnknown',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Already answered on another device.`
   String get aiAnsweredElsewhere {
     return Intl.message(

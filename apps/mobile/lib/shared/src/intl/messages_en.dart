@@ -281,6 +281,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiNoticeUndoOff": MessageLookupByLibrary.simpleMessage(
       "Undo is off for this project.",
     ),
+    "aiOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
+      "This may not have been sent — the connection dropped. Check the session before trying again.",
+    ),
     "aiPermAllowAlways": MessageLookupByLibrary.simpleMessage("Always allow"),
     "aiPermAllowOnce": MessageLookupByLibrary.simpleMessage("Allow"),
     "aiPermDetails": MessageLookupByLibrary.simpleMessage("Details"),

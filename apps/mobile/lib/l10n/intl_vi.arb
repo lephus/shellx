@@ -317,6 +317,7 @@
   "aiTooLong": "Quá dài để gửi từ điện thoại (tối đa {max} KB).",
   "aiQueueFull": "Đã có 5 tin đang chờ.",
   "aiRequestFailed": "Máy tính không nhận ({reason}).",
+  "aiOutcomeUnknown": "Có thể chưa gửi được — kết nối bị gián đoạn. Hãy xem lại phiên trước khi thử lại.",
   "aiAnsweredElsewhere": "Đã được trả lời ở thiết bị khác.",
   "aiThought": "Suy nghĩ",
   "aiFromComputerOnly": "Quá lớn để xem trên điện thoại. Xem trên máy tính.",

@@ -273,6 +273,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiNoticeUndoOff": MessageLookupByLibrary.simpleMessage(
       "Hoàn tác đang tắt cho dự án này.",
     ),
+    "aiOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
+      "Có thể chưa gửi được — kết nối bị gián đoạn. Hãy xem lại phiên trước khi thử lại.",
+    ),
     "aiPermAllowAlways": MessageLookupByLibrary.simpleMessage("Luôn cho phép"),
     "aiPermAllowOnce": MessageLookupByLibrary.simpleMessage("Cho phép"),
     "aiPermDetails": MessageLookupByLibrary.simpleMessage("Xem chi tiết"),

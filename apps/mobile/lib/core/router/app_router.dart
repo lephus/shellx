@@ -24,6 +24,7 @@ class AppRouter extends RootStackRouter {
     // Signed-in routes - MachineListRoute is initial.
     AutoRoute(page: MachineListRoute.page, initial: true, guards: [updateGuard, authGuard]),
     AutoRoute(page: TerminalRoute.page, guards: [authGuard]),
+    AutoRoute(page: AiSessionRoute.page, guards: [authGuard]),
     AutoRoute(page: QrScannerRoute.page, guards: [authGuard]),
     AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
     AutoRoute(page: DeleteAccountRoute.page, guards: [authGuard]),

@@ -521,6 +521,7 @@
   "aiQueueFull": "5 messages are already waiting.",
   "aiRequestFailed": "The computer did not take it ({reason}).",
   "@aiRequestFailed": {"placeholders": {"reason": {"type": "String"}}},
+  "aiOutcomeUnknown": "This may not have been sent — the connection dropped. Check the session before trying again.",
   "aiAnsweredElsewhere": "Already answered on another device.",
   "aiThought": "Thinking",
   "aiFromComputerOnly": "Too large for the phone. Open it on the computer.",

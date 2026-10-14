@@ -222,4 +222,50 @@ void main() {
       expect(previous, hasLength(7));
     });
   });
+
+  group('clipping a text for drawing', () {
+    test('a text within the limits comes back as it is', () {
+      const text = 'a\nb\nc';
+      final shown = clipForDisplay(text, maxChars: 100, maxLines: 10);
+      expect(shown.cut, isFalse);
+      expect(identical(shown.text, text), isTrue);
+      expect(clipForDisplay('', maxChars: 5).cut, isFalse);
+    });
+
+    test('by characters: exactly at the limit is whole, one more is cut', () {
+      expect(clipForDisplay('12345', maxChars: 5), (text: '12345', cut: false));
+      expect(clipForDisplay('123456', maxChars: 5), (text: '12345', cut: true));
+    });
+
+    test('by lines: the last line allowed is whole, the next is left out with its line break', () {
+      expect(clipForDisplay('a\nb\nc', maxChars: 100, maxLines: 3), (text: 'a\nb\nc', cut: false));
+      expect(clipForDisplay('a\nb\nc\nd', maxChars: 100, maxLines: 3), (text: 'a\nb\nc', cut: true));
+      expect(clipForDisplay('a\n\n\nd', maxChars: 100, maxLines: 2), (text: 'a\n', cut: true));
+      expect(clipForDisplay('a\nb\nc\nd', maxChars: 100, maxLines: null).cut, isFalse);
+    });
+
+    test('never in the middle of a surrogate pair', () {
+      const clef = '\u{1D11E}'; // two UTF-16 units
+      expect(clipForDisplay('ab$clef', maxChars: 3), (text: 'ab', cut: true));
+      expect(clipForDisplay('ab$clef', maxChars: 4), (text: 'ab$clef', cut: false));
+      expect(clipForDisplay('a$clef$clef', maxChars: 4), (text: 'a$clef', cut: true));
+    });
+
+    test('a megabyte on one line, or a hundred thousand lines, costs little and is cut', () {
+      final line = 'x' * 1000000;
+      final shown = clipForDisplay(line, maxChars: kShownOutputChars);
+      expect((shown.text.length, shown.cut), (kShownOutputChars, true));
+      final lines = clipForDisplay(List.filled(100000, 'l').join('\n'), maxChars: kShownOutputChars * 10);
+      expect('\n'.allMatches(lines.text).length + 1, kShownLines);
+      expect(lines.cut, isTrue);
+    });
+
+    test('what the computer sends within its own limits is never cut here', () {
+      // 4 KiB at each end of an output, 8 KiB whole, 2 KiB of input, 4 KiB per side of a diff.
+      expect(kShownOutputChars, greaterThanOrEqualTo(8 * 1024));
+      expect(kShownInputChars, greaterThanOrEqualTo(2 * 1024));
+      expect(kShownTextChars, greaterThanOrEqualTo(32 * 1024)); // what a phone may send
+      expect(kShownAnswerChars, greaterThan(kShownOutputChars));
+    });
+  });
 }

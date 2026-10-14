@@ -1,5 +1,8 @@
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
+import 'package:shellx_client/shellx_client.dart';
+import 'package:shellx_mobile/core/architecture/error_text.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// V2-2 §5: the words of AI sessions on the phone (the desktop's V2-1 §4
@@ -42,6 +45,13 @@ abstract final class AiWords {
     final m = (total % 3600) ~/ 60;
     final sec = (total % 60).toString().padLeft(2, '0');
     return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$sec' : '$m:$sec';
+  }
+
+  /// How long a tool call has been running (V2-2 §5.2): "2,1 s" below a minute, "2:05" after.
+  static String elapsed(Duration d, {String? locale}) {
+    final ms = d.isNegative ? 0 : d.inMilliseconds;
+    if (ms < 60000) return '${NumberFormat('0.0', locale).format(ms / 1000)} s';
+    return clock(d);
   }
 
   /// V2-1 D10: the main label of a permission option by kind; the agent's
@@ -119,13 +129,31 @@ abstract final class AiWords {
     };
   }
 
-  /// What a failed request shows (`ai.result` codes, V2-2 §4.6); null when
+  /// Codes the phone makes itself for a request that failed on the way (the computer's own come in
+  /// `ai.result`), see [failure].
+  ///
+  /// The connection dropped, or the computer did not answer in time: the request may have landed
+  /// (V2-2 D13), so it is said so and never sent again by itself.
+  static const String outcomeUnknown = 'outcome_unknown';
+
+  /// The handshake failed before anything was sent: the computer no longer trusts this phone, or this
+  /// version of the app is too old for it.
+  static const String untrusted = 'untrusted';
+  static const String updateRequired = 'update_required';
+
+  /// The same kind of request is already on its way: nothing to say, the first one will.
+  static const String inFlight = 'in_flight';
+
+  /// Anything else that went wrong on this side.
+  static const String error = 'error';
+
+  /// What a failed request shows (`ai.result` codes, V2-2 §4.6, and the codes above); null when
   /// nothing needs saying (a stop that came after the turn ended: the
   /// header already shows it). [answer]: the request was an answer.
   ///
   /// `not_found` and `unavailable` are also how a request in flight ends when its session closes or the
-  /// window quits. A lost channel is no code but a `MachineConnectionException`: the caller words it
-  /// `offline`.
+  /// window quits. A lost channel is no code but a `MachineConnectionException`: the caller makes
+  /// [outcomeUnknown] of it (or [untrusted] / [updateRequired], which are the machine's words).
   static String? failure(S s, String code, {bool answer = false}) => switch (code) {
     'stale' => answer ? s.aiAnsweredElsewhere : null,
     'queue_full' => s.aiQueueFull,
@@ -133,7 +161,22 @@ abstract final class AiWords {
     'offline' => s.aiReconnecting,
     'unavailable' => s.aiUnavailable,
     'not_found' || 'gone' => s.aiClosedGone,
+    // The computer keeps an answer that would turn on a mode without approval for itself: it stays
+    // open there (V2-2 D13).
+    'on_computer' => s.aiPermOnComputer,
+    outcomeUnknown => s.aiOutcomeUnknown,
+    untrusted => ErrorText(s).machine(MachineConnectionFailure.untrusted),
+    updateRequired => ErrorText(s).machine(MachineConnectionFailure.protocolUnsupported),
+    inFlight => null,
+    error => s.errorUnknown(code),
     _ => s.aiRequestFailed(code),
+  };
+
+  /// What a strip says of a computer that cannot be reached: the machine's own state ([ErrorText.machine]),
+  /// and for one that is simply off the longer text of the spec (V2-2 §5.2).
+  static String machineFailure(S s, MachineConnectionFailure failure) => switch (failure) {
+    MachineConnectionFailure.agentOffline => s.errorAgentOffline,
+    _ => ErrorText(s).machine(failure),
   };
 
   /// What the strip of a closed session says (`AiSessionHandle.closedReason`): `desktop_closed`

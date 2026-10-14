@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_ai/shellx_ai.dart';
+import 'package:shellx_client/shellx_client.dart' show MachineConnectionFailure;
 import 'package:shellx_core/shellx_core.dart' show kAiMaxPromptBytes;
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/shared/shared.dart';
@@ -483,6 +484,82 @@ void main() {
         'This kind of item is not supported on the phone yet. See it on the computer.',
       );
       expect(AiWords.itemOnComputer(en, const MirrorUnknown(2, 0, 1, null)), AiWords.itemOnComputer(en, cards[1]));
+    });
+  });
+
+  group('how long a call has been running', () {
+    test('seconds with a decimal below a minute (comma in Vietnamese), minutes after', () {
+      expect(AiWords.elapsed(const Duration(milliseconds: 2100), locale: 'vi'), '2,1 s');
+      expect(AiWords.elapsed(const Duration(milliseconds: 2100), locale: 'en'), '2.1 s');
+      expect(AiWords.elapsed(const Duration(milliseconds: 59900), locale: 'vi'), '59,9 s');
+      expect(AiWords.elapsed(const Duration(seconds: 60), locale: 'vi'), '1:00');
+      expect(AiWords.elapsed(const Duration(seconds: 3725), locale: 'vi'), '1:02:05');
+      expect(AiWords.elapsed(const Duration(seconds: -4), locale: 'vi'), '0,0 s'); // the clocks differ
+    });
+  });
+
+  group('a request that failed on the way (V2-2 D13)', () {
+    test('one that may have landed says so, in both languages', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(
+        AiWords.failure(vi, 'outcome_unknown'),
+        'Có thể chưa gửi được — kết nối bị gián đoạn. Hãy xem lại phiên trước khi thử lại.',
+      );
+      expect(AiWords.failure(vi, 'outcome_unknown', answer: true), AiWords.failure(vi, 'outcome_unknown'));
+      final en = await S.load(const Locale('en'));
+      expect(
+        AiWords.failure(en, 'outcome_unknown'),
+        'This may not have been sent — the connection dropped. Check the session before trying again.',
+      );
+    });
+
+    test('a handshake that failed sent nothing: the machine\'s own words', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(AiWords.failure(vi, 'untrusted'), 'Máy không còn tin cậy điện thoại này. Hãy ghép nối lại.');
+      expect(AiWords.failure(vi, 'update_required'), 'Cần cập nhật app');
+      final en = await S.load(const Locale('en'));
+      expect(AiWords.failure(en, 'untrusted'), 'This computer no longer trusts this phone. Please pair again.');
+      expect(AiWords.failure(en, 'update_required'), 'App update required');
+    });
+
+    test('an option the computer keeps for itself is answered there', () async {
+      // The computer refuses an answer that would turn on a mode without approval (V2-2 D13); the
+      // request stays open for it.
+      final vi = await S.load(const Locale('vi'));
+      expect(AiWords.failure(vi, 'on_computer', answer: true), 'Trả lời yêu cầu này trên máy tính.');
+      final en = await S.load(const Locale('en'));
+      expect(AiWords.failure(en, 'on_computer', answer: true), 'Answer this request on the computer.');
+    });
+
+    test('a request already on its way says nothing; anything else is a sentence', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(AiWords.failure(vi, 'in_flight'), isNull);
+      expect(AiWords.failure(vi, 'error'), 'Đã có lỗi xảy ra (error).');
+      final en = await S.load(const Locale('en'));
+      expect(AiWords.failure(en, 'error'), 'Something went wrong (error).');
+    });
+
+    test('a computer that cannot be reached is worded by the machine, the offline one at length', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(
+        AiWords.machineFailure(vi, MachineConnectionFailure.agentOffline),
+        'Máy tính đang offline. Hãy mở ShellX trên máy tính rồi thử lại.',
+      );
+      expect(AiWords.machineFailure(vi, MachineConnectionFailure.timeout), 'Máy tính không phản hồi. Hãy thử lại.');
+      expect(
+        AiWords.machineFailure(vi, MachineConnectionFailure.untrusted),
+        'Máy không còn tin cậy điện thoại này. Hãy ghép nối lại.',
+      );
+      expect(AiWords.machineFailure(vi, MachineConnectionFailure.protocolUnsupported), 'Cần cập nhật app');
+      final en = await S.load(const Locale('en'));
+      expect(
+        AiWords.machineFailure(en, MachineConnectionFailure.agentOffline),
+        'The computer is offline. Open ShellX on the computer and try again.',
+      );
+      expect(
+        AiWords.machineFailure(en, MachineConnectionFailure.timeout),
+        "The computer didn't respond. Please try again.",
+      );
     });
   });
 }
