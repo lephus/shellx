@@ -37,10 +37,14 @@ final class RestoreOutcome {
     required this.keyBySession,
     required this.tabIdByKey,
     required this.panesFailed,
+    this.aiKeyByPane = const {},
   });
 
   /// The saved pane key of every reopened session.
   final Map<int, String> keyBySession;
+
+  /// V2-1 D14: the saved key of every reopened AI tab, by its AI pane.
+  final Map<int, String> aiKeyByPane;
 
   /// The new tab id of every restored tab, by saved tab key.
   final Map<String, int> tabIdByKey;
@@ -161,6 +165,7 @@ extension _Restore on TerminalTabs {
   Future<RestoreOutcome> _runRestore(FutureOr<RestorePlan?> pending) async {
     final keyBySession = <int, String>{};
     final tabIdByKey = <String, int>{};
+    final aiKeyByPane = <int, String>{};
     var failed = 0;
     if (_restoring != null) return RestoreOutcome.none;
     final done = _restoring = Completer<void>();
@@ -180,6 +185,8 @@ extension _Restore on TerminalTabs {
         for (final w in snapshot.workspaces)
           for (final key in w.tabs) key: w.id,
       };
+      // V2-1 D14: AI tabs at once (no process to start, B11).
+      _restoreAiTabs(snapshot, workspaceOf, tabIdByKey, aiKeyByPane);
       order = _restoreOrder(snapshot);
       for (final saved in order) {
         if (!alive()) break;
@@ -267,7 +274,46 @@ extension _Restore on TerminalTabs {
       keyBySession: keyBySession,
       tabIdByKey: tabIdByKey,
       panesFailed: failed,
+      aiKeyByPane: aiKeyByPane,
     );
+  }
+
+  /// V2-1 D14: the saved AI tabs, each with its title, agent, folder and
+  /// session, placed in its workspace; selected when it was. No agent
+  /// starts: a pane starts its agent when it is first shown (B11).
+  void _restoreAiTabs(
+    RestoreSnapshot snapshot,
+    Map<String, String> workspaceOf,
+    Map<String, int> tabIdByKey,
+    Map<int, String> aiKeyByPane,
+  ) {
+    final fallback = _ref.read(appL10nProvider).aiNewSession;
+    for (final saved in snapshot.aiTabs) {
+      final tab = TerminalTab.ai(
+        id: kSyntheticTabIdBase + _syntheticTabIds++,
+        pane: AiPaneState(
+          id: _nextAiPaneId--,
+          agentId: saved.agent,
+          agentName: saved.agentName,
+          title: saved.title.isEmpty ? fallback : saved.title,
+          cwd: saved.cwd,
+          sessionId: saved.session,
+        ),
+        customTitle: saved.name,
+        meta: saved.meta,
+      );
+      // Before the tab appears: the sidebar takes it as it places the tab.
+      _ref.read(restorePlacementProvider).pending[tab.id] =
+          workspaceOf[saved.key];
+      final select = _restoreMaySelect && saved.key == snapshot.selectedTab;
+      if (select) _restoreMaySelect = false;
+      _set(
+        tabs: [..._state.tabs, tab],
+        selectedId: select ? tab.id : _state.selectedId ?? tab.id,
+      );
+      tabIdByKey[saved.key] = tab.id;
+      aiKeyByPane[tab.ai!.id] = saved.key;
+    }
   }
 
   /// A5b D14: the saved tabs over the sessions that are alive (their panes
@@ -337,10 +383,20 @@ extension _Restore on TerminalTabs {
       tabs: [...tabs, ...rest],
       selectedId: selected ?? tabs.firstOrNull?.id ?? _state.selectedId,
     );
+    // V2-1 D14: the AI tabs too (the service never held them).
+    final workspaceOf = {
+      for (final w in snapshot.workspaces)
+        for (final key in w.tabs) key: w.id,
+    };
+    final aiKeyByPane = <int, String>{};
+    _restoreMaySelect = selected == null;
+    _restoreAiTabs(snapshot, workspaceOf, tabIdByKey, aiKeyByPane);
+    _restoreMaySelect = false;
     return RestoreOutcome(
       keyBySession: keyBySession,
       tabIdByKey: tabIdByKey,
       panesFailed: failed,
+      aiKeyByPane: aiKeyByPane,
     );
   }
 

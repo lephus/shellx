@@ -19,6 +19,12 @@ const int _maxCwd = 4096;
 
 /// Same bound as A2's stored workspace ids (`Workspace.decode`).
 const int _maxWorkspaceId = 64;
+
+/// V2-1 D14: an AI tab's agent id (`claude`, a custom agent's id).
+final RegExp _agentId = RegExp(r'^[a-z0-9][a-z0-9._-]{0,63}$');
+
+/// V2-1 D14: an AI tab's saved title, at most this many characters.
+const int _maxAiTitle = 200;
 final RegExp _keyPattern = RegExp(r'^[0-9a-f]{32}$');
 
 /// POSIX `/…`, Windows `C:\…` or `C:/…`, or UNC `\\…`.
@@ -148,6 +154,113 @@ final class SavedTab {
       TabMeta(pinned: pinned, description: description, status: status);
 }
 
+/// V2-1 D14: one AI tab of `layout.json` (`aiTabs`). Its key is the key
+/// of its AI leaf (`{"ai": key}`); ruling B3: that leaf is all the layout
+/// holds. Never any conversation: the agent keeps it, under [session].
+final class SavedAiTab {
+  const SavedAiTab({
+    required this.key,
+    required this.title,
+    required this.agent,
+    required this.agentName,
+    this.name,
+    this.session,
+    this.cwd,
+    this.pinned = false,
+    this.description = '',
+    this.status = TabStatus.none,
+  });
+
+  final String key;
+
+  /// The automatic title (the session's, or the first prompt).
+  final String title;
+
+  /// The user's name for the tab (B4); null: automatic.
+  final String? name;
+  final String agent;
+  final String agentName;
+
+  /// The agent's session id, already a valid A12 session id.
+  final String? session;
+  final String? cwd;
+  final bool pinned;
+  final String description;
+  final TabStatus status;
+
+  TabMeta get meta =>
+      TabMeta(pinned: pinned, description: description, status: status);
+
+  Map<String, Object?> toJson() => {
+    'key': key,
+    'title': title,
+    'name': ?name,
+    'focused': key,
+    'zoomed': null,
+    'agent': agent,
+    'agentName': agentName,
+    'session': session,
+    'cwd': cwd,
+    'layout': {'ai': key},
+    if (pinned) 'pinned': true,
+    if (description.isNotEmpty) 'desc': description,
+    if (status != TabStatus.none) 'status': status.wire,
+  };
+
+  /// Null for anything that is not a well-formed AI tab: the entry is then
+  /// dropped, never the file. Damaged optional fields are repaired.
+  static SavedAiTab? tryParse(Object? raw) {
+    if (raw is! Map<String, Object?>) return null;
+    final key = raw['key'];
+    final agent = raw['agent'];
+    if (key is! String || !isPaneKey(key)) return null;
+    if (agent is! String || !_agentId.hasMatch(agent)) return null;
+    if (!_hasAiLeaf(raw['layout'], key, 0)) return null;
+    final title = raw['title'];
+    final name = raw['name'];
+    final agentName = raw['agentName'];
+    final session = raw['session'];
+    final cwd = raw['cwd'];
+    return SavedAiTab(
+      key: key,
+      title: title is String ? _cleanTitle(title) : '',
+      name: name is String && name.isNotEmpty && name.length <= _maxName
+          ? name
+          : null,
+      agent: agent,
+      agentName:
+          agentName is String &&
+              agentName.trim().isNotEmpty &&
+              agentName.length <= _maxName
+          ? agentName
+          : agent,
+      session: session is String && isValidSessionId(session) ? session : null,
+      cwd: cwd is String && isRestorableCwd(cwd) ? cwd : null,
+      pinned: raw['pinned'] == true,
+      description: switch (raw['desc']) {
+        final String d => TabMeta.cleanDescription(d),
+        _ => '',
+      },
+      status: TabStatus.fromWire(raw['status']),
+    );
+  }
+
+  static bool _hasAiLeaf(Object? node, String key, int depth) {
+    if (depth > _maxDepth || node is! Map<String, Object?>) return false;
+    if (node['ai'] == key) return true;
+    return _hasAiLeaf(node['first'], key, depth + 1) ||
+        _hasAiLeaf(node['second'], key, depth + 1);
+  }
+
+  static String _cleanTitle(String text) {
+    final clean = text.replaceAll(_control, ' ').trim();
+    final runes = clean.runes;
+    return runes.length <= _maxAiTitle
+        ? clean
+        : String.fromCharCodes(runes.take(_maxAiTitle));
+  }
+}
+
 final class SavedWorkspace {
   const SavedWorkspace({required this.id, required this.tabs});
 
@@ -167,6 +280,7 @@ final class RestoreSnapshot {
     this.selectedTab,
     required this.workspaces,
     required this.tabs,
+    this.aiTabs = const [],
   });
 
   final DateTime savedAt;
@@ -177,6 +291,12 @@ final class RestoreSnapshot {
   final String? selectedTab;
   final List<SavedWorkspace> workspaces;
   final List<SavedTab> tabs;
+
+  /// V2-1 D14: the AI tabs (top-level `aiTabs`, which V1 ignores).
+  final List<SavedAiTab> aiTabs;
+
+  /// Something to restore: a terminal tab or an AI tab (Review Focus 2).
+  bool get hasTabs => tabs.isNotEmpty || aiTabs.isNotEmpty;
 
   Set<String> get paneKeys => {
     for (final t in tabs) ...savedLeaves(t.layout).map((p) => p.key),
@@ -190,6 +310,7 @@ final class RestoreSnapshot {
         selectedTab: selectedTab,
         workspaces: workspaces,
         tabs: tabs,
+        aiTabs: aiTabs,
       );
 
   /// Equal apart from [savedAt] and [cleanExit]: no write needed.
@@ -215,6 +336,9 @@ final class RestoreSnapshot {
           if (t.status != TabStatus.none) 'status': t.status.wire,
         },
     ],
+    // V2-1 D14: only when there is one, so a terminal-only layout is
+    // byte-identical to before.
+    if (aiTabs.isNotEmpty) 'aiTabs': [for (final t in aiTabs) t.toJson()],
   };
 
   String encode() => jsonEncode({
@@ -269,6 +393,18 @@ final class RestoreSnapshot {
         );
       }
       if (seen.length > _maxPanes) return null;
+      // V2-1 D14: the AI tabs; a damaged one is dropped, never the file.
+      final aiTabs = <SavedAiTab>[];
+      final aiKeys = <String>{};
+      if (root['aiTabs'] case final List<Object?> list) {
+        for (final raw in list) {
+          final t = SavedAiTab.tryParse(raw);
+          if (t == null || tabKeys.contains(t.key) || seen.contains(t.key)) {
+            continue;
+          }
+          if (aiKeys.add(t.key)) aiTabs.add(t);
+        }
+      }
       // A tab key is its creating pane's key: a leaf of its own tree, or
       // of none once that pane closed, never a pane of another tab.
       for (final t in tabs) {
@@ -292,7 +428,9 @@ final class RestoreSnapshot {
           // A tab sits in one place: once across all workspaces.
           final key = k! as String;
           if (!listed.add(key)) return null;
-          if (tabKeys.contains(key)) members.add(key);
+          if (tabKeys.contains(key) || aiKeys.contains(key)) {
+            members.add(key);
+          }
         }
         workspaces.add(SavedWorkspace(id: id, tabs: members));
       }
@@ -301,9 +439,12 @@ final class RestoreSnapshot {
         savedAt: savedAt,
         cleanExit: clean,
         daemon: root['daemon'] as String?,
-        selectedTab: tabKeys.contains(selected) ? selected : null,
+        selectedTab: tabKeys.contains(selected) || aiKeys.contains(selected)
+            ? selected
+            : null,
         workspaces: workspaces,
         tabs: tabs,
+        aiTabs: aiTabs,
       );
     } on Object {
       // FormatException, TypeError from a cast, ArgumentError from

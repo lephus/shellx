@@ -42,10 +42,11 @@ final class RestoreLoad {
   required RestoreSnapshot? current,
   required List<RestoreSnapshot?> generations,
 }) {
-  if (current != null && current.tabs.isNotEmpty) {
+  // V2-1 D14: a layout with only AI tabs is not empty (Review Focus 2).
+  if (current != null && current.hasTabs) {
     return (snapshot: current, recovered: false);
   }
-  final fallback = generations.where((g) => g != null && g.tabs.isNotEmpty);
+  final fallback = generations.where((g) => g != null && g.hasTabs);
   if (current == null) {
     return fallback.isEmpty
         ? (snapshot: null, recovered: false)
@@ -56,7 +57,7 @@ final class RestoreLoad {
   }
   if (!current.cleanExit && generations.isNotEmpty) {
     final newest = generations.first;
-    if (newest != null && newest.tabs.isNotEmpty) {
+    if (newest != null && newest.hasTabs) {
       return (snapshot: newest.copyWith(cleanExit: false), recovered: true);
     }
   }
@@ -247,7 +248,7 @@ final class RestoreStore implements RestoreFiles {
       final generations = [await _readGeneration(1), await _readGeneration(2)];
       final pick = pickSnapshot(current: current, generations: generations);
       if (pick.recovered) _log('restore: recovered from an earlier layout');
-      if (current != null && current.tabs.isNotEmpty && text != null) {
+      if (current != null && current.hasTabs && text != null) {
         await _rotate(text, current, generations.first);
       }
       return RestoreLoad(

@@ -1,3 +1,4 @@
+import '../terminal/agent_status.dart' show isValidSessionId;
 import '../terminal/pane_layout.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
@@ -9,6 +10,10 @@ import 'restore_snapshot.dart';
 /// after that pane has closed. When that pane now lives in another tab (A11
 /// D20), the tab's key is [keyOf] of the negated tab id instead: a pane key
 /// of its own that no leaf of any tab carries, so the file still loads.
+///
+/// V2-1 D14: AI tabs go to `aiTabs`, keyed by [aiKeyOf] of their AI pane
+/// (never [keyOf]: AI pane ids are negative, as displaced tabs' are); none
+/// without [aiKeyOf].
 RestoreSnapshot captureSnapshot({
   required TerminalTabsState tabs,
   required SidebarState sidebar,
@@ -17,9 +22,30 @@ RestoreSnapshot captureSnapshot({
   required bool cleanExit,
   String? daemon,
   SavedAgent? Function(int sessionId)? agentOf,
+  String Function(int aiPaneId)? aiKeyOf,
 }) {
   final saved = <int, SavedTab>{};
+  final savedAi = <int, SavedAiTab>{};
   for (final tab in tabs.tabs) {
+    if (tab.isAi) {
+      final ai = tab.ai;
+      if (ai == null || aiKeyOf == null) continue;
+      final session = ai.sessionId;
+      final cwd = ai.cwd;
+      savedAi[tab.id] = SavedAiTab(
+        key: aiKeyOf(ai.id),
+        title: ai.title,
+        name: tab.customTitle,
+        agent: ai.agentId,
+        agentName: ai.agentName,
+        session: session != null && isValidSessionId(session) ? session : null,
+        cwd: cwd != null && isRestorableCwd(cwd) ? cwd : null,
+        pinned: tab.meta.pinned,
+        description: tab.meta.description,
+        status: tab.meta.status,
+      );
+      continue;
+    }
     final layout = savePaneTree(tab.layout, tab, keyOf, agentOf: agentOf);
     if (layout == null) continue;
     final leaves = savedLeaves(layout);
@@ -49,12 +75,15 @@ RestoreSnapshot captureSnapshot({
     savedAt: now,
     cleanExit: cleanExit,
     daemon: daemon,
-    selectedTab: saved[tabs.selectedId]?.key,
+    selectedTab: saved[tabs.selectedId]?.key ?? savedAi[tabs.selectedId]?.key,
     workspaces: [
       for (final w in sidebar.workspaces)
         SavedWorkspace(
           id: w.id,
-          tabs: [for (final id in sidebar.tabsOf(w.id)) ?saved[id]?.key],
+          tabs: [
+            for (final id in sidebar.tabsOf(w.id))
+              ?(saved[id]?.key ?? savedAi[id]?.key),
+          ],
         ),
     ],
     tabs: [
@@ -62,6 +91,11 @@ RestoreSnapshot captureSnapshot({
       // Tabs the sidebar has not placed yet keep creation order.
       for (final t in tabs.tabs)
         if (!placed.contains(t.id)) ?saved[t.id],
+    ],
+    aiTabs: [
+      for (final id in ordered) ?savedAi[id],
+      for (final t in tabs.tabs)
+        if (!placed.contains(t.id)) ?savedAi[t.id],
     ],
   );
 }

@@ -97,6 +97,10 @@ class RestorePersistence extends Notifier<void> {
   /// A3 D1, and its key with it).
   final _keys = <int, String>{};
 
+  /// V2-1 D14: AI pane id → its AI tab's key, apart from [_keys] (AI pane
+  /// ids are negative, as [_keys]' displaced-tab entries are).
+  final _aiKeys = <int, String>{};
+
   /// Pane keys that may have a scrollback file. One that is no longer a
   /// pane of the layout loses its file at the next layout write (D15).
   final _filed = <String>{};
@@ -213,6 +217,9 @@ class RestorePersistence extends Notifier<void> {
     return key;
   });
 
+  /// V2-1 D14: an AI tab's key, made when its pane is first saved.
+  String aiKeyOf(int aiPaneId) => _aiKeys.putIfAbsent(aiPaneId, newPaneKey);
+
   Future<bool> hasSavedScrollback() => _files.hasScrollback();
 
   /// After `flushAll(clean: true)` the quit or power-off did not happen
@@ -277,6 +284,7 @@ class RestorePersistence extends Notifier<void> {
       final plan = await planned;
       if (!ref.mounted) return;
       _keys.addAll(outcome.keyBySession);
+      _aiKeys.addAll(outcome.aiKeyByPane);
       _filed.addAll(outcome.keyBySession.values);
       if (plan == null) {
         if (!_frozen && !unreadable && !_restoreStopped) {
@@ -522,6 +530,7 @@ class RestorePersistence extends Notifier<void> {
       cleanExit: cleanExit,
       daemon: currentDaemon,
       agentOf: _agentOf,
+      aiKeyOf: aiKeyOf,
     );
     final previous = _written;
     if (!force && previous != null && previous.sameLayoutAs(next)) return;
@@ -536,6 +545,7 @@ class RestorePersistence extends Notifier<void> {
           ? !tabs.tabs.any((t) => t.id == -id)
           : tabs.tabOfSession(id) == null && !tabs.tabs.any((t) => t.id == id),
     );
+    _aiKeys.removeWhere((id, _) => tabs.tabOfPane(id) == null);
     bool ok;
     try {
       ok = await files.writeLayout(next);
@@ -548,7 +558,8 @@ class RestorePersistence extends Notifier<void> {
       return;
     }
     _written = next;
-    if (next.tabs.isNotEmpty) {
+    // V2-1 D14: AI tabs count (Review Focus 2).
+    if (next.hasTabs) {
       _hadTabs = true;
     } else if (_hadTabs) {
       // The user closed the last tab: a crash must not bring the old
