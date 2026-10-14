@@ -7,6 +7,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_diff_overlay.dart';
+import 'ai_notice_card.dart' show aiUndoReason;
 import 'ai_scope.dart';
 
 /// "This turn" or "Whole session" (§4.4).
@@ -36,6 +37,32 @@ AiTurns aiTurnsOf(AiSessionState s) {
     lastFinished: lastFinished,
     running: running != null,
   );
+}
+
+/// The last turn that ended — with a restore point or without one (undo
+/// off, a snapshot that failed) — or null. What the Files panel and `@` read
+/// the project again after (D18); [aiTurnsOf] counts only turns that have a
+/// restore point, so with undo off it would never move.
+int? aiLastEndedTurn(AiSessionState s) {
+  final items = s.timeline.items;
+  for (var i = items.length - 1; i >= 0; i--) {
+    final item = items[i];
+    if (item is TurnEndItem) return item.turn;
+  }
+  return null;
+}
+
+/// Why undo is off right now: the latest "undo is off" card of the
+/// conversation that is still open; null when undo works.
+UndoUnavailable? aiUndoOffOf(AiSessionState s) {
+  final items = s.timeline.items;
+  for (var i = items.length - 1; i >= 0; i--) {
+    final item = items[i];
+    if (item is! NoticeItem || item.resolved) continue;
+    final notice = item.notice;
+    if (notice is UndoUnavailable) return notice;
+  }
+  return null;
 }
 
 /// B14: what the undo dialog chose.
@@ -104,14 +131,27 @@ Future<void> aiRevert(
   final changes = turn == null
       ? await runtime.sessionChanges()
       : await runtime.changesSince(turn);
+  if (changes == null) {
+    // git did not answer: said, never a silent nothing.
+    ui.note.value = l10n.aiRevertFailed;
+    return;
+  }
   var paths = [
-    for (final c in changes ?? const <FileChange>[])
+    for (final c in changes)
       if (only == null || c.path == only) c.path,
   ];
-  if (paths.isEmpty) return;
-  final after = last == null
+  if (paths.isEmpty) {
+    // Nothing of it is changed any more (put back by hand): the panel
+    // looks again, so the row it still shows goes.
+    ui.changesChanged();
+    return;
+  }
+  // A turn that ended without its end tree (the agent died, "Dừng hẳn")
+  // cannot say what changed after it: any file may have, so every file asks.
+  final known = last == null
       ? const <String>{}
-      : await runtime.changedAfterTurn(last) ?? const <String>{};
+      : await runtime.changedAfterTurn(last);
+  final after = known ?? paths.toSet();
   final touched = [
     for (final path in paths)
       if (after.contains(path)) path,
@@ -139,7 +179,12 @@ Future<void> aiRevert(
   } on Object catch (error) {
     debugPrint('ShellX: revert failed: ${error.runtimeType}');
   }
-  ui.note.value = ok ? l10n.aiReverted(paths.length) : l10n.aiRevertFailed;
+  ui.note.value = ok
+      ? l10n.aiReverted(paths.length)
+      // A turn started while the dialog was open: that is the reason.
+      : runtime.state.turn != null
+      ? l10n.aiRevertBusy
+      : l10n.aiRevertFailed;
   ui.changesChanged();
 }
 
@@ -164,6 +209,9 @@ class _AiChangesPanelState extends State<AiChangesPanel> {
   var _scope = AiChangesScope.turn;
   AiPaneScope? _pane;
   AiTurns? _turns;
+
+  /// Why undo is off, while no turn has a restore point to show.
+  UndoUnavailable? _undoOff;
   List<FileChange>? _changes;
   Set<String> _after = const {};
   var _loaded = false;
@@ -180,6 +228,7 @@ class _AiChangesPanelState extends State<AiChangesPanel> {
       pane.ui.changes.addListener(_reload);
       _pane = pane;
       _turns = aiTurnsOf(pane.state);
+      _undoOff = _undoOffOf(_turns!, pane.state);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _reload();
       });
@@ -191,13 +240,33 @@ class _AiChangesPanelState extends State<AiChangesPanel> {
   void dispose() {
     _pane?.frames.removeListener(_onFrame);
     _pane?.ui.changes.removeListener(_reload);
+    // The note is about what was done here; it does not wait for the panel
+    // to open again.
+    _clearNote();
     super.dispose();
   }
 
+  UndoUnavailable? _undoOffOf(AiTurns turns, AiSessionState state) =>
+      turns.last == null ? aiUndoOffOf(state) : null;
+
+  /// A result ("Reverted 2 files.", "Wait for the running turn to finish.")
+  /// that is no longer true: a turn started or ended, the scope changed.
+  void _clearNote() {
+    final note = _pane?.ui.note;
+    if (note != null && note.value != null) note.value = null;
+  }
+
   void _onFrame() {
-    final next = aiTurnsOf(_pane!.state);
-    if (next == _turns) return;
+    final state = _pane!.state;
+    final next = aiTurnsOf(state);
+    final off = _undoOffOf(next, state);
+    if (next == _turns) {
+      if (!identical(off, _undoOff)) setState(() => _undoOff = off);
+      return;
+    }
     _turns = next;
+    _undoOff = off;
+    _clearNote();
     unawaited(_load());
   }
 
@@ -257,19 +326,28 @@ class _AiChangesPanelState extends State<AiChangesPanel> {
     final dim = ShellxText.caption.copyWith(
       color: ShellxDesktopColors.textSecondary,
     );
+    Widget line(String text) => Padding(
+      padding: const EdgeInsets.all(ShellxSpace.s12),
+      child: Text(text, style: dim),
+    );
     final Widget body;
     if (!_loaded) {
       body = const SizedBox.shrink();
-    } else if (turn == null || changes == null) {
-      body = Padding(
-        padding: const EdgeInsets.all(ShellxSpace.s12),
-        child: Text(l10n.aiChangesNoTurn, style: dim),
+    } else if (turn == null) {
+      // No turn has a restore point: none yet, or undo is off and says why.
+      final off = _undoOff;
+      body = line(
+        off == null
+            ? l10n.aiChangesNoTurn
+            : off.turnOnly
+            ? l10n.aiNoUndoTurn(aiUndoReason(l10n, off.reason))
+            : l10n.aiNoUndo(aiUndoReason(l10n, off.reason)),
       );
+    } else if (changes == null) {
+      // The turn is there; git did not answer.
+      body = line(l10n.errorUnexpected('changes'));
     } else if (changes.isEmpty) {
-      body = Padding(
-        padding: const EdgeInsets.all(ShellxSpace.s12),
-        child: Text(l10n.aiChangesEmpty, style: dim),
-      );
+      body = line(l10n.aiChangesEmpty);
     } else {
       body = ListView.builder(
         itemCount: changes.length,
@@ -327,6 +405,7 @@ class _AiChangesPanelState extends State<AiChangesPanel> {
             ],
             selected: {_scope},
             onSelectionChanged: (s) {
+              _clearNote();
               setState(() => _scope = s.single);
               unawaited(_load());
             },
