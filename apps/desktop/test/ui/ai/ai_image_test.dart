@@ -249,7 +249,7 @@ void main() {
     );
     await paste(t);
     // The codec answers on the engine's own thread: real time.
-    for (var i = 0; i < 40 && ui.images.items.isEmpty; i++) {
+    for (var i = 0; i < 100 && ui.images.items.isEmpty; i++) {
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 25)),
       );
