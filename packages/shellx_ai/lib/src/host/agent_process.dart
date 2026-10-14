@@ -4,6 +4,7 @@ import 'dart:io';
 import 'agent_catalog.dart';
 import 'byte_ring.dart';
 import 'process_snapshot.dart';
+import 'running_agents.dart' show KillPid;
 
 /// This process's own pid (inside [AgentProcess], `pid` is the agent's).
 final int _ownPid = pid;
@@ -31,12 +32,20 @@ typedef AgentLauncher =
     Future<AgentChannel> Function(AgentCommand command, {required String cwd});
 
 /// Kills a process and everything it started; the desktop passes its
-/// `killProcessTree` (taskkill /T, or the A10 POSIX tree killer).
+/// `killProcessTree` (the A10 POSIX tree killer; taskkill /T on Windows).
+/// [AgentProcess] uses it on macOS and Linux only: on Windows nothing is
+/// killed by walking a tree (see [AgentProcess]).
 typedef KillTree = Future<void> Function(Process process);
 
 /// The fallback [KillTree]: the process only.
 Future<void> killOnly(Process process) async {
   process.kill(ProcessSignal.sigkill);
+}
+
+/// The default [KillPid] of [AgentProcess]: the process whose pid it is, and
+/// nothing it started.
+Future<void> killPidOnly(int pid) async {
+  Process.killPid(pid, ProcessSignal.sigkill);
 }
 
 /// A process this app did not start, as far as a [KillTree] can use one: it
@@ -73,14 +82,29 @@ final class _Stranger implements Process {
 /// its children to nobody. The process table is read first, while the agent is
 /// still their parent ([processTable], for at most [firstReadLimit]); after
 /// the exit, or after the grace, what of them is still the same process is
-/// killed through [killTree].
+/// killed.
+///
+/// On macOS and Linux a tree is killed through [killTree]. On Windows
+/// ([isWindows]) no tree is ever walked when a kill is made: a parent id
+/// outlives its process there and a pid is reused at once, so the tree of a
+/// pid (taskkill /T) can take a process that is not the agent's, ShellX itself
+/// or what is above it. The agent is killed by its own handle, and the
+/// processes the table showed it had started, each on its own through
+/// [killPid], after the check that it is still the same process. What the
+/// agent starts after the table is read is left.
+///
+/// Every request for the table says when the agent was spawned, so that a read
+/// that began before ([SharedProcessTable]) is never taken for one about it.
 final class AgentProcess implements AgentChannel {
   AgentProcess._(
     this._process,
     this._killTree,
+    this._killPid,
+    this._windows,
     this._grace,
     this._processTable,
     this._firstReadLimit,
+    this._spawned,
   ) {
     _process.stderr.listen(_stderr.add, onError: (Object _) {});
     unawaited(_process.exitCode.then((_) => _exited = true));
@@ -90,6 +114,8 @@ final class AgentProcess implements AgentChannel {
     AgentCommand command, {
     required String cwd,
     KillTree killTree = killOnly,
+    KillPid killPid = killPidOnly,
+    bool? isWindows,
     Duration grace = const Duration(seconds: 2),
     ProcessTableReader processTable = readProcessTable,
     Duration? firstReadLimit,
@@ -104,17 +130,26 @@ final class AgentProcess implements AgentChannel {
     return AgentProcess._(
       process,
       killTree,
+      killPid,
+      isWindows ?? Platform.isWindows,
       grace,
       processTable,
       firstReadLimit ?? firstTableReadLimit(),
+      // After the process exists: a table read before is not about it.
+      processClock(),
     );
   }
 
   final Process _process;
   final KillTree _killTree;
+  final KillPid _killPid;
+  final bool _windows;
   final Duration _grace;
   final ProcessTableReader _processTable;
   final Duration? _firstReadLimit;
+
+  /// When the agent came into being, on the [processClock].
+  final Duration _spawned;
   final _stderr = ByteRing(256 * 1024);
   Future<void>? _stopping;
   var _exited = false;
@@ -147,9 +182,19 @@ final class AgentProcess implements AgentChannel {
     try {
       await _process.exitCode.timeout(_grace);
     } on TimeoutException {
-      await _killTree(_process);
+      await _killAgent();
     }
     await _killLeftovers(started);
+  }
+
+  /// The agent that did not leave: with its tree elsewhere, by itself on
+  /// Windows (what it started is in the list the caller holds).
+  Future<void> _killAgent() async {
+    if (_windows) {
+      _process.kill(ProcessSignal.sigkill);
+    } else {
+      await _killTree(_process);
+    }
   }
 
   /// What the agent has started right now: its children, theirs… Empty when
@@ -178,14 +223,19 @@ final class AgentProcess implements AgentChannel {
 
   /// Kills what of [started] is still there and still the same process.
   /// What no longer is (it left, or its pid went to another process) is left
-  /// alone, and so is anything that was not in [started]. Each top of what
-  /// is left is killed with its tree; what that did not take is killed one by
-  /// one. Best effort: the stop has been done.
+  /// alone, and so is anything that was not in [started]. Elsewhere each top
+  /// of what is left is killed with its tree, and what that did not take one
+  /// by one; on Windows every one of them on its own, and no tree. Best
+  /// effort: the stop has been done.
   Future<void> _killLeftovers(List<ProcessRow> started) async {
     if (started.isEmpty) return;
     try {
       final left = await _stillThere(started);
       if (left.isEmpty) return;
+      if (_windows) {
+        await Future.wait([for (final r in left) _killOne(r.pid)]);
+        return;
+      }
       final pids = {for (final r in left) r.pid};
       final tops = [
         for (final r in left)
@@ -209,7 +259,12 @@ final class AgentProcess implements AgentChannel {
   /// own when null). The wait is ended here as well as in the reader: the read
   /// may be one that was under way before ([SharedProcessTable]).
   Future<List<ProcessRow>?> _table(Duration? limit) {
-    final read = _processTable(limit: limit);
+    // Made again as a Future that can hold null: a reader written the plain
+    // way (`async => rows`) gives a Future<List<ProcessRow>> at run time,
+    // whatever its type says, and its onTimeout could not give null.
+    final read = Future<List<ProcessRow>?>.value(
+      _processTable(limit: limit, after: _spawned),
+    );
     return limit == null ? read : read.timeout(limit, onTimeout: () => null);
   }
 
@@ -225,14 +280,25 @@ final class AgentProcess implements AgentChannel {
 
   Future<void> _killOne(int pid) async {
     try {
-      await _killTree(_Stranger(pid));
+      if (_windows) {
+        await _killPid(pid);
+      } else {
+        await _killTree(_Stranger(pid));
+      }
     } on Object {
       // The others still go.
     }
   }
 
   @override
-  Future<void> kill() => _killTree(_process);
+  Future<void> kill() async {
+    if (!_windows) return _killTree(_process);
+    // Windows: who the agent has started, as the table shows it now (it is
+    // here, hung or not); then the agent, and each of them on its own.
+    final started = await _descendants();
+    _process.kill(ProcessSignal.sigkill);
+    await Future.wait([for (final r in started) _killOne(r.pid)]);
+  }
 
   @override
   String toString() => '…';

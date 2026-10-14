@@ -281,7 +281,7 @@ void main() {
       final limits = <Duration?>[];
       return (
         limits: limits,
-        read: ({Duration? limit}) async {
+        read: ({Duration? limit, Duration? after}) async {
           final call = limits.length;
           limits.add(limit);
           await Future<void>.delayed(delay);
@@ -322,7 +322,7 @@ void main() {
       'a read that fails fails them all, and the next one is made',
       () async {
         var calls = 0;
-        final table = SharedProcessTable(({limit}) async {
+        final table = SharedProcessTable(({limit, after}) async {
           calls++;
           await Future<void>.delayed(const Duration(milliseconds: 20));
           if (calls == 1) throw StateError('ps broke');
@@ -343,6 +343,99 @@ void main() {
       expect(await Future.wait([table(), table()]), [null, null]);
       expect(r.limits, hasLength(1));
     });
+
+    // A table that was read before a process existed shows the pid it got as
+    // whatever had that pid then. Whoever asks says since when it exists
+    // (`after`, on the processClock), and joins only a read that began later.
+    group('a read is joined only if it began after the asker existed', () {
+      Future<void> pause([int ms = 10]) =>
+          Future<void>.delayed(Duration(milliseconds: ms));
+
+      test('one that began before is not joined: a new read is made', () async {
+        final r = reader(
+          (call) => [row(call + 1, 1)],
+          delay: const Duration(milliseconds: 200),
+        );
+        final table = SharedProcessTable(r.read);
+        final old = table(); // under way
+        await pause();
+        final existsSince = processClock(); // an agent spawned after it began
+        await pause();
+        final fresh = table(after: existsSince);
+        expect(r.limits, hasLength(2));
+        expect((await old)!.single.pid, 1);
+        expect((await fresh)!.single.pid, 2);
+      });
+
+      test('one that began after is joined', () async {
+        final r = reader((call) => [row(call + 1, 1)]);
+        final table = SharedProcessTable(r.read);
+        final existsSince = processClock();
+        await pause();
+        final first = table();
+        final joined = table(after: existsSince);
+        expect(r.limits, hasLength(1));
+        expect((await joined)!.single.pid, (await first)!.single.pid);
+      });
+
+      test('whoever does not say since when joins what is under way', () async {
+        final r = reader((call) => [row(call + 1, 1)]);
+        final table = SharedProcessTable(r.read);
+        final first = table();
+        await pause();
+        final second = table();
+        expect(r.limits, hasLength(1));
+        expect(await first, await second);
+      });
+
+      test('the newer read is the one that is joined from then on, and the '
+          'older one ending does not make it forgotten', () async {
+        final r = reader(
+          (call) => [row(call + 1, 1)],
+          delay: const Duration(milliseconds: 400),
+        );
+        final table = SharedProcessTable(r.read);
+        final first = table(); // ends at 400 ms
+        await pause(100);
+        final existsSince = processClock();
+        await pause();
+        final second = table(after: existsSince); // began at ~110, ends ~510
+        await first; // the older read ends while the newer is under way
+        final third = table(after: existsSince);
+        expect(r.limits, hasLength(2), reason: 'the third joined the second');
+        expect(await third, await second);
+        // …and when the newer one has ended too, the next ask is a new read.
+        await table();
+        expect(r.limits, hasLength(3));
+      });
+
+      test('a failing older read does not take the newer one down', () async {
+        var calls = 0;
+        final table = SharedProcessTable(({limit, after}) async {
+          final call = calls++;
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          if (call == 0) throw StateError('ps broke');
+          return [row(1, 0)];
+        });
+        final old = table();
+        final oldFails = expectLater(old, throwsA(isA<StateError>()));
+        await pause();
+        final existsSince = processClock();
+        await pause();
+        final fresh = table(after: existsSince);
+        await oldFails;
+        expect((await fresh)!.single.pid, 1);
+        expect((await table(after: existsSince))!.single.pid, 1);
+      });
+    });
+  });
+
+  test('processClock goes forward only', () async {
+    final a = processClock();
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    final b = processClock();
+    expect(b, greaterThan(a));
+    expect(processClock() >= b, isTrue);
   });
 
   test(

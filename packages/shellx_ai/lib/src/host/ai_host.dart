@@ -51,7 +51,8 @@ final class AiHost with Redacted {
   final RunningAgents running;
   final KillTree _killTree;
 
-  /// The one read of the process table that agents stopping together share.
+  /// The one read of the process table that agents stopping together share
+  /// (never one that began before the agent that asks was spawned).
   final SharedProcessTable _processTable;
   final DateTime Function() _now;
 

@@ -89,12 +89,17 @@ void main() {
     /// The agent is a Dart process that leaves when stdin closes (or one that
     /// ignores it). [tables] are the answers to the 1st, 2nd… read of the
     /// process table, the last one repeating; each is given the agent's pid.
+    /// [windows] runs the strategy of Windows (a pid at a time, no tree is
+    /// walked) on any machine. [killed] are the processes the tree killer was
+    /// asked for (elsewhere), [pidKills] those killed one by one (Windows).
     Future<
       ({
         AgentProcess agent,
         List<int> killed,
+        List<int> pidKills,
         List<String> log,
         List<Duration?> limits,
+        List<Duration?> afters,
       })
     >
     run(
@@ -104,10 +109,13 @@ void main() {
       Duration grace = const Duration(seconds: 2),
       Duration? firstReadLimit,
       Set<int> failing = const {},
+      bool windows = false,
     }) async {
       final killed = <int>[];
+      final pidKills = <int>[];
       final log = <String>[];
       final limits = <Duration?>[];
+      final afters = <Duration?>[];
       var reads = 0;
       late final AgentProcess agent;
       agent = track(
@@ -128,13 +136,21 @@ void main() {
           cwd: tmp.path,
           grace: grace,
           firstReadLimit: firstReadLimit,
-          processTable: ({limit}) async {
+          isWindows: windows,
+          processTable: ({limit, after}) async {
             log.add('table');
             limits.add(limit);
+            afters.add(after);
             final answer =
                 tables[reads < tables.length ? reads : tables.length - 1];
             reads++;
             return answer(agent.pid);
+          },
+          killPid: (pid) async {
+            log.add('pid $pid');
+            pidKills.add(pid);
+            // Only the agent is a real process here, and it is never named.
+            if (failing.contains(pid)) throw StateError('cannot kill');
           },
           killTree: (proc) async {
             log.add('kill ${proc.pid == agent.pid ? 'agent' : proc.pid}');
@@ -145,7 +161,14 @@ void main() {
           },
         ),
       );
-      return (agent: agent, killed: killed, log: log, limits: limits);
+      return (
+        agent: agent,
+        killed: killed,
+        pidKills: pidKills,
+        log: log,
+        limits: limits,
+        afters: afters,
+      );
     }
 
     test('the table is read before stdin closes: the agent is still their '
@@ -165,7 +188,10 @@ void main() {
             environment: Platform.environment,
           ),
           cwd: tmp.path,
-          processTable: ({limit}) async {
+          // Not the 1.5 s of Windows: a cold runner may need longer to start
+          // the agent, and the wait for the table would end before it.
+          firstReadLimit: const Duration(seconds: 30),
+          processTable: ({limit, after}) async {
             // Once the agent is up: a stdin closed before that would be seen
             // the moment it listens.
             for (var i = 0; i < 400 && !up.existsSync(); i++) {
@@ -339,79 +365,377 @@ void main() {
     // table says, ShellX and what is above it are never killed (the desktop's
     // killProcessTree ends with an unconditional killPid), nor pid 0 and 1,
     // nor anything that is only under them. What the agent really left is
-    // still killed.
-    group('never this process, what is above it, or pid 0 and 1', () {
-      /// The dev server the agent really left, and its worker.
-      List<ProcessRow> left(int agent) => [
-        row(_nowhere + 1, agent),
-        row(_nowhere + 2, _nowhere + 1),
-      ];
+    // still killed. Both ways of killing: a tree at a time, and (Windows) a
+    // pid at a time.
+    for (final windows in [false, true]) {
+      group(
+        'never this process, what is above it, or pid 0 and 1 '
+        '(${windows ? 'a pid at a time, as on Windows' : 'with the tree killer'})',
+        () {
+          /// The dev server the agent really left, and its worker.
+          List<ProcessRow> left(int agent) => [
+            row(_nowhere + 1, agent),
+            row(_nowhere + 2, _nowhere + 1),
+          ];
 
-      Future<void> expectOnlyTheLeftovers(
-        List<ProcessRow> Function(int agent) table,
-      ) async {
-        final r = await run([table]);
+          Future<void> expectOnlyTheLeftovers(
+            List<ProcessRow> Function(int agent) table,
+          ) async {
+            final r = await run([table], windows: windows);
+            await r.agent.stop();
+            expect(await r.agent.exitCode, 0);
+            final named = windows ? r.pidKills : r.killed;
+            expect(
+              named,
+              unorderedEquals([_nowhere + 1, _nowhere + 2]),
+              reason: 'what the agent left, and nothing else',
+            );
+            expect(windows ? r.killed : r.pidKills, isEmpty);
+          }
+
+          test('this process listed as a child of the agent: neither it nor '
+              'what is under it', () async {
+            await expectOnlyTheLeftovers(
+              (agent) => [
+                row(agent, pid), // the agent, a child of this process
+                row(pid, agent), // this process, "a child of the agent"
+                row(_nowhere + 20, pid), // a shell this process started
+                row(_nowhere + 21, _nowhere + 20), // its child
+                ...left(agent),
+              ],
+            );
+          });
+
+          test('an ancestor listed as a child of the agent: neither it nor '
+              'what is under it', () async {
+            const parent = _nowhere + 30;
+            const grandparent = _nowhere + 31;
+            await expectOnlyTheLeftovers(
+              (agent) => [
+                row(agent, pid),
+                row(pid, parent), // this process, started by `parent`…
+                row(parent, grandparent), // …which `grandparent` started…
+                row(grandparent, agent), // …and that is "a child of the agent"
+                row(_nowhere + 32, grandparent), // under an ancestor
+                row(_nowhere + 33, parent), // under another
+                ...left(agent),
+              ],
+            );
+          });
+
+          test('pid 1 and pid 0 listed as children of the agent: neither them '
+              'nor what is under them', () async {
+            await expectOnlyTheLeftovers(
+              (agent) => [
+                row(agent, pid),
+                row(1, agent, command: 'launchd'),
+                row(0, agent, command: 'kernel_task'),
+                row(_nowhere + 40, 1), // anything the system started
+                row(_nowhere + 41, 0),
+                ...left(agent),
+              ],
+            );
+          });
+
+          test('the same in the table read after the exit', () async {
+            // The first table is right; the second lists this process under the
+            // agent. Only what was in the first can be killed anyway.
+            final r = await run([
+              (agent) => [row(agent, pid), ...left(agent)],
+              (agent) => [row(pid, agent), ...left(agent)],
+            ], windows: windows);
+            await r.agent.stop();
+            expect(
+              windows ? r.pidKills : r.killed,
+              unorderedEquals([_nowhere + 1, _nowhere + 2]),
+            );
+          });
+        },
+      );
+    }
+
+    // Windows keeps the parent id of a process whose parent has left, and
+    // reuses a pid at once, so a tree walked when the kill is made (taskkill
+    // /T, the tree killer) can take a process that is not the agent's: ShellX
+    // itself, or what is above it. There nothing is killed by walking: the
+    // agent (its own Process, whose handle is ours), and the processes the
+    // table showed it had started, each on its own, after the check that it
+    // is still the same process.
+    group('on Windows no tree is walked', () {
+      test('what the agent left is killed one by one, each as the table '
+          'showed it, and the tree killer is not asked', () async {
+        final r = await run([tree, (agent) => afterwards()], windows: true);
         await r.agent.stop();
         expect(await r.agent.exitCode, 0);
-        expect(r.killed, [
-          _nowhere + 1,
-          _nowhere + 2,
-        ], reason: 'what the agent left, and nothing else');
-      }
-
-      test('this process listed as a child of the agent: neither it nor what '
-          'is under it', () async {
-        await expectOnlyTheLeftovers(
-          (agent) => [
-            row(agent, pid), // the agent, a child of this process
-            row(pid, agent), // this process, "a child of the agent"
-            row(_nowhere + 20, pid), // a shell this process started
-            row(_nowhere + 21, _nowhere + 20), // its child
-            ...left(agent),
-          ],
+        expect(
+          r.pidKills,
+          unorderedEquals([_nowhere + 1, _nowhere + 2, _nowhere + 3]),
+          reason: 'the worker too: it is on the list, not found by a walk',
+        );
+        expect(r.killed, isEmpty, reason: 'no taskkill /T, no tree killer');
+        expect(
+          r.log.where((e) => e == 'table'),
+          hasLength(2),
+          reason: 'one read before, one after: nothing is left to a third',
         );
       });
 
-      test('an ancestor listed as a child of the agent: neither it nor what '
-          'is under it', () async {
-        const parent = _nowhere + 30;
-        const grandparent = _nowhere + 31;
-        await expectOnlyTheLeftovers(
-          (agent) => [
-            row(agent, pid),
-            row(pid, parent), // this process, started by `parent`…
-            row(parent, grandparent), // …which `grandparent` started…
-            row(grandparent, agent), // …and that is "a child of the agent"
-            row(_nowhere + 32, grandparent), // under an ancestor
-            row(_nowhere + 33, parent), // under another
-            ...left(agent),
-          ],
-        );
-      });
-
-      test('pid 1 and pid 0 listed as children of the agent: neither them '
-          'nor what is under them', () async {
-        await expectOnlyTheLeftovers(
-          (agent) => [
-            row(agent, pid),
-            row(1, agent, command: 'launchd'),
-            row(0, agent, command: 'kernel_task'),
-            row(_nowhere + 40, 1), // anything the system started
-            row(_nowhere + 41, 0),
-            ...left(agent),
-          ],
-        );
-      });
-
-      test('the same in the table read after the exit', () async {
-        // The first table is right; the second lists this process under the
-        // agent. Only what was in the first can be killed anyway.
+      test('only what is still the same process: not a reused pid, not what '
+          'came after the table', () async {
         final r = await run([
-          (agent) => [row(agent, pid), ...left(agent)],
-          (agent) => [row(pid, agent), ...left(agent)],
-        ]);
+          tree,
+          (agent) => [
+            row(_nowhere + 1, 1),
+            row(_nowhere + 2, _nowhere + 1),
+            // The pid of the test run was reused, an hour later.
+            row(_nowhere + 3, 1, at: t0.add(const Duration(hours: 1))),
+            row(_nowhere + 5, 1),
+            row(_nowhere + 9, 1), // started after the table was read
+          ],
+        ], windows: true);
         await r.agent.stop();
-        expect(r.killed, [_nowhere + 1, _nowhere + 2]);
+        expect(r.pidKills, unorderedEquals([_nowhere + 1, _nowhere + 2]));
+        expect(r.killed, isEmpty);
+      });
+
+      test('an agent that ignores stdin is killed on its own, then the '
+          'processes the table showed', () async {
+        final r = await run(
+          [tree, (agent) => afterwards(testRun: false)],
+          ignoresStdin: true,
+          grace: const Duration(milliseconds: 300),
+          windows: true,
+        );
+        await r.agent.stop();
+        expect(
+          await r.agent.exitCode.timeout(const Duration(seconds: 10)),
+          isNot(0),
+          reason: 'the agent was killed (by its own handle)',
+        );
+        expect(r.killed, isEmpty, reason: 'its tree is not walked');
+        expect(r.pidKills, unorderedEquals([_nowhere + 1, _nowhere + 2]));
+        expect(r.pidKills, isNot(contains(r.agent.pid)));
+      });
+
+      test(
+        'with no table the agent is killed and nothing is guessed',
+        () async {
+          final r = await run(
+            [(agent) => null],
+            ignoresStdin: true,
+            grace: const Duration(milliseconds: 300),
+            windows: true,
+          );
+          await r.agent.stop();
+          await r.agent.exitCode.timeout(const Duration(seconds: 10));
+          expect(r.killed, isEmpty);
+          expect(r.pidKills, isEmpty);
+        },
+      );
+
+      test('a pid that cannot be killed fails nobody else', () async {
+        final r = await run(
+          [tree, (agent) => afterwards()],
+          failing: {_nowhere + 1},
+          windows: true,
+        );
+        await r.agent.stop();
+        expect(
+          r.pidKills,
+          unorderedEquals([_nowhere + 1, _nowhere + 2, _nowhere + 3]),
+        );
+        expect(await r.agent.exitCode, 0);
+      });
+
+      test('kill() reads the table, then kills the agent and each process '
+          'the table showed under it, one by one', () async {
+        final r = await run([tree], ignoresStdin: true, windows: true);
+        await r.agent.kill();
+        expect(
+          await r.agent.exitCode.timeout(const Duration(seconds: 10)),
+          isNot(0),
+        );
+        expect(
+          r.pidKills,
+          unorderedEquals([_nowhere + 1, _nowhere + 2, _nowhere + 3]),
+        );
+        expect(r.killed, isEmpty, reason: 'no tree is walked');
+        expect(
+          r.log.first,
+          'table',
+          reason: 'the table first, the agent still there',
+        );
+      });
+
+      test('kill() never names this process or what is above it', () async {
+        final r = await run(
+          [
+            (agent) => [
+              row(agent, pid),
+              row(pid, agent),
+              row(_nowhere + 20, pid),
+              row(1, agent),
+              row(_nowhere + 1, agent),
+            ],
+          ],
+          ignoresStdin: true,
+          windows: true,
+        );
+        await r.agent.kill();
+        await r.agent.exitCode.timeout(const Duration(seconds: 10));
+        expect(r.pidKills, [_nowhere + 1]);
+      });
+
+      test('kill() with no table kills the agent and nothing else', () async {
+        final r = await run(
+          [(agent) => null],
+          ignoresStdin: true,
+          windows: true,
+        );
+        await r.agent.kill();
+        await r.agent.exitCode.timeout(const Duration(seconds: 10));
+        expect(r.pidKills, isEmpty);
+        expect(r.killed, isEmpty);
+      });
+
+      test('kill() of an agent that has left reads no table', () async {
+        final r = await run([tree], source: 'void main() {}', windows: true);
+        await r.agent.exitCode;
+        await r.agent.kill();
+        expect(r.log, isEmpty);
+      });
+    });
+
+    // The table a stop is given must not be older than the agent: a shared
+    // read (SharedProcessTable) that began before it was spawned shows the
+    // pid it got as the process that had it then.
+    group('a table is never older than the agent', () {
+      test('every request says when the agent was spawned', () async {
+        final before = processClock();
+        final r = await run([tree, (agent) => afterwards()]);
+        final spawned = processClock();
+        await r.agent.stop();
+        expect(r.afters, isNotEmpty);
+        for (final after in r.afters) {
+          expect(after, isNotNull);
+          expect(after! >= before && after <= spawned, isTrue);
+        }
+        expect(r.afters.toSet(), hasLength(1), reason: 'the same moment');
+      });
+
+      test(
+        'a reader that always answers with a list works with a limit '
+        '(its future cannot give null on a timeout, and must not need to)',
+        () async {
+          late final AgentProcess agent;
+          var reads = 0;
+          final killed = <int>[];
+          agent = track(
+            await AgentProcess.start(
+              AgentCommand(
+                executable: Platform.resolvedExecutable,
+                args: [
+                  ...dartScript(tmp, 'eof', _upThenExitOnEof),
+                  '${tmp.path}/up',
+                  '${tmp.path}/eof',
+                ],
+                environment: Platform.environment,
+              ),
+              cwd: tmp.path,
+              firstReadLimit: const Duration(seconds: 30),
+              // Written the plain way: the future is a Future<List<ProcessRow>>,
+              // never a Future<List<ProcessRow>?>, whatever the type says.
+              processTable: ({limit, after}) async => reads++ == 0
+                  ? [row(agent.pid, pid), row(_nowhere + 1, agent.pid)]
+                  : [row(_nowhere + 1, 1)],
+              killTree: (proc) async => killed.add(proc.pid),
+            ),
+          );
+          await agent.stop();
+          expect(killed, [_nowhere + 1], reason: 'the snapshot was taken');
+        },
+      );
+
+      test('a read that began before the agent existed is not joined: its '
+          'pid was another process\'s in that table, and that one\'s '
+          'surviving children are not the agent\'s', () async {
+        late int agentPid;
+        var reads = 0;
+        final shared = SharedProcessTable(({limit, after}) async {
+          final call = reads++;
+          if (call == 0) {
+            // The table of a moment ago, slow to come: the pid the agent has
+            // now was a child of this process that has left since, and its
+            // child stays.
+            await Future<void>.delayed(const Duration(milliseconds: 600));
+            return [
+              row(agentPid, pid, command: 'old-child'),
+              row(_nowhere + 1, agentPid),
+              row(_nowhere + 2, _nowhere + 1),
+            ];
+          }
+          // The table of now: the agent has started nothing; the old child's
+          // children are there still, under init.
+          return [
+            row(agentPid, pid),
+            row(_nowhere + 1, 1),
+            row(_nowhere + 2, _nowhere + 1),
+          ];
+        });
+        final someoneElses = shared(); // under way before the agent exists
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        final killed = <int>[];
+        final agent = track(
+          await AgentProcess.start(
+            AgentCommand(
+              executable: Platform.resolvedExecutable,
+              args: [
+                ...dartScript(tmp, 'eof', _upThenExitOnEof),
+                '${tmp.path}/up',
+                '${tmp.path}/eof',
+              ],
+              environment: Platform.environment,
+            ),
+            cwd: tmp.path,
+            firstReadLimit: const Duration(seconds: 30),
+            processTable: shared.call,
+            killTree: (proc) async => killed.add(proc.pid),
+          ),
+        );
+        agentPid = agent.pid;
+        await agent.stop();
+        expect(await agent.exitCode, 0);
+        expect(killed, isEmpty, reason: 'nothing the agent started is left');
+        expect(reads, greaterThanOrEqualTo(2), reason: 'it read for itself');
+        await someoneElses;
+      });
+
+      test('a read that began after the agent was spawned is joined, as '
+          'before', () async {
+        var reads = 0;
+        final shared = SharedProcessTable(({limit, after}) async {
+          reads++;
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+          return null;
+        });
+        final agent = track(
+          await AgentProcess.start(
+            AgentCommand(
+              executable: Platform.resolvedExecutable,
+              args: [
+                ...dartScript(tmp, 'eof', _upThenExitOnEof),
+                '${tmp.path}/up',
+                '${tmp.path}/eof',
+              ],
+              environment: Platform.environment,
+            ),
+            cwd: tmp.path,
+            firstReadLimit: const Duration(seconds: 30),
+            processTable: shared.call,
+          ),
+        );
+        await Future.wait([shared(), agent.stop()]);
+        expect(reads, 1, reason: 'one read, started after the spawn');
       });
     });
 
@@ -471,110 +795,161 @@ void main() {
     });
   });
 
-  group('with real processes', () {
-    final noSh = Platform.isWindows ? 'the fake agent is a shell script' : null;
+  // Real processes, both ways of killing what the agent left: a tree at a
+  // time (macOS, Linux) and a pid at a time (Windows, run here as well).
+  for (final windows in [false, true]) {
+    group(
+      'with real processes (${windows ? 'a pid at a time, as on Windows' : 'with the tree killer'})',
+      () {
+        final noSh = Platform.isWindows
+            ? 'the fake agent is a shell script'
+            : null;
 
-    Future<int> pidIn(File file) async {
-      for (var i = 0; i < 200 && !file.existsSync(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 25));
-      }
-      // The shell wrote the line as it started the child: a beat for it to be
-      // complete.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      final pid = int.parse(file.readAsStringSync().trim());
-      strangers.add(pid);
-      return pid;
-    }
+        Future<int> pidIn(File file) async {
+          for (var i = 0; i < 200 && !file.existsSync(); i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 25));
+          }
+          // The shell wrote the line as it started the child: a beat for it to be
+          // complete.
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          final pid = int.parse(file.readAsStringSync().trim());
+          strangers.add(pid);
+          return pid;
+        }
 
-    Future<bool> goneSoon(int pid) async {
-      for (var i = 0; i < 60; i++) {
-        if (!_alive(pid)) return true;
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
-      return false;
-    }
+        Future<bool> goneSoon(int pid) async {
+          for (var i = 0; i < 60; i++) {
+            if (!_alive(pid)) return true;
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          }
+          return false;
+        }
 
-    AgentCommand shell(String script) => AgentCommand(
-      executable: '/bin/sh',
-      args: ['-c', script],
-      environment: const {'PATH': '/usr/bin:/bin'},
-    );
-
-    test(
-      'an agent that exits when stdin closes leaves no child behind',
-      () async {
-        final pidFile = File('${tmp.path}/child.pid');
-        final p = track(
-          await AgentProcess.start(
-            shell(
-              'sleep 60 & echo \$! > "${pidFile.path}"; cat > /dev/null; exit 0',
-            ),
-            cwd: tmp.path,
-          ),
+        AgentCommand shell(String script) => AgentCommand(
+          executable: '/bin/sh',
+          args: ['-c', script],
+          environment: const {'PATH': '/usr/bin:/bin'},
         );
-        final child = await pidIn(pidFile);
-        expect(_alive(child), isTrue);
-        await p.stop();
-        expect(await p.exitCode, 0, reason: 'it left by itself, in time');
-        expect(await goneSoon(child), isTrue, reason: 'its child went with it');
-      },
-      skip: noSh,
-    );
 
-    test(
-      'a child with a child of its own: the whole of what it left',
-      () async {
-        final middleFile = File('${tmp.path}/middle.pid');
-        final workerFile = File('${tmp.path}/worker.pid');
-        final p = track(
-          await AgentProcess.start(
-            shell(
-              'sh -c \'sleep 60 & echo \$! > "${workerFile.path}"; wait\' & '
-              'echo \$! > "${middleFile.path}"; cat > /dev/null; exit 0',
-            ),
-            cwd: tmp.path,
-          ),
+        test(
+          'an agent that exits when stdin closes leaves no child behind',
+          () async {
+            final pidFile = File('${tmp.path}/child.pid');
+            final p = track(
+              await AgentProcess.start(
+                shell(
+                  'sleep 60 & echo \$! > "${pidFile.path}"; cat > /dev/null; exit 0',
+                ),
+                cwd: tmp.path,
+                isWindows: windows,
+              ),
+            );
+            final child = await pidIn(pidFile);
+            expect(_alive(child), isTrue);
+            await p.stop();
+            expect(await p.exitCode, 0, reason: 'it left by itself, in time');
+            expect(
+              await goneSoon(child),
+              isTrue,
+              reason: 'its child went with it',
+            );
+          },
+          skip: noSh,
         );
-        final middle = await pidIn(middleFile);
-        final worker = await pidIn(workerFile);
-        await p.stop();
-        expect(await goneSoon(middle), isTrue);
-        expect(await goneSoon(worker), isTrue);
+
+        test(
+          'a child with a child of its own: the whole of what it left',
+          () async {
+            final middleFile = File('${tmp.path}/middle.pid');
+            final workerFile = File('${tmp.path}/worker.pid');
+            final p = track(
+              await AgentProcess.start(
+                shell(
+                  'sh -c \'sleep 60 & echo \$! > "${workerFile.path}"; wait\' & '
+                  'echo \$! > "${middleFile.path}"; cat > /dev/null; exit 0',
+                ),
+                cwd: tmp.path,
+                isWindows: windows,
+              ),
+            );
+            final middle = await pidIn(middleFile);
+            final worker = await pidIn(workerFile);
+            await p.stop();
+            expect(await goneSoon(middle), isTrue);
+            expect(await goneSoon(worker), isTrue);
+          },
+          skip: noSh,
+        );
+
+        test('what the agent did not start is left alone', () async {
+          final pidFile = File('${tmp.path}/child.pid');
+          final bystander = await Process.start('/bin/sleep', ['60']);
+          strangers.add(bystander.pid);
+          final p = track(
+            await AgentProcess.start(
+              shell(
+                'sleep 60 & echo \$! > "${pidFile.path}"; cat > /dev/null; exit 0',
+              ),
+              cwd: tmp.path,
+              isWindows: windows,
+            ),
+          );
+          final child = await pidIn(pidFile);
+          await p.stop();
+          expect(await goneSoon(child), isTrue);
+          expect(
+            _alive(bystander.pid),
+            isTrue,
+            reason: 'not the agent\'s child',
+          );
+        }, skip: noSh);
+
+        test('an agent that has to be killed takes its children too', () async {
+          final pidFile = File('${tmp.path}/child.pid');
+          final p = track(
+            await AgentProcess.start(
+              shell('sleep 60 & echo \$! > "${pidFile.path}"; exec sleep 300'),
+              cwd: tmp.path,
+              isWindows: windows,
+              grace: const Duration(milliseconds: 400),
+            ),
+          );
+          final child = await pidIn(pidFile);
+          await p.stop();
+          await p.exitCode.timeout(const Duration(seconds: 10));
+          expect(await goneSoon(child), isTrue);
+        }, skip: noSh);
+
+        if (windows) {
+          test(
+            'kill() takes the agent and what it started, one by one',
+            () async {
+              final pidFile = File('${tmp.path}/child.pid');
+              final bystander = await Process.start('/bin/sleep', ['60']);
+              strangers.add(bystander.pid);
+              final p = track(
+                await AgentProcess.start(
+                  shell(
+                    'sleep 60 & echo \$! > "${pidFile.path}"; exec sleep 300',
+                  ),
+                  cwd: tmp.path,
+                  isWindows: true,
+                ),
+              );
+              final child = await pidIn(pidFile);
+              await p.kill();
+              await p.exitCode.timeout(const Duration(seconds: 10));
+              expect(await goneSoon(child), isTrue);
+              expect(
+                _alive(bystander.pid),
+                isTrue,
+                reason: 'not the agent\'s child',
+              );
+            },
+            skip: noSh,
+          );
+        }
       },
-      skip: noSh,
     );
-
-    test('what the agent did not start is left alone', () async {
-      final pidFile = File('${tmp.path}/child.pid');
-      final bystander = await Process.start('/bin/sleep', ['60']);
-      strangers.add(bystander.pid);
-      final p = track(
-        await AgentProcess.start(
-          shell(
-            'sleep 60 & echo \$! > "${pidFile.path}"; cat > /dev/null; exit 0',
-          ),
-          cwd: tmp.path,
-        ),
-      );
-      final child = await pidIn(pidFile);
-      await p.stop();
-      expect(await goneSoon(child), isTrue);
-      expect(_alive(bystander.pid), isTrue, reason: 'not the agent\'s child');
-    }, skip: noSh);
-
-    test('an agent that has to be killed takes its children too', () async {
-      final pidFile = File('${tmp.path}/child.pid');
-      final p = track(
-        await AgentProcess.start(
-          shell('sleep 60 & echo \$! > "${pidFile.path}"; exec sleep 300'),
-          cwd: tmp.path,
-          grace: const Duration(milliseconds: 400),
-        ),
-      );
-      final child = await pidIn(pidFile);
-      await p.stop();
-      await p.exitCode.timeout(const Duration(seconds: 10));
-      expect(await goneSoon(child), isTrue);
-    }, skip: noSh);
-  });
+  }
 }

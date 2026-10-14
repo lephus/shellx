@@ -40,6 +40,7 @@ void main() {
         ),
         cwd: tmp.path,
         killTree: killTree,
+        isWindows: false, // the tree killer is what these tests ask about
         grace: grace,
       );
       started.add(p);

@@ -366,7 +366,7 @@ void main() {
       final host = AiHost(
         supportDir: e.tmp.path,
         clientVersion: '2.0.0',
-        processTable: ({limit}) async {
+        processTable: ({limit, after}) async {
           reads++;
           await Future<void>.delayed(const Duration(milliseconds: 150));
           return const <ProcessRow>[]; // the agents are not in it
@@ -394,24 +394,31 @@ void main() {
       expect(reads, 2);
     });
 
-    test('agents are killed with the tree killer the host was given', () async {
-      final killed = <int>[];
-      final host = AiHost(
-        supportDir: e.tmp.path,
-        clientVersion: '2.0.0',
-        killTree: (process) async {
-          killed.add(process.pid);
-          process.kill(ProcessSignal.sigkill);
-        },
-      );
-      final process = await e.launch(
-        host,
-        e.script('marker', _markerThenWait, [p.join(e.tmp.path, 'up')]),
-      );
-      await process.kill();
-      await process.exitCode;
-      expect(killed, [process.pid]);
-    });
+    test(
+      'agents are killed with the tree killer the host was given',
+      () async {
+        final killed = <int>[];
+        final host = AiHost(
+          supportDir: e.tmp.path,
+          clientVersion: '2.0.0',
+          killTree: (process) async {
+            killed.add(process.pid);
+            process.kill(ProcessSignal.sigkill);
+          },
+        );
+        final process = await e.launch(
+          host,
+          e.script('marker', _markerThenWait, [p.join(e.tmp.path, 'up')]),
+        );
+        await process.kill();
+        await process.exitCode;
+        expect(killed, [process.pid]);
+      },
+      skip: Platform.isWindows
+          ? 'on Windows no tree is walked: the agent is killed by its handle, '
+                'the processes the table showed one by one'
+          : false,
+    );
   });
 
   group('the crash registry is best effort', () {

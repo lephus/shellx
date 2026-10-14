@@ -46,6 +46,7 @@ void main() {
             ),
           ),
           cwd: tmp.path,
+          isWindows: false, // the tree killer is what is asked about
           killTree: (proc) async => killed.add(proc.pid),
         ),
       );
@@ -76,6 +77,7 @@ void main() {
         ),
         cwd: tmp.path,
         grace: const Duration(milliseconds: 300),
+        isWindows: false, // the tree killer is what is asked about
         killTree: (proc) async {
           killed.add(proc.pid);
           proc.kill(ProcessSignal.sigkill);

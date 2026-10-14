@@ -24,11 +24,22 @@ final class ProcessRow with Redacted {
   final DateTime startedAt;
 }
 
+/// Now, on the clock that orders the reads of the process table and the
+/// processes that ask for them: monotonic, so that a wall clock set back
+/// cannot reorder them.
+Duration processClock() => _processClock.elapsed;
+
+final Stopwatch _processClock = Stopwatch()..start();
+
 /// The process table as it is now; null when it cannot be read (no `ps`, a
 /// PowerShell that does not answer in time). [limit] is how long it may take
-/// (null: the reader's own limit).
+/// (null: the reader's own limit). [after] is the [processClock] time the
+/// asker came into being: a table read before that shows the pid the asker
+/// got as the process that had it then, so only a read that began after is
+/// good for it. A reader that reads when it is asked (every real one but
+/// [SharedProcessTable]) always begins after and has nothing to do with it.
 typedef ProcessTableReader =
-    Future<List<ProcessRow>?> Function({Duration? limit});
+    Future<List<ProcessRow>?> Function({Duration? limit, Duration? after});
 
 final _psRow = RegExp(r'^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$');
 
@@ -87,7 +98,10 @@ const _cimScript =
 /// The real [ProcessTableReader]: `ps` on macOS and Linux (2 s unless a
 /// [limit] is given), CIM through PowerShell on Windows (3 s). It gives up
 /// after that, so a stop never waits on it for long.
-Future<List<ProcessRow>?> readProcessTable({Duration? limit}) async {
+Future<List<ProcessRow>?> readProcessTable({
+  Duration? limit,
+  Duration? after,
+}) async {
   if (Platform.isWindows) {
     final r = await runProbe('powershell', [
       '-NoProfile',
@@ -125,16 +139,44 @@ Duration? firstTableReadLimit({bool? isWindows}) =>
 /// read asked for after the last one ended is a new one, so an answer is
 /// never older than the read that was under way when it was asked for. The
 /// read is made with the [limit] of whoever started it.
+///
+/// A read is joined only if it began after the asker came into being (`after`,
+/// on the [processClock]): the pid of an agent that was spawned since may be
+/// that of a process the earlier table shows, with children that are not the
+/// agent's. Otherwise a read is made for the asker, and is the one that is
+/// joined from then on.
 final class SharedProcessTable {
   SharedProcessTable([ProcessTableReader read = readProcessTable])
     : _read = read;
 
   final ProcessTableReader _read;
-  Future<List<ProcessRow>?>? _underWay;
+  _Read? _underWay;
 
-  /// The table: the read that is under way, or a new one.
-  Future<List<ProcessRow>?> call({Duration? limit}) =>
-      _underWay ??= _read(limit: limit).whenComplete(() => _underWay = null);
+  /// The table: the read that is under way if the asker may have it, or a
+  /// new one.
+  Future<List<ProcessRow>?> call({Duration? limit, Duration? after}) {
+    final joinable = _underWay;
+    if (joinable != null && (after == null || joinable.began > after)) {
+      return joinable.table;
+    }
+    final read = _Read(processClock());
+    // As a Future that can hold null (see AgentProcess._table).
+    read.table = Future<List<ProcessRow>?>.value(_read(limit: limit))
+        .whenComplete(() {
+          // A newer read may have taken the place of this one.
+          if (identical(_underWay, read)) _underWay = null;
+        });
+    return (_underWay = read).table;
+  }
+}
+
+/// A read of the process table that is under way: when it began, and its
+/// answer.
+final class _Read {
+  _Read(this.began);
+
+  final Duration began;
+  late final Future<List<ProcessRow>?> table;
 }
 
 /// Everything [root] started that is in [rows]: children, their children…
