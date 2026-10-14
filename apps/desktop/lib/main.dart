@@ -21,6 +21,7 @@ import 'src/agent/desktop_services.dart';
 import 'src/agent/remote_agent_controller.dart';
 import 'src/agent/ui_services.dart';
 import 'src/ai/ai_host_provider.dart';
+import 'src/ai/ai_paths.dart';
 import 'src/ai/ai_startup.dart';
 import 'src/remote/remote_shutdown.dart';
 import 'src/remote/remote_tools_provider.dart';
@@ -368,8 +369,16 @@ Future<void> _start(_Startup startup) async {
     overrides: [
       desktopServicesProvider.overrideWithValue(services),
       // V2-1: the AI host (agents, restore points) and the run sheet's PTYs.
+      // On Windows its data stays out of the roaming profile (D6, D12).
       aiHostProvider.overrideWithValue(
-        buildAiHost(supportDir: supportDirectory.path, version: info.version),
+        buildAiHost(
+          supportDir: aiSupportDirectoryPath(
+            windows: Platform.isWindows,
+            environment: environment,
+            appSupportPath: supportDirectory.path,
+          ),
+          version: info.version,
+        ),
       ),
       aiPtyFactoryProvider.overrideWithValue(ptyFactory),
       remoteToolsProvider.overrideWithValue(remoteTools),
