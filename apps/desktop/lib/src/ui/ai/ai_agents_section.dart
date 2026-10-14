@@ -48,8 +48,10 @@ String aiAgentStatus(
 ///   met the sign-in (only it knows the agent's methods).
 /// - The default agent; custom agents (name, command, args, env) to add
 ///   and remove.
-/// - How long restore points stay, and "Delete all restore points".
-/// The agents are checked again when the section opens.
+/// - How long restore points stay, and "Delete all restore points" (not
+///   while a turn runs: the store may not be deleted under it).
+/// The agents are checked again when the section opens, against the login
+/// shell's environment as it is then.
 class AiAgentsSection extends ConsumerStatefulWidget {
   const AiAgentsSection({super.key});
 
@@ -65,8 +67,21 @@ class _AiAgentsSectionState extends ConsumerState<AiAgentsSection> {
     super.initState();
     // Not while building: the check runs the login shell and probes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(ref.read(aiReadinessProvider.notifier).refresh());
+      if (mounted) _recheck();
     });
+  }
+
+  /// The agents are checked again — and the login shell's environment is
+  /// asked again first, so a Node installed after launch is seen (the
+  /// environment is otherwise kept for the whole run).
+  void _recheck() {
+    try {
+      ref.read(aiHostProvider).env.invalidate();
+    } on Object {
+      // No AI host (a window of a test of something else): the check says
+      // so itself.
+    }
+    unawaited(ref.read(aiReadinessProvider.notifier).refresh());
   }
 
   Future<void> _sheet(Widget Function(VoidCallback close) build) =>
@@ -157,12 +172,27 @@ class _AiAgentsSectionState extends ConsumerState<AiAgentsSection> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
+    // `deleteAll` needs that no turn runs (and none starts before it is
+    // done): a turn may have begun while the question was open.
+    final runtimes = ref.read(aiRuntimesProvider.notifier);
+    final turnRuns = ref
+        .read(terminalTabsProvider)
+        .tabs
+        .any((tab) => runtimes.busy(tab.id));
+    if (turnRuns) {
+      setState(() => _note = l10n.aiRevertBusy);
+      return;
+    }
+    setState(() => _note = null);
     try {
       await ref.read(aiDeleteCheckpointsProvider)();
       if (mounted) setState(() => _note = l10n.aiDeleteCheckpointsDone);
     } on Object catch (error) {
       debugPrint('ShellX: restore points not deleted: ${error.runtimeType}');
+      if (mounted) {
+        setState(() => _note = l10n.errorUnexpected('restore-points'));
+      }
     }
   }
 
