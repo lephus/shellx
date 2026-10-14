@@ -166,11 +166,14 @@ AgentKind? agentKindOf(String agentId) => switch (agentId) {
 
 /// V2-1 D7/D23: how an agent's readiness is learned; tests swap it.
 final aiReadinessSourceProvider =
-    Provider<Future<AgentReadiness> Function(AgentSpec agent)>((ref) {
-      final host = ref.read(aiHostProvider);
-      return (agent) async =>
-          host.resolver.resolve(agent, await host.env.resolve());
-    });
+    Provider<Future<AgentReadiness> Function(AgentSpec agent)>(
+      (ref) => (agent) async {
+        // Read when asked: a window without the AI host (a test of
+        // something else) gets a failed check, never a broken provider.
+        final host = ref.read(aiHostProvider);
+        return host.resolver.resolve(agent, await host.env.resolve());
+      },
+    );
 
 /// V2-1 D7/D23: each agent's readiness as last resolved; absent: not known
 /// yet.
@@ -179,6 +182,9 @@ final aiReadinessProvider =
 
 class AiReadiness extends Notifier<Map<String, AgentReadiness>> {
   Future<void>? _warm;
+
+  /// Agents whose last check failed: Settings › Agents says "Error".
+  final failed = <String>{};
 
   @override
   Map<String, AgentReadiness> build() => const {};
@@ -196,9 +202,13 @@ class AiReadiness extends Notifier<Map<String, AgentReadiness>> {
       try {
         final r = await source(agent);
         if (!ref.mounted) return;
+        failed.remove(agent.id);
         state = {...state, agent.id: r};
       } on Object catch (error) {
         debugPrint('ShellX: agent check failed: ${error.runtimeType}');
+        if (!ref.mounted) return;
+        failed.add(agent.id);
+        state = {...state}..remove(agent.id);
       }
     }
   }

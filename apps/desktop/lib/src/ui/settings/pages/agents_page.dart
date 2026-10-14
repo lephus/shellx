@@ -12,6 +12,7 @@ import '../../../terminal/agent_names.dart';
 import '../../../terminal/agent_status.dart';
 import '../../../tray/tray_action.dart';
 import '../../../tray/tray_actions.dart';
+import '../../ai/ai_agents_section.dart';
 import '../../theme/shellx_desktop_theme.dart';
 import '../settings_row.dart' show SettingsScope;
 import 'page_parts.dart';
@@ -49,6 +50,9 @@ class AgentsPage extends ConsumerWidget {
         settingWidget(settingById('agent-resume')),
         _PrStatusRow(),
         const _AgentCommandRow(),
+        // V2-1 D7: the AI interface's agents (last, so the rows above keep
+        // their place).
+        const AiAgentsSection(),
       ],
     );
   }
