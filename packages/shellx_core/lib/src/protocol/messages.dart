@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import '../util/cbor_values.dart';
 
+part 'ai_messages.dart';
+
 sealed class AppMessage {
   const AppMessage();
 
@@ -26,11 +28,15 @@ sealed class AppMessage {
       'session.list' => SessionList(
         desktop: f.optionalBoolean('desktop') ?? false,
       ),
-      'session.list.result' => SessionListResult([
-        for (final item in f.list('sessions'))
-          // ignore: use_null_aware_elements
-          if (SessionInfo._fromMap(item, t) case final info?) info,
-      ], desktopSharing: f.optionalBoolean('desktop_sharing')),
+      'session.list.result' => SessionListResult(
+        [
+          for (final item in f.list('sessions'))
+            // ignore: use_null_aware_elements
+            if (SessionInfo._fromMap(item, t) case final info?) info,
+        ],
+        desktopSharing: f.optionalBoolean('desktop_sharing'),
+        ai: f.optionalInteger('ai'),
+      ),
       'session.open' => SessionOpen(
         cols: f.integer('cols'),
         rows: f.integer('rows'),
@@ -84,6 +90,8 @@ sealed class AppMessage {
         message: f.string('message'),
         id: f.optionalInteger('id'),
       ),
+      // V2-2: never fatal, see [AiMessage].
+      _ when t.startsWith('ai.') => AiMessage._fromMap(t, f),
       _ => null,
     };
   }
@@ -280,8 +288,13 @@ final class SessionInfo {
 }
 
 final class SessionListResult extends AppMessage {
-  const SessionListResult(this.sessions, {this.desktopSharing});
+  const SessionListResult(this.sessions, {this.desktopSharing, this.ai});
   final List<SessionInfo> sessions;
+
+  /// V2-2 D3: the `ai.*` protocol this desktop speaks ([kAiProtocol]); only
+  /// in answers to `session.list {desktop: true}`, only written when set.
+  /// Null: a desktop without AI sessions for phones (every older one).
+  final int? ai;
 
   /// Whether terminal sharing is on (spec §8); only in answers to
   /// `session.list {desktop: true}`. Null means an agent without terminal
@@ -294,6 +307,7 @@ final class SessionListResult extends AppMessage {
     't': type,
     'sessions': [for (final session in sessions) session.toMap()],
     if (desktopSharing != null) 'desktop_sharing': desktopSharing,
+    if (ai != null) 'ai': ai,
   };
 }
 
@@ -659,6 +673,12 @@ final class _Fields {
     final value = _map[key];
     if (value == null || value is String) return value as String?;
     throw FormatException('$_type: "$key" must be a string');
+  }
+
+  Uint8List? optionalBytes(String key) {
+    final value = _map[key];
+    if (value == null || value is Uint8List) return value as Uint8List?;
+    throw FormatException('$_type: "$key" must be a byte string');
   }
 
   T _get<T>(String key) {
