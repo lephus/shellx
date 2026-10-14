@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'probe.dart' show envValue, runProbe;
+
 /// Where an environment came from.
 enum LoginEnvSource { interactiveLogin, login, process }
 
@@ -52,11 +54,93 @@ Map<String, String> cleanAgentEnv(Map<String, String> env) => {
       e.key: e.value,
 };
 
+/// Where Windows keeps the user's environment variables (`reg query`).
+const windowsUserEnvKey = r'HKCU\Environment';
+
+/// Where Windows keeps the machine's environment variables (`reg query`).
+const windowsMachineEnvKey =
+    r'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+
+/// What `reg query <key> /v Path` printed for [key]; null when it could not
+/// be had (no such value, no `reg`).
+typedef RegistryReader = Future<String?> Function(String key);
+
+/// The real [RegistryReader].
+Future<String?> readRegistryPath(String key) async {
+  final r = await runProbe('reg', ['query', key, '/v', 'Path']);
+  return r == null || r.exitCode != 0 ? null : r.stdout;
+}
+
+final _regValue = RegExp(r'^\s*(\S+)\s+(REG_SZ|REG_EXPAND_SZ)\s+(.*?)\s*$');
+
+/// The `Path` value in the output of `reg query <key> /v Path`
+/// (`    Path    REG_EXPAND_SZ    <data>`): its data, and whether it holds
+/// `%VAR%`s to expand (`REG_EXPAND_SZ`). Null when the output has no such
+/// value: an error, another name or type, anything else.
+({String data, bool expands})? parseRegQueryPath(String output) {
+  for (final line in const LineSplitter().convert(output)) {
+    final m = _regValue.firstMatch(line);
+    if (m == null || m[1]!.toLowerCase() != 'path') continue;
+    return (data: m[3]!, expands: m[2] == 'REG_EXPAND_SZ');
+  }
+  return null;
+}
+
+/// [text] with every `%NAME%` replaced by [vars]' NAME (without case, as on
+/// Windows). A name it does not know stays as written; what a name expands to
+/// is not expanded again.
+String expandWindowsVars(String text, Map<String, String> vars) =>
+    text.replaceAllMapped(
+      RegExp(r'%([^%]+)%'),
+      (m) => envValue(vars, m[1]!) ?? m[0]!,
+    );
+
+/// `PATH` as a fresh login would have it, from the registry's answers
+/// ([machine] and [user]: the output of `reg query … /v Path`): the machine's
+/// entries, then the user's, `%VAR%`s expanded from [vars] where the value is
+/// `REG_EXPAND_SZ`. The entries of [vars]' own `PATH` that the registry lacks
+/// follow (an app started from a shell keeps what that shell added), and an
+/// entry is listed once, without case and with or without a final `\`. Null
+/// when neither answer holds a `Path`.
+String? mergeRegistryPath({
+  String? machine,
+  String? user,
+  required Map<String, String> vars,
+}) {
+  final entries = <String>[];
+  var found = false;
+  for (final output in [machine, user]) {
+    final value = output == null ? null : parseRegQueryPath(output);
+    if (value == null) continue;
+    found = true;
+    final data = value.expands
+        ? expandWindowsVars(value.data, vars)
+        : value.data;
+    entries.addAll(data.split(';'));
+  }
+  if (!found) return null;
+  entries.addAll((envValue(vars, 'PATH') ?? '').split(';'));
+  final seen = <String>{};
+  final merged = <String>[];
+  for (final raw in entries) {
+    final entry = raw.trim();
+    if (entry.isEmpty) continue;
+    var key = entry.toLowerCase();
+    while (key.length > 1 && (key.endsWith(r'\') || key.endsWith('/'))) {
+      key = key.substring(0, key.length - 1);
+    }
+    if (seen.add(key)) merged.add(entry);
+  }
+  return merged.join(';');
+}
+
 /// The user's login-shell environment, resolved once per app session
 /// (spec D6): `$SHELL -i -l -c`, then `-l -c`, then the app's own
 /// environment. The script prints `env -0` between `\x1e` markers, so
 /// whatever a profile prints around it is ignored. Windows has no login
-/// shell: the app's environment is used. Agents never run through a shell.
+/// shell: the app's environment is used, and after [invalidate] its `PATH` is
+/// read again from the registry, so a Node installed since the app started is
+/// found without restarting it. Agents never run through a shell.
 final class LoginShellEnv {
   LoginShellEnv({
     String? shell,
@@ -64,6 +148,7 @@ final class LoginShellEnv {
     bool? isWindows,
     bool? isMacOS,
     ShellRunner? run,
+    RegistryReader? registry,
     this.timeout = const Duration(seconds: 10),
   }) : _processEnv = processEnv ?? Platform.environment,
        _isWindows = isWindows ?? Platform.isWindows,
@@ -73,7 +158,8 @@ final class LoginShellEnv {
              (processEnv ?? Platform.environment)['SHELL'],
              isMacOS ?? Platform.isMacOS,
            ),
-       _run = run ?? _runShell;
+       _run = run ?? _runShell,
+       _registry = registry ?? readRegistryPath;
 
   static const script = r"printf '\036'; /usr/bin/env -0; printf '\036'";
   static const _known = {'zsh', 'bash', 'sh', 'fish', 'dash', 'ksh'};
@@ -83,12 +169,21 @@ final class LoginShellEnv {
   final bool _isWindows;
   final String _shell;
   final ShellRunner _run;
+  final RegistryReader _registry;
   Future<LoginEnv>? _cached;
+
+  /// The next resolve on Windows reads `PATH` from the registry.
+  var _readRegistry = false;
 
   Future<LoginEnv> resolve() => _cached ??= _resolve();
 
   /// Forgets the environment (the user installed Node, edited a profile…).
-  void invalidate() => _cached = null;
+  /// On Windows the next [resolve] also rebuilds `PATH` from the registry
+  /// (V2-1 final review I-4); any failure there keeps the app's own.
+  void invalidate() {
+    _cached = null;
+    if (_isWindows) _readRegistry = true;
+  }
 
   static String _pickShell(String? shell, bool isMacOS) {
     if (shell != null &&
@@ -101,10 +196,9 @@ final class LoginShellEnv {
 
   Future<LoginEnv> _resolve() async {
     if (_isWindows) {
-      return LoginEnv(
-        cleanAgentEnv(_processEnv),
-        source: LoginEnvSource.process,
-      );
+      final fromRegistry = _readRegistry;
+      _readRegistry = false;
+      return _resolveWindows(fromRegistry);
     }
     // A profile can skip slow setup when it sees this (like VS Code's flag);
     // cleanAgentEnv drops it again.
@@ -128,6 +222,43 @@ final class LoginShellEnv {
       }
     }
     return LoginEnv(cleanAgentEnv(_processEnv), source: LoginEnvSource.process);
+  }
+
+  Future<LoginEnv> _resolveWindows(bool fromRegistry) async {
+    final env = cleanAgentEnv(_processEnv);
+    if (fromRegistry) {
+      final path = await _registryPath(env);
+      if (path != null) {
+        final key = env.keys.firstWhere(
+          (k) => k.toUpperCase() == 'PATH',
+          orElse: () => 'Path',
+        );
+        env[key] = path;
+      }
+    }
+    return LoginEnv(env, source: LoginEnvSource.process);
+  }
+
+  /// `PATH` as the registry has it now ([mergeRegistryPath]); null when
+  /// neither key answered, whatever the reason.
+  Future<String?> _registryPath(Map<String, String> env) async {
+    Future<String?> read(String key) async {
+      try {
+        return await _registry(key);
+      } on Object {
+        return null;
+      }
+    }
+
+    final [machine, user] = await Future.wait([
+      read(windowsMachineEnvKey),
+      read(windowsUserEnvKey),
+    ]);
+    try {
+      return mergeRegistryPath(machine: machine, user: user, vars: env);
+    } on Object {
+      return null;
+    }
   }
 
   static Future<(int, List<int>)> _runShell(
