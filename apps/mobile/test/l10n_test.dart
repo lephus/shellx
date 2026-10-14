@@ -98,6 +98,104 @@ void main() {
     expect(en.settingsNotificationsOpenSystem, 'Open system settings');
   });
 
+  test('AI session texts (V2-2 §5.5) in Vietnamese', () async {
+    final vi = await S.load(const Locale('vi'));
+    expect(vi.aiGroup, 'Phiên AI');
+    expect([vi.aiNewSession, vi.aiUntitled], ['Phiên AI mới', 'Phiên AI mới']);
+    expect(vi.aiUnavailable, 'Mở ShellX trên máy tính để dùng phiên AI.');
+    expect(vi.aiUpdateDesktop, 'Cập nhật ShellX trên máy tính để dùng phiên AI từ điện thoại.');
+    expect(vi.aiComposerHint('Claude'), 'Nhắn cho Claude…');
+    expect(
+      [vi.aiSend, vi.aiQueue, vi.aiStop, vi.aiStopping, vi.aiForceStop],
+      ['Gửi', 'Xếp hàng', 'Dừng', 'Đang dừng…', 'Dừng hẳn'],
+    );
+    expect(vi.aiReconnecting, 'Đang kết nối lại… nội dung có thể chưa mới nhất.');
+    expect(vi.aiClosedGone, 'Phiên AI này đã đóng trên máy tính.');
+    expect(vi.aiClosedDesktop, 'ShellX trên máy tính đã thoát. Mở lại để tiếp tục.');
+    expect(vi.aiClosedUnreadable, 'Điện thoại không đọc được phiên AI này. Xem trên máy tính.');
+    expect(vi.aiPermTitle('Claude'), 'Claude xin quyền:');
+    expect(
+      [vi.aiPermAllowOnce, vi.aiPermAllowAlways, vi.aiPermRejectOnce, vi.aiPermRejectAlways],
+      ['Cho phép', 'Luôn cho phép', 'Từ chối', 'Luôn từ chối'],
+    );
+    expect(vi.aiPermOnComputer, 'Trả lời yêu cầu này trên máy tính.');
+    expect(vi.aiAnsweredElsewhere, 'Đã được trả lời ở thiết bị khác.');
+    expect(vi.aiYouChose('Cho phép (Yes)'), 'Bạn chọn: Cho phép (Yes)');
+    expect(vi.aiAskOnComputer, 'Trả lời câu hỏi này trên máy tính.');
+    expect(vi.aiTurnSummary(3, '0:41'), 'Lượt 3 · 0:41');
+    expect([vi.aiTurnFiles(1), vi.aiTurnFiles(2)], ['1 tệp đổi', '2 tệp đổi']);
+    expect(vi.aiFromComputerOnly, 'Quá lớn để xem trên điện thoại. Xem trên máy tính.');
+    expect(vi.aiItemOnComputer, 'Điện thoại chưa hỗ trợ loại mục này. Xem trên máy tính.');
+    expect(vi.aiTooLong(32), 'Quá dài để gửi từ điện thoại (tối đa 32 KB).');
+    expect(vi.aiRowSubtitle('Claude', 'Đang chạy'), 'Claude · Đang chạy');
+    expect(vi.aiCutLines(120), '120 dòng; phần giữa xem trên máy tính');
+    expect(vi.aiMoreDiffs(2), '+2 tệp nữa');
+    expect(vi.aiPermMore(2), 'còn 2 yêu cầu');
+    expect(vi.aiContext(16), 'Ngữ cảnh 16%');
+    expect(vi.aiPlan(2, 5), 'Kế hoạch · 2/5');
+    expect(vi.aiAttentionTitle('Claude'), 'Claude cần bạn trả lời');
+    expect(vi.aiToolRunningFor('2:05'), 'đang chạy · 2:05');
+    expect(vi.aiNoticeNode('Claude', 20), 'Claude cần Node.js 20 trở lên trên máy tính.');
+    expect(vi.aiNoticeExited('Claude', 1), 'Claude dừng bất ngờ (mã thoát 1).');
+    expect(vi.aiRequestFailed('refused'), 'Máy tính không nhận (refused).');
+  });
+
+  test('AI session texts (V2-2 §5.5) in English', () async {
+    final en = await S.load(const Locale('en'));
+    expect(en.aiGroup, 'AI sessions');
+    expect([en.aiNewSession, en.aiUntitled], ['New AI session', 'New AI session']);
+    expect(en.aiUnavailable, 'Open ShellX on the computer to use AI sessions.');
+    expect(en.aiUpdateDesktop, 'Update ShellX on the computer to use AI sessions from your phone.');
+    expect(en.aiComposerHint('Claude'), 'Message Claude…');
+    expect(
+      [en.aiSend, en.aiQueue, en.aiStop, en.aiStopping, en.aiForceStop],
+      ['Send', 'Queue', 'Stop', 'Stopping…', 'Force stop'],
+    );
+    expect(en.aiReconnecting, 'Reconnecting… what you see may be behind.');
+    expect(en.aiClosedGone, 'This AI session was closed on the computer.');
+    expect(en.aiClosedDesktop, 'ShellX was closed on the computer. Open it to continue.');
+    expect(en.aiClosedUnreadable, 'The phone cannot read this AI session. See it on the computer.');
+    expect(en.aiPermTitle('Claude'), 'Claude asks:');
+    expect(
+      [en.aiPermAllowOnce, en.aiPermAllowAlways, en.aiPermRejectOnce, en.aiPermRejectAlways],
+      ['Allow', 'Always allow', 'Reject', 'Always reject'],
+    );
+    expect(en.aiPermOnComputer, 'Answer this request on the computer.');
+    expect(en.aiAnsweredElsewhere, 'Already answered on another device.');
+    expect(en.aiYouChose('Allow (Yes)'), 'You chose: Allow (Yes)');
+    expect(en.aiAskOnComputer, 'Answer this question on the computer.');
+    expect(en.aiTurnSummary(3, '0:41'), 'Turn 3 · 0:41');
+    expect([en.aiTurnFiles(1), en.aiTurnFiles(2)], ['1 file changed', '2 files changed']);
+    expect(en.aiFromComputerOnly, 'Too large for the phone. Open it on the computer.');
+    expect(en.aiItemOnComputer, 'This kind of item is not supported on the phone yet. See it on the computer.');
+    expect(en.aiTooLong(32), 'Too long to send from the phone (32 KB at most).');
+    expect(en.aiRowSubtitle('Claude', 'Running'), 'Claude · Running');
+    expect(en.aiCutLines(120), '120 lines in all; the middle is on the computer');
+    expect(en.aiMoreDiffs(2), '+2 more files');
+    expect(en.aiPermMore(2), '2 more waiting');
+    expect(en.aiContext(16), 'Context 16%');
+    expect(en.aiPlan(2, 5), 'Plan · 2/5');
+    expect(en.aiAttentionTitle('Claude'), 'Claude needs your answer');
+    expect(en.aiToolRunningFor('2:05'), 'running · 2:05');
+    expect(en.aiNoticeNode('Claude', 20), 'Claude needs Node.js 20 or newer on the computer.');
+    expect(en.aiNoticeExited('Claude', 1), 'Claude stopped unexpectedly (exit 1).');
+    expect(en.aiRequestFailed('refused'), 'The computer did not take it (refused).');
+  });
+
+  test('the AI texts call the agent Claude, never "Claude Code"', () {
+    for (final path in ['lib/l10n/intl_en.arb', 'lib/l10n/intl_vi.arb']) {
+      final json = jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
+      final ai = {
+        for (final entry in json.entries)
+          if (RegExp(r'^ai[A-Z]').hasMatch(entry.key)) entry.key: entry.value,
+      };
+      expect(ai.length, greaterThan(100), reason: path);
+      for (final entry in ai.entries) {
+        expect(entry.value.toString(), isNot(contains('Claude Code')), reason: '${entry.key} in $path');
+      }
+    }
+  });
+
   testWidgets('S.of(context) resolves Vietnamese inside the design system', (tester) async {
     await tester.pumpWidget(localized(Builder(builder: (context) => Text(S.of(context).machinesTitle))));
     await tester.pumpAndSettle();

@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:injectable/injectable.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/auth/account_session.dart';
@@ -201,6 +203,9 @@ final class _MachineSessionAdapter implements MachineSession {
   List<TabHandle> get tabs => [for (final tab in _client.tabs) _wrap(tab)];
 
   @override
+  late final AiMachine ai = _AiMachineAdapter(_client.ai);
+
+  @override
   void input(int id, Uint8List data) => _client.input(id, data);
 
   @override
@@ -244,4 +249,79 @@ final class _TabAdapter implements TabHandle {
 
   @override
   Stream<TabEvent> get events => _tab.events;
+}
+
+final class _AiMachineAdapter implements AiMachine {
+  _AiMachineAdapter(this._ai);
+
+  final MachineAi _ai;
+  final Map<AiSessionLink, _AiSessionAdapter> _links = Map.identity();
+
+  @override
+  bool? get supported => _ai.supported;
+
+  @override
+  AiListing? get listing => _ai.listing;
+
+  @override
+  Stream<AiListing> get listings => _ai.listings;
+
+  @override
+  Future<void> watch() => _ai.watch();
+
+  @override
+  AiSessionHandle attach(String sid) {
+    final link = _ai.attach(sid);
+    _links.removeWhere((key, _) => key.state == AiLinkState.closed && !identical(key, link));
+    return _links.putIfAbsent(link, () => _AiSessionAdapter(link));
+  }
+
+  @override
+  Future<void> prompt(String sid, String text) => _ai.prompt(sid, text);
+
+  @override
+  Future<void> answerPermission(String sid, int permission, String option) =>
+      _ai.answerPermission(sid, permission, option);
+
+  @override
+  Future<void> answerAsk(String sid, int ask, ElicitationResponse response) => _ai.answerAsk(sid, ask, response);
+
+  @override
+  Future<void> cancel(String sid) => _ai.cancel(sid);
+
+  @override
+  Future<void> forceStop(String sid) => _ai.forceStop(sid);
+
+  @override
+  Future<void> unqueue(String sid, int queued) => _ai.unqueue(sid, queued);
+
+  @override
+  Future<String> open(String agent, String folder) => _ai.open(agent, folder);
+}
+
+final class _AiSessionAdapter implements AiSessionHandle {
+  _AiSessionAdapter(this._link);
+
+  final AiSessionLink _link;
+
+  @override
+  String get sid => _link.sid;
+
+  @override
+  AiMirror get mirror => _link.mirror;
+
+  @override
+  AiLinkState get state => _link.state;
+
+  @override
+  String? get closedReason => _link.closedReason;
+
+  @override
+  Stream<void> get changes => _link.changes;
+
+  @override
+  void detach() => _link.detach();
+
+  @override
+  void loadEarlier() => _link.loadEarlier();
 }

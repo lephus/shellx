@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/auth/account_session.dart';
@@ -104,12 +106,69 @@ abstract interface class MachineSession {
   /// (the size is kept for the next re-attach).
   void resize(int id, int cols, int rows);
 
+  /// V2-2: the machine's AI sessions.
+  AiMachine get ai;
+
   /// Removes the tab and ends its [TabHandle.events]. An attached tab also
   /// closes its session on the machine: at once, or — without a channel —
   /// right after the next channel is installed. A desktop tab
   /// ([SessionKind.desktop]) only leaves the terminal (`session.detach`): the
   /// window keeps running on the computer. An ended tab is only removed here.
   Future<void> closeTab(int id);
+}
+
+/// App-side view of one mirrored AI session ([AiSessionLink] in `shellx_client`).
+abstract interface class AiSessionHandle {
+  String get sid;
+
+  /// What the phone holds of the session; changes come on [changes].
+  AiMirror get mirror;
+
+  /// [AiLinkState.attaching] also lasts while the machine cannot be reached (offline, failed,
+  /// untrusted): read [MachineSession.state] for that.
+  AiLinkState get state;
+
+  /// `gone`, `desktop_closed`, `unavailable`, `detached`, `unreadable` (the computer keeps sending
+  /// what this version cannot read), or a newer word.
+  String? get closedReason;
+  Stream<void> get changes;
+
+  /// Stops mirroring (the screen closed).
+  void detach();
+
+  /// "Tải thêm": older items.
+  void loadEarlier();
+}
+
+/// App-side view of a machine's AI sessions ([MachineAi] in `shellx_client`). Every request
+/// connects first; it throws [AiRequestException] (the computer said no, with its code) or
+/// [MachineConnectionException].
+///
+/// A request in flight when its session closes fails with [AiRequestException] too (no `ai.result`
+/// comes then): `not_found` for a tab that closed, `unavailable` when the window quit; a listing that
+/// says no window serves AI ends every request in flight with `unavailable`. One in flight when the
+/// channel is lost fails with [MachineConnectionException] (`agentOffline`) and is never sent again.
+abstract interface class AiMachine {
+  /// Learned only from the computer's answer to a list of its sessions: null before the first one;
+  /// false for a computer without AI for phones. True does not mean a window serves AI yet: [listing]
+  /// can still say `available: false`, which the phone shows as "no AI sessions now", not as an error.
+  bool? get supported;
+  AiListing? get listing;
+  Stream<AiListing> get listings;
+
+  /// Keeps [listing] current while the app is connected. There is no way to stop it: from the first
+  /// call on, a lost channel is brought back even with no terminal tab open.
+  Future<void> watch();
+  AiSessionHandle attach(String sid);
+  Future<void> prompt(String sid, String text);
+  Future<void> answerPermission(String sid, int permission, String option);
+  Future<void> answerAsk(String sid, int ask, ElicitationResponse response);
+  Future<void> cancel(String sid);
+  Future<void> forceStop(String sid);
+  Future<void> unqueue(String sid, int queued);
+
+  /// A new session; its sid.
+  Future<String> open(String agent, String folder);
 }
 
 /// Everything the signed-in UI needs from `shellx_core` + `shellx_client`.

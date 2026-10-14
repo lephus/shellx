@@ -2473,6 +2473,933 @@ class S {
       args: [],
     );
   }
+
+  /// `AI sessions`
+  String get aiGroup {
+    return Intl.message('AI sessions', name: 'aiGroup', desc: '', args: []);
+  }
+
+  /// `New AI session`
+  String get aiNewSession {
+    return Intl.message(
+      'New AI session',
+      name: 'aiNewSession',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `New AI session`
+  String get aiUntitled {
+    return Intl.message(
+      'New AI session',
+      name: 'aiUntitled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `AI sessions`
+  String get aiChromeTooltip {
+    return Intl.message(
+      'AI sessions',
+      name: 'aiChromeTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Running`
+  String get aiStateRunning {
+    return Intl.message('Running', name: 'aiStateRunning', desc: '', args: []);
+  }
+
+  /// `Needs your answer`
+  String get aiStateNeedsInput {
+    return Intl.message(
+      'Needs your answer',
+      name: 'aiStateNeedsInput',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting`
+  String get aiStateIdle {
+    return Intl.message('Waiting', name: 'aiStateIdle', desc: '', args: []);
+  }
+
+  /// `Starting`
+  String get aiStateStarting {
+    return Intl.message(
+      'Starting',
+      name: 'aiStateStarting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not started`
+  String get aiStateStopped {
+    return Intl.message(
+      'Not started',
+      name: 'aiStateStopped',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign in on the computer`
+  String get aiStateNeedsAuth {
+    return Intl.message(
+      'Sign in on the computer',
+      name: 'aiStateNeedsAuth',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Error`
+  String get aiStateFailed {
+    return Intl.message('Error', name: 'aiStateFailed', desc: '', args: []);
+  }
+
+  /// `Choose a folder on the computer`
+  String get aiStateNoFolder {
+    return Intl.message(
+      'Choose a folder on the computer',
+      name: 'aiStateNoFolder',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Agent off on the computer`
+  String get aiStateAgentOff {
+    return Intl.message(
+      'Agent off on the computer',
+      name: 'aiStateAgentOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{agent} · {state}`
+  String aiRowSubtitle(String agent, String state) {
+    return Intl.message(
+      '$agent · $state',
+      name: 'aiRowSubtitle',
+      desc: '',
+      args: [agent, state],
+    );
+  }
+
+  /// `Open ShellX on the computer to use AI sessions.`
+  String get aiUnavailable {
+    return Intl.message(
+      'Open ShellX on the computer to use AI sessions.',
+      name: 'aiUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Update ShellX on the computer to use AI sessions from your phone.`
+  String get aiUpdateDesktop {
+    return Intl.message(
+      'Update ShellX on the computer to use AI sessions from your phone.',
+      name: 'aiUpdateDesktop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Agent`
+  String get aiNewAgent {
+    return Intl.message('Agent', name: 'aiNewAgent', desc: '', args: []);
+  }
+
+  /// `Folder`
+  String get aiNewFolder {
+    return Intl.message('Folder', name: 'aiNewFolder', desc: '', args: []);
+  }
+
+  /// `First message (optional)`
+  String get aiNewFirstMessage {
+    return Intl.message(
+      'First message (optional)',
+      name: 'aiNewFirstMessage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Start`
+  String get aiNewStart {
+    return Intl.message('Start', name: 'aiNewStart', desc: '', args: []);
+  }
+
+  /// `Set a project folder for a workspace on the computer first (Settings › Projects).`
+  String get aiNewNoFolders {
+    return Intl.message(
+      'Set a project folder for a workspace on the computer first (Settings › Projects).',
+      name: 'aiNewNoFolders',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No agent is ready on the computer. Set one up in Settings › Agents.`
+  String get aiNewNoAgents {
+    return Intl.message(
+      'No agent is ready on the computer. Set one up in Settings › Agents.',
+      name: 'aiNewNoAgents',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `set up on the computer`
+  String get aiAgentNotReady {
+    return Intl.message(
+      'set up on the computer',
+      name: 'aiAgentNotReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Message {agent}…`
+  String aiComposerHint(String agent) {
+    return Intl.message(
+      'Message $agent…',
+      name: 'aiComposerHint',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `Send`
+  String get aiSend {
+    return Intl.message('Send', name: 'aiSend', desc: '', args: []);
+  }
+
+  /// `Queue`
+  String get aiQueue {
+    return Intl.message('Queue', name: 'aiQueue', desc: '', args: []);
+  }
+
+  /// `Stop`
+  String get aiStop {
+    return Intl.message('Stop', name: 'aiStop', desc: '', args: []);
+  }
+
+  /// `Stopping…`
+  String get aiStopping {
+    return Intl.message('Stopping…', name: 'aiStopping', desc: '', args: []);
+  }
+
+  /// `Force stop`
+  String get aiForceStop {
+    return Intl.message('Force stop', name: 'aiForceStop', desc: '', args: []);
+  }
+
+  /// `Queued`
+  String get aiQueued {
+    return Intl.message('Queued', name: 'aiQueued', desc: '', args: []);
+  }
+
+  /// `Remove from queue`
+  String get aiRemoveQueued {
+    return Intl.message(
+      'Remove from queue',
+      name: 'aiRemoveQueued',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Load earlier`
+  String get aiLoadEarlier {
+    return Intl.message(
+      'Load earlier',
+      name: 'aiLoadEarlier',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Latest`
+  String get aiJumpLatest {
+    return Intl.message('Latest', name: 'aiJumpLatest', desc: '', args: []);
+  }
+
+  /// `No messages yet. Write the first one below.`
+  String get aiEmpty {
+    return Intl.message(
+      'No messages yet. Write the first one below.',
+      name: 'aiEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reconnecting… what you see may be behind.`
+  String get aiReconnecting {
+    return Intl.message(
+      'Reconnecting… what you see may be behind.',
+      name: 'aiReconnecting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This AI session was closed on the computer.`
+  String get aiClosedGone {
+    return Intl.message(
+      'This AI session was closed on the computer.',
+      name: 'aiClosedGone',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `ShellX was closed on the computer. Open it to continue.`
+  String get aiClosedDesktop {
+    return Intl.message(
+      'ShellX was closed on the computer. Open it to continue.',
+      name: 'aiClosedDesktop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The phone cannot read this AI session. See it on the computer.`
+  String get aiClosedUnreadable {
+    return Intl.message(
+      'The phone cannot read this AI session. See it on the computer.',
+      name: 'aiClosedUnreadable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `AI sessions`
+  String get aiBackToList {
+    return Intl.message(
+      'AI sessions',
+      name: 'aiBackToList',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too long to send from the phone ({max} KB at most).`
+  String aiTooLong(int max) {
+    return Intl.message(
+      'Too long to send from the phone ($max KB at most).',
+      name: 'aiTooLong',
+      desc: '',
+      args: [max],
+    );
+  }
+
+  /// `5 messages are already waiting.`
+  String get aiQueueFull {
+    return Intl.message(
+      '5 messages are already waiting.',
+      name: 'aiQueueFull',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The computer did not take it ({reason}).`
+  String aiRequestFailed(String reason) {
+    return Intl.message(
+      'The computer did not take it ($reason).',
+      name: 'aiRequestFailed',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `Already answered on another device.`
+  String get aiAnsweredElsewhere {
+    return Intl.message(
+      'Already answered on another device.',
+      name: 'aiAnsweredElsewhere',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Thinking`
+  String get aiThought {
+    return Intl.message('Thinking', name: 'aiThought', desc: '', args: []);
+  }
+
+  /// `Too large for the phone. Open it on the computer.`
+  String get aiFromComputerOnly {
+    return Intl.message(
+      'Too large for the phone. Open it on the computer.',
+      name: 'aiFromComputerOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This kind of item is not supported on the phone yet. See it on the computer.`
+  String get aiItemOnComputer {
+    return Intl.message(
+      'This kind of item is not supported on the phone yet. See it on the computer.',
+      name: 'aiItemOnComputer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{count} lines in all; the middle is on the computer`
+  String aiCutLines(int count) {
+    return Intl.message(
+      '$count lines in all; the middle is on the computer',
+      name: 'aiCutLines',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `The rest of this message is on the computer.`
+  String get aiCutText {
+    return Intl.message(
+      'The rest of this message is on the computer.',
+      name: 'aiCutText',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `+{count} more files`
+  String aiMoreDiffs(int count) {
+    return Intl.message(
+      '+$count more files',
+      name: 'aiMoreDiffs',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `new file`
+  String get aiCreated {
+    return Intl.message('new file', name: 'aiCreated', desc: '', args: []);
+  }
+
+  /// `No output`
+  String get aiNoOutput {
+    return Intl.message('No output', name: 'aiNoOutput', desc: '', args: []);
+  }
+
+  /// `Read {target}`
+  String aiToolRead(String target) {
+    return Intl.message(
+      'Read $target',
+      name: 'aiToolRead',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Edit {target}`
+  String aiToolEdit(String target) {
+    return Intl.message(
+      'Edit $target',
+      name: 'aiToolEdit',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Create {target}`
+  String aiToolCreate(String target) {
+    return Intl.message(
+      'Create $target',
+      name: 'aiToolCreate',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Delete {target}`
+  String aiToolDelete(String target) {
+    return Intl.message(
+      'Delete $target',
+      name: 'aiToolDelete',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Rename {target}`
+  String aiToolMove(String target) {
+    return Intl.message(
+      'Rename $target',
+      name: 'aiToolMove',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Search {target}`
+  String aiToolSearch(String target) {
+    return Intl.message(
+      'Search $target',
+      name: 'aiToolSearch',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Fetch {target}`
+  String aiToolFetch(String target) {
+    return Intl.message(
+      'Fetch $target',
+      name: 'aiToolFetch',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Run {target}`
+  String aiToolExecute(String target) {
+    return Intl.message(
+      'Run $target',
+      name: 'aiToolExecute',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Switch mode`
+  String get aiToolSwitchMode {
+    return Intl.message(
+      'Switch mode',
+      name: 'aiToolSwitchMode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `waiting`
+  String get aiToolPending {
+    return Intl.message('waiting', name: 'aiToolPending', desc: '', args: []);
+  }
+
+  /// `waiting for you`
+  String get aiToolAwaiting {
+    return Intl.message(
+      'waiting for you',
+      name: 'aiToolAwaiting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `running · {time}`
+  String aiToolRunningFor(String time) {
+    return Intl.message(
+      'running · $time',
+      name: 'aiToolRunningFor',
+      desc: '',
+      args: [time],
+    );
+  }
+
+  /// `rejected`
+  String get aiToolRejected {
+    return Intl.message('rejected', name: 'aiToolRejected', desc: '', args: []);
+  }
+
+  /// `stopped`
+  String get aiToolStopped {
+    return Intl.message('stopped', name: 'aiToolStopped', desc: '', args: []);
+  }
+
+  /// `error`
+  String get aiToolFailed {
+    return Intl.message('error', name: 'aiToolFailed', desc: '', args: []);
+  }
+
+  /// `You chose: {option}`
+  String aiYouChose(String option) {
+    return Intl.message(
+      'You chose: $option',
+      name: 'aiYouChose',
+      desc: '',
+      args: [option],
+    );
+  }
+
+  /// `{agent} asks:`
+  String aiPermTitle(String agent) {
+    return Intl.message(
+      '$agent asks:',
+      name: 'aiPermTitle',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `Allow`
+  String get aiPermAllowOnce {
+    return Intl.message('Allow', name: 'aiPermAllowOnce', desc: '', args: []);
+  }
+
+  /// `Always allow`
+  String get aiPermAllowAlways {
+    return Intl.message(
+      'Always allow',
+      name: 'aiPermAllowAlways',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reject`
+  String get aiPermRejectOnce {
+    return Intl.message('Reject', name: 'aiPermRejectOnce', desc: '', args: []);
+  }
+
+  /// `Always reject`
+  String get aiPermRejectAlways {
+    return Intl.message(
+      'Always reject',
+      name: 'aiPermRejectAlways',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{count} more waiting`
+  String aiPermMore(int count) {
+    return Intl.message(
+      '$count more waiting',
+      name: 'aiPermMore',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Details`
+  String get aiPermDetails {
+    return Intl.message('Details', name: 'aiPermDetails', desc: '', args: []);
+  }
+
+  /// `Answer this request on the computer.`
+  String get aiPermOnComputer {
+    return Intl.message(
+      'Answer this request on the computer.',
+      name: 'aiPermOnComputer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{agent} asks you`
+  String aiAskTitle(String agent) {
+    return Intl.message(
+      '$agent asks you',
+      name: 'aiAskTitle',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `Send answer`
+  String get aiAskSubmit {
+    return Intl.message('Send answer', name: 'aiAskSubmit', desc: '', args: []);
+  }
+
+  /// `Decline`
+  String get aiAskDecline {
+    return Intl.message('Decline', name: 'aiAskDecline', desc: '', args: []);
+  }
+
+  /// `Answer this question on the computer.`
+  String get aiAskOnComputer {
+    return Intl.message(
+      'Answer this question on the computer.',
+      name: 'aiAskOnComputer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Answered`
+  String get aiAskAnswered {
+    return Intl.message('Answered', name: 'aiAskAnswered', desc: '', args: []);
+  }
+
+  /// `Declined`
+  String get aiAskDeclined {
+    return Intl.message('Declined', name: 'aiAskDeclined', desc: '', args: []);
+  }
+
+  /// `Cancelled`
+  String get aiAskCancelled {
+    return Intl.message(
+      'Cancelled',
+      name: 'aiAskCancelled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This question uses an answer type ShellX does not support yet.`
+  String get aiAskUnsupported {
+    return Intl.message(
+      'This question uses an answer type ShellX does not support yet.',
+      name: 'aiAskUnsupported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting for your answer below`
+  String get aiAskWaiting {
+    return Intl.message(
+      'Waiting for your answer below',
+      name: 'aiAskWaiting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Turn {n} · {time}`
+  String aiTurnSummary(int n, String time) {
+    return Intl.message(
+      'Turn $n · $time',
+      name: 'aiTurnSummary',
+      desc: '',
+      args: [n, time],
+    );
+  }
+
+  /// `{count, plural, one{1 file changed} other{{count} files changed}}`
+  String aiTurnFiles(int count) {
+    return Intl.plural(
+      count,
+      one: '1 file changed',
+      other: '$count files changed',
+      name: 'aiTurnFiles',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Stopped turn {n} · {time}`
+  String aiTurnStopped(int n, String time) {
+    return Intl.message(
+      'Stopped turn $n · $time',
+      name: 'aiTurnStopped',
+      desc: '',
+      args: [n, time],
+    );
+  }
+
+  /// `Turn {n} interrupted`
+  String aiTurnInterrupted(int n) {
+    return Intl.message(
+      'Turn $n interrupted',
+      name: 'aiTurnInterrupted',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `Turn {n} failed`
+  String aiTurnFailed(int n) {
+    return Intl.message(
+      'Turn $n failed',
+      name: 'aiTurnFailed',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `{agent} needs you to sign in, on the computer.`
+  String aiNoticeLogin(String agent) {
+    return Intl.message(
+      '$agent needs you to sign in, on the computer.',
+      name: 'aiNoticeLogin',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `{agent} needs Node.js {version} or newer on the computer.`
+  String aiNoticeNode(String agent, int version) {
+    return Intl.message(
+      '$agent needs Node.js $version or newer on the computer.',
+      name: 'aiNoticeNode',
+      desc: '',
+      args: [agent, version],
+    );
+  }
+
+  /// `{agent} is not installed on the computer.`
+  String aiNoticeNotInstalled(String agent) {
+    return Intl.message(
+      '$agent is not installed on the computer.',
+      name: 'aiNoticeNotInstalled',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `{agent} was not found on the computer.`
+  String aiNoticeMissing(String agent) {
+    return Intl.message(
+      '$agent was not found on the computer.',
+      name: 'aiNoticeMissing',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `{agent} stopped unexpectedly (exit {code}).`
+  String aiNoticeExited(String agent, int code) {
+    return Intl.message(
+      '$agent stopped unexpectedly (exit $code).',
+      name: 'aiNoticeExited',
+      desc: '',
+      args: [agent, code],
+    );
+  }
+
+  /// `{agent} sent output ShellX cannot read and was stopped.`
+  String aiNoticeInvalid(String agent) {
+    return Intl.message(
+      '$agent sent output ShellX cannot read and was stopped.',
+      name: 'aiNoticeInvalid',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `{agent} could not start.`
+  String aiNoticeStartFailed(String agent) {
+    return Intl.message(
+      '$agent could not start.',
+      name: 'aiNoticeStartFailed',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `This agent cannot reopen the old session; a new one was started.`
+  String get aiNoticeCannotResume {
+    return Intl.message(
+      'This agent cannot reopen the old session; a new one was started.',
+      name: 'aiNoticeCannotResume',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The session's folder is gone. Choose one on the computer.`
+  String get aiNoticeFolderMissing {
+    return Intl.message(
+      'The session\'s folder is gone. Choose one on the computer.',
+      name: 'aiNoticeFolderMissing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Undo is off for this project.`
+  String get aiNoticeUndoOff {
+    return Intl.message(
+      'Undo is off for this project.',
+      name: 'aiNoticeUndoOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `A notice from the computer.`
+  String get aiNoticeOther {
+    return Intl.message(
+      'A notice from the computer.',
+      name: 'aiNoticeOther',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Ask first`
+  String get aiModeDefault {
+    return Intl.message('Ask first', name: 'aiModeDefault', desc: '', args: []);
+  }
+
+  /// `Edit files`
+  String get aiModeAcceptEdits {
+    return Intl.message(
+      'Edit files',
+      name: 'aiModeAcceptEdits',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Plan`
+  String get aiModePlan {
+    return Intl.message('Plan', name: 'aiModePlan', desc: '', args: []);
+  }
+
+  /// `Auto`
+  String get aiModeAuto {
+    return Intl.message('Auto', name: 'aiModeAuto', desc: '', args: []);
+  }
+
+  /// `Bypass permissions`
+  String get aiModeBypass {
+    return Intl.message(
+      'Bypass permissions',
+      name: 'aiModeBypass',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Context {percent}%`
+  String aiContext(int percent) {
+    return Intl.message(
+      'Context $percent%',
+      name: 'aiContext',
+      desc: '',
+      args: [percent],
+    );
+  }
+
+  /// `Plan · {done}/{total}`
+  String aiPlan(int done, int total) {
+    return Intl.message(
+      'Plan · $done/$total',
+      name: 'aiPlan',
+      desc: '',
+      args: [done, total],
+    );
+  }
+
+  /// `{agent} needs your answer`
+  String aiAttentionTitle(String agent) {
+    return Intl.message(
+      '$agent needs your answer',
+      name: 'aiAttentionTitle',
+      desc: '',
+      args: [agent],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

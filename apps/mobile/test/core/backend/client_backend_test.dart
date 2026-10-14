@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/backend/client_backend.dart';
@@ -145,6 +146,73 @@ void main() {
     );
     expect(machine.state, isA<MachineFailed>());
   });
+
+  test('AI sessions: one AiMachine per machine; a handle per link, a new one once the link closed', () async {
+    await pin(agentA, publicKey: (await NoiseKeyPair.generate()).publicKey);
+    final backend = await start();
+    addTearDown(backend.dispose);
+
+    final machine = backend.machine(agentA);
+    final ai = machine.ai;
+    expect(machine.ai, same(ai));
+    // Nothing is known before the computer answered a list.
+    expect(ai.supported, isNull);
+    expect(ai.listing, isNull);
+
+    final first = ai.attach('e.1');
+    expect(ai.attach('e.1'), same(first));
+    expect(ai.attach('e.2'), isNot(same(first)));
+    expect(first.sid, 'e.1');
+    expect(first.state, AiLinkState.attaching);
+    expect(first.mirror.head, isNull);
+    expect(first.closedReason, isNull);
+    first.loadEarlier(); // nothing held, nothing to ask
+
+    // The relay is down: the machine fails, and the link goes on waiting (the page shows the machine's state).
+    await pumpEventQueue();
+    expect(machine.state, isA<MachineFailed>());
+    expect(first.state, AiLinkState.attaching);
+
+    final events = <String>[];
+    first.changes.listen((_) => events.add('change'), onDone: () => events.add('end'));
+    first.detach();
+    await pumpEventQueue();
+    expect(first.state, AiLinkState.closed);
+    expect(first.closedReason, 'detached');
+    expect(events, ['change', 'end']);
+
+    final again = ai.attach('e.1');
+    expect(again, isNot(same(first)));
+    expect(again.state, AiLinkState.attaching);
+    expect(again.closedReason, isNull);
+    expect(ai.attach('e.1'), same(again));
+  });
+
+  test(
+    'AI requests connect first and fail like the client\'s own; an oversized prompt never leaves the phone',
+    () async {
+      await pin(agentA, publicKey: (await NoiseKeyPair.generate()).publicKey);
+      final backend = await start();
+      addTearDown(backend.dispose);
+      final ai = backend.machine(agentA).ai;
+
+      Matcher offline() => throwsA(
+        isA<MachineConnectionException>().having((e) => e.failure, 'failure', MachineConnectionFailure.timeout),
+      );
+      await expectLater(ai.prompt('e.1', 'hi'), offline());
+      await expectLater(ai.answerPermission('e.1', 1, 'allow'), offline());
+      await expectLater(ai.answerAsk('e.1', 2, const ElicitDecline()), offline());
+      await expectLater(ai.cancel('e.1'), offline());
+      await expectLater(ai.forceStop('e.1'), offline());
+      await expectLater(ai.unqueue('e.1', 3), offline());
+      await expectLater(ai.open('claude', 'k1'), offline());
+      await expectLater(ai.watch(), offline());
+
+      Matcher tooLarge() => throwsA(isA<AiRequestException>().having((e) => e.code, 'code', 'too_large'));
+      await expectLater(ai.prompt('e.1', 'x' * (32 * 1024 + 1)), tooLarge());
+      await expectLater(ai.answerAsk('e.1', 2, ElicitAccept({'text': 'x' * (48 * 1024)})), tooLarge());
+    },
+  );
 
   test('an untrusted machine is forgotten: machine() throws, the pin is gone', () async {
     // A pin that cannot be used is treated as untrusted by shellx_client, like an HS2 `untrusted`.

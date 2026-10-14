@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/remote.dart';
+import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
@@ -273,6 +276,250 @@ class FakeMachineSession implements MachineSession {
   }
 
   FakeTabHandle handle(int id) => handles.firstWhere((h) => h.id == id);
+
+  /// V2-2: the machine's AI sessions.
+  @override
+  final FakeAiMachine ai = FakeAiMachine();
+}
+
+/// A mirrored AI session for tests (V2-2). Fed like the real one: a desktop-side [AiSubscription]
+/// over [desktop] makes the bodies, [sync] applies them as the phone would.
+///
+/// It acts like [AiSessionLink] (`shellx_client`) where tests rely on it: a lost channel keeps the
+/// mirror and the next [sync] attaches again with what the mirror holds; a closed link — by the
+/// computer ([close]) or by [detach] — is final, and a [detach]ed one ends its [changes].
+class FakeAiSession implements AiSessionHandle {
+  FakeAiSession(this.sid, {AiSessionState? desktop})
+    : desktop =
+          desktop ?? (AiSessionState(agentId: 'claude', agentName: 'Claude', cwd: '/p')..setPhase(AgentPhase.ready));
+
+  @override
+  final String sid;
+
+  /// The session as the computer holds it; tests change it like the agent would.
+  final AiSessionState desktop;
+  late final AiSubscription _sub = AiSubscription(desktop, generation: 1);
+
+  /// False before the first [sync] and after [lose]: the next [sync] attaches (a snapshot, which
+  /// goes on from the numbers before it after a loss).
+  var _attached = false;
+
+  @override
+  final AiMirror mirror = AiMirror();
+  AiLinkState stateValue = AiLinkState.attaching;
+  String? closedReasonValue;
+  final StreamController<void> _changes = StreamController<void>.broadcast(sync: true);
+  bool detached = false;
+  int earlierCalls = 0;
+  var _notifying = false;
+  var _notifyAgain = false;
+  var _ended = false;
+
+  /// Tells the listeners, like the real link: a change made from inside a listener (a `detach()` from
+  /// its callback, say) is told once the round is over, and a detached link ends [changes] after the
+  /// last round.
+  void _notify() {
+    if (_changes.isClosed) return;
+    if (_notifying) {
+      _notifyAgain = true;
+      return;
+    }
+    _notifying = true;
+    try {
+      do {
+        _notifyAgain = false;
+        _changes.add(null);
+      } while (_notifyAgain);
+    } finally {
+      _notifying = false;
+    }
+    if (_ended) unawaited(_changes.close());
+  }
+
+  /// Brings the phone's mirror up to date with [desktop] (the snapshot first; a long text comes in
+  /// pieces, all of them). A closed link takes no more bodies.
+  void sync() {
+    if (stateValue == AiLinkState.closed) return;
+    var out = _attached ? _sub.delta() : _sub.attach(mirror.generation < 0 ? null : mirror.have);
+    _attached = true;
+    for (var round = 0; round < 1000; round++) {
+      for (final o in out) {
+        mirror.apply(decodeBody(o.body)!, snapshot: o.snapshot);
+        _sub.ack(o.seq);
+      }
+      if (!_sub.dirty) break;
+      out = _sub.delta();
+    }
+    stateValue = AiLinkState.live;
+    _notify();
+  }
+
+  /// The computer closed it ([reason]: `gone`, `desktop_closed`, …).
+  void close(String reason) {
+    if (_ended) return;
+    stateValue = AiLinkState.closed;
+    closedReasonValue = reason;
+    _notify();
+  }
+
+  /// The channel dropped: the mirror stays, the link re-attaches ([sync]). A link that is not live
+  /// (still attaching, or closed) has nothing to tell.
+  void lose() {
+    _attached = false;
+    if (stateValue != AiLinkState.live) return;
+    stateValue = AiLinkState.attaching;
+    _notify();
+  }
+
+  @override
+  AiLinkState get state => stateValue;
+
+  @override
+  String? get closedReason => closedReasonValue;
+
+  @override
+  Stream<void> get changes => _changes.stream;
+
+  /// Like the real link: closed with reason `detached` (unless the computer closed it first), told to
+  /// the listeners once, then [changes] ends.
+  @override
+  void detach() {
+    detached = true;
+    if (stateValue != AiLinkState.closed) {
+      stateValue = AiLinkState.closed;
+      closedReasonValue = 'detached';
+      _notify();
+    }
+    _ended = true;
+    if (!_notifying) unawaited(_changes.close());
+  }
+
+  /// Counts the tap; asks the computer only while the link is live and older items exist.
+  @override
+  void loadEarlier() {
+    earlierCalls++;
+    if (stateValue != AiLinkState.live || !mirror.hasEarlier) return;
+    for (final o in _sub.earlier(mirror.from)) {
+      mirror.apply(decodeBody(o.body)!, snapshot: false);
+      _sub.ack(o.seq);
+    }
+    _notify();
+  }
+}
+
+/// Scriptable [AiMachine] (V2-2): records every request.
+/// - [failWith] makes requests fail with that `ai.result` code ([AiRequestException]);
+/// - [connectFailure] makes them, and [watch], fail like a machine that cannot be reached
+///   ([MachineConnectionException]);
+/// - [gate] holds them in flight: what is set meanwhile decides how they end.
+///
+/// [attach] gives the same link while it is open and, like `MachineAi`, a new one over the same
+/// session once it closed.
+class FakeAiMachine implements AiMachine {
+  bool? supportedValue;
+  AiListing? listingValue;
+  final StreamController<AiListing> _listings = StreamController<AiListing>.broadcast(sync: true);
+  final Map<String, FakeAiSession> sessions = {};
+  final List<(String, String)> prompts = [];
+  final List<(String, int, String)> permissionAnswers = [];
+  final List<(String, int, ElicitationResponse)> askAnswers = [];
+  final List<String> cancels = [];
+  final List<String> forceStops = [];
+  final List<(String, int)> unqueued = [];
+  final List<(String, String)> opened = [];
+  String? failWith;
+  MachineConnectionFailure? connectFailure;
+  String openedSid = 'e.-9';
+  int watchCalls = 0;
+
+  /// Requests wait for this when set (an answer still travelling).
+  Completer<void>? gate;
+
+  /// A listing came from the computer: it has AI, as the real client learns from an `ai.list.result`
+  /// ([AiListing.unavailable]: no window serves it yet).
+  void emitListing(AiListing listing) {
+    supportedValue = true;
+    listingValue = listing;
+    _listings.add(listing);
+  }
+
+  FakeAiSession session(String sid) => sessions.putIfAbsent(sid, () => FakeAiSession(sid));
+
+  Future<void> _request() async {
+    await gate?.future;
+    final failure = connectFailure;
+    if (failure != null) throw MachineConnectionException(failure);
+    final code = failWith;
+    if (code != null) throw AiRequestException(code);
+  }
+
+  @override
+  bool? get supported => supportedValue;
+
+  @override
+  AiListing? get listing => listingValue;
+
+  @override
+  Stream<AiListing> get listings => _listings.stream;
+
+  @override
+  Future<void> watch() async {
+    watchCalls++;
+    final failure = connectFailure;
+    if (failure != null) throw MachineConnectionException(failure);
+  }
+
+  @override
+  AiSessionHandle attach(String sid) {
+    final current = sessions[sid];
+    if (current != null && current.state == AiLinkState.closed) {
+      sessions[sid] = FakeAiSession(sid, desktop: current.desktop);
+    }
+    return session(sid);
+  }
+
+  @override
+  Future<void> prompt(String sid, String text) async {
+    prompts.add((sid, text));
+    await _request();
+  }
+
+  @override
+  Future<void> answerPermission(String sid, int permission, String option) async {
+    permissionAnswers.add((sid, permission, option));
+    await _request();
+  }
+
+  @override
+  Future<void> answerAsk(String sid, int ask, ElicitationResponse response) async {
+    askAnswers.add((sid, ask, response));
+    await _request();
+  }
+
+  @override
+  Future<void> cancel(String sid) async {
+    cancels.add(sid);
+    await _request();
+  }
+
+  @override
+  Future<void> forceStop(String sid) async {
+    forceStops.add(sid);
+    await _request();
+  }
+
+  @override
+  Future<void> unqueue(String sid, int queued) async {
+    unqueued.add((sid, queued));
+    await _request();
+  }
+
+  @override
+  Future<String> open(String agent, String folder) async {
+    opened.add((agent, folder));
+    await _request();
+    return openedSid;
+  }
 }
 
 /// Scriptable [ShellxBackend]. [unpair] (whether or not [unpairError] is set) and an `untrusted`
@@ -294,6 +541,8 @@ class FakeMachineSession implements MachineSession {
 ///   same tab);
 /// - pins ([pinnedList]) and sessions ([machines]) are tracked separately: [addMachine] pins
 ///   nothing, and [machine] works for any added machine;
+/// - [FakeMachineSession.ai] carries on after [unpair] (real: the machine's AI links and listing end
+///   with it), and its requests do not connect first (script [FakeAiMachine.connectFailure]);
 /// - every stream is synchronous.
 class FakeBackend implements ShellxBackend {
   FakeBackend({List<RemoteDevice>? devices, List<PinnedMachine>? pinnedList})
