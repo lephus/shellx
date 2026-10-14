@@ -128,7 +128,23 @@ final class AiSubscription with Redacted {
 
   /// What changed since the last bodies, within the window (at least one
   /// body when anything did). Empty when nothing changed.
-  List<AiOutgoing> delta() => dirty ? _produce() : const [];
+  ///
+  /// A phone more than twice [attachItems] items behind starts over from
+  /// the last [attachItems], as a re-attach that far behind would (V2-2
+  /// D5): one reset snapshot instead of everything it missed. While the
+  /// agent starts, items after the ones the phone holds wait: that is when a
+  /// restored session replays its history (`session/load`, D15), which then
+  /// comes as its last [attachItems] however slowly it was replayed.
+  List<AiOutgoing> delta() {
+    if (!dirty) return const [];
+    if (!_starting && _behind > 2 * attachItems) return attach(null);
+    return _produce();
+  }
+
+  /// Items the phone was sent nothing of: the ones after those it holds.
+  int get _behind => state.timeline.items.length - (_from + _revs.length);
+
+  bool get _starting => state.phase == AgentPhase.starting;
 
   /// The page before index [before] (it must be [from]): whole items, the
   /// newest body first, each one continuing the held window downwards. A
@@ -194,9 +210,14 @@ final class AiSubscription with Redacted {
     final items = state.timeline.items;
     final n = items.length;
     final budget = max(kAiBodyBytes, windowBytes - unackedBytes);
+    // New items wait while the agent starts (see [delta]); a snapshot
+    // brings what there is.
+    final end = snapshot == null && _starting
+        ? min(n, _from + _revs.length)
+        : n;
     final records = <(String, int)>[];
     var produced = 0;
-    for (var i = _from; i < n; i++) {
+    for (var i = _from; i < end; i++) {
       final k = i - _from;
       final item = items[i];
       if (k < _revs.length && _revs[k] == item.rev) continue;

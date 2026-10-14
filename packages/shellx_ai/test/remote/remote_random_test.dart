@@ -46,7 +46,7 @@ bool _deliver(AiMirror mirror, AiSubscription sub, List<AiOutgoing> out) {
   return ok;
 }
 
-void _session(int seed, {required int steps}) {
+void _session(int seed, {required int steps, bool bursts = false}) {
   final r = Random(seed);
   final why = 'seed $seed';
   final s = AiSessionState(agentId: 'claude', agentName: 'Claude', cwd: '/p')
@@ -88,6 +88,29 @@ void _session(int seed, {required int steps}) {
   };
 
   for (var step = 0; step < steps; step++) {
+    if (bursts && r.nextInt(20) == 0) {
+      // More than twice 60 new items at once: a history replayed while the
+      // agent starts (session/load), or a phone that was sent nothing for a
+      // while. Flushes may come in between.
+      final phase = s.phase;
+      final starting = r.nextBool();
+      if (starting) s.setPhase(AgentPhase.starting);
+      final count = 121 + r.nextInt(200);
+      final flushEvery = r.nextBool() ? 25 : 1000;
+      for (var i = 0; i < count; i++) {
+        update({
+          'sessionUpdate': 'tool_call',
+          'toolCallId': 'h${toolId++}',
+          'title': _text(r, 1 + r.nextInt(80)),
+          'kind': 'read',
+          'status': 'completed',
+          if (r.nextBool()) 'content': [textContent(_text(r, _size(r)))],
+        });
+        if (r.nextInt(flushEvery) == 0) flush(loss: 0.15);
+      }
+      if (starting) s.setPhase(phase);
+      continue;
+    }
     final p = r.nextInt(100);
     if (p < 28) {
       if (!turnOpen) {
@@ -287,6 +310,13 @@ void main() {
   test('the mirror equals the desktop after any mix of events', () {
     for (var seed = 1; seed <= 30; seed++) {
       _session(seed, steps: 100);
+    }
+  });
+
+  test('and with bursts of history, some of them while the agent starts: '
+      'the phone starts over from the last 60 and still equals it', () {
+    for (var seed = 1; seed <= 30; seed++) {
+      _session(seed, steps: 100, bursts: true);
     }
   });
 }

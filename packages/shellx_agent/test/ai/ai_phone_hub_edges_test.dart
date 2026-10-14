@@ -40,8 +40,46 @@ void tool(AiSessionState s, String id) => s.applyUpdate(
   aiT0,
 );
 
+/// A finished tool call [i] (`t$i`) with about 1 KB of output.
+void heavyTool(AiSessionState s, int i) => s.applyUpdate(
+  SessionUpdate.fromJson({
+    'sessionUpdate': 'tool_call',
+    'toolCallId': 't$i',
+    'title': 'Run $i',
+    'kind': 'execute',
+    'status': 'completed',
+    'content': [
+      {
+        'type': 'content',
+        'content': {'type': 'text', 'text': 'line of call $i\n' * 60},
+      },
+    ],
+  }),
+  aiT0,
+);
+
 AiListing listing(AiListResult r) =>
     AiListing.fromJson(decodeBody(r.body)!, available: r.available);
+
+/// The bytes of every mirror body [who] was sent.
+int bytesTo(HubRig rig, String who) => rig
+    .to(who)
+    .map(
+      (m) => switch (m) {
+        AiSnapshot(:final body) || AiUpdate(:final body) => body.length,
+        _ => 0,
+      },
+    )
+    .fold(0, (a, b) => a + b);
+
+/// A few flushes of session `ep.-1`, each acknowledged by [phone] as it
+/// comes.
+void flushAndAck(FakeAsync async, HubRig rig) {
+  for (var i = 0; i < 10; i++) {
+    async.elapse(const Duration(milliseconds: 150));
+    ackAll(rig, phone, 'ep.-1');
+  }
+}
 
 /// 81 items: an attach brings the last 60 and the phone can load 21 more.
 AiSessionState longSession(HubRig rig) {
@@ -631,6 +669,56 @@ void main() {
           async.elapse(const Duration(milliseconds: 150));
         }
         expect(textOf(phone), whole);
+      });
+    });
+
+    test('a phone sent nothing while 400 items came gets the last 60 of '
+        'them, not all 400 (D5)', () {
+      fakeAsync((async) {
+        final rig = HubRig();
+        final s = rig.source.add(-1);
+        rig.hub.handle(phone, const AiAttach(sid: 'ep.-1')); // empty
+        for (var i = 0; i < 400; i++) {
+          heavyTool(s, i);
+        }
+        flushAndAck(async, rig);
+        final mirror = rig.mirror(phone, 'ep.-1');
+        expect((mirror.from, mirror.end), (340, 400));
+        expect(mirror.hasEarlier, isTrue);
+        // About 1 KB per card: 60 of them went, not 400.
+        expect(bytesTo(rig, phone), lessThan(100 * 1024));
+
+        heavyTool(s, 400); // what comes next is an update after the 60
+        flushAndAck(async, rig);
+        expect(rig.to(phone).last, isA<AiUpdate>());
+        final after = rig.mirror(phone, 'ep.-1');
+        expect((after.from, after.end), (340, 401));
+      });
+    });
+
+    test('a restored session opened from the phone: the history its agent '
+        'replays as it starts comes as its last 60, however slowly '
+        '(D15, D5)', () {
+      fakeAsync((async) {
+        final rig = HubRig();
+        // The attach started the agent; `session/load` replays the history
+        // into the state the phone already mirrors.
+        final s = rig.source.add(-1)..setPhase(AgentPhase.starting);
+        rig.hub.handle(phone, const AiAttach(sid: 'ep.-1'));
+        for (var round = 0; round < 10; round++) {
+          for (var i = 0; i < 40; i++) {
+            heavyTool(s, round * 40 + i);
+          }
+          flushAndAck(async, rig);
+          expect(rig.mirror(phone, 'ep.-1').items, isEmpty);
+        }
+        s.setPhase(AgentPhase.ready);
+        flushAndAck(async, rig);
+        final mirror = rig.mirror(phone, 'ep.-1');
+        expect((mirror.from, mirror.end), (340, 400));
+        expect(mirror.hasEarlier, isTrue);
+        expect(mirror.head!.phase, 'ready');
+        expect(bytesTo(rig, phone), lessThan(100 * 1024));
       });
     });
   });
