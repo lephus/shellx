@@ -8,6 +8,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import '../../../l10n/app_localizations.dart';
 import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'ai_config_chips.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
 
@@ -240,7 +241,8 @@ class _AiComposerState extends State<AiComposer> {
                     ),
                   )
                 else
-                  const Spacer(),
+                  // D11: mode, model, thinking.
+                  const Expanded(child: AiConfigChips()),
                 if (view.usage case final percent?)
                   Padding(
                     padding: const EdgeInsets.only(right: ShellxSpace.s8),
