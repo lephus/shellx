@@ -293,11 +293,12 @@ class TrayActions {
         await _dispatch(const Quit());
       case Quit(:final confirm):
         if (_quitting) return;
-        if (confirm && state.sessions.isNotEmpty) {
+        final aiBusy = confirm ? _aiBusyCount() : 0;
+        if (confirm && (state.sessions.isNotEmpty || aiBusy > 0)) {
           final ok = await _router.confirm(
             ConfirmRequest(
               title: l10n.confirmQuitTitle,
-              body: l10n.confirmQuitBody(state.sessions.length),
+              body: _quitBody(state.sessions.length, aiBusy),
               confirmLabel: l10n.confirmQuitAction,
             ),
           );
@@ -345,6 +346,29 @@ class TrayActions {
     }
   }
 
+  /// V2-1: how many AI tabs have an agent at work — a running turn, or
+  /// messages waiting for it (the same question as closing the tab). Their
+  /// agents run in this window's process and stop on any quit.
+  int _aiBusyCount() {
+    final busy = _ref.read(terminalTabsProvider.notifier).aiBusy;
+    if (busy == null) return 0;
+    return _ref
+        .read(terminalTabsProvider)
+        .tabs
+        .where((tab) => tab.isAi && busy(tab.id))
+        .length;
+  }
+
+  /// What a quit question says: the tabs the shells lose (A1), then the AI
+  /// agents at work that stop with it; either may be absent.
+  String _quitBody(int sessions, int aiBusy) {
+    final l10n = _services.l10n;
+    return [
+      if (sessions > 0) l10n.confirmQuitBody(sessions),
+      if (aiBusy > 0) l10n.confirmQuitAiBusy(aiBusy),
+    ].join(' ');
+  }
+
   /// A10 D15: only where the shells end with the app (never when the
   /// background service keeps them).
   Future<void> _deleteImages() async {
@@ -365,17 +389,23 @@ class TrayActions {
     final l10n = _services.l10n;
     final settings = _ref.read(settingsStoreProvider);
     final count = _ref.read(localSessionsProvider).sessions.length;
+    // The AI agents run in this window's process: they stop on this quit too,
+    // though the shells do not.
+    final aiBusy = confirm ? _aiBusyCount() : 0;
     if (confirm &&
         count > 0 &&
         !settings.getBool(
           SettingKeys.quitKeepsSessionsExplained,
           defaultValue: false,
         )) {
+      final explained = _services.platform == DevicePlatform.windows
+          ? l10n.quitUiExplainedBodyWindows(count)
+          : l10n.quitUiExplainedBody(count);
       final request = ConfirmRequest(
         title: l10n.quitUiExplainedTitle,
-        body: _services.platform == DevicePlatform.windows
-            ? l10n.quitUiExplainedBodyWindows(count)
-            : l10n.quitUiExplainedBody(count),
+        body: aiBusy > 0
+            ? '$explained ${l10n.confirmQuitAiBusy(aiBusy)}'
+            : explained,
         confirmLabel: l10n.quitUiAction,
         secondaryLabel: l10n.quitAllAction,
         destructive: false,
@@ -390,6 +420,17 @@ class TrayActions {
         return;
       }
       if (!ok || _quitting) return;
+    } else if (aiBusy > 0) {
+      // No shell to explain (or it was explained): the agents at work are
+      // the one thing this quit stops.
+      final ok = await _router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmQuitTitle,
+          body: l10n.confirmQuitAiBusy(aiBusy),
+          confirmLabel: l10n.quitUiAction,
+        ),
+      );
+      if (!ok || _quitting) return;
     }
     await _finishQuit(stopService: false);
   }
@@ -400,11 +441,12 @@ class TrayActions {
     if (_quitting) return;
     final l10n = _services.l10n;
     final count = _ref.read(localSessionsProvider).sessions.length;
-    if (count > 0) {
+    final aiBusy = _aiBusyCount();
+    if (count > 0 || aiBusy > 0) {
       final ok = await _router.confirm(
         ConfirmRequest(
           title: l10n.confirmQuitTitle,
-          body: l10n.confirmQuitBody(count),
+          body: _quitBody(count, aiBusy),
           confirmLabel: l10n.confirmQuitAllAction,
         ),
       );
