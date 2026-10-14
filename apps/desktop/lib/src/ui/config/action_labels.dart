@@ -112,6 +112,8 @@ String severityText(AppLocalizations l10n, ConfigSeverity s) => switch (s) {
 /// UI-A9 §7.3: the palette / shortcut-sheet name of an action.
 String actionLabel(AppLocalizations l10n, KeyAction a) => switch (a.name) {
   'new_tab' => l10n.actionNewTab,
+  'new_ai_session' => l10n.actionNewAiSession,
+  'new_terminal_tab' => l10n.actionNewTerminalTab,
   'close_surface' => l10n.actionCloseSurface,
   'close_tab' => l10n.actionCloseTab,
   'new_workspace' => l10n.actionNewWorkspace,

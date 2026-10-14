@@ -93,6 +93,11 @@ Set<String> a11Additions(String platform) => platform == 'mac'
         'ctrl+alt+20000022d -> WorkspaceFontIntent(-1.0)',
       };
 
+/// V2-1 D5: "New AI session" (⌘⇧E / Ctrl+Shift+E).
+Set<String> v21Additions(String platform) => platform == 'mac'
+    ? const {'shift+meta+65 norepeat -> NewAiSessionIntent'}
+    : const {'ctrl+shift+65 norepeat -> NewAiSessionIntent'};
+
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").
   final maps =
@@ -123,7 +128,8 @@ void main() {
               .union(a9Additions(map, name))
               .union(a10Additions(name))
               .union(a11Additions(name))
-              .union(a11Changes(name)),
+              .union(a11Changes(name))
+              .union(v21Additions(name)),
         );
       });
     }

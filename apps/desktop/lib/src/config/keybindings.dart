@@ -132,6 +132,8 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
       'reopen_closed',
     ),
     b(shifted(LogicalKeyboardKey.keyN), 'new_workspace'),
+    // V2-1 D5: ⌘⇧E / Ctrl+Shift+E (free on both).
+    b(shifted(LogicalKeyboardKey.keyE), 'new_ai_session'),
     b(shifted(LogicalKeyboardKey.keyK), 'ssh_connect'),
     b(shifted(LogicalKeyboardKey.keyI), 'toggle_notifications'),
     b(shifted(LogicalKeyboardKey.keyU), 'jump_to_unread'),

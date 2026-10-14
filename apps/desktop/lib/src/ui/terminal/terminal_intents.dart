@@ -10,6 +10,17 @@ class NewTabIntent extends Intent {
   const NewTabIntent();
 }
 
+/// V2-1 D5: ⌘⇧E / Ctrl+Shift+E, the sidebar's button, the `+` menu.
+class NewAiSessionIntent extends Intent {
+  const NewAiSessionIntent();
+}
+
+/// V2-1 D5: a terminal tab even when `new-tab-kind = ai` (palette, `+`
+/// menu).
+class NewTerminalTabIntent extends Intent {
+  const NewTerminalTabIntent();
+}
+
 class CloseTabIntent extends Intent {
   const CloseTabIntent();
 }

@@ -109,6 +109,21 @@ void main() {
     ]);
   });
 
+  test('V2-1 D5: new_ai_session is ⌘⇧E / Ctrl+Shift+E; new_terminal_tab '
+      'has no chord', () {
+    var (b, problems) = resolve('');
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+shift+e'), isA<NewAiSessionIntent>());
+    expect(b.labelOf(const KeyAction('new_ai_session')), '⌘⇧E');
+    expect(b.labelOf(const KeyAction('new_terminal_tab')), isNull);
+    (b, problems) = resolve('', platform: win);
+    expect(lookup(b, 'ctrl+shift+e'), isA<NewAiSessionIntent>());
+    expect(b.labelOf(const KeyAction('new_ai_session')), 'Ctrl+Shift+E');
+    (b, problems) = resolve('keybind = super+t=new_terminal_tab');
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+t'), isA<NewTerminalTabIntent>());
+  });
+
   test('unbind, clear, ignore, empty value', () {
     var (b, _) = resolve('keybind = super+d=unbind');
     expect(lookup(b, 'super+d'), isNull);

@@ -18,6 +18,8 @@ String? actionShortcutLabel(KeyAction action) => _bindings.labelOf(action);
 
 String? newTabShortcutLabel() =>
     actionShortcutLabel(const KeyAction('new_tab'));
+String? newAiSessionShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('new_ai_session'));
 String? closeTabShortcutLabel() =>
     actionShortcutLabel(const KeyAction('close_surface'));
 String? copyShortcutLabel() =>

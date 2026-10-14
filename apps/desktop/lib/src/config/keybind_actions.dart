@@ -138,6 +138,9 @@ final Map<String, ActionSpec> kActionSpecs = {
     const ActionSpec('toggle_pin_tab', ActionGroup.tabs),
     const ActionSpec('ssh_connect', ActionGroup.tabs),
     const ActionSpec('tmux_attach', ActionGroup.tabs),
+    // V2-1 D5: an AI tab; and a terminal tab whatever `new-tab-kind` says.
+    const ActionSpec('new_ai_session', ActionGroup.tabs),
+    const ActionSpec('new_terminal_tab', ActionGroup.tabs),
     const ActionSpec(
       'goto_tab',
       ActionGroup.tabs,
@@ -355,6 +358,8 @@ PaneDirection _dir(String p) => PaneDirection.values.byName(p);
 /// The window intent an action stands for.
 Intent intentForAction(KeyAction a) => switch (a.name) {
   'new_tab' => const NewTabIntent(),
+  'new_ai_session' => const NewAiSessionIntent(),
+  'new_terminal_tab' => const NewTerminalTabIntent(),
   'close_surface' => const CloseTabIntent(),
   'close_tab' => const CloseWholeTabIntent(),
   'reopen_closed' => const ReopenClosedIntent(),
