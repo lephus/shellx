@@ -961,6 +961,155 @@ void main() {
         );
       },
     );
+
+    group('a stale index.lock (a git killed inside add leaves it behind)', () {
+      File leaveLock() =>
+          File(p.join(gp.gitDir, 'index.lock'))..writeAsStringSync('');
+
+      // The first thing the next app session does with the store.
+      final startsWith =
+          <
+            String,
+            Future<void> Function(CheckpointStore next, Checkpoint before)
+          >{
+            'snapshot': (next, before) async =>
+                expect(await next.snapshot('s/2'), isNotNull),
+            'currentTree': (next, before) async =>
+                expect(await next.currentTree(), isNotNull),
+            'changes': (next, before) async => expect(
+              (await next.changes(before.tree)).map((c) => c.path),
+              ['a.txt'],
+            ),
+            'changedSince': (next, before) async =>
+                expect(await next.changedSince(before.tree), {'a.txt'}),
+            'restore': (next, before) async {
+              await next.restore(before.commit, ['a.txt']);
+              expect(utf8.decode(gp.bytes('a.txt')), 'one');
+            },
+          };
+      for (final entry in startsWith.entries) {
+        test(
+          'is cleared when the next session starts with ${entry.key}',
+          () async {
+            gp.put('a.txt', 'one');
+            final before = (await store().snapshot('s/1'))!;
+            gp.put('a.txt', 'two');
+            final lock = leaveLock();
+            // A new store: the app was restarted.
+            await entry.value(store(), before);
+            expect(lock.existsSync(), isFalse);
+          },
+        );
+      }
+
+      test(
+        'left by a killed first snapshot does not switch undo off for a week',
+        () async {
+          gp.put('a.txt', 'a');
+          await store().snapshot('s/1');
+          // The first `git add` of a repository was killed: no index, a lock.
+          File(p.join(gp.gitDir, 'index')).deleteSync();
+          leaveLock();
+          final next = store();
+          expect(await next.snapshot('s/2'), isNotNull);
+          expect(next.off, isNull);
+          expect(store().off, isNull, reason: 'nothing was remembered either');
+        },
+      );
+
+      test(
+        'that cannot be removed does not throw: the operation fails as before',
+        () async {
+          gp.put('a.txt', 'one');
+          await store().snapshot('s/1');
+          leaveLock();
+          // Nothing in the folder can be unlinked now.
+          Process.runSync('chmod', ['555', gp.gitDir]);
+          try {
+            final next = store();
+            expect(await next.snapshot('s/2'), isNull);
+            expect(next.off, isNull, reason: 'not a first snapshot');
+          } finally {
+            Process.runSync('chmod', ['755', gp.gitDir]);
+          }
+        },
+        skip:
+            Platform.isWindows ||
+                Process.runSync('id', ['-u']).stdout.toString().trim() == '0'
+            ? 'needs a user that permissions apply to'
+            : null,
+      );
+
+      test(
+        'that appears after the first operation is left alone: it may be a live git',
+        () async {
+          gp.put('a.txt', 'a');
+          final s = store();
+          expect(await s.snapshot('s/1'), isNotNull);
+          final lock = leaveLock();
+          gp.put('a.txt', 'b');
+          expect(
+            await s.snapshot('s/2'),
+            isNull,
+            reason: 'git cannot take the lock',
+          );
+          expect(
+            lock.existsSync(),
+            isTrue,
+            reason: 'swept once per session, before anything ran',
+          );
+          expect(
+            s.off,
+            isNull,
+            reason: 'only a first snapshot switches undo off',
+          );
+        },
+      );
+    });
+
+    test(
+      'restore never deletes anything inside a .git, the project own or a nested one, even when asked',
+      () async {
+        gp.put('a.txt', 'a');
+        gp.userGit(['init', '-q']);
+        gp.put('sub/repo/x.txt', 'x');
+        gp.userGit(['init', '-q'], dir: p.join(gp.project, 'sub', 'repo'));
+        gp.put('wt/x.txt', 'x');
+        // A worktree or submodule has a .git FILE.
+        final gitFile = File(p.join(gp.project, 'wt', '.git'));
+        gitFile.writeAsStringSync('gitdir: /nonexistent\n');
+        final s = store();
+        final ck = (await s.snapshot('s/1'))!;
+        gp.put('new.txt', 'made by the turn');
+        final guarded = [
+          File(p.join(gp.project, '.git', 'config')),
+          File(p.join(gp.project, '.git', 'HEAD')),
+          File(p.join(gp.project, 'sub', 'repo', '.git', 'config')),
+          gitFile,
+        ];
+        final before = [for (final f in guarded) f.readAsBytesSync()];
+        await s.restore(ck.commit, [
+          '.git/config',
+          '.git/HEAD',
+          'sub/repo/.git/config',
+          'wt/.git',
+          '.git',
+          '.GIT/config', // the same file on a case-insensitive disk
+          'new.txt',
+        ]);
+        expect([for (final f in guarded) f.readAsBytesSync()], before);
+        expect(
+          gp.exists('new.txt'),
+          isFalse,
+          reason: 'the turn file still goes',
+        );
+        expect(
+          gp.userGit(['rev-parse', '--git-dir']).exitCode,
+          0,
+          reason: 'the project repository still works',
+        );
+      },
+    );
   });
 
   group('CheckpointStores', () {
@@ -1130,5 +1279,132 @@ void main() {
         expect(await second!.snapshot('s/1'), isNotNull);
       },
     );
+
+    group('the git lookup', () {
+      final exes = <String>{};
+      var probes = 0;
+      late List<GitTool> found;
+      late CheckpointStores byLookup;
+      final lookupEnv = LoginEnv({
+        'PATH': '/g',
+      }, source: LoginEnvSource.process);
+
+      setUp(() {
+        exes.clear();
+        probes = 0;
+        found = [];
+        byLookup = CheckpointStores(
+          root: root,
+          locator: GitLocator(
+            isMacOS: false,
+            isWindows: false,
+            files: _Exes(exes),
+            probe: (exe, args, {environment}) async {
+              probes++;
+              return const ProbeResult(0, 'git version 2.40.0\n');
+            },
+          ),
+          create: (project, gitDir, git, e) {
+            found.add(git);
+            return CheckpointStore(
+              project: project,
+              gitDir: gitDir,
+              git: git,
+              env: e,
+            );
+          },
+        );
+      });
+
+      test(
+        'a lookup that found no git is made again at the next forProject',
+        () async {
+          expect(await byLookup.forProject(gp.project, lookupEnv), (
+            null,
+            UndoOff.noGit,
+          ));
+          exes.add('/g/git'); // the user installs git, or fixes the PATH
+          final (store, off) = await byLookup.forProject(gp.project, lookupEnv);
+          expect(off, isNull);
+          expect(store, isNotNull);
+          expect(
+            [found.single.executable, found.single.major, found.single.minor],
+            ['/g/git', 2, 40],
+          );
+        },
+      );
+
+      test('a lookup that failed on the version is made again too', () async {
+        exes.add('/g/git');
+        final answers = [
+          const ProbeResult(1, ''),
+          const ProbeResult(0, 'git version 2.40.0\n'),
+        ];
+        final flaky = CheckpointStores(
+          root: root,
+          locator: GitLocator(
+            isMacOS: false,
+            isWindows: false,
+            files: _Exes(exes),
+            probe: (exe, args, {environment}) async => answers.removeAt(0),
+          ),
+        );
+        expect(
+          (await flaky.forProject(gp.project, lookupEnv)).$2,
+          UndoOff.noGit,
+          reason: 'one probe that failed',
+        );
+        expect((await flaky.forProject(gp.project, lookupEnv)).$1, isNotNull);
+      });
+
+      test('a git that was found is kept: no second lookup', () async {
+        exes.add('/g/git');
+        final other = Directory(p.join(gp.tmp.path, 'other'))..createSync();
+        expect(
+          (await byLookup.forProject(gp.project, lookupEnv)).$1,
+          isNotNull,
+        );
+        expect(
+          (await byLookup.forProject(other.path, lookupEnv)).$1,
+          isNotNull,
+        );
+        expect(probes, 1);
+      });
+
+      test('requests that arrive together share one lookup', () async {
+        exes.add('/g/git');
+        final other = Directory(p.join(gp.tmp.path, 'other'))..createSync();
+        final both = await Future.wait([
+          byLookup.forProject(gp.project, lookupEnv),
+          byLookup.forProject(other.path, lookupEnv),
+        ]);
+        expect(both.map((r) => r.$1), everyElement(isNotNull));
+        expect(probes, 1);
+      });
+
+      test(
+        'pruneAll makes a failed lookup again too, and deletes nothing until git is found',
+        () async {
+          final repo = Directory(p.join(root, 'abc'))
+            ..createSync(recursive: true);
+          File(p.join(repo.path, 'shellx.json')).writeAsStringSync(
+            jsonEncode({'project': p.join(gp.tmp.path, 'gone')}),
+          );
+          await byLookup.pruneAll(const Duration(days: 14), lookupEnv);
+          expect(
+            repo.existsSync(),
+            isTrue,
+            reason: 'no git: nothing can be told to be old',
+          );
+          exes.add('/g/git');
+          await byLookup.pruneAll(const Duration(days: 14), lookupEnv);
+          expect(
+            repo.existsSync(),
+            isFalse,
+            reason: 'git found: the repository of a project that is gone goes',
+          );
+        },
+      );
+    });
   });
 }

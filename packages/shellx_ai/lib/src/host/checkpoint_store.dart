@@ -99,6 +99,7 @@ final class CheckpointStore with Redacted implements Checkpoints {
   final DateTime Function() _now;
   final _queue = SerialQueue();
   UndoOff? _off;
+  bool _swept = false;
 
   /// Why undo is off for this project; null when it works.
   @override
@@ -410,12 +411,13 @@ final class CheckpointStore with Redacted implements Checkpoints {
 
   /// Deletes the files a turn created, then the folders that are left
   /// empty (R5). Async and batched, like [_exclude]. A path that leaves the
-  /// project is never touched.
+  /// project, or goes through a `.git`, is never touched.
   Future<void> _deleteNew(List<String> paths) async {
     final root = p.canonicalize(project);
     final files = [
       for (final path in paths)
-        if (p.isWithin(root, p.canonicalize(p.join(project, path))))
+        if (!_inDotGit(path) &&
+            p.isWithin(root, p.canonicalize(p.join(project, path))))
           File(p.join(project, path)),
     ];
     await _mapBatched(files, (file) async {
@@ -479,6 +481,14 @@ final class CheckpointStore with Redacted implements Checkpoints {
   static List<String> _split(String z) =>
       z.split('\x00').where((s) => s.isNotEmpty).toList();
 
+  /// Whether [path] is a `.git` or inside one: the project's own repository,
+  /// a nested one, or the `.git` file of a worktree or submodule. Git never
+  /// tracks these, so they are never in a checkpoint and never ours to
+  /// delete. Compared without case: on macOS and Windows `.GIT` is the same
+  /// folder.
+  static bool _inDotGit(String path) =>
+      p.split(path).any((segment) => segment.toLowerCase() == '.git');
+
   /// `added\tremoved\tpath`; `-` counts mean binary.
   static (int?, int?, String)? _numstat(String record) {
     final a = record.indexOf('\t');
@@ -491,7 +501,31 @@ final class CheckpointStore with Redacted implements Checkpoints {
     );
   }
 
-  Future<T> _serial<T>(Future<T> Function() op) => _queue.run(op);
+  Future<T> _serial<T>(Future<T> Function() op) => _queue.run(() {
+    if (!_swept) {
+      _swept = true;
+      _clearStaleLock();
+    }
+    return op();
+  });
+
+  /// A git killed inside `add` (power cut, out of memory, `kill -9`) leaves
+  /// `index.lock` behind, and then every `add`, `write-tree` and `restore`
+  /// exits 128 for good. This runs once, before the store's first operation.
+  /// It is safe there: [CheckpointStores] makes one store per project, all
+  /// the git of a store runs inside [_serial], and nothing has run yet, so a
+  /// lock found now was left by a git that is dead. A lock that appears later
+  /// is never touched (it could be live); [GitRunner] removes the one a
+  /// timeout of its own left.
+  void _clearStaleLock() {
+    final lock = File(p.join(gitDir, 'index.lock'));
+    try {
+      if (lock.existsSync()) lock.deleteSync();
+    } on FileSystemException {
+      // Cannot be removed: git fails on it as before, and the first snapshot
+      // says so (undo off).
+    }
+  }
 }
 
 /// Every project's [CheckpointStore], one per project so each has one
@@ -526,19 +560,37 @@ final class CheckpointStores with Redacted {
   final CheckpointStore Function(String, String, GitTool, Map<String, String>)
   _create;
   final _stores = <String, CheckpointStore>{};
-  Future<(GitTool?, UndoOff?)>? _git;
+  GitTool? _gitTool;
+  Future<(GitTool?, UndoOff?)>? _lookup;
 
   static String projectId(String realPath, {required bool isWindows}) => sha1
       .convert(utf8.encode(isWindows ? realPath.toLowerCase() : realPath))
       .toString()
       .substring(0, 12);
 
+  /// The git to use, or why there is none. A git that was found is kept for
+  /// the session; a failed lookup is not, so installing git (or the Command
+  /// Line Tools) or fixing the PATH needs no restart: the next request looks
+  /// again. Requests that arrive together share one lookup.
+  Future<(GitTool?, UndoOff?)> _locate(LoginEnv env) async {
+    final known = _gitTool;
+    if (known != null) return (known, null);
+    final lookup = _lookup ??= _locator.locate(env);
+    try {
+      final found = await lookup;
+      if (found.$1 != null) _gitTool = found.$1;
+      return found;
+    } finally {
+      if (identical(_lookup, lookup)) _lookup = null;
+    }
+  }
+
   /// The store for [project], or why undo is off on this machine.
   Future<(CheckpointStore?, UndoOff?)> forProject(
     String project,
     LoginEnv env,
   ) async {
-    final (git, off) = await (_git ??= _locator.locate(env));
+    final (git, off) = await _locate(env);
     if (git == null) return (null, off);
     final real = _real(project);
     final id = projectId(real, isWindows: _isWindows);
@@ -558,7 +610,7 @@ final class CheckpointStores with Redacted {
   Future<void> pruneAll(Duration olderThan, LoginEnv env) async {
     final dir = Directory(root);
     if (!dir.existsSync()) return;
-    final (git, _) = await (_git ??= _locator.locate(env));
+    final (git, _) = await _locate(env);
     // Without git nothing can be pruned. Deleting here would turn one probe
     // that timed out into the loss of every project's checkpoints.
     if (git == null) return;
