@@ -7,3 +7,11 @@ import 'package:shellx_ai/host.dart';
 final aiHostProvider = Provider<AiHost>(
   (ref) => throw StateError('aiHostProvider is set by main.dart'),
 );
+
+/// V2-1b final review M-11: how the app asks the system to leave a folder out
+/// of its backups (macOS Time Machine: `tmutil addexclusion`). `main.dart`
+/// sets it where the system has such a thing; null (the default, and every
+/// test) asks for nothing.
+final aiBackupExcluderProvider = Provider<Future<void> Function(String path)?>(
+  (ref) => null,
+);

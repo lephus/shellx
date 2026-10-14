@@ -35,12 +35,51 @@ AiHost buildAiHost({required String supportDir, required String version}) =>
       ),
     );
 
+/// M-11: Time Machine keeps neither the agents' npm adapters (hundreds of
+/// MB, downloaded again on demand) nor the restore points' repositories (a
+/// copy of every project, changing every turn). Both folders are made if
+/// need be (the system can only exclude one that exists) and left out, one
+/// after the other; each call is bounded, and a failure only means a backup
+/// may hold them. Never throws, and logs the error's type only — never a
+/// path.
+Future<void> excludeAiDataFromBackup(
+  AiHost host, {
+  required Future<void> Function(String path) exclude,
+  Duration timeout = const Duration(seconds: 5),
+  void Function(String message)? log,
+}) async {
+  final say = log ?? debugPrint;
+  for (final path in [host.resolver.agentsDir, host.checkpoints.root]) {
+    try {
+      await Directory(path).create(recursive: true);
+      await exclude(path).timeout(timeout);
+    } on Object catch (error) {
+      say('ShellX: AI backup exclusion failed (${error.runtimeType})');
+    }
+  }
+}
+
 /// After the first frame (smoothness: warm start), once per launch and never
 /// skipped: V2-1a's `AiHost.launch` waits for this sweep. The agents a crash
 /// left behind stop (§6), restore points older than `ai-checkpoint-days` go
 /// (D12), then the login environment and every agent's readiness resolve,
-/// so the first "New AI session" waits for none of it. Never throws.
+/// so the first "New AI session" waits for none of it. The AI data folders
+/// are asked to stay out of backups on the side (M-11), never waited for.
+/// Never throws.
 Future<void> startAi(ProviderContainer container) async {
+  try {
+    final exclude = container.read(aiBackupExcluderProvider);
+    if (exclude != null) {
+      unawaited(
+        excludeAiDataFromBackup(
+          container.read(aiHostProvider),
+          exclude: exclude,
+        ),
+      );
+    }
+  } on Object catch (error) {
+    debugPrint('ShellX: AI backup exclusion failed (${error.runtimeType})');
+  }
   final days = container.read(shellxConfigProvider).config.aiCheckpointDays;
   try {
     final stopped = await container

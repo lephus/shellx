@@ -381,6 +381,10 @@ Future<void> _start(_Startup startup) async {
         ),
       ),
       aiPtyFactoryProvider.overrideWithValue(ptyFactory),
+      // The agents' adapters and the restore points stay out of Time Machine.
+      aiBackupExcluderProvider.overrideWithValue(
+        Platform.isMacOS ? excludeFromBackupMacOS : null,
+      ),
       remoteToolsProvider.overrideWithValue(remoteTools),
       homeDirectoryProvider.overrideWithValue(home),
       pasteImageStoreProvider.overrideWithValue(pasteImages),
