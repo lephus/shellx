@@ -4,6 +4,10 @@
 library;
 
 export 'src/host/agent_catalog.dart';
+export 'src/host/agent_process.dart';
 export 'src/host/agent_resolver.dart';
+export 'src/host/byte_ring.dart';
 export 'src/host/login_shell_env.dart';
 export 'src/host/probe.dart';
+export 'src/host/running_agents.dart';
+export 'src/host/serial_queue.dart';
