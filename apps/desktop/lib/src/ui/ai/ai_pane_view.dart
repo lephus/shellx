@@ -16,6 +16,7 @@ import '../settings/settings_start_page.dart';
 import '../terminal/shellx_menu.dart';
 import '../terminal/terminal_intents.dart' show TogglePaneZoomIntent;
 import '../theme/shellx_desktop_theme.dart';
+import 'ai_changes_panel.dart';
 import 'ai_dock.dart';
 import 'ai_folder_card.dart';
 import 'ai_header.dart';
@@ -23,6 +24,7 @@ import 'ai_log_dialog.dart';
 import 'ai_permission_bar.dart';
 import 'ai_run_sheet.dart';
 import 'ai_scope.dart';
+import 'ai_side_panel.dart';
 import 'ai_timeline.dart';
 
 enum _More { settings, restart, log }
@@ -84,6 +86,11 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     super.initState();
     _ui.onChooseFolder = () => setState(() => _choosing = true);
     _ui.onRun = (request) => unawaited(_run(request));
+    _ui.onRevertTurn = (turn) {
+      final runtime = _runtime;
+      if (runtime == null) return;
+      unawaited(aiRevert(context, runtime, _ui, turn: turn));
+    };
     widget.focusNode?.addListener(_onWindowFocus);
     _attachSoon();
   }
@@ -328,18 +335,36 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
         tab: widget.tab,
         pane: pane,
         ui: _ui,
-        child: _Conversation(input: _input, resuming: _resuming),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _Conversation(input: _input, resuming: _resuming),
+            ),
+            // §4.4: the right panel, 268 px.
+            ListenableBuilder(
+              listenable: _ui,
+              builder: (context, _) =>
+                  _ui.panelOpen ? const AiSidePanel() : const SizedBox.shrink(),
+            ),
+          ],
+        ),
       );
     }
     final tabs = ref.read(terminalTabsProvider.notifier);
-    Widget header(AiHeaderView view) => AiHeader(
-      paneId: pane.id,
-      agentName: pane.agentName,
-      title: widget.tab.label,
-      view: view,
-      onTerminal: () => unawaited(tabs.openAiTerminal(widget.tab.id)),
-      onZoom: widget.tab.isSplit ? _zoom : null,
-      onMore: (at) => unawaited(_more(at)),
+    Widget header(AiHeaderView view) => ListenableBuilder(
+      listenable: _ui,
+      builder: (context, _) => AiHeader(
+        paneId: pane.id,
+        agentName: pane.agentName,
+        title: widget.tab.label,
+        view: view,
+        onPanel: runtime == null ? null : _ui.togglePanel,
+        panelOpen: _ui.panelOpen,
+        onTerminal: () => unawaited(tabs.openAiTerminal(widget.tab.id)),
+        onZoom: widget.tab.isSplit ? _zoom : null,
+        onMore: (at) => unawaited(_more(at)),
+      ),
     );
     final content = Semantics(
       container: true,

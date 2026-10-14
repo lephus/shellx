@@ -58,15 +58,30 @@ final class AiRunInstall extends AiRunRequest {
   const AiRunInstall();
 }
 
+/// The right panel's tabs (§4.4).
+enum AiPanelTab { changes, files }
+
 /// The AI pane's own UI state, which its parts change: the overlay over the
 /// conversation (run sheet, viewer), the side panel, and text for the
 /// composer (Files › "Mention in chat").
 final class AiPaneUi extends ChangeNotifier {
   Widget? _overlay;
   var _panel = false;
+  var _tab = AiPanelTab.changes;
 
   Widget? get overlay => _overlay;
   bool get panelOpen => _panel;
+  AiPanelTab get panelTab => _tab;
+
+  /// The Changes panel's last result ("Reverted 2 files.", "Wait for the
+  /// running turn to finish.").
+  final note = ValueNotifier<String?>(null);
+
+  /// Goes up when the project changed under the Changes panel (a revert).
+  final changes = ValueNotifier<int>(0);
+
+  /// "Reviewed" marks (`aiReviewKey`), kept while the pane lives.
+  final reviewed = <String>{};
 
   /// Text the composer inserts at its cursor, then clears.
   final insert = ValueNotifier<String?>(null);
@@ -96,15 +111,23 @@ final class AiPaneUi extends ChangeNotifier {
     notifyListeners();
   }
 
-  void openPanel() {
-    if (_panel) return;
+  /// Opens the panel on its Changes tab ("View" on a turn summary).
+  void openPanel() => showTab(AiPanelTab.changes);
+
+  void showTab(AiPanelTab tab) {
+    if (_panel && _tab == tab) return;
     _panel = true;
+    _tab = tab;
     notifyListeners();
   }
+
+  void changesChanged() => changes.value++;
 
   @override
   void dispose() {
     insert.dispose();
+    note.dispose();
+    changes.dispose();
     super.dispose();
   }
 }

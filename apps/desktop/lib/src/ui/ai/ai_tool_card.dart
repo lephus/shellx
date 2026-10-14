@@ -4,19 +4,15 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../agent/desktop_services.dart';
 import '../../ai/ai_off_thread.dart';
 import '../../ai/line_diff.dart';
-import '../../config/config_controller.dart' show shellxConfigProvider;
-import '../../platform/editor_links.dart';
-import '../terminal/link_layer.dart' show editorDetectorProvider;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_diff_view.dart';
+import 'ai_editor.dart';
 import 'ai_labels.dart';
 import 'ai_scope.dart';
 import 'ai_theme.dart';
@@ -129,24 +125,6 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
           if (mounted && identical(_diffOf, d)) setState(() => _diff = lines);
         }),
       );
-    }
-  }
-
-  Future<void> _openInEditor(String path, String cwd) async {
-    final abs = p.isAbsolute(path) ? path : p.join(cwd, path);
-    final opener = ref.read(desktopServicesProvider).urlOpener;
-    try {
-      final editor = await editorFor(
-        ref.read(shellxConfigProvider).config.linkEditor,
-        ref.read(editorDetectorProvider),
-      );
-      if (editor != null) {
-        await opener.openInEditor(editor, abs);
-      } else {
-        await opener.reveal(abs, isDirectory: false);
-      }
-    } on Object catch (error) {
-      debugPrint('ShellX: editor not opened: ${error.runtimeType}');
     }
   }
 
@@ -278,7 +256,7 @@ class _AiToolCardState extends ConsumerState<AiToolCard> {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             key: const Key('ai.tool.editor'),
-            onPressed: () => unawaited(_openInEditor(d.path, cwd)),
+            onPressed: () => unawaited(aiOpenInEditor(ref, d.path, cwd)),
             icon: const Icon(Icons.open_in_new, size: 14),
             label: Text(l10n.aiOpenInEditor),
           ),
