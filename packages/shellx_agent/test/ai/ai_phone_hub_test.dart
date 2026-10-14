@@ -292,9 +292,13 @@ void main() {
         const AiOpen(rid: 2, agent: 'claude', folder: 'nope'),
       );
       await Future<void>.delayed(Duration.zero);
-      final results = rig.to(phone).whereType<AiResult>().toList();
-      expect((results[0].ok, results[0].sid), (true, 'ep.-5'));
-      expect((results[1].ok, results[1].code), (false, 'refused'));
+      // By rid, not by order: a folder that is not offered is refused at
+      // once, before the open that waits for the window.
+      final results = {
+        for (final r in rig.to(phone).whereType<AiResult>()) r.rid: r,
+      };
+      expect((results[1]!.ok, results[1]!.sid), (true, 'ep.-5'));
+      expect((results[2]!.ok, results[2]!.code), (false, 'refused'));
     });
 
     test('a phone that floods gets busy, then is heard again', () {

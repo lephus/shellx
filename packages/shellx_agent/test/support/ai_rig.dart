@@ -82,10 +82,33 @@ final class FakeAiSource implements AiSessionSource {
   final controls = <int, FakeAiControl>{};
   final started = <int>[];
   final seen = <int>{};
-  @override
-  Duration? doneThreshold = const Duration(seconds: 30);
   int? opened;
   final openedWith = <(String, String)>[];
+
+  /// Members that throw when called, by name: `sessions`, `agents`,
+  /// `folders`, `control`, `open`, `seen`, `threshold` (a window whose
+  /// adapter fails).
+  final failing = <String>{};
+
+  void _maybeFail(String member) {
+    if (failing.contains(member)) throw StateError('$member failed');
+  }
+
+  Duration? _doneThreshold = const Duration(seconds: 30);
+  List<AiAgentChoice> _agents = const [
+    AiAgentChoice(id: 'claude', name: 'Claude'),
+  ];
+  List<AiFolderChoice> _folders = const [
+    AiFolderChoice(key: 'ws:a', name: 'shop', path: '/p'),
+  ];
+
+  @override
+  Duration? get doneThreshold {
+    _maybeFail('threshold');
+    return _doneThreshold;
+  }
+
+  set doneThreshold(Duration? value) => _doneThreshold = value;
 
   /// Adds AI pane [paneId] with a ready state (or none, [runs] false).
   AiSessionState add(
@@ -157,6 +180,24 @@ final class FakeAiSource implements AiSessionSource {
     return state;
   }
 
+  /// The runtime of [paneId] is forgotten (a folder was changed, its agent
+  /// switched off): the tab stays without a state. [unavailable] says why
+  /// it cannot run; null: it just has none now (a new one comes).
+  void forget(int paneId, {AiRemoteState? unavailable}) {
+    final i = entries.indexWhere((e) => e.paneId == paneId);
+    final old = entries[i];
+    entries[i] = AiSessionEntry(
+      paneId: paneId,
+      agentId: old.agentId,
+      agentName: old.agentName,
+      title: old.title,
+      cwd: old.cwd,
+      unavailable: unavailable,
+    );
+    controls.remove(paneId);
+    _changes.add(null);
+  }
+
   void remove(int paneId) {
     entries.removeWhere((e) => e.paneId == paneId);
     controls.remove(paneId);
@@ -167,46 +208,66 @@ final class FakeAiSource implements AiSessionSource {
   Stream<void> get changes => _changes.stream;
 
   @override
-  List<AiSessionEntry> get sessions => List.of(entries);
+  List<AiSessionEntry> get sessions {
+    _maybeFail('sessions');
+    return List.of(entries);
+  }
 
   @override
-  List<AiAgentChoice> get agents => const [
-    AiAgentChoice(id: 'claude', name: 'Claude'),
-  ];
+  List<AiAgentChoice> get agents {
+    _maybeFail('agents');
+    return _agents;
+  }
+
+  set agents(List<AiAgentChoice> value) => _agents = value;
 
   @override
-  List<AiFolderChoice> folders = const [
-    AiFolderChoice(key: 'ws:a', name: 'shop', path: '/p'),
-  ];
+  List<AiFolderChoice> get folders {
+    _maybeFail('folders');
+    return _folders;
+  }
+
+  set folders(List<AiFolderChoice> value) => _folders = value;
 
   @override
   String? defaultAgent = 'claude';
 
   @override
   AiControl? control(int paneId, {bool start = false}) {
+    _maybeFail('control');
     if (start) started.add(paneId);
     return controls[paneId];
   }
 
+  /// Set: `open` waits for it first (a tab still being made).
+  Completer<void>? holdOpen;
+
   @override
   Future<int?> open(String agentId, String folderKey) async {
+    _maybeFail('open');
     openedWith.add((agentId, folderKey));
+    final gate = holdOpen;
+    if (gate != null) await gate.future;
     final id = opened;
     if (id != null) add(id);
     return id;
   }
 
   @override
-  bool seenOnDesktop(int paneId) => seen.contains(paneId);
+  bool seenOnDesktop(int paneId) {
+    _maybeFail('seen');
+    return seen.contains(paneId);
+  }
 }
 
-/// A hub over [source] whose messages are kept per phone.
+/// A hub over [source] whose messages are kept per phone. Pushes go to
+/// [pushes], or to [sink] when a test needs one that does something else.
 final class HubRig {
-  HubRig({FakeAiSource? source, this.pushes})
+  HubRig({FakeAiSource? source, this.pushes, AiPushSink? sink})
     : source = source ?? FakeAiSource() {
     hub = AiPhoneHub(
       source: this.source,
-      push: pushes?.add,
+      push: sink ?? pushes?.add,
       now: () => now,
       epoch: 'ep',
     );
