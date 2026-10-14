@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/agent/agent_runtime.dart';
+import 'package:shellx_desktop/src/agent/daemon_ai.dart';
 import 'package:shellx_desktop/src/agent/session_core.dart';
 
 import '../mux/mux_test_support.dart';
@@ -74,10 +75,7 @@ void main() {
       onQuit: () async {},
     )..serve(listener);
     addTearDown(server.close);
-    // What daemon_main.dart does with them.
-    final forwarder = MuxAiForwarder();
-    server.ai = forwarder;
-    c.ai.target = forwarder;
+    installDaemonAi(server, c); // What daemon_main.dart calls.
     final toPhone = <AppMessage>[];
     c.ai.outbound.listen((o) => toPhone.add(o.message));
 

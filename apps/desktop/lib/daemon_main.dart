@@ -12,6 +12,7 @@ import 'l10n/app_localizations.dart';
 import 'src/agent/agent_bridge_impl.dart';
 import 'src/agent/agent_controller_base.dart';
 import 'src/agent/agent_side.dart';
+import 'src/agent/daemon_ai.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/cli/cli_host_control.dart';
 import 'src/cli/cli_install.dart';
@@ -153,13 +154,8 @@ Future<void> _serve({
     onQuit: () => host.quit(),
     onUiChanged: (attached) => host.onUiChanged(attached),
   );
-  // V2-2 D1: phones' AI messages go to the attached window that serves
-  // AI; its pushes go out with this service's account.
-  final aiForwarder = MuxAiForwarder(
-    onPush: (push) => core.notifications?.aiNotice(push),
-  );
-  server.ai = aiForwarder;
-  core.ai.target = aiForwarder;
+  // V2-2 D1: phones' AI messages go to the attached window that serves AI.
+  installDaemonAi(server, core);
   final cli = CliHost.adopted(
     ui: server.uiApi,
     enabled: () =>
