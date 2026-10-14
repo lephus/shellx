@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shellx_agent/shellx_agent.dart' show PtyFactory;
@@ -49,6 +51,26 @@ Future<void> startAi(ProviderContainer container) async {
     debugPrint('ShellX: AI startup failed: ${error.runtimeType}');
   }
   await container.read(aiReadinessProvider.notifier).warmUp();
+}
+
+/// [startAi], once the first frame is drawn: `main` calls it right after
+/// `runApp`, so the crash sweep is in flight before anything a user can open
+/// (a tab restored from the last run, ⌘⇧E at once) launches an agent; it does
+/// not wait for the sign-in check, the restore or the first layout. [start]
+/// is the one thing a test swaps. Never throws.
+void startAiAfterFirstFrame(
+  ProviderContainer container, {
+  Future<void> Function(ProviderContainer container) start = startAi,
+}) {
+  WidgetsBinding.instance
+    ..addPostFrameCallback((_) {
+      unawaited(
+        start(container).catchError((Object error) {
+          debugPrint('ShellX: AI startup failed: ${error.runtimeType}');
+        }),
+      );
+    })
+    ..ensureVisualUpdate();
 }
 
 /// Quit (§6): every agent stops before the app exits.

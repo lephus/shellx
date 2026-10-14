@@ -674,6 +674,11 @@ Future<void> _start(_Startup startup) async {
       child: ShellxDesktopApp(locale: locale),
     ),
   );
+  // V2-1 §6, smoothness (warm start): the stray agents a crash left behind,
+  // old restore points, the login environment and every agent's readiness,
+  // in the background from the first frame on. Before the bootstrap and the
+  // restore below, so the sweep is in flight before any AI tab can launch.
+  startAiAfterFirstFrame(container);
   container.read(windowRouterProvider.notifier).showTerminal();
   if (daemonMode) {
     // UI-A5 §7.3, §7.4: the dialogs come over the window; leaving them is
@@ -707,9 +712,6 @@ Future<void> _start(_Startup startup) async {
   // A5a D16: the restore reopens its panes now; the activation below waits
   // for it, so a restored window gets no extra tab.
   layoutReady.complete();
-  // V2-1 smoothness (warm start): stray agents, old restore points, the
-  // login environment and every agent's readiness, in the background.
-  _unawaitedLogged(startAi(container), 'AI startup');
   await handleActivation(container);
 }
 

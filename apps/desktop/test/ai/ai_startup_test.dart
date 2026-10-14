@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_ai/host.dart';
@@ -61,6 +62,45 @@ void main() {
     },
     skip: Platform.isWindows,
   );
+
+  testWidgets('the start waits for the first frame and runs once: scheduled '
+      'right after runApp, ahead of anything a user can open (§6)', (
+    tester,
+  ) async {
+    final c = ProviderContainer.test();
+    final started = <ProviderContainer>[];
+    startAiAfterFirstFrame(
+      c,
+      start: (container) async => started.add(container),
+    );
+    expect(started, isEmpty, reason: 'not inline: the first frame comes first');
+    await tester.pump();
+    expect(started, [c]);
+    await tester.pump();
+    expect(started, hasLength(1));
+  });
+
+  testWidgets('a start that fails is logged by its type and never thrown', (
+    tester,
+  ) async {
+    final c = ProviderContainer.test();
+    final logged = <String>[];
+    final saved = debugPrint;
+    // The framework checks its debug variables before any tear-down runs.
+    debugPrint = (message, {wrapWidth}) => logged.add(message ?? '');
+    try {
+      startAiAfterFirstFrame(
+        c,
+        start: (_) async => throw StateError('secret path /Users/me'),
+      );
+      await tester.pump();
+      await tester.pump();
+    } finally {
+      debugPrint = saved;
+    }
+    expect(tester.takeException(), isNull);
+    expect(logged, ['ShellX: AI startup failed: StateError']);
+  });
 
   test('start: sweep, prune and warm-up, and nothing throws', () async {
     final tmp = Directory.systemTemp.createTempSync('ai_start');
