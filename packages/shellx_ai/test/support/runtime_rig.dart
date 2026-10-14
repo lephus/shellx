@@ -281,12 +281,15 @@ final class RecordingCheckpoints implements Checkpoints {
   final calls = <String>[];
   var _trees = 0;
 
+  /// Why undo is off for the project; null when it works. Like the real
+  /// store, an off store takes no snapshot.
   @override
-  UndoOff? get off => null;
+  UndoOff? off;
 
   @override
   Future<Checkpoint?> snapshot(String ref) async {
     calls.add('snapshot:$ref');
+    if (off != null) return null;
     if (failSnapshot?.call(ref) ?? false) throw StateError('snapshot');
     return Checkpoint(commit: 'c-$ref', tree: 't-$ref');
   }

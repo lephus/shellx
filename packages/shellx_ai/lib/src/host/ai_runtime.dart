@@ -79,6 +79,9 @@ final class AiRuntime with Redacted {
   var _disposed = false;
   Checkpoints? _store;
   Future<void>? _warmup;
+
+  /// The checkpoints are being asked for (or their first snapshot is taken).
+  var _probing = false;
   Checkpoint? _firstCheckpoint;
   final _turnCheckpoints = <int, Checkpoint>{};
   final _afterTrees = <int, String>{};
@@ -197,7 +200,10 @@ final class AiRuntime with Redacted {
     try {
       if (resume != null && state.capabilities.loadSession) {
         _loading = true;
-        _keepTimeline = state.timeline.items.isNotEmpty;
+        // A restart whose replay repeats the conversation on screen. Cards (a
+        // sign-in, a setup problem) are not conversation: a tab that shows
+        // only those has not seen its history yet.
+        _keepTimeline = state.timeline.items.any((i) => i is! NoticeItem);
         final r = await client.loadSession(sessionId: resume, cwd: state.cwd);
         state.setSession(
           resume,
@@ -297,31 +303,56 @@ final class AiRuntime with Redacted {
     state.touch();
   }
 
-  /// The first snapshot of a project runs in the background (spec D12).
+  /// The first snapshot of a project runs in the background (spec D12). Undo
+  /// that is off because no store could be had (no git yet, a failed lookup)
+  /// is asked for again at every ready; a tab that has a store keeps it, even
+  /// one that is off for its project.
   void _warmCheckpoints() {
     final get = _checkpoints;
-    if (get == null || _warmup != null) return;
+    if (get == null || _probing || (_warmup != null && _store != null)) return;
+    _probing = true;
     _warmup = () async {
-      final (Checkpoints?, UndoOff?) found;
       try {
-        found = await get();
-      } on Object {
-        // Without the answer there is no undo; say so, the turns still run.
-        state.addNotice(const UndoUnavailable(UndoOff.failed));
-        return;
-      }
-      final (store, off) = found;
-      if (store == null) {
-        if (off != null) state.addNotice(UndoUnavailable(off));
-        return;
-      }
-      _store = store;
-      final ck = store.off == null ? await store.snapshot('$_key/0') : null;
-      final reason = store.off;
-      if (ck == null && reason != null) {
-        state.addNotice(UndoUnavailable(reason));
+        final (Checkpoints?, UndoOff?) found;
+        try {
+          found = await get();
+        } on Object {
+          // Without the answer there is no undo; say so, the turns still run.
+          _noteUndoOff(UndoOff.failed);
+          return;
+        }
+        final (store, off) = found;
+        if (store == null) {
+          if (off != null) _noteUndoOff(off);
+          return;
+        }
+        _store = store;
+        final ck = store.off == null ? await store.snapshot('$_key/0') : null;
+        final reason = store.off;
+        if (reason != null) {
+          if (ck == null) _noteUndoOff(reason);
+        } else if (ck != null) {
+          // It works now: an earlier note that it is off is no longer true.
+          state.resolveNotices(_isUndoOffNote);
+        }
+      } finally {
+        _probing = false;
       }
     }().catchError((Object _) {});
+  }
+
+  static bool _isUndoOffNote(AiNotice n) => n is UndoUnavailable && !n.turnOnly;
+
+  /// Says why undo is off for the project, once: a note still open with the
+  /// same reason stays, another reason replaces it.
+  void _noteUndoOff(UndoOff reason) {
+    final told = state.timeline.items.any((i) {
+      final n = i is NoticeItem && !i.resolved ? i.notice : null;
+      return n is UndoUnavailable && !n.turnOnly && n.reason == reason;
+    });
+    if (told) return;
+    state.resolveNotices(_isUndoOffNote);
+    state.addNotice(UndoUnavailable(reason));
   }
 
   /// "Khởi động lại": a new agent process, then `session/load`.
@@ -516,7 +547,9 @@ final class AiRuntime with Redacted {
   }
 
   /// Stop (Esc): `session/cancel`, and every open question is answered
-  /// `cancelled`. After [cancelGrace], "Dừng hẳn" is offered (spec §1.4).
+  /// `cancelled`, so the tab is `running` again at once (the agent may take
+  /// a while to end the turn). After [cancelGrace], "Dừng hẳn" is offered
+  /// (spec §1.4).
   void cancel() {
     final turn = state.turn;
     if (turn == null || turn.cancelRequested) return;
@@ -524,6 +557,7 @@ final class AiRuntime with Redacted {
     final sid = state.sessionId;
     if (sid != null) _client?.cancel(sid);
     _cancelPending();
+    _afterAnswer();
     final c = _turnCancel;
     if (c != null && !c.isCompleted) c.complete(null);
     _cancelTimer = Timer(cancelGrace, () {
@@ -629,7 +663,8 @@ final class AiRuntime with Redacted {
     if (!quiet) _afterAnswer();
   }
 
-  /// The user answered: back to what the tab was doing before it asked.
+  /// The questions were answered (by the user, or by Stop): back to what the
+  /// tab was doing before it asked.
   void _afterAnswer() {
     if (state.needsInput) return;
     _status(state.turn != null ? AiStatus.running : AiStatus.idle);

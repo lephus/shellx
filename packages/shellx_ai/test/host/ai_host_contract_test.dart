@@ -486,6 +486,22 @@ void main() {
       await e.until(() => !repo.existsSync());
     });
 
+    test('a startup that comes after a launch still prunes', () async {
+      final root = p.join(e.tmp.path, 'ai', 'checkpoints');
+      final repo = repoOfGoneProject(root);
+      final host = AiHost(
+        supportDir: e.tmp.path,
+        clientVersion: '2.0.0',
+        env: live,
+      );
+      await e.launch(
+        host,
+        e.script('marker', _markerThenWait, [p.join(e.tmp.path, 'up')]),
+      );
+      expect(await host.startup(), 0, reason: 'no sweep, the agent is ours');
+      await e.until(() => !repo.existsSync());
+    });
+
     test('a prune that fails is nobody\'s business', () async {
       final root = p.join(e.tmp.path, 'ai', 'checkpoints');
       final repo = repoOfGoneProject(root);

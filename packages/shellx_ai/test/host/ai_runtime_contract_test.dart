@@ -858,7 +858,177 @@ void main() {
     });
   });
 
+  group('a resumed tab keeps its replay after a card (spec D14, D15)', () {
+    const history = [
+      {
+        'sessionUpdate': 'user_message_chunk',
+        'content': {'type': 'text', 'text': 'q1'},
+      },
+      {
+        'sessionUpdate': 'agent_message_chunk',
+        'content': {'type': 'text', 'text': 'a1'},
+      },
+    ];
+
+    void expectReplayed(RuntimeRig r) {
+      final items = r.state.timeline.items;
+      expect(items.whereType<UserItem>().map((u) => u.text), ['q1']);
+      expect(items.whereType<AgentTextItem>().map((t) => t.text), ['a1']);
+      expect(r.state.label, 'q1');
+    }
+
+    test('a sign-in card, then the login, then retry', () async {
+      final dir = Directory.systemTemp.createTempSync('auth');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final marker = p.join(dir.path, 'signed-in');
+      final r = RuntimeRig(
+        first: FakeScenario(
+          requireAuth: true,
+          authFile: marker,
+          authMethods: const [
+            {'id': 'login', 'name': 'Log in', 'type': 'terminal'},
+          ],
+          history: history,
+        ),
+        resume: 'old-1',
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      expect(r.state.phase, AgentPhase.needsAuth);
+      File(marker).writeAsStringSync('');
+      await r.runtime.retry();
+      expect(r.state.phase, AgentPhase.ready);
+      expect(r.state.sessionId, 'old-1');
+      expectReplayed(r);
+    });
+
+    test(
+      'a "Node missing" card, then the setup is fixed, then retry',
+      () async {
+        var fixed = false;
+        final r = RuntimeRig(
+          first: const FakeScenario(history: history),
+          resolve: () async => fixed
+              ? const AgentReady(fakeCommand)
+              : const AgentNeedsNode(required: 22, found: 'v20.1.0'),
+          resume: 'old-1',
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        expect(r.state.phase, AgentPhase.failed);
+        expect(r.notices.single, isA<NodeMissing>());
+        fixed = true;
+        await r.runtime.retry();
+        expect(r.state.phase, AgentPhase.ready);
+        expect(r.state.sessionId, 'old-1');
+        expectReplayed(r);
+      },
+    );
+
+    test('a failed first start, then restart', () async {
+      final r = RuntimeRig(
+        first: const FakeScenario(
+          loadSessionError: {'code': -32603, 'message': 'boom'},
+          history: history,
+        ),
+        later: const [FakeScenario(history: history)],
+        resume: 'old-1',
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      expect(r.state.phase, AgentPhase.failed);
+      expect(
+        r.notices.single,
+        isA<StartFailed>().having(
+          (n) => n.reason,
+          'reason',
+          StartFailure.session,
+        ),
+      );
+      await r.runtime.restart();
+      expect(r.state.phase, AgentPhase.ready);
+      expectReplayed(r);
+    });
+
+    test(
+      'a restart of a tab that shows the conversation still does not draw it twice',
+      () async {
+        final r = RuntimeRig(
+          first: const FakeScenario(history: history),
+          later: const [FakeScenario(history: history)],
+          resume: 'old-1',
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        expectReplayed(r);
+        await r.runtime.restart();
+        expect(r.state.phase, AgentPhase.ready);
+        expect(r.agent(1).received, contains('session/load:old-1'));
+        expectReplayed(r);
+      },
+    );
+  });
+
   group('status (spec D13)', () {
+    test(
+      'Stop with a question open: running again at once, even if the agent hangs',
+      () async {
+        final r = RuntimeRig(
+          first: FakeScenario(
+            turns: [
+              [FakeSteps.hang()],
+            ],
+          ),
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        await r.runtime.send(hi);
+        final answer = askPermission(r.agent(), 'x', 'Edit a.txt');
+        await r.until(() => r.state.currentPermission != null);
+        expect(r.statuses, [AiStatus.running, AiStatus.needsInput]);
+        r.runtime.cancel();
+        expect(r.statuses, [
+          AiStatus.running,
+          AiStatus.needsInput,
+          AiStatus.running,
+        ], reason: 'nothing waits for the user any more');
+        expect(await answer, {
+          'outcome': {'outcome': 'cancelled'},
+        });
+        expect(
+          r.state.turn,
+          isNotNull,
+          reason: 'the agent has not answered yet',
+        );
+        expect(r.statuses.last, AiStatus.running);
+      },
+    );
+
+    test(
+      'Stop with a question open and an agent that ends its turn: running, then idle',
+      () async {
+        final r = RuntimeRig(
+          first: FakeScenario(
+            turns: [
+              [FakeSteps.ask(_form)],
+            ],
+          ),
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        await r.runtime.send(hi);
+        await r.until(() => r.state.currentAsk != null);
+        r.runtime.cancel();
+        await r.runtime.whenIdle();
+        expect(r.statuses, [
+          AiStatus.running,
+          AiStatus.needsInput,
+          AiStatus.running,
+          AiStatus.idle,
+        ]);
+      },
+    );
+
     test(
       'a question outside any turn needs input; the answer returns the tab to idle',
       () async {
@@ -1482,6 +1652,216 @@ void main() {
           r.runtime.stderrTail,
           contains('boom: the details'),
           reason: '"Xem log" is offered on the crash card',
+        );
+      },
+    );
+  });
+
+  group('undo that was off for a transient cause (spec D12)', () {
+    final turn = FakeScenario(
+      turns: [
+        [FakeSteps.text('ok')],
+      ],
+    );
+
+    List<NoticeItem> undoNotes(RuntimeRig r) => [
+      for (final c in r.cards)
+        if (c.notice is UndoUnavailable) c,
+    ];
+
+    test('no git at first, git later: the next ready probes again', () async {
+      var asked = 0;
+      final ck = RecordingCheckpoints();
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async =>
+            ++asked == 1 ? (null, UndoOff.noGit) : (ck, null),
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      await r.until(() => undoNotes(r).isNotEmpty);
+      expect(
+        undoNotes(r).single.notice,
+        isA<UndoUnavailable>().having((n) => n.reason, 'reason', UndoOff.noGit),
+      );
+      await r.runtime.restart();
+      await r.runtime.send(hi);
+      await r.runtime.whenIdle();
+      expect(asked, 2);
+      expect(
+        r.turnEnds.single.checkpoint,
+        isNotNull,
+        reason: 'the turn has undo',
+      );
+      expect(r.runtime.checkpointOf(1)!.commit, 'c-k1/1');
+      expect(ck.calls.where((c) => c.startsWith('snapshot')), [
+        'snapshot:k1/0',
+        'snapshot:k1/1',
+      ]);
+      expect(
+        undoNotes(r).single.resolved,
+        isTrue,
+        reason: 'undo is not off any more',
+      );
+    });
+
+    test('a source that threw at first answers later', () async {
+      var asked = 0;
+      final ck = RecordingCheckpoints();
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async {
+          if (++asked == 1) throw StateError('git probe');
+          return (ck, null);
+        },
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      await r.until(() => undoNotes(r).isNotEmpty);
+      await r.runtime.restart();
+      await r.runtime.send(hi);
+      await r.runtime.whenIdle();
+      expect(r.turnEnds.single.checkpoint, isNotNull);
+      expect(undoNotes(r).single.resolved, isTrue);
+    });
+
+    test('a retry after the agent died probes again too', () async {
+      var asked = 0;
+      final ck = RecordingCheckpoints();
+      final r = RuntimeRig(
+        first: FakeScenario(
+          turns: [
+            [FakeSteps.exit(3)],
+          ],
+        ),
+        later: [turn],
+        checkpoints: () async =>
+            ++asked == 1 ? (null, UndoOff.noGit) : (ck, null),
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      await r.runtime.send(hi);
+      await r.until(() => r.state.phase == AgentPhase.failed);
+      await r.runtime.retry();
+      await r.runtime.send(const [TextBlock('again')]);
+      await r.runtime.whenIdle();
+      expect(asked, 2);
+      expect(r.turnEnds.last.checkpoint, isNotNull);
+    });
+
+    test('still off: one note, however often the agent restarts', () async {
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async => (null, UndoOff.noGit),
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      for (var i = 0; i < 2; i++) {
+        await r.runtime.restart();
+        await r.runtime.send(hi);
+        await r.runtime.whenIdle();
+      }
+      expect(undoNotes(r), hasLength(1));
+      expect(undoNotes(r).single.resolved, isFalse);
+    });
+
+    test('a source that keeps throwing: one note', () async {
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async => throw StateError('git probe'),
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      for (var i = 0; i < 2; i++) {
+        await r.runtime.restart();
+        await r.runtime.send(hi);
+        await r.runtime.whenIdle();
+      }
+      expect(undoNotes(r), hasLength(1));
+      expect(
+        (undoNotes(r).single.notice as UndoUnavailable).reason,
+        UndoOff.failed,
+      );
+    });
+
+    test('another reason replaces the note', () async {
+      var asked = 0;
+      final ck = RecordingCheckpoints()..off = UndoOff.tooManyFiles;
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async =>
+            ++asked == 1 ? (null, UndoOff.noGit) : (ck, null),
+      );
+      addTearDown(r.dispose);
+      await r.runtime.start();
+      await r.until(() => undoNotes(r).isNotEmpty);
+      await r.runtime.restart();
+      await r.runtime.send(hi);
+      await r.runtime.whenIdle();
+      expect(
+        [
+          for (final c in undoNotes(r))
+            ((c.notice as UndoUnavailable).reason, c.resolved),
+        ],
+        [(UndoOff.noGit, true), (UndoOff.tooManyFiles, false)],
+      );
+    });
+
+    test('a probe still under way is not started twice', () async {
+      final gate = Completer<void>();
+      var asked = 0;
+      final ck = RecordingCheckpoints();
+      final r = RuntimeRig(
+        first: turn,
+        later: [turn],
+        checkpoints: () async {
+          asked++;
+          await gate.future;
+          return (ck, null);
+        },
+      );
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+        return r.dispose();
+      });
+      await r.runtime.start();
+      await r.runtime.restart(); // ready again while the first probe waits
+      expect(asked, 1);
+      gate.complete();
+      await r.runtime.send(hi);
+      await r.runtime.whenIdle();
+      expect(asked, 1);
+      expect(r.turnEnds.single.checkpoint, isNotNull);
+    });
+
+    test(
+      'a store that exists but is off for the project is not asked again',
+      () async {
+        var asked = 0;
+        final ck = RecordingCheckpoints()..off = UndoOff.tooManyFiles;
+        final r = RuntimeRig(
+          first: turn,
+          later: [turn],
+          checkpoints: () async {
+            asked++;
+            return (ck, null);
+          },
+        );
+        addTearDown(r.dispose);
+        await r.runtime.start();
+        await r.runtime.restart();
+        await r.runtime.send(hi);
+        await r.runtime.whenIdle();
+        expect(asked, 1);
+        expect(undoNotes(r), hasLength(1));
+        expect(
+          (undoNotes(r).single.notice as UndoUnavailable).reason,
+          UndoOff.tooManyFiles,
         );
       },
     );
