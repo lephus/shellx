@@ -4,6 +4,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'ai_ask_card.dart';
 import 'ai_markdown.dart';
 import 'ai_notice_card.dart';
 import 'ai_scope.dart';
@@ -17,7 +18,7 @@ Widget aiTimelineItem(TimelineItem item) => switch (item) {
   AgentTextItem() => AiAgentText(item: item),
   ThoughtItem() => AiThought(item: item),
   ToolItem() => AiToolCard(item: item),
-  AskItem() => _AskFallback(item: item),
+  AskItem() => AiAskCard(item: item),
   TurnEndItem() => AiTurnSummary(item: item),
   NoticeItem() => AiNoticeCard(item: item),
 };
@@ -296,42 +297,6 @@ class _AiThoughtState extends State<AiThought> {
               widget.item.text,
               style: ShellxText.small.copyWith(color: dim),
             ),
-          ),
-      ],
-    );
-  }
-}
-
-class _PlainLine extends StatelessWidget {
-  const _PlainLine({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: ShellxText.small.copyWith(color: ShellxDesktopColors.textSecondary),
-  );
-}
-
-/// Until the question cards (D22) land: the agent's question and a way to
-/// say no, so a turn never waits on nothing.
-class _AskFallback extends StatelessWidget {
-  const _AskFallback({required this.item});
-  final AskItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final runtime = AiPaneScope.of(context).runtime;
-    return Row(
-      children: [
-        Expanded(child: _PlainLine(text: item.request.message)),
-        if (item.response == null && !item.autoDeclined)
-          TextButton(
-            onPressed: () => runtime.answerAsk(item.id, const ElicitDecline()),
-            child: Text(l10n.aiAskDecline),
           ),
       ],
     );
