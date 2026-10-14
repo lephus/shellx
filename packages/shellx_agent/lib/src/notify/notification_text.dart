@@ -35,6 +35,19 @@ final class NotificationText {
     return '✗ $name · $code ${command.exitCode} · $time';
   }
 
+  /// V2-2 D11: "Cần bạn trả lời: Sửa src/main.ts" / "Needs your answer: …"
+  /// (just the first part without [detail]).
+  String aiNeedsInput(String? detail) {
+    final d = _singleLine(detail);
+    final head = vietnamese ? 'Cần bạn trả lời' : 'Needs your answer';
+    return d.isEmpty ? head : '$head: $d';
+  }
+
+  /// V2-2 D11: "Xong lượt 3 · 4 phút 2 giây" / "Finished turn 3 · 4 min 2 s".
+  String aiDone(int turn, Duration elapsed) => vietnamese
+      ? 'Xong lượt $turn · ${duration(elapsed)}'
+      : 'Finished turn $turn · ${duration(elapsed)}';
+
   /// "45 giây", "3 phút 12 giây", "1 giờ 4 phút" (en: "45 s", "3 min
   /// 12 s", "1 h 4 min"). Whole seconds; a zero part is left out.
   String duration(Duration d) {
