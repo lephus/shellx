@@ -191,6 +191,7 @@ void main() {
           // Not the 1.5 s of Windows: a cold runner may need longer to start
           // the agent, and the wait for the table would end before it.
           firstReadLimit: const Duration(seconds: 30),
+          isWindows: false,
           processTable: ({limit, after}) async {
             // Once the agent is up: a stdin closed before that would be seen
             // the moment it listens.
@@ -293,7 +294,6 @@ void main() {
           expect(await r.agent.exitCode, 0);
           expect(r.killed, isEmpty);
           expect(r.log, ['table'], reason: 'no second read without a first');
-          tmp.listSync().whereType<File>().forEach((f) => f.deleteSync());
         }
       },
     );
@@ -309,7 +309,6 @@ void main() {
           await r.agent.stop();
           expect(r.killed, isEmpty);
           expect(r.log, ['table', 'table']);
-          tmp.listSync().whereType<File>().forEach((f) => f.deleteSync());
         }
       },
     );
@@ -547,24 +546,72 @@ void main() {
         expect(await r.agent.exitCode, 0);
       });
 
-      test('kill() reads the table, then kills the agent and each process '
-          'the table showed under it, one by one', () async {
-        final r = await run([tree], ignoresStdin: true, windows: true);
+      test(
+        'kill() reads the table, then kills the agent, and each process '
+        'the table showed under it that is still there, one by one',
+        () async {
+          final r = await run(
+            [tree, (agent) => afterwards()],
+            ignoresStdin: true,
+            windows: true,
+          );
+          await r.agent.kill();
+          expect(
+            await r.agent.exitCode.timeout(const Duration(seconds: 10)),
+            isNot(0),
+          );
+          expect(
+            r.pidKills,
+            unorderedEquals([_nowhere + 1, _nowhere + 2, _nowhere + 3]),
+          );
+          expect(r.killed, isEmpty, reason: 'no tree is walked');
+          expect(
+            r.log.take(2),
+            ['table', 'table'],
+            reason: 'the table, the agent still there; then the check again',
+          );
+        },
+      );
+
+      test('kill() checks again that each is still the same process, as the '
+          'stop does: not a pid that was reused, not what left', () async {
+        final r = await run(
+          [
+            tree,
+            (agent) => [
+              row(_nowhere + 1, 1),
+              // _nowhere + 2 has left.
+              // The pid of the test run was reused, an hour later.
+              row(_nowhere + 3, 1, at: t0.add(const Duration(hours: 1))),
+              row(_nowhere + 5, 1),
+              row(_nowhere + 9, 1), // came after the table was read
+            ],
+          ],
+          ignoresStdin: true,
+          windows: true,
+        );
         await r.agent.kill();
-        expect(
-          await r.agent.exitCode.timeout(const Duration(seconds: 10)),
-          isNot(0),
-        );
-        expect(
-          r.pidKills,
-          unorderedEquals([_nowhere + 1, _nowhere + 2, _nowhere + 3]),
-        );
-        expect(r.killed, isEmpty, reason: 'no tree is walked');
-        expect(
-          r.log.first,
-          'table',
-          reason: 'the table first, the agent still there',
-        );
+        await r.agent.exitCode.timeout(const Duration(seconds: 10));
+        expect(r.pidKills, [_nowhere + 1]);
+        expect(r.killed, isEmpty);
+      });
+
+      test('kill() with a table that cannot be read the second time kills '
+          'the agent and guesses nothing', () async {
+        for (final second in <List<ProcessRow>? Function(int)>[
+          (agent) => null,
+          (agent) => throw StateError('ps broke'),
+        ]) {
+          final r = await run(
+            [tree, second],
+            ignoresStdin: true,
+            windows: true,
+          );
+          await r.agent.kill();
+          await r.agent.exitCode.timeout(const Duration(seconds: 10));
+          expect(r.pidKills, isEmpty);
+          expect(r.log, ['table', 'table']);
+        }
       });
 
       test('kill() never names this process or what is above it', () async {
@@ -608,29 +655,19 @@ void main() {
 
     // The table a stop is given must not be older than the agent: a shared
     // read (SharedProcessTable) that began before it was spawned shows the
-    // pid it got as the process that had it then.
-    group('a table is never older than the agent', () {
-      test('every request says when the agent was spawned', () async {
-        final before = processClock();
-        final r = await run([tree, (agent) => afterwards()]);
-        final spawned = processClock();
-        await r.agent.stop();
-        expect(r.afters, isNotEmpty);
-        for (final after in r.afters) {
-          expect(after, isNotNull);
-          expect(after! >= before && after <= spawned, isTrue);
-        }
-        expect(r.afters.toSet(), hasLength(1), reason: 'the same moment');
-      });
-
-      test(
-        'a reader that always answers with a list works with a limit '
-        '(its future cannot give null on a timeout, and must not need to)',
-        () async {
-          late final AgentProcess agent;
-          var reads = 0;
-          final killed = <int>[];
-          agent = track(
+    // pid it got as the process that had it then. Both ways of killing, the
+    // platform pinned in each: what is killed is the same.
+    for (final windows in [false, true]) {
+      group(
+        'a table is never older than the agent '
+        '(${windows ? 'a pid at a time, as on Windows' : 'with the tree killer'})',
+        () {
+          /// An agent that leaves when stdin closes, reading [table] and
+          /// killing (either way) into [killed].
+          Future<AgentProcess> start(
+            ProcessTableReader table,
+            List<int> killed,
+          ) async => track(
             await AgentProcess.start(
               AgentCommand(
                 executable: Platform.resolvedExecutable,
@@ -642,102 +679,110 @@ void main() {
                 environment: Platform.environment,
               ),
               cwd: tmp.path,
+              // Not the 1.5 s of Windows: a cold runner starts the VM slowly.
               firstReadLimit: const Duration(seconds: 30),
-              // Written the plain way: the future is a Future<List<ProcessRow>>,
-              // never a Future<List<ProcessRow>?>, whatever the type says.
-              processTable: ({limit, after}) async => reads++ == 0
-                  ? [row(agent.pid, pid), row(_nowhere + 1, agent.pid)]
-                  : [row(_nowhere + 1, 1)],
+              isWindows: windows,
+              processTable: table,
               killTree: (proc) async => killed.add(proc.pid),
+              killPid: (pid) async => killed.add(pid),
             ),
           );
-          await agent.stop();
-          expect(killed, [_nowhere + 1], reason: 'the snapshot was taken');
+
+          test('every request says when the agent was spawned', () async {
+            final before = processClock();
+            final r = await run([
+              tree,
+              (agent) => afterwards(),
+            ], windows: windows);
+            final spawned = processClock();
+            await r.agent.stop();
+            expect(r.afters, isNotEmpty);
+            for (final after in r.afters) {
+              expect(after, isNotNull);
+              expect(after! >= before && after <= spawned, isTrue);
+            }
+            expect(r.afters.toSet(), hasLength(1), reason: 'the same moment');
+          });
+
+          test('a reader that always answers with a list works with a limit '
+              '(its future cannot give null on a timeout, and must not need '
+              'to)', () async {
+            late final AgentProcess agent;
+            var reads = 0;
+            final killed = <int>[];
+            agent = await start(
+              // Written the plain way: the future is a Future<List<ProcessRow>>,
+              // never a Future<List<ProcessRow>?>, whatever the type says.
+              ({limit, after}) async => reads++ == 0
+                  ? [row(agent.pid, pid), row(_nowhere + 1, agent.pid)]
+                  : [row(_nowhere + 1, 1)],
+              killed,
+            );
+            await agent.stop();
+            expect(killed, [_nowhere + 1], reason: 'the snapshot was taken');
+          });
+
+          test('a read that began before the agent existed is not joined: its '
+              'pid was another process\'s in that table, and that one\'s '
+              'surviving children are not the agent\'s', () async {
+            late int agentPid;
+            var reads = 0;
+            final shared = SharedProcessTable(({limit, after}) async {
+              final call = reads++;
+              if (call == 0) {
+                // The table of a moment ago, slow to come: the pid the agent
+                // has now was a child of this process that has left since, and
+                // its child stays.
+                await Future<void>.delayed(const Duration(milliseconds: 600));
+                return [
+                  row(agentPid, pid, command: 'old-child'),
+                  row(_nowhere + 1, agentPid),
+                  row(_nowhere + 2, _nowhere + 1),
+                ];
+              }
+              // The table of now: the agent has started nothing; the old
+              // child's children are there still, under init.
+              return [
+                row(agentPid, pid),
+                row(_nowhere + 1, 1),
+                row(_nowhere + 2, _nowhere + 1),
+              ];
+            });
+            final someoneElses = shared(); // under way before the agent exists
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            final killed = <int>[];
+            final agent = await start(shared.call, killed);
+            agentPid = agent.pid;
+            await agent.stop();
+            expect(await agent.exitCode, 0);
+            expect(
+              killed,
+              isEmpty,
+              reason: 'nothing the agent started is left',
+            );
+            expect(
+              reads,
+              greaterThanOrEqualTo(2),
+              reason: 'it read for itself',
+            );
+            await someoneElses;
+          });
+
+          test('a read that began after the agent was spawned is joined, as '
+              'before', () async {
+            var reads = 0;
+            final shared = SharedProcessTable(({limit, after}) async {
+              reads++;
+              await Future<void>.delayed(const Duration(milliseconds: 200));
+              return null;
+            });
+            final agent = await start(shared.call, []);
+            await Future.wait([shared(), agent.stop()]);
+            expect(reads, 1, reason: 'one read, started after the spawn');
+          });
         },
       );
-
-      test('a read that began before the agent existed is not joined: its '
-          'pid was another process\'s in that table, and that one\'s '
-          'surviving children are not the agent\'s', () async {
-        late int agentPid;
-        var reads = 0;
-        final shared = SharedProcessTable(({limit, after}) async {
-          final call = reads++;
-          if (call == 0) {
-            // The table of a moment ago, slow to come: the pid the agent has
-            // now was a child of this process that has left since, and its
-            // child stays.
-            await Future<void>.delayed(const Duration(milliseconds: 600));
-            return [
-              row(agentPid, pid, command: 'old-child'),
-              row(_nowhere + 1, agentPid),
-              row(_nowhere + 2, _nowhere + 1),
-            ];
-          }
-          // The table of now: the agent has started nothing; the old child's
-          // children are there still, under init.
-          return [
-            row(agentPid, pid),
-            row(_nowhere + 1, 1),
-            row(_nowhere + 2, _nowhere + 1),
-          ];
-        });
-        final someoneElses = shared(); // under way before the agent exists
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-        final killed = <int>[];
-        final agent = track(
-          await AgentProcess.start(
-            AgentCommand(
-              executable: Platform.resolvedExecutable,
-              args: [
-                ...dartScript(tmp, 'eof', _upThenExitOnEof),
-                '${tmp.path}/up',
-                '${tmp.path}/eof',
-              ],
-              environment: Platform.environment,
-            ),
-            cwd: tmp.path,
-            firstReadLimit: const Duration(seconds: 30),
-            processTable: shared.call,
-            killTree: (proc) async => killed.add(proc.pid),
-          ),
-        );
-        agentPid = agent.pid;
-        await agent.stop();
-        expect(await agent.exitCode, 0);
-        expect(killed, isEmpty, reason: 'nothing the agent started is left');
-        expect(reads, greaterThanOrEqualTo(2), reason: 'it read for itself');
-        await someoneElses;
-      });
-
-      test('a read that began after the agent was spawned is joined, as '
-          'before', () async {
-        var reads = 0;
-        final shared = SharedProcessTable(({limit, after}) async {
-          reads++;
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-          return null;
-        });
-        final agent = track(
-          await AgentProcess.start(
-            AgentCommand(
-              executable: Platform.resolvedExecutable,
-              args: [
-                ...dartScript(tmp, 'eof', _upThenExitOnEof),
-                '${tmp.path}/up',
-                '${tmp.path}/eof',
-              ],
-              environment: Platform.environment,
-            ),
-            cwd: tmp.path,
-            firstReadLimit: const Duration(seconds: 30),
-            processTable: shared.call,
-          ),
-        );
-        await Future.wait([shared(), agent.stop()]);
-        expect(reads, 1, reason: 'one read, started after the spawn');
-      });
-    });
+    }
 
     // On Windows every read of the table is a PowerShell, a second or two:
     // the stop waits for the first only a little, and the agents that stop

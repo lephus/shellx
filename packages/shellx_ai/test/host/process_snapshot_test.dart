@@ -1,6 +1,7 @@
 // The process table the agent's stop reads (V2-1 final review: an agent that
 // leaves leaves its children): the rows of `ps` and of the Windows script,
 // the descendants of a pid, and whether a row is still the same process.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:shellx_ai/host.dart';
@@ -206,6 +207,30 @@ void main() {
       },
     );
 
+    test('a parent that began after its child is a parent id that was '
+        'reused: the chain ends there (Windows keeps the id of a parent '
+        'that has left)', () {
+      final rows = [
+        row(5, 4, at: t0),
+        row(4, 3, at: t0.subtract(const Duration(hours: 1))), // a real parent
+        row(3, 2, at: t0.add(const Duration(hours: 1))), // reused, not 4's
+        row(2, 1),
+      ];
+      expect(ancestorsIn(5, rows), [4]);
+    });
+
+    test('within the slack a younger parent is still a parent (ages are whole '
+        'seconds); with none it is not', () {
+      final rows = [
+        row(5, 4, at: t0),
+        row(4, 3, at: t0),
+        row(3, 2, at: t0.add(const Duration(seconds: 1))),
+        row(2, 1, at: t0),
+      ];
+      expect(ancestorsIn(5, rows), [4, 3, 2]);
+      expect(ancestorsIn(5, rows, slack: Duration.zero), [4]);
+    });
+
     test('a loop ends, and a pid is listed once', () {
       final rows = [row(5, 4), row(4, 3), row(3, 5)];
       expect(ancestorsIn(5, rows), [4, 3]);
@@ -347,85 +372,101 @@ void main() {
     // A table that was read before a process existed shows the pid it got as
     // whatever had that pid then. Whoever asks says since when it exists
     // (`after`, on the processClock), and joins only a read that began later.
+    // The reads here end when the test says so: no timing decides anything.
     group('a read is joined only if it began after the asker existed', () {
-      Future<void> pause([int ms = 10]) =>
-          Future<void>.delayed(Duration(milliseconds: ms));
+      Future<void> pause() =>
+          Future<void>.delayed(const Duration(milliseconds: 10));
+
+      ({ProcessTableReader read, List<Completer<List<ProcessRow>?>> reads})
+      manual() {
+        final reads = <Completer<List<ProcessRow>?>>[];
+        return (
+          reads: reads,
+          read: ({Duration? limit, Duration? after}) {
+            final c = Completer<List<ProcessRow>?>();
+            reads.add(c);
+            return c.future;
+          },
+        );
+      }
 
       test('one that began before is not joined: a new read is made', () async {
-        final r = reader(
-          (call) => [row(call + 1, 1)],
-          delay: const Duration(milliseconds: 200),
-        );
-        final table = SharedProcessTable(r.read);
+        final m = manual();
+        final table = SharedProcessTable(m.read);
         final old = table(); // under way
         await pause();
         final existsSince = processClock(); // an agent spawned after it began
         await pause();
         final fresh = table(after: existsSince);
-        expect(r.limits, hasLength(2));
+        expect(m.reads, hasLength(2));
+        m.reads[0].complete([row(1, 1)]);
+        m.reads[1].complete([row(2, 1)]);
         expect((await old)!.single.pid, 1);
         expect((await fresh)!.single.pid, 2);
       });
 
       test('one that began after is joined', () async {
-        final r = reader((call) => [row(call + 1, 1)]);
-        final table = SharedProcessTable(r.read);
+        final m = manual();
+        final table = SharedProcessTable(m.read);
         final existsSince = processClock();
         await pause();
         final first = table();
         final joined = table(after: existsSince);
-        expect(r.limits, hasLength(1));
-        expect((await joined)!.single.pid, (await first)!.single.pid);
+        expect(m.reads, hasLength(1));
+        m.reads[0].complete([row(1, 1)]);
+        expect(await joined, await first);
       });
 
       test('whoever does not say since when joins what is under way', () async {
-        final r = reader((call) => [row(call + 1, 1)]);
-        final table = SharedProcessTable(r.read);
+        final m = manual();
+        final table = SharedProcessTable(m.read);
         final first = table();
         await pause();
         final second = table();
-        expect(r.limits, hasLength(1));
+        expect(m.reads, hasLength(1));
+        m.reads[0].complete([row(1, 1)]);
         expect(await first, await second);
       });
 
       test('the newer read is the one that is joined from then on, and the '
           'older one ending does not make it forgotten', () async {
-        final r = reader(
-          (call) => [row(call + 1, 1)],
-          delay: const Duration(milliseconds: 400),
-        );
-        final table = SharedProcessTable(r.read);
-        final first = table(); // ends at 400 ms
-        await pause(100);
+        final m = manual();
+        final table = SharedProcessTable(m.read);
+        final first = table();
+        await pause();
         final existsSince = processClock();
         await pause();
-        final second = table(after: existsSince); // began at ~110, ends ~510
+        final second = table(after: existsSince);
+        m.reads[0].complete([row(1, 1)]);
         await first; // the older read ends while the newer is under way
         final third = table(after: existsSince);
-        expect(r.limits, hasLength(2), reason: 'the third joined the second');
+        expect(m.reads, hasLength(2), reason: 'the third joined the second');
+        m.reads[1].complete([row(2, 1)]);
         expect(await third, await second);
         // …and when the newer one has ended too, the next ask is a new read.
-        await table();
-        expect(r.limits, hasLength(3));
+        final next = table();
+        expect(m.reads, hasLength(3));
+        m.reads[2].complete(const []);
+        await next;
       });
 
       test('a failing older read does not take the newer one down', () async {
-        var calls = 0;
-        final table = SharedProcessTable(({limit, after}) async {
-          final call = calls++;
-          await Future<void>.delayed(const Duration(milliseconds: 100));
-          if (call == 0) throw StateError('ps broke');
-          return [row(1, 0)];
-        });
+        final m = manual();
+        final table = SharedProcessTable(m.read);
         final old = table();
         final oldFails = expectLater(old, throwsA(isA<StateError>()));
         await pause();
         final existsSince = processClock();
         await pause();
         final fresh = table(after: existsSince);
+        m.reads[0].completeError(StateError('ps broke'));
         await oldFails;
+        m.reads[1].complete([row(1, 0)]);
         expect((await fresh)!.single.pid, 1);
-        expect((await table(after: existsSince))!.single.pid, 1);
+        final again = table(after: existsSince);
+        expect(m.reads, hasLength(3), reason: 'the newer one has ended');
+        m.reads[2].complete([row(3, 0)]);
+        expect((await again)!.single.pid, 3);
       });
     });
   });

@@ -168,6 +168,7 @@ void main() {
         late final RunningAgents running;
         running = RunningAgents(
           e.registry,
+          isWindows: false, // the tree killer is what is asked about
           info: (pid) async {
             looked.add(pid);
             await gate.future;
@@ -259,6 +260,7 @@ void main() {
         late final RunningAgents running;
         running = RunningAgents(
           e.registry,
+          isWindows: false, // the tree killer is what is asked about
           info: (pid) async {
             looked.add(pid);
             // A process the registry names "matches": a sweep would kill it.
@@ -498,7 +500,12 @@ void main() {
           supportDir: p.join(e.tmp.path, 'support'),
           clientVersion: '2.0.0',
           env: LoginShellEnv(
-            processEnv: {...Platform.environment, 'HOME': home.path},
+            // Home is HOME where there is a login shell, USERPROFILE on Windows.
+            processEnv: {
+              ...Platform.environment,
+              'HOME': home.path,
+              'USERPROFILE': home.path,
+            },
             run: (s, a, c, t) async => (0, <int>[]),
           ),
           checkpoints: CheckpointStores(

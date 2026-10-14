@@ -50,6 +50,7 @@ void main() {
     };
     final r = RunningAgents(
       file,
+      isWindows: false, // the tree killer is what is asked about
       info: (pid) async => now[pid],
       killPid: (pid) async => killed.add(pid),
     );
@@ -89,34 +90,48 @@ void main() {
     expect(parseEtime('soon'), isNull);
   });
 
-  test('lookupProcess and killProcessByPid on a real process', () async {
-    final proc = await Process.start(
-      Platform.resolvedExecutable,
-      dartScript(tmp, 'ready', readyThenIgnoreStdin),
-    );
-    spawned.add(proc);
-    final started = DateTime.now();
-    // The VM has the final name (macOS: `dart` becomes `dartvm`) once the
-    // script runs; a lookup before that, then a sweep after, would not match.
-    await proc.stdout.first.timeout(const Duration(seconds: 10));
-    final info = await lookupProcess(proc.pid);
-    expect(info, isNotNull);
-    final name = info!.command
-        .replaceAll(r'\', '/')
-        .split('/')
-        .last
-        .toLowerCase();
-    expect(name, anyOf('dart', 'dart.exe', 'dartvm', 'dartvm.exe'));
-    expect(
-      info.startedAt.difference(started).abs(),
-      lessThan(const Duration(seconds: 30)),
-    );
+  // A real process, both ways of stopping a leftover: the fallback killer
+  // (`killProcessByPid`; taskkill /T on Windows) and the way of Windows, a pid
+  // at a time from one read of the process table (run here as well).
+  for (final windows in [false, true]) {
+    test(
+      'lookupProcess and the sweep on a real process '
+      '(${windows ? 'a pid at a time, as on Windows' : 'killProcessByPid'})',
+      () async {
+        final proc = await Process.start(
+          Platform.resolvedExecutable,
+          dartScript(tmp, 'ready', readyThenIgnoreStdin),
+        );
+        spawned.add(proc);
+        final started = DateTime.now();
+        // The VM has the final name (macOS: `dart` becomes `dartvm`) once the
+        // script runs; a lookup before that, then a sweep after, would not
+        // match.
+        await proc.stdout.first.timeout(const Duration(seconds: 10));
+        final info = await lookupProcess(proc.pid);
+        expect(info, isNotNull);
+        final name = info!.command
+            .replaceAll(r'\', '/')
+            .split('/')
+            .last
+            .toLowerCase();
+        expect(name, anyOf('dart', 'dart.exe', 'dartvm', 'dartvm.exe'));
+        expect(
+          info.startedAt.difference(started).abs(),
+          lessThan(const Duration(seconds: 30)),
+        );
 
-    final r = RunningAgents(file);
-    await r.add(
-      RunningRecord(pid: proc.pid, command: info.command, startedAt: started),
+        final r = RunningAgents(file, isWindows: windows);
+        await r.add(
+          RunningRecord(
+            pid: proc.pid,
+            command: info.command,
+            startedAt: started,
+          ),
+        );
+        expect(await r.sweep(), 1);
+        await proc.exitCode.timeout(const Duration(seconds: 10));
+      },
     );
-    expect(await r.sweep(), 1);
-    await proc.exitCode.timeout(const Duration(seconds: 10));
-  });
+  }
 }

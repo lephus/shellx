@@ -234,34 +234,37 @@ void main() {
       },
     );
 
-    test('a snapshot that is running when it starts finishes first', () async {
-      if (Platform.isWindows) return;
-      gp.put('a.txt', 'a');
-      final mark = File(p.join(gp.tmp.path, 'in-write-tree'));
-      // A git that holds `write-tree` for a second, after saying so.
-      final slow = File(p.join(gp.tmp.path, 'slow-git'))
-        ..writeAsStringSync(
-          '#!/bin/sh\n'
-          'for a in "\$@"; do\n'
-          '  if [ "\$a" = write-tree ]; then : > "${mark.path}"; sleep 1; fi\n'
-          'done\n'
-          'exec "${git.executable}" "\$@"\n',
-        );
-      Process.runSync('chmod', ['+x', slow.path]);
-      final s = stores(tool: GitTool(slow.path, git.major, git.minor));
-      final (store, _) = await s.forProject(gp.project, env());
-      final snapshot = store!.snapshot('s/1');
-      for (var i = 0; i < 400 && !mark.existsSync(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
-      expect(mark.existsSync(), isTrue, reason: 'the snapshot is under way');
-      var deleted = false;
-      final deleting = s.deleteAll().then((_) => deleted = true);
-      expect(await snapshot, isNotNull, reason: 'it was not cut off');
-      expect(deleted, isFalse, reason: 'the delete waited its turn');
-      await deleting;
-      expect(Directory(store.gitDir).existsSync(), isFalse);
-    });
+    test(
+      'a snapshot that is running when it starts finishes first',
+      () async {
+        gp.put('a.txt', 'a');
+        final mark = File(p.join(gp.tmp.path, 'in-write-tree'));
+        // A git that holds `write-tree` for a second, after saying so.
+        final slow = File(p.join(gp.tmp.path, 'slow-git'))
+          ..writeAsStringSync(
+            '#!/bin/sh\n'
+            'for a in "\$@"; do\n'
+            '  if [ "\$a" = write-tree ]; then : > "${mark.path}"; sleep 1; fi\n'
+            'done\n'
+            'exec "${git.executable}" "\$@"\n',
+          );
+        Process.runSync('chmod', ['+x', slow.path]);
+        final s = stores(tool: GitTool(slow.path, git.major, git.minor));
+        final (store, _) = await s.forProject(gp.project, env());
+        final snapshot = store!.snapshot('s/1');
+        for (var i = 0; i < 400 && !mark.existsSync(); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(mark.existsSync(), isTrue, reason: 'the snapshot is under way');
+        var deleted = false;
+        final deleting = s.deleteAll().then((_) => deleted = true);
+        expect(await snapshot, isNotNull, reason: 'it was not cut off');
+        expect(deleted, isFalse, reason: 'the delete waited its turn');
+        await deleting;
+        expect(Directory(store.gitDir).existsSync(), isFalse);
+      },
+      skip: Platform.isWindows ? 'the git held back is a shell script' : null,
+    );
 
     test('undo that was off comes back with the fresh repository', () async {
       for (var i = 0; i < 5; i++) {
@@ -303,7 +306,6 @@ void main() {
       'a store that cannot delete says so, and the others are deleted '
       'all the same',
       () async {
-        if (Platform.isWindows) return;
         final other = Directory(p.join(gp.tmp.path, 'other'))..createSync();
         File(p.join(other.path, 'b.txt')).writeAsStringSync('b');
         gp.put('a.txt', 'a');
@@ -321,7 +323,11 @@ void main() {
           Process.runSync('chmod', ['755', one.gitDir]);
         }
       },
-      skip: Process.runSync('id', ['-u']).stdout.toString().trim() == '0'
+      // `id` is not there on Windows, and this is evaluated when the file is
+      // loaded: the suite must load on every platform.
+      skip: Platform.isWindows
+          ? 'needs chmod'
+          : Process.runSync('id', ['-u']).stdout.toString().trim() == '0'
           ? 'needs a user that permissions apply to'
           : null,
     );

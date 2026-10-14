@@ -38,6 +38,7 @@ void main() {
     final t = DateTime.now();
     final running = RunningAgents(
       File(p.join(tmp.path, 'ai', 'running.json')),
+      isWindows: false, // the tree killer is what is asked about
       info: (pid) async => (command: '/usr/bin/node', startedAt: t),
       killPid: (pid) async => killed.add(pid),
     );

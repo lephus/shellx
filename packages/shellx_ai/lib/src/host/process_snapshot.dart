@@ -4,7 +4,28 @@ import 'dart:io';
 import 'package:shellx_acp/shellx_acp.dart' show Redacted;
 
 import 'probe.dart';
-import 'running_agents.dart' show parseEtime, sameProgram;
+
+/// Whether two commands are the same program: the file name, without folder,
+/// case or `.exe` (`/opt/homebrew/bin/node` and `C:\Program Files\nodejs\NODE.EXE`
+/// are `node`).
+bool sameProgram(String a, String b) {
+  String base(String s) {
+    final name = s.replaceAll(r'\', '/').split('/').last.toLowerCase();
+    return name.endsWith('.exe') ? name.substring(0, name.length - 4) : name;
+  }
+
+  return base(a) == base(b);
+}
+
+/// `ps -o etime` → age: `mm:ss`, `hh:mm:ss` or `d-hh:mm:ss`.
+Duration? parseEtime(String text) {
+  final m = RegExp(
+    r'^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$',
+  ).firstMatch(text.trim());
+  if (m == null) return null;
+  int g(int i) => int.parse(m.group(i) ?? '0');
+  return Duration(days: g(1), hours: g(2), minutes: g(3), seconds: g(4));
+}
 
 /// One row of the operating system's process table: enough to know a process
 /// again a few seconds later (its pid alone is not: a pid is reused).
@@ -225,8 +246,15 @@ List<ProcessRow> descendantsIn(
 
 /// The pids above [pid] in [rows]: its parent, that one's parent… as far as
 /// the table shows them. Never pid 0 or 1, and never a pid twice (a loop in
-/// the table ends the chain).
-List<int> ancestorsIn(int pid, List<ProcessRow> rows) {
+/// the table ends the chain). The chain ends too where a parent began after
+/// its child by more than [slack]: that is a parent id that was reused
+/// (Windows keeps it after the parent has left), not a parent. That is the
+/// rule [descendantsIn] has for a child, seen from below.
+List<int> ancestorsIn(
+  int pid,
+  List<ProcessRow> rows, {
+  Duration slack = const Duration(seconds: 2),
+}) {
   final byPid = {for (final r in rows) r.pid: r};
   final above = <int>[];
   final seen = {pid};
@@ -234,8 +262,10 @@ List<int> ancestorsIn(int pid, List<ProcessRow> rows) {
   while (at != null) {
     final parent = at.parentPid;
     if (parent <= 1 || !seen.add(parent)) break;
+    final up = byPid[parent];
+    if (up != null && up.startedAt.isAfter(at.startedAt.add(slack))) break;
     above.add(parent);
-    at = byPid[parent];
+    at = up;
   }
   return above;
 }

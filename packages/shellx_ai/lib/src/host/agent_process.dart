@@ -4,7 +4,7 @@ import 'dart:io';
 import 'agent_catalog.dart';
 import 'byte_ring.dart';
 import 'process_snapshot.dart';
-import 'running_agents.dart' show KillPid;
+import 'running_agents.dart' show KillPid, killPidOnly;
 
 /// This process's own pid (inside [AgentProcess], `pid` is the agent's).
 final int _ownPid = pid;
@@ -40,12 +40,6 @@ typedef KillTree = Future<void> Function(Process process);
 /// The fallback [KillTree]: the process only.
 Future<void> killOnly(Process process) async {
   process.kill(ProcessSignal.sigkill);
-}
-
-/// The default [KillPid] of [AgentProcess]: the process whose pid it is, and
-/// nothing it started.
-Future<void> killPidOnly(int pid) async {
-  Process.killPid(pid, ProcessSignal.sigkill);
 }
 
 /// A process this app did not start, as far as a [KillTree] can use one: it
@@ -294,10 +288,12 @@ final class AgentProcess implements AgentChannel {
   Future<void> kill() async {
     if (!_windows) return _killTree(_process);
     // Windows: who the agent has started, as the table shows it now (it is
-    // here, hung or not); then the agent, and each of them on its own.
+    // here, hung or not). The agent goes at once, by its handle; then each of
+    // them that is still the same process, one by one, as in a stop: the table
+    // took time to come, and a pid is reused at once there.
     final started = await _descendants();
     _process.kill(ProcessSignal.sigkill);
-    await Future.wait([for (final r in started) _killOne(r.pid)]);
+    await _killLeftovers(started);
   }
 
   @override

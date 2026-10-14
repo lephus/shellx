@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'probe.dart';
+import 'process_snapshot.dart';
 import 'serial_queue.dart';
+
+/// This process's own pid (inside [RunningRecord], `pid` is the agent's).
+final int _ownPid = pid;
 
 /// One agent process this app started.
 final class RunningRecord {
@@ -48,26 +52,10 @@ typedef ProcessLookup =
 
 typedef KillPid = Future<void> Function(int pid);
 
-/// Whether two commands are the same program: the file name, without folder,
-/// case or `.exe` (`/opt/homebrew/bin/node` and `C:\Program Files\nodejs\NODE.EXE`
-/// are `node`).
-bool sameProgram(String a, String b) {
-  String base(String s) {
-    final name = s.replaceAll(r'\', '/').split('/').last.toLowerCase();
-    return name.endsWith('.exe') ? name.substring(0, name.length - 4) : name;
-  }
-
-  return base(a) == base(b);
-}
-
-/// `ps -o etime` → age: `mm:ss`, `hh:mm:ss` or `d-hh:mm:ss`.
-Duration? parseEtime(String text) {
-  final m = RegExp(
-    r'^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$',
-  ).firstMatch(text.trim());
-  if (m == null) return null;
-  int g(int i) => int.parse(m.group(i) ?? '0');
-  return Duration(days: g(1), hours: g(2), minutes: g(3), seconds: g(4));
+/// A [KillPid] that kills the process whose pid it is, and nothing it
+/// started: the way where a tree must not be walked (Windows).
+Future<void> killPidOnly(int pid) async {
+  Process.killPid(pid, ProcessSignal.sigkill);
 }
 
 /// The OS view of [pid]: `ps` on macOS/Linux, CIM through PowerShell on
@@ -122,19 +110,39 @@ Future<void> killProcessByPid(int pid) async {
 /// the next launch stops the ones left behind, but only when both the
 /// command and the start time still match: a reused pid is left alone
 /// (spec §6). Writes run one at a time.
+///
+/// Elsewhere a leftover goes through [killPid], the tree killer. On Windows
+/// ([isWindows]) no tree is walked when the kill is made: `taskkill /T`
+/// follows the ParentProcessId of every process, Windows keeps that id after
+/// the parent has left, and a stale one can make a process that has nothing
+/// to do with the agent (an explorer.exe whose parent id is the pid the
+/// leftover got since, a process above ShellX) look like its child. There the
+/// leftover is checked again against one read of the process table
+/// ([processTable]), and it and the processes that table shows under it (a
+/// child is not older than its parent; never this process or what is above
+/// it; never pid 0 or 1) are killed, each on its own, through [killAlone].
 final class RunningAgents {
   RunningAgents(
     this.file, {
     ProcessLookup? info,
     KillPid? killPid,
     this.tolerance = const Duration(seconds: 5),
+    bool? isWindows,
+    ProcessTableReader? processTable,
+    KillPid? killAlone,
   }) : _info = info ?? lookupProcess,
-       _killPid = killPid ?? killProcessByPid;
+       _killPid = killPid ?? killProcessByPid,
+       _windows = isWindows ?? Platform.isWindows,
+       _processTable = processTable ?? readProcessTable,
+       _killAlone = killAlone ?? killPidOnly;
 
   final File file;
   final Duration tolerance;
   final ProcessLookup _info;
   final KillPid _killPid;
+  final bool _windows;
+  final ProcessTableReader _processTable;
+  final KillPid _killAlone;
   final _queue = SerialQueue();
 
   Future<void> add(RunningRecord record) => _queue.run(() async {
@@ -153,12 +161,57 @@ final class RunningAgents {
       final now = await _info(r.pid);
       if (now == null || !sameProgram(now.command, r.command)) continue;
       if (now.startedAt.difference(r.startedAt).abs() > tolerance) continue;
-      await _killPid(r.pid);
-      stopped++;
+      if (_windows) {
+        if (await _stopOnWindows(r)) stopped++;
+      } else {
+        await _killPid(r.pid);
+        stopped++;
+      }
     }
     _write(const []);
     return stopped;
   });
+
+  /// Windows: the leftover [r], whose identity has been checked, and what one
+  /// read of the process table shows it started, each on its own. False, and
+  /// nothing killed, when that read disagrees about who the process is, when
+  /// it does not show it, or when it is this process, pid 0 or 1, or above
+  /// this process (the leftover may be what started it): the table is not
+  /// believed against that. A table that cannot be read leaves the leftover
+  /// alone to be killed, as the check found it.
+  Future<bool> _stopOnWindows(RunningRecord r) async {
+    if (r.pid <= 1 || r.pid == _ownPid) return false;
+    List<ProcessRow>? rows;
+    try {
+      rows = await _processTable();
+    } on Object {
+      rows = null;
+    }
+    var below = const <ProcessRow>[];
+    if (rows != null) {
+      final me = rows.where((x) => x.pid == r.pid).firstOrNull;
+      if (me == null ||
+          !sameProgram(me.command, r.command) ||
+          me.startedAt.difference(r.startedAt).abs() > tolerance) {
+        return false;
+      }
+      final above = ancestorsIn(_ownPid, rows);
+      if (above.contains(r.pid)) return false;
+      below = descendantsIn(r.pid, rows, never: {_ownPid, ...above});
+    }
+    // The agent first: it can start nothing more.
+    await _killOne(r.pid);
+    await Future.wait([for (final d in below) _killOne(d.pid)]);
+    return true;
+  }
+
+  Future<void> _killOne(int pid) async {
+    try {
+      await _killAlone(pid);
+    } on Object {
+      // The others still go.
+    }
+  }
 
   /// The records as they are on disk.
   List<RunningRecord> read() => _readNow();

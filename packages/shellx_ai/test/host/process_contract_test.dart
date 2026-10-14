@@ -245,6 +245,7 @@ void main() {
       final r = RunningAgents(
         file,
         tolerance: tolerance,
+        isWindows: false, // the tree killer is what is asked about
         info: (pid) async => now[pid],
         killPid: (pid) async => killed.add(pid),
       );
@@ -273,6 +274,7 @@ void main() {
       };
       final r = RunningAgents(
         file,
+        isWindows: false, // the tree killer is what is asked about
         info: (pid) async => now[pid],
         killPid: (pid) async => killed.add(pid),
       );
