@@ -131,6 +131,9 @@ Future<void> aiRevert(
   final changes = turn == null
       ? await runtime.sessionChanges()
       : await runtime.changesSince(turn);
+  // Every wait below can outlive the panel or the tab (closed while git
+  // works): its notifiers are disposed then, and nobody reads a note.
+  if (!context.mounted) return;
   if (changes == null) {
     // git did not answer: said, never a silent nothing.
     ui.note.value = l10n.aiRevertFailed;
@@ -151,19 +154,19 @@ Future<void> aiRevert(
   final known = last == null
       ? const <String>{}
       : await runtime.changedAfterTurn(last);
+  if (!context.mounted) return;
   final after = known ?? paths.toSet();
   final touched = [
     for (final path in paths)
       if (after.contains(path)) path,
   ];
   if (touched.isNotEmpty) {
-    if (!context.mounted) return;
     final choice = await showAiRevertDialog(
       context,
       touched: touched,
       someUnchanged: touched.length < paths.length,
     );
-    if (choice == null) return;
+    if (choice == null || !context.mounted) return;
     if (choice == AiRevertChoice.onlyUnchanged) {
       paths = [
         for (final path in paths)
@@ -179,6 +182,7 @@ Future<void> aiRevert(
   } on Object catch (error) {
     debugPrint('ShellX: revert failed: ${error.runtimeType}');
   }
+  if (!context.mounted) return;
   ui.note.value = ok
       ? l10n.aiReverted(paths.length)
       // A turn started while the dialog was open: that is the reason.

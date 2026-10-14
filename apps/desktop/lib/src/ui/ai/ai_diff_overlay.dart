@@ -52,6 +52,9 @@ class _AiDiffOverlayState extends ConsumerState<AiDiffOverlay> {
     final before = aiFileContentOf(
       await pane.runtime.fileBefore(widget.turn, widget.path),
     );
+    // Closed while the restore point was read (Esc, ×, the tab): `ref` and
+    // `setState` are gone with the widget.
+    if (!mounted) return;
     final now = await ref
         .read(aiProjectFilesProvider)
         .read(p.join(pane.state.cwd, widget.path));
