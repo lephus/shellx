@@ -206,6 +206,28 @@ void main() {
       ]);
     });
 
+    test('a session id longer than the hub\'s 256 characters is passed on but '
+        'not remembered: a phone cannot make the service keep what nobody '
+        'answers', () {
+      forwarder.serve(window, toUi.add);
+      final longest = 'e.${'x' * 254}'; // 256 characters, the hub's limit
+      final tooLong = 'e.${'x' * 255}';
+      forwarder
+        ..handle(phone, AiAttach(sid: longest))
+        ..handle(phone, AiAttach(sid: tooLong));
+      for (var i = 0; i < 500; i++) {
+        forwarder.handle(phone, AiAttach(sid: '${'y' * 1000}$i'));
+      }
+      expect(toUi, hasLength(502)); // the window decides what to answer
+      forwarder.unserve(window);
+      expect(out.map((o) => (o.mobileId, o.message)), [
+        (phone, AiClosed(sid: longest, reason: 'desktop_closed')),
+      ]);
+      // A detach of one it never kept changes nothing.
+      forwarder.handle(phone, AiDetach(sid: tooLong));
+      expect(out, hasLength(1));
+    });
+
     test('mirrors closed when a window quit are not closed again when the '
         'next window quits', () {
       forwarder.serve(window, toUi.add);

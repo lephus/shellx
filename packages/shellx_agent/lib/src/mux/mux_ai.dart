@@ -48,6 +48,10 @@ bool _towardsPhone(AiMessage m) => switch (m) {
   AiOpen() => false,
 };
 
+/// The longest session id the service keeps for a phone: the hub's own limit
+/// (`AiPhoneHub` answers none longer, and the ones it makes are far shorter).
+const int _maxSidLength = 256;
+
 /// V2-2 D1, background service side: phones' `ai.*` messages go to the
 /// attached window that serves AI (`ai.in`), its answers come back
 /// (`ai.out`). Without such a window phones get [aiUnavailableReply]; when
@@ -137,9 +141,11 @@ final class MuxAiForwarder implements AiEndpoint {
       case AiList():
         _listing.add(mobileId);
       // Only a mirror the window knows of is open; without a window the
-      // attach is answered "closed" below.
+      // attach is answered "closed" below. A session id longer than the
+      // hub's limit is none it made and none it answers: it is passed on, not
+      // kept (a phone cannot make the service remember what it likes).
       case AiAttach(:final sid) when ui != null:
-        (_attached[mobileId] ??= {}).add(sid);
+        if (sid.length <= _maxSidLength) (_attached[mobileId] ??= {}).add(sid);
       case AiDetach(:final sid):
         _attached[mobileId]?.remove(sid);
       default:
