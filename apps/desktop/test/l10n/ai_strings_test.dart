@@ -35,10 +35,7 @@ void main() {
     expect(vi.aiRunSheetLogin('Claude'), 'Đăng nhập Claude');
     expect(vi.aiRunSheetInstall('Claude'), 'Cài Claude');
     expect(vi.aiNodeMissing('Claude', 22), 'Claude cần Node.js 22 trở lên');
-    expect(
-      vi.aiAgentExited('Claude', 1),
-      'Claude dừng bất ngờ (mã thoát 1)',
-    );
+    expect(vi.aiAgentExited('Claude', 1), 'Claude dừng bất ngờ (mã thoát 1)');
     expect(vi.aiForceStop, 'Dừng hẳn');
     expect(vi.aiResumeSession, 'Tiếp tục phiên');
     expect(vi.aiHistory, 'Lịch sử phiên');
@@ -59,7 +56,7 @@ void main() {
     expect(en.aiNodeMissing('Codex', 20), 'Codex needs Node.js 20 or newer');
   });
 
-  test('the run sheet note spells its apostrophe like the rest of the file', () {
+  test('the run sheet note uses the typographic apostrophe', () {
     expect(
       en.aiRunSheetNote,
       'This is the agent’s own program; ShellX does not read or keep what '

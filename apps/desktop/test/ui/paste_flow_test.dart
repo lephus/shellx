@@ -54,7 +54,9 @@ void main() {
     (t) async {
       final w = await pumpConfiguredWorkspace(t);
       final tab = w.container.read(terminalTabsProvider).selected!;
-      tab.terminal!.write('\x1b[?2004h'); // the program asks for bracketed paste
+      tab.terminal!.write(
+        '\x1b[?2004h',
+      ); // the program asks for bracketed paste
       final text = 'x' * 800000;
       mockClipboard(t, text);
       await pasteChord(t);

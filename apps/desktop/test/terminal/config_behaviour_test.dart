@@ -63,7 +63,10 @@ void main() {
     await tabs().openTab();
     expect(local.openCwds.last, '/tmp/w');
     await config('working-directory = inherit\n');
-    local.setCwd(state().selected!.focused!.id, '/repo'); // A2 OSC 7 in the fake
+    local.setCwd(
+      state().selected!.focused!.id,
+      '/repo',
+    ); // A2 OSC 7 in the fake
     await tabs().openTab();
     expect(local.openCwds.last, '/repo');
   });
