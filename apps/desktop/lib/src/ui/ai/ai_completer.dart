@@ -13,30 +13,61 @@ typedef AiSuggestion = ({
 /// The most suggestions shown at once.
 const int kAiSuggestMax = 8;
 
+/// Candidates ranked (tests: each path is ranked once per keystroke).
+@visibleForTesting
+int debugFileRanks = 0;
+
+/// 0: the name starts with [q] (lower case); 1: it contains it; 2: the path
+/// does; 3: no match.
+int _rank(String path, String q) {
+  debugFileRanks++;
+  final lower = path.toLowerCase();
+  final name = lower.substring(lower.lastIndexOf('/') + 1);
+  if (name.startsWith(q)) return 0;
+  if (name.contains(q)) return 1;
+  return lower.contains(q) ? 2 : 3;
+}
+
 /// D16: the files matching [query] (case-insensitive), best first — the
 /// name starting with it, then the name containing it, then the path
-/// containing it; shorter paths first among equals.
+/// containing it; shorter paths first among equals, then the order they came
+/// in. Smoothness (this runs on every keystroke, over 20 000 paths): each
+/// path is ranked once and only the best [kAiSuggestMax] are kept.
 List<AiSuggestion> aiMatchFiles(List<String> files, String query) {
   final q = query.toLowerCase();
-  int rank(String path) {
-    final lower = path.toLowerCase();
-    final name = lower.substring(lower.lastIndexOf('/') + 1);
-    if (name.startsWith(q)) return 0;
-    if (name.contains(q)) return 1;
-    return lower.contains(q) ? 2 : 3;
+  // The best so far, best first.
+  final best = <({int rank, String path})>[];
+  for (final path in files) {
+    final rank = _rank(path, q);
+    if (rank > 2) continue;
+    if (best.length == kAiSuggestMax) {
+      final worst = best.last;
+      // Not better than the worst kept: equal keeps the earlier path.
+      if (rank > worst.rank ||
+          (rank == worst.rank && path.length >= worst.path.length)) {
+        continue;
+      }
+      best.removeLast();
+    }
+    var at = best.length;
+    while (at > 0) {
+      final before = best[at - 1];
+      if (before.rank < rank ||
+          (before.rank == rank && before.path.length <= path.length)) {
+        break;
+      }
+      at--;
+    }
+    best.insert(at, (rank: rank, path: path));
   }
-
-  final hits = [
-    for (final f in files)
-      if (rank(f) < 3) f,
-  ];
-  hits.sort((a, b) {
-    final r = rank(a).compareTo(rank(b));
-    return r != 0 ? r : a.length.compareTo(b.length);
-  });
   return [
-    for (final f in hits.take(kAiSuggestMax))
-      (insert: '@$f ', label: f, detail: null, mention: f),
+    for (final hit in best)
+      (
+        insert: '@${hit.path} ',
+        label: hit.path,
+        detail: null,
+        mention: hit.path,
+      ),
   ];
 }
 

@@ -10,6 +10,11 @@ import 'ai_theme.dart';
 
 /// The dock under the conversation (spec §4.1), top to bottom: the plan
 /// (folds), the permission bar (Task 16), the queue, the composer.
+///
+/// All of it is "in" the composer's field for a tap: on macOS and Windows a
+/// click outside a field takes its focus, and with it keys 1–9, Esc and
+/// typing, so a click on Send, on Allow or on a chip would leave the composer
+/// deaf until it is clicked again.
 class AiDock extends StatelessWidget {
   const AiDock({super.key, this.focusNode, this.permissionBar, this.keyHook});
 
@@ -26,34 +31,44 @@ class AiDock extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: AiSizes.column),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListenableBuilder(
-              listenable: scope.frames,
-              builder: (context, _) {
-                final s = scope.state;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (s.plan.isNotEmpty) AiPlanBar(entries: s.plan),
-                    for (final q in s.queue)
-                      _Queued(
-                        text: q.text,
-                        onRemove: () => s.removeQueued(q.id),
-                      ),
-                  ],
-                );
-              },
-            ),
-            ?permissionBar,
-            // D16: images pasted or dropped on the composer.
-            AiImageInput(
-              child: AiComposer(focusNode: focusNode, keyHook: keyHook),
-            ),
-          ],
+        child: TextFieldTapRegion(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AiSelect<List<PlanEntry>>(
+                frames: scope.frames,
+                select: (s) => s.plan,
+                builder: (context, plan) => plan.isEmpty
+                    ? const SizedBox.shrink()
+                    : AiPlanBar(entries: plan),
+              ),
+              ?permissionBar,
+              AiSelect<String>(
+                frames: scope.frames,
+                select: (s) => [for (final q in s.queue) q.id].join(','),
+                builder: (context, _) {
+                  final s = scope.state;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final q in s.queue)
+                        _Queued(
+                          key: ValueKey(q.id),
+                          text: q.text,
+                          onRemove: () => s.removeQueued(q.id),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              // D16: images pasted or dropped on the composer.
+              AiImageInput(
+                child: AiComposer(focusNode: focusNode, keyHook: keyHook),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -137,7 +152,7 @@ class _AiPlanBarState extends State<AiPlanBar> {
 }
 
 class _Queued extends StatelessWidget {
-  const _Queued({required this.text, required this.onRemove});
+  const _Queued({super.key, required this.text, required this.onRemove});
   final String text;
   final VoidCallback onRemove;
 

@@ -93,9 +93,16 @@ final class AiImages extends ChangeNotifier {
   }
 }
 
+/// Whether the pane [context] is in is on screen. A hidden tab stays in the
+/// tree — in an `IndexedStack`, whose children keep their tickers, which is
+/// why `TickerMode` alone does not tell — and `Visibility.of` says so; a pane
+/// switched off another way stops its tickers (`TickerMode`).
+bool aiPaneShown(BuildContext context) =>
+    Visibility.of(context) && TickerMode.valuesOf(context).enabled;
+
 /// The AI pane's own UI state, which its parts change: the overlay over the
-/// conversation (run sheet, viewer), the side panel, and text for the
-/// composer (Files › "Mention in chat").
+/// conversation (run sheet, viewer), the side panel, and what goes into the
+/// composer (a paste; Files › "Mention in chat").
 final class AiPaneUi extends ChangeNotifier {
   Widget? _overlay;
   var _panel = false;
@@ -115,8 +122,18 @@ final class AiPaneUi extends ChangeNotifier {
   /// "Reviewed" marks (`aiReviewKey`), kept while the pane lives.
   final reviewed = <String>{};
 
-  /// Text the composer inserts at its cursor, then clears.
-  final insert = ValueNotifier<String?>(null);
+  /// Text the composer inserts at its cursor, then clears: a paste (D16).
+  /// Only text — a pasted `@path` is never a file mention.
+  final paste = ValueNotifier<String?>(null);
+
+  /// The file the composer mentions next, then clears: [mention].
+  final mentioned = ValueNotifier<String?>(null);
+
+  /// Files › "Mention in chat" (D18): the composer puts `@path ` at its
+  /// cursor and the file goes along with the message as a `resource_link`
+  /// (D16) while its `@path` is still in the text. [path] is relative to the
+  /// session folder.
+  void mention(String path) => mentioned.value = path;
 
   /// Set by the pane: the run sheet (D8).
   void Function(AiRunRequest request)? onRun;
@@ -171,7 +188,8 @@ final class AiPaneUi extends ChangeNotifier {
 
   @override
   void dispose() {
-    insert.dispose();
+    paste.dispose();
+    mentioned.dispose();
     note.dispose();
     changes.dispose();
     images.dispose();

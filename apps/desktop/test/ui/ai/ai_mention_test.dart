@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +26,44 @@ void main() {
       [for (final s in aiMatchFiles(files, 'src')) s.label],
       ['src/domain.dart', 'lib/src/main.dart'],
     );
+  });
+
+  test('20 000 paths: each is ranked once per keystroke, the best eight '
+      'are kept, in the order a full sort gives', () {
+    final random = Random(7);
+    final many = [
+      for (var i = 0; i < 20000; i++)
+        'packages/pkg_${random.nextInt(97)}/lib/${random.nextBool() ? 'src/' : ''}'
+            'feature_${random.nextInt(211)}/file_$i.dart',
+    ];
+    for (final q in ['a', 'fi', 'file_1', 'FEATURE_2', 'zzz', '']) {
+      debugFileRanks = 0;
+      final got = [for (final s in aiMatchFiles(many, q)) s.label];
+      expect(debugFileRanks, lessThanOrEqualTo(many.length), reason: q);
+      // The reference: rank everything, sort fully (stable on the order the
+      // paths came in), take eight.
+      final lowered = q.toLowerCase();
+      int rank(String path) {
+        final lower = path.toLowerCase();
+        final name = lower.substring(lower.lastIndexOf('/') + 1);
+        if (name.startsWith(lowered)) return 0;
+        if (name.contains(lowered)) return 1;
+        return lower.contains(lowered) ? 2 : 3;
+      }
+
+      final ranked =
+          [
+            for (final (i, f) in many.indexed)
+              if (rank(f) < 3)
+                (rank: rank(f), length: f.length, index: i, path: f),
+          ]..sort((a, b) {
+            final r = a.rank.compareTo(b.rank);
+            if (r != 0) return r;
+            final l = a.length.compareTo(b.length);
+            return l != 0 ? l : a.index.compareTo(b.index);
+          });
+      expect(got, [for (final r in ranked.take(8)) r.path], reason: q);
+    }
   });
 
   Future<(FakeAiRuntimes, AiRuntime)> dock(WidgetTester t) async {
@@ -83,4 +124,22 @@ void main() {
     expect(fakes.agent().received.where((r) => r.contains('prompt')), isEmpty);
     await runtime.dispose();
   });
+
+  testWidgets('clicking a suggestion keeps the keyboard in the composer '
+      '(macOS and Windows drop it on a tap outside a field)', (t) async {
+    final (_, runtime) = await dock(t);
+    final focus = t
+        .widget<TextField>(find.byKey(const Key('ai.composer')))
+        .focusNode!;
+    await t.enterText(find.byKey(const Key('ai.composer')), 'look at @ma');
+    await t.pump();
+    await t.tap(
+      find.byKey(const Key('ai.suggest.1')),
+      kind: PointerDeviceKind.mouse,
+    );
+    await t.pump();
+    expect(text(t), 'look at @src/domain.dart ');
+    expect(focus.hasPrimaryFocus, isTrue);
+    await runtime.dispose();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }

@@ -1,18 +1,20 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../ai/ai_off_thread.dart';
 import '../text_editing_shortcuts.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_completer.dart';
 import 'ai_config_chips.dart';
 import 'ai_images.dart';
+import 'ai_permission_bar.dart' show aiPermissionDigit;
 import 'ai_scope.dart';
 import 'ai_theme.dart';
 
@@ -34,8 +36,15 @@ typedef _View = ({
   bool running,
   bool stopping,
   bool force,
+  bool queueFull,
   int? usage,
 });
+
+/// An image going with a message.
+typedef _Image = ({Uint8List bytes, String mime});
+
+/// What the composer says in place of the chips, for as long as it is true.
+enum _Note { queueFull, cannotSend }
 
 /// The composer (D16, spec §4.1): a field that grows to 140 px and, under
 /// it, the context use and Send / Queue / Stop / Force stop.
@@ -43,8 +52,8 @@ typedef _View = ({
 ///   composing (Telex), Enter is the input method's (§1.10).
 /// - Sending while a turn runs (or the agent starts) queues (at most 5).
 /// - Esc with no question open stops the turn: "Stopping…" at once, "Force
-///   stop" after 10 s (§1.4).
-class AiComposer extends StatefulWidget {
+///   stop" after 10 s (§1.4) — a button; Esc never kills the agent.
+class AiComposer extends ConsumerStatefulWidget {
   const AiComposer({super.key, this.focusNode, this.keyHook});
 
   /// The window's terminal focus while this pane is the focused one.
@@ -54,15 +63,15 @@ class AiComposer extends StatefulWidget {
   final AiKeyHook? keyHook;
 
   @override
-  State<AiComposer> createState() => _AiComposerState();
+  ConsumerState<AiComposer> createState() => _AiComposerState();
 }
 
-class _AiComposerState extends State<AiComposer> {
+class _AiComposerState extends ConsumerState<AiComposer> {
   final _text = TextEditingController();
   final _ownFocus = FocusNode(debugLabel: 'ai composer');
   AiPaneScope? _scope;
   _View? _view;
-  String? _note;
+  _Note? _note;
 
   /// D16: `@` file suggestions; the files mentioned so far (sent along as
   /// `resource_link` while their `@path` is still in the text).
@@ -71,6 +80,15 @@ class _AiComposerState extends State<AiComposer> {
     commands: () => _scope?.state.commands ?? const [],
   );
   final _mentions = <String>{};
+
+  /// The Esc or digit key taken on key-down, until it is let go: its repeats
+  /// are taken too (holding Esc after a reject must not also stop the turn;
+  /// a held digit must not type).
+  LogicalKeyboardKey? _held;
+
+  /// Messages go out in the order they were sent, even when one waits for
+  /// its images to be encoded.
+  Future<void> _tail = Future.value();
 
   FocusNode get _focus => widget.focusNode ?? _ownFocus;
 
@@ -88,18 +106,24 @@ class _AiComposerState extends State<AiComposer> {
     final scope = AiPaneScope.of(context);
     if (!identical(scope.frames, _scope?.frames)) {
       _scope?.frames.removeListener(_onFrame);
-      _scope?.ui.insert.removeListener(_onInsert);
       scope.frames.addListener(_onFrame);
-      scope.ui.insert.addListener(_onInsert);
+    }
+    if (!identical(scope.ui, _scope?.ui)) {
+      _scope?.ui.paste.removeListener(_onPaste);
+      _scope?.ui.mentioned.removeListener(_onMention);
+      scope.ui.paste.addListener(_onPaste);
+      scope.ui.mentioned.addListener(_onMention);
     }
     _scope = scope;
     _view = _read(scope.state);
+    if (!_noteHolds(_view!)) _note = null;
   }
 
   @override
   void dispose() {
     _scope?.frames.removeListener(_onFrame);
-    _scope?.ui.insert.removeListener(_onInsert);
+    _scope?.ui.paste.removeListener(_onPaste);
+    _scope?.ui.mentioned.removeListener(_onMention);
     _text.dispose();
     _ownFocus.dispose();
     _completer.dispose();
@@ -111,20 +135,36 @@ class _AiComposerState extends State<AiComposer> {
     running: s.turn != null,
     stopping: s.turn?.cancelRequested ?? false,
     force: s.turn?.canForceStop ?? false,
+    queueFull: s.queue.length >= AiSessionState.maxQueue,
     usage: s.usage?.percent,
   );
 
+  static bool _canSendIn(AgentPhase phase) => switch (phase) {
+    AgentPhase.needsAuth || AgentPhase.failed => false,
+    _ => true,
+  };
+
+  bool get _canSend => _canSendIn(_view!.phase);
+
+  /// A note stays only while it is true.
+  bool _noteHolds(_View v) => switch (_note) {
+    null => false,
+    _Note.queueFull => v.queueFull,
+    _Note.cannotSend => !_canSendIn(v.phase),
+  };
+
   void _onFrame() {
     final next = _read(_scope!.state);
-    if (next != _view) setState(() => _view = next);
+    if (next == _view) return;
+    setState(() {
+      _view = next;
+      if (!_noteHolds(next)) _note = null;
+    });
   }
 
-  /// Files › "Mention in chat" (D18): text at the cursor.
-  void _onInsert() {
-    final insert = _scope!.ui.insert;
-    final add = insert.value;
-    if (add == null) return;
-    insert.value = null;
+  /// [add] goes in at the cursor, over what is selected; the field keeps the
+  /// keyboard.
+  void _insert(String add) {
     final v = _text.value;
     final at = v.selection.isValid ? v.selection.start : v.text.length;
     final end = v.selection.isValid ? v.selection.end : v.text.length;
@@ -132,15 +172,36 @@ class _AiComposerState extends State<AiComposer> {
       text: v.text.replaceRange(at, end, add),
       selection: TextSelection.collapsed(offset: at + add.length),
     );
-    if (add.startsWith('@')) _mentions.add(add.substring(1).trim());
     _focus.requestFocus();
   }
 
-  /// A suggestion goes in place of what was typed.
+  /// A paste (D16): text, nothing else — a pasted `@path` is no mention.
+  void _onPaste() {
+    final paste = _scope!.ui.paste;
+    final add = paste.value;
+    if (add == null) return;
+    paste.value = null;
+    _insert(add);
+  }
+
+  /// Files › "Mention in chat" (D18): `@path ` at the cursor; the file goes
+  /// along as a `resource_link`.
+  void _onMention() {
+    final mentioned = _scope!.ui.mentioned;
+    final path = mentioned.value;
+    if (path == null) return;
+    mentioned.value = null;
+    _insert('@$path ');
+    _mentions.add(path);
+  }
+
+  /// A suggestion goes in place of what was typed; the field keeps the
+  /// keyboard (a click on the list is a click outside the field).
   void _take([int? index]) {
     final (value, pick) = _completer.accept(_text.value, index);
     _text.value = value;
     if (pick.mention case final path?) _mentions.add(path);
+    _focus.requestFocus();
   }
 
   /// The "/" button: a command starts the message.
@@ -165,59 +226,97 @@ class _AiComposerState extends State<AiComposer> {
     _focus.requestFocus();
   }
 
-  bool get _canSend => switch (_view!.phase) {
-    AgentPhase.needsAuth || AgentPhase.failed => false,
-    _ => true,
-  };
-
-  Future<void> _send() async {
-    final text = _text.text;
+  /// Enter, Send, Queue: the message leaves the composer at once; it goes to
+  /// the agent after the ones sent before it. A message the agent cannot take
+  /// comes back whole: text, images and files.
+  Future<void> _send() {
     final scope = _scope!;
+    final text = _text.text;
     final images = [...scope.ui.images.items];
-    if ((text.trim().isEmpty && images.isEmpty) || !_canSend) return;
-    final l10n = AppLocalizations.of(context);
+    if ((text.trim().isEmpty && images.isEmpty) || !_canSend) {
+      return Future.value();
+    }
     // D16: each file still mentioned goes along as a `resource_link`.
-    final cwd = scope.state.cwd;
-    final blocks = <ContentBlock>[
-      if (text.trim().isNotEmpty) TextBlock(text.trim()),
-      // D16: the images, as `image` blocks.
-      for (final i in images)
-        ImageBlock(data: base64Encode(i.bytes), mimeType: i.mime),
+    final mentions = {
       for (final path in _mentions)
-        if (text.contains('@$path'))
-          ResourceLinkBlock(
-            uri: Uri.file(p.join(cwd, path)).toString(),
-            name: p.basename(path),
-            title: path,
-          ),
-    ];
+        if (text.contains('@$path')) path,
+    };
+    final run = ref.read(aiOffThreadProvider);
     _mentions.clear();
     scope.ui.images.clear();
     _text.clear();
     setState(() => _note = null);
-    final ok = await scope.runtime.send(blocks);
-    if (ok || !mounted) return;
-    _text.text = text;
-    setState(
-      () => _note = scope.state.queue.length >= AiSessionState.maxQueue
-          ? l10n.aiQueueFull
-          : l10n.aiCannotSend,
+    return _tail = _tail.then(
+      (_) => _deliver(scope, run, text, images, mentions),
     );
   }
 
-  void _stop() {
-    final runtime = _scope!.runtime;
-    final turn = runtime.state.turn;
-    if (turn == null) return;
-    if (turn.canForceStop) {
-      unawaited(runtime.forceStop());
-    } else {
-      runtime.cancel();
+  Future<void> _deliver(
+    AiPaneScope scope,
+    OffThread run,
+    String text,
+    List<_Image> images,
+    Set<String> mentions,
+  ) async {
+    final cwd = scope.state.cwd;
+    // D16: the images, as `image` blocks (base64 off the UI isolate when big).
+    final data = await aiEncodeImages(run, [for (final i in images) i.bytes]);
+    final blocks = <ContentBlock>[
+      if (text.trim().isNotEmpty) TextBlock(text.trim()),
+      for (final (i, image) in images.indexed)
+        ImageBlock(data: data[i], mimeType: image.mime),
+      for (final path in mentions)
+        ResourceLinkBlock(
+          uri: Uri.file(p.join(cwd, path)).toString(),
+          name: p.basename(path),
+          title: path,
+        ),
+    ];
+    final ok = await scope.runtime.send(blocks);
+    if (ok || !mounted) return;
+    // Nothing is lost: the text (before what was typed meanwhile), the
+    // images and the files come back.
+    _mentions.addAll(mentions);
+    for (final image in images) {
+      scope.ui.images.add(image.bytes, image.mime);
     }
+    final now = _text.text;
+    final all = now.isEmpty ? text : '$text\n$now';
+    _text.value = TextEditingValue(
+      text: all,
+      selection: TextSelection.collapsed(offset: all.length),
+    );
+    setState(
+      () => _note = scope.state.queue.length >= AiSessionState.maxQueue
+          ? _Note.queueFull
+          : _Note.cannotSend,
+    );
   }
 
+  /// Stop (Esc): the turn is asked to end. Never more than that.
+  void _cancel() => _scope!.runtime.cancel();
+
+  /// "Force stop": the button, after the turn did not end in time.
+  void _forceStop() => unawaited(_scope!.runtime.forceStop());
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (event is KeyUpEvent) {
+      if (key == _held) _held = null;
+      return KeyEventResult.ignored;
+    }
+    if (event is KeyRepeatEvent && key == _held) return KeyEventResult.handled;
+    if (event is KeyDownEvent) _held = null;
+    final result = _handle(event);
+    if (result == KeyEventResult.handled &&
+        event is KeyDownEvent &&
+        (key == LogicalKeyboardKey.escape || aiPermissionDigit(key) != null)) {
+      _held = key;
+    }
+    return result;
+  }
+
+  KeyEventResult _handle(KeyEvent event) {
     // §1.10: the input method's keys while it composes.
     if (_text.value.composing.isValid) return KeyEventResult.ignored;
     // D16: an open suggestion list takes its keys first (Esc closes it,
@@ -253,7 +352,7 @@ class _AiComposerState extends State<AiComposer> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.escape && _view!.running) {
-      _stop();
+      _cancel();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -264,6 +363,11 @@ class _AiComposerState extends State<AiComposer> {
     final l10n = AppLocalizations.of(context);
     final scope = _scope!;
     final view = _view!;
+    final note = switch (_note) {
+      _Note.queueFull => l10n.aiQueueFull,
+      _Note.cannotSend => l10n.aiCannotSend,
+      null => null,
+    };
     return Container(
       margin: const EdgeInsets.fromLTRB(
         ShellxSpace.s16,
@@ -285,7 +389,7 @@ class _AiComposerState extends State<AiComposer> {
                 ? _Suggestions(completer: _completer, onPick: _take)
                 : const SizedBox.shrink(),
           ),
-          const AiAttachments(),
+          AiAttachments(focus: _focus),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: AiSizes.composerMax),
             child: Focus(
@@ -309,9 +413,12 @@ class _AiComposerState extends State<AiComposer> {
                     color: ShellxDesktopColors.textPrimary,
                   ),
                   decoration: InputDecoration(
-                    hintText: _canSend
-                        ? l10n.aiComposerHint(scope.state.agentName)
-                        : l10n.aiComposerWaiting,
+                    // A failed agent is not "coming": say what is so.
+                    hintText: switch (view.phase) {
+                      AgentPhase.failed => l10n.aiCannotSend,
+                      AgentPhase.needsAuth => l10n.aiComposerWaiting,
+                      _ => l10n.aiComposerHint(scope.state.agentName),
+                    },
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -348,7 +455,7 @@ class _AiComposerState extends State<AiComposer> {
                   onPressed: _canSend ? _startCommand : null,
                   icon: const Icon(Icons.terminal),
                 ),
-                if (_note case final note?)
+                if (note != null)
                   Expanded(
                     child: Text(
                       note,
@@ -375,9 +482,11 @@ class _AiComposerState extends State<AiComposer> {
                   ),
                 _SendButton(
                   view: view,
-                  hasText: _text,
+                  text: _text,
+                  images: scope.ui.images,
                   onSend: () => unawaited(_send()),
-                  onStop: _stop,
+                  onCancel: _cancel,
+                  onForce: _forceStop,
                 ),
               ],
             ),
@@ -448,53 +557,66 @@ class _Suggestions extends StatelessWidget {
   );
 }
 
-/// Send (⏎) / Queue (⏎) / Stop (Esc) / Stopping… / Force stop.
+/// Send (⏎) / Queue (⏎) / Stop (Esc) / Stopping… / Force stop. A message is
+/// text or an image; while a turn runs, or the agent starts, it queues.
 class _SendButton extends StatelessWidget {
   const _SendButton({
     required this.view,
-    required this.hasText,
+    required this.text,
+    required this.images,
     required this.onSend,
-    required this.onStop,
+    required this.onCancel,
+    required this.onForce,
   });
 
   final _View view;
-  final TextEditingController hasText;
+  final TextEditingController text;
+  final AiImages images;
   final VoidCallback onSend;
-  final VoidCallback onStop;
+  final VoidCallback onCancel;
+  final VoidCallback onForce;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: hasText,
-      builder: (context, value, _) {
-        final text = value.text.trim().isNotEmpty;
-        if (view.running && !text) {
+      valueListenable: text,
+      builder: (context, value, _) => ListenableBuilder(
+        listenable: images,
+        builder: (context, _) {
+          final content =
+              value.text.trim().isNotEmpty || images.items.isNotEmpty;
+          // The turn did not end in time: the way out stays, whatever is
+          // typed.
           if (view.force) {
             return FilledButton.icon(
               key: const Key('ai.forceStop'),
               style: destructiveButtonStyle(),
-              onPressed: onStop,
+              onPressed: onForce,
               icon: const Icon(Icons.stop_circle_outlined, size: 16),
               label: Text(l10n.aiForceStop),
             );
           }
-          return OutlinedButton.icon(
-            key: const Key('ai.stop'),
-            onPressed: view.stopping ? null : onStop,
-            icon: const Icon(Icons.stop, size: 16),
-            label: Text(
-              view.stopping ? l10n.aiStopping : '${l10n.aiStop}  Esc',
-            ),
+          if (view.running && (view.stopping || !content)) {
+            return OutlinedButton.icon(
+              key: const Key('ai.stop'),
+              onPressed: view.stopping ? null : onCancel,
+              icon: const Icon(Icons.stop, size: 16),
+              label: Text(
+                view.stopping ? l10n.aiStopping : '${l10n.aiStop}  Esc',
+              ),
+            );
+          }
+          // The prompt waits when a turn runs and while the agent starts.
+          final queues = view.running || view.phase == AgentPhase.starting;
+          return FilledButton.icon(
+            key: const Key('ai.send'),
+            onPressed: content ? onSend : null,
+            icon: const Icon(Icons.send, size: 16),
+            label: Text('${queues ? l10n.aiQueue : l10n.aiSend}  ⏎'),
           );
-        }
-        return FilledButton.icon(
-          key: const Key('ai.send'),
-          onPressed: text ? onSend : null,
-          icon: const Icon(Icons.send, size: 16),
-          label: Text('${view.running ? l10n.aiQueue : l10n.aiSend}  ⏎'),
-        );
-      },
+        },
+      ),
     );
   }
 }

@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/host.dart';
+import 'package:shellx_ai/shellx_ai.dart' show PendingPermission;
 
 import '../../../l10n/app_localizations.dart';
+import '../../ai/ai_no_approval.dart';
 import '../theme/shellx_desktop_theme.dart';
+import 'ai_config_chips.dart' show confirmAiBypass;
 import 'ai_labels.dart';
 import 'ai_scope.dart';
 
@@ -32,6 +37,12 @@ const _numpad = [
   LogicalKeyboardKey.numpad9,
 ];
 
+/// The option a digit key picks (0-based); null for any other key.
+int? aiPermissionDigit(LogicalKeyboardKey key) {
+  final n = _digits.contains(key) ? _digits.indexOf(key) : _numpad.indexOf(key);
+  return n < 0 ? null : n;
+}
+
 /// D10: the permission bar's keys, offered by the composer before its own
 /// (the bar never takes the focus). On key-down:
 /// - 1–9 pick the options in the agent's order — not while the composer
@@ -57,12 +68,53 @@ bool aiPermissionKeys(
   if (hasText) return false;
   final hw = HardwareKeyboard.instance;
   if (hw.isMetaPressed || hw.isControlPressed || hw.isAltPressed) return false;
-  var n = _digits.indexOf(key);
-  if (n < 0) n = _numpad.indexOf(key);
+  final n = aiPermissionDigit(key);
   final options = pending.request.options;
-  if (n < 0 || n >= options.length) return false;
-  runtime.answerPermission(pending.id, options[n].optionId);
+  if (n == null || n >= options.length) return false;
+  final option = options[n];
+  if (_turnsOnNoApproval(option)) {
+    // The key asks as the button does (R6). The key event comes from the
+    // field that has the focus; its context is the pane's.
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context != null && context.mounted) {
+      unawaited(aiAnswerPermission(context, runtime, pending, option));
+    }
+    return true;
+  }
+  runtime.answerPermission(pending.id, option.optionId);
   return true;
+}
+
+/// An answer that is not a reject and whose id is a mode that acts without
+/// asking: Claude's ExitPlanMode offers "Yes, and bypass permissions" as the
+/// option `bypassPermissions`.
+bool _turnsOnNoApproval(PermissionOption option) =>
+    !option.kind.isReject && aiIsNoApprovalMode(option.optionId);
+
+final _asking = Expando<bool>('ai bypass question');
+
+/// D10, R6: answers [pending] with [option]. An option that turns on a mode
+/// acting without asking shows the Bypass confirmation first; Cancel leaves
+/// the request open. Nothing here ever answers by itself.
+Future<void> aiAnswerPermission(
+  BuildContext context,
+  AiRuntime runtime,
+  PendingPermission pending,
+  PermissionOption option,
+) async {
+  if (_turnsOnNoApproval(option)) {
+    // One question at a time, however often the key is pressed.
+    if (_asking[pending] ?? false) return;
+    _asking[pending] = true;
+    final bool on;
+    try {
+      on = await confirmAiBypass(context, runtime.state.agentName);
+    } finally {
+      _asking[pending] = false;
+    }
+    if (!on) return;
+  }
+  runtime.answerPermission(pending.id, option.optionId);
 }
 
 /// D10, spec §4.3: the request being asked (one at a time; the next waits
@@ -108,15 +160,7 @@ class AiPermissionBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    l10n.aiPermTitle(scope.state.agentName, pending.title),
-                    style: ShellxText.bodyStrong.copyWith(
-                      color: ShellxDesktopColors.textTitle,
-                    ),
-                  ),
-                ),
+                _Title(l10n.aiPermTitle(scope.state.agentName, pending.title)),
                 const SizedBox(height: ShellxSpace.s8),
                 Wrap(
                   spacing: ShellxSpace.s8,
@@ -130,9 +174,13 @@ class AiPermissionBar extends StatelessWidget {
                         tooltip: o.name,
                         esc: i == firstReject,
                         reject: o.kind.isReject,
-                        onPressed: () => scope.runtime.answerPermission(
-                          pending.id,
-                          o.optionId,
+                        onPressed: () => unawaited(
+                          aiAnswerPermission(
+                            context,
+                            scope.runtime,
+                            pending,
+                            o,
+                          ),
                         ),
                       ),
                   ],
@@ -157,6 +205,60 @@ class AiPermissionBar extends StatelessWidget {
       },
     );
   }
+}
+
+/// The tallest the request's first line grows before it scrolls.
+const double kAiPermissionTitleMax = 112;
+
+/// The request's first line, read once as a live region of its own (the
+/// words, never the buttons around them). Claude's Bash title is the whole
+/// command — a heredoc may be fifty lines: the line stops at
+/// [kAiPermissionTitleMax] px and scrolls, so the buttons and the composer
+/// never leave the window and the command stays there to read.
+class _Title extends StatefulWidget {
+  const _Title(this.text);
+  final String text;
+
+  @override
+  State<_Title> createState() => _TitleState();
+}
+
+class _TitleState extends State<_Title> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    label: widget.text,
+    excludeSemantics: true,
+    child: ConstrainedBox(
+      key: const Key('ai.permission.title'),
+      constraints: const BoxConstraints(maxHeight: kAiPermissionTitleMax),
+      child: Scrollbar(
+        controller: _scroll,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          child: Padding(
+            padding: const EdgeInsets.only(right: ShellxSpace.s8),
+            child: Text(
+              widget.text,
+              style: ShellxText.bodyStrong.copyWith(
+                color: ShellxDesktopColors.textTitle,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _OptionButton extends StatelessWidget {

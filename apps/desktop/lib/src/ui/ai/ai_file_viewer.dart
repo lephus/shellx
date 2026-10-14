@@ -131,9 +131,9 @@ class _AiFileViewerState extends ConsumerState<AiFileViewer> {
   }
 
   void _mention() {
-    final ui = AiPaneScope.of(context).ui;
-    ui.insert.value = '@${widget.path} ';
-    ui.closeOverlay();
+    AiPaneScope.of(context).ui
+      ..mention(widget.path)
+      ..closeOverlay();
   }
 
   @override
@@ -155,6 +155,9 @@ class _AiFileViewerState extends ConsumerState<AiFileViewer> {
         autofocus: false,
         showCursorWhenReadOnly: false,
         wordWrap: false,
+        // A minified file is one line of a million characters: only the
+        // first 2 000 are laid out.
+        maxLengthSingleLineRendering: 2000,
         style: CodeEditorStyle(
           fontFamily: kAiMono.fontFamily,
           fontSize: kAiMono.fontSize,
