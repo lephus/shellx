@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:test/test.dart';
 
@@ -469,4 +471,106 @@ void main() {
       expect(v.toString(), '…', reason: v.runtimeType.toString());
     }
   });
+
+  test('every ACP class is Redacted (spec D20)', () {
+    // The classes of lib/src/acp_*.dart, read from the source, so that a class
+    // added later is covered without touching this test. Tests run from the
+    // package root, as in conformance_test.dart.
+    final source = [
+      for (final f in Directory('lib/src').listSync().whereType<File>())
+        if (RegExp(r'^acp_\w+\.dart$').hasMatch(f.uri.pathSegments.last))
+          f.readAsStringSync(),
+    ].join('\n');
+    final classes = declaredClasses(source);
+    expect(
+      classes,
+      isNotEmpty,
+      reason: 'no class found in lib/src/acp_*.dart: the scan is broken',
+    );
+
+    bool redacted(String? name) {
+      final c = classes[name];
+      return c != null &&
+          (c.mixins.contains('Redacted') || redacted(c.superclass));
+    }
+
+    final offenders = [
+      for (final name in classes.keys)
+        if (!redacted(name)) name,
+    ];
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'toString() of these would show content; add `with Redacted`: '
+          '${offenders.join(', ')}',
+    );
+  });
+
+  test('the Redacted scan reads class headers as Dart writes them', () {
+    final classes = declaredClasses(r'''
+      /// class InADocComment extends Nothing {
+      /* class InABlockComment {} */
+      sealed class A with Redacted {}
+      final class B extends A {}
+      abstract interface class C<T extends A> implements Redacted {}
+      final class D<T extends Object>
+          extends A
+          with Other, Redacted
+          implements C<T> {}
+      class E {}
+    ''');
+    expect(classes.keys, ['A', 'B', 'C', 'D', 'E']);
+    expect(classes['A']!.mixins, {'Redacted'});
+    expect(classes['B']!.superclass, 'A');
+    expect(
+      classes['C']!.mixins,
+      isEmpty,
+      reason: 'implements brings no toString',
+    );
+    expect(
+      classes['C']!.superclass,
+      isNull,
+      reason: '`T extends A` is a bound',
+    );
+    expect(classes['D']!.superclass, 'A');
+    expect(classes['D']!.mixins, {'Other', 'Redacted'});
+    expect(classes['E']!.superclass, isNull);
+  });
+}
+
+/// The superclass and the mixins in the header of a `class` declaration.
+typedef ClassHeader = ({String? superclass, Set<String> mixins});
+
+/// The classes declared in the Dart text [source], by name. Only the header
+/// after the name is read, as `extends X` and `with A, B`; `implements` names
+/// no mixin and brings no `toString`.
+Map<String, ClassHeader> declaredClasses(String source) {
+  final code = source
+      .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '')
+      .replaceAll(RegExp(r'//[^\n]*'), '');
+  final classes = <String, ClassHeader>{};
+  for (final m in RegExp(r'\bclass\s+([\w$]+)([^{;]*)').allMatches(code)) {
+    // Type arguments go first, innermost out, so that `<T extends X>` is not
+    // read as `extends X`.
+    var header = m[2]!;
+    for (var before = ''; before != header;) {
+      before = header;
+      header = header.replaceAll(RegExp(r'<[^<>]*>'), '');
+    }
+    String? superclass;
+    final mixins = <String>{};
+    var keyword = '';
+    for (final word in header.split(RegExp(r'[\s,]+')).where((w) => w != '')) {
+      if (word == 'extends' || word == 'with' || word == 'implements') {
+        keyword = word;
+      } else if (keyword == 'extends') {
+        superclass ??= word;
+      } else if (keyword == 'with') {
+        mixins.add(word);
+      }
+    }
+    classes[m[1]!] = (superclass: superclass, mixins: mixins);
+  }
+  return classes;
 }
