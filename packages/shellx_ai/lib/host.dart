@@ -8,6 +8,7 @@ export 'src/host/agent_process.dart';
 export 'src/host/agent_resolver.dart';
 export 'src/host/ai_host.dart';
 export 'src/host/ai_runtime.dart';
+export 'src/host/broad_folder.dart';
 export 'src/host/byte_ring.dart';
 export 'src/host/checkpoint_store.dart';
 export 'src/host/git_locator.dart';
