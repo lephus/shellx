@@ -95,4 +95,33 @@ void main() {
     );
     expect(await p.exitCode.timeout(const Duration(seconds: 10)), 3);
   });
+
+  test('closing stdin with a question open: the agent exits 0', () async {
+    final (p, client, err) = await spawn(
+      FakeScenario(
+        turns: [
+          [FakeSteps.permission('t1', 'Edit a.txt')],
+        ],
+      ),
+    );
+    final asked = Completer<void>();
+    client.onPermission = (_) {
+      asked.complete();
+      return Completer<PermissionOutcome>().future; // nobody ever answers
+    };
+    await client.initialize(clientVersion: '2.0.0');
+    final sid = (await client.newSession(cwd: tmp.path)).sessionId;
+    final turn = expectLater(
+      client.prompt(sid, const [TextBlock('go')]),
+      throwsA(isA<ConnectionClosed>()),
+    );
+    await asked.future.timeout(const Duration(seconds: 10));
+    await client.close(); // closes stdin with the question still open
+    await turn;
+    expect(
+      await p.exitCode.timeout(const Duration(seconds: 10)),
+      0,
+      reason: err.toString(),
+    );
+  });
 }

@@ -365,6 +365,58 @@ void main() {
       },
     );
 
+    test(
+      'a client that hangs up with a question open leaves no error behind',
+      () async {
+        final JsonMap form = {
+          'mode': 'form',
+          'message': 'Pick',
+          'requestedSchema': {
+            'type': 'object',
+            'properties': <String, Object?>{},
+          },
+        };
+        final uncaught = <String, List<Object>>{};
+        final outcomes = <String, Object?>{};
+        for (final (kind, step) in [
+          ('permission', FakeSteps.permission('t1', 'Edit a.txt')),
+          ('ask', FakeSteps.ask(form)),
+        ]) {
+          final errors = <Object>[];
+          outcomes[kind] = await runZonedGuarded<Future<Object?>>(() async {
+            final (client, _) = connect(
+              FakeScenario(
+                turns: [
+                  [step],
+                ],
+              ),
+            );
+            final asked = Completer<void>();
+            client.onPermission = (_) {
+              asked.complete();
+              return Completer<PermissionOutcome>().future; // never answered
+            };
+            client.onElicitation = (_) {
+              asked.complete();
+              return Completer<ElicitationResponse>().future; // never answered
+            };
+            final sid = await start(client);
+            final turn = client
+                .prompt(sid, const [TextBlock('go')])
+                .then<Object?>((_) => 'answered', onError: (Object e) => e);
+            await asked.future;
+            await client.close(); // hangs up with the question still open
+            final outcome = await turn;
+            await pumpEventQueue(); // let the agent side see the hang-up
+            return outcome;
+          }, (e, _) => errors.add(e));
+          if (errors.isNotEmpty) uncaught[kind] = errors;
+        }
+        expect(uncaught, isEmpty, reason: 'errors the fake left unhandled');
+        expect(outcomes.values, everyElement(isA<ConnectionClosed>()));
+      },
+    );
+
     test('a cancel does not leak into the next turn', () async {
       final (client, _) = connect(
         FakeScenario(

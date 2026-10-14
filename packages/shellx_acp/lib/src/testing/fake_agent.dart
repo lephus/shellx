@@ -259,10 +259,15 @@ final class FakeAgent {
     _turn++;
     _cancelled = false;
     _cancel = Completer<void>();
-    for (final step in steps) {
-      if (_cancelled) return {'stopReason': 'cancelled'};
-      final reason = await _run(step, sessionId);
-      if (reason != null) return {'stopReason': reason};
+    try {
+      for (final step in steps) {
+        if (_cancelled) return {'stopReason': 'cancelled'};
+        final reason = await _run(step, sessionId);
+        if (reason != null) return {'stopReason': reason};
+      }
+    } on ConnectionClosed {
+      // The client hung up with a question open; nobody is left to answer.
+      return {'stopReason': 'cancelled'};
     }
     return {'stopReason': _cancelled ? 'cancelled' : 'end_turn'};
   }
