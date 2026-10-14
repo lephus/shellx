@@ -4,7 +4,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_client/shellx_client.dart' show MachineConnectionFailure;
-import 'package:shellx_core/shellx_core.dart' show kAiMaxPromptBytes;
+import 'package:shellx_core/shellx_core.dart' show kAiMaxBodyBytes, kAiMaxPromptBytes;
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
@@ -79,6 +79,21 @@ void main() {
     expect(AiWords.option(vi, o(PermissionKind.other)), 'Agent words');
   });
 
+  test('an unknown kind the agent gave no words for is still a button with a label', () async {
+    PermissionOption other(String name) => PermissionOption(optionId: 'x', name: name, kind: PermissionKind.other);
+    final vi = await S.load(const Locale('vi'));
+    for (final blank in ['', ' ', '  \t\n']) {
+      expect(AiWords.option(vi, other(blank)), 'Lựa chọn', reason: 'name: "$blank"');
+    }
+    expect(AiWords.option(vi, other('Agent words')), 'Agent words');
+    final en = await S.load(const Locale('en'));
+    expect(AiWords.option(en, other('')), 'Option');
+    expect(AiWords.option(en, other('Agent words')), 'Agent words');
+    // The kinds that have words of their own never need the fallback, whatever name the agent sent.
+    const named = PermissionOption(optionId: 'x', name: '', kind: PermissionKind.allowOnce);
+    expect(AiWords.option(en, named), 'Allow');
+  });
+
   test('modes, states, clock and failures', () async {
     final vi = await S.load(const Locale('vi'));
     const head = MirrorHead(phase: 'running', agentId: 'claude', agentName: 'Claude', modeId: 'acceptEdits');
@@ -95,7 +110,7 @@ void main() {
   group('tool cards, edges', () {
     test('a verb for every kind, in both languages', () async {
       final vi = await S.load(const Locale('vi'));
-      expect(AiWords.toolTitle(vi, _tool(ToolKind.delete, path: '/p/old.ts')), 'Xoá old.ts');
+      expect(AiWords.toolTitle(vi, _tool(ToolKind.delete, path: '/p/old.ts')), 'Xóa old.ts');
       expect(AiWords.toolTitle(vi, _tool(ToolKind.move, path: '/p/src/a.ts')), 'Đổi tên a.ts');
       expect(AiWords.toolTitle(vi, _tool(ToolKind.search, title: 'TODO')), 'Tìm TODO');
       expect(AiWords.toolTitle(vi, _tool(ToolKind.fetch, title: 'https://example.com')), 'Tải https://example.com');
@@ -311,7 +326,7 @@ void main() {
         [for (final n in notices) AiWords.notice(vi, n, 'Claude')],
         [
           'Claude cần đăng nhập, trên máy tính.',
-          'Claude cần Node.js 20 trở lên trên máy tính.',
+          'Claude cần máy tính có Node.js 20 trở lên.',
           'Claude chưa được cài trên máy tính.',
           'Không tìm thấy Claude trên máy tính.',
           'Claude dừng bất ngờ (mã thoát 1).',
@@ -319,7 +334,7 @@ void main() {
           'Claude không khởi động được.',
           'Agent này không khôi phục được phiên cũ; đã mở phiên mới.',
           'Thư mục của phiên không còn. Chọn thư mục trên máy tính.',
-          'Hoàn tác đang tắt cho dự án này.',
+          'Hoàn tác đang tắt cho dự án này (không tìm thấy git).',
         ],
       );
     });
@@ -339,7 +354,7 @@ void main() {
           'Claude could not start.',
           'This agent cannot reopen the old session; a new one was started.',
           "The session's folder is gone. Choose one on the computer.",
-          'Undo is off for this project.',
+          'Undo is off for this project (git was not found).',
         ],
       );
     });
@@ -352,6 +367,97 @@ void main() {
       const bare = MirrorNotice(0, 0, 1, kind: 'exited');
       expect(AiWords.notice(vi, bare, 'Claude'), 'Claude dừng bất ngờ (mã thoát 0).');
     });
+
+    group('undo is off, and why', () {
+      // `reason` on the wire is `UndoOff.name`. broadFolder is a newer computer's: this version of
+      // shellx_ai may not have it in the enum yet, so it is listed by name as well.
+      final names = {...UndoOff.values.map((r) => r.name), 'broadFolder'};
+      const vi = {
+        'noGit': 'không tìm thấy git',
+        'noCommandLineTools': 'chưa cài Command Line Tools',
+        'gitTooOld': 'git cũ hơn 2.26',
+        'tooManyFiles': 'hơn 200 000 tệp',
+        'tooSlow': 'lần chụp đầu quá 30 s',
+        'failed': 'chụp điểm khôi phục lỗi',
+        'broadFolder': 'thư mục này là thư mục home hoặc gốc ổ đĩa',
+      };
+      const en = {
+        'noGit': 'git was not found',
+        'noCommandLineTools': 'the Command Line Tools are not installed',
+        'gitTooOld': 'git is older than 2.26',
+        'tooManyFiles': 'more than 200,000 files',
+        'tooSlow': 'the first snapshot took over 30 s',
+        'failed': 'a snapshot failed',
+        'broadFolder': 'this folder is your home folder or a disk root',
+      };
+
+      MirrorNotice undoOff(String? reason, {bool turnOnly = false}) => MirrorNotice(
+        0,
+        0,
+        1,
+        kind: 'undo_off',
+        args: {'k': 'undo_off', 'reason': ?reason, if (turnOnly) 'turn_only': true},
+      );
+
+      test('every reason the computer can give has words, in both languages, the desktop\'s own', () async {
+        expect(names, containsAll(vi.keys));
+        expect(vi.keys, containsAll(names));
+        final viS = await S.load(const Locale('vi'));
+        expect({for (final name in names) name: AiWords.undoReason(viS, name)}, vi);
+        final enS = await S.load(const Locale('en'));
+        expect({for (final name in names) name: AiWords.undoReason(enS, name)}, en);
+      });
+
+      test('the card says why undo is off, for the project or for one turn only', () async {
+        final viS = await S.load(const Locale('vi'));
+        expect(
+          AiWords.notice(viS, undoOff('broadFolder'), 'Claude'),
+          'Hoàn tác đang tắt cho dự án này (thư mục này là thư mục home hoặc gốc ổ đĩa).',
+        );
+        expect(
+          AiWords.notice(viS, undoOff('tooSlow', turnOnly: true), 'Claude'),
+          'Hoàn tác đang tắt cho lượt này (lần chụp đầu quá 30 s).',
+        );
+        final enS = await S.load(const Locale('en'));
+        expect(
+          AiWords.notice(enS, undoOff('broadFolder'), 'Claude'),
+          'Undo is off for this project (this folder is your home folder or a disk root).',
+        );
+        expect(
+          AiWords.notice(enS, undoOff('tooSlow', turnOnly: true), 'Claude'),
+          'Undo is off for this turn (the first snapshot took over 30 s).',
+        );
+      });
+
+      test('read from the real wire, whatever the reason', () async {
+        final ai = FakeAiSession('s1');
+        ai.desktop
+          ..addNotice(const UndoUnavailable(UndoOff.noCommandLineTools))
+          ..addNotice(const UndoUnavailable(UndoOff.failed, turnOnly: true));
+        ai.sync();
+        final notices = ai.mirror.items.whereType<MirrorNotice>().toList();
+        final viS = await S.load(const Locale('vi'));
+        expect(
+          [for (final n in notices) AiWords.notice(viS, n, 'Claude')],
+          [
+            'Hoàn tác đang tắt cho dự án này (chưa cài Command Line Tools).',
+            'Hoàn tác đang tắt cho lượt này (chụp điểm khôi phục lỗi).',
+          ],
+        );
+      });
+
+      test('a reason this version does not know, or none, leaves the card without one', () async {
+        final viS = await S.load(const Locale('vi'));
+        for (final notice in [undoOff('somethingNew'), undoOff(null), undoOff('somethingNew', turnOnly: true)]) {
+          expect(AiWords.notice(viS, notice, 'Claude'), 'Hoàn tác đang tắt cho dự án này.');
+        }
+        // A reason that is no word at all is no reason.
+        const odd = MirrorNotice(0, 0, 1, kind: 'undo_off', args: {'k': 'undo_off', 'reason': 7});
+        expect(AiWords.notice(viS, odd, 'Claude'), 'Hoàn tác đang tắt cho dự án này.');
+        expect(AiWords.undoReason(viS, null), isNull);
+        expect(AiWords.undoReason(viS, 7), isNull);
+      });
+    });
   });
 
   group('failures', () {
@@ -362,8 +468,8 @@ void main() {
       expect(AiWords.failure(vi, 'unavailable'), 'Mở ShellX trên máy tính để dùng phiên AI.');
       expect(AiWords.failure(vi, 'not_found'), 'Phiên AI này đã đóng trên máy tính.');
       expect(AiWords.failure(vi, 'gone'), 'Phiên AI này đã đóng trên máy tính.');
-      expect(AiWords.failure(vi, 'refused'), 'Máy tính không nhận (refused).');
-      expect(AiWords.failure(vi, 'busy'), 'Máy tính không nhận (busy).');
+      expect(AiWords.failure(vi, 'refused'), 'Máy tính không nhận yêu cầu này.');
+      expect(AiWords.failure(vi, 'busy'), 'Quá nhiều yêu cầu cùng lúc. Chờ một lát rồi thử lại.');
       // A code of a newer computer is still a sentence.
       expect(AiWords.failure(vi, 'quota'), 'Máy tính không nhận (quota).');
     });
@@ -376,7 +482,32 @@ void main() {
       expect(AiWords.failure(en, 'offline'), 'Reconnecting… what you see may be behind.');
       expect(AiWords.failure(en, 'unavailable'), 'Open ShellX on the computer to use AI sessions.');
       expect(AiWords.failure(en, 'not_found'), 'This AI session was closed on the computer.');
-      expect(AiWords.failure(en, 'refused'), 'The computer did not take it (refused).');
+      expect(AiWords.failure(en, 'refused'), 'The computer did not accept this request.');
+      expect(AiWords.failure(en, 'busy'), 'Too many requests at once. Wait a moment, then try again.');
+      expect(AiWords.failure(en, 'quota'), 'The computer did not take it (quota).');
+    });
+
+    test('no code the computer sends shows as a code in a sentence', () async {
+      // `ai.result` codes of the hub (and the client): the user reads words, not "busy" or "queue_full".
+      const codes = ['stale', 'refused', 'queue_full', 'too_large', 'busy', 'not_found', 'unavailable', 'on_computer'];
+      for (final locale in ['vi', 'en']) {
+        final s = await S.load(Locale(locale));
+        for (final code in codes) {
+          final text = AiWords.failure(s, code, answer: true);
+          expect(text, isNotNull, reason: '$code in $locale');
+          expect(text, isNot(contains(code)), reason: '$code in $locale');
+        }
+      }
+    });
+
+    test('an answer to a question may be 48 KB, a prompt 32 KB: each says its own limit', () async {
+      final vi = await S.load(const Locale('vi'));
+      expect(AiWords.failure(vi, 'too_large'), 'Quá dài để gửi từ điện thoại (tối đa 32 KB).');
+      expect(AiWords.failure(vi, 'too_large', answer: true), 'Quá dài để gửi từ điện thoại (tối đa 48 KB).');
+      final en = await S.load(const Locale('en'));
+      expect(AiWords.failure(en, 'too_large'), 'Too long to send from the phone (32 KB at most).');
+      expect(AiWords.failure(en, 'too_large', answer: true), 'Too long to send from the phone (48 KB at most).');
+      expect(AiWords.kAiMaxAnswerKb * 1024, kAiMaxBodyBytes);
     });
 
     test('a request in flight when the window quits or the session closes is worded, answers included', () async {

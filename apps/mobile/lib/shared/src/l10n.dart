@@ -2834,6 +2834,26 @@ class S {
     );
   }
 
+  /// `The computer did not accept this request.`
+  String get aiRefused {
+    return Intl.message(
+      'The computer did not accept this request.',
+      name: 'aiRefused',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too many requests at once. Wait a moment, then try again.`
+  String get aiBusy {
+    return Intl.message(
+      'Too many requests at once. Wait a moment, then try again.',
+      name: 'aiBusy',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Already answered on another device.`
   String get aiAnsweredElsewhere {
     return Intl.message(
@@ -2889,10 +2909,12 @@ class S {
     );
   }
 
-  /// `+{count} more files`
+  /// `{count, plural, one{+1 more file} other{+{count} more files}}`
   String aiMoreDiffs(int count) {
-    return Intl.message(
-      '+$count more files',
+    return Intl.plural(
+      count,
+      one: '+1 more file',
+      other: '+$count more files',
       name: 'aiMoreDiffs',
       desc: '',
       args: [count],
@@ -3087,6 +3109,11 @@ class S {
       desc: '',
       args: [],
     );
+  }
+
+  /// `Option`
+  String get aiPermOption {
+    return Intl.message('Option', name: 'aiPermOption', desc: '', args: []);
   }
 
   /// `{count} more waiting`
@@ -3331,6 +3358,96 @@ class S {
     return Intl.message(
       'Undo is off for this project.',
       name: 'aiNoticeUndoOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Undo is off for this project ({reason}).`
+  String aiNoticeUndoOffReason(String reason) {
+    return Intl.message(
+      'Undo is off for this project ($reason).',
+      name: 'aiNoticeUndoOffReason',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `Undo is off for this turn ({reason}).`
+  String aiNoticeUndoOffTurn(String reason) {
+    return Intl.message(
+      'Undo is off for this turn ($reason).',
+      name: 'aiNoticeUndoOffTurn',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `git was not found`
+  String get aiUndoNoGit {
+    return Intl.message(
+      'git was not found',
+      name: 'aiUndoNoGit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `the Command Line Tools are not installed`
+  String get aiUndoNoCommandLineTools {
+    return Intl.message(
+      'the Command Line Tools are not installed',
+      name: 'aiUndoNoCommandLineTools',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `git is older than 2.26`
+  String get aiUndoGitTooOld {
+    return Intl.message(
+      'git is older than 2.26',
+      name: 'aiUndoGitTooOld',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `more than 200,000 files`
+  String get aiUndoTooManyFiles {
+    return Intl.message(
+      'more than 200,000 files',
+      name: 'aiUndoTooManyFiles',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `the first snapshot took over 30 s`
+  String get aiUndoTooSlow {
+    return Intl.message(
+      'the first snapshot took over 30 s',
+      name: 'aiUndoTooSlow',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `a snapshot failed`
+  String get aiUndoFailed {
+    return Intl.message(
+      'a snapshot failed',
+      name: 'aiUndoFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `this folder is your home folder or a disk root`
+  String get aiUndoBroadFolder {
+    return Intl.message(
+      'this folder is your home folder or a disk root',
+      name: 'aiUndoBroadFolder',
       desc: '',
       args: [],
     );

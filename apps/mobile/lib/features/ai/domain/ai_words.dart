@@ -55,13 +55,14 @@ abstract final class AiWords {
   }
 
   /// V2-1 D10: the main label of a permission option by kind; the agent's
-  /// own words when the kind is unknown.
+  /// own words when the kind is unknown, and a plain "Option" when it left
+  /// those blank (a button is never empty).
   static String option(S s, PermissionOption o) => switch (o.kind) {
     PermissionKind.allowOnce => s.aiPermAllowOnce,
     PermissionKind.allowAlways => s.aiPermAllowAlways,
     PermissionKind.rejectOnce => s.aiPermRejectOnce,
     PermissionKind.rejectAlways => s.aiPermRejectAlways,
-    PermissionKind.other => o.name,
+    PermissionKind.other => o.name.trim().isEmpty ? s.aiPermOption : o.name,
   };
 
   /// V2-1 D11: Claude's known mode ids in the app's words; others as sent.
@@ -124,10 +125,33 @@ abstract final class AiWords {
       'start_failed' => s.aiNoticeStartFailed(agent),
       'cannot_resume' => s.aiNoticeCannotResume,
       'folder_missing' => s.aiNoticeFolderMissing,
-      'undo_off' => s.aiNoticeUndoOff,
+      'undo_off' => _undoOff(s, n),
       _ => s.aiNoticeOther,
     };
   }
+
+  /// An `undo_off` notice (V2-1 `aiNoUndo`): for the project, or for one turn only, with the reason
+  /// when this version knows it; else the plain "Undo is off for this project.".
+  static String _undoOff(S s, MirrorNotice n) {
+    final why = undoReason(s, n.args['reason']);
+    if (why == null) return s.aiNoticeUndoOff;
+    return n.args['turn_only'] == true ? s.aiNoticeUndoOffTurn(why) : s.aiNoticeUndoOffReason(why);
+  }
+
+  /// Why undo is off, in words (V2-1 `aiNoUndo`, said as the desktop says it): [name] is the `reason` of
+  /// an `undo_off` notice, an `UndoOff.name`. Null for one this version does not know (a newer
+  /// computer's) or none. `broadFolder` is a folder undo would have to snapshot whole: the home folder or
+  /// a disk root.
+  static String? undoReason(S s, Object? name) => switch (name) {
+    'noGit' => s.aiUndoNoGit,
+    'noCommandLineTools' => s.aiUndoNoCommandLineTools,
+    'gitTooOld' => s.aiUndoGitTooOld,
+    'tooManyFiles' => s.aiUndoTooManyFiles,
+    'tooSlow' => s.aiUndoTooSlow,
+    'failed' => s.aiUndoFailed,
+    'broadFolder' => s.aiUndoBroadFolder,
+    _ => null,
+  };
 
   /// Codes the phone makes itself for a request that failed on the way (the computer's own come in
   /// `ai.result`), see [failure].
@@ -157,7 +181,10 @@ abstract final class AiWords {
   static String? failure(S s, String code, {bool answer = false}) => switch (code) {
     'stale' => answer ? s.aiAnsweredElsewhere : null,
     'queue_full' => s.aiQueueFull,
-    'too_large' => s.aiTooLong(kAiMaxPromptKb),
+    // A prompt may be 32 KB; the answer to a question, a message of the channel, 48 KB.
+    'too_large' => s.aiTooLong(answer ? kAiMaxAnswerKb : kAiMaxPromptKb),
+    'refused' => s.aiRefused,
+    'busy' => s.aiBusy,
     'offline' => s.aiReconnecting,
     'unavailable' => s.aiUnavailable,
     'not_found' || 'gone' => s.aiClosedGone,
@@ -202,4 +229,7 @@ abstract final class AiWords {
 
   /// The prompt limit in KB, for [S.aiTooLong].
   static const int kAiMaxPromptKb = 32;
+
+  /// The limit on an answer to a question in KB (the channel's message limit), for [S.aiTooLong].
+  static const int kAiMaxAnswerKb = 48;
 }

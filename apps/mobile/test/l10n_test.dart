@@ -129,15 +129,25 @@ void main() {
     expect(vi.aiTooLong(32), 'Quá dài để gửi từ điện thoại (tối đa 32 KB).');
     expect(vi.aiRowSubtitle('Claude', 'Đang chạy'), 'Claude · Đang chạy');
     expect(vi.aiCutLines(120), '120 dòng; phần giữa xem trên máy tính');
-    expect(vi.aiMoreDiffs(2), '+2 tệp nữa');
+    expect([vi.aiMoreDiffs(1), vi.aiMoreDiffs(2)], ['+1 tệp nữa', '+2 tệp nữa']);
     expect(vi.aiPermMore(2), 'còn 2 yêu cầu');
     expect(vi.aiContext(16), 'Ngữ cảnh 16%');
     expect(vi.aiPlan(2, 5), 'Kế hoạch · 2/5');
     expect(vi.aiAttentionTitle('Claude'), 'Claude cần bạn trả lời');
     expect(vi.aiToolRunningFor('2:05'), 'đang chạy · 2:05');
-    expect(vi.aiNoticeNode('Claude', 20), 'Claude cần Node.js 20 trở lên trên máy tính.');
+    expect(vi.aiNoticeNode('Claude', 20), 'Claude cần máy tính có Node.js 20 trở lên.');
+    expect(vi.aiToolDelete('old.ts'), 'Xóa old.ts');
+    expect(vi.aiAskCancelled, 'Đã hủy');
+    expect(vi.aiNewNoAgents, 'Chưa có agent nào sẵn sàng trên máy tính. Hãy thiết lập trong Cài đặt › Agents.');
     expect(vi.aiNoticeExited('Claude', 1), 'Claude dừng bất ngờ (mã thoát 1).');
     expect(vi.aiRequestFailed('refused'), 'Máy tính không nhận (refused).');
+    expect(vi.aiRefused, 'Máy tính không nhận yêu cầu này.');
+    expect(vi.aiBusy, 'Quá nhiều yêu cầu cùng lúc. Chờ một lát rồi thử lại.');
+    expect(vi.aiPermOption, 'Lựa chọn');
+    expect(vi.aiNoticeUndoOff, 'Hoàn tác đang tắt cho dự án này.');
+    expect(vi.aiNoticeUndoOffReason('không tìm thấy git'), 'Hoàn tác đang tắt cho dự án này (không tìm thấy git).');
+    expect(vi.aiNoticeUndoOffTurn('git cũ hơn 2.26'), 'Hoàn tác đang tắt cho lượt này (git cũ hơn 2.26).');
+    expect(vi.aiUndoBroadFolder, 'thư mục này là thư mục home hoặc gốc ổ đĩa');
   });
 
   test('AI session texts (V2-2 §5.5) in English', () async {
@@ -171,15 +181,25 @@ void main() {
     expect(en.aiTooLong(32), 'Too long to send from the phone (32 KB at most).');
     expect(en.aiRowSubtitle('Claude', 'Running'), 'Claude · Running');
     expect(en.aiCutLines(120), '120 lines in all; the middle is on the computer');
-    expect(en.aiMoreDiffs(2), '+2 more files');
+    expect([en.aiMoreDiffs(1), en.aiMoreDiffs(2)], ['+1 more file', '+2 more files']);
     expect(en.aiPermMore(2), '2 more waiting');
     expect(en.aiContext(16), 'Context 16%');
     expect(en.aiPlan(2, 5), 'Plan · 2/5');
     expect(en.aiAttentionTitle('Claude'), 'Claude needs your answer');
     expect(en.aiToolRunningFor('2:05'), 'running · 2:05');
     expect(en.aiNoticeNode('Claude', 20), 'Claude needs Node.js 20 or newer on the computer.');
+    expect(en.aiToolDelete('old.ts'), 'Delete old.ts');
+    expect(en.aiAskCancelled, 'Cancelled');
+    expect(en.aiNewNoAgents, 'No agent is ready on the computer. Set one up in Settings › Agents.');
     expect(en.aiNoticeExited('Claude', 1), 'Claude stopped unexpectedly (exit 1).');
     expect(en.aiRequestFailed('refused'), 'The computer did not take it (refused).');
+    expect(en.aiRefused, 'The computer did not accept this request.');
+    expect(en.aiBusy, 'Too many requests at once. Wait a moment, then try again.');
+    expect(en.aiPermOption, 'Option');
+    expect(en.aiNoticeUndoOff, 'Undo is off for this project.');
+    expect(en.aiNoticeUndoOffReason('git was not found'), 'Undo is off for this project (git was not found).');
+    expect(en.aiNoticeUndoOffTurn('git is older than 2.26'), 'Undo is off for this turn (git is older than 2.26).');
+    expect(en.aiUndoBroadFolder, 'this folder is your home folder or a disk root');
   });
 
   test('the AI texts call the agent Claude, never "Claude Code"', () {
@@ -193,6 +213,55 @@ void main() {
       for (final entry in ai.entries) {
         expect(entry.value.toString(), isNot(contains('Claude Code')), reason: '${entry.key} in $path');
       }
+    }
+  });
+
+  test(
+    'the Vietnamese AI texts put the tone of an open oa, oe, uy on its first vowel ("Xóa", "Hủy"), like the app',
+    () {
+      // Old style ("xoá", "huỷ", "hoạ", "khoẻ", "thuỷ") writes it on the second vowel. A syllable that ends in a
+      // consonant ("hoàn", "hoạch", "thoát") has its tone on the a in both styles, and "qu" is a consonant ("quý").
+      final json = jsonDecode(File('lib/l10n/intl_vi.arb').readAsStringSync()) as Map<String, Object?>;
+      final oldStyle = RegExp(r'(?:o[àáạảãèéẹẻẽ]|(?<!q)u[ỳýỵỷỹ])$');
+      final combining = RegExp(r'[\u0300-\u036f]');
+      final offenders = <String>[];
+      var checked = 0;
+      for (final entry in json.entries) {
+        final value = entry.value;
+        if (!RegExp(r'^ai[A-Z]').hasMatch(entry.key) || value is! String) continue;
+        checked++;
+        // One piece (NFC): a tone mark typed apart from its letter would slip through the check below.
+        if (combining.hasMatch(value)) offenders.add('${entry.key}: not NFC');
+        for (final word in RegExp(r'\p{L}+', unicode: true).allMatches(value.toLowerCase())) {
+          if (oldStyle.hasMatch(word[0]!)) offenders.add('${entry.key}: ${word[0]}');
+        }
+      }
+      expect(checked, greaterThan(100));
+      expect(offenders, isEmpty);
+    },
+  );
+
+  test('that check knows the two styles apart', () {
+    final oldStyle = RegExp(r'(?:o[àáạảãèéẹẻẽ]|(?<!q)u[ỳýỵỷỹ])$');
+    for (final old in ['xoá', 'huỷ', 'hoà', 'hoạ', 'khoẻ', 'thuỷ', 'tuỳ', 'toả']) {
+      expect(oldStyle.hasMatch(old), isTrue, reason: old);
+    }
+    for (final fine in [
+      'xóa',
+      'hủy',
+      'hòa',
+      'họa',
+      'khỏe',
+      'thủy',
+      'tùy',
+      'hoàn',
+      'hoạch',
+      'thoát',
+      'quý',
+      'quỳ',
+      'tuyệt',
+    ]) {
+      expect(oldStyle.hasMatch(fine), isFalse, reason: fine);
     }
   });
 
