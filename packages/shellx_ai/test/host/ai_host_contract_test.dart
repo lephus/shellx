@@ -237,6 +237,49 @@ void main() {
     );
 
     test(
+      'a startup that comes after a launch leaves the agents of this run alone',
+      () async {
+        final looked = <int>[];
+        final killed = <int>[];
+        late final RunningAgents running;
+        running = RunningAgents(
+          e.registry,
+          info: (pid) async {
+            looked.add(pid);
+            // A process the registry names "matches": a sweep would kill it.
+            final record = running
+                .read()
+                .where((r) => r.pid == pid)
+                .firstOrNull;
+            return record == null
+                ? null
+                : (command: record.command, startedAt: record.startedAt);
+          },
+          killPid: (pid) async => killed.add(pid),
+        );
+        final host = AiHost(
+          supportDir: e.tmp.path,
+          clientVersion: '2.0.0',
+          running: running,
+          env: e.env,
+        );
+        final process = await e.launch(
+          host,
+          e.script('marker', _markerThenWait, [p.join(e.tmp.path, 'up')]),
+        );
+        expect(await host.startup(), 0);
+        expect(killed, isEmpty, reason: 'the agent is not a leftover');
+        expect(looked, isEmpty);
+        expect(running.read().single.pid, process.pid);
+        expect(
+          await process.exitCode.timeout(Duration.zero, onTimeout: () => -1),
+          -1,
+          reason: 'still running',
+        );
+      },
+    );
+
+    test(
       'a failing sweep reaches startup and never stops an agent from launching',
       () async {
         final gate = Completer<void>();

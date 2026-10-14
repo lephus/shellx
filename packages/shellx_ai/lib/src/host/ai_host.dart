@@ -53,6 +53,9 @@ final class AiHost with Redacted {
   Future<int>? _startup;
   Future<int>? _sweep;
 
+  /// An agent was launched (or is being): a sweep from now on would meet it.
+  var _launched = false;
+
   /// Starts an agent process and keeps `running.json` in step (spec §6).
   ///
   /// Waits for the [startup] sweep if one was started: a sweep that ran beside
@@ -63,6 +66,7 @@ final class AiHost with Redacted {
     AgentCommand command, {
     required String cwd,
   }) async {
+    _launched = true;
     final sweep = _sweep;
     if (sweep != null) {
       try {
@@ -117,11 +121,17 @@ final class AiHost with Redacted {
   ///
   /// Once per host: a second call returns the first one's result and does not
   /// sweep again (it would meet the agents this run has started). Call it
-  /// before any tab can launch an agent; [launch] waits for it.
+  /// before any tab can launch an agent; [launch] waits for it. Called after a
+  /// launch it does not sweep at all (the new agent would look like a
+  /// leftover): what a crash left behind waits for the next start.
   Future<int> startup({Duration retention = const Duration(days: 14)}) =>
       _startup ??= _startupOnce(retention);
 
   Future<int> _startupOnce(Duration retention) async {
+    if (_launched) {
+      unawaited(_prune(retention));
+      return 0;
+    }
     final sweep = _sweep = running.sweep();
     final stopped = await sweep;
     unawaited(_prune(retention));
