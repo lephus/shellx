@@ -43,6 +43,14 @@ final class NotificationText {
     return d.isEmpty ? head : '$head: $d';
   }
 
+  /// V2-2 D11, M2: "Claude hỏi bạn" / "Claude has a question" — never what
+  /// it asks (just "needs your answer" without [agent]).
+  String aiQuestion(String agent) {
+    final a = _singleLine(agent);
+    if (a.isEmpty) return aiNeedsInput(null);
+    return vietnamese ? '$a hỏi bạn' : '$a has a question';
+  }
+
   /// V2-2 D11: "Xong lượt 3 · 4 phút 2 giây" / "Finished turn 3 · 4 min 2 s".
   String aiDone(int turn, Duration elapsed) => vietnamese
       ? 'Xong lượt $turn · ${duration(elapsed)}'

@@ -117,6 +117,7 @@ final class AiPush with Redacted {
     required this.agentName,
     required this.sid,
     this.detail,
+    this.question = false,
     this.turn,
     this.elapsed,
   });
@@ -125,17 +126,26 @@ final class AiPush with Redacted {
   final String agentName;
   final String sid;
 
-  /// What the agent waits for ("Sửa src/main.ts").
+  /// The permission the agent waits for ("Sửa src/main.ts"), in clear
+  /// through the push service like a command line (N3).
   final String? detail;
+
+  /// The agent waits for the answer to a question: the push says only that
+  /// it asks. Its words are the agent's own and may quote a file, so they
+  /// never leave the encrypted channel (as ruled after review, M2).
+  final bool question;
   final int? turn;
   final Duration? elapsed;
 
-  /// For `ai.push` (window → background service).
+  /// For `ai.push` (window → background service). `question` is a later
+  /// key: an older service skips it and, with no detail, says only "needs
+  /// your answer".
   Map<String, Object?> toFields() => {
     'kind': kind.name,
     'name': agentName,
     'sid': sid,
     'detail': ?detail,
+    if (question) 'question': true,
     'turn': ?turn,
     if (elapsed != null) 'ms': elapsed!.inMilliseconds,
   };
@@ -155,6 +165,7 @@ final class AiPush with Redacted {
       agentName: name,
       sid: sid,
       detail: detail is String ? detail : null,
+      question: f['question'] == true,
       turn: turn is int ? turn : null,
       elapsed: ms is int ? Duration(milliseconds: ms) : null,
     );
@@ -685,13 +696,17 @@ final class AiPhoneHub implements AiEndpoint {
     w
       ..needsPushedAt = now
       ..pushed.add(request);
+    // A permission is named by its action title (N3); a question by nothing
+    // of what it asks (M2).
+    final permission = w.state.currentPermission;
     _sendPush(
       push,
       AiPush(
         kind: AiPushKind.needsInput,
         agentName: w.state.agentName,
         sid: sid,
-        detail: aiWaitingOf(w.state),
+        detail: permission == null ? null : clipText(permission.title, 240),
+        question: permission == null,
       ),
     );
   }

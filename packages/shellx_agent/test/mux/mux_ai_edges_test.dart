@@ -555,6 +555,19 @@ void main() {
         (AiPushKind.needsInput, 'Claude', 'ep.1', 'Sửa src/main.ts', 3),
       );
       expect(push.elapsed, const Duration(seconds: 95));
+      expect(push.question, isFalse);
+
+      // A question's push: the flag, and no words of the question (M2).
+      muxAiPushSink(client)(
+        const AiPush(
+          kind: AiPushKind.needsInput,
+          agentName: 'Claude',
+          sid: 'ep.1',
+          question: true,
+        ),
+      );
+      await pumpEventQueue();
+      expect((pushes.last.question, pushes.last.detail), (true, null));
     });
   });
 

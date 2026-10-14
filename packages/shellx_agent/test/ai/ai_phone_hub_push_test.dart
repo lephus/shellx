@@ -280,4 +280,53 @@ void main() {
       });
     });
   });
+
+  group('a question (M2)', () {
+    test('its push says the agent asks, never what it asks', () {
+      fakeAsync((async) {
+        final (rig, s, pushes) = running(async);
+        s.addAsk(
+          ElicitationRequest.fromJson({
+            'mode': 'form',
+            'message': 'Use the token SECRET-123 from .env?',
+            'requestedSchema': {
+              'type': 'object',
+              'properties': {
+                'ok': {'type': 'boolean'},
+              },
+            },
+          }),
+        );
+        final push = pushes.single;
+        expect(
+          (push.kind, push.question, push.detail),
+          (AiPushKind.needsInput, true, null),
+        );
+        expect('${push.toFields()}', isNot(contains('SECRET')));
+        expect('$push', '…');
+      });
+    });
+
+    test('the background service gets the flag; an older one, which does '
+        'not read it, has no detail to say', () {
+      const push = AiPush(
+        kind: AiPushKind.needsInput,
+        agentName: 'Claude',
+        sid: 'ep.-1',
+        question: true,
+      );
+      final fields = push.toFields();
+      expect(fields.containsKey('detail'), isFalse);
+      final back = AiPush.fromFields(fields)!;
+      expect(
+        (back.kind, back.agentName, back.sid, back.question, back.detail),
+        (AiPushKind.needsInput, 'Claude', 'ep.-1', true, null),
+      );
+      // A permission's push, or one from an older window, has no flag.
+      expect(
+        AiPush.fromFields({...fields}..remove('question'))!.question,
+        isFalse,
+      );
+    });
+  });
 }

@@ -70,6 +70,10 @@ final class AgentNotifications {
         machine = '';
       }
       final body = switch (push.kind) {
+        // A question's words never go to the push service (M2).
+        AiPushKind.needsInput when push.question => text.aiQuestion(
+          push.agentName,
+        ),
         AiPushKind.needsInput => text.aiNeedsInput(push.detail),
         AiPushKind.done => text.aiDone(
           push.turn ?? 0,
