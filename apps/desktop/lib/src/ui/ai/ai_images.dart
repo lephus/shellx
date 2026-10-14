@@ -13,9 +13,10 @@ import '../../ai/ai_off_thread.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_scope.dart';
 
-/// ⌘V / Ctrl+V (and Ctrl+Shift+V) in the composer, D16: the text on the
-/// clipboard first, as in the terminal; an image only when there is no text
-/// (a screenshot has none).
+/// ⌘V / Ctrl+V (and Ctrl+Shift+V) in the composer, D16: the files copied in
+/// Finder / Explorer first, as in the terminal — the pictures among them
+/// attach, as if they were dropped; then the text on the clipboard; an image
+/// only when there is no text (a screenshot has none).
 class AiPasteIntent extends Intent {
   const AiPasteIntent();
 }
@@ -167,22 +168,36 @@ Future<List<String>> aiEncodeImages(OffThread run, List<Uint8List> images) {
       : Future.value([for (final b in images) _base64(b)]);
 }
 
-/// D16 around the composer: a paste pastes the text on the clipboard at the
-/// cursor, else attaches the image on it, and images dropped on the composer
-/// go with the next message. A hidden pane takes no drop (`DropTarget` hears
-/// drops while invisible).
+/// D16 around the composer: a paste attaches the pictures among the files on
+/// the clipboard, else pastes the text on it at the cursor, else attaches the
+/// image on it; and images dropped on the composer go with the next message. A
+/// hidden pane takes no drop (`DropTarget` hears drops while invisible).
 class AiImageInput extends StatelessWidget {
   const AiImageInput({super.key, required this.child});
   final Widget child;
 
-  /// The text first, as the terminal does: Excel, Numbers, Word and Pages put
-  /// a picture of what was copied next to its text, and the text is what
-  /// someone pasting cells wants. A screenshot carries no text, so it still
-  /// attaches. [context] is the widget's: it may be gone when the clipboard
-  /// answers.
+  /// What a paste takes from the clipboard, in the terminal's order (A10
+  /// D15): files copied in Finder / Explorer first — their name is also on the
+  /// clipboard as text, and what someone pasting a copied picture wants is the
+  /// picture, as when it is dropped; files that are no pictures leave the
+  /// text, their names, to be pasted. Then the text, as Excel, Numbers, Word
+  /// and Pages put a picture of what was copied next to its text, and the text
+  /// is what someone pasting cells wants. A screenshot carries no file and no
+  /// text, so it still attaches. [context] is the widget's: it may be gone
+  /// when the clipboard answers.
   Future<void> _paste(BuildContext context) async {
     final scope = AiPaneScope.of(context);
     final l10n = AppLocalizations.of(context);
+    final files = await scope.ui.clipboardFiles?.call() ?? const <String>[];
+    if (!context.mounted) return;
+    final pictures = [
+      for (final path in files)
+        if (_isImageFile(path)) DropItemFile(path),
+    ];
+    if (pictures.isNotEmpty) {
+      await _attachFiles(context, scope, l10n, pictures);
+      return;
+    }
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (!context.mounted) return;
     final text = data?.text;
@@ -206,20 +221,37 @@ class AiImageInput extends StatelessWidget {
     '.tiff',
   };
 
-  /// A dropped file is read only while it can still be attached: past
-  /// [kAiImagesMax] nothing is read (the count is known without the disk).
-  /// The reader ([AiPaneUi.readImageFile]) does not read a file over
-  /// [kAiImageMaxBytes] either — it looks at its size first and gives null —
-  /// and then the user is told why, for an image (by its name): a text file
-  /// dropped on a full composer, or one that cannot be read, is just not
+  /// Whether [path] is named like an image ShellX attaches (a BMP or a TIFF
+  /// goes as a PNG).
+  static bool _isImageFile(String path) =>
+      _imageTypes.contains(p.extension(path).toLowerCase());
+
+  Future<void> _drop(BuildContext context, DropDoneDetails details) =>
+      _attachFiles(
+        context,
+        AiPaneScope.of(context),
+        AppLocalizations.of(context),
+        details.files,
+      );
+
+  /// The files of a drop, or the pictures among those copied (a paste), go
+  /// with the next message. A file is read only while it can still be
+  /// attached: past [kAiImagesMax] nothing is read (the count is known without
+  /// the disk). The reader ([AiPaneUi.readImageFile]) does not read a file
+  /// over [kAiImageMaxBytes] either — it looks at its size first and gives
+  /// null — and then the user is told why, for an image (by its name): a text
+  /// file dropped on a full composer, or one that cannot be read, is just not
   /// attached.
-  Future<void> _drop(BuildContext context, DropDoneDetails details) async {
-    final scope = AiPaneScope.of(context);
-    final l10n = AppLocalizations.of(context);
+  static Future<void> _attachFiles(
+    BuildContext context,
+    AiPaneScope scope,
+    AppLocalizations l10n,
+    Iterable<DropItem> files,
+  ) async {
     final images = scope.ui.images;
-    for (final f in details.files) {
+    for (final f in files) {
       if (f.path.isEmpty) continue;
-      final image = _imageTypes.contains(p.extension(f.path).toLowerCase());
+      final image = _isImageFile(f.path);
       if (images.items.length >= kAiImagesMax) {
         if (!image) continue;
         images.say(l10n.aiTooManyImages);

@@ -268,4 +268,67 @@ void main() {
     expect(target.ui.images.note, isNull);
     await runtime.dispose();
   });
+
+  testWidgets('files that the clipboard names after the pane is gone are '
+      'not read, attached or pasted', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    await runtime.start();
+    final target = await pasteTarget(t, runtime);
+    final named = Completer<List<String>>();
+    final read = <String>[];
+    target.ui.clipboardFiles = () => named.future;
+    target.ui.readImageFile = (path) async {
+      read.add(path);
+      return _png;
+    };
+    Actions.invoke(target.inner(), const AiPasteIntent());
+    await t.pump();
+    target.close();
+    await t.pump();
+    named.complete(['/shots/a.png']);
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(t.takeException(), isNull);
+    expect(read, isEmpty);
+    expect(target.ui.images.items, isEmpty);
+    expect(target.ui.images.note, isNull);
+    expect(target.ui.paste.value, isNull);
+    await runtime.dispose();
+  });
+
+  testWidgets('a copied picture file that is read after the pane is gone '
+      'is not attached', (t) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    await runtime.start();
+    final target = await pasteTarget(t, runtime);
+    final read = Completer<Uint8List?>();
+    target.ui.clipboardFiles = () async => ['/shots/a.png'];
+    target.ui.readImageFile = (path) => read.future;
+    Actions.invoke(target.inner(), const AiPasteIntent());
+    await t.pump();
+    await t.pump();
+    target.close();
+    await t.pump();
+    read.complete(_png);
+    for (var i = 0; i < 5; i++) {
+      await t.pump();
+    }
+    expect(t.takeException(), isNull);
+    expect(target.ui.images.items, isEmpty);
+    expect(target.ui.images.note, isNull);
+    await runtime.dispose();
+  });
 }
+
+/// The first bytes of a PNG: all `aiImageMime` looks at.
+final _png = Uint8List.fromList([
+  0x89,
+  0x50,
+  0x4E,
+  0x47,
+  0x0D,
+  0x0A,
+  0x1A,
+  0x0A,
+]);

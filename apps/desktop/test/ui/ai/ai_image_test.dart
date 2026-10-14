@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -954,5 +955,286 @@ void main() {
       expect(ui.images.note, isNull);
       await runtime.dispose();
     });
+  });
+
+  // ---- ⌘V of files copied in Finder / Explorer ---------------------------
+
+  group('⌘V with files on the clipboard', () {
+    /// The pane with the clipboard holding [files] (and [text] and [image],
+    /// as Finder puts the name of a copied file as text next to it); the
+    /// pane's reader gives the [bytes] of a path, else null. The paths read.
+    Future<(AiRuntime, AiPaneUi, List<String>)> clipboard(
+      WidgetTester t, {
+      required List<String> files,
+      String? text,
+      Uint8List? image,
+      Map<String, Uint8List> bytes = const {},
+      FakeScenario scenario = const FakeScenario(),
+    }) async {
+      mockClipboardText(t, text);
+      final (_, runtime, ui) = await dock(t, scenario, clipboard: image);
+      final read = <String>[];
+      ui.clipboardFiles = () async => files;
+      ui.readImageFile = (path) async {
+        read.add(path);
+        return bytes[path];
+      };
+      return (runtime, ui, read);
+    }
+
+    testWidgets('an image file copied in Finder attaches: the picture, '
+        'not the name Finder also puts on the clipboard as text', (t) async {
+      const file = '/Users/me/Desktop/shot.png';
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: [file],
+        text: 'shot.png',
+        // Finder may offer the icon of the file as a picture too.
+        image: Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0]),
+        bytes: {file: _png},
+      );
+      await paste(t);
+      expect(read, [file]);
+      expect(ui.images.items, hasLength(1));
+      expect(ui.images.items.single.bytes, _png);
+      expect(ui.images.items.single.mime, 'image/png');
+      expect(composerText(t), isEmpty, reason: 'the name is not pasted');
+      expect(ui.images.note, isNull);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('it goes with the next message as an image block, like a '
+        'dropped one', (t) async {
+      const file = '/Users/me/Desktop/shot.png';
+      mockClipboardText(t, 'shot.png');
+      final (fakes, runtime, ui) = await dock(t, const FakeScenario());
+      ui.clipboardFiles = () async => [file];
+      ui.readImageFile = (path) async => _png;
+      await paste(t);
+      await t.enterText(find.byKey(const Key('ai.composer')), 'what is this');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pump();
+      final prompt = fakes.agent().params['session/prompt']!['prompt']! as List;
+      expect(prompt, [
+        {'type': 'text', 'text': 'what is this'},
+        {'type': 'image', 'data': base64Encode(_png), 'mimeType': 'image/png'},
+      ]);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('every type the drop takes is taken, in any case of its '
+        'extension', (t) async {
+      final files = [
+        '/p/a.png',
+        '/p/b.JPG',
+        '/p/c.jpeg',
+        '/p/d.gif',
+        '/p/e.WebP',
+      ];
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: files,
+        text: files.join('\n'),
+        bytes: {for (final f in files) f: _png},
+      );
+      await paste(t);
+      expect(read, files);
+      expect(ui.images.items, hasLength(5));
+      expect(composerText(t), isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    for (final ext in ['bmp', 'tif', 'tiff']) {
+      testWidgets('a .$ext file is attached as a PNG, as when dropped', (
+        t,
+      ) async {
+        final file = '/p/scan.$ext';
+        final (runtime, ui, read) = await clipboard(
+          t,
+          files: [file],
+          text: 'scan.$ext',
+          bytes: {file: _bmp()},
+        );
+        await paste(t);
+        // The codec answers on the engine's own thread: real time.
+        for (var i = 0; i < 100 && ui.images.items.isEmpty; i++) {
+          await t.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 25)),
+          );
+          await t.pump();
+        }
+        expect(read, [file]);
+        expect(ui.images.items, hasLength(1));
+        expect(ui.images.items.single.mime, 'image/png');
+        expect(composerText(t), isEmpty);
+        await runtime.dispose();
+      }, variant: mac);
+    }
+
+    testWidgets('files that are no images: the text on the clipboard is '
+        'pasted as now, and the files are not read', (t) async {
+      const names = 'report.pdf\nnotes.txt';
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: ['/docs/report.pdf', '/docs/notes.txt'],
+        text: names,
+        image: _png,
+      );
+      await paste(t);
+      expect(composerText(t), names);
+      expect(read, isEmpty);
+      expect(ui.images.items, isEmpty);
+      expect(ui.images.note, isNull);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('images among other files: the images attach, the others '
+        'are left alone, and no text is pasted', (t) async {
+      const files = ['/d/report.pdf', '/d/a.png', '/d/notes.txt', '/d/b.jpg'];
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: files,
+        text: 'report.pdf\na.png\nnotes.txt\nb.jpg',
+        bytes: {'/d/a.png': _png, '/d/b.jpg': _png},
+      );
+      await paste(t);
+      expect(read, ['/d/a.png', '/d/b.jpg']);
+      expect(ui.images.items, hasLength(2));
+      expect(composerText(t), isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('no file, but text and a picture of it (cells of a '
+        'spreadsheet): the text wins, as before', (t) async {
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: const [],
+        text: cells,
+        image: _png,
+      );
+      await paste(t);
+      expect(composerText(t), cells);
+      expect(ui.images.items, isEmpty);
+      expect(ui.images.note, isNull);
+      expect(read, isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('no file and no text (a screenshot): the picture still '
+        'attaches', (t) async {
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: const [],
+        image: _png,
+      );
+      await paste(t);
+      expect(ui.images.items, hasLength(1));
+      expect(composerText(t), isEmpty);
+      expect(read, isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('the limits are the drop\'s: at most five, the sixth is said '
+        'and no file past the fifth is read', (t) async {
+      final files = [for (var i = 0; i < 7; i++) '/shots/$i.png'];
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: files,
+        text: files.join('\n'),
+        bytes: {for (final f in files) f: _png},
+      );
+      await paste(t);
+      expect(ui.images.items, hasLength(5));
+      expect(read, files.take(5));
+      expect(find.text('At most 5 images per message.'), findsOneWidget);
+      expect(composerText(t), isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('images already attached count: a copied file is a sixth '
+        'one too many', (t) async {
+      mockClipboardText(t, null);
+      final (_, runtime, ui) = await dock(
+        t,
+        const FakeScenario(),
+        clipboard: _png,
+      );
+      for (var i = 0; i < 5; i++) {
+        await paste(t);
+      }
+      expect(ui.images.items, hasLength(5));
+      // Now a file is copied (Finder has no picture of it to offer).
+      ui.clipboardImage = () async => null;
+      ui.clipboardFiles = () async => ['/shots/6.png'];
+      ui.readImageFile = (path) async => fail('nothing is read past the cap');
+      await paste(t);
+      expect(ui.images.items, hasLength(5));
+      expect(find.text('At most 5 images per message.'), findsOneWidget);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('an agent that takes no images says so: nothing is attached '
+        'and no name is pasted', (t) async {
+      const file = '/Users/me/Desktop/shot.png';
+      final (runtime, ui, _) = await clipboard(
+        t,
+        files: [file],
+        text: 'shot.png',
+        bytes: {file: _png},
+        scenario: const FakeScenario(image: false),
+      );
+      await paste(t);
+      expect(ui.images.items, isEmpty);
+      expect(find.text('Claude does not take images.'), findsOneWidget);
+      expect(composerText(t), isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('a file that cannot be read (gone since it was copied) '
+        'attaches nothing and says nothing', (t) async {
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: ['/gone/shot.png'],
+        text: 'shot.png',
+      );
+      await paste(t);
+      // Why it could not be read is asked of the disk, in real time.
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await t.pump();
+      expect(read, ['/gone/shot.png']);
+      expect(ui.images.items, isEmpty);
+      expect(ui.images.note, isNull);
+      await runtime.dispose();
+    }, variant: mac);
+
+    testWidgets('an image file over 10 MiB is said to be too large, as when '
+        'dropped', (t) async {
+      final dir = Directory.systemTemp.createTempSync('ai_paste_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      // A file one byte over the limit (nothing in it: it is not read).
+      final big = File('${dir.path}/huge.png');
+      final file = big.openSync(mode: FileMode.write);
+      file.truncateSync(kAiImageMaxBytes + 1);
+      file.closeSync();
+      final (runtime, ui, read) = await clipboard(
+        t,
+        files: [big.path],
+        text: 'huge.png',
+      );
+      await paste(t);
+      for (var i = 0; i < 100 && ui.images.note == null; i++) {
+        await t.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await t.pump();
+      }
+      expect(read, [big.path], reason: 'the pane\'s reader gives up on it');
+      expect(ui.images.items, isEmpty);
+      expect(find.text('The image is too large (at most 10 MB).'), findsOne);
+      expect(composerText(t), isEmpty);
+      await runtime.dispose();
+    }, variant: mac);
   });
 }

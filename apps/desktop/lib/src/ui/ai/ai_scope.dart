@@ -156,11 +156,15 @@ final class AiPaneUi extends ChangeNotifier {
   /// D16: the images of the next message.
   final images = AiImages();
 
+  /// Set by the pane: the paths of the files copied in Finder / Explorer;
+  /// empty: none.
+  Future<List<String>> Function()? clipboardFiles;
+
   /// Set by the pane: an image on the clipboard; null: none.
   Future<Uint8List?> Function()? clipboardImage;
 
-  /// Set by the pane: a dropped file's bytes; null: unreadable or over
-  /// 10 MiB.
+  /// Set by the pane: the bytes of a dropped file, or of a picture file that
+  /// was copied (a paste); null: unreadable or over 10 MiB.
   Future<Uint8List?> Function(String path)? readImageFile;
 
   void showOverlay(Widget overlay) {

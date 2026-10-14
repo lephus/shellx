@@ -112,6 +112,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     };
     _ui.onRun = (request) => unawaited(_run(request));
     _ui.fileIndex = _fileIndex;
+    _ui.clipboardFiles = () => ref.read(clipboardMediaProvider).files();
     _ui.clipboardImage = () => ref.read(clipboardMediaProvider).image();
     _ui.readImageFile = _readImage;
     _ui.onRevertTurn = (turn) {
