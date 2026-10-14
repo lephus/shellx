@@ -273,6 +273,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String confirmQuitAiBusy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'AI agents are still working in $count tabs. Quitting stops them.',
+      one: 'An AI agent is still working in 1 tab. Quitting stops it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get confirmQuitAction => 'Quit';
 
   @override
@@ -3379,6 +3390,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRetry => 'Try again';
 
   @override
+  String get aiCheckAgain => 'Check again';
+
+  @override
+  String get aiRestartShellxHint =>
+      'Still not found? Restart ShellX so it sees the new PATH.';
+
+  @override
+  String get aiStartNewSession => 'Start a new session';
+
+  @override
   String get aiCannotResume =>
       'This agent cannot restore the previous session; a new session started.';
 
@@ -3422,6 +3443,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiUndoFailed => 'a snapshot failed';
+
+  @override
+  String get aiUndoBroadFolder =>
+      'this folder is your home folder or a disk root';
 
   @override
   String aiNoUndoTurn(String reason) {
@@ -3490,6 +3515,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String aiImageUnsupported(String agent) {
     return '$agent does not take images.';
   }
+
+  @override
+  String get aiImageTooLarge => 'The image is too large (at most 10 MB).';
+
+  @override
+  String get aiTooManyImages => 'At most 5 images per message.';
 
   @override
   String get aiNoMatches => 'No matches';

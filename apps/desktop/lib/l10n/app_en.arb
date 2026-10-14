@@ -126,6 +126,12 @@
       "count": {"type": "int"}
     }
   },
+  "confirmQuitAiBusy": "{count, plural, =1{An AI agent is still working in 1 tab. Quitting stops it.} other{AI agents are still working in {count} tabs. Quitting stops them.}}",
+  "@confirmQuitAiBusy": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "confirmQuitAction": "Quit",
   "pairingTitle": "Pair a phone",
   "pairingInstructions": "Open ShellX on your phone (signed in to the same account), tap this computer and scan the code.",
@@ -1317,6 +1323,9 @@
   "@aiStartFailed": {"placeholders": {"agent": {"type": "String"}}},
   "aiRestart": "Restart",
   "aiRetry": "Try again",
+  "aiCheckAgain": "Check again",
+  "aiRestartShellxHint": "Still not found? Restart ShellX so it sees the new PATH.",
+  "aiStartNewSession": "Start a new session",
   "aiCannotResume": "This agent cannot restore the previous session; a new session started.",
   "aiFolderMissing": "The project folder no longer exists",
   "aiChooseFolder": "Choose folder",
@@ -1331,6 +1340,7 @@
   "aiUndoTooManyFiles": "more than 200,000 files",
   "aiUndoTooSlow": "the first snapshot took over 30 s",
   "aiUndoFailed": "a snapshot failed",
+  "aiUndoBroadFolder": "this folder is your home folder or a disk root",
   "aiNoUndoTurn": "Undo is off for this turn ({reason})",
   "@aiNoUndoTurn": {"placeholders": {"reason": {"type": "String"}}},
   "aiClaudeOff": "The Claude integration is turned off (ai-agent-claude = off).",
@@ -1355,6 +1365,8 @@
   "aiRemoveImage": "Remove image",
   "aiImageUnsupported": "{agent} does not take images.",
   "@aiImageUnsupported": {"placeholders": {"agent": {"type": "String"}}},
+  "aiImageTooLarge": "The image is too large (at most 10 MB).",
+  "aiTooManyImages": "At most 5 images per message.",
   "aiNoMatches": "No matches",
   "aiPanelChanges": "Changes",
   "aiPanelFiles": "Files",

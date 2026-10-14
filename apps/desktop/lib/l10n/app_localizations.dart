@@ -530,6 +530,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 open tab will be closed. Your phones cannot reach this computer until ShellX runs again.} other{{count} open tabs will be closed. Your phones cannot reach this computer until ShellX runs again.}}'**
   String confirmQuitBody(int count);
 
+  /// No description provided for @confirmQuitAiBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{An AI agent is still working in 1 tab. Quitting stops it.} other{AI agents are still working in {count} tabs. Quitting stops them.}}'**
+  String confirmQuitAiBusy(int count);
+
   /// No description provided for @confirmQuitAction.
   ///
   /// In en, this message translates to:
@@ -5244,6 +5250,24 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get aiRetry;
 
+  /// No description provided for @aiCheckAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get aiCheckAgain;
+
+  /// No description provided for @aiRestartShellxHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Still not found? Restart ShellX so it sees the new PATH.'**
+  String get aiRestartShellxHint;
+
+  /// No description provided for @aiStartNewSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new session'**
+  String get aiStartNewSession;
+
   /// No description provided for @aiCannotResume.
   ///
   /// In en, this message translates to:
@@ -5327,6 +5351,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'a snapshot failed'**
   String get aiUndoFailed;
+
+  /// No description provided for @aiUndoBroadFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'this folder is your home folder or a disk root'**
+  String get aiUndoBroadFolder;
 
   /// No description provided for @aiNoUndoTurn.
   ///
@@ -5441,6 +5471,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{agent} does not take images.'**
   String aiImageUnsupported(String agent);
+
+  /// No description provided for @aiImageTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The image is too large (at most 10 MB).'**
+  String get aiImageTooLarge;
+
+  /// No description provided for @aiTooManyImages.
+  ///
+  /// In en, this message translates to:
+  /// **'At most 5 images per message.'**
+  String get aiTooManyImages;
 
   /// No description provided for @aiNoMatches.
   ///

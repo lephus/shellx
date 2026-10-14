@@ -270,6 +270,16 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String confirmQuitAiBusy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Còn $count tab AI đang làm việc. Thoát sẽ dừng chúng.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get confirmQuitAction => 'Thoát';
 
   @override
@@ -3282,6 +3292,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String get aiRetry => 'Thử lại';
 
   @override
+  String get aiCheckAgain => 'Kiểm tra lại';
+
+  @override
+  String get aiRestartShellxHint =>
+      'Vẫn chưa thấy? Hãy khởi động lại ShellX để nhận PATH mới.';
+
+  @override
+  String get aiStartNewSession => 'Bắt đầu phiên mới';
+
+  @override
   String get aiCannotResume =>
       'Agent này không khôi phục được phiên cũ; đã mở phiên mới.';
 
@@ -3324,6 +3344,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get aiUndoFailed => 'chụp điểm khôi phục lỗi';
+
+  @override
+  String get aiUndoBroadFolder => 'thư mục này là thư mục home hoặc gốc ổ đĩa';
 
   @override
   String aiNoUndoTurn(String reason) {
@@ -3391,6 +3414,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String aiImageUnsupported(String agent) {
     return '$agent không nhận ảnh.';
   }
+
+  @override
+  String get aiImageTooLarge => 'Ảnh quá lớn (tối đa 10 MB).';
+
+  @override
+  String get aiTooManyImages => 'Tối đa 5 ảnh cho mỗi tin nhắn.';
 
   @override
   String get aiNoMatches => 'Không có kết quả';
