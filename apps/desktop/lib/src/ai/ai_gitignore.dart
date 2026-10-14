@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -23,6 +24,8 @@ final class AiGitIgnore {
   /// the root with `/` separators.
   void add(String base, String text) {
     final rules = <_Rule>[];
+    // Git skips a byte order mark at the start of the file.
+    if (text.startsWith('\uFEFF')) text = text.substring(1);
     for (var line in text.split('\n')) {
       line = line.replaceAll('\r', '');
       if (line.isEmpty || line.startsWith('#')) continue;
@@ -44,7 +47,14 @@ final class AiGitIgnore {
         line = line.substring(0, line.length - 1);
       }
       if (line.isEmpty) continue;
-      final re = _compile(line);
+      // A line that cannot be compiled drops that line only: reading a
+      // `.gitignore` never fails the panel or `@`.
+      RegExp? re;
+      try {
+        re = _compile(line);
+      } on Object {
+        re = null;
+      }
       if (re != null) rules.add(_Rule(re, negate: negate, dirOnly: dirOnly));
     }
     if (rules.isNotEmpty) _sets.add((base, rules));
@@ -99,7 +109,10 @@ final class AiGitIgnore {
       } else if (c == '?') {
         b.write('[^/]');
       } else if (c == '[') {
-        final close = pat.indexOf(']', i + 2);
+        // The search starts after the first member (`[]a]` takes its first
+        // `]` as one); a `[` that ends the pattern is no class (and an
+        // `indexOf` past the end is a RangeError).
+        final close = i + 2 > pat.length ? -1 : pat.indexOf(']', i + 2);
         if (close < 0) {
           b.write(r'\[');
           continue;
@@ -152,9 +165,14 @@ void _addIgnore(AiGitIgnore rules, String root, String dirAbs) {
   try {
     if (file.existsSync()) {
       final base = dirAbs == root ? '' : _rel(root, dirAbs);
-      rules.add(base, file.readAsStringSync());
+      // Not valid UTF-8 (a Latin-1 comment): the bad bytes become U+FFFD,
+      // the rules around them still count.
+      rules.add(
+        base,
+        utf8.decode(file.readAsBytesSync(), allowMalformed: true),
+      );
     }
-  } on FileSystemException {
+  } on Object {
     // Unreadable: nothing ignored by it.
   }
 }

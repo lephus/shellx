@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -45,6 +46,26 @@ void main() {
       expect(r.ignores('a.tmp', dir: false), isTrue);
       expect(r.ignores('pkg/a.tmp', dir: false), isFalse);
     });
+
+    test('a rule that cannot be compiled is skipped, never thrown: the '
+        'other lines still count', () {
+      // `foo[` ends in `[` (a RangeError once), `[z-a]` is a backwards
+      // range, `[` alone has nothing after it.
+      for (final bad in ['foo[', '[', '[z-a]', 'x/[', 'a[!']) {
+        final r = AiGitIgnore();
+        expect(() => r.add('', 'one.txt\n$bad\ntwo.txt\n'), returnsNormally);
+        expect(r.ignores('one.txt', dir: false), isTrue, reason: bad);
+        expect(r.ignores('two.txt', dir: false), isTrue, reason: bad);
+        expect(r.ignores('three.txt', dir: false), isFalse, reason: bad);
+      }
+    });
+
+    test('a byte order mark at the start of the file is not part of the '
+        'first rule (git skips it too)', () {
+      final r = rules('\uFEFFbuild/\n*.log\n');
+      expect(r.ignores('build', dir: true), isTrue);
+      expect(r.ignores('a.log', dir: false), isTrue);
+    });
   });
 
   group('walks', () {
@@ -79,6 +100,40 @@ void main() {
     });
 
     test('the index keeps what .gitignore keeps and never enters .git', () {
+      expect(aiIndexProject(root.path), [
+        '.gitignore',
+        'b.txt',
+        'src/main.dart',
+      ]);
+    });
+
+    test('a .gitignore that is not valid UTF-8 still counts (a Latin-1 '
+        'comment must not drop every rule)', () {
+      // "build/\n# caf<E9>\n*.log\n" with a lone 0xE9 byte.
+      File(p.join(root.path, '.gitignore')).writeAsBytesSync(
+        Uint8List.fromList([
+          ...'build/\n# caf'.codeUnits,
+          0xE9,
+          ...'\n*.log\n'.codeUnits,
+        ]),
+      );
+      final top = aiListDir((root.path, ''));
+      expect({
+        for (final e in top) e.path: e.ignored,
+      }, containsPair('build', true));
+      expect(top.firstWhere((e) => e.path == 'a.log').ignored, isTrue);
+      expect(aiIndexProject(root.path), isNot(contains('a.log')));
+      expect(aiIndexProject(root.path), contains('src/main.dart'));
+    });
+
+    test('a rule that cannot be compiled never fails the folder or the '
+        'index', () {
+      File(
+        p.join(root.path, '.gitignore'),
+      ).writeAsStringSync('build/\nbroken[\n*.log\n');
+      final top = aiListDir((root.path, ''));
+      expect(top.firstWhere((e) => e.path == 'build').ignored, isTrue);
+      expect(top.firstWhere((e) => e.path == 'a.log').ignored, isTrue);
       expect(aiIndexProject(root.path), [
         '.gitignore',
         'b.txt',
