@@ -15,5 +15,6 @@ export 'src/host/git_locator.dart';
 export 'src/host/git_runner.dart';
 export 'src/host/login_shell_env.dart';
 export 'src/host/probe.dart';
+export 'src/host/process_snapshot.dart';
 export 'src/host/running_agents.dart';
 export 'src/host/serial_queue.dart';

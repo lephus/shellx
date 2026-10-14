@@ -48,6 +48,18 @@ typedef ProcessLookup =
 
 typedef KillPid = Future<void> Function(int pid);
 
+/// Whether two commands are the same program: the file name, without folder,
+/// case or `.exe` (`/opt/homebrew/bin/node` and `C:\Program Files\nodejs\NODE.EXE`
+/// are `node`).
+bool sameProgram(String a, String b) {
+  String base(String s) {
+    final name = s.replaceAll(r'\', '/').split('/').last.toLowerCase();
+    return name.endsWith('.exe') ? name.substring(0, name.length - 4) : name;
+  }
+
+  return base(a) == base(b);
+}
+
 /// `ps -o etime` → age: `mm:ss`, `hh:mm:ss` or `d-hh:mm:ss`.
 Duration? parseEtime(String text) {
   final m = RegExp(
@@ -139,7 +151,7 @@ final class RunningAgents {
     var stopped = 0;
     for (final r in _readNow()) {
       final now = await _info(r.pid);
-      if (now == null || !_sameCommand(now.command, r.command)) continue;
+      if (now == null || !sameProgram(now.command, r.command)) continue;
       if (now.startedAt.difference(r.startedAt).abs() > tolerance) continue;
       await _killPid(r.pid);
       stopped++;
@@ -150,15 +162,6 @@ final class RunningAgents {
 
   /// The records as they are on disk.
   List<RunningRecord> read() => _readNow();
-
-  static bool _sameCommand(String a, String b) {
-    String base(String s) {
-      final name = s.replaceAll(r'\', '/').split('/').last.toLowerCase();
-      return name.endsWith('.exe') ? name.substring(0, name.length - 4) : name;
-    }
-
-    return base(a) == base(b);
-  }
 
   List<RunningRecord> _readNow() {
     try {
