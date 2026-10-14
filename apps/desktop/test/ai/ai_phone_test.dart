@@ -483,6 +483,117 @@ void main() {
           );
       expect(c.read(sidebarWorkspacesProvider).workspaceOf(opened.id), shop);
     });
+
+    test('a phone that attaches again never starts a session that ran: a '
+        'force-stopped agent stays stopped and what was queued waits for the '
+        'user (D13, V2-1 D16)', () async {
+      boot(
+        FakeScenario(
+          turns: [
+            [FakeSteps.hang()],
+          ],
+        ),
+      );
+      final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
+      final sid = hub.sidOf(ai.ai!.id);
+      hub.handle(_phone, AiAttach(sid: sid));
+      await until(() => stateOf(ai).phase == AgentPhase.ready);
+      final runtime = c.read(aiRuntimesProvider.notifier).existing(ai.ai!.id)!;
+      hub.handle(_phone, AiPrompt(sid: sid, rid: 1, text: 'one'));
+      await until(() => runtime.state.turn != null);
+      hub.handle(_phone, AiPrompt(sid: sid, rid: 2, text: 'two'));
+      await until(() => runtime.state.queue.length == 1);
+      await runtime.forceStop(); // "Dừng hẳn"
+      await until(() => runtime.state.phase == AgentPhase.stopped);
+      final snapshots = sent<AiSnapshot>().length;
+      // The phone's channel blips and it attaches again: nobody tapped.
+      hub.handle(_phone, AiAttach(sid: sid));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(sent<AiSnapshot>(), hasLength(snapshots + 1));
+      expect(fakes.launcher.channels, hasLength(1), reason: 'no agent again');
+      expect(runtime.state.phase, AgentPhase.stopped);
+      expect(runtime.state.queue, hasLength(1), reason: 'the queue waits');
+      expect(
+        runtime.state.timeline.items.whereType<UserItem>().map((u) => u.text),
+        ['one'],
+      );
+    });
+
+    test('a new session the computer cannot start is refused and leaves no '
+        'tab behind (V2-2 §7)', () async {
+      boot(
+        const FakeScenario(),
+        runtimes: [
+          aiRuntimeFactoryProvider.overrideWithValue(
+            (_) => throw StateError('no AI host'),
+          ),
+          aiReadinessSourceProvider.overrideWithValue(
+            (_) async => FakeAiRuntimes.ready,
+          ),
+        ],
+      );
+      final ws = c.read(sidebarWorkspacesProvider).workspaces.first.id;
+      c.read(sidebarWorkspacesProvider.notifier).setRoot(ws, testAiCwd);
+      final mine = openTestAiTab(c, cwd: null, select: true);
+      final tabs = c.read(terminalTabsProvider).tabs.map((t) => t.id).toList();
+      hub.handle(_phone, const AiList());
+      hub.handle(_phone, AiOpen(rid: 1, agent: 'claude', folder: 'ws:$ws'));
+      await until(() => sent<AiResult>().isNotEmpty);
+      final r = result(1);
+      expect((r.ok, r.code, r.sid), (false, 'refused', null));
+      expect(c.read(terminalTabsProvider).tabs.map((t) => t.id), tabs);
+      expect(c.read(terminalTabsProvider).selectedId, mine.id);
+    });
+
+    test('sessions follow the sidebar, workspace by workspace and top to '
+        'bottom, not the order the tabs were opened in', () {
+      boot(const FakeScenario());
+      final shop = c
+          .read(sidebarWorkspacesProvider.notifier)
+          .createFor(name: 'Shop');
+      final b = openTestAiTab(
+        c,
+        cwd: testAiCwd,
+        workspace: shop,
+        select: false,
+      );
+      final a = openTestAiTab(
+        c,
+        cwd: testAiCwd,
+        workspace: kDefaultWorkspaceId,
+        select: false,
+      );
+      expect(c.read(sidebarWorkspacesProvider).orderedTabIds, [a.id, b.id]);
+      expect(c.read(_source).sessions.map((e) => e.paneId), [
+        a.ai!.id,
+        b.ai!.id,
+      ]);
+      hub.handle(_phone, const AiList());
+      expect(listing().sessions.map((s) => s.sid), [
+        hub.sidOf(a.ai!.id),
+        hub.sidOf(b.ai!.id),
+      ]);
+    });
+
+    test(
+      '`made` ends with the window, not with a rebuild of the runtimes',
+      () async {
+        boot(const FakeScenario());
+        final runtimes = c.read(aiRuntimesProvider.notifier);
+        final made = <int>[];
+        var ended = false;
+        runtimes.made.listen(made.add, onDone: () => ended = true);
+        c.invalidate(aiRuntimesProvider);
+        final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
+        c.read(aiRuntimesProvider.notifier).runtimeFor(ai.ai!.id);
+        await pumpEventQueue();
+        expect(made, [ai.ai!.id]);
+        expect(ended, isFalse, reason: 'a rebuild keeps the stream');
+        c.dispose();
+        await pumpEventQueue();
+        expect(ended, isTrue);
+      },
+    );
   });
 
   test('an answer that turns on a mode acting without asking is refused from '

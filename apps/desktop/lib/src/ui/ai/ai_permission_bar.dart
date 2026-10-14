@@ -72,7 +72,7 @@ bool aiPermissionKeys(
   final options = pending.request.options;
   if (n == null || n >= options.length) return false;
   final option = options[n];
-  if (_turnsOnNoApproval(option)) {
+  if (aiOptionEnablesNoApproval(option)) {
     // The key asks as the button does (R6). The key event comes from the
     // field that has the focus; its context is the pane's.
     final context = FocusManager.instance.primaryFocus?.context;
@@ -85,12 +85,6 @@ bool aiPermissionKeys(
   return true;
 }
 
-/// An answer that is not a reject and whose id is a mode that acts without
-/// asking: Claude's ExitPlanMode offers "Yes, and bypass permissions" as the
-/// option `bypassPermissions`.
-bool _turnsOnNoApproval(PermissionOption option) =>
-    !option.kind.isReject && aiIsNoApprovalMode(option.optionId);
-
 final _asking = Expando<bool>('ai bypass question');
 
 /// D10, R6: answers [pending] with [option]. An option that turns on a mode
@@ -102,7 +96,7 @@ Future<void> aiAnswerPermission(
   PendingPermission pending,
   PermissionOption option,
 ) async {
-  if (_turnsOnNoApproval(option)) {
+  if (aiOptionEnablesNoApproval(option)) {
     // One question at a time, however often the key is pressed.
     if (_asking[pending] ?? false) return;
     _asking[pending] = true;

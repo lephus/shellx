@@ -140,6 +140,17 @@ class AiRuntimes extends Notifier<void> {
       for (final id in [..._runtimes.keys]) {
         _drop(id);
       }
+      // A rebuild reuses this notifier and keeps [made] (Riverpod 3); only a
+      // real dispose leaves the ref unmounted once this turn is over.
+      scheduleMicrotask(() {
+        bool alive;
+        try {
+          alive = ref.mounted;
+        } on Object {
+          alive = false;
+        }
+        if (!alive) unawaited(_made.close());
+      });
     });
   }
 
@@ -189,7 +200,7 @@ class AiRuntimes extends Notifier<void> {
     void listener() => _queueSync(paneId);
     _listeners[paneId] = listener;
     runtime.state.addListener(listener);
-    _made.add(paneId);
+    if (!_made.isClosed) _made.add(paneId);
     return runtime;
   }
 
