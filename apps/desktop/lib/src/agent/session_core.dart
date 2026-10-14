@@ -73,4 +73,10 @@ final class SessionCore {
   final int Function() ids;
   final AgentNotifications? notifications;
   final SessionManager sessions;
+
+  /// V2-2 D1: where phones' `ai.*` messages go. Every runtime's router
+  /// uses it; the process sets its target once it can serve AI (the
+  /// window's hub in-process, the forwarder to the window in the
+  /// background service). Until then phones hear "unavailable".
+  final ai = AiEndpointSlot();
 }
