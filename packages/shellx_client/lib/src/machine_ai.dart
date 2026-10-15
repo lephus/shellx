@@ -377,6 +377,40 @@ final class MachineAi {
     return sid;
   }
 
+  /// V2-2b B17: a page of the earlier sessions of [sid]'s agent in its folder
+  /// ([cursor]: the next page). Throws [AiRequestException]: `not_ready`
+  /// while the agent does not run, `unsupported` when the computer cannot.
+  Future<AiHistoryPage> history(String sid, {String? cursor}) async {
+    final result = await _feature(
+      AiFeature.history,
+      sid,
+      (rid) => AiHistory(sid: sid, rid: rid, cursor: cursor),
+    );
+    return AiHistoryPage.fromJson(decodeBody(result.body) ?? const {});
+  }
+
+  /// V2-2b B17: reopens the agent's earlier session [acp] in a new AI tab of
+  /// [agent] in [folder] (a listing key: the folder of the session the
+  /// history came from); the new session's sid.
+  Future<String> resume(String agent, String folder, String acp) async {
+    final result = await _feature(
+      AiFeature.history,
+      null,
+      (rid) => AiOpen(rid: rid, agent: agent, folder: folder, resume: acp),
+    );
+    final sid = result.sid;
+    if (sid == null) throw const AiRequestException('refused');
+    return sid;
+  }
+
+  /// V2-2b B18: runs session [sid], a tab without a folder, in [folder] (a
+  /// key from the listing); the session then starts on the computer.
+  Future<void> chooseFolder(String sid, String folder) => _feature(
+    AiFeature.folder,
+    sid,
+    (rid) => AiFolder(sid: sid, rid: rid, folder: folder),
+  );
+
   /// V2-2b B11: the mode, model and thinking choices of [sid] this phone may
   /// make. Throws [AiRequestException] (`unsupported` at once, sending
   /// nothing, when the computer cannot: R15) or [MachineConnectionException].

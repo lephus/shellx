@@ -4,7 +4,7 @@ part of 'ai_phone_hub.dart';
 /// refusal [code] — or a refusal with a body (`confirm`).
 final class _Reply {
   const _Reply.ok([this.body]) : code = null;
-  const _Reply.refuse(this.code, [this.body]);
+  const _Reply.refuse(String this.code, [this.body]);
 
   final String? code;
   final Uint8List? body;
@@ -167,4 +167,90 @@ extension _AiPhoneRequests on AiPhoneHub {
       );
     }),
   );
+
+  /// V2-2b B17: a page of the agent's earlier sessions in the session's
+  /// folder. Only while the agent runs (`not_ready` before it does: the phone
+  /// asks again once it runs); an agent without `session/list` is
+  /// `refused`. An agent page longer than [kAiHistoryPage] is served from
+  /// here in pages of that many, under the hub's own cursor, so that the
+  /// phone skips none; the agent's next cursor comes after the last of them.
+  void _history(String mobileId, _Phone phone, AiHistory h) {
+    unawaited(
+      _ask(mobileId, phone, h.sid, h.rid, (c) async {
+        final s = c.state;
+        if (s.phase != AgentPhase.ready && s.phase != AgentPhase.running) {
+          return const _Reply.refuse('not_ready');
+        }
+        if (!s.capabilities.listSessions) {
+          return const _Reply.refuse('refused');
+        }
+        final cursor = h.cursor;
+        final held = phone.historyRest;
+        final List<SessionSummary> sessions;
+        final String? after;
+        if (held != null && held.sid == h.sid && held.cursor == cursor) {
+          sessions = held.rest;
+          after = held.next;
+        } else {
+          if (cursor != null &&
+              (cursor.isEmpty || utf8Length(cursor) > kAiHistoryCursorBytes)) {
+            return const _Reply.refuse('refused');
+          }
+          final page = await c.listSessions(cursor: cursor);
+          if (page == null) return const _Reply.refuse('refused');
+          sessions = page.sessions;
+          after = page.nextCursor;
+        }
+        phone.historyRest = null;
+        var next = after;
+        if (sessions.length > kAiHistoryPage) {
+          final mine = 'shellx-rest-${_nextHistoryRest++}';
+          phone.historyRest = (
+            sid: h.sid,
+            cursor: mine,
+            rest: sessions.sublist(kAiHistoryPage),
+            next: after,
+          );
+          next = mine;
+        }
+        return _Reply.ok(
+          encodeHistoryPage(
+            ListSessionsResult(
+              sessions: sessions.take(kAiHistoryPage).toList(),
+              nextCursor: next,
+            ),
+            current: s.sessionId,
+          ),
+        );
+      }),
+    );
+  }
+
+  /// V2-2b B18: the folder of a tab that has none (V2-2 D14 `no_folder`): a
+  /// key the window offers now (D9, R18), never a path. The window then does
+  /// what the tab's own "Use this folder" does, and the hub looks at its tabs
+  /// at once: a phone parked on the session attaches again and its agent
+  /// starts (V2-2 §13 D15). One answer, to [phone] only.
+  Future<void> _folder(String mobileId, _Phone phone, AiFolder f) async {
+    String? code;
+    try {
+      final paneId = _paneOf(f.sid);
+      final entry = paneId == null
+          ? null
+          : _source.sessions.where((e) => e.paneId == paneId).firstOrNull;
+      if (paneId == null || entry == null) {
+        code = 'not_found';
+      } else if (entry.unavailable != AiRemoteState.noFolder ||
+          !_source.folders.any((x) => x.key == f.folder)) {
+        code = 'refused';
+      } else if (!await _source.chooseFolder(paneId, f.folder)) {
+        code = 'refused';
+      } else {
+        _rescan();
+      }
+    } on Object {
+      code = 'refused'; // the window's code failed: still one answer
+    }
+    _send(mobileId, AiResult(rid: f.rid, ok: code == null, code: code), phone);
+  }
 }

@@ -47,6 +47,9 @@ final class _Control implements AiControl {
 
   @override
   Future<void> setMode(String modeId) async {}
+
+  @override
+  Future<ListSessionsResult?> listSessions({String? cursor}) async => null;
 }
 
 final class _Source implements AiSessionSource {
@@ -82,7 +85,10 @@ final class _Source implements AiSessionSource {
   @override
   AiControl? control(int paneId, {bool start = false}) => runtime;
   @override
-  Future<int?> open(String agentId, String folderKey) async => null;
+  Future<int?> open(String agentId, String folderKey, {String? resume}) async =>
+      null;
+  @override
+  Future<bool> chooseFolder(int paneId, String folderKey) async => false;
   @override
   bool seenOnDesktop(int paneId) => false;
   @override

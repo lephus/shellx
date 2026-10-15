@@ -206,7 +206,7 @@ final class DesktopAiSource implements AiSessionSource {
   }
 
   @override
-  Future<int?> open(String agentId, String folderKey) async {
+  Future<int?> open(String agentId, String folderKey, {String? resume}) async {
     final path = folders.where((f) => f.key == folderKey).firstOrNull?.path;
     final agent = aiAgentById(_ref.read(aiAgentsProvider), agentId);
     if (path == null || agent == null) return null;
@@ -217,6 +217,9 @@ final class DesktopAiSource implements AiSessionSource {
           agentName: agent.name,
           title: _ref.read(appL10nProvider).aiNewSession,
           cwd: path,
+          // V2-2b B17: reopens that earlier session (`session/load`), as the
+          // desktop's History does (V2-1 D15).
+          sessionId: resume,
           workspace: _workspaceFor(folderKey, path),
           select: false, // the computer's user keeps their tab (V2-2 D9)
         );
@@ -234,6 +237,27 @@ final class DesktopAiSource implements AiSessionSource {
       return null;
     }
     return pane.id;
+  }
+
+  /// V2-2b B18: what the tab's own "Use this folder" does
+  /// (`AiPaneView._useFolder`), for a tab that has no folder yet: a runtime it
+  /// may have is forgotten and the pane gets [folderKey]'s folder (a new
+  /// session: no session id). False when the pane has a folder, is gone, or
+  /// the key is not offered now. The runtime is made, and its agent started,
+  /// when a phone attaches or the pane shows (V2-2 D15).
+  @override
+  Future<bool> chooseFolder(int paneId, String folderKey) async {
+    final path = folders.where((f) => f.key == folderKey).firstOrNull?.path;
+    final pane = _ref
+        .read(terminalTabsProvider)
+        .tabOfPane(paneId)
+        ?.aiPanes[paneId];
+    if (path == null || pane == null || pane.cwd != null) return false;
+    _ref.read(aiRuntimesProvider.notifier).forget(paneId);
+    _ref
+        .read(terminalTabsProvider.notifier)
+        .updateAiPane(paneId, (p) => p.copyWith(cwd: path, sessionId: null));
+    return true;
   }
 
   /// Where a new tab in [folderKey] goes (D9): the workspace it names
@@ -308,6 +332,10 @@ final class _RuntimeControl implements AiControl {
   @override
   void answerAsk(int id, ElicitationResponse response) =>
       _runtime.answerAsk(id, response);
+
+  @override
+  Future<ListSessionsResult?> listSessions({String? cursor}) =>
+      _runtime.listSessions(cursor: cursor);
 
   /// V2-2b B11: a choice from the phone, as the composer's chip makes it —
   /// sent to the agent, then remembered for its next sessions. The hub

@@ -118,6 +118,18 @@ final class FakeAiControl implements AiControl {
     state.modes = state.modes?.withCurrent(modeId);
     state.touch();
   }
+
+  /// V2-2b B17: what `listSessions` answers (null: the agent says nothing),
+  /// and the cursors it was asked with.
+  ListSessionsResult? history;
+  final cursors = <String?>[];
+
+  @override
+  Future<ListSessionsResult?> listSessions({String? cursor}) async {
+    _fail();
+    cursors.add(cursor);
+    return history;
+  }
 }
 
 /// A window with AI sessions on plain states.
@@ -131,8 +143,8 @@ final class FakeAiSource implements AiSessionSource {
   final openedWith = <(String, String)>[];
 
   /// Members that throw when called, by name: `sessions`, `agents`,
-  /// `folders`, `control`, `open`, `seen`, `threshold` (a window whose
-  /// adapter fails).
+  /// `folders`, `control`, `open`, `folder` (`chooseFolder`), `seen`,
+  /// `threshold` (a window whose adapter fails).
   final failing = <String>{};
 
   void _maybeFail(String member) {
@@ -316,15 +328,53 @@ final class FakeAiSource implements AiSessionSource {
   /// Set: `open` waits for it first (a tab still being made).
   Completer<void>? holdOpen;
 
+  /// V2-2b B17: the earlier sessions `open` was asked to reopen, in order.
+  final resumed = <String>[];
+
   @override
-  Future<int?> open(String agentId, String folderKey) async {
+  Future<int?> open(String agentId, String folderKey, {String? resume}) async {
     _maybeFail('open');
     openedWith.add((agentId, folderKey));
+    if (resume != null) resumed.add(resume);
     final gate = holdOpen;
     if (gate != null) await gate.future;
     final id = opened;
     if (id != null) add(id);
     return id;
+  }
+
+  /// V2-2b B18: what `chooseFolder` was asked: (pane, folder key).
+  final folderChosen = <(int, String)>[];
+
+  /// Set: `chooseFolder` answers false (a window that will not).
+  var refuseFolder = false;
+
+  /// Like the desktop's: only a pane without a folder, only a key offered;
+  /// the pane then has the folder, and its runtime is made when asked for
+  /// ([lazy]).
+  @override
+  Future<bool> chooseFolder(int paneId, String folderKey) async {
+    _maybeFail('folder');
+    folderChosen.add((paneId, folderKey));
+    final folder = _folders.where((f) => f.key == folderKey).firstOrNull;
+    final i = entries.indexWhere((e) => e.paneId == paneId);
+    if (refuseFolder ||
+        folder == null ||
+        i < 0 ||
+        entries[i].unavailable != AiRemoteState.noFolder) {
+      return false;
+    }
+    final old = entries[i];
+    entries[i] = AiSessionEntry(
+      paneId: paneId,
+      agentId: old.agentId,
+      agentName: old.agentName,
+      title: old.title,
+      cwd: folder.path ?? '/p',
+    );
+    lazy.add(paneId);
+    _changes.add(null);
+    return true;
   }
 
   @override
