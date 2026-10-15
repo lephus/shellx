@@ -239,6 +239,43 @@ class AiSessionController extends Controller {
     return _simple(() => _machine!.ai.unqueue(sid, id));
   }
 
+  /// V2-2b B18: the folders the computer offers for a tab without one (the held listing's).
+  List<AiFolderChoice> get folders => listing?.folders ?? const [];
+
+  /// V2-2b B18: runs this session, a tab without a folder, in [folder] (a listing key). Null when the computer took
+  /// it — the session then starts there and its snapshot comes —, else the failure code.
+  Future<String?> chooseFolder(String folder) => _simple(() => _machine!.ai.chooseFolder(sid, folder));
+
+  /// V2-2b B17: a page of the agent's earlier sessions in this session's folder ([cursor]: the next one): the page,
+  /// or the failure code (`not_ready` while the agent does not run).
+  Future<({AiHistoryPage? page, String? code})> history({String? cursor}) async {
+    final machine = _machine;
+    if (machine == null) return (page: null, code: 'refused');
+    try {
+      return (page: await machine.ai.history(sid, cursor: cursor), code: null);
+    } catch (error) {
+      return (page: null, code: _failure(error));
+    }
+  }
+
+  /// V2-2b B17: reopens the agent's earlier session [acp] on the computer in a new AI tab of this session's agent and
+  /// folder (not shown there): its sid, or the failure code. The folder is the listing's key for this session's
+  /// folder (V2-2 D9: never a path). One that went out and got no answer may have opened it
+  /// ([AiWords.openUnknown]): it is never asked again by itself (V2-2 D13).
+  Future<({String? sid, String? code})> resume(String acp) async {
+    final machine = _machine;
+    final head = this.head;
+    final cwd = head?.cwd;
+    final folder = cwd == null ? null : folders.where((f) => f.path == cwd).firstOrNull?.key;
+    if (machine == null || head == null || folder == null) return (sid: null, code: 'refused');
+    try {
+      return (sid: await machine.ai.resume(head.agentId, folder, acp), code: null);
+    } catch (error) {
+      final code = _failure(error);
+      return (sid: null, code: code == AiWords.outcomeUnknown ? AiWords.openUnknown : code);
+    }
+  }
+
   /// "Tải thêm".
   void loadEarlier() => _link?.loadEarlier();
 

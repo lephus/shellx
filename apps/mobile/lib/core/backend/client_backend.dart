@@ -323,6 +323,15 @@ final class _AiMachineAdapter implements AiMachine {
   Future<String> open(String agent, String folder) => _ai.open(agent, folder);
 
   @override
+  Future<AiHistoryPage> history(String sid, {String? cursor}) => _ai.history(sid, cursor: cursor);
+
+  @override
+  Future<String> resume(String agent, String folder, String acp) => _ai.resume(agent, folder, acp);
+
+  @override
+  Future<void> chooseFolder(String sid, String folder) => _ai.chooseFolder(sid, folder);
+
+  @override
   Future<AiConfigView> config(String sid) => _ai.config(sid);
 
   @override

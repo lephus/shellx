@@ -202,6 +202,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiBusy": MessageLookupByLibrary.simpleMessage(
       "Too many requests at once. Wait a moment, then try again.",
     ),
+    "aiChooseFolder": MessageLookupByLibrary.simpleMessage(
+      "Choose a folder for this session",
+    ),
     "aiChromeTooltip": MessageLookupByLibrary.simpleMessage("AI sessions"),
     "aiClosedDesktop": MessageLookupByLibrary.simpleMessage(
       "ShellX was closed on the computer. Open ShellX on the computer, then open the session again.",
@@ -238,6 +241,14 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiFromPhone": MessageLookupByLibrary.simpleMessage("from phone"),
     "aiGroup": MessageLookupByLibrary.simpleMessage("AI sessions"),
+    "aiHistory": MessageLookupByLibrary.simpleMessage("Session history"),
+    "aiHistoryEmpty": MessageLookupByLibrary.simpleMessage(
+      "No earlier sessions in this folder.",
+    ),
+    "aiHistoryMore": MessageLookupByLibrary.simpleMessage("Load more"),
+    "aiHistoryNotReady": MessageLookupByLibrary.simpleMessage(
+      "The history shows once the agent runs.",
+    ),
     "aiItemChanging": MessageLookupByLibrary.simpleMessage(
       "It is still changing on the computer. Try again in a moment.",
     ),
@@ -389,6 +400,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiUpdateDesktop": MessageLookupByLibrary.simpleMessage(
       "Update ShellX on the computer to use AI sessions from your phone.",
     ),
+    "aiUseFolder": MessageLookupByLibrary.simpleMessage("Use this folder"),
     "aiViewAll": MessageLookupByLibrary.simpleMessage("View all"),
     "aiYouChose": m35,
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),

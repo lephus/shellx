@@ -3610,6 +3610,61 @@ class S {
       args: [],
     );
   }
+
+  /// `Session history`
+  String get aiHistory {
+    return Intl.message(
+      'Session history',
+      name: 'aiHistory',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Load more`
+  String get aiHistoryMore {
+    return Intl.message('Load more', name: 'aiHistoryMore', desc: '', args: []);
+  }
+
+  /// `No earlier sessions in this folder.`
+  String get aiHistoryEmpty {
+    return Intl.message(
+      'No earlier sessions in this folder.',
+      name: 'aiHistoryEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The history shows once the agent runs.`
+  String get aiHistoryNotReady {
+    return Intl.message(
+      'The history shows once the agent runs.',
+      name: 'aiHistoryNotReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use this folder`
+  String get aiUseFolder {
+    return Intl.message(
+      'Use this folder',
+      name: 'aiUseFolder',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose a folder for this session`
+  String get aiChooseFolder {
+    return Intl.message(
+      'Choose a folder for this session',
+      name: 'aiChooseFolder',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

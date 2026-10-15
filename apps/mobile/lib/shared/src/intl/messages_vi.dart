@@ -195,6 +195,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiBusy": MessageLookupByLibrary.simpleMessage(
       "Quá nhiều yêu cầu cùng lúc. Chờ một lát rồi thử lại.",
     ),
+    "aiChooseFolder": MessageLookupByLibrary.simpleMessage(
+      "Chọn thư mục cho phiên này",
+    ),
     "aiChromeTooltip": MessageLookupByLibrary.simpleMessage("Phiên AI"),
     "aiClosedDesktop": MessageLookupByLibrary.simpleMessage(
       "ShellX trên máy tính đã thoát. Mở ShellX trên máy tính rồi mở lại phiên.",
@@ -231,6 +234,14 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiFromPhone": MessageLookupByLibrary.simpleMessage("từ điện thoại"),
     "aiGroup": MessageLookupByLibrary.simpleMessage("Phiên AI"),
+    "aiHistory": MessageLookupByLibrary.simpleMessage("Lịch sử phiên"),
+    "aiHistoryEmpty": MessageLookupByLibrary.simpleMessage(
+      "Chưa có phiên nào trước đây trong thư mục này.",
+    ),
+    "aiHistoryMore": MessageLookupByLibrary.simpleMessage("Tải thêm"),
+    "aiHistoryNotReady": MessageLookupByLibrary.simpleMessage(
+      "Lịch sử hiện khi agent đang chạy.",
+    ),
     "aiItemChanging": MessageLookupByLibrary.simpleMessage(
       "Mục này vẫn đang thay đổi trên máy tính. Thử lại sau giây lát.",
     ),
@@ -382,6 +393,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiUpdateDesktop": MessageLookupByLibrary.simpleMessage(
       "Cập nhật ShellX trên máy tính để dùng phiên AI từ điện thoại.",
     ),
+    "aiUseFolder": MessageLookupByLibrary.simpleMessage("Dùng thư mục này"),
     "aiViewAll": MessageLookupByLibrary.simpleMessage("Xem đủ"),
     "aiYouChose": m35,
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),

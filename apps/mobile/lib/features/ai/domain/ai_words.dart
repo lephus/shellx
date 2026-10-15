@@ -217,6 +217,8 @@ abstract final class AiWords {
     // V2-2b B16: a full item too big for the phone, or one that kept changing while it loaded.
     'too_big' => s.aiFromComputerOnly,
     changing => s.aiItemChanging,
+    // V2-2b B17: the agent's history while it does not run (asked again once it does).
+    'not_ready' => s.aiHistoryNotReady,
     _ => s.aiRequestFailed(code),
   };
 
@@ -237,6 +239,16 @@ abstract final class AiWords {
     'unreadable' => s.aiClosedUnreadable,
     _ => s.aiClosedGone,
   };
+
+  /// V2-2b B17: when an earlier session last changed, "2026-10-13 09:30" in local time (as the desktop's History says
+  /// it); the agent's own text when it is no date, and nothing when it sent none.
+  static String historyWhen(String? at) {
+    final t = at == null ? null : DateTime.tryParse(at);
+    if (t == null) return at ?? '';
+    final l = t.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
+  }
 
   /// A permission that came without options (the computer leaves them out when its header would not
   /// fit a message) is answered on the computer; null when there are buttons to show.

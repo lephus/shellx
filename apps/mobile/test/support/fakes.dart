@@ -577,6 +577,41 @@ class FakeAiMachine implements AiMachine {
     return openedSid;
   }
 
+  /// V2-2b B17: the history pages by cursor (null: the first one), every ask (session, cursor), and a code
+  /// [history] fails with (`not_ready`) besides [failWith].
+  final Map<String?, AiHistoryPage> historyPages = {};
+  final List<(String, String?)> historyAsks = [];
+  String? historyFailWith;
+
+  /// V2-2b B17: every resume (agent, folder key, earlier session), and the sid it opens.
+  final List<(String, String, String)> resumed = [];
+  String resumedSid = 'e.-7';
+
+  /// V2-2b B18: every folder chosen (session, folder key).
+  final List<(String, String)> foldersChosen = [];
+
+  @override
+  Future<AiHistoryPage> history(String sid, {String? cursor}) async {
+    historyAsks.add((sid, cursor));
+    await _request();
+    final code = historyFailWith;
+    if (code != null) throw AiRequestException(code);
+    return historyPages[cursor] ?? const AiHistoryPage();
+  }
+
+  @override
+  Future<String> resume(String agent, String folder, String acp) async {
+    resumed.add((agent, folder, acp));
+    await _request();
+    return resumedSid;
+  }
+
+  @override
+  Future<void> chooseFolder(String sid, String folder) async {
+    foldersChosen.add((sid, folder));
+    await _request();
+  }
+
   /// V2-2b B11: what [config] answers, and the choices set (session, option, value) and modes set.
   AiConfigView configValue = const AiConfigView();
   int configCalls = 0;

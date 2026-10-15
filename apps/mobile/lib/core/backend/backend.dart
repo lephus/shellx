@@ -199,6 +199,17 @@ abstract interface class AiMachine {
   /// A new session; its sid.
   Future<String> open(String agent, String folder);
 
+  /// V2-2b B17: a page of the earlier sessions of [sid]'s agent in its folder ([cursor]: the next page). Throws
+  /// [AiRequestException] (`not_ready` while the agent does not run, `unsupported` when the computer cannot).
+  Future<AiHistoryPage> history(String sid, {String? cursor});
+
+  /// V2-2b B17: reopens the agent's earlier session [acp] in a new AI tab of [agent] in [folder] (a listing key);
+  /// the new session's sid.
+  Future<String> resume(String agent, String folder, String acp);
+
+  /// V2-2b B18: runs session [sid], a tab without a folder, in [folder] (a listing key).
+  Future<void> chooseFolder(String sid, String folder);
+
   /// V2-2b B11: the mode, model and thinking choices of [sid] this phone may make; `unsupported` when the
   /// computer cannot (R15).
   Future<AiConfigView> config(String sid);
