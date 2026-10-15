@@ -196,8 +196,11 @@ final class WkWebViewEngine implements BrowserEngine {
 
   Future<void> _setup() async {
     await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    // Disposed while setup waited: nothing more goes to native code.
+    if (_events.isClosed) return;
     // Safari's Web Inspector reaches the user's own tool (macOS 13.3+).
     await enableWebInspector(_platform.setInspectable);
+    if (_events.isClosed) return;
     await _controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (request) {
@@ -268,7 +271,9 @@ final class WkWebViewEngine implements BrowserEngine {
       return text is String ? text : '';
     });
     // Last: the plugin's own UI delegate is set by now, and BrowserNative
-    // stands its new-window guard in front of it.
+    // stands its new-window guard in front of it. Never once disposed:
+    // `forget` has gone already, and nothing would undo this `attach`.
+    if (_events.isClosed) return;
     await _native.attach(_id, sink: _emit, newWindow: _newWindow);
   }
 
