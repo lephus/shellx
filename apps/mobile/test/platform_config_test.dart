@@ -73,6 +73,22 @@ void main() {
       );
     });
 
+    test('push taps: the notification delegate is set before launch ends, by firebase_messaging (V2-2b B5)', () {
+      final delegate = readFile('ios/Runner/AppDelegate.swift');
+      expect(delegate, contains('import firebase_messaging'));
+      final launch = delegate.indexOf('didFinishLaunchingWithOptions launchOptions');
+      final configure = delegate.indexOf('FLTFirebaseMessagingPlugin.configureNotificationCenterDelegate()');
+      final handOn = delegate.indexOf(
+        'return super.application(application, didFinishLaunchingWithOptions: launchOptions)',
+      );
+      expect(launch, greaterThanOrEqualTo(0));
+      expect(configure, greaterThan(launch), reason: 'inside didFinishLaunching');
+      expect(handOn, greaterThan(configure), reason: 'before launch ends');
+      // flutter_local_notifications is never set up on iOS: it would replace the app's notification
+      // categories with its own (V2-2b B5, B8).
+      expect(delegate, isNot(contains('FlutterLocalNotificationsPlugin')));
+    });
+
     test('Firebase: GoogleService-Info.plist of project shellxpro for com.shellx.prod, bundled', () {
       final plist = readFile('ios/Runner/GoogleService-Info.plist');
       expect(plist, contains('<string>shellxpro</string>'));
