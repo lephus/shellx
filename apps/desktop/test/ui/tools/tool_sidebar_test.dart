@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/tools/tool_dock.dart';
 import 'package:shellx_desktop/src/tools/tool_registry.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/terminal/workspace_header.dart';
+import 'package:shellx_desktop/src/ui/tools/tool_sidebar_group.dart';
 import 'package:shellx_desktop/src/ui/window_router.dart';
 
 import '../../support/config_workspace.dart';
@@ -172,6 +173,76 @@ void main() {
     expect(cursorOnB, findsNothing);
     expect(rig.container.read(terminalTabsProvider).selectedId, underneath);
     expect(rig.container.read(toolDockProvider).loose, isNull);
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('a tool row is 36 px at 1x and tall enough for both of its '
+      'lines at any text size (D18)', (t) async {
+    await rig.pump(t);
+    rig.add(kDefaultWorkspaceId, 'localhost:4000', name: 'Board');
+    await t.pumpAndSettle();
+    // 1x: the 24 px header, then 36 px per tool, none when folded.
+    expect(
+      ToolSidebarGroup.heightFor(TextScaler.noScaling, count: 2, folded: false),
+      24 + 2 * 36,
+    );
+    expect(
+      ToolSidebarGroup.heightFor(TextScaler.noScaling, count: 2, folded: true),
+      24,
+    );
+    final group = find.byType(ToolSidebarGroup);
+    expect(t.getSize(group).height, 24 + 36);
+    // 2.25x is Windows' largest text size; the sidebar lays the group out
+    // with the height it reports.
+    addTearDown(t.platformDispatcher.clearAllTestValues);
+    for (final scale in [2.25, 3.0]) {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull, reason: 'at $scale x');
+      expect(
+        t.getSize(group).height,
+        ToolSidebarGroup.heightFor(
+          TextScaler.linear(scale),
+          count: 1,
+          folded: false,
+        ),
+      );
+    }
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('a list with no tab and a tool is no Tab stop; the tool\'s row '
+      'is still a button the keyboard reaches (UI §3.6, D18)', (t) async {
+    await rig.pump(t);
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    final tabs = rig.container.read(terminalTabsProvider.notifier);
+    tabs.close(rig.container.read(terminalTabsProvider).tabs.single.id);
+    await t.pumpAndSettle();
+    expect(
+      page.sidebarFocus.canRequestFocus,
+      isFalse,
+      reason: 'no row to walk',
+    );
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:4000', name: 'Board');
+    await t.pumpAndSettle();
+    final row = find.byKey(Key('sidebar.tool.${tool.id}'));
+    expect(row, findsOneWidget);
+    expect(page.sidebarFocus.canRequestFocus, isFalse);
+    expect(page.sidebarFocus.skipTraversal, isTrue);
+    // The row is a button of its own: it takes the keyboard, and Enter
+    // opens the tool.
+    bool dockOpen() =>
+        rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).open;
+    expect(dockOpen(), isFalse);
+    Focus.of(
+      t.element(find.descendant(of: row, matching: find.byType(Icon)).first),
+    ).requestFocus();
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    expect(dockOpen(), isTrue);
     await disposeWorkspace(t, rig.container);
   });
 }

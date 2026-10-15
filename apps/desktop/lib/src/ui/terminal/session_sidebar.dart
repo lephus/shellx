@@ -303,7 +303,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   /// V2-3 R14: choosing a tab ends a workspace shown without a tab. The
   /// dock controller sees only a change of the selected tab, and choosing
   /// the tab already selected is none, so the list's keys end it themselves.
-  /// A move onto a header chooses no tab and leaves it.
+  /// A move onto a header chooses no tab and leaves it. The one-workspace
+  /// list never calls it: that workspace shows without a tab only when it
+  /// has none, and then there is nothing to choose.
   void _endLoose() => ref.read(toolDockProvider.notifier).clearLoose();
 
   /// UI §3.6 list keys. ↑/↓/Home/End move the selection itself (the
@@ -393,16 +395,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       switch (key) {
         case LogicalKeyboardKey.arrowDown:
           workspaces.step(1);
-          _endLoose();
         case LogicalKeyboardKey.arrowUp:
           workspaces.step(-1);
-          _endLoose();
         case LogicalKeyboardKey.home:
           workspaces.selectVisible(1);
-          _endLoose();
         case LogicalKeyboardKey.end:
           workspaces.selectVisible(_visibleTabs().length);
-          _endLoose();
         case LogicalKeyboardKey.enter ||
             LogicalKeyboardKey.numpadEnter ||
             LogicalKeyboardKey.space:
@@ -1461,6 +1459,8 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       for (final item in items)
         if (item is _RowItem) item,
     ];
+    // What the arrows walk (D14, as [_navigation]): headers and rows.
+    final walkable = items.any((i) => i is _HeaderItem || i is _RowItem);
     // Keyboard or ⌘1…⌘9 moved the selection: keep its row on screen; the
     // list's cursor goes with it (D14).
     ref.listen(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
@@ -1884,9 +1884,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               container: true,
               child: Focus(
                 focusNode: widget.focusNode,
-                // An empty list is no tab stop (UI §3.6).
-                canRequestFocus: items.isNotEmpty,
-                skipTraversal: items.isEmpty,
+                // An empty list is no tab stop (UI §3.6): one with nothing for
+                // the arrows to walk — a Tools group alone is not, its rows
+                // are buttons of their own (R11).
+                canRequestFocus: walkable,
+                skipTraversal: !walkable,
                 onKeyEvent: _onKey,
                 child: Listener(
                   // The pointer drives auto-scroll even once the dragged
