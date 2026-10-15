@@ -15,11 +15,14 @@ final class _Reply {
 const _fullItemKeep = Duration(seconds: 60);
 const _fullItemsPerPhone = 4;
 
-/// One item made in full for one phone (V2-2b B16): its JSON text and where
-/// its slices end, for the rev it was made of.
+/// One item made in full for one phone (V2-2b B16): the item it was made of,
+/// at [rev] (F21: a runtime that replaced the session's has other items under
+/// the same session id and index, whatever their rev), its JSON text and where
+/// its slices end.
 final class _FullItem {
-  _FullItem(this.rev, this.text, this.ends, this.at);
+  _FullItem(this.item, this.rev, this.text, this.ends, this.at);
 
+  final TimelineItem item;
   final int rev;
   final String text;
   final List<int> ends;
@@ -112,11 +115,11 @@ extension _AiPhoneRequests on AiPhoneHub {
 
   /// V2-2b B16, R14: slice [AiItemPart.part] of item [AiItemPart.index] in
   /// full. The item is made once per rev and kept for the phone's next
-  /// slices ([_fullItemKeep], [_fullItemsPerPhone]); its body says the rev
-  /// (`r`), so a phone that sees it change (a command still running) starts
-  /// again. An item over [kAiFullItemBytes] is read on the computer
-  /// (`too_big`); one with nothing more to show, an index or a part that is
-  /// not there, `refused`.
+  /// slices ([_fullItemKeep], [_fullItemsPerPhone]) — for that very item
+  /// only (F21) —; its body says the rev (`r`), so a phone that sees it
+  /// change (a command still running) starts again. An item over
+  /// [kAiFullItemBytes] is read on the computer (`too_big`); one with nothing
+  /// more to show, an index or a part that is not there, `refused`.
   void _fullItem(String mobileId, _Phone phone, AiItemPart m) => unawaited(
     _ask(mobileId, phone, m.sid, m.rid, (c) async {
       final items = c.state.timeline.items;
@@ -131,13 +134,16 @@ extension _AiPhoneRequests on AiPhoneHub {
       });
       final key = '${m.sid}/${m.index}';
       var full = phone.items[key];
-      if (full == null || full.rev != item.rev) {
+      // Kept for the very item, at its rev: a session id outlives its runtime
+      // (a folder changed, an agent switched), and the new runtime's item at
+      // the same index can have the same rev with other content.
+      if (full == null || !identical(full.item, item) || full.rev != item.rev) {
         final text = aiFullItemJson(item);
         if (text == null) return const _Reply.refuse('refused');
         if (utf8Length(text) > kAiFullItemBytes) {
           return const _Reply.refuse('too_big');
         }
-        full = _FullItem(item.rev, text, aiSliceEnds(text), now);
+        full = _FullItem(item, item.rev, text, aiSliceEnds(text), now);
       }
       // The one asked for last is the one kept longest.
       phone.items
