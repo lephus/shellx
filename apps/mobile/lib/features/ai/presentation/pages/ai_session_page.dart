@@ -128,6 +128,10 @@ class _AiSessionPageState extends State<AiSessionPage> {
     final images = List.of(_images);
     // B13: the files still mentioned in the text go with it; a mention deleted from the text does not.
     final files = _controller.can(AiFeature.files) ? AiMentions.stillMentioned(text, _mentions) : const <String>[];
+    // F39: the note was about the last pick or the last Send; this Send says its own, below, and only for its own
+    // images. A note kept would still say "Retry" after the images of this Send got through and the message
+    // failed (it may have landed, D13, or can never go).
+    if (_note != null) setState(() => _note = null);
     // While it is on its way the message is no draft: a page opened again before the answer comes back
     // must not start with it (and send it twice). A message that did not go is put back below.
     _controller.keepDraft('');
@@ -160,7 +164,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
   int get _imageBytes => _images.fold(0, (n, image) => n + image.bytes.length);
 
   /// V2-2b B12: photos from the library or the camera join the next message — five at most and 20 MB in all (F34),
-  /// of a type and a size the computer takes (a photo that is not says why, in the composer).
+  /// of a type and a size the computer takes, and without their metadata (F38): [aiTakePicked] cleans them. A photo
+  /// that is not says why, in the composer.
   Future<void> _attach() async {
     final s = S.of(context);
     final room = kAiImagesMax - _images.length;
