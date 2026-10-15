@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -42,6 +43,12 @@ enum AiLinkState {
 /// Re-attaches in a row after a body that could not be taken, before the
 /// link gives up: a desktop that keeps sending one must not make a loop.
 const int _maxReattach = 3;
+
+/// V2-2b B16: how many times a full item that changes while it loads starts
+/// again, and the most slices one may have (2 MiB of the worst escaping is
+/// about 350).
+const int _itemRestarts = 3;
+const int _maxItemParts = 512;
 
 /// This phone's mirror of one AI session (V2-2 D5). Kept across channel
 /// losses: on a new channel it re-attaches with what it holds, so only
@@ -401,6 +408,67 @@ final class MachineAi {
     (rid) =>
         AiConfigSet(sid: sid, rid: rid, body: encodeBody({'mode': modeId})),
   );
+
+  /// V2-2b B16: item [index] of [sid] in full, loaded one slice at a time:
+  /// one request in flight, so the channel and the budget stay free for
+  /// everything else. [onPart] is told after each slice (1-based); an error
+  /// it throws ends the load (the page that asked is gone). When the item
+  /// changes on the computer while it loads (a command still running), the
+  /// load starts again from the first slice, at most [_itemRestarts] times,
+  /// then fails `changing`. Throws [AiRequestException] (`too_big`: read it on
+  /// the computer; `unsupported`, R15) or [MachineConnectionException].
+  Future<AiFullView> fullItem(
+    String sid,
+    int index, {
+    void Function(int part, int parts)? onPart,
+  }) async {
+    for (var round = 0; round <= _itemRestarts; round++) {
+      final text = StringBuffer();
+      int? rev;
+      var parts = 1;
+      var changed = false;
+      for (var part = 0; part < parts; part++) {
+        final result = await _feature(
+          AiFeature.item,
+          sid,
+          (rid) => AiItemPart(sid: sid, rid: rid, index: index, part: part),
+        );
+        final body = decodeBody(result.body);
+        final r = body == null ? null : jInt(body, 'r');
+        final n = body == null ? null : jInt(body, 'parts');
+        final slice = body == null ? null : jString(body, 'text');
+        // What no hub sends: a body that cannot be read, or more slices than
+        // any item may have.
+        if (r == null || n == null || n < 1 || n > _maxItemParts) {
+          throw const AiRequestException('refused');
+        }
+        if (slice == null || jInt(body!, 'part') != part) {
+          throw const AiRequestException('refused');
+        }
+        if (rev != null && r != rev) {
+          changed = true;
+          break;
+        }
+        rev = r;
+        parts = n;
+        text.write(slice);
+        onPart?.call(part + 1, parts);
+      }
+      if (changed) continue;
+      Object? json;
+      try {
+        json = jsonDecode(text.toString());
+      } on FormatException {
+        json = null;
+      }
+      final view = json is Map<String, Object?>
+          ? AiFullView.fromJson(json)
+          : null;
+      if (view == null) throw const AiRequestException('refused');
+      return view;
+    }
+    throw const AiRequestException('changing');
+  }
 
   // -------------------------------------------------- from MachineClient --
 

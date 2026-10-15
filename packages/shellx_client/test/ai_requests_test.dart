@@ -157,4 +157,134 @@ void main() {
       });
     });
   });
+
+  group('V2-2b B16: an item in full', () {
+    /// Answers slices of [text] in [n] parts, with rev [rev] (which [revAt]
+    /// may change per part asked).
+    AiMessage? Function(AiMessage) slices(
+      String text,
+      int n, {
+      int Function(int part)? revAt,
+      List<int>? asked,
+    }) => (m) {
+      if (m is! AiItemPart) return null;
+      asked?.add(m.part);
+      final size = (text.length / n).ceil();
+      final start = m.part * size;
+      final end = start + size > text.length ? text.length : start + size;
+      return AiResult(
+        rid: m.rid,
+        ok: true,
+        body: encodeBody({
+          'i': m.index,
+          'r': revAt?.call(m.part) ?? 1,
+          'part': m.part,
+          'parts': n,
+          'text': text.substring(start, end),
+        }),
+      );
+    };
+
+    test('the slices are asked one after the other and make the view; the '
+        'progress is told', () {
+      fakeAsync((async) {
+        final d = _Desktop({AiFeature.item});
+        final ai = ready(async, d);
+        final json = '{"k":"tool","title":"Run","out":"${'a' * 3000}"}';
+        d.answer = slices(json, 3);
+        final progress = <(int, int)>[];
+        final view = drive(
+          async,
+          ai.fullItem(_sid, 4, onPart: (p, n) => progress.add((p, n))),
+        );
+        expect(view.output, 'a' * 3000);
+        expect(progress, [(1, 3), (2, 3), (3, 3)]);
+        expect(d.got<AiItemPart>().map((m) => (m.index, m.part)), [
+          (4, 0),
+          (4, 1),
+          (4, 2),
+        ]);
+      });
+    });
+
+    test('an item that changes while it loads starts again; one that keeps '
+        'changing fails "changing" after three tries', () {
+      fakeAsync((async) {
+        final d = _Desktop({AiFeature.item});
+        final ai = ready(async, d);
+        const json = '{"k":"agent","text":"done"}';
+        var calls = 0;
+        // The rev changes once, on the second slice of the first try.
+        d.answer = slices(json, 2, revAt: (_) => ++calls >= 2 ? 2 : 1);
+        expect(drive(async, ai.fullItem(_sid, 0)).text, 'done');
+        final asked = <int>[];
+        var rev = 0;
+        d.answer = slices(json, 2, revAt: (_) => ++rev, asked: asked);
+        expect(
+          () => drive(async, ai.fullItem(_sid, 0)),
+          throwsA(_aiError('changing')),
+        );
+        expect(asked, [0, 1, 0, 1, 0, 1, 0, 1]);
+      });
+    });
+
+    test('what no hub sends is refused, and an error of the page ends the '
+        'load', () {
+      fakeAsync((async) {
+        final d = _Desktop({AiFeature.item});
+        final ai = ready(async, d);
+        d.answer = (m) => m is AiItemPart
+            ? AiResult(
+                rid: m.rid,
+                ok: true,
+                body: encodeBody({
+                  'i': 0,
+                  'r': 1,
+                  'part': 0,
+                  'parts': 100000,
+                  'text': '',
+                }),
+              )
+            : null;
+        expect(
+          () => drive(async, ai.fullItem(_sid, 0)),
+          throwsA(_aiError('refused')),
+        );
+        final asked = <int>[];
+        d.answer = slices('{"k":"agent","text":"x"}', 3, asked: asked);
+        expect(
+          () => drive(
+            async,
+            ai.fullItem(_sid, 0, onPart: (_, _) => throw StateError('left')),
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(asked, [0], reason: 'nothing asked after the page left');
+      });
+    });
+
+    test('too_big is said as the computer said it; without the feature '
+        'nothing is asked', () {
+      fakeAsync((async) {
+        final d = _Desktop({AiFeature.item});
+        final ai = ready(async, d);
+        d.answer = (m) => m is AiItemPart
+            ? AiResult(rid: m.rid, ok: false, code: 'too_big')
+            : null;
+        expect(
+          () => drive(async, ai.fullItem(_sid, 0)),
+          throwsA(_aiError('too_big')),
+        );
+        d.features = const {};
+        drive(async, ai.watch()); // a listing without it
+        settle(async);
+        final before = d.got<AiItemPart>().length;
+        expect(
+          () => drive(async, ai.fullItem(_sid, 0)),
+          throwsA(_aiError('unsupported')),
+        );
+        expect(d.got<AiItemPart>(), hasLength(before));
+      });
+    });
+  });
 }

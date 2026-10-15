@@ -112,6 +112,43 @@ void main() {
   late TestKeys keys;
   setUpAll(() async => keys = await TestKeys.generate());
 
+  test('V2-2b B16: a long output in full, slice by slice, through the real '
+      'hub and the encrypted channel', () {
+    fakeAsync((async) {
+      final source = _Source();
+      final hub = AiPhoneHub(source: source, epoch: 'ep');
+      final h = Harness(async, keys, ai: hub);
+      final ai = h.phoneMachine.ai;
+      h.run(h.phoneMachine.listSessions(includeDesktop: true));
+      h.run(ai.watch());
+      settle(async);
+      expect(ai.can(AiFeature.item), isTrue);
+      final output = [for (var i = 0; i < 30000; i++) 'dòng số $i'].join('\n');
+      source.state.applyUpdate(
+        SessionUpdate.fromJson({
+          'sessionUpdate': 'tool_call',
+          'toolCallId': 'c1',
+          'title': 'npm test',
+          'kind': 'execute',
+          'content': [
+            {
+              'type': 'content',
+              'content': {'type': 'text', 'text': output},
+            },
+          ],
+        }),
+        _t0,
+      );
+      final progress = <int>[];
+      final view = h.run(
+        ai.fullItem('ep.-1', 0, onPart: (part, _) => progress.add(part)),
+      );
+      expect(view.output, output);
+      expect(progress.length, greaterThan(5));
+      expect(progress.last, progress.length);
+    });
+  });
+
   test('list, attach, stream, prompt and answer from the phone', () {
     fakeAsync((async) {
       final source = _Source();

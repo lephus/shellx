@@ -10,6 +10,24 @@ final class _Reply {
   final Uint8List? body;
 }
 
+/// How long a phone's full item is kept for its next slices, and how many a
+/// phone has at most (V2-2b B16): at most 4 × 2 MiB of text per phone.
+const _fullItemKeep = Duration(seconds: 60);
+const _fullItemsPerPhone = 4;
+
+/// One item made in full for one phone (V2-2b B16): its JSON text and where
+/// its slices end, for the rev it was made of.
+final class _FullItem {
+  _FullItem(this.rev, this.text, this.ends, this.at);
+
+  final int rev;
+  final String text;
+  final List<int> ends;
+
+  /// When a slice of it was last asked for.
+  DateTime at;
+}
+
 /// The V2-2b requests (B4, B11, …): each answers with one `ai.result`, a
 /// body maybe, checked against the window as it is when it runs.
 extension _AiPhoneRequests on AiPhoneHub {
@@ -89,6 +107,58 @@ extension _AiPhoneRequests on AiPhoneHub {
       if (no != null) return _Reply.refuse(no);
       await c.setConfig(id, value!);
       return const _Reply.ok();
+    }),
+  );
+
+  /// V2-2b B16, R14: slice [AiItemPart.part] of item [AiItemPart.index] in
+  /// full. The item is made once per rev and kept for the phone's next
+  /// slices ([_fullItemKeep], [_fullItemsPerPhone]); its body says the rev
+  /// (`r`), so a phone that sees it change (a command still running) starts
+  /// again. An item over [kAiFullItemBytes] is read on the computer
+  /// (`too_big`); one with nothing more to show, an index or a part that is
+  /// not there, `refused`.
+  void _fullItem(String mobileId, _Phone phone, AiItemPart m) => unawaited(
+    _ask(mobileId, phone, m.sid, m.rid, (c) async {
+      final items = c.state.timeline.items;
+      if (m.index < 0 || m.index >= items.length) {
+        return const _Reply.refuse('refused');
+      }
+      final item = items[m.index];
+      final now = _now();
+      phone.items.removeWhere((_, f) {
+        final idle = now.difference(f.at);
+        return idle > _fullItemKeep || idle.isNegative;
+      });
+      final key = '${m.sid}/${m.index}';
+      var full = phone.items[key];
+      if (full == null || full.rev != item.rev) {
+        final text = aiFullItemJson(item);
+        if (text == null) return const _Reply.refuse('refused');
+        if (utf8Length(text) > kAiFullItemBytes) {
+          return const _Reply.refuse('too_big');
+        }
+        full = _FullItem(item.rev, text, aiSliceEnds(text), now);
+      }
+      // The one asked for last is the one kept longest.
+      phone.items
+        ..remove(key)
+        ..[key] = full;
+      while (phone.items.length > _fullItemsPerPhone) {
+        phone.items.remove(phone.items.keys.first);
+      }
+      full.at = now;
+      final parts = full.ends.length;
+      if (m.part < 0 || m.part >= parts) return const _Reply.refuse('refused');
+      final start = m.part == 0 ? 0 : full.ends[m.part - 1];
+      return _Reply.ok(
+        encodeBody({
+          'i': m.index,
+          'r': full.rev,
+          'part': m.part,
+          'parts': parts,
+          'text': full.text.substring(start, full.ends[m.part]),
+        }),
+      );
     }),
   );
 }
