@@ -1,6 +1,7 @@
 /// ShellX desktop agent logic: sessions, pairing responder, trust list.
 library;
 
+export 'src/ai/ai_blob_store.dart';
 export 'src/ai/ai_endpoint.dart';
 export 'src/ai/ai_phone_hub.dart';
 export 'src/context/cwd_url.dart';

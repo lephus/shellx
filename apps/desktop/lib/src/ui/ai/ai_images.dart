@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -7,13 +6,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:shellx_ai/shellx_ai.dart' show AiSessionState;
+import 'package:shellx_ai/remote.dart'
+    show aiImageMime, aiTakesNoImages, kAiImageMaxBytes, kAiImagesMax;
 
 import '../../../l10n/app_localizations.dart';
-import '../../ai/ai_off_thread.dart';
 import '../../tools/tool_dock.dart' show toolPanesCoveredProvider;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_scope.dart';
+
+// V2-2b B12: the pure image helpers moved where the phone hub reaches them;
+// the AI pane keeps using them by these names.
+export 'package:shellx_ai/remote.dart'
+    show aiImageMime, aiTakesNoImages, kAiImageMaxBytes, kAiImagesMax;
+
+export '../../ai/ai_image_encode.dart'
+    show aiEncodeImages, kAiInlineEncodeBytes;
 
 /// ⌘V / Ctrl+V (and Ctrl+Shift+V) in the composer, D16: the files copied in
 /// Finder / Explorer first, as in the terminal — the pictures among them
@@ -23,40 +30,9 @@ class AiPasteIntent extends Intent {
   const AiPasteIntent();
 }
 
-/// The most images one message takes.
-const int kAiImagesMax = 5;
-
-/// The largest image a message takes, pasted or dropped (agents refuse
-/// bigger ones).
-const int kAiImageMaxBytes = 10 << 20;
-
 /// A BMP or TIFF over this many bytes is not decoded (a 5K screenshot is
 /// 45 MB as a BMP).
 const int kAiImageConvertMax = 64 << 20;
-
-/// Above this many bytes of images in a message, base64 runs off the UI
-/// isolate (smoothness: 10 MiB is ~100 ms of it).
-const int kAiInlineEncodeBytes = 256 << 10;
-
-/// The image type of [bytes] by their first bytes (PNG, JPEG, GIF, WebP);
-/// null: not an image ShellX sends.
-String? aiImageMime(Uint8List bytes) {
-  bool starts(List<int> sig, [int at = 0]) {
-    if (bytes.length < at + sig.length) return false;
-    for (var i = 0; i < sig.length; i++) {
-      if (bytes[at + i] != sig[i]) return false;
-    }
-    return true;
-  }
-
-  if (starts([0x89, 0x50, 0x4E, 0x47])) return 'image/png';
-  if (starts([0xFF, 0xD8, 0xFF])) return 'image/jpeg';
-  if (starts([0x47, 0x49, 0x46, 0x38])) return 'image/gif';
-  if (starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8)) {
-    return 'image/webp';
-  }
-  return null;
-}
 
 /// A BMP (what Windows puts a screenshot on the clipboard as) or a TIFF:
 /// formats agents do not take.
@@ -96,14 +72,6 @@ Future<Uint8List?> aiPngOf(Uint8List bytes) async {
     return null;
   }
 }
-
-/// Whether [state]'s agent has said it takes no images (`promptCapabilities.
-/// image`). Before `initialize` has answered it has said nothing: a new tab
-/// would otherwise tell its user "Claude does not take images" for the first
-/// seconds of every session. Nothing is refused then; the composer asks again
-/// when the message is sent.
-bool aiTakesNoImages(AiSessionState state) =>
-    state.agent != null && !state.capabilities.prompt.image;
 
 /// D16: [bytes] go with the next message — unless the agent takes no images
 /// (the composer says so), there are [kAiImagesMax] already, or they are over
@@ -157,17 +125,6 @@ Future<bool> aiAttachImage(
   }
   images.add(data, mime);
   return true;
-}
-
-String _base64(Uint8List bytes) => base64Encode(bytes);
-
-/// [images] as base64 for the `image` blocks, off the UI isolate when they
-/// are many bytes.
-Future<List<String>> aiEncodeImages(OffThread run, List<Uint8List> images) {
-  final bytes = images.fold<int>(0, (n, b) => n + b.length);
-  return bytes > kAiInlineEncodeBytes
-      ? Future.wait([for (final b in images) run(_base64, b)])
-      : Future.value([for (final b in images) _base64(b)]);
 }
 
 /// D16 around the composer: a paste attaches the pictures among the files on

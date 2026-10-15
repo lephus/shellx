@@ -28,6 +28,7 @@ final class MirrorText extends MirrorItem {
     this.text, {
     this.fullLength,
     this.fromPhone = false,
+    this.images = 0,
   });
 
   final MirrorTextKind kind;
@@ -40,6 +41,9 @@ final class MirrorText extends MirrorItem {
   /// V2-2b B24: a user's prompt written on a phone (`src`), not at the
   /// computer.
   final bool fromPhone;
+
+  /// V2-2b B12: how many images went with a user's message (`img`).
+  final int images;
 }
 
 /// What happened to a tool call's permission request.
@@ -578,6 +582,7 @@ final class AiMirror with Redacted {
           at == 0 ? add : before + add,
           fullLength: jInt(r, 'clip'),
           fromPhone: jString(r, 'src') == 'phone',
+          images: jInt(r, 'img') ?? 0,
         );
       case 'tool':
         final out = jMap(r, 'out');

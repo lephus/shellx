@@ -113,6 +113,19 @@ extension _AiPhoneRequests on AiPhoneHub {
     }),
   );
 
+  /// V2-2b B12: one part of an image a phone uploads for its next prompt;
+  /// every part gets its own `ai.result`. Not about a session: the image is
+  /// the phone's until a prompt takes it.
+  void _blob(String mobileId, AiBlob part) {
+    String? code;
+    try {
+      code = _blobs.put(mobileId, part);
+    } on Object {
+      code = 'refused';
+    }
+    _send(mobileId, AiResult(rid: part.rid, ok: code == null, code: code));
+  }
+
   /// V2-2b B16, R14: slice [AiItemPart.part] of item [AiItemPart.index] in
   /// full. The item is made once per rev and kept for the phone's next
   /// slices ([_fullItemKeep], [_fullItemsPerPhone]) — for that very item
