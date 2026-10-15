@@ -142,6 +142,12 @@ final class ToolTokenPacer implements ToolPacer {
 
   /// Tokens are kept ×1e6, so a microsecond adds the per-second rate.
   static const _unit = 1000000;
+
+  /// A refill credits at most this much idle time, 60 s in microseconds: both
+  /// buckets are full long before, and the product of days of idle time and
+  /// the byte rate overflows an int64 (past 12.7 days at 8 MiB/s), which
+  /// would leave the bucket in debt and stall every tool stream.
+  static const _maxRefill = 60 * 1000000;
   late int _frames;
   late int _bytes;
   late int _last;
@@ -155,9 +161,10 @@ final class ToolTokenPacer implements ToolPacer {
 
   void _refill() {
     final now = _clock();
-    final elapsed = now - _last;
+    final idle = now - _last;
     _last = now;
-    if (elapsed <= 0) return;
+    if (idle <= 0) return;
+    final elapsed = min(idle, _maxRefill);
     _frames = min(frameBurst * _unit, _frames + elapsed * framesPerSecond);
     _bytes = min(byteBurst * _unit, _bytes + elapsed * bytesPerSecond);
   }
@@ -492,12 +499,22 @@ final class ToolBytesIn {
   }
 }
 
+/// V2-4 E7: what a `tool.ws.msg` piece of [length] data bytes costs: at least
+/// one byte, against the stream and phone windows and in the acknowledgement
+/// totals of a WebSocket stream, at both ends ([ToolWsOut], [ToolWsIn]). An
+/// empty message weighs nothing in bytes, so without this a flood of them
+/// would fill no window and grow memory without limit. HTTP bodies
+/// ([ToolBytesOut], [ToolBytesIn]) stay pure byte counts.
+int toolWsPieceCost(int length) => max(1, length);
+
 /// V2-4 E7: the messages of a WebSocket ([source]: `String` or bytes) sent as
 /// `tool.ws.msg` pieces of at most [kToolMaxChunkBytes], the last with
-/// `fin`, within [window] and as [pacer] allows. While a message waits to go
-/// it stops reading [source]. A message over [maxMessage] calls [onTooBig]
-/// (the caller closes with 1009). [onDone]: the source ended and everything
-/// went out.
+/// `fin`, within [window] and as [pacer] allows. A piece counts as at least
+/// one byte ([toolWsPieceCost]) against the windows and in the
+/// acknowledgement totals ([onAck]); the [pacer] is charged the real bytes.
+/// While a piece's worth of bytes, or 64 messages, wait to go it stops
+/// reading [source]. A message over [maxMessage] calls [onTooBig] (the caller
+/// closes with 1009). [onDone]: the source ended and everything went out.
 final class ToolWsOut {
   ToolWsOut({
     required this.id,
@@ -519,6 +536,10 @@ final class ToolWsOut {
   final int maxMessage;
   final void Function()? onTooBig;
   final void Function()? onDone;
+
+  /// While this many messages wait to go it stops reading [source]: empty
+  /// messages add no bytes, so their count is bounded on its own.
+  static const _maxQueuedMessages = 64;
 
   final _messages = Queue<({Uint8List bytes, bool text})>();
   int _offset = 0; // into the first message
@@ -558,7 +579,7 @@ final class ToolWsOut {
     }
     _messages.add((bytes: bytes, text: text));
     _queued += bytes.length;
-    if (_queued >= kToolMaxChunkBytes && !_paused) {
+    if (_full && !_paused) {
       _paused = true;
       _subscription?.pause();
     }
@@ -574,6 +595,10 @@ final class ToolWsOut {
   int get _nextSize =>
       min(_messages.first.bytes.length - _offset, kToolMaxChunkBytes);
 
+  /// A piece's worth of bytes, or [_maxQueuedMessages] messages, wait to go.
+  bool get _full =>
+      _queued >= kToolMaxChunkBytes || _messages.length >= _maxQueuedMessages;
+
   void _pump() {
     if (_stopped || _asked) return;
     if (_messages.isEmpty) {
@@ -583,7 +608,7 @@ final class ToolWsOut {
       }
       return;
     }
-    if (!window.canSend(_nextSize)) {
+    if (!window.canSend(toolWsPieceCost(_nextSize))) {
       window._waitForCredit(_pump);
       return;
     }
@@ -597,7 +622,8 @@ final class ToolWsOut {
     _withdraw = null;
     if (_stopped || _messages.isEmpty) return null;
     final size = _nextSize;
-    if (!window.canSend(size)) {
+    final cost = toolWsPieceCost(size);
+    if (!window.canSend(cost)) {
       scheduleMicrotask(_pump);
       return null;
     }
@@ -610,9 +636,9 @@ final class ToolWsOut {
       _offset = 0;
     }
     _queued -= size;
-    window.onSent(size);
+    window.onSent(cost);
     _send(ToolWsMessage(id: id, data: piece, text: message.text, fin: fin));
-    if (_paused && _queued < kToolMaxChunkBytes) {
+    if (_paused && !_full) {
       _paused = false;
       _subscription?.resume();
     }
@@ -655,10 +681,12 @@ final class ToolWsOut {
 
 /// V2-4 E7: WebSocket pieces as they arrive (`tool.ws.msg`), put together and
 /// written in order with [write] (`ws.addStream(Stream.value(message))`,
-/// which completes once the socket took it). Bytes are acknowledged
+/// which completes once the socket took it). Pieces are acknowledged
 /// ([onConsumed]) while nothing waits to be written; while a message waits,
 /// what follows is held unacknowledged, so the sender stops after its
-/// window. A message over [maxMessage], a piece that changes the kind of
+/// window. A piece counts as at least one byte ([toolWsPieceCost]), in
+/// [window] and in the totals acknowledged, as it does at the sender. A
+/// message over [maxMessage] (real bytes), a piece that changes the kind of
 /// its message, or more in flight than [window]: [add] says no.
 final class ToolWsIn {
   ToolWsIn({
@@ -693,7 +721,7 @@ final class ToolWsIn {
 
   bool add(ToolWsMessage piece) {
     if (_failed) return false;
-    _received += piece.data.length;
+    _received += toolWsPieceCost(piece.data.length);
     if (_received - _consumed > window) return false;
     if (_parts.isEmpty) {
       _text = piece.text;

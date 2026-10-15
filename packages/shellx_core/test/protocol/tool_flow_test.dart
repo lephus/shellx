@@ -10,6 +10,50 @@ Uint8List _bytes(int length, [int seed = 0]) => Uint8List.fromList([
   for (var i = 0; i < length; i++) (i * 31 + seed) & 0xFF,
 ]);
 
+/// Whether two WebSocket messages are alike: the same text, or the same bytes.
+bool _sameMessage(Object a, Object b) {
+  if (a is String || b is String) return a == b;
+  final x = a as List<int>;
+  final y = b as List<int>;
+  if (x.length != y.length) return false;
+  for (var i = 0; i < x.length; i++) {
+    if (x[i] != y[i]) return false;
+  }
+  return true;
+}
+
+/// A pacer that grants only when the test says so, one request at a time.
+class _ManualPacer implements ToolPacer {
+  final _requests = <int? Function()>[];
+
+  /// Requests not granted yet.
+  int get waiting => _requests.length;
+
+  @override
+  void Function() acquire(int? Function() send) {
+    _requests.add(send);
+    return () => _requests.remove(send);
+  }
+
+  /// Grants the oldest request; what its `send` returned (the bytes charged).
+  int? grant() => _requests.removeAt(0)();
+}
+
+/// Wraps a pacer and records what every grant sent (null: nothing).
+class _RecordingPacer implements ToolPacer {
+  _RecordingPacer(this.inner);
+
+  final ToolPacer inner;
+  final grants = <int?>[];
+
+  @override
+  void Function() acquire(int? Function() send) => inner.acquire(() {
+    final sent = send();
+    grants.add(sent);
+    return sent;
+  });
+}
+
 /// V2-4 E7, E8: windows, acknowledgements, pacing; byte and WebSocket
 /// streams in and out.
 void main() {
@@ -168,6 +212,25 @@ void main() {
         expect(order, ['a', 'b', 'd', 'e']);
       });
     });
+
+    test('after 13 idle days the next frame is granted at once', () {
+      fakeAsync((async) {
+        final pacer = ToolTokenPacer(clock: () => async.elapsed.inMicroseconds);
+        pacer.acquire(() => kToolMaxChunkBytes); // part of the burst is spent
+        // Past 12.7 days, idle time × 8 MiB/s no longer fits an int64.
+        async.elapse(const Duration(days: 13));
+        var granted = 0;
+        for (var i = 0; i < 17; i++) {
+          pacer.acquire(() {
+            granted++;
+            return 1;
+          });
+        }
+        expect(granted, 16, reason: 'a full burst of 16 frames, no more');
+        async.elapse(const Duration(milliseconds: 7));
+        expect(granted, 17, reason: 'then 150 frames a second, as ever');
+      });
+    });
   });
 
   group('bytes out (E7, RF 3)', () {
@@ -246,14 +309,69 @@ void main() {
           credit.inFlight,
           greaterThan(kToolPhoneWindow - kToolMaxChunkBytes),
         );
-        // One stream's ack lets another go on.
+        // One stream's ack lets the others go on.
+        final others = windows[1].sent + windows[2].sent;
         windows[0].onAck(windows[0].sent);
         async.flushMicrotasks();
         expect(peak, lessThanOrEqualTo(kToolPhoneWindow));
         expect(
           windows[1].sent + windows[2].sent,
-          greaterThan(kToolPhoneWindow - windows[0].sent),
+          greaterThan(others),
+          reason: "woken by another stream's ack, not only by its own",
         );
+      });
+    });
+
+    test('a frame granted after the phone window filled up waits for an ack '
+        'and keeps its bytes', () {
+      fakeAsync((async) {
+        // Room for one 48 KiB frame, not for two. Both ask while the pacer
+        // has no token, so the second grant finds the room gone.
+        final credit = ToolCredit(limit: 60 * 1024);
+        final tokens = ToolTokenPacer(
+          framesPerSecond: 10,
+          frameBurst: 1,
+          clock: () => async.elapsed.inMicroseconds,
+        );
+        tokens.acquire(() => 1); // spends the burst
+        final pacer = _RecordingPacer(tokens);
+        final windows = [ToolSendWindow(credit), ToolSendWindow(credit)];
+        final outs = <ToolBytesOut>[];
+        final got = [BytesBuilder(), BytesBuilder()];
+        final bodies = [
+          _bytes(kToolMaxChunkBytes),
+          _bytes(kToolMaxChunkBytes, 5),
+        ];
+        for (var i = 0; i < 2; i++) {
+          final source = StreamController<List<int>>();
+          outs.add(
+            ToolBytesOut(
+              id: i,
+              source: source.stream,
+              window: windows[i],
+              pacer: pacer,
+              send: (m) => got[i].add((m as ToolData).data),
+            )..start(),
+          );
+          source.add(bodies[i]);
+          unawaited(source.close());
+        }
+        async.elapse(const Duration(milliseconds: 350));
+        expect(got[0].length, kToolMaxChunkBytes);
+        expect(got[1].length, 0, reason: 'no room yet: it waits');
+        expect(windows[1].sent, 0);
+        expect(
+          pacer.grants,
+          [kToolMaxChunkBytes, null],
+          reason: 'the second grant came, found no room and sent nothing',
+        );
+        // The first stream's ack frees the room. The second goes on at once:
+        // the grant that found no room charged no token.
+        expect(outs[0].onAck(windows[0].sent), isTrue);
+        async.flushMicrotasks();
+        expect(got[1].length, kToolMaxChunkBytes);
+        expect(got[0].takeBytes(), bodies[0]);
+        expect(got[1].takeBytes(), bodies[1], reason: 'not a byte dropped');
       });
     });
 
@@ -317,6 +435,15 @@ void main() {
 
       final limited = ToolBytesIn(onConsumed: (_) {}, maxBytes: 5);
       expect(limited.add(_bytes(6), end: false), isFalse);
+    });
+
+    test('HTTP bodies stay pure byte counts: an empty piece costs nothing', () {
+      final inlet = ToolBytesIn(onConsumed: (_) {}, window: 10);
+      for (var i = 0; i < 100; i++) {
+        expect(inlet.add(Uint8List(0), end: false), isTrue, reason: 'piece $i');
+      }
+      expect(inlet.received, 0);
+      expect(inlet.add(_bytes(10), end: false), isTrue);
     });
 
     test('fail cuts the sink with an error', () async {
@@ -470,6 +597,268 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('a message granted after the phone window filled up waits for an '
+        'ack and keeps its place', () {
+      fakeAsync((async) {
+        // Room for one 48 KiB piece, not for two. Both ask while the pacer
+        // has no token, so the second grant finds the room gone.
+        final credit = ToolCredit(limit: 60 * 1024);
+        final tokens = ToolTokenPacer(
+          framesPerSecond: 10,
+          frameBurst: 1,
+          clock: () => async.elapsed.inMicroseconds,
+        );
+        tokens.acquire(() => 1); // spends the burst
+        final pacer = _RecordingPacer(tokens);
+        final windows = [ToolSendWindow(credit), ToolSendWindow(credit)];
+        final outs = <ToolWsOut>[];
+        final got = [<ToolWsMessage>[], <ToolWsMessage>[]];
+        final messages = [
+          _bytes(kToolMaxChunkBytes),
+          _bytes(kToolMaxChunkBytes, 5),
+        ];
+        for (var i = 0; i < 2; i++) {
+          final source = StreamController<Object?>();
+          outs.add(
+            ToolWsOut(
+              id: i,
+              source: source.stream,
+              window: windows[i],
+              pacer: pacer,
+              send: (m) => got[i].add(m as ToolWsMessage),
+            )..start(),
+          );
+          source.add(messages[i]);
+        }
+        async.elapse(const Duration(milliseconds: 350));
+        expect(got[0], hasLength(1));
+        expect(got[1], isEmpty, reason: 'no room yet: it waits');
+        expect(windows[1].sent, 0);
+        expect(
+          pacer.grants,
+          [kToolMaxChunkBytes, null],
+          reason: 'the second grant came, found no room and sent nothing',
+        );
+        // The first stream's ack frees the room. The second goes on at once:
+        // the grant that found no room charged no token.
+        expect(outs[0].onAck(windows[0].sent), isTrue);
+        async.flushMicrotasks();
+        expect(got[1], hasLength(1));
+        expect(got[1].single.data, messages[1], reason: 'not a byte dropped');
+        expect(got[1].single.fin, isTrue);
+      });
+    });
+
+    test('a flood of empty messages pauses the source, the queue stays '
+        'bounded, and every one goes out in order once granted', () {
+      fakeAsync((async) {
+        final source = StreamController<Object?>();
+        var read = 0; // what the outlet took from the source
+        final pacer = _ManualPacer();
+        final window = ToolSendWindow(ToolCredit());
+        final sent = <ToolWsMessage>[];
+        ToolWsOut(
+          id: 1,
+          source: source.stream.map((m) {
+            read++;
+            return m;
+          }),
+          window: window,
+          pacer: pacer,
+          send: (m) => sent.add(m as ToolWsMessage),
+        ).start();
+        // Empty text, empty bytes, and now and then a message with content.
+        Object messageAt(int i) => switch (i % 3) {
+          0 => '',
+          1 => Uint8List(0),
+          _ => 'm$i',
+        };
+        const total = 500;
+        var added = 0;
+        // The page sends as fast as its socket lets it: a paused source
+        // holds it back.
+        void flood() {
+          while (added < total && !source.isPaused) {
+            source.add(messageAt(added++));
+            async.flushMicrotasks();
+          }
+          if (added == total) unawaited(source.close());
+        }
+
+        flood();
+        expect(source.isPaused, isTrue, reason: 'a pacer that grants nothing');
+        expect(read, 64, reason: 'it took 64 messages, then stopped reading');
+        expect(sent, isEmpty);
+        final charged = <int?>[];
+        while (sent.length < total) {
+          expect(pacer.waiting, 1);
+          charged.add(pacer.grant());
+          async.flushMicrotasks();
+          flood();
+          expect(read - sent.length, lessThanOrEqualTo(64));
+        }
+        expect(sent, hasLength(total));
+        for (var i = 0; i < total; i++) {
+          final expected = messageAt(i);
+          expect(sent[i].fin, isTrue, reason: 'message $i');
+          expect(sent[i].text, expected is String, reason: 'message $i');
+          expect(
+            sent[i].data,
+            expected is String ? utf8.encode(expected) : expected,
+            reason: 'message $i',
+          );
+          expect(charged[i], sent[i].data.length, reason: 'real bytes charged');
+        }
+        // An empty piece costs one byte of window, a piece its length.
+        final cost = [for (final p in sent) p.data.isEmpty ? 1 : p.data.length];
+        expect(window.sent, cost.fold<int>(0, (a, b) => a + b));
+      });
+    });
+
+    test('an empty message costs one byte of window at the sender', () {
+      fakeAsync((async) {
+        final source = StreamController<Object?>();
+        final window = ToolSendWindow(ToolCredit(), limit: 5);
+        final sent = <ToolWsMessage>[];
+        final out = ToolWsOut(
+          id: 1,
+          source: source.stream,
+          window: window,
+          pacer: const ToolUnpaced(),
+          send: (m) => sent.add(m as ToolWsMessage),
+        )..start();
+        for (var i = 0; i < 12; i++) {
+          source.add(i.isEven ? '' : Uint8List(0));
+        }
+        async.flushMicrotasks();
+        expect(sent, hasLength(5), reason: 'five empty messages, five bytes');
+        expect(window.inFlight, 5);
+        expect(out.onAck(3), isTrue);
+        async.flushMicrotasks();
+        expect(sent, hasLength(8));
+        expect(out.onAck(8), isTrue);
+        async.flushMicrotasks();
+        expect(sent, hasLength(12));
+        expect(window.sent, 12);
+      });
+    });
+
+    test('an empty piece counts as one byte: a flood is refused at the window '
+        'and what is acknowledged is the sum of the costs', () async {
+      ToolWsMessage piece(int length, {bool text = false, bool fin = true}) =>
+          ToolWsMessage(id: 1, data: Uint8List(length), text: text, fin: fin);
+
+      // A write waits for the socket while a flood of empty messages comes.
+      final stuck = Completer<void>();
+      final heldBack = <int>[];
+      final flooded = ToolWsIn(
+        write: (_) => stuck.future,
+        onConsumed: heldBack.add,
+        window: 50,
+      );
+      var accepted = 0;
+      while (accepted < 1000 && flooded.add(piece(0))) {
+        accepted++;
+      }
+      expect(accepted, 50, reason: 'one byte each: the window of 50, no more');
+      expect(heldBack, isEmpty, reason: 'held while the write waits');
+
+      // What is acknowledged afterwards is the sum of what the pieces cost.
+      final gate = Completer<void>();
+      final consumed = <int>[];
+      final counted = ToolWsIn(
+        write: (_) => gate.future,
+        onConsumed: consumed.add,
+      );
+      final pieces = [
+        piece(0, text: true), // 1
+        piece(5), // 5
+        piece(0, fin: false), // 1, an empty first piece
+        piece(3), // 3
+        piece(0, text: true), // 1
+      ];
+      var cost = 0;
+      for (final p in pieces) {
+        expect(counted.add(p), isTrue);
+        cost += p.data.isEmpty ? 1 : p.data.length;
+      }
+      expect(cost, 11);
+      gate.complete();
+      await counted.idle;
+      expect(consumed.last, 11);
+
+      // The message limit counts real bytes: an empty last piece does not
+      // push a message of exactly the limit over it.
+      final limited = ToolWsIn(
+        write: (_) async {},
+        onConsumed: (_) {},
+        maxMessage: 10,
+      );
+      expect(limited.add(piece(10, fin: false)), isTrue);
+      expect(limited.add(piece(0)), isTrue);
+    });
+
+    test('both ends count a WebSocket piece alike: every acknowledgement is '
+        'accepted and the window empties', () {
+      fakeAsync((async) {
+        final messages = <Object>[
+          for (var i = 0; i < 1500; i++)
+            switch (i % 6) {
+              0 => '',
+              1 => Uint8List(0),
+              2 => 'é' * (i % 40),
+              3 => _bytes(i % 700, i),
+              4 => i % 24 == 4 ? _bytes(60000, i) : 'x' * (i % 5000),
+              _ => 'tail $i',
+            },
+        ];
+        final source = StreamController<Object?>();
+        final window = ToolSendWindow(ToolCredit());
+        final written = <Object>[];
+        var refused = false;
+        late ToolWsOut out;
+        late ToolAckBook book;
+        final inlet = ToolWsIn(
+          write: (m) async => written.add(m),
+          onConsumed: (total) => book.consumed(1, total),
+        );
+        book = ToolAckBook((ack) {
+          for (var i = 0; i < ack.acks.length; i += 2) {
+            if (!out.onAck(ack.acks[i + 1])) refused = true;
+          }
+        });
+        out = ToolWsOut(
+          id: 1,
+          source: source.stream,
+          window: window,
+          pacer: const ToolUnpaced(),
+          send: (m) {
+            if (!inlet.add(m as ToolWsMessage)) refused = true;
+          },
+        )..start();
+        messages.forEach(source.add);
+        for (var i = 0; i < 4000 && written.length < messages.length; i++) {
+          async.elapse(const Duration(milliseconds: 10));
+        }
+        async.elapse(const Duration(milliseconds: 100)); // the last ack
+        expect(refused, isFalse);
+        expect(written, hasLength(messages.length));
+        final wrong = [
+          for (var i = 0; i < messages.length; i++)
+            if (!_sameMessage(messages[i], written[i])) i,
+        ];
+        expect(wrong, isEmpty, reason: 'in order, kind and content alike');
+        expect(window.inFlight, 0, reason: 'everything sent was acknowledged');
+      });
+    });
+
+    test('a WebSocket piece costs at least one byte', () {
+      expect(toolWsPieceCost(0), 1);
+      expect(toolWsPieceCost(1), 1);
+      expect(toolWsPieceCost(2), 2);
+      expect(toolWsPieceCost(kToolMaxChunkBytes), kToolMaxChunkBytes);
     });
   });
 }
