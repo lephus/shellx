@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shellx_ai/host.dart';
+import 'package:shellx_ai/remote.dart' show AiTurns, aiTurnsOf, aiUndoOffOf;
 import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -10,34 +11,13 @@ import 'ai_diff_overlay.dart';
 import 'ai_notice_card.dart' show aiUndoReason;
 import 'ai_scope.dart';
 
+// V2-2b: the turns undo knows and why it is off are read by the phone's
+// header and changes too; they live in `package:shellx_ai/remote.dart`, and
+// this file still offers them to its importers.
+export 'package:shellx_ai/remote.dart' show AiTurns, aiTurnsOf, aiUndoOffOf;
+
 /// "This turn" or "Whole session" (§4.4).
 enum AiChangesScope { turn, session }
-
-/// The session's turns that have a restore point: the first, the last (the
-/// running one counts), the last finished one; and whether a turn runs.
-typedef AiTurns = ({int? first, int? last, int? lastFinished, bool running});
-
-AiTurns aiTurnsOf(AiSessionState s) {
-  int? first, last, lastFinished;
-  for (final item in s.timeline.items) {
-    if (item is TurnEndItem && item.checkpoint != null) {
-      first ??= item.turn;
-      last = item.turn;
-      lastFinished = item.turn;
-    }
-  }
-  final running = s.turn;
-  if (running != null && running.checkpoint != null) {
-    first ??= running.index;
-    last = running.index;
-  }
-  return (
-    first: first,
-    last: last,
-    lastFinished: lastFinished,
-    running: running != null,
-  );
-}
 
 /// The last turn that ended — with a restore point or without one (undo
 /// off, a snapshot that failed) — or null. What the Files panel and `@` read
@@ -48,19 +28,6 @@ int? aiLastEndedTurn(AiSessionState s) {
   for (var i = items.length - 1; i >= 0; i--) {
     final item = items[i];
     if (item is TurnEndItem) return item.turn;
-  }
-  return null;
-}
-
-/// Why undo is off right now: the latest "undo is off" card of the
-/// conversation that is still open; null when undo works.
-UndoUnavailable? aiUndoOffOf(AiSessionState s) {
-  final items = s.timeline.items;
-  for (var i = items.length - 1; i >= 0; i--) {
-    final item = items[i];
-    if (item is! NoticeItem || item.resolved) continue;
-    final notice = item.notice;
-    if (notice is UndoUnavailable) return notice;
   }
   return null;
 }

@@ -263,6 +263,11 @@ final class MirrorHead with Redacted {
     this.modeId,
     this.modeName,
     this.unavailable,
+    this.acp,
+    this.modelId,
+    this.modelName,
+    this.history = false,
+    this.undo,
   });
 
   /// `stopped`, `starting`, `needsAuth`, `ready`, `running`, `failed`.
@@ -284,6 +289,24 @@ final class MirrorHead with Redacted {
   /// [AiRemoteState.agentOff]): set up on the computer.
   final AiRemoteState? unavailable;
 
+  /// V2-2b §4.2: the agent's own session id (B22); null from an older
+  /// computer, or before the agent opened the session.
+  final String? acp;
+
+  /// V2-2b B11: the current model, by id and name; null when none is known.
+  final String? modelId;
+  final String? modelName;
+
+  /// V2-2b B17: the agent lists its earlier sessions.
+  final bool history;
+
+  /// V2-2b B19: `on` or `off` (or a newer word); null from an older computer.
+  final String? undo;
+
+  /// V2-2b B19: undo does not work for this session (no restore point, and
+  /// the computer says why).
+  bool get undoOff => undo == 'off';
+
   bool get running => turn != null;
 
   /// A prompt can be sent or queued now (V2-1 D16).
@@ -299,6 +322,7 @@ final class MirrorHead with Redacted {
     final ask = jMap(j, 'ask');
     final usage = jMap(j, 'usage');
     final mode = jMap(j, 'mode');
+    final model = jMap(j, 'model');
     final unavailable = jString(j, 'unavailable');
     return MirrorHead(
       phase: jString(j, 'phase') ?? 'stopped',
@@ -363,6 +387,11 @@ final class MirrorHead with Redacted {
       unavailable: unavailable == null
           ? null
           : AiRemoteState.parse(unavailable),
+      acp: jString(j, 'acp'),
+      modelId: model == null ? null : jString(model, 'id'),
+      modelName: model == null ? null : jString(model, 'name'),
+      history: jBool(j, 'hist'),
+      undo: jString(j, 'undo'),
     );
   }
 }

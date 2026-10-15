@@ -8,6 +8,7 @@ export 'src/remote/item_codec.dart' show encodeHead, encodeItem, itemText;
 export 'src/remote/listing.dart';
 export 'src/remote/mirror.dart';
 export 'src/remote/subscription.dart';
+export 'src/remote/undo_view.dart';
 export 'src/remote/wire.dart'
     show
         clipText,

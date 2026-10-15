@@ -312,15 +312,17 @@ final class AiSubscription with Redacted {
 
   /// The header as JSON, within [kAiRecordBytes] so that a body holds it with
   /// its envelope (a body over [kAiBodyBytes] would drop the phone's whole
-  /// channel). An agent decides how long its plan, its mode's id and a
-  /// permission's options are, so when the header is too big they go, one
-  /// after the other and the least needed first: the plan, the mode, then
-  /// the options — the request itself (id, title) stays, so the phone knows
-  /// one waits and the user answers it on the computer.
+  /// channel). An agent decides how long its model's name, its plan, its
+  /// mode's id and a permission's options are, so when the header is too big
+  /// they go, one after the other and the least needed first: the model
+  /// (V2-2b), the plan, the mode, then the options — the request itself (id,
+  /// title) stays, so the phone knows one waits and the user answers it on
+  /// the computer.
   String _headJson() {
     final head = encodeHead(state, _indexOf);
     var json = jsonEncode(head);
     final cuts = <void Function()>[
+      () => head.remove('model'),
       () => head.remove('plan'),
       () => head.remove('mode'),
       () {
