@@ -11,6 +11,7 @@ import '../terminal/local_sessions_provider.dart';
 import '../terminal/resume_offers.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
+import '../tools/tool_dock.dart';
 import 'restore_capture.dart';
 import 'restore_snapshot.dart';
 import 'restore_store.dart';
@@ -200,6 +201,8 @@ class RestorePersistence extends Notifier<void> {
     ref.onDispose(() => unawaited(replacements.cancel()));
     ref.listen(terminalTabsProvider, (_, _) => _schedule());
     ref.listen(sidebarWorkspacesProvider, (_, _) => _schedule());
+    // V2-3 D14: a dock opened, closed, resized or zoomed.
+    ref.listen(toolDockProvider, (_, _) => _schedule());
     // A12 D13: a pane's agent session changing is a layout change; a state
     // change alone is not.
     ref.listen(agentStatusProvider, (prev, next) {
@@ -294,6 +297,8 @@ class RestorePersistence extends Notifier<void> {
         return;
       }
       final snapshot = plan.snapshot;
+      // V2-3 D14: the docks as they were; their pages load when shown.
+      ref.read(toolDockProvider.notifier).restore(snapshot.toolDock);
       // A12 D13–D14: the agents that were running, offered back (never run).
       restoreAgentSessions(
         ref,
@@ -531,6 +536,7 @@ class RestorePersistence extends Notifier<void> {
       daemon: currentDaemon,
       agentOf: _agentOf,
       aiKeyOf: aiKeyOf,
+      toolDock: ref.read(toolDockProvider.notifier).saved,
     );
     final previous = _written;
     if (!force && previous != null && previous.sameLayoutAs(next)) return;

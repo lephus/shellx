@@ -2,6 +2,7 @@ import '../terminal/agent_status.dart' show isValidSessionId;
 import '../terminal/pane_layout.dart';
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
+import '../tools/tool_dock_state.dart';
 import 'restore_snapshot.dart';
 
 /// What is restorable right now (D9: exited panes and tabs left with no
@@ -14,6 +15,9 @@ import 'restore_snapshot.dart';
 /// V2-1 D14: AI tabs go to `aiTabs`, keyed by [aiKeyOf] of their AI pane
 /// (never [keyOf]: AI pane ids are negative, as displaced tabs' are); none
 /// without [aiKeyOf].
+///
+/// V2-3 D14: [toolDock] (each workspace's dock that is not the default) goes
+/// to the top-level `toolDock`.
 RestoreSnapshot captureSnapshot({
   required TerminalTabsState tabs,
   required SidebarState sidebar,
@@ -23,6 +27,7 @@ RestoreSnapshot captureSnapshot({
   String? daemon,
   SavedAgent? Function(int sessionId)? agentOf,
   String Function(int aiPaneId)? aiKeyOf,
+  Map<String, ToolDockState> toolDock = const {},
 }) {
   final saved = <int, SavedTab>{};
   final savedAi = <int, SavedAiTab>{};
@@ -97,6 +102,7 @@ RestoreSnapshot captureSnapshot({
       for (final t in tabs.tabs)
         if (!placed.contains(t.id)) ?savedAi[t.id],
     ],
+    toolDock: toolDock,
   );
 }
 
