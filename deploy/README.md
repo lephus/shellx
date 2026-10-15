@@ -101,9 +101,9 @@ the VPS as the deploy user unless a step says otherwise.
      `phu/shellx` (optional: that is the default; relative to the deploy user's home) and, only if
      sshd on the VPS does not listen on the default port 22, `VPS_SSH_PORT` (digits only; both
      workflows validate it and refuse anything else).
-   - Repeat the same four secrets and the two variables on the existing `release` Environment (see
-     `release/README.md`): `release-desktop.yml`'s `publish` job uploads installers to the same VPS
-     and needs them too. None of these are **repository** secrets or variables.
+   - `release-desktop.yml`'s `publish` job uploads installers to the same VPS with these same
+     `production` secrets and variables (see `release/README.md`). None of these are
+     **repository** secrets or variables.
    - Remove the old `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 4. **First deploy.** Push to `main` or run **Actions → Deploy → Run workflow**. The first run pushes
    the two images to GHCR as *private* packages, so the VPS cannot pull them and the run fails at

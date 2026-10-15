@@ -53,8 +53,8 @@ subsets) for headings, JetBrains Mono for terminal text.
 - `desktopVersion` — the desktop version the home page links to:
   `https://download.shellx.pro/desktop/<v>/ShellX-<v>.dmg` and
   `https://download.shellx.pro/desktop/<v>/ShellX-Setup-<v>.exe`.
-  Bump it only after `release-desktop.yml` has published that version (see `release/README.md`),
-  and run `CHECK_DOWNLOADS=1 npm run build` before merging.
+  `release-desktop.yml` bumps it itself once that version's installers are live (its `announce`
+  job, see `release/README.md`); do not raise it by hand ahead of a release.
 - `appStoreUrl`, `googlePlayUrl` — `null` shows "Sắp ra mắt" / "Coming soon". Once the listings
   are live, set `googlePlayUrl` to `https://play.google.com/store/apps/details?id=pro.shellx.mobile`
   and `appStoreUrl` to the App Store listing URL (`https://apps.apple.com/app/id` followed by the

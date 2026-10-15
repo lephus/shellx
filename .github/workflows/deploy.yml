@@ -16,6 +16,15 @@ on:
         description: 'Full 40-character commit SHA, tag or branch to deploy (empty = the selected branch). Pick an older commit to roll back.'
         required: false
         type: string
+  # release-desktop.yml calls this with ref main once the installers are live and its announce job
+  # pushed the commit that points deploy/relay.env and the website at them (pushed with
+  # GITHUB_TOKEN, so no push trigger fires for it).
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Branch or commit on main to deploy'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -34,9 +43,9 @@ jobs:
     name: Build, push and roll out
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Restricted to the main branch in the runbook (deploy/README.md); shares its four VPS_* secrets
-    # and the VPS_APP_DIR variable with the release Environment used by release-desktop.yml's publish
-    # job, since both write to the same VPS.
+    # Restricted to the main branch in the runbook (deploy/README.md); its four VPS_* secrets and the
+    # VPS_APP_DIR variable are also what release-desktop.yml's publish job uses to upload installers
+    # to the same VPS.
     environment: production
     env:
       # ShellX's one folder on the VPS, relative to the deploy user's home (decision V8). Declared at

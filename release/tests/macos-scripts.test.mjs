@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -106,6 +106,82 @@ test('make-dmg.sh packs the app as ShellX.app next to an /Applications link', { 
     } finally {
       run('hdiutil', ['detach', mount, '-force']);
     }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Stand-ins for xcrun (notarytool, stapler) and spctl: log their arguments, report "Accepted".
+function fakeNotaryTools(dir) {
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  const log = join(dir, 'calls.log');
+  writeFileSync(join(bin, 'xcrun'), `#!/bin/bash\necho "xcrun $*" >> '${log}'\nif [[ "$1 $2" == "notarytool submit" ]]; then echo '{"status":"Accepted","id":"sub-1"}'; fi\n`, { mode: 0o755 });
+  writeFileSync(join(bin, 'spctl'), `#!/bin/bash\necho "spctl $*" >> '${log}'\n`, { mode: 0o755 });
+  return { path: `${bin}:${process.env.PATH}`, log };
+}
+
+const notaryEnvUnset = { APPLE_API_KEY_PATH: '', APPLE_API_KEY_ID: '', APPLE_API_ISSUER_ID: '', APPLE_APP_SPECIFIC_PASSWORD: '', APPLE_ID: '', APPLE_TEAM_ID: '' };
+
+test('notarize.sh signs in with the Apple ID, app-specific password and team when there is no API key', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shellx-notary-'));
+  try {
+    const tools = fakeNotaryTools(dir);
+    const dmg = join(dir, 'ShellX-9.9.9.dmg');
+    writeFileSync(dmg, 'x');
+    const result = run(join(scripts, 'notarize.sh'), [dmg], {
+      ...notaryEnvUnset, PATH: tools.path, APPLE_ID: 'dev@example.com', APPLE_TEAM_ID: 'ABCDE12345', APPLE_APP_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(tools.log, 'utf8');
+    assert.match(calls, /xcrun notarytool submit .*ShellX-9\.9\.9\.dmg --apple-id dev@example\.com --password abcd-efgh-ijkl-mnop --team-id ABCDE12345 --wait/);
+    assert.match(calls, /xcrun stapler staple .*ShellX-9\.9\.9\.dmg/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('notarize.sh prefers the App Store Connect API key when it is set', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shellx-notary-'));
+  try {
+    const tools = fakeNotaryTools(dir);
+    const dmg = join(dir, 'ShellX-9.9.9.dmg');
+    writeFileSync(dmg, 'x');
+    const result = run(join(scripts, 'notarize.sh'), [dmg], {
+      ...notaryEnvUnset, PATH: tools.path, APPLE_API_KEY_PATH: '/tmp/AuthKey.p8', APPLE_API_KEY_ID: 'KEY1234567', APPLE_API_ISSUER_ID: 'issuer-uuid',
+      APPLE_ID: 'dev@example.com', APPLE_TEAM_ID: 'ABCDE12345', APPLE_APP_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(tools.log, 'utf8'), /--key \/tmp\/AuthKey\.p8 --key-id KEY1234567 --issuer issuer-uuid --wait/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('notarize.sh says which secrets are missing when it has no way to sign in', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shellx-notary-'));
+  try {
+    const tools = fakeNotaryTools(dir);
+    const dmg = join(dir, 'ShellX-9.9.9.dmg');
+    writeFileSync(dmg, 'x');
+    const result = run(join(scripts, 'notarize.sh'), [dmg], { ...notaryEnvUnset, PATH: tools.path, APPLE_ID: 'dev@example.com', APPLE_TEAM_ID: 'ABCDE12345' });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout + result.stderr, /APPLE_APP_SPECIFIC_PASSWORD/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('check-team.sh refuses code that is not signed by the expected team', { skip }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shellx-team-'));
+  try {
+    const app = fakeApp(dir);
+    const entitlements = join(dir, 'Release.entitlements');
+    writeFileSync(entitlements, plist({ 'com.apple.security.network.client': true }));
+    assert.equal(run(join(scripts, 'sign-app.sh'), [app, entitlements], { MACOS_SIGNING_IDENTITY: '-' }).status, 0);
+    const result = run(join(scripts, 'check-team.sh'), [app, 'ABCDE12345']);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout + result.stderr, /signed by team 'not set', expected ABCDE12345/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

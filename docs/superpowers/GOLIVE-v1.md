@@ -96,7 +96,7 @@ Windows chưa từng chạy; mỗi mục dưới đây cũng là lần chạy đ
 ### A5. Relay, web và cửa hàng (4 mục)
 
 1. **S-01** Relay thật: `curl https://relay.shellx.pro/v1/version` đúng phiên bản; `docker compose logs relay | grep push_` thấy `push_enabled {"project":"shellxpro"}`; e2e trên relay thật: `cd packages/shellx_e2e && SHELLX_E2E_RELAY=https://relay.shellx.pro dart test test/desktop_terminal_e2e_test.dart` xanh.
-2. **S-02** Quy trình phát hành theo đúng thứ tự (`release/README.md`): dry run → tag `desktop-v1.0.0` → URL tải về công khai → `LATEST_AGENT_VERSION/MAC_URL/WIN_URL` → `CHECK_DOWNLOADS=1 npm run build` web. DMG tải bằng trình duyệt trên Mac sạch chỉ hiện hộp "tải từ Internet"; trang web mới có nút tải chạy.
+2. **S-02** Phát hành tự động khi push `main` (`release/README.md`, từ 2026-10-15): version lấy từ `apps/desktop/pubspec.yaml` (`node release/scripts/bump.mjs X.Y.Z`); workflow build → ký/notarize → URL tải về công khai → tự sửa `LATEST_AGENT_VERSION/MAC_URL/WIN_URL` + `desktopVersion` web, tag `desktop-vX.Y.Z` và deploy. DMG tải bằng trình duyệt trên Mac sạch chỉ hiện hộp "tải từ Internet"; trang web mới có nút tải chạy.
 3. **S-03** Trang privacy/terms vi + en lên **trước** khi phát hành app có push; đã có mục thông báo đẩy, SSH, agent, khôi phục phiên; tên pháp nhân/địa chỉ đã điền và có người chuyên môn xem; câu về log ≤ 30 ngày khớp thực tế (Docker xoay log 10 MB × 3).
 4. **S-04** Nhãn quyền riêng tư cửa hàng: App Store Connect (FCM token = Device ID, Audio data cho giọng nói) và Play Data safety khớp privacy; điền `apps/desktop/assets/whats_new.json` cho đúng số phiên bản v1 (khoá hiện là `1.1.0`, thiếu thì thẻ "Có gì mới" không hiện).
 
@@ -129,7 +129,7 @@ Làm trong 2 tuần đầu, theo thứ tự này:
 |---|---|---|---|
 | 1 | **CI Windows đang đỏ** (`windows-check.yml`) | Cần log lỗi của lần chạy gần nhất (Actions → Windows check → job lỗi). Chưa có nên chưa kết luận được nguyên nhân; C++ của runner (`flutter_window.cpp`, `daemon_runner.cpp`), Inno Pascal và plugin hotkey chưa từng biên dịch. Phải xanh trước khi tag. | Bạn gửi log, rồi sửa |
 | 2 | **Windows chưa từng chạy trên máy thật** | Hết mục A2 (14 mục). Không đạt = không phát hành bản Windows; có thể phát hành macOS + mobile trước. | Bạn |
-| 3 | **Ký macOS + notarize** | Developer ID, 11 secret trong GitHub Environment `release`, dry run, tag; `notarize.sh` + `spctl` pass. | Bạn |
+| 3 | **Ký macOS + notarize** | Developer ID team `W4RF3W4VTZ` (`phulealali@gmail.com`): 3 secret macOS trong GitHub Environment `release` (`release/README.md`), rồi push `main`; `notarize.sh` + `spctl` pass. | Bạn |
 | 4 | **Ký Windows** | Azure Trusted Signing có thể không nhận nhà phát hành Việt Nam → dùng chứng chỉ OV và sửa hai bước ký trong workflow; nếu chưa ký, SmartScreen cảnh báo. | Bạn |
 | 5 | **Cửa hàng** | iOS: APNs key vào Firebase, App ID bật Push, bản Archive build được (chưa từng build iOS) và `aps-environment = production`; Android: `appbundle` + SHA-1 Play App Signing; nhãn riêng tư; icon 1024×1024. | Bạn |
 | 6 | **Pháp lý** | Tên pháp nhân/địa chỉ cho privacy/terms; người chuyên môn xem; thống nhất câu log ≤ 30 ngày. | Bạn |
