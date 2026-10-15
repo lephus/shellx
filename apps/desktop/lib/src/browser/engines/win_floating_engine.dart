@@ -92,6 +92,10 @@ final class WinFloatingEngine implements BrowserEngine {
   /// The plugin reports a failed navigation twice: failed, then finished.
   bool _failedLoad = false;
 
+  /// D7: what [setVisible] asked for last. The plugin's widget shows the
+  /// page by itself whenever it mounts or comes back into the tree.
+  bool _visible = true;
+
   bool get _disposed => _events.isClosed;
 
   void _emit(BrowserEngineEvent e) {
@@ -233,8 +237,18 @@ final class WinFloatingEngine implements BrowserEngine {
   Future<void> releaseFocus() async {}
 
   @override
-  Future<void> setVisible(bool visible) =>
-      _guard((c) => c.setVisibility(visible));
+  Future<void> setVisible(bool visible) {
+    _visible = visible;
+    return _guard((c) => c.setVisibility(visible));
+  }
+
+  /// D7: the plugin's widget has just shown the page (it resumes WebView2
+  /// as it mounts or comes back): a page asked to hide meanwhile — a menu
+  /// opened while WebView2 was starting — hides again.
+  void _keepHidden() {
+    if (_visible || _disposed) return;
+    unawaited(_guard((c) => c.setVisibility(false)));
+  }
 
   /// The plugin's widget calls its controller by itself (when it mounts,
   /// after each layout, when it leaves), so it only stands for a page whose
@@ -319,9 +333,47 @@ class _WinFloatingViewState extends State<_WinFloatingView> {
     future: widget.engine._ready,
     builder: (context, started) =>
         started.data == true && !widget.engine._disposed
-        ? WinWebViewWidget(controller: widget.controller)
+        ? _PluginView(engine: widget.engine, controller: widget.controller)
         : const SizedBox.shrink(),
   );
+}
+
+/// The plugin's widget, which resumes and shows WebView2 when it mounts
+/// and when it comes back into the tree (`initState`, `activate`). After
+/// that frame the engine hides the page again if the dock asked it to
+/// (D7): the plugin's calls go out first, this one after them.
+class _PluginView extends StatefulWidget {
+  const _PluginView({required this.engine, required this.controller});
+
+  final WinFloatingEngine engine;
+  final WinWebViewController controller;
+
+  @override
+  State<_PluginView> createState() => _PluginViewState();
+}
+
+class _PluginViewState extends State<_PluginView> {
+  @override
+  void initState() {
+    super.initState();
+    _afterPluginShows();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _afterPluginShows();
+  }
+
+  void _afterPluginShows() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.engine._keepHidden();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      WinWebViewWidget(controller: widget.controller);
 }
 
 /// D8, D22, R16 on Windows: through a live page whose WebView2 started

@@ -296,6 +296,43 @@ void main() {
     expect(events, isEmpty);
   });
 
+  testWidgets('a page hidden before the plugin\'s view mounts stays hidden: '
+      'the view shows it as it mounts (`resume`), the engine hides it again '
+      '(D7)', (tester) async {
+    final plugin = _Plugin();
+    final created = Completer<bool>();
+    plugin.created = () => created.future;
+    final engine = WinFloatingEngine(
+      policy: toolNavigation,
+      dataFolder: _folder,
+    );
+    await tester.pumpWidget(engine.buildView());
+    // A menu opened over the window while WebView2 was starting.
+    final hidden = engine.setVisible(false);
+    created.complete(true);
+    await hidden;
+    expect(find.byType(WinWebViewWidget), findsNothing);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(WinWebViewWidget), findsOneWidget);
+    // WebView2's visibility calls in order (`resume` shows the page).
+    final shown = [
+      for (final c in plugin.calls)
+        if (c.method == 'setVisibility')
+          _args(c)['isVisible']
+        else if (c.method == 'resume')
+          true
+        else if (c.method == 'suspend')
+          false,
+    ];
+    expect(shown, [false, true, false], reason: 'the last one is false');
+
+    final disposed = engine.dispose();
+    await tester.pumpWidget(const SizedBox());
+    await disposed;
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('without WebView2 (no data folder, or no Runtime) the view '
       'stays empty and calls nothing (F1, ruling c)', (tester) async {
     final plugin = _Plugin()..created = () async => false;
