@@ -88,6 +88,9 @@ final class _Desktop {
   /// The streams the phone ended (`tool.end`), in order.
   final ends = <ToolEnd>[];
 
+  /// What the phone acknowledged (`tool.ack`'s `[id, total, …]`), in order.
+  final acked = <List<int>>[];
+
   bool _fromPhone(List<AppMessage> batch) {
     final messages = decodeBatch(encodeBatch(batch));
     scheduleMicrotask(() {
@@ -113,6 +116,8 @@ final class _Desktop {
             replies = script(request);
           case final ToolEnd end:
             ends.add(end);
+          case ToolAck(:final acks):
+            acked.add(acks);
           default:
             break;
         }
@@ -129,14 +134,32 @@ final class _Desktop {
 /// with that code before any response; `/early` answers in full (`early`)
 /// whatever the body; `/bad-status` answers a status no HTTP response has;
 /// `/ws-protocol` opens a WebSocket on a protocol nobody offered,
-/// `/ws-two-protocols` on two; `/hold` gets nothing; anything else 204.
+/// `/ws-two-protocols` on two; `/ws-hello`, `/ws-close` and `/ws-hello-bye`
+/// open one and, in the same batch as the 101, send `hello`, close with
+/// 4000, or send `hello` and `again` and close with 4001; `/hold` gets
+/// nothing; anything else 204.
 List<ToolMessage> _script(ToolRequest request) {
   final id = request.id;
   final target = request.target;
   if (target.startsWith('/end/')) {
     return [ToolEnd(id: id, code: target.substring(5))];
   }
+  final opened = ToolResponse(id: id, status: 101, head: const [], end: false);
+  ToolWsMessage say(String text) => ToolWsMessage(
+    id: id,
+    data: Uint8List.fromList(utf8.encode(text)),
+    text: true,
+    fin: true,
+  );
   return switch (target) {
+    '/ws-hello' => [opened, say('hello')],
+    '/ws-close' => [opened, ToolEnd(id: id, wsCode: 4000, wsReason: 'bye')],
+    '/ws-hello-bye' => [
+      opened,
+      say('hello'),
+      say('again'),
+      ToolEnd(id: id, wsCode: 4001),
+    ],
     '/early' => [
       ToolResponse(
         id: id,
@@ -1090,6 +1113,65 @@ void main() {
         throwsA(isA<SocketException>()),
       );
       expect(api.hits, isEmpty);
+    });
+  });
+
+  /// Ruling I2: the WebSocket's way to the webview exists from the moment
+  /// the 101 is accepted. What the computer sends with it, before the
+  /// upgraded socket is ready, waits in order and goes out once it is:
+  /// never dropped, acknowledged only once written (E7, E8, RF 3).
+  group('what comes with the 101 (I2)', () {
+    Future<WebSocket> connect(ToolSession page, Webview view, String path) {
+      final port = page.servedPort!;
+      return view
+          .socket(
+            Uri.parse('ws://localhost:$port$path'),
+            origin: 'http://localhost:$port',
+          )
+          .timeout(const Duration(seconds: 5));
+    }
+
+    /// What [ws] hears until the webview sees it closed (its stream ends;
+    /// dart:io's `done` is the sink's and waits for this side to write).
+    Future<List<Object?>> heard(WebSocket ws) {
+      final got = <Object?>[];
+      final closed = Completer<List<Object?>>();
+      ws.listen(
+        got.add,
+        onError: (Object _) {},
+        onDone: () => closed.complete(got),
+      );
+      return closed.future.timeout(const Duration(seconds: 3));
+    }
+
+    test('a message in the same batch as the 101 reaches the webview, and '
+        'is acknowledged once written', () async {
+      final (:page, :view, :desktop) = await openScripted();
+      final ws = await connect(page, view, '/ws-hello');
+      final got = <Object?>[];
+      ws.listen(got.add, onError: (Object _) {});
+      await until(() => got.isNotEmpty, timeout: const Duration(seconds: 3));
+      expect(got, ['hello']);
+      await until(() => desktop.acked.isNotEmpty);
+      final id = desktop.requests.last.id;
+      expect(desktop.acked.single, [id, toolWsPieceCost(5)]);
+      await ws.close();
+    });
+
+    test('a close in the same batch as the 101 reaches the webview with its '
+        'code', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final ws = await connect(page, view, '/ws-close');
+      expect(await heard(ws), isEmpty);
+      expect(ws.closeCode, 4000);
+      expect(ws.closeReason, 'bye');
+    });
+
+    test('messages, then the close, all with the 101: in that order', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final ws = await connect(page, view, '/ws-hello-bye');
+      expect(await heard(ws), ['hello', 'again']);
+      expect(ws.closeCode, 4001);
     });
   });
 }
