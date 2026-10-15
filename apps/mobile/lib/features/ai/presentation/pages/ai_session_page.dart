@@ -8,6 +8,8 @@ import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_co
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_config_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_folder_chooser.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_history_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
@@ -118,6 +120,29 @@ class _AiSessionPageState extends State<AiSessionPage> {
     }
   }
 
+  /// V2-2b B17: "Lịch sử phiên" — an earlier session picked there opens on the computer in a new AI tab (not shown
+  /// there), and here in place of this page.
+  Future<void> _openHistory() async {
+    final acp = await showAiHistorySheet(context, _controller);
+    if (acp == null || !mounted) return;
+    final opened = await _controller.resume(acp);
+    if (!mounted) return;
+    final sid = opened.sid;
+    if (sid == null) {
+      _say(opened.code);
+      return;
+    }
+    // Keyed by its session, as the list of sessions does (`openAiChooser`): a page that takes the place of another
+    // session's page is a new page — the router would otherwise keep the old one's state, and so its session.
+    final route = AiSessionRoute(
+      key: ValueKey('ai:${widget.agentId}/$sid'),
+      agentId: widget.agentId,
+      machineName: widget.machineName,
+      sid: sid,
+    );
+    unawaited(context.router.replace(route));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -159,8 +184,11 @@ class _AiSessionPageState extends State<AiSessionPage> {
       onSubtitle: head != null && _controller.linkState == AiLinkState.live && _controller.can(AiFeature.config)
           ? _openConfig
           : null,
-      // V2-2b B17, B20: the "⋯" menu, each entry only while the computer offers it (Tasks 15 and 25 add theirs).
-      menu: [],
+      // V2-2b B17, B20: the "⋯" menu, each entry only while the computer offers it (Task 25 adds B20's).
+      menu: [
+        if (!closed && head != null && head.history && _controller.can(AiFeature.history))
+          (key: const Key('ai.menu.history'), label: s.aiHistory, onTap: () => unawaited(_openHistory())),
+      ],
     );
   }
 
@@ -243,6 +271,18 @@ class _AiSessionPageState extends State<AiSessionPage> {
     }
     final unavailable = head?.unavailable;
     if (unavailable != null && empty) {
+      // V2-2b B18: a tab without a folder takes one of the computer's from here, when the computer can.
+      final folders = _controller.folders;
+      if (unavailable == AiRemoteState.noFolder &&
+          link == AiLinkState.live &&
+          folders.isNotEmpty &&
+          _controller.can(AiFeature.folder)) {
+        return AiFolderChooser(
+          key: const Key('ai.folders'),
+          folders: folders,
+          onUse: (folder) async => _say(await _controller.chooseFolder(folder)),
+        );
+      }
       // D14: set up on the computer; nothing to send from here.
       return Center(
         key: const Key('ai.unavailable'),

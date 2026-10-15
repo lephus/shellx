@@ -407,5 +407,11 @@
   "aiConfigOnComputer": "Chọn mục này trên máy tính.",
   "aiViewAll": "Xem đủ",
   "aiLoadingParts": "Đang tải {part}/{parts}",
-  "aiItemChanging": "Mục này vẫn đang thay đổi trên máy tính. Thử lại sau giây lát."
+  "aiItemChanging": "Mục này vẫn đang thay đổi trên máy tính. Thử lại sau giây lát.",
+  "aiHistory": "Lịch sử phiên",
+  "aiHistoryMore": "Tải thêm",
+  "aiHistoryEmpty": "Chưa có phiên nào trước đây trong thư mục này.",
+  "aiHistoryNotReady": "Lịch sử hiện khi agent đang chạy.",
+  "aiUseFolder": "Dùng thư mục này",
+  "aiChooseFolder": "Chọn thư mục cho phiên này"
 }
