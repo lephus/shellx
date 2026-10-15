@@ -101,6 +101,18 @@ const _webSocketGuid = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const _policyHeader = 'content-security-policy';
 
+/// The request headers the gate reads as one value: its own checks and the
+/// WebSocket handshake. `HttpHeaders.value` throws on a repeated one, which
+/// would leave the request unanswered: a repeated one is refused (400).
+const _oneValueHeaders = [
+  'origin',
+  'access-control-request-method',
+  'sec-fetch-site',
+  HttpHeaders.upgradeHeader,
+  'sec-websocket-key',
+  'sec-websocket-version',
+];
+
 /// RFC 6455: the `Sec-WebSocket-Accept` for [key].
 String webSocketAccept(String key) => base64Encode(
   const DartSha1().hashSync(utf8.encode('$key$_webSocketGuid')).bytes,
@@ -477,6 +489,11 @@ final class ToolSession {
     if (!isToolLoopbackAuthority(host, port)) {
       return _answer(request, HttpStatus.forbidden);
     }
+    for (final name in _oneValueHeaders) {
+      if ((request.headers[name]?.length ?? 0) > 1) {
+        return _answer(request, HttpStatus.badRequest);
+      }
+    }
     // E11: the reserved prefix is the phone's own, never the tool's.
     if (request.uri.path.startsWith(kToolReservedPrefix)) {
       return _enter(request, served);
@@ -792,6 +809,15 @@ sealed class _Stream implements ToolStreamListener {
   Future<void> reply(int status, [String? text]) =>
       session._answer(request, status, text, read);
 
+  /// The computer's answer cannot be passed on to the webview (a status no
+  /// response has, a protocol the page did not offer): the computer is told,
+  /// so its side ends too, and the webview gets 502.
+  void reject() {
+    link.enqueue(ToolEnd(id: id, code: ToolCode.aborted));
+    forget();
+    unawaited(reply(HttpStatus.badGateway));
+  }
+
   /// Ended here (page left, app paused): the computer is told.
   void abort() {
     if (done) return;
@@ -922,8 +948,7 @@ final class _HttpStream extends _Stream {
     final response = request.response;
     final status = message.status;
     if (status < 100 || status > 599 || status == 101) {
-      forget();
-      unawaited(reply(HttpStatus.badGateway));
+      reject();
       return;
     }
     response.statusCode = status;
@@ -1037,15 +1062,23 @@ final class _WsStream extends _Stream {
   void onResponse(ToolResponse message) {
     if (done || responded) return;
     responded = true;
-    if (message.status != HttpStatus.switchingProtocols) {
+    final status = message.status;
+    if (status < 100 || status > 599) {
+      reject();
+      return;
+    }
+    if (status != HttpStatus.switchingProtocols) {
       _refused(message);
       return;
     }
+    // At most one protocol, and one the page offered (RFC 6455 §4.1).
     final protocols = toolHeadValues(message.head, 'sec-websocket-protocol');
     final protocol = protocols.isEmpty ? null : protocols.first;
     final key = request.headers.value('sec-websocket-key');
-    if (key == null || (protocol != null && !_offered.contains(protocol))) {
-      abort();
+    if (key == null ||
+        protocols.length > 1 ||
+        (protocol != null && !_offered.contains(protocol))) {
+      reject();
       return;
     }
     unawaited(_upgrade(key, protocol));

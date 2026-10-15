@@ -40,6 +40,19 @@ Future<List<String>> _rawHead(int port, List<String> lines) async {
   return (end < 0 ? text : text.substring(0, end)).split('\r\n');
 }
 
+/// A WebSocket upgrade of [path] from the page on [port], with [cookie]
+/// (the webview's `Cookie` value), for [_rawHead].
+List<String> _upgrade(int port, String path, String cookie) => [
+  'GET $path HTTP/1.1',
+  'host: localhost:$port',
+  'connection: Upgrade',
+  'upgrade: websocket',
+  'sec-websocket-version: 13',
+  'sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==',
+  'origin: http://localhost:$port',
+  'cookie: $cookie',
+];
+
 /// The `Content-Security-Policy` lines of a raw [head], one per line.
 List<String> _policies(List<String> head) => [
   for (final line in head.skip(1))
@@ -65,6 +78,9 @@ final class _Desktop {
   late final MachineTools tools;
   final requests = <ToolRequest>[];
 
+  /// The streams the phone ended (`tool.end`), in order.
+  final ends = <ToolEnd>[];
+
   bool _fromPhone(List<AppMessage> batch) {
     final messages = decodeBatch(encodeBatch(batch));
     scheduleMicrotask(() {
@@ -88,6 +104,8 @@ final class _Desktop {
           case final ToolRequest request:
             requests.add(request);
             replies = script(request);
+          case final ToolEnd end:
+            ends.add(end);
           default:
             break;
         }
@@ -103,7 +121,8 @@ final class _Desktop {
 /// What the stand-in computer sends for a request: `/end/<code>` ends it
 /// with that code before any response; `/early` answers in full (`early`)
 /// whatever the body; `/bad-status` answers a status no HTTP response has;
-/// `/hold` gets nothing; anything else 204.
+/// `/ws-protocol` opens a WebSocket on a protocol nobody offered,
+/// `/ws-two-protocols` on two; `/hold` gets nothing; anything else 204.
 List<ToolMessage> _script(ToolRequest request) {
   final id = request.id;
   final target = request.target;
@@ -126,6 +145,27 @@ List<ToolMessage> _script(ToolRequest request) {
     ],
     '/bad-status' => [
       ToolResponse(id: id, status: 42, head: const [], end: true),
+    ],
+    '/ws-protocol' => [
+      ToolResponse(
+        id: id,
+        status: 101,
+        head: const ['sec-websocket-protocol', 'never-offered'],
+        end: false,
+      ),
+    ],
+    '/ws-two-protocols' => [
+      ToolResponse(
+        id: id,
+        status: 101,
+        head: const [
+          'sec-websocket-protocol',
+          'chat',
+          'sec-websocket-protocol',
+          'chat',
+        ],
+        end: false,
+      ),
     ],
     '/hold' => const [],
     _ => [ToolResponse(id: id, status: 204, head: const [], end: true)],
@@ -673,16 +713,8 @@ void main() {
       final port = session.servedPort!;
       final policy = toolContentSecurityPolicy([port]);
       await webview.enter(events.whereType<ToolLoad>().single.url);
-      List<String> upgrade(String path) => [
-        'GET $path HTTP/1.1',
-        'host: localhost:$port',
-        'connection: Upgrade',
-        'upgrade: websocket',
-        'sec-websocket-version: 13',
-        'sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==',
-        'origin: http://localhost:$port',
-        'cookie: ${webview.cookieHeader}',
-      ];
+      List<String> upgrade(String path) =>
+          _upgrade(port, path, webview.cookieHeader);
       final opened = await _rawHead(port, upgrade('/ws'));
       expect(opened.first, startsWith('HTTP/1.1 101'));
       expect(_policies(opened), [policy]);
@@ -908,6 +940,77 @@ void main() {
       await until(() => desktop.requests.any((r) => r.target == '/hold'));
       desktop.tools.channelLost();
       expect((await waiting).status, 502);
+    });
+  });
+
+  /// Found in review: the gate reads some headers as one value (dart:io's
+  /// `HttpHeaders.value` throws on a repeated one, which left the request
+  /// unanswered), and some answers of the computer cannot be passed on.
+  group('what the phone cannot pass on', () {
+    test('a header the gate reads once, given twice: 400 at once, with one '
+        'ShellX policy, and nothing reaches the tool (RF 5)', () async {
+      await openSamePort();
+      final port = session.servedPort!;
+      final policy = toolContentSecurityPolicy([port]);
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      tool.hits.clear();
+      final host = 'host: localhost:$port';
+      final origin = 'origin: http://localhost:$port';
+      final cookie = 'cookie: ${webview.cookieHeader}';
+      final requests = {
+        'origin': ['GET / HTTP/1.1', host, origin, 'origin: http://evil.com'],
+        'sec-fetch-site': [
+          'POST / HTTP/1.1',
+          host,
+          cookie,
+          'content-length: 0',
+          'sec-fetch-site: same-origin',
+          'sec-fetch-site: cross-site',
+        ],
+        'access-control-request-method': [
+          'OPTIONS / HTTP/1.1',
+          host,
+          origin,
+          'access-control-request-method: POST',
+          'access-control-request-method: PUT',
+        ],
+        'sec-websocket-key': [
+          ..._upgrade(port, '/ws', webview.cookieHeader),
+          'sec-websocket-key: AQIDBAUGBwgJCgsMDQ4PEA==',
+        ],
+      };
+      for (final MapEntry(key: name, value: lines) in requests.entries) {
+        final head = await _rawHead(port, lines);
+        expect(head.first, startsWith('HTTP/1.1 400'), reason: name);
+        expect(_policies(head), [policy], reason: name);
+      }
+      expect(tool.hits, isEmpty);
+    });
+
+    test('an answer of the computer the phone cannot pass on (a status no '
+        'response has, a protocol the page did not offer): the computer is '
+        'told, the webview gets 502', () async {
+      final (:page, :view, :desktop) = await openScripted();
+      final port = page.servedPort!;
+      final policy = toolContentSecurityPolicy([port]);
+      final http = await view
+          .request(Uri.parse('http://localhost:$port/bad-status'))
+          .timeout(const Duration(seconds: 2));
+      expect(http.status, 502);
+      expect(http.headers['content-security-policy'], [policy]);
+      for (final path in ['/bad-status', '/ws-protocol', '/ws-two-protocols']) {
+        final head = await _rawHead(port, [
+          ..._upgrade(port, path, view.cookieHeader),
+          'sec-websocket-protocol: chat',
+        ]);
+        expect(head.first, startsWith('HTTP/1.1 502'), reason: path);
+        expect(_policies(head), [policy], reason: path);
+      }
+      await until(() => desktop.ends.length == 4);
+      expect(
+        [for (final end in desktop.ends) (end.id, end.code)],
+        [for (final request in desktop.requests) (request.id, 'aborted')],
+      );
     });
   });
 }
