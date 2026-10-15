@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
@@ -174,6 +176,69 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('ai.history.old-1')), findsOneWidget);
       expect(machine.ai.historyAsks, hasLength(2));
+    });
+
+    testWidgets('the retry of a not_ready history waits with a spinner, never with "no earlier sessions"', (
+      tester,
+    ) async {
+      offers({AiFeature.history});
+      machine.ai
+        ..historyFailWith = 'not_ready'
+        ..historyPages[null] = const AiHistoryPage(
+          sessions: [AiPastSession(acp: 'old-1', title: 'Cũ')],
+        );
+      final ai = machine.ai.session(sid);
+      ai.desktop
+        ..setAgent(_lists)
+        ..setPhase(AgentPhase.stopped);
+      await open(tester);
+      await openHistory(tester);
+      expect(find.byKey(const Key('ai.history.notReady')), findsOneWidget);
+      // The agent runs and the sheet asks again; the computer's reply is still on its way.
+      final held = Completer<void>();
+      machine.ai.gate = held;
+      machine.ai.historyFailWith = null;
+      ai.desktop.setPhase(AgentPhase.ready);
+      ai.sync();
+      await tester.pump();
+      expect(machine.ai.historyAsks, hasLength(2), reason: 'the retry went out');
+      expect(find.byKey(const Key('ai.history.empty')), findsNothing, reason: 'nothing has come yet');
+      expect(find.byKey(const Key('ai.history.notReady')), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      held.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ai.history.old-1')), findsOneWidget);
+      expect(find.byKey(const Key('ai.history.empty')), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('a "Tải thêm" on its way while no session is shown waits with a spinner too', (tester) async {
+      offers({AiFeature.history});
+      machine.ai.historyPages
+        ..[null] = const AiHistoryPage(
+          sessions: [AiPastSession(acp: 'sess-1', title: 'Đang mở ở đây')],
+          current: 'sess-1',
+          next: 'c2',
+        )
+        ..['c2'] = const AiHistoryPage(
+          sessions: [AiPastSession(acp: 'b', title: 'B')],
+        );
+      machine.ai.session(sid).desktop.setAgent(_lists);
+      await open(tester);
+      await openHistory(tester);
+      // The first page holds only the session open here: nothing is shown, more is offered.
+      expect(find.byKey(const Key('ai.history.empty')), findsNothing);
+      final held = Completer<void>();
+      machine.ai.gate = held;
+      await tester.tap(find.byKey(const Key('ai.history.more')));
+      await tester.pump();
+      expect(machine.ai.historyAsks, [(sid, null), (sid, 'c2')]);
+      expect(find.byKey(const Key('ai.history.empty')), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      held.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ai.history.b')), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('no entry without the feature, or for an agent without session/list', (tester) async {

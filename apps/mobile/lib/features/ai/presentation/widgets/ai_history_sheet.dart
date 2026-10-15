@@ -37,7 +37,11 @@ class _HistorySheetState extends State<_HistorySheet> {
 
   /// Why the last page did not come (`not_ready`, …); null when it came.
   String? _code;
+
+  /// A load is on its way. While nothing is shown the sheet shows its spinner, never "no earlier sessions".
   var _loading = false;
+
+  /// A page has come (a load that failed leaves it as it was): "no earlier sessions" is said only after one.
   var _loaded = false;
   void Function()? _stopWatching;
 
@@ -73,12 +77,12 @@ class _HistorySheetState extends State<_HistorySheet> {
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _loaded = true;
       final page = result.page;
       if (page == null) {
         _code = result.code;
         return;
       }
+      _loaded = true;
       if (cursor == null) _sessions.clear();
       _sessions.addAll(page.sessions);
       _current = page.current;
@@ -115,12 +119,12 @@ class _HistorySheetState extends State<_HistorySheet> {
                 line(const Key('ai.history.notReady'), s.aiHistoryNotReady)
               else if (code != null)
                 line(const Key('ai.history.error'), AiWords.failure(s, code) ?? s.somethingWentWrong)
-              else if (!_loaded)
+              else if (_loading && shown.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(24),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (shown.isEmpty && _next == null)
+              else if (_loaded && shown.isEmpty && _next == null)
                 line(const Key('ai.history.empty'), s.aiHistoryEmpty),
               Flexible(
                 child: ListView(
