@@ -175,6 +175,81 @@ void main() {
     expect(popups.infos.single, 'Tool ở cổng 8000 chưa bật cho điện thoại.');
   });
 
+  // C1: on Android the plugin loads whatever the policy lets through, and a link the web view will not
+  // render (a download, a PDF) comes back to the same policy; let through again, it goes round for ever.
+  const download = 'http://localhost:5173/files/report.zip';
+
+  testWidgets('an address let through that comes back before any page start is a download: stopped, one toast (C1)', (
+    tester,
+  ) async {
+    await open(tester);
+    await shown(tester);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    expect(engine.callbacks.decide(download, true), isA<ToolBlock>());
+    expect(popups.infos, ['Tải tệp chưa làm được trên điện thoại.']);
+  });
+
+  testWidgets('after a page start the same address goes on again (C1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    engine.callbacks.onPageStarted();
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    expect(popups.infos, isEmpty);
+  });
+
+  testWidgets('a page started twice and never finished that comes back a third time is a download too (C1)', (
+    tester,
+  ) async {
+    await open(tester);
+    await shown(tester);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    engine.callbacks.onPageStarted();
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    engine.callbacks.onPageStarted();
+    expect(engine.callbacks.decide(download, true), isA<ToolBlock>());
+    expect(popups.infos, ['Tải tệp chưa làm được trên điện thoại.']);
+  });
+
+  testWidgets('a finished page forgets what it let through: a reload after a redirect goes on (C1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    // iOS asks the policy for the entry URL, for the redirect it answers with, and again for a reload.
+    expect(engine.callbacks.decide('http://localhost:5173/__shellx/enter?n=x', true), isA<ToolGo>());
+    engine.callbacks.onPageStarted();
+    expect(engine.callbacks.decide('http://localhost:5173/', true), isA<ToolGo>());
+    engine.callbacks.onPageFinished();
+    expect(engine.callbacks.decide('http://localhost:5173/', true), isA<ToolGo>());
+    expect(popups.infos, isEmpty);
+  });
+
+  testWidgets('links within a page, frames and about:blank are never stopped (C1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    for (final (url, mainFrame) in [
+      ('http://localhost:5173/#/board', true),
+      ('http://localhost:5173/files/report.zip', false),
+      ('about:blank', true),
+    ]) {
+      for (var i = 0; i < 4; i++) {
+        expect(engine.callbacks.decide(url, mainFrame), isA<ToolGo>(), reason: '$url, time $i');
+      }
+    }
+    expect(popups.infos, isEmpty);
+  });
+
+  testWidgets('a load the app makes itself is no re-entry (C1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    await tester.tap(find.byKey(const Key('tool.reload')));
+    await tester.pump();
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    page().emit(const ToolReload());
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    expect(popups.infos, isEmpty);
+  });
+
   testWidgets('the page\'s dialogs are the app\'s and name the tool (E12)', (tester) async {
     await open(tester);
     await shown(tester);

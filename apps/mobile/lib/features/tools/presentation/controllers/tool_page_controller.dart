@@ -31,6 +31,13 @@ class ToolPageController extends Controller {
   bool _foreground = true;
   bool _disposed = false;
 
+  /// C1: the main-frame address this page last let through, until its page has finished, failed or the
+  /// app loaded something itself; how many times it was let through, and whether a page has started
+  /// since. See [decide].
+  String? _passed;
+  int _passes = 0;
+  bool _startedSincePass = false;
+
   final Signal<ToolPhase> _phase = signal(ToolPhase.opening);
   final Signal<int?> _alias = signal(null);
   final Signal<int> _progress = signal(0);
@@ -83,8 +90,10 @@ class ToolPageController extends Controller {
   void _onEvent(ToolPageEvent event) {
     switch (event) {
       case ToolLoad(:final url):
+        _forgetPassed();
         unawaited(_engine?.load(url));
       case ToolReload():
+        _forgetPassed();
         unawaited(_engine?.reload());
       case ToolSiblingOff(:final port):
         _notices.add((ToolNotice.siblingOff, port));
@@ -93,14 +102,40 @@ class ToolPageController extends Controller {
     }
   }
 
-  /// [ToolWebCallbacks.decide]: E12 against what this phone serves now.
+  /// [ToolWebCallbacks.decide]: E12 against what this phone serves now, and C1: a main-frame address
+  /// let through that comes back to the policy before any page has started is a download (or a
+  /// response the web view will not render) and is stopped, with the "no downloads" toast.
+  ///
+  /// Why: on Android the plugin loads whatever the policy lets through, and hands a download to the
+  /// same policy again (`onDownloadStart` → `onNavigationRequest`); let through each time, the same
+  /// request would go to the computer for ever. Where the web view reports a page start for such an
+  /// attempt (it fires when a navigation begins) the first re-entry cannot be told from a link
+  /// followed again, so an address let through twice and never finished is stopped the third time.
+  /// A finished or failed page, a load the app makes itself, a different address, a frame, a link
+  /// within a page (a fragment) and `about:blank` forget or skip all of this.
   ToolNavigation decide(String url, bool mainFrame) {
     final decision = toolNavigation(url, mainFrame: mainFrame, origins: _page?.origins ?? const {});
     if (decision is ToolOtherLocal) _notices.add((ToolNotice.siblingOff, decision.port));
+    if (mainFrame && decision is ToolGo && url != 'about:blank' && !(Uri.tryParse(url)?.hasFragment ?? false)) {
+      if (_passed == url && (!_startedSincePass || _passes >= 2)) {
+        _notices.add((ToolNotice.noDownloads, null));
+        return const ToolBlock();
+      }
+      _passes = _passed == url ? _passes + 1 : 1;
+      _passed = url;
+      _startedSincePass = false;
+    }
     return decision;
   }
 
+  void _forgetPassed() {
+    _passed = null;
+    _passes = 0;
+    _startedSincePass = false;
+  }
+
   void pageStarted() {
+    _startedSincePass = true;
     _page?.resetRequests();
     _set(_loading, true);
     _set(_slowRequests, null);
@@ -114,6 +149,7 @@ class ToolPageController extends Controller {
   }
 
   void pageFinished() {
+    _forgetPassed();
     _slow?.cancel();
     _slow = null;
     _set(_loading, false);
@@ -124,11 +160,17 @@ class ToolPageController extends Controller {
   void progressed(int percent) => _set(_progress, percent);
 
   /// E12: the web content process stopped: the page loads again.
-  void crashed() => unawaited(_engine?.reload());
+  void crashed() {
+    _forgetPassed();
+    unawaited(_engine?.reload());
+  }
 
   void fileChooser() => _notices.add((ToolNotice.noDownloads, null));
 
-  Future<void> reload() async => _engine?.reload();
+  Future<void> reload() async {
+    _forgetPassed();
+    await _engine?.reload();
+  }
 
   /// "Về trang đầu".
   void home() => _page?.home();
