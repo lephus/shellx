@@ -62,6 +62,7 @@ void main() {
       'http://localhost:0/': ToolUrlError.badPort,
       'localhost:65536': ToolUrlError.badPort,
       'http://localhost:99999': ToolUrlError.badPort,
+      'http://localhost:99999999999999999999': ToolUrlError.badPort,
       'http://localhost:abc': ToolUrlError.noHost,
     };
     refused.forEach((input, error) {
@@ -184,6 +185,7 @@ void main() {
         {...valid, 'ws': 3},
         {...valid, 'url': 'javascript:alert(1)'},
         {...valid, 'url': 'http://u:p@h/'},
+        {...valid, 'url': 'http://localhost:99999999999999999999'},
         {...valid, 'url': null},
         <Object?, Object?>{1: 2},
       ];

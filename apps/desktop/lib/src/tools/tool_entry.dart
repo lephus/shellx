@@ -94,13 +94,20 @@ ToolUrlResult parseToolUrl(String input) {
   if (!host.contains(':') && !_hostName.hasMatch(host)) {
     return const ToolUrlBad(ToolUrlError.noHost);
   }
-  if (uri.hasPort && (uri.port < 1 || uri.port > 65535)) {
+  // Uri reads the port lazily: a number too big for an int throws here.
+  final int? port;
+  try {
+    port = uri.hasPort ? uri.port : null;
+  } on FormatException {
+    return const ToolUrlBad(ToolUrlError.badPort);
+  }
+  if (port != null && (port < 1 || port > 65535)) {
     return const ToolUrlBad(ToolUrlError.badPort);
   }
   final clean = Uri(
     scheme: uri.scheme.toLowerCase(),
     host: host,
-    port: uri.hasPort ? uri.port : null,
+    port: port,
     path: uri.path.isEmpty ? '/' : uri.path,
     query: uri.hasQuery ? uri.query : null,
   ).toString();
