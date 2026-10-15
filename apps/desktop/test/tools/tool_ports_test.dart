@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
@@ -9,6 +10,7 @@ import 'package:shellx_ai/host.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart'
     show clockProvider;
+import 'package:shellx_desktop/src/ai/ai_host_provider.dart';
 import 'package:shellx_desktop/src/ai/ai_runtimes.dart';
 import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -26,9 +28,15 @@ final class _Probe implements PortProbe, ProcessTableProbe {
   final Map<int, ProgramRow> rows;
   int scans = 0;
 
+  /// Thrown by the read of the listening sockets / of the process table.
+  Object? listeningError;
+  Object? tableError;
+
   @override
   Future<Map<int, Set<int>>> listening() async {
     scans++;
+    final error = listeningError;
+    if (error != null) throw error;
     return ports;
   }
 
@@ -36,7 +44,22 @@ final class _Probe implements PortProbe, ProcessTableProbe {
   Future<Map<int, int>> parents() async => const {};
 
   @override
-  Future<Map<int, ProgramRow>> processTable() async => rows;
+  Future<Map<int, ProgramRow>> processTable() async {
+    final error = tableError;
+    if (error != null) throw error;
+    return rows;
+  }
+}
+
+bool _alive(int pid) => Process.runSync('kill', ['-0', '$pid']).exitCode == 0;
+
+/// [done], asked every 25 ms for up to 10 s: a process starting or ending
+/// takes a moment, and the machine may be busy.
+Future<bool> _until(bool Function() done) async {
+  for (var i = 0; i < 400 && !done(); i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 25));
+  }
+  return done();
 }
 
 final class _Channel implements AgentChannel {
@@ -164,6 +187,92 @@ void main() {
       expect(list, isEmpty);
       expect(probe.scans, 0, reason: 'nothing to look up');
     });
+
+    test('an exited pane\'s ports are not suggested, a live pane\'s are '
+        '(R13)', () async {
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab();
+      await tabs.openTab();
+      final [gone, live] = [for (final s in local.summaries) s.id];
+      // 8080 is nginx's and 5173 node's in the probe: a suggestion for 8080
+      // would show.
+      local.replace(local.summary(gone, ports: [8080]));
+      local.replace(local.summary(live, ports: [5173]));
+      local.views[gone]!.end(2);
+      await pumpEventQueue();
+      final pane = c
+          .read(terminalTabsProvider)
+          .tabOfSession(gone)!
+          .panes[gone]!;
+      expect(pane.exited, isTrue);
+      expect(pane.ports, [8080], reason: 'the last ports stay after an exit');
+      final list = await c.read(
+        toolPortSuggestionsProvider(kDefaultWorkspaceId).future,
+      );
+      expect(list, const [ToolPortSuggestion(port: 5173, process: 'node')]);
+    });
+
+    /// A terminal pane on 3000 and 5173, and an AI agent (pid 900) whose
+    /// server on 4000 a working scan would find.
+    Future<void> panesAndAnAgent() async {
+      await c.read(terminalTabsProvider.notifier).openTab();
+      local.replace(
+        local.summary(local.summaries.single.id, ports: [3000, 5173]),
+      );
+      final ai = openTestAiTab(c, title: 'x', cwd: '/w');
+      c.read(aiAgentPidsProvider).set(ai.ai!.id, 900);
+    }
+
+    /// The suggestions of the default workspace, and every line `debugPrint`
+    /// wrote while they were made.
+    Future<({List<ToolPortSuggestion> list, List<String> logged})>
+    suggestAndLog() async {
+      final logged = <String>[];
+      final saved = debugPrint;
+      debugPrint = (message, {wrapWidth}) => logged.add(message ?? '');
+      try {
+        final list = await c.read(
+          toolPortSuggestionsProvider(kDefaultWorkspaceId).future,
+        );
+        return (list: list, logged: logged);
+      } finally {
+        debugPrint = saved;
+      }
+    }
+
+    test(
+      'a scan that fails leaves the panes\' ports, without names or the '
+      'agent\'s server, and logs only the error\'s type (D12, D24)',
+      () async {
+        await panesAndAnAgent();
+        // What a real failure could carry: ports, a path, a program's name.
+        probe.listeningError = const PortProbeException(
+          'lsof: 3000,5173 of node in /Users/me/secret',
+        );
+        final (:list, :logged) = await suggestAndLog();
+        expect(list, const [
+          ToolPortSuggestion(port: 3000),
+          ToolPortSuggestion(port: 5173),
+        ]);
+        expect(logged, ['tool suggestions: scan failed (PortProbeException)']);
+        expect(probe.scans, 1);
+      },
+    );
+
+    test(
+      'a table read that fails after the ports were read costs the '
+      'names, not the ports; any error is logged by its type (D12, D24)',
+      () async {
+        await panesAndAnAgent();
+        probe.tableError = StateError('ps said 3000 node /Users/me/secret');
+        final (:list, :logged) = await suggestAndLog();
+        expect(list, const [
+          ToolPortSuggestion(port: 3000),
+          ToolPortSuggestion(port: 5173),
+        ]);
+        expect(logged, ['tool suggestions: scan failed (StateError)']);
+      },
+    );
   });
 
   test('recordingAgentPids keeps the pid while the agent runs', () async {
@@ -200,4 +309,110 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(pids.of(-3), isNull);
   }, testOn: '!windows');
+
+  test('the default factory keeps the pid of the agent it launches for a '
+      'pane until that agent exits (R12, D12)', () async {
+    final tmp = Directory.systemTemp.createTempSync('tool_ports_agent');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    // The app's own AiHost, with nothing of the machine in it: the
+    // environment is a given map (no login shell), git is never found, the
+    // process table is not read. The "agent" is a shell that reads its stdin
+    // until the runtime closes it.
+    final host = AiHost(
+      supportDir: tmp.path,
+      clientVersion: 'test',
+      env: LoginShellEnv(
+        processEnv: const {'PATH': '/usr/bin:/bin'},
+        run: (_, _, _, _) async => throw StateError('no login shell here'),
+      ),
+      checkpoints: CheckpointStores(
+        root: '${tmp.path}/ai/checkpoints',
+        locator: GitLocator(probe: (_, _, {environment}) async => null),
+      ),
+      processTable: ({limit, after}) async => null,
+    );
+    final c = ProviderContainer.test(
+      overrides: [aiHostProvider.overrideWithValue(host)],
+    );
+    const agent = AgentSpec(
+      id: 'stand-in',
+      name: 'Stand-in',
+      launch: CustomLaunch(command: '/bin/sh', args: ['-c', 'cat > /dev/null']),
+    );
+    final pids = c.read(aiAgentPidsProvider);
+    final runtime = c.read(aiRuntimeFactoryProvider)(
+      AiRuntimeRequest(agent: agent, cwd: tmp.path, paneId: -7),
+    );
+    int? pid;
+    addTearDown(() async {
+      await runtime.dispose();
+      // Only the process this test started, if it is somehow still there.
+      final started = pid;
+      if (started != null && _alive(started)) {
+        Process.killPid(started, ProcessSignal.sigkill);
+      }
+    });
+
+    unawaited(runtime.start());
+    expect(
+      await _until(() => pids.of(-7) != null),
+      isTrue,
+      reason: 'the launched agent\'s pid is kept for its pane',
+    );
+    pid = pids.of(-7)!;
+    expect(_alive(pid), isTrue);
+    expect(pids.of(-8), isNull, reason: 'only for that pane');
+
+    await runtime.dispose();
+    expect(
+      await _until(() => pids.of(-7) == null),
+      isTrue,
+      reason: 'cleared when the agent exits',
+    );
+    expect(_alive(pid), isFalse, reason: 'the stand-in agent ended');
+  }, testOn: '!windows');
+
+  test('clear leaves the pid of a newer agent of the pane, and the pids of '
+      'other panes, in place', () {
+    final pids = AiAgentPids()
+      ..set(-1, 100)
+      ..set(-2, 100)
+      ..set(-1, 200);
+    pids.clear(-1, 100);
+    expect(pids.of(-1), 200, reason: 'a newer agent of the pane stays');
+    expect(pids.of(-2), 100, reason: 'another pane keeps its own');
+    pids.clear(-1, 200);
+    expect(pids.of(-1), isNull);
+    expect(pids.toString(), 'AiAgentPids(1)');
+  });
+
+  test(
+    'a restarted agent keeps its pid when the one before it exits late',
+    () async {
+      final pids = AiAgentPids();
+      final older = _Channel();
+      final newer = _Channel();
+      final launched = [older, newer];
+      final pidOfChannel = <AgentChannel, int>{older: 11, newer: 22};
+      final launch = recordingAgentPids(
+        (command, {required cwd}) async => launched.removeAt(0),
+        pids,
+        -2,
+        pidOf: (channel) => pidOfChannel[channel],
+      );
+      await launch(const AgentCommand(executable: 'x'), cwd: '/');
+      await launch(const AgentCommand(executable: 'x'), cwd: '/');
+      expect(pids.of(-2), 22, reason: 'the restart replaced the pid');
+      older.end();
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        pids.of(-2),
+        22,
+        reason: 'the older agent\'s exit is not the newer\'s',
+      );
+      newer.end();
+      await Future<void>.delayed(Duration.zero);
+      expect(pids.of(-2), isNull);
+    },
+  );
 }
