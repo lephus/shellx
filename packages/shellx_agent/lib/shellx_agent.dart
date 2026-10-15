@@ -54,6 +54,7 @@ export 'src/term/desktop_session_manager.dart';
 export 'src/term/osc_title.dart';
 export 'src/term/term_server.dart';
 export 'src/term/terminal_sharing.dart';
+export 'src/tool/tool_endpoint.dart';
 export 'src/trust/trusted_store.dart';
 export 'src/remote/remote_bootstrap.dart';
 export 'src/remote/ssh_command.dart';
