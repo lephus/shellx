@@ -526,6 +526,7 @@ final class _HttpStream extends _Stream {
 final class _WsStream extends _Stream {
   _WsStream(super.proxy, super.phone, super.tool, super.request);
 
+  HttpClientRequest? _upstream;
   Socket? _socket;
   WebSocket? _ws;
   ToolWsOut? _out;
@@ -561,6 +562,7 @@ final class _WsStream extends _Stream {
       upstream.abort();
       return;
     }
+    _upstream = upstream;
     final HttpClientResponse response;
     try {
       upstream.followRedirects = false;
@@ -590,8 +592,12 @@ final class _WsStream extends _Stream {
     if (response.statusCode != HttpStatus.switchingProtocols) {
       return _refused(response);
     }
-    final protocol = response.headers.value('sec-websocket-protocol');
-    if (protocol != null && !protocols.contains(protocol)) {
+    // At most one, and one the webview offered (RFC 6455 §4.1); never
+    // `headers.value`, which throws on two.
+    final chosen = response.headers['sec-websocket-protocol'] ?? const [];
+    final protocol = chosen.isEmpty ? null : chosen.first;
+    if (chosen.length > 1 ||
+        (protocol != null && !protocols.contains(protocol))) {
       _drop(response);
       abort(ToolCode.aborted); // a protocol the webview did not offer
       return;
@@ -728,13 +734,17 @@ final class _WsStream extends _Stream {
     _closeBoth(message.wsCode, _truncate(message.wsReason), tellPhone: false);
   }
 
+  /// [reason] within a close frame's 123 bytes of UTF-8, cut at a character
+  /// boundary (one pass: a long reason from the phone never stalls us).
   static String? _truncate(String? reason) {
     if (reason == null) return null;
-    var out = reason;
-    while (utf8.encode(out).length > 123) {
-      out = out.substring(0, out.length - 1);
+    final bytes = utf8.encode(reason);
+    if (bytes.length <= 123) return reason;
+    var end = 123;
+    while ((bytes[end] & 0xC0) == 0x80) {
+      end--; // a continuation byte: the character starts before it
     }
-    return out;
+    return utf8.decode(bytes.sublist(0, end));
   }
 
   @override
@@ -743,6 +753,7 @@ final class _WsStream extends _Stream {
 
   @override
   void release() {
+    _upstream?.abort(); // drops the connection while the tool has not answered
     _out?.cancel();
     _refusal?.cancel();
     _socket?.destroy();

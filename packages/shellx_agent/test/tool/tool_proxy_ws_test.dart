@@ -218,4 +218,99 @@ void main() {
     expect(phone.endOf(id)?.code, 'bad_request');
     expect(tool.hits, isEmpty);
   });
+
+  /// `/ws` on a tool that answers each upgrade by hand: [answer]'s raw
+  /// bytes, or never. [ends] gets one future per connection, done once the
+  /// desktop drops it.
+  Future<void> Function(HttpRequest) byHand(
+    List<Future<void>> ends, {
+    String Function(HttpRequest request)? answer,
+  }) => (request) async {
+    final socket = await request.response.detachSocket(writeHeaders: false);
+    addTearDown(socket.destroy);
+    final end = Completer<void>();
+    ends.add(end.future);
+    socket.listen(
+      null,
+      onDone: end.complete,
+      onError: (Object _) => end.complete(),
+      cancelOnError: true,
+    );
+    if (answer != null) socket.add(latin1.encode(answer(request)));
+  };
+
+  test('a stream that ends before the tool answered the upgrade drops its '
+      'connection: the phone gone, the flag turned off', () async {
+    final ends = <Future<void>>[];
+    await setUpWith(routes: {'/ws': byHand(ends)});
+    phone.request(_id, target: '/ws', ws: true);
+    await until(() => ends.length == 1);
+    proxy.phoneGone(phone.mobileId);
+    await ends[0].timeout(const Duration(seconds: 5));
+
+    final id = phone.request(_id, target: '/ws', ws: true);
+    await until(() => ends.length == 2);
+    proxy.serve(catalogOf([], off: [_id]));
+    await phone.ended(id);
+    expect(phone.endOf(id)?.code, 'disabled');
+    await ends[1].timeout(const Duration(seconds: 5));
+  });
+
+  test('an upgrade the tool does not answer in time: timeout, and its '
+      'connection is dropped', () async {
+    final ends = <Future<void>>[];
+    await setUpWith(
+      routes: {'/ws': byHand(ends)},
+      withProxy: ToolProxy(headTimeout: const Duration(milliseconds: 200)),
+    );
+    final id = phone.request(_id, target: '/ws', ws: true);
+    await phone.ended(id);
+    expect(phone.endOf(id)?.code, 'timeout');
+    await ends.single.timeout(const Duration(seconds: 5));
+  });
+
+  test('a 101 with a protocol the webview did not offer, or with more than '
+      'one: aborted, and the connection is dropped (RFC 6455 §4.1)', () async {
+    final ends = <Future<void>>[];
+    await setUpWith(
+      routes: {
+        '/ws': byHand(
+          ends,
+          answer: (request) => [
+            'HTTP/1.1 101 Switching Protocols',
+            'connection: Upgrade',
+            'upgrade: websocket',
+            for (final p in request.uri.queryParametersAll['p']!)
+              'sec-websocket-protocol: $p',
+            '',
+            '',
+          ].join('\r\n'),
+        ),
+      },
+    );
+    const offered = ['sec-websocket-protocol', 'vite-hmr, other'];
+    final a = phone.request(_id, target: '/ws?p=mine', ws: true, head: offered);
+    await phone.ended(a);
+    expect(phone.endOf(a)?.code, 'aborted');
+    await ends[0].timeout(const Duration(seconds: 5));
+
+    final b = phone.request(
+      _id,
+      target: '/ws?p=vite-hmr&p=other',
+      ws: true,
+      head: offered,
+    );
+    await phone.ended(b);
+    expect(phone.endOf(b)?.code, 'aborted');
+    await ends[1].timeout(const Duration(seconds: 5));
+  });
+
+  test('a reason over 123 bytes reaches the tool cut at a character '
+      'boundary', () async {
+    await setUpWith();
+    final id = await open();
+    phone.send(ToolEnd(id: id, wsCode: 4003, wsReason: '😀' * 40));
+    await until(() => tool.wsClosed.isNotEmpty);
+    expect(tool.wsClosed.single, (4003, '😀' * 30));
+  });
 }
