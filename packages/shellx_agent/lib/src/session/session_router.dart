@@ -4,6 +4,7 @@ import 'package:shellx_core/shellx_core.dart';
 
 import '../ai/ai_endpoint.dart';
 import '../term/desktop_session_manager.dart';
+import '../tool/tool_endpoint.dart';
 import 'agent_sessions.dart';
 import 'session_manager.dart';
 
@@ -27,10 +28,12 @@ final class SessionRouter implements AgentSessions {
     required DesktopSessionManager desktop,
     required bool Function() desktopSharing,
     AiEndpoint? ai,
+    ToolEndpoint? tools,
   }) : _shells = shells,
        _desktop = desktop,
        _desktopSharing = desktopSharing,
-       _ai = ai {
+       _ai = ai,
+       _tools = tools {
     shells.receivesDriver = _receivesDriver;
     _subscriptions.addAll([
       shells.outbound.listen(_outbound.add),
@@ -38,12 +41,17 @@ final class SessionRouter implements AgentSessions {
       shells.changes.listen(_changes.add),
       desktop.changes.listen(_changes.add),
       ?ai?.outbound.listen(_outbound.add),
+      ?tools?.outbound.listen(_outbound.add),
     ]);
   }
 
   /// V2-2 D1: where `ai.*` messages go; null: this agent has no AI for
   /// phones (they are ignored, `session.list.result` carries no `ai`).
   final AiEndpoint? _ai;
+
+  /// V2-4 E5: where `tool.*` messages go; null: this agent has no tools for
+  /// phones (they are ignored, `session.list.result` carries no `tools`).
+  final ToolEndpoint? _tools;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
 
@@ -90,10 +98,14 @@ final class SessionRouter implements AgentSessions {
             // V2-2 D3: only to a phone that knows `desktop` (a new decoder);
             // an older one skips the key anyway.
             ai: desktop && _ai != null ? kAiProtocol : null,
+            // V2-4 E6: and only while this process serves tools.
+            tools: desktop && (_tools?.serving ?? false) ? kToolProtocol : null,
           ),
         );
       case AiMessage():
         _ai?.handle(mobileId, message);
+      case ToolMessage():
+        _tools?.handle(mobileId, message);
       case SessionAttach(:final id, :final cols, :final rows, :final lastSeq)
           when _desktop.owns(id):
         if (_desktopPhones.contains(mobileId)) {
@@ -129,6 +141,7 @@ final class SessionRouter implements AgentSessions {
     _shells.mobileDisconnected(mobileId);
     _desktop.mobileDisconnected(mobileId);
     _ai?.phoneGone(mobileId);
+    _tools?.phoneGone(mobileId);
   }
 
   @override
@@ -137,6 +150,7 @@ final class SessionRouter implements AgentSessions {
     _shells.closeSessionsAttachedTo(mobileId);
     _desktop.disconnectPhonesAttachedTo(mobileId);
     _ai?.phoneGone(mobileId);
+    _tools?.phoneGone(mobileId);
   }
 
   /// Tray: a shell session is closed; a desktop terminal only loses its
@@ -154,6 +168,7 @@ final class SessionRouter implements AgentSessions {
     _shells.closeAll();
     _desktop.disconnectAllPhones();
     _ai?.allPhonesGone();
+    _tools?.allPhonesGone();
   }
 
   /// The runtime stops (A1 D7): every phone is let go silently (it sees
@@ -162,6 +177,7 @@ final class SessionRouter implements AgentSessions {
     _shells.disconnectAllPhones();
     _desktop.releaseAllPhones();
     _ai?.allPhonesGone();
+    _tools?.allPhonesGone();
   }
 
   /// The runtime is gone; the shell sessions live on (A1 D7) and must not

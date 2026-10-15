@@ -122,6 +122,41 @@ void main() {
     });
   });
 
+  test(
+    'pending tool data reaching 48 KiB is flushed immediately (V2-4 E7)',
+    () {
+      fakeAsync((async) {
+        final (agentSide, phoneSide) = drive(async, securePair());
+        final sent = <DataFrame>[];
+        final channel = newChannel(agentSide, sent);
+        channel.enqueue(
+          ToolData(id: 1, data: Uint8List(30 * 1024), end: false),
+        );
+        async.flushMicrotasks();
+        expect(sent, isEmpty, reason: 'below 48 KiB the 16 ms timer sends it');
+        channel.enqueue(
+          ToolWsMessage(
+            id: 2,
+            data: Uint8List(18 * 1024),
+            text: false,
+            fin: true,
+          ),
+        );
+        async.flushMicrotasks();
+        expect(sent, hasLength(1));
+        expect(openFrame(async, phoneSide, sent.single).map((m) => m.type), [
+          'tool.data',
+          'tool.ws.msg',
+        ]);
+        channel.enqueue(
+          ToolData(id: 1, data: Uint8List(kToolMaxChunkBytes), end: false),
+        );
+        async.flushMicrotasks();
+        expect(sent, hasLength(2), reason: 'a full chunk goes at once');
+      });
+    },
+  );
+
   test('a burst of full chunks is split into payloads that fit a frame', () {
     fakeAsync((async) {
       final (agentSide, phoneSide) = drive(async, securePair());

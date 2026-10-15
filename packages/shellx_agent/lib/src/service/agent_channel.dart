@@ -6,14 +6,19 @@ import 'package:shellx_core/shellx_core.dart';
 /// Pending output that triggers an immediate flush (spec §6.5).
 const int kFlushThresholdBytes = 16 * 1024;
 
+/// Pending tool data that triggers an immediate flush (V2-4 E7): a full
+/// `tool.data` or `tool.ws.msg` goes out at once, in a frame of its own.
+const int kToolFlushThresholdBytes = kToolMaxChunkBytes;
+
 /// One established encrypted channel to a phone.
 ///
 /// Outgoing messages are batched: everything pending is sent
 /// [flushInterval] after the first pending message, or immediately (in a
 /// microtask, so a synchronous burst from one pump is collected first) once
-/// pending `output` data reaches [kFlushThresholdBytes]. A flush produces as
-/// many TRANSPORT payloads as [splitIntoBatches] needs. Sealing is serialized
-/// so Noise nonces go out in order.
+/// pending `output` data reaches [kFlushThresholdBytes], or pending tool data
+/// (`tool.data`, `tool.ws.msg`) [kToolFlushThresholdBytes]. A flush produces
+/// as many TRANSPORT payloads as [splitIntoBatches] needs. Sealing is
+/// serialized so Noise nonces go out in order.
 ///
 /// If a batch fails to seal, or the relay reports it could not be sent, the
 /// channel marks itself failed: it stops sending exactly like [close] (timer
@@ -55,6 +60,7 @@ final class AgentChannel {
   final Duration _flushInterval;
   final _pending = <AppMessage>[];
   int _pendingOutputBytes = 0;
+  int _pendingToolBytes = 0;
   Timer? _timer;
   bool _flushScheduled = false;
   Future<void> _sendChain = Future.value();
@@ -68,8 +74,16 @@ final class AgentChannel {
   void enqueue(AppMessage message) {
     if (_closed) return;
     _pending.add(message);
-    if (message is OutputMessage) _pendingOutputBytes += message.data.length;
-    if (_pendingOutputBytes >= kFlushThresholdBytes) {
+    switch (message) {
+      case OutputMessage(:final data):
+        _pendingOutputBytes += data.length;
+      case ToolData(:final data) || ToolWsMessage(:final data):
+        _pendingToolBytes += data.length;
+      default:
+        break;
+    }
+    if (_pendingOutputBytes >= kFlushThresholdBytes ||
+        _pendingToolBytes >= kToolFlushThresholdBytes) {
       _timer?.cancel();
       _timer = null;
       if (!_flushScheduled) {
@@ -89,6 +103,7 @@ final class AgentChannel {
     final batches = splitIntoBatches(_pending);
     _pending.clear();
     _pendingOutputBytes = 0;
+    _pendingToolBytes = 0;
     for (final batch in batches) {
       _sendChain = _sendChain
           .then((_) async {
