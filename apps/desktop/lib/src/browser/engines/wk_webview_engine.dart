@@ -7,28 +7,71 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 import '../browser_engine.dart';
-import '../browser_url.dart';
 
 const String browserNativeChannelName = 'pro.shellx.desktop/browser';
 
-/// A6 D14: NSURLErrorDomain codes → error kinds; `null` = not an error to
-/// show (-999: cancelled because a newer navigation started).
-BrowserLoadErrorKind? macErrorKind(int code, {bool processTerminated = false}) {
-  if (processTerminated) return BrowserLoadErrorKind.crashed;
-  return switch (code) {
-    -999 => null,
-    -1004 => BrowserLoadErrorKind.refused,
-    -1003 || -1006 => BrowserLoadErrorKind.dns,
-    -1001 => BrowserLoadErrorKind.timeout,
-    -1009 || -1005 || -1018 || -1020 => BrowserLoadErrorKind.unreachable,
-    >= -1206 && <= -1200 => BrowserLoadErrorKind.certificate,
-    _ => BrowserLoadErrorKind.other,
-  };
+typedef _NativeSink = ({
+  void Function(BrowserEngineEvent event) sink,
+  void Function(Uri? url) newWindow,
+});
+
+/// D9, D13: what a main-frame error of [domain] / [code] is — an error for
+/// the panel, a stopped download, or nothing to show (null: a newer
+/// navigation cancelled this one).
+BrowserEngineEvent? macErrorEvent(
+  String? domain,
+  int code, {
+  bool processTerminated = false,
+  Uri? url,
+}) {
+  if (processTerminated) return const LoadFailed(BrowserLoadErrorKind.crashed);
+  switch (domain) {
+    case 'WebKitErrorDomain':
+      // 102 "frame load interrupted": BrowserNative's download guard
+      // cancelled the response and already said so. 100: a type WebKit
+      // cannot show that slipped past the guard.
+      if (code == 102) return null;
+      if (code == 100) return DownloadBlocked(url: url);
+      return const LoadFailed(BrowserLoadErrorKind.other);
+    case 'NSURLErrorDomain':
+      final kind = switch (code) {
+        -999 => null,
+        -1004 => BrowserLoadErrorKind.refused,
+        -1022 => BrowserLoadErrorKind.ats,
+        -1003 || -1006 => BrowserLoadErrorKind.dns,
+        -1001 => BrowserLoadErrorKind.timeout,
+        -1009 || -1005 || -1018 || -1020 => BrowserLoadErrorKind.unreachable,
+        >= -1206 && <= -1200 => BrowserLoadErrorKind.certificate,
+        _ => BrowserLoadErrorKind.other,
+      };
+      return kind == null ? null : LoadFailed(kind);
+    default:
+      return const LoadFailed(BrowserLoadErrorKind.other);
+  }
 }
 
-/// WebKitErrorDomain 102 "Frame load interrupted": WebKit stopped a
-/// navigation it cannot display — a download (A6 D10).
-bool isMacInterruptedLoad(int code) => code == 102;
+/// A URL WebKit reported for the page, or null when it gave none (a first
+/// navigation that failed before it committed), an empty one, or one
+/// without a scheme: never an empty Uri that would pass for the page's
+/// address.
+Uri? pageUriOf(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  final uri = Uri.tryParse(raw);
+  return uri != null && uri.hasScheme ? uri : null;
+}
+
+/// R28: Safari's Web Inspector reaches the user's own tool, best effort.
+/// The plugin refuses it below macOS 13.3 (a [PlatformException]); the page
+/// sets up and loads all the same (spec §8: macOS 12–13 work like 14+).
+Future<void> enableWebInspector(
+  Future<void> Function(bool inspectable) setInspectable,
+) async {
+  try {
+    await setInspectable(true);
+  } on PlatformException catch (e) {
+    debugPrint('ShellX: Web Inspector not enabled: ${e.runtimeType}');
+  }
+}
 
 /// The app's one `pro.shellx.desktop/browser` channel (BrowserNative.swift).
 final class BrowserNativeMac implements BrowserDataStore {
@@ -37,16 +80,23 @@ final class BrowserNativeMac implements BrowserDataStore {
   ]) : _channel = channel;
 
   final MethodChannel _channel;
-  final Map<int, void Function(BrowserEngineEvent)> _sinks = {};
+  final Map<int, _NativeSink> _sinks = {};
   bool _listening = false;
 
-  void attach(int webViewId, void Function(BrowserEngineEvent) sink) {
+  /// Starts forwarding [webViewId]'s native events: chords and clicks to
+  /// [sink], new windows (D9) to [newWindow] (BrowserNative `attach`).
+  Future<void> attach(
+    int webViewId, {
+    required void Function(BrowserEngineEvent event) sink,
+    required void Function(Uri? url) newWindow,
+  }) {
     // Lazily, so merely constructing it (a provider) needs no binding.
     if (!_listening) {
       _listening = true;
       _channel.setMethodCallHandler(_onCall);
     }
-    _sinks[webViewId] = sink;
+    _sinks[webViewId] = (sink: sink, newWindow: newWindow);
+    return _channel.invokeMethod<void>('attach', {'id': webViewId});
   }
 
   void detach(int webViewId) {
@@ -60,14 +110,22 @@ final class BrowserNativeMac implements BrowserDataStore {
 
   Future<dynamic> _onCall(MethodCall call) async {
     final args = (call.arguments as Map).cast<String, Object?>();
-    final sink = _sinks[args['id']];
-    if (sink == null) return;
+    final target = _sinks[args['id']];
+    if (target == null) return;
     switch (call.method) {
       case 'shortcut':
         final chord = args['chord'];
-        if (chord is String) sink(ShortcutForwarded(chord));
+        if (chord is String) target.sink(ShortcutForwarded(chord));
       case 'pointerDown':
-        sink(const ContentClicked());
+        target.sink(const ContentClicked());
+      case 'newWindow':
+        final url = args['url'];
+        target.newWindow(pageUriOf(url is String ? url : null));
+      case 'download':
+        final url = args['url'];
+        target.sink(
+          DownloadBlocked(url: pageUriOf(url is String ? url : null)),
+        );
     }
   }
 
@@ -78,7 +136,7 @@ final class BrowserNativeMac implements BrowserDataStore {
   Future<void> setForwardedChords(int id, List<String> chords) => _channel
       .invokeMethod<void>('setForwardedChords', {'id': id, 'chords': chords});
 
-  /// D8: the app's default WebKit store.
+  /// D8, D22: the app's default WebKit store (`~/Library/WebKit/<bundle id>`).
   @override
   Future<void> clearAll() => _channel.invokeMethod<void>('clearWebsiteData');
 }
@@ -88,25 +146,31 @@ final browserNativeMacProvider = Provider<BrowserNativeMac>(
   (ref) => BrowserNativeMac(),
 );
 
-/// A6 D1, taken for V2-3 (D6): WKWebView through webview_flutter_wkwebview,
-/// as a platform view. No JavaScript channel, no document-start script, no
-/// snapshot (D16). Task 5 reviews and hardens it.
+/// A6 D1 for V2-3 (D6): WKWebView through webview_flutter_wkwebview, as a
+/// platform view, in the app's default data store (D8). No JavaScript
+/// channel, no user script, no snapshot (D16). [policy] decides every
+/// navigation (D9); [dialogs] shows the page's alert/confirm/prompt.
 final class WkWebViewEngine implements BrowserEngine {
   WkWebViewEngine({
     required BrowserNativeMac native,
+    required NavigationPolicy policy,
     BrowserDialogPresenter? dialogs,
   }) : _native = native,
+       _policy = policy,
        _dialogs = dialogs {
+    // D9: camera and microphone are refused (the app has no usage
+    // description, and a tool gets no device).
     _controller = WebViewController.fromPlatformCreationParams(
       WebKitWebViewControllerCreationParams(),
+      onPermissionRequest: (request) => unawaited(request.deny()),
     );
     _platform = _controller.platform as WebKitWebViewController;
     _id = _platform.webViewIdentifier;
-    _native.attach(_id, _emit);
     _ready = _setup();
   }
 
   final BrowserNativeMac _native;
+  final NavigationPolicy _policy;
   final BrowserDialogPresenter? _dialogs;
   late final WebViewController _controller;
   late final WebKitWebViewController _platform;
@@ -119,20 +183,38 @@ final class WkWebViewEngine implements BrowserEngine {
     if (!_events.isClosed) _events.add(e);
   }
 
+  /// D9: a new window never opens, here or in a second view: it goes
+  /// outside (http, https, mailto, tel) or nowhere.
+  void _newWindow(Uri? url) {
+    final verdict = _policy(url, mainFrame: true, newWindow: true);
+    if (verdict == NavigationVerdict.outside && url != null) {
+      _emit(OpenOutside(url, newWindow: true));
+    } else {
+      _emit(const NavigationBlocked());
+    }
+  }
+
   Future<void> _setup() async {
     await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-    await _platform.setInspectable(true);
-    // Makes the id known to BrowserNative (the key monitor's list).
-    await _native.setForwardedChords(_id, const []);
+    // Safari's Web Inspector reaches the user's own tool (macOS 13.3+).
+    await enableWebInspector(_platform.setInspectable);
     await _controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (request) {
-          if (!request.isMainFrame) return NavigationDecision.navigate;
-          final uri = Uri.tryParse(request.url);
-          if (uri != null && isNavigable(uri)) {
-            return NavigationDecision.navigate;
+          final url = pageUriOf(request.url);
+          final verdict = _policy(
+            url,
+            mainFrame: request.isMainFrame,
+            newWindow: false,
+          );
+          switch (verdict) {
+            case NavigationVerdict.allow:
+              return NavigationDecision.navigate;
+            case NavigationVerdict.outside when url != null:
+              _emit(OpenOutside(url, newWindow: false));
+            case _:
+              _emit(const NavigationBlocked());
           }
-          _emit(const NavigationBlocked());
           return NavigationDecision.prevent;
         },
         onPageStarted: (_) => _emit(const LoadStarted()),
@@ -144,23 +226,21 @@ final class WkWebViewEngine implements BrowserEngine {
           if (title != null) _emit(TitleChanged(title));
         },
         onUrlChange: (change) {
-          final uri = Uri.tryParse(change.url ?? '');
+          final uri = pageUriOf(change.url);
           if (uri != null) _emit(UrlChanged(uri));
           unawaited(_history());
         },
         onWebResourceError: (error) {
           if (error.isForMainFrame == false) return;
-          if (isMacInterruptedLoad(error.errorCode)) {
-            _emit(const DownloadBlocked());
-            return;
-          }
-          final kind = macErrorKind(
+          final event = macErrorEvent(
+            error is WebKitWebResourceError ? error.domain : null,
             error.errorCode,
             processTerminated:
                 error.errorType ==
                 WebResourceErrorType.webContentProcessTerminated,
+            url: pageUriOf(error.url),
           );
-          if (kind != null) _emit(LoadFailed(kind));
+          if (event != null) _emit(event);
         },
       ),
     );
@@ -183,8 +263,13 @@ final class WkWebViewEngine implements BrowserEngine {
           defaultText: r.defaultText,
         ),
       );
+      // The pinned plugin answers a String: a cancelled prompt reaches the
+      // page as "", not null (an accepted limit).
       return text is String ? text : '';
     });
+    // Last: the plugin's own UI delegate is set by now, and BrowserNative
+    // stands its new-window guard in front of it.
+    await _native.attach(_id, sink: _emit, newWindow: _newWindow);
   }
 
   Future<void> _history() async => _emit(
@@ -203,11 +288,7 @@ final class WkWebViewEngine implements BrowserEngine {
   @override
   Future<void> load(Uri url) async {
     await _ready;
-    if (url == aboutBlank) {
-      await _controller.loadHtmlString('');
-    } else {
-      await _controller.loadRequest(url);
-    }
+    await _controller.loadRequest(url);
   }
 
   @override

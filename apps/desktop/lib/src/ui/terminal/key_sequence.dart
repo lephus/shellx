@@ -44,6 +44,17 @@ class KeySequence extends Notifier<KeyChord?> {
     if (state != null) state = null;
   }
 
+  /// V2-3 D10: a tool page handed back [prefix] (the first step of a
+  /// sequence): the wait starts as if the key had been pressed here. False
+  /// when no sequence starts with it.
+  bool arm(KeyChord prefix) {
+    final sequences = ref.read(shellxConfigProvider).bindings.sequences;
+    if (!sequences.any((b) => b.sequence.first == prefix)) return false;
+    _seen = null;
+    state = prefix;
+    return true;
+  }
+
   /// Handles one key. Handled: swallowed (a prefix, the step that ran, Esc,
   /// the prefix typed). Ignored: it goes on to the shell or to the other
   /// shortcuts as if no sequence were pending.
