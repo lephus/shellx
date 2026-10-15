@@ -11,11 +11,15 @@ enum PushPermission {
 /// A push notification as the agent sent it (push spec §4.2): the relay adds `agent_id`, the agent
 /// `session_id` and `kind`.
 final class PushMessage {
-  const PushMessage({this.title, this.body, this.data = const {}});
+  const PushMessage({this.title, this.body, this.data = const {}, this.action});
 
   final String? title;
   final String? body;
   final Map<String, String> data;
+
+  /// V2-2b B8, B9: the button of the notification that was tapped (`allow`, `reject`, or the system's own id of a
+  /// plain tap); null for a tap on the notification itself, a banner, or a message that was not tapped.
+  final String? action;
 
   /// The computer that sent it; null for a message that did not come through the relay.
   String? get agentId {
@@ -36,6 +40,12 @@ final class PushMessage {
   @override
   String toString() => 'PushMessage(agentId: $agentId, sessionId: $sessionId)';
 }
+
+/// The `data` of a push as strings (FCM hands the values over untyped); null values are left out.
+Map<String, String> pushDataOf(Map<String, dynamic> data) => {
+  for (final entry in data.entries)
+    if (entry.value != null) entry.key: entry.value.toString(),
+};
 
 /// The phone's push service (Firebase Cloud Messaging in production). Every method may throw a
 /// platform error; callers treat push as best effort.

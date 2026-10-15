@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 
 import '../../support/fake_biometrics.dart';
@@ -20,6 +21,20 @@ void main() {
     auth = FakeBiometricAuthenticator();
     now = DateTime(2026, 9, 25, 9);
     enabled = true;
+  });
+
+  test('V2-2b B10: inForeground is false from onBackgrounded to onForegrounded, and the lock comes back first', () {
+    final lock = controller();
+    expect(lock.inForeground.value, isTrue);
+    lock.onBackgrounded();
+    expect(lock.inForeground.value, isFalse);
+    now = now.add(const Duration(minutes: 6));
+    final seen = <(bool, bool)>[];
+    final stop = effect(() => seen.add((lock.inForeground.value, lock.isLocked.value)));
+    lock.onForegrounded();
+    stop();
+    // Never "in the foreground and unlocked" in between: a push's answer waiting for that must not go.
+    expect(seen, [(false, false), (true, true)]);
   });
 
   test('locks on launch when enabled, not when disabled', () {

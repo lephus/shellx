@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:shellx_mobile/features/notifications/domain/push_answer.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/notification_opener.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_answerer.dart';
 
 /// A scripted push service: the permission the user would give, the token, and streams a test
 /// drives by hand (synchronous).
@@ -98,4 +100,18 @@ class RecordingOpener implements NotificationOpener {
 
   @override
   Future<void> open(PushMessage message) async => opened.add(message);
+}
+
+/// Records the push answers [PushController] hands over (V2-2b B10).
+class RecordingAnswerer implements PushAnswerer {
+  final List<(PushMessage, PushAnswer)> answered = [];
+
+  @override
+  Duration get patience => const Duration(minutes: 2);
+
+  @override
+  Duration get relayWait => const Duration(seconds: 10);
+
+  @override
+  Future<void> answer(PushMessage message, PushAnswer answer) async => answered.add((message, answer));
 }
