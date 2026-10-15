@@ -30,7 +30,9 @@ final emptyAiListingBody = encodeBody(const AiListing().toJson());
 
 /// What a desktop answers when nobody serves AI (V2-2 D1): the list is
 /// unavailable, an attach is closed with [reason], a request fails
-/// `unavailable`. Null for messages that need no answer.
+/// `unavailable` — every V2-2b request too, and a newer phone's request
+/// (an [AiRaw] with a `rid`, V2-2b B2), so a phone never waits for a
+/// window that is not there. Null for messages that need no answer.
 AiMessage? aiUnavailableReply(
   AiMessage message, {
   String reason = 'unavailable',
@@ -42,7 +44,18 @@ AiMessage? aiUnavailableReply(
   AiCancel(:final rid) ||
   AiForceStop(:final rid) ||
   AiUnqueue(:final rid) ||
-  AiOpen(:final rid) => AiResult(rid: rid, ok: false, code: 'unavailable'),
+  AiOpen(:final rid) ||
+  AiConfigGet(:final rid) ||
+  AiConfigSet(:final rid) ||
+  AiBlob(:final rid) ||
+  AiFiles(:final rid) ||
+  AiItemPart(:final rid) ||
+  AiHistory(:final rid) ||
+  AiFolder(:final rid) ||
+  AiChanges(:final rid) ||
+  AiDiff(:final rid) ||
+  AiRevert(:final rid) => AiResult(rid: rid, ok: false, code: 'unavailable'),
+  AiRaw(rid: final rid?) => AiResult(rid: rid, ok: false, code: 'unavailable'),
   _ => null,
 };
 

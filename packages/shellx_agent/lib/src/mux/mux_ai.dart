@@ -9,11 +9,15 @@ import '../session/agent_sessions.dart';
 import 'mux_messages.dart';
 import 'remote_local_sessions.dart';
 
+/// [message] as the service passes it on: as it came when it was read from
+/// the wire ([AiMessage.wire], V2-2b B2), keys this version does not know
+/// included.
 MuxMessage _carry(String type, String mobileId, AiMessage message) =>
-    MuxMessage(type, fields: {'m': mobileId, 'b': encodeCbor(message.toMap())});
+    MuxMessage(type, fields: {'m': mobileId, 'b': encodeCbor(message.wire)});
 
-/// The `ai.*` message in [m]'s `b`; null when it is not one this version
-/// reads.
+/// The `ai.*` message in [m]'s `b` (an [AiRaw] for a kind this version does
+/// not know); null when it is not one, or a malformed one of a kind this
+/// version reads.
 AiMessage? _carried(MuxMessage m) {
   final bytes = m.get<Uint8List>('b');
   if (bytes == null) return null;
@@ -75,7 +79,9 @@ const int _maxSidLength = 256;
 /// Only the kinds that belong to a direction travel it: a desktop → phone
 /// kind from a phone, a phone → desktop kind from the window, and a message
 /// over one sealed batch are dropped, never sent (a batch too big would
-/// drop the phone's whole channel).
+/// drop the phone's whole channel). Since V2-2b (B2) a kind this version
+/// does not know goes the way it came, and every message goes on as it came
+/// ([AiMessage.wire]): a later addition needs only the window.
 final class MuxAiForwarder implements AiEndpoint {
   MuxAiForwarder({this.onPush});
 
@@ -120,8 +126,9 @@ final class MuxAiForwarder implements AiEndpoint {
   }
 
   /// `ai.out` or `ai.push` from [owner]'s window. Only desktop → phone
-  /// types that fit one sealed batch are passed on; anything else is
-  /// dropped, never sent (a batch too big would drop the phone's channel).
+  /// types, and kinds this version does not know (B2), that fit one sealed
+  /// batch are passed on; anything else is dropped, never sent (a batch too
+  /// big would drop the phone's channel).
   void fromUi(Object owner, MuxMessage m) {
     if (!identical(_owner, owner)) return;
     switch (m.type) {
@@ -129,7 +136,7 @@ final class MuxAiForwarder implements AiEndpoint {
         final mobileId = m.get<String>('m');
         final message = _carried(m);
         if (mobileId == null || message == null) return;
-        if (_towardsPhone(message) != true) return;
+        if (_towardsPhone(message) == false) return;
         if (message is AiClosed) _attached[mobileId]?.remove(message.sid);
         _emit(mobileId, message);
       case MuxType.aiPush:
@@ -201,12 +208,13 @@ final class MuxAiForwarder implements AiEndpoint {
 final class MuxAiBinding {
   MuxAiBinding(this.client, this.hub) {
     _events = client.events.listen(_onEvent);
-    _out = hub.outbound.listen(
-      (o) => client.send(MuxType.aiOut, {
+    _out = hub.outbound.listen((o) {
+      final message = o.message;
+      client.send(MuxType.aiOut, {
         'm': o.mobileId,
-        'b': encodeCbor(o.message.toMap()),
-      }),
-    );
+        'b': encodeCbor(message is AiMessage ? message.wire : message.toMap()),
+      });
+    });
     client.send(MuxType.aiServe);
   }
 
