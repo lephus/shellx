@@ -405,22 +405,45 @@ final class ToolSession {
   String get _cookieName => toolGateCookieName(servedPort ?? _port);
 
   /// Binds the tool on its port (or another, E3) and each other tool of the
-  /// workspace on its own port when it is free (E4).
+  /// workspace on its own port when it is free (E4): a port is the phone's
+  /// only when it holds it on every loopback address it has.
   Future<void> _serve(List<ToolServing> serving) async {
     _secret = _random();
+    final ipv6 = await _hasIpv6Loopback();
     final main = serving.first;
-    final own = await _bind(main.port) ?? await _bind(0);
+    final own =
+        await _bind(main.port, ipv6: ipv6) ?? await _bindAnyPort(ipv6: ipv6);
     if (own == null) return;
     _servers.add(_Served(this, main.id, own, main: true));
     for (final other in serving.skip(1)) {
-      final servers = await _bind(other.port);
+      final servers = await _bind(other.port, ipv6: ipv6);
       if (servers != null) _servers.add(_Served(this, other.id, servers));
     }
   }
 
-  /// 127.0.0.1:[port] and, when it can, [::1] on the same port; never any
-  /// other address (E11). Null when the port cannot be had.
-  Future<List<HttpServer>?> _bind(int port) async {
+  /// Whether this phone has an IPv6 loopback: [::1] can be bound at all
+  /// (never judged from why a bind of a given port failed).
+  static Future<bool> _hasIpv6Loopback() async {
+    try {
+      final probe = await ServerSocket.bind(
+        InternetAddress.loopbackIPv6,
+        0,
+        v6Only: true,
+      );
+      await probe.close();
+      return true;
+    } on SocketException {
+      return false;
+    }
+  }
+
+  /// [port] on 127.0.0.1 and, when this phone has an IPv6 loopback ([ipv6]),
+  /// on [::1] too; never any other address (E11). The webview tries
+  /// `localhost` on ::1 first: an app holding [::1]:[port] would get the
+  /// entry URL's nonce and every request carrying the gate cookie, so then
+  /// the port is not this phone's to serve. Null when the port cannot be had
+  /// on every one of them.
+  Future<List<HttpServer>?> _bind(int port, {required bool ipv6}) async {
     final HttpServer v4;
     try {
       v4 = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
@@ -428,16 +451,19 @@ final class ToolSession {
       return null;
     }
     final servers = [v4];
-    try {
-      servers.add(
-        await HttpServer.bind(
-          InternetAddress.loopbackIPv6,
-          v4.port,
-          v6Only: true,
-        ),
-      );
-    } on SocketException {
-      // IPv4 only: `localhost` still reaches it.
+    if (ipv6) {
+      try {
+        servers.add(
+          await HttpServer.bind(
+            InternetAddress.loopbackIPv6,
+            v4.port,
+            v6Only: true,
+          ),
+        );
+      } on SocketException {
+        await v4.close(force: true);
+        return null; // another app holds it on [::1]
+      }
     }
     for (final server in servers) {
       server
@@ -447,6 +473,16 @@ final class ToolSession {
         ..autoCompress = false;
     }
     return servers;
+  }
+
+  /// E3's P′: an ephemeral port held on every loopback address, a fresh one
+  /// whenever [::1] of the one 127.0.0.1 gave is taken.
+  Future<List<HttpServer>?> _bindAnyPort({required bool ipv6}) async {
+    for (var tries = 0; tries < 16; tries++) {
+      final servers = await _bind(0, ipv6: ipv6);
+      if (servers != null) return servers;
+    }
+    return null;
   }
 
   Future<void> _unserve() async {
