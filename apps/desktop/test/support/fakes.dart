@@ -440,6 +440,15 @@ final class RecordingUrlOpener implements UrlOpener {
     webLinks.add(uri);
   }
 
+  /// V2-3 D9: mailto: and tel: links handed to the system.
+  final List<Uri> mailOrPhone = [];
+
+  @override
+  Future<void> openMailOrPhone(Uri uri) async {
+    if (fail) throw const ProcessException('/usr/bin/open', [], 'failed');
+    mailOrPhone.add(uri);
+  }
+
   /// A10: paths shown in Finder / Explorer (path, isDirectory).
   final List<(String, bool)> revealed = [];
 
