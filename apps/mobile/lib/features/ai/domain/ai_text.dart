@@ -120,4 +120,11 @@ const int kShownLineChars = 4000;
   return (text: text.substring(0, end), cut: true);
 }
 
+/// V2-2b B16: [line] of a full item as its row shows it: at most [kShownLineChars] UTF-16 units, never cut in
+/// the middle of a surrogate pair (the layout throws on half of one), with "…" after it when it was cut.
+String clipLine(String line) {
+  final shown = clipForDisplay(line, maxChars: kShownLineChars, maxLines: null);
+  return shown.cut ? '${shown.text}…' : shown.text;
+}
+
 bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
