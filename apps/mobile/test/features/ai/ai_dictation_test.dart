@@ -164,4 +164,151 @@ void main() {
     speech.emit(const SpeechFinal('muộn'));
     expect(field.text, isEmpty);
   });
+
+  // F40: the first permission prompt takes the app out of the front, and the page stops the dictation then. A stop
+  // that lands while the system asks must not swallow the answer: a refusal is said, a listen does not start.
+  group('stop() while the permission prompt is up (F40)', () {
+    Future<void> stoppedDuringPrompt() async {
+      speech.permissionGate = Completer<void>();
+      final starting = dictation.toggle('vi');
+      dictation.stop();
+      speech.permissionGate!.complete();
+      await starting;
+    }
+
+    test('a refusal is still said', () async {
+      speech.permission = SpeechPermission.denied;
+      await stoppedDuringPrompt();
+      expect(dictation.issue.value, VoiceIssue.noPermission);
+      expect(speech.starts, isEmpty);
+      expect(dictation.phase.value, VoicePhase.idle);
+    });
+
+    test('so is a phone without speech recognition', () async {
+      speech.permission = SpeechPermission.unsupported;
+      await stoppedDuringPrompt();
+      expect(dictation.issue.value, VoiceIssue.unsupported);
+      expect(speech.starts, isEmpty);
+    });
+
+    test('so is a phone without the language', () async {
+      speech.localeIds = {VoiceLocale.vi: null, VoiceLocale.en: 'en-US'};
+      await stoppedDuringPrompt();
+      expect(dictation.issue.value, VoiceIssue.localeUnavailable);
+      expect(speech.starts, isEmpty);
+    });
+
+    test('a granted permission: nothing is said and the listen still does not start; the next tap does', () async {
+      await stoppedDuringPrompt();
+      expect(dictation.issue.value, isNull);
+      expect(speech.starts, isEmpty);
+      expect(dictation.phase.value, VoicePhase.idle);
+      await listen();
+      expect(speech.starts.single, (localeId: 'vi-VN', onDevice: true));
+    });
+  });
+
+  // F41: the user types while it listens. What was typed is theirs: the listen ends at the next thing it hears, and
+  // nothing of that listen touches the field again.
+  group('the user edits the field while it listens (F41)', () {
+    test('typed text survives the next partial, and the listen is over', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!'; // the user types
+      speech.emit(const SpeechPartial('các bạn'));
+      expect(field.text, 'xin chào!');
+      expect(dictation.phase.value, VoicePhase.idle);
+      expect(speech.cancels, 1);
+    });
+
+    test('so does text typed after words that were already heard', () async {
+      field.text = 'xin chào';
+      await listen();
+      speech.emit(const SpeechPartial('các'));
+      expect(field.text, 'xin chào các');
+      field.text = 'xin chào các!';
+      speech.emit(const SpeechPartial('các bạn'));
+      expect(field.text, 'xin chào các!');
+      expect(dictation.phase.value, VoicePhase.idle);
+    });
+
+    test('typed text survives a "huỷ" final: it was not said', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!';
+      speech.emit(const SpeechFinal('huỷ'));
+      expect((field.text, sends), ('xin chào!', 0));
+    });
+
+    test('a "gửi" final after an edit sends nothing and leaves the field', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!';
+      speech.emit(const SpeechFinal('các bạn gửi'));
+      expect((field.text, sends), ('xin chào!', 0));
+    });
+
+    test('the phase is idle once the edit is seen, and late words of that listen are nobody\'s', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!';
+      speech.emit(const SpeechPartial('các'));
+      expect(dictation.phase.value, VoicePhase.idle);
+      speech.emit(const SpeechPartial('các bạn'));
+      speech.emit(const SpeechFinal('các bạn gửi'));
+      expect((field.text, sends), ('xin chào!', 0));
+      expect(speech.cancels, 1);
+    });
+
+    test('the next listen goes on from the edited field', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!';
+      speech.emit(const SpeechPartial('các'));
+      await listen();
+      speech.emit(const SpeechFinal('các bạn'));
+      expect(field.text, 'xin chào! các bạn');
+    });
+
+    test('a failure after an edit neither retries in the cloud nor says anything: the listen is over', () async {
+      field.text = 'xin chào';
+      await listen();
+      field.text = 'xin chào!';
+      speech.emit(const SpeechFailed(SpeechErrorKind.other));
+      expect(speech.starts, hasLength(1));
+      expect(dictation.issue.value, isNull);
+      expect(dictation.phase.value, VoicePhase.idle);
+    });
+
+    // Not edits: nothing here may end the listen.
+    test('text typed while the prompt was still up is part of the field the words go after', () async {
+      speech.permissionGate = Completer<void>();
+      final starting = dictation.toggle('vi');
+      field.text = 'gõ trước'; // the listen has not begun: this is the field it starts from
+      speech.permissionGate!.complete();
+      await starting;
+      speech.emit(const SpeechListening(true));
+      speech.emit(const SpeechPartial('rồi nói'));
+      expect(field.text, 'gõ trước rồi nói');
+      expect(dictation.phase.value, VoicePhase.listening);
+    });
+
+    test('a field that ends in a blank is not an edit', () async {
+      field.text = 'xin chào ';
+      await listen();
+      speech.emit(const SpeechPartial('các bạn'));
+      expect(field.text, 'xin chào các bạn');
+      expect(dictation.phase.value, VoicePhase.listening);
+    });
+
+    test('a move of the cursor is not an edit', () async {
+      field.text = 'xin chào';
+      await listen();
+      speech.emit(const SpeechPartial('các'));
+      field.selection = const TextSelection.collapsed(offset: 3);
+      speech.emit(const SpeechPartial('các bạn'));
+      expect(field.text, 'xin chào các bạn');
+      expect(dictation.phase.value, VoicePhase.listening);
+    });
+  });
 }

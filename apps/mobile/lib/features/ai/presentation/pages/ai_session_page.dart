@@ -76,6 +76,11 @@ class _AiSessionPageState extends State<AiSessionPage> {
   /// Stops the dictation once the session is not live (a lost channel, a session closed).
   late final void Function() _stopWhenNotLive;
 
+  /// Set when the dictation is made. The dock reads it first: a `Watch` follows only what its last tracked run read,
+  /// and that run came before the dictation existed, so this change is what runs the dock again — with the dictation's
+  /// phase and issue read, and followed from then on (else the mic never fills and a refusal is never said).
+  final _dictationMade = signal(false);
+
   /// V2-2b B16: the whole form of a question too big for the mirror is on its way.
   var _loadingForm = false;
 
@@ -105,6 +110,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
     _lifecycle.dispose();
     _stopWhenNotLive();
     _dictation?.dispose();
+    _dictationMade.dispose();
     _suggestTimer?.cancel();
     _text.removeListener(_lookForMention);
     _text.removeListener(_keepDraft);
@@ -255,7 +261,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
         canSend: () => _controller.canSend && (_text.text.trim().isNotEmpty || _images.isNotEmpty),
         onSend: () => unawaited(_send()),
       );
-    setState(() {}); // the mic follows the dictation's phase from now on
+    _dictationMade.value = true; // the dock runs again and follows the dictation's phase and issue from now on
     await dictation.toggle(language);
   }
 
@@ -483,6 +489,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
 
   Widget _dock(BuildContext context, double available) {
     _controller.version.value;
+    _dictationMade.value;
     final head = _controller.head;
     final mirror = _controller.mirror;
     final link = _controller.linkState;
@@ -492,6 +499,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
     final live = link == AiLinkState.live;
     final answering = _controller.answering.value;
     final busy = !live || answering != null;
+    // B14: read always (not only while no image note hides it), so that the dock keeps following the voice problem.
+    final voiceIssue = _voiceIssue(S.of(context), _dictation);
     final permission = head.permission;
     final ask = _waitingAsk(head, mirror);
     final panels = [
@@ -559,7 +568,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
           upload: _controller.upload.value,
           suggestions: _suggestions,
           onSuggestion: _pickSuggestion,
-          note: _note ?? _voiceIssue(S.of(context), _dictation),
+          note: _note ?? voiceIssue,
           listening: _dictation?.phase.value == VoicePhase.listening,
           onMic: _mic,
         ),
