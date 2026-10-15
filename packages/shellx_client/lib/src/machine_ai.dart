@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -247,6 +248,12 @@ final class MachineAi {
   final _pending = <int, _Pending>{};
   var _nextRid = 1;
 
+  /// V2-2b B12, R17: the number of the next image this phone uploads.
+  var _nextBlob = 1;
+
+  /// Image parts in flight at once (V2-2b B12).
+  static const int _partsInFlight = 4;
+
   /// A listing is watched or a mirror is open (or waits for AI to be
   /// available again): a lost channel must come back even without a
   /// terminal tab.
@@ -308,11 +315,96 @@ final class MachineAi {
     return link;
   }
 
-  Future<void> prompt(String sid, String text) {
-    if (utf8Length(text) > kAiMaxPromptBytes) {
+  /// Sends [text] to [sid] (queued there while a turn runs), with the images
+  /// this phone uploaded ([blobs], V2-2b B12): at most [kAiImagesMax], sent
+  /// only to a computer that takes them (B1).
+  Future<void> prompt(String sid, String text, {List<int> blobs = const []}) {
+    if (utf8Length(text) > kAiMaxPromptBytes || blobs.length > kAiImagesMax) {
       return Future.error(const AiRequestException('too_large'));
     }
-    return _request(sid, (rid) => AiPrompt(sid: sid, rid: rid, text: text));
+    AiMessage make(int rid) =>
+        AiPrompt(sid: sid, rid: rid, text: text, blobs: blobs);
+    return blobs.isEmpty
+        ? _request(sid, make)
+        : _feature(AiFeature.blob, sid, make);
+  }
+
+  /// V2-2b B12, R17: a number for the next image this phone uploads, never
+  /// the same twice for this machine.
+  int newBlobId() => _nextBlob++;
+
+  /// V2-2b B12: uploads image [blob] — [bytes] of type [mime] — in parts of
+  /// at most [kAiMaxBlobPartBytes], at most four in flight; [onProgress]
+  /// after each part the computer took. A part the computer is too busy for
+  /// goes again after a moment, three times at most. Throws like every
+  /// request; a lost channel fails it, and the caller uploads the image again
+  /// (never the prompt by itself, V2-2 D13).
+  Future<void> uploadImage(
+    int blob,
+    String mime,
+    Uint8List bytes, {
+    void Function(int sent, int parts)? onProgress,
+  }) async {
+    if (!can(AiFeature.blob)) throw const AiRequestException('unsupported');
+    if (bytes.isEmpty || bytes.length > kAiImageMaxBytes) {
+      throw const AiRequestException('too_large');
+    }
+    final parts =
+        (bytes.length + kAiMaxBlobPartBytes - 1) ~/ kAiMaxBlobPartBytes;
+    var next = 0;
+    var sent = 0;
+    var failed = false;
+    Future<void> worker() async {
+      while (!failed && next < parts) {
+        final part = next++;
+        final from = part * kAiMaxBlobPartBytes;
+        final data = bytes.sublist(
+          from,
+          min(from + kAiMaxBlobPartBytes, bytes.length),
+        );
+        try {
+          await _blobPart(blob, part, parts, part == 0 ? mime : null, data);
+        } on Object {
+          failed = true;
+          rethrow;
+        }
+        onProgress?.call(++sent, parts);
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < min(_partsInFlight, parts); i++) worker(),
+    ]);
+  }
+
+  /// One part of an upload; `busy` waits and asks again, three times at most.
+  Future<void> _blobPart(
+    int blob,
+    int part,
+    int parts,
+    String? mime,
+    Uint8List data,
+  ) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        await _feature(
+          AiFeature.blob,
+          null,
+          (rid) => AiBlob(
+            rid: rid,
+            blob: blob,
+            part: part,
+            parts: parts,
+            mime: mime,
+            data: data,
+          ),
+        );
+        return;
+      } on AiRequestException catch (e) {
+        if (e.code != 'busy' || attempt >= 3) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    }
   }
 
   Future<void> answerPermission(String sid, int permission, String option) =>

@@ -38,6 +38,11 @@ String? itemText(TimelineItem item) => switch (item) {
   final start = min(from, text.length);
   final end = utf8Cut(text, maxBytes, from: start);
   final goesOn = end < text.length;
+  // V2-2b B12: how many images went with a user's message (the phone shows
+  // "2 ảnh"; the images themselves stay on the computer).
+  final images = item is UserItem
+      ? item.blocks.whereType<ImageBlock>().length
+      : 0;
   return (
     {
       'i': index,
@@ -53,6 +58,7 @@ String? itemText(TimelineItem item) => switch (item) {
       if (goesOn && clip) 'clip': text.length,
       // V2-2b B24: a phone's prompt says so (an older phone skips the key).
       if (item is UserItem && item.source == PromptSource.phone) 'src': 'phone',
+      if (images > 0) 'img': images,
     },
     end,
   );

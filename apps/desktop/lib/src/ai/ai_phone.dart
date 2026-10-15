@@ -18,6 +18,8 @@ import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import '../ui/window_focus.dart';
 import 'ai_agents.dart';
+import 'ai_image_encode.dart';
+import 'ai_off_thread.dart';
 import 'ai_runtimes.dart';
 
 /// V2-2 D2: the window's AI sessions as the phone hub sees them, over
@@ -297,11 +299,28 @@ final class _RuntimeControl implements AiControl {
   @override
   AiSessionState get state => _runtime.state;
 
-  /// V2-2b B24: the computer shows it as the phone's ("Bạn · từ điện
-  /// thoại").
+  /// V2-2 D7, V2-2b B12, B24: what a phone sends, as the phone's — its text,
+  /// then its images as `image` blocks, base64 off the UI isolate when they
+  /// are many bytes, as the composer does (V2-1 D16). The agent's answer to
+  /// `initialize` may have come while they were encoded: one that takes no
+  /// images is sent none (`no_images`).
   @override
-  Future<bool> send(AiPhonePrompt prompt) =>
-      _runtime.send([TextBlock(prompt.text)], source: PromptSource.phone);
+  Future<bool> send(AiPhonePrompt prompt) async {
+    final images = prompt.images;
+    final data = images.isEmpty
+        ? const <String>[]
+        : await aiEncodeImages(_ref.read(aiOffThreadProvider), [
+            for (final i in images) i.bytes,
+          ]);
+    if (images.isNotEmpty && aiTakesNoImages(_runtime.state)) {
+      throw const AiRefused('no_images');
+    }
+    return _runtime.send([
+      if (prompt.text.trim().isNotEmpty) TextBlock(prompt.text),
+      for (final (i, image) in images.indexed)
+        ImageBlock(data: data[i], mimeType: image.mime),
+    ], source: PromptSource.phone);
+  }
 
   @override
   void cancel() => _runtime.cancel();

@@ -9,6 +9,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_core/shellx_core.dart';
 
 import '../session/agent_sessions.dart';
+import 'ai_blob_store.dart';
 import 'ai_endpoint.dart';
 
 part 'ai_phone_hub_requests.dart';
@@ -42,13 +43,25 @@ final class AiSessionEntry with Redacted {
   final AiRemoteState? unavailable;
 }
 
-/// What a phone sends (V2-2 D7, V2-2b B24): its text. The window makes the
-/// agent's blocks of it and sends them as the phone's
-/// (`PromptSource.phone`), so the computer shows who wrote it.
+/// V2-2b B12: an image a phone sent with a prompt — whole, of a type ShellX
+/// sends ([mime], read from its first bytes).
+final class AiPhoneImage with Redacted {
+  const AiPhoneImage(this.mime, this.bytes);
+
+  final String mime;
+  final Uint8List bytes;
+}
+
+/// What a phone sends (V2-2 D7, V2-2b B12, B24): its text, and the images
+/// that go with it. The window makes the agent's blocks of it — the images
+/// base64 off the UI isolate (V2-1 D16) — and sends it as the phone's.
 final class AiPhonePrompt with Redacted {
-  const AiPhonePrompt(this.text);
+  const AiPhonePrompt(this.text, {this.images = const []});
 
   final String text;
+
+  /// At most [kAiImagesMax], each whole and of a type ShellX sends.
+  final List<AiPhoneImage> images;
 }
 
 /// What a phone may do to a running session (V2-1a `AiRuntime`).
@@ -420,6 +433,7 @@ final class AiPhoneHub implements AiEndpoint {
   }) : _source = source,
        _push = push,
        _now = now ?? DateTime.now,
+       _blobs = AiBlobStore(now: now),
        epoch = epoch ?? _newEpoch(),
        features = features ?? offered {
     _changes = source.changes.listen((_) => _rescan(), onError: (Object _) {});
@@ -429,6 +443,9 @@ final class AiPhoneHub implements AiEndpoint {
   final AiSessionSource _source;
   final AiPushSink? _push;
   final DateTime Function() _now;
+
+  /// V2-2b B12: what phones uploaded for their next prompt.
+  final AiBlobStore _blobs;
 
   /// V2-2b B1: what this hub does beyond V2-2a ([AiFeature] words), named in
   /// every listing (`f`). Each feature's task adds its word when the hub and
@@ -440,6 +457,7 @@ final class AiPhoneHub implements AiEndpoint {
     AiFeature.item,
     AiFeature.history,
     AiFeature.folder,
+    AiFeature.blob,
   };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
@@ -528,8 +546,8 @@ final class AiPhoneHub implements AiEndpoint {
         if (!phone.subs.containsKey(sid)) return;
         phone.earlier[sid] = before;
         _sendEarlier(mobileId, phone, sid);
-      case AiPrompt(:final sid, :final rid, :final text):
-        unawaited(_prompt(mobileId, phone, sid, rid, text));
+      case AiPrompt():
+        unawaited(_prompt(mobileId, phone, message));
       case AiAnswer():
         _answer(mobileId, message);
       case AiCancel(:final sid, :final rid):
@@ -560,8 +578,8 @@ final class AiPhoneHub implements AiEndpoint {
         _configGet(mobileId, phone, sid, rid);
       case AiConfigSet():
         _configSet(mobileId, phone, message);
-      case AiBlob(:final rid):
-        _refuse(mobileId, rid);
+      case AiBlob():
+        _blob(mobileId, message);
       case AiFiles(:final rid):
         _refuse(mobileId, rid);
       case AiItemPart():
@@ -594,12 +612,14 @@ final class AiPhoneHub implements AiEndpoint {
   /// looked at again (V2-2 D11).
   @override
   void phoneGone(String mobileId) {
+    _blobs.dropPhone(mobileId); // V2-2b B12: its images go with it
     final phone = _phones.remove(mobileId);
     if (phone != null) _lookAgain(phone.subs.keys);
   }
 
   @override
   void allPhonesGone() {
+    _blobs.clear();
     final sids = [for (final p in _phones.values) ...p.subs.keys];
     _phones.clear();
     _lookAgain(sids);
@@ -635,6 +655,7 @@ final class AiPhoneHub implements AiEndpoint {
     }
     _watched.clear();
     _phones.clear();
+    _blobs.clear();
   }
 
   // ------------------------------------------------------------ sessions --
@@ -1246,32 +1267,54 @@ final class AiPhoneHub implements AiEndpoint {
 
   /// The answer goes to [phone] only: if it is gone by then, or came back on
   /// a new channel, nothing is sent (a result belongs to the request that
-  /// made it).
-  Future<void> _prompt(
-    String mobileId,
-    _Phone phone,
-    String sid,
-    int rid,
-    String text,
-  ) async {
+  /// made it). Images (V2-2b B12) are taken from the store only once the
+  /// prompt may go, right before it does; the type that goes with each is
+  /// the one its bytes say.
+  Future<void> _prompt(String mobileId, _Phone phone, AiPrompt p) async {
     String? code;
     try {
-      final control = _controlOf(sid);
+      final control = _controlOf(p.sid);
       if (control == null) {
         code = 'not_found';
-      } else if (text.trim().isEmpty) {
-        code = 'refused';
-      } else if (utf8Length(text) > kAiMaxPromptBytes) {
-        code = 'too_large';
-      } else if (control.state.queue.length >= AiSessionState.maxQueue) {
-        code = 'queue_full';
-      } else if (!await control.send(AiPhonePrompt(text))) {
-        code = 'refused';
+      } else {
+        code = _promptRefusal(mobileId, control, p);
+        if (code == null) {
+          final images = [
+            for (final b in p.blobs)
+              if (_blobs.take(mobileId, b) case final image?)
+                AiPhoneImage(aiImageMime(image.bytes)!, image.bytes),
+          ];
+          if (!await control.send(AiPhonePrompt(p.text, images: images))) {
+            code = 'refused';
+          }
+        }
       }
+    } on AiRefused catch (refusal) {
+      code = refusal.code; // the window's own reason (`no_images`)
     } on Object {
       code = 'refused'; // nothing escapes into the window's zone
     }
-    _send(mobileId, AiResult(rid: rid, ok: code == null, code: code), phone);
+    _send(mobileId, AiResult(rid: p.rid, ok: code == null, code: code), phone);
+  }
+
+  /// Why [p] cannot go to [control]'s session now (V2-2 D7, V2-2b B12); null
+  /// when it can. Nothing is taken from the store here.
+  String? _promptRefusal(String mobileId, AiControl control, AiPrompt p) {
+    final blobs = p.blobs;
+    if (p.text.trim().isEmpty && blobs.isEmpty) return 'refused';
+    if (utf8Length(p.text) > kAiMaxPromptBytes) return 'too_large';
+    if (control.state.queue.length >= AiSessionState.maxQueue) {
+      return 'queue_full';
+    }
+    if (blobs.isEmpty) return null;
+    if (blobs.length > kAiImagesMax) return 'too_large';
+    if (blobs.toSet().length != blobs.length) return 'refused';
+    for (final b in blobs) {
+      final image = _blobs.peek(mobileId, b);
+      if (image == null || aiImageMime(image.bytes) == null) return 'refused';
+    }
+    if (aiTakesNoImages(control.state)) return 'no_images';
+    return null;
   }
 
   void _answer(String mobileId, AiAnswer a) {
