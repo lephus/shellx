@@ -134,6 +134,8 @@ List<KeyBinding> defaultKeyBindings(TargetPlatform platform) {
     b(shifted(LogicalKeyboardKey.keyN), 'new_workspace'),
     // V2-1 D5: ⌘⇧E / Ctrl+Shift+E (free on both).
     b(shifted(LogicalKeyboardKey.keyE), 'new_ai_session'),
+    // V2-3 D10: ⌘⇧B / Ctrl+Shift+B (free on both).
+    b(shifted(LogicalKeyboardKey.keyB), 'toggle_tools'),
     b(shifted(LogicalKeyboardKey.keyK), 'ssh_connect'),
     b(shifted(LogicalKeyboardKey.keyI), 'toggle_notifications'),
     b(shifted(LogicalKeyboardKey.keyU), 'jump_to_unread'),

@@ -20,6 +20,8 @@ String? newTabShortcutLabel() =>
     actionShortcutLabel(const KeyAction('new_tab'));
 String? newAiSessionShortcutLabel() =>
     actionShortcutLabel(const KeyAction('new_ai_session'));
+String? toggleToolsShortcutLabel() =>
+    actionShortcutLabel(const KeyAction('toggle_tools'));
 String? closeTabShortcutLabel() =>
     actionShortcutLabel(const KeyAction('close_surface'));
 String? copyShortcutLabel() =>

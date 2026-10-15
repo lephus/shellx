@@ -109,6 +109,21 @@ void main() {
     ]);
   });
 
+  test('V2-3 D10: toggle_tools is ⌘⇧B / Ctrl+Shift+B; add_tool has no '
+      'chord', () {
+    var (b, problems) = resolve('');
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+shift+b'), isA<ToggleToolsIntent>());
+    expect(b.labelOf(const KeyAction('toggle_tools')), '⌘⇧B');
+    expect(b.labelOf(const KeyAction('add_tool')), isNull);
+    (b, problems) = resolve('', platform: win);
+    expect(lookup(b, 'ctrl+shift+b'), isA<ToggleToolsIntent>());
+    expect(b.labelOf(const KeyAction('toggle_tools')), 'Ctrl+Shift+B');
+    (b, problems) = resolve('keybind = super+shift+j=add_tool');
+    expect(problems, isEmpty);
+    expect(lookup(b, 'super+shift+j'), isA<AddToolIntent>());
+  });
+
   test('V2-1 D5: new_ai_session is ⌘⇧E / Ctrl+Shift+E; new_terminal_tab '
       'has no chord', () {
     var (b, problems) = resolve('');
