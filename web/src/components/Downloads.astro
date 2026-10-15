@@ -1,6 +1,6 @@
 ---
 import { ui, type Lang } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
+import { appStoreUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
 
 interface Props {
   lang: Lang;
@@ -31,7 +31,6 @@ const stores = [
 <div class="downloads">
   <div class="group">
     <h3>{t.desktopHeading}</h3>
-    <p class="muted">{t.version} {desktopVersion}</p>
     {desktops.map((d) => (
       <a class="button" data-platform={d.id} href={d.url}>
         <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d={d.logo} /></svg></span>
@@ -75,7 +74,6 @@ const stores = [
     padding: 1.5rem; border-radius: 20px; background: rgba(21, 16, 38, 0.85); border: 1px solid var(--border);
   }
   .group h3 { margin-bottom: 0.15rem; font-size: 1.2rem; }
-  .muted { color: var(--muted); margin: 0 0 1rem; font-size: 0.9rem; }
   .button {
     display: flex; align-items: center; gap: 0.9rem; padding: 0.8rem 1rem; margin-top: 0.75rem;
     border: 1px solid var(--border); border-radius: 14px; background: var(--bg);
