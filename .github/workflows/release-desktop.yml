@@ -4,8 +4,8 @@ name: Release desktop
 # already serves it (release/README.md). Pick the next version with
 # `node release/scripts/bump.mjs X.Y.Z`, commit, push: build, sign, publish, then the relay and the
 # website are pointed at it. A failed release is retried by the next push to main.
-# To retry without other changes, push a commit that touches this file (an empty commit can be
-# skipped by paths-ignore), or run it from the Actions tab (workflow_dispatch, dry_run off).
+# To retry without other changes, push a commit that touches this file (an empty commit may be
+# skipped by paths-ignore), or run it from the Actions tab (workflow_dispatch with dry_run off).
 on:
   push:
     branches: [main]
