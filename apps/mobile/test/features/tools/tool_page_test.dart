@@ -445,4 +445,20 @@ void main() {
     expect(find.text('Bảng việc'), findsNothing);
     expect(page().closes, 1);
   });
+
+  // NB2: the strip lifts a cover once the link drops, but with the servers closed (after "disabled", "gone",
+  // "unavailable", or a lost channel right after a resume) the history points at ports nothing of ours serves.
+  testWidgets('back leaves the page while reconnecting with nothing served (NB2)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    page().servedPortValue = null;
+    page().setPhase(ToolPhase.reconnecting);
+    await tester.pump();
+    engine.canGoBackValue = true;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(engine.goBacks, 0);
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(page().closes, 1);
+  });
 }
