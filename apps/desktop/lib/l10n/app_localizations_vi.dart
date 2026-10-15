@@ -3767,4 +3767,261 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get aiFileMissing => 'Tệp này không còn nữa.';
+
+  @override
+  String get toolsGroup => 'Tool';
+
+  @override
+  String get toolAdd => 'Thêm tool';
+
+  @override
+  String toolOpenCommand(String name) {
+    return 'Mở tool: $name';
+  }
+
+  @override
+  String get toolLocal => 'Trên máy này';
+
+  @override
+  String get toolRemote => 'Ngoài máy này';
+
+  @override
+  String get toolUnencrypted => 'không mã hoá';
+
+  @override
+  String toolAway(String host) {
+    return 'Đang ở $host';
+  }
+
+  @override
+  String get toolBackToTool => 'Về tool';
+
+  @override
+  String get toolPhoneOn => 'Điện thoại: bật';
+
+  @override
+  String get toolPhoneOff => 'Điện thoại: tắt';
+
+  @override
+  String get toolPhoneOnlyLocal =>
+      'Chỉ tool http trên máy này mở được trên điện thoại.';
+
+  @override
+  String get toolAlsoPhone => '· cả điện thoại';
+
+  @override
+  String get toolExpand => 'Mở rộng';
+
+  @override
+  String get toolCollapse => 'Thu về';
+
+  @override
+  String get toolOpenInBrowser => 'Mở bằng trình duyệt';
+
+  @override
+  String toolRefused(String hostPort) {
+    return 'Chưa có gì chạy ở $hostPort. Chạy server của tool rồi trang sẽ tự hiện.';
+  }
+
+  @override
+  String toolLoadFailed(String reason) {
+    return 'Không tải được trang: $reason';
+  }
+
+  @override
+  String get toolAtsBlocked =>
+      'macOS không cho mở trang http này trong ShellX.';
+
+  @override
+  String get toolCrashed => 'Trang đã dừng.';
+
+  @override
+  String get toolDownloadBlocked =>
+      'Tool muốn tải một tệp. Mở bằng trình duyệt để tải.';
+
+  @override
+  String toolDeleteConfirm(String name) {
+    return 'Xoá tool \"$name\"? Trang của nó đóng lại. Dữ liệu web của nó không bị xoá.';
+  }
+
+  @override
+  String get toolClearData => 'Xoá dữ liệu của tool…';
+
+  @override
+  String get toolClearDataConfirm =>
+      'Đăng xuất mọi tool và xoá cookie, bộ nhớ của chúng?';
+
+  @override
+  String get toolEmbedSetting => 'Hiện tool trong ShellX';
+
+  @override
+  String get toolEmbedAuto => 'Tự động';
+
+  @override
+  String get toolEmbedOn => 'Luôn';
+
+  @override
+  String get toolEmbedOff => 'Không, mở bằng trình duyệt';
+
+  @override
+  String toolCovered(String name) {
+    return '$name — tạm ẩn khi đang mở menu';
+  }
+
+  @override
+  String toolTooMany(String name) {
+    return 'Đã dỡ \"$name\" cho ShellX nhẹ. Bấm để tải lại.';
+  }
+
+  @override
+  String toolJsAlertTitle(String name) {
+    return '$name nhắn';
+  }
+
+  @override
+  String get actionToggleTools => 'Hiện hoặc ẩn vùng tool';
+
+  @override
+  String get actionAddTool => 'Thêm tool…';
+
+  @override
+  String get toolDialogAddTitle => 'Thêm tool';
+
+  @override
+  String get toolDialogEditTitle => 'Sửa tool';
+
+  @override
+  String get toolDialogName => 'Tên';
+
+  @override
+  String get toolDialogNameHint => 'Bảng việc';
+
+  @override
+  String get toolDialogUrl => 'URL';
+
+  @override
+  String get toolDialogUrlHint => 'http://localhost:4000';
+
+  @override
+  String get toolSuggestionsTitle => 'Cổng đang chạy mà ShellX thấy:';
+
+  @override
+  String toolSuggestion(int port, String process) {
+    return 'localhost:$port · $process';
+  }
+
+  @override
+  String get toolSuggestionsNone =>
+      'Chưa thấy cổng nào. Chạy server của tool trong một terminal hoặc nhờ agent chạy.';
+
+  @override
+  String get toolDialogPhone => 'Cho mở trên điện thoại';
+
+  @override
+  String get toolDialogPhoneNote =>
+      'Đi qua relay, mã hoá đầu cuối. Điện thoại chỉ tới được đúng URL này.';
+
+  @override
+  String get toolDialogAdd => 'Thêm';
+
+  @override
+  String get toolDialogSave => 'Lưu';
+
+  @override
+  String get toolUrlNotHttp => 'URL phải bắt đầu bằng http:// hoặc https://';
+
+  @override
+  String get toolUrlUserinfo =>
+      'URL không được chứa tên đăng nhập hay mật khẩu';
+
+  @override
+  String get toolUrlBackslash => 'URL không được chứa dấu gạch ngược (\\)';
+
+  @override
+  String get toolUrlNoHost => 'URL cần có tên máy, ví dụ localhost:4000';
+
+  @override
+  String get toolUrlBadPort => 'Cổng phải là số từ 1 đến 65535';
+
+  @override
+  String get toolUrlTooLong => 'URL dài quá 2048 ký tự';
+
+  @override
+  String toolLimitReached(int count) {
+    return 'Dự án này đã có $count tool.';
+  }
+
+  @override
+  String get toolBack => 'Quay lại';
+
+  @override
+  String get toolReload => 'Tải lại';
+
+  @override
+  String get toolStop => 'Dừng';
+
+  @override
+  String get toolMore => 'Thêm';
+
+  @override
+  String get toolEditMenu => 'Sửa tool…';
+
+  @override
+  String get toolCopyUrl => 'Sao chép URL';
+
+  @override
+  String get toolCloseDock => 'Đóng vùng tool';
+
+  @override
+  String get toolClose => 'Đóng tool';
+
+  @override
+  String get toolMenuOpen => 'Mở';
+
+  @override
+  String get toolMenuEdit => 'Sửa…';
+
+  @override
+  String get toolMenuDelete => 'Xoá…';
+
+  @override
+  String get toolDeleteAction => 'Xoá';
+
+  @override
+  String get toolClearDataAction => 'Xoá';
+
+  @override
+  String get toolClearDataNote => 'Tool vẫn còn; bạn đăng nhập lại vào chúng.';
+
+  @override
+  String get toolDataLabel => 'Dữ liệu của tool';
+
+  @override
+  String get toolNeedsWebView2 => 'Cần Microsoft Edge WebView2 Runtime.';
+
+  @override
+  String get toolReasonDns => 'không tìm thấy địa chỉ';
+
+  @override
+  String get toolReasonTimeout => 'quá lâu không phản hồi';
+
+  @override
+  String get toolReasonCertificate => 'chứng chỉ không hợp lệ';
+
+  @override
+  String get toolReasonUnreachable => 'không tới được mạng';
+
+  @override
+  String get toolReasonOther => 'có lỗi xảy ra';
+
+  @override
+  String toolDockLabel(String name) {
+    return 'Tool: $name';
+  }
+
+  @override
+  String get toolHandleLabel => 'Độ rộng vùng tool';
+
+  @override
+  String get toolOk => 'OK';
 }
