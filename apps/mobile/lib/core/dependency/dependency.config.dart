@@ -34,6 +34,7 @@ import '../../features/machines/presentation/controllers/machine_list_controller
 import '../../features/notifications/domain/push_messaging.dart' as _i623;
 import '../../features/notifications/presentation/notification_opener.dart'
     as _i539;
+import '../../features/notifications/presentation/push_answerer.dart' as _i344;
 import '../../features/notifications/presentation/push_controller.dart'
     as _i737;
 import '../../features/pairing/presentation/controllers/qr_scanner_controller.dart'
@@ -216,6 +217,13 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i539.MachineNavigator>(),
       ),
     );
+    gh.lazySingleton<_i344.PushAnswerer>(
+      () => _i344.PushAnswerer.create(
+        gh<_i351.SessionHolder>(),
+        gh<_i306.AppLockController>(),
+        gh<_i539.NotificationOpener>(),
+      ),
+    );
     gh.lazySingleton<_i695.PopupHandler>(
       () => _i695.PopupHandler(gh<_i351.BuildContext>()),
     );
@@ -227,6 +235,7 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i539.NotificationOpener>(),
         gh<_i351.DeviceDescription>(),
         gh<_i306.AppLockController>(),
+        gh<_i344.PushAnswerer>(),
       ),
       dispose: (i) => i.dispose(),
     );

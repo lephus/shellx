@@ -75,13 +75,12 @@ final class FirebasePushMessaging implements PushMessaging {
   @override
   Future<void> deleteToken() => _messaging.deleteToken();
 
+  /// V2-2b B8: on iOS the button that opened the app comes as `actionIdentifier` (firebase_messaging 16.4.0+).
   static PushMessage _message(RemoteMessage message) => PushMessage(
     title: message.notification?.title,
     body: message.notification?.body,
-    data: {
-      for (final entry in message.data.entries)
-        if (entry.value != null) entry.key: entry.value.toString(),
-    },
+    data: pushDataOf(message.data),
+    action: message.actionIdentifier,
   );
 
   static PushPermission _map(AuthorizationStatus status) => switch (status) {

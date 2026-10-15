@@ -5,8 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
+import 'package:shellx_mobile/features/notifications/domain/push_answer.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/notifications/presentation/notification_opener.dart';
+import 'package:shellx_mobile/features/notifications/presentation/push_answerer.dart';
 import 'package:toastification/toastification.dart';
 
 /// Push notifications on this phone (push spec §6), for the whole app's life:
@@ -17,7 +19,9 @@ import 'package:toastification/toastification.dart';
 /// - sign-out, or notifications turned off in the system settings → this install's token is
 ///   deleted (the relay drops its copy too);
 /// - in the foreground → an in-app banner; a tap (banner, notification, or the one that launched
-///   the app) → [NotificationOpener].
+///   the app) → [NotificationOpener];
+/// - V2-2b B10: a tap on "Cho phép" / "Từ chối" of an AI permission push → [PushAnswerer] (without one, it
+///   opens like any tap).
 ///
 /// Without Firebase ([PushMessaging.available] false) it does nothing at all.
 @lazySingleton
@@ -30,7 +34,9 @@ class PushController {
     required DeviceDescription device,
     required AppLockController lock,
     required PopupHandler Function() popup,
+    PushAnswerer? answerer,
   }) : _messaging = messaging,
+       _answerer = answerer,
        _session = session,
        _lock = lock,
        _prefs = prefs,
@@ -46,6 +52,7 @@ class PushController {
     NotificationOpener opener,
     DeviceDescription device,
     AppLockController lock,
+    PushAnswerer answerer,
   ) => PushController(
     messaging: messaging,
     session: session,
@@ -55,6 +62,7 @@ class PushController {
     lock: lock,
     // Resolved when a banner shows: the popup handler needs the router's context.
     popup: () => getIt<PopupHandler>(),
+    answerer: answerer,
   );
 
   /// Set once the automatic prompt was shown on this install.
@@ -68,6 +76,7 @@ class PushController {
   final AppLockController _lock;
   final SharedPreferences _prefs;
   final NotificationOpener _opener;
+  final PushAnswerer? _answerer;
   final PushPlatform _platform;
   final PopupHandler Function() _popup;
   final Signal<PushPermission?> _permission = signal(null);
@@ -227,13 +236,23 @@ class PushController {
   Future<void> _openInitial() async {
     try {
       final message = await _messaging.initialMessage();
-      if (message != null) await _opener.open(message);
+      if (message != null) await _route(message);
     } catch (error) {
       _log('initialMessage', error);
     }
   }
 
-  void _open(PushMessage message) => unawaited(_opener.open(message));
+  void _open(PushMessage message) => unawaited(_route(message));
+
+  /// V2-2b B10: a tap on a button of an AI permission push whose data reads right goes to the answerer;
+  /// everything else — the notification itself, a banner, a button of a push it cannot read — opens as before
+  /// and answers nothing.
+  Future<void> _route(PushMessage message) {
+    final answerer = _answerer;
+    final answer = answerer == null ? null : PushAnswer.of(message);
+    if (answerer == null || answer == null) return _opener.open(message);
+    return answerer.answer(message, answer);
+  }
 
   /// The system shows nothing while the app is open: the banner does (push spec §6).
   void _showBanner(PushMessage message) {

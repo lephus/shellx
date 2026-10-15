@@ -311,4 +311,67 @@ void main() {
       expect(opener.opened, hasLength(2));
     });
   });
+
+  group('the buttons of an AI permission push (V2-2b B10)', () {
+    const data = {
+      'kind': 'ai',
+      'ai_session': 'k3f9za.-12',
+      'agent_id': agentA,
+      'perm': '41',
+      'allow': 'allow-once',
+      'reject': 'reject-once',
+    };
+    const allow = PushMessage(
+      title: 'MacBook · Claude',
+      body: 'Cần bạn trả lời: Sửa src/main.ts',
+      data: data,
+      action: 'allow',
+    );
+    late RecordingAnswerer answerer;
+
+    setUp(() {
+      answerer = RecordingAnswerer();
+      controller.dispose();
+      controller = PushController(
+        messaging: messaging,
+        session: session,
+        prefs: prefs,
+        opener: opener,
+        device: const DeviceDescription(name: 'iPhone 15', platform: DevicePlatform.ios),
+        lock: lock,
+        popup: () => popup,
+        answerer: answerer,
+      );
+    });
+
+    test('a button that launched the app, and one tapped later, go to the answerer, not the opener', () async {
+      messaging.initial = allow;
+      controller.start();
+      await pumpEventQueue();
+      messaging.opened.add(const PushMessage(data: data, action: 'reject'));
+      await pumpEventQueue();
+      expect([for (final (_, a) in answerer.answered) a.option], ['allow-once', 'reject-once']);
+      expect(opener.opened, isEmpty);
+    });
+
+    test('the notification itself, a banner, or a button whose data does not read right only opens', () async {
+      controller.start();
+      const body = PushMessage(title: 'MacBook · Claude', data: data);
+      final bad = PushMessage(data: {...data, 'perm': 'x'}, action: 'allow');
+      messaging.opened
+        ..add(body)
+        ..add(bad);
+      await pumpEventQueue();
+      expect(answerer.answered, isEmpty);
+      expect(opener.opened, [body, bad]);
+    });
+
+    test('without an answerer (an older wiring) a button opens like a tap', () async {
+      controller.dispose();
+      controller = build()..start();
+      messaging.opened.add(allow);
+      await pumpEventQueue();
+      expect(opener.opened, [allow]);
+    });
+  });
 }

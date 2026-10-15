@@ -133,6 +133,33 @@ void main() {
       }
       expect(readFile('ios/Runner/Info.plist'), contains('your terminal or an AI session'));
     });
+
+    test('V2-2b B8: the ai_perm buttons — Deny first and not destructive (R5), Allow needs an unlock — named in '
+        'both languages, registered once at launch', () {
+      final delegate = readFile('ios/Runner/AppDelegate.swift');
+      expect(delegate, contains('AppDelegate.registerNotificationCategories()'));
+      expect(delegate, contains('identifier: "ai_perm"'));
+      expect(delegate, contains('actions: [reject, allow]'));
+      expect(delegate, contains('UNUserNotificationCenter.current().setNotificationCategories([category])'));
+      expect(RegExp(r'identifier: "reject",[\s\S]*?options: \[\.foreground\]\s*\)').hasMatch(delegate), isTrue);
+      expect(
+        RegExp(r'identifier: "allow",[\s\S]*?options: \[\.foreground, \.authenticationRequired\]').hasMatch(delegate),
+        isTrue,
+      );
+      // An Apple Watch double tap runs the first action that is not destructive: it must be "Deny".
+      expect(delegate, isNot(contains('.destructive')));
+      for (final language in ['vi', 'en']) {
+        final strings = readFile('ios/Runner/$language.lproj/Localizable.strings');
+        expect(strings, contains('"pushActionAllow" = "'), reason: language);
+        expect(strings, contains('"pushActionReject" = "'), reason: language);
+      }
+      expect(readFile('ios/Runner/vi.lproj/Localizable.strings'), contains('"pushActionReject" = "Từ chối";'));
+      expect(readFile('ios/Runner/en.lproj/Localizable.strings'), contains('"pushActionAllow" = "Allow";'));
+      final project = readFile('ios/Runner.xcodeproj/project.pbxproj');
+      expect(project, contains('path = vi.lproj/Localizable.strings;'));
+      expect(project, contains('path = en.lproj/Localizable.strings;'));
+      expect(project, contains('/* Localizable.strings in Resources */,'));
+    });
   });
 
   group('Android', () {

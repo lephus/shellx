@@ -664,5 +664,13 @@
   "aiPickFailed": "Couldn't open the photos. Check ShellX's access in Settings.",
   "aiRemoveImage": "Remove image",
   "aiUploading": "Sending images…",
-  "aiMicTooltip": "Speak a message"
+  "aiMicTooltip": "Speak a message",
+  "pushActionAllow": "Allow",
+  "pushActionReject": "Deny",
+  "aiPushAllowed": "Allowed: {title}",
+  "@aiPushAllowed": {"placeholders": {"title": {"type": "String"}}},
+  "aiPushDenied": "Denied: {title}",
+  "@aiPushDenied": {"placeholders": {"title": {"type": "String"}}},
+  "aiPushMaybeNotSent": "It may not have been sent. Check the session.",
+  "aiPushAnsweredElsewhere": "This request was already answered elsewhere."
 }

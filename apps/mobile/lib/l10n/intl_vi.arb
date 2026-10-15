@@ -426,5 +426,11 @@
   "aiPickFailed": "Không mở được ảnh. Hãy kiểm tra quyền của ShellX trong Cài đặt.",
   "aiRemoveImage": "Bỏ ảnh",
   "aiUploading": "Đang gửi ảnh…",
-  "aiMicTooltip": "Nói tin nhắn"
+  "aiMicTooltip": "Nói tin nhắn",
+  "pushActionAllow": "Cho phép",
+  "pushActionReject": "Từ chối",
+  "aiPushAllowed": "Đã cho phép: {title}",
+  "aiPushDenied": "Đã từ chối: {title}",
+  "aiPushMaybeNotSent": "Có thể chưa gửi được. Xem trong phiên.",
+  "aiPushAnsweredElsewhere": "Yêu cầu này đã được trả lời ở nơi khác."
 }

@@ -3787,6 +3787,56 @@ class S {
       args: [],
     );
   }
+
+  /// `Allow`
+  String get pushActionAllow {
+    return Intl.message('Allow', name: 'pushActionAllow', desc: '', args: []);
+  }
+
+  /// `Deny`
+  String get pushActionReject {
+    return Intl.message('Deny', name: 'pushActionReject', desc: '', args: []);
+  }
+
+  /// `Allowed: {title}`
+  String aiPushAllowed(String title) {
+    return Intl.message(
+      'Allowed: $title',
+      name: 'aiPushAllowed',
+      desc: '',
+      args: [title],
+    );
+  }
+
+  /// `Denied: {title}`
+  String aiPushDenied(String title) {
+    return Intl.message(
+      'Denied: $title',
+      name: 'aiPushDenied',
+      desc: '',
+      args: [title],
+    );
+  }
+
+  /// `It may not have been sent. Check the session.`
+  String get aiPushMaybeNotSent {
+    return Intl.message(
+      'It may not have been sent. Check the session.',
+      name: 'aiPushMaybeNotSent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This request was already answered elsewhere.`
+  String get aiPushAnsweredElsewhere {
+    return Intl.message(
+      'This request was already answered elsewhere.',
+      name: 'aiPushAnsweredElsewhere',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {
