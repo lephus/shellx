@@ -10,6 +10,7 @@ import type { HubSocket } from "../hub/user-hub.js";
 import { Errors } from "../http/errors.js";
 import { errorKind, logMeta } from "../log.js";
 import { CloseCode } from "../protocol/frames.js";
+import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 
 /** Close code for a connection the hub could not admit (its tombstones could not be read). */
 export const INTERNAL_ERROR_CLOSE = 1011;
@@ -79,6 +80,7 @@ export const webSocketAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const auth = await authenticate(c.get("db"), parseBearer(c.req.header("Authorization")), c.get("now")());
   if (auth === null) throw Errors.unauthorized();
   if (!hasUpgradeToken(c.req.header("Connection"))) throw Errors.upgradeRequired();
+  recordAppVersion(c.get("db"), auth.deviceId, c.req.header(CLIENT_VERSION_HEADER));
   c.set("auth", auth);
   await next();
 };

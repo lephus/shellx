@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app.js";
 import type { Db } from "../db/db.js";
 import { Errors } from "../http/errors.js";
+import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 import type { DeviceKind } from "./device.js";
 import { hashToken, parseBearer, TOKEN_IDLE_TTL_MS, TOKEN_TOUCH_INTERVAL_MS } from "./tokens.js";
 
@@ -65,6 +66,7 @@ export async function authenticate(db: Db, token: string | null, now: number): P
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const auth = await authenticate(c.get("db"), parseBearer(c.req.header("Authorization")), c.get("now")());
   if (auth === null) throw Errors.unauthorized();
+  recordAppVersion(c.get("db"), auth.deviceId, c.req.header(CLIENT_VERSION_HEADER));
   c.set("auth", auth);
   await next();
 };

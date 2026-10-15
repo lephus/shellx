@@ -17,6 +17,17 @@ export interface Config {
   winUrl: string;
   /** Only the exact string "false" in RATE_LIMITS_ENABLED turns the limits off (local dev / E2E). */
   rateLimitsEnabled: boolean;
+  /**
+   * Host name of the admin dashboard (ADMIN_HOST, lower-case, no port): requests whose Host is this
+   * name are answered by the admin app alone (src/admin/app.ts), never by the relay's routes.
+   */
+  adminHost: string;
+  /**
+   * ADMIN_PASSWORD, or null when unset. Admin is enabled only when it has at least
+   * ADMIN_PASSWORD_MIN_CHARS characters; a shorter one is not a startup error (the relay itself does
+   * not need it), it only keeps admin disabled and is logged once as `admin_disabled`.
+   */
+  adminPassword: string | null;
 }
 
 export class ConfigError extends Error {
@@ -28,6 +39,10 @@ export const REQUIRED_VARIABLES = ["MIN_AGENT", "MIN_MOBILE", "LATEST_AGENT_VERS
 export const DEFAULT_PORT = 8080;
 export const DEFAULT_HOST = "0.0.0.0";
 export const DEFAULT_DB_PATH = "/data/relay.db";
+export const DEFAULT_ADMIN_HOST = "admin.shellx.pro";
+
+/** Letters, digits, dots and hyphens: what a DNS name in a Host header looks like. */
+const HOST_NAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): Config {
   const value = (name: string): string | undefined => {
@@ -43,6 +58,10 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     throw new ConfigError(`PORT must be an integer from 0 to 65535, got "${portText}"`);
   }
+  const adminHost = (value("ADMIN_HOST") ?? DEFAULT_ADMIN_HOST).toLowerCase();
+  if (!HOST_NAME_RE.test(adminHost)) {
+    throw new ConfigError(`ADMIN_HOST must be a host name such as ${DEFAULT_ADMIN_HOST} (no scheme, port or path), got "${adminHost}"`);
+  }
   return {
     host: value("HOST") ?? DEFAULT_HOST,
     port,
@@ -53,5 +72,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     macUrl: value("MAC_URL")!,
     winUrl: value("WIN_URL")!,
     rateLimitsEnabled: env.RATE_LIMITS_ENABLED !== "false",
+    adminHost,
+    adminPassword: value("ADMIN_PASSWORD") ?? null,
   };
 }

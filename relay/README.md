@@ -45,12 +45,15 @@ stops the relay with one line on stderr and exit status 1.
 | `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
 | `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade/notification limits off |
 | `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push notifications). Unset, unreadable or invalid → push is off, the relay runs normally, logs `push_disabled` with the reason once, and `POST /v1/notifications` answers 503 `push_unavailable` |
+| `ADMIN_HOST` | `admin.shellx.pro` | Host name of the admin dashboard (see "Admin dashboard" below); a value that is not a bare host name stops the relay |
+| `ADMIN_PASSWORD` | unset | The admin dashboard's password. Unset or shorter than 16 characters → admin is off (`admin_disabled` logged once with the reason, never the password) and the relay runs normally |
 | `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
 
 On startup the relay applies every `migrations/*.sql` not yet listed in `schema_migrations`, in
 file-name order, one transaction per file. There are no down-migrations: fix a mistake with a new
 file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub's
-`pairing_removed` tombstones; `0003_push_tokens.sql` holds the phones' FCM tokens.
+`pairing_removed` tombstones; `0003_push_tokens.sql` holds the phones' FCM tokens; `0004_admin.sql`
+adds `devices.app_version` and the admin's `app_settings`.
 
 ## Behaviour worth knowing
 
@@ -135,6 +138,32 @@ Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
   `FCM_SERVICE_ACCOUNT=.data/fake-fcm.json FCM_ENDPOINT=http://127.0.0.1:8788
   FCM_TOKEN_ENDPOINT=http://127.0.0.1:8788/token npm run dev` (environment variables win over
   `dev.env`). `packages/shellx_e2e/test/push_e2e_test.dart` runs that fake server on port 8788.
+
+## Admin dashboard
+
+A request whose `Host` (port and case ignored) is `ADMIN_HOST` is answered only by the admin app
+(`src/admin/`): the static UI in `admin/` (`/`, `/admin.css`, `/admin.js`) and a JSON API under
+`/api/` (`session`, `login`, `logout`, `stats`, `settings`). No relay route answers on that host and
+no admin path answers on any other.
+
+- **Sign-in:** one shared password (`ADMIN_PASSWORD`, compared as SHA-256 digests in constant time).
+  The session id lives in the `shellx_admin` cookie (HttpOnly, Secure, SameSite=Strict, 12 h); the
+  relay keeps only its digest, in memory, so a restart signs the admin out. 5 failed sign-ins per IP
+  within 15 minutes → 429 for that IP, even with the right password (independent of
+  `RATE_LIMITS_ENABLED`).
+- **Mutating calls** (POST/PUT) need `Content-Type: application/json` and, when the browser sends an
+  `Origin`, `https://<ADMIN_HOST>` (or `http://<ADMIN_HOST>[:port]` for dev); else 403 `forbidden`.
+  Every admin response carries a strict CSP (`script-src 'self'`, no inline code), `nosniff`,
+  `no-referrer`, `X-Frame-Options: DENY` and `Cache-Control: no-store`.
+- **Minimum versions:** `PUT /api/settings {min_agent?, min_mobile?}` stores an override in
+  `app_settings` that `GET /v1/version` serves instead of `MIN_AGENT`/`MIN_MOBILE` (read per request,
+  no restart); `null` removes it. `latest_agent` stays env only.
+- **App versions:** the apps send their `x.y.z` in `X-ShellX-Version`; on every authenticated call,
+  WebSocket upgrade, register and login the relay stores it in `devices.app_version` when it changed
+  (anything not `\d{1,6}.\d{1,6}.\d{1,6}` is ignored). `GET /api/stats` reports the distribution.
+- **Locally:** `npm run dev` sets `ADMIN_HOST=admin.localhost` and a dev-only password; open
+  http://admin.localhost:8787 (Chrome and Firefox resolve `*.localhost` to 127.0.0.1 and accept the
+  Secure cookie there).
 
 ## Healthcheck
 

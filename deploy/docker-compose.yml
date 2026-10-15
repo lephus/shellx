@@ -21,9 +21,14 @@ services:
     memswap_limit: 512m
     env_file: relay.env
     environment:
-      VIRTUAL_HOST: relay.shellx.pro
+      # admin.shellx.pro is the relay's admin dashboard: the relay answers it by Host header alone
+      # (relay/src/admin/), so both names point at this one container.
+      VIRTUAL_HOST: relay.shellx.pro,admin.shellx.pro
       VIRTUAL_PORT: "8080"
-      LETSENCRYPT_HOST: relay.shellx.pro
+      LETSENCRYPT_HOST: relay.shellx.pro,admin.shellx.pro
+      # One certificate per name, so a problem issuing admin.shellx.pro's can never touch the
+      # relay's certificate (the apps' only way in).
+      LETSENCRYPT_SINGLE_DOMAIN_CERTS: "true"
       HOST: 0.0.0.0
       PORT: "8080"
       DB_PATH: /data/relay.db
@@ -31,6 +36,9 @@ services:
       # container, e.g. /secrets/fcm.json, set once by hand in .env (deploy/README.md, "Push
       # notifications"). Empty → push is off and the relay runs as before.
       FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      # Password of admin.shellx.pro, set once by hand in the VPS's .env (deploy/README.md, "Admin"),
+      # never in this repository. Empty or under 16 characters → the dashboard stays disabled.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       # SQLite database; the directory must belong to uid 1000 (the image's `node` user).
       - ./data:/data

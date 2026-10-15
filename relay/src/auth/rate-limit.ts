@@ -74,6 +74,15 @@ export class SlidingWindowLimiter implements RateLimiter {
     return true;
   }
 
+  /**
+   * True when `key` has used up its limit in the current window; counts nothing. Lets a caller
+   * count only some calls, e.g. the admin login, which records failed attempts with `limit()`.
+   */
+  isLimited(key: string): boolean {
+    const since = this.now() - this.windowMs;
+    return (this.hits.get(key) ?? []).filter((t) => t > since).length >= this.options.limit;
+  }
+
   /** Drops every key with no call inside the window. */
   sweep(now: number = this.now()): void {
     this.lastSweep = now;

@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { Hono } from "hono";
+import { ADMIN_STATIC_DIR, createAdminApp, hostName } from "./admin/app.js";
 import type { PasswordHasher } from "./auth/password.js";
 import { HasherBusyError, passwords as defaultPasswords } from "./auth/password.js";
 import type { RateLimiters } from "./auth/rate-limit.js";
@@ -16,6 +17,7 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
+import { minVersions } from "./settings.js";
 
 export interface AppDeps {
   config: Config;
@@ -28,6 +30,8 @@ export interface AppDeps {
   now?: () => number;
   /** FCM gateway; null or absent when push is not configured (503 `push_unavailable`). */
   push?: PushGateway | null;
+  /** Directory of the admin UI (index.html, admin.css, admin.js); defaults to `relay/admin/`. */
+  adminStaticDir?: string;
 }
 
 export interface AppVariables {
@@ -51,6 +55,21 @@ export type AppEnv = { Bindings: AppBindings; Variables: AppVariables };
 
 export function createApp(deps: AppDeps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  const admin = createAdminApp({
+    config: deps.config,
+    db: deps.db,
+    hubs: deps.hubs,
+    now: deps.now ?? Date.now,
+    staticDir: deps.adminStaticDir ?? ADMIN_STATIC_DIR,
+  });
+
+  // First of all: a request for ADMIN_HOST goes to the admin app and only there (its own routes,
+  // 404 and errors), so no relay route answers on the admin host. The admin app is mounted nowhere
+  // else, so no admin route answers on any other host.
+  app.use("*", async (c, next) => {
+    if (hostName(c.req.header("Host")) === deps.config.adminHost) return admin.fetch(c.req.raw, c.env);
+    await next();
+  });
 
   app.use("*", async (c, next) => {
     c.set("config", deps.config);
@@ -65,9 +84,12 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
 
   app.get("/v1/version", (c) => {
     const config = c.get("config");
+    // The admin's override from the dashboard when set, else MIN_AGENT / MIN_MOBILE; latest_agent is
+    // env only (the desktop release pipeline commits it to deploy/relay.env).
+    const min = minVersions(c.get("db"), config);
     return c.json({
-      min_agent: config.minAgent,
-      min_mobile: config.minMobile,
+      min_agent: min.min_agent,
+      min_mobile: min.min_mobile,
       latest_agent: { version: config.latestAgentVersion, mac_url: config.macUrl, win_url: config.winUrl },
     });
   });

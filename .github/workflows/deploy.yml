@@ -169,6 +169,8 @@ jobs:
           }
           check https://relay.shellx.pro/v1/version
           check https://shellx.pro/
+          # 200 whether or not ADMIN_PASSWORD is set on the VPS ({"enabled": false} without it).
+          check https://admin.shellx.pro/api/session
 
       - name: Remove the SSH key
         if: always()

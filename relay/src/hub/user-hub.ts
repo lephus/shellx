@@ -142,6 +142,16 @@ export class HubState {
     return this.sockets.size;
   }
 
+  /**
+   * Devices with a live socket right now, read directly rather than through the queue: a snapshot
+   * for statistics (see `HubRegistry.liveDevices`), which may be a moment behind queued work.
+   */
+  liveDevices(): { deviceId: string; kind: DeviceKind }[] {
+    const devices = new Map<string, DeviceKind>();
+    for (const [socket, me] of this.sockets) if (isLive(socket, me)) devices.set(me.device_id, me.kind);
+    return [...devices].map(([deviceId, kind]) => ({ deviceId, kind }));
+  }
+
   // ---- sockets (called by the ws route) -------------------------------------------------------
 
   /**

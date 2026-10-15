@@ -58,6 +58,17 @@ describe("SlidingWindowLimiter", () => {
     await limiter.limit("next@example.com"); // triggers the sweep
     expect(limiter.size).toBe(1);
   });
+
+  it("isLimited tells whether a key is over its limit without counting a call", async () => {
+    const t = clock();
+    const limiter = new SlidingWindowLimiter({ limit: 2, now: t.now });
+    for (let i = 0; i < 10; i++) expect(limiter.isLimited("k")).toBe(false);
+    await allowed(limiter, "k", 2);
+    expect(limiter.isLimited("k")).toBe(true);
+    expect(limiter.isLimited("other")).toBe(false);
+    t.advance(RATE_WINDOW_MS);
+    expect(limiter.isLimited("k")).toBe(false);
+  });
 });
 
 describe("createRateLimiters (production wiring)", () => {

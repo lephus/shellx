@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: "ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu, mã hóa đầu cuối bảo vệ nội dung terminal ra sao, và cách xóa tài khoản của bạn."
-updated: "2026-10-09"
+updated: "2026-10-15"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -29,6 +29,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 - **tên thiết bị**: tên máy (hostname) với máy tính, tên model với điện thoại;
 - **loại thiết bị** (agent trên máy tính hoặc ứng dụng di động) và **nền tảng** (macOS, Windows, iOS hoặc Android);
+- **phiên bản ứng dụng** đang chạy trên thiết bị (ví dụ `1.2.0`), dùng để biết khi nào có thể yêu cầu cập nhật bắt buộc mà không chặn nhầm ai;
 - **khóa công khai** của thiết bị (X25519). Khóa bí mật tương ứng không bao giờ rời khỏi thiết bị;
 - thời điểm thêm thiết bị và **thời điểm online gần nhất**, dùng để hiển thị "Lần cuối online" trong ứng dụng.
 

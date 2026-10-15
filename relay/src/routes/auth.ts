@@ -11,6 +11,7 @@ import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
 import { logMeta } from "../log.js";
 import { CloseCode } from "../protocol/frames.js";
+import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 
 export const authRoutes = new Hono<AppEnv>();
 
@@ -65,6 +66,7 @@ authRoutes.post("/register", jsonBodyLimit, async (c) => {
     if (String(err).includes("UNIQUE constraint failed: users.email")) throw Errors.emailTaken();
     throw err;
   }
+  recordAppVersion(db, deviceId, c.req.header(CLIENT_VERSION_HEADER));
   logMeta("register", { device_id: deviceId });
   return c.json({ user_id: userId, device_id: deviceId, token }, 201);
 });
@@ -116,6 +118,7 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
     logMeta("login_failed", { device_id: deviceId });
     throw Errors.invalidCredentials();
   }
+  recordAppVersion(db, deviceId, c.req.header(CLIENT_VERSION_HEADER));
   logMeta("login", { device_id: deviceId });
   return c.json({ user_id: user.id, device_id: deviceId, token }, 200);
 });

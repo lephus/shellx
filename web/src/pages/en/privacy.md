@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
-updated: "2026-10-09"
+updated: "2026-10-15"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -29,6 +29,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 
 - the **device name**: the hostname for a computer, the model name for a phone;
 - the **device kind** (desktop agent or mobile app) and **platform** (macOS, Windows, iOS or Android);
+- the **app version** running on the device (for example `1.2.0`), used to know when an update can be made mandatory without blocking anyone by mistake;
 - the device's **public key** (X25519). The matching private key never leaves the device;
 - when the device was added and when it was **last online**, used to show "Last online" in the app.
 

@@ -2,14 +2,14 @@
 
 Everything ShellX puts on the VPS lives in **one folder, `~/phu/shellx`**, in the home of the SSH
 user that deploys (decision V8, `docs/superpowers/specs/2026-09-26-shellx-vps-infra-design.md`).
-The only exception is four small files copied once into nginx-proxy's `vhost.d` directory (step 5).
+The only exception is five small files copied once into nginx-proxy's `vhost.d` directory (step 5).
 
 ```
 ~/phu/shellx/
   docker-compose.yml     # from deploy/docker-compose.yml (compose project "shellx")
   relay.env              # from deploy/relay.env (versions, download links; no secrets)
-  .env                   # IMAGE_TAG (written by deploy.yml), PROXY_NETWORK and, for push,
-                         # FCM_SERVICE_ACCOUNT (written by you, once)
+  .env                   # IMAGE_TAG (written by deploy.yml), PROXY_NETWORK and, for push and
+                         # admin, FCM_SERVICE_ACCOUNT and ADMIN_PASSWORD (written by you, once)
   secrets/fcm.json       # Firebase service account key (push; by hand, never synced — see below)
   data/relay.db          # the SQLite database (bind mount ./data:/data, owned by uid 1000)
   backups/relay-<YYYY-MM-DD>.db   # daily at 03:00, the 14 newest are kept
@@ -26,7 +26,7 @@ The only exception is four small files copied once into nginx-proxy's `vhost.d` 
 
 | Container | Image | What it does |
 |---|---|---|
-| `relay` | `ghcr.io/lephus/shellx-relay:<commit>` | `relay.shellx.pro` (REST + WebSocket), port 8080 on the proxy network only |
+| `relay` | `ghcr.io/lephus/shellx-relay:<commit>` | `relay.shellx.pro` (REST + WebSocket) and `admin.shellx.pro` (admin dashboard, by Host header), port 8080 on the proxy network only |
 | `web` | `ghcr.io/lephus/shellx-web:<commit>` | `shellx.pro`, `www.shellx.pro` (→ `shellx.pro`), `download.shellx.pro` |
 | `backup` | `alpine:3.22` + sqlite | `sqlite3 .backup` of `data/relay.db` every day at 03:00 VPS time |
 
@@ -49,12 +49,12 @@ deploy leaves the live config and `.prev/` alone instead of restoring an older, 
 after any restore (its bind-mounted `backup/` was replaced). It prints only a hint to check the logs
 on the VPS yourself, never the logs' own content, into the Actions output (M11). On success it best-effort prunes old ShellX images (I4). A `workflow_dispatch` run is
 refused unless the requested `ref` is already an ancestor of `origin/main` (M2), so it can only
-deploy code that has actually been merged. Finally it checks `https://relay.shellx.pro/v1/version`
-and `https://shellx.pro/`.
+deploy code that has actually been merged. Finally it checks `https://relay.shellx.pro/v1/version`,
+`https://shellx.pro/` and `https://admin.shellx.pro/api/session`.
 
 ## First-time setup
 
-Do this after the DNS A records of `shellx.pro`, `www`, `relay` and `download` point at the VPS:
+Do this after the DNS A records of `shellx.pro`, `www`, `relay`, `admin` and `download` point at the VPS:
 letsencrypt-companion can only get certificates for names that resolve to it. Run the commands on
 the VPS as the deploy user unless a step says otherwise.
 
@@ -111,14 +111,14 @@ the VPS as the deploy user unless a step says otherwise.
    `shellx-web` → Package settings → Change visibility → Public (they contain no secrets) — then
    re-run the workflow.
 5. **nginx-proxy settings (the only files outside the folder).** After the first deploy synced
-   `~/phu/shellx/nginx-proxy/`, copy its four files into nginx-proxy's `vhost.d` directory, then
+   `~/phu/shellx/nginx-proxy/`, copy its five files into nginx-proxy's `vhost.d` directory, then
    recreate the ShellX containers so nginx-proxy regenerates its configuration:
 
    ```bash
    PROXY=nginx-proxy   # the name of the nginx-proxy container (docker ps)
    VHOST_D="$(docker inspect "$PROXY" --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/vhost.d"}}{{.Source}}{{end}}{{end}}')"
    echo "$VHOST_D"     # must print a directory; stop here if it is empty
-   for f in relay.shellx.pro shellx.pro www.shellx.pro download.shellx.pro; do
+   for f in relay.shellx.pro admin.shellx.pro shellx.pro www.shellx.pro download.shellx.pro; do
      target="$VHOST_D/$f"
      if [ -e "$target" ] && grep -q 'access_log off' "$target"; then
        echo "$target already has our lines; leaving it alone (edit it by hand if deploy/nginx-proxy/$f changed)"
@@ -139,20 +139,22 @@ the VPS as the deploy user unless a step says otherwise.
    `## Start of configuration add by letsencrypt container` block to these files; the loop above never
    overwrites a file that already exists without our `access_log off` marker line, precisely so that
    block is never clobbered — it tells you to merge by hand instead (M7). These files turn access logs
-   off for the four names (the privacy policy promises no access logs), give the relay's WebSockets
-   120 s timeouts and cap request bodies at 32 KiB. If `deploy/nginx-proxy/` ever changes, edit the
-   copies in `vhost.d` the same way (keeping the companion's block) and recreate the containers again.
+   off for the five names (the privacy policy promises no access logs), give the relay's WebSockets
+   120 s timeouts and cap request bodies at 32 KiB (16 KiB for admin). If `deploy/nginx-proxy/` ever
+   changes, edit the copies in `vhost.d` the same way (keeping the companion's block) and recreate
+   the containers again.
 6. **Check.**
 
    ```bash
    curl https://relay.shellx.pro/v1/version
+   curl https://admin.shellx.pro/api/session                # {"enabled":false,...} until "Admin" below
    curl -sI https://shellx.pro/ | head -1                   # HTTP/2 200
    curl -sI https://www.shellx.pro/privacy/ | grep -i ^location   # https://shellx.pro/privacy/
    docker compose -f ~/phu/shellx/docker-compose.yml ps     # relay (healthy), web (healthy), backup
    ```
 
    **nginx-proxy's HTTP→HTTPS redirect still logs client IPs (I3).** `deploy/nginx-proxy/shellx.pro`
-   (and the other three files) turn `access_log off` for the HTTPS server block only — that is the
+   (and the other four files) turn `access_log off` for the HTTPS server block only — that is the
    only block nginx-proxy includes them into. Port 80 answers with its own, separate redirect server
    block (shared by every site behind this nginx-proxy), which keeps its default access log. We
    cannot safely change that shared, un-owned block from ShellX's files alone. Verify what your proxy
@@ -213,6 +215,51 @@ The website only builds once the country hosting the VPS replaces `[quốc gia]`
 `web/src/pages/privacy.md`, `web/src/pages/en/privacy.md`, `web/src/pages/terms.md` and
 `web/src/pages/en/terms.md` (update their `updated:` dates too). Until then every deploy stops at the
 web image build, so fill it in before the first deploy.
+
+## Admin (admin.shellx.pro)
+
+The relay also answers `admin.shellx.pro` (same container, chosen by Host header): a small dashboard
+with account and device statistics and the minimum app versions (force update). The DNS record
+already points at the VPS; the `relay` service routes both names and gets a separate certificate for
+each (`LETSENCRYPT_SINGLE_DOMAIN_CERTS`), so admin's can never break the relay's. Without a password
+the dashboard is off: `/api/session` answers `{"enabled":false,...}` and every other call 503.
+
+1. **Once, after the first deploy that ships `deploy/nginx-proxy/admin.shellx.pro`** (VPS set up
+   before admin existed): copy it into `vhost.d` exactly like step 5, so admin requests are not
+   logged either:
+
+   ```bash
+   PROXY=proxy   # the nginx-proxy container's name (docker ps; "proxy" on the current VPS)
+   VHOST_D="$(docker inspect "$PROXY" --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/vhost.d"}}{{.Source}}{{end}}{{end}}')"
+   echo "$VHOST_D"     # must print a directory; stop here if it is empty
+   target="$VHOST_D/admin.shellx.pro"
+   if sudo grep -qs 'access_log off' "$target"; then echo "$target already has our lines"
+   elif sudo test -e "$target"; then echo "$target exists WITHOUT our lines -- merge ~/phu/shellx/nginx-proxy/admin.shellx.pro into it BY HAND, keeping the companion's block"
+   else sudo cp ~/phu/shellx/nginx-proxy/admin.shellx.pro "$target"; fi
+   ```
+
+   (`sudo test`/`sudo grep`: a named volume's directory is readable by root only.) The next step
+   recreates the relay, which makes nginx-proxy include the file; check it afterwards with
+   `docker exec "$PROXY" nginx -T 2>/dev/null | grep -A3 'server_name admin.shellx.pro'`.
+2. **Enable** (on the VPS):
+
+   ```bash
+   cd ~/phu/shellx && echo "ADMIN_PASSWORD=$(openssl rand -hex 24)" >> .env && grep ADMIN_PASSWORD .env && docker compose up -d relay
+   docker compose logs relay | grep admin_   # admin_enabled {"host":"admin.shellx.pro"}
+   ```
+
+   Keep the printed password in your password manager; it is the only sign-in, and it lives only in
+   `.env` (never in the repository or `relay.env`, which deploys overwrite; `rollout.sh` keeps every
+   `.env` line except `IMAGE_TAG` and rewrites the file with mode 0600). Hex because Compose reads `.env`
+   itself: a `$`, quote or `#` in the value would be interpolated or cut off. At least 16 characters,
+   or the relay keeps admin off and logs `admin_disabled {"reason":"password_too_short"}`.
+3. **Change the password:** `sed -i '/^ADMIN_PASSWORD=/d' .env`, then the command of step 2 again.
+   **Disable:** `sed -i '/^ADMIN_PASSWORD=/d' .env && docker compose up -d relay`.
+
+Sessions live in the relay's memory only (12 h, HttpOnly cookie): any relay restart — a deploy, a
+password change, `docker compose up -d relay` — signs you out, and you simply sign in again. That
+restart also drops the apps' WebSockets for a moment; they reconnect on their own. 5 wrong passwords
+from one IP within 15 minutes lock that IP out for the rest of the window.
 
 ## Operations
 
@@ -287,4 +334,5 @@ restoring `.incoming/`/`.prev/` config, restoring only a config this run swapped
 `backup` after a restore, `--force-recreate` on the rollback too, skipping a no-op restage,
 recovering from a crash mid-swap, pruning images only after success) and `backup/backup-once.sh`
 with the local `sqlite3` (rotation, missing and unreadable databases, 0600 file mode, handing each
-file to the owner of `backups/`).
+file to the owner of `backups/`). `compose.test.mjs` checks `docker-compose.yml` (memory ceiling,
+push and admin settings) and that every name it routes has its `nginx-proxy/` file in step 5.

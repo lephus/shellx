@@ -1,6 +1,14 @@
+import type { DeviceKind } from "../auth/device.js";
 import type { Db } from "../db/db.js";
 import { FrameBudgets } from "./frame-budgets.js";
 import { HubState, UserHub, type HubHost } from "./user-hub.js";
+
+/** A device with a live WebSocket in this process. */
+export interface LiveDevice {
+  userId: string;
+  deviceId: string;
+  kind: DeviceKind;
+}
 
 export interface HubRegistryOptions {
   db: Db;
@@ -46,6 +54,18 @@ export class HubRegistry implements HubHost {
 
   existingState(userId: string): HubState | undefined {
     return this.states.get(userId);
+  }
+
+  /**
+   * Every device connected to this process right now, for the admin dashboard's "online" counts.
+   * A synchronous snapshot of the in-memory hubs: it never creates a hub state or queues anything.
+   */
+  liveDevices(): LiveDevice[] {
+    const result: LiveDevice[] = [];
+    for (const state of this.states.values()) {
+      for (const device of state.liveDevices()) result.push({ userId: state.userId, ...device });
+    }
+    return result;
   }
 
   /** Accounts whose hub state is in memory right now. */

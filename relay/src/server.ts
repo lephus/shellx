@@ -1,4 +1,5 @@
 // Entry point of the relay container: `node dist/server.js` (dev: `npm run dev`).
+import { adminStatus } from "./admin/app.js";
 import { createRateLimiters } from "./auth/rate-limit.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
 import { Db } from "./db/db.js";
@@ -36,6 +37,12 @@ try {
 const push = loadPush(process.env);
 if (push.gateway === null) logMeta("push_disabled", { reason: push.reason });
 else logMeta("push_enabled", { project: push.projectId });
+
+// Admin is optional too: without an ADMIN_PASSWORD of at least 16 characters the dashboard on
+// ADMIN_HOST only answers 503 admin_disabled. Neither line says anything about the password itself.
+const admin = adminStatus(config);
+if (admin === "enabled") logMeta("admin_enabled", { host: config.adminHost });
+else logMeta("admin_disabled", { reason: admin });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(

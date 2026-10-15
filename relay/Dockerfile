@@ -30,6 +30,8 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations
+# The admin dashboard's static UI (index.html, admin.css, admin.js), served on ADMIN_HOST.
+COPY --from=build /app/admin ./admin
 USER node
 EXPOSE 8080
 CMD ["node", "dist/server.js"]

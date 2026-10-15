@@ -377,3 +377,24 @@ describe("push configuration (FCM_SERVICE_ACCOUNT, push spec §5)", () => {
     expect(result.stdout).not.toContain("phone-fcm-token");
   });
 });
+
+describe("admin configuration (ADMIN_PASSWORD, ADMIN_HOST)", () => {
+  it("logs once whether admin is on, never the password; a short password keeps it off without stopping the relay", async () => {
+    for (const [extra, line, enabled] of [
+      [{}, '"event":"admin_disabled","reason":"no_password"', false],
+      [{ ADMIN_PASSWORD: "too-short-pw" }, '"event":"admin_disabled","reason":"password_too_short"', false],
+      [{ ADMIN_PASSWORD: "a-long-enough-password", ADMIN_HOST: "admin.localhost" }, '"event":"admin_enabled","host":"admin.localhost"', true],
+    ] as const) {
+      const server = startServer({ ...VERSION_ENV, ...extra, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db") });
+      const port = await waitForListening(server.output);
+      expect(server.output()).toContain(line);
+      const host = "ADMIN_HOST" in extra ? extra.ADMIN_HOST : "admin.shellx.pro";
+      const session = await call(remote(port), "GET", "/api/session", { headers: { Host: `${host}:${port}` } });
+      expect(await session.json()).toEqual({ enabled, signed_in: false });
+      server.child.kill("SIGTERM");
+      const result = await server.exit;
+      expect(result.code).toBe(0);
+      if ("ADMIN_PASSWORD" in extra) expect(result.stdout).not.toContain(extra.ADMIN_PASSWORD);
+    }
+  });
+});

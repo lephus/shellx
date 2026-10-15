@@ -26,6 +26,8 @@ export const TEST_CONFIG: Config = {
   macUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg",
   winUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe",
   rateLimitsEnabled: false,
+  adminHost: "admin.shellx.pro",
+  adminPassword: null,
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
@@ -165,9 +167,9 @@ export interface CallOptions {
 }
 
 /**
- * One HTTP request to the relay with `node:http` (fetch() refuses headers like `Upgrade`). A JSON
- * body gets `Content-Type: application/json` and a `Content-Length`; `chunks` sends a streamed
- * (chunked) body without one.
+ * One HTTP request to the relay with `node:http` (fetch() refuses headers like `Upgrade`). A body
+ * gets `Content-Type: application/json` (unless `headers` sets its own) and a `Content-Length`;
+ * `chunks` sends a streamed (chunked) body without one.
  */
 export async function call(app: TestApp, method: string, path: string, options: CallOptions = {}): Promise<TestResponse> {
   const headers: Record<string, string> = { ...options.headers };
@@ -176,7 +178,7 @@ export async function call(app: TestApp, method: string, path: string, options: 
   let body: Buffer | undefined;
   if (options.body !== undefined) {
     body = Buffer.from(typeof options.body === "string" ? options.body : JSON.stringify(options.body), "utf8");
-    headers["Content-Type"] = "application/json";
+    headers["Content-Type"] ??= "application/json";
     headers["Content-Length"] = String(body.length);
   }
   return request(app, method, path, headers, body === undefined ? [] : [body]);

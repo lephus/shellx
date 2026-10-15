@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>ShellX Admin</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/admin.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <p class="brand"><span class="prompt" aria-hidden="true">$</span> ShellX <span class="brand-sub">Admin</span></p>
+      <div class="top-actions" id="top-actions" hidden>
+        <button type="button" class="btn btn-sm" id="btn-refresh">Làm mới</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-logout">Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <section id="view-loading" class="view center" aria-labelledby="h-loading">
+      <h1 id="h-loading" class="loading" tabindex="-1"><span class="cursor">Đang tải</span></h1>
+      <button type="button" class="btn" id="btn-retry" hidden>Thử lại</button>
+    </section>
+
+    <section id="view-disabled" class="view panel" aria-labelledby="h-disabled" hidden>
+      <h1 id="h-disabled" tabindex="-1">Admin chưa được bật</h1>
+      <p>Trên VPS, đặt <code>ADMIN_PASSWORD</code> (≥ 16 ký tự) trong <code>~/phu/shellx/.env</code> rồi chạy lại relay:</p>
+      <pre class="cmd"><code>cd ~/phu/shellx
+echo "ADMIN_PASSWORD=$(openssl rand -hex 24)" &gt;&gt; .env
+docker compose up -d relay</code></pre>
+      <p class="muted">Mật khẩu nằm trong <code>.env</code> (xem: <code>grep ADMIN_PASSWORD .env</code>). Đừng gửi nó qua chat.</p>
+      <button type="button" class="btn" id="btn-recheck">Kiểm tra lại</button>
+    </section>
+
+    <section id="view-login" class="view panel narrow" aria-labelledby="h-login" hidden>
+      <h1 id="h-login" tabindex="-1">Đăng nhập</h1>
+      <form id="login-form" class="stack" novalidate>
+        <input type="text" name="username" autocomplete="username" value="admin" hidden>
+        <div>
+          <label for="password">Mật khẩu</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required aria-describedby="login-error">
+        </div>
+        <p id="login-error" class="field-error" role="alert"></p>
+        <button type="submit" class="btn btn-primary" id="btn-login">Đăng nhập</button>
+      </form>
+    </section>
+
+    <section id="view-dash" class="view" aria-labelledby="h-dash" hidden>
+      <div class="dash-head">
+        <h1 id="h-dash" tabindex="-1">Tổng quan</h1>
+        <p class="muted meta">Cập nhật lúc <time id="generated-at">—</time></p>
+      </div>
+
+      <div class="kpis">
+        <article class="tile" aria-labelledby="h-k-users">
+          <h2 id="h-k-users">Người dùng</h2>
+          <p class="big" id="k-users">—</p>
+          <p class="sub" id="k-users-new">—</p>
+        </article>
+        <article class="tile" aria-labelledby="h-k-active">
+          <h2 id="h-k-active">Hoạt động</h2>
+          <p class="big"><span id="k-active7">—</span> <span class="unit">/ 7 ngày</span></p>
+          <p class="sub" id="k-active30">—</p>
+        </article>
+        <article class="tile" aria-labelledby="h-k-agent">
+          <h2 id="h-k-agent">Desktop</h2>
+          <p class="big" id="k-agent">—</p>
+          <p class="sub"><span class="dot" id="k-agent-dot" aria-hidden="true"></span>Đang online: <strong id="k-agent-online">—</strong></p>
+          <p class="sub" id="k-agent-split">—</p>
+        </article>
+        <article class="tile" aria-labelledby="h-k-mobile">
+          <h2 id="h-k-mobile">Mobile</h2>
+          <p class="big" id="k-mobile">—</p>
+          <p class="sub"><span class="dot" id="k-mobile-dot" aria-hidden="true"></span>Đang online: <strong id="k-mobile-online">—</strong></p>
+          <p class="sub" id="k-mobile-split">—</p>
+        </article>
+      </div>
+
+      <section class="card" aria-labelledby="h-signups">
+        <div class="card-head">
+          <h2 id="h-signups">Đăng ký 30 ngày</h2>
+          <p class="muted small" id="signups-total"></p>
+        </div>
+        <div class="chart">
+          <p class="muted small" id="signups-max"></p>
+          <svg id="signups-svg" class="bars" viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+          <div class="chart-axis muted small"><span id="signups-from"></span><span id="signups-to"></span></div>
+        </div>
+        <table class="sr-only" id="signups-table">
+          <caption>Đăng ký theo ngày (UTC)</caption>
+          <thead><tr><th scope="col">Ngày</th><th scope="col">Đăng ký</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="card" aria-labelledby="h-versions">
+        <h2 id="h-versions">Phiên bản đang dùng</h2>
+        <div class="two">
+          <div>
+            <div class="table-wrap">
+              <table id="ver-agent">
+                <caption>Desktop <span class="muted">· tối thiểu <span data-f="min">—</span></span></caption>
+                <thead><tr><th scope="col">Phiên bản</th><th scope="col" class="num">Số thiết bị</th><th scope="col" class="num">%</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="note" id="ver-agent-sum"></p>
+          </div>
+          <div>
+            <div class="table-wrap">
+              <table id="ver-mobile">
+                <caption>Mobile <span class="muted">· tối thiểu <span data-f="min">—</span></span></caption>
+                <thead><tr><th scope="col">Phiên bản</th><th scope="col" class="num">Số thiết bị</th><th scope="col" class="num">%</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="note" id="ver-mobile-sum"></p>
+          </div>
+        </div>
+        <p class="note">“Không rõ” = bản cũ, chưa báo phiên bản — có thể bị chặn khi nâng mức tối thiểu.</p>
+      </section>
+
+      <section class="card" aria-labelledby="h-force">
+        <h2 id="h-force">Cập nhật bắt buộc</h2>
+        <p class="note">Thiết bị chạy bản thấp hơn mức tối thiểu sẽ bị chặn cho tới khi cập nhật.</p>
+        <div class="two">
+          <div class="setting" id="set-agent">
+            <h3>Desktop <span class="badge warn" data-f="badge" hidden>đang ghi đè</span></h3>
+            <dl class="kv">
+              <div><dt>Hiện tại</dt><dd data-f="value">—</dd></div>
+              <div><dt>Mặc định (env)</dt><dd data-f="env">—</dd></div>
+            </dl>
+            <form data-f="form" novalidate>
+              <label for="in-agent">Phiên bản tối thiểu mới</label>
+              <div class="row">
+                <input id="in-agent" data-f="input" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="x.y.z" pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)" required aria-describedby="err-agent">
+                <button type="submit" class="btn btn-primary" data-f="save">Lưu</button>
+                <button type="button" class="btn btn-ghost" data-f="reset" hidden>Về mặc định</button>
+              </div>
+              <p class="field-error" id="err-agent" data-f="error"></p>
+            </form>
+            <div class="confirm" data-f="confirm" hidden>
+              <p id="cf-agent" data-f="confirm-text" tabindex="-1"></p>
+              <div class="row">
+                <button type="button" class="btn btn-danger" data-f="yes" aria-describedby="cf-agent">Xác nhận</button>
+                <button type="button" class="btn btn-ghost" data-f="no">Huỷ</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting" id="set-mobile">
+            <h3>Mobile <span class="badge warn" data-f="badge" hidden>đang ghi đè</span></h3>
+            <dl class="kv">
+              <div><dt>Hiện tại</dt><dd data-f="value">—</dd></div>
+              <div><dt>Mặc định (env)</dt><dd data-f="env">—</dd></div>
+            </dl>
+            <form data-f="form" novalidate>
+              <label for="in-mobile">Phiên bản tối thiểu mới</label>
+              <div class="row">
+                <input id="in-mobile" data-f="input" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="x.y.z" pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)" required aria-describedby="err-mobile note-mobile">
+                <button type="submit" class="btn btn-primary" data-f="save">Lưu</button>
+                <button type="button" class="btn btn-ghost" data-f="reset" hidden>Về mặc định</button>
+              </div>
+              <p class="field-error" id="err-mobile" data-f="error"></p>
+            </form>
+            <div class="confirm" data-f="confirm" hidden>
+              <p id="cf-mobile" data-f="confirm-text" tabindex="-1"></p>
+              <div class="row">
+                <button type="button" class="btn btn-danger" data-f="yes" aria-describedby="cf-mobile">Xác nhận</button>
+                <button type="button" class="btn btn-ghost" data-f="no">Huỷ</button>
+              </div>
+            </div>
+            <p class="note warn-note" id="note-mobile">Áp dụng cho cả iOS và Android — chỉ nâng khi bản mới đã lên <strong>cả</strong> App Store và Google Play.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-latest">
+        <h2 id="h-latest">Bản desktop mới nhất</h2>
+        <p class="big" id="latest-version">—</p>
+        <ul class="links" id="latest-links"></ul>
+        <p class="note">Do pipeline release quản lý — chỉ xem.</p>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

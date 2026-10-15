@@ -21,6 +21,8 @@ describe("loadConfig", () => {
       macUrl: REQUIRED.MAC_URL,
       winUrl: REQUIRED.WIN_URL,
       rateLimitsEnabled: true,
+      adminHost: "admin.shellx.pro",
+      adminPassword: null,
     });
   });
 
@@ -41,6 +43,23 @@ describe("loadConfig", () => {
     expect(run).toThrow(ConfigError);
     expect(run).toThrow("missing required environment variables: MIN_AGENT, MAC_URL, WIN_URL");
     expect(() => loadConfig({ ...REQUIRED, MIN_MOBILE: undefined })).toThrow("missing required environment variable: MIN_MOBILE");
+  });
+
+  it("reads ADMIN_HOST (lower-cased) and ADMIN_PASSWORD; a short password is not a startup error", () => {
+    expect(loadConfig({ ...REQUIRED, ADMIN_HOST: "Admin.Example.COM", ADMIN_PASSWORD: "0123456789abcdef" })).toMatchObject({
+      adminHost: "admin.example.com",
+      adminPassword: "0123456789abcdef",
+    });
+    // admin stays disabled (src/admin/app.ts adminStatus) and the relay starts as usual
+    expect(loadConfig({ ...REQUIRED, ADMIN_PASSWORD: "short" }).adminPassword).toBe("short");
+    expect(loadConfig({ ...REQUIRED, ADMIN_PASSWORD: "  " }).adminPassword).toBeNull();
+  });
+
+  it("refuses an ADMIN_HOST that is not a bare host name", () => {
+    for (const host of ["https://admin.shellx.pro", "admin.shellx.pro:443", "admin.shellx.pro/", "admin shellx", "-admin.shellx.pro"]) {
+      expect(() => loadConfig({ ...REQUIRED, ADMIN_HOST: host })).toThrow(ConfigError);
+    }
+    expect(loadConfig({ ...REQUIRED, ADMIN_HOST: "admin.localhost" }).adminHost).toBe("admin.localhost");
   });
 
   it("refuses a PORT that is not an integer from 0 to 65535 (0 picks a free port)", () => {
