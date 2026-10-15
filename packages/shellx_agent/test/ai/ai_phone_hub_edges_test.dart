@@ -334,7 +334,12 @@ void main() {
       rig.source.defaultAgent = 'x' * 70000; // an id: cut nowhere
       rig.hub.handle(phone, const AiList());
       final result = rig.last<AiListResult>(phone);
-      expect(result.body.length, lessThan(100));
+      // Nothing of the window, and the features the hub names (`f`) — which
+      // grow with every V2-2b feature, so no byte count is pinned.
+      expect(
+        result.body,
+        encodeBody(AiListing(features: rig.hub.features).toJson()),
+      );
       expect(result.available, isTrue);
       expect(listing(result).sessions, isEmpty);
     });
