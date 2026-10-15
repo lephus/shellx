@@ -148,6 +148,8 @@ final class CoreAgentRuntime implements AgentRuntime {
       wsUri: relayWebSocketUri(relayBaseUri),
       token: () => token,
       connector: connector,
+      // Contract §1: the upgrade reports this build's x.y.z.
+      clientVersion: appVersion,
     );
     _desktopSessions = DesktopSessionManager(
       nextId: core.ids,

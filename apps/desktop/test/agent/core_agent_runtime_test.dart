@@ -121,6 +121,8 @@ void main() {
         (e) => e.key.toLowerCase() == 'authorization',
       );
       expect(auth.value, 'Bearer agent-token');
+      // Contract §1: and this build's version.
+      expect(connects.single.$2[clientVersionHeader], '1.0.0');
       await runtime.stop();
     },
   );

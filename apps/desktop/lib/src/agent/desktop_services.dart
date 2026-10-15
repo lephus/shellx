@@ -10,6 +10,7 @@ import '../platform/settings_store.dart';
 import '../platform/url_opener.dart';
 import '../terminal_sharing/terminal_sharing_setup.dart';
 import 'agent_runtime.dart';
+import 'update_check.dart' show kUpdateCheckInterval;
 
 final RegExp _releaseVersion = RegExp(r'^\d+\.\d+\.\d+$');
 
@@ -35,7 +36,7 @@ final class DesktopServices {
     required this.appVersion,
     required this.platform,
     required this.deviceName,
-    this.updateInterval = const Duration(hours: 24),
+    this.updateInterval = kUpdateCheckInterval,
     this.quitApp,
     this.deletePastedImages,
     this.stopRemoteRetries,
@@ -90,10 +91,13 @@ final class DesktopServices {
   /// `(await PackageInfo.fromPlatform()).version` (Task 11): the pubspec
   /// `version:` without the `+build` suffix. `evaluateUpdate` ignores
   /// anything that is not `x.y.z`, so a suffix would silently turn update
-  /// checks off; debug builds assert the format.
+  /// checks off; debug builds assert the format. Also what every ShellxApi
+  /// and relay link of the app reports as `X-ShellX-Version` (contract §1).
   final String appVersion;
   final DevicePlatform platform;
   final String deviceName;
+
+  /// Between two automatic update checks (contract §5: 6 h).
   final Duration updateInterval;
 
   /// Runs after `AgentController.shutdown()`: removes the tray icon and
@@ -135,7 +139,7 @@ final class DesktopServices {
   /// offered (Windows without `SHELLX_EXPERIMENTAL=terminal-sharing`).
   final TerminalSharingSetup? terminalSharing;
 
-  /// Wall clock (the attach-notification limit).
+  /// Wall clock (the attach-notification limit, update reminders).
   final DateTime Function() now;
 }
 

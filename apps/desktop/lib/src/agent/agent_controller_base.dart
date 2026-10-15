@@ -85,7 +85,8 @@ abstract class AgentControllerBase extends Notifier<AgentViewState> {
 
   /// A12 D20: the "Check for updates" button. Asks the relay now and says
   /// what it found; never throws, never notifies, installs nothing. The
-  /// only state it touches is [AgentViewState.update].
+  /// only state it touches is [AgentViewState.update] (and through it the
+  /// force-update block, contract §5).
   Future<UpdateCheckResult> checkForUpdateNow();
   Future<void> shutdown();
 }

@@ -52,6 +52,9 @@ class AgentController extends AgentControllerBase {
   Timer? _updateTimer;
   WakeDetector? _wakeDetector;
   bool _updateCheckFailed = false;
+
+  /// The last update notice notified, and when ([_remind]).
+  ({String version, bool required, DateTime at})? _updateNotified;
   bool _revoking = false;
 
   /// The sign-in in flight, if any (see [signIn]).
@@ -114,7 +117,8 @@ class AgentController extends AgentControllerBase {
   Future<void>? get terminalSharingCheck => _sharingCheck;
 
   /// Loads settings and stored credentials; starts the agent when signed in
-  /// and remote access is on; schedules update checks (startup + every 24 h).
+  /// and remote access is on; schedules update checks (startup + every
+  /// `updateInterval`, 6 h: contract §5).
   /// An unreadable secure store starts it signed out, with a notification.
   ///
   /// Runs once: a second call (concurrent or later) returns the first one's
@@ -355,7 +359,9 @@ class AgentController extends AgentControllerBase {
   }
 
   /// Spec §8.3 as amended by A1 D7: off disconnects from the relay and
-  /// every phone; the shells keep running. Remembered across restarts.
+  /// every phone; the shells keep running. Remembered across restarts. On
+  /// while an update is required only stores it (contract §5: the runtime
+  /// starts once the block clears).
   @override
   Future<void> setRemoteAccess(bool enabled) async {
     await _s.settings.setBool(SettingKeys.remoteAccess, enabled);
@@ -651,7 +657,10 @@ class AgentController extends AgentControllerBase {
   Future<void> reconnect() async => _runtime?.reconnectNow();
 
   /// Spec §14 / §12. Never throws: a failure is retried when the relay next
-  /// connects.
+  /// connects (while an update is required there is no relay link: the
+  /// next periodic check retries). An answer that starts or ends the force
+  /// update block (contract §5) completes once remote access has stopped
+  /// or resumed ([_setUpdate]).
   @override
   Future<void> checkForUpdate() async {
     final VersionInfo info;
@@ -668,8 +677,8 @@ class AgentController extends AgentControllerBase {
       appVersion: _s.appVersion,
       platform: _s.platform,
     );
-    state = state.copyWith(update: notice);
-    if (notice == null) return;
+    await _setUpdate(notice);
+    if (notice == null || !ref.mounted || !_remind(notice)) return;
     final l10n = _s.l10n;
     await _notify(
       title: notice.required
@@ -695,13 +704,50 @@ class AgentController extends AgentControllerBase {
     if (!ref.mounted) return result;
     switch (result) {
       case Available(:final notice):
-        state = state.copyWith(update: notice);
+        await _setUpdate(notice);
       case UpToDate():
-        state = state.copyWith(update: null);
+        await _setUpdate(null);
       case Failed():
-        break; // what the tray knew stays
+        break; // what the tray knew stays (a block too)
     }
     return result;
+  }
+
+  /// Contract §5: the answer that starts requiring an update stops remote
+  /// access as the switch does (every phone gets `closed_by_host`, the
+  /// shells keep running, A1 D7); the one that no longer requires it starts
+  /// the runtime again if signed in with the switch on. The sleep
+  /// assertion follows. Completes once that is done; never throws.
+  Future<void> _setUpdate(UpdateNotice? notice) async {
+    final wasRequired = state.updateRequired;
+    state = state.copyWith(update: notice);
+    if (state.updateRequired == wasRequired) return;
+    if (state.updateRequired) {
+      await _stopRuntime();
+    } else {
+      await _bestEffort(_startRuntime);
+    }
+    await _applyKeepAwake();
+  }
+
+  /// Whether to notify [notice]: always when it is new (another version,
+  /// or required now / no more), else once [kUpdateReminderInterval] has
+  /// passed since it was last notified.
+  bool _remind(UpdateNotice notice) {
+    final now = _s.now();
+    final last = _updateNotified;
+    if (last != null &&
+        last.version == notice.version &&
+        last.required == notice.required &&
+        now.difference(last.at) < kUpdateReminderInterval) {
+      return false;
+    }
+    _updateNotified = (
+      version: notice.version,
+      required: notice.required,
+      at: now,
+    );
+    return true;
   }
 
   /// Before quitting (the caller then runs `quitApp`): disconnect, close
@@ -739,7 +785,8 @@ class AgentController extends AgentControllerBase {
     await _startRuntime();
   }
 
-  /// Starts the runtime if signed in with remote access on and none runs.
+  /// Starts the runtime if signed in with remote access on, no update is
+  /// required (contract §5) and none runs.
   ///
   /// First waits for a previous runtime that is still stopping: its relay
   /// may still have an upgrade in flight, which would replace (4001) a new
@@ -755,7 +802,8 @@ class AgentController extends AgentControllerBase {
         identity == null ||
         !ref.mounted ||
         !state.signedIn ||
-        !state.remoteAccess) {
+        !state.remoteAccess ||
+        state.updateRequired) {
       return;
     }
     final runtime = _s.runtimeFactory(
@@ -783,7 +831,11 @@ class AgentController extends AgentControllerBase {
       ),
     );
     await runtime.start();
-    if (state.terminalSharing.enabled && _s.terminalSharing != null) {
+    // Not on a runtime stopped meanwhile (the switch, a sign-out, an update
+    // becoming required): its server would outlive it.
+    if (identical(_runtime, runtime) &&
+        state.terminalSharing.enabled &&
+        _s.terminalSharing != null) {
       await _startSharing(runtime);
     }
   }
@@ -1110,9 +1162,14 @@ class AgentController extends AgentControllerBase {
     state = state.copyWith(trusted: devices);
   }
 
+  /// Awake only for phones: none can connect while an update is required.
   Future<void> _applyKeepAwake() async {
     if (!ref.mounted) return;
-    final enabled = state.keepAwake && state.signedIn && state.remoteAccess;
+    final enabled =
+        state.keepAwake &&
+        state.signedIn &&
+        state.remoteAccess &&
+        !state.updateRequired;
     await _bestEffort(() => _s.keepAwake.setEnabled(enabled));
   }
 

@@ -33,8 +33,9 @@ DesktopServices buildUiServices({
 }) => DesktopServices(
   secureStore: SecureKeyValueStore(),
   settings: settings,
-  api: ShellxApi(baseUri: relayBase),
-  createApi: () => ShellxApi(baseUri: relayBase),
+  // Contract §1: every request reports this build's x.y.z.
+  api: ShellxApi(baseUri: relayBase, clientVersion: appVersion),
+  createApi: () => ShellxApi(baseUri: relayBase, clientVersion: appVersion),
   runtimeFactory: (_) =>
       throw StateError('the agent runs in the background service'),
   sessions: const UnattachedSessions(),

@@ -2977,6 +2977,20 @@ class AppLocalizationsVi extends AppLocalizations {
   String get updateFailed => 'Không kiểm tra được lúc này.';
 
   @override
+  String get updateRequiredTitle => 'Cần cập nhật ShellX';
+
+  @override
+  String updateRequiredBody(String current, String version) {
+    return 'Bản ShellX này ($current) không còn được hỗ trợ. Hãy tải và cài ShellX $version để tiếp tục dùng. Trong lúc đó, điện thoại không thể kết nối tới máy này.';
+  }
+
+  @override
+  String get updateRequiredDownload => 'Tải bản mới';
+
+  @override
+  String get updateRequiredQuit => 'Thoát ShellX';
+
+  @override
   String get configProblemAgentCommandBad =>
       'agent-event-command phải bắt đầu bằng đường dẫn tuyệt đối hoặc ~/, không có ký tự ẩn và không thiếu dấu nháy đóng';
 

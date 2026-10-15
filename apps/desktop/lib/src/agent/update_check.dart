@@ -91,6 +91,15 @@ final class Failed extends UpdateCheckResult {
 /// The longest a manual check waits for the relay.
 const Duration kUpdateCheckTimeout = Duration(seconds: 10);
 
+/// Force update (contract §5): the automatic check runs at startup and this
+/// often (was 24 h), so lowering `min_agent` blocks or frees an agent within
+/// hours.
+const Duration kUpdateCheckInterval = Duration(hours: 6);
+
+/// The same notice is notified again at most this often: checking every
+/// 6 h must not remind four times a day.
+const Duration kUpdateReminderInterval = Duration(hours: 24);
+
 /// One check, never throwing: [fetch] is `GET /v1/version`.
 Future<UpdateCheckResult> runUpdateCheck(
   Future<VersionInfo> Function() fetch, {

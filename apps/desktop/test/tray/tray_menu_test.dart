@@ -306,4 +306,58 @@ void main() {
       expect(trayActionForKey(TrayKeys.reconnect), isA<Reconnect>());
     });
   });
+
+  group('force update (contract §5): only the download and Quit', () {
+    final required = UpdateNotice(
+      version: '1.2.0',
+      url: Uri.parse('https://download.shellx.pro/x.dmg'),
+      required: true,
+    );
+
+    test('signed in or out, whatever else the state holds', () {
+      for (final state in [
+        _signedIn(
+          update: required,
+          relay: RelayConnectionState.stopped,
+          trusted: [phone('m1', 'Pixel')],
+        ),
+        AgentViewState(phase: AuthPhase.signedOut, update: required),
+      ]) {
+        final menu = buildTrayMenu(state, vi, TrayMenuIds());
+        expect(_labels(menu), ['Tải ShellX 1.2.0…', '---', 'Thoát']);
+        expect(trayActionForKey(menu.items!.first.key), isA<DownloadUpdate>());
+      }
+    });
+
+    test('with the background service, both ways out (UI-A5 §6.2)', () {
+      final menu = buildTrayMenu(
+        _signedIn(update: required),
+        vi,
+        TrayMenuIds(),
+        local: const TrayLocalState(daemonMode: true),
+      );
+      expect(_labels(menu), [
+        'Tải ShellX 1.2.0…',
+        '---',
+        'Thoát',
+        'Thoát hoàn toàn',
+      ]);
+    });
+
+    test('an update that is not required leaves the menu whole', () {
+      final menu = buildTrayMenu(
+        _signedIn(
+          update: UpdateNotice(
+            version: '1.2.0',
+            url: required.url,
+            required: false,
+          ),
+        ),
+        vi,
+        TrayMenuIds(),
+      );
+      expect(menu.getMenuItem(TrayKeys.remoteAccess), isNotNull);
+      expect(menu.getMenuItem(TrayKeys.openTerminal), isNotNull);
+    });
+  });
 }

@@ -174,6 +174,8 @@ Future<void> _serve({
   // itself, in this process.
   container.read(cliHostControlProvider).recheck = cli.recheck;
 
+  // Also while an update is required (contract §5): the service stays to
+  // resume serving phones when a later check lifts the block.
   bool servingPhones() {
     final state = container.read(agentControllerProvider);
     return state.signedIn && state.remoteAccess;

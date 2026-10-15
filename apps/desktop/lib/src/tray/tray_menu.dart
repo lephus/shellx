@@ -134,7 +134,8 @@ String _statusLine(AgentViewState state, AppLocalizations l10n) {
 }
 
 /// Builds the tray menu of spec §8.3 (signed in) or a minimal one (signed
-/// out), both led by "Mở cửa sổ terminal" (A1 D11, UI §5).
+/// out), both led by "Mở cửa sổ terminal" (A1 D11, UI §5); while an update
+/// is required, only the download and Quit (contract §5).
 Menu buildTrayMenu(
   AgentViewState state,
   AppLocalizations l10n,
@@ -269,6 +270,18 @@ Menu buildTrayMenu(
           item(TrayKeys.quitAll, l10n.trayQuitAll),
         ]
       : [item(TrayKeys.quit, l10n.trayQuit)];
+
+  // Contract §5: below `min_agent`, signed in or not, only the download and
+  // the way out; the windows show "Update required".
+  if (state.update case final notice? when notice.required) {
+    return Menu(
+      items: [
+        item(TrayKeys.downloadUpdate, l10n.trayDownloadUpdate(notice.version)),
+        sep(),
+        ...quitItems(),
+      ],
+    );
+  }
 
   if (!state.signedIn) {
     return Menu(

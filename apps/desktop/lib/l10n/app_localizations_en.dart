@@ -3069,6 +3069,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateFailed => 'Couldn’t check right now.';
 
   @override
+  String get updateRequiredTitle => 'Update required';
+
+  @override
+  String updateRequiredBody(String current, String version) {
+    return 'This version of ShellX ($current) is no longer supported. Download and install ShellX $version to keep using it. Until then, your phones can’t connect to this computer.';
+  }
+
+  @override
+  String get updateRequiredDownload => 'Download';
+
+  @override
+  String get updateRequiredQuit => 'Quit';
+
+  @override
   String get configProblemAgentCommandBad =>
       'agent-event-command must start with an absolute path or ~/, and have no hidden characters or unclosed quotes';
 

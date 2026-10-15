@@ -4728,6 +4728,30 @@ abstract class AppLocalizations {
   /// **'Couldn’t check right now.'**
   String get updateFailed;
 
+  /// No description provided for @updateRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update required'**
+  String get updateRequiredTitle;
+
+  /// No description provided for @updateRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of ShellX ({current}) is no longer supported. Download and install ShellX {version} to keep using it. Until then, your phones can’t connect to this computer.'**
+  String updateRequiredBody(String current, String version);
+
+  /// No description provided for @updateRequiredDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateRequiredDownload;
+
+  /// No description provided for @updateRequiredQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get updateRequiredQuit;
+
   /// No description provided for @configProblemAgentCommandBad.
   ///
   /// In en, this message translates to:

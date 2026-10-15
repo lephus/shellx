@@ -84,7 +84,8 @@ final class AgentViewState {
   final bool launchAtStartup;
   final bool onboardingDone;
 
-  /// `stopped` whenever there is no runtime (signed out or remote access off).
+  /// `stopped` whenever there is no runtime (signed out, remote access off,
+  /// or [updateRequired]).
   final RelayConnectionState relay;
   final int activeChannels;
   final List<SessionSummary> sessions;
@@ -114,6 +115,11 @@ final class AgentViewState {
   final bool sshRemoteHook;
 
   bool get signedIn => phase == AuthPhase.signedIn;
+
+  /// Force update (contract §5): this build is below `min_agent`. Remote
+  /// access stays stopped, the windows show only "Update required" and the
+  /// tray only the download and Quit, until a later check says otherwise.
+  bool get updateRequired => update?.required ?? false;
 
   AgentViewState copyWith({
     AuthPhase? phase,

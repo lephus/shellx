@@ -64,7 +64,8 @@ AgentSide buildAgentSide({
     hooksDirectory: '$supportDirectory${Platform.pathSeparator}hooks',
   );
   // The app's one ShellxApi: the controller sets its token at sign-in.
-  final api = ShellxApi(baseUri: relayBase);
+  // Contract §1: every request reports this build's x.y.z.
+  final api = ShellxApi(baseUri: relayBase, clientVersion: appVersion);
   // A1 D7: the process's one SessionManager. It outlives every runtime, so
   // signing out or losing the relay never ends a shell; Quit does.
   final core = SessionCore(
@@ -100,7 +101,7 @@ AgentSide buildAgentSide({
     secureStore: SecureKeyValueStore(),
     settings: settings,
     api: api,
-    createApi: () => ShellxApi(baseUri: relayBase),
+    createApi: () => ShellxApi(baseUri: relayBase, clientVersion: appVersion),
     runtimeFactory: (params) => CoreAgentRuntime(
       params,
       core: core,
