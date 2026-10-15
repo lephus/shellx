@@ -396,5 +396,7 @@
   "aiModeBypass": "Bỏ qua mọi quyền",
   "aiContext": "Ngữ cảnh {percent}%",
   "aiPlan": "Kế hoạch · {done}/{total}",
-  "aiFromPhone": "từ điện thoại"
+  "aiFromPhone": "từ điện thoại",
+  "aiReattached": "Đã nối lại sau khi ShellX khởi động lại.",
+  "aiOpenList": "Mở danh sách phiên"
 }

@@ -156,6 +156,20 @@ abstract interface class AiMachine {
   AiListing? get listing;
   Stream<AiListing> get listings;
 
+  /// V2-2b B1: the `ai` protocol the computer's relay process reported in its answer to a list of its
+  /// sessions (2 or more: it forwards what V2-2b adds); null before such an answer.
+  int? get protocol;
+
+  /// V2-2b B1 (ruling R3): whether a V2-2b feature ([AiFeature]) can be used now — [protocol] is 2 or
+  /// more and the last [listing] names it. A request of a feature that cannot be used fails at once with
+  /// `AiRequestException('unsupported')`, sending nothing.
+  bool can(String feature);
+
+  /// V2-2b B22, B23: the last entry seen for session [sid] in a listing of this machine, in this run of the
+  /// app; null when none was. What a session was (its agent's own id, agent and folder) once the computer
+  /// restarted ShellX and gave it another sid.
+  AiSessionInfo? seen(String sid);
+
   /// Keeps [listing] current while the app is connected: asks now (connecting first when there is no
   /// channel) and again on every new channel, and a lost channel is brought back even with no terminal
   /// tab open, until [unwatch]. It is one switch, not a count: whoever shares the list between screens

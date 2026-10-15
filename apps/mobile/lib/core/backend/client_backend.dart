@@ -7,6 +7,7 @@ import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/auth/account_session.dart';
+import 'package:shellx_mobile/core/backend/ai_seen_sessions.dart';
 import 'package:shellx_mobile/core/backend/backend.dart';
 import 'package:shellx_mobile/core/config/app_config.dart';
 import 'package:shellx_mobile/core/platform/device_description.dart';
@@ -252,10 +253,27 @@ final class _TabAdapter implements TabHandle {
 }
 
 final class _AiMachineAdapter implements AiMachine {
-  _AiMachineAdapter(this._ai);
+  _AiMachineAdapter(this._ai) {
+    final now = _ai.listing;
+    if (now != null) _seen.note(now);
+    // Synchronous and broadcast: every listing the client takes, whoever watches; it ends with the machine.
+    _ai.listings.listen(_seen.note);
+  }
 
   final MachineAi _ai;
   final Map<AiSessionLink, _AiSessionAdapter> _links = Map.identity();
+
+  /// V2-2b B22, B23.
+  final _seen = AiSeenSessions();
+
+  @override
+  int? get protocol => _ai.protocol;
+
+  @override
+  bool can(String feature) => _ai.can(feature);
+
+  @override
+  AiSessionInfo? seen(String sid) => _seen.of(sid);
 
   @override
   bool? get supported => _ai.supported;

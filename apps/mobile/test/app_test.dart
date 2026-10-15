@@ -156,7 +156,7 @@ void main() {
         (agentId, _) => TerminalPageController(agentId, registry, session, settings),
       )
       ..registerFactoryParam<AiSessionController, String, String>(
-        (agentId, sid) => AiSessionController(agentId, sid, session, AiDrafts()),
+        (agentId, sid) => AiSessionController(agentId, sid, session, AiDrafts(), registry),
       )
       ..registerFactory<VoiceComposerController>(() => VoiceComposerController(FakeSpeechInput(), settings))
       ..registerFactory<QrScannerController>(() => QrScannerController(session))

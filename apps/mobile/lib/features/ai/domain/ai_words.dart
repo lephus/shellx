@@ -202,6 +202,8 @@ abstract final class AiWords {
     inFlight => null,
     // No code to show: [error] is no word of the computer's, only "something on this side".
     error => s.somethingWentWrong,
+    // V2-2b B1: the computer cannot do this yet (an older ShellX there, or its background service).
+    'unsupported' => s.aiUpdateDesktop,
     _ => s.aiRequestFailed(code),
   };
 

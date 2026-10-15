@@ -143,14 +143,6 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.AppSettings>(),
       ),
     );
-    gh.factoryParam<_i800.AiSessionController, String, String>(
-      (agentId, sid) => _i800.AiSessionController(
-        agentId,
-        sid,
-        gh<_i351.SessionHolder>(),
-        gh<_i267.AiDrafts>(),
-      ),
-    );
     gh.factory<_i1044.QrScannerController>(
       () => _i1044.QrScannerController(gh<_i351.SessionHolder>()),
     );
@@ -197,6 +189,15 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.AppRouter>(),
       )..initialize(),
       dispose: (i) => i.dispose(),
+    );
+    gh.factoryParam<_i800.AiSessionController, String, String>(
+      (agentId, sid) => _i800.AiSessionController(
+        agentId,
+        sid,
+        gh<_i351.SessionHolder>(),
+        gh<_i267.AiDrafts>(),
+        gh<_i667.WorkspaceRegistry>(),
+      ),
     );
     gh.lazySingleton<_i539.MachineNavigator>(
       () => _i539.RouterMachineNavigator(gh<_i351.AppRouter>()),
