@@ -123,11 +123,12 @@ final class ToolPage extends ChangeNotifier {
   bool _shown = false;
   bool _disposed = false;
 
-  /// What the last load asked for (a retry loads it again).
+  /// What the last load asked for; while that load is pending, what a
+  /// recovery loads ([_recoveryUrl]).
   Uri? _target;
 
   /// A load the app asked for ([_load]) has not finished yet: no
-  /// [LoadFinished] since ([_recoveryUrl]).
+  /// [LoadFinished] since (a ✕ leaves it pending). See [_recoveryUrl].
   bool _loadPending = false;
   int _attempt = 0;
   int _crashes = 0;
@@ -175,12 +176,16 @@ final class ToolPage extends ChangeNotifier {
   }
 
   /// ↻ and the panels' "Reload": a user's reload starts over (crash count,
-  /// retry schedule).
+  /// retry schedule). After an error, before the first load and while a
+  /// load the app asked for is pending (one ✕ stopped included), it loads
+  /// [_recoveryUrl]: a native reload would reload the last page committed,
+  /// about:blank after a stopped first load (R25). Only a page that
+  /// finished loading, with no error, is reloaded natively.
   Future<void> reload() async {
     _crashes = 0;
     _attempt = 0;
     _stopRetrying();
-    if (_state.error != null || !_state.started) {
+    if (_state.error != null || !_state.started || _loadPending) {
       await _load(_recoveryUrl);
     } else {
       _set(_state.copyWith(download: null));
@@ -188,7 +193,14 @@ final class ToolPage extends ChangeNotifier {
     }
   }
 
-  Future<void> stop() => engine.stop();
+  /// ✕ (D17). The engines report nothing for a cancelled navigation, so the
+  /// page stops loading here and the bar shows ↻ again. What the app asked
+  /// for stays pending: ↻ loads it again ([reload]).
+  Future<void> stop() {
+    _set(_state.copyWith(loading: false));
+    return engine.stop();
+  }
+
   Future<void> back() => engine.goBack();
 
   /// D9 "Back to tool".

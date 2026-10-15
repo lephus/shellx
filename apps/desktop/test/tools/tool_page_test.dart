@@ -209,6 +209,40 @@ void main() {
     expect(p.state.error, isNull, reason: 'a user reload starts over');
   });
 
+  test('✕ ends the loading state; ↻ after ✕ of the first load loads the '
+      'tool, never a native reload of about:blank (D17, R25)', () {
+    final t = Uri.parse('http://localhost:4000/');
+    final p = page(tool('localhost:4000'));
+    p.setShown(true);
+    expect(p.state.loading, isTrue);
+    unawaited(p.stop());
+    expect(engine.calls, ['stop']);
+    expect(p.state.loading, isFalse, reason: '✕ turns back into ↻');
+    unawaited(p.reload());
+    expect(engine.loads, [t, t]);
+    expect(engine.calls, ['stop'], reason: 'no engine.reload()');
+  });
+
+  test('↻ after ✕ of an edit loads the new URL; once a page finished '
+      'loading, ↻ reloads it natively (D17, D23)', () {
+    final b = Uri.parse('http://localhost:4001/');
+    final p = page(tool('localhost:4000'));
+    p.setShown(true);
+    engine.emit(UrlChanged(Uri.parse('http://localhost:4000/')));
+    engine.emit(const LoadFinished());
+    p.retarget(p.tool.copyWith(url: 'http://localhost:4001/'));
+    unawaited(p.stop());
+    var loads = engine.loads.length;
+    unawaited(p.reload());
+    expect(engine.loads.sublist(loads), [b], reason: 'what was asked');
+    engine.emit(UrlChanged(b));
+    engine.emit(const LoadFinished());
+    loads = engine.loads.length;
+    unawaited(p.reload());
+    expect(engine.calls.last, 'reload', reason: 'nothing pending');
+    expect(engine.loads, hasLength(loads));
+  });
+
   test('other errors show their panel and do not retry (D13)', () {
     fakeAsync((async) {
       final p = page(tool('localhost:5173'));
