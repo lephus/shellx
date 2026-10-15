@@ -5,6 +5,7 @@ import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
@@ -68,6 +69,21 @@ class _AiSessionPageState extends State<AiSessionPage> {
     if (text == _kept) return; // a move of the cursor is no change of the text
     _kept = text;
     _controller.keepDraft(text);
+  }
+
+  /// V2-2b B22: "Mở danh sách phiên" — the computer's AI sessions, the one picked in this page's place.
+  Future<void> _openList() async {
+    final listing = _controller.listing;
+    final ai = _controller.ai;
+    if (listing == null || ai == null) return;
+    await openAiChooser(
+      context,
+      agentId: widget.agentId,
+      machineName: widget.machineName,
+      ai: ai,
+      listing: listing,
+      replace: true,
+    );
   }
 
   void _say(String? code, {bool answer = false}) {
@@ -134,6 +150,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
       // A closed session runs nothing: no state colour either.
       state: head == null || closed ? null : AiWords.headState(head),
       onBack: () => context.router.maybePop(),
+      // V2-2b B17, B20: the "⋯" menu, each entry only while the computer offers it (Tasks 15 and 25 add theirs).
+      menu: [],
     );
   }
 
@@ -167,6 +185,10 @@ class _AiSessionPageState extends State<AiSessionPage> {
     final mirror = _controller.mirror;
     final holds = _controller.head != null || (mirror != null && mirror.end > mirror.from);
     final unreachable = machine is MachineFailed;
+    final reason = _controller.closedReason;
+    // B22: a session closed on the computer may be there again under another name; the computer's AI
+    // sessions are one tap away when the page holds their list.
+    final openList = (reason == 'gone' || reason == 'desktop_closed') && _controller.listing != null;
     return Column(
       children: [
         if (machine is MachineFailed)
@@ -176,7 +198,15 @@ class _AiSessionPageState extends State<AiSessionPage> {
         // A page that cannot show the session because the machine is gone says so with the machine's
         // words, not as a session closed on the computer.
         if (link == AiLinkState.closed && !(closed && unreachable))
-          _Strip(key: const Key('ai.closed'), text: AiWords.closed(s, _controller.closedReason)),
+          _Strip(
+            key: const Key('ai.closed'),
+            text: AiWords.closed(s, reason),
+            action: openList
+                ? TextButton(key: const Key('ai.openList'), onPressed: _openList, child: Text(s.aiOpenList))
+                : null,
+          ),
+        if (_controller.reattached.value && link != AiLinkState.closed)
+          _Strip(key: const Key('ai.reattached'), text: s.aiReattached),
       ],
     );
   }
@@ -328,13 +358,31 @@ class _AiSessionPageState extends State<AiSessionPage> {
   }
 }
 
+/// V2-2b: one entry of the header's "⋯" menu (B17 "Lịch sử phiên", B20 "Thay đổi").
+typedef AiHeaderAction = ({Key key, String label, VoidCallback onTap});
+
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.subtitle, required this.state, required this.onBack});
+  const _Header({
+    required this.title,
+    required this.subtitle,
+    required this.state,
+    required this.onBack,
+    // Task 11 passes it ("Chế độ và model").
+    // ignore: unused_element_parameter
+    this.onSubtitle,
+    this.menu = const [],
+  });
 
   final String title;
   final String subtitle;
   final AiRemoteState? state;
   final VoidCallback onBack;
+
+  /// V2-2b B11: the subtitle opens "Chế độ và model"; null: it is plain text.
+  final VoidCallback? onSubtitle;
+
+  /// V2-2b B17, B20: the "⋯" menu; none when empty.
+  final List<AiHeaderAction> menu;
 
   @override
   Widget build(BuildContext context) {
@@ -367,45 +415,72 @@ class _Header extends StatelessWidget {
                   style: context.typo.subHeader.bold.copyWith(color: colors.primaryText),
                 ),
                 2.sizedHeight,
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-                    ),
-                    6.sizedWidth,
-                    Expanded(
-                      child: Text(
-                        subtitle,
-                        key: const Key('ai.status'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.typo.paragraph13.copyWith(
-                          color: state == AiRemoteState.needsInput ? colors.warn : colors.secondaryText,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                _subtitleRow(context, dot),
               ],
             ),
           ),
+          if (menu.isNotEmpty)
+            PopupMenuButton<int>(
+              key: const Key('ai.menu'),
+              icon: Icon(Icons.more_horiz, color: colors.primary),
+              onSelected: (i) => menu[i].onTap(),
+              itemBuilder: (context) => [
+                for (final (i, action) in menu.indexed)
+                  PopupMenuItem<int>(key: action.key, value: i, child: Text(action.label)),
+              ],
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _subtitleRow(BuildContext context, Color dot) {
+    final colors = context.colors;
+    final row = Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+        6.sizedWidth,
+        Expanded(
+          child: Text(
+            subtitle,
+            key: const Key('ai.status'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.typo.paragraph13.copyWith(
+              color: state == AiRemoteState.needsInput ? colors.warn : colors.secondaryText,
+            ),
+          ),
+        ),
+        if (onSubtitle != null) Icon(Icons.expand_more, size: 16, color: colors.secondaryText),
+      ],
+    );
+    final tap = onSubtitle;
+    if (tap == null) return row;
+    // At least 44 points under the finger: the whole line is the button.
+    return InkWell(
+      key: const Key('ai.status.tap'),
+      onTap: tap,
+      child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 44), child: row),
     );
   }
 }
 
 class _Strip extends StatelessWidget {
-  const _Strip({super.key, required this.text, this.tone = NoticeTone.info});
+  const _Strip({super.key, required this.text, this.tone = NoticeTone.info, this.action});
 
   final String text;
   final NoticeTone tone;
 
+  /// A button at the strip's end (V2-2b B22 "Mở danh sách phiên").
+  final Widget? action;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-    child: NoticeBanner(text: text, tone: tone),
+    child: NoticeBanner(text: text, tone: tone, action: action),
   );
 }

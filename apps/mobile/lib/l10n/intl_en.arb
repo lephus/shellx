@@ -632,6 +632,8 @@
   "aiPlan": "Plan · {done}/{total}",
   "@aiPlan": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
   "aiFromPhone": "from phone",
+  "aiReattached": "Reconnected after ShellX restarted.",
+  "aiOpenList": "Open the session list",
   "pickerTools": "Tools",
   "toolRowSub": "{workspace} · localhost:{port}",
   "@toolRowSub": {"placeholders": {"workspace": {"type": "String"}, "port": {"type": "int"}}},

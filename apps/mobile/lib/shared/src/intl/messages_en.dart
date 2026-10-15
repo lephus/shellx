@@ -287,6 +287,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiNoticeUndoOffReason": m12,
     "aiNoticeUndoOffTurn": m13,
+    "aiOpenList": MessageLookupByLibrary.simpleMessage("Open the session list"),
     "aiOpenOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
       "The new session may not have been created. Check the list before trying again.",
     ),
@@ -310,6 +311,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "5 messages are already waiting.",
     ),
     "aiQueued": MessageLookupByLibrary.simpleMessage("Queued"),
+    "aiReattached": MessageLookupByLibrary.simpleMessage(
+      "Reconnected after ShellX restarted.",
+    ),
     "aiReconnecting": MessageLookupByLibrary.simpleMessage(
       "Reconnecting… what you see may be behind.",
     ),

@@ -279,6 +279,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiNoticeUndoOffReason": m12,
     "aiNoticeUndoOffTurn": m13,
+    "aiOpenList": MessageLookupByLibrary.simpleMessage("Mở danh sách phiên"),
     "aiOpenOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
       "Có thể phiên mới chưa được tạo. Hãy xem lại danh sách trước khi thử lại.",
     ),
@@ -302,6 +303,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Đã có 5 tin đang chờ.",
     ),
     "aiQueued": MessageLookupByLibrary.simpleMessage("Đang xếp hàng"),
+    "aiReattached": MessageLookupByLibrary.simpleMessage(
+      "Đã nối lại sau khi ShellX khởi động lại.",
+    ),
     "aiReconnecting": MessageLookupByLibrary.simpleMessage(
       "Đang kết nối lại… nội dung có thể chưa mới nhất.",
     ),

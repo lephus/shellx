@@ -10,6 +10,7 @@ import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
+import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
 import '../../support/app_harness.dart';
 import '../../support/fake_links.dart';
@@ -47,6 +48,7 @@ void main() {
   late FakeSessionHolder session;
   late FakePopupHandler popups;
   late AiDrafts drafts;
+  late WorkspaceRegistry registry;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
@@ -54,16 +56,20 @@ void main() {
     session = FakeSessionHolder(backend);
     popups = FakePopupHandler();
     drafts = AiDrafts();
+    registry = WorkspaceRegistry(session.backend);
     getIt
       ..registerSingleton<PopupHandler>(popups)
       ..registerSingleton<SessionHolder>(session)
       ..registerSingleton<ExternalLinks>(FakeExternalLinks())
       ..registerFactoryParam<AiSessionController, String, String>(
-        (agentId, sid) => AiSessionController(agentId, sid, session, drafts),
+        (agentId, sid) => AiSessionController(agentId, sid, session, drafts, registry),
       );
   });
 
-  tearDown(() async => getIt.reset());
+  tearDown(() async {
+    registry.dispose();
+    await getIt.reset();
+  });
 
   /// A panel that has just appeared, or a button that is free again, ignores taps for 400 ms (V2-1 D10: one
   /// tap, meant). Time for it to settle.
@@ -1360,7 +1366,7 @@ void main() {
       getIt
         ..unregister<AiSessionController>()
         ..registerFactoryParam<AiSessionController, String, String>(
-          (agentId, sid) => spy = _SpyController(agentId, sid, session, drafts),
+          (agentId, sid) => spy = _SpyController(agentId, sid, session, drafts, registry),
         );
       final ai = machine.ai.session(sid);
       ai.desktop.beginTurn(const [TextBlock('go')], DateTime.now());
@@ -1710,7 +1716,7 @@ void main() {
 
 /// A controller that says what the page tells it about the app in the background.
 class _SpyController extends AiSessionController {
-  _SpyController(super.agentId, super.sid, super.session, super.drafts);
+  _SpyController(super.agentId, super.sid, super.session, super.drafts, super.registry);
 
   final foreground = <bool>[];
 

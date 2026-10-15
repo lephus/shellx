@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/remote.dart' show AiFeature;
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/backend/client_backend.dart';
@@ -187,6 +188,16 @@ void main() {
     expect(again.state, AiLinkState.attaching);
     expect(again.closedReason, isNull);
     expect(ai.attach('e.1'), same(again));
+  });
+
+  test('V2-2b: before the computer answered, nothing is known — no protocol, no feature, no session seen', () async {
+    await pin(agentA, publicKey: (await NoiseKeyPair.generate()).publicKey);
+    final backend = await start();
+    addTearDown(backend.dispose);
+    final ai = backend.machine(agentA).ai;
+    expect(ai.protocol, isNull);
+    expect(ai.can(AiFeature.config), isFalse);
+    expect(ai.seen('e.1'), isNull);
   });
 
   test(

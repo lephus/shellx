@@ -206,6 +206,7 @@ class FakeMachineSession implements MachineSession {
   Future<List<SessionInfo>> listSessions() async {
     listCalls++;
     _failIfShutDown();
+    ai.noteList();
     return sessions;
   }
 
@@ -453,12 +454,43 @@ class FakeAiMachine implements AiMachine {
   Completer<void>? gate;
 
   /// A listing came from the computer: it has AI, as the real client learns from an `ai.list.result`
-  /// ([AiListing.unavailable]: no window serves it yet).
+  /// ([AiListing.unavailable]: no window serves it yet). Its sessions are [seen] from now on.
   void emitListing(AiListing listing) {
     supportedValue = true;
     listingValue = listing;
+    for (final session in listing.sessions) {
+      seenSessions[session.sid] = session;
+    }
     _listings.add(listing);
   }
+
+  /// V2-2b B1: the computer's `ai` protocol as the app knows it (null: no list answered yet).
+  int? protocolValue;
+
+  /// What the computer's `session.list.result` says (`ai`): a list of the sessions
+  /// ([FakeMachineSession.listSessions]) teaches it, as the real client learns it. Null: the test sets
+  /// [protocolValue] and [supportedValue] itself.
+  int? listedProtocol;
+
+  /// A list of the machine's sessions came back.
+  void noteList() {
+    final protocol = listedProtocol;
+    if (protocol == null) return;
+    protocolValue = protocol;
+    supportedValue = protocol >= 1;
+  }
+
+  /// V2-2b B22, B23: every session of every listing emitted.
+  final Map<String, AiSessionInfo> seenSessions = {};
+
+  @override
+  int? get protocol => protocolValue;
+
+  @override
+  bool can(String feature) => (protocolValue ?? 0) >= 2 && (listingValue?.features.contains(feature) ?? false);
+
+  @override
+  AiSessionInfo? seen(String sid) => seenSessions[sid];
 
   FakeAiSession session(String sid) => sessions.putIfAbsent(sid, () => FakeAiSession(sid));
 

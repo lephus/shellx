@@ -397,6 +397,8 @@
   "aiContext": "Ngữ cảnh {percent}%",
   "aiPlan": "Kế hoạch · {done}/{total}",
   "aiFromPhone": "từ điện thoại",
+  "aiReattached": "Đã nối lại sau khi ShellX khởi động lại.",
+  "aiOpenList": "Mở danh sách phiên",
   "pickerTools": "Tool",
   "toolRowSub": "{workspace} · localhost:{port}",
   "toolsEmpty": "Chưa có tool nào bật cho điện thoại. Trên máy tính: thanh của tool › 📱 Điện thoại.",

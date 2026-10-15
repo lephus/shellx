@@ -8,6 +8,7 @@ import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
 import '../../support/fakes.dart';
 
@@ -34,14 +35,18 @@ void main() {
   late FakeBackend backend;
   late FakeMachineSession machine;
   late FakeSessionHolder session;
+  late WorkspaceRegistry registry;
 
   setUp(() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
     machine = backend.addMachine(agentA);
     session = FakeSessionHolder(backend);
+    registry = WorkspaceRegistry(session.backend);
   });
 
-  AiSessionController make() => AiSessionController(agentA, sid, session, AiDrafts());
+  tearDown(() => registry.dispose());
+
+  AiSessionController make() => AiSessionController(agentA, sid, session, AiDrafts(), registry);
 
   group('the link', () {
     test('attaches when made and detaches on dispose, which is safe to repeat', () {
@@ -122,7 +127,8 @@ void main() {
     });
 
     test('signed out: closed, nothing to show the relay state of', () async {
-      final controller = AiSessionController(agentA, sid, FakeSessionHolder(), AiDrafts());
+      final signedOut = FakeSessionHolder();
+      final controller = AiSessionController(agentA, sid, signedOut, AiDrafts(), WorkspaceRegistry(signedOut.backend));
       expect(controller.closed.value, isTrue);
       expect(controller.backend, isNull);
       expect(await controller.send('hello'), 'refused');
@@ -205,15 +211,15 @@ void main() {
   group('the draft of the text field', () {
     test('a page left and opened again for the same session finds it; another session does not', () {
       final drafts = AiDrafts();
-      final first = AiSessionController(agentA, sid, session, drafts);
+      final first = AiSessionController(agentA, sid, session, drafts, registry);
       expect(first.draft, isEmpty);
       first
         ..keepDraft('Thêm nút đăng xuất')
         ..dispose();
-      final again = AiSessionController(agentA, sid, session, drafts);
+      final again = AiSessionController(agentA, sid, session, drafts, registry);
       expect(again.draft, 'Thêm nút đăng xuất');
       again.dispose();
-      final other = AiSessionController(agentA, 'e.-2', session, drafts);
+      final other = AiSessionController(agentA, 'e.-2', session, drafts, registry);
       expect(other.draft, isEmpty);
       other.dispose();
     });
@@ -222,32 +228,32 @@ void main() {
       backend.pinnedList = [pinned(agentA), pinned(agentB)];
       backend.addMachine(agentB);
       final drafts = AiDrafts();
-      AiSessionController(agentA, sid, session, drafts)
+      AiSessionController(agentA, sid, session, drafts, registry)
         ..keepDraft('chỉ cho máy A')
         ..dispose();
-      final there = AiSessionController(agentB, sid, session, drafts);
+      final there = AiSessionController(agentB, sid, session, drafts, registry);
       expect(there.draft, isEmpty);
       there.dispose();
-      final here = AiSessionController(agentA, sid, session, drafts);
+      final here = AiSessionController(agentA, sid, session, drafts, registry);
       expect(here.draft, 'chỉ cho máy A');
       here.dispose();
     });
 
     test('a draft is only the text: sending it, or clearing the field, leaves none', () {
       final drafts = AiDrafts();
-      final controller = AiSessionController(agentA, sid, session, drafts)
+      final controller = AiSessionController(agentA, sid, session, drafts, registry)
         ..keepDraft('đang viết')
         ..keepDraft('');
       expect(controller.draft, isEmpty);
       controller.dispose();
-      expect(AiSessionController(agentA, sid, session, drafts).draft, isEmpty);
+      expect(AiSessionController(agentA, sid, session, drafts, registry).draft, isEmpty);
     });
 
     group('a session that is over for good keeps no draft', () {
       for (final reason in ['gone', 'desktop_closed']) {
         test('closed "$reason": the draft goes, and a late restore does not bring it back', () {
           final drafts = AiDrafts();
-          final controller = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
+          final controller = AiSessionController(agentA, sid, session, drafts, registry)..keepDraft('còn dở');
           final ai = machine.ai.session(sid)..sync();
           expect(controller.draft, 'còn dở');
           ai.close(reason);
@@ -255,14 +261,18 @@ void main() {
           controller.keepDraft('một tin chưa gửi được'); // a failed message put back after the session closed
           expect(controller.draft, isEmpty);
           controller.dispose();
-          expect(AiSessionController(agentA, sid, session, drafts).draft, isEmpty, reason: 'nor on the next visit');
+          expect(
+            AiSessionController(agentA, sid, session, drafts, registry).draft,
+            isEmpty,
+            reason: 'nor on the next visit',
+          );
         });
       }
 
       for (final reason in ['unavailable', 'unreadable']) {
         test('closed "$reason" (it may pass): the draft stays, and is still kept', () {
           final drafts = AiDrafts();
-          final controller = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
+          final controller = AiSessionController(agentA, sid, session, drafts, registry)..keepDraft('còn dở');
           final ai = machine.ai.session(sid)..sync();
           ai.close(reason);
           expect(controller.draft, 'còn dở');
@@ -274,8 +284,8 @@ void main() {
 
       test('the other page of the same session leaving (the shared link is detached) does not drop the draft', () {
         final drafts = AiDrafts();
-        final staying = AiSessionController(agentA, sid, session, drafts)..keepDraft('còn dở');
-        final leaving = AiSessionController(agentA, sid, session, drafts);
+        final staying = AiSessionController(agentA, sid, session, drafts, registry)..keepDraft('còn dở');
+        final leaving = AiSessionController(agentA, sid, session, drafts, registry);
         machine.ai.session(sid).sync();
         leaving.dispose();
         expect(staying.draft, 'còn dở');

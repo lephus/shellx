@@ -3520,6 +3520,26 @@ class S {
   String get aiFromPhone {
     return Intl.message('from phone', name: 'aiFromPhone', desc: '', args: []);
   }
+
+  /// `Reconnected after ShellX restarted.`
+  String get aiReattached {
+    return Intl.message(
+      'Reconnected after ShellX restarted.',
+      name: 'aiReattached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open the session list`
+  String get aiOpenList {
+    return Intl.message(
+      'Open the session list',
+      name: 'aiOpenList',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

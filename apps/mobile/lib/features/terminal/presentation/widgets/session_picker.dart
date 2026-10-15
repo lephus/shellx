@@ -67,8 +67,13 @@ String? agentChipText(S strings, SessionInfo session) {
 /// Spec §9.2 #4 and terminal sharing §9.1 / design "Terminal trên máy tính": the bottom sheet
 /// offering the sessions not open as tabs, in two groups — "Terminal trên máy tính" (or, without any,
 /// a hint picked by `desktop_sharing`) and "Phiên ShellX" — then "Phiên mới". Returns null when
-/// dismissed.
-Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing listing, {DateTime? now}) {
+/// dismissed. With [aiOnly] (V2-2b B21, B22) only the AI group shows: no terminal, no "Phiên mới".
+Future<SessionChoice?> showSessionPicker(
+  BuildContext context,
+  SessionListing listing, {
+  DateTime? now,
+  bool aiOnly = false,
+}) {
   return showModalBottomSheet<SessionChoice>(
     context: context,
     showDragHandle: true,
@@ -111,58 +116,60 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
                 8.sizedHeight,
                 _Group(children: _aiRows(context, listing)),
               ],
-              // V2-4 E15: the Tool group after the AI sessions (none from a computer without tools).
-              if (listing.toolsSupported == true) ...[
+              if (!aiOnly) ...[
+                // V2-4 E15: the Tool group after the AI sessions (none from a computer without tools).
+                if (listing.toolsSupported == true) ...[
+                  14.sizedHeight,
+                  _GroupHeader(strings.pickerTools),
+                  8.sizedHeight,
+                  StreamBuilder<ToolListing>(
+                    stream: listing.toolUpdates,
+                    initialData: listing.tools,
+                    builder: (context, snapshot) => _Group(children: _toolRows(context, snapshot.data)),
+                  ),
+                ],
                 14.sizedHeight,
-                _GroupHeader(strings.pickerTools),
-                8.sizedHeight,
-                StreamBuilder<ToolListing>(
-                  stream: listing.toolUpdates,
-                  initialData: listing.tools,
-                  builder: (context, snapshot) => _Group(children: _toolRows(context, snapshot.data)),
-                ),
-              ],
-              14.sizedHeight,
-              _GroupHeader(strings.pickerDesktopGroup),
-              8.sizedHeight,
-              _Group(
-                children: desktop.isEmpty
-                    ? [_Hint(key: const ValueKey('picker-desktop-hint'), text: hint)]
-                    : [
-                        for (final session in desktop)
-                          _SessionRow(
-                            session: session,
-                            label: desktopSessionLabel(session),
-                            desktop: true,
-                            now: at,
-                          ),
-                      ],
-              ),
-              if (shellx.isNotEmpty) ...[
-                14.sizedHeight,
-                _GroupHeader(strings.pickerShellxGroup),
+                _GroupHeader(strings.pickerDesktopGroup),
                 8.sizedHeight,
                 _Group(
-                  children: [
-                    for (final session in shellx)
-                      _SessionRow(
-                        session: session,
-                        label: '${session.shell} ${session.index}',
-                        desktop: false,
-                        now: at,
-                      ),
-                  ],
+                  children: desktop.isEmpty
+                      ? [_Hint(key: const ValueKey('picker-desktop-hint'), text: hint)]
+                      : [
+                          for (final session in desktop)
+                            _SessionRow(
+                              session: session,
+                              label: desktopSessionLabel(session),
+                              desktop: true,
+                              now: at,
+                            ),
+                        ],
+                ),
+                if (shellx.isNotEmpty) ...[
+                  14.sizedHeight,
+                  _GroupHeader(strings.pickerShellxGroup),
+                  8.sizedHeight,
+                  _Group(
+                    children: [
+                      for (final session in shellx)
+                        _SessionRow(
+                          session: session,
+                          label: '${session.shell} ${session.index}',
+                          desktop: false,
+                          now: at,
+                        ),
+                    ],
+                  ),
+                ],
+                14.sizedHeight,
+                AppButton(
+                  title: strings.pickerNewSession,
+                  prefix: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Icon(Icons.add, color: colors.onPrimary),
+                  ),
+                  onTap: () => Navigator.pop(context, const OpenNewSession()),
                 ),
               ],
-              14.sizedHeight,
-              AppButton(
-                title: strings.pickerNewSession,
-                prefix: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(Icons.add, color: colors.onPrimary),
-                ),
-                onTap: () => Navigator.pop(context, const OpenNewSession()),
-              ),
             ],
           ),
         ),
