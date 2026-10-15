@@ -1174,4 +1174,22 @@ void main() {
       expect(ws.closeCode, 4001);
     });
   });
+
+  /// Ruling I3: a request the gate cannot read is still answered (with the
+  /// policy, and its response closed), never left open.
+  group('a request the gate cannot read (I3)', () {
+    test('an entry whose query is not UTF-8, without the cookie: 403 at '
+        'once', () async {
+      await openSamePort();
+      final port = session.servedPort!;
+      final answer = await webview
+          .request(Uri.parse('http://localhost:$port/__shellx/enter?n=%FF'))
+          .timeout(const Duration(seconds: 2));
+      expect(answer.status, 403);
+      expect(answer.headers['content-security-policy'], [
+        toolContentSecurityPolicy([port]),
+      ]);
+      expect(tool.hits, isEmpty);
+    });
+  });
 }

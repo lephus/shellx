@@ -668,9 +668,15 @@ final class ToolSession {
     if (uri.path != '${kToolReservedPrefix}enter' || !served.main) {
       return _answer(request, HttpStatus.notFound);
     }
+    final Map<String, String> query;
+    try {
+      query = uri.queryParameters;
+    } on FormatException {
+      return _answer(request, HttpStatus.forbidden); // an escape not UTF-8
+    }
     final nonce = _nonce;
     final at = _nonceAt;
-    final given = uri.queryParameters['n'] ?? '';
+    final given = query['n'] ?? '';
     final fresh =
         nonce != null &&
         at != null &&
@@ -678,7 +684,7 @@ final class ToolSession {
         constantTimeEquals(utf8.encode(given), utf8.encode(nonce));
     if (!fresh) return _answer(request, HttpStatus.forbidden);
     _nonce = null; // one time only
-    final to = uri.queryParameters['to'] ?? '/';
+    final to = query['to'] ?? '/';
     final response = request.response..statusCode = HttpStatus.seeOther;
     _addPolicy(response);
     response
@@ -751,6 +757,14 @@ final class ToolSession {
     }
   }
 
+  /// [_handle] failed before it answered [request]: 400 (with the policy,
+  /// the response closed), unless a stream took the request (its own
+  /// answers go on). A request is never left open.
+  Future<void> _unanswered(HttpRequest request) async {
+    if (_streams.any((stream) => identical(stream.request, request))) return;
+    await _answer(request, HttpStatus.badRequest);
+  }
+
   /// What [stream], ended before its response, answers the webview.
   Future<void> _answerEnd(_Stream stream, String? code) {
     final served = stream.served;
@@ -799,7 +813,9 @@ final class _Served {
     for (final server in servers) {
       server.listen(
         (request) => unawaited(
-          session._handle(this, server.port, request).catchError((Object _) {}),
+          session
+              ._handle(this, server.port, request)
+              .catchError((Object _) => session._unanswered(request)),
         ),
         onError: (Object _) {},
       );
