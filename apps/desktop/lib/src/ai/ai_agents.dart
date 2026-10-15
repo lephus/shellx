@@ -266,8 +266,10 @@ final aiDefaultAgentProvider = Provider<AgentSpec?>((ref) {
 });
 
 /// V2-1 D11: the choices remembered for [agentId]'s new sessions. A choice
-/// that acts without asking never comes back, even from a line an older
-/// version stored (ruling R6, never auto-allow).
+/// that acts without asking never comes back, nor any choice of an option
+/// named like such a mode (a switch or a select `yolo`, whatever its value:
+/// V2-2b F19), even from a line an older version stored (ruling R6, never
+/// re-apply a remembered no-approval mode).
 Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
   final out = <String, Object>{};
   for (final line in store.getStrings(SettingKeys.aiAgentConfig)) {
@@ -277,6 +279,7 @@ Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
       final value = jsonDecode(parts[2]);
       if (value is! String && value is! bool) continue;
       if (aiTurnsOnNoApproval(configId: parts[1], value: value)) continue;
+      if (aiIsNoApprovalMode(parts[1])) continue; // named like one
       out[parts[1]] = value as Object;
     } on FormatException {
       continue;
@@ -287,8 +290,9 @@ Map<String, Object> rememberedConfig(SettingsStore store, String agentId) {
 
 /// V2-1 D11: remembers [value] of [configId] for [agentId]'s new sessions.
 /// A mode that acts without asking ("Bypass permissions", Codex's
-/// "full-access", Gemini's "yolo") is never remembered (ruling R6, never
-/// auto-allow).
+/// "full-access", Gemini's "yolo") is never remembered, nor any value of an
+/// option named like one (a switch or a select `yolo`, `off` too: V2-2b
+/// F19) (ruling R6, never re-apply a remembered no-approval mode).
 Future<void> rememberConfig(
   SettingsStore store,
   String agentId,
@@ -296,6 +300,7 @@ Future<void> rememberConfig(
   Object value,
 ) async {
   if (aiTurnsOnNoApproval(configId: configId, value: value)) return;
+  if (aiIsNoApprovalMode(configId)) return; // named like one
   final prefix = '$agentId\t$configId\t';
   await store.setStrings(SettingKeys.aiAgentConfig, [
     for (final line in store.getStrings(SettingKeys.aiAgentConfig))

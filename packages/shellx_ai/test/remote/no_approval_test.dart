@@ -56,6 +56,61 @@ void main() {
     expect(aiTurnsOnNoApproval(configId: 'model', value: 'opus'), isFalse);
   });
 
+  test('V2-2b F19: an option named like one turns it on with any value but '
+      'an off value — a select too, not only a switch', () {
+    for (final id in ['yolo', 'clearAndBypass', 'allow-all-tools']) {
+      for (final value in ['on', 'On', 'enabled', 'always', 'full']) {
+        expect(
+          aiTurnsOnNoApproval(configId: id, value: value),
+          isTrue,
+          reason: '$id=$value',
+        );
+      }
+      // The off values, in any case and with any mark between the letters,
+      // as the predicate reads an id.
+      for (final value in [
+        'off',
+        'Off',
+        'FALSE',
+        'no',
+        'disabled',
+        ' Disabled ',
+        '0',
+        'none',
+        'n-o-n-e',
+      ]) {
+        expect(
+          aiTurnsOnNoApproval(configId: id, value: value),
+          isFalse,
+          reason: '$id=$value',
+        );
+      }
+      // A switch as before: on turns it on, off does not.
+      expect(
+        aiTurnsOnNoApproval(configId: id, value: true),
+        isTrue,
+        reason: id,
+      );
+      expect(
+        aiTurnsOnNoApproval(configId: id, value: false),
+        isFalse,
+        reason: id,
+      );
+      // Any other value is not an off value: it fails closed.
+      expect(
+        aiTurnsOnNoApproval(configId: id, value: null),
+        isTrue,
+        reason: id,
+      );
+    }
+    // An option not named like one keeps its answers.
+    expect(aiTurnsOnNoApproval(configId: 'model', value: 'opus'), isFalse);
+    expect(aiTurnsOnNoApproval(configId: 'effort', value: 'on'), isFalse);
+    expect(aiTurnsOnNoApproval(configId: 'thinking', value: true), isFalse);
+    expect(aiTurnsOnNoApproval(configId: 'mode', value: 'yolo'), isTrue);
+    expect(aiTurnsOnNoApproval(configId: 'mode', value: 'off'), isFalse);
+  });
+
   test('a permission answer turns it on when it is no reject and names such '
       'a mode', () {
     expect(
