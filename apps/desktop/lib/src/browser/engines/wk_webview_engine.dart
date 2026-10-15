@@ -60,6 +60,17 @@ Uri? pageUriOf(String? raw) {
   return uri != null && uri.hasScheme ? uri : null;
 }
 
+/// D9: a page's new window (`window.open`, or a `target=_blank` link, mail
+/// and phone included) never opens, here or in a second view: it goes
+/// outside (http, https, mailto, tel) or nowhere.
+BrowserEngineEvent newWindowEvent(NavigationPolicy policy, Uri? url) {
+  final verdict = policy(url, mainFrame: true, newWindow: true);
+  if (verdict == NavigationVerdict.outside && url != null) {
+    return OpenOutside(url, newWindow: true);
+  }
+  return const NavigationBlocked();
+}
+
 /// R28: Safari's Web Inspector reaches the user's own tool, best effort.
 /// The plugin refuses it below macOS 13.3 (a [PlatformException]); the page
 /// sets up and loads all the same (spec §8: macOS 12–13 work like 14+).
@@ -183,16 +194,7 @@ final class WkWebViewEngine implements BrowserEngine {
     if (!_events.isClosed) _events.add(e);
   }
 
-  /// D9: a new window never opens, here or in a second view: it goes
-  /// outside (http, https, mailto, tel) or nowhere.
-  void _newWindow(Uri? url) {
-    final verdict = _policy(url, mainFrame: true, newWindow: true);
-    if (verdict == NavigationVerdict.outside && url != null) {
-      _emit(OpenOutside(url, newWindow: true));
-    } else {
-      _emit(const NavigationBlocked());
-    }
-  }
+  void _newWindow(Uri? url) => _emit(newWindowEvent(_policy, url));
 
   Future<void> _setup() async {
     await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
@@ -222,13 +224,17 @@ final class WkWebViewEngine implements BrowserEngine {
         },
         onPageStarted: (_) => _emit(const LoadStarted()),
         onProgress: (p) => _emit(LoadProgress(p)),
+        // Once disposed, the blank page `forget` loads (D5) reads nothing
+        // back: no history, no title.
         onPageFinished: (_) async {
+          if (_events.isClosed) return;
           _emit(const LoadFinished());
           await _history();
           final title = await _controller.getTitle();
           if (title != null) _emit(TitleChanged(title));
         },
         onUrlChange: (change) {
+          if (_events.isClosed) return;
           final uri = pageUriOf(change.url);
           if (uri != null) _emit(UrlChanged(uri));
           unawaited(_history());
@@ -290,51 +296,59 @@ final class WkWebViewEngine implements BrowserEngine {
   @override
   bool get coversFlutter => false;
 
+  /// Setup done and not disposed. A disposed engine makes no native call: a
+  /// dispose may have cut setup short, and its page has no D9 policy and no
+  /// guard.
+  Future<bool> _live() async {
+    await _ready;
+    return !_events.isClosed;
+  }
+
   @override
   Future<void> load(Uri url) async {
-    await _ready;
+    if (!await _live()) return;
     await _controller.loadRequest(url);
   }
 
   @override
   Future<void> goBack() async {
-    await _ready;
+    if (!await _live()) return;
     await _controller.goBack();
   }
 
   @override
   Future<void> goForward() async {
-    await _ready;
+    if (!await _live()) return;
     await _controller.goForward();
   }
 
   @override
   Future<void> reload() async {
-    await _ready;
+    if (!await _live()) return;
     await _controller.reload();
   }
 
   @override
   Future<void> stop() async {
-    await _ready;
+    if (!await _live()) return;
     await _native.stop(_id);
   }
 
   @override
   Future<void> setForwardedChords(List<String> chords) async {
-    await _ready;
+    if (!await _live()) return;
     await _native.setForwardedChords(_id, chords);
   }
 
   @override
   Future<void> focusContent() async {
-    await _ready;
+    if (!await _live()) return;
     await _native.focus(_id);
   }
 
   @override
   Future<void> releaseFocus() async {
-    await _ready;
+    if (!await _live()) return;
     await _native.blur(_id);
   }
 

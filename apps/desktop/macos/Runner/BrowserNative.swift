@@ -106,15 +106,69 @@ final class BrowserNative: NSObject {
     "`": "backquote", "[": "bracket_left", "]": "bracket_right",
   ]
 
+  /// What the US layout types on each typewriter key (ANSI key codes
+  /// 0x00–0x32; Return, Tab and Space are named keys).
+  static let usCharacters: [UInt16: String] = [
+    0x00: "a", 0x01: "s", 0x02: "d", 0x03: "f", 0x04: "h", 0x05: "g",
+    0x06: "z", 0x07: "x", 0x08: "c", 0x09: "v", 0x0B: "b", 0x0C: "q",
+    0x0D: "w", 0x0E: "e", 0x0F: "r", 0x10: "y", 0x11: "t", 0x12: "1",
+    0x13: "2", 0x14: "3", 0x15: "4", 0x16: "6", 0x17: "5", 0x18: "=",
+    0x19: "9", 0x1A: "7", 0x1B: "-", 0x1C: "8", 0x1D: "0", 0x1E: "]",
+    0x1F: "o", 0x20: "u", 0x21: "[", 0x22: "i", 0x23: "p", 0x25: "l",
+    0x26: "j", 0x27: "'", 0x28: "k", 0x29: ";", 0x2A: "\\", 0x2B: ",",
+    0x2C: "/", 0x2D: "n", 0x2E: "m", 0x2F: ".", 0x32: "`",
+  ]
+
   /// The key of [event] as Dart's `chordConfigText` writes it; nil for a
   /// key Dart has no name for.
   static func keyName(_ event: NSEvent) -> String? {
-    if let named = namedKeys[event.keyCode] { return named }
-    // The character without Shift, Option or Command: ⌘⇧1 is "1", ⌘⇧= is
-    // "=", as Flutter's logical key is.
-    guard let raw = event.characters(byApplyingModifiers: []), raw.count == 1
+    keyName(
+      code: event.keyCode,
+      unshifted: event.characters(byApplyingModifiers: []),
+      shifted: event.characters(byApplyingModifiers: .shift))
+  }
+
+  /// D10: a key named as Flutter names its logical key, so a chord pressed
+  /// in a page is the keymap's chord on any layout. Named keys go by key
+  /// code. A typewriter key (0x00–0x32) is, in this order:
+  /// (a) the ASCII letter or digit it types without Shift, else with Shift
+  ///     (AZERTY's and Czech's digit rows give 1…0);
+  /// (b) when it types nothing in Latin-1 with or without Shift (Russian,
+  ///     Greek), the US key at its place: ⌘T is "t";
+  /// (c) else what it types without Shift, as every other key: ⌘⇧= is "=".
+  static func keyName(code: UInt16, unshifted: String?, shifted: String?) -> String? {
+    if let named = namedKeys[code] { return named }
+    if code <= 0x32 {
+      if let c = asciiAlnum(unshifted?.lowercased()) ?? asciiAlnum(shifted) {
+        return c
+      }
+      if !latin1(unshifted), !latin1(shifted), let us = usCharacters[code] {
+        return characterName(us)
+      }
+    }
+    guard let raw = unshifted, raw.count == 1 else { return nil }
+    return characterName(raw.lowercased())
+  }
+
+  /// An ASCII letter or digit as typed (Flutter's layout goals: a–z, 0–9).
+  static func asciiAlnum(_ c: String?) -> String? {
+    guard let c, c.unicodeScalars.count == 1,
+      let v = c.unicodeScalars.first?.value,
+      (0x61...0x7a).contains(v) || (0x30...0x39).contains(v)
     else { return nil }
-    let c = raw.lowercased()
+    return c
+  }
+
+  /// Latin-1 as Flutter's layout check counts it: no character counts too.
+  static func latin1(_ c: String?) -> Bool {
+    guard let v = c?.unicodeScalars.first?.value else { return true }
+    return v < 0x100
+  }
+
+  /// One character as Dart's `chordConfigText` writes it: punctuation by
+  /// name, an ASCII letter or digit as itself, a layout's own letter as
+  /// itself; nil for any other ASCII.
+  static func characterName(_ c: String) -> String? {
     if let p = punctuation[c] { return p }
     guard let scalar = c.unicodeScalars.first else { return nil }
     if scalar.value < 0x80 {
@@ -176,6 +230,14 @@ final class BrowserNative: NSObject {
         {
           web.navigationDelegate = guardian.inner
         }
+        // D5: a closed or unloaded tool stops at once (scripts, sockets,
+        // sound), although the plugin keeps the view until Dart lets go.
+        // Its id is unknown by now, and Dart's engine is closed: nothing of
+        // this blank page reaches it.
+        if let web, let blank = URL(string: "about:blank") {
+          web.stopLoading()
+          web.load(URLRequest(url: blank))
+        }
       }
       result(nil)
       return
@@ -197,9 +259,14 @@ final class BrowserNative: NSObject {
         web.uiDelegate = guardian
       }
       if downloadGuards[id] == nil, let inner = web.navigationDelegate {
-        let guardian = DownloadGuard(inner: inner) { [weak self] url in
-          self?.send("download", id: id, url: url)
-        }
+        let guardian = DownloadGuard(
+          inner: inner,
+          onDownload: { [weak self] url in
+            self?.send("download", id: id, url: url)
+          },
+          onNewWindow: { [weak self] url in
+            self?.send("newWindow", id: id, url: url)
+          })
         downloadGuards[id] = guardian
         web.navigationDelegate = guardian
       }
@@ -259,19 +326,60 @@ final class NewWindowGuard: NSObject, WKUIDelegate {
   }
 }
 
-/// V2-3 D9: a tool never downloads. The plugin's navigation delegate lets
-/// every response show (a zip would replace the page); this guard stops a
-/// top-frame response that is a download — an attachment, or a type WebKit
-/// cannot show — and hands its URL to Dart, and passes every other call on
-/// to the plugin's delegate.
+/// V2-3 D9: a tool never downloads, and a page's new window never opens in
+/// it. The plugin's navigation delegate lets every response show (a zip
+/// would replace the page) and judges a new window's link as a frame's. This
+/// guard stands in front of it:
+/// - a link the page asks to download (`<a download>`) is cancelled and
+///   handed to Dart as `download`; then a link to a new window
+///   (`target=_blank`) as `newWindow`, the message NewWindowGuard sends for
+///   `window.open`;
+/// - a top-frame response that is a download (an attachment, or a type
+///   WebKit cannot show) is cancelled and handed to Dart as `download`;
+/// - every other call goes on to the plugin's delegate. The pinned plugin
+///   implements only the navigation-action call without `preferences:`, so
+///   WebKit asks this one (R4: re-check on an upgrade).
 final class DownloadGuard: NSObject, WKNavigationDelegate {
   let inner: WKNavigationDelegate
   private let onDownload: (URL?) -> Void
+  private let onNewWindow: (URL?) -> Void
 
-  init(inner: WKNavigationDelegate, onDownload: @escaping (URL?) -> Void) {
+  init(
+    inner: WKNavigationDelegate,
+    onDownload: @escaping (URL?) -> Void,
+    onNewWindow: @escaping (URL?) -> Void
+  ) {
     self.inner = inner
     self.onDownload = onDownload
+    self.onNewWindow = onNewWindow
     super.init()
+  }
+
+  /// A download link's URL for Dart; none for `blob:` and `data:`, which
+  /// mean nothing outside the page.
+  static func downloadURL(_ url: URL?) -> URL? {
+    let scheme = url?.scheme?.lowercased()
+    return scheme == "blob" || scheme == "data" ? nil : url
+  }
+
+  func webView(
+    _ webView: WKWebView,
+    decidePolicyFor navigationAction: WKNavigationAction,
+    decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+  ) {
+    if navigationAction.shouldPerformDownload {
+      onDownload(DownloadGuard.downloadURL(navigationAction.request.url))
+      decisionHandler(.cancel)
+      return
+    }
+    if navigationAction.targetFrame == nil {
+      onNewWindow(navigationAction.request.url)
+      decisionHandler(.cancel)
+      return
+    }
+    let answered: Void? = inner.webView?(
+      webView, decidePolicyFor: navigationAction, decisionHandler: decisionHandler)
+    if answered == nil { decisionHandler(.allow) }
   }
 
   static func isDownload(_ response: WKNavigationResponse) -> Bool {
