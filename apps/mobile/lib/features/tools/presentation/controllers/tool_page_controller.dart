@@ -164,6 +164,14 @@ class ToolPageController extends Controller {
     _set(_firstLoad, false);
   }
 
+  /// I3: a load failed. iOS reports a page that did not load only as an error and never calls
+  /// `onPageFinished`, so the error of the page itself ends that load (the progress line, the slow
+  /// line and its timer, the first-load cover); an error inside the page (Android reports every
+  /// resource that failed) changes nothing.
+  void loadFailed(bool mainFrame) {
+    if (mainFrame) pageFinished();
+  }
+
   void progressed(int percent) => _set(_progress, percent);
 
   /// E12: the web content process stopped: the page loads again.

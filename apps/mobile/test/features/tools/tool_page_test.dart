@@ -250,6 +250,47 @@ void main() {
     expect(popups.infos, isEmpty);
   });
 
+  // I3: iOS reports a page that failed to load only as an error and never as finished.
+  testWidgets('a page that fails to load ends the load: no progress line, no slow line, no cover (I3)', (
+    tester,
+  ) async {
+    await open(tester);
+    page().ready();
+    engine.callbacks.onPageStarted();
+    await tester.pump();
+    expect(find.byKey(const Key('tool.progress')), findsOneWidget);
+    expect(find.text('Đang tải qua đường hầm…'), findsOneWidget, reason: 'the first load');
+    await tester.pump(const Duration(milliseconds: 3600));
+    expect(find.byKey(const Key('tool.slow')), findsOneWidget);
+    engine.callbacks.onLoadError(true);
+    await tester.pump();
+    expect(find.byKey(const Key('tool.progress')), findsNothing);
+    expect(find.byKey(const Key('tool.slow')), findsNothing);
+    expect(find.text('Đang tải qua đường hầm…'), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.byKey(const Key('tool.slow')), findsNothing, reason: 'the timer of the slow line is gone');
+  });
+
+  testWidgets('an error inside the page changes nothing (I3)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    engine.callbacks.onPageStarted();
+    await tester.pump(const Duration(milliseconds: 3600));
+    engine.callbacks.onLoadError(false);
+    await tester.pump();
+    expect(find.byKey(const Key('tool.progress')), findsOneWidget);
+    expect(find.byKey(const Key('tool.slow')), findsOneWidget);
+  });
+
+  testWidgets('a page that failed to load forgets what it let through (I3, C1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    engine.callbacks.onLoadError(true);
+    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+    expect(popups.infos, isEmpty);
+  });
+
   testWidgets('the page\'s dialogs are the app\'s and name the tool (E12)', (tester) async {
     await open(tester);
     await shown(tester);

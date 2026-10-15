@@ -185,6 +185,7 @@ void main() {
         onProgress: (percent) => events.add('progress:$percent'),
         onPageStarted: () => events.add('started'),
         onPageFinished: () => events.add('finished'),
+        onLoadError: (mainFrame) => events.add(mainFrame ? 'error:page' : 'error:inside'),
         onCrashed: () => events.add('crashed'),
         onFileChooser: () => events.add('fileChooser'),
         alert: (message) async => events.add('alert:$message'),
@@ -278,21 +279,47 @@ void main() {
     expect(events, ['alert:hi', 'confirm:sure?', 'prompt:name?:An', 'prompt:name?:cancel']);
   });
 
-  test('page events reach the app; only a stopped web content process asks for a reload', () {
+  test('page events reach the app', () {
     platform.delegate.onPageStarted!('u');
     platform.delegate.onProgress!(40);
     platform.delegate.onPageFinished!('u');
-    platform.delegate.onWebResourceError!(
-      const WebResourceError(errorCode: 1, description: 'd', errorType: WebResourceErrorType.hostLookup),
-    );
+    expect(events, ['started', 'progress:40', 'finished']);
+  });
+
+  test('a stopped web content process asks for a reload, and is not a failed page', () {
     platform.delegate.onWebResourceError!(
       const WebResourceError(
         errorCode: 2,
         description: 'd',
         errorType: WebResourceErrorType.webContentProcessTerminated,
+        isForMainFrame: true,
       ),
     );
-    expect(events, ['started', 'progress:40', 'finished', 'crashed']);
+    expect(events, ['crashed']);
+  });
+
+  test('a page that failed to load is told as such (iOS never says finished); an error inside it is told apart', () {
+    platform.delegate.onWebResourceError!(
+      const WebResourceError(
+        errorCode: 3,
+        description: 'd',
+        errorType: WebResourceErrorType.connect,
+        isForMainFrame: true,
+      ),
+    );
+    platform.delegate.onWebResourceError!(
+      const WebResourceError(
+        errorCode: 4,
+        description: 'd',
+        errorType: WebResourceErrorType.connect,
+        isForMainFrame: false,
+      ),
+    );
+    // No frame given: the page's own, which ends a load that would otherwise never end.
+    platform.delegate.onWebResourceError!(
+      const WebResourceError(errorCode: 5, description: 'd', errorType: WebResourceErrorType.hostLookup),
+    );
+    expect(events, ['error:page', 'error:inside', 'error:page']);
   });
 
   test('load, reload and back go to the web view', () async {
