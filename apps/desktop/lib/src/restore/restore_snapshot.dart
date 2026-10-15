@@ -6,6 +6,7 @@ import 'package:shellx_agent/shellx_agent.dart' show SessionLaunch;
 import '../terminal/agent_status.dart' show AgentKind, isValidSessionId;
 import '../terminal/pane_layout.dart';
 import '../terminal/tab_meta.dart';
+import '../tools/tool_dock_state.dart';
 
 // Pure model of `restore/layout.json`: imports only the A3 pane tree, so
 // the tab and sidebar notifiers can depend on it without a cycle. Capture
@@ -281,6 +282,7 @@ final class RestoreSnapshot {
     required this.workspaces,
     required this.tabs,
     this.aiTabs = const [],
+    this.toolDock = const {},
   });
 
   final DateTime savedAt;
@@ -294,6 +296,10 @@ final class RestoreSnapshot {
 
   /// V2-1 D14: the AI tabs (top-level `aiTabs`, which V1 ignores).
   final List<SavedAiTab> aiTabs;
+
+  /// V2-3 D14: each workspace's tool dock (top-level `toolDock`, which V1
+  /// and V2.0 ignore), by workspace id; only docks that are not the default.
+  final Map<String, ToolDockState> toolDock;
 
   /// Something to restore: a terminal tab or an AI tab (Review Focus 2).
   bool get hasTabs => tabs.isNotEmpty || aiTabs.isNotEmpty;
@@ -311,6 +317,7 @@ final class RestoreSnapshot {
         workspaces: workspaces,
         tabs: tabs,
         aiTabs: aiTabs,
+        toolDock: toolDock,
       );
 
   /// Equal apart from [savedAt] and [cleanExit]: no write needed.
@@ -339,6 +346,9 @@ final class RestoreSnapshot {
     // V2-1 D14: only when there is one, so a terminal-only layout is
     // byte-identical to before.
     if (aiTabs.isNotEmpty) 'aiTabs': [for (final t in aiTabs) t.toJson()],
+    // V2-3 D14: likewise only when there is one.
+    if (toolDock.isNotEmpty)
+      'toolDock': {for (final e in toolDock.entries) e.key: e.value.toJson()},
   };
 
   String encode() => jsonEncode({
@@ -434,6 +444,15 @@ final class RestoreSnapshot {
         }
         workspaces.add(SavedWorkspace(id: id, tabs: members));
       }
+      // V2-3 D14: the docks; a damaged one is dropped, never the file.
+      final toolDock = <String, ToolDockState>{};
+      if (root['toolDock'] case final Map<String, Object?> docks) {
+        for (final MapEntry(:key, :value) in docks.entries) {
+          if (key.isEmpty || key.length > _maxWorkspaceId) continue;
+          final dock = ToolDockState.tryParse(value);
+          if (dock != null && !dock.isDefault) toolDock[key] = dock;
+        }
+      }
       final selected = root['selectedTab'] as String?;
       return RestoreSnapshot(
         savedAt: savedAt,
@@ -445,6 +464,7 @@ final class RestoreSnapshot {
         workspaces: workspaces,
         tabs: tabs,
         aiTabs: aiTabs,
+        toolDock: toolDock,
       );
     } on Object {
       // FormatException, TypeError from a cast, ArgumentError from
