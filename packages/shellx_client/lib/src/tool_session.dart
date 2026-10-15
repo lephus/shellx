@@ -1080,10 +1080,15 @@ final class _WsStream extends _Stream {
   _WsStream(super.session, super.served, super.id, super.request);
 
   Socket? _socket;
-  WebSocket? _ws;
   ToolWsOut? _out;
   ToolWsIn? _in;
   ToolBytesIn? _refusal;
+
+  /// The upgraded socket toward the webview, from the moment the computer's
+  /// 101 is accepted: what comes before it is ready (pieces, the end and its
+  /// close code) waits in order in [_in] and in [_closeWebview], and goes
+  /// out once it is; a piece is acknowledged only once written.
+  Completer<WebSocket>? _ready;
 
   List<String> get _offered => [
     for (final value in request.headers['sec-websocket-protocol'] ?? const [])
@@ -1117,10 +1122,23 @@ final class _WsStream extends _Stream {
       reject();
       return;
     }
+    // The way to the webview exists from now on: a tool that speaks first
+    // (Vite's `connected`) has its message in the same batch as the 101.
+    final ready = _ready = Completer<WebSocket>();
+    ready.future.ignore(); // an upgrade that fails is told by abort()
+    _in = ToolWsIn(
+      write: (message) async {
+        final ws = await ready.future;
+        await ws.addStream(Stream.value(message));
+      },
+      onConsumed: (total) => link.acks.consumed(id, total),
+      maxMessage: session.maxWsMessage,
+    );
     unawaited(_upgrade(key, protocol));
   }
 
   Future<void> _upgrade(String key, String? protocol) async {
+    final ready = _ready!;
     final response = request.response
       ..statusCode = HttpStatus.switchingProtocols;
     session._addPolicy(response);
@@ -1135,26 +1153,18 @@ final class _WsStream extends _Stream {
     final Socket socket;
     try {
       socket = await response.detachSocket();
-    } on Object {
+    } on Object catch (error) {
+      ready.completeError(error);
       abort();
       return;
     }
-    if (done) {
-      socket.destroy();
-      return;
-    }
     _socket = socket;
-    final ws = _ws = WebSocket.fromUpgradedSocket(
+    final ws = WebSocket.fromUpgradedSocket(
       socket,
       protocol: protocol,
       serverSide: true,
     );
-    _in = ToolWsIn(
-      write: (message) => ws.addStream(Stream.value(message)),
-      onConsumed: (total) => link.acks.consumed(id, total),
-      maxMessage: session.maxWsMessage,
-    );
-    _out = ToolWsOut(
+    final out = _out = ToolWsOut(
       id: id,
       source: ws,
       window: window,
@@ -1171,6 +1181,11 @@ final class _WsStream extends _Stream {
         _socket?.destroy();
       },
     )..start();
+    // Ended meanwhile (the tool closed, the page was left): what came first
+    // still goes to the webview, then the close; nothing goes back, but the
+    // webview is still read so that the close handshake can finish.
+    if (done) out.discard();
+    ready.complete(ws);
   }
 
   /// The tool would not upgrade: the webview gets its answer as HTTP.
@@ -1216,15 +1231,23 @@ final class _WsStream extends _Stream {
     _closeWebview(code, null);
   }
 
+  /// Closes the webview's socket with [code] once it is ready and what came
+  /// before was written (at most 5 s more; then the socket is dropped).
   void _closeWebview(int? code, String? reason) {
-    final ws = _ws;
-    if (ws == null) return;
+    final ready = _ready;
+    if (ready == null) return;
     final valid = code != null && _sendable(code);
     unawaited(
-      (_in?.idle ?? Future<void>.value())
-          .timeout(const Duration(seconds: 5))
-          .then((_) => valid ? ws.close(code, reason) : ws.close())
-          .catchError((Object _) => _socket?.destroy()),
+      ready.future
+          .then<void>((ws) async {
+            await (_in?.idle ?? Future<void>.value()).timeout(
+              const Duration(seconds: 5),
+            );
+            await (valid ? ws.close(code, reason) : ws.close());
+          })
+          .catchError((Object _) {
+            _socket?.destroy();
+          }),
     );
   }
 
@@ -1264,7 +1287,7 @@ final class _WsStream extends _Stream {
       unawaited(session._answerEnd(this, message.code));
       return;
     }
-    if (_ws == null) {
+    if (_ready == null) {
       _refusal?.fail(const SocketException('cut'));
       return;
     }
@@ -1280,8 +1303,7 @@ final class _WsStream extends _Stream {
   void cut() {
     _out?.cancel();
     _refusal?.fail(const SocketException('cut'));
-    final ws = _ws;
-    if (ws != null) {
+    if (_ready != null) {
       _closeWebview(WebSocketStatus.goingAway, null);
     } else if (!responded) {
       unawaited(reply(HttpStatus.badGateway));
