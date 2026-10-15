@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -229,11 +230,14 @@ final class ToolProxy implements ToolEndpoint {
         (request.ws && request.method.toUpperCase() != 'GET')) {
       return refuse(ToolCode.badRequest);
     }
-    if (request.ws) return refuse(ToolCode.badRequest); // Task 6
-    if (phone.streams.length >= kToolMaxHttpStreams) {
+    final ws = phone.streams.values.whereType<_WsStream>().length;
+    final http = phone.streams.length - ws;
+    if (request.ws ? ws >= kToolMaxWsStreams : http >= kToolMaxHttpStreams) {
       return refuse(ToolCode.busy);
     }
-    final stream = _HttpStream(this, phone, tool, request);
+    final stream = request.ws
+        ? _WsStream(this, phone, tool, request)
+        : _HttpStream(this, phone, tool, request);
     phone.streams[id] = stream;
     _idleCheck ??= Timer.periodic(
       Duration(microseconds: max(1, idleTimeout.inMicroseconds ~/ 4)),
@@ -514,5 +518,233 @@ final class _HttpStream extends _Stream {
     _response?.cancel();
     _body?.fail(const SocketException('ended'));
     _upstream?.abort();
+  }
+}
+
+/// A WebSocket: the desktop makes its own upgrade to the tool (pinned like
+/// any request), then carries messages both ways.
+final class _WsStream extends _Stream {
+  _WsStream(super.proxy, super.phone, super.tool, super.request);
+
+  Socket? _socket;
+  WebSocket? _ws;
+  ToolWsOut? _out;
+  ToolWsIn? _in;
+  ToolBytesOut? _refusal;
+
+  @override
+  void start() => unawaited(_run());
+
+  Future<void> _run() async {
+    final key = base64Encode(
+      List<int>.generate(16, (_) => Random.secure().nextInt(256)),
+    );
+    final protocols = [
+      for (final value in toolHeadValues(
+        request.head,
+        'sec-websocket-protocol',
+      ))
+        for (final p in value.split(','))
+          if (p.trim().isNotEmpty) p.trim(),
+    ];
+    final HttpClientRequest upstream;
+    try {
+      upstream = await proxy._client.openUrl(
+        'GET',
+        toolUri(tool, request.target),
+      );
+    } on Object {
+      abort(ToolCode.refused);
+      return;
+    }
+    if (ended) {
+      upstream.abort();
+      return;
+    }
+    final HttpClientResponse response;
+    try {
+      upstream.followRedirects = false;
+      forwardRequestHead(
+        request.head,
+        tool,
+        alias: request.alias,
+        ws: true,
+      ).applyTo(upstream);
+      upstream.headers
+        ..set(HttpHeaders.connectionHeader, 'Upgrade')
+        ..set(HttpHeaders.upgradeHeader, 'websocket')
+        ..set('sec-websocket-key', key)
+        ..set('sec-websocket-version', '13');
+      response = await upstream.close().timeout(proxy.headTimeout);
+    } on TimeoutException {
+      abort(ToolCode.timeout);
+      return;
+    } on Object {
+      abort(ToolCode.aborted);
+      return;
+    }
+    if (ended) {
+      _drop(response);
+      return;
+    }
+    if (response.statusCode != HttpStatus.switchingProtocols) {
+      return _refused(response);
+    }
+    final protocol = response.headers.value('sec-websocket-protocol');
+    if (protocol != null && !protocols.contains(protocol)) {
+      _drop(response);
+      abort(ToolCode.aborted); // a protocol the webview did not offer
+      return;
+    }
+    final Socket socket;
+    try {
+      socket = await response.detachSocket();
+    } on Object {
+      abort(ToolCode.aborted);
+      return;
+    }
+    if (ended) {
+      socket.destroy();
+      return;
+    }
+    _socket = socket;
+    final ws = _ws = WebSocket.fromUpgradedSocket(
+      socket,
+      protocol: protocol,
+      serverSide: false,
+    );
+    send(
+      ToolResponse(
+        id: id,
+        status: HttpStatus.switchingProtocols,
+        head: [
+          if (protocol != null) ...['sec-websocket-protocol', protocol],
+        ],
+        end: false,
+      ),
+    );
+    _in = ToolWsIn(
+      write: (message) => ws.addStream(Stream.value(message)),
+      onConsumed: (total) => phone.acks.consumed(id, total),
+      maxMessage: proxy.maxWsMessage,
+    );
+    _out = ToolWsOut(
+      id: id,
+      source: ws,
+      window: window,
+      pacer: proxy.pacer,
+      send: send,
+      maxMessage: proxy.maxWsMessage,
+      onTooBig: () => _closeBoth(WebSocketStatus.messageTooBig, null),
+      onDone: () => _closed(ws.closeCode, ws.closeReason),
+    )..start();
+  }
+
+  /// The tool did not upgrade: the phone gets its answer as plain HTTP.
+  void _refused(HttpClientResponse response) {
+    final head = forwardResponseHead(
+      flatHeaders(response.headers),
+      tool,
+      alias: request.alias,
+    );
+    if (head == null) {
+      _drop(response);
+      abort(ToolCode.tooLarge);
+      return;
+    }
+    send(
+      ToolResponse(id: id, status: response.statusCode, head: head, end: false),
+    );
+    _refusal = ToolBytesOut(
+      id: id,
+      source: response,
+      window: window,
+      pacer: proxy.pacer,
+      send: send,
+      onError: (_) => abort(ToolCode.aborted),
+      onDone: _finish,
+    )..start();
+  }
+
+  /// The tool closed: the phone hears its code.
+  void _closed(int? code, String? reason) {
+    if (ended) return;
+    _finish();
+    release();
+    proxy._emit(phone, ToolEnd(id: id, wsCode: code, wsReason: reason));
+  }
+
+  /// Ends the stream with a close frame to the tool ([code], once what the
+  /// phone sent was written); the phone hears [code] too unless it closed
+  /// first ([tellPhone]).
+  void _closeBoth(int? code, String? reason, {bool tellPhone = true}) {
+    if (ended) return;
+    _finish();
+    _out?.discard(); // keep reading: the tool's close frame must come in
+    _refusal?.cancel();
+    _closeTool(code, reason);
+    if (tellPhone) {
+      proxy._emit(phone, ToolEnd(id: id, wsCode: code, wsReason: reason));
+    }
+  }
+
+  void _closeTool(int? code, String? reason) {
+    final ws = _ws;
+    if (ws == null) return;
+    final valid = code != null && _sendable(code);
+    unawaited(
+      (_in?.idle ?? Future<void>.value())
+          .timeout(const Duration(seconds: 5))
+          .then((_) => valid ? ws.close(code, reason) : ws.close())
+          .catchError((Object _) => _socket?.destroy()),
+    );
+  }
+
+  /// A close code an endpoint may send (RFC 6455 §7.4).
+  static bool _sendable(int code) =>
+      (code >= 1000 && code <= 1003) ||
+      (code >= 1007 && code <= 1011) ||
+      (code >= 3000 && code <= 4999);
+
+  @override
+  void onData(ToolData message) => abort(ToolCode.badRequest);
+
+  @override
+  void onWsMessage(ToolWsMessage message) {
+    final input = _in;
+    if (ended || input == null) return;
+    if (!input.add(message)) _closeBoth(WebSocketStatus.messageTooBig, null);
+  }
+
+  @override
+  void onPhoneEnd(ToolEnd message) {
+    if (ended) return;
+    if (message.code != null || _ws == null) {
+      abort(null);
+      return;
+    }
+    // The webview closed: the tool hears the same code once everything the
+    // phone sent was written.
+    _closeBoth(message.wsCode, _truncate(message.wsReason), tellPhone: false);
+  }
+
+  static String? _truncate(String? reason) {
+    if (reason == null) return null;
+    var out = reason;
+    while (utf8.encode(out).length > 123) {
+      out = out.substring(0, out.length - 1);
+    }
+    return out;
+  }
+
+  @override
+  bool acked(int total) =>
+      (_out?.onAck(total) ?? _refusal?.onAck(total)) ?? total == 0;
+
+  @override
+  void release() {
+    _out?.cancel();
+    _refusal?.cancel();
+    _socket?.destroy();
   }
 }
