@@ -52,16 +52,25 @@ final class AiPhoneImage with Redacted {
   final Uint8List bytes;
 }
 
-/// What a phone sends (V2-2 D7, V2-2b B12, B24): its text, and the images
-/// that go with it. The window makes the agent's blocks of it — the images
-/// base64 off the UI isolate (V2-1 D16) — and sends it as the phone's.
+/// What a phone sends (V2-2 D7, V2-2b B12, B13, B24): its text, and the
+/// images and files that go with it. The window makes the agent's blocks of
+/// it — the images base64 off the UI isolate, each file a `resource_link`,
+/// as the composer does (V2-1 D16) — and sends it as the phone's.
 final class AiPhonePrompt with Redacted {
-  const AiPhonePrompt(this.text, {this.images = const []});
+  const AiPhonePrompt(
+    this.text, {
+    this.images = const [],
+    this.files = const [],
+  });
 
   final String text;
 
   /// At most [kAiImagesMax], each whole and of a type ShellX sends.
   final List<AiPhoneImage> images;
+
+  /// V2-2b B13, R18: at most [kAiMaxPromptFiles] paths relative to the
+  /// session's folder, none leaving it; the window checks them again.
+  final List<String> files;
 }
 
 /// What a phone may do to a running session (V2-1a `AiRuntime`).
@@ -95,6 +104,11 @@ abstract interface class AiControl {
   /// (`session/list` from [cursor]); null when the agent does not offer it or
   /// did not answer.
   Future<ListSessionsResult?> listSessions({String? cursor});
+
+  /// V2-2b B13: at most eight files of the session's folder matching
+  /// [query], best first, as the composer's `@` offers them (paths relative
+  /// to the folder, `/` between their parts).
+  Future<List<String>> files(String query);
 }
 
 /// An [AiControl] will not do what a phone asks, for a reason of the
@@ -458,6 +472,7 @@ final class AiPhoneHub implements AiEndpoint {
     AiFeature.history,
     AiFeature.folder,
     AiFeature.blob,
+    AiFeature.files,
   };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
@@ -580,8 +595,8 @@ final class AiPhoneHub implements AiEndpoint {
         _configSet(mobileId, phone, message);
       case AiBlob():
         _blob(mobileId, message);
-      case AiFiles(:final rid):
-        _refuse(mobileId, rid);
+      case AiFiles():
+        _files(mobileId, phone, message);
       case AiItemPart():
         _fullItem(mobileId, phone, message);
       case AiHistory():
@@ -1284,7 +1299,8 @@ final class AiPhoneHub implements AiEndpoint {
               if (_blobs.take(mobileId, b) case final image?)
                 AiPhoneImage(aiImageMime(image.bytes)!, image.bytes),
           ];
-          if (!await control.send(AiPhonePrompt(p.text, images: images))) {
+          final prompt = AiPhonePrompt(p.text, images: images, files: p.files);
+          if (!await control.send(prompt)) {
             code = 'refused';
           }
         }
@@ -1297,17 +1313,21 @@ final class AiPhoneHub implements AiEndpoint {
     _send(mobileId, AiResult(rid: p.rid, ok: code == null, code: code), phone);
   }
 
-  /// Why [p] cannot go to [control]'s session now (V2-2 D7, V2-2b B12); null
-  /// when it can. Nothing is taken from the store here.
+  /// Why [p] cannot go to [control]'s session now (V2-2 D7, V2-2b B12, B13,
+  /// R18); null when it can. Nothing is taken from the store here.
   String? _promptRefusal(String mobileId, AiControl control, AiPrompt p) {
     final blobs = p.blobs;
+    final files = p.files;
     if (p.text.trim().isEmpty && blobs.isEmpty) return 'refused';
     if (utf8Length(p.text) > kAiMaxPromptBytes) return 'too_large';
     if (control.state.queue.length >= AiSessionState.maxQueue) {
       return 'queue_full';
     }
+    if (blobs.length > kAiImagesMax || files.length > kAiMaxPromptFiles) {
+      return 'too_large';
+    }
+    if (!files.every(_isRelativePath)) return 'refused';
     if (blobs.isEmpty) return null;
-    if (blobs.length > kAiImagesMax) return 'too_large';
     if (blobs.toSet().length != blobs.length) return 'refused';
     for (final b in blobs) {
       final image = _blobs.peek(mobileId, b);

@@ -19,6 +19,12 @@ final class FakeAiControl implements AiControl {
 
   /// Every prompt as it came (V2-2b: what a phone sends with its text).
   final prompts = <AiPhonePrompt>[];
+
+  /// V2-2b B13: the files `@` offers in the session's folder.
+  List<String> projectFiles = const [];
+
+  /// Every query [files] was asked.
+  final queries = <String>[];
   final permissions = <(int, String)>[];
   final asks = <(int, ElicitationResponse)>[];
   var cancels = 0;
@@ -52,6 +58,10 @@ final class FakeAiControl implements AiControl {
     if (gate != null) await gate.future;
     _fail();
     if (!accept) return false;
+    // V2-2b B13, R18: the window sends only files `@` offers.
+    if (prompt.files.any((f) => !projectFiles.contains(f))) {
+      throw const AiRefused('refused');
+    }
     sent.add(prompt.text);
     prompts.add(prompt);
     final blocks = [TextBlock(prompt.text)];
@@ -61,6 +71,16 @@ final class FakeAiControl implements AiControl {
       state.enqueue(blocks, source: PromptSource.phone);
     }
     return true;
+  }
+
+  /// V2-2b B13: every file containing [query] (the hub keeps eight).
+  @override
+  Future<List<String>> files(String query) async {
+    queries.add(query);
+    return [
+      for (final f in projectFiles)
+        if (f.contains(query)) f,
+    ];
   }
 
   @override

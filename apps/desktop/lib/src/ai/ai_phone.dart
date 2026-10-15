@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:path/path.dart' as p;
 import 'package:shellx_acp/shellx_acp.dart';
 // Not the terminal-sharing message of that name: the agents' readiness.
 import 'package:shellx_agent/shellx_agent.dart' hide AgentReady;
@@ -20,6 +22,7 @@ import '../ui/window_focus.dart';
 import 'ai_agents.dart';
 import 'ai_image_encode.dart';
 import 'ai_off_thread.dart';
+import 'ai_phone_files.dart';
 import 'ai_runtimes.dart';
 
 /// V2-2 D2: the window's AI sessions as the phone hub sees them, over
@@ -299,13 +302,19 @@ final class _RuntimeControl implements AiControl {
   @override
   AiSessionState get state => _runtime.state;
 
-  /// V2-2 D7, V2-2b B12, B24: what a phone sends, as the phone's — its text,
-  /// then its images as `image` blocks, base64 off the UI isolate when they
-  /// are many bytes, as the composer does (V2-1 D16). The agent's answer to
-  /// `initialize` may have come while they were encoded: one that takes no
-  /// images is sent none (`no_images`).
+  /// V2-2 D7, V2-2b B12, B13, B24: what a phone sends, as the phone's — its
+  /// text, then its images as `image` blocks, base64 off the UI isolate when
+  /// they are many bytes, then a `resource_link` for each file, as the
+  /// composer does (V2-1 D16). A file goes only when `@` offers it in the
+  /// session's folder now and it is there (R18): else nothing is sent
+  /// (`refused`). The agent's answer to `initialize` may have come while the
+  /// images were encoded: one that takes no images is sent none
+  /// (`no_images`), asked with no `await` before `send`.
   @override
   Future<bool> send(AiPhonePrompt prompt) async {
+    final links = prompt.files.isEmpty
+        ? const <ContentBlock>[]
+        : await _links(prompt.files);
     final images = prompt.images;
     final data = images.isEmpty
         ? const <String>[]
@@ -319,8 +328,42 @@ final class _RuntimeControl implements AiControl {
       if (prompt.text.trim().isNotEmpty) TextBlock(prompt.text),
       for (final (i, image) in images.indexed)
         ImageBlock(data: data[i], mimeType: image.mime),
+      ...links,
     ], source: PromptSource.phone);
   }
+
+  /// V2-2b B13, R18: a `resource_link` for each of [files] — once each —, as
+  /// the composer makes it (V2-1 D16); [AiRefused] (`refused`) for one `@`
+  /// does not offer in the session's folder now, one that leaves the folder,
+  /// or one that is not there.
+  Future<List<ContentBlock>> _links(List<String> files) async {
+    final state = _runtime.state;
+    final cwd = state.cwd;
+    final offered = {...await _ref.read(aiPhoneFileIndexProvider).files(state)};
+    final links = <ContentBlock>[];
+    for (final path in {...files}) {
+      final file = p.join(cwd, path);
+      if (!offered.contains(path) ||
+          !p.isWithin(p.normalize(cwd), p.normalize(file)) ||
+          !await File(file).exists()) {
+        throw const AiRefused('refused');
+      }
+      links.add(
+        ResourceLinkBlock(
+          uri: Uri.file(file).toString(),
+          name: p.basename(path),
+          title: path,
+        ),
+      );
+    }
+    return links;
+  }
+
+  /// V2-2b B13: the files of the session's folder matching [query], as the
+  /// composer's `@` offers them.
+  @override
+  Future<List<String>> files(String query) =>
+      _ref.read(aiPhoneFileIndexProvider).match(_runtime.state, query);
 
   @override
   void cancel() => _runtime.cancel();

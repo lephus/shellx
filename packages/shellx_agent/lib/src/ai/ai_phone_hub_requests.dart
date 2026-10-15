@@ -126,6 +126,31 @@ extension _AiPhoneRequests on AiPhoneHub {
     _send(mobileId, AiResult(rid: part.rid, ok: code == null, code: code));
   }
 
+  /// V2-2b B13: the files of [f]'s session folder matching its query, for
+  /// the phone's `@` — at most eight, best first, as the composer offers
+  /// them. A path the phone could not send back (R18, or over
+  /// [kAiMaxPathBytes] once in JSON: eight always fit one body) is left out.
+  void _files(String mobileId, _Phone phone, AiFiles f) => unawaited(
+    _ask(mobileId, phone, f.sid, f.rid, (c) async {
+      if (utf8Length(f.query) > _maxFileQueryBytes) {
+        return const _Reply.refuse('too_large');
+      }
+      final files = await c.files(f.query);
+      return _Reply.ok(
+        encodeBody({
+          'files': files
+              .where(
+                (path) =>
+                    _isRelativePath(path) &&
+                    utf8Length(jsonEncode(path)) <= kAiMaxPathBytes,
+              )
+              .take(_maxFilesShown)
+              .toList(),
+        }),
+      );
+    }),
+  );
+
   /// V2-2b B16, R14: slice [AiItemPart.part] of item [AiItemPart.index] in
   /// full. The item is made once per rev and kept for the phone's next
   /// slices ([_fullItemKeep], [_fullItemsPerPhone]) — for that very item
@@ -266,4 +291,30 @@ extension _AiPhoneRequests on AiPhoneHub {
     }
     _send(mobileId, AiResult(rid: f.rid, ok: code == null, code: code), phone);
   }
+}
+
+/// V2-2b B13: the longest `@` query a phone may ask (a token, not a text).
+const int _maxFileQueryBytes = 200;
+
+/// V2-2b B13: the most files one `ai.files` answers.
+const int _maxFilesShown = 8;
+
+final _drive = RegExp('^[A-Za-z]:');
+
+/// V2-2b R18: whether [path] names a file inside a session's folder as `@`
+/// offers it — relative, `/` between its parts and none of them empty, `.`
+/// or `..`, at most [kAiMaxPathBytes]. The window checks it again (offered,
+/// inside the folder, there).
+bool _isRelativePath(String path) {
+  if (path.isEmpty ||
+      utf8Length(path) > kAiMaxPathBytes ||
+      path.startsWith('/') ||
+      path.contains(r'\') ||
+      path.contains('\u0000') ||
+      _drive.hasMatch(path)) {
+    return false;
+  }
+  return path
+      .split('/')
+      .every((part) => part.isNotEmpty && part != '.' && part != '..');
 }

@@ -43,6 +43,9 @@ final class _Control implements AiControl {
   void answerAsk(int id, ElicitationResponse response) {}
 
   @override
+  Future<List<String>> files(String query) async => const [];
+
+  @override
   Future<void> setConfig(String id, Object value) async {}
 
   @override
