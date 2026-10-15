@@ -601,6 +601,31 @@ class FakeAiMachine implements AiMachine {
     modeSets.add((sid, modeId));
     await _request();
   }
+
+  /// V2-2b B16: what [fullItem] answers by item index (a missing one is `refused`); how many slices it
+  /// reports, and the gate each slice waits for when set (index 0: the first slice).
+  final Map<int, AiFullView> fullItems = {};
+  int fullParts = 1;
+  List<Completer<void>>? partGates;
+  final List<(String, int)> fullAsked = [];
+
+  /// Slices served, over every load.
+  int partsServed = 0;
+
+  @override
+  Future<AiFullView> fullItem(String sid, int index, {void Function(int part, int parts)? onPart}) async {
+    fullAsked.add((sid, index));
+    for (var part = 1; part <= fullParts; part++) {
+      final gates = partGates;
+      if (gates != null && gates.length >= part) await gates[part - 1].future;
+      await _request();
+      partsServed++;
+      onPart?.call(part, fullParts);
+    }
+    final view = fullItems[index];
+    if (view == null) throw const AiRequestException('refused');
+    return view;
+  }
 }
 
 /// Scriptable [ToolMachine] (V2-4): the list as a test sets it, and the pages it made.

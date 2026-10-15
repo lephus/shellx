@@ -330,6 +330,10 @@ final class _AiMachineAdapter implements AiMachine {
 
   @override
   Future<void> setMode(String sid, String modeId) => _ai.setMode(sid, modeId);
+
+  @override
+  Future<AiFullView> fullItem(String sid, int index, {void Function(int part, int parts)? onPart}) =>
+      _ai.fullItem(sid, index, onPart: onPart);
 }
 
 final class _AiSessionAdapter implements AiSessionHandle {

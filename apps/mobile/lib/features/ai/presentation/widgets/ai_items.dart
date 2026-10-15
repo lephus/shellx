@@ -6,6 +6,52 @@ import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_markdown.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
+/// What the conversation's items may ask of the page (V2-2b): an item in full ("Xem đủ", B16) and a turn's
+/// changes (B20). The page provides it around the conversation; a callback is null when the computer does not
+/// offer it, and the items then show nothing for it. Callbacks that stay the same (a page's own methods) keep
+/// the items from rebuilding.
+class AiItemActions extends InheritedWidget {
+  const AiItemActions({super.key, this.onViewAll, this.onChanges, required super.child});
+
+  /// B16: item [index] in full, on its own page.
+  final void Function(int index)? onViewAll;
+
+  /// B20: the changes of turn [turn].
+  final void Function(int turn)? onChanges;
+
+  static AiItemActions? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<AiItemActions>();
+
+  @override
+  bool updateShouldNotify(AiItemActions oldWidget) =>
+      oldWidget.onViewAll != onViewAll || oldWidget.onChanges != onChanges;
+}
+
+/// "Xem đủ" (V2-2b B16) under what the phone shows cut, or not at all: the whole item on its own page.
+/// Nothing when the computer does not offer it.
+class _ViewAll extends StatelessWidget {
+  const _ViewAll(this.index);
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = AiItemActions.maybeOf(context)?.onViewAll;
+    if (open == null) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        key: Key('ai.viewAll.$index'),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          minimumSize: const Size(44, 44),
+        ),
+        onPressed: () => open(index),
+        child: Text(S.of(context).aiViewAll),
+      ),
+    );
+  }
+}
+
 /// One conversation item on the phone (V2-2 §5.2). The timeline hands the very same widget to Flutter
 /// for as long as the item is the one the mirror holds (the mirror replaces an item when the desktop
 /// sends a newer rev), so it rebuilds only when the desktop changed it, and the state of its element
@@ -65,7 +111,7 @@ class _UserBubble extends StatelessWidget {
             children: [
               // Plain text: the timeline's one SelectionArea makes it selectable, without an editor of its own.
               Text(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
-              if (shown.cut || item.fullLength != null) _Hint(S.of(context).aiCutText),
+              if (shown.cut || item.fullLength != null) ...[_Hint(S.of(context).aiCutText), _ViewAll(item.index)],
               // V2-2b B24: written on a phone (this one or another), as the computer says too.
               if (item.fromPhone)
                 Padding(
@@ -89,7 +135,12 @@ class _AgentText extends StatelessWidget {
   final MirrorText item;
 
   @override
-  Widget build(BuildContext context) => AiMarkdown(text: item.text, truncated: item.fullLength != null);
+  Widget build(BuildContext context) {
+    final cut = item.fullLength != null || item.text.length > kShownAnswerChars;
+    final markdown = AiMarkdown(text: item.text, truncated: item.fullLength != null);
+    if (!cut) return markdown;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [markdown, _ViewAll(item.index)]);
+  }
 }
 
 /// Folded by default (V2-1 §4.2).
@@ -125,6 +176,8 @@ class _ThoughtState extends State<_Thought> {
           ),
         ),
         if (_open) AiMarkdown(text: widget.item.text, dim: true, truncated: widget.item.fullLength != null),
+        if (_open && (widget.item.fullLength != null || widget.item.text.length > kShownAnswerChars))
+          _ViewAll(widget.item.index),
       ],
     );
   }
@@ -160,6 +213,7 @@ class _AskLine extends StatelessWidget {
             item.status == 'auto_declined' ? s.aiAskUnsupported : status,
             style: context.typo.paragraph13.copyWith(color: item.open ? colors.warn : colors.secondaryText),
           ),
+          if (item.request == null) _ViewAll(item.index),
         ],
       ),
     );
@@ -255,7 +309,15 @@ class _OnComputer extends StatelessWidget {
   final MirrorUnknown item;
 
   @override
-  Widget build(BuildContext context) => _CardFrame(child: _Hint(AiWords.itemOnComputer(S.of(context), item)));
+  Widget build(BuildContext context) => _CardFrame(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Hint(AiWords.itemOnComputer(S.of(context), item)),
+        if (item.kind == 'big') _ViewAll(item.index),
+      ],
+    ),
+  );
 }
 
 class _Hint extends StatelessWidget {
@@ -381,6 +443,7 @@ class _AiToolCardState extends State<AiToolCard> {
                 padding: const EdgeInsets.only(top: 8),
                 child: _Mono(t.input!, maxChars: kShownInputChars),
               ),
+            if (hasBody) _ViewAll(t.index),
           ],
         ],
       ),
@@ -490,7 +553,6 @@ class _AiDiffViewState extends State<AiDiffView> {
     final colors = context.colors;
     final diff = widget.diff;
     final lines = _lines;
-    const mono = TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 12, height: 1.35);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -515,14 +577,7 @@ class _AiDiffViewState extends State<AiDiffView> {
                   for (final (i, l) in lines.indexed)
                     TextSpan(
                       text: '${l.mark} ${l.text}${i == lines.length - 1 ? '' : '\n'}',
-                      style: mono.copyWith(
-                        color: l.mark == ' ' ? colors.secondaryText : colors.primaryText,
-                        backgroundColor: switch (l.mark) {
-                          '+' => colors.okDot.withValues(alpha: 0.16),
-                          '-' => colors.error.withValues(alpha: 0.12),
-                          _ => null,
-                        },
-                      ),
+                      style: aiDiffLineStyle(context, l.mark),
                     ),
                 ],
               ),
@@ -532,6 +587,33 @@ class _AiDiffViewState extends State<AiDiffView> {
         if (_cut) _Hint(s.aiFromComputerOnly),
       ],
     );
+  }
+}
+
+/// The look of one diff line (V2-2 D6): context dimmed, a removed or added line on its colour.
+TextStyle aiDiffLineStyle(BuildContext context, String mark) {
+  final colors = context.colors;
+  return const TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 12, height: 1.35).copyWith(
+    color: mark == ' ' ? colors.secondaryText : colors.primaryText,
+    backgroundColor: switch (mark) {
+      '+' => colors.okDot.withValues(alpha: 0.16),
+      '-' => colors.error.withValues(alpha: 0.12),
+      _ => null,
+    },
+  );
+}
+
+/// One diff line on a row of its own (V2-2b B16: the full view builds only the rows on screen). A line
+/// longer than [kShownLineChars] is cut, "…" after it.
+class AiDiffLineRow extends StatelessWidget {
+  const AiDiffLineRow({super.key, required this.line});
+
+  final DiffLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = line.text.length > kShownLineChars ? '${line.text.substring(0, kShownLineChars)}…' : line.text;
+    return Text('${line.mark} $text', style: aiDiffLineStyle(context, line.mark));
   }
 }
 
