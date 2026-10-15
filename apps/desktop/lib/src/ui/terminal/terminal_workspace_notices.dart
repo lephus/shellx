@@ -17,6 +17,7 @@ import '../../terminal/global_search.dart' show GlobalHit;
 import '../../terminal/sidebar_workspaces.dart'
     show settingsStoreProvider, sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_dock.dart' show toolDockProvider;
 import '../../tools/tool_registry.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
@@ -155,7 +156,10 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   List<PaletteEntry> _moveEntries(AppLocalizations l10n) {
     final tabs = ref.read(terminalTabsProvider);
     final selected = tabs.selected;
-    if (selected == null) return const [];
+    // V2-3 R14: never the tab under a workspace shown without a tab.
+    if (selected == null || ref.read(toolDockProvider).loose != null) {
+      return const [];
+    }
     final side = ref.read(sidebarWorkspacesProvider);
     final here = side.workspaceOf(selected.id);
     PaletteEntry entry(String id, String title, Intent intent) => PaletteEntry(
@@ -241,6 +245,9 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     }
     ref.read(sidebarWorkspacesProvider.notifier).reveal(tab.id);
     ref.read(terminalTabsProvider.notifier).focusPane(hit.paneId);
+    // V2-3 R14: the hit's tab is chosen, maybe the one still selected under
+    // a workspace shown without a tab.
+    ref.read(toolDockProvider.notifier).clearLoose();
     final find = ref.read(findSessionsProvider.notifier).open(hit.paneId);
     if (find == null) {
       focusTerminal();
