@@ -5,11 +5,13 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   flutter_secure_storage_windows
+  fullscreen_window
   hotkey_manager_windows
   local_notifier
   pasteboard
   screen_retriever_windows
   tray_manager
+  webview_win_floating
   window_manager
 )
 

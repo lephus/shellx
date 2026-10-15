@@ -58,6 +58,8 @@ dependencies:
   # wkwebview 3.26+ needs Flutter 3.44 / Dart 3.12.
   webview_flutter: 4.14.1
   webview_flutter_wkwebview: 3.25.1
+  # V2-3 D7: WebView2 on Windows, a native window over the Flutter one.
+  webview_win_floating: 3.0.3
   win32: ^5.15.0
   window_manager: ^0.5.2
   # xterm 4.0.0 (same version as apps/mobile, A1 D12), vendored for one

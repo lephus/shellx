@@ -150,6 +150,8 @@ void main() {
       'new-tab-kind',
       'ai-agent-claude',
       'ai-checkpoint-days',
+      // V2-3.
+      'tool-embed',
     };
     final have = {
       for (final d in kSettings)
