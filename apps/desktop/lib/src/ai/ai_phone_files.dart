@@ -7,7 +7,10 @@ import 'ai_project_files.dart';
 
 /// V2-2b B13, R18: the files of a session's folder a phone may name with
 /// `@` — the project index the composer's `@` reads (V2-1 D16), read again
-/// once a turn ended since, kept for at most [keep] folders.
+/// once a turn ended since, kept for at most [keep] folders. A turn's number
+/// is its session's own (the composer keeps one index per pane): a read is
+/// fresh only for the session that made it, and another session in the
+/// folder reads it again (F37).
 final class AiPhoneFileIndex {
   AiPhoneFileIndex(this._project);
 
@@ -16,19 +19,29 @@ final class AiPhoneFileIndex {
   /// The folders whose index is kept at once.
   static const keep = 4;
 
-  /// Per folder, the least recently used first: its index, and the last turn
-  /// that had ended when it was read.
-  final _held = <String, ({int? turn, Future<List<String>> files})>{};
+  /// Per folder, the least recently used first: its index, the session that
+  /// read it (weakly: a closed session is not kept alive for it), and the
+  /// last turn that had ended in that session then.
+  final _held =
+      <
+        String,
+        ({
+          WeakReference<AiSessionState> state,
+          int? turn,
+          Future<List<String>> files,
+        })
+      >{};
 
   /// The files of [state]'s folder (relative, `/` between their parts).
   Future<List<String>> files(AiSessionState state) {
     final cwd = state.cwd;
     final turn = aiLastEndedTurn(state);
     final held = _held.remove(cwd);
-    final files = held != null && held.turn == turn
+    final files =
+        held != null && identical(held.state.target, state) && held.turn == turn
         ? held.files
         : _project.index(cwd).catchError((Object _) => const <String>[]);
-    _held[cwd] = (turn: turn, files: files);
+    _held[cwd] = (state: WeakReference(state), turn: turn, files: files);
     if (_held.length > keep) _held.remove(_held.keys.first);
     return files;
   }

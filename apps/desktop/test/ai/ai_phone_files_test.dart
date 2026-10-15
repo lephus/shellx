@@ -12,6 +12,8 @@ import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_desktop/src/ai/ai_phone.dart' show DesktopAiSource;
 import 'package:shellx_desktop/src/ai/ai_phone_files.dart';
 import 'package:shellx_desktop/src/ai/ai_project_files.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_changes_panel.dart'
+    show aiLastEndedTurn;
 
 import '../support/ai_phone_rig.dart';
 import '../support/ai_tabs.dart';
@@ -25,7 +27,8 @@ final _source = Provider<DesktopAiSource>((ref) {
   return source;
 });
 
-/// A project index that counts its reads (no disk).
+/// A project index that counts its reads (no disk). A read is what [paths]
+/// held then: a file added later is not in an earlier read.
 final class _Counting implements AiProjectFiles {
   _Counting(this.paths);
 
@@ -35,7 +38,7 @@ final class _Counting implements AiProjectFiles {
   @override
   Future<List<String>> index(String root) async {
     reads++;
-    return paths;
+    return [...paths];
   }
 
   @override
@@ -167,6 +170,34 @@ void main() {
     expect(project.reads, 2);
     s.cwd = '/other';
     await index.files(s);
+    expect(project.reads, 3);
+  });
+
+  test('F37: a folder read is fresh only for the session that read it: '
+      'another one there, whose own turn of the same number ended, reads the '
+      'folder again and offers its new file', () async {
+    final project = _Counting(['src/old.ts']);
+    final index = AiPhoneFileIndex(project);
+    AiSessionState session() =>
+        AiSessionState(agentId: 'claude', agentName: 'Claude', cwd: '/w');
+    void turn(AiSessionState s) => s
+      ..beginTurn([const TextBlock('x')], DateTime.utc(2026, 10, 15))
+      ..endTurn(outcome: TurnOutcome.finished, at: DateTime.utc(2026, 10, 15));
+    final a = session();
+    final b = session();
+    turn(a);
+    expect(await index.match(a, 'ts'), ['src/old.ts']);
+    expect(project.reads, 1);
+    // B's own turn 1 ends, having made a file: the number A's read was at.
+    project.paths.add('src/new.ts');
+    turn(b);
+    expect(aiLastEndedTurn(b), aiLastEndedTurn(a));
+    expect(await index.match(b, 'new'), ['src/new.ts']);
+    expect(project.reads, 2);
+    // A asks again: the folder's read is now B's, so A reads it once more,
+    // and then keeps it until its own next turn ends.
+    await index.files(a);
+    await index.files(a);
     expect(project.reads, 3);
   });
 }
