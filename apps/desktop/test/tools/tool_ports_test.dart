@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_ai/host.dart';
+import 'package:shellx_ai/testing.dart' show FakeScenario;
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart'
     show clockProvider;
@@ -19,6 +20,8 @@ import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tools/tool_ports.dart';
 import 'package:shellx_desktop/src/tools/tool_registry.dart';
 
+import '../cli/support/cli_container.dart';
+import '../support/ai_fakes.dart';
 import '../support/ai_tabs.dart';
 import '../support/fake_local_sessions.dart';
 
@@ -60,6 +63,46 @@ Future<bool> _until(bool Function() done) async {
     await Future<void>.delayed(const Duration(milliseconds: 25));
   }
   return done();
+}
+
+/// `AiHost.runtime` (packages/shellx_ai/lib/src/host/ai_host.dart) as
+/// `aiRuntimeFactoryProvider`'s copy of it was made (V2-3 R12). Update this
+/// only after the copy follows a change of the original.
+const _pinnedHostRuntime = r'''
+AiRuntime runtime({
+    required AgentSpec agent,
+    required String cwd,
+    String? resumeSessionId,
+    Map<String, Object> preferredConfig = const {},
+  }) => AiRuntime(
+    state: AiSessionState(agentId: agent.id, agentName: agent.name, cwd: cwd),
+    resolve: () async => resolver.resolve(agent, await env.resolve()),
+    launch: launch,
+    clientVersion: clientVersion,
+    checkpoints: () async => checkpoints.forProject(cwd, await env.resolve()),
+    resumeSessionId: resumeSessionId,
+    preferredConfig: preferredConfig,
+  );''';
+
+const _hostRuntimeChanged =
+    'AiHost.runtime changed (packages/shellx_ai/lib/src/host/ai_host.dart). '
+    'The copy in aiRuntimeFactoryProvider '
+    '(apps/desktop/lib/src/ai/ai_runtimes.dart) builds the runtime of every '
+    'desktop AI pane: bring it in step with AiHost.runtime first, and only '
+    'then update _pinnedHostRuntime in this test (V2-3 R12).';
+
+/// [text] with every run of white space (a line break, indentation, a
+/// Windows `\r\n`) as one space.
+String _squash(String text) => text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+/// `AiHost.runtime` in [source], from `AiRuntime runtime({` to its closing
+/// `);`, squashed; null when it is not there.
+String? _hostRuntimeIn(String source) {
+  final start = source.indexOf('AiRuntime runtime({');
+  if (start < 0) return null;
+  final end = source.indexOf(');', start);
+  if (end < 0) return null;
+  return _squash(source.substring(start, end + 2));
 }
 
 final class _Channel implements AgentChannel {
@@ -273,6 +316,55 @@ void main() {
         expect(logged, ['tool suggestions: scan failed (StateError)']);
       },
     );
+
+    test('a workspace is suggested its own terminals (an AI tab\'s too) and '
+        'its own agents\' servers, never another workspace\'s (D12)', () async {
+      final tabs = c.read(terminalTabsProvider.notifier);
+      final other = c
+          .read(sidebarWorkspacesProvider.notifier)
+          .createFor(name: 'Other');
+      // The default workspace: a terminal tab on 5173, and an AI tab whose
+      // agent (900) started a server on 4000 and which has a terminal pane
+      // on 6006.
+      await tabs.openTab();
+      final termA = local.summaries.single.id;
+      local.replace(local.summary(termA, ports: [5173]));
+      final aiA = openTestAiTab(c, title: 'a', cwd: '/w');
+      c.read(aiAgentPidsProvider).set(aiA.ai!.id, 900);
+      final paneA = await tabs.addAiTerminal(aiA.id);
+      probe.ports[60] = {6006};
+      probe.rows[60] = (parent: 1, name: 'storybook');
+      local.replace(local.summary(paneA, ports: [6006]));
+      // "Other": a terminal tab on 3000, and an AI tab whose agent (910)
+      // started a server on 4100.
+      final termB = await tabs.openTabFor(cwd: '/w', workspace: other);
+      probe.ports[30] = {3000};
+      probe.rows[30] = (parent: 1, name: 'python');
+      local.replace(local.summary(termB, ports: [3000]));
+      final aiB = openTestAiTab(c, title: 'b', cwd: '/w', workspace: other);
+      c.read(aiAgentPidsProvider).set(aiB.ai!.id, 910);
+      probe.ports[913] = {4100};
+      probe.rows[910] = (parent: 1, name: 'claude');
+      probe.rows[913] = (parent: 910, name: 'deno');
+
+      final sidebar = c.read(sidebarWorkspacesProvider);
+      expect(
+        sidebar.tabsOf(kDefaultWorkspaceId),
+        unorderedEquals([termA, aiA.id]),
+      );
+      expect(sidebar.tabsOf(other), unorderedEquals([termB, aiB.id]));
+      // As text: a suggestion prints as `ToolPortSuggestion(…)` (D24), which
+      // would not say which port leaked.
+      Future<String> suggested(String ws) async => [
+        for (final s in await c.read(toolPortSuggestionsProvider(ws).future))
+          '${s.port} ${s.process}',
+      ].join(', ');
+      expect(
+        await suggested(kDefaultWorkspaceId),
+        '4000 node, 5173 node, 6006 storybook',
+      );
+      expect(await suggested(other), '3000 python, 4100 deno');
+    });
   });
 
   test('recordingAgentPids keeps the pid while the agent runs', () async {
@@ -415,4 +507,38 @@ void main() {
       expect(pids.of(-2), isNull);
     },
   );
+
+  test('runtimeFor passes its pane to the factory, which keeps the agent\'s '
+      'pid for that pane (D12)', () {
+    final fakes = FakeAiRuntimes(const FakeScenario());
+    final c = cliContainer(FakeLocalSessions(), overrides: fakes.overrides);
+    final ai = openTestAiTab(c, cwd: testAiCwd);
+    final runtime = c.read(aiRuntimesProvider.notifier).runtimeFor(ai.ai!.id);
+    expect(runtime, isNotNull);
+    expect(fakes.requests.single.paneId, ai.ai!.id);
+  });
+
+  // AiRuntimes.runtimeFor always passes the pane, so aiRuntimeFactoryProvider
+  // builds every desktop AI pane's runtime from its own copy of
+  // AiHost.runtime, and `host.runtime(...)` is not reached. A change of the
+  // original must not go unseen.
+  test('AiHost.runtime is still the text the factory\'s copy was made from '
+      '(R12)', () {
+    // The tests run in apps/desktop; "/" works in a URI on Windows too.
+    final source = File.fromUri(
+      Directory.current.uri.resolve(
+        '../../packages/shellx_ai/lib/src/host/ai_host.dart',
+      ),
+    );
+    expect(
+      source.existsSync(),
+      isTrue,
+      reason: 'read from apps/desktop: ${source.path}',
+    );
+    expect(
+      _hostRuntimeIn(source.readAsStringSync()) ?? 'AiHost.runtime not found',
+      _squash(_pinnedHostRuntime),
+      reason: _hostRuntimeChanged,
+    );
+  });
 }
