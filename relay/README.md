@@ -121,9 +121,14 @@ Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
   1..4096 characters, platform `android` or `ios`) stores the phone's FCM token; a token registered
   again by another device moves to it. `DELETE /v1/devices/me/push-token` removes it. Logout removes
   it too, and deleting the account removes it with the device.
-- `POST /v1/notifications {title, body, data?}` (agents only): title 1..200, body 1..1000
-  characters, `data` at most 10 string values (FCM-reserved keys such as `from`, `google…`, `gcm…`
-  are refused with 400; the relay adds `agent_id`). Recipients are the phones with a pairing record
+- `POST /v1/notifications {title, body, data?, category?, tag?}` (agents only): title 1..200, body
+  1..1000 characters, `data` at most 10 string values (FCM-reserved keys such as `from`, `google…`,
+  `gcm…` are refused with 400; the relay adds `agent_id`). `category` (only `ai_perm`, an AI agent's
+  permission request: iOS shows the buttons the app registered for it, `apns.payload.aps.category`)
+  and `tag` (1..64 of `[A-Za-z0-9_.:-]`: `android.notification.tag`, so the Android app can put a
+  notification with buttons in its place) are optional; anything else in them is 400. The
+  `notification` block is always sent, so a phone that knows neither shows the push as before.
+  Recipients are the phones with a pairing record
   to this agent, a push token and a live sign-in. Answers `202 {sent}` after FCM answered for each;
   tokens FCM reports `UNREGISTERED`/`INVALID_ARGUMENT` are deleted; other FCM errors are logged by
   kind and not retried. 120 per agent per hour (`429 rate_limited`). 503 `push_unavailable` without

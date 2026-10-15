@@ -12,9 +12,17 @@ export const NOTIFICATION_DATA_MAX_KEYS = 10;
 export const NOTIFICATION_DATA_VALUE_MAX_CHARS = 256;
 /**
  * FCM refuses messages over 4096 bytes of payload; title + body + data keys and values (UTF-8)
- * stay under this, leaving room for `agent_id` and the rest of the message.
+ * stay under this, leaving room for `agent_id` and the rest of the message (a category and a tag
+ * below included: at most 7 + 64 bytes).
  */
 export const NOTIFICATION_MAX_PAYLOAD_BYTES = 3584;
+/**
+ * V2-2b B6: the categories a phone registers buttons for — iOS shows them when `aps.category` names
+ * one. `ai_perm`: an AI agent's permission request ("Từ chối" / "Cho phép").
+ */
+export const NOTIFICATION_CATEGORIES: readonly string[] = ["ai_perm"];
+/** V2-2b B6: an Android notification tag (a notification with the same tag takes its place). */
+const TAG = /^[A-Za-z0-9_.:-]{1,64}$/;
 const DATA_KEY = /^[a-z0-9_]{1,64}$/;
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
@@ -53,6 +61,15 @@ function parseData(value: unknown): Record<string, string> | null {
   return data;
 }
 
+/**
+ * V2-2b B6: an optional string of the body that must pass [valid]: undefined when it is absent (or
+ * null), null when it is there and does not pass (the request is refused).
+ */
+function parseOptional(value: unknown, valid: (text: string) => boolean): string | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  return typeof value === "string" && valid(value) ? value : null;
+}
+
 interface Recipient {
   device_id: string;
   token: string;
@@ -61,9 +78,12 @@ interface Recipient {
 export const notificationRoutes = new Hono<AppEnv>();
 
 /**
- * POST /v1/notifications {title, body, data?} — agents only (push spec §5). Sends one push to every
- * phone of the account that has a pairing record with this agent, a push token and a live sign-in.
- * `data` (at most 10 keys `[a-z0-9_]{1,64}`, string values ≤ 256 characters) is passed through with `agent_id` added by the relay.
+ * POST /v1/notifications {title, body, data?, category?, tag?} — agents only (push spec §5). Sends one
+ * push to every phone of the account that has a pairing record with this agent, a push token and a live
+ * sign-in. `data` (at most 10 keys `[a-z0-9_]{1,64}`, string values ≤ 256 characters) is passed through
+ * with `agent_id` added by the relay. V2-2b B6: `category` (one of [NOTIFICATION_CATEGORIES]) makes iOS
+ * show that category's buttons, `tag` (1..64 of `[A-Za-z0-9_.:-]`) is the Android notification's tag;
+ * both are optional, anything else in them is 400, and the notification itself is sent as before.
  * Answers `202 {sent}` once FCM has answered for every phone; tokens FCM reports as gone are deleted.
  * 503 `push_unavailable` when the relay has no Firebase configuration; 429 past 120 per agent per
  * hour (N10). 400 for anything FCM would refuse as a payload error (too large — title, body and
@@ -83,6 +103,9 @@ notificationRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
   if (!isWellFormed(title) || !isWellFormed(text)) throw Errors.badRequest();
   const data = parseData(body.data);
   if (data === null) throw Errors.badRequest();
+  const category = parseOptional(body.category, (value) => NOTIFICATION_CATEGORIES.includes(value));
+  const tag = parseOptional(body.tag, (value) => TAG.test(value));
+  if (category === null || tag === null) throw Errors.badRequest();
   const payloadBytes =
     utf8Bytes(title) + utf8Bytes(text) + Object.entries(data).reduce((n, [k, v]) => n + utf8Bytes(k) + utf8Bytes(v), 0);
   if (payloadBytes > NOTIFICATION_MAX_PAYLOAD_BYTES) throw Errors.badRequest();
@@ -99,7 +122,13 @@ notificationRoutes.post("/", requireAuth, jsonBodyLimit, async (c) => {
     auth.deviceId,
     c.get("now")() - TOKEN_IDLE_TTL_MS,
   );
-  const message = { title, body: text, data: { ...data, agent_id: auth.deviceId } };
+  const message = {
+    title,
+    body: text,
+    data: { ...data, agent_id: auth.deviceId },
+    ...(category === undefined ? {} : { category }),
+    ...(tag === undefined ? {} : { tag }),
+  };
   const results = await Promise.all(recipients.map((r) => push.send({ ...message, token: r.token })));
   let sent = 0;
   let removed = 0;

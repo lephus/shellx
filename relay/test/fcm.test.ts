@@ -133,6 +133,34 @@ describe("FcmClient", () => {
     });
   });
 
+  it("adds the iOS category and the Android tag of an AI permission push, and keeps the notification block (V2-2b B6)", async () => {
+    const f = fakeFetch();
+    const client = new FcmClient({ account: ACCOUNT, fetch: f.fn });
+    const data = { kind: "ai", ai_session: "k3f9za.-12", perm: "41", allow: "allow", reject: "reject" };
+    expect(await client.send({ ...MESSAGE, data, category: "ai_perm", tag: "ai-k3f9za--12-41" })).toBe("ok");
+    expect(JSON.parse(String(f.sends()[0]!.init.body))).toEqual({
+      message: {
+        token: "phone-token",
+        notification: { title: "Mac · Session 1", body: "✓ make · 45 s" },
+        data,
+        android: { priority: "high", notification: { tag: "ai-k3f9za--12-41" } },
+        apns: { payload: { aps: { sound: "default", category: "ai_perm" } } },
+      },
+    });
+  });
+
+  it("a tag without a category, or a category without a tag, adds only that key", async () => {
+    const f = fakeFetch();
+    const client = new FcmClient({ account: ACCOUNT, fetch: f.fn });
+    await client.send({ ...MESSAGE, tag: "t-1" });
+    await client.send({ ...MESSAGE, category: "ai_perm" });
+    const [tagOnly, categoryOnly] = f.sends().map((s) => JSON.parse(String(s.init.body)).message);
+    expect(tagOnly.android).toEqual({ priority: "high", notification: { tag: "t-1" } });
+    expect(tagOnly.apns).toEqual({ payload: { aps: { sound: "default" } } });
+    expect(categoryOnly.android).toEqual({ priority: "high" });
+    expect(categoryOnly.apns).toEqual({ payload: { aps: { sound: "default", category: "ai_perm" } } });
+  });
+
   it("caches the access token until a minute before it expires", async () => {
     const f = fakeFetch();
     let now = 1_800_000_000_000;

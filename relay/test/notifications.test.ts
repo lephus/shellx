@@ -201,6 +201,72 @@ describe("POST /v1/notifications", () => {
     expect(ok.status).toBe(202);
   });
 
+  it("passes an AI permission push's category and tag on (V2-2b B6), and adds neither when they are absent", async () => {
+    const push = new FakeGateway();
+    const app = makeApp({ push });
+    const account = await registerAccount(app);
+    const phone = await loginDevice(app, account, "mobile");
+    await pair(app, account.agent.token, phone.deviceId);
+    await setToken(app, phone, "t", "ios");
+    const ai = {
+      title: "MacBook · Claude",
+      body: "Cần bạn trả lời: Sửa src/main.ts",
+      data: { kind: "ai", ai_session: "k3f9za.-12", perm: "41", allow: "allow", reject: "reject" },
+      category: "ai_perm",
+      tag: "ai-k3f9za--12-41",
+    };
+    expect((await notify(app, account.agent.token, ai)).status).toBe(202);
+    expect(push.sent).toEqual([
+      {
+        token: "t",
+        title: ai.title,
+        body: ai.body,
+        data: { ...ai.data, agent_id: account.agent.deviceId },
+        category: "ai_perm",
+        tag: "ai-k3f9za--12-41",
+      },
+    ]);
+    expect((await notify(app, account.agent.token, { ...NOTE, category: null, tag: null })).status).toBe(202);
+    expect((await notify(app, account.agent.token, NOTE)).status).toBe(202);
+    expect(push.sent).toHaveLength(3);
+    for (const m of push.sent.slice(1)) {
+      expect("category" in m).toBe(false);
+      expect("tag" in m).toBe(false);
+    }
+  });
+
+  it("refuses a category it does not know and a tag that is not 1..64 of [A-Za-z0-9_.:-] (400, nothing sent)", async () => {
+    const push = new FakeGateway();
+    const app = makeApp({ push });
+    const account = await registerAccount(app);
+    const phone = await loginDevice(app, account, "mobile");
+    await pair(app, account.agent.token, phone.deviceId);
+    await setToken(app, phone, "t");
+    for (const extra of [
+      { category: "other" },
+      { category: "" },
+      { category: "AI_PERM" },
+      { category: 5 },
+      { category: ["ai_perm"] },
+      { tag: "" },
+      { tag: "t".repeat(65) },
+      { tag: "with space" },
+      { tag: "slash/tag" },
+      { tag: "é" },
+      { tag: 41 },
+      { tag: { t: "x" } },
+    ]) {
+      const res = await notify(app, account.agent.token, { ...NOTE, ...extra });
+      expect(res.status, JSON.stringify(extra)).toBe(400);
+      expect(await errorCode(res)).toBe("bad_request");
+    }
+    expect(push.sent).toEqual([]);
+    // The edges of the rule are fine.
+    for (const tag of ["t".repeat(64), "A-z_0.9:-", "ai-ep--1-0"]) {
+      expect((await notify(app, account.agent.token, { ...NOTE, tag })).status, tag).toBe(202);
+    }
+  });
+
   it("limits each agent (429 rate_limited from the notifyAgent limiter, keyed by device id)", async () => {
     const notifyAgent = new CountingLimiter(2);
     const app = makeApp({ push: new FakeGateway(), limiters: { ...unlimited, notifyAgent } });

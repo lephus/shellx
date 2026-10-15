@@ -7,6 +7,10 @@ export interface PushMessage {
   title: string;
   body: string;
   data: Readonly<Record<string, string>>;
+  /** V2-2b B6: the iOS category whose buttons the phone shows (`apns.payload.aps.category`). */
+  category?: string;
+  /** V2-2b B6: the Android notification tag (`android.notification.tag`): one with the same tag replaces it. */
+  tag?: string;
 }
 
 /**
@@ -143,10 +147,14 @@ export class FcmClient implements PushGateway {
         body: JSON.stringify({
           message: {
             token: message.token,
+            // Kept with a category and a tag too (V2-2b B6): an older phone, or one whose app never
+            // runs, shows this notification as before.
             notification: { title: message.title, body: message.body },
             data: message.data,
-            android: { priority: "high" },
-            apns: { payload: { aps: { sound: "default" } } },
+            android: message.tag === undefined ? { priority: "high" } : { priority: "high", notification: { tag: message.tag } },
+            apns: {
+              payload: { aps: message.category === undefined ? { sound: "default" } : { sound: "default", category: message.category } },
+            },
           },
         }),
         signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
