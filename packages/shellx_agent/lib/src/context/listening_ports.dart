@@ -136,6 +136,99 @@ int? ownerOf(int pid, Map<int, int> parents, Map<int, int> shellToSession) {
   return null;
 }
 
+/// V2-3 D12: one process of the table — its parent and its program's name.
+typedef ProgramRow = ({int parent, String name});
+
+final _controls = RegExp(r'[\x00-\x1f\x7f]');
+
+/// `pid ppid command` per line (`ps -axo pid=,ppid=,comm=`, and the CIM
+/// query of [WindowsPortProbe.processTable]). The command may hold spaces
+/// (a path): its base name is kept, without a Windows `.exe`, controls
+/// dropped, at most 64 characters. Never logged.
+Map<int, ProgramRow> parseProcessTable(String output) {
+  final result = <int, ProgramRow>{};
+  for (final line in const LineSplitter().convert(output)) {
+    final m = RegExp(r'^\s*(\d+)\s+(\d+)\s+(.+?)\s*$').firstMatch(line);
+    if (m == null) continue;
+    final base = m.group(3)!.split(RegExp(r'[\\/]')).last;
+    var name = base.replaceAll(_controls, '');
+    if (name.toLowerCase().endsWith('.exe')) {
+      name = name.substring(0, name.length - 4);
+    }
+    if (name.length > 64) name = name.substring(0, 64);
+    result[int.parse(m.group(1)!)] = (
+      parent: int.parse(m.group(2)!),
+      name: name,
+    );
+  }
+  return result;
+}
+
+/// V2-3 D12: the process table with program names, read on demand.
+abstract interface class ProcessTableProbe {
+  /// pid → parent and name. Throws [PortProbeException].
+  Future<Map<int, ProgramRow>> processTable();
+}
+
+/// V2-3 D12: a port a process under one of the roots listens on.
+typedef RootedPort = ({int port, int root, String name});
+
+/// V2-3 D12: the listening ports and the process table, read once, on
+/// demand (when "Add tool" opens) — never polled.
+final class ListeningScan {
+  const ListeningScan(this.listening, this.table);
+
+  /// Listening TCP ports by pid.
+  final Map<int, Set<int>> listening;
+
+  /// pid → parent and program name; empty when nothing listens.
+  final Map<int, ProgramRow> table;
+
+  static const empty = ListeningScan({}, {});
+
+  /// Reads the ports, then the table only when something listens. Throws
+  /// [PortProbeException].
+  static Future<ListeningScan> read(
+    PortProbe ports,
+    ProcessTableProbe table,
+  ) async {
+    final listening = await ports.listening();
+    if (listening.isEmpty) return empty;
+    return ListeningScan(listening, await table.processTable());
+  }
+
+  /// The program listening on [port] ('' when unknown).
+  String nameOf(int port) {
+    for (final MapEntry(key: pid, value: open) in listening.entries) {
+      if (open.contains(port)) return table[pid]?.name ?? '';
+    }
+    return '';
+  }
+
+  /// The ports that processes under [roots], or the roots themselves,
+  /// listen on — the dev server an AI agent started, which no session shell
+  /// owns. A2's attribution ([ownerOf]) with the roots standing in for
+  /// shells. One entry per port, sorted.
+  List<RootedPort> under(Set<int> roots) {
+    if (roots.isEmpty) return const [];
+    final parents = {for (final e in table.entries) e.key: e.value.parent};
+    final rootOf = {for (final r in roots) r: r};
+    final byPort = <int, RootedPort>{};
+    for (final MapEntry(key: pid, value: open) in listening.entries) {
+      final root = ownerOf(pid, parents, rootOf);
+      if (root == null) continue;
+      final name = table[pid]?.name ?? '';
+      for (final port in open) {
+        byPort.putIfAbsent(port, () => (port: port, root: root, name: name));
+      }
+    }
+    return [for (final port in byPort.keys.toList()..sort()) byPort[port]!];
+  }
+
+  @override
+  String toString() => 'ListeningScan(${listening.length})';
+}
+
 /// Where listening ports and the process tree come from.
 abstract interface class PortProbe {
   /// Listening TCP ports by pid. Throws [PortProbeException].
@@ -146,7 +239,7 @@ abstract interface class PortProbe {
 }
 
 /// macOS: `lsof` and `ps` (C3).
-final class MacPortProbe implements PortProbe {
+final class MacPortProbe implements PortProbe, ProcessTableProbe {
   MacPortProbe({TimedCommandRunner run = runWithTimeout}) : _run = run;
   final TimedCommandRunner _run;
   static const timeout = Duration(seconds: 2);
@@ -178,6 +271,18 @@ final class MacPortProbe implements PortProbe {
     }
     return parseParentTable(out.stdout);
   }
+
+  @override
+  Future<Map<int, ProgramRow>> processTable() async {
+    final out = await _run('/bin/ps', const [
+      '-axo',
+      'pid=,ppid=,comm=',
+    ], timeout: timeout);
+    if (out.exitCode != 0) {
+      throw PortProbeException('ps exited with code ${out.exitCode}');
+    }
+    return parseProcessTable(out.stdout);
+  }
 }
 
 /// Windows: `netstat -ano` for ports (fast), CIM through PowerShell for
@@ -185,7 +290,7 @@ final class MacPortProbe implements PortProbe {
 /// `wmic`: Windows 11 24H2 removed it (D7). Both run by absolute path
 /// under `%SystemRoot%\System32`, so a `netstat.exe` or `powershell.exe`
 /// earlier on `PATH` (or in the working directory) is never picked up.
-final class WindowsPortProbe implements PortProbe {
+final class WindowsPortProbe implements PortProbe, ProcessTableProbe {
   WindowsPortProbe({
     TimedCommandRunner run = runWithTimeout,
     Map<String, String>? environment,
@@ -227,6 +332,22 @@ final class WindowsPortProbe implements PortProbe {
       throw PortProbeException('powershell exited with code ${out.exitCode}');
     }
     return parseParentTable(out.stdout);
+  }
+
+  @override
+  Future<Map<int, ProgramRow>> processTable() async {
+    final out = await _run(_powerShell, const [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      r"Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name"
+          r" | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, "
+          r"$_.ParentProcessId, $_.Name }",
+    ], timeout: cimTimeout);
+    if (out.exitCode != 0) {
+      throw PortProbeException('powershell exited with code ${out.exitCode}');
+    }
+    return parseProcessTable(out.stdout);
   }
 }
 

@@ -21,6 +21,7 @@ final class AiRuntimeRequest {
     required this.cwd,
     this.resumeSessionId,
     this.preferredConfig = const {},
+    this.paneId,
   });
 
   final AgentSpec agent;
@@ -31,6 +32,10 @@ final class AiRuntimeRequest {
 
   /// D11: the remembered choices (never "Bypass permissions", R6).
   final Map<String, Object> preferredConfig;
+
+  /// V2-3 D12: the AI pane the runtime is for (its agent's pid is kept in
+  /// [aiAgentPidsProvider]); null: not kept.
+  final int? paneId;
 
   @override
   String toString() => '…';
@@ -73,21 +78,93 @@ final aiLabelReaderProvider = Provider<String? Function(AiSessionState state)>(
       (state) => state.label,
 );
 
+/// V2-3 D12: the pid of each AI pane's running agent — the root of the
+/// "servers this agent started" scan. Kept by the default runtime factory;
+/// runtimes over fakes leave it empty. Never logged.
+final class AiAgentPids {
+  final _byPane = <int, int>{};
+
+  int? of(int paneId) => _byPane[paneId];
+
+  void set(int paneId, int pid) => _byPane[paneId] = pid;
+
+  /// Only the agent it recorded: a newer agent of the pane stays.
+  void clear(int paneId, int pid) {
+    if (_byPane[paneId] == pid) _byPane.remove(paneId);
+  }
+
+  @override
+  String toString() => 'AiAgentPids(${_byPane.length})';
+}
+
+final aiAgentPidsProvider = Provider<AiAgentPids>((ref) => AiAgentPids());
+
+/// V2-3 D12: [inner], and the pid of each agent it starts kept for [paneId]
+/// until that agent exits. [pidOf] reads a channel's pid (an [AgentProcess]
+/// has one).
+AgentLauncher recordingAgentPids(
+  AgentLauncher inner,
+  AiAgentPids pids,
+  int paneId, {
+  int? Function(AgentChannel channel) pidOf = _pidOf,
+}) => (command, {required cwd}) async {
+  final channel = await inner(command, cwd: cwd);
+  final pid = pidOf(channel);
+  if (pid != null) {
+    pids.set(paneId, pid);
+    unawaited(
+      channel.exitCode.then(
+        (_) => pids.clear(paneId, pid),
+        onError: (Object _) => pids.clear(paneId, pid),
+      ),
+    );
+  }
+  return channel;
+};
+
+int? _pidOf(AgentChannel channel) =>
+    channel is AgentProcess ? channel.pid : null;
+
 /// Makes one AI pane's runtime. Tests swap it for runtimes over
 /// `FakeLauncher` (`test/support/ai_fakes.dart`): no process, no login
 /// shell, no git.
+///
+/// With a pane, it is `AiHost.runtime` (V2-1a) with one change: the agent's
+/// pid is kept for V2-3 D12 ([recordingAgentPids]). Keep the two in step.
 final aiRuntimeFactoryProvider =
-    Provider<AiRuntime Function(AiRuntimeRequest request)>(
-      (ref) =>
-          (r) => ref
-              .read(aiHostProvider)
-              .runtime(
-                agent: r.agent,
-                cwd: r.cwd,
-                resumeSessionId: r.resumeSessionId,
-                preferredConfig: r.preferredConfig,
-              ),
-    );
+    Provider<AiRuntime Function(AiRuntimeRequest request)>((ref) {
+      return (r) {
+        final host = ref.read(aiHostProvider);
+        final paneId = r.paneId;
+        if (paneId == null) {
+          return host.runtime(
+            agent: r.agent,
+            cwd: r.cwd,
+            resumeSessionId: r.resumeSessionId,
+            preferredConfig: r.preferredConfig,
+          );
+        }
+        return AiRuntime(
+          state: AiSessionState(
+            agentId: r.agent.id,
+            agentName: r.agent.name,
+            cwd: r.cwd,
+          ),
+          resolve: () async =>
+              host.resolver.resolve(r.agent, await host.env.resolve()),
+          launch: recordingAgentPids(
+            host.launch,
+            ref.read(aiAgentPidsProvider),
+            paneId,
+          ),
+          clientVersion: host.clientVersion,
+          checkpoints: () async =>
+              host.checkpoints.forProject(r.cwd, await host.env.resolve()),
+          resumeSessionId: r.resumeSessionId,
+          preferredConfig: r.preferredConfig,
+        );
+      };
+    });
 
 /// The runtime of every AI pane: made on first use, stopped when its pane
 /// goes, all stopped on quit. It also carries each runtime's news into the
@@ -187,6 +264,7 @@ class AiRuntimes extends Notifier<void> {
           ref.read(settingsStoreProvider),
           agent.id,
         ),
+        paneId: paneId,
       ),
     );
     _runtimes[paneId] = runtime;
