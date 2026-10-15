@@ -98,6 +98,11 @@ Set<String> v21Additions(String platform) => platform == 'mac'
     ? const {'shift+meta+65 norepeat -> NewAiSessionIntent'}
     : const {'ctrl+shift+65 norepeat -> NewAiSessionIntent'};
 
+/// V2-3 D10: "Show or hide tools" (⌘⇧B / Ctrl+Shift+B).
+Set<String> v23Additions(String platform) => platform == 'mac'
+    ? const {'shift+meta+62 norepeat -> ToggleToolsIntent'}
+    : const {'ctrl+shift+62 norepeat -> ToggleToolsIntent'};
+
 void main() {
   // No browser map: A6 is not merged ("browser pending A6").
   final maps =
@@ -129,7 +134,8 @@ void main() {
               .union(a10Additions(name))
               .union(a11Additions(name))
               .union(a11Changes(name))
-              .union(v21Additions(name)),
+              .union(v21Additions(name))
+              .union(v23Additions(name)),
         );
       });
     }

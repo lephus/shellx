@@ -21,6 +21,24 @@ class NewTerminalTabIntent extends Intent {
   const NewTerminalTabIntent();
 }
 
+/// V2-3 D10: ⌘⇧B / Ctrl+Shift+B, the AI header's tool button — show or
+/// hide the tool dock of the selected tab's workspace.
+class ToggleToolsIntent extends Intent {
+  const ToggleToolsIntent();
+}
+
+/// V2-3 D4, D21: "Add tool…" (palette, sidebar foot).
+class AddToolIntent extends Intent {
+  const AddToolIntent();
+}
+
+/// V2-3 D4: "Open tool: {name}" (palette; built by the window, one per
+/// tool).
+class OpenToolIntent extends Intent {
+  const OpenToolIntent(this.toolId);
+  final String toolId;
+}
+
 class CloseTabIntent extends Intent {
   const CloseTabIntent();
 }

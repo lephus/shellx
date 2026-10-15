@@ -265,6 +265,10 @@ final Map<String, ActionSpec> kActionSpecs = {
     ),
     const ActionSpec('next_region', ActionGroup.window, repeats: true),
     const ActionSpec('previous_region', ActionGroup.window, repeats: true),
+    // V2-3 D10: the tool dock (⌘⇧B / Ctrl+Shift+B); "Add tool…" has no
+    // default chord.
+    const ActionSpec('toggle_tools', ActionGroup.window),
+    const ActionSpec('add_tool', ActionGroup.window),
     const ActionSpec(
       'toggle_command_palette',
       ActionGroup.window,
@@ -360,6 +364,8 @@ Intent intentForAction(KeyAction a) => switch (a.name) {
   'new_tab' => const NewTabIntent(),
   'new_ai_session' => const NewAiSessionIntent(),
   'new_terminal_tab' => const NewTerminalTabIntent(),
+  'toggle_tools' => const ToggleToolsIntent(),
+  'add_tool' => const AddToolIntent(),
   'close_surface' => const CloseTabIntent(),
   'close_tab' => const CloseWholeTabIntent(),
   'reopen_closed' => const ReopenClosedIntent(),
@@ -444,5 +450,6 @@ String describeIntent(Intent i) => switch (i) {
   WorkspaceFontIntent(:final step, :final reset) =>
     reset ? 'WorkspaceFontIntent(reset)' : 'WorkspaceFontIntent($step)',
   RunUserCommandIntent(:final name) => 'RunUserCommandIntent($name)',
+  OpenToolIntent() => 'OpenToolIntent',
   _ => i.runtimeType.toString(),
 };
