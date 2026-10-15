@@ -187,6 +187,41 @@ final class AiFolderChoice with Redacted {
   }
 }
 
+/// V2-2b B1: what a window's hub does beyond V2-2a, named in its listing
+/// (`f`). A phone uses one only when the listing names it and the process
+/// that holds the relay reports `ai` 2 or more (`MachineAi.can`).
+abstract final class AiFeature {
+  /// `ai.config.get`, `ai.config`: mode, model and thinking (B11).
+  static const config = 'config';
+
+  /// `ai.blob` and `ai.prompt {blobs}`: images (B12).
+  static const blob = 'blob';
+
+  /// `ai.files` and `ai.prompt {files}`: `@` files (B13).
+  static const files = 'files';
+
+  /// `ai.changes`, `ai.diff`: a turn's or the session's changes (B19).
+  static const changes = 'changes';
+
+  /// `ai.revert`: undo a turn or the session (B19).
+  static const revert = 'revert';
+
+  /// `ai.item`: a big item in full (B16).
+  static const item = 'item';
+
+  /// `ai.history` and `ai.open {resume}`: earlier sessions (B17).
+  static const history = 'history';
+
+  /// `ai.folder`: a folder for a tab without one (B18).
+  static const folder = 'folder';
+
+  /// The window's pushes carry the answer buttons' data (B7).
+  static const pushAnswer = 'push_answer';
+
+  /// The mirror's header carries the agent's session id `acp` (B22).
+  static const acpHead = 'acp_head';
+}
+
 /// A desktop's AI sessions, and what a new one may use (`ai.list.result`).
 final class AiListing with Redacted {
   const AiListing({
@@ -195,6 +230,7 @@ final class AiListing with Redacted {
     this.agents = const [],
     this.folders = const [],
     this.defaultAgent,
+    this.features = const {},
   });
 
   /// No window serves AI (`available: false` on the envelope).
@@ -207,6 +243,10 @@ final class AiListing with Redacted {
   final List<AiFolderChoice> folders;
   final String? defaultAgent;
 
+  /// V2-2b B1: what the window's hub does beyond V2-2a ([AiFeature] words);
+  /// empty from an older one.
+  final Set<String> features;
+
   /// Sessions waiting for the user.
   int get needsInput =>
       sessions.where((s) => s.state == AiRemoteState.needsInput).length;
@@ -217,6 +257,8 @@ final class AiListing with Redacted {
     'agents': [for (final a in agents) a.toJson()],
     'folders': [for (final f in folders) f.toJson()],
     if (defaultAgent != null) 'default_agent': defaultAgent,
+    // Only when there is one: the body of a V2-2a hub stays as it was.
+    if (features.isNotEmpty) 'f': [...features]..sort(),
   };
 
   static AiListing fromJson(
@@ -230,5 +272,6 @@ final class AiListing with Redacted {
     agents: [for (final a in jMaps(j, 'agents')) ?AiAgentChoice.fromJson(a)],
     folders: [for (final f in jMaps(j, 'folders')) ?AiFolderChoice.fromJson(f)],
     defaultAgent: jString(j, 'default_agent'),
+    features: {...jStrings(j, 'f')},
   );
 }

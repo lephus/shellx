@@ -10,13 +10,18 @@ import 'client_types.dart';
 
 /// A request of the AI session failed on the computer (`ai.result` with
 /// [code]: `stale`, `refused`, `queue_full`, `too_large`, `busy`,
-/// `not_found`, `unavailable`, or a newer word). It also ends a request that
-/// was in flight when the computer closed the session (`not_found` for a tab
-/// that closed, `unavailable` when the window quit): no `ai.result` comes
-/// then.
+/// `not_found`, `unavailable`, `on_computer`, and since V2-2b `no_images`,
+/// `confirm`, `busy_turn`, `not_ready`, `undo_off`, `too_big`, or a newer
+/// word). It also ends a request that was in flight when the computer closed
+/// the session (`not_found` for a tab that closed, `unavailable` when the
+/// window quit): no `ai.result` comes then. `unsupported` (V2-2b R15): this
+/// phone did not send it, the computer cannot take it. [body]: what the
+/// computer said with the code (V2-2b B4, a `confirm`'s files, say), when it
+/// was a JSON object; never in [toString].
 final class AiRequestException implements Exception {
-  const AiRequestException(this.code);
+  const AiRequestException(this.code, {this.body});
   final String code;
+  final Map<String, Object?>? body;
 
   @override
   String toString() => 'AiRequestException($code)';
@@ -226,6 +231,7 @@ final class MachineAi {
   final Future<void> Function() _connect;
   final Duration _timeout;
   bool? _supported;
+  int? _protocol;
   AiListing? _listing;
   final _listings = StreamController<AiListing>.broadcast(sync: true);
   var _watching = false;
@@ -244,6 +250,21 @@ final class MachineAi {
   /// Whether the computer has AI sessions for phones (`ai` in
   /// `session.list.result`); null before the first desktop list.
   bool? get supported => _supported;
+
+  /// V2-2b B1: the `ai` protocol the computer's relay process reported in
+  /// its last `session.list.result` — 1: V2-2a (or a V2-2b window behind a
+  /// V2-2a background service, which drops what it cannot read); 2: V2-2b.
+  /// Null before the first desktop list, or from a computer without AI for
+  /// phones.
+  int? get protocol => _protocol;
+
+  /// V2-2b B1 (R3): whether this phone may use [feature] (an `AiFeature`
+  /// word) now: the computer's relay process speaks `ai` 2 or more, so
+  /// whatever lies between the phone and the window passes V2-2b messages
+  /// on, and the window's last listing names it. With either missing, the
+  /// feature's buttons do not show and its requests fail at once (R15).
+  bool can(String feature) =>
+      (_protocol ?? 0) >= 2 && (_listing?.features.contains(feature) ?? false);
 
   /// The last listing; null before the first one.
   AiListing? get listing => _listing;
@@ -357,6 +378,7 @@ final class MachineAi {
   void noteListResult(SessionListResult result) {
     final ai = result.ai;
     _supported = ai != null && ai >= 1;
+    _protocol = ai;
   }
 
   @internal
@@ -521,7 +543,29 @@ final class MachineAi {
         );
       },
     );
-    if (!result.ok) throw AiRequestException(result.code ?? 'refused');
+    if (!result.ok) {
+      throw AiRequestException(
+        result.code ?? 'refused',
+        body: decodeBody(result.body),
+      );
+    }
     return result;
+  }
+
+  /// A V2-2b request of [feature] (R15): when the computer cannot take it
+  /// ([can] is false) it fails at once with `unsupported`, sending nothing;
+  /// else it goes like every request, and its [AiResult] (with its
+  /// [AiResult.body]) is the caller's to read.
+  // The first feature's request (V2-2b Task 10) is its first caller.
+  // ignore: unused_element
+  Future<AiResult> _feature(
+    String feature,
+    String? sid,
+    AiMessage Function(int rid) make,
+  ) {
+    if (!can(feature)) {
+      return Future.error(const AiRequestException('unsupported'));
+    }
+    return _request(sid, make);
   }
 }

@@ -283,10 +283,12 @@ final class AiPhoneHub implements AiEndpoint {
     this.pushEvery = const Duration(seconds: 30),
     this.ackGrace = const Duration(seconds: 10),
     this.overdueAfter = const Duration(seconds: 60),
+    Set<String>? features,
   }) : _source = source,
        _push = push,
        _now = now ?? DateTime.now,
-       epoch = epoch ?? _newEpoch() {
+       epoch = epoch ?? _newEpoch(),
+       features = features ?? offered {
     _changes = source.changes.listen((_) => _rescan(), onError: (Object _) {});
     _rescan();
   }
@@ -294,6 +296,14 @@ final class AiPhoneHub implements AiEndpoint {
   final AiSessionSource _source;
   final AiPushSink? _push;
   final DateTime Function() _now;
+
+  /// V2-2b B1: what this hub does beyond V2-2a ([AiFeature] words), named in
+  /// every listing (`f`). Each feature's task adds its word when the hub and
+  /// the window both do it.
+  static const Set<String> offered = {};
+
+  /// What this hub's listings name ([offered]; a test may say otherwise).
+  final Set<String> features;
 
   /// Starts every session id of this hub: ids of another run are unknown.
   final String epoch;
@@ -848,6 +858,7 @@ final class AiPhoneHub implements AiEndpoint {
           agents: _source.agents,
           folders: _source.folders,
           defaultAgent: _source.defaultAgent,
+          features: features,
         ),
       );
     } on Object {
@@ -879,7 +890,8 @@ final class AiPhoneHub implements AiEndpoint {
     while (size > kAiRecordBytes) {
       final longest = parts.reduce((a, b) => b.bytes > a.bytes ? b : a);
       if (longest.entries.isEmpty) {
-        return jsonEncode(const AiListing().toJson()); // nothing left to cut
+        // Nothing left to cut; what the hub does still goes.
+        return jsonEncode(AiListing(features: listing.features).toJson());
       }
       size -= longest.dropLast();
     }
@@ -889,6 +901,7 @@ final class AiPhoneHub implements AiEndpoint {
         agents: agents.entries,
         folders: folders.entries,
         defaultAgent: listing.defaultAgent,
+        features: listing.features,
       ).toJson(),
     );
   }

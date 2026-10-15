@@ -43,7 +43,13 @@ final class TestKeys {
 /// have their pairing recorded on the relay (as after the agent's
 /// `POST /v1/pairings`).
 final class Harness {
-  Harness(this.async, this.keys, {bool paired = true, this.ai}) {
+  Harness(
+    this.async,
+    this.keys, {
+    bool paired = true,
+    this.ai,
+    this.aiProtocol = kAiProtocol,
+  }) {
     agentDevice = relay.addDevice(
       id: agentId,
       userId: userId,
@@ -106,6 +112,10 @@ final class Harness {
   /// V2-2: the agent's AI endpoint; null: an agent without AI for phones
   /// (every older desktop).
   final AiEndpoint? ai;
+
+  /// V2-2b B1: the `ai` the agent's router reports with [ai]: 1 plays a
+  /// V2-2a desktop, or a V2-2b window behind a V2-2a background service.
+  final int aiProtocol;
   final relay = FakeRelay();
   final agentEvents = <AgentEvent>[];
   DateTime now = DateTime.utc(2026, 9, 25, 12);
@@ -161,6 +171,7 @@ final class Harness {
       desktop: desktop,
       desktopSharing: () => desktopSharing,
       ai: ai,
+      aiProtocol: aiProtocol,
     );
     agent = AgentService(
       relay: RelayConnection(

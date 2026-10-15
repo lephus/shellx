@@ -27,10 +27,12 @@ final class SessionRouter implements AgentSessions {
     required DesktopSessionManager desktop,
     required bool Function() desktopSharing,
     AiEndpoint? ai,
+    int aiProtocol = kAiProtocol,
   }) : _shells = shells,
        _desktop = desktop,
        _desktopSharing = desktopSharing,
-       _ai = ai {
+       _ai = ai,
+       _aiProtocol = aiProtocol {
     shells.receivesDriver = _receivesDriver;
     _subscriptions.addAll([
       shells.outbound.listen(_outbound.add),
@@ -44,6 +46,10 @@ final class SessionRouter implements AgentSessions {
   /// V2-2 D1: where `ai.*` messages go; null: this agent has no AI for
   /// phones (they are ignored, `session.list.result` carries no `ai`).
   final AiEndpoint? _ai;
+
+  /// V2-2b B1: the `ai` this router reports with an endpoint — the
+  /// [kAiProtocol] of this process; a test plays an older desktop with 1.
+  final int _aiProtocol;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
 
@@ -89,7 +95,7 @@ final class SessionRouter implements AgentSessions {
             desktopSharing: desktop ? _desktopSharing() : null,
             // V2-2 D3: only to a phone that knows `desktop` (a new decoder);
             // an older one skips the key anyway.
-            ai: desktop && _ai != null ? kAiProtocol : null,
+            ai: desktop && _ai != null ? _aiProtocol : null,
           ),
         );
       case AiMessage():
