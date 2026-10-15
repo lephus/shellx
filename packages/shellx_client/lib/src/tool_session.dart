@@ -99,10 +99,38 @@ const List<Duration> kToolRetryDelays = [
 
 const _webSocketGuid = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+const _policyHeader = 'content-security-policy';
+
 /// RFC 6455: the `Sec-WebSocket-Accept` for [key].
 String webSocketAccept(String key) => base64Encode(
   const DartSha1().hashSync(utf8.encode('$key$_webSocketGuid')).bytes,
 );
+
+/// The top-level CSP ruling: the one `Content-Security-Policy` the phone's
+/// server adds to every response of a tool page, for [ports] (every port it
+/// serves for that page: the tool's own or its alias P′ (E3), and the other
+/// tools of its workspace (E4)), deduplicated and in ascending order.
+///
+/// Cookies ignore ports: the webview would send the gate cookie (and the
+/// tool's own cookies) to any `localhost` port a page asks for, and an app
+/// on the phone listening there would get the secret (spec §9 Review Focus
+/// 5). The policy keeps every subresource, fetch, WebSocket, frame, worker
+/// and form of the page on the served ports, on `https:`/`wss:` (a
+/// localhost certificate fails before a cookie is sent), and on `data:` and
+/// `blob:`. `'unsafe-inline' 'unsafe-eval'` keep dev servers working (Vite's
+/// inline preamble, eval source maps); a tool's own, stricter policy still
+/// applies beside it. Never `upgrade-insecure-requests`.
+String toolContentSecurityPolicy(Iterable<int> ports) {
+  final served = ports.toSet().toList()..sort();
+  return [
+    "default-src 'self'",
+    for (final q in served) 'http://localhost:$q ws://localhost:$q',
+    "https: wss: data: blob: 'unsafe-inline' 'unsafe-eval';",
+    "form-action 'self'",
+    for (final q in served) 'http://localhost:$q',
+    'https:',
+  ].join(' ');
+}
 
 /// V2-4 E2, E3, E11, E13: the phone's side of one open tool. It serves the
 /// tool (and the other tools of its workspace, E4) on this phone's loopback
@@ -598,8 +626,9 @@ final class ToolSession {
     if (!fresh) return _answer(request, HttpStatus.forbidden);
     _nonce = null; // one time only
     final to = uri.queryParameters['to'] ?? '/';
-    final response = request.response
-      ..statusCode = HttpStatus.seeOther
+    final response = request.response..statusCode = HttpStatus.seeOther;
+    _addPolicy(response);
+    response
       ..headers.set(HttpHeaders.locationHeader, isToolTarget(to) ? to : '/')
       ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
       ..headers.set('referrer-policy', 'no-referrer')
@@ -612,11 +641,26 @@ final class ToolSession {
     await response.close().catchError((Object _) => response);
   }
 
+  /// The top-level CSP ruling: ShellX's one policy on [response], for the
+  /// ports served at the moment its head is written (a tool served after
+  /// the page loaded is reachable from it after a reload). Each policy is a
+  /// line of its own, never folded into a tool's (browsers enforce each):
+  /// call it before a tool's headers are copied, which only ever `add`.
+  void _addPolicy(HttpResponse response) {
+    response.headers
+      ..noFolding(_policyHeader)
+      ..add(
+        _policyHeader,
+        toolContentSecurityPolicy([for (final served in _servers) served.port]),
+      );
+  }
+
   /// Answers [request] here, with [text] as a plain body when given.
   Future<void> _answer(HttpRequest request, int status, [String? text]) async {
     final response = request.response;
     try {
       response.statusCode = status;
+      _addPolicy(response);
       response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
       if (text == null) {
         response.contentLength = 0;
@@ -808,6 +852,7 @@ final class _HttpStream extends _Stream {
       return;
     }
     response.statusCode = status;
+    session._addPolicy(response); // before the tool's own (CSP ruling)
     int? length;
     for (var i = 0; i + 1 < message.head.length; i += 2) {
       final name = message.head[i];
@@ -929,7 +974,9 @@ final class _WsStream extends _Stream {
 
   Future<void> _upgrade(String key, String? protocol) async {
     final response = request.response
-      ..statusCode = HttpStatus.switchingProtocols
+      ..statusCode = HttpStatus.switchingProtocols;
+    session._addPolicy(response);
+    response
       ..headers.set(HttpHeaders.connectionHeader, 'Upgrade')
       ..headers.set(HttpHeaders.upgradeHeader, 'websocket')
       ..headers.set('sec-websocket-accept', webSocketAccept(key))
@@ -981,6 +1028,7 @@ final class _WsStream extends _Stream {
   /// The tool would not upgrade: the webview gets its answer as HTTP.
   void _refused(ToolResponse message) {
     final response = request.response..statusCode = message.status;
+    session._addPolicy(response); // before the tool's own (CSP ruling)
     for (var i = 0; i + 1 < message.head.length; i += 2) {
       final name = message.head[i];
       final value = message.head[i + 1];

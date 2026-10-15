@@ -12,6 +12,40 @@ import 'support/tool_pipe.dart';
 
 const _id = 'k3f9za7q1m';
 
+/// The head of the answer to [lines] (one HTTP/1.1 request) on a raw socket
+/// to 127.0.0.1:[port], line by line as it was sent: the status line, then
+/// each header line (`name: value`).
+Future<List<String>> _rawHead(int port, List<String> lines) async {
+  final socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
+  final bytes = <int>[];
+  final head = Completer<void>();
+  final subscription = socket.listen(
+    (chunk) {
+      bytes.addAll(chunk);
+      final text = String.fromCharCodes(bytes);
+      if (text.contains('\r\n\r\n') && !head.isCompleted) head.complete();
+    },
+    onError: (Object _) {},
+    onDone: () {
+      if (!head.isCompleted) head.complete();
+    },
+  );
+  socket.write('${lines.join('\r\n')}\r\n\r\n');
+  await head.future.timeout(const Duration(seconds: 5));
+  await subscription.cancel();
+  socket.destroy();
+  final text = String.fromCharCodes(bytes);
+  final end = text.indexOf('\r\n\r\n');
+  return (end < 0 ? text : text.substring(0, end)).split('\r\n');
+}
+
+/// The `Content-Security-Policy` lines of a raw [head], one per line.
+List<String> _policies(List<String> head) => [
+  for (final line in head.skip(1))
+    if (line.toLowerCase().startsWith('content-security-policy:'))
+      line.substring(line.indexOf(':') + 1).trim(),
+];
+
 /// V2-4 E2, E3, E4, E11, E13, §8: the phone's loopback server for one open
 /// tool, with real sockets: a tool, the desktop's proxy, the phone's
 /// session, and a webview stand-in.
@@ -23,6 +57,9 @@ void main() {
   late Webview webview;
   late List<ToolPageEvent> events;
 
+  /// Whether the test opened a page (the policy's own test opens none).
+  var opened = false;
+
   /// The tool on [::1] only and the proxy reaching [::1] only, so the phone
   /// can hold 127.0.0.1 on the tool's own port (one machine plays both).
   Future<void> openSamePort({
@@ -30,6 +67,7 @@ void main() {
     List<Map<String, Object?>> Function(TestTool tool)? catalog,
     List<Duration> retry = kToolRetryDelays,
   }) async {
+    opened = true;
     tool = await TestTool.start(
       routes: routes,
       address: InternetAddress.loopbackIPv6,
@@ -55,6 +93,8 @@ void main() {
       Uri.parse('http://localhost:${port ?? session.servedPort}$path');
 
   tearDown(() async {
+    if (!opened) return;
+    opened = false;
     await session.close();
     webview.close();
     proxy.close();
@@ -191,6 +231,7 @@ void main() {
 
   test('the tool\'s port is taken on the phone: another port, and the '
       'desktop rewrites Host and Origin (E3)', () async {
+    opened = true;
     tool = await TestTool.start(); // on 127.0.0.1: the phone cannot have it
     proxy = ToolProxy();
     proxy.serve(catalogOf([tool.entry()]));
@@ -427,5 +468,189 @@ void main() {
       const ToolServing(id: _id, port: 1, path: '/secret').toString(),
       'ToolServing(…)',
     );
+  });
+
+  /// Top-level ruling (CSP): the policy keeps a page's requests on the ports
+  /// this phone serves, so the gate cookie (cookies ignore ports) never
+  /// reaches another app listening on a localhost port (RF 5).
+  group('the page\'s Content-Security-Policy (CSP ruling)', () {
+    test('the policy: every served port ascending, http and ws; deduplicated; '
+        'never upgrade-insecure-requests', () {
+      expect(
+        toolContentSecurityPolicy([8000, 5173]),
+        "default-src 'self' http://localhost:5173 ws://localhost:5173 "
+        'http://localhost:8000 ws://localhost:8000 https: wss: data: blob: '
+        "'unsafe-inline' 'unsafe-eval'; form-action 'self' "
+        'http://localhost:5173 http://localhost:8000 https:',
+      );
+      expect(
+        toolContentSecurityPolicy([5173, 8000, 5173]),
+        toolContentSecurityPolicy([8000, 5173]),
+      );
+      expect(
+        toolContentSecurityPolicy(const []),
+        "default-src 'self' https: wss: data: blob: 'unsafe-inline' "
+        "'unsafe-eval'; form-action 'self' https:",
+      );
+      expect(
+        toolContentSecurityPolicy([8000, 5173]),
+        isNot(contains('upgrade-insecure-requests')),
+      );
+    });
+
+    test('the gate\'s own answers carry exactly one: 403 without the cookie, '
+        'the entry\'s 303, 403 for another Host, 404 under /__shellx/, '
+        '431', () async {
+      await openSamePort();
+      final policy = toolContentSecurityPolicy([session.servedPort!]);
+      final noCookie = await webview.request(at('/'));
+      expect(noCookie.status, 403);
+      expect(noCookie.headers['content-security-policy'], [policy]);
+      final entry = await webview.request(
+        events.whereType<ToolLoad>().single.url,
+      );
+      expect(entry.status, 303);
+      expect(entry.headers['content-security-policy'], [policy]);
+      final rebinding = await webview.request(
+        at('/'),
+        headers: {'host': 'evil.com:${session.servedPort}'},
+      );
+      expect(rebinding.status, 403);
+      expect(rebinding.headers['content-security-policy'], [policy]);
+      final reserved = await webview.request(at('/__shellx/other'));
+      expect(reserved.status, 404);
+      expect(reserved.headers['content-security-policy'], [policy]);
+      final big = await webview.request(
+        at('/'),
+        headers: {'x-big': 'x' * (kToolMaxHeadBytes + 1)},
+      );
+      expect(big.status, 431);
+      expect(big.headers['content-security-policy'], [policy]);
+    });
+
+    test('a forwarded answer: ShellX\'s policy once, and the tool\'s own '
+        'beside it, unchanged, never merged', () async {
+      const own = "default-src 'none'; img-src 'self'";
+      await openSamePort(
+        routes: {
+          '/strict': (request) async {
+            request.response
+              ..headers.set('content-security-policy', own)
+              ..write('strict');
+            await request.response.close();
+          },
+        },
+      );
+      final policy = toolContentSecurityPolicy([session.servedPort!]);
+      final page = await webview.enter(events.whereType<ToolLoad>().single.url);
+      expect(page.status, 200);
+      expect(page.headers['content-security-policy'], [policy]);
+      final strict = await webview.request(at('/strict'));
+      expect(strict.status, 200);
+      expect(strict.text, 'strict');
+      expect(strict.headers['content-security-policy'], [policy, own]);
+    });
+
+    test('a WebSocket\'s 101 and an upgrade the tool refuses carry exactly '
+        'one', () async {
+      await openSamePort();
+      final port = session.servedPort!;
+      final policy = toolContentSecurityPolicy([port]);
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      List<String> upgrade(String path) => [
+        'GET $path HTTP/1.1',
+        'host: localhost:$port',
+        'connection: Upgrade',
+        'upgrade: websocket',
+        'sec-websocket-version: 13',
+        'sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==',
+        'origin: http://localhost:$port',
+        'cookie: ${webview.cookieHeader}',
+      ];
+      final opened = await _rawHead(port, upgrade('/ws'));
+      expect(opened.first, startsWith('HTTP/1.1 101'));
+      expect(_policies(opened), [policy]);
+      // RFC 6455 §1.3's example key and accept.
+      expect(
+        opened,
+        contains('sec-websocket-accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo='),
+      );
+      final refused = await _rawHead(port, upgrade('/page'));
+      expect(refused.first, startsWith('HTTP/1.1 200'));
+      expect(_policies(refused), [policy]);
+    });
+
+    test('an answer the phone gives after a stream started (a refused port: '
+        '502) carries exactly one', () async {
+      await openSamePort(retry: const [Duration(seconds: 30)]);
+      final policy = toolContentSecurityPolicy([session.servedPort!]);
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      await tool.server.close(force: true);
+      final failed = await webview.request(at('/'));
+      expect(failed.status, 502);
+      expect(failed.headers['content-security-policy'], [policy]);
+    });
+
+    test('alias mode (E3): the policy names the alias P′, never the tool\'s '
+        'port P', () async {
+      opened = true;
+      tool = await TestTool.start(); // on 127.0.0.1: the phone cannot have it
+      proxy = ToolProxy();
+      proxy.serve(catalogOf([tool.entry()]));
+      pipe = ToolPipe(proxy);
+      session = ToolSession(
+        tool: _id,
+        port: tool.port,
+        path: '/',
+        link: pipe.tools,
+      );
+      events = [];
+      session.events.listen(events.add);
+      webview = Webview();
+      session.start();
+      await until(() => events.whereType<ToolLoad>().isNotEmpty);
+      final alias = session.alias!;
+      final expected = toolContentSecurityPolicy([alias]);
+      final entry = await webview.request(
+        events.whereType<ToolLoad>().single.url,
+      );
+      expect(entry.headers['content-security-policy'], [expected]);
+      final page = await webview.request(at('/'));
+      expect(page.status, 200);
+      expect(page.headers['content-security-policy'], [expected]);
+      final sources = expected.split(RegExp('[ ;]+'));
+      expect(
+        sources,
+        containsAll(['http://localhost:$alias', 'ws://localhost:$alias']),
+      );
+      expect(sources, isNot(contains('http://localhost:${tool.port}')));
+      expect(sources, isNot(contains('ws://localhost:${tool.port}')));
+    });
+
+    test('with another tool of the workspace served (E4): both ports, '
+        'ascending', () async {
+      final api = await TestTool.start(address: InternetAddress.loopbackIPv6);
+      addTearDown(api.close);
+      await openSamePort(
+        catalog: (tool) => [
+          tool.entry(host: '[::1]'),
+          api.entry(id: 'api0000001', name: 'API', host: '[::1]'),
+        ],
+      );
+      expect(session.origins, hasLength(2));
+      final ports = [tool.port, api.port]..sort();
+      final lo = ports.first;
+      final hi = ports.last;
+      final policy =
+          "default-src 'self' http://localhost:$lo ws://localhost:$lo "
+          'http://localhost:$hi ws://localhost:$hi https: wss: data: blob: '
+          "'unsafe-inline' 'unsafe-eval'; form-action 'self' "
+          'http://localhost:$lo http://localhost:$hi https:';
+      final page = await webview.enter(events.whereType<ToolLoad>().single.url);
+      expect(page.headers['content-security-policy'], [policy]);
+      final fromApi = await webview.request(at('/v1', port: api.port));
+      expect(fromApi.status, 200);
+      expect(fromApi.headers['content-security-policy'], [policy]);
+    });
   });
 }
