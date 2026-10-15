@@ -13,6 +13,7 @@ import '../../config/shellx_config.dart';
 import '../../terminal/pane_paste.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../../terminal/user_commands.dart';
+import '../../tools/tool_dock.dart' show toolDockProvider;
 import 'terminal_intents.dart';
 import 'terminal_workspace_notices.dart' show A9Overlay;
 import '../settings/update_check_ui.dart';
@@ -73,11 +74,17 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     }) => WindowAction<I>(body, enabled);
     return <Type, Action<Intent>>{
       // The whole tab, every pane (A3 D6's row ×), not only the focused one.
-      CloseWholeTabIntent: run<CloseWholeTabIntent>((_) {
-        closePanel();
-        final selected = ref.read(terminalTabsProvider).selected;
-        if (selected != null) unawaited(closeTab(selected));
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      // V2-3 R14: never the tab under a workspace shown without a tab.
+      CloseWholeTabIntent: run<CloseWholeTabIntent>(
+        (_) {
+          closePanel();
+          final selected = ref.read(terminalTabsProvider).selected;
+          if (selected != null) unawaited(closeTab(selected));
+        },
+        enabled: (_) =>
+            ref.read(terminalTabsProvider).selected != null &&
+            ref.read(toolDockProvider).loose == null,
+      ),
       ReloadConfigIntent: run<ReloadConfigIntent>((_) {
         closePanel();
         unawaited(ref.read(shellxConfigProvider.notifier).load(manual: true));

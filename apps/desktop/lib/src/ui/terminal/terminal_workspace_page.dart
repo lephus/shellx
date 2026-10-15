@@ -32,6 +32,7 @@ import '../../terminal/terminal_font_size.dart';
 import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
 import '../../tools/tool_dock.dart';
+import '../../tools/tool_dock_state.dart' show toolDockLayout;
 import '../../tools/tool_embed.dart';
 import '../../tools/tool_keys.dart';
 import '../../tools/tool_pages.dart';
@@ -93,6 +94,10 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// its own: with no tab at all, the panes' empty state under it holds
   /// [emptyFocus].
   final looseFocus = FocusNode(debugLabel: 'open new tab (tools)');
+
+  /// The content area (the panes and the dock): its width decides whether
+  /// a dock fits beside the panes (§8).
+  final _toolAreaKey = GlobalKey(debugLabel: 'tool area');
   final sidebarScroll = ScrollController();
 
   late final _tools = ToolActions(ref);
@@ -161,6 +166,26 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         }
       })
       ..ensureVisualUpdate();
+  }
+
+  /// V2-3 §8: a content area too narrow for the dock beside the panes shows
+  /// it only expanded, so a dock the window has just opened opens expanded
+  /// there (its bar, and Restore, are on screen only then). Decided on the
+  /// width last laid out: never during a layout.
+  void _expandIfNarrow() {
+    final box = _toolAreaKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final ws = _tools.currentWorkspace();
+    final dock = ref.read(toolDockProvider).of(ws);
+    final embedded = ref.read(toolsEmbeddedProvider);
+    bool shows(bool zoom) => toolDockLayout(
+      width: box.size.width,
+      dock: dock.copyWith(zoom: zoom),
+      embedded: embedded,
+    ).showsDock;
+    if (shows(true) && !shows(false)) {
+      ref.read(toolDockProvider.notifier).setZoom(ws, true);
+    }
   }
 
   /// V2-3 D4: a workspace shown without a tab: no pane command applies.
@@ -534,18 +559,24 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       }, enabled: _isSplit),
       // A11 D20: swap, break and move panes. No default keys; the pane
       // menu, the palette and `keybind` reach them.
-      SwapPaneIntent: run<SwapPaneIntent>((intent) {
-        closePanel();
-        if (tabs.swapFocusedPane(intent.direction)) {
-          focusTerminal();
-          _announceFocusedPane();
-        }
-      }, enabled: (intent) => tabs.canSwapFocusedPane(intent.direction)),
+      // V2-3 R14: like the other pane and tab commands, nothing of the tab
+      // under a workspace shown without a tab.
+      SwapPaneIntent: run<SwapPaneIntent>(
+        (intent) {
+          closePanel();
+          if (tabs.swapFocusedPane(intent.direction)) {
+            focusTerminal();
+            _announceFocusedPane();
+          }
+        },
+        enabled: (intent) =>
+            !_loose && tabs.canSwapFocusedPane(intent.direction),
+      ),
       TogglePinTabIntent: run<TogglePinTabIntent>((_) {
         final tab = ref.read(terminalTabsProvider).selected;
         if (tab == null) return;
         tabs.setMeta(tab.id, (m) => m.copyWith(pinned: !m.pinned));
-      }),
+      }, enabled: (_) => !_loose),
       BreakPaneIntent: run<BreakPaneIntent>((_) {
         closePanel();
         final tab = ref.read(terminalTabsProvider).selected;
@@ -561,14 +592,18 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         } on PaneNoRoomException {
           tabs.showNotice(const PaneNoRoomNotice());
         }
-      }, enabled: (intent) => _joinTarget(intent) != null),
-      MoveTabToWorkspaceIntent: run<MoveTabToWorkspaceIntent>((intent) {
-        closePanel();
-        final tab = ref.read(terminalTabsProvider).selected;
-        if (tab == null) return;
-        workspaces.moveTab(tab.id, intent.workspaceId);
-        focusTerminal();
-      }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      }, enabled: (intent) => !_loose && _joinTarget(intent) != null),
+      MoveTabToWorkspaceIntent: run<MoveTabToWorkspaceIntent>(
+        (intent) {
+          closePanel();
+          final tab = ref.read(terminalTabsProvider).selected;
+          if (tab == null) return;
+          workspaces.moveTab(tab.id, intent.workspaceId);
+          focusTerminal();
+        },
+        enabled: (_) =>
+            !_loose && ref.read(terminalTabsProvider).selected != null,
+      ),
       // R14: a step chooses a tab whenever one is in sight (the same one,
       // with a single tab).
       NextTabIntent: run<NextTabIntent>((_) {
@@ -601,6 +636,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           if (!mounted) return;
           switch (result) {
             case ToolToggle.opened:
+              _expandIfNarrow();
               _focusDock();
             case ToolToggle.closed:
               focusTerminal();
@@ -616,14 +652,20 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         unawaited(() async {
           final tool = await _tools.add(context, _tools.currentWorkspace());
           if (tool == null || !mounted) return;
-          if (await _tools.open(tool.id) && mounted) _focusDock();
+          if (await _tools.open(tool.id) && mounted) {
+            _expandIfNarrow();
+            _focusDock();
+          }
         }());
       }),
       // V2-3 D4: the sidebar's rows, the palette, Settings › Projects.
       OpenToolIntent: run<OpenToolIntent>((intent) {
         closePanel();
         unawaited(() async {
-          if (await _tools.open(intent.toolId) && mounted) _focusDock();
+          if (await _tools.open(intent.toolId) && mounted) {
+            _expandIfNarrow();
+            _focusDock();
+          }
         }());
       }),
       ToggleNotificationsPanelIntent: run<ToggleNotificationsPanelIntent>(
@@ -701,6 +743,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       FocusHistoryIntent: run<FocusHistoryIntent>((i) {
         closePanel();
         if (ref.read(focusHistoryProvider.notifier).go(back: i.back)) {
+          _tabChosen(); // R14: maybe the tab under a loose workspace
           focusTerminal();
           _announceFocusedPane();
         }
@@ -1008,9 +1051,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       if (current == null || current is FocusScopeNode) focusTerminal();
     });
     // A notification click, the panel, next unread (A4): the keyboard to
-    // the selected tab's terminal; an open panel closes.
+    // the selected tab's terminal; an open panel closes. V2-3 R14: they
+    // choose that tab, maybe the one under a workspace shown without a tab.
     ref.listen<int>(terminalFocusRequestProvider, (_, _) {
       closePanel(restoreFocus: false);
+      _tabChosen();
       focusTerminal();
     });
     _buildShortcuts(
@@ -1127,6 +1172,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       Expanded(
         // V2-3 D3: the tool dock is a third column, beside the panes.
         child: ToolArea(
+          key: _toolAreaKey,
           dockFocus: toolDockFocus,
           covered: covered,
           onChord: _onToolChord,

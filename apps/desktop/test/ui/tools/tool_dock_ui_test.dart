@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/browser/browser_engine.dart';
 import 'package:shellx_desktop/src/config/keybind_trigger.dart';
+import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tools/tool_dock.dart';
+import 'package:shellx_desktop/src/tools/tool_pages.dart';
 import 'package:shellx_desktop/src/ui/terminal/key_sequence.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_intents.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
@@ -149,6 +152,7 @@ void main() {
     expect(rig.engines[tool.id]!.disposed, isFalse, reason: 'D5');
     await chord(LogicalKeyboardKey.keyB, shift: true);
     expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(rig.engines[tool.id]!.loads, hasLength(1), reason: 'RF1');
     await chord(LogicalKeyboardKey.keyW);
     expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
     expect(rig.engines[tool.id]!.disposed, isTrue);
@@ -341,18 +345,64 @@ void main() {
   );
 
   testWidgets('a click on the row of the tab still selected under a '
-      'workspace shown without a tab ends it: the panes show again (R14, '
-      'D4)', (t) async {
+      'workspace shown without a tab ends it: the panes show again; until '
+      'then no pane or tab command reaches that tab (R14, D4)', (t) async {
     await rig.pump(t);
+    final tabs = rig.container.read(terminalTabsProvider.notifier);
+    final first = rig.container.read(terminalTabsProvider).selectedId!;
+    await tabs.openTab();
+    await t.pumpAndSettle();
+    await tabs.split(SplitAxis.row);
+    await t.pumpAndSettle();
     final under = rig.container.read(terminalTabsProvider).selectedId!;
     final ws = rig.container
         .read(sidebarWorkspacesProvider.notifier)
         .createFor(name: 'B');
     final tool = rig.add(ws, 'localhost:1');
     await t.pumpAndSettle();
+    // The selected tab's pane and tab commands, each one applicable here
+    // (a split tab, another tab, another workspace).
+    final commands = <Intent>[
+      const SwapPaneIntent(PaneDirection.left),
+      JoinPaneIntent(tabId: first),
+      MoveTabToWorkspaceIntent(ws),
+      const TogglePinTabIntent(),
+      const CloseWholeTabIntent(),
+    ];
+    bool enabled(Intent intent) => Actions.find<Intent>(
+      t.element(find.byType(ToolArea)),
+      intent: intent,
+    ).isEnabled(intent);
+    Future<void> palette() async {
+      await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyP);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).last, 'Move');
+      await t.pumpAndSettle();
+    }
+
+    Future<void> closePalette() async {
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+    }
+
+    expect(commands.where(enabled), hasLength(commands.length));
+    await palette();
+    expect(find.text('Move tab to B'), findsOneWidget);
+    await closePalette();
+
     await openTool(t, tool.id);
     expect(find.byKey(const Key('tool.loose')), findsOneWidget);
     expect(rig.container.read(terminalTabsProvider).selectedId, under);
+    // R14: nothing of the covered tab is reachable meanwhile.
+    expect(commands.where(enabled), isEmpty);
+    await palette();
+    expect(find.text('Move tab to B'), findsNothing);
+    expect(find.textContaining('Move pane to tab'), findsNothing);
+    await closePalette();
     // The same tab again: no selection change for the dock to hear.
     await t.tap(find.byKey(ValueKey('tab.$under')));
     await t.pumpAndSettle();
@@ -365,6 +415,93 @@ void main() {
       reason: 'the whole content area is the panes again',
     );
     expect(rig.engines[tool.id]!.disposed, isFalse, reason: 'D5: kept');
+    expect(commands.where(enabled), hasLength(commands.length));
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('a jump to the tab still selected under a workspace shown '
+      'without a tab (a notification, ⌘⇧U) ends it: the panes show (R14, '
+      'D4)', (t) async {
+    await rig.pump(t);
+    final under = rig.container.read(terminalTabsProvider).selectedId!;
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final tool = rig.add(ws, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    expect(find.byKey(const Key('tool.loose')), findsOneWidget);
+    expect(
+      rig.container.read(tabAttentionProvider.notifier).jumpTo(under),
+      isTrue,
+    );
+    await t.pumpAndSettle();
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    expect(find.byKey(const Key('tool.loose')), findsNothing);
+    expect(t.getRect(find.byKey(const ValueKey('tool.panesSlot'))).width, 879);
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    expect(page.terminalFocus.hasFocus, isTrue);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('a window too narrow for the dock beside the panes opens it '
+      'expanded; Restore hides it again and the panes show (§8)', (t) async {
+    await rig.pump(t);
+    t.view.physicalSize = const Size(800, 800);
+    await t.pumpAndSettle();
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(
+      t.getRect(find.byKey(const ValueKey('tool.dockSlot'))),
+      t.getRect(find.byType(ToolArea)),
+      reason: 'the whole 579 px content area',
+    );
+    final engine = rig.engines[tool.id]!;
+    expect(engine.loads, [Uri.parse('http://localhost:1/')]);
+    expect(engine.calls, contains('focus'));
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    expect(t.getRect(find.byKey(const ValueKey('tool.panesSlot'))).width, 579);
+    expect(engine.disposed, isFalse, reason: 'D5: kept');
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('Review Focus 1: another workspace\'s tab and back keep the '
+      'same page — one engine, one load, no reload (§10)', (t) async {
+    await rig.pump(t);
+    final a = rig.container.read(terminalTabsProvider).selectedId!;
+    final side = rig.container.read(sidebarWorkspacesProvider.notifier);
+    final ws = side.createFor(name: 'B');
+    await side.openTabIn(ws);
+    await t.pumpAndSettle();
+    final b = rig.container.read(terminalTabsProvider).selectedId!;
+    expect(rig.container.read(sidebarWorkspacesProvider).workspaceOf(b), ws);
+    final tabs = rig.container.read(terminalTabsProvider.notifier);
+    tabs.select(a);
+    await t.pumpAndSettle();
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:5173');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    final engine = rig.engines[tool.id]!;
+    tabs.select(b);
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    tabs.select(a);
+    await t.pumpAndSettle();
+    expect(rig.made, 1);
+    expect(engine.disposed, isFalse);
+    expect(engine.loads, hasLength(1));
+    expect(engine.calls, isNot(contains('reload')));
+    expect(find.byKey(Key('browser.fakeView.${tool.id}')), findsOneWidget);
+    expect(
+      rig.container.read(toolPagesProvider.notifier).existing(tool.id)!.shown,
+      isTrue,
+    );
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
