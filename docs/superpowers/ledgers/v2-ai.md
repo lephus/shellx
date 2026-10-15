@@ -96,3 +96,7 @@ Ruling R20 (B23): a push sid this app run saw in a listing, which the current li
 Ruling R21 (B9): Android re-draws only a push that came with an `ai-` tag (only the relay of Task 7 sets it); through an older relay the push stays as FCM drew it, without buttons, never twice — cost if wrong: Android buttons wait for the relay deploy, like iOS's.
 Ruling R22 (B16): "Xem đủ" shows on every open tool card with a body, since the mirror cuts a call's input without a flag — cost if wrong: the button sometimes loads what is already shown.
 Ruling R23 (B12, §7): images lost with the channel are uploaded again by the next tap on Send, which then sends the prompt; nothing is uploaded or sent by itself — cost if wrong: the upload starts at the tap, not when the channel returns.
+
+## V2-2b — execution
+
+- Relay B6 (Task 7) on `v2-2b-relay` at `c6cf495`, not deployed: merging it to `main` deploys the relay, so it waits for the user's approval.
