@@ -45,16 +45,21 @@ class ToolSidebarGroup extends ConsumerWidget {
   static const double _header = 24;
   static const double _row = 36;
 
+  static double _headerHeight(TextScaler scaler) =>
+      math.max(_header, scaler.scale(13) + 8);
+
+  /// A row holds two text lines — the name (`small`, 16 px) over the
+  /// `host:port` (`caption`, 14 px) — and 3 px above and below: 36 px at
+  /// 1x, and tall enough for both lines at any text size (D18).
+  static double _rowHeight(TextScaler scaler) =>
+      math.max(_row, scaler.scale(30) + 6);
+
   /// The group's height, which the sidebar's lazy list adds up.
   static double heightFor(
     TextScaler scaler, {
     required int count,
     required bool folded,
-  }) {
-    final header = math.max(_header, scaler.scale(13) + 8);
-    final row = math.max(_row, scaler.scale(13) + scaler.scale(11) + 12);
-    return header + (folded ? 0 : row * count);
-  }
+  }) => _headerHeight(scaler) + (folded ? 0 : _rowHeight(scaler) * count);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,8 +70,8 @@ class ToolSidebarGroup extends ConsumerWidget {
     );
     final dock = ref.watch(toolDockProvider.select((d) => d.of(workspaceId)));
     final embedded = ref.watch(toolsEmbeddedProvider);
-    final header = math.max(_header, scaler.scale(13) + 8);
-    final row = math.max(_row, scaler.scale(13) + scaler.scale(11) + 12);
+    final header = _headerHeight(scaler);
+    final row = _rowHeight(scaler);
     return SizedBox(
       height: heightFor(scaler, count: tools.length, folded: folded),
       child: Column(
