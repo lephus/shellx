@@ -310,7 +310,7 @@ final class AiPhoneHub implements AiEndpoint {
   /// V2-2b B1: what this hub does beyond V2-2a ([AiFeature] words), named in
   /// every listing (`f`). Each feature's task adds its word when the hub and
   /// the window both do it.
-  static const Set<String> offered = {};
+  static const Set<String> offered = {AiFeature.acpHead};
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
   final Set<String> features;

@@ -7,6 +7,7 @@ import '../model/notices.dart';
 import '../model/session_state.dart';
 import '../model/timeline.dart';
 import 'acp_out.dart';
+import 'undo_view.dart';
 import 'wire.dart';
 
 /// The text of a text item (user prompt, agent text, thought); null for
@@ -374,7 +375,28 @@ Map<String, Object?> encodeHead(
           {'text': clipText(e.content, 600), 'st': e.status.wire},
       ],
     'mode': ?mode,
+    // V2-2b §4.2: the agent's own session id (a phone finds the session
+    // again after the computer restarted ShellX, B22), the model, whether
+    // the agent lists its earlier sessions (B17), whether undo works (B19).
+    if (s.sessionId case final acp?) 'acp': clipText(acp, 200),
+    'model': ?_model(s),
+    if (s.capabilities.listSessions) 'hist': true,
+    'undo': aiUndoIsOff(s) ? 'off' : 'on',
   };
+}
+
+/// V2-2b B11: the current model, by id and name — the choice of the option
+/// in the `model` category; null when the agent offers none.
+Map<String, Object?>? _model(AiSessionState s) {
+  for (final o in s.configOptions ?? const <ConfigOption>[]) {
+    if (o.category != 'model') continue;
+    for (final c in o.choices) {
+      if (c.value == o.currentValue) {
+        return {'id': clipText(c.value, 200), 'name': clipText(c.name, 200)};
+      }
+    }
+  }
+  return null;
 }
 
 /// The current mode, by id and name: the phone words Claude's known ids
