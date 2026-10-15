@@ -24,7 +24,11 @@ import '../../terminal/tab_meta.dart';
 import '../../config/config_controller.dart';
 import '../../remote/remote_port_forwards.dart';
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_dock.dart';
+import '../../tools/tool_entry.dart';
+import '../../tools/tool_registry.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../tools/tool_sidebar_group.dart';
 import 'session_tab_row.dart';
 import 'shellx_menu.dart';
 import 'sidebar_new_button.dart';
@@ -168,7 +172,19 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final tabsState = ref.read(terminalTabsProvider);
     final attention = ref.read(tabAttentionProvider);
     final byId = {for (final t in tabsState.tabs) t.id: t};
+    // V2-3 D21: each workspace's tools, after its rows.
+    final toolsByWs = <String, List<ToolEntry>>{};
+    for (final t in ref.read(toolRegistryProvider)) {
+      toolsByWs.putIfAbsent(t.ws, () => []).add(t);
+    }
+    final folded = ref.read(toolGroupsFoldedProvider);
     final items = <_Item>[];
+    void addTools(String ws) {
+      final tools = toolsByWs[ws];
+      if (tools == null) return;
+      items.add(_ToolsItem(ws, tools, folded: folded.contains(ws)));
+    }
+
     for (final w in s.workspaces) {
       final tabs = [for (final id in s.tabsOf(w.id)) ?byId[id]];
       if (s.showHeaders) {
@@ -185,6 +201,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
         if (w.collapsed) continue;
         if (tabs.isEmpty) {
           items.add(_EmptyItem(w.id));
+          addTools(w.id);
           continue;
         }
       }
@@ -200,6 +217,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
           ),
         );
       }
+      addTools(w.id);
     }
     return items;
   }
@@ -209,6 +227,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     _HeaderItem(:final workspace) => ValueKey(('header', workspace.id)),
     _RowItem(:final tab) => ValueKey(('row', tab.id)),
     _EmptyItem(:final workspaceId) => ValueKey(('empty', workspaceId)),
+    _ToolsItem(:final workspaceId) => ValueKey(('tools', workspaceId)),
   };
 
   /// Space above item [i]: 8 above a header (the first item has the
@@ -234,6 +253,11 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       ShellxSizes.emptyWorkspaceRow,
       scaler.scale(ShellxSizes.contextLine) + 16,
     ),
+    _ToolsItem(:final tools, :final folded) => ToolSidebarGroup.heightFor(
+      scaler,
+      count: tools.length,
+      folded: folded,
+    ),
   };
 
   /// What the keyboard walks (D14): headers (workspace ids) and visible
@@ -243,7 +267,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       switch (item) {
         _HeaderItem(:final workspace) => workspace.id,
         _RowItem(:final tab) => tab.id,
-        _EmptyItem() => null,
+        _EmptyItem() || _ToolsItem() => null,
       },
   ].nonNulls.toList();
 
@@ -275,6 +299,12 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
   bool get _showFocus =>
       widget.focusNode.hasPrimaryFocus &&
       FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+
+  /// V2-3 R14: choosing a tab ends a workspace shown without a tab. The
+  /// dock controller sees only a change of the selected tab, and choosing
+  /// the tab already selected is none, so the list's keys end it themselves.
+  /// A move onto a header chooses no tab and leaves it.
+  void _endLoose() => ref.read(toolDockProvider.notifier).clearLoose();
 
   /// UI §3.6 list keys. ↑/↓/Home/End move the selection itself (the
   /// terminal on the right follows; the workspace does not take the focus
@@ -363,12 +393,16 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       switch (key) {
         case LogicalKeyboardKey.arrowDown:
           workspaces.step(1);
+          _endLoose();
         case LogicalKeyboardKey.arrowUp:
           workspaces.step(-1);
+          _endLoose();
         case LogicalKeyboardKey.home:
           workspaces.selectVisible(1);
+          _endLoose();
         case LogicalKeyboardKey.end:
           workspaces.selectVisible(_visibleTabs().length);
+          _endLoose();
         case LogicalKeyboardKey.enter ||
             LogicalKeyboardKey.numpadEnter ||
             LogicalKeyboardKey.space:
@@ -394,6 +428,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       } else {
         setState(() => _headerCursor = null);
         ref.read(terminalTabsProvider.notifier).select(target as int);
+        _endLoose();
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(target));
     }
@@ -494,7 +529,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
       final matches = switch (item) {
         _HeaderItem(:final workspace) => workspace.id == target,
         _RowItem(:final tab) => tab.id == target,
-        _EmptyItem() => false,
+        _EmptyItem() || _ToolsItem() => false,
       };
       if (matches) {
         found = top;
@@ -1410,6 +1445,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
     final state = ref.watch(terminalTabsProvider);
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final home = ref.watch(homeDirectoryProvider);
+    // V2-3 D21: the tool rows follow the tools and their folding.
+    ref.watch(toolRegistryProvider);
+    ref.watch(toolGroupsFoldedProvider);
     // A8: rows' port tooltips say whether a server's port is forwarded.
     ref.watch(remotePortForwardsProvider);
     registerRowActionOrder(l10n);
@@ -1813,6 +1851,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               padding: EdgeInsets.only(top: gap, left: indent),
               child: empty(item),
             ),
+            _ToolsItem(:final workspaceId, :final tools) => Padding(
+              padding: EdgeInsets.only(top: gap, left: indent),
+              child: ToolSidebarGroup(workspaceId: workspaceId, tools: tools),
+            ),
           },
         );
       },
@@ -1898,9 +1940,9 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             descendantsAreTraversable: false,
             child: const AiIntroCard(),
           ),
-          // V2-1 D5: "New AI session" at the foot of the sidebar. Not a Tab
-          // stop (⌘⇧E is the keyboard's way): Tab keeps going sidebar →
-          // strip → terminal.
+          // V2-1 D5: "New AI session" at the foot of the sidebar, and V2-3
+          // D21 "Add tool" beside it. Not Tab stops (⌘⇧E and the palette are
+          // the keyboard's ways): Tab keeps going sidebar → strip → terminal.
           FocusTraversalGroup(
             descendantsAreTraversable: false,
             child: Padding(
@@ -1910,22 +1952,51 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                 ShellxSpace.s8,
                 ShellxSpace.s8,
               ),
-              child: Tooltip(
-                message: switch (newAiSessionShortcutLabel()) {
-                  final shortcut? => l10n.aiNewSessionTooltip(shortcut),
-                  null => l10n.aiNewSession,
-                },
-                child: TextButton.icon(
-                  key: const Key('sidebar.newAi'),
-                  style: TextButton.styleFrom(
-                    alignment: Alignment.centerLeft,
-                    foregroundColor: ShellxDesktopColors.textSecondary,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Tooltip(
+                      message: switch (newAiSessionShortcutLabel()) {
+                        final shortcut? => l10n.aiNewSessionTooltip(shortcut),
+                        null => l10n.aiNewSession,
+                      },
+                      child: TextButton.icon(
+                        key: const Key('sidebar.newAi'),
+                        style: TextButton.styleFrom(
+                          alignment: Alignment.centerLeft,
+                          foregroundColor: ShellxDesktopColors.textSecondary,
+                        ),
+                        onPressed: () => Actions.maybeInvoke(
+                          context,
+                          const NewAiSessionIntent(),
+                        ),
+                        icon: const Icon(Icons.auto_awesome, size: 14),
+                        label: Text(
+                          l10n.aiNewSession,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () =>
-                      Actions.maybeInvoke(context, const NewAiSessionIntent()),
-                  icon: const Icon(Icons.auto_awesome, size: 14),
-                  label: Text(l10n.aiNewSession),
-                ),
+                  Flexible(
+                    child: TextButton.icon(
+                      key: const Key('sidebar.addTool'),
+                      style: TextButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        foregroundColor: ShellxDesktopColors.textSecondary,
+                      ),
+                      onPressed: () =>
+                          Actions.maybeInvoke(context, const AddToolIntent()),
+                      icon: const Icon(Icons.extension_outlined, size: 14),
+                      label: Text(
+                        l10n.toolAdd,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -2004,4 +2075,12 @@ final class _RowItem extends _Item {
 final class _EmptyItem extends _Item {
   const _EmptyItem(this.workspaceId);
   final String workspaceId;
+}
+
+/// V2-3 D21: a workspace's "Tools" group, after its rows.
+final class _ToolsItem extends _Item {
+  const _ToolsItem(this.workspaceId, this.tools, {required this.folded});
+  final String workspaceId;
+  final List<ToolEntry> tools;
+  final bool folded;
 }
