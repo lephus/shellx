@@ -483,7 +483,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Sign out'), 200);
+    await tester.scrollUntilVisible(find.text('Sign out').hitTestable(), 200);
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
@@ -556,7 +556,7 @@ void main() {
     await signIn(tester);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Delete account'), 200);
+    await tester.scrollUntilVisible(find.text('Delete account').hitTestable(), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
@@ -577,7 +577,7 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     relay.logoutGate = Completer<void>();
-    await tester.scrollUntilVisible(find.text('Sign out'), 200);
+    await tester.scrollUntilVisible(find.text('Sign out').hitTestable(), 200);
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
@@ -600,7 +600,7 @@ void main() {
     await signIn(tester);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Sign out'), 200);
+    await tester.scrollUntilVisible(find.text('Sign out').hitTestable(), 200);
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
