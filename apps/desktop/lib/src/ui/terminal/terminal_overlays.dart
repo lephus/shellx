@@ -608,7 +608,8 @@ class _NoticeToastState extends State<NoticeToast> {
       widget.notice is RestorePanesFailedNotice ||
       widget.notice is CliSkillsCopiedNotice ||
       widget.notice is CliPathInstalledNotice ||
-      widget.notice is SshRecentClearedNotice;
+      widget.notice is SshRecentClearedNotice ||
+      widget.notice is ToolUnloadedNotice;
 
   /// A fresh 6 s (4 s when neutral), unless the pointer or the keyboard is
   /// on the toast.
@@ -697,6 +698,7 @@ class _NoticeToastState extends State<NoticeToast> {
     RemotePortForwardFailedNotice(:final port) => l10n.remotePortForwardFailed(
       port,
     ),
+    ToolUnloadedNotice(:final name) => l10n.toolTooMany(name),
   };
 
   @override

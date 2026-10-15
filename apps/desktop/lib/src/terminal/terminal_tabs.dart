@@ -132,6 +132,14 @@ final class LinkOpenFailedNotice extends TabNotice {
   const LinkOpenFailedNotice();
 }
 
+/// V2-3 D5: a ninth live tool page unloaded the one unseen longest; its chip
+/// stays (a click loads it again). [name] is the tool's name, shown only
+/// in the toast. Neutral toast.
+final class ToolUnloadedNotice extends TabNotice {
+  const ToolUnloadedNotice(this.name);
+  final String name;
+}
+
 /// A10 D15–D17: why a drop or an image paste did nothing.
 enum InputNoticeKind {
   dropSsh,
