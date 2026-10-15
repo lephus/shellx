@@ -194,4 +194,18 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(other.getStrings(SettingKeys.workspaceTools), hasLength(3));
   });
+
+  test('ToolDocks.toString() shows a count only (D24)', () {
+    final ws2 = c.read(sidebarWorkspacesProvider.notifier).createFor(name: 'B');
+    final a = add(kDefaultWorkspaceId, 1), b = add(ws2, 2);
+    dock().open(kDefaultWorkspaceId, a.id);
+    dock().open(ws2, b.id);
+    dock().showLoose(ws2);
+    expect(docks().byWorkspace, hasLength(2));
+    final text = docks().toString();
+    expect(text, 'ToolDocks(2)');
+    for (final id in [kDefaultWorkspaceId, ws2, a.id, b.id]) {
+      expect(text, isNot(contains(id)));
+    }
+  });
 }
