@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
@@ -167,5 +168,46 @@ void main() {
         .restoreAtStartup(RestoreLoad(snapshot: written));
     final dock = c.read(toolDockProvider).of(kDefaultWorkspaceId);
     expect([dock.open, dock.active, dock.width], [true, t.id, 0.5]);
+  });
+
+  test('a dock change alone schedules a write (D14)', () {
+    fakeAsync((async) {
+      c.read(restorePersistenceProvider.notifier).start();
+      final t = add(5173);
+      final dock = c.read(toolDockProvider.notifier);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, isEmpty); // a tool alone is not in the layout
+
+      // Opened: written 1 s after the change, not before.
+      dock.open(kDefaultWorkspaceId, t.id);
+      async.elapse(const Duration(milliseconds: 999));
+      expect(files.layouts, isEmpty);
+      async.elapse(const Duration(milliseconds: 2));
+      expect(files.layouts, hasLength(1));
+      expect(files.layouts.last.toolDock[kDefaultWorkspaceId]!.open, isTrue);
+
+      // Resized, zoomed: each is a layout change of its own.
+      dock.setWidth(kDefaultWorkspaceId, 0.6);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(2));
+      expect(files.layouts.last.toolDock[kDefaultWorkspaceId]!.width, 0.6);
+      dock.setZoom(kDefaultWorkspaceId, true);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(3));
+      expect(files.layouts.last.toolDock[kDefaultWorkspaceId]!.zoom, isTrue);
+
+      // Back to the default: the key leaves the file.
+      dock.closeTool(kDefaultWorkspaceId, t.id);
+      dock.setWidth(kDefaultWorkspaceId, 0.45);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(4));
+      expect(files.layouts.last.toolDock, isEmpty);
+      expect(files.layouts.last.encode(), isNot(contains('toolDock')));
+
+      // Nothing changed: nothing is written.
+      dock.close(kDefaultWorkspaceId);
+      async.elapse(const Duration(seconds: 2));
+      expect(files.layouts, hasLength(4));
+    });
   });
 }
