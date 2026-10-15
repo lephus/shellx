@@ -150,21 +150,36 @@ void main() {
 
     testWidgets('one message carries 20 MB of images at most, counting what is already in the row (F34): the photo '
         'that would pass it stays out, and the composer says why', (tester) async {
-      Uint8List jpegOf(int length) => Uint8List(length)..setAll(0, [0xFF, 0xD8, 0xFF]);
-      photos.photos = [jpegOf(8 << 20), jpegOf(8 << 20), jpegOf(8 << 20)];
+      photos.photos = [jpegOfSize(8 << 20), jpegOfSize(8 << 20), jpegOfSize(8 << 20)];
       await open(tester);
       await attach(tester);
       expect(find.byKey(const Key('ai.image.1')), findsOneWidget);
       expect(find.byKey(const Key('ai.image.2')), findsNothing, reason: 'the third would make 24 MB');
       expect(find.text('Một tin chỉ mang được tối đa 20 MB ảnh.'), findsOneWidget);
-      photos.photos = [jpegOf(5 << 20)];
+      photos.photos = [jpegOfSize(5 << 20)];
       await attach(tester);
       expect(find.byKey(const Key('ai.image.2')), findsNothing, reason: '16 MB are in the row: 5 MB more pass 20');
       expect(find.text('Một tin chỉ mang được tối đa 20 MB ảnh.'), findsOneWidget);
-      photos.photos = [jpegOf(4 << 20)];
+      photos.photos = [jpegOfSize(4 << 20)];
       await attach(tester);
       expect(find.byKey(const Key('ai.image.2')), findsOneWidget, reason: '16 + 4 are exactly 20 MB');
       expect(find.text('Một tin chỉ mang được tối đa 20 MB ảnh.'), findsNothing);
+    });
+
+    testWidgets('the photos go up without their metadata, the place they were taken included (F38)', (tester) async {
+      final plain = jpegOfSize(40);
+      final located = [...'Exif\u0000\u0000'.codeUnits, ...'GPSLatitude 37.77N GPSLongitude 122.41W'.codeUnits];
+      final photo = Uint8List.fromList([
+        ...plain.sublist(0, 2), // SOI
+        0xFF, 0xE1, (located.length + 2) >> 8, (located.length + 2) & 0xFF, ...located, // an Exif with a location
+        ...plain.sublist(2),
+      ]);
+      expect(photo.length, greaterThan(plain.length));
+      photos.photos = [photo];
+      await open(tester);
+      await attach(tester);
+      await send(tester);
+      expect(machine.ai.uploads.single.$3, plain.length, reason: 'what goes up is the picture alone');
     });
 
     testWidgets('a picker that fails (camera refused) says so, and nothing changes', (tester) async {
@@ -233,6 +248,38 @@ void main() {
       expect(machine.ai.promptBlobs.single, [2]);
       expect(find.byKey(const Key('ai.composer.note')), findsNothing);
     });
+
+    // F39: the note of an upload that did not go is gone once the next Send is on its way. That Send's images went
+    // up, so what stops its message after them is the popup's to say alone: "Retry" would invite a resend of a
+    // message that may have landed (D13), or of one that can never go.
+    for (final (label, fail, said) in <(String, void Function(FakeAiMachine), String)>[
+      ('a computer too busy', (ai) => ai.failWith = 'busy', 'Quá nhiều yêu cầu cùng lúc. Chờ một lát rồi thử lại.'),
+      (
+        'a channel lost',
+        (ai) => ai.connectFailure = MachineConnectionFailure.agentOffline,
+        'Có thể chưa gửi được — kết nối bị gián đoạn. Hãy xem lại phiên trước khi thử lại.',
+      ),
+      ('an agent that takes no images', (ai) => ai.failWith = 'no_images', 'Claude không nhận ảnh.'),
+    ]) {
+      testWidgets('an upload failed, then the retried images got through and the message failed ($label): the '
+          'note is gone, only the popup speaks (F39)', (tester) async {
+        photos.photos = [kTinyPng];
+        machine.ai.uploadError = const MachineConnectionException(MachineConnectionFailure.agentOffline);
+        await open(tester);
+        await attach(tester);
+        await type(tester, 'Xem giúp');
+        await send(tester);
+        expect(tester.widget<Text>(find.byKey(const Key('ai.composer.note'))).data, 'Ảnh chưa gửi được. Thử lại');
+        machine.ai.uploadError = null;
+        fail(machine.ai);
+        await send(tester);
+        expect(machine.ai.uploads, hasLength(2), reason: 'the images of the second Send went up');
+        expect(find.byKey(const Key('ai.composer.note')), findsNothing);
+        expect(popups.errors.last, said);
+        expect(field(tester), 'Xem giúp');
+        expect(find.byKey(const Key('ai.image.0')), findsOneWidget);
+      });
+    }
 
     testWidgets('an agent that takes no images: said with its name, and nothing is lost', (tester) async {
       photos.photos = [kTinyPng];

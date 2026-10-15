@@ -11,6 +11,18 @@ final Uint8List kTinyPng = Uint8List.fromList(const [
   0xae, 0x42, 0x60, 0x82,
 ]);
 
+/// A JPEG of exactly [length] bytes (at least 19) that is no picture but walks like one: SOI, a quantization table,
+/// the scan header, zeros for the scan and EOI. For tests of sizes: the composer takes only images whose structure
+/// it can walk, to remove their metadata (V2-2b F38), and counts their bytes after that.
+Uint8List jpegOfSize(int length) {
+  const head = [0xFF, 0xD8, 0xFF, 0xDB, 0x00, 0x03, 0x00, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00];
+  const tail = [0xFF, 0xD9];
+  assert(length >= head.length + tail.length, 'too short for a JPEG that walks');
+  return Uint8List(length)
+    ..setAll(0, head)
+    ..setAll(length - tail.length, tail);
+}
+
 /// The phone's photos in tests (V2-2b B12): what the library and the camera give, every call recorded.
 class FakeAiImageSource implements AiImageSource {
   /// What the library gives (the first `limit` of them).
