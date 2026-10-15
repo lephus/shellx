@@ -159,6 +159,21 @@ void main() {
       expect(tool.hits, isEmpty);
     });
 
+    test('a target that becomes "//host" once its URL is built (dot '
+        'segments): bad_request, nothing reaches the tool', () async {
+      await setUpWith();
+      final ids = [
+        phone.request(_id, target: '/a/../..//evil.com/x'),
+        phone.request(_id, target: '/%2e%2e//evil.com/x'),
+      ];
+      await pumpEventQueue();
+      for (final id in ids) {
+        expect(phone.endOf(id)?.code, 'bad_request', reason: 'stream $id');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(tool.hits, isEmpty);
+    });
+
     test('a foreign Host is replaced with the tool\'s; hop-by-hop, '
         'forwarding headers and the gate cookie are dropped; cookies are '
         'joined', () async {
@@ -437,6 +452,48 @@ void main() {
       await phone.ended(id);
       expect(phone.endOf(id)?.code, 'aborted');
     });
+
+    test('a stream quiet for longer than the idle limit is timed from its '
+        'next piece, not from its last ack (SSE, an idle WebSocket)', () async {
+      final again = Completer<void>();
+      final done = Completer<void>();
+      await setUpWith(
+        routes: {
+          '/quiet': (request) async {
+            request.response
+              ..bufferOutput = false
+              ..add(Uint8List(10));
+            await request.response.flush();
+            await again.future;
+            request.response.add(Uint8List(10));
+            await request.response.flush();
+            await done.future;
+            await request.response.close();
+          },
+        },
+        withProxy: ToolProxy(idleTimeout: const Duration(milliseconds: 600)),
+      );
+      phone.autoAck = false;
+      final id = phone.request(_id, target: '/quiet');
+      await until(() => phone.body(id).length == 10);
+      phone.ackAll();
+      // Nothing in flight for longer than the limit: nothing to time.
+      await Future<void>.delayed(const Duration(seconds: 1));
+      again.complete();
+      await until(() => phone.body(id).length == 20);
+      // In flight for less than the limit, over an idle check (every 150 ms).
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(
+        phone.endOf(id),
+        isNull,
+        reason: 'not stalled, just sent; ended ${phone.endOf(id)?.code}',
+      );
+      phone.ackAll();
+      done.complete();
+      await phone.ended(id);
+      expect(phone.endOf(id), isNull);
+      expect(phone.body(id).length, 20);
+    });
   });
 
   group('alias mode (E3): the phone serves on another port', () {
@@ -551,6 +608,21 @@ void main() {
         'path': '/',
         'group': 'ws:a',
       });
+    });
+
+    test('a phone that listed before the window said hears when it does, '
+        'even an empty list; and when it stops', () async {
+      tool = await TestTool.start();
+      proxy = ToolProxy();
+      phone = ToolPhone(proxy);
+      phone.send(const ToolList());
+      proxy.serve(catalogOf([])); // the same bytes as "no list yet"
+      proxy.serve(null);
+      await pumpEventQueue();
+      expect(
+        phone.messages.whereType<ToolListResult>().map((l) => l.available),
+        [false, true, false],
+      );
     });
 
     test('open: refused while nothing listens; then the tool and its '
