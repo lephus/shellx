@@ -222,6 +222,7 @@ void main() {
     List<Map<String, Object?>> Function(TestTool tool)? catalog,
     List<Duration> retry = kToolRetryDelays,
     Duration headTimeout = kToolHeadTimeout,
+    Duration nonceLife = const Duration(seconds: 10),
   }) async {
     opened = true;
     proxy = ToolProxy(connect: connectTestTool, headTimeout: headTimeout);
@@ -233,6 +234,7 @@ void main() {
       path: '/',
       link: pipe.tools,
       retryDelays: retry,
+      nonceLife: nonceLife,
     );
     events = [];
     session.events.listen(events.add);
@@ -250,10 +252,16 @@ void main() {
     List<Map<String, Object?>> Function(TestTool tool)? catalog,
     List<Duration> retry = kToolRetryDelays,
     Duration headTimeout = kToolHeadTimeout,
+    Duration nonceLife = const Duration(seconds: 10),
   }) async {
     opened = true;
     tool = await TestTool.samePort(routes: routes);
-    await openPage(catalog: catalog, retry: retry, headTimeout: headTimeout);
+    await openPage(
+      catalog: catalog,
+      retry: retry,
+      headTimeout: headTimeout,
+      nonceLife: nonceLife,
+    );
   }
 
   Uri at(String path, {int? port}) =>
@@ -333,8 +341,8 @@ void main() {
       expect(again.status, 403);
     });
 
-    test('without the cookie, with another Host, or with an expired entry: '
-        '403, and nothing reaches the tool', () async {
+    test('without the cookie, with another Host, or from another app: 403, '
+        'and nothing reaches the tool', () async {
       await openSamePort();
       expect((await webview.request(at('/'))).status, 403);
       await webview.enter(events.whereType<ToolLoad>().single.url);
@@ -1189,6 +1197,87 @@ void main() {
       expect(answer.headers['content-security-policy'], [
         toolContentSecurityPolicy([port]),
       ]);
+      expect(tool.hits, isEmpty);
+    });
+  });
+
+  /// Review I4 (RF 5): the gate's secret, the entry's life and its two
+  /// exemptions are each pinned: another app on the phone gets nothing
+  /// through.
+  group('the gate\'s own checks (I4, RF 5)', () {
+    test('a gate cookie with the right name and a wrong value: 403, and '
+        'nothing reaches the tool', () async {
+      await openSamePort();
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      tool.hits.clear();
+      final port = session.servedPort!;
+      final name = toolGateCookieName(port);
+      final right = webview.cookies[name]!;
+      final wrong = '${right.substring(1)}${right[0] == 'A' ? 'B' : 'A'}';
+      final answer = await webview.request(
+        at('/'),
+        withCookies: false,
+        headers: {'cookie': '$name=$wrong'},
+      );
+      expect(answer.status, 403);
+      expect(tool.hits, isEmpty);
+    });
+
+    test('an entry used after its life (zero here): 403, no gate cookie, '
+        'and nothing reaches the tool', () async {
+      await openSamePort(nonceLife: Duration.zero);
+      final entry = await webview.request(
+        events.whereType<ToolLoad>().single.url,
+      );
+      expect(entry.status, 403);
+      expect(entry.headers['set-cookie'], isNull);
+      expect((await webview.request(at('/'))).status, 403);
+      expect(tool.hits, isEmpty);
+    });
+
+    test('a request without the cookie passes only as a CORS preflight of a '
+        'served origin: OPTIONS from another origin, or without '
+        'Access-Control-Request-Method, gets 403 and nothing reaches the '
+        'tool (R6)', () async {
+      await openSamePort();
+      final port = session.servedPort!;
+      final foreign = await webview.request(
+        at('/'),
+        method: 'OPTIONS',
+        withCookies: false,
+        headers: {
+          'origin': 'http://evil.com',
+          'access-control-request-method': 'POST',
+        },
+      );
+      expect(foreign.status, 403);
+      final notPreflight = await webview.request(
+        at('/'),
+        method: 'OPTIONS',
+        withCookies: false,
+        headers: {'origin': 'http://localhost:$port'},
+      );
+      expect(notPreflight.status, 403);
+      expect(tool.hits, isEmpty);
+    });
+
+    test('a WebSocket upgrade with the cookie from another origin, or '
+        'cross-site: 403, and nothing reaches the tool', () async {
+      await openSamePort();
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      tool.hits.clear();
+      final port = session.servedPort!;
+      final upgrade = _upgrade(port, '/ws', webview.cookieHeader);
+      final foreign = await _rawHead(port, [
+        for (final line in upgrade)
+          line.startsWith('origin:') ? 'origin: http://evil.com' : line,
+      ]);
+      expect(foreign.first, startsWith('HTTP/1.1 403'));
+      final crossSite = await _rawHead(port, [
+        ...upgrade,
+        'sec-fetch-site: cross-site',
+      ]);
+      expect(crossSite.first, startsWith('HTTP/1.1 403'));
       expect(tool.hits, isEmpty);
     });
   });
