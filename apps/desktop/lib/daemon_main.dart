@@ -13,6 +13,7 @@ import 'src/agent/agent_bridge_impl.dart';
 import 'src/agent/agent_controller_base.dart';
 import 'src/agent/agent_side.dart';
 import 'src/agent/daemon_ai.dart';
+import 'src/agent/daemon_tools.dart';
 import 'src/agent/desktop_services.dart';
 import 'src/cli/cli_host_control.dart';
 import 'src/cli/cli_install.dart';
@@ -32,7 +33,8 @@ import 'src/remote/remote_tools_provider.dart';
 import 'src/startup.dart';
 
 /// What the daemon tells a client about itself (`hello.caps`, additive).
-const kDaemonCaps = ['agent', 'cli'];
+/// `tools` (V2-4 E5): it hosts the tool proxy and takes `tool.serve`.
+const kDaemonCaps = ['agent', 'cli', 'tools'];
 
 /// The `shellx-mux` entry point (A5b D2/D3): started by the native runner
 /// on a headless engine, never through `main()`, so it takes no arguments.
@@ -156,6 +158,8 @@ Future<void> _serve({
   );
   // V2-2 D1: phones' AI messages go to the attached window that serves AI.
   installDaemonAi(server, core);
+  // V2-4 E5: tools are served here, from the window's last list.
+  final tools = installDaemonTools(server, core);
   final cli = CliHost.adopted(
     ui: server.uiApi,
     enabled: () =>
@@ -193,7 +197,7 @@ Future<void> _serve({
     // A connected `cli` client is not a UI, but it delays the idle exit.
     hasSessions: () => core.sessions.sessions.isNotEmpty || cli.clientCount > 0,
     servingPhones: servingPhones,
-    shutdown: () => _shutdown(container, cli, side),
+    shutdown: () => _shutdown(container, cli, side, tools),
     exit: exit,
     log: (m) => debugPrint(m),
   );
@@ -225,6 +229,7 @@ Future<void> _shutdown(
   ProviderContainer container,
   CliHost cli,
   AgentSide side,
+  ToolProxy tools,
 ) async {
   await runBounded(
     cli.stop,
@@ -244,4 +249,5 @@ Future<void> _shutdown(
       label: 'closing the ssh masters',
     );
   }
+  tools.close(); // its streams and its connections to the tools
 }

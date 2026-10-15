@@ -164,6 +164,7 @@ final class CoreAgentRuntime implements AgentRuntime {
       desktop: _desktopSessions,
       desktopSharing: () => _sharing?.enabled ?? false,
       ai: core.ai,
+      tools: core.tools,
     );
     _pairing = PairingCodeManager(now: _now);
     _service = AgentService(
